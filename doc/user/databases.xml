@@ -678,7 +678,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 for bitwise exclusive OR (XOR), <quote>:</quote>
                 for string splice, <quote>!</quote> for insert,
                 <quote>#</quote> for delete.
-                Thus in the instruction <code>s:update{44,, {{'+,1,55},{=',3,'x'}})</code>
+                Thus in the instruction <code>s:update(44, {{'+',1,55},{'=',3,'x'}})</code>
                 the primary-key value is 44,
                 the operators are '+' and '='
                 meaning "add a value to a field
@@ -981,6 +981,43 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
 ... </programlisting>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Insert a new tuple using an auto-increment primary key.
+                The space specified by space-name must have a
+                NUM primary key index of type TREE.
+                The primary-key field will be incremented before the insert.
+            </para>
+            <para>
+               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values for the tuple's fields,
+               other than the primary-key field.
+            </para>
+            <para>
+               Returns: (type = tuple) the inserted tuple.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
+               Possible errors: index has wrong type or primary-key indexed field is not a number.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool> <userinput>box.space.tester:auto_increment{'Fld#1', 'Fld#2'}</userinput>
+---
+- [1, 'Fld#1', 'Fld#2']
+...
+tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
+---
+- [2, 'Fld#3']
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
 
     <varlistentry>
         <term>
@@ -1014,39 +1051,6 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
         </listitem>
     </varlistentry>
 
-    <varlistentry>
-        <term xml:id="on_replace">
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:on_replace(<replaceable>function-name</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create a "replace trigger". The <code>function-name</code> will be executed whenever a replace() or insert() happens to <code>space-name</code>.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-             Notes: A replace trigger can be temporarily disabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(false)</code>
-             and re-enabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(true)</code>.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following series of requests will create a space, create an index,
-              create a function which increments a counter, create a trigger,
-              do two inserts, drop the space, and display the counter value -- which is 2,
-              because the function is executed once after each insert.
-<programlisting>s = box.schema.space.create('space53')
-s:create_index('primary', {parts = {1, 'NUM'}})
-function replace_trigger() replace_counter = replace_counter + 1 end
-s:on_replace(replace_trigger)
-replace_counter = 0
-t = s:insert{1, 'First replace'}
-t = s:insert{2, 'Second replace'}
-s:drop()
-replace_counter</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
     
     <varlistentry>
         <term>
@@ -1634,42 +1638,6 @@ The result will be a table of tuples and will look like this:
         </listitem>
     </varlistentry>
 
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Insert a new tuple using an auto-increment primary key.
-                The space specified by space-name must have a
-                NUM primary key index of type TREE.
-                The primary-key field will be incremented before the insert.
-            </para>
-            <para>
-               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values for the tuple's fields,
-               other than the primary-key field.
-            </para>
-            <para>
-               Returns: (type = tuple) the inserted tuple.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
-            </para>
-            <para>
-               Possible errors: index has wrong type or primary-key indexed field is not a number.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.space.tester:auto_increment{'Fld#1', 'Fld#2'}</userinput>
----
-- [1, 'Fld#1', 'Fld#2']
-...
-tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
----
-- [2, 'Fld#3']
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
 </variablelist>
 
 <bridgehead renderas="sect4">Example showing use of the box functions</bridgehead>
@@ -1733,7 +1701,7 @@ console.delimiter('')!
 </section>
 
 <section xml:id="RTREE">
-    <title>RTREE</title>
+    <title>Package <code >box.index</code> with index type = RTREE for spatial searches</title>
     <para>
         The <code>box.index</code> package may be used for spatial searches
         if the index type is RTREE. There are operations for searching
@@ -3240,8 +3208,9 @@ or
 
 <para>
 The function for revoking a privilege is:
-<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>.
-</para>
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>
+or
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.</para>
 
 <para>
 For example, here is a session where the admin user gave

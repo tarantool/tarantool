@@ -137,6 +137,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 85 */_(ER_INDEX_EXISTS,		2, "Index '%s' already exists") \
 	/* 86 */_(ER_TUPLE_REF_OVERFLOW,	1, "Tuple reference counter overflow") \
 	/* 87 */_(ER_ROLE_LOOP,			2, "Granting role '%s' to role '%s' would create a loop") \
+	/* 88 */_(ER_GRANT,			2, "Incorrect grant arguments: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

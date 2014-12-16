@@ -183,7 +183,7 @@ Starting  ARG
   <para>
     The following tables describe all parameters for basic operation,
     for storage, for binary logging and snapshots, for replication,
-    for networking, for logging, and for hot standby.
+    for networking, and for logging.
   </para>
 
   <table frame='all' pgwide='1'>
@@ -246,8 +246,8 @@ Starting  ARG
         </row>
         <row>
           <entry xml:id="core-dump" xreflabel="core-dump">coredump</entry>
-          <entry>0 or 1</entry>
-          <entry>0</entry>
+          <entry>boolean</entry>
+          <entry>false</entry>
           <entry>no</entry>          
           <entry>Deprecated. Do not use.</entry>
         </row>
@@ -700,33 +700,22 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
     </tgroup>
   </table>
 
-  <table frame='all' pgwide='1'>
-    <title>Hot Standby</title>
-    <tgroup cols='5' colsep='1' rowsep='1'>
-      <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="5" colname="col4" colwidth="6*"/>
+</section>
 
-      <thead>
-        <row>
-          <entry>Name</entry>
-          <entry>Type</entry>
-          <entry>Default</entry>
-          <entry>Dynamic?</entry>
-          <entry>Description</entry>
-        </row>
-      </thead>
+<section xml:id="local_hot_standby" xreflabel="local_hot_standby">
+<title>Local hot standby</title>
 
-      <tbody>
-
-        <row>
-          <entry>local_hot_standby</entry>
-          <entry>boolean</entry>
-          <entry>true</entry>
-          <entry>no</entry>
-          <entry>
-            <anchor xml:id="local_hot_standby" xreflabel="local_hot_standby"/>
-          In version 1.6 local hot standby is always on so this is a legacy setting.
-          When local_hot_standby=true, the expectation is that there will be two
+          <para>
+          Local hot standby is a feature which provides a simple form of failover without replication.
+          To initiate it, start a second instance of the Tarantool server on the same computer with
+          the same <code>box.cfg</code> configuration settings -- including the same directories and same URIs.
+          A warning should appear with a message like
+          "W> primary: [URI] is already in use, will retry binding after [n] seconds".
+          This is fine.
+          It means that the second instance is ready to take over if the first instance goes down.
+          </para>
+          <para>
+          The expectation is that there will be two
           instances of the server using the same configuration.
           The first one to start will be the "primary" instance.
           The second one to start will be the "standby" instance.
@@ -740,15 +729,14 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           the ports will become free so the standby instance will
           succeed in connecting, and will become the primary instance.
           Thus there is no noticeable downtime if the primary instance goes down.
-          When local_hot_standby=true, replication_source should be an
+          </para>
+          <para>
+          If this local_hot_standby feature is being used, then replication_source should be an
           empty string and wal_mode should not be equal to "none".
-          </entry>
-        </row>
-      </tbody>
-    </tgroup>
-  </table>
-  
+         </para>
+
 </section>
+
 </chapter>
 
 <!--

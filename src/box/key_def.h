@@ -32,6 +32,8 @@
 #include "salad/rlist.h"
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
+#define RB_COMPACT 1
+#include "third_party/rb.h"
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>
@@ -355,6 +357,8 @@ struct priv_def {
 	 * revoked.
 	 */
 	uint8_t access;
+	/** To maintain a set of effective privileges. */
+	rb_node(struct priv_def) link;
 };
 
 /**

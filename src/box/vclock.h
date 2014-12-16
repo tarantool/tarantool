@@ -47,6 +47,7 @@ enum { VCLOCK_MAX = 16 };
 /** Cluster vector clock */
 struct vclock {
 	int64_t lsn[VCLOCK_MAX];
+	/** To order binary logs by vector clock. */
 	rb_node(struct vclock) link;
 };
 
