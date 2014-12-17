@@ -119,7 +119,7 @@ box.schema.role.grant("role2", "role10")
 
 --
 -- test grant propagation
--- 
+--
 box.schema.role.grant("role1", "read", "universe")
 box.session.su("user")
 box.space._space.index.name:get{"_space"}[3]
@@ -228,7 +228,7 @@ box.schema.role.drop("role9")
 box.schema.role.drop("role10")
 
 
--- 
+--
 -- only the creator of the role can grant it (or a superuser)
 -- There is no grant option.
 -- the same applies for privileges
@@ -255,15 +255,15 @@ box.schema.role.grant('grantee', 'role')
 box.schema.role.grant('grantee', 'read', 'space', 'test')
 --
 -- granting 'public' is however an exception - everyone
--- can grant 'public' role, it's implicitly granted with 
+-- can grant 'public' role, it's implicitly granted with
 -- a grant option.
--- 
+--
 box.schema.role.grant('grantee', 'public')
--- 
--- revoking role 'public' is another deal - only the 
+--
+-- revoking role 'public' is another deal - only the
 -- superuser can do that, and even that would be useless,
 -- since one can still re-grant it back to oneself.
--- 
+--
 box.schema.role.revoke('grantee', 'public')
 
 box.session.su('admin')
@@ -272,3 +272,34 @@ box.schema.user.drop('user')
 box.schema.user.drop('grantee')
 box.schema.role.drop('role')
 box.space.test:drop()
+
+--
+-- grant a privilege through a role, but
+-- the user has another privilege either granted
+-- natively (one case) or via another role.
+-- Check that privileges actually OR, but
+-- not replace each other.
+--
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('primary')
+box.schema.user.create('john')
+box.schema.user.grant('john', 'read', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{1}
+box.session.su('admin')
+box.schema.role.grant('public', 'write', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{2}
+box.session.su('admin')
+box.schema.role.revoke('public', 'write', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{1}
+box.session.su('admin')
+box.space.test:drop()
+box.schema.user.drop('john')
+
+-- test ER_GRANT
+box.space._priv:insert{1, 0, 'universe', 0, 0}
