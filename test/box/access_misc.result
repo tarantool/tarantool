@@ -320,6 +320,9 @@ s:drop()
 box.schema.user.create('testuser')
 ---
 ...
+maxuid = box.space._user.index.primary:max()[1]
+---
+...
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 ---
 ...
@@ -337,12 +340,12 @@ box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
-uid = box.space._user:insert{4, session.uid(), 'someone', 'user'}[1]
+uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user'}[1]
 ---
 ...
-box.space._user:delete(4)
+box.space._user:delete(uid)
 ---
-- [4, 3, 'someone', 'user']
+- [5, 4, 'someone', 'user']
 ...
 session.su('admin')
 ---
@@ -375,7 +378,7 @@ box.space._user:select(1)
 ---
 - - [1, 1, 'admin', 'user']
 ...
-box.space._user:insert{4,session.uid(),'someone2', 'user'}
+box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 ---
 - error: Write access denied for user 'testuser' to space '_user'
 ...
@@ -570,6 +573,7 @@ box.space._user:select()
 - - [0, 1, 'guest', 'user']
   - [1, 1, 'admin', 'user']
   - [2, 1, 'public', 'role']
+  - [3, 1, 'replication', 'role']
 ...
 box.space._space:select()
 ---

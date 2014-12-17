@@ -1,5 +1,5 @@
 --# set connection default
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'replication')
 --# create server hot_standby with script='replication/hot_standby.lua', rpl_master=default
 --# create server replica with rpl_master=default, script='replication/replica.lua'
 --# start server hot_standby

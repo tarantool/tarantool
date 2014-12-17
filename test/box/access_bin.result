@@ -170,7 +170,7 @@ box.schema.user.drop('test')
 ...
 c.space.test:insert{1}
 ---
-- error: User '3' is not found
+- error: User '4' is not found
 ...
 c:close()
 ---

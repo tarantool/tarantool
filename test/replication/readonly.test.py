@@ -6,7 +6,7 @@ from lib.tarantool_server import TarantoolServer
 master = server
 master_id = master.get_param('server')['id']
 
-master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
