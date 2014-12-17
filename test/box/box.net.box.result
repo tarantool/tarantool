@@ -141,7 +141,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:229: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:226: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -706,13 +706,10 @@ con.space.test == nil
 ...
 con:reload_schema()
 ---
-- error: '[string "return con:reload_schema() "]:1: attempt to call method ''reload_schema''
-    (a nil value)'
 ...
 con.space.test:select{}
 ---
-- error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
-    (a nil value)'
+- - [2, 3, 4]
 ...
 box.space.test:drop()
 ---
