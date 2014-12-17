@@ -212,3 +212,17 @@ void MemtxFactory::rollback(struct txn *txn)
 		}
 	}
 }
+
+/*
+ * memtx snapshotting supported directly by box.
+ * do nothing here.
+*/
+void MemtxFactory::snapshot(uint64_t /* lsn */) {
+}
+
+int MemtxFactory::snapshot_ready(uint64_t) {
+	return 1;
+}
+
+void MemtxFactory::snapshot_delete(uint64_t) {
+}

@@ -128,6 +128,12 @@ public:
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
+	/**
+	 * Engine snapshotting support.
+	 */
+	virtual void snapshot(uint64_t) = 0;
+	virtual int  snapshot_ready(uint64_t) = 0;
+	virtual void snapshot_delete(uint64_t) = 0;
 public:
 	/** Name of the engine. */
 	const char *name;

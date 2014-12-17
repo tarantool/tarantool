@@ -1174,27 +1174,45 @@ snapshot_write_row(struct recovery_state *r, struct log_io *l,
 	}
 }
 
-void
-snapshot_save(struct recovery_state *r)
+inline struct log_io*
+snapshot_create(struct recovery_state *r)
 {
 	assert(r->snapshot_handler != NULL);
 	struct log_io *snap = log_io_open_for_write(&r->snap_dir,
 		&r->server_uuid, &r->vclock);
-	if (snap == NULL)
-		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
+	return snap;
+}
+
+inline void
+snapshot_write(struct recovery_state *r, struct log_io *snap)
+{
+	say_info("saving snapshot `%s'", snap->filename);
+
+	r->snapshot_handler(snap);
+}
+
+inline int
+snapshot_close(struct log_io *snap)
+{
+	int rc = log_io_close(&snap);
+	if (rc == 0)
+		say_info("done");
+	return rc;
+}
+
+void
+snapshot_save(struct recovery_state *r)
+{
 	/*
 	 * While saving a snapshot, snapshot name is set to
 	 * <lsn>.snap.inprogress. When done, the snapshot is
 	 * renamed to <lsn>.snap.
 	 */
-	say_info("saving snapshot `%s'", snap->filename);
-
-	r->snapshot_handler(snap);
-
-	log_io_close(&snap);
-
-	say_info("done");
+	struct log_io *snap = snapshot_create(r);
+	if (snap == NULL)
+		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
+	snapshot_write(r, snap);
+	snapshot_close(snap);
 }
 
 /* }}} */
-

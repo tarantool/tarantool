@@ -165,14 +165,6 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	int rc = sp_open(db);
 	if (rc == -1)
 		sophia_raise(env);
-	/* auto-complete any space created
-	 * after recovery */
-	engine_recovery *r = &factory->recovery;
-	if (r->recover == space_noop) {
-		rc = sp_open(db);
-		if (rc == -1)
-			sophia_raise(env);
-	}
 	tuple_format_ref(space->format, 1);
 }
 

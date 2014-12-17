@@ -51,6 +51,7 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "coeio.h"
 
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);
@@ -446,14 +447,14 @@ box_init()
 		/* Initialize a new replica */
 		replica_bootstrap(recovery);
 		space_end_recover_snapshot();
-		snapshot_save(recovery);
+		box_deploy(recovery);
 	} else {
 		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
 		space_end_recover_snapshot();
-		snapshot_save(recovery);
+		box_deploy(recovery);
 	}
 	fiber_gc();
 
@@ -479,7 +480,6 @@ box_init()
 	too_long_threshold = cfg_getd("too_long_threshold");
 	iobuf_set_readahead(cfg_geti("readahead"));
 }
-
 
 void
 box_atfork()
@@ -537,45 +537,129 @@ box_snapshot_cb(struct log_io *l)
 	space_foreach(snapshot_space, l);
 }
 
+static inline void
+box_snapshot_engine(EngineFactory *f, void *udate)
+{
+	uint64_t lsn = *(uint64_t*)udate;
+	f->snapshot(lsn);
+}
+
+static inline void
+box_snapshot_delete_engine(EngineFactory *f, void *udate)
+{
+	uint64_t lsn = *(uint64_t*)udate;
+	f->snapshot_delete(lsn);
+}
+
+static inline void
+box_snapshot_complete_engine(EngineFactory *f, void *udate)
+{
+	uint64_t lsn = *(uint64_t*)udate;
+	while (! f->snapshot_ready(lsn))
+		fiber_yield_timeout(200000); /* 20 ms */
+}
+
+static ssize_t
+box_snapshot_close_cb(va_list ap)
+{
+	struct log_io *snap = va_arg(ap, struct log_io *);
+	int *status = va_arg(ap, int*);
+	*status = snapshot_close(snap);
+	return 0;
+}
+
 int
 box_snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
 
-	/* flush buffers to avoid multiple output */
-	/* https://github.com/tarantool/tarantool/issues/366 */
+	/* flush buffers to avoid multiple output
+	 *
+	 * https://github.com/tarantool/tarantool/issues/366
+	*/
 	fflush(stdout);
 	fflush(stderr);
-	pid_t p = fork();
-	if (p < 0) {
+
+	/* create snapshot file */
+	int rc, status;
+	pid_t pid;
+	uint64_t snap_lsn = vclock_signature(&recovery->vclock);
+	int snap_fd = -1;
+	struct log_io *snap;
+	snap = snapshot_create(recovery);
+	if (snap == NULL)
+		return errno;
+
+	/* create engine snapshot */
+	engine_foreach(box_snapshot_engine, &snap_lsn);
+
+	/* Due to fork nature, no threads are recreated.
+	 * This is the only consistency guarantee here for a
+	 * multi-threaded engine. */
+	pid = fork();
+	switch (pid) {
+	case -1:
 		say_syserror("fork");
-		return -1;
+		goto error;
+	case  0: /* dumper */
+		slab_arena_mprotect(&memtx_arena);
+		cord_set_name("snap");
+		title("dumper", "%" PRIu32, getppid());
+		fiber_set_name(fiber(), "dumper");
+		/* make sure we don't double-write parent stdio
+		 * buffers at exit() during panic */
+		snap_fd = fileno(snap->f);
+		close_all_xcpt(2, log_fd, snap_fd);
+		snapshot_write(recovery, snap);
+		exit(EXIT_SUCCESS);
+		return 0;
+	default: /* waiter */
+		snapshot_pid = pid;
 	}
-	if (p > 0) {
-		snapshot_pid = p;
-		/* increment snapshot version */
-		tuple_begin_snapshot();
-		int status = wait_for_child(p);
-		tuple_end_snapshot();
-		snapshot_pid = 0;
-		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
+
+	/* increment snapshot version */
+	tuple_begin_snapshot();
+
+	/* wait for memtx-part snapshot completion */
+	status = wait_for_child(pid);
+	if (WIFSIGNALED(status))
+		status = EINTR;
+	else
+		status = WEXITSTATUS(status);
+	if (status != 0) {
+		engine_foreach(box_snapshot_delete_engine, &snap_lsn);
+		return status;
 	}
 
-	slab_arena_mprotect(&memtx_arena);
+	/* wait for engine snapshot completion */
+	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
 
-	cord_set_name("snap");
-	title("dumper", "%" PRIu32, getppid());
-	fiber_set_name(fiber(), "dumper");
-	/*
-	 * Safety: make sure we don't double-write
-	 * parent stdio buffers at exit().
-	 */
-	close_all_xcpt(1, log_fd);
-	snapshot_save(recovery);
+	/* wait for snapshot close/sync */
+	rc = coeio_custom(box_snapshot_close_cb, TIMEOUT_INFINITY,
+	                  snap, &status);
+	if (rc == -1 || status == -1)
+		goto error;
 
-	exit(EXIT_SUCCESS);
+	tuple_end_snapshot();
+	snapshot_pid = 0;
 	return 0;
+error:
+	/* rollback snapshot creation */
+	engine_foreach(box_snapshot_delete_engine, &snap_lsn);
+	return -1;
+}
+
+void
+box_deploy(struct recovery_state *r)
+{
+	/* create memtx snapshot */
+	snapshot_save(r);
+
+	/* create engine snapshot and for it completion */
+	uint64_t snap_lsn = vclock_signature(&r->vclock);
+	engine_foreach(box_snapshot_engine, &snap_lsn);
+	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
 }
 
 const char *

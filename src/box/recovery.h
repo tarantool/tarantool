@@ -163,7 +163,12 @@ struct fio_batch;
 
 void
 snapshot_write_row(struct recovery_state *r, struct log_io *l,
-		   struct xrow_header *packet);
+                   struct xrow_header *packet);
+
+struct log_io*
+snapshot_create(struct recovery_state *r);
+void snapshot_write(struct recovery_state *r, struct log_io *snap);
+int  snapshot_close(struct log_io *snap);
 void snapshot_save(struct recovery_state *r);
 
 #if defined(__cplusplus)

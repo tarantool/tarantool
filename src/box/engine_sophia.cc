@@ -88,7 +88,9 @@ sophia_recovery_end(struct space *space)
 	r->state   = READY_ALL_KEYS;
 	r->replace = sophia_replace;
 	r->recover = space_noop;
+	/*
 	sophia_complete_recovery(space);
+	*/
 }
 
 static void
@@ -152,6 +154,10 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 		recovery.recover = sophia_recovery_end_snapshot;
 		break;
 	case END_RECOVERY:
+		/* complete two-phase recovery */
+		int rc = sp_open(env);
+		if (rc == -1)
+			sophia_raise(env);
 		recovery.state   = READY_NO_KEYS;
 		recovery.replace = sophia_replace;
 		recovery.recover = space_noop;
@@ -319,4 +325,62 @@ SophiaFactory::rollback(struct txn *)
 		tx = NULL;
 	});
 	sp_rollback(tx);
+}
+
+void SophiaFactory::snapshot(uint64_t lsn)
+{
+	/* start asynchronous checkpoint */
+	void *c = sp_ctl(env);
+	int rc = sp_set(c, "scheduler.checkpoint");
+	if (rc == -1)
+		sophia_raise(env);
+	/* create snapshot */
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
+	rc = sp_set(c, "snapshot", snapshot);
+	if (rc == -1)
+		sophia_raise(env);
+}
+
+int SophiaFactory::snapshot_ready(uint64_t lsn)
+{
+	/* get sophia lsn associated with snapshot */
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	void *c = sp_ctl(env);
+	void *o = sp_get(c, snapshot);
+	if (o == NULL) {
+		if (sp_error(env))
+			sophia_raise(env);
+		panic("sophia snapshot %" PRIu64 " does not exist", lsn);
+	}
+	char *pe;
+	char *p = (char *)sp_get(o, "value", NULL);
+	uint64_t snapshot_start_lsn = strtoull(p, &pe, 10);
+	sp_destroy(o);
+
+	/* compare with a latest completed checkpoint lsn */
+	o = sp_get(c, "scheduler.checkpoint_lsn_last");
+	if (o == NULL)
+		sophia_raise(env);
+	p = (char *)sp_get(o, "value", NULL);
+	uint64_t last_lsn = strtoull(p, &pe, 10);
+	sp_destroy(o);
+	return last_lsn >= snapshot_start_lsn;
+}
+
+void SophiaFactory::snapshot_delete(uint64_t lsn)
+{
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	void *c = sp_ctl(env);
+	void *s = sp_get(c, snapshot);
+	if (s == NULL) {
+		if (sp_error(env))
+			sophia_raise(env);
+		panic("sophia snapshot %" PRIu64 " does not exist", lsn);
+	}
+	int rc = sp_delete(s);
+	if (rc == -1)
+		sophia_raise(env);
 }
