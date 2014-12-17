@@ -9,6 +9,8 @@ sophia_printdir()
 ---
 - '100
 
+  snapshot
+
 '
 ...
 box.snapshot()

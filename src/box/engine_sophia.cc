@@ -62,7 +62,7 @@ void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
 	SophiaFactory *factory = (SophiaFactory*)engine_find("sophia");
 	void *env = factory->env;
 	void *c = sp_ctl(env);
-	void *o, *cur = sp_cursor(c, ">=", NULL);
+	void *o, *cur = sp_cursor(c);
 	if (cur == NULL)
 		sophia_raise(env);
 	while ((o = sp_get(cur))) {
@@ -112,7 +112,6 @@ SophiaFactory::SophiaFactory()
 	flags = ENGINE_TRANSACTIONAL;
 	env   = NULL;
 	tx    = NULL;
-	tx_db = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -129,8 +128,7 @@ SophiaFactory::init()
 	sp_set(c, "scheduler.threads", cfg_gets("sophia.threads"));
 	sp_set(c, "memory.limit", cfg_gets("sophia.memory_limit"));
 	sp_set(c, "compaction.node_size", cfg_gets("sophia.node_size"));
-	sp_set(c, "compaction.node_branch_wm", cfg_gets("sophia.node_branch_wm"));
-	sp_set(c, "compaction.node_compact_wm", cfg_gets("sophia.node_compact_wm"));
+	sp_set(c, "compaction.page_size", cfg_gets("sophia.page_size"));
 	sp_set(c, "log.enable", "0");
 	sp_set(c, "log.two_phase_recover", "1");
 	sp_set(c, "log.commit_lsn", "1");
@@ -249,26 +247,19 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-SophiaFactory::begin(struct txn * txn, struct space *space)
+SophiaFactory::begin(struct txn *txn, struct space *space)
 {
 	assert(space->engine->factory == this);
 	if (txn->n_stmts == 1) {
 		assert(tx == NULL);
 		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 		assert(index->db != NULL);
-		tx = sp_begin(index->db);
+		tx = sp_begin(env);
 		if (tx == NULL)
 			sophia_raise(env);
-		tx_db = index->db;
 		return;
 	}
 	assert(tx != NULL);
-	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
-	if (index->db != tx_db) {
-		tnt_raise(ClientError, ER_SOPHIA,
-		           "only one sophia space can be used in "
-		           "a multi-statement transaction");
-	}
 }
 
 void
@@ -278,7 +269,6 @@ SophiaFactory::commit(struct txn *txn)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
 		tx = NULL;
-		tx_db = NULL;
 	});
 
 	/* a. prepare transaction for commit */
@@ -327,7 +317,6 @@ SophiaFactory::rollback(struct txn *)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
 		tx = NULL;
-		tx_db = NULL;
 	});
 	sp_rollback(tx);
 }
