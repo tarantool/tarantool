@@ -3102,7 +3102,7 @@ the numeric id of the tuple, the numeric id of the tuple's creator, the user nam
 </para>
 
 <para>
-There are three special users: 'guest', 'admin', and 'public'.
+There are three special tuples in the _user space: 'guest', 'admin', and 'public'.
 </para>
 
             
@@ -3120,7 +3120,7 @@ There are three special users: 'guest', 'admin', and 'public'.
                          <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using <code>tarantool</code> as a console. Usually an administrative user with all privileges.</entry>
                         </row>
                         <row>
-                         <entry>public</entry><entry>2</entry><entry>role</entry><entry>Not a user in the usual sense. A role is a container for privileges which can be granted to regular users. </entry>
+                         <entry>public</entry><entry>2</entry><entry>role</entry><entry>Not a user in the usual sense. Described later in section <link linkend="roles">Roles</link>. </entry>
                         </row>
                         </tbody>
                     </tgroup>
@@ -3304,6 +3304,119 @@ box.session.su('manager')
 box.space.payroll:select{'Jones'}</programlisting>
 </para>
 
+<para xml:id="roles">
+<bridgehead renderas="sect4">Roles</bridgehead>
+A role is a container for privileges which can be granted to regular users.
+Instead of granting and revoking individual privileges, one can put all the
+privileges in a role and then grant or revoke the role.
+Role information is in the _user space but the third field -- the type field -- is 'role' rather than 'user'.
+</para>
+
+<para>
+If a role R1 is granted a privilege X, and user U1 is granted a privilege "role R1",
+then user U1 in effect has privilege X.
+Then if a role R2 is granted a privilege Y, and role R1 is granted a privilege "role R2",
+then user U1 in effect has both privilege X and privilege Y.
+In other words, a user gets all the privileges that are granted to a user's roles,
+directly or indirectly.
+</para>
+
+<variablelist>
+
+  <varlistentry>
+   <term><emphasis role="lua" xml:id="role-1">box.schema.role.create(<replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>
+      Create a new role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-2">box.schema.role.grant(<replaceable>role-name</replaceable>, <replaceable>privilege</replaceable>)</emphasis></term>
+    <listitem><para>
+      Put a privilege in a role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-3">box.schema.role.revoke(<replaceable>role-name</replaceable>, <replaceable>privilege</replaceable>)</emphasis></term>
+    <listitem><para>
+     Take a privilege out of a role.
+    </para></listitem>
+  </varlistentry>
+  
+   <varlistentry>
+    <term><emphasis role="lua" xml:id="role-4">box.schema.user.drop(<replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Drop a role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-5">box.schema.role.info()</emphasis></term>
+    <listitem><para>Get information about a role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-6">box.schema.user.grant(<replaceable>user-name</replaceable>, 'execute', 'role', <replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Grant a role to a user.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-7">box.schema.role.grant(<replaceable>role-name</replaceable>, 'execute', 'role', <replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Grant a role to a role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-8">box.schema.user.revoke(<replaceable>user-name</replaceable>, 'execute', 'role', <replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Revoke a role from a user.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-9">box.schema.role.revoke(<replaceable>role-name</replaceable>, 'execute', 'role', <replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Revoke a role from a role.
+    </para></listitem>
+  </varlistentry>
+
+</variablelist>
+
+<para>
+There is one predefined role, named 'public', which is automatically assigned to
+new users when they are created with <code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>.
+Therefore a convenient way to grant 'read' on space 't' to every user that will ever exist is:
+<code>box.schema.role.grant('public','read','space','t')</code>.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Example showing a role within a role</bridgehead>
+In this example, a new user named U1 will insert a new tuple into
+a new space named T, and will succeed even though user U1 has no
+direct privilege to do such an insert -- that privilege is inherited
+from role R1, which in turn inherits from role R2.
+<programlisting>
+-- This example will work for a user with many privileges, such as 'admin'
+box.schema.space.create('T')
+box.space.T:create_index('primary',{})
+-- Create a user U1 so that later it's possible to say box.session.su('U1')
+box.schema.user.create('U1')
+-- Create two roles, R1 and R2
+box.schema.role.create('R1')
+box.schema.role.create('R2')
+-- Grant role R2 to role R1 and role R1 to U1 (order doesn't matter)
+box.schema.role.grant('R1','execute','role','R2')
+box.schema.role.grant('U1','execute','role','R1')
+-- Grant read and execute privileges to R2 (but not to R1 and not to U1)
+box.schema.role.grant('R2','read,write','space','T')
+box.schema.role.grant('R2','execute','universe')
+-- Use box.session.su to say "now become user U1"
+box.session.su('U1')
+-- The following insert succeeds because U1 in effect has write privilege on T
+box.space.T:insert{1}
+</programlisting>
+</para>
+
 </section>
 
 <section xml:id="limitations">
@@ -3361,7 +3474,7 @@ box.space.payroll:select{'Jones'}</programlisting>
   </varlistentry>
   
   <varlistentry>
-    <term xml:id="limitations-user-count" xreflabel="limitations-user-count">Number of users</term>
+    <term xml:id="limitations-user-count" xreflabel="limitations-user-count">Number of users and roles</term>
     <listitem><para>32.
     </para></listitem>
   </varlistentry>
