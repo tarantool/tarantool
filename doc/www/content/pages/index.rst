@@ -9,7 +9,7 @@
 Tarantool is a NoSQL database running inside a Lua program. It
 combines the network programming power of Node.JS with data
 persistency capabilities of Redis. It's **open source**, BSD licensed.
-The latest release is Tarantool 1.6.3, published on July 20, 2014.
+The latest release is Tarantool 1.6.4, published on November 24, 2014.
 
 -------------------------------------------------------------------------------
                                   Features
