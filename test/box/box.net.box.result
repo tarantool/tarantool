@@ -758,3 +758,6 @@ file_log:close()
 ---
 - true
 ...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

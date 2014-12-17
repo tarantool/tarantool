@@ -18,3 +18,4 @@ conn.space[space.id]:select(3, { iterator = 'LT' })
 conn:close()
 
 space:drop()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

@@ -51,3 +51,6 @@ conn:close()
 space:drop()
 ---
 ...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

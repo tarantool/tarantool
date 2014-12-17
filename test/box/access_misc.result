@@ -53,6 +53,7 @@ box.schema.user.grant('testus', 'read', 'space', 'admin_space')
 ...
 box.schema.user.grant('testus', 'read', 'space', 'admin_space')
 ---
+- error: User 'testus' already has read access on space 'admin_space'
 ...
 session.su('testus')
 ---
@@ -84,6 +85,7 @@ box.schema.user.revoke('testus', 'read', 'space', 'admin_space')
 ...
 box.schema.user.revoke('testus', 'read', 'space', 'admin_space')
 ---
+- error: User 'testus' does not have read access on space 'admin_space'
 ...
 session.su('testus')
 ---
@@ -402,6 +404,7 @@ session.su('admin')
 ...
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
+- error: User 'testuser' does not have read, write, execute access on universe 'nil'
 ...
 --
 -- Check that itertors check privileges

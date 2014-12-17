@@ -98,3 +98,4 @@ replica.admin('box.info.vclock[%d]' % replica_id3)
 # Cleanup
 sys.stdout.pop_filter()
 
+master.admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")

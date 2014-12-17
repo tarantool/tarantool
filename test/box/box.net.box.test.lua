@@ -311,3 +311,4 @@ end;
 --# setopt delimiter ''
 
 file_log:close()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

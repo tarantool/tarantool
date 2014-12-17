@@ -360,6 +360,7 @@ box.space._priv:select{id}
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
+- error: User 'user' already has read access on universe 'nil'
 ...
 box.space._priv:select{id}
 ---

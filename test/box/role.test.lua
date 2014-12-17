@@ -244,13 +244,27 @@ box.schema.role.grant('grantee', 'role')
 box.schema.role.revoke('grantee', 'role')
 box.schema.user.create('john')
 box.session.su('john')
+-- error
 box.schema.role.grant('grantee', 'role')
+--
 box.session.su('admin')
 _ = box.schema.space.create('test')
 box.schema.user.grant('john', 'read,write,execute', 'universe')
 box.session.su('john')
 box.schema.role.grant('grantee', 'role')
 box.schema.role.grant('grantee', 'read', 'space', 'test')
+--
+-- granting 'public' is however an exception - everyone
+-- can grant 'public' role, it's implicitly granted with 
+-- a grant option.
+-- 
+box.schema.role.grant('grantee', 'public')
+-- 
+-- revoking role 'public' is another deal - only the 
+-- superuser can do that, and even that would be useless,
+-- since one can still re-grant it back to oneself.
+-- 
+box.schema.role.revoke('grantee', 'public')
 
 box.session.su('admin')
 box.schema.user.drop('john')

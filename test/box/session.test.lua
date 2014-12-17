@@ -88,3 +88,4 @@ session.uid()
 session.user()
 fiber = nil
 session = nil
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

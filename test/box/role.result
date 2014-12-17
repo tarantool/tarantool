@@ -67,9 +67,11 @@ box.schema.user.grant('tester', 'execute', 'role', 'tester')
 -- test granting a non-execute grant on a role - error
 box.schema.user.grant('tester', 'write', 'role', 'iddqd')
 ---
+- error: User 'tester' already has role 'iddqd'
 ...
 box.schema.user.grant('tester', 'read', 'role', 'iddqd')
 ---
+- error: User 'tester' already has role 'iddqd'
 ...
 -- test granting role to a role
 box.schema.user.grant('iddqd', 'execute', 'role', 'iddqd')
@@ -82,9 +84,11 @@ box.schema.user.grant('iddqd', 'iddqd')
 ...
 box.schema.user.revoke('iddqd', 'iddqd')
 ---
+- error: User 'iddqd' does not have role 'iddqd'
 ...
 box.schema.user.grant('tester', 'iddqd')
 ---
+- error: User 'tester' already has role 'iddqd'
 ...
 box.schema.user.revoke('tester', 'iddqd')
 ---
@@ -631,10 +635,12 @@ box.schema.user.create('john')
 box.session.su('john')
 ---
 ...
+-- error
 box.schema.role.grant('grantee', 'role')
 ---
 - error: Read access denied for user 'john' to space '_user'
 ...
+--
 box.session.su('admin')
 ---
 ...
@@ -654,6 +660,24 @@ box.schema.role.grant('grantee', 'role')
 box.schema.role.grant('grantee', 'read', 'space', 'test')
 ---
 - error: Read access denied for user 'john'
+...
+--
+-- granting 'public' is however an exception - everyone
+-- can grant 'public' role, it's implicitly granted with 
+-- a grant option.
+-- 
+box.schema.role.grant('grantee', 'public')
+---
+- error: User 'grantee' already has role 'public'
+...
+-- 
+-- revoking role 'public' is another deal - only the 
+-- superuser can do that, and even that would be useless,
+-- since one can still re-grant it back to oneself.
+-- 
+box.schema.role.revoke('grantee', 'public')
+---
+- error: Create or drop access denied for user 'john'
 ...
 box.session.su('admin')
 ---
