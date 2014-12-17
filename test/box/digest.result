@@ -193,19 +193,19 @@ digest.base64_decode(b) == s
 ...
 digest.base64_decode(nil)
 ---
-- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:89: Usage: digest.base64_decode(string)'
 ...
 digest.base64_encode(nil)
 ---
-- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:78: Usage: digest.base64_encode(string)'
 ...
 digest.base64_encode(123)
 ---
-- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:78: Usage: digest.base64_encode(string)'
 ...
 digest.base64_decode(123)
 ---
-- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:89: Usage: digest.base64_decode(string)'
 ...
 digest = nil
 ---
