@@ -134,14 +134,15 @@ s:drop()
 -- Check write grant on _user
 --
 box.schema.user.create('testuser')
+maxuid = box.space._user.index.primary:max()[1]
 
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
 testuser_uid = session.uid()
 box.space._user:delete(2)
 box.space._user:select(1)
-uid = box.space._user:insert{4, session.uid(), 'someone', 'user'}[1]
-box.space._user:delete(4)
+uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user'}[1]
+box.space._user:delete(uid)
 
 session.su('admin')
 box.space._user:select(1)
@@ -154,7 +155,7 @@ box.schema.user.grant('testuser', 'read', 'space', '_user')
 session.su('testuser')
 box.space._user:delete(2)
 box.space._user:select(1)
-box.space._user:insert{4,session.uid(),'someone2', 'user'}
+box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 
 session.su('admin')
 --

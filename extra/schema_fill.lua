@@ -62,10 +62,15 @@ _index:insert{_cluster.id, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
 _user:insert{GUEST, ADMIN, 'guest', 'user'}
 _user:insert{ADMIN, ADMIN, 'admin', 'user'}
 _user:insert{PUBLIC, ADMIN, 'public', 'role'}
+RPL_ID = _user:auto_increment{ADMIN, 'replication', 'role'}[1]
 -- grant admin access to the universe
 _priv:insert{1, 1, 'universe', 0, 7}
 -- grant 'public' role access to 'box.schema.user.info' function
 _func:insert{1, 1, 'box.schema.user.info', 1}
 _priv:insert{1, 2, 'function', 1, 4}
+-- replication can read universe
+_priv:insert{1, RPL_ID, 'universe', 0, 1}
+-- replication can append to '_cluster' system space
+_priv:insert{1, RPL_ID, 'space', box.schema.CLUSTER_ID, 2}
 -- grant 'guest' role 'public'
 _priv:insert{1, 0, 'role', 2, 4}

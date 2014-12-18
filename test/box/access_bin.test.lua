@@ -79,3 +79,30 @@ c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
 c:call('dostring', 'return 2 + 2')
 c:close()
 box.space._user:replace(u)
+--
+-- Roles: test that universal access of an authenticated
+-- session is not updated if grant is made from another
+-- session
+--
+test = box.schema.space.create('test')
+_ = test:create_index('primary')
+test:insert{1}
+box.schema.user.create('test', {password='test'})
+box.schema.user.grant('test', 'read', 'space', '_space')
+box.schema.user.grant('test', 'read', 'space', '_index')
+net = require('net.box')
+c = net.new('test:test@'..box.cfg.listen)
+c.space.test:select{}
+box.schema.role.grant('public', 'read', 'universe')
+c.space.test:select{}
+c:close()
+c = net.new('test:test@'..box.cfg.listen)
+c.space.test:select{}
+box.schema.role.revoke('public', 'read', 'universe')
+c.space.test:select{}
+box.session.su('test')
+test:select{}
+box.session.su('admin')
+c:close()
+box.schema.user.drop('test')
+test:drop()

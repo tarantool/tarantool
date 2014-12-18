@@ -43,16 +43,6 @@ t
 ---
 - []
 ...
--- begin/commit delete
-box.begin()
----
-...
-for key = 1, 10 do space:delete({key}) end
----
-...
-box.commit()
----
-...
 -- begin/commit insert
 box.begin()
 ---
@@ -88,53 +78,25 @@ t
   - [9]
   - [10]
 ...
--- cross-engine constraint
-space_tmp = box.schema.create_space('test_tmp')
----
-...
-index = space_tmp:create_index('primary', { type = 'tree', parts = {1, 'num'} })
----
-...
+-- begin/commit delete
 box.begin()
 ---
 ...
-space:insert({123})
----
-- [123]
-...
-space_tmp:insert({123}) -- exception
----
-- error: A multi-statement transaction can not use multiple storage engines
-...
-box.rollback()
+for key = 1, 10 do space:delete({key}) end
 ---
 ...
-space_tmp:drop()
+box.commit()
 ---
 ...
--- cross-space constraint
-space_tmp = box.schema.create_space('test_tmp', { engine = 'sophia', id = 101 })
+t = {}
 ---
 ...
-index = space_tmp:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+for key = 1, 10 do assert(space:get({key}) == nil) end
 ---
 ...
-box.begin()
+t
 ---
-...
-space:insert({123})
----
-- [123]
-...
-space_tmp:insert({123}) -- exception
----
-- error: only one sophia space can be used in a multi-statement transaction
-...
-box.rollback()
----
-...
-space_tmp:drop()
----
+- []
 ...
 space:drop()
 ---

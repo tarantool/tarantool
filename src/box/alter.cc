@@ -1502,7 +1502,8 @@ priv_def_check(struct priv_def *priv)
 				  role ? role->name :
 				  int2str(priv->object_id));
 		}
-		/* Only the creator of the role can grant or revoke it.
+		/*
+		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
 		if (role->owner != grantor->uid && grantor->uid != ADMIN &&

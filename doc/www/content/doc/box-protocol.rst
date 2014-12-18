@@ -210,7 +210,7 @@ The server responds to authentication packet with a standard response with 0 tup
     |                  |                  |                  |
     +==================+==================+==================+
     |                  |                  |                  |
-    |   0x13: OFFSET   |   0x14: ITERATOR |   0x14: KEY      |
+    |   0x13: OFFSET   |   0x14: ITERATOR |   0x20: KEY      |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
     |                  |                  |                  |
     +==================+==================+==================+
@@ -245,7 +245,7 @@ The server responds to authentication packet with a standard response with 0 tup
     |                  |                  |                  |          +~~~~~~~~~~+ |
     |                  |                  |                  |          |          | |
     |                  |                  |                  | (TUPLE)  |    OP    | |
-    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |    0x21: |          | |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x20: KEY      |    0x21: |          | |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |  MP_INT: +~~~~~~~~~~+ |
     |                  |                  |                  |            MP_ARRAY   |
     +==================+==================+==================+=======================+
@@ -318,7 +318,7 @@ It's an error to specify an argument of a type that differs from expected type.
 
     +==================+==================+==================+
     |                  |                  |                  |
-    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x20: KEY      |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
     |                  |                  |                  |
     +==================+==================+==================+
@@ -461,7 +461,7 @@ can be found in `src/errcode.h
                                 XLOG / SNAP
 --------------------------------------------------------------------------------
 
-XLOG and SNAP have one format now. For example, they starts with:
+XLOG and SNAP have the same format. They start with:
 
 .. code-block:: bash
 
@@ -472,18 +472,18 @@ XLOG and SNAP have one format now. For example, they starts with:
     \n
     ...
 
-So, **Header** of SNAP/XLOG consists from:
+So, **Header** of an SNAP/XLOG consists of:
 
 .. code-block:: bash
 
     <format>\n
     <format_version>\n
-    Server: <server_uuid>
+    Server: <server_uuid>\n
     VClock: <vclock_map>\n
     \n
 
 
-There're two markers: tuple beggining - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with such schema:
+There're two markers: tuple beggining - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with the following schema:
 
 .. code-block:: bash
 

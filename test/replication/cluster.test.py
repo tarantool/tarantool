@@ -47,7 +47,7 @@ print '-------------------------------------------------------------'
 master = server
 master_id = master.get_param('server')['id']
 
-master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
@@ -98,3 +98,4 @@ replica.admin('box.info.vclock[%d]' % replica_id3)
 # Cleanup
 sys.stdout.pop_filter()
 
+master.admin("box.schema.user.revoke('guest', 'replication')")

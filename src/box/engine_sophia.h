@@ -42,7 +42,6 @@ struct SophiaFactory: public EngineFactory {
 	virtual void recoveryEvent(enum engine_recovery_event);
 	void *env;
 	void *tx;
-	void *tx_db;
 };
 
 void sophia_info(void (*)(const char*, const char*, void*), void*);

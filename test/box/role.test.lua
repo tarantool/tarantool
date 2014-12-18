@@ -119,7 +119,7 @@ box.schema.role.grant("role2", "role10")
 
 --
 -- test grant propagation
--- 
+--
 box.schema.role.grant("role1", "read", "universe")
 box.session.su("user")
 box.space._space.index.name:get{"_space"}[3]
@@ -157,6 +157,7 @@ box.space._space.index.name:get{"_space"}[3]
 box.space._index:get{288, 0}[3]
 box.session.su("admin")
 
+--
 -- grant via two branches
 --
 box.schema.role.grant("role3", "read", "space", "_index")
@@ -193,6 +194,27 @@ box.session.su("user1")
 box.space._index:get{288, 0}[3]
 box.session.su("admin")
 
+--
+-- check diamond-shaped grant graph
+--
+
+box.schema.role.grant("role5", "read", "space", "_space")
+
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.session.su("user1")
+box.space._space.index.name:get{"_space"}[3]
+
+box.session.su("admin")
+box.schema.role.revoke("role5", "read", "space", "_space")
+
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.session.su("user1")
+box.space._space.index.name:get{"_space"}[3]
+
+box.session.su("admin")
+
 box.schema.user.drop("user")
 box.schema.user.drop("user1")
 box.schema.role.drop("role1")
@@ -205,3 +227,79 @@ box.schema.role.drop("role7")
 box.schema.role.drop("role9")
 box.schema.role.drop("role10")
 
+
+--
+-- only the creator of the role can grant it (or a superuser)
+-- There is no grant option.
+-- the same applies for privileges
+--
+box.schema.user.create('user')
+box.schema.user.create('grantee')
+
+box.schema.user.grant('user', 'read,write,execute', 'universe')
+box.session.su('user')
+box.schema.role.create('role')
+box.session.su('admin')
+box.schema.role.grant('grantee', 'role')
+box.schema.role.revoke('grantee', 'role')
+box.schema.user.create('john')
+box.session.su('john')
+-- error
+box.schema.role.grant('grantee', 'role')
+--
+box.session.su('admin')
+_ = box.schema.space.create('test')
+box.schema.user.grant('john', 'read,write,execute', 'universe')
+box.session.su('john')
+box.schema.role.grant('grantee', 'role')
+box.schema.role.grant('grantee', 'read', 'space', 'test')
+--
+-- granting 'public' is however an exception - everyone
+-- can grant 'public' role, it's implicitly granted with
+-- a grant option.
+--
+box.schema.role.grant('grantee', 'public')
+--
+-- revoking role 'public' is another deal - only the
+-- superuser can do that, and even that would be useless,
+-- since one can still re-grant it back to oneself.
+--
+box.schema.role.revoke('grantee', 'public')
+
+box.session.su('admin')
+box.schema.user.drop('john')
+box.schema.user.drop('user')
+box.schema.user.drop('grantee')
+box.schema.role.drop('role')
+box.space.test:drop()
+
+--
+-- grant a privilege through a role, but
+-- the user has another privilege either granted
+-- natively (one case) or via another role.
+-- Check that privileges actually OR, but
+-- not replace each other.
+--
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('primary')
+box.schema.user.create('john')
+box.schema.user.grant('john', 'read', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{1}
+box.session.su('admin')
+box.schema.role.grant('public', 'write', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{2}
+box.session.su('admin')
+box.schema.role.revoke('public', 'write', 'space', 'test')
+box.session.su('john')
+box.space.test:select{}
+box.space.test:insert{1}
+box.session.su('admin')
+box.space.test:drop()
+box.schema.user.drop('john')
+
+-- test ER_GRANT
+box.space._priv:insert{1, 0, 'universe', 0, 0}

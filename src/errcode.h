@@ -138,6 +138,10 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 86 */_(ER_TUPLE_REF_OVERFLOW,	1, "Tuple reference counter overflow") \
 	/* 87 */_(ER_ROLE_LOOP,			2, "Granting role '%s' to role '%s' would create a loop") \
 	/* 88 */_(ER_GRANT,			2, "Incorrect grant arguments: %s") \
+	/* 89 */_(ER_PRIV_GRANTED,		2, "User '%s' already has %s access on %s '%s'") \
+	/* 90 */_(ER_ROLE_GRANTED,		2, "User '%s' already has role '%s'") \
+	/* 91 */_(ER_PRIV_NOT_GRANTED,		2, "User '%s' does not have %s access on %s '%s'") \
+	/* 92 */_(ER_ROLE_NOT_GRANTED,		2, "User '%s' does not have role '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

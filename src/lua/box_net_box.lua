@@ -516,6 +516,9 @@ local remote_methods = {
 
     reload_schema = function(self)
          self:_load_schema()
+         if self.state ~= 'error' and self.state ~= 'closed' then
+               self:_switch_state('active')
+         end
     end,
 
     close = function(self)

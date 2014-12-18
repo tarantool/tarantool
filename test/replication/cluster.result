@@ -32,7 +32,7 @@ box.space._cluster:replace{1, require('uuid').NULL:str()}
 -------------------------------------------------------------
 gh-527: update vclock on delete from box.space._cluster
 -------------------------------------------------------------
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'replication')
 ---
 ...
 box.space._schema:insert{"test", 48}
@@ -130,4 +130,7 @@ box.info.vclock[10]
 box.info.vclock[11]
 ---
 - 0
+...
+box.schema.user.revoke('guest', 'replication')
+---
 ...

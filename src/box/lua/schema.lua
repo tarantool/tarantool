@@ -1044,7 +1044,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, user_name)
     end
-    privilege = privilege_resolve(privilege)
+    privilege_hex = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
     if grantor == nil then
         grantor = session.uid()
@@ -1060,11 +1060,19 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     else
         old_privilege = 0
     end
-    privilege = bit.bor(privilege, old_privilege)
+    privilege_hex = bit.bor(privilege_hex, old_privilege)
     -- do not execute a replace if it does not change anything
-    -- XXX bug: new grantor replaces the old one, old grantor is lost
-    if privilege ~= old_privilege then
-        _priv:replace{grantor, uid, object_type, oid, privilege}
+    -- XXX bug if we decide to add a grant option: new grantor
+    -- replaces the old one, old grantor is lost
+    if privilege_hex ~= old_privilege then
+        _priv:replace{grantor, uid, object_type, oid, privilege_hex}
+    else
+        if object_type == 'role' then
+            box.error(box.error.ROLE_GRANTED, user_name, object_name)
+        else
+            box.error(box.error.PRIV_GRANTED, user_name, privilege,
+                      object_type, object_name)
+        end
     end
 end
 
@@ -1082,13 +1090,18 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, name)
     end
-    privilege = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
     if tuple == nil then
-        return
+        if object_type == 'role' then
+            box.error(box.error.ROLE_NOT_GRANTED, user_name, object_name)
+        else
+            box.error(box.error.PRIV_NOT_GRANTED, user_name, privilege,
+                      object_type, object_name)
+        end
     end
+    privilege = privilege_resolve(privilege)
     local old_privilege = tuple[5]
     local grantor = tuple[1]
     -- sic:
