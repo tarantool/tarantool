@@ -210,7 +210,7 @@ The server responds to authentication packet with a standard response with 0 tup
     |                  |                  |                  |
     +==================+==================+==================+
     |                  |                  |                  |
-    |   0x13: OFFSET   |   0x14: ITERATOR |   0x14: KEY      |
+    |   0x13: OFFSET   |   0x14: ITERATOR |   0x20: KEY      |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
     |                  |                  |                  |
     +==================+==================+==================+
@@ -245,7 +245,7 @@ The server responds to authentication packet with a standard response with 0 tup
     |                  |                  |                  |          +~~~~~~~~~~+ |
     |                  |                  |                  |          |          | |
     |                  |                  |                  | (TUPLE)  |    OP    | |
-    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |    0x21: |          | |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x20: KEY      |    0x21: |          | |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |  MP_INT: +~~~~~~~~~~+ |
     |                  |                  |                  |            MP_ARRAY   |
     +==================+==================+==================+=======================+
@@ -318,7 +318,7 @@ It's an error to specify an argument of a type that differs from expected type.
 
     +==================+==================+==================+
     |                  |                  |                  |
-    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x20: KEY      |
     | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
     |                  |                  |                  |
     +==================+==================+==================+
