@@ -117,13 +117,13 @@ struct _mh(t) {
 
 #if !mh_bytemap
 #define mh_exist(h, i)		({ h->b[i >> 4] & (1 << (i % 16)); })
-#define mh_dirty(h, i)		({ h->b[i >> 4] & (1 << (i % 16 + 16)); })
+#define mh_dirty(h, i)		({ h->b[i >> 4] & (1u << (i % 16 + 16)); })
 #define mh_gethk(hash)		(1)
 #define mh_mayeq(h, i, hk)	mh_exist(h, i)
 
 #define mh_setfree(h, i)	({ h->b[i >> 4] &= ~(1 << (i % 16)); })
 #define mh_setexist(h, i, hk)	({ h->b[i >> 4] |= (1 << (i % 16)); })
-#define mh_setdirty(h, i)	({ h->b[i >> 4] |= (1 << (i % 16 + 16)); })
+#define mh_setdirty(h, i)	({ h->b[i >> 4] |= (1u << (i % 16 + 16)); })
 #else
 #define mh_exist(h, i)		({ h->b[i] & 0x7f; })
 #define mh_dirty(h, i)		({ h->b[i] & 0x80; })
@@ -429,7 +429,6 @@ _mh(clear)(struct _mh(t) *h)
 #else
 	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
 #endif
-	h->upper_bound = h->n_buckets * MH_DENSITY;
 	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 }
@@ -437,6 +436,11 @@ _mh(clear)(struct _mh(t) *h)
 void
 _mh(delete)(struct _mh(t) *h)
 {
+	if (h->shadow->p) {
+		free(h->shadow->p);
+		free(h->shadow->b);
+		memset(h->shadow, 0, sizeof(*h->shadow));
+	}
 	free(h->shadow);
 	free(h->b);
 	free(h->p);
