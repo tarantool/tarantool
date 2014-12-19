@@ -764,6 +764,12 @@ f2:cancel()
 f3:cancel()
 ---
 ...
+-- # gh-666: nulls in output
+--
+getmetatable(fiber.info())
+---
+- __serialize: mapping
+...
 fiber = nil
 ---
 ...
