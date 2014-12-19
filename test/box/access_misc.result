@@ -253,7 +253,7 @@ box.space._user:select(1)
 ...
 box.space._space:select(280)
 ---
-- - [280, 1, '_space', 'memtx', 0]
+- - [280, 1, '_space', 'memtx', 0, '']
 ...
 us = box.schema.create_space('uniuser_space')
 ---
@@ -577,13 +577,13 @@ box.space._user:select()
 ...
 box.space._space:select()
 ---
-- - [272, 1, '_schema', 'memtx', 0]
-  - [280, 1, '_space', 'memtx', 0]
-  - [288, 1, '_index', 'memtx', 0]
-  - [296, 1, '_func', 'memtx', 0]
-  - [304, 1, '_user', 'memtx', 0]
-  - [312, 1, '_priv', 'memtx', 0]
-  - [320, 1, '_cluster', 'memtx', 0]
+- - [272, 1, '_schema', 'memtx', 0, '']
+  - [280, 1, '_space', 'memtx', 0, '']
+  - [288, 1, '_index', 'memtx', 0, '']
+  - [296, 1, '_func', 'memtx', 0, '']
+  - [304, 1, '_user', 'memtx', 0, '']
+  - [312, 1, '_priv', 'memtx', 0, '']
+  - [320, 1, '_cluster', 'memtx', 0, '']
 ...
 box.space._func:select()
 ---
