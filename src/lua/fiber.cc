@@ -256,6 +256,10 @@ lbox_fiber_info(struct lua_State *L)
 {
 	lua_newtable(L);
 	fiber_stat(lbox_fiber_statof, L);
+	lua_createtable(L, 0, 1);
+	lua_pushliteral(L, "mapping"); /* YAML will use block mode */
+	lua_setfield(L, -2, LUAL_SERIALIZE);
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
