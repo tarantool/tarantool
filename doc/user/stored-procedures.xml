@@ -850,11 +850,11 @@ hi
 -      via fiber id (fid), which is numeric.
     </para>
     <para>
-      A runaway fiber can be stopped with <code>fiber.cancel()</code>.
-      However, <code>fiber.cancel()</code> is advisory &mdash; it works
+     A runaway fiber can be stopped with <code><replaceable>fiber_object</replaceable>:cancel()</code>.
+      However, <code><replaceable>fiber_object</replaceable>:cancel()</code> is advisory &mdash; it works
       only if the runaway fiber calls <code>fiber.testcancel()</code>
-      once in a while. Most <code>box.*</code> hooks, such as <code>box.space...delete()</code>
-      or <code>box.space...update()</code>, do call <code>fiber.testcancel()</code>.
+      once in a while. Most <code>box.*</code> functions, such as <code>box.space...delete()</code>
+      or <code>box.space...update()</code>, do call <code>fiber.testcancel()</code> but
       <code>box.space...select{}</code> does not.
       In practice, a runaway fiber can only become unresponsive
       if it does many computations and does not check
@@ -885,7 +885,7 @@ procedures.
  
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function, function-arguments</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function</replaceable> [, <replaceable>function-arguments</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -899,16 +899,19 @@ procedures.
             <para>
              Returns: (type = userdata) created fiber object.
             </para>
+            <para>
+             Example: <code>fiber_object = fiber.create(function_name)</code>
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.id">fiber.id(<replaceable>fiber</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.id"><replaceable>fiber_object</replaceable>:id() </emphasis>
         </term>
         <listitem>
             <para>
-              Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
+              Parameters: fiber object, for example the fiber object returned by <code>fiber.create</code>.
             </para>
             <para>
               Returns: (type = number) id of the fiber.
@@ -918,14 +921,34 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.name">fiber.name(<replaceable>fiber</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.name"><replaceable>fiber_object</replaceable>:name() </emphasis>
         </term>
         <listitem>
             <para>
-              Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
+              Parameters: fiber object, for example the fiber object returned by <code>fiber.create</code>.
             </para>
             <para>
               Returns: (type = string) name of the fiber.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="ofiber.name"><replaceable>fiber_object</replaceable>:name(<replaceable>new-name</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Change the fiber name. By default the Tarantool server's interactive-mode fiber is named
+              'interactive' and new fibers created due to <code>fiber.create</code> are named 'lua'.
+              Giving fibers distinct names makes it easier to distinguish them when using <code>fiber.info</code>.
+            </para>
+            <para>
+              Parameters: fiber object, for example the fiber object returned by <code>fiber.create</code>;
+              new-name = (type = string) the new name of the fiber.
+            </para>
+            <para>
+              Returns: nil.
             </para>
         </listitem>
     </varlistentry>
@@ -936,8 +959,7 @@ procedures.
         </term>
         <listitem>
             <para>
-              Returns: (type = userdata) <code>fiber</code>
-              object for the currently scheduled fiber.
+              Returns: (type = userdata) fiber object for the currently scheduled fiber.
             </para>
         </listitem>
     </varlistentry>
@@ -962,7 +984,7 @@ procedures.
         </term>
         <listitem>
             <para>
-              Yield to the sched fiber and sleep for the specified number of seconds.
+              Yield control to the scheduler and sleep for the specified number of seconds.
               Only the current fiber can be made to sleep.
             </para>
             <para>
@@ -987,15 +1009,14 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.status">fiber.status(<replaceable>[fiber]</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.ostatus"><replaceable>fiber_object</replaceable>:status()</emphasis>
         </term>
         <listitem>
             <para>
               Return the status of the specified fiber.
             </para>
             <para>
-              Parameters: <code>fiber</code> = the fiber to be checked -- if this is not
-              supplied, then the current fiber is to be checked.
+              Parameters: <code>fiber_object</code> = the fiber to be checked.
             </para>
             <para>
               Returns: (type = string) the status of <code>fiber</code>.
@@ -1005,6 +1026,27 @@ procedures.
             </para>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="fiber.status">fiber.status()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Return the status of the current fiber.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: (type = string) the status of <code>fiber</code>.
+              One of: <quote>dead</quote>,
+              <quote>suspended</quote>, <quote>attached</quote>
+              or <quote>running</quote>.
+            </para>
+        </listitem>
+    </varlistentry>
+
 
     <varlistentry>
         <term>
@@ -1022,21 +1064,21 @@ procedures.
  
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.cancel">fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.cancel"><replaceable>fiber_object</replaceable>:cancel()</emphasis>
         </term>
         <listitem>
             <para>
               Cancel a <code>fiber</code>.
               Running and suspended fibers can be canceled.
               After a fiber has been canceled, attempts to operate on it will cause errors,
-              for example <code>fiber.id(<replaceable>fiber</replaceable>)</code> will cause
+              for example <code><replaceable>fiber_object</replaceable>:id()</code> will cause
               "error: the fiber is dead".
             </para>
             <para>
               Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
             </para>
             <para>
-              Possible errors: the specified fiber does not permit cancel.
+              Possible errors: cancel is not permitted for the specified fiber object.
             </para>
         </listitem>
     </varlistentry>
@@ -1050,13 +1092,13 @@ procedures.
               Locate a fiber by its numeric id and cancel it. In
               other words, <code>fiber.kill()</code> combines <emphasis
               role="lua">fiber.find()</emphasis> and <emphasis
-              role="lua">fiber.cancel()</emphasis>.
+              role="lua"><replaceable>fiber_object</replaceable>:cancel()</emphasis>.
             </para>
             <para>
               Parameters: <code>id</code> = the id of the fiber to be canceled.
             </para>
             <para>
-              Possible errors: the specified fiber does not exist or does not permit cancel.
+              Possible errors: the specified fiber does not exist or cancel is not permitted.
             </para>
         </listitem>
     </varlistentry>
@@ -1150,7 +1192,7 @@ so it will be running independently of the caller.
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fid = fiber.id(fiber_of_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = fiber_of_x:id()</userinput>
 ---
 ...
 </programlisting>
@@ -1158,7 +1200,7 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)</userinput>
 # 102 .  suspended . gvar= 399
 ---
 ...
@@ -1168,12 +1210,12 @@ Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fiber.cancel(fiber_of_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_:cancel()</userinput>
 ... fiber `lua' has been cancelled
 ... fiber `lua': exiting
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)</userinput>
 # 102 .  dead . gvar= 421
 ---
 ...</programlisting>
