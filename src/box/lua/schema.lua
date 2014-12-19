@@ -189,6 +189,7 @@ box.schema.space.create = function(name, options)
         id = 'number',
         field_count = 'number',
         user = 'string, number',
+        format = 'table'
     }
     local options_defaults = {
         engine = 'memtx',
@@ -222,8 +223,21 @@ box.schema.space.create = function(name, options)
         uid = session.uid()
     end
     local temporary = options.temporary and "temporary" or ""
-    _space:insert{id, uid, name, options.engine, options.field_count, temporary}
+    local format = options.format and options.format or {}
+    _space:insert{id, uid, name, options.engine, options.field_count, temporary, format}
     return box.space[id], "created"
+end
+
+-- space format - the metadata about space fields
+function box.schema.space.format(id, format)
+    _space = box.space._space
+    check_param(id, 'id', 'number')
+    check_param(format, 'format', 'table')
+    if format == nil then
+        return _space:get(id)[7]
+    else
+        _space:update(id, {{'=', 7, format}})
+    end
 end
 
 box.schema.create_space = box.schema.space.create
@@ -808,6 +822,9 @@ function box.schema.space.bless(space)
         for i = 1, #keys, 1 do
             _index:insert(keys[i])
         end
+    end
+    space_mt.format = function(space, format)
+        return box.schema.space.format(space.id, format)
     end
     space_mt.drop = function(space)
         return box.schema.space.drop(space.id)

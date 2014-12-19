@@ -273,7 +273,7 @@ box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 1}})
 -- remove field_count - ok
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
 ---
-- [512, 1, 'test', 'memtx', 0, '']
+- [512, 1, 'test', 'memtx', 0, '', []]
 ...
 s:select{}
 ---
@@ -294,7 +294,7 @@ s:select{}
 -- set field_count of an empty space
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 ---
-- [512, 1, 'test', 'memtx', 3, '']
+- [512, 1, 'test', 'memtx', 3, '', []]
 ...
 s:select{}
 ---

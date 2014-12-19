@@ -20,42 +20,79 @@ _schema:insert{'version', 1, 6}
 --
 -- _schema
 --
-_space:insert{_schema.id, ADMIN, '_schema', 'memtx', 0, ''}
+_space:insert{_schema.id, ADMIN, '_schema', 'memtx', 0, '', {}}
 --
 -- _space
 --
-_space:insert{_space.id, ADMIN, '_space', 'memtx', 0, ''}
+_space:insert{_space.id, ADMIN, '_space', 'memtx', 0, '', {}}
 --
 -- _index
 --
-_space:insert{_index.id, ADMIN, '_index', 'memtx', 0, ''}
+_space:insert{_index.id, ADMIN, '_index', 'memtx', 0, '', {}}
 --
 -- _func
 --
-_space:insert{_func.id, ADMIN, '_func', 'memtx', 0, ''}
+_space:insert{_func.id, ADMIN, '_func', 'memtx', 0, '', {}}
 --
 -- _user
 --
-_space:insert{_user.id, ADMIN, '_user', 'memtx', 0, ''}
+_space:insert{_user.id, ADMIN, '_user', 'memtx', 0, '', {}}
 --
 -- _priv
 --
-_space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, ''}
+_space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, '', {}}
 --
 -- _cluster
 --
 _space:insert{_cluster.id, ADMIN, '_cluster', 'memtx', 0, ''}
 
--- define indexes
-_index:insert{_schema.id, 0, 'primary', 'tree', 1, 1, 0, 'str'}
-
+-- define formats.
 -- stick to the following convention:
--- prefer user id (owner id) in field #1
--- prefer object name in field #2
--- index on owner id is index #1
--- index on object name is index #2
---
+-- prefer user id (owner id) in field #2 (base-1)
+-- prefer object name in field #3 (base-1)
+-- 
+format={}
+format[1] = {type='str', name='key'}
+_schema:format(format)
+format={}
+format[1] = {name='id', type='num'}
+format[2] = {name='owner', type='num'}
+format[3] = {name='name', type='str'}
+format[4] = {name='engine', type='str'}
+format[5] = {name='field_count', type='num'}
+format[6] = {name='flags', type='str'}
+format[7] = {name='format', type='*'}
+_space:format(format)
+format={}
+format[1] = {name='id', type='num'}
+format[2] = {name='owner', type='num'}
+format[3] = {name='name', type='str'}
+format[4] = {name='setuid', type='num'}
+_func:format(format)
+format={}
+format[1] = {name='id', type='num'}
+format[2] = {name='owner', type='num'}
+format[3] = {name='name', type='str'}
+format[4] = {name='type', type='str'}
+format[5] = {name='auth', type='*'}
+_user:format(format)
+format={}
+format[1] = {name='grantor', type='num'}
+format[2] = {name='grantee', type='num'}
+format[3] = {name='object_type', type='str'}
+format[4] = {name='object_id', type='num'}
+format[5] = {name='privilege', type='num'}
+_priv:format(format)
+format = {}
+format[1] = {name='id', type='num'}
+format[2] = {name='uuid', type='str'}
+_cluster:format(format)
+-- define indexes
+-- stick to the following convention:
+-- index on owner id is index #1 (base-0)
+-- index on object name is index #2 (base-0)
 -- space name is unique
+_index:insert{_schema.id, 0, 'primary', 'tree', 1, 1, 0, 'str'}
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 _index:insert{_space.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
 _index:insert{_space.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
