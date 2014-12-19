@@ -312,4 +312,8 @@ f1:cancel()
 f2:cancel()
 f3:cancel()
 
+-- # gh-666: nulls in output
+--
+getmetatable(fiber.info())
+
 fiber = nil
