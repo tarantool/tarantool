@@ -21,9 +21,9 @@ ffi.cdef[[
     /* from libc */
     int snprintf(char *str, size_t size, const char *format, ...);
 
-
     typedef uint32_t (*crc32_func)(uint32_t crc,
         const unsigned char *buf, unsigned int len);
+    extern int32_t guava(int64_t state, int32_t buckets);
     extern crc32_func crc32_calc;
 ]]
 
@@ -54,7 +54,7 @@ local def = {
     sha384  = { 'SHA384', 48 },
     sha512  = { 'SHA512', 64 },
     md5     = { 'MD5',    16 },
-    md4     = { 'MD4',    16 }
+    md4     = { 'MD4',    16 },
 }
 
 local hexres = ffi.new('char[129]')
@@ -85,6 +85,16 @@ local m = {
         end
         return ffi.C.crc32_calc(tonumber(crc), str, string.len(str))
     end,
+
+    guava = function(state, buckets)
+       if type(state) ~= 'number' then
+          error("state arg is not number")
+       end
+       if type(buckets) ~= 'number' then
+          error("buckets arg is not number")
+       end
+       return ffi.C.guava(state, buckets)
+    end,
 }
 
 if ssl ~= nil then
@@ -102,7 +112,7 @@ if ssl ~= nil then
             local r = ssl[hfunction](str, string.len(str), nil)
             return ffi.string(r, hsize)
         end
-        
+
         m[ pname .. '_hex' ] = function(str)
             if str == nil then
                 str = ''
