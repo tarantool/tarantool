@@ -33,13 +33,11 @@
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
-#include "third_party/tarantool_eio.h"
 #include "fiob.h"
+#include "third_party/tarantool_eio.h"
 #include "msgpuck/msgpuck.h"
 #include "scoped_guard.h"
-#define MH_UNDEF 1 /* conflicts with mh_nodeids_t */
-#include "recovery.h" /* for mh_cluster */
-#include "vclock.h"
+#include "xrow.h"
 #include "iproto_constants.h"
 
 /*
@@ -55,7 +53,7 @@ const char v12[] = "0.12\n";
 
 /* {{{ struct log_dir */
 
-int
+void
 log_dir_create(struct log_dir *dir, const char *dirname,
 	       enum log_dir_type type)
 {
@@ -75,11 +73,13 @@ log_dir_create(struct log_dir *dir, const char *dirname,
 		dir->filetype = "XLOG\n";
 		dir->filename_ext = ".xlog";
 	}
-	return 0;
 }
 
+/**
+ * Delete all members from the set of vector clocks.
+ */
 static void
-vclockset_clean(vclockset_t *set) {
+vclockset_reset(vclockset_t *set) {
 	struct vclock *cur = vclockset_first(set);
 	while (cur != NULL) {
 		struct vclock *next = vclockset_next(set, cur);
@@ -89,39 +89,56 @@ vclockset_clean(vclockset_t *set) {
 	}
 }
 
+/**
+ * Destroy log_dir object and free memory.
+ */
 void
 log_dir_destroy(struct log_dir *dir)
 {
 	free(dir->dirname);
-	vclockset_clean(&dir->index);
+	vclockset_reset(&dir->index);
 }
 
+/**
+ * Add a single log file to the index of all log files
+ * in a given log directory.
+ */
 static inline void
-log_dir_add_to_index(struct log_dir *dir, int64_t signature)
+log_dir_index_file(struct log_dir *dir, int64_t signature)
 {
 	/*
-	 * Open xlog and parse vclock
+	 * Open xlog and parse vclock in its text header.
+	 * The vclock stores the state of the log at the
+	 * time it is created.
 	 */
 	struct log_io *wal = log_io_open_for_read(dir, signature, NULL,
 						  INPROGRESS);
-	if (wal == NULL)
+	if (wal == NULL) {
 		tnt_raise(ClientError, ER_INVALID_XLOG,
 			  format_filename(dir, signature, NONE));
+	}
 	auto log_guard = make_scoped_guard([&]{
 		log_io_close(&wal);
 	});
 
 	/*
-	 * Check filename
+	 * Check the match between log file name and contents:
+	 * the sum of vector clock coordinates must be the same
+	 * as the name of the file.
 	 */
 	int64_t signature_check = vclock_signature(&wal->vclock);
 	if (signature_check != signature) {
 		tnt_raise(ClientError, ER_INVALID_XLOG_NAME,
-			  (long long) signature_check, (long long) signature);
+			  (long long) signature_check,
+			  (long long) signature);
 	}
-
 	/*
-	 * Check ordering
+	 * All log files in a directory must satisfy Lamport's
+	 * eventual order: events in each log file must be
+	 * separable with consistent cuts, for example:
+	 *
+	 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
+	 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
 	 */
 	struct vclock *dup = vclockset_search(&dir->index, &wal->vclock);
 	if (dup != NULL) {
@@ -131,7 +148,8 @@ log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 	}
 
 	/*
-	 * Update vclockset
+	 * Append the clock describing the file to the directory
+	 * index.
 	 */
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
@@ -152,6 +170,23 @@ cmp_i64(const void *_a, const void *_b)
 	return (*a > *b) ? 1 : -1;
 }
 
+/**
+ * Scan (or rescan) a log directory.
+ * Read all files matching a pattern from the directory -
+ * the filename pattern is \d+.xlog[.inprogress]
+ * The name of the file is based on its vclock signature:
+ * the sum of all elements in the vector clock recorded
+ * when the file was created. Elements in the vector
+ * reflect log sequence numbers of servers in the asynchronous
+ * replication set (see _cluster system space for details).
+ *
+ * This function tries to avoid re-reading a file if
+ * it is already in the set of files "known" to the log
+ * dir object. This is necessary to optimize local
+ * hot standby and recovery_follow_local(), which
+ * periodically rescan the directory to discover newly
+ * created logs.
+ */
 int
 log_dir_scan(struct log_dir *dir)
 {
@@ -169,7 +204,6 @@ log_dir_scan(struct log_dir *dir)
 	int64_t *signts = NULL;
 	size_t signts_capacity = 0, signts_size = 0;
 
-	errno = 0;
 	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
 		char *ext = strchr(dent->d_name, '.');
@@ -183,23 +217,24 @@ log_dir_scan(struct log_dir *dir)
 		 * 'xlog'.
 		 */
 		bool ext_is_ok;
-		if (suffix == NULL)
+		if (suffix == NULL) {
 			ext_is_ok = strcmp(ext, dir->filename_ext) == 0;
-		else
+		} else {
 			ext_is_ok = (strncmp(ext, dir->filename_ext,
 					     ext_len) == 0 &&
 				     strcmp(suffix, inprogress_suffix) == 0);
+		}
 		if (!ext_is_ok)
 			continue;
 
-		long long signt = strtoll(dent->d_name, &ext, 10);
+		long long signature = strtoll(dent->d_name, &ext, 10);
 		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		if (signt == LLONG_MAX || signt == LLONG_MIN) {
+		if (signature == LLONG_MAX || signature == LLONG_MIN) {
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
@@ -214,12 +249,12 @@ log_dir_scan(struct log_dir *dir)
 			signts_capacity = capacity;
 		}
 
-		signts[signts_size++] = signt;
+		signts[signts_size++] = signature;
 	}
 
 	if (signts_size == 0) {
 		/* Empty directory */
-		vclockset_clean(&dir->index);
+		vclockset_reset(&dir->index);
 		return 0;
 	}
 
@@ -244,7 +279,7 @@ log_dir_scan(struct log_dir *dir)
 		}
 
 		try {
-			log_dir_add_to_index(dir, signts[i]);
+			log_dir_index_file(dir, signts[i]);
 		} catch (ClientError *e) {
 			e->log();
 			say_warn("failed to scan %s",
@@ -272,6 +307,10 @@ format_filename(struct log_dir *dir, int64_t signt, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
+/**
+ * @retval 0 success
+ * @retval 1 EOF
+ */
 static int
 row_reader(FILE *f, struct xrow_header *row)
 {
@@ -299,7 +338,7 @@ error:
 	uint32_t len = mp_decode_uint(&data);
 	if (len > IPROTO_BODY_LEN_MAX) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "received packet is too big");
+			  "packet is too big");
 	}
 
 	/* Read previous crc32 */
@@ -736,7 +775,7 @@ log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
 	l = (struct log_io *) calloc(1, sizeof(*l));
 	if (l == NULL) {
 		save_errno = errno;
-		say_syserror("%s: memory error", filename);
+		say_syserror("%s: out of memory", filename);
 		goto error_2;
 	}
 	l->f = file;

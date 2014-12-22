@@ -50,6 +50,7 @@
 #include "box/schema.h"
 #include "box/vclock.h"
 #include "scoped_guard.h"
+#include "xrow.h"
 
 /** Replication topology
  * ----------------------

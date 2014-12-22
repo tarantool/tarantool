@@ -29,12 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <stdio.h>
-#include <limits.h>
 #include <stdbool.h>
-#include <sys/uio.h>
-#include "trivia/util.h"
-#include "third_party/tarantool_ev.h"
-#include "xrow.h"
 #include "tt_uuid.h"
 #include "vclock.h"
 
@@ -71,7 +66,7 @@ struct log_dir {
 	vclockset_t index; /* vclock set for this directory */
 };
 
-int
+void
 log_dir_create(struct log_dir *dir, const char *dirname,
 	       enum log_dir_type type);
 void
