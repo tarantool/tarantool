@@ -46,6 +46,8 @@
  * |  0xd5  |  type  |       data      |
  * +--------+--------+--------+--------+
  */
+typedef uint32_t log_magic_t;
+
 const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
 const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 const char inprogress_suffix[] = ".inprogress";
@@ -79,13 +81,14 @@ xdir_create(struct xdir *dir, const char *dirname,
  * Delete all members from the set of vector clocks.
  */
 static void
-vclockset_reset(vclockset_t *set) {
-	struct vclock *cur = vclockset_first(set);
-	while (cur != NULL) {
-		struct vclock *next = vclockset_next(set, cur);
-		vclockset_remove(set, cur);
-		free(cur);
-		cur = next;
+vclockset_reset(vclockset_t *set)
+{
+	struct vclock *vclock = vclockset_first(set);
+	while (vclock != NULL) {
+		struct vclock *next = vclockset_next(set, vclock);
+		vclockset_remove(set, vclock);
+		free(vclock);
+		vclock = next;
 	}
 }
 
@@ -171,21 +174,38 @@ cmp_i64(const void *_a, const void *_b)
 }
 
 /**
- * Scan (or rescan) a log directory.
+ * Scan (or rescan) a directory with snapshot or write ahead logs.
  * Read all files matching a pattern from the directory -
  * the filename pattern is \d+.xlog[.inprogress]
- * The name of the file is based on its vclock signature:
- * the sum of all elements in the vector clock recorded
+ * The name of the file is based on its vclock signature,
+ * which is the sum of all elements in the vector clock recorded
  * when the file was created. Elements in the vector
  * reflect log sequence numbers of servers in the asynchronous
- * replication set (see _cluster system space for details).
+ * replication set (see also _cluster system space and vclock.h
+ * comments).
  *
  * This function tries to avoid re-reading a file if
  * it is already in the set of files "known" to the log
- * dir object. This is necessary to optimize local
- * hot standby and recovery_follow_local(), which
- * periodically rescan the directory to discover newly
- * created logs.
+ * dir object. This is done to speed up local hot standby and
+ * recovery_follow_local(), which periodically rescan the
+ * directory to discover newly created logs.
+ *
+ * On error, this function throws an exception. If
+ * dir->panic_if_error is false, *some* errors are not
+ * propagated up but only logged in the error log file.
+ *
+ * The list of errors ignored in panic_if_error = false mode
+ * includes:
+ * - a file can not be opened
+ * - some of the files have incorrect metadata (such files are
+ *   skipped)
+ *
+ * The goal of panic_if_error = false mode is partial recovery
+ * from a damaged/incorrect data directory. It doesn't
+ * silence conditions such as out of memory or lack of OS
+ * resources.
+ *
+ * @return nothing.
  */
 int
 xdir_scan(struct xdir *dir)
@@ -205,6 +225,26 @@ xdir_scan(struct xdir *dir)
 	size_t signts_capacity = 0, signts_size = 0;
 
 	struct dirent *dent;
+	/*
+	  A note regarding thread safety, readdir vs. readdir_r:
+
+	  POSIX explicitly makes the following guarantee: "The
+	  pointer returned by readdir() points to data which may
+	  be overwritten by another call to readdir() on the same
+	  directory stream. This data is not overwritten by another
+	  call to readdir() on a different directory stream.
+
+	  In practice, you don't have a problem with readdir(3)
+	  because Android's bionic, Linux's glibc, and OS X and iOS'
+	  libc all allocate per-DIR* buffers, and return pointers
+	  into those; in Android's case, that buffer is currently about
+	  8KiB. If future file systems mean that this becomes an actual
+	  limitation, we can fix the C library and all your applications
+	  will keep working.
+
+	  See also
+	  http://elliotth.blogspot.co.uk/2012/10/how-not-to-use-readdirr3.html
+	*/
 	while ((dent = readdir(dh)) != NULL) {
 		char *ext = strchr(dent->d_name, '.');
 		if (ext == NULL)
@@ -294,12 +334,15 @@ xdir_scan(struct xdir *dir)
 }
 
 char *
-format_filename(struct xdir *dir, int64_t signt, enum log_suffix suffix)
+format_filename(struct xdir *dir, int64_t signature,
+		enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
-	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
+	const char *suffix_str = (suffix == INPROGRESS ?
+				  inprogress_suffix : "");
 	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
-		 dir->dirname, (long long)signt, dir->filename_ext, suffix_str);
+		 dir->dirname, (long long) signature,
+		 dir->filename_ext, suffix_str);
 	return filename;
 }
 
