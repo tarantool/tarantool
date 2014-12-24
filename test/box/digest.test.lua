@@ -59,4 +59,10 @@ digest.base64_encode(nil)
 digest.base64_encode(123)
 digest.base64_decode(123)
 
+digest.guava('hello', 0)
+digest.guava(1, 'nope_')
+digest.guava(10863919174838991, 11)
+digest.guava(2016238256797177309, 11)
+digest.guava(1673758223894951030, 11)
+
 digest = nil
