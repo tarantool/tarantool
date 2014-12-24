@@ -1,9 +1,0 @@
-
--- snapshot
-
-space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
-index = space:create_index('primary')
-sophia_printdir()
-box.snapshot()
-space:drop()
-box.snapshot()

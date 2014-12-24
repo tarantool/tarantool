@@ -556,7 +556,7 @@ box_snapshot_complete_engine(EngineFactory *f, void *udate)
 {
 	uint64_t lsn = *(uint64_t*)udate;
 	while (! f->snapshot_ready(lsn))
-		fiber_yield_timeout(200000); /* 20 ms */
+		fiber_yield_timeout(.020);
 }
 
 static ssize_t
@@ -564,7 +564,7 @@ box_snapshot_close_cb(va_list ap)
 {
 	struct log_io *snap = va_arg(ap, struct log_io *);
 	int *status = va_arg(ap, int*);
-	*status = snapshot_close(snap);
+	*status = snapshot_complete(snap);
 	return 0;
 }
 
@@ -612,6 +612,7 @@ box_snapshot(void)
 		snap_fd = fileno(snap->f);
 		close_all_xcpt(2, log_fd, snap_fd);
 		snapshot_write(recovery, snap);
+		snapshot_close(snap, false); /* do not rename yet */
 		exit(EXIT_SUCCESS);
 		return 0;
 	default: /* waiter */

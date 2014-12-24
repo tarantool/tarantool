@@ -620,6 +620,16 @@ log_io_sync(struct log_io *l)
 	return 0;
 }
 
+int
+log_io_flush(struct log_io *l)
+{
+	if (fflush(l->f) == EOF) {
+		say_syserror("%s: fflush failed", l->filename);
+		return -1;
+	}
+	return 0;
+}
+
 #define SERVER_UUID_KEY "Server"
 #define VCLOCK_KEY "VClock"
 

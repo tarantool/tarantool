@@ -334,8 +334,13 @@ void SophiaFactory::snapshot(uint64_t lsn)
 	int rc = sp_set(c, "scheduler.checkpoint");
 	if (rc == -1)
 		sophia_raise(env);
-	/* create snapshot */
 	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	/* ensure snapshot is not already exists */
+	void *o = sp_get(c, snapshot);
+	if (o) {
+		return;
+	}
 	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
 	rc = sp_set(c, "snapshot", snapshot);
 	if (rc == -1)

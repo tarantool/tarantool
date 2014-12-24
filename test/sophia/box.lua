@@ -12,7 +12,19 @@ function sophia_rmdir(dir)
 	os.execute("rm -rf sophia_test")
 end
 
-sophia_rmdir()
+function file_exists(name)
+	local f = io.open(name,"r")
+	if f ~= nil then
+		io.close(f)
+		return true
+	else
+		return false
+	end
+end
+
+if not file_exists("lock") then
+	sophia_rmdir()
+end
 
 local sophia = {
 	memory_limit = 0,

@@ -1180,6 +1180,8 @@ snapshot_create(struct recovery_state *r)
 	assert(r->snapshot_handler != NULL);
 	struct log_io *snap = log_io_open_for_write(&r->snap_dir,
 		&r->server_uuid, &r->vclock);
+	if (snap)
+		log_io_flush(snap);
 	return snap;
 }
 
@@ -1187,16 +1189,23 @@ inline void
 snapshot_write(struct recovery_state *r, struct log_io *snap)
 {
 	say_info("saving snapshot `%s'", snap->filename);
-
 	r->snapshot_handler(snap);
 }
 
 inline int
-snapshot_close(struct log_io *snap)
+snapshot_close(struct log_io *snap, bool rename)
 {
-	int rc = log_io_close(&snap);
-	if (rc == 0)
-		say_info("done");
+	snap->is_inprogress = rename;
+	return log_io_close(&snap);
+}
+
+int
+snapshot_complete(struct log_io *snap)
+{
+	int rc = inprogress_log_rename(snap);
+	if (rc == -1)
+		return -1;
+	/* TODO: snap->f leakage here */
 	return rc;
 }
 
@@ -1212,7 +1221,9 @@ snapshot_save(struct recovery_state *r)
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 	snapshot_write(r, snap);
-	snapshot_close(snap);
+	int rc = snapshot_close(snap, true);
+	if (rc == 0)
+		say_info("done");
 }
 
 /* }}} */
