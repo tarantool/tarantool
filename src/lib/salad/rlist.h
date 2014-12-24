@@ -106,6 +106,14 @@ rlist_shift(struct rlist *head)
         return shift;
 }
 
+inline static struct rlist *
+rlist_shift_tail(struct rlist *head)
+{
+        struct rlist *shift = head->prev;
+        rlist_del(shift);
+        return shift;
+}
+
 /**
  * return first element
  */
@@ -222,6 +230,14 @@ rlist_swap(struct rlist *rhs, struct rlist *lhs)
  */
 #define rlist_shift_entry(head, type, member)				\
         rlist_entry(rlist_shift(head), type, member)			\
+
+/**
+ * Remove one element from the list tail and return it
+ * @pre the list is not empty
+ */
+#define rlist_shift_tail_entry(head, type, member)				\
+        rlist_entry(rlist_shift_tail(head), type, member)			\
+
 
 /**
  * return last entry
