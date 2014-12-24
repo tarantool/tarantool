@@ -194,6 +194,24 @@ vclockset_isearch(vclockset_t *set, struct vclock *key)
 
 #include "exception.h"
 
+/**
+ * Allocate a new vclock object and initialize it
+ *
+ * @param src source vclock to use for initialization (can be
+ *            NULL, in that case a new object is created).
+ */
+static inline struct vclock *
+vclock_dup(struct vclock *src)
+{
+	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  sizeof(*vclock), "vclock", "malloc");
+	}
+	vclock_copy(vclock, src);
+	return vclock;
+}
+
 static inline void
 vclock_add_server(struct vclock *vclock, uint32_t server_id)
 {

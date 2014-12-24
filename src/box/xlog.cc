@@ -113,8 +113,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct xlog *wal = xlog_open(dir, signature, NULL,
-						  INPROGRESS);
+	struct xlog *wal = xlog_open(dir, signature, NULL, INPROGRESS);
 	if (wal == NULL) {
 		tnt_raise(ClientError, ER_INVALID_XLOG,
 			  format_filename(dir, signature, NONE));
@@ -148,18 +147,11 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 			  (long long) signature,
 			  (long long) vclock_signature(dup));
 	}
-
 	/*
-	 * Append the clock describing the file to the directory
-	 * index.
+	 * Append the clock describing the file to the
+	 * directory index.
 	 */
-	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
-	if (vclock == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(*vclock), "xdir", "vclockset");
-	}
-	vclock_create(vclock);
-	vclock_copy(vclock, &wal->vclock);
+	struct vclock *vclock = vclock_dup(&wal->vclock);
 	vclockset_insert(&dir->index, vclock);
 }
 
