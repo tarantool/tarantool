@@ -238,7 +238,7 @@ int
 xlog_rename(struct xlog *l);
 
 /**
- * Close the log file and free xlog object. Sets *lptr to NULL.
+ * Close the log file and free xlog object.
  * Renames the file to a name without .inprogress suffix if
  * necessary.
  *
@@ -246,7 +246,7 @@ xlog_rename(struct xlog *l);
  * @retval -1 error (fclose() failed).
  */
 int
-xlog_close(struct xlog **lptr);
+xlog_close(struct xlog *l);
 
 /**
  * atfork() handler function to close the log pointed

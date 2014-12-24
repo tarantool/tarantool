@@ -202,6 +202,13 @@ recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 		r->snap_io_rate_limit = UINT64_MAX;
 }
 
+static inline void
+recovery_close_log(struct recovery_state *r)
+{
+	xlog_close(r->current_wal);
+	r->current_wal = NULL;
+}
+
 void
 recovery_delete(struct recovery_state *r)
 {
@@ -218,8 +225,9 @@ recovery_delete(struct recovery_state *r)
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
 		 */
-		xlog_close(&r->current_wal);
+		xlog_close(r->current_wal);
 	}
+	free(r);
 }
 
 void
@@ -259,7 +267,7 @@ recovery_bootstrap(struct recovery_state *r)
 	if (snap == NULL)
 		panic("failed to open %s", filename);
 	int rc = recover_xlog(r, snap);
-	xlog_close(&snap);
+	xlog_close(snap);
 
 	if (rc != 0)
 		panic("failed to recover from %s", filename);
@@ -441,7 +449,7 @@ recover_current_wal:
 		}
 		if (result == LOG_EOF) {
 			say_info("done `%s'", r->current_wal->filename);
-			xlog_close(&r->current_wal);
+			recovery_close_log(r);
 			/* goto find_next_wal; */
 		} else if (r->signature == last_signt) {
 			/* last file is not finished */
@@ -462,7 +470,7 @@ recover_current_wal:
 		} else {
 			say_warn("WAL `%s' wasn't correctly closed",
 				 r->current_wal->filename);
-			xlog_close(&r->current_wal);
+			recovery_close_log(r);
 		}
 	}
 
@@ -515,7 +523,7 @@ recovery_finalize(struct recovery_state *r)
 		} else
 			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
 
-		xlog_close(&r->current_wal);
+		recovery_close_log(r);
 	}
 
 	wal_writer_start(r);
@@ -604,7 +612,7 @@ recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 		panic("recover failed");
 	if (result == LOG_EOF) {
 		say_info("done `%s'", r->current_wal->filename);
-		xlog_close(&r->current_wal);
+		recovery_close_log(r);
 		recovery_stop_file(watcher);
 		/* Don't wait for wal_dir_rescan_delay. */
 		recovery_rescan_dir(loop, &watcher->dir_timer, 0);
@@ -932,15 +940,18 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 			 * A warning is written to the server
 			 * log file.
 			 */
-			xlog_close(&wal_to_close);
+			xlog_close(wal_to_close);
+			wal_to_close = NULL;
 		}
 	} else if (l->rows == 1) {
 		/*
 		 * Rename WAL after the first successful write
 		 * to a name  without .inprogress suffix.
 		 */
-		if (xlog_rename(l))
-			xlog_close(&l);       /* error. */
+		if (xlog_rename(l)) {
+			xlog_close(l);       /* error. */
+			l = NULL;
+		}
 	}
 	assert(wal_to_close == NULL);
 	*wal = l;
@@ -1042,7 +1053,7 @@ wal_writer_thread(void *worker_args)
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 	if (r->current_wal != NULL)
-		xlog_close(&r->current_wal);
+		recovery_close_log(r);
 	return NULL;
 }
 
@@ -1178,8 +1189,8 @@ void
 snapshot_save(struct recovery_state *r)
 {
 	assert(r->snapshot_handler != NULL);
-	struct xlog *snap = xlog_create(&r->snap_dir,
-		&r->server_uuid, &r->vclock);
+	struct xlog *snap = xlog_create(&r->snap_dir, &r->server_uuid,
+					&r->vclock);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 	/*
@@ -1191,7 +1202,7 @@ snapshot_save(struct recovery_state *r)
 
 	r->snapshot_handler(snap);
 
-	xlog_close(&snap);
+	xlog_close(snap);
 
 	say_info("done");
 }

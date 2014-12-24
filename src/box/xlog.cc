@@ -118,8 +118,8 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 		tnt_raise(ClientError, ER_INVALID_XLOG,
 			  format_filename(dir, signature, NONE));
 	}
-	auto log_guard = make_scoped_guard([&]{
-		xlog_close(&wal);
+	auto log_guard = make_scoped_guard([=]{
+		xlog_close(wal);
 	});
 
 	/*
@@ -617,9 +617,8 @@ inprogress_log_unlink(char *filename)
 /* {{{ struct xlog */
 
 int
-xlog_close(struct xlog **lptr)
+xlog_close(struct xlog *l)
 {
-	struct xlog *l = *lptr;
 	int r;
 
 	if (l->mode == LOG_WRITE) {
@@ -640,7 +639,6 @@ xlog_close(struct xlog **lptr)
 	if (r < 0)
 		say_syserror("can't close");
 	free(l);
-	*lptr = NULL;
 	return r;
 }
 
