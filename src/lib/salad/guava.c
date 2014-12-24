@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include "lib/guava/guava.h"
+#include "lib/salad/guava.h"
 
 #include <stdint.h>
 
