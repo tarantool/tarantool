@@ -48,22 +48,22 @@
  */
 typedef uint32_t log_magic_t;
 
-const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
-const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
-const char inprogress_suffix[] = ".inprogress";
-const char v12[] = "0.12\n";
+static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
+static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
+static const char inprogress_suffix[] = ".inprogress";
+static const char v12[] = "0.12\n";
 
 /* {{{ struct xdir */
 
 void
 xdir_create(struct xdir *dir, const char *dirname,
-	       enum xdir_type type)
+	    enum xdir_type type)
 {
 	memset(dir, 0, sizeof(*dir));
 	vclockset_new(&dir->index);
 	/* Default mode. */
 	dir->mode = 0660;
-	dir->dirname = strdup(dirname);
+	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
 	if (type == SNAP) {
 		strcpy(dir->open_wflags, "wxd");
 		dir->filetype = "SNAP\n";
@@ -98,7 +98,6 @@ vclockset_reset(vclockset_t *set)
 void
 xdir_destroy(struct xdir *dir)
 {
-	free(dir->dirname);
 	vclockset_reset(&dir->index);
 }
 
@@ -822,7 +821,7 @@ xlog_open_stream(struct xdir *dir, const char *filename,
 		goto error_2;
 	}
 	l->f = file;
-	strncpy(l->filename, filename, PATH_MAX);
+	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_READ;
 	l->dir = dir;
 	l->is_inprogress = (suffix == INPROGRESS);
@@ -894,7 +893,7 @@ xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
 	if (l == NULL)
 		goto error;
 	l->f = f;
-	strncpy(l->filename, filename, PATH_MAX);
+	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_WRITE;
 	l->dir = dir;
 	l->is_inprogress = true;

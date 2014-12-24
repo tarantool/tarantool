@@ -80,10 +80,6 @@ struct xdir {
 	 * File name extension (.xlog or .snap).
 	 */
 	const char *filename_ext;
-	/**
-	 * Directory path.
-	 */
-	char *dirname;
 	/** File create mode in this directory. */
 	mode_t mode;
 	/*
@@ -91,6 +87,10 @@ struct xdir {
 	 * empty, must be initialized with xdir_scan().
 	 */
 	vclockset_t index;
+	/**
+	 * Directory path.
+	 */
+	char dirname[PATH_MAX+1];
 };
 
 /**
