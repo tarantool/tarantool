@@ -6,7 +6,9 @@
 
 #include "unit.h"
 
-static void check_guava_correctness(uint64_t code) {
+static void
+check_guava_correctness(uint64_t code)
+{
 	int32_t last = 0;
 	for (int32_t shards = 1; shards <= 100000; shards++) {
 		int32_t b = guava(code, shards);
@@ -17,7 +19,9 @@ static void check_guava_correctness(uint64_t code) {
 	}
 }
 
-static void correctness_check() {
+static void
+correctness_check()
+{
 	header();
 	int64_t i_vals[] = {0, 1, 2};
 	for (size_t i = 0; i < sizeof(i_vals) / sizeof(int64_t); ++i)
@@ -28,13 +32,17 @@ static void correctness_check() {
 	footer();
 }
 
-static void sameresult_check() {
+static void
+sameresult_check()
+{
 	header();
 	fail_if(guava(100, 20) != guava(100, 20));
 	footer();
 }
 
-static void lcg_compat_check() {
+static void
+lcg_compat_check()
+{
 	header();
 	int32_t golden100[] = {
 		0, 55, 62, 8, 45, 59, 86, 97, 82, 59,
@@ -52,7 +60,9 @@ static void lcg_compat_check() {
 	footer();
 }
 
-int main(void) {
+int
+main(void)
+{
 	correctness_check();
 	lcg_compat_check();
 	sameresult_check();

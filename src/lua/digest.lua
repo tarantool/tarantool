@@ -87,12 +87,6 @@ local m = {
     end,
 
     guava = function(state, buckets)
-       if type(state) ~= 'number' then
-          error("state arg is not number")
-       end
-       if type(buckets) ~= 'number' then
-          error("buckets arg is not number")
-       end
        return ffi.C.guava(state, buckets)
     end,
 }

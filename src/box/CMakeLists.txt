@@ -33,5 +33,6 @@ tarantool_module("box"
     box_lua.cc
     box_lua_space.cc)
 
+target_link_libraries(ltbox guava)
 set_source_files_properties(box_lua.cc PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 target_link_libraries(tarantool_box bitset)
