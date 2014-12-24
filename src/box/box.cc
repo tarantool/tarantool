@@ -62,7 +62,7 @@ static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
 
 static void
-box_snapshot_cb(struct log_io *l);
+box_snapshot_cb(struct xlog *l);
 
 /** The snapshot row metadata repeats the structure of REPLACE request. */
 struct request_replace_body {
@@ -490,7 +490,7 @@ box_atfork()
 }
 
 static void
-snapshot_write_tuple(struct log_io *l,
+snapshot_write_tuple(struct xlog *l,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct request_replace_body body;
@@ -520,7 +520,7 @@ snapshot_space(struct space *sp, void *udata)
 	if (space_is_sophia(sp))
 		return;
 	struct tuple *tuple;
-	struct log_io *l = (struct log_io *)udata;
+	struct xlog *l = (struct xlog *)udata;
 	Index *pk = space_index(sp, 0);
 	if (pk == NULL)
 		return;
@@ -532,7 +532,7 @@ snapshot_space(struct space *sp, void *udata)
 }
 
 static void
-box_snapshot_cb(struct log_io *l)
+box_snapshot_cb(struct xlog *l)
 {
 	space_foreach(snapshot_space, l);
 }

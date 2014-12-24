@@ -33,7 +33,7 @@
 
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
-#include "log_io.h"
+#include "xlog.h"
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "uri.h"
@@ -48,7 +48,7 @@ struct recovery_state;
 
 typedef void (row_handler)(struct recovery_state *, void *,
 			   struct xrow_header *packet);
-typedef void (snapshot_handler)(struct log_io *);
+typedef void (snapshot_handler)(struct xlog *);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -94,9 +94,9 @@ struct remote {
 struct recovery_state {
 	struct vclock vclock;
 	/** The WAL we're currently reading/writing from/to. */
-	struct log_io *current_wal;
-	struct log_dir snap_dir;
-	struct log_dir wal_dir;
+	struct xlog *current_wal;
+	struct xdir snap_dir;
+	struct xdir wal_dir;
 	/** Used to find missing xlog files */
 	int64_t signature;
 	struct wal_writer *writer;
@@ -153,7 +153,7 @@ void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
 
-int recover_wal(struct recovery_state *r, struct log_io *l);
+int recover_xlog(struct recovery_state *r, struct xlog *l);
 int wal_write(struct recovery_state *r, struct xrow_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
@@ -162,7 +162,7 @@ void recovery_process(struct recovery_state *r, struct xrow_header *packet);
 struct fio_batch;
 
 void
-snapshot_write_row(struct recovery_state *r, struct log_io *l,
+snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		   struct xrow_header *packet);
 void snapshot_save(struct recovery_state *r);
 

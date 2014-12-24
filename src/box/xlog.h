@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_LOG_IO_H_INCLUDED
-#define TARANTOOL_LOG_IO_H_INCLUDED
+#ifndef TARANTOOL_XLOG_H_INCLUDED
+#define TARANTOOL_XLOG_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,21 +33,10 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
-extern const uint32_t xlog_format;
 
-enum log_dir_type {
-	SNAP,
-	XLOG
-};
+enum xdir_type { SNAP, XLOG };
 
-enum log_mode {
-	LOG_READ,
-	LOG_WRITE
-};
-
-enum log_suffix { NONE, INPROGRESS };
-
-struct log_dir {
+struct xdir {
 	bool panic_if_error;
 	/**
 	 * true if the file can by fsync()ed at close
@@ -67,19 +56,21 @@ struct log_dir {
 };
 
 void
-log_dir_create(struct log_dir *dir, const char *dirname,
-	       enum log_dir_type type);
+xdir_create(struct xdir *dir, const char *dirname,
+	       enum xdir_type type);
 void
-log_dir_destroy(struct log_dir *dir);
+xdir_destroy(struct xdir *dir);
 
 int
-log_dir_scan(struct log_dir *dir);
+xdir_scan(struct xdir *dir);
 
-char *
-format_filename(struct log_dir *dir, int64_t signature, enum log_suffix suffix);
+enum log_mode { LOG_READ, LOG_WRITE };
 
-struct log_io {
-	struct log_dir *dir;
+enum log_suffix { NONE, INPROGRESS };
+
+
+struct xlog {
+	struct xdir *dir;
 	FILE *f;
 
 	enum log_mode mode;
@@ -94,40 +85,43 @@ struct log_io {
 	struct vclock vclock;
 };
 
-struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t signature,
+struct xlog *
+xlog_open(struct xdir *dir, int64_t signature,
 		     const tt_uuid *server_uuid, enum log_suffix suffix);
 
-struct log_io *
-log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
+struct xlog *
+xlog_open_stream(struct xdir *dir, const char *filename,
 			    const tt_uuid *server_uuid, enum log_suffix suffix,
 			    FILE *file);
 
-struct log_io *
-log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
+struct xlog *
+xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
 		      const struct vclock *vclock);
 int
-log_io_sync(struct log_io *l);
-int
-log_io_close(struct log_io **lptr);
-void
-log_io_atfork(struct log_io **lptr);
+xlog_sync(struct xlog *l);
 
-struct log_io_cursor
+int
+xlog_rename(struct xlog *l);
+int
+xlog_close(struct xlog **lptr);
+void
+xlog_atfork(struct xlog **lptr);
+
+struct xlog_cursor
 {
-	struct log_io *log;
+	struct xlog *log;
 	int row_count;
 	off_t good_offset;
 	bool eof_read;
 };
 
 void
-log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
+xlog_cursor_open(struct xlog_cursor *i, struct xlog *l);
 void
-log_io_cursor_close(struct log_io_cursor *i);
+xlog_cursor_close(struct xlog_cursor *i);
 
 int
-log_io_cursor_next(struct log_io_cursor *i, struct xrow_header *packet);
+xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *packet);
 int
 xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
@@ -135,7 +129,9 @@ typedef uint32_t log_magic_t;
 
 int
 inprogress_log_unlink(char *filename);
-int
-inprogress_log_rename(struct log_io *l);
 
-#endif /* TARANTOOL_LOG_IO_H_INCLUDED */
+char *
+format_filename(struct xdir *dir, int64_t signature, enum log_suffix suffix);
+
+
+#endif /* TARANTOOL_XLOG_H_INCLUDED */

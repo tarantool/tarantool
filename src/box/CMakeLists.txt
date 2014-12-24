@@ -21,6 +21,7 @@ add_library(box
     iproto_constants.c
     iproto_port.cc
     xrow.cc
+    xlog.cc
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
@@ -47,7 +48,6 @@ add_library(box
     authentication.cc
     vclock.c
     cluster.cc
-    log_io.cc
     recovery.cc
     replica.cc
     replication.cc

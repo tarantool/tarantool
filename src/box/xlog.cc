@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "log_io.h"
+#include "xlog.h"
 #include <dirent.h>
 #include <fcntl.h>
 
@@ -51,11 +51,11 @@ const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 const char inprogress_suffix[] = ".inprogress";
 const char v12[] = "0.12\n";
 
-/* {{{ struct log_dir */
+/* {{{ struct xdir */
 
 void
-log_dir_create(struct log_dir *dir, const char *dirname,
-	       enum log_dir_type type)
+xdir_create(struct xdir *dir, const char *dirname,
+	       enum xdir_type type)
 {
 	memset(dir, 0, sizeof(*dir));
 	vclockset_new(&dir->index);
@@ -90,10 +90,10 @@ vclockset_reset(vclockset_t *set) {
 }
 
 /**
- * Destroy log_dir object and free memory.
+ * Destroy xdir object and free memory.
  */
 void
-log_dir_destroy(struct log_dir *dir)
+xdir_destroy(struct xdir *dir)
 {
 	free(dir->dirname);
 	vclockset_reset(&dir->index);
@@ -104,21 +104,21 @@ log_dir_destroy(struct log_dir *dir)
  * in a given log directory.
  */
 static inline void
-log_dir_index_file(struct log_dir *dir, int64_t signature)
+xdir_index_file(struct xdir *dir, int64_t signature)
 {
 	/*
 	 * Open xlog and parse vclock in its text header.
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct log_io *wal = log_io_open_for_read(dir, signature, NULL,
+	struct xlog *wal = xlog_open(dir, signature, NULL,
 						  INPROGRESS);
 	if (wal == NULL) {
 		tnt_raise(ClientError, ER_INVALID_XLOG,
 			  format_filename(dir, signature, NONE));
 	}
 	auto log_guard = make_scoped_guard([&]{
-		log_io_close(&wal);
+		xlog_close(&wal);
 	});
 
 	/*
@@ -154,7 +154,7 @@ log_dir_index_file(struct log_dir *dir, int64_t signature)
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(*vclock), "log_dir", "vclockset");
+			  sizeof(*vclock), "xdir", "vclockset");
 	}
 	vclock_create(vclock);
 	vclock_copy(vclock, &wal->vclock);
@@ -188,7 +188,7 @@ cmp_i64(const void *_a, const void *_b)
  * created logs.
  */
 int
-log_dir_scan(struct log_dir *dir)
+xdir_scan(struct xdir *dir)
 {
 	ssize_t ext_len = strlen(dir->filename_ext);
 	DIR *dh = opendir(dir->dirname);
@@ -279,7 +279,7 @@ log_dir_scan(struct log_dir *dir)
 		}
 
 		try {
-			log_dir_index_file(dir, signts[i]);
+			xdir_index_file(dir, signts[i]);
 		} catch (ClientError *e) {
 			e->log();
 			say_warn("failed to scan %s",
@@ -294,7 +294,7 @@ log_dir_scan(struct log_dir *dir)
 }
 
 char *
-format_filename(struct log_dir *dir, int64_t signt, enum log_suffix suffix)
+format_filename(struct xdir *dir, int64_t signt, enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
 	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
@@ -305,7 +305,7 @@ format_filename(struct log_dir *dir, int64_t signt, enum log_suffix suffix)
 
 /* }}} */
 
-/* {{{ struct log_io_cursor */
+/* {{{ struct xlog_cursor */
 
 /**
  * @retval 0 success
@@ -406,7 +406,7 @@ xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 }
 
 void
-log_io_cursor_open(struct log_io_cursor *i, struct log_io *l)
+xlog_cursor_open(struct xlog_cursor *i, struct xlog *l)
 {
 	i->log = l;
 	i->row_count = 0;
@@ -415,9 +415,9 @@ log_io_cursor_open(struct log_io_cursor *i, struct log_io *l)
 }
 
 void
-log_io_cursor_close(struct log_io_cursor *i)
+xlog_cursor_close(struct xlog_cursor *i)
 {
-	struct log_io *l = i->log;
+	struct xlog *l = i->log;
 	l->rows += i->row_count;
 	/*
 	 * Since we don't close log_io
@@ -439,15 +439,15 @@ log_io_cursor_close(struct log_io_cursor *i)
  *
  */
 int
-log_io_cursor_next(struct log_io_cursor *i, struct xrow_header *row)
+xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 {
-	struct log_io *l = i->log;
+	struct xlog *l = i->log;
 	log_magic_t magic;
 	off_t marker_offset = 0;
 
 	assert(i->eof_read == false);
 
-	say_debug("log_io_cursor_next: marker:0x%016X/%zu",
+	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
 		  row_marker, sizeof(row_marker));
 
 #if 0
@@ -536,7 +536,7 @@ eof:
 /* }}} */
 
 int
-inprogress_log_rename(struct log_io *l)
+xlog_rename(struct xlog *l)
 {
 	char *filename = l->filename;
 	char new_filename[PATH_MAX];
@@ -580,12 +580,12 @@ inprogress_log_unlink(char *filename)
 	return 0;
 }
 
-/* {{{ struct log_io */
+/* {{{ struct xlog */
 
 int
-log_io_close(struct log_io **lptr)
+xlog_close(struct xlog **lptr)
 {
-	struct log_io *l = *lptr;
+	struct xlog *l = *lptr;
 	int r;
 
 	if (l->mode == LOG_WRITE) {
@@ -597,8 +597,8 @@ log_io_close(struct log_io **lptr)
 		 * Do not sync if the file is opened with O_SYNC.
 		 */
 		if (! strchr(l->dir->open_wflags, 's'))
-			log_io_sync(l);
-		if (l->is_inprogress && inprogress_log_rename(l) != 0)
+			xlog_sync(l);
+		if (l->is_inprogress && xlog_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
 	}
 
@@ -614,9 +614,9 @@ log_io_close(struct log_io **lptr)
  * effects (for use in the atfork handler).
  */
 void
-log_io_atfork(struct log_io **lptr)
+xlog_atfork(struct xlog **lptr)
 {
-	struct log_io *l = *lptr;
+	struct xlog *l = *lptr;
 	if (l) {
 		/*
 		 * Close the file descriptor STDIO buffer does not
@@ -643,7 +643,7 @@ sync_cb(eio_req *req)
 }
 
 int
-log_io_sync(struct log_io *l)
+xlog_sync(struct xlog *l)
 {
 	if (l->dir->sync_is_async) {
 		int fd = dup(fileno(l->f));
@@ -663,7 +663,7 @@ log_io_sync(struct log_io *l)
 #define VCLOCK_KEY "VClock"
 
 static int
-log_io_write_meta(struct log_io *l, const tt_uuid *server_uuid,
+xlog_write_meta(struct xlog *l, const tt_uuid *server_uuid,
 		  const struct vclock *vclock)
 {
 	char *vstr = NULL;
@@ -687,10 +687,10 @@ log_io_write_meta(struct log_io *l, const tt_uuid *server_uuid,
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, const tt_uuid *server_uuid)
+xlog_verify_meta(struct xlog *l, const tt_uuid *server_uuid)
 {
 	char filetype[32], version[32], buf[256];
-	struct log_dir *dir = l->dir;
+	struct xdir *dir = l->dir;
 	FILE *stream = l->f;
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
@@ -756,12 +756,12 @@ log_io_verify_meta(struct log_io *l, const tt_uuid *server_uuid)
 	return 0;
 }
 
-struct log_io *
-log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
+struct xlog *
+xlog_open_stream(struct xdir *dir, const char *filename,
 			    const tt_uuid *server_uuid, enum log_suffix suffix,
 			    FILE *file)
 {
-	struct log_io *l = NULL;
+	struct xlog *l = NULL;
 	int save_errno;
 	/*
 	 * Check fopen() result the caller first thing, to
@@ -772,7 +772,7 @@ log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
 		say_syserror("%s: failed to open file", filename);
 		goto error_1;
 	}
-	l = (struct log_io *) calloc(1, sizeof(*l));
+	l = (struct xlog *) calloc(1, sizeof(*l));
 	if (l == NULL) {
 		save_errno = errno;
 		say_syserror("%s: out of memory", filename);
@@ -784,7 +784,7 @@ log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
 	l->dir = dir;
 	l->is_inprogress = (suffix == INPROGRESS);
 	vclock_create(&l->vclock);
-	if (log_io_verify_meta(l, server_uuid) != 0) {
+	if (xlog_verify_meta(l, server_uuid) != 0) {
 		save_errno = EINVAL;
 		goto error_3;
 	}
@@ -799,8 +799,8 @@ error_1:
 	return NULL;
 }
 
-struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t signature,
+struct xlog *
+xlog_open(struct xdir *dir, int64_t signature,
 		     const tt_uuid *server_uuid, enum log_suffix suffix)
 {
 	const char *filename = format_filename(dir, signature, suffix);
@@ -810,20 +810,20 @@ log_io_open_for_read(struct log_dir *dir, int64_t signature,
 		f = fopen(filename, "r");
 		suffix = NONE;
 	}
-	return log_io_open_stream_for_read(dir, filename, server_uuid, suffix, f);
+	return xlog_open_stream(dir, filename, server_uuid, suffix, f);
 }
 
 /**
  * In case of error, writes a message to the server log
  * and sets errno.
  */
-struct log_io *
-log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
+struct xlog *
+xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
 		      const struct vclock *vclock)
 {
 	char *filename;
 	FILE *f = NULL;
-	struct log_io *l = NULL;
+	struct xlog *l = NULL;
 
 	int64_t signt = vclock_signature(vclock);
 	assert(signt >= 0);
@@ -847,7 +847,7 @@ log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
 	if (!f)
 		goto error;
 	say_info("creating `%s'", filename);
-	l = (struct log_io *) calloc(1, sizeof(*l));
+	l = (struct xlog *) calloc(1, sizeof(*l));
 	if (l == NULL)
 		goto error;
 	l->f = f;
@@ -856,7 +856,7 @@ log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
 	l->dir = dir;
 	l->is_inprogress = true;
 	setvbuf(l->f, NULL, _IONBF, 0);
-	if (log_io_write_meta(l, server_uuid, vclock) != 0)
+	if (xlog_write_meta(l, server_uuid, vclock) != 0)
 		goto error;
 
 	return l;

@@ -43,7 +43,7 @@
 #include "tarantool.h"
 #include "fiber.h"
 #include "recovery.h"
-#include "log_io.h"
+#include "xlog.h"
 #include "evio.h"
 #include "iproto_constants.h"
 #include "box/cluster.h"
