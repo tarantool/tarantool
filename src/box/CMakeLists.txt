@@ -62,3 +62,5 @@ add_library(box
     lua/error.cc
     lua/session.cc
     ${bin_sources})
+
+# target_link_libraries(box salad)

@@ -73,3 +73,6 @@ add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/third_party/sha1.c
     ${CMAKE_SOURCE_DIR}/third_party/base64.c
     ${CMAKE_SOURCE_DIR}/src/random.c)
+
+add_executable(guava.test guava.c)
+target_link_libraries(guava.test salad)
