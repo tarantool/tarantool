@@ -560,11 +560,11 @@ box_snapshot_complete_engine(EngineFactory *f, void *udate)
 }
 
 static ssize_t
-box_snapshot_close_cb(va_list ap)
+box_snapshot_rename_cb(va_list ap)
 {
-	struct log_io *snap = va_arg(ap, struct log_io *);
+	uint64_t id = *va_arg(ap, uint64_t*);
 	int *status = va_arg(ap, int*);
-	*status = snapshot_complete(snap);
+	*status = snapshot_rename(&recovery->snap_dir, id);
 	return 0;
 }
 
@@ -582,14 +582,7 @@ box_snapshot(void)
 	fflush(stderr);
 
 	/* create snapshot file */
-	int rc, status;
-	pid_t pid;
 	uint64_t snap_lsn = vclock_signature(&recovery->vclock);
-	int snap_fd = -1;
-	struct log_io *snap;
-	snap = snapshot_create(recovery);
-	if (snap == NULL)
-		return errno;
 
 	/* create engine snapshot */
 	engine_foreach(box_snapshot_engine, &snap_lsn);
@@ -597,7 +590,9 @@ box_snapshot(void)
 	/* Due to fork nature, no threads are recreated.
 	 * This is the only consistency guarantee here for a
 	 * multi-threaded engine. */
-	pid = fork();
+	int rc;
+	int status;
+	pid_t pid = fork();
 	switch (pid) {
 	case -1:
 		say_syserror("fork");
@@ -609,10 +604,8 @@ box_snapshot(void)
 		fiber_set_name(fiber(), "dumper");
 		/* make sure we don't double-write parent stdio
 		 * buffers at exit() during panic */
-		snap_fd = fileno(snap->f);
-		close_all_xcpt(2, log_fd, snap_fd);
-		snapshot_write(recovery, snap);
-		snapshot_close(snap, false); /* do not rename yet */
+		close_all_xcpt(1, log_fd);
+		snapshot_save(recovery, false); /* do not rename snapshot */
 		exit(EXIT_SUCCESS);
 		return 0;
 	default: /* waiter */
@@ -628,17 +621,15 @@ box_snapshot(void)
 		status = EINTR;
 	else
 		status = WEXITSTATUS(status);
-	if (status != 0) {
-		engine_foreach(box_snapshot_delete_engine, &snap_lsn);
-		return status;
-	}
+	if (status != 0)
+		goto error;
 
 	/* wait for engine snapshot completion */
 	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
 
-	/* wait for snapshot close/sync */
-	rc = coeio_custom(box_snapshot_close_cb, TIMEOUT_INFINITY,
-	                  snap, &status);
+	/* rename snapshot on completion */
+	rc = coeio_custom(box_snapshot_rename_cb,
+	                  TIMEOUT_INFINITY, &snap_lsn, &status);
 	if (rc == -1 || status == -1)
 		goto error;
 
@@ -648,6 +639,8 @@ box_snapshot(void)
 error:
 	/* rollback snapshot creation */
 	engine_foreach(box_snapshot_delete_engine, &snap_lsn);
+	tuple_end_snapshot();
+	snapshot_pid = 0;
 	return -1;
 }
 
@@ -655,7 +648,7 @@ void
 box_deploy(struct recovery_state *r)
 {
 	/* create memtx snapshot */
-	snapshot_save(r);
+	snapshot_save(r, true);
 
 	/* create engine snapshot and for it completion */
 	uint64_t snap_lsn = vclock_signature(&r->vclock);

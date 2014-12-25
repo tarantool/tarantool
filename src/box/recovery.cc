@@ -1174,56 +1174,40 @@ snapshot_write_row(struct recovery_state *r, struct log_io *l,
 	}
 }
 
-inline struct log_io*
-snapshot_create(struct recovery_state *r)
+void
+snapshot_save(struct recovery_state *r, bool rename)
 {
 	assert(r->snapshot_handler != NULL);
 	struct log_io *snap = log_io_open_for_write(&r->snap_dir,
 		&r->server_uuid, &r->vclock);
-	if (snap)
-		log_io_flush(snap);
-	return snap;
-}
-
-inline void
-snapshot_write(struct recovery_state *r, struct log_io *snap)
-{
-	say_info("saving snapshot `%s'", snap->filename);
-	r->snapshot_handler(snap);
-}
-
-inline int
-snapshot_close(struct log_io *snap, bool rename)
-{
-	snap->is_inprogress = rename;
-	return log_io_close(&snap);
-}
-
-int
-snapshot_complete(struct log_io *snap)
-{
-	int rc = inprogress_log_rename(snap);
-	if (rc == -1)
-		return -1;
-	/* TODO: snap->f leakage here */
-	return rc;
-}
-
-void
-snapshot_save(struct recovery_state *r)
-{
+	if (snap == NULL)
+		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 	/*
 	 * While saving a snapshot, snapshot name is set to
 	 * <lsn>.snap.inprogress. When done, the snapshot is
 	 * renamed to <lsn>.snap.
 	 */
-	struct log_io *snap = snapshot_create(r);
-	if (snap == NULL)
-		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-	snapshot_write(r, snap);
-	int rc = snapshot_close(snap, true);
-	if (rc == 0)
-		say_info("done");
+	say_info("saving snapshot `%s'", snap->filename);
+
+	r->snapshot_handler(snap);
+
+	snap->is_inprogress = rename;
+	log_io_close(&snap);
+
+	say_info("done");
+}
+
+int snapshot_rename(struct log_dir *dir, int64_t id)
+{
+	char dest[PATH_MAX + 1];
+	snprintf(dest, sizeof(dest), "%s",
+	         format_filename(dir, id, NONE));
+	const char *from = format_filename(dir, id, INPROGRESS);
+	int rc = rename(from, dest);
+	if (rc == -1)
+		say_syserror("can't rename %s to %s", from, dest);
+	return rc;
 }
 
 /* }}} */
+

@@ -114,8 +114,6 @@ log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
 int
 log_io_sync(struct log_io *l);
 int
-log_io_flush(struct log_io *l);
-int
 log_io_close(struct log_io **lptr);
 void
 log_io_atfork(struct log_io **lptr);
