@@ -26,10 +26,10 @@ extra/bin2c
 extra/dist/tarantoolctl.1
 cmake_install.cmake
 config.mk
-doc/www/content/docs/dev_guide.html
-doc/www/content/docs/tnt.css
-doc/www/content/docs/user_guide.html
-doc/www/content/docs/user_guide/
+doc/www/content/doc/dev_guide.html
+doc/www/content/doc/tnt.css
+doc/www/content/doc/user_guide.html
+doc/www/content/doc/user_guide/
 doc/developer/dev_guide.txt
 doc/man/tarantool.1
 doc/man/tarantool_box.1

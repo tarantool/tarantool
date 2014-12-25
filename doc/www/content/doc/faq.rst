@@ -1,6 +1,7 @@
 :title: FAQ's
 :slug: faq
-:save_as: faq.html
+:save_as: doc/faq.html
+:template: old_documentation
 
 -------------------------------------------------------------------------------
                            Frequently Asked Questions

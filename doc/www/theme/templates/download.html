@@ -1,0 +1,46 @@
+﻿{% extends "base" %}
+
+{% block header_scripts %}
+<script src="js/main.js"></script>
+{% endblock header_scripts %}
+
+{% block content %}
+<section class="b-lightgray_block b-downloads_top">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">{{ page.blocks.top.title }}</h2>
+    <div class="b-section-text">{{ page.blocks.top.content }}</div>
+  </div>
+</section>
+<section class="b-block b-downloads">
+  <div class="b-block-wrapper">
+    <ul class="b-download-list">
+      {% for item in page.blocks.binarylist %}
+      <li class="b-download-list-item">
+        <a href="#" class="b-download-list-item-url">{{ item[0] }}</a>
+        <div class="b-download-list-item-drop">{{ item[1] }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+<section class="b-lightgray_block b-downloads_top">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">{{ page.blocks.gimemore.title }}</h2>
+    <div class="b-section-text">{{ page.blocks.gimemore.content }}</div>
+  </div>
+</section>
+<section class="b-block b-downloads">
+  <div class="b-block-wrapper">
+    <ul class="b-download-list">
+      {% for item in page.blocks.gimemorelist %}
+      <li class="b-download-list-item">
+        <a href="#" class="b-download-list-item-url">{{ item[0] }}</a>
+        <div class="b-download-list-item-drop">{{ item[1] }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}
