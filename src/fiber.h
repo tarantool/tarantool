@@ -202,23 +202,14 @@ cord_start(struct cord *cord, const char *name,
 int
 cord_join(struct cord *cord);
 
-/**
- * \brief Yield until \a cord has terminated.
- * If \a cord has terminated with an uncaught exception
- * **re-throws** this exception in the calling cord/fiber.
- * \param cord cord
- * \sa pthread_join()
- * \return 0 on success
- */
-int
-cord_cojoin(struct cord *cord);
-
 static inline void
 cord_set_name(const char *name)
 {
 	snprintf(cord()->name, FIBER_NAME_MAX, "%s", name);
 }
 
+void
+cord_destroy(struct cord *cord);
 
 void fiber_init(void);
 void fiber_free(void);
@@ -233,7 +224,7 @@ fiber_name(struct fiber *f)
 	return region_name(&f->gc);
 }
 
-void
+bool
 fiber_checkstack();
 
 void fiber_yield(void);

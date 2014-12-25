@@ -232,8 +232,7 @@ region_alloc(struct region *region, size_t size)
 {
 	void *ptr = region_alloc_nothrow(region, size);
 	if (ptr == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  size, "region", "new slab");
+		tnt_raise(OutOfMemory, size, "region", "new slab");
 	return ptr;
 }
 

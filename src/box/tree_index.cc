@@ -29,7 +29,6 @@
 #include "tree_index.h"
 #include "tuple.h"
 #include "space.h"
-#include "exception.h"
 #include "errinj.h"
 #include "memory.h"
 #include "fiber.h"

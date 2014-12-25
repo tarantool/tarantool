@@ -33,11 +33,9 @@
 #include <string.h>
 
 #include "say.h"
-#include "stat.h"
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
-#include "coeio.h"
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -76,12 +74,13 @@ fiber_call(struct fiber *callee, ...)
 	va_end(callee->f_data);
 }
 
-void
+bool
 fiber_checkstack()
 {
 	struct cord *cord = cord();
 	if (cord->sp + 1 - cord->stack >= FIBER_CALL_STACK)
-		tnt_raise(ClientError, ER_FIBER_STACK);
+		return true;
+	return false;
 }
 
 /** Interrupt a synchronous wait of a fiber inside the event loop.
@@ -397,10 +396,7 @@ fiber_loop(void *data __attribute__((unused)))
 		} catch (Exception *e) {
 			e->log();
 		} catch (...) {
-			/*
-			 * This can only happen in case of a bug
-			 * server bug.
-			 */
+			/* This can only happen in case of a server bug. */
 			say_error("fiber `%s': unknown exception",
 				fiber_name(fiber()));
 			panic("fiber `%s': exiting", fiber_name(fiber()));
@@ -636,29 +632,6 @@ cord_join(struct cord *cord)
 	}
 	cord_destroy(cord);
 	return res;
-}
-
-ssize_t
-cord_cojoin_cb(va_list ap)
-{
-	struct cord *cord = va_arg(ap, struct cord *);
-	void *retval = NULL;
-	int res = tt_pthread_join(cord->id, &retval);
-	return res;
-}
-
-int
-cord_cojoin(struct cord *cord)
-{
-	assert(cord() != cord); /* Can't join self. */
-	int rc = coeio_custom(cord_cojoin_cb, TIMEOUT_INFINITY, cord);
-	if (rc == 0 && cord->exception) {
-		Exception::move(cord, cord());
-		cord_destroy(cord);
-		cord()->exception->raise(); /* re-throw exception from cord */
-	}
-	cord_destroy(cord);
-	return rc;
 }
 
 void

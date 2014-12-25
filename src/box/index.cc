@@ -33,7 +33,6 @@
 #include "sophia_index.h"
 #include "tuple.h"
 #include "say.h"
-#include "exception.h"
 #include "schema.h"
 
 STRS(iterator_type, ITERATOR_TYPE);

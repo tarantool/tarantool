@@ -30,10 +30,11 @@
  */
 #include "object.h"
 #include <stdarg.h>
-#include "errcode.h"
 #include "say.h"
 
 struct cord;
+
+enum { TNT_ERRMSG_MAX = 512 };
 
 class Exception: public Object {
 public:
@@ -51,7 +52,7 @@ public:
 		return m_errmsg;
 	}
 
-	virtual void log() const = 0;
+	virtual void log() const;
 	virtual ~Exception() {}
 
 	static void init(struct cord *cord);
@@ -84,7 +85,7 @@ public:
 	int
 	errnum() const
 	{
-		return m_errnum;
+		return m_errno;
 	}
 
 	virtual void log() const;
@@ -98,60 +99,16 @@ protected:
 	void
 	init(const char *format, va_list ap);
 
-private:
+protected:
 	/* system errno */
-	int m_errnum;
+	int m_errno;
 };
 
-class ClientError: public Exception {
+class OutOfMemory: public SystemError {
 public:
-	virtual void raise()
-	{
-		throw this;
-	}
-
-	virtual void log() const;
-
-	int
-	errcode() const
-	{
-		return m_errcode;
-	}
-
-	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
-	/* A special constructor for lbox_raise */
-	ClientError(const char *file, unsigned line, const char *msg,
-		    uint32_t errcode);
-private:
-	/* client errno code */
-	int m_errcode;
-};
-
-extern ClientError out_of_memory;
-
-class LoggedError: public ClientError {
-public:
-	template <typename ... Args>
-	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
-		: ClientError(file, line, errcode, args...)
-	{
-		/* TODO: actually calls ClientError::log */
-		log();
-	}
-};
-
-class IllegalParams: public LoggedError {
-public:
-	template <typename ... Args>
-	IllegalParams(const char *file, unsigned line, const char *format,
-		      Args ... args)
-		:LoggedError(file, line, ER_ILLEGAL_PARAMS,
-			     format, args...) {}
-};
-
-class ErrorInjection: public LoggedError {
-public:
-	ErrorInjection(const char *file, unsigned line, const char *msg);
+	OutOfMemory(const char *file, unsigned line,
+		    size_t amount, const char *allocator,
+		    const char *object);
 };
 
 #define tnt_raise(...) tnt_raise0(__VA_ARGS__)

@@ -430,11 +430,12 @@ tarantool_lua_utils_init(struct lua_State *L);
 } /* extern "C" */
 
 #include "exception.h"
+class LuajitError: public Exception {
+public:
+	LuajitError(const char *file, unsigned line,
+		    struct lua_State *L);
+};
 
-/**
- * A wrapper around lua_call() which converts Lua error(...)
- * to ER_PROC_LUA
- */
 static inline void
 lbox_call(struct lua_State *L, int nargs, int nreturns)
 {
@@ -445,14 +446,15 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 		throw;
 	} catch (...) {
 		/* Convert Lua error to a Tarantool exception. */
-		const char *msg = lua_tostring(L, -1);
-		tnt_raise(ClientError, ER_PROC_LUA, msg ? msg : "");
+		tnt_raise(LuajitError, L);
 	}
 }
 
 /**
  * Single global lua_State shared by core and modules.
  * Created with tarantool_lua_init().
+ * const char *msg = lua_tostring(L, -1);
+ * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
 

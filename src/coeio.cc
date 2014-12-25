@@ -283,3 +283,27 @@ coeio_resolve(int socktype, const char *host, const char *port,
 		return NULL;
 	return result;
 }
+
+ssize_t
+cord_cojoin_cb(va_list ap)
+{
+	struct cord *cord = va_arg(ap, struct cord *);
+	void *retval = NULL;
+	int res = tt_pthread_join(cord->id, &retval);
+	return res;
+}
+
+int
+cord_cojoin(struct cord *cord)
+{
+	assert(cord() != cord); /* Can't join self. */
+	int rc = coeio_custom(cord_cojoin_cb, TIMEOUT_INFINITY, cord);
+	if (rc == 0 && cord->exception) {
+		Exception::move(cord, cord());
+		cord_destroy(cord);
+		cord()->exception->raise(); /* re-throw exception from cord */
+	}
+	cord_destroy(cord);
+	return rc;
+}
+

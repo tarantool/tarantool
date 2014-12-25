@@ -192,7 +192,7 @@ vclockset_isearch(vclockset_t *set, struct vclock *key)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-#include "exception.h"
+#include "error.h"
 
 /**
  * Allocate a new vclock object and initialize it

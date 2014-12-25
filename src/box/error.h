@@ -1,4 +1,5 @@
-#include "errcode.h"
+#ifndef TARANTOOL_BOX_ERROR_H_INCLUDED
+#define TARANTOOL_BOX_ERROR_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -27,14 +28,58 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "errcode.h"
+#include "exception.h"
 
-#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
-	.errstr = #s,				\
-	.errflags = f,				\
-	.errdesc = d				\
-},
+class ClientError: public Exception {
+public:
+	virtual void raise()
+	{
+		throw this;
+	}
 
-struct errcode_record tnt_error_codes[tnt_error_codes_enum_MAX] = {
-	ERROR_CODES(ERRCODE_RECORD_MEMBER)
+	virtual void log() const;
+
+	int
+	errcode() const
+	{
+		return m_errcode;
+	}
+
+	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
+	/* A special constructor for lbox_raise */
+	ClientError(const char *file, unsigned line, const char *msg,
+		    uint32_t errcode);
+
+	static uint32_t get_code_for_foreign_exception(const Exception *e);
+private:
+	/* client errno code */
+	int m_errcode;
 };
 
+class LoggedError: public ClientError {
+public:
+	template <typename ... Args>
+	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
+		: ClientError(file, line, errcode, args...)
+	{
+		/* TODO: actually calls ClientError::log */
+		log();
+	}
+};
+
+class IllegalParams: public LoggedError {
+public:
+	template <typename ... Args>
+	IllegalParams(const char *file, unsigned line, const char *format,
+		      Args ... args)
+		:LoggedError(file, line, ER_ILLEGAL_PARAMS,
+			     format, args...) {}
+};
+
+class ErrorInjection: public LoggedError {
+public:
+	ErrorInjection(const char *file, unsigned line, const char *msg);
+};
+
+#endif /* TARANTOOL_BOX_ERROR_H_INCLUDED */

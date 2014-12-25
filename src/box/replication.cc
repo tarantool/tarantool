@@ -51,6 +51,7 @@
 #include "box/vclock.h"
 #include "scoped_guard.h"
 #include "xrow.h"
+#include "coeio.h"
 
 /** Replication topology
  * ----------------------

@@ -49,11 +49,15 @@ target_link_libraries(rtree_itr.test)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
 add_executable(vclock.test vclock.cc test.c
-    ${CMAKE_SOURCE_DIR}/src/box/vclock.c)
-target_link_libraries(vclock.test core small
-    ${LIBEV_LIBRARIES} ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES})
+    ${CMAKE_SOURCE_DIR}/src/box/vclock.c
+    ${CMAKE_SOURCE_DIR}/src/box/errcode.c
+    ${CMAKE_SOURCE_DIR}/src/box/error.cc)
+target_link_libraries(vclock.test core small)
 add_executable(quota.test quota.cc test.c)
 target_link_libraries(quota.test pthread)
+
+add_executable(fiber.test fiber.cc)
+target_link_libraries(fiber.test core)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

@@ -30,7 +30,7 @@
  */
 #include "trivia/util.h"
 #include "salad/rlist.h"
-#include <exception.h>
+#include "error.h"
 #include "msgpuck/msgpuck.h"
 #define RB_COMPACT 1
 #include "third_party/rb.h"

@@ -42,9 +42,25 @@ add_custom_target(ragel
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND ragel -G2 src/uri.rl -o src/uri.c)
 
-set (common_sources
+set (core_sources
+     say.cc
      memory.cc
      fiber.cc
+     exception.cc
+     coro.cc
+     object.cc
+     assoc.c
+ )
+
+add_library(core STATIC ${core_sources})
+target_link_libraries(core
+    salad small
+    ${LIBEV_LIBRARIES}
+    ${LIBEIO_LIBRARIES}
+    ${LIBCORO_LIBRARIES}
+)
+
+set (server_sources
      util.cc
      find_path.c
      sio.cc
@@ -54,15 +70,9 @@ set (common_sources
      iobuf.cc
      coio_buf.cc
      pickle.cc
-     coro.cc
      stat.cc
-     object.cc
-     exception.cc
      ipc.cc
      errinj.cc
-     errcode.c
-     assoc.c
-     say.cc
      fio.c
      crc32.c
      random.c
@@ -90,29 +100,22 @@ set (common_sources
 )
 
 if (ENABLE_TRACE)
-    set (common_sources ${common_sources} trace.c)
+    set (server_sources ${server_sources} trace.c)
 endif()
 
-set_source_files_compile_flags(${common_sources})
-add_library(core STATIC ${common_sources})
-target_link_libraries(core pthread)
+set_source_files_compile_flags(${server_sources})
+add_library(server STATIC ${server_sources})
+target_link_libraries(server core pthread)
 
-set (common_libraries core small salad misc bitset msgpuck)
+set (common_libraries server core misc bitset msgpuck)
 
 list(APPEND common_libraries
-    ${LIBEV_LIBRARIES}
-    ${LIBEIO_LIBRARIES}
-    ${LIBCORO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
     ${LIBCJSON_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
     ${LUAJIT_LIB}
 )
-
-set (THREAD_LIB pthread)
-
-set (common_libraries ${common_libraries} ${THREAD_LIB})
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
     set (common_libraries ${common_libraries} dl)

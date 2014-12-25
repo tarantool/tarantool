@@ -29,7 +29,6 @@
 #include "hash_index.h"
 #include "say.h"
 #include "tuple.h"
-#include "exception.h"
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"

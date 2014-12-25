@@ -51,8 +51,7 @@ tarantool_coro_create(struct tarantool_coro *coro,
 					+ slab_sizeof();
 
 	if (coro->stack == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sizeof(coro->stack_size),
+		tnt_raise(OutOfMemory, sizeof(coro->stack_size),
 			  "mmap", "coro stack");
 	}
 

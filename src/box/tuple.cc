@@ -33,7 +33,6 @@
 
 #include "key_def.h"
 #include "tuple_update.h"
-#include <exception.h>
 #include <stdio.h>
 
 /** Global table of tuple formats */

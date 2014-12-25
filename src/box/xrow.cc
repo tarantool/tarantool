@@ -28,7 +28,6 @@
  */
 #include "xrow.h"
 #include "msgpuck/msgpuck.h"
-#include "exception.h"
 #include "fiber.h"
 #include "tt_uuid.h"
 #include "vclock.h"

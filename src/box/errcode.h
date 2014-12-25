@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ERRCODE_H_INCLUDED
-#define TARANTOOL_ERRCODE_H_INCLUDED
+#ifndef TARANTOOL_BOX_ERRCODE_H_INCLUDED
+#define TARANTOOL_BOX_ERRCODE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,13 +32,15 @@
 
 #include "trivia/util.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct errcode_record {
 	const char *errstr;
 	const char *errdesc;
 	uint8_t errflags;
 };
-
-enum { TNT_ERRMSG_MAX = 512 };
 
 /*
  * To add a new error code to Tarantool, extend this array.
@@ -172,4 +174,8 @@ static inline const char *tnt_errcode_desc(uint32_t errcode)
 	return tnt_error_codes[errcode].errdesc;
 }
 
-#endif /* TARANTOOL_ERRCODE_H_INCLUDED */
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
+
+#endif /* TARANTOOL_BOX_ERRCODE_H_INCLUDED */

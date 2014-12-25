@@ -34,8 +34,6 @@
 
 #include "iproto_port.h"
 #include "tarantool.h"
-#include "exception.h"
-#include "errcode.h"
 #include "fiber.h"
 #include "say.h"
 #include "evio.h"
@@ -584,7 +582,7 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 		nwr = sio_writev(fd, iov, iovcnt);
 
 		sio_add_to_iov(iov, svp->iov_len);
-	} catch (Exception *) {
+	} catch (SocketError *) {
 		sio_add_to_iov(iov, svp->iov_len);
 		throw;
 	}
@@ -660,7 +658,7 @@ iproto_process_dml(struct iproto_request *ireq)
 	iproto_port_init(&port, out, ireq->header.sync);
 	try {
 		box_process((struct port *) &port, &ireq->request);
-	} catch (ClientError *e) {
+	} catch (Exception *e) {
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
 		iproto_reply_error(out, e, ireq->header.sync);
@@ -714,7 +712,7 @@ iproto_process_admin(struct iproto_request *ireq)
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				   (uint32_t) ireq->header.type);
 		}
-	} catch (ClientError *e) {
+	} catch (Exception *e) {
 		say_error("admin command error: %s", e->errmsg());
 		iproto_reply_error(&iobuf->out, e, ireq->header.sync);
 	}
@@ -763,17 +761,17 @@ iproto_process_connect(struct iproto_request *request)
 			   IPROTO_GREETING_SIZE);
 		if (! rlist_empty(&session_on_connect))
 			session_run_on_connect_triggers(con->session);
-	} catch (ClientError *e) {
+	} catch (SocketError *e) {
+		e->log();
+		iproto_connection_close(con);
+		return;
+	} catch (Exception *e) {
 		iproto_reply_error(&iobuf->out, e, request->header.type);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
 		} catch (Exception *e) {
 			e->log();
 		}
-		iproto_connection_close(con);
-		return;
-	} catch (Exception *e) {
-		e->log();
 		iproto_connection_close(con);
 		return;
 	}

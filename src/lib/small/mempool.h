@@ -65,7 +65,7 @@ extern "C" {
  * ----------------
  * The only type of failure which can occur is a failure to
  * allocate memory. In case of such error, an exception
- * (ClientError, ER_OUT_OF_RESOURCES) is raised. _nothrow()
+ * (OutOfMemory) is raised. _nothrow()
  * version of mempool_alloc() returns NULL rather than raises an
  * error in case of failure.
  */
@@ -284,8 +284,8 @@ mempool_alloc(struct mempool *pool)
 {
 	void *ptr = mempool_alloc_nothrow(pool);
 	if (ptr == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  pool->objsize, "mempool", "new slab");
+		tnt_raise(OutOfMemory, pool->objsize,
+			  "mempool", "new slab");
 	return ptr;
 }
 

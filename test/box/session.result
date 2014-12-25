@@ -80,11 +80,11 @@ session.on_disconnect()
 ...
 session.on_connect(function() end, function() end)
 ---
-- error: Trigger is not found
+- error: 'trigger reset: Trigger is not found'
 ...
 session.on_disconnect(function() end, function() end)
 ---
-- error: Trigger is not found
+- error: 'trigger reset: Trigger is not found'
 ...
 session.on_connect(1, 2)
 ---

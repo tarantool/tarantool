@@ -20,6 +20,8 @@ add_library(box
     iproto.cc
     iproto_constants.c
     iproto_port.cc
+    errcode.c
+    error.cc
     xrow.cc
     xlog.cc
     tuple.cc

@@ -33,7 +33,7 @@
 #include "third_party/queue.h"
 
 #include "salad/rope.h"
-#include <exception.h>
+#include "error.h"
 #include "msgpuck/msgpuck.h"
 
 /** UPDATE request implementation.

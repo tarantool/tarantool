@@ -31,7 +31,6 @@
 #include "schema.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include "exception.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
