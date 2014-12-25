@@ -90,9 +90,6 @@ random_bytes(char *buf, size_t size)
 	}
 rand:
 	/* fill remaining bytes with PRNG */
-	generated -= generated % sizeof(int);
-	while (generated < size) {
-		*(int *)(buf + generated) = rand();
-		generated += sizeof(int);
-	}
+	while (generated < size)
+		buf[generated++] = rand();
 }
