@@ -56,7 +56,6 @@ add_library(core STATIC ${core_sources})
 target_link_libraries(core
     salad small pthread
     ${LIBEV_LIBRARIES}
-    ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
 )
 
@@ -110,6 +109,7 @@ target_link_libraries(server core)
 set (common_libraries server core misc bitset msgpuck)
 
 list(APPEND common_libraries
+    ${LIBEIO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
     ${LIBCJSON_LIBRARIES}
     ${LIBYAML_LIBRARIES}
@@ -152,10 +152,7 @@ set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
 add_executable(tarantool tarantool.cc)
 add_dependencies(tarantool build_bundled_libs)
-target_link_libraries(tarantool
-    box
-    ${sophia_lib}
-    ${common_libraries})
+target_link_libraries(tarantool box ${common_libraries})
 
 if (TARGET_OS_DARWIN)
     # Necessary to make LuaJIT work on Darwin, see

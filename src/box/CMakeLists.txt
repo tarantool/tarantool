@@ -65,4 +65,4 @@ add_library(box
     lua/session.cc
     ${bin_sources})
 
-# target_link_libraries(box salad)
+target_link_libraries(box ${sophia_lib})
