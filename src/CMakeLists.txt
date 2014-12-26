@@ -54,7 +54,7 @@ set (core_sources
 
 add_library(core STATIC ${core_sources})
 target_link_libraries(core
-    salad small
+    salad small pthread
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
@@ -105,7 +105,7 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
-target_link_libraries(server core pthread)
+target_link_libraries(server core)
 
 set (common_libraries server core misc bitset msgpuck)
 
