@@ -986,6 +986,17 @@ box.schema.func.drop = function(name)
     _func:delete{fid}
 end
 
+function box.schema.func.exists(name_or_id)
+    local _func = box.space[box.schema.FUNC_ID]
+    local tuple 
+    if type(name_or_id) == 'string' then
+        tuple = _func.index.name:get{name_or_id}
+    else
+        tuple = _func:get{name_or_id}
+    end
+    return tuple ~= nil
+end
+
 box.schema.user = {}
 
 box.schema.user.password = function(password)

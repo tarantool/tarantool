@@ -499,3 +499,24 @@ box.schema.user.exists{}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
+-- gh-671: box.schema.func.exists()
+box.schema.func.exists('nosuchfunc')
+---
+- false
+...
+box.schema.func.exists('guest')
+---
+- false
+...
+box.schema.func.exists(1)
+---
+- true
+...
+box.schema.func.exists(2)
+---
+- false
+...
+box.schema.func.exists('box.schema.user.info')
+---
+- true
+...
