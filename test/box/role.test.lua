@@ -303,3 +303,17 @@ box.schema.user.drop('john')
 
 -- test ER_GRANT
 box.space._priv:insert{1, 0, 'universe', 0, 0}
+-- role.exists()
+--
+-- true if the role is present
+box.schema.role.exists('public')
+-- for if there is no such role
+box.schema.role.exists('nosuchrole')
+-- false for users
+box.schema.role.exists('guest')
+-- false for users
+box.schema.role.exists('admin')
+-- role id is ok
+box.schema.role.exists(3)
+-- user id 
+box.schema.role.exists(0)

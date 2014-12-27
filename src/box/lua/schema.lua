@@ -74,6 +74,21 @@ local function user_resolve(user)
     return tuple[1]
 end
 
+local function role_resolve(name_or_id)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple
+    if type(name_or_id) == 'string' then
+        tuple = _user.index.name:get{name_or_id}
+    else
+        tuple = _user:get{name_or_id}
+    end
+    if tuple == nil or tuple[4] ~= 'role' then
+        return nil
+    else
+        return tuple[1]
+    end
+end
+
 --[[
  @brief Common function to check table with parameters (like options)
  @param table - table with parameters
@@ -1154,6 +1169,14 @@ box.schema.user.info = function(user_name)
 end
 
 box.schema.role = {}
+
+box.schema.role.exists = function(name)
+    if role_resolve(name) then
+        return true
+    else
+        return false
+    end
+end
 
 box.schema.role.create = function(name)
     local uid = user_resolve(name)
