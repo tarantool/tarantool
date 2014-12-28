@@ -3257,6 +3257,11 @@ The function for dropping a _func tuple is:
 </para>
 
 <para>
+The function for checking whether a _func tuple exists is:
+<code>box.schema.func.exists(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
 In the following example, a function named 'f7' is created,
 then it is put in the _func space, then it is used in a
 box.schema.user.grant function, then it is dropped:
@@ -3377,6 +3382,12 @@ directly or indirectly.
   <varlistentry>
     <term><emphasis role="lua" xml:id="role-9">box.schema.role.revoke(<replaceable>role-name</replaceable>, 'execute', 'role', <replaceable>role-name</replaceable>)</emphasis></term>
     <listitem><para>Revoke a role from a role.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua" xml:id="role-a">box.schema.role.exists(<replaceable>role-name</replaceable>)</emphasis></term>
+    <listitem><para>Check whether a role exists. Returns (type = boolean) <code>true</code> if role-name identifies a role, otherwise <code>false</code>.
     </para></listitem>
   </varlistentry>
 

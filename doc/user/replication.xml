@@ -151,7 +151,7 @@ the first server's databases can happen without conflicts.
 </para>
 <para>
 Step 3. Start the second server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#2</replaceable>, replication_source=<replaceable>uri#1</replaceable>}</userinput></programlisting>
-... where uri#1 = the primary port that the first server is listening on.
+... where uri#1 = the URI that the first server is listening on.
 </para>
 <para>
 That's all.

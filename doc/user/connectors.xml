@@ -150,6 +150,13 @@ box.schema.user.grant('guest','read','space','_space')
        Please see <link xlink:href="http://dgreenru.github.io/tarantool-java/"><filename>http://dgreenru.github.io/tarantool-java/</filename></link>.
     </para>
   </section>
+  
+  <section xml:id="connector-go">
+    <title>Go</title>
+    <para>
+       Please see <link xlink:href="https://github.com/mialinx/go-tarantool-1.6"><filename>https://github.com/mialinx/go-tarantool-1.6</filename></link>.
+    </para>
+  </section>
 
   <section xml:id="connector-perl">
     <title>Perl</title>
