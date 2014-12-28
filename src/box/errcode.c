@@ -1,3 +1,4 @@
+#include "errcode.h"
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,70 +27,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "random.h"
-#include <sys/types.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdlib.h>
+#include "errcode.h"
 
-static int rfd;
+#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
+	.errstr = #s,				\
+	.errflags = f,				\
+	.errdesc = d				\
+},
 
-void
-random_init(void)
-{
-	int seed;
-	rfd = open("/dev/urandom", O_RDONLY);
-	if (rfd == -1)
-		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
-	if (rfd == -1) {
-		struct timeval tv;
-		gettimeofday(&tv, 0);
-		seed = (getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec;
-		goto srand;
-	}
+struct errcode_record tnt_error_codes[tnt_error_codes_enum_MAX] = {
+	ERROR_CODES(ERRCODE_RECORD_MEMBER)
+};
 
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags != -1)
-		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
-
-	ssize_t res = read(rfd, &seed, sizeof(seed));
-	(void) res;
-srand:
-	srandom(seed);
-	srand(seed);
-}
-
-void
-random_free(void)
-{
-	if (rfd == -1)
-		return;
-	close(rfd);
-}
-
-void
-random_bytes(char *buf, size_t size)
-{
-	size_t generated = 0;
-
-	if (rfd == -1)
-		goto rand;
-
-	int attempt = 0;
-	while (generated < size) {
-		ssize_t n = read(rfd, buf + generated, size - generated);
-		if (n <= 0) {
-			if (attempt++ > 5)
-				break;
-			continue;
-		}
-		generated += n;
-		attempt = 0;
-	}
-rand:
-	/* fill remaining bytes with PRNG */
-	while (generated < size)
-		buf[generated++] = rand();
-}

@@ -90,7 +90,7 @@ lbox_trigger_reset(struct lua_State *L, int top,
 		luaL_unref(L, LUA_REGISTRYINDEX, (intptr_t) trg->data);
 
 	} else if (lua_isfunction(L, top)) {
-		tnt_raise(ClientError, ER_NO_SUCH_TRIGGER);
+		luaL_error(L, "trigger reset: Trigger is not found");
 	}
 	/*
 	 * During update of a trigger, we must preserve its

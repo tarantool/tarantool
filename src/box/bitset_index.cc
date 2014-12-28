@@ -32,7 +32,6 @@
 #include <string.h>
 
 #include "tuple.h"
-#include "exception.h"
 #include "bitset/index.h"
 
 static inline struct tuple *

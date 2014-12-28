@@ -277,8 +277,7 @@ smalloc(struct small_alloc *alloc, size_t size, const char *where)
 {
 	void *ptr = smalloc_nothrow(alloc, size);
 	if (ptr == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  size, "slab allocator", where);
+		tnt_raise(OutOfMemory, size, "slab allocator", where);
 	return ptr;
 }
 

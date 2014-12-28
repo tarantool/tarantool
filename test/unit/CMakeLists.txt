@@ -11,6 +11,7 @@ add_executable(uri.test uri.c test.c ${CMAKE_SOURCE_DIR}/src/uri.c)
 add_executable(fiob.test test.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)
+add_executable(mhash_bytemap.test mhash_bytemap.c)
 add_executable(rope_basic.test rope_basic.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c)
 add_executable(rope_avl.test rope_avl.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c)
 add_executable(rope_stress.test rope_stress.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c)
@@ -48,11 +49,15 @@ target_link_libraries(rtree_itr.test)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
 add_executable(vclock.test vclock.cc test.c
-    ${CMAKE_SOURCE_DIR}/src/box/vclock.c)
-target_link_libraries(vclock.test core small
-    ${LIBEV_LIBRARIES} ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES})
+    ${CMAKE_SOURCE_DIR}/src/box/vclock.c
+    ${CMAKE_SOURCE_DIR}/src/box/errcode.c
+    ${CMAKE_SOURCE_DIR}/src/box/error.cc)
+target_link_libraries(vclock.test core small)
 add_executable(quota.test quota.cc test.c)
 target_link_libraries(quota.test pthread)
+
+add_executable(fiber.test fiber.cc)
+target_link_libraries(fiber.test core)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test
@@ -72,3 +77,6 @@ add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/third_party/sha1.c
     ${CMAKE_SOURCE_DIR}/third_party/base64.c
     ${CMAKE_SOURCE_DIR}/src/random.c)
+
+add_executable(guava.test guava.c)
+target_link_libraries(guava.test salad)

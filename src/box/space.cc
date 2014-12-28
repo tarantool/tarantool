@@ -29,7 +29,6 @@
 #include "space.h"
 #include <stdlib.h>
 #include <string.h>
-#include <exception.h>
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "trigger.h"

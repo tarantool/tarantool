@@ -297,7 +297,7 @@ evio_service_init(ev_loop *loop,
 
 	struct uri u;
 	if (uri_parse(&u, uri) || u.service == NULL)
-		tnt_raise(IllegalParams, "invalid uri for bind: %s", uri);
+		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
 
 	snprintf(service->serv, sizeof(service->serv), "%.*s",
 		 (int) u.service_len, u.service);

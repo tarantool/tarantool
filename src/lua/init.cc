@@ -414,7 +414,7 @@ run_script(va_list ap)
 	}
 	try {
 		lbox_call(L, lua_gettop(L) - 1, 0);
-	} catch (ClientError *e) {
+	} catch (Exception *e) {
 		panic("%s", e->errmsg());
 	}
 

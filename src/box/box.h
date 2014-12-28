@@ -44,7 +44,7 @@ struct txn;
 struct tbuf;
 struct port;
 struct fio_batch;
-struct log_io;
+struct xlog;
 struct lua_State;
 
 /** To be called at program start. */

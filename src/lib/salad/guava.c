@@ -26,70 +26,30 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "random.h"
-#include <sys/types.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdlib.h>
 
-static int rfd;
+#include "lib/salad/guava.h"
 
-void
-random_init(void)
+#include <stdint.h>
+
+static const int64_t K = 2862933555777941757;
+static const double  D = 0x1.0p31;
+
+static inline double lcg(int64_t *state)
 {
-	int seed;
-	rfd = open("/dev/urandom", O_RDONLY);
-	if (rfd == -1)
-		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
-	if (rfd == -1) {
-		struct timeval tv;
-		gettimeofday(&tv, 0);
-		seed = (getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec;
-		goto srand;
-	}
-
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags != -1)
-		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
-
-	ssize_t res = read(rfd, &seed, sizeof(seed));
-	(void) res;
-srand:
-	srandom(seed);
-	srand(seed);
+	return (double )((int32_t)(((uint64_t )*state >> 33) + 1)) / D;
 }
 
-void
-random_free(void)
+int32_t
+guava(int64_t state, int32_t buckets)
 {
-	if (rfd == -1)
-		return;
-	close(rfd);
-}
-
-void
-random_bytes(char *buf, size_t size)
-{
-	size_t generated = 0;
-
-	if (rfd == -1)
-		goto rand;
-
-	int attempt = 0;
-	while (generated < size) {
-		ssize_t n = read(rfd, buf + generated, size - generated);
-		if (n <= 0) {
-			if (attempt++ > 5)
-				break;
-			continue;
-		}
-		generated += n;
-		attempt = 0;
+	int32_t candidate = 0;
+	int32_t next;
+	while (1) {
+		state = K * state + 1;
+		next = (int32_t)((candidate + 1) / lcg(&state));
+		if (next >= 0 && next < buckets)
+			candidate = next;
+		else
+			return candidate;
 	}
-rand:
-	/* fill remaining bytes with PRNG */
-	while (generated < size)
-		buf[generated++] = rand();
 }

@@ -60,7 +60,7 @@ ffi.cdef[[
     boxffi_txn_rollback();
 ]]
 
-local function user_resolve(user)
+local function user_or_role_resolve(user)
     local _user = box.space[box.schema.USER_ID]
     local tuple
     if type(user) == 'string' then
@@ -72,6 +72,36 @@ local function user_resolve(user)
         return nil
     end
     return tuple[1]
+end
+
+local function role_resolve(name_or_id)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple
+    if type(name_or_id) == 'string' then
+        tuple = _user.index.name:get{name_or_id}
+    else
+        tuple = _user:get{name_or_id}
+    end
+    if tuple == nil or tuple[4] ~= 'role' then
+        return nil
+    else
+        return tuple[1]
+    end
+end
+
+local function user_resolve(name_or_id)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple
+    if type(name_or_id) == 'string' then
+        tuple = _user.index.name:get{name_or_id}
+    else
+        tuple = _user:get{name_or_id}
+    end
+    if tuple == nil or tuple[4] ~= 'user' then
+        return nil
+    else
+        return tuple[1]
+    end
 end
 
 --[[
@@ -189,6 +219,7 @@ box.schema.space.create = function(name, options)
         id = 'number',
         field_count = 'number',
         user = 'string, number',
+        format = 'table'
     }
     local options_defaults = {
         engine = 'memtx',
@@ -216,14 +247,27 @@ box.schema.space.create = function(name, options)
     end
     local uid = nil
     if options.user then
-        uid = user_resolve(options.user)
+        uid = user_or_role_resolve(options.user)
     end
     if uid == nil then
         uid = session.uid()
     end
     local temporary = options.temporary and "temporary" or ""
-    _space:insert{id, uid, name, options.engine, options.field_count, temporary}
+    local format = options.format and options.format or {}
+    _space:insert{id, uid, name, options.engine, options.field_count, temporary, format}
     return box.space[id], "created"
+end
+
+-- space format - the metadata about space fields
+function box.schema.space.format(id, format)
+    _space = box.space._space
+    check_param(id, 'id', 'number')
+    check_param(format, 'format', 'table')
+    if format == nil then
+        return _space:get(id)[7]
+    else
+        _space:update(id, {{'=', 7, format}})
+    end
 end
 
 box.schema.create_space = box.schema.space.create
@@ -809,6 +853,9 @@ function box.schema.space.bless(space)
             _index:insert(keys[i])
         end
     end
+    space_mt.format = function(space, format)
+        return box.schema.space.format(space.id, format)
+    end
     space_mt.drop = function(space)
         return box.schema.space.drop(space.id)
     end
@@ -954,6 +1001,17 @@ box.schema.func.drop = function(name)
     _func:delete{fid}
 end
 
+function box.schema.func.exists(name_or_id)
+    local _func = box.space[box.schema.FUNC_ID]
+    local tuple 
+    if type(name_or_id) == 'string' then
+        tuple = _func.index.name:get{name_or_id}
+    else
+        tuple = _func:get{name_or_id}
+    end
+    return tuple ~= nil
+end
+
 box.schema.user = {}
 
 box.schema.user.password = function(password)
@@ -974,7 +1032,7 @@ box.schema.user.passwd = function(new_password)
 end
 
 box.schema.user.create = function(name, opts)
-    local uid = user_resolve(name)
+    local uid = user_or_role_resolve(name)
     if uid then
         box.error(box.error.USER_EXISTS, name)
     end
@@ -1000,7 +1058,7 @@ box.schema.user.exists = function(name)
 end
 
 box.schema.user.drop = function(name)
-    local uid = user_resolve(name)
+    local uid = user_or_role_resolve(name)
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, name)
     end
@@ -1040,7 +1098,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     if object_type == 'role' then
         privilege = 'execute'
     end
-    local uid = user_resolve(user_name)
+    local uid = user_or_role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, user_name)
     end
@@ -1049,7 +1107,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     if grantor == nil then
         grantor = session.uid()
     else
-        grantor = user_resolve(grantor)
+        grantor = user_or_role_resolve(grantor)
     end
     local _priv = box.space[box.schema.PRIV_ID]
     -- add the granted privilege to the current set
@@ -1086,7 +1144,7 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
         -- to prevent stupid mistakes with privilege name
         privilege = 'read,write,execute'
     end
-    local uid = user_resolve(user_name)
+    local uid = user_or_role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, name)
     end
@@ -1121,7 +1179,7 @@ box.schema.user.info = function(user_name)
     if user_name == nil then
         uid = box.session.uid()
     else
-        uid = user_resolve(user_name)
+        uid = user_or_role_resolve(user_name)
         if uid == nil then
             box.error(box.error.NO_SUCH_USER, user_name)
         end
@@ -1138,8 +1196,16 @@ end
 
 box.schema.role = {}
 
+box.schema.role.exists = function(name)
+    if role_resolve(name) then
+        return true
+    else
+        return false
+    end
+end
+
 box.schema.role.create = function(name)
-    local uid = user_resolve(name)
+    local uid = user_or_role_resolve(name)
     if uid then
         box.error(box.error.ROLE_EXISTS, name)
     end
@@ -1148,7 +1214,7 @@ box.schema.role.create = function(name)
 end
 
 box.schema.role.drop = function(name)
-    local uid = user_resolve(name)
+    local uid = user_or_role_resolve(name)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, name)
     end
@@ -1156,7 +1222,7 @@ box.schema.role.drop = function(name)
 end
 box.schema.role.grant = function(user_name, privilege, object_type,
                                  object_name, grantor)
-    local uid = user_resolve(user_name)
+    local uid = user_or_role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end
@@ -1165,7 +1231,7 @@ box.schema.role.grant = function(user_name, privilege, object_type,
 end
 box.schema.role.revoke = function(user_name, privilege, object_type,
                                   object_name)
-    local uid = user_resolve(user_name)
+    local uid = user_or_role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end

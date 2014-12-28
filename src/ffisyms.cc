@@ -11,6 +11,7 @@
 #include "lua/bsdsocket.h"
 #include "lua/digest.h"
 #include "base64.h"
+#include <lib/salad/guava.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -50,5 +51,6 @@ void *ffi_symbols[] = {
 	(void *) base64_decode,
 	(void *) base64_encode,
 	(void *) base64_bufsize,
-	(void *) SHA1internal
+	(void *) SHA1internal,
+	(void *) guava
 };

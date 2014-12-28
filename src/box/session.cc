@@ -32,7 +32,6 @@
 
 #include "assoc.h"
 #include "trigger.h"
-#include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
 #include "user.h"

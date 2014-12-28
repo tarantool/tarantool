@@ -35,10 +35,10 @@ extern "C" {
 } /* extern "C" */
 
 #include <fiber.h>
-#include <errcode.h>
 #include <errinj.h>
 
 #include "lua/utils.h"
+#include "box/error.h"
 
 static int
 lbox_raise(lua_State *L)

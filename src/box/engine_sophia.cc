@@ -36,7 +36,6 @@
 #include "index.h"
 #include "sophia_index.h"
 #include "space.h"
-#include "exception.h"
 #include "salad/rlist.h"
 #include <sophia.h>
 #include <stdlib.h>

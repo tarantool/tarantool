@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_ERROR_H_INCLUDED
+#define TARANTOOL_BOX_ERROR_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,70 +28,58 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "random.h"
-#include <sys/types.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdlib.h>
+#include "errcode.h"
+#include "exception.h"
 
-static int rfd;
-
-void
-random_init(void)
-{
-	int seed;
-	rfd = open("/dev/urandom", O_RDONLY);
-	if (rfd == -1)
-		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
-	if (rfd == -1) {
-		struct timeval tv;
-		gettimeofday(&tv, 0);
-		seed = (getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec;
-		goto srand;
+class ClientError: public Exception {
+public:
+	virtual void raise()
+	{
+		throw this;
 	}
 
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags != -1)
-		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
+	virtual void log() const;
 
-	ssize_t res = read(rfd, &seed, sizeof(seed));
-	(void) res;
-srand:
-	srandom(seed);
-	srand(seed);
-}
-
-void
-random_free(void)
-{
-	if (rfd == -1)
-		return;
-	close(rfd);
-}
-
-void
-random_bytes(char *buf, size_t size)
-{
-	size_t generated = 0;
-
-	if (rfd == -1)
-		goto rand;
-
-	int attempt = 0;
-	while (generated < size) {
-		ssize_t n = read(rfd, buf + generated, size - generated);
-		if (n <= 0) {
-			if (attempt++ > 5)
-				break;
-			continue;
-		}
-		generated += n;
-		attempt = 0;
+	int
+	errcode() const
+	{
+		return m_errcode;
 	}
-rand:
-	/* fill remaining bytes with PRNG */
-	while (generated < size)
-		buf[generated++] = rand();
-}
+
+	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
+	/* A special constructor for lbox_raise */
+	ClientError(const char *file, unsigned line, const char *msg,
+		    uint32_t errcode);
+
+	static uint32_t get_code_for_foreign_exception(const Exception *e);
+private:
+	/* client errno code */
+	int m_errcode;
+};
+
+class LoggedError: public ClientError {
+public:
+	template <typename ... Args>
+	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
+		: ClientError(file, line, errcode, args...)
+	{
+		/* TODO: actually calls ClientError::log */
+		log();
+	}
+};
+
+class IllegalParams: public LoggedError {
+public:
+	template <typename ... Args>
+	IllegalParams(const char *file, unsigned line, const char *format,
+		      Args ... args)
+		:LoggedError(file, line, ER_ILLEGAL_PARAMS,
+			     format, args...) {}
+};
+
+class ErrorInjection: public LoggedError {
+public:
+	ErrorInjection(const char *file, unsigned line, const char *msg);
+};
+
+#endif /* TARANTOOL_BOX_ERROR_H_INCLUDED */

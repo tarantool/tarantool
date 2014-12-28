@@ -775,3 +775,35 @@ box.space._priv:insert{1, 0, 'universe', 0, 0}
 ---
 - error: 'Incorrect grant arguments: the grant tuple has no privileges'
 ...
+-- role.exists()
+--
+-- true if the role is present
+box.schema.role.exists('public')
+---
+- true
+...
+-- for if there is no such role
+box.schema.role.exists('nosuchrole')
+---
+- false
+...
+-- false for users
+box.schema.role.exists('guest')
+---
+- false
+...
+-- false for users
+box.schema.role.exists('admin')
+---
+- false
+...
+-- role id is ok
+box.schema.role.exists(3)
+---
+- true
+...
+-- user id 
+box.schema.role.exists(0)
+---
+- false
+...

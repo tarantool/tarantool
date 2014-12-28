@@ -410,7 +410,7 @@ coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
 		sio_add_to_iov(iov, -offset);
 		nwr = sio_writev(fd, iov, iovcnt);
 		sio_add_to_iov(iov, offset);
-	} catch (Exception *e) {
+	} catch (SocketError *e) {
 		sio_add_to_iov(iov, offset);
 		throw;
 	}
@@ -578,6 +578,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 		iobuf = iobuf_new(iobuf_name);
 		f = fiber_new(fiber_name, service->handler);
 	} catch (Exception *e) {
+		e->log();
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(loop(), &coio);
 		if (iobuf)

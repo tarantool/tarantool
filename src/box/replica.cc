@@ -33,7 +33,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "log_io.h"
+#include "xlog.h"
 #include "fiber.h"
 #include "scoped_guard.h"
 #include "coio_buf.h"

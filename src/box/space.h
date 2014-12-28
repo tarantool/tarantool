@@ -32,7 +32,6 @@
 #include "key_def.h"
 #include "engine.h"
 #include "salad/rlist.h"
-#include <exception.h>
 
 struct space {
 	struct access access[BOX_USER_MAX];

@@ -29,7 +29,6 @@
 #include "box.h"
 #include "cluster.h"
 #include "recovery.h"
-#include "exception.h"
 
 /**
  * Globally unique identifier of this cluster.

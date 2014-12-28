@@ -36,7 +36,6 @@
 #include "rtree_index.h"
 #include "bitset_index.h"
 #include "space.h"
-#include "exception.h"
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>

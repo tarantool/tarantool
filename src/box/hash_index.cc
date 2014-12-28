@@ -29,7 +29,6 @@
 #include "hash_index.h"
 #include "say.h"
 #include "tuple.h"
-#include "exception.h"
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"
@@ -151,6 +150,7 @@ mh_index_hash_key(const char *key, const struct key_def *key_def)
 typedef struct tuple * mh_node_t;
 #define mh_name _index
 #define MH_SOURCE 1
+#define mh_bytemap 1
 #include "salad/mhash.h"
 
 /* {{{ HashIndex Iterators ****************************************/

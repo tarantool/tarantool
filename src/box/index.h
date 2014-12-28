@@ -33,7 +33,6 @@
 
 #include "object.h"
 #include "key_def.h"
-#include "exception.h"
 
 struct tuple;
 

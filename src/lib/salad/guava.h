@@ -1,4 +1,6 @@
-#include "errcode.h"
+#ifndef TARANTOOL_LIB_GUAVA_H_INCLUDED
+#define TARANTOOL_LIB_GUAVA_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,13 +30,17 @@
  * SUCH DAMAGE.
  */
 
-#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
-	.errstr = #s,				\
-	.errflags = f,				\
-	.errdesc = d				\
-},
+#include <stdint.h>
 
-struct errcode_record tnt_error_codes[tnt_error_codes_enum_MAX] = {
-	ERROR_CODES(ERRCODE_RECORD_MEMBER)
-};
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
+int32_t
+guava(int64_t state, int32_t buckets);
+
+#if defined(__cplusplus)
+} /* extern C */
+#endif
+
+#endif /* TARANTOOL_LIB_GUAVA_H_INCLUDED */

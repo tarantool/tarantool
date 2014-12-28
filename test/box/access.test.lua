@@ -203,3 +203,12 @@ box.schema.user.exists(100500)
 box.schema.user.exists('admin')
 box.schema.user.exists('nosuchuser')
 box.schema.user.exists{}
+-- gh-671: box.schema.func.exists()
+box.schema.func.exists('nosuchfunc')
+box.schema.func.exists('guest')
+box.schema.func.exists(1)
+box.schema.func.exists(2)
+box.schema.func.exists('box.schema.user.info')
+-- gh-665: user.exists() should nto be true for roles
+box.schema.user.exists('public')
+box.schema.role.exists('public')

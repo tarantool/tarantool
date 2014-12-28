@@ -100,8 +100,7 @@ static inline void
 obuf_init_pos(struct obuf *buf, size_t pos)
 {
 	if (pos >= IOBUF_IOV_MAX) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE, buf->pos,
-			  "obuf_init_pos", "iovec");
+		tnt_raise(OutOfMemory, buf->pos, "obuf_init_pos", "iovec");
 	}
 	buf->iov[pos].iov_base = NULL;
 	buf->iov[pos].iov_len = 0;

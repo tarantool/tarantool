@@ -193,19 +193,39 @@ digest.base64_decode(b) == s
 ...
 digest.base64_decode(nil)
 ---
-- error: 'builtin/digest.lua:89: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
 ...
 digest.base64_encode(nil)
 ---
-- error: 'builtin/digest.lua:78: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
 ...
 digest.base64_encode(123)
 ---
-- error: 'builtin/digest.lua:78: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
 ...
 digest.base64_decode(123)
 ---
-- error: 'builtin/digest.lua:89: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
+...
+digest.guava('hello', 0)
+---
+- error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''int64_t'')'
+...
+digest.guava(1, 'nope_')
+---
+- error: 'bad argument #2 to ''?'' (cannot convert ''string'' to ''int'')'
+...
+digest.guava(10863919174838991, 11)
+---
+- 8
+...
+digest.guava(2016238256797177309, 11)
+---
+- 7
+...
+digest.guava(1673758223894951030, 11)
+---
+- 7
 ...
 digest = nil
 ---

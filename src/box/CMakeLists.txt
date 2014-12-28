@@ -20,7 +20,10 @@ add_library(box
     iproto.cc
     iproto_constants.c
     iproto_port.cc
+    errcode.c
+    error.cc
     xrow.cc
+    xlog.cc
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
@@ -47,7 +50,6 @@ add_library(box
     authentication.cc
     vclock.c
     cluster.cc
-    log_io.cc
     recovery.cc
     replica.cc
     replication.cc
@@ -62,3 +64,5 @@ add_library(box
     lua/error.cc
     lua/session.cc
     ${bin_sources})
+
+target_link_libraries(box ${sophia_lib})

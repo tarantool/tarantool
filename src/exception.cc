@@ -33,10 +33,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <typeinfo>
 
-/* Statically allocate out-of-memory exception */
-ClientError out_of_memory(__FILE__, __LINE__, ER_MEMORY_ISSUE, 0,
-			  "exception", "new");
+static OutOfMemory out_of_memory(__FILE__, __LINE__,
+				 sizeof(OutOfMemory), "malloc", "exception");
 
 void *
 Exception::operator new(size_t size)
@@ -56,7 +56,7 @@ Exception::operator new(size_t size)
 		}
 		free(cord->exception);
 	}
-	cord->exception = (ClientError *) malloc(size);
+	cord->exception = (Exception *) malloc(size);
 	if (cord->exception) {
 		cord->exception_size = size;
 		return cord->exception;
@@ -112,9 +112,17 @@ Exception::Exception(const Exception& e)
 	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
 }
 
+void
+Exception::log() const
+{
+	_say(S_ERROR, m_file, m_line, "%s %s",
+	     typeid(*this).name(), m_errmsg);
+}
+
+
 SystemError::SystemError(const char *file, unsigned line)
 	: Exception(file, line),
-	  m_errnum(errno)
+	  m_errno(errno)
 {
 	/* nothing */
 }
@@ -137,42 +145,17 @@ SystemError::init(const char *format, va_list ap)
 void
 SystemError::log() const
 {
-	_say(S_SYSERROR, m_file, m_line, strerror(m_errnum), "SystemError %s",
+	_say(S_SYSERROR, m_file, m_line, strerror(m_errno), "SystemError %s",
 	     m_errmsg);
 }
 
-
-ClientError::ClientError(const char *file, unsigned line, uint32_t errcode, ...)
-	: Exception(file, line)
+OutOfMemory::OutOfMemory(const char *file, unsigned line,
+			 size_t amount, const char *allocator,
+			 const char *object)
+	:SystemError(file, line)
 {
-	m_errcode = errcode;
-	va_list ap;
-	va_start(ap, errcode);
-	vsnprintf(m_errmsg, sizeof(m_errmsg) - 1,
-		  tnt_errcode_desc(m_errcode), ap);
-	m_errmsg[sizeof(m_errmsg) - 1] = 0;
-	va_end(ap);
+	m_errno = ENOMEM;
+	snprintf(m_errmsg, sizeof(m_errmsg),
+		 "Failed to allocate %u bytes in %s for %s",
+		 (unsigned) amount, allocator, object);
 }
-
-ClientError::ClientError(const char *file, unsigned line, const char *msg,
-			 uint32_t errcode)
-	: Exception(file, line)
-{
-	m_errcode = errcode;
-	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
-	m_errmsg[sizeof(m_errmsg) - 1] = 0;
-}
-
-void
-ClientError::log() const
-{
-	_say(S_ERROR, m_file, m_line, NULL, "%s: %s", tnt_errcode_str(m_errcode),
-	     m_errmsg);
-}
-
-ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
-	: LoggedError(file, line, ER_INJECTION, msg)
-{
-	/* nothing */
-}
-

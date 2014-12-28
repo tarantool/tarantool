@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "exception.h"
+#include "error.h"
 #include <stdio.h> /* snprintf */
 
 enum schema_id {
@@ -162,6 +162,5 @@ func_by_name(const char *name, uint32_t name_len)
  */
 bool
 schema_find_grants(const char *type, uint32_t id);
-
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

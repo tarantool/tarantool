@@ -30,7 +30,6 @@
 #include "say.h"
 #include "tuple.h"
 #include "scoped_guard.h"
-#include "exception.h"
 #include "errinj.h"
 #include "schema.h"
 #include "space.h"

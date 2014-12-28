@@ -26,70 +26,50 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "random.h"
-#include <sys/types.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdlib.h>
+#include "error.h"
+#include <stdio.h>
+#include <typeinfo>
 
-static int rfd;
-
-void
-random_init(void)
+ClientError::ClientError(const char *file, unsigned line, uint32_t errcode, ...)
+	: Exception(file, line)
 {
-	int seed;
-	rfd = open("/dev/urandom", O_RDONLY);
-	if (rfd == -1)
-		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
-	if (rfd == -1) {
-		struct timeval tv;
-		gettimeofday(&tv, 0);
-		seed = (getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec;
-		goto srand;
-	}
+	m_errcode = errcode;
+	va_list ap;
+	va_start(ap, errcode);
+	vsnprintf(m_errmsg, sizeof(m_errmsg) - 1,
+		  tnt_errcode_desc(m_errcode), ap);
+	m_errmsg[sizeof(m_errmsg) - 1] = 0;
+	va_end(ap);
+}
 
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags != -1)
-		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
-
-	ssize_t res = read(rfd, &seed, sizeof(seed));
-	(void) res;
-srand:
-	srandom(seed);
-	srand(seed);
+ClientError::ClientError(const char *file, unsigned line, const char *msg,
+			 uint32_t errcode)
+	: Exception(file, line)
+{
+	m_errcode = errcode;
+	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
+	m_errmsg[sizeof(m_errmsg) - 1] = 0;
 }
 
 void
-random_free(void)
+ClientError::log() const
 {
-	if (rfd == -1)
-		return;
-	close(rfd);
+	_say(S_ERROR, m_file, m_line, NULL, "%s: %s", tnt_errcode_str(m_errcode),
+	     m_errmsg);
 }
 
-void
-random_bytes(char *buf, size_t size)
+
+uint32_t
+ClientError::get_code_for_foreign_exception(const Exception *e)
 {
-	size_t generated = 0;
-
-	if (rfd == -1)
-		goto rand;
-
-	int attempt = 0;
-	while (generated < size) {
-		ssize_t n = read(rfd, buf + generated, size - generated);
-		if (n <= 0) {
-			if (attempt++ > 5)
-				break;
-			continue;
-		}
-		generated += n;
-		attempt = 0;
-	}
-rand:
-	/* fill remaining bytes with PRNG */
-	while (generated < size)
-		buf[generated++] = rand();
+	if (typeid(*e) == typeid(OutOfMemory))
+		return ER_MEMORY_ISSUE;
+	return ER_PROC_LUA;
 }
+
+ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
+	: LoggedError(file, line, ER_INJECTION, msg)
+{
+	/* nothing */
+}
+

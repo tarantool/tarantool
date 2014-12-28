@@ -2,7 +2,11 @@
 #include <stdio.h>
 #include "unit.h"
 
+#ifndef bytemap
+#define bytemap 0
+#endif
 #define MH_SOURCE 1
+
 
 #define mh_name _i32
 struct mh_i32_node_t {
@@ -13,6 +17,7 @@ struct mh_i32_node_t {
 #define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
+#define mh_bytemap bytemap
 #include "salad/mhash.h"
 
 #define mh_name _i32_collision
@@ -25,6 +30,7 @@ struct mh_i32_collision_node_t {
 #define mh_hash(a, arg) 42
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
 
+#define mh_bytemap bytemap
 #include "salad/mhash.h"
 
 #undef MH_SOURCE

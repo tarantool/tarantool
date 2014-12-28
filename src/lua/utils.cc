@@ -688,3 +688,11 @@ tarantool_lua_utils_init(struct lua_State *L)
 	fpconv_init();
 	return 0;
 }
+
+LuajitError::LuajitError(const char *file, unsigned line,
+			 struct lua_State *L)
+	:Exception(file, line)
+{
+	const char *msg = lua_tostring(L, -1);
+	snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
+}
