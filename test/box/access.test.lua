@@ -209,3 +209,6 @@ box.schema.func.exists('guest')
 box.schema.func.exists(1)
 box.schema.func.exists(2)
 box.schema.func.exists('box.schema.user.info')
+-- gh-665: user.exists() should nto be true for roles
+box.schema.user.exists('public')
+box.schema.role.exists('public')

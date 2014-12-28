@@ -520,3 +520,12 @@ box.schema.func.exists('box.schema.user.info')
 ---
 - true
 ...
+-- gh-665: user.exists() should nto be true for roles
+box.schema.user.exists('public')
+---
+- false
+...
+box.schema.role.exists('public')
+---
+- true
+...
