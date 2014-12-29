@@ -318,8 +318,6 @@ lbox_fiber_create(struct lua_State *L)
  * - "running", if the fiber is running (that is, it called status);
  * - "suspended", if the fiber is suspended in a call to yield(),
  *    or if it has not started running yet;
- * - "normal" if the fiber is active but not running (that is,
- *   it has resumed another fiber);
  * - "dead" if the fiber has finished its body function, or if it
  *   has stopped with an error.
  */
