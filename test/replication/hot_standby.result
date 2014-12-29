@@ -61,7 +61,16 @@ end;
 ---
 ...
 --# setopt delimiter ''
+--# set connection hot_standby
+box.info.status
+---
+- hot_standby
+...
 --# set connection default
+box.info.status
+---
+- running
+...
 -- set begin lsn on master, replica and hot_standby.
 --# set variable replica_port to 'replica.listen'
 REPLICA = require('uri').parse(tostring(replica_port))

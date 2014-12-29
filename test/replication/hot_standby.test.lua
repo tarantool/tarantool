@@ -52,7 +52,10 @@ do
     end
 end;
 --# setopt delimiter ''
+--# set connection hot_standby
+box.info.status
 --# set connection default
+box.info.status
 
 -- set begin lsn on master, replica and hot_standby.
 --# set variable replica_port to 'replica.listen'
