@@ -142,10 +142,12 @@ do
 
 
     local function next_snap_interval()
-        local interval
         
-        if box.cfg.snapshot_period == nil or box.cfg.snapshot_period <= 0 then
-            return interval
+        -- don't do anything in hot_standby mode
+        if box.info.status ~= 'running' or
+            box.cfg.snapshot_period == nil or
+            box.cfg.snapshot_period <= 0 then
+            return nil
         end
 
         local interval = box.cfg.snapshot_period / 10
