@@ -30,15 +30,15 @@
 #include <stdio.h>
 #include <typeinfo>
 
-ClientError::ClientError(const char *file, unsigned line, uint32_t errcode, ...)
+ClientError::ClientError(const char *file, unsigned line,
+			 uint32_t errcode, ...)
 	: Exception(file, line)
 {
 	m_errcode = errcode;
 	va_list ap;
 	va_start(ap, errcode);
-	vsnprintf(m_errmsg, sizeof(m_errmsg) - 1,
+	vsnprintf(m_errmsg, sizeof(m_errmsg),
 		  tnt_errcode_desc(m_errcode), ap);
-	m_errmsg[sizeof(m_errmsg) - 1] = 0;
 	va_end(ap);
 }
 

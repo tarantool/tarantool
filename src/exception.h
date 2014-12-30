@@ -90,6 +90,8 @@ public:
 
 	virtual void log() const;
 
+	SystemError(const char *file, unsigned line,
+		    const char *format, ...);
 protected:
 	SystemError(const char *file, unsigned line);
 

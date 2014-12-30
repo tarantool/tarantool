@@ -29,6 +29,7 @@
 #include "xlog.h"
 #include <dirent.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include "fiber.h"
 #include "crc32.h"
@@ -198,22 +199,23 @@ cmp_i64(const void *_a, const void *_b)
  *
  * @return nothing.
  */
-int
+void
 xdir_scan(struct xdir *dir)
 {
+	DIR *dh = opendir(dir->dirname);        /* log dir */
+	int64_t *signatures = NULL;             /* log file names */
+	size_t s_count = 0, s_capacity = 0;
 	ssize_t ext_len = strlen(dir->filename_ext);
-	DIR *dh = opendir(dir->dirname);
 
 	if (dh == NULL) {
-		say_syserror("error reading directory `%s'", dir->dirname);
-		return -1;
+		tnt_raise(SystemError, "error reading directory '%s'",
+			  dir->dirname);
 	}
+
 	auto log_guard = make_scoped_guard([&]{
 		closedir(dh);
+		free(signatures);
 	});
-
-	int64_t *signts = NULL;
-	size_t signts_capacity = 0, signts_size = 0;
 
 	struct dirent *dent;
 	/*
@@ -270,58 +272,55 @@ xdir_scan(struct xdir *dir)
 			continue;
 		}
 
-		if (signts_size == signts_capacity) {
-			size_t capacity = signts_capacity > 0 ?
-					2 * signts_capacity : 16;
-			int64_t *new_signts = (int64_t *) region_alloc(
-				&fiber()->gc, sizeof(*signts) * capacity);
-			memcpy(new_signts, signts, sizeof(*signts) * signts_size);
-			signts = new_signts;
-			signts_capacity = capacity;
-		}
-
-		signts[signts_size++] = signature;
-	}
-
-	if (signts_size == 0) {
-		/* Empty directory */
-		vclockset_reset(&dir->index);
-		return 0;
-	}
-
-	qsort(signts, signts_size, sizeof(*signts), cmp_i64);
-	struct vclock *cur = vclockset_first(&dir->index);
-	for (size_t i = 0; i < signts_size; i++) {
-		while (cur != NULL) {
-			int64_t signt = vclock_signature(cur);
-			if (signt < signts[i]) {
-				struct vclock *next =
-					vclockset_next(&dir->index, cur);
-				vclockset_remove(&dir->index, cur);
-				free(cur);
-				cur = next;
-				continue;
-			} else if (signt == signts[i]) {
-				cur = vclockset_next(&dir->index, cur);
-				goto skip; /* already exists */
-			} else /* signt > lsns[i] */ {
-				break;
+		if (s_count == s_capacity) {
+			s_capacity = s_capacity > 0 ? 2 * s_capacity : 16;
+			size_t size = sizeof(*signatures) * s_capacity;
+			signatures = (int64_t *) realloc(signatures, size);
+			if (signatures == NULL) {
+				tnt_raise(OutOfMemory,
+					  size, "signatures array", "realloc");
 			}
 		}
-
-		try {
-			xdir_index_file(dir, signts[i]);
-		} catch (ClientError *e) {
-			e->log();
-			say_warn("failed to scan %s",
-				 format_filename(dir, signts[i], NONE));
-			if (dir->panic_if_error)
-				throw;
-		}
-		skip: ;
+		signatures[s_count++] = signature;
 	}
-
-	return 0;
+	/** Sort the list of files */
+	qsort(signatures, s_count, sizeof(*signatures), cmp_i64);
+	/**
+	 * Update the log dir index with the current state:
+	 * remove files which no longer exist, add files which
+	 * appeared since the last scan.
+	 */
+	struct vclock *vclock = vclockset_first(&dir->index);
+	int i = 0;
+	while (i < s_count || vclock != NULL) {
+		int64_t s_old = vclock ? vclock_signature(vclock) : LLONG_MAX;
+		int64_t s_new = i < s_count ? signatures[i] : LLONG_MAX;
+		if (s_old < s_new) {
+			/** Remove a deleted file from the index */
+			struct vclock *next =
+				vclockset_next(&dir->index, vclock);
+			vclockset_remove(&dir->index, vclock);
+			free(vclock);
+			vclock = next;
+		} else if (s_old > s_new) {
+			/** Add a new file. */
+			try {
+				xdir_index_file(dir, s_new);
+			} catch (Exception *e) {
+				e->log();
+				say_warn("failed to scan %s",
+					 format_filename(dir, s_new, NONE));
+				if (dir->panic_if_error)
+					throw;
+			}
+			i++;
+		} else {
+			assert(s_old == s_new && i < s_count &&
+			       vclock != NULL);
+			vclock = vclockset_next(&dir->index, vclock);
+			i++;
+		}
+	}
 }
 
 char *
@@ -454,8 +453,8 @@ xlog_cursor_close(struct xlog_cursor *i)
 	struct xlog *l = i->log;
 	l->rows += i->row_count;
 	/*
-	 * Since we don't close log_io
-	 * we must rewind log_io to last known
+	 * Since we don't close the xlog
+	 * we must rewind it to the last known
 	 * good position if there was an error.
 	 * Seek back to last known good offset.
 	 */
@@ -519,11 +518,14 @@ restart:
 	try {
 		if (row_reader(l->f, row) != 0)
 			goto eof;
-	} catch (Exception *e) {
+	} catch (ClientError *e) {
 		if (l->dir->panic_if_error)
-			panic("failed to read row");
-		say_warn("failed to read row");
-		goto restart;
+			throw;
+		else {
+			say_warn("failed to read row:");
+			e->log();
+			goto restart;
+		}
 	}
 
 	i->good_offset = ftello(l->f);
@@ -642,7 +644,8 @@ xlog_close(struct xlog *l)
 	return r;
 }
 
-/** Free log_io memory and destroy it cleanly, without side
+/**
+ * Free xlog memory and destroy it cleanly, without side
  * effects (for use in the atfork handler).
  */
 void
@@ -700,7 +703,8 @@ xlog_write_meta(struct xlog *l, const tt_uuid *server_uuid,
 {
 	char *vstr = NULL;
 	if (fprintf(l->f, "%s%s", l->dir->filetype, v12) < 0 ||
-	    fprintf(l->f, SERVER_UUID_KEY ": %s\n", tt_uuid_str(server_uuid)) < 0 ||
+	    fprintf(l->f, SERVER_UUID_KEY ": %s\n",
+		    tt_uuid_str(server_uuid)) < 0 ||
 	    (vstr = vclock_to_string(vclock)) == NULL ||
 	    fprintf(l->f, VCLOCK_KEY ": %s\n\n", vstr) < 0) {
 		free(vstr);
@@ -713,13 +717,13 @@ xlog_write_meta(struct xlog *l, const tt_uuid *server_uuid,
 /**
  * Verify that file is of the given format.
  *
- * @param l		log_io object, denoting the file to check.
+ * @param l		xlog object, denoting the file to check.
  * @param[out] errmsg   set if error
  *
  * @return 0 if success, -1 on error.
  */
 static int
-xlog_verify_meta(struct xlog *l, const tt_uuid *server_uuid)
+xlog_read_meta(struct xlog *l, const tt_uuid *server_uuid)
 {
 	char filetype[32], version[32], buf[256];
 	struct xdir *dir = l->dir;
@@ -745,20 +749,23 @@ xlog_verify_meta(struct xlog *l, const tt_uuid *server_uuid)
 				  l->filename);
 			return -1;
 		}
+		/** Empty line indicates the end of file header. */
 		if (strcmp(buf, "\n") == 0)
 			break;
 
 		/* Parse RFC822-like string */
 		char *end = buf + strlen(buf);
-		if (end > buf && *(end - 1) == '\n') *(--end) = 0; /* skip \n */
+		if (end > buf && *(end - 1) == '\n')
+			*(--end) = 0; /* skip \n */
 		char *key = buf;
 		char *val = strchr(buf, ':');
 		if (val == NULL) {
 			say_error("%s: invalid meta", l->filename);
 			return -1;
 		}
-		*(val++) = 0;
-		while (*val == ' ') ++val; /* skip starting spaces */
+		*val++ = 0;
+		while (isspace(*val))
+			++val;	/* skip starting spaces */
 
 		if (strcmp(key, SERVER_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
@@ -790,8 +797,8 @@ xlog_verify_meta(struct xlog *l, const tt_uuid *server_uuid)
 
 struct xlog *
 xlog_open_stream(struct xdir *dir, const char *filename,
-			    const tt_uuid *server_uuid, enum log_suffix suffix,
-			    FILE *file)
+		 const tt_uuid *server_uuid, enum log_suffix suffix,
+		 FILE *file)
 {
 	struct xlog *l = NULL;
 	int save_errno;
@@ -816,7 +823,7 @@ xlog_open_stream(struct xdir *dir, const char *filename,
 	l->dir = dir;
 	l->is_inprogress = (suffix == INPROGRESS);
 	vclock_create(&l->vclock);
-	if (xlog_verify_meta(l, server_uuid) != 0) {
+	if (xlog_read_meta(l, server_uuid) != 0) {
 		save_errno = EINVAL;
 		goto error_3;
 	}
@@ -833,7 +840,7 @@ error_1:
 
 struct xlog *
 xlog_open(struct xdir *dir, int64_t signature,
-		     const tt_uuid *server_uuid, enum log_suffix suffix)
+	  const tt_uuid *server_uuid, enum log_suffix suffix)
 {
 	const char *filename = format_filename(dir, signature, suffix);
 	FILE *f = fopen(filename, "r");

@@ -179,10 +179,13 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	vclock_create(&r->vclock);
 
-	if (xdir_scan(&r->snap_dir) != 0)
-		panic("can't scan snapshot directory");
-	if (xdir_scan(&r->wal_dir) != 0)
-		panic("can't scan WAL directory");
+	try {
+		xdir_scan(&r->snap_dir);
+		xdir_scan(&r->wal_dir);
+	} catch (Exception *e) {
+		e->log();
+		panic("can't scan a data directory");
+	}
 
 	return r;
 }
@@ -287,8 +290,12 @@ recover_snap(struct recovery_state *r)
 	struct xlog *snap;
 	int64_t sign;
 
-	if (xdir_scan(&r->snap_dir) != 0)
+	try {
+		xdir_scan(&r->snap_dir);
+	} catch (Exception *e) {
+		e->log();
 		panic("can't scan snapshot directory");
+	}
 	struct vclock *res = vclockset_last(&r->snap_dir.index);
 	if (res == NULL)
 		panic("can't find snapshot");
@@ -330,7 +337,7 @@ recover_xlog(struct recovery_state *r, struct xlog *l)
 	while (xlog_cursor_next(&i, &row) == 0) {
 		try {
 			recovery_process(r, &row);
-		} catch (SocketError *e) {
+		} catch (SystemError *e) {
 			say_error("can't apply row: %s", e->errmsg());
 			goto end;
 		} catch (Exception *e) {
@@ -362,8 +369,12 @@ recover_remaining_wals(struct recovery_state *r)
 	size_t rows_before;
 	enum log_suffix suffix;
 
-	if (xdir_scan(&r->wal_dir) != 0)
+	try {
+		xdir_scan(&r->wal_dir);
+	} catch (Exception *e) {
+		e->log();
 		return -1;
+	}
 
 	current_vclock = vclockset_last(&r->wal_dir.index);
 	last_signt = current_vclock != NULL ?

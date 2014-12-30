@@ -127,6 +127,17 @@ SystemError::SystemError(const char *file, unsigned line)
 	/* nothing */
 }
 
+SystemError::SystemError(const char *file, unsigned line,
+			 const char *format, ...)
+	:Exception(file, line),
+	m_errno(errno)
+{
+	va_list ap;
+	va_start(ap, format);
+	init(format, ap);
+	va_end(ap);
+}
+
 void
 SystemError::init(const char *format, ...)
 {

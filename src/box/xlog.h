@@ -98,7 +98,7 @@ struct xdir {
  */
 void
 xdir_create(struct xdir *dir, const char *dirname,
-	       enum xdir_type type);
+	    enum xdir_type type);
 
 /**
  * Destroy a log dir object.
@@ -112,7 +112,7 @@ xdir_destroy(struct xdir *dir);
  * Must be used if it is necessary to find the last log/
  * snapshot or scan through all logs.
  */
-int
+void
 xdir_scan(struct xdir *dir);
 
 /* }}} */
