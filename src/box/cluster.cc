@@ -53,7 +53,8 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 	if (r->server_id == server_id) {
 		if (tt_uuid_is_equal(&r->server_uuid, server_uuid))
 			return;
-		say_warn("server uuid changed to %s", tt_uuid_str(server_uuid));
+		say_warn("server UUID changed to %s",
+			 tt_uuid_str(server_uuid));
 		assert(vclock_has(&r->vclock, server_id));
 		memcpy(&r->server_uuid, server_uuid, sizeof(*server_uuid));
 		return;

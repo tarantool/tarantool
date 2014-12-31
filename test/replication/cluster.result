@@ -9,9 +9,9 @@ box.info.server.uuid
 ---
 - 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae
 ...
-check log line for 'server uuid changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
+check log line for 'server UUID changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
 
-'server uuid changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae' exists in server log
+'server UUID changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae' exists in server log
 
 box.info.server.uuid
 ---

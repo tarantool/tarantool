@@ -168,9 +168,9 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	r->snapshot_handler = snapshot_handler;
 
-	xdir_create(&r->snap_dir, snap_dirname, SNAP);
+	xdir_create(&r->snap_dir, snap_dirname, SNAP, &r->server_uuid);
 
-	xdir_create(&r->wal_dir, wal_dirname, XLOG);
+	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
 
 	if (r->wal_mode == WAL_FSYNC)
 		(void) strcat(r->wal_dir.open_wflags, "s");
@@ -181,7 +181,14 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	try {
 		xdir_scan(&r->snap_dir);
-		xdir_scan(&r->wal_dir);
+		/**
+		 * Avoid scanning WAL dir before we recovered
+		 * the snapshot and know server UUID - this will
+		 * make sure the scan skips files with wrong
+		 * UUID, see replication/cluster.test for
+		 * details.
+		 */
+		xdir_check(&r->wal_dir);
 	} catch (Exception *e) {
 		e->log();
 		panic("can't scan a data directory");
@@ -265,10 +272,8 @@ recovery_bootstrap(struct recovery_state *r)
 	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream(&r->snap_dir,
-		filename, NULL, NONE, f);
-	if (snap == NULL)
-		panic("failed to open %s", filename);
+	struct xlog *snap = xlog_open_stream(&r->snap_dir, 0, NONE, f,
+					     filename);
 	int rc = recover_xlog(r, snap);
 	xlog_close(snap);
 
@@ -300,12 +305,10 @@ recover_snap(struct recovery_state *r)
 	if (res == NULL)
 		panic("can't find snapshot");
 	sign = vclock_signature(res);
-	snap = xlog_open(&r->snap_dir, sign, NULL, NONE);
-	if (snap == NULL)
-		panic("can't open snapshot");
+	snap = xlog_open(&r->snap_dir, sign, NONE);
 
 	/* Save server uuid */
-	memcpy(&r->server_uuid, &snap->server_uuid, sizeof(r->server_uuid));
+	r->server_uuid = snap->server_uuid;
 
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&r->vclock, 0);
@@ -314,7 +317,7 @@ recover_snap(struct recovery_state *r)
 	if (recover_xlog(r, snap) != 0)
 		panic("can't process snapshot");
 
-	/* Replace server vclock using data from snapshot */
+	/* Replace server vclock using the data from snapshot */
 	vclock_copy(&r->vclock, &snap->vclock);
 }
 
@@ -414,13 +417,14 @@ recover_remaining_wals(struct recovery_state *r)
 		 * xlog_rename().
 		 */
 		suffix = current_signt == last_signt ? INPROGRESS : NONE;
-		next_wal = xlog_open(&r->wal_dir, current_signt,
-			&r->server_uuid, suffix);
-		/*
-		 * When doing final recovery, and dealing with the
-		 * last file, try opening .<ext>.inprogress.
-		 */
-		if (next_wal == NULL) {
+		try {
+			next_wal = xlog_open(&r->wal_dir, current_signt, suffix);
+		} catch (XlogError *e) {
+			e->log();
+			/*
+			 * When doing final recovery, and dealing with the
+			 * last file, try opening .<ext>.inprogress.
+			 */
 			if (r->finalize && suffix == INPROGRESS) {
 				/*
 				 * There is an .inprogress file, but
@@ -936,7 +940,7 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 	}
 	if (l == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
-		l = xlog_create(&r->wal_dir, &r->server_uuid, vclock);
+		l = xlog_create(&r->wal_dir, vclock);
 		/*
 		 * Close the file *after* we create the new WAL, since
 		 * this is when replication relays get an inotify alarm
@@ -1200,8 +1204,7 @@ void
 snapshot_save(struct recovery_state *r)
 {
 	assert(r->snapshot_handler != NULL);
-	struct xlog *snap = xlog_create(&r->snap_dir, &r->server_uuid,
-					&r->vclock);
+	struct xlog *snap = xlog_create(&r->snap_dir, &r->vclock);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 	/*

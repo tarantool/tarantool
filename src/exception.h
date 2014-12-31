@@ -113,10 +113,13 @@ public:
 		    const char *object);
 };
 
-#define tnt_raise(...) tnt_raise0(__VA_ARGS__)
-#define tnt_raise0(class, ...) do {					\
+#define tnt_error(class, ...) ({					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	throw new class(__FILE__, __LINE__, ##__VA_ARGS__);		\
+	new class(__FILE__, __LINE__, ##__VA_ARGS__);			\
+})
+
+#define tnt_raise(...) do {						\
+	throw tnt_error(__VA_ARGS__);					\
 } while (0)
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */
