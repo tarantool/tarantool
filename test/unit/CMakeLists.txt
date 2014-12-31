@@ -48,6 +48,8 @@ add_executable(rtree_itr.test rtree_itr.cc ${CMAKE_SOURCE_DIR}/src/lib/salad/rtr
 target_link_libraries(rtree_itr.test)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
+add_executable(light.test light.cc)
+target_link_libraries(light.test small)
 add_executable(vclock.test vclock.cc test.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
