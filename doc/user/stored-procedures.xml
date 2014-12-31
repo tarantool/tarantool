@@ -1021,7 +1021,7 @@ procedures.
             <para>
               Returns: (type = string) the status of <code>fiber</code>.
               One of: <quote>dead</quote>,
-              <quote>suspended</quote>, <quote>attached</quote>
+              <quote>suspended</quote>,
               or <quote>running</quote>.
             </para>
         </listitem>
@@ -1041,7 +1041,7 @@ procedures.
             <para>
               Returns: (type = string) the status of <code>fiber</code>.
               One of: <quote>dead</quote>,
-              <quote>suspended</quote>, <quote>attached</quote>
+              <quote>suspended</quote>,
               or <quote>running</quote>.
             </para>
         </listitem>

@@ -181,9 +181,6 @@
                          <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last space's id, +1</entry>
                         </row>
                         <row>
-                         <entry>enabled</entry><entry>space is enabled</entry><entry>true|false</entry><entry>true</entry>
-                        </row>
-                        <row>
                          <entry>field_count</entry><entry>fixed field count</entry><entry>number</entry><entry>0 i.e. not fixed</entry>
                         </row>
                         <row>
@@ -819,7 +816,7 @@ tarantool> <userinput>box.space.tester:delete('a')</userinput>
         <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.enabled</emphasis></term>
         <listitem>
             <para>
-              (type = boolean) Whether or not this space is enabled.
+              (type = boolean) Whether or not this space is enabled. The value is false if there is no index.
             </para>
         </listitem>
     </varlistentry>

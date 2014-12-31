@@ -264,7 +264,8 @@ Starting  ARG
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.
-          A typical value is 3301.</entry>
+          A typical value is 3301.
+          The listen parameter may also be set for <olink targetptr="local_hot_standby">local hot standby</olink>.</entry>
         </row>
 
         <row>
