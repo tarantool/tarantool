@@ -1,3 +1,5 @@
+#include <lib/salad/guava.h>
+
 #include "lua/bsdsocket.h"
 
 /*
@@ -6,5 +8,6 @@
  */
 void *ffi_symbols[] = {
 	(void *)bsdsocket_local_resolve,
-	(void *)bsdsocket_nonblock
+	(void *)bsdsocket_nonblock,
+	(void *)guava
 };

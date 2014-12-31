@@ -146,3 +146,23 @@ lua box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
 ---
  - 3628146660
 ...
+lua box.digest.guava('hello', 0)
+---
+error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''int64_t'')'
+...
+lua box.digest.guava(1, 'nope_')
+---
+error: 'bad argument #2 to ''?'' (cannot convert ''string'' to ''int'')'
+...
+lua box.digest.guava(10863919174838991, 11)
+---
+ - 8
+...
+lua box.digest.guava(2016238256797177309, 11)
+---
+ - 7
+...
+lua box.digest.guava(1673758223894951030, 11)
+---
+ - 7
+...
