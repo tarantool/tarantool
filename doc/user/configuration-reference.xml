@@ -244,6 +244,17 @@ Starting  ARG
           relative to work_dir. If not specified, defaults to
           work_dir. See also <olink targetptr="wal_dir"/>.</entry>
         </row>
+        
+        <row>
+          <entry xml:id="sophia_dir" xreflabel="sophia_dir">sophia_dir</entry>
+          <entry>string</entry>
+          <entry>"sophia"</entry>
+          <entry>no</entry>
+          <entry>A directory where sophia files will be stored. Can be
+          relative to work_dir. If not specified, defaults to
+          work_dir/sophia.</entry>
+        </row>
+
         <row>
           <entry xml:id="core-dump" xreflabel="core-dump">coredump</entry>
           <entry>boolean</entry>

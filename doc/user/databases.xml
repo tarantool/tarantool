@@ -142,6 +142,21 @@
       about which Complexity Factors might affect the function's resource usage.
      </para>
       
+     <para>
+      <bridgehead renderas="sect4">The two storage engines: memtx and sophia</bridgehead>
+      A storage engine is a set of very-low-level routines which actually store and retrieve tuple values.
+      Tarantool offers a choice of two storage engines: memtx (the in-memory storage engine)
+      and sophia (the on-disk storage engine). To specify that the engine should be sophia,
+      add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtx because it is
+      the default and has been around longer. But sophia is a working key-value engine and will especially
+      appeal to users who like to see data go directly to disk, so that recovery time might be
+      shorter and database size might be larger.
+      For architectural explanations and benchmarks, see <link xlink:href="http://sphia.org">sphia.org</link>.
+      On the other hand, sophia lacks some functions and options that are available with memtx.
+      Where that is the case, the relevant description will contain the words
+      "only applicable for the memtx storage engine".
+      </para>
+
 </section>
 
 <section xml:id="sp-box-schema">
@@ -219,17 +234,6 @@ tarantool> <userinput>s = box.schema.space.create('space55', {if_not_exists = tr
             then it is available for insert, select, and all the other
             <link linkend="box.space">box.space</link> functions.
             </para>
-            <para>
-            <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
-            There are actually two storage engines for Tarantool: memtx (the in-memory storage engine)
-            and Sophia (the on-disk storage engine). To specify that the engine should be Sophia,
-            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtx because it is
-            the default and has been around longer. But Sophia is a working key-value engine and will especially
-            appeal to users who like to see data go directly to disk, so that recovery time might be
-            shorter and database size might be larger. On the other hand, with Sophia the maximum
-            number of indexes is 1, and the maximum number of fields per index is 1.
-            For architectural explanations and benchmarks, see <link xlink:href="http://sphia.org">sphia.org</link>.
-            </para>
         </listitem>
     </varlistentry>
 
@@ -303,6 +307,8 @@ tarantool> <userinput>s = box.schema.space.create('space55', {if_not_exists = tr
             </para>
             <para>
               Possible errors: too many parts.
+              A type options other than TREE, or a unique option other than unique, or a parts option with more than one field component,
+              is only applicable for the memtx storage engine.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 tarantool> <userinput>s = box.space.space55</userinput>
@@ -532,6 +538,7 @@ tarantool> <userinput>box.space.space56:rename('space55')</userinput>
             </para>
             <para>
               Possible errors: The first index cannot be changed to {unique = false}.
+              The <code>alter</code> function is only applicable for the memtx storage engine.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 tarantool> <userinput>box.space.space55.index.primary:alter({type = 'HASH'})</userinput>
@@ -550,7 +557,7 @@ tarantool> <userinput>box.space.space55.index.primary:alter({type = 'HASH'})</us
         </term>
         <listitem>
             <para>
-              Drop an index.
+              Drop an index. Dropping a primary-key index has a side effect: all tuples are deleted.
             </para>
             <para>
               Parameters: none.
@@ -862,6 +869,7 @@ tarantool> <userinput>box.space.tester:delete('a')</userinput>
         <listitem>
             <para>
               Returns: (type = number) number of tuples in the space.
+              The <code>len()</code> function is only applicable for the memtx storage engine.
               <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>tarantool&gt; <userinput>box.space.tester:len()</userinput>
 ---
@@ -1618,6 +1626,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
               Returns: (type = number) the number of matching index keys.
+              The <code>index</code> function is only applicable for the memtx storage engine.
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -2981,6 +2990,7 @@ error: can't save snapshot, errno 17 (File exists)
         In effect the fiber which executes <code>box.begin()</code>
         is starting an "active multi-request transaction", blocking all
         other fibers until the transaction ends.
+        All operations within this transaction should use the same storage engine.
       </para></listitem>
     </varlistentry>
 
@@ -3432,7 +3442,7 @@ box.space.T:insert{1}
 <title>Limitations</title>
 
 <variablelist>
- 
+
   <varlistentry>
     <term xml:id="limitations-index-field-count" xreflabel="limitations-index-field-count">Number of fields in an index</term>
     <listitem><para>For BITSET indexes, the maximum is 1.
@@ -3476,7 +3486,7 @@ box.space.T:insert{1}
   </varlistentry>
 
   <varlistentry>
-    <term xml:id="limitations-update-count" xreflabel="limitations-updae-count">Update operations count</term>
+    <term xml:id="limitations-update-count" xreflabel="limitations-update-count">Update operations count</term>
     <listitem><para>The maximum number of operations that can be in a single update is 4000 (BOX_UPDATE_OP_CNT_MAX).
     </para></listitem>
   </varlistentry>
@@ -3492,8 +3502,20 @@ box.space.T:insert{1}
     <listitem><para>32 (box.schema.NAME_MAX).
     </para></listitem>
   </varlistentry>
+  
+  <varlistentry>
+   <term xml:id="sophia-limitations" xreflabel="sophia-limitations">Limitations which are only applicable for the sophia storage engine</term>
+   <listitem><para>
+   The maximum number of fields in an index is always 1, that is, multi-part indexes are not supported.
+   The maximum number of indexes in a space is always 1, that is, secondary indexes are not supported.
+   Indexes must be unique, that is, the options type=HASH or type=RTREE or type=BITSET are not supported.
+   Indexes must be unique, that is, the option unique=false is not supported.
+   The alter(), len(), and count() functions are not supported.
+   </para></listitem>
+  </varlistentry>
 
 </variablelist>
+
 </section>
 
 
