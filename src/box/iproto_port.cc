@@ -69,7 +69,7 @@ iproto_encode_error(uint32_t error)
 }
 
 void
-iproto_reply_ping(struct obuf *out, uint64_t sync)
+iproto_reply_ok(struct obuf *out, uint64_t sync)
 {
 	struct iproto_header_bin reply = iproto_header_bin;
 	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5);
@@ -121,20 +121,32 @@ iproto_port_eof(struct port *ptr)
 	struct iproto_port *port = iproto_port(ptr);
 	/* found == 0 means add_tuple wasn't called at all. */
 	if (port->found == 0) {
-		port->svp = obuf_book(port->buf, SVP_SIZE);
-		port->size += SVP_SIZE;
+		port->svp = iproto_prepare_select(port->buf);
 	}
 
-	uint32_t len = port->size - 5;
+	iproto_reply_select(port->buf, &port->svp, port->sync, port->found);
+}
+
+struct obuf_svp
+iproto_prepare_select(struct obuf *buf)
+{
+	return obuf_book(buf, SVP_SIZE);
+}
+
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+			uint32_t count)
+{
+	uint32_t len = obuf_size(buf) - svp->size - 5;
 
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);
-	header.v_sync = mp_bswap_u64(port->sync);
+	header.v_sync = mp_bswap_u64(sync);
 
 	struct iproto_body_bin body = iproto_body_bin;
-	body.v_data_len = mp_bswap_u32(port->found);
+	body.v_data_len = mp_bswap_u32(count);
 
-	char *pos = (char *) obuf_svp_to_ptr(port->buf, &port->svp);
+	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
 	memcpy(pos, &header, sizeof(header));
 	memcpy(pos + sizeof(header), &body, sizeof(body));
 }
@@ -145,11 +157,9 @@ iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
 	struct iproto_port *port = iproto_port(ptr);
 	if (++port->found == 1) {
 		/* Found the first tuple, add header. */
-		port->svp = obuf_book(port->buf, SVP_SIZE);
-		port->size += SVP_SIZE;
+		port->svp = iproto_prepare_select(port->buf);
 	}
 	tuple_to_obuf(tuple, port->buf);
-	port->size += tuple->bsize;
 }
 
 struct port_vtab iproto_port_vtab = {

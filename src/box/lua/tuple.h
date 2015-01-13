@@ -31,7 +31,6 @@
 struct lua_State;
 struct txn;
 struct tuple;
-struct tbuf;
 
 /**
  * Push tuple on lua stack
@@ -46,7 +45,7 @@ struct tuple*
 lua_totuple(struct lua_State *L, int first, int last);
 
 int
-luamp_encodestack(struct lua_State *L, struct tbuf *b,
+luamp_encodestack(struct lua_State *L, struct obuf *b,
 		  int first, int last);
 
 void

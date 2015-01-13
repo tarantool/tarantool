@@ -58,7 +58,7 @@ box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
 
-static int stat_base;
+int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
 
 static void
@@ -78,7 +78,7 @@ process_rw(struct port *port, struct request *request)
 {
 	try {
 		stat_collect(stat_base, request->type, 1);
-		request->execute(request, port);
+		request_execute(request, port);
 		port_eof(port);
 	} catch (Exception *e) {
 		txn_rollback_stmt();
@@ -249,7 +249,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	*/
 	space_end_recover();
 
-	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
+	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	if (recovery_has_remote(recovery))
@@ -436,7 +436,7 @@ box_init()
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 
 	if (recovery_has_data(recovery)) {
 		/* Process existing snapshot */
