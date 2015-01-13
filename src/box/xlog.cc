@@ -368,8 +368,11 @@ row_reader(FILE *f, struct xrow_header *row)
 		if (feof(f))
 			return 1;
 error:
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "invalid fixed header");
+		char buf[PATH_MAX];
+		snprintf(buf, sizeof(buf), "%s: failed to read or parse row header"
+			 " at offset %zu", fio_filename(fileno(f)),
+			 (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
 
 	/* Decode len, previous crc32 and row crc32 */
@@ -383,8 +386,11 @@ error:
 		goto error;
 	uint32_t len = mp_decode_uint(&data);
 	if (len > IPROTO_BODY_LEN_MAX) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "packet is too big");
+		char buf[PATH_MAX];
+		snprintf(buf, sizeof(buf),
+			 "%s: row is too big at offset %zu",
+			 fio_filename(fileno(f)), (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
 
 	/* Read previous crc32 */
@@ -407,8 +413,15 @@ error:
 		return 1;
 
 	/* Validate checksum */
-	if (crc32_calc(0, bodybuf, len) != crc32c)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "invalid crc32");
+	if (crc32_calc(0, bodybuf, len) != crc32c) {
+		char buf[PATH_MAX];
+
+		snprintf(buf, sizeof(buf), "%s: row checksum mismatch (expected %u)"
+			 " at offset %zu",
+			 fio_filename(fileno(f)), (unsigned) crc32c,
+			 (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
+	}
 
 	data = bodybuf;
 	xrow_header_decode(row, &data, bodybuf + len);
@@ -531,8 +544,7 @@ restart:
 		if (l->dir->panic_if_error)
 			throw;
 		else {
-			say_warn("failed to read row:");
-			e->log();
+			say_warn("failed to read row");
 			goto restart;
 		}
 	}
@@ -547,8 +559,8 @@ restart:
 eof:
 	/*
 	 * The only two cases of fully read file:
-	 * 1. sizeof(eof_marker) > 0 and it is the last record in file
-	 * 2. sizeof(eof_marker) == 0 and there is no unread data in file
+	 * 1. eof_marker is present and it is the last record in file
+	 * 2. eof_marker is missing but there is no unread data in file
 	 */
 	if (ftello(l->f) == i->good_offset + sizeof(eof_marker)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
@@ -912,6 +924,7 @@ error:
 		fclose(f);
 		unlink(filename); /* try to remove incomplete file */
 	}
+	free(l);
 	errno = save_errno;
 	return NULL;
 }

@@ -235,7 +235,7 @@ xlog_open_stream(struct xdir *dir, int64_t signature,
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
  *
- * @return  xlog object. Raises an exception in case of error.
+ * @return  xlog object or NULL in case of error.
  */
 struct xlog *
 xlog_create(struct xdir *dir, const struct vclock *vclock);
