@@ -30,7 +30,7 @@
 #include "coio_buf.h"
 #include "fiber.h"
 
-struct mempool iobuf_pool;
+__thread struct mempool iobuf_pool;
 /**
  * Network readahead. A signed integer to avoid
  * automatic type coercion to an unsigned type.
