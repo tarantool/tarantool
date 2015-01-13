@@ -472,9 +472,7 @@ xlog_cursor_close(struct xlog_cursor *i)
 	 * Seek back to last known good offset.
 	 */
 	fseeko(l->f, i->good_offset, SEEK_SET);
-#if 0
 	region_free(&fiber()->gc);
-#endif
 }
 
 /**
@@ -496,14 +494,12 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
 		  row_marker, sizeof(row_marker));
 
-#if 0
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
 	region_free_after(&fiber()->gc, 128 * 1024);
-#endif
 
 restart:
 	if (marker_offset > 0)
