@@ -352,7 +352,7 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 23 bytes in hash for key
+- error: Failed to allocate 10 bytes in hash_table for key
 ...
 s:delete{1}
 ---
@@ -406,7 +406,7 @@ check_iter_and_size(9)
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 23 bytes in hash for key
+- error: Failed to allocate 9 bytes in hash_table for key
 ...
 s:delete{2}
 ---
@@ -435,7 +435,7 @@ res
 ...
 for i = 3501,4500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 23 bytes in hash for key
+- error: Failed to allocate 8 bytes in hash_table for key
 ...
 s:delete{3}
 ---

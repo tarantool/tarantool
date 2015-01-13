@@ -53,6 +53,7 @@ my_light_free(void *p)
 #define LIGHT_KEY_TYPE uint64_t
 #define LIGHT_CMP_ARG_TYPE int
 #define LIGHT_EQUAL(a, b, arg) equal(a, b)
+#define LIGHT_EQUAL_KEY(a, b, arg) equal_key(a, b)
 #include "salad/light.h"
 
 

@@ -69,13 +69,23 @@
 #endif
 
 /**
- * Data comparing function. Takes 3 parameters - value, key and
+ * Data comparing function. Takes 3 parameters - value1, value2 and
  * optional value that stored in hash table struct.
  * Third parameter may be simply ignored like that:
  * #define LIGHT_EQUAL(a, b, garb) a == b
  */
 #ifndef LIGHT_EQUAL
 #error "LIGHT_EQUAL must be defined"
+#endif
+
+/**
+ * Data comparing function. Takes 3 parameters - value, key and
+ * optional value that stored in hash table struct.
+ * Third parameter may be simply ignored like that:
+ * #define LIGHT_EQUAL_KEY(a, b, garb) a == b
+ */
+#ifndef LIGHT_EQUAL_KEY
+#error "LIGHT_EQUAL_KEY must be defined"
 #endif
 
 /**
@@ -146,18 +156,39 @@ LH(light_destroy)(struct LH(light) *ht);
  * @param data - value to find
  * @return integer ID of found record or light_end if nothing found
  */
-inline uint32_t
-LH(light_find)(const struct LH(light) *ht, uint32_t hash, LIGHT_KEY_TYPE data);
+uint32_t
+LH(light_find)(const struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
+
+/**
+ * @brief Find a record with given hash and key
+ * @param ht - pointer to a hash table struct
+ * @param hash - hash to find
+ * @param data - key to find
+ * @return integer ID of found record or light_end if nothing found
+ */
+uint32_t
+LH(light_find_key)(const struct LH(light) *ht, uint32_t hash, LIGHT_KEY_TYPE data);
 
 /**
  * @brief Insert a record with given hash and value
  * @param ht - pointer to a hash table struct
  * @param hash - hash to insert
  * @param data - value to insert
+ * @return integer ID of inserted record or light_end if failed
+ */
+uint32_t
+LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
+
+/**
+ * @brief Replace a record with given hash and value
+ * @param ht - pointer to a hash table struct
+ * @param hash - hash to find
+ * @param data - value to find and replace
+ * @param replaced - pointer to a value that was stored in table before replace
  * @return integer ID of found record or light_end if nothing found
  */
-void
-LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
+uint32_t
+LH(light_replace)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data, LIGHT_DATA_TYPE *replaced);
 
 /**
  * @brief Delete a record from a hash table by given record ID
@@ -166,6 +197,22 @@ LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
  */
 void
 LH(light_delete)(struct LH(light) *ht, uint32_t slotpos);
+
+/**
+ * @brief Get a value from a desired position
+ * @param ht - pointer to a hash table struct
+ * @param slotpos - ID of an record
+ */
+LIGHT_DATA_TYPE
+LH(light_get)(struct LH(light) *ht, uint32_t slotpos);
+
+/**
+ * @brief Determine if posision holds a value
+ * @param ht - pointer to a hash table struct
+ * @param slotpos - ID of an record
+ */
+bool
+LH(light_pos_valid)(struct LH(light) *ht, uint32_t slotpos);
 
 /**
  * Internal definitions
@@ -228,7 +275,38 @@ LH(light_cluster)(const struct LH(light) *ht, uint32_t slot)
 }
 
 inline uint32_t
-LH(light_find)(const struct LH(light) *ht, uint32_t hash, LIGHT_KEY_TYPE data)
+LH(light_find_key)(const struct LH(light) *ht, uint32_t hash, LIGHT_KEY_TYPE data)
+{
+	if (ht->table_size == 0)
+		return LH(light_end);
+	uint32_t slot = LH(light_slot)(ht, hash);
+	while (1) {
+		struct LH(light_cluster) *cluster = LH(light_cluster)(ht, slot);
+		__builtin_prefetch(cluster, 0);
+		uint32_t search_mask = ~(((hash & 017) | 060) * 01010101);
+		uint32_t mask = cluster->flags & 03737373737;
+		uint32_t found_mask = ((mask ^ search_mask) + 0101010101) & 04040404040;
+		while (found_mask) {
+			uint32_t bit = __builtin_ctz(found_mask);
+			found_mask ^= (1u << bit);
+			uint32_t pos = bit / 6;
+			if (cluster->hash[pos] == hash &&
+			    (LIGHT_EQUAL_KEY((cluster->data[pos]), (data), (ht->arg))))
+				return slot * 5 + pos;
+		}
+
+		if (!(cluster->flags >> 31))
+			return LH(light_end);
+		slot++;
+		if (slot >= ht->table_size)
+			slot = 0;
+	}
+	/* unreachable */
+	return LH(light_end);
+}
+
+inline uint32_t
+LH(light_find)(const struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data)
 {
 	if (ht->table_size == 0)
 		return LH(light_end);
@@ -246,6 +324,40 @@ LH(light_find)(const struct LH(light) *ht, uint32_t hash, LIGHT_KEY_TYPE data)
 			if (cluster->hash[pos] == hash &&
 			    (LIGHT_EQUAL((cluster->data[pos]), (data), (ht->arg))))
 				return slot * 5 + pos;
+		}
+
+		if (!(cluster->flags >> 31))
+			return LH(light_end);
+		slot++;
+		if (slot >= ht->table_size)
+			slot = 0;
+	}
+	/* unreachable */
+	return LH(light_end);
+}
+
+inline uint32_t
+LH(light_replace)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data, LIGHT_DATA_TYPE *replaced)
+{
+	if (ht->table_size == 0)
+		return LH(light_end);
+	uint32_t slot = LH(light_slot)(ht, hash);
+	while (1) {
+		struct LH(light_cluster) *cluster = LH(light_cluster)(ht, slot);
+		__builtin_prefetch(cluster, 0);
+		uint32_t search_mask = ~(((hash & 017) | 060) * 01010101);
+		uint32_t mask = cluster->flags & 03737373737;
+		uint32_t found_mask = ((mask ^ search_mask) + 0101010101) & 04040404040;
+		while (found_mask) {
+			uint32_t bit = __builtin_ctz(found_mask);
+			found_mask ^= (1u << bit);
+			uint32_t pos = bit / 6;
+			if (cluster->hash[pos] == hash &&
+			    (LIGHT_EQUAL((cluster->data[pos]), (data), (ht->arg)))) {
+				*replaced = cluster->data[pos];
+				cluster->data[pos] = data;
+				return slot * 5 + pos;
+			}
 		}
 
 		if (!(cluster->flags >> 31))
@@ -350,7 +462,7 @@ LH(light_grow)(struct LH(light) *ht)
 	}
 }
 
-inline void
+inline uint32_t
 LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data)
 {
 	if (ht->table_size == 0) {
@@ -360,7 +472,7 @@ LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data)
 			matras_alloc(&ht->mtable, &slot);
 		cluster->flags = 0;
 	}
-	if (ht->count >= 2 * ht->table_size)
+	if (ht->count >= 1 * ht->table_size)
 		LH(light_grow)(ht);
 
 	uint32_t slot = LH(light_slot)(ht, hash);
@@ -377,6 +489,7 @@ LH(light_insert)(struct LH(light) *ht, uint32_t hash, LIGHT_DATA_TYPE data)
 	uint32_t pos = __builtin_ctz(((~cluster->flags) & 02020202020)) / 6;
 	LH(light_set_value)(cluster, pos, hash_flags, hash, data);
 	ht->count++;
+	return slot * 5 + pos;
 }
 
 inline void
@@ -401,6 +514,30 @@ LH(light_delete)(struct LH(light) *ht, uint32_t slotpos)
 		}
 	}
 }
+
+inline LIGHT_DATA_TYPE
+LH(light_get)(struct LH(light) *ht, uint32_t slotpos)
+{
+	uint32_t slot = slotpos / 5;
+	uint32_t pos = slotpos % 5;
+	struct LH(light_cluster) *cluster = LH(light_cluster)(ht, slot);
+	return cluster->data[pos];
+}
+
+/**
+ * @brief Determine if posision holds a value
+ * @param ht - pointer to a hash table struct
+ * @param slotpos - ID of an record
+ */
+inline bool
+LH(light_pos_valid)(struct LH(light) *ht, uint32_t slotpos)
+{
+	uint32_t slot = slotpos / 5;
+	uint32_t pos = slotpos % 5;
+	struct LH(light_cluster) *cluster = LH(light_cluster)(ht, slot);
+	return cluster->flags & (020 << (pos * 6));
+}
+
 
 inline uint32_t
 LH(light_selfcheck)(const struct LH(light) *ht)
