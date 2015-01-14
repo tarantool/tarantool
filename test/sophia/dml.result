@@ -4,18 +4,14 @@ space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
 ...
 sophia_printdir()
 ---
-- 'snapshot
-
-'
+- 
 ...
 space:drop()
 ---
 ...
 sophia_printdir()
 ---
-- 'snapshot
-
-'
+- 
 ...
 -- index create/drop
 space = box.schema.create_space('test', { id = 101, engine = 'sophia' })
@@ -28,8 +24,6 @@ sophia_printdir()
 ---
 - '101
 
-  snapshot
-
 '
 ...
 space:drop()
@@ -37,9 +31,7 @@ space:drop()
 ...
 sophia_printdir()
 ---
-- 'snapshot
-
-'
+- 
 ...
 -- index create/drop alter
 space = box.schema.create_space('test', { id = 102, engine = 'sophia' })
@@ -52,8 +44,6 @@ sophia_printdir()
 ---
 - '102
 
-  snapshot
-
 '
 ...
 _index = box.space[box.schema.INDEX_ID]
@@ -65,9 +55,7 @@ _index:delete{102, 0}
 ...
 sophia_printdir()
 ---
-- 'snapshot
-
-'
+- 
 ...
 space:drop()
 ---
@@ -86,8 +74,6 @@ space:insert({'test'})
 sophia_printdir()
 ---
 - '103
-
-  snapshot
 
 '
 ...
@@ -108,8 +94,6 @@ space:insert({13})
 sophia_printdir()
 ---
 - '104
-
-  snapshot
 
 '
 ...
@@ -144,9 +128,7 @@ space:drop()
 ...
 sophia_printdir()
 ---
-- 'snapshot
-
-'
+- 
 ...
 -- index size
 space = box.schema.create_space('test', { id = 107, engine = 'sophia' })

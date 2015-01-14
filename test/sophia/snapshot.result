@@ -9,8 +9,6 @@ sophia_printdir()
 ---
 - '100
 
-  snapshot
-
 '
 ...
 for key = 1, 351 do space:insert({key}) end

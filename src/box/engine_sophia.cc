@@ -277,39 +277,19 @@ SophiaFactory::commit(struct txn *txn)
 		tx = NULL;
 	});
 
-	/* a. prepare transaction for commit */
-	int rc = sp_prepare(tx);
-	if (rc == -1)
-		sophia_raise(env);
-	assert(rc == 0);
-
-	/* b. create transaction log cursor and
-	 *    forge each statement's LSN number.
-	*/
-	void *lc = sp_ctl(tx, "log_cursor");
-	if (lc == NULL) {
-		sp_rollback(tx);
-		sophia_raise(env);
-	}
+	/* a. get max lsn for commit */
+	uint64_t lsn = 0;
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->new_tuple == NULL && stmt->old_tuple == NULL)
-			continue;
-		void *v = sp_get(lc);
-		assert(v != NULL);
-		sp_set(v, "lsn", stmt->row->lsn);
-		/* remove tuple reference */
-		if (stmt->new_tuple) {
-			/* 2 refs: iproto case */
-			/* 3 refs: lua case */
-			assert(stmt->new_tuple->refs >= 2);
-			tuple_unref(stmt->new_tuple);
-		}
+		if (stmt->row->lsn > lsn)
+			lsn = stmt->row->lsn;
 	}
-	assert(sp_get(lc) == NULL);
-	sp_destroy(lc);
 
-	/* c. commit transaction */
+	/* b. commit transaction */
+	int rc = sp_prepare(tx, lsn);
+	assert(rc == 0);
+	if (rc == -1)
+		sophia_raise(env);
 	rc = sp_commit(tx);
 	if (rc == -1)
 		sophia_raise(env);

@@ -132,15 +132,18 @@ sophia_configure(struct space *space, struct key_def *key_def)
 		(SophiaFactory*)space->engine->factory;
 	void *env = factory->env;
 	void *c = sp_ctl(env);
+	char pointer[128];
 	char name[128];
 	snprintf(name, sizeof(name), "%" PRIu32, key_def->space_id);
 	sp_set(c, "db", name);
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.cmp",
 	         key_def->space_id);
-	sp_set(c, name, sophia_index_compare);
+	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)sophia_index_compare);
+	sp_set(c, name, pointer);
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.cmp_arg",
 	         key_def->space_id);
-	sp_set(c, name, key_def);
+	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)key_def);
+	sp_set(c, name, pointer);
 	snprintf(name, sizeof(name), "db.%" PRIu32, key_def->space_id);
 	void *db = sp_get(c, name);
 	if (db == NULL)
@@ -204,7 +207,8 @@ SophiaIndex::random(uint32_t rnd) const
 	if (o == NULL)
 		sophia_raise(env);
 	sp_set(o, "key", &rnd, sizeof(rnd));
-	void *c = sp_cursor(db, "random", o);
+	sp_set(o, "order", "random");
+	void *c = sp_cursor(db, o);
 	if (c == NULL)
 		sophia_raise(env);
 	auto scoped_guard =
@@ -306,6 +310,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	SophiaFactory *factory =
 		(SophiaFactory *)space->engine->factory;
 	assert(factory->tx != NULL);
+
+	/* insert, replace or update */
 	if (new_tuple) {
 		const char *key = tuple_field(new_tuple, key_def->parts[0].fieldno);
 		const char *keyptr = key;
@@ -330,7 +336,9 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		}
 		if (dup_tuple)
 			return dup_tuple;
+		return old_tuple;
 	}
+	/* delete */
 	if (old_tuple)
 		sophia_index_stmt(factory->tx, db, 1, key_def, old_tuple);
 	return old_tuple;
@@ -470,9 +478,10 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	void *o = sp_object(db);
 	if (o == NULL)
 		sophia_raise(env);
+	sp_set(o, "order", compare);
 	if (key)
 		sp_set(o, "key", key, keysize);
-	it->cursor = sp_cursor(db, compare, o);
+	it->cursor = sp_cursor(db, o);
 	if (it->cursor == NULL)
 		sophia_raise(env);
 }
