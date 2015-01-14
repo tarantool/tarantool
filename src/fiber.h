@@ -261,8 +261,9 @@ void fiber_testcancel(void);
  */
 bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
-struct tbuf;
-void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
+
+void
+fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int revents);
 
 /**
  * \brief Associate \a value with \a key in fiber local storage
@@ -276,6 +277,9 @@ fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
 	assert(key < FIBER_KEY_MAX);
 	fiber->fls[key] = value;
 }
+
+bool
+fiber_is_cancelled();
 
 /**
  * \brief Retrieve value by \a key from fiber local storage

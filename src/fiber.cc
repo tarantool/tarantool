@@ -273,22 +273,19 @@ fiber_sleep(ev_tstamp delay)
 	fiber_testcancel();
 }
 
+typedef void (*ev_child_cb)(ev_loop *, ev_child *, int);
+
 /** Wait for a forked child to complete.
  * @note: this is a cancellation point (@sa fiber_testcancel()).
  * @return process return status
 */
-void
-fiber_schedule_child(ev_loop * /* loop */, ev_child *watcher, int event)
-{
-	return fiber_schedule((ev_watcher *) watcher, event);
-}
 
 int
 wait_for_child(pid_t pid)
 {
 	assert(cord() == &main_cord);
 	ev_child cw;
-	ev_init(&cw, fiber_schedule_child);
+	ev_init(&cw, (ev_child_cb) fiber_schedule);
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber();
 	ev_child_start(loop(), &cw);
@@ -300,7 +297,7 @@ wait_for_child(pid_t pid)
 }
 
 void
-fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)))
+fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 {
 	assert(fiber() == &cord()->sched);
 	fiber_call((struct fiber *) watcher->data);
