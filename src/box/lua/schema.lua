@@ -1085,7 +1085,7 @@ box.schema.user.drop = function(name)
 end
 
 box.schema.user.grant = function(user_name, privilege, object_type,
-                                 object_name, grantor)
+                                 object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax grant(user, role).
     if object_name == nil and object_type == nil then
@@ -1104,10 +1104,16 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     end
     privilege_hex = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
-    if grantor == nil then
-        grantor = session.uid()
+    if options == nil then
+        options = {}
+    end
+    if options.grantor == nil then
+        options.grantor = session.uid()
     else
-        grantor = user_or_role_resolve(grantor)
+        options.grantor = user_or_role_resolve(options.grantor)
+    end
+    if options.if_not_exists == nil then
+        options.if_not_exists = false
     end
     local _priv = box.space[box.schema.PRIV_ID]
     -- add the granted privilege to the current set
@@ -1123,18 +1129,18 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     -- XXX bug if we decide to add a grant option: new grantor
     -- replaces the old one, old grantor is lost
     if privilege_hex ~= old_privilege then
-        _priv:replace{grantor, uid, object_type, oid, privilege_hex}
-    else
-        if object_type == 'role' then
-            box.error(box.error.ROLE_GRANTED, user_name, object_name)
-        else
-            box.error(box.error.PRIV_GRANTED, user_name, privilege,
-                      object_type, object_name)
-        end
+        _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
+    elseif options.if_not_exists == false then
+            if object_type == 'role' then
+                box.error(box.error.ROLE_GRANTED, user_name, object_name)
+            else
+                box.error(box.error.PRIV_GRANTED, user_name, privilege,
+                          object_type, object_name)
+            end
     end
 end
 
-box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
+box.schema.user.revoke = function(user_name, privilege, object_type, object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax revoke(user, role).
     if object_name == nil and object_type == nil then
@@ -1148,10 +1154,19 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, name)
     end
+    if options == nil then
+        options = {}
+    end
+    if options.if_exists == nil then
+        options.if_exists = false
+    end
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
     if tuple == nil then
+        if options.if_exists then
+            return
+        end
         if object_type == 'role' then
             box.error(box.error.ROLE_NOT_GRANTED, user_name, object_name)
         else

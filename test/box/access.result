@@ -529,3 +529,24 @@ box.schema.role.exists('public')
 ---
 - true
 ...
+-- test if_exists/if_not_exists in grant/revoke
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+- error: User 'guest' already has read,write,execute access on universe 'nil'
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_exists = true })
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+- error: User 'guest' does not have read,write,execute access on universe 'nil'
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
+---
+...
