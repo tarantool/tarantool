@@ -62,7 +62,7 @@ simple_test()
 {
 	header();
 
-	struct light ht;
+	struct light_core ht;
 	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
 	std::vector<bool> vect;
 	size_t count = 0;
@@ -125,7 +125,7 @@ collision_test()
 {
 	header();
 
-	struct light ht;
+	struct light_core ht;
 	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
 	std::vector<bool> vect;
 	size_t count = 0;

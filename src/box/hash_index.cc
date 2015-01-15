@@ -147,7 +147,7 @@ key_hash(const char *key, const struct key_def *key_def)
 	return PMurHash32_Result(h, carry, total_size);
 }
 
-#define LIGHT_NAME index_
+#define LIGHT_NAME _index
 #define LIGHT_DATA_TYPE struct tuple *
 #define LIGHT_KEY_TYPE const char *
 #define LIGHT_CMP_ARG_TYPE struct key_def *
@@ -161,7 +161,7 @@ typedef uint32_t hash_t;
 
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
-	struct index_light *hash_table;
+	struct light_index_core *hash_table;
 	uint32_t h_pos;
 };
 
@@ -178,11 +178,11 @@ hash_iterator_ge(struct iterator *ptr)
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
-	if (it->h_pos < it->hash_table->table_size * 5) {
-		struct tuple *res = index_light_get(it->hash_table, it->h_pos);
+	if (it->h_pos < it->hash_table->table_size) {
+		struct tuple *res = light_index_get(it->hash_table, it->h_pos);
 		it->h_pos++;
-		while (it->h_pos < it->hash_table->table_size * 5
-		       && !index_light_pos_valid(it->hash_table, it->h_pos))
+		while (it->h_pos < it->hash_table->table_size
+		       && !light_index_pos_valid(it->hash_table, it->h_pos))
 			it->h_pos++;
 		return res;
 	}
@@ -235,18 +235,18 @@ HashIndex::HashIndex(struct key_def *key_def)
 			HASH_INDEX_EXTENT_SIZE);
 		index_arena_initialized = true;
 	}
-	hash_table = new struct index_light;
+	hash_table = new struct light_index_core;
 	if (hash_table == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash_table),
 			  "HashIndex", "hash_table");
 	}
-	index_light_create(hash_table, HASH_INDEX_EXTENT_SIZE,
+	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
 			   extent_alloc, extent_free, this->key_def);
 }
 
 HashIndex::~HashIndex()
 {
-	index_light_destroy(hash_table);
+	light_index_destroy(hash_table);
 	delete hash_table;
 }
 
@@ -273,12 +273,12 @@ HashIndex::random(uint32_t rnd) const
 {
 	if (hash_table->count == 0)
 		return NULL;
-	rnd %= (hash_table->table_size * 5);
-	while (!index_light_pos_valid(hash_table, rnd)) {
+	rnd %= (hash_table->table_size);
+	while (!light_index_pos_valid(hash_table, rnd)) {
 		rnd++;
-		rnd %= (hash_table->table_size * 5);
+		rnd %= (hash_table->table_size);
 	}
-	return index_light_get(hash_table, rnd);
+	return light_index_get(hash_table, rnd);
 }
 
 struct tuple *
@@ -289,9 +289,9 @@ HashIndex::findByKey(const char *key, uint32_t part_count) const
 
 	struct tuple *ret = NULL;
 	uint32_t h = key_hash(key, key_def);
-	uint32_t k = index_light_find_key(hash_table, h, key);
-	if (k != index_light_end)
-		ret = index_light_get(hash_table, k);
+	uint32_t k = light_index_find_key(hash_table, h, key);
+	if (k != light_index_end)
+		ret = light_index_get(hash_table, k);
 	return ret;
 }
 
@@ -304,27 +304,27 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	if (new_tuple) {
 		uint32_t h = tuple_hash(new_tuple, key_def);
 		struct tuple *dup_tuple = NULL;
-		hash_t pos = index_light_replace(hash_table, h, new_tuple, &dup_tuple);
-		if (pos == index_light_end)
-			pos = index_light_insert(hash_table, h, new_tuple);
+		hash_t pos = light_index_replace(hash_table, h, new_tuple, &dup_tuple);
+		if (pos == light_index_end)
+			pos = light_index_insert(hash_table, h, new_tuple);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
-			index_light_delete(hash_table, pos);
-			pos = index_light_end;
+			light_index_delete(hash_table, pos);
+			pos = light_index_end;
 		});
 
-		if (pos == index_light_end) {
+		if (pos == light_index_end) {
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) hash_table->count,
 				  "hash_table", "key");
 		}
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			index_light_delete(hash_table, pos);
+			light_index_delete(hash_table, pos);
 			if (dup_tuple) {
-				uint32_t pos = index_light_insert(hash_table, h, dup_tuple);
-				if (pos == index_light_end) {
+				uint32_t pos = light_index_insert(hash_table, h, dup_tuple);
+				if (pos == light_index_end) {
 					panic("Failed to allocate memory in "
 					      "recover of int hash_table");
 				}
@@ -338,9 +338,9 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 	if (old_tuple) {
 		uint32_t h = tuple_hash(old_tuple, key_def);
-		hash_t slot = index_light_find(hash_table, h, old_tuple);
-		assert(slot != index_light_end);
-		index_light_delete(hash_table, slot);
+		hash_t slot = light_index_find(hash_table, h, old_tuple);
+		assert(slot != light_index_end);
+		light_index_delete(hash_table, slot);
 	}
 	return old_tuple;
 }
@@ -375,14 +375,14 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	switch (type) {
 	case ITER_ALL:
 		it->h_pos = 0;
-		while (it->h_pos < it->hash_table->table_size * 5
-		       && !index_light_pos_valid(it->hash_table, it->h_pos))
+		while (it->h_pos < it->hash_table->table_size
+		       && !light_index_pos_valid(it->hash_table, it->h_pos))
 			it->h_pos++;
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
 		assert(part_count > 0);
-		it->h_pos = index_light_find_key(hash_table, key_hash(key, key_def), key);
+		it->h_pos = light_index_find_key(hash_table, key_hash(key, key_def), key);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:

@@ -31,7 +31,7 @@
 
 #include "index.h"
 
-struct index_light;
+struct light_index_core;
 
 class HashIndex: public Index {
 public:
@@ -53,7 +53,7 @@ public:
 	virtual size_t memsize() const;
 
 protected:
-	struct index_light *hash_table;
+	struct light_index_core *hash_table;
 };
 
 #endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */

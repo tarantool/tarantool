@@ -4,6 +4,13 @@
 
 #include "matras.h"
 #include <limits.h>
+#ifdef WIN32
+#include <intrin.h>
+#pragma intrinsic (_BitScanReverse)
+#ifndef _DEBUG
+#define __OPTIMIZE__ 1
+#endif
+#endif
 
 /*
  * Binary logarithm of value (exact if the value is a power of 2,
@@ -13,8 +20,15 @@ static matras_id_t
 pt_log2(matras_id_t val)
 {
 	assert(val > 0);
-	return sizeof(unsigned long) * CHAR_BIT -
-		__builtin_clzl((unsigned long) val) - 1;
+#ifdef WIN32
+    unsigned long res = 0;
+    unsigned char nonzero = _BitScanReverse(&res, val);
+	assert(nonzero); (void)nonzero;
+	return (matras_id_t)res;
+#else
+	return sizeof(unsigned int) * CHAR_BIT -
+		__builtin_clz((unsigned int) val) - 1;
+#endif
 }
 
 /**
@@ -92,7 +106,7 @@ matras_destroy(struct matras *m)
 		m->block_count = 0;
 	}
 #ifndef __OPTIMIZE__
-	m->extent = (void *)0xDEADBEEF;
+	m->extent = (void *)(long long)0xDEADBEEF;
 #endif
 }
 
@@ -219,6 +233,40 @@ matras_dealloc(struct matras *m)
 			m->free_func(extent1);
 		return;
 	}
+}
+
+/**
+ * Allocate a range_count of blocks. Return both, first block pointer
+ * and first block id. This method only works if current number of blocks and
+ * number of blocks in one extent are divisible by range_count.
+ * range_count must also be less or equal to number of blocks in one extent.
+ *
+ * @retval NULL failed to allocate memory
+ */
+void *
+matras_alloc_range(struct matras *m, matras_id_t *id, matras_id_t range_count)
+{
+	assert(m->block_count % range_count == 0);
+	assert(m->extent_size / m->block_size % range_count == 0);
+	void *res = matras_alloc(m, id);
+	if (res)
+		m->block_count += (range_count - 1);
+	return res;
+}
+
+/*
+ * Deallocate last range_count of blocks (blocks with maximum ID)
+ * This method only works if current number of blocks and
+ * number of blocks in one extent are divisible by range_count.
+ * range_count must also be less or equal to number of blocks in one extent.
+ */
+void
+matras_dealloc_range(struct matras *m, matras_id_t range_count)
+{
+	assert(m->block_count % range_count == 0);
+	assert(m->extent_size / m->block_size % range_count == 0);
+	m->block_count -= (range_count - 1);
+	matras_dealloc(m);
 }
 
 /**

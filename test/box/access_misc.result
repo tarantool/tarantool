@@ -178,8 +178,8 @@ session.su('admin')
 ...
 s:select()
 ---
-- - [3]
-  - [2]
+- - [2]
+  - [3]
 ...
 --
 -- Create user with universe read&write grants
@@ -244,8 +244,8 @@ box.schema.user.drop('uniuser_testus')
 --
 box.space.admin_space:select()
 ---
-- - [3]
-  - [2]
+- - [2]
+  - [3]
 ...
 box.space._user:select(1)
 ---

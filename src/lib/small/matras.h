@@ -82,7 +82,13 @@
  */
 /* }}} */
 
+#ifdef WIN32
+typedef unsigned __int32 matras_id_t;
+#else
 #include <stdint.h>
+typedef uint32_t matras_id_t;
+#endif
+
 #include <assert.h>
 
 #if defined(__cplusplus)
@@ -92,7 +98,6 @@ extern "C" {
 /**
  * Type of a block ID.
  */
-typedef uint32_t matras_id_t;
 
 /**
  * Type of the extent allocator (the allocator for regions
@@ -109,7 +114,7 @@ typedef void (*prov_free_func)(void *);
 struct matras {
 	/* Pointer to the root extent of matras */
 	void *extent;
-	/* Block size (M) */
+	/* Block size (N) */
 	matras_id_t block_size;
 	/* Extent size (M) */
 	matras_id_t extent_size;
@@ -187,6 +192,26 @@ void
 matras_dealloc(struct matras *m);
 
 /**
+ * Allocate a range_count of blocks. Return both, first block pointer
+ * and first block id. This method only works if current number of blocks and
+ * number of blocks in one extent are divisible by range_count.
+ * range_count must also be less or equal to number of blocks in one extent.
+ *
+ * @retval NULL failed to allocate memory
+ */
+void *
+matras_alloc_range(struct matras *m, matras_id_t *id, matras_id_t range_count);
+
+/*
+ * Deallocate last range_count of blocks (blocks with maximum ID)
+ * This method only works if current number of blocks and
+ * number of blocks in one extent are divisible by range_count.
+ * range_count must also be less or equal to number of blocks in one extent.
+ */
+void
+matras_dealloc_range(struct matras *m, matras_id_t range_count);
+
+/**
  * Convert block id into block address.
  */
 static void *
@@ -214,8 +239,6 @@ matras_get(const struct matras *m, matras_id_t id)
 
 	return (((char***)m->extent)[n1][n2] + n3 * m->block_size);
 }
-
-
 
 #if defined(__cplusplus)
 } /* extern "C" */
