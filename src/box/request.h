@@ -33,7 +33,7 @@
 
 struct txn;
 struct port;
-
+extern int stat_base;
 
 struct request
 {
@@ -66,7 +66,7 @@ void
 request_create(struct request *request, uint32_t code);
 
 void
-request_execute(struct request *request, struct port *port);
+process_rw(struct request *request, struct port *port);
 
 void
 request_decode(struct request *request, const char *data, uint32_t len);

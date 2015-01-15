@@ -63,7 +63,7 @@ box_atfork();
  * change when entering/leaving read-only mode
  * (master->slave propagation).
  */
-typedef void (*box_process_func)(struct port *port, struct request *request);
+typedef void (*box_process_func)(struct request *request, struct port *port);
 /** For read-write operations. */
 extern box_process_func box_process;
 
@@ -126,8 +126,6 @@ void box_set_snap_io_rate_limit(double limit);
 void box_set_too_long_threshold(double threshold);
 
 extern struct recovery_state *recovery;
-
-extern int stat_base;
 
 #if defined(__cplusplus)
 }

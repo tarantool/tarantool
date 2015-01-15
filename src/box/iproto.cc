@@ -663,7 +663,7 @@ iproto_process(struct iproto_request *ireq)
 		case IPROTO_DELETE:
 			struct iproto_port port;
 			iproto_port_init(&port, out, ireq->header.sync);
-			box_process((struct port *) &port, &ireq->request);
+			box_process(&ireq->request, (struct port *) &port);
 			break;
 		case IPROTO_CALL:
 			stat_collect(stat_base, ireq->request.type, 1);

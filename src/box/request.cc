@@ -40,6 +40,9 @@
 #include <scoped_guard.h>
 #include "user_def.h"
 #include "iproto_constants.h"
+#include "stat.h"
+
+int stat_base;
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
@@ -171,17 +174,23 @@ request_create(struct request *request, uint32_t type)
 typedef void (*request_execute_f)(struct request *, struct port *);
 
 void
-request_execute(struct request *request, struct port *port)
+process_rw(struct request *request, struct port *port)
 {
 	assert(iproto_type_is_dml(request->type));
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete
 	};
-
 	request_execute_f fun = execute_map[request->type];
 	assert(fun != NULL);
-	fun(request, port);
+	stat_collect(stat_base, request->type, 1);
+	try {
+		fun(request, port);
+		port_eof(port);
+	} catch (Exception *e) {
+		txn_rollback_stmt();
+		throw;
+	}
 }
 
 void

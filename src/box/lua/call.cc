@@ -183,7 +183,7 @@ lbox_process(lua_State *L)
 	struct request request;
 	request_create(&request, op);
 	request_decode(&request, req, sz);
-	box_process(port_lua, &request);
+	box_process(&request, port_lua);
 
 	return 1;
 }
@@ -266,7 +266,7 @@ boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	request.key_end = key_end;
 
 	try {
-		box_process(port, &request);
+		box_process(&request, port);
 		return 0;
 	} catch (Exception *e) {
 		/* will be hanled by box.error() in Lua */
@@ -284,7 +284,7 @@ lbox_insert(lua_State *L)
 	struct port_lua port;
 	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2);
 	port_lua_create(&port, L);
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
 }
 
@@ -298,7 +298,7 @@ lbox_replace(lua_State *L)
 	struct port_lua port;
 	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2);
 	port_lua_create(&port, L);
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
 }
 
@@ -314,7 +314,7 @@ lbox_update(lua_State *L)
 	request.field_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 4;
 }
 
@@ -329,7 +329,7 @@ lbox_delete(lua_State *L)
 	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1);
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 3;
 }
 
