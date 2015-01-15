@@ -72,9 +72,11 @@ void
 iproto_reply_ping(struct obuf *out, uint64_t sync)
 {
 	struct iproto_header_bin reply = iproto_header_bin;
-	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5);
+	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5 + 1);
 	reply.v_sync = mp_bswap_u64(sync);
+	uint8_t empty_map[1] = { 0x80 };
 	obuf_dup(out, &reply, sizeof(reply));
+	obuf_dup(out, &empty_map, sizeof(empty_map));
 }
 
 static inline uint32_t
