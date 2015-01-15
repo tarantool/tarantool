@@ -101,6 +101,9 @@ void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
 
 void
+box_process_auth(struct request *request);
+
+void
 box_process_join(int fd, struct xrow_header *header);
 
 void
@@ -123,6 +126,8 @@ void box_set_snap_io_rate_limit(double limit);
 void box_set_too_long_threshold(double threshold);
 
 extern struct recovery_state *recovery;
+
+extern int stat_base;
 
 #if defined(__cplusplus)
 }

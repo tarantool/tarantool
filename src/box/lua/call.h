@@ -39,7 +39,7 @@ struct port;
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(struct request *request, struct port *port);
+box_lua_call(struct request *request, struct obuf *out);
 
 extern "C" {
 struct port_ffi
