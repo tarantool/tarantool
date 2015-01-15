@@ -11,6 +11,7 @@
 #include "lua/bsdsocket.h"
 #include "lua/digest.h"
 #include "base64.h"
+#include "random.h"
 #include <lib/salad/guava.h>
 
 /*
@@ -52,5 +53,6 @@ void *ffi_symbols[] = {
 	(void *) base64_encode,
 	(void *) base64_bufsize,
 	(void *) SHA1internal,
-	(void *) guava
+	(void *) guava,
+	(void *) random_bytes,
 };

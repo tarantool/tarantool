@@ -30,6 +30,9 @@ ffi.cdef[[
    int base64_bufsize(int binsize);
    int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
    int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len);
+
+   /* random */
+   void random_bytes(char *, size_t);
 ]]
 
 local ssl
@@ -135,6 +138,15 @@ local m = {
     guava = function(state, buckets)
        return ffi.C.guava(state, buckets)
     end,
+
+    urandom = function(n)
+        if n == nil then
+            error('Usage: digest.urandom(len)')
+        end
+        local buf = ffi.new('char[?]', n)
+        ffi.C.random_bytes(buf, n)
+        return ffi.string(buf, n)
+    end
 }
 
 if ssl ~= nil then
