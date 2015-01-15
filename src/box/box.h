@@ -83,6 +83,7 @@ extern uint32_t snapshot_version;
  * snapshot file.
  */
 int box_snapshot(void);
+void box_deploy_snapshot(struct recovery_state*);
 void box_deploy(struct recovery_state*);
 
 /** Basic initialization of the storage dir. */

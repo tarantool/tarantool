@@ -61,6 +61,7 @@ struct recovery_state *recovery;
 
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
+uint64_t snapshot_last_lsn = 0;
 
 static void
 box_snapshot_cb(struct log_io *l);
@@ -440,6 +441,8 @@ box_init()
 	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
 
 	if (recovery_has_data(recovery)) {
+		/* recover engine snapshot */
+		box_deploy_snapshot(recovery);
 		/* Process existing snapshot */
 		recover_snap(recovery);
 		space_end_recover_snapshot();
@@ -541,21 +544,28 @@ static inline void
 box_snapshot_engine(EngineFactory *f, void *udate)
 {
 	uint64_t lsn = *(uint64_t*)udate;
-	f->snapshot(lsn);
+	f->snapshot(SNAPSHOT_START, lsn);
+}
+
+static inline void
+box_snapshot_recover_engine(EngineFactory *f, void *udate)
+{
+	uint64_t lsn = *(uint64_t*)udate;
+	f->snapshot(SNAPSHOT_RECOVER, lsn);
 }
 
 static inline void
 box_snapshot_delete_engine(EngineFactory *f, void *udate)
 {
 	uint64_t lsn = *(uint64_t*)udate;
-	f->snapshot_delete(lsn);
+	f->snapshot(SNAPSHOT_DELETE, lsn);
 }
 
 static inline void
 box_snapshot_complete_engine(EngineFactory *f, void *udate)
 {
 	uint64_t lsn = *(uint64_t*)udate;
-	while (! f->snapshot_ready(lsn))
+	while (! f->snapshot(SNAPSHOT_READY, lsn))
 		fiber_yield_timeout(.020);
 }
 
@@ -596,6 +606,7 @@ box_snapshot(void)
 	switch (pid) {
 	case -1:
 		say_syserror("fork");
+		status = errno;
 		goto error;
 	case  0: /* dumper */
 		slab_arena_mprotect(&memtx_arena);
@@ -633,15 +644,22 @@ box_snapshot(void)
 	if (rc == -1 || status == -1)
 		goto error;
 
+	/* remove previous snapshot reference */
+	engine_foreach(box_snapshot_delete_engine, &snapshot_last_lsn);
+
+	/* complete snapshot */
 	tuple_end_snapshot();
+
+	snapshot_last_lsn = snap_lsn;
 	snapshot_pid = 0;
 	return 0;
+
 error:
 	/* rollback snapshot creation */
 	engine_foreach(box_snapshot_delete_engine, &snap_lsn);
 	tuple_end_snapshot();
 	snapshot_pid = 0;
-	return -1;
+	return status;
 }
 
 void
@@ -650,10 +668,23 @@ box_deploy(struct recovery_state *r)
 	/* create memtx snapshot */
 	snapshot_save(r, true);
 
-	/* create engine snapshot and for it completion */
+	/* create engine snapshot and wait for completion */
 	uint64_t snap_lsn = vclock_signature(&r->vclock);
 	engine_foreach(box_snapshot_engine, &snap_lsn);
 	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
+}
+
+void
+box_deploy_snapshot(struct recovery_state *r)
+{
+	/* recover last snapshot lsn */
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	if (res == NULL)
+		panic("can't find snapshot");
+	snapshot_last_lsn = vclock_signature(res);
+
+	/* recover engine snapshot */
+	engine_foreach(box_snapshot_recover_engine, &snapshot_last_lsn);
 }
 
 const char *

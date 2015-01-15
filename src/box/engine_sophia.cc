@@ -112,8 +112,8 @@ SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
 {
 	flags = ENGINE_TRANSACTIONAL;
-	env   = NULL;
-	tx    = NULL;
+	env = NULL;
+	tx  = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -307,7 +307,8 @@ SophiaFactory::rollback(struct txn *)
 	sp_rollback(tx);
 }
 
-void SophiaFactory::snapshot(uint64_t lsn)
+static inline void
+sophia_snapshot(void *env, uint64_t lsn)
 {
 	/* start asynchronous checkpoint */
 	void *c = sp_ctl(env);
@@ -327,7 +328,26 @@ void SophiaFactory::snapshot(uint64_t lsn)
 		sophia_raise(env);
 }
 
-int SophiaFactory::snapshot_ready(uint64_t lsn)
+static inline void
+sophia_snapshot_recover(void *env, uint64_t lsn)
+{
+	/* recovered snapshot lsn is >= then last
+	 * engine lsn */
+	char snapshot_lsn[32];
+	snprintf(snapshot_lsn, sizeof(snapshot_lsn), "%" PRIu64, lsn);
+	void *c = sp_ctl(env);
+	int rc = sp_set(c, "snapshot", snapshot_lsn);
+	if (rc == -1)
+		sophia_raise(env);
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	rc = sp_set(c, snapshot, snapshot_lsn);
+	if (rc == -1)
+		sophia_raise(env);
+}
+
+static inline int
+sophia_snapshot_ready(void *env, uint64_t lsn)
 {
 	/* get sophia lsn associated with snapshot */
 	char snapshot[32];
@@ -354,7 +374,8 @@ int SophiaFactory::snapshot_ready(uint64_t lsn)
 	return last_lsn >= snapshot_start_lsn;
 }
 
-void SophiaFactory::snapshot_delete(uint64_t lsn)
+static inline void
+sophia_snapshot_delete(void *env, uint64_t lsn)
 {
 	char snapshot[32];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
@@ -365,7 +386,25 @@ void SophiaFactory::snapshot_delete(uint64_t lsn)
 			sophia_raise(env);
 		panic("sophia snapshot %" PRIu64 " does not exist", lsn);
 	}
-	int rc = sp_delete(s);
+	int rc = sp_destroy(s);
 	if (rc == -1)
 		sophia_raise(env);
+}
+
+int SophiaFactory::snapshot(enum engine_snapshot_event e, uint64_t lsn)
+{
+	switch (e) {
+	case SNAPSHOT_START:
+		sophia_snapshot(env, lsn);
+		break;
+	case SNAPSHOT_RECOVER:
+		sophia_snapshot_recover(env, lsn);
+		break;
+	case SNAPSHOT_DELETE:
+		sophia_snapshot_delete(env, lsn);
+		break;
+	case SNAPSHOT_READY:
+		return sophia_snapshot_ready(env, lsn);
+	}
+	return 0;
 }

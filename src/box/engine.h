@@ -75,6 +75,16 @@ enum engine_recovery_event {
 	END_RECOVERY
 };
 
+/**
+ * Engine specific snapshot event.
+ */
+enum engine_snapshot_event {
+	SNAPSHOT_START,
+	SNAPSHOT_RECOVER,
+	SNAPSHOT_DELETE,
+	SNAPSHOT_READY
+};
+
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -131,9 +141,7 @@ public:
 	/**
 	 * Engine snapshotting support.
 	 */
-	virtual void snapshot(uint64_t) = 0;
-	virtual int  snapshot_ready(uint64_t) = 0;
-	virtual void snapshot_delete(uint64_t) = 0;
+	virtual int snapshot(enum engine_snapshot_event, uint64_t) = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
