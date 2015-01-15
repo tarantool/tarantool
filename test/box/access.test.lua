@@ -212,3 +212,10 @@ box.schema.func.exists('box.schema.user.info')
 -- gh-665: user.exists() should nto be true for roles
 box.schema.user.exists('public')
 box.schema.role.exists('public')
+-- test if_exists/if_not_exists in grant/revoke
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_exists = true })
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })

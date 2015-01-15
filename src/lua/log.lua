@@ -20,16 +20,7 @@ ffi.cdef[[
 ]]
 
 local function say(level, fmt, ...)
-    local str
-   
-    args = { ... }
-    if not pcall(function() str = string.format(fmt, unpack(args)) end) then
-        str = fmt .. ' ['
-        for i = 1, select('#', ...) do
-            str = str .. select(i, ...) .. ', '
-        end
-        str = str .. ']'
-    end
+    local str = string.format(fmt, ...)
     local frame = debug.getinfo(3, "Sl")
     local line = 0
     local file = 'eval'

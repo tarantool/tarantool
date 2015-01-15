@@ -65,4 +65,9 @@ digest.guava(10863919174838991, 11)
 digest.guava(2016238256797177309, 11)
 digest.guava(1673758223894951030, 11)
 
+digest.urandom()
+#digest.urandom(0)
+#digest.urandom(1)
+#digest.urandom(16)
+
 digest = nil

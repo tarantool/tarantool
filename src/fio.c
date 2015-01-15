@@ -40,7 +40,7 @@
 
 #include <say.h>
 
-static const char *
+const char *
 fio_filename(int fd)
 {
 #ifdef TARGET_OS_LINUX

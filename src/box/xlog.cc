@@ -54,16 +54,27 @@ static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte ord
 static const char inprogress_suffix[] = ".inprogress";
 static const char v12[] = "0.12\n";
 
+XlogError::XlogError(const char *file, unsigned line,
+		     const char *format, ...)
+	:Exception(file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
+	va_end(ap);
+}
+
 /* {{{ struct xdir */
 
 void
 xdir_create(struct xdir *dir, const char *dirname,
-	    enum xdir_type type)
+	    enum xdir_type type, const tt_uuid *server_uuid)
 {
 	memset(dir, 0, sizeof(*dir));
 	vclockset_new(&dir->index);
 	/* Default mode. */
 	dir->mode = 0660;
+	dir->server_uuid = server_uuid;
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
 	if (type == SNAP) {
 		strcpy(dir->open_wflags, "wxd");
@@ -114,40 +125,39 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct xlog *wal = xlog_open(dir, signature, NULL, INPROGRESS);
-	if (wal == NULL) {
-		tnt_raise(ClientError, ER_INVALID_XLOG,
-			  format_filename(dir, signature, NONE));
+	struct xlog *wal;
+
+	try {
+		wal = xlog_open(dir, signature, INPROGRESS);
+		/*
+		 * All log files in a directory must satisfy Lamport's
+		 * eventual order: events in each log file must be
+		 * separable with consistent cuts, for example:
+		 *
+		 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
+		 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
+		 */
+		struct vclock *dup = vclockset_search(&dir->index,
+						      &wal->vclock);
+		if (dup != NULL) {
+			XlogError *e = tnt_error(XlogError,
+						 "%s: invalid xlog order",
+						 wal->filename);
+			xlog_close(wal);
+			throw e;
+		}
+	} catch (XlogError *e) {
+		if (dir->panic_if_error)
+			throw;
+		/** Skip a corrupted file */
+		e->log();
+		return;
 	}
+
 	auto log_guard = make_scoped_guard([=]{
 		xlog_close(wal);
 	});
 
-	/*
-	 * Check the match between log file name and contents:
-	 * the sum of vector clock coordinates must be the same
-	 * as the name of the file.
-	 */
-	int64_t signature_check = vclock_signature(&wal->vclock);
-	if (signature_check != signature) {
-		tnt_raise(ClientError, ER_INVALID_XLOG_NAME,
-			  (long long) signature_check,
-			  (long long) signature);
-	}
-	/*
-	 * All log files in a directory must satisfy Lamport's
-	 * eventual order: events in each log file must be
-	 * separable with consistent cuts, for example:
-	 *
-	 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
-	 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
-	 */
-	struct vclock *dup = vclockset_search(&dir->index, &wal->vclock);
-	if (dup != NULL) {
-		tnt_raise(ClientError, ER_INVALID_XLOG_ORDER,
-			  (long long) signature,
-			  (long long) vclock_signature(dup));
-	}
 	/*
 	 * Append the clock describing the file to the
 	 * directory index.
@@ -212,7 +222,7 @@ xdir_scan(struct xdir *dir)
 			  dir->dirname);
 	}
 
-	auto log_guard = make_scoped_guard([&]{
+	auto dir_guard = make_scoped_guard([&]{
 		closedir(dh);
 		free(signatures);
 	});
@@ -278,7 +288,7 @@ xdir_scan(struct xdir *dir)
 			signatures = (int64_t *) realloc(signatures, size);
 			if (signatures == NULL) {
 				tnt_raise(OutOfMemory,
-					  size, "signatures array", "realloc");
+					  size, "realloc", "signatures array");
 			}
 		}
 		signatures[s_count++] = signature;
@@ -304,15 +314,7 @@ xdir_scan(struct xdir *dir)
 			vclock = next;
 		} else if (s_old > s_new) {
 			/** Add a new file. */
-			try {
-				xdir_index_file(dir, s_new);
-			} catch (Exception *e) {
-				e->log();
-				say_warn("failed to scan %s",
-					 format_filename(dir, s_new, NONE));
-				if (dir->panic_if_error)
-					throw;
-			}
+			xdir_index_file(dir, s_new);
 			i++;
 		} else {
 			assert(s_old == s_new && i < s_count &&
@@ -321,6 +323,17 @@ xdir_scan(struct xdir *dir)
 			i++;
 		}
 	}
+}
+
+void
+xdir_check(struct xdir *dir)
+{
+	DIR *dh = opendir(dir->dirname);        /* log dir */
+	if (dh == NULL) {
+		tnt_raise(SystemError, "error reading directory '%s'",
+			  dir->dirname);
+	}
+	closedir(dh);
 }
 
 char *
@@ -355,8 +368,11 @@ row_reader(FILE *f, struct xrow_header *row)
 		if (feof(f))
 			return 1;
 error:
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "invalid fixed header");
+		char buf[PATH_MAX];
+		snprintf(buf, sizeof(buf), "%s: failed to read or parse row header"
+			 " at offset %zu", fio_filename(fileno(f)),
+			 (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
 
 	/* Decode len, previous crc32 and row crc32 */
@@ -370,8 +386,11 @@ error:
 		goto error;
 	uint32_t len = mp_decode_uint(&data);
 	if (len > IPROTO_BODY_LEN_MAX) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "packet is too big");
+		char buf[PATH_MAX];
+		snprintf(buf, sizeof(buf),
+			 "%s: row is too big at offset %zu",
+			 fio_filename(fileno(f)), (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
 
 	/* Read previous crc32 */
@@ -394,8 +413,15 @@ error:
 		return 1;
 
 	/* Validate checksum */
-	if (crc32_calc(0, bodybuf, len) != crc32c)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "invalid crc32");
+	if (crc32_calc(0, bodybuf, len) != crc32c) {
+		char buf[PATH_MAX];
+
+		snprintf(buf, sizeof(buf), "%s: row checksum mismatch (expected %u)"
+			 " at offset %zu",
+			 fio_filename(fileno(f)), (unsigned) crc32c,
+			 (uint64_t) ftello(f));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
+	}
 
 	data = bodybuf;
 	xrow_header_decode(row, &data, bodybuf + len);
@@ -459,9 +485,7 @@ xlog_cursor_close(struct xlog_cursor *i)
 	 * Seek back to last known good offset.
 	 */
 	fseeko(l->f, i->good_offset, SEEK_SET);
-#if 0
 	region_free(&fiber()->gc);
-#endif
 }
 
 /**
@@ -483,14 +507,12 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
 	say_debug("xlog_cursor_next: marker:0x%016X/%zu",
 		  row_marker, sizeof(row_marker));
 
-#if 0
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
 	region_free_after(&fiber()->gc, 128 * 1024);
-#endif
 
 restart:
 	if (marker_offset > 0)
@@ -522,8 +544,7 @@ restart:
 		if (l->dir->panic_if_error)
 			throw;
 		else {
-			say_warn("failed to read row:");
-			e->log();
+			say_warn("failed to read row");
 			goto restart;
 		}
 	}
@@ -538,8 +559,8 @@ restart:
 eof:
 	/*
 	 * The only two cases of fully read file:
-	 * 1. sizeof(eof_marker) > 0 and it is the last record in file
-	 * 2. sizeof(eof_marker) == 0 and there is no unread data in file
+	 * 1. eof_marker is present and it is the last record in file
+	 * 2. eof_marker is missing but there is no unread data in file
 	 */
 	if (ftello(l->f) == i->good_offset + sizeof(eof_marker)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
@@ -587,7 +608,7 @@ xlog_rename(struct xlog *l)
 	new_filename[suffix - filename] = '\0';
 
 	if (rename(filename, new_filename) != 0) {
-		say_syserror("can't rename %s to %s", filename, new_filename);
+		say_syserror("%s: rename to %s failed", filename, new_filename);
 
 		return -1;
 	}
@@ -608,7 +629,7 @@ inprogress_log_unlink(char *filename)
 		if (errno == ENOENT)
 			return 0;
 
-		say_syserror("can't unlink %s", filename);
+		say_syserror("%s: unlink() failed", filename);
 
 		return -1;
 	}
@@ -634,12 +655,13 @@ xlog_close(struct xlog *l)
 		if (! strchr(l->dir->open_wflags, 's'))
 			xlog_sync(l);
 		if (l->is_inprogress && xlog_rename(l) != 0)
-			panic("can't rename 'inprogress' WAL");
+			panic("%s: rename() of 'inprogress' WAL failed",
+			      l->filename);
 	}
 
 	r = fclose(l->f);
 	if (r < 0)
-		say_syserror("can't close");
+		say_syserror("%s: close() failed", l->filename);
 	free(l);
 	return r;
 }
@@ -668,11 +690,13 @@ xlog_atfork(struct xlog **lptr)
 static int
 sync_cb(eio_req *req)
 {
-	if (req->result)
-		say_error("%s: fsync failed, errno: %d",
-			  __func__, (int) req->result);
-
 	int fd = (intptr_t) req->data;
+	if (req->result) {
+		errno = req->result;
+		say_syserror("%s: fsync() failed",
+			     fio_filename(fd));
+		errno = 0;
+	}
 	close(fd);
 	return 0;
 }
@@ -683,7 +707,7 @@ xlog_sync(struct xlog *l)
 	if (l->dir->sync_is_async) {
 		int fd = dup(fileno(l->f));
 		if (fd == -1) {
-			say_syserror("%s: dup() failed", __func__);
+			say_syserror("%s: dup() failed", l->filename);
 			return -1;
 		}
 		eio_fsync(fd, 0, sync_cb, (void *) (intptr_t) fd);
@@ -698,14 +722,13 @@ xlog_sync(struct xlog *l)
 #define VCLOCK_KEY "VClock"
 
 static int
-xlog_write_meta(struct xlog *l, const tt_uuid *server_uuid,
-		  const struct vclock *vclock)
+xlog_write_meta(struct xlog *l)
 {
 	char *vstr = NULL;
 	if (fprintf(l->f, "%s%s", l->dir->filetype, v12) < 0 ||
 	    fprintf(l->f, SERVER_UUID_KEY ": %s\n",
-		    tt_uuid_str(server_uuid)) < 0 ||
-	    (vstr = vclock_to_string(vclock)) == NULL ||
+		    tt_uuid_str(l->dir->server_uuid)) < 0 ||
+	    (vstr = vclock_to_string(&l->vclock)) == NULL ||
 	    fprintf(l->f, VCLOCK_KEY ": %s\n\n", vstr) < 0) {
 		free(vstr);
 		return -1;
@@ -722,8 +745,8 @@ xlog_write_meta(struct xlog *l, const tt_uuid *server_uuid,
  *
  * @return 0 if success, -1 on error.
  */
-static int
-xlog_read_meta(struct xlog *l, const tt_uuid *server_uuid)
+static void
+xlog_read_meta(struct xlog *l, int64_t signature)
 {
 	char filetype[32], version[32], buf[256];
 	struct xdir *dir = l->dir;
@@ -731,23 +754,22 @@ xlog_read_meta(struct xlog *l, const tt_uuid *server_uuid)
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
 	    fgets(version, sizeof(version), stream) == NULL) {
-		say_error("%s: failed to read log file header", l->filename);
-		return -1;
+		tnt_raise(XlogError, "%s: failed to read log file header",
+			  l->filename);
 	}
 	if (strcmp(dir->filetype, filetype) != 0) {
-		say_error("%s: unknown filetype", l->filename);
-		return -1;
+		tnt_raise(XlogError, "%s: unknown filetype", l->filename);
 	}
 
 	if (strcmp(v12, version) != 0) {
-		say_error("%s: unsupported file format version", l->filename);
-		return -1;
+		tnt_raise(XlogError, "%s: unsupported file format version",
+			  l->filename);
 	}
 	for (;;) {
 		if (fgets(buf, sizeof(buf), stream) == NULL) {
-			say_error("%s: failed to read log file header",
+			tnt_raise(XlogError,
+				  "%s: failed to read log file header",
 				  l->filename);
-			return -1;
 		}
 		/** Empty line indicates the end of file header. */
 		if (strcmp(buf, "\n") == 0)
@@ -760,8 +782,7 @@ xlog_read_meta(struct xlog *l, const tt_uuid *server_uuid)
 		char *key = buf;
 		char *val = strchr(buf, ':');
 		if (val == NULL) {
-			say_error("%s: invalid meta", l->filename);
-			return -1;
+			tnt_raise(XlogError, "%s: invalid meta", l->filename);
 		}
 		*val++ = 0;
 		while (isspace(*val))
@@ -770,86 +791,82 @@ xlog_read_meta(struct xlog *l, const tt_uuid *server_uuid)
 		if (strcmp(key, SERVER_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
 			    tt_uuid_from_string(val, &l->server_uuid) != 0) {
-				say_error("%s: can't parse node uuid",
+				tnt_raise(XlogError, "%s: can't parse node UUID",
 					  l->filename);
-				return -1;
 			}
 		} else if (strcmp(key, VCLOCK_KEY) == 0){
 			size_t offset = vclock_from_string(&l->vclock, val);
 			if (offset != 0) {
-				say_error("%s: invalid vclock at offset %zd",
+				tnt_raise(XlogError, "%s: invalid vclock at offset %zd",
 					  l->filename, offset);
-				return -1;
 			}
 		} else {
 			/* Skip unknown key */
 		}
 	}
 
-	if (server_uuid != NULL && !tt_uuid_is_nil(server_uuid) &&
-	    !tt_uuid_is_equal(server_uuid, &l->server_uuid)) {
-		say_error("%s: invalid server uuid", l->filename);
-		if (l->dir->panic_if_error)
-			return -1;
+	if (!tt_uuid_is_nil(dir->server_uuid) &&
+	    !tt_uuid_is_equal(dir->server_uuid, &l->server_uuid)) {
+		tnt_raise(XlogError, "%s: invalid server UUID",
+			  l->filename);
 	}
-	return 0;
+	/*
+	 * Check the match between log file name and contents:
+	 * the sum of vector clock coordinates must be the same
+	 * as the name of the file.
+	 */
+	int64_t signature_check = vclock_signature(&l->vclock);
+	if (signature_check != signature) {
+		tnt_raise(XlogError, "%s: signature check failed",
+			  l->filename);
+	}
 }
 
 struct xlog *
-xlog_open_stream(struct xdir *dir, const char *filename,
-		 const tt_uuid *server_uuid, enum log_suffix suffix,
-		 FILE *file)
+xlog_open_stream(struct xdir *dir, int64_t signature, enum log_suffix suffix,
+		 FILE *file, const char *filename)
 {
-	struct xlog *l = NULL;
-	int save_errno;
 	/*
 	 * Check fopen() result the caller first thing, to
 	 * preserve the errno.
 	 */
-	if (file == NULL) {
-		save_errno = errno;
-		say_syserror("%s: failed to open file", filename);
-		goto error_1;
-	}
-	l = (struct xlog *) calloc(1, sizeof(*l));
-	if (l == NULL) {
-		save_errno = errno;
-		say_syserror("%s: out of memory", filename);
-		goto error_2;
-	}
+	if (file == NULL)
+		tnt_raise(SystemError, "%s: failed to open file", filename);
+
+	struct xlog *l = (struct xlog *) calloc(1, sizeof(*l));
+
+	auto log_guard = make_scoped_guard([=]{
+		fclose(file);
+		free(l);
+	});
+
+	if (l == NULL)
+		tnt_raise(OutOfMemory, sizeof(*l), "malloc", "struct xlog");
+
 	l->f = file;
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_READ;
 	l->dir = dir;
 	l->is_inprogress = (suffix == INPROGRESS);
 	vclock_create(&l->vclock);
-	if (xlog_read_meta(l, server_uuid) != 0) {
-		save_errno = EINVAL;
-		goto error_3;
-	}
-	return l;
 
-error_3:
-	free(l);
-error_2:
-	fclose(file);
-error_1:
-	errno = save_errno;
-	return NULL;
+	xlog_read_meta(l, signature);
+
+	log_guard.is_active = false;
+	return l;
 }
 
 struct xlog *
-xlog_open(struct xdir *dir, int64_t signature,
-	  const tt_uuid *server_uuid, enum log_suffix suffix)
+xlog_open(struct xdir *dir, int64_t signature, enum log_suffix suffix)
 {
 	const char *filename = format_filename(dir, signature, suffix);
 	FILE *f = fopen(filename, "r");
-	if (suffix == INPROGRESS && f == NULL) {
-		filename = format_filename(dir, signature, NONE);
-		f = fopen(filename, "r");
+	if (f == NULL && suffix == INPROGRESS) {
 		suffix = NONE;
+		filename = format_filename(dir, signature, suffix);
+		f = fopen(filename, "r");
 	}
-	return xlog_open_stream(dir, filename, server_uuid, suffix, f);
+	return xlog_open_stream(dir, signature, suffix, f, filename);
 }
 
 /**
@@ -857,8 +874,7 @@ xlog_open(struct xdir *dir, int64_t signature,
  * and sets errno.
  */
 struct xlog *
-xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
-		      const struct vclock *vclock)
+xlog_create(struct xdir *dir, const struct vclock *vclock)
 {
 	char *filename;
 	FILE *f = NULL;
@@ -866,6 +882,7 @@ xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
 
 	int64_t signt = vclock_signature(vclock);
 	assert(signt >= 0);
+	assert(!tt_uuid_is_nil(dir->server_uuid));
 
 	/*
 	* Check whether a file with this name already exists.
@@ -894,8 +911,9 @@ xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
 	l->mode = LOG_WRITE;
 	l->dir = dir;
 	l->is_inprogress = true;
+	vclock_copy(&l->vclock, vclock);
 	setvbuf(l->f, NULL, _IONBF, 0);
-	if (xlog_write_meta(l, server_uuid, vclock) != 0)
+	if (xlog_write_meta(l) != 0)
 		goto error;
 
 	return l;
@@ -906,6 +924,7 @@ error:
 		fclose(f);
 		unlink(filename); /* try to remove incomplete file */
 	}
+	free(l);
 	errno = save_errno;
 	return NULL;
 }

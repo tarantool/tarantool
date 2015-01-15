@@ -4,7 +4,7 @@ import sys
 import glob
 import traceback
 import subprocess
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 
 from lib.server import Server
 from lib.tarantool_server import Test
@@ -12,7 +12,7 @@ from lib.tarantool_server import Test
 class UnitTest(Test):
     def execute(self, server):
         execs = [os.path.join(server.builddir, "test", self.name)]
-        proc = Popen(execs, stdout=PIPE)
+        proc = Popen(execs, stdout=PIPE, stderr=STDOUT)
         sys.stdout.write(proc.communicate()[0])
 
 class UnittestServer(Server):

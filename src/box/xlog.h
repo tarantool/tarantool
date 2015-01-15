@@ -33,6 +33,18 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
+/**
+ * XlogError is raised when there is an error with contents
+ * of the data directory or a log file. A special subclass
+ * of exception is introduced to gracefully skip such errors
+ * in panic_if_error = false mode.
+ */
+struct XlogError: public Exception
+{
+	XlogError(const char *file, unsigned line,
+		  const char *format, ...);
+};
+
 /* {{{ log dir */
 
 /**
@@ -71,6 +83,14 @@ struct xdir {
 	 */
 	char open_wflags[6];
 	/**
+	 * A pointer to this server uuid. If not assigned
+	 * (tt_uuid_is_nil returns true), server id check
+	 * for logs in this directory is not performed.
+	 * Otherwise, any log in this directory must have
+	 * the matching server id.
+	 */
+	const struct tt_uuid *server_uuid;
+	/**
 	 * Text of a marker written to the text file header:
 	 * XLOG (meaning it's a write ahead log) or SNAP (a
 	 * snapshot).
@@ -97,8 +117,8 @@ struct xdir {
  * Initialize a log dir.
  */
 void
-xdir_create(struct xdir *dir, const char *dirname,
-	    enum xdir_type type);
+xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
+	    const struct tt_uuid *server_uuid);
 
 /**
  * Destroy a log dir object.
@@ -114,6 +134,12 @@ xdir_destroy(struct xdir *dir);
  */
 void
 xdir_scan(struct xdir *dir);
+
+/**
+ * Check that a directory exists and is writable.
+ */
+void
+xdir_check(struct xdir *dir);
 
 /* }}} */
 
@@ -175,8 +201,6 @@ struct xlog {
  *
  * @param  dir           the log directory to look for a file
  * @param  signature     file name
- * @param  server_uuid   the file must have been created by
- *                       the server with this uuid, check it
  * @param  suffix        if IN_PROGRESS, look also for
  *                       .inprogress  files
  *
@@ -185,8 +209,8 @@ struct xlog {
  * Raises an exception in case of error.
  */
 struct xlog *
-xlog_open(struct xdir *dir, int64_t signature,
-	  const tt_uuid *server_uuid, enum log_suffix suffix);
+xlog_open(struct xdir *dir, int64_t signature, enum log_suffix suffix);
+
 /**
  * Open an xlog from a pre-created stdio stream. The log
  * The log is open for reading.
@@ -199,9 +223,8 @@ xlog_open(struct xdir *dir, int64_t signature,
  */
 
 struct xlog *
-xlog_open_stream(struct xdir *dir, const char *filename,
-			    const tt_uuid *server_uuid, enum log_suffix suffix,
-			    FILE *file);
+xlog_open_stream(struct xdir *dir, int64_t signature,
+		 enum log_suffix suffix, FILE *file, const char *filename);
 
 /**
  * Create a new file and open it in write (append) mode.
@@ -212,11 +235,11 @@ xlog_open_stream(struct xdir *dir, const char *filename,
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
  *
- * @return  xlog object. Raises an exception in case of error.
+ * @return  xlog object or NULL in case of error.
  */
 struct xlog *
-xlog_create(struct xdir *dir, const tt_uuid *server_uuid,
-	    const struct vclock *vclock);
+xlog_create(struct xdir *dir, const struct vclock *vclock);
+
 /**
  * Sync a log file. The exact action is defined
  * by xdir flags.

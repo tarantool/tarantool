@@ -112,11 +112,20 @@ Exception::Exception(const Exception& e)
 	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
 }
 
+/** A quick & dirty version of name demangle for class names */
+static const char *
+demangle(const char *name)
+{
+	char *res = NULL;
+	(void) strtol(name, &res, 10);
+	return res && strlen(res) ? res : name;
+}
+
 void
 Exception::log() const
 {
-	_say(S_ERROR, m_file, m_line, "%s %s",
-	     typeid(*this).name(), m_errmsg);
+	_say(S_ERROR, m_file, m_line, m_errmsg, "%s",
+	     demangle(typeid(*this).name()));
 }
 
 

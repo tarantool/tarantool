@@ -41,6 +41,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+const char *
+fio_filename(int fd);
+
 struct iovec;
 /**
  * Read up to N bytes from file into the buffer,

@@ -52,13 +52,11 @@
 #include "cfg.h"
 #include "iobuf.h"
 
-static void process_ro(struct port *port, struct request *request);
-static void process_rw(struct port *port, struct request *request);
+static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
 
-static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
 
 static void
@@ -74,24 +72,11 @@ struct request_replace_body {
 } __attribute__((packed));
 
 static void
-process_rw(struct port *port, struct request *request)
-{
-	try {
-		stat_collect(stat_base, request->type, 1);
-		request->execute(request, port);
-		port_eof(port);
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		throw;
-	}
-}
-
-static void
-process_ro(struct port *port, struct request *request)
+process_ro(struct request *request, struct port *port)
 {
 	if (!iproto_type_is_select(request->type))
 		tnt_raise(LoggedError, ER_READONLY);
-	return process_rw(port, request);
+	return process_rw(request, port);
 }
 
 void
@@ -118,7 +103,7 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 	request_decode(&request, (const char *) row->body[0].iov_base,
 		row->body[0].iov_len);
 	request.header = row;
-	process_rw(&null_port, &request);
+	process_rw(&request, &null_port);
 }
 
 /* {{{ configuration bindings */
@@ -249,7 +234,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	*/
 	space_end_recover();
 
-	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
+	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	if (recovery_has_remote(recovery))
@@ -299,7 +284,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
-	process_rw(&null_port, &req);
+	process_rw(&req, &null_port);
 }
 
 /**
@@ -436,7 +421,7 @@ box_init()
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 
 	if (recovery_has_data(recovery)) {
 		/* Process existing snapshot */

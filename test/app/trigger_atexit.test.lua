@@ -27,10 +27,11 @@ box.space.abc:create_index('pk', { type = 'tree' })
 box.space.abc:on_replace(test_replace)
 
 
-cleanup_list = fio.glob(fio.pathjoin(tempdir), '*')
+cleanup_list = fio.glob(fio.pathjoin(tempdir, '*'))
 for _, file in pairs(cleanup_list) do
     fio.unlink(file)
 end
 fio.rmdir(tempdir)
+print("done")
 os.exit(0)
 

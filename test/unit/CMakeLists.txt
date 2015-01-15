@@ -6,9 +6,9 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
-add_executable(rlist.test rlist.c test.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rlist.c)
-add_executable(uri.test uri.c test.c ${CMAKE_SOURCE_DIR}/src/uri.c)
-add_executable(fiob.test test.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
+add_executable(rlist.test rlist.c unit.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rlist.c)
+add_executable(uri.test uri.c unit.c ${CMAKE_SOURCE_DIR}/src/uri.c)
+add_executable(fiob.test unit.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)
 add_executable(mhash_bytemap.test mhash_bytemap.c)
@@ -48,16 +48,26 @@ add_executable(rtree_itr.test rtree_itr.cc ${CMAKE_SOURCE_DIR}/src/lib/salad/rtr
 target_link_libraries(rtree_itr.test)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
-add_executable(vclock.test vclock.cc test.c
+add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc)
 target_link_libraries(vclock.test core small)
-add_executable(quota.test quota.cc test.c)
+add_executable(quota.test quota.cc unit.c)
 target_link_libraries(quota.test pthread)
 
 add_executable(fiber.test fiber.cc)
 target_link_libraries(fiber.test core)
+
+add_executable(coio.test coio.cc unit.c
+        ${CMAKE_SOURCE_DIR}/src/sio.cc
+        ${CMAKE_SOURCE_DIR}/src/evio.cc
+        ${CMAKE_SOURCE_DIR}/src/coio.cc
+        ${CMAKE_SOURCE_DIR}/src/coeio.cc
+        ${CMAKE_SOURCE_DIR}/src/uri.c
+        ${CMAKE_SOURCE_DIR}/src/fio.c
+        ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
+target_link_libraries(coio.test core eio bit)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

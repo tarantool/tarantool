@@ -27,15 +27,14 @@
  * SUCH DAMAGE.
  */
 extern "C" {
-#include "test.h"
+#include "unit.h"
+#include "unit.h"
 } /* extern "C" */
 
 #include <stdarg.h>
 
 #include "box/vclock.h"
 
-#define header() note("*** %s ***", __func__)
-#define footer() note("*** %s: done ***", __func__)
 #define str2(x) #x
 #define str(x) str2(x)
 #define arg(...) __VA_ARGS__

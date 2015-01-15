@@ -35,7 +35,7 @@
 #define header() printf("\t*** %s ***\n", __func__)
 #define footer() printf("\t*** %s: done ***\n ", __func__)
 
-#define fail(expr, result) do {						\
+#define fail(expr, result) do {					\
 	fprintf(stderr, "Test failed: %s is %s at %s:%d, in function '%s'\n",\
 		expr, result, __FILE__, __LINE__, __func__);		\
 	exit(-1);							\
@@ -43,5 +43,96 @@
 
 #define fail_if(expr) if (expr) fail(#expr, "true")
 #define fail_unless(expr) if (!(expr)) fail(#expr, "false")
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+@brief example
+
+@code
+	#include "unit.h"
+
+	int main(void) {
+		plan(3);		// count of test You planned to check
+		ok(1, "Test name 1");
+		is(4, 2 * 2, "2 * 2 == 4");
+		isnt(5, 2 * 2, "2 * 2 != 5);
+		return check_plan();	// print resume
+	}
+@endcode
+
+
+*/
+
+/* private function, use ok(...) instead */
+int _ok(int condition, const char *fmt, ...);
+
+/* private function, use note(...) or diag(...) instead */
+void _space(FILE *stream);
+
+#define msg(stream, ...) ({ _space(stream); fprintf(stream, "# ");            \
+	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
+
+#define note(...) msg(stdout, __VA_ARGS__)
+#define diag(...) msg(stderr, __VA_ARGS__)
+
+/**
+@brief set and print plan
+@param count
+Before anything else, you need a testing plan.  This basically declares
+how many tests your program is going to run to protect against premature
+failure.
+*/
+void plan(int count);
+
+/**
+@brief check if plan is reached and print report
+*/
+int check_plan(void);
+
+#define ok(condition, fmt, args...)	{		\
+	int res = _ok(condition, fmt, ##args);		\
+	if (!res) {					\
+		_space(stderr);			\
+		fprintf(stderr, "#   Failed test '");	\
+		fprintf(stderr, fmt, ##args);		\
+		fprintf(stderr, "'\n");			\
+		_space(stderr);			\
+		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
+	}						\
+	res = res;					\
+}
+
+#define is(a, b, fmt, args...)	{			\
+	int res = _ok((a) == (b), fmt, ##args);	\
+	if (!res) {					\
+		_space(stderr);			\
+		fprintf(stderr, "#   Failed test '");	\
+		fprintf(stderr, fmt, ##args);		\
+		fprintf(stderr, "'\n");			\
+		_space(stderr);			\
+		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
+	}						\
+	res = res;					\
+}
+
+#define isnt(a, b, fmt, args...) {			\
+	int res = _ok((a) != (b), fmt, ##args);	\
+	if (!res) {					\
+		_space(stderr);			\
+		fprintf(stderr, "#   Failed test '");	\
+		fprintf(stderr, fmt, ##args);		\
+		fprintf(stderr, "'\n");			\
+		_space(stderr);			\
+		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
+	}						\
+	res = res;					\
+}
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_TEST_UNIT_H */

@@ -38,10 +38,11 @@
 #include <errinj.h>
 #include <fiber.h>
 #include <scoped_guard.h>
-#include <third_party/base64.h>
-#include "authentication.h"
 #include "user_def.h"
 #include "iproto_constants.h"
+#include "stat.h"
+
+int stat_base;
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
@@ -160,35 +161,41 @@ execute_select(struct request *request, struct port *port)
 	}
 }
 
-void
-execute_auth(struct request *request, struct port * /* port */)
-{
-	const char *user = request->key;
-	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, request->tuple, request->tuple_end);
-}
-
 /** }}} */
 
 void
 request_create(struct request *request, uint32_t type)
 {
-	if (!iproto_type_is_dml(type))
-		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
-	static const request_execute_f execute_map[] = {
-		NULL, execute_select, execute_replace, execute_replace,
-		execute_update, execute_delete, box_lua_call,
-		execute_auth,
-	};
+
 	memset(request, 0, sizeof(*request));
 	request->type = type;
-	request->execute = execute_map[type];
+}
+
+typedef void (*request_execute_f)(struct request *, struct port *);
+
+void
+process_rw(struct request *request, struct port *port)
+{
+	assert(iproto_type_is_dml(request->type));
+	static const request_execute_f execute_map[] = {
+		NULL, execute_select, execute_replace, execute_replace,
+		execute_update, execute_delete
+	};
+	request_execute_f fun = execute_map[request->type];
+	assert(fun != NULL);
+	stat_collect(stat_base, request->type, 1);
+	try {
+		fun(request, port);
+		port_eof(port);
+	} catch (Exception *e) {
+		txn_rollback_stmt();
+		throw;
+	}
 }
 
 void
 request_decode(struct request *request, const char *data, uint32_t len)
 {
-	assert(request->execute != NULL);
 	const char *end = data + len;
 	uint64_t key_map = iproto_body_key_map[request->type];
 

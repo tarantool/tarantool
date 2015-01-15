@@ -18,7 +18,7 @@ server.admin("box.info.server.uuid")
 server.stop()
 server.start()
 
-line = "server uuid changed to " + new_uuid
+line = "server UUID changed to " + new_uuid
 print "check log line for '%s'" % line
 print
 if server.logfile_pos.seek_once(line) >= 0:

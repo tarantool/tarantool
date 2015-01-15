@@ -63,7 +63,7 @@ box_atfork();
  * change when entering/leaving read-only mode
  * (master->slave propagation).
  */
-typedef void (*box_process_func)(struct port *port, struct request *request);
+typedef void (*box_process_func)(struct request *request, struct port *port);
 /** For read-write operations. */
 extern box_process_func box_process;
 
@@ -99,6 +99,9 @@ const char *box_status(void);
  */
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
+
+void
+box_process_auth(struct request *request);
 
 void
 box_process_join(int fd, struct xrow_header *header);

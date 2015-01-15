@@ -53,6 +53,7 @@
 #include "box/schema.h"
 #include "box/session.h"
 #include "box/iproto_constants.h"
+#include "box/iproto_port.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char session_lua[],
@@ -147,60 +148,6 @@ port_lua_table_create(struct lua_State *L)
 	return (struct port *) port;
 }
 
-static void
-port_add_lua_ret(struct port *port, struct lua_State *L, int index)
-{
-	struct tuple *tuple = lua_totuple(L, index, index);
-	TupleGuard guard(tuple);
-	port_add_tuple(port, tuple);
-}
-
-/**
- * Add all elements from Lua stack to fiber iov.
- *
- * To allow clients to understand a complex return from
- * a procedure, we are compatible with SELECT protocol,
- * and return the number of return values first, and
- * then each return value as a tuple.
- *
- * If a Lua stack contains at least one scalar, each
- * value on the stack is converted to a tuple. A Lua
- * is converted to a tuple with multiple fields.
- *
- * If the stack is a Lua table, each member of which is
- * not scalar, each member of the table is converted to
- * a tuple. This way very large lists of return values can
- * be used, since Lua stack size is limited by 8000 elements,
- * while Lua table size is pretty much unlimited.
- */
-static void
-port_add_lua_multret(struct port *port, struct lua_State *L)
-{
-	int nargs = lua_gettop(L);
-	/** Check if we deal with a table of tables. */
-	if (nargs == 1 && lua_istable(L, 1)) {
-		/*
-		 * The table is not empty and consists of tables
-		 * or tuples. Treat each table element as a tuple,
-		 * and push it.
-		 */
-		lua_pushnil(L);
-		int has_keys = lua_next(L, 1);
-		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
-			do {
-				port_add_lua_ret(port, L, lua_gettop(L));
-				lua_pop(L, 1);
-			} while (lua_next(L, 1));
-			return;
-		} else if (has_keys) {
-			lua_pop(L, 1);
-		}
-	}
-	for (int i = 1; i <= nargs; ++i) {
-		port_add_lua_ret(port, L, i);
-	}
-}
-
 /* }}} */
 
 /**
@@ -236,7 +183,7 @@ lbox_process(lua_State *L)
 	struct request request;
 	request_create(&request, op);
 	request_decode(&request, req, sz);
-	box_process(port_lua, &request);
+	box_process(&request, port_lua);
 
 	return 1;
 }
@@ -319,7 +266,7 @@ boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	request.key_end = key_end;
 
 	try {
-		box_process(port, &request);
+		box_process(&request, port);
 		return 0;
 	} catch (Exception *e) {
 		/* will be hanled by box.error() in Lua */
@@ -337,7 +284,7 @@ lbox_insert(lua_State *L)
 	struct port_lua port;
 	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2);
 	port_lua_create(&port, L);
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
 }
 
@@ -351,7 +298,7 @@ lbox_replace(lua_State *L)
 	struct port_lua port;
 	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2);
 	port_lua_create(&port, L);
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
 }
 
@@ -367,7 +314,7 @@ lbox_update(lua_State *L)
 	request.field_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 4;
 }
 
@@ -382,7 +329,7 @@ lbox_delete(lua_State *L)
 	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1);
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	box_process((struct port *) &port, &request);
+	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 3;
 }
 
@@ -547,11 +494,9 @@ SetuidGuard::~SetuidGuard()
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void
-box_lua_call(struct request *request, struct port *port)
+static inline void
+execute_call(lua_State *L, struct request *request, struct obuf *out)
 {
-	lua_State *L = lua_newthread(tarantool_L);
-	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
 
@@ -573,9 +518,76 @@ box_lua_call(struct request *request, struct port *port)
 	for (uint32_t i = 0; i < arg_count; i++) {
 		luamp_decode(L, luaL_msgpack_default, &args);
 	}
-	lbox_call(L, arg_count + oc - 1, LUA_MULTRET);
-	/* Send results of the called procedure to the client. */
-	port_add_lua_multret(port, L);
+	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
+
+	/**
+	 * Add all elements from Lua stack to iproto.
+	 *
+	 * To allow clients to understand a complex return from
+	 * a procedure, we are compatible with SELECT protocol,
+	 * and return the number of return values first, and
+	 * then each return value as a tuple.
+	 *
+	 * If a Lua stack contains at least one scalar, each
+	 * value on the stack is converted to a tuple. A Lua
+	 * is converted to a tuple with multiple fields.
+	 *
+	 * If the stack is a Lua table, each member of which is
+	 * not scalar, each member of the table is converted to
+	 * a tuple. This way very large lists of return values can
+	 * be used, since Lua stack size is limited by 8000 elements,
+	 * while Lua table size is pretty much unlimited.
+	 */
+
+	uint32_t count = 0;
+	struct obuf_svp svp = iproto_prepare_select(out);
+
+	/** Check if we deal with a table of tables. */
+	int nrets = lua_gettop(L);
+	if (nrets == 1 && lua_istable(L, 1)) {
+		/*
+		 * The table is not empty and consists of tables
+		 * or tuples. Treat each table element as a tuple,
+		 * and push it.
+		 */
+		lua_pushnil(L);
+		int has_keys = lua_next(L, 1);
+		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
+			do {
+				int top = lua_gettop(L);
+				luamp_encodestack(L, out, top, top);
+				++count;
+				lua_pop(L, 1);
+			} while (lua_next(L, 1));
+			goto done;
+		} else if (has_keys) {
+			lua_pop(L, 1);
+		}
+	}
+	for (int i = 1; i <= nrets; ++i) {
+		luamp_encodestack(L, out, i, i);
+		++count;
+	}
+
+done:
+	iproto_reply_select(out, &svp, request->header->sync, count);
+}
+
+void
+box_lua_call(struct request *request, struct obuf *out)
+{
+	lua_State *L = NULL;
+	try {
+		L = lua_newthread(tarantool_L);
+		LuarefGuard coro_ref(tarantool_L);
+		execute_call(L, request, out);
+	} catch (Exception *e) {
+		/* Let all well-behaved exceptions pass through. */
+		throw;
+	} catch (...) {
+		/* Convert Lua error to a Tarantool exception. */
+		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+	}
 }
 
 static int

@@ -64,7 +64,6 @@ struct iproto_port
 	/** A pointer in the reply buffer where the reply starts. */
 	struct obuf_svp svp;
 	/** Size of data written after reply starts */
-	uint32_t size;
 };
 
 extern struct port_vtab iproto_port_vtab;
@@ -77,15 +76,21 @@ iproto_port_init(struct iproto_port *port, struct obuf *buf,
 	port->buf = buf;
 	port->sync = sync;
 	port->found = 0;
-	port->size = 0;
 }
 
 /** Stack a reply to 'ping' packet. */
 void
-iproto_reply_ping(struct obuf *out, uint64_t sync);
+iproto_reply_ok(struct obuf *out, uint64_t sync);
 
 /** Send an error packet back. */
 void
 iproto_reply_error(struct obuf *out, const Exception *e, uint64_t sync);
+
+struct obuf_svp
+iproto_prepare_select(struct obuf *buf);
+
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		    uint32_t count);
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

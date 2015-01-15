@@ -29,7 +29,7 @@
 
 MsgPack data types:
 
-* **MP_INT** - Unsigned Integer
+* **MP_INT** - Integer
 * **MP_MAP** - Map
 * **MP_ARR** - Array
 * **MP_STRING** - String

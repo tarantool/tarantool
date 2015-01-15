@@ -33,8 +33,7 @@
 
 struct txn;
 struct port;
-
-typedef void (*request_execute_f)(struct request *, struct port *);
+extern int stat_base;
 
 struct request
 {
@@ -61,12 +60,13 @@ struct request
 	const char *tuple_end;
 	/** Base field offset for error messages, e.g. 0 for C and 1 for Lua. */
 	int field_base;
-
-	request_execute_f execute;
 };
 
 void
 request_create(struct request *request, uint32_t code);
+
+void
+process_rw(struct request *request, struct port *port);
 
 void
 request_decode(struct request *request, const char *data, uint32_t len);

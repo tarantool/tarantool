@@ -44,11 +44,8 @@ struct CoioGuard {
 	~CoioGuard() { ev_io_stop(loop(), ev_io); }
 };
 
-static inline void
-fiber_schedule_coio(ev_loop * /* loop */, ev_io *watcher, int event)
-{
-	return fiber_schedule((ev_watcher *) watcher, event);
-}
+typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
+typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
 /** Note: this function does not throw */
 void
@@ -56,13 +53,18 @@ coio_init(struct ev_io *coio)
 {
 	/* Prepare for ev events. */
 	coio->data = fiber();
-	ev_init(coio, fiber_schedule_coio);
+	ev_init(coio, (ev_io_cb) fiber_schedule);
 	coio->fd = -1;
 }
 
 static inline void
 coio_fiber_yield(struct ev_io *coio)
 {
+	/**
+	 * We may create an event in one fiber, but wait for it
+	 * in another. Hence we set the coroutine right before the
+	 * yield.
+	 */
 	coio->data = fiber();
 	fiber_yield();
 #ifdef DEBUG
@@ -606,4 +608,22 @@ coio_service_init(struct coio_service *service, const char *name,
 			  coio_service_on_accept, service);
 	service->handler = handler;
 	service->handler_param = handler_param;
+}
+
+void
+coio_stat_init(ev_stat *stat, const char *path)
+{
+	ev_stat_init(stat, (ev_stat_cb) fiber_schedule, path, 0.0);
+}
+
+void
+coio_stat_stat_timeout(ev_stat *stat, ev_tstamp timeout)
+{
+	stat->data = fiber();
+	ev_stat_start(loop(), stat);
+	ev_tstamp start, delay;
+	coio_timeout_init(&start, &delay, timeout);
+	fiber_yield_timeout(delay);
+	ev_stat_stop(loop(), stat);
+	fiber_testcancel();
 }

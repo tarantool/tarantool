@@ -149,4 +149,11 @@ coio_service_init(struct coio_service *service, const char *name,
 		  const char *uri,
 		  void (*handler)(va_list ap), void *handler_param);
 
+
+void
+coio_stat_init(ev_stat *stat, const char *path);
+
+void
+coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
+
 #endif /* TARANTOOL_COIO_H_INCLUDED */
