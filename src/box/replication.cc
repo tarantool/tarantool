@@ -234,8 +234,7 @@ replication_join(int fd, struct xrow_header *packet)
 {
 	struct recovery_state *r;
 	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
-			 replication_relay_send_row,
-			 NULL, NULL, INT32_MAX);
+			 replication_relay_send_row, NULL);
 	auto recovery_guard = make_scoped_guard([&]{
 		recovery_delete(r);
 	});
@@ -753,8 +752,7 @@ replication_relay_loop(struct relay *relay)
 	struct recovery_state *r = NULL;
 	try {
 		r = recovery_new(cfg_snap_dir, cfg_wal_dir,
-				 replication_relay_send_row,
-				 NULL, NULL, INT32_MAX);
+				 replication_relay_send_row, NULL);
 		r->relay = *relay; /* copy relay state to recovery */
 
 		assert(r->relay.type == IPROTO_SUBSCRIBE);

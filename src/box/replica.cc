@@ -189,7 +189,7 @@ replica_bootstrap(struct recovery_state *r)
 			break;
 		} else if (iproto_type_is_dml(row.type)) {
 			/* Regular snapshot row  (IPROTO_INSERT) */
-			recovery_process(r, &row);
+			recovery_apply_row(r, &row);
 		} else /* error or unexpected packet */ {
 			xrow_decode_error(&row);  /* rethrow error */
 		}
@@ -264,7 +264,7 @@ pull_from_remote(va_list ap)
 
 			if (iproto_type_is_error(row.type))
 				xrow_decode_error(&row);  /* error */
-			recovery_process(r, &row);
+			recovery_apply_row(r, &row);
 
 			iobuf_reset(iobuf);
 			fiber_gc();

@@ -227,7 +227,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		 */
 		return;
 	}
-	recovery_finalize(recovery);
+	recovery_finalize(recovery, cfg_geti("rows_per_wal"));
 
 	/*
 	 * notify engines about end of recovery.
@@ -417,9 +417,7 @@ box_init()
 		/* recovery initialization */
 		recovery = recovery_new(cfg_gets("snap_dir"),
 					cfg_gets("wal_dir"),
-					recover_row, NULL,
-					box_snapshot_cb,
-					cfg_geti("rows_per_wal"));
+					recover_row, NULL);
 		recovery_set_remote(recovery,
 				    cfg_gets("replication_source"));
 		recovery_update_io_rate_limit(recovery,
@@ -436,14 +434,14 @@ box_init()
 			/* Initialize a new replica */
 			replica_bootstrap(recovery);
 			space_end_recover_snapshot();
-			snapshot_save(recovery);
+			snapshot_save(recovery, box_snapshot_cb);
 		} else {
 			/* Initialize the first server of a new cluster */
 			recovery_bootstrap(recovery);
 			box_set_cluster_uuid();
 			box_set_server_uuid();
 			space_end_recover_snapshot();
-			snapshot_save(recovery);
+			snapshot_save(recovery, box_snapshot_cb);
 		}
 		fiber_gc();
 	} catch (Exception *e) {
@@ -564,7 +562,7 @@ box_snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, log_fd);
-	snapshot_save(recovery);
+	snapshot_save(recovery, box_snapshot_cb);
 
 	exit(EXIT_SUCCESS);
 	return 0;
