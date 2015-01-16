@@ -54,8 +54,7 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 void
 ClientError::log() const
 {
-	_say(S_ERROR, m_file, m_line, NULL, "%s: %s", tnt_errcode_str(m_errcode),
-	     m_errmsg);
+	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", tnt_errcode_str(m_errcode));
 }
 
 

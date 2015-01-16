@@ -252,6 +252,7 @@ SophiaFactory::begin(struct txn *txn, struct space *space)
 	if (txn->n_stmts == 1) {
 		assert(tx == NULL);
 		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+		(void) index;
 		assert(index->db != NULL);
 		tx = sp_begin(env);
 		if (tx == NULL)
