@@ -38,6 +38,9 @@ local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
 
+local SPACE_SPACE_ID    = 280
+local SPACE_INDEX_ID    = 288
+
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
 local sequence_mt = { __serialize = 'sequence' }
@@ -834,9 +837,9 @@ local remote_methods = {
         self:_switch_state('schema')
 
         local spaces = self:_request_internal('select',
-            true, box.schema.SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, SPACE_SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
         local indexes = self:_request_internal('select',
-            true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, SPACE_INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
 
