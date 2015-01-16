@@ -153,7 +153,6 @@ void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
 
-int recover_xlog(struct recovery_state *r, struct xlog *l);
 int wal_write(struct recovery_state *r, struct xrow_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);

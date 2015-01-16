@@ -261,6 +261,45 @@ recovery_process(struct recovery_state *r, struct xrow_header *row)
 	return r->row_handler(r, r->row_handler_param, row);
 }
 
+#define LOG_EOF 0
+
+/**
+ * @retval 0 OK, read full xlog.
+ * @retval 1 OK, read some but not all rows, or no EOF marker
+ */
+static int
+recover_xlog(struct recovery_state *r, struct xlog *l)
+{
+	struct xlog_cursor i;
+
+	xlog_cursor_open(&i, l);
+
+	auto guard = make_scoped_guard([&]{
+		xlog_cursor_close(&i);
+	});
+
+	struct xrow_header row;
+	while (xlog_cursor_next(&i, &row) == 0) {
+		try {
+			recovery_process(r, &row);
+		} catch (ClientError *e) {
+			if (l->dir->panic_if_error)
+				throw;
+			say_error("can't apply row: ");
+			e->log();
+		}
+	}
+	/*
+	 * xlog_cursor_next() returns 1 when
+	 * it can not read more rows. This doesn't mean
+	 * the file is fully read: it's fully read only
+	 * when EOF marker has been read. This is
+	 * why eof_read is used here to indicate the
+	 * end of log.
+	 */
+	return !i.eof_read;
+}
+
 void
 recovery_bootstrap(struct recovery_state *r)
 {
@@ -274,16 +313,20 @@ recovery_bootstrap(struct recovery_state *r)
 			   sizeof(bootstrap_bin), "r");
 	struct xlog *snap = xlog_open_stream(&r->snap_dir, 0, NONE, f,
 					     filename);
-	int rc = recover_xlog(r, snap);
-	xlog_close(snap);
-
-	if (rc != 0)
-		panic("failed to recover from %s", filename);
+	auto guard = make_scoped_guard([=]{
+		xlog_close(snap);
+	});
+	/** The snapshot must have a EOF marker. */
+	if (recover_xlog(r, snap) != LOG_EOF)
+		panic("can't process bootstrap snapshot");
 }
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
+ *
+ * @pre there is an existing snapshot. Otherwise
+ * recovery_bootstrap() should be used instead.
  */
 void
 recover_snap(struct recovery_state *r)
@@ -291,72 +334,33 @@ recover_snap(struct recovery_state *r)
 	/* There's no current_wal during initial recover. */
 	assert(r->current_wal == NULL);
 	say_info("recovery start");
-
-	struct xlog *snap;
-	int64_t sign;
-
-	try {
-		xdir_scan(&r->snap_dir);
-	} catch (Exception *e) {
-		e->log();
-		panic("can't scan snapshot directory");
-	}
+	/**
+	 * Don't rescan the directory, it's done when
+	 * recovery is initialized.
+	 * Don't check if the directory index is empty, there must
+	 * be at least one existing snapshot, otherwise we would
+	 * have created it from a bootstrap copy.
+	 */
 	struct vclock *res = vclockset_last(&r->snap_dir.index);
-	if (res == NULL)
-		panic("can't find snapshot");
-	sign = vclock_signature(res);
-	snap = xlog_open(&r->snap_dir, sign, NONE);
+	int64_t signature = vclock_signature(res);
 
-	/* Save server uuid */
+	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
+	auto guard = make_scoped_guard([=]{
+		xlog_close(snap);
+	});
+	/* Save server UUID */
 	r->server_uuid = snap->server_uuid;
 
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&r->vclock, 0);
 
 	say_info("recovering from `%s'", snap->filename);
-	if (recover_xlog(r, snap) != 0)
+	if (recover_xlog(r, snap) != LOG_EOF)
 		panic("can't process snapshot");
-
 	/* Replace server vclock using the data from snapshot */
 	vclock_copy(&r->vclock, &snap->vclock);
 }
 
-#define LOG_EOF 0
-
-/**
- * @retval -1 error
- * @retval 0 EOF
- * @retval 1 ok, maybe read something
- */
-int
-recover_xlog(struct recovery_state *r, struct xlog *l)
-{
-	int res = -1;
-	struct xlog_cursor i;
-
-	xlog_cursor_open(&i, l);
-
-	struct xrow_header row;
-	while (xlog_cursor_next(&i, &row) == 0) {
-		try {
-			recovery_process(r, &row);
-		} catch (SystemError *e) {
-			say_error("can't apply row: ");
-			e->log();
-			goto end;
-		} catch (Exception *e) {
-			say_error("can't apply row: ");
-			e->log();
-			if (l->dir->panic_if_error)
-				goto end;
-		}
-	}
-	res = i.eof_read ? LOG_EOF : 1;
-end:
-	xlog_cursor_close(&i);
-	/* Sic: we don't close the log here. */
-	return res;
-}
 
 /** Find out if there are new .xlog files since the current
  * LSN, and read them all up.
@@ -447,10 +451,12 @@ recover_remaining_wals(struct recovery_state *r)
 
 recover_current_wal:
 		rows_before = r->current_wal->rows;
-		result = recover_xlog(r, r->current_wal);
-		if (result < 0) {
+		try {
+			result = recover_xlog(r, r->current_wal);
+		} catch (Exception *e) {
 			say_error("failure reading from %s",
 				  r->current_wal->filename);
+			e->log();
 			break;
 		}
 
@@ -623,17 +629,19 @@ recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
 	fiber_set_user(fiber(), &admin_credentials);
-	int result = recover_xlog(r, r->current_wal);
-	fiber_set_user(fiber(), NULL);
-	if (result < 0)
+	try {
+		if (recover_xlog(r, r->current_wal) == LOG_EOF) {
+			say_info("done `%s'", r->current_wal->filename);
+			recovery_close_log(r);
+			recovery_stop_file(watcher);
+			/* Don't wait for wal_dir_rescan_delay. */
+			recovery_rescan_dir(loop, &watcher->dir_timer, 0);
+		}
+	} catch (Exception *e) {
+		e->log();
 		panic("recover failed");
-	if (result == LOG_EOF) {
-		say_info("done `%s'", r->current_wal->filename);
-		recovery_close_log(r);
-		recovery_stop_file(watcher);
-		/* Don't wait for wal_dir_rescan_delay. */
-		recovery_rescan_dir(loop, &watcher->dir_timer, 0);
 	}
+	fiber_set_user(fiber(), NULL);
 }
 
 void
