@@ -121,6 +121,7 @@ fill_lsn(struct recovery_state *r, struct xrow_header *row)
 	if (row == NULL || row->server_id == 0) {
 		/* Local request */
 		int64_t lsn = vclock_inc(&r->vclock, r->server_id);
+		/* row is NULL if wal_mode = NONE */
 		if (row != NULL) {
 			row->server_id = r->server_id;
 			row->lsn = lsn;
@@ -158,6 +159,11 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 {
 	struct recovery_state *r = (struct recovery_state *)
 			calloc(1, sizeof(*r));
+
+	auto guard = make_scoped_guard([=]{
+		free(r);
+	});
+
 	recovery_update_mode(r, WAL_NONE);
 
 	assert(rows_per_wal > 1);
@@ -179,21 +185,17 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	vclock_create(&r->vclock);
 
-	try {
-		xdir_scan(&r->snap_dir);
-		/**
-		 * Avoid scanning WAL dir before we recovered
-		 * the snapshot and know server UUID - this will
-		 * make sure the scan skips files with wrong
-		 * UUID, see replication/cluster.test for
-		 * details.
-		 */
-		xdir_check(&r->wal_dir);
-	} catch (Exception *e) {
-		e->log();
-		panic("can't scan a data directory");
-	}
+	xdir_scan(&r->snap_dir);
+	/**
+	 * Avoid scanning WAL dir before we recovered
+	 * the snapshot and know server UUID - this will
+	 * make sure the scan skips files with wrong
+	 * UUID, see replication/cluster.test for
+	 * details.
+	 */
+	xdir_check(&r->wal_dir);
 
+	guard.is_active = false;
 	return r;
 }
 

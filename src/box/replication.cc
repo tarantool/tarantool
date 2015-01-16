@@ -749,20 +749,21 @@ replication_relay_loop(struct relay *relay)
 	sio_setfl(relay->sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
-	struct recovery_state *r;
-	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
-			 replication_relay_send_row,
-			 NULL, NULL, INT32_MAX);
-	r->relay = *relay; /* copy relay state to recovery */
-
 	int rc = EXIT_SUCCESS;
+	struct recovery_state *r = NULL;
 	try {
+		r = recovery_new(cfg_snap_dir, cfg_wal_dir,
+				 replication_relay_send_row,
+				 NULL, NULL, INT32_MAX);
+		r->relay = *relay; /* copy relay state to recovery */
+
 		assert(r->relay.type == IPROTO_SUBSCRIBE);
 		replication_relay_subscribe(r);
 	} catch (Exception *e) {
 		say_error("relay error: %s", e->errmsg());
 		rc = EXIT_FAILURE;
 	}
-	recovery_delete(r);
+	if (r)
+		recovery_delete(r);
 	exit(rc);
 }
