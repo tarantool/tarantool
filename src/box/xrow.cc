@@ -161,8 +161,7 @@ xrow_encode_uuid(char *pos, const struct tt_uuid *in)
 }
 
 int
-xrow_to_iovec(const struct xrow_header *row,
-	      struct iovec *out)
+xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
 	static const int iov0_len = mp_sizeof_uint(UINT32_MAX);
 	int iovcnt = xrow_header_encode(row, out + 1) + 1;

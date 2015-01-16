@@ -341,10 +341,12 @@ recover_xlog(struct recovery_state *r, struct xlog *l)
 		try {
 			recovery_process(r, &row);
 		} catch (SystemError *e) {
-			say_error("can't apply row: %s", e->errmsg());
+			say_error("can't apply row: ");
+			e->log();
 			goto end;
 		} catch (Exception *e) {
-			say_error("can't apply row: %s", e->errmsg());
+			say_error("can't apply row: ");
+			e->log();
 			if (l->dir->panic_if_error)
 				goto end;
 		}

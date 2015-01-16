@@ -281,7 +281,7 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 		}
 	}
 
-	if (level == S_WARN || level == S_ERROR)
+	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR)
 		p += snprintf(buf + p, len - p, " %s:%i", filename, line);
 
 	p += snprintf(buf + p, len - p, " %c> ", level_to_char(level));

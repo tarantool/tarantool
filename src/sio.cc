@@ -304,7 +304,7 @@ sio_writev_all(int fd, struct iovec *iov, int iovcnt)
 {
 	ssize_t bytes_total = 0;
 	struct iovec *iovend = iov + iovcnt;
-	while(1) {
+	while (1) {
 		int cnt = iovend - iov;
 		if (cnt > IOV_MAX)
 			cnt = IOV_MAX;
@@ -315,8 +315,16 @@ sio_writev_all(int fd, struct iovec *iov, int iovcnt)
 			tnt_raise(SocketError, fd, "writev(%d)", cnt);
 		}
 		bytes_total += bytes_written;
-		while (bytes_written >= iov->iov_len)
+		/*
+		 * Check for iov < iovend, since otherwise
+		 * if iovend->iov_len is 0, iov may go beyond
+		 * iovend
+		 */
+		while (bytes_written >= iov->iov_len) {
 			bytes_written -= (iov++)->iov_len;
+			if (iov == iovend)
+				break;
+		}
 		if (iov == iovend)
 			break;
 		iov->iov_base = (char *) iov->iov_base + bytes_written;

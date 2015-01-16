@@ -241,12 +241,22 @@ pull_from_remote(va_list ap)
 				xrow_encode_subscribe(&row, &cluster_id,
 					&r->server_uuid, &r->vclock);
 				remote_write_row(&coio, &row);
+				remote_read_row(&coio, iobuf, &row);
+				if (iproto_type_is_error(row.type)) {
+					try {
+						xrow_decode_error(&row);
+					} catch (ClientError *e) {
+						e->log();
+						panic("replication subscribe "
+						      "failed");
+					}
+				}
 				r->remote.warning_said = false;
 				remote_set_status(&r->remote, "connected");
 			}
 			err = "can't read row";
 			remote_read_row(&coio, iobuf, &row);
-			if (!iproto_type_is_dml(row.type))
+			if (iproto_type_is_error(row.type))
 				xrow_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;
@@ -255,6 +265,10 @@ pull_from_remote(va_list ap)
 			r->remote.recovery_last_update_tstamp =
 				ev_now(loop);
 
+			/**
+			 * XXX: deal with apply conflict,
+			 * it's ignored now.
+			 */
 			recovery_process(r, &row);
 
 			iobuf_reset(iobuf);
