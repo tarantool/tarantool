@@ -562,11 +562,10 @@ box_snapshot_delete_engine(EngineFactory *f, void *udate)
 }
 
 static inline void
-box_snapshot_complete_engine(EngineFactory *f, void *udate)
+box_snapshot_wait_engine(EngineFactory *f, void *udate)
 {
 	uint64_t lsn = *(uint64_t*)udate;
-	while (! f->snapshot(SNAPSHOT_READY, lsn))
-		fiber_yield_timeout(.020);
+	f->snapshot(SNAPSHOT_WAIT, lsn);
 }
 
 static ssize_t
@@ -636,7 +635,7 @@ box_snapshot(void)
 		goto error;
 
 	/* wait for engine snapshot completion */
-	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
+	engine_foreach(box_snapshot_wait_engine, &snap_lsn);
 
 	/* rename snapshot on completion */
 	rc = coeio_custom(box_snapshot_rename_cb,
@@ -671,7 +670,7 @@ box_deploy(struct recovery_state *r)
 	/* create engine snapshot and wait for completion */
 	uint64_t snap_lsn = vclock_signature(&r->vclock);
 	engine_foreach(box_snapshot_engine, &snap_lsn);
-	engine_foreach(box_snapshot_complete_engine, &snap_lsn);
+	engine_foreach(box_snapshot_wait_engine, &snap_lsn);
 }
 
 void

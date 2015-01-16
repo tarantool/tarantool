@@ -213,10 +213,9 @@ void MemtxFactory::rollback(struct txn *txn)
 	}
 }
 
-int MemtxFactory::snapshot(enum engine_snapshot_event, uint64_t /* lsn */) {
+void MemtxFactory::snapshot(enum engine_snapshot_event, uint64_t /* lsn */) {
 /*
  * memtx snapshotting supported directly by box.
  * do nothing here.
 */
-	return 1;
 }

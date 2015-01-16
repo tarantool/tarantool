@@ -391,7 +391,7 @@ sophia_snapshot_delete(void *env, uint64_t lsn)
 		sophia_raise(env);
 }
 
-int SophiaFactory::snapshot(enum engine_snapshot_event e, uint64_t lsn)
+void SophiaFactory::snapshot(enum engine_snapshot_event e, uint64_t lsn)
 {
 	switch (e) {
 	case SNAPSHOT_START:
@@ -403,8 +403,9 @@ int SophiaFactory::snapshot(enum engine_snapshot_event e, uint64_t lsn)
 	case SNAPSHOT_DELETE:
 		sophia_snapshot_delete(env, lsn);
 		break;
-	case SNAPSHOT_READY:
-		return sophia_snapshot_ready(env, lsn);
+	case SNAPSHOT_WAIT:
+		while (! sophia_snapshot_ready(env, lsn))
+			fiber_yield_timeout(.020);
+		break;
 	}
-	return 0;
 }
