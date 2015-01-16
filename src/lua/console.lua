@@ -288,8 +288,9 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
+    local version = rawget(box, 'info') and box.info.version or ''
     state:print(string.format("%-63s\n%-63s\n",
-        "Tarantool ".. box.info.version.." (Lua console)",
+        "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
     repl(state)
     log.info("client %s:%s disconnected", peer.host, peer.port)
