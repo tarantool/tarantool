@@ -6,6 +6,7 @@ local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
 local urilib = require('uri')
+local ffi = require('ffi')
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = require('yaml').new()
@@ -288,7 +289,7 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
-    local version = rawget(box, 'info') and box.info.version or ''
+    local version = ffi.string(ffi.C.tarantool_version())
     state:print(string.format("%-63s\n%-63s\n",
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
