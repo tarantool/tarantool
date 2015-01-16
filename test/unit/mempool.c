@@ -93,6 +93,25 @@ mempool_basic()
 	footer();
 }
 
+void
+mempool_aligh()
+{
+	header();
+
+	for (uint32_t size = OBJSIZE_MIN; size < OBJSIZE_MAX; size <<= 1) {
+		mempool_create(&pool, &cache, size);
+		for (uint32_t i = 0; i < 32; i++) {
+			void *ptr = mempool_alloc_nothrow(&pool);
+			uintptr_t addr = (uintptr_t)ptr;
+			if (addr % size)
+				fail("aligment", "wrong");
+		}
+		mempool_destroy(&pool);
+	}
+
+	footer();
+}
+
 int main()
 {
 	seed = time(0);
@@ -110,6 +129,8 @@ int main()
 	slab_cache_create(&cache, &arena, 0);
 
 	mempool_basic();
+
+	mempool_aligh();
 
 	slab_cache_destroy(&cache);
 }
