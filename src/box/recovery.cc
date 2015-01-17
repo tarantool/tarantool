@@ -172,8 +172,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	recovery_update_mode(r, WAL_NONE);
 
-	assert(rows_per_wal > 1);
-
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
 	r->signature = -1;
@@ -861,6 +859,7 @@ wal_writer_start(struct recovery_state *r, int rows_per_wal)
 	assert(r->writer == NULL);
 	assert(r->watcher == NULL);
 	assert(r->current_wal == NULL);
+	assert(rows_per_wal > 1);
 	assert(! wal_writer.is_shutdown);
 	assert(STAILQ_EMPTY(&wal_writer.input));
 	assert(STAILQ_EMPTY(&wal_writer.commit));
