@@ -316,4 +316,8 @@ f3:cancel()
 --
 getmetatable(fiber.info())
 
+zombie = false
+for fid, i in pairs(fiber.info()) do if i.name == 'zombie' then zombie = true end end
+zombie
+
 fiber = nil
