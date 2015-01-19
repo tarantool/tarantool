@@ -94,7 +94,7 @@ mempool_basic()
 }
 
 void
-mempool_aligh()
+mempool_align()
 {
 	header();
 
@@ -130,7 +130,7 @@ int main()
 
 	mempool_basic();
 
-	mempool_aligh();
+	mempool_align();
 
 	slab_cache_destroy(&cache);
 }
