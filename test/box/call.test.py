@@ -123,5 +123,20 @@ sql("call space:delete(4)")
 admin("space:drop()")
 admin("box.schema.user.drop('test')")
 
+def lua_eval(name, *args):
+    print 'eval (%s)(%s)' % (name, ','.join([ str(arg) for arg in args]))
+    print '---'
+    print sql.py_con.eval(name, *args)
+
+lua_eval('return 2+2')
+lua_eval('return 1, 2, 3')
+lua_eval('return ...', 1, 2, 3)
+lua_eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
+lua_eval('return nil')
+lua_eval('return')
+lua_eval('error("exception")')
+lua_eval('box.error(0)')
+lua_eval('!invalid expression')
+
 # Re-connect after removing user
 sql.py_con.close()

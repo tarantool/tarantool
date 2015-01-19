@@ -483,7 +483,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		 * stay in sync.
 		 */
 		if (ireq->header.type >= IPROTO_SELECT &&
-		    ireq->header.type <= IPROTO_AUTH) {
+		    ireq->header.type <= IPROTO_EVAL) {
 			/* Pre-parse request before putting it into the queue */
 			if (ireq->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -661,16 +661,24 @@ iproto_process(struct iproto_request *ireq)
 		case IPROTO_REPLACE:
 		case IPROTO_UPDATE:
 		case IPROTO_DELETE:
+			assert(ireq->request.type == ireq->header.type);
 			struct iproto_port port;
 			iproto_port_init(&port, out, ireq->header.sync);
 			box_process(&ireq->request, (struct port *) &port);
 			break;
 		case IPROTO_CALL:
+			assert(ireq->request.type == ireq->header.type);
 			stat_collect(stat_base, ireq->request.type, 1);
 			box_lua_call(&ireq->request, &iobuf->out);
 			break;
+		case IPROTO_EVAL:
+			assert(ireq->request.type == ireq->header.type);
+			stat_collect(stat_base, ireq->request.type, 1);
+			box_lua_eval(&ireq->request, &iobuf->out);
+			break;
 		case IPROTO_AUTH:
 		{
+			assert(ireq->request.type == ireq->header.type);
 			const char *user = ireq->request.key;
 			uint32_t len = mp_decode_strl(&user);
 			authenticate(user, len, ireq->request.tuple,

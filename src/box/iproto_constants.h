@@ -118,8 +118,9 @@ enum iproto_type {
 	IPROTO_DELETE = 5,
 	IPROTO_TYPE_DML_MAX = IPROTO_DELETE + 1,
 	IPROTO_CALL = 6,
-	IPROTO_TYPE_STAT_MAX = IPROTO_CALL + 1,
 	IPROTO_AUTH = 7,
+	IPROTO_EVAL = 8,
+	IPROTO_TYPE_STAT_MAX = IPROTO_EVAL + 1,
 	/* admin command codes */
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
@@ -138,7 +139,7 @@ extern const uint64_t iproto_body_key_map[];
 static inline const char *
 iproto_type_name(uint32_t type)
 {
-	if (type >= IPROTO_TYPE_DML_MAX)
+	if (type >= IPROTO_TYPE_STAT_MAX)
 		return "unknown";
 	return iproto_type_strs[type];
 }

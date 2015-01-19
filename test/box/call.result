@@ -133,7 +133,7 @@ function f3() return {'hello', {'world'}} end
 ...
 call f3()
 ---
-- ['hello', ('world',)]
+- ['hello', ['world']]
 ...
 function f3() return 'hello', {{'world'}, {'canada'}} end
 ---
@@ -141,7 +141,7 @@ function f3() return 'hello', {{'world'}, {'canada'}} end
 call f3()
 ---
 - ['hello']
-- [('world',), ('canada',)]
+- [['world'], ['canada']]
 ...
 function f3() return {}, '123', {{}, {}} end
 ---
@@ -150,14 +150,14 @@ call f3()
 ---
 - []
 - ['123']
-- [(), ()]
+- [[], []]
 ...
 function f3() return { {{'hello'}} } end
 ---
 ...
 call f3()
 ---
-- [('hello',)]
+- [['hello']]
 ...
 function f3() return { box.tuple.new('hello'), {'world'} } end
 ---
@@ -375,3 +375,42 @@ space:drop()
 box.schema.user.drop('test')
 ---
 ...
+eval (return 2+2)()
+---
+[4]
+
+eval (return 1, 2, 3)()
+---
+[1, 2, 3]
+
+eval (return ...)(1,2,3)
+---
+[1, 2, 3]
+
+eval (return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil)()
+---
+- {k: v1}
+- true
+- {xx: 10, yy: 15}
+- null
+
+eval (return nil)()
+---
+[null]
+
+eval (return)()
+---
+[]
+
+eval (error("exception"))()
+---
+error: {code: ER_PROC_LUA, reason: 'eval:1: exception'}
+
+eval (box.error(0))()
+---
+error: {code: ER_OK, reason: Unknown error}
+
+eval (!invalid expression)()
+---
+error: {code: ER_PROC_LUA, reason: 'eval:1: unexpected symbol near ''!'''}
+

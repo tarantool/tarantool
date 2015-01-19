@@ -590,6 +590,61 @@ box_lua_call(struct request *request, struct obuf *out)
 	}
 }
 
+static inline void
+execute_eval(lua_State *L, struct request *request, struct obuf *out)
+{
+	/* Check permissions */
+	struct credentials *credentials = current_user();
+	if (!(credentials->universal_access & PRIV_X)) {
+		/* Access violation, report error. */
+		struct user *user = user_cache_find(credentials->uid);
+		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
+			  priv_name(PRIV_X), user->name, "eval");
+	}
+
+	/* Compile expression */
+	const char *expr = request->key;
+	uint32_t expr_len = mp_decode_strl(&expr);
+	if (luaL_loadbuffer(L, expr, expr_len, "=eval"))
+		tnt_raise(LuajitError, L);
+
+	/* Unpack arguments */
+	const char *args = request->tuple;
+	uint32_t arg_count = mp_decode_array(&args);
+	luaL_checkstack(L, arg_count, "call: out of stack");
+	for (uint32_t i = 0; i < arg_count; i++) {
+		luamp_decode(L, luaL_msgpack_default, &args);
+	}
+
+	/* Call compiled code */
+	lua_call(L, arg_count, LUA_MULTRET);
+
+	/* Send results of the called procedure to the client. */
+	struct obuf_svp svp = iproto_prepare_select(out);
+	int nrets = lua_gettop(L);
+	for (int k = 1; k <= nrets; ++k) {
+		luamp_encode(L, luaL_msgpack_default, out, k);
+	}
+	iproto_reply_select(out, &svp, request->header->sync, nrets);
+}
+
+void
+box_lua_eval(struct request *request, struct obuf *out)
+{
+	lua_State *L = NULL;
+	try {
+		L = lua_newthread(tarantool_L);
+		LuarefGuard coro_ref(tarantool_L);
+		execute_eval(L, request, out);
+	} catch (Exception *e) {
+		/* Let all well-behaved exceptions pass through. */
+		throw;
+	} catch (...) {
+		/* Convert Lua error to a Tarantool exception. */
+		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+	}
+}
+
 static int
 lbox_snapshot(struct lua_State *L)
 {

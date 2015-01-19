@@ -85,9 +85,11 @@ end;
 t;
 ---
 - - DELETE
+  - EVAL
   - SELECT
   - REPLACE
   - INSERT
+  - AUTH
   - CALL
   - UPDATE
   - total
