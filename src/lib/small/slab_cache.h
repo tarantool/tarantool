@@ -211,8 +211,8 @@ slab_order(struct slab_cache *cache, size_t size)
 	if (size > cache->arena->slab_size)
 		return cache->order_max + 1;
 
-	return (uint8_t) (CHAR_BIT * sizeof(uint32_t) -
-			  __builtin_clz((uint32_t) size - 1) -
+	return (uint8_t) (CHAR_BIT * sizeof(unsigned) -
+			  __builtin_clz((unsigned) size - 1) -
 			  cache->order0_size_lb);
 }
 
