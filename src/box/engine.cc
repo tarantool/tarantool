@@ -110,6 +110,20 @@ void engine_shutdown()
 	}
 }
 
+static inline void
+engine_begin_recover_cb(EngineFactory *f, void *udate)
+{
+	int64_t lsn = *(int64_t*)udate;
+	f->snapshot(SNAPSHOT_RECOVER, lsn);
+}
+
+void
+engine_begin_recover_snapshot(int64_t snapshot_last_lsn)
+{
+	/* recover engine snapshot */
+	engine_foreach(engine_begin_recover_cb, &snapshot_last_lsn);
+}
+
 static void
 do_one_recover_step(struct space *space, void * /* param */)
 {
@@ -124,38 +138,39 @@ do_one_recover_step(struct space *space, void * /* param */)
 }
 
 static inline void
-space_end_recover_snapshot_cb(EngineFactory *f, void *udate)
+engine_end_recover_snapshot_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
 	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
 }
 
 void
-space_end_recover_snapshot()
+engine_end_recover_snapshot()
 {
 	/*
 	 * For all new spaces created from now on, when the
 	 * PRIMARY key is added, enable it right away.
 	 */
-	engine_foreach(space_end_recover_snapshot_cb, NULL);
+	engine_foreach(engine_end_recover_snapshot_cb, NULL);
 	space_foreach(do_one_recover_step, NULL);
 }
 
 static inline void
-space_end_recover_cb(EngineFactory *f, void *udate)
+engine_end_recover_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
 	f->recoveryEvent(END_RECOVERY);
 }
 
 void
-space_end_recover()
+engine_end_recover()
 {
 	/*
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
-	engine_foreach(space_end_recover_cb, NULL);
+	engine_foreach(engine_end_recover_cb, NULL);
 
 	space_foreach(do_one_recover_step, NULL);
 }
+

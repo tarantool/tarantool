@@ -278,7 +278,7 @@ SophiaFactory::commit(struct txn *txn)
 	});
 
 	/* a. get max lsn for commit */
-	uint64_t lsn = 0;
+	int64_t lsn = 0;
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row->lsn > lsn)
@@ -308,7 +308,7 @@ SophiaFactory::rollback(struct txn *)
 }
 
 static inline void
-sophia_snapshot(void *env, uint64_t lsn)
+sophia_snapshot(void *env, int64_t lsn)
 {
 	/* start asynchronous checkpoint */
 	void *c = sp_ctl(env);
@@ -329,7 +329,7 @@ sophia_snapshot(void *env, uint64_t lsn)
 }
 
 static inline void
-sophia_snapshot_recover(void *env, uint64_t lsn)
+sophia_snapshot_recover(void *env, int64_t lsn)
 {
 	/* recovered snapshot lsn is >= then last
 	 * engine lsn */
@@ -347,7 +347,7 @@ sophia_snapshot_recover(void *env, uint64_t lsn)
 }
 
 static inline int
-sophia_snapshot_ready(void *env, uint64_t lsn)
+sophia_snapshot_ready(void *env, int64_t lsn)
 {
 	/* get sophia lsn associated with snapshot */
 	char snapshot[32];
@@ -361,7 +361,7 @@ sophia_snapshot_ready(void *env, uint64_t lsn)
 	}
 	char *pe;
 	char *p = (char *)sp_get(o, "value", NULL);
-	uint64_t snapshot_start_lsn = strtoull(p, &pe, 10);
+	int64_t snapshot_start_lsn = strtoull(p, &pe, 10);
 	sp_destroy(o);
 
 	/* compare with a latest completed checkpoint lsn */
@@ -369,13 +369,13 @@ sophia_snapshot_ready(void *env, uint64_t lsn)
 	if (o == NULL)
 		sophia_raise(env);
 	p = (char *)sp_get(o, "value", NULL);
-	uint64_t last_lsn = strtoull(p, &pe, 10);
+	int64_t last_lsn = strtoull(p, &pe, 10);
 	sp_destroy(o);
 	return last_lsn >= snapshot_start_lsn;
 }
 
 static inline void
-sophia_snapshot_delete(void *env, uint64_t lsn)
+sophia_snapshot_delete(void *env, int64_t lsn)
 {
 	char snapshot[32];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
@@ -391,7 +391,7 @@ sophia_snapshot_delete(void *env, uint64_t lsn)
 		sophia_raise(env);
 }
 
-void SophiaFactory::snapshot(enum engine_snapshot_event e, uint64_t lsn)
+void SophiaFactory::snapshot(enum engine_snapshot_event e, int64_t lsn)
 {
 	switch (e) {
 	case SNAPSHOT_START:

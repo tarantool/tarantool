@@ -61,7 +61,7 @@ struct recovery_state *recovery;
 
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
-uint64_t snapshot_last_lsn = 0;
+int64_t snapshot_last_lsn = 0;
 
 static void
 box_snapshot_cb(struct log_io *l);
@@ -249,7 +249,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	/*
 	 * notify engines about end of recovery.
 	*/
-	space_end_recover();
+	engine_end_recover();
 
 	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
@@ -442,21 +442,21 @@ box_init()
 
 	if (recovery_has_data(recovery)) {
 		/* recover engine snapshot */
-		box_deploy_snapshot(recovery);
+		engine_begin_recover_snapshot(recovery_snap_lsn(recovery));
 		/* Process existing snapshot */
 		recover_snap(recovery);
-		space_end_recover_snapshot();
+		engine_end_recover_snapshot();
 	} else if (recovery_has_remote(recovery)) {
 		/* Initialize a new replica */
 		replica_bootstrap(recovery);
-		space_end_recover_snapshot();
+		engine_end_recover_snapshot();
 		box_deploy(recovery);
 	} else {
 		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
-		space_end_recover_snapshot();
+		engine_end_recover_snapshot();
 		box_deploy(recovery);
 	}
 	fiber_gc();
@@ -541,30 +541,23 @@ box_snapshot_cb(struct log_io *l)
 }
 
 static inline void
-box_snapshot_engine(EngineFactory *f, void *udate)
+engine_start_snapshot(EngineFactory *f, void *udate)
 {
-	uint64_t lsn = *(uint64_t*)udate;
+	int64_t lsn = *(int64_t*)udate;
 	f->snapshot(SNAPSHOT_START, lsn);
 }
 
 static inline void
-box_snapshot_recover_engine(EngineFactory *f, void *udate)
+engine_delete_snapshot(EngineFactory *f, void *udate)
 {
-	uint64_t lsn = *(uint64_t*)udate;
-	f->snapshot(SNAPSHOT_RECOVER, lsn);
-}
-
-static inline void
-box_snapshot_delete_engine(EngineFactory *f, void *udate)
-{
-	uint64_t lsn = *(uint64_t*)udate;
+	int64_t lsn = *(int64_t*)udate;
 	f->snapshot(SNAPSHOT_DELETE, lsn);
 }
 
 static inline void
-box_snapshot_wait_engine(EngineFactory *f, void *udate)
+engine_wait_snapshot(EngineFactory *f, void *udate)
 {
-	uint64_t lsn = *(uint64_t*)udate;
+	int64_t lsn = *(int64_t*)udate;
 	f->snapshot(SNAPSHOT_WAIT, lsn);
 }
 
@@ -591,14 +584,16 @@ box_snapshot(void)
 	fflush(stderr);
 
 	/* create snapshot file */
-	uint64_t snap_lsn = vclock_signature(&recovery->vclock);
+	int64_t snap_lsn = vclock_signature(&recovery->vclock);
 
 	/* create engine snapshot */
-	engine_foreach(box_snapshot_engine, &snap_lsn);
+	engine_foreach(engine_start_snapshot, &snap_lsn);
 
-	/* Due to fork nature, no threads are recreated.
+	/*
+	 * Due to fork nature, no threads are recreated.
 	 * This is the only consistency guarantee here for a
-	 * multi-threaded engine. */
+	 * multi-threaded engine.
+	 */
 	int rc;
 	int status;
 	pid_t pid = fork();
@@ -638,7 +633,7 @@ box_snapshot(void)
 	tuple_end_snapshot();
 
 	/* wait for engine snapshot completion */
-	engine_foreach(box_snapshot_wait_engine, &snap_lsn);
+	engine_foreach(engine_wait_snapshot, &snap_lsn);
 
 	/* rename snapshot on completion */
 	rc = coeio_custom(box_snapshot_rename_cb,
@@ -647,8 +642,7 @@ box_snapshot(void)
 		goto error;
 
 	/* remove previous snapshot reference */
-	engine_foreach(box_snapshot_delete_engine, &snapshot_last_lsn);
-
+	engine_foreach(engine_delete_snapshot, &snapshot_last_lsn);
 
 	snapshot_last_lsn = snap_lsn;
 	snapshot_pid = 0;
@@ -656,7 +650,7 @@ box_snapshot(void)
 
 error:
 	/* rollback snapshot creation */
-	engine_foreach(box_snapshot_delete_engine, &snap_lsn);
+	engine_foreach(engine_delete_snapshot, &snap_lsn);
 	tuple_end_snapshot();
 	snapshot_pid = 0;
 	return status;
@@ -670,21 +664,8 @@ box_deploy(struct recovery_state *r)
 
 	/* create engine snapshot and wait for completion */
 	uint64_t snap_lsn = vclock_signature(&r->vclock);
-	engine_foreach(box_snapshot_engine, &snap_lsn);
-	engine_foreach(box_snapshot_wait_engine, &snap_lsn);
-}
-
-void
-box_deploy_snapshot(struct recovery_state *r)
-{
-	/* recover last snapshot lsn */
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
-	if (res == NULL)
-		panic("can't find snapshot");
-	snapshot_last_lsn = vclock_signature(res);
-
-	/* recover engine snapshot */
-	engine_foreach(box_snapshot_recover_engine, &snapshot_last_lsn);
+	engine_foreach(engine_start_snapshot, &snap_lsn);
+	engine_foreach(engine_wait_snapshot, &snap_lsn);
 }
 
 const char *

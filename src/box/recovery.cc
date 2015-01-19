@@ -1097,6 +1097,14 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 
 /* {{{ box.snapshot() */
 
+int64_t
+recovery_snap_lsn(struct recovery_state *r)
+{
+	/* recover last snapshot lsn */
+	struct vclock *vclock= vclockset_last(&r->snap_dir.index);
+	return vclock ? vclock_signature(vclock) : -1;
+}
+
 void
 snapshot_write_row(struct recovery_state *r, struct log_io *l,
 		   struct xrow_header *row)

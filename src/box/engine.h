@@ -141,7 +141,7 @@ public:
 	/**
 	 * Engine snapshotting support.
 	 */
-	virtual void snapshot(enum engine_snapshot_event, uint64_t) = 0;
+	virtual void snapshot(enum engine_snapshot_event, int64_t) = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -219,17 +219,24 @@ engine_id(Engine *engine)
 }
 
 /**
+ * Tell the engine what the last LSN to recover from is
+ * (during server start.
+ */
+void
+engine_begin_recover_snapshot(int64_t snapshot_last_lsn);
+
+/**
  * Called at the end of recovery from snapshot.
  * Build primary keys in all spaces.
  * */
 void
-space_end_recover_snapshot();
+engine_end_recover_snapshot();
 
 /**
  * Called at the end of recovery.
  * Build secondary keys in all spaces.
  */
 void
-space_end_recover();
+engine_end_recover();
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

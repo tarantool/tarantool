@@ -37,7 +37,7 @@ struct MemtxFactory: public EngineFactory {
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void recoveryEvent(enum engine_recovery_event event);
 	virtual void rollback(struct txn*);
-	virtual void snapshot(enum engine_snapshot_event, uint64_t);
+	virtual void snapshot(enum engine_snapshot_event, int64_t);
 };
 
 #endif /* TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED */
