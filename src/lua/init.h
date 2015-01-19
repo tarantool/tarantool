@@ -74,7 +74,7 @@ tarantool_lua_tostring(struct lua_State *L, int index);
  * @param L is a Lua State.
  */
 void
-tarantool_lua_run_script(char *path);
+tarantool_lua_run_script(char *path, int argc, char **argv);
 
 void
 tarantool_lua(struct lua_State *L,
