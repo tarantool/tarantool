@@ -105,20 +105,6 @@ schema_init();
 void
 schema_free();
 
-/**
- * Called at the end of recovery from snapshot.
- * Build primary keys in all spaces.
- * */
-void
-space_end_recover_snapshot();
-
-/**
- * Called at the end of recovery.
- * Build secondary keys in all spaces.
- */
-void
-space_end_recover();
-
 struct space *schema_space(uint32_t id);
 
 /*
@@ -162,6 +148,5 @@ func_by_name(const char *name, uint32_t name_len)
  */
 bool
 schema_find_grants(const char *type, uint32_t id);
-
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

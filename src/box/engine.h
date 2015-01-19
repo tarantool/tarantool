@@ -218,4 +218,18 @@ engine_id(Engine *engine)
 	return engine->factory->id;
 }
 
+/**
+ * Called at the end of recovery from snapshot.
+ * Build primary keys in all spaces.
+ * */
+void
+space_end_recover_snapshot();
+
+/**
+ * Called at the end of recovery.
+ * Build secondary keys in all spaces.
+ */
+void
+space_end_recover();
+
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

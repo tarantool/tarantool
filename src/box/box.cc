@@ -634,6 +634,9 @@ box_snapshot(void)
 	if (status != 0)
 		goto error;
 
+	/* complete snapshot */
+	tuple_end_snapshot();
+
 	/* wait for engine snapshot completion */
 	engine_foreach(box_snapshot_wait_engine, &snap_lsn);
 
@@ -646,8 +649,6 @@ box_snapshot(void)
 	/* remove previous snapshot reference */
 	engine_foreach(box_snapshot_delete_engine, &snapshot_last_lsn);
 
-	/* complete snapshot */
-	tuple_end_snapshot();
 
 	snapshot_last_lsn = snap_lsn;
 	snapshot_pid = 0;
