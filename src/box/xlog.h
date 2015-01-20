@@ -111,6 +111,7 @@ struct xdir {
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX+1];
+	enum xdir_type type;
 };
 
 /**

@@ -90,6 +90,26 @@ struct remote {
 	socklen_t addr_len;
 };
 
+/**
+ * This is used in local hot standby or replication
+ * relay mode: look for changes in the wal_dir and apply them
+ * locally or send to the replica.
+ */
+struct wal_watcher {
+	/**
+	 * Rescan the WAL directory in search for new WAL files
+	 * every wal_dir_rescan_delay seconds.
+	 */
+	ev_timer dir_timer;
+	/**
+	 * When the latest WAL does not contain a EOF marker,
+	 * re-read its tail on every change in file metadata.
+	 */
+	ev_stat stat;
+	/** Path to the file being watched with 'stat'. */
+	char filename[PATH_MAX+1];
+};
+
 struct recovery_state {
 	struct vclock vclock;
 	/** The WAL we're currently reading/writing from/to. */
@@ -99,7 +119,7 @@ struct recovery_state {
 	/** Used to find missing xlog files */
 	int64_t signature;
 	struct wal_writer *writer;
-	struct wal_watcher *watcher;
+	struct wal_watcher watcher;
 	union {
 		/** slave->master state */
 		struct remote remote;

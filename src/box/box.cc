@@ -227,7 +227,12 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		 */
 		return;
 	}
-	recovery_finalize(recovery, cfg_geti("rows_per_wal"));
+	try {
+		recovery_finalize(recovery, cfg_geti("rows_per_wal"));
+	} catch (Exception *e) {
+		e->log();
+		panic("unable to successfully finalize recovery");
+	}
 
 	/*
 	 * notify engines about end of recovery.

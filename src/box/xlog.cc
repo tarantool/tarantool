@@ -87,6 +87,7 @@ xdir_create(struct xdir *dir, const char *dirname,
 		dir->filetype = "XLOG\n";
 		dir->filename_ext = ".xlog";
 	}
+	dir->type = type;
 }
 
 /**
