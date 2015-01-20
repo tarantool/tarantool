@@ -442,7 +442,8 @@ box_init()
 
 	if (recovery_has_data(recovery)) {
 		/* recover engine snapshot */
-		engine_begin_recover_snapshot(recovery_snap_lsn(recovery));
+		snapshot_last_lsn = recovery_snap_lsn(recovery);
+		engine_begin_recover_snapshot(snapshot_last_lsn);
 		/* Process existing snapshot */
 		recover_snap(recovery);
 		engine_end_recover_snapshot();
@@ -595,7 +596,7 @@ box_snapshot(void)
 	 * multi-threaded engine.
 	 */
 	int rc;
-	int status;
+	int status = 0;
 	pid_t pid = fork();
 	switch (pid) {
 	case -1:
@@ -650,7 +651,8 @@ box_snapshot(void)
 
 error:
 	/* rollback snapshot creation */
-	engine_foreach(engine_delete_snapshot, &snap_lsn);
+	if (snap_lsn != snapshot_last_lsn)
+		engine_foreach(engine_delete_snapshot, &snap_lsn);
 	tuple_end_snapshot();
 	snapshot_pid = 0;
 	return status;

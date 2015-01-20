@@ -223,7 +223,7 @@ engine_id(Engine *engine)
  * (during server start.
  */
 void
-engine_begin_recover_snapshot(int64_t snapshot_last_lsn);
+engine_begin_recover_snapshot(int64_t snapshot_lsn);
 
 /**
  * Called at the end of recovery from snapshot.

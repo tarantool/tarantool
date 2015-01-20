@@ -1101,7 +1101,7 @@ int64_t
 recovery_snap_lsn(struct recovery_state *r)
 {
 	/* recover last snapshot lsn */
-	struct vclock *vclock= vclockset_last(&r->snap_dir.index);
+	struct vclock *vclock = vclockset_last(&r->snap_dir.index);
 	return vclock ? vclock_signature(vclock) : -1;
 }
 

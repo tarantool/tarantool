@@ -118,10 +118,10 @@ engine_begin_recover_cb(EngineFactory *f, void *udate)
 }
 
 void
-engine_begin_recover_snapshot(int64_t snapshot_last_lsn)
+engine_begin_recover_snapshot(int64_t snapshot_lsn)
 {
 	/* recover engine snapshot */
-	engine_foreach(engine_begin_recover_cb, &snapshot_last_lsn);
+	engine_foreach(engine_begin_recover_cb, &snapshot_lsn);
 }
 
 static void
