@@ -465,8 +465,9 @@ local remote_methods = {
                 eval_str = eval_str .. tostring(arg)
             else
                 arg = tostring(arg)
-                arg = string.gsub(arg, '"', '\\"')
-                eval_str = eval_str .. '"' .. arg .. '"'
+                arg = string.gsub(arg, ']]', ']].."]]"..[[')
+                arg = string.gsub(arg, "\n", ']].."\\n"..[[')
+                eval_str = eval_str .. '[[' .. arg .. ']]'
             end
         end
         eval_str = eval_str .. ")\n"

@@ -224,6 +224,12 @@ cnc:call('console_unpack_test', 1)
 cn:call('123')
 cnc:call('123')
 
+-- gh-649: String escaping doesn't work in remote console
+function echo(...) return ... end
+#cn:call('echo', [[a \[\[ \091\091 b \093\093 c \n d \t e \]\] f ]])[1][1]
+#cnc:call('echo', [[a \[\[ \091\091 b \093\093 c \n d \t e \]\] f ]])[1][1]
+#cn:call('echo', "a [[ \091\091 b \093\093 c \n d \t e ]] f ")[1][1]
+#cnc:call('echo', "a [[ \091\091 b \093\093 c \n d \t e ]] f ")[1][1]
 
 -- #545 user or password is not defined
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
