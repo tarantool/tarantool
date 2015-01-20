@@ -24,19 +24,28 @@ local function format(status, ...)
     local function wrapnull(v)
         return v == nil and formatter.NULL or v
     end
-    if not status then
-        local v = ...
-        return formatter.encode({{error = wrapnull(v) }})
+    local err
+    if status then
+        local count = select('#', ...)
+        if count == 0 then
+            return "---\n...\n"
+        end
+        local res = {}
+        for i=1,count,1 do
+            table.insert(res, wrapnull(select(i, ...)))
+        end
+        -- serializer can raise an exception
+        status, err = pcall(formatter.encode, res)
+        if status then
+            return err
+        else
+            err = 'console: an exception occurred during formatting result: '..
+                tostring(err)
+        end
+    else
+        err = wrapnull(...)
     end
-    local count = select('#', ...)
-    if count == 0 then
-        return "---\n...\n"
-    end
-    local res = {}
-    for i=1,count,1 do
-        table.insert(res, wrapnull(select(i, ...)))
-    end
-    return formatter.encode(res)
+    return formatter.encode({{error = err }})
 end
 
 --

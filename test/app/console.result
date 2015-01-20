@@ -1,5 +1,5 @@
 TAP version 13
-1..26
+1..28
 ok - console.listen started
 ok - Handshake
 ok - connect to console
@@ -18,6 +18,8 @@ ok - remote eval
 ok - remote state.remote.host
 ok - remote state.remote.port
 ok - remote state.prompt
+ok - exception handling
+ok - exception handling
 ok - remote disconnect
 ok - console.listen stopped
 ok - console.listen uri support
