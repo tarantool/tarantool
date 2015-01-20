@@ -75,6 +75,10 @@ s.index.spatial:count()
 s.index.spatial:min()
 s.index.spatial:max()
 
+-- seems that drop can't fail
+s.index.spatial:drop()
+s.index.spatial:select({})
+
 s:drop()
 
 s = box.schema.create_space('sophia', {engine = 'sophia'})

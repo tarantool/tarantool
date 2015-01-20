@@ -20,7 +20,7 @@ local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(26)
+test:plan(28)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -97,6 +97,14 @@ test:is(state.remote.host, "unix/", "remote state.remote.host")
 test:is(state.remote.port, IPROTO_SOCKET, "remote state.remote.port")
 test:is(state.prompt, string.format("%s:%s", "unix/", IPROTO_SOCKET),
         "remote state.prompt")
+
+-- Check exception handling (gh-643)
+client:write("error('test')\n")
+test:ok(yaml.decode(client:read(EOL))[1].error:match('test') ~= nil,
+    "exception handling")
+client:write("setmetatable({}, { __serialize = function() error('test') end})\n")
+test:ok(yaml.decode(client:read(EOL))[1].error:match('test') ~= nil,
+    "exception handling")
 
 -- Disconnect from iproto
 client:write("~.\n")

@@ -191,10 +191,9 @@ coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
 			}
 			return 0; /* connected */
 		} catch (SocketError *e) {
-			/* ignore */
-			say_error("failed to connect to %s: %s",
-				  sio_strfaddr(ai->ai_addr, ai->ai_addrlen),
-				  e->errmsg());
+			if (ai->ai_next == NULL)
+				throw;
+			/* ignore exception and try the next address */
 		}
 		ai = ai->ai_next;
 		ev_now_update(loop);
