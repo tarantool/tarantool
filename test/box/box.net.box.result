@@ -10,9 +10,6 @@ log = require 'log'
 msgpack = require 'msgpack'
 ---
 ...
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
----
-...
 LISTEN = require('uri').parse(box.cfg.listen)
 ---
 ...
@@ -54,6 +51,7 @@ cn:ping()
 ---
 - true
 ...
+-- check permissions
 cn:call('unexists_procedure')
 ---
 - error: Procedure 'unexists_procedure' is not defined
@@ -63,13 +61,106 @@ function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Execute access denied for user 'guest' to function 'test_foo'
+...
+cn:eval('return 2+2')
+---
+- error: Execute access denied for user 'guest'
+...
+box.schema.user.grant('guest','execute','universe')
+---
+...
+cn:close()
+---
+...
+cn = remote:new(box.cfg.listen)
+---
+...
+cn:call('unexists_procedure')
+---
+- error: Procedure 'unexists_procedure' is not defined
+...
+cn:call('test_foo', 'a', 'b', 'c')
+---
+- error: Tuple/Key must be MsgPack array
 ...
 cn:call(nil, 'a', 'b', 'c')
 ---
 - error: Procedure 'nil' is not defined
+...
+cn:eval('return 2+2')
+---
+- 4
+...
+cn:eval('return 1, 2, 3')
+---
+- 1
+- 2
+- 3
+...
+cn:eval('return ...', 1, 2, 3)
+---
+- 1
+- 2
+- 3
+...
+cn:eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
+---
+- {k: v1}
+- true
+- {yy: 15, xx: 10}
+- null
+...
+cn:eval('return nil')
+---
+- null
+...
+cn:eval('return')
+---
+...
+cn:eval('error("exception")')
+---
+- error: 'eval:1: exception'
+...
+cn:eval('box.error(0)')
+---
+- error: Unknown error
+...
+cn:eval('!invalid expression')
+---
+- error: 'eval:1: unexpected symbol near ''!'''
+...
+remote.self:eval('return 1+1, 2+2')
+---
+- 2
+- 4
+...
+remote.self:eval('return')
+---
+...
+remote.self:eval('error("exception")')
+---
+- error: '[string "error("exception")"]:1: exception'
+...
+remote.self:eval('box.error(0)')
+---
+- error: Unknown error
+...
+remote.self:eval('!invalid expression')
+---
+- error: '[string "return !invalid expression"]:1: unexpected symbol near ''!'''
+...
+box.schema.user.revoke('guest','execute','universe')
+---
+...
+box.schema.user.grant('guest','read,write,execute','universe')
+---
+...
+cn:close()
+---
+...
+cn = remote:new(box.cfg.listen)
+---
 ...
 cn:_select(space.id, space.index.primary.id, 123)
 ---
@@ -141,7 +232,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:229: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:242: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -384,9 +475,7 @@ cn:call('pause')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Tuple/Key must be MsgPack array
 ...
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
@@ -397,9 +486,7 @@ remote.self:call('test_foo', 'a', 'b', 'c')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Tuple/Key must be MsgPack array
 ...
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
@@ -757,7 +844,7 @@ require('fiber').create(
 ---
 - status: suspended
   name: lua
-  id: 151
+  id: 157
 ...
 while true do
    local line = file_log:read(2048)

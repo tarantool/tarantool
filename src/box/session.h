@@ -187,4 +187,16 @@ credentials_init(struct credentials *cr, struct user *user)
 	cr->uid = user->uid;
 }
 
+static inline void
+access_check_universe(uint8_t access)
+{
+	struct credentials *credentials = current_user();
+	if (!(credentials->universal_access & access)) {
+		/* Access violation, report error. */
+		struct user *user = user_cache_find(credentials->uid);
+		tnt_raise(ClientError, ER_ACCESS_DENIED,
+			  priv_name(access), user->name);
+	}
+}
+
 #endif /* INCLUDES_TARANTOOL_SESSION_H */

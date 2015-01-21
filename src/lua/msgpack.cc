@@ -45,7 +45,7 @@ extern "C" {
 
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
-static int
+static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx, struct obuf *buf);
 
 static void
@@ -147,13 +147,13 @@ luamp_encode_bool(struct luaL_serializer *cfg, struct obuf *buf, bool val)
 	obuf_advance(buf, pos - data);
 }
 
-static int
+static mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx, struct obuf *b)
 {
 	(void) L;
 	(void) idx;
 	(void) b;
-	return -1;
+	return MP_EXT;
 }
 
 void
@@ -184,7 +184,7 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 	}
 }
 
-static void
+static enum mp_type
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 	       int level)
 {
@@ -195,31 +195,43 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 	luaL_tofield(L, cfg, index, &field);
 	if (field.type == MP_EXT) {
 		/* Run trigger if type can't be encoded */
-		if (luamp_encode_extension(L, index, b) == 0)
-			return; /* Value has been packed by the trigger */
+		enum mp_type type = luamp_encode_extension(L, index, b);
+		if (type != MP_EXT)
+			return type; /* Value has been packed by the trigger */
 		/* Try to convert value to serializable type */
 		luaL_convertfield(L, cfg, index, &field);
 	}
 	switch (field.type) {
 	case MP_UINT:
-		return luamp_encode_uint(cfg, b, field.ival);
+		luamp_encode_uint(cfg, b, field.ival);
+		return MP_UINT;
 	case MP_STR:
+		luamp_encode_str(cfg, b, field.sval.data, field.sval.len);
+		return MP_STR;
 	case MP_BIN:
-		return luamp_encode_str(cfg, b, field.sval.data, field.sval.len);
+		luamp_encode_str(cfg, b, field.sval.data, field.sval.len);
+		return MP_BIN;
 	case MP_INT:
-		return luamp_encode_int(cfg, b, field.ival);
+		luamp_encode_int(cfg, b, field.ival);
+		return MP_INT;
 	case MP_FLOAT:
-		return luamp_encode_float(cfg, b, field.fval);
+		luamp_encode_float(cfg, b, field.fval);
+		return MP_FLOAT;
 	case MP_DOUBLE:
-		return luamp_encode_double(cfg, b, field.dval);
+		luamp_encode_double(cfg, b, field.dval);
+		return MP_DOUBLE;
 	case MP_BOOL:
-		return luamp_encode_bool(cfg, b, field.bval);
+		luamp_encode_bool(cfg, b, field.bval);
+		return MP_BOOL;
 	case MP_NIL:
-		return luamp_encode_nil(cfg, b);
+		luamp_encode_nil(cfg, b);
+		return MP_NIL;
 	case MP_MAP:
 		/* Map */
-		if (level >= cfg->encode_max_depth)
-			return luamp_encode_nil(cfg, b); /* Limit nested maps */
+		if (level >= cfg->encode_max_depth) {
+			luamp_encode_nil(cfg, b); /* Limit nested maps */
+			return MP_NIL;
+		}
 		luamp_encode_map(cfg, b, field.size);
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, index) != 0) {
@@ -229,26 +241,28 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 			luamp_encode_r(L, cfg, b, level + 1);
 			lua_pop(L, 1);
 		}
-		return;
+		return MP_MAP;
 	case MP_ARRAY:
 		/* Array */
-		if (level >= cfg->encode_max_depth)
-			return luamp_encode_nil(cfg, b); /* Limit nested arrays */
+		if (level >= cfg->encode_max_depth) {
+			luamp_encode_nil(cfg, b); /* Limit nested arrays */
+			return MP_NIL;
+		}
 		luamp_encode_array(cfg, b, field.size);
 		for (uint32_t i = 0; i < field.size; i++) {
 			lua_rawgeti(L, index, i + 1);
 			luamp_encode_r(L, cfg, b, level + 1);
 			lua_pop(L, 1);
 		}
-		return;
+		return MP_ARRAY;
 	case MP_EXT:
 		/* handled by luaL_convertfield */
 		assert(false);
-		return;
 	}
+	return MP_EXT;
 }
 
-void
+enum mp_type
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 	     int index)
 {
@@ -261,11 +275,13 @@ luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 		lua_pushvalue(L, index); /* copy a value to the stack top */
 	}
 
-	luamp_encode_r(L, cfg, b, 0);
+	enum mp_type top_type = luamp_encode_r(L, cfg, b, 0);
 
 	if (!on_top) {
 		lua_remove(L, top + 1); /* remove a value copy */
 	}
+
+	return top_type;
 }
 
 void

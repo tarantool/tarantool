@@ -3,7 +3,6 @@ fiber = require 'fiber'
 log = require 'log'
 msgpack = require 'msgpack'
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.create_space('net_box_test_space')
 index = space:create_index('primary', { type = 'tree' })
@@ -23,12 +22,39 @@ log.info("ping is done")
 cn:ping()
 
 
+-- check permissions
 cn:call('unexists_procedure')
-
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
+cn:call('test_foo', 'a', 'b', 'c')
+cn:eval('return 2+2')
 
+box.schema.user.grant('guest','execute','universe')
+cn:close()
+cn = remote:new(box.cfg.listen)
+
+cn:call('unexists_procedure')
 cn:call('test_foo', 'a', 'b', 'c')
 cn:call(nil, 'a', 'b', 'c')
+cn:eval('return 2+2')
+cn:eval('return 1, 2, 3')
+cn:eval('return ...', 1, 2, 3)
+cn:eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
+cn:eval('return nil')
+cn:eval('return')
+cn:eval('error("exception")')
+cn:eval('box.error(0)')
+cn:eval('!invalid expression')
+
+remote.self:eval('return 1+1, 2+2')
+remote.self:eval('return')
+remote.self:eval('error("exception")')
+remote.self:eval('box.error(0)')
+remote.self:eval('!invalid expression')
+
+box.schema.user.revoke('guest','execute','universe')
+box.schema.user.grant('guest','read,write,execute','universe')
+cn:close()
+cn = remote:new(box.cfg.listen)
 
 cn:_select(space.id, space.index.primary.id, 123)
 space:insert{123, 345}

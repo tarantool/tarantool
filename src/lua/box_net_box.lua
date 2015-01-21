@@ -19,6 +19,7 @@ local UPDATE            = 4
 local DELETE            = 5
 local CALL              = 6
 local AUTH              = 7
+local EVAL              = 8
 local PING              = 64
 local ERROR_TYPE        = 65536
 
@@ -34,6 +35,7 @@ local KEY               = 0x20
 local TUPLE             = 0x21
 local FUNCTION_NAME     = 0x22
 local USER              = 0x23
+local EXPR              = 0x27
 local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
@@ -122,6 +124,17 @@ local proto = {
         return request(
             { [SYNC] = sync, [TYPE] = CALL  },
             { [FUNCTION_NAME] = proc, [TUPLE] = args }
+        )
+    end,
+
+    -- lua eval
+    eval = function(sync, expr, args)
+        if args == nil then
+            args = {}
+        end
+        return request(
+            { [SYNC] = sync, [TYPE] = EVAL  },
+            { [EXPR] = expr, [TUPLE] = args }
         )
     end,
 
@@ -474,6 +487,24 @@ local remote_methods = {
 
         local res = self:_console_request(eval_str, true)
         return res.body[DATA]
+    end,
+
+    eval    = function(self, expr, ...)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:eval(expr, ...)")
+        end
+
+        expr = tostring(expr)
+        local res = self:_request('eval', true, expr, {...})
+        local data = res.body[DATA]
+        local data_len = #data
+        if data_len == 1 then
+            return data[1]
+        elseif data_len == 0 then
+            return
+        else
+            return unpack(data)
+        end
     end,
 
     is_connected = function(self)
@@ -1017,10 +1048,10 @@ local remote_methods = {
         if raise == nil then
             raise = true
         end
-        return self:_request_raw(CONSOLE_FAKESYNC, request_body, raise)
+        return self:_request_raw('call', CONSOLE_FAKESYNC, request_body, raise)
     end,
 
-    _request_raw = function(self, sync, request, raise)
+    _request_raw = function(self, name, sync, request, raise)
 
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
@@ -1062,7 +1093,7 @@ local remote_methods = {
         end
 
         if response.body[DATA] ~= nil then
-            if rawget(box, 'tuple') ~= nil then
+            if rawget(box, 'tuple') ~= nil and name ~= 'eval' then
                 for i, v in pairs(response.body[DATA]) do
                     response.body[DATA][i] =
                         box.tuple.new(response.body[DATA][i])
@@ -1078,7 +1109,7 @@ local remote_methods = {
     _request_internal = function(self, name, raise, ...)
         local sync = self.proto:sync()
         local request = self.proto[name](sync, ...)
-        return self:_request_raw(sync, request, raise)
+        return self:_request_raw(name, sync, request, raise)
     end,
 
     -- private (low level) methods
@@ -1138,6 +1169,16 @@ remote.self = {
             result[i] = box.tuple.new(v)
         end
         return result
+    end,
+    eval = function(_box, expr, ...)
+        local proc, errmsg = loadstring(expr)
+        if not proc then
+            proc, errmsg = loadstring("return "..expr)
+        end
+        if not proc then
+            box.error(box.error.PROC_LUA, errmsg)
+        end
+        return proc(...)
     end,
     console = false
 }

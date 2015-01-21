@@ -67,6 +67,7 @@ enum iproto_key {
 	IPROTO_SERVER_UUID = 0x24,
 	IPROTO_CLUSTER_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
+	IPROTO_EXPR = 0x27, /* EVAL */
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -79,7 +80,9 @@ enum iproto_key {
 			  bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
-			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME))
+			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME) | \
+			  bit(EXPR))
+
 static inline bool
 xrow_header_has_key(const char *pos, const char *end)
 {
@@ -118,8 +121,9 @@ enum iproto_type {
 	IPROTO_DELETE = 5,
 	IPROTO_TYPE_DML_MAX = IPROTO_DELETE + 1,
 	IPROTO_CALL = 6,
-	IPROTO_TYPE_STAT_MAX = IPROTO_CALL + 1,
 	IPROTO_AUTH = 7,
+	IPROTO_EVAL = 8,
+	IPROTO_TYPE_STAT_MAX = IPROTO_EVAL + 1,
 	/* admin command codes */
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
@@ -138,7 +142,7 @@ extern const uint64_t iproto_body_key_map[];
 static inline const char *
 iproto_type_name(uint32_t type)
 {
-	if (type >= IPROTO_TYPE_DML_MAX)
+	if (type >= IPROTO_TYPE_STAT_MAX)
 		return "unknown";
 	return iproto_type_strs[type];
 }

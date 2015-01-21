@@ -92,7 +92,7 @@ local function remote_eval(self, line)
     --
     -- call remote 'console.eval' function using 'dostring' and return result
     --
-    local status, res = pcall(self.remote.call, self.remote, "dostring",
+    local status, res = pcall(self.remote.eval, self.remote,
         "return require('console').eval(...)", line)
     if not status then
         -- remote request failed
