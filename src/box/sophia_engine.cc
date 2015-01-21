@@ -26,12 +26,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "sophia_engine.h"
 #include "cfg.h"
 #include "xrow.h"
 #include "tuple.h"
 #include "scoped_guard.h"
-#include "engine.h"
-#include "sophia_engine.h"
 #include "txn.h"
 #include "index.h"
 #include "sophia_index.h"

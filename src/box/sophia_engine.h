@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "engine.h"
 
 struct SophiaFactory: public EngineFactory {
 	SophiaFactory();
