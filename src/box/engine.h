@@ -79,10 +79,15 @@ enum engine_recovery_event {
  * Engine specific snapshot event.
  */
 enum engine_snapshot_event {
+	/** Begin two-face snapshot creation in this engine. */
 	SNAPSHOT_START,
-	SNAPSHOT_RECOVER,
+	/** Wait for completion of the two-phase snapshot creation */
+	SNAPSHOT_WAIT,
+	/**
+	 * On success, delete previous snapshot, on failure,
+	 * delete the last snapshot (passed in as lsn.
+	 */
 	SNAPSHOT_DELETE,
-	SNAPSHOT_WAIT
 };
 
 typedef void (*engine_recover_f)(struct space*);
@@ -138,6 +143,7 @@ public:
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
+	virtual void set_snapshot_lsn(int64_t lsn) = 0;
 	/**
 	 * Engine snapshotting support.
 	 */

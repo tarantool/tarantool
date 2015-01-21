@@ -200,7 +200,8 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 	}
 }
 
-void MemtxFactory::rollback(struct txn *txn)
+void
+MemtxFactory::rollback(struct txn *txn)
 {
 	struct txn_stmt *stmt;
 	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
@@ -211,7 +212,18 @@ void MemtxFactory::rollback(struct txn *txn)
 	}
 }
 
-void MemtxFactory::snapshot(enum engine_snapshot_event, int64_t /* lsn */)
+/** Called at start to tell memtx to recover to a given LSN. */
+void
+MemtxFactory::set_snapshot_lsn(int64_t /* lsn */)
+{
+	/*
+	 * memtx snapshotting supported directly by box.
+	 * do nothing here.
+	 */
+}
+
+void
+MemtxFactory::snapshot(enum engine_snapshot_event, int64_t /* lsn */)
 {
 	/*
 	 * memtx snapshotting supported directly by box.

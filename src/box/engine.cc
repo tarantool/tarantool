@@ -85,7 +85,7 @@ EngineFactory *
 engine_find(const char *name)
 {
 	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link) {
+	engine_foreach(e) {
 		if (strcmp(e->name, name) == 0)
 			return e;
 	}
@@ -108,7 +108,7 @@ engine_begin_recover_snapshot(int64_t snapshot_lsn)
 	/* recover engine snapshot */
 	EngineFactory *f;
 	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_RECOVER, snapshot_lsn);
+		f->set_snapshot_lsn(snapshot_lsn);
 	}
 }
 

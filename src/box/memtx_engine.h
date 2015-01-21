@@ -38,6 +38,7 @@ struct MemtxFactory: public EngineFactory {
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void recoveryEvent(enum engine_recovery_event event);
 	virtual void rollback(struct txn*);
+	virtual void set_snapshot_lsn(int64_t lsn);
 	virtual void snapshot(enum engine_snapshot_event, int64_t);
 };
 
