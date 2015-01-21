@@ -494,6 +494,8 @@ xlog_cursor_close(struct xlog_cursor *i)
  *
  * @param i	iterator object, encapsulating log specifics.
  *
+ * @retval 0    OK
+ * @retval 1    EOF
  */
 int
 xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *row)
@@ -543,10 +545,15 @@ restart:
 	} catch (ClientError *e) {
 		if (l->dir->panic_if_error)
 			throw;
-		else {
-			say_warn("failed to read row");
-			goto restart;
-		}
+		/*
+		 * say_warn() is used and exception is not
+		 * logged since an error may happen in local
+		 * hot standby or replication mode, when it's
+		 * caused by an attempt to read a partially
+		 * written WAL.
+		 */
+		say_warn("failed to read row");
+		goto restart;
 	}
 
 	i->good_offset = ftello(l->f);

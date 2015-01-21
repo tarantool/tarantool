@@ -258,7 +258,7 @@ snap_dir = The directory for the snapshot *.snap files.
 The script will add "/<replaceable>instance-name</replaceable>" to the directory-name.
 </para>
 <para>
-sophia_dir = The directory for the Sophia-storage-engine files.
+sophia_dir = The directory for the sophia-storage-engine files.
 The script will add "/sophia/<replaceable>instance-name</replaceable>" to the directory-name.
 </para>
 <para>

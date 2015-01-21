@@ -648,7 +648,7 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_run_script(script);
+		tarantool_lua_run_script(script, main_argc, main_argv);
 		/*
 		 * Start event loop after executing Lua script if signal_cb()
 		 * wasn't triggered and there is some new events. Initial value

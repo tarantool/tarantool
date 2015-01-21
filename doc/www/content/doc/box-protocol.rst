@@ -155,8 +155,15 @@ type of value that follows. If a body has no keys, entire msgpack map for
 the body may be missing. Such is the case, for example, in <ping> request.
 
 --------------------------------------------------------------------------------
-                            Authorization
+                            Authentication
 --------------------------------------------------------------------------------
+
+When a client connects to the server, the server responds with a 128-byte
+text greeting message. Part of the greeting is base-64 encoded session salt -
+a random string which can be used for authentication. The length of decoded
+salt (44 bytes) exceeds the amount necessary to sign the authentication
+message (first 20 bytes). An excess is reserved for future authentication
+schemas.
 
 .. code-block:: bash
 
@@ -171,7 +178,7 @@ the body may be missing. Such is the case, for example, in <ping> request.
         step_1 = sha1(password);
         step_2 = sha1(step_1);
         step_3 = sha1(salt, step_2);
-        scramble = xor(step_1, step_4);
+        scramble = xor(step_1, step_3);
         return scramble;
 
     AUTHORIZATION BODY: CODE = 0x07

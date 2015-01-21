@@ -70,26 +70,6 @@ extern "C" {
  * error in case of failure.
  */
 
-typedef unsigned long mbitmap_t;
-
-enum {
-	/**
-	 * At least this many bytes must be reserved
-	 * for free/occupied object bit map.
-	 */
-	MEMPOOL_MAP_SIZEOF = sizeof(mbitmap_t),
-	/**
-	 * How many bits per bitmap, i.e. how many objects
-	 * a single bitmap can map.
-	 */
-	MEMPOOL_MAP_BIT = MEMPOOL_MAP_SIZEOF * CHAR_BIT,
-	/** Mempool slab has to contain at least this many
-	 * objects, to ensure that overhead on bitmaps
-	 * for free/used objects is small.
-	 */
-	MEMPOOL_OBJ_MIN = 2 * MEMPOOL_MAP_BIT
-};
-
 /** mslab - a standard slab formatted to store objects of equal size. */
 struct mslab {
 	struct slab slab;
@@ -103,17 +83,13 @@ struct mslab {
 	rb_node(struct mslab) node;
 	/* Reference to the owning pool. */
 	struct mempool *pool;
-	/**
-	 * A bitmap for free used/objects in the slab.
-	 * A bitmap rather than a free list is used since:
-	 * - this tends to keep allocations close to the
-	 *   beginning of the slab, which is better for
-	 *   cache locality
-	 * - it makes it possible to iterate over all
-	 *   objects in a slab.
-	 */
-	mbitmap_t map[0];
 };
+
+/**
+ * Mempool will try to allocate blocks large enough to have overhead
+ * less than specified below
+ */
+static const double expected_overhead_max = 0.05;
 
 static inline uint32_t
 mslab_sizeof()
@@ -129,7 +105,7 @@ static inline uint32_t
 mempool_objsize_max(uint32_t slab_size)
 {
 	/* Fit at least 4 objects in a slab, aligned by pointer size. */
-	return ((slab_size - mslab_sizeof() - MEMPOOL_MAP_SIZEOF)/4) &
+	return ((slab_size - mslab_sizeof()) / 4) &
 		 ~(sizeof(intptr_t) - 1);
 }
 
@@ -172,11 +148,8 @@ struct mempool
 	uint8_t slab_order;
 	/** How many objects can fit in a slab. */
 	uint32_t objcount;
-	/**
-	 * How many bytes of the slab are reserved for
-	 * slab map.
-	 */
-	uint32_t mapsize;
+	/** Offset from beginning of slab to the first object */
+	uint32_t objoffset;
 };
 
 /** Allocation statistics. */
@@ -218,8 +191,10 @@ static inline void
 mempool_create(struct mempool *pool, struct slab_cache *cache,
 	       uint32_t objsize)
 {
-	/* Keep size-induced internal fragmentation within limits. */
-	size_t slab_size_min = objsize * MEMPOOL_OBJ_MIN;
+	size_t expected_loss = objsize > sizeof(struct mslab)
+		? objsize : sizeof(struct mslab);
+	size_t slab_size_min = (size_t)(expected_loss / expected_overhead_max);
+
 	/*
 	 * Calculate the amount of usable space in a slab.
 	 * @note: this asserts that slab_size_min is less than

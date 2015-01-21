@@ -655,10 +655,5 @@ int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
 		if (res != 0)
 			return res;
 	}
-	rlist_foreach_entry(fiber, &cord->zombie_fibers, link) {
-		res = cb(fiber, cb_ctx);
-		if (res != 0)
-			return res;
-	}
 	return 0;
 }

@@ -770,6 +770,16 @@ getmetatable(fiber.info())
 ---
 - __serialize: mapping
 ...
+zombie = false
+---
+...
+for fid, i in pairs(fiber.info()) do if i.name == 'zombie' then zombie = true end end
+---
+...
+zombie
+---
+- false
+...
 fiber = nil
 ---
 ...

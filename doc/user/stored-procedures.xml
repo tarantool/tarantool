@@ -338,7 +338,7 @@ administration with the built-in packages.
       <row><entry>name</entry><entry>effect</entry></row>
      </thead>
     <tbody>
-    <row><entry><code>digest.crc32(<replaceable>string</replaceable>)</code></entry><entry>                  Returns 32-bit checksum made with CRC32.</entry></row>
+    <row><entry><code>digest.crc32(<replaceable>string</replaceable>)</code></entry><entry>                  Returns 32-bit checksum made with CRC32. See <link linkend="note-crc32">note</link>.</entry></row>
     <row><entry><code>digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)</code></entry><entry>    Returns update of a checksum calculated with CRC32.</entry></row>
     <row><entry><code>digest.sha(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 160-bit digest made with SHA-0. Not recommended.</entry></row>
     <row><entry><code>digest.sha_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with sha.</entry></row>
@@ -358,17 +358,27 @@ administration with the built-in packages.
     <row><entry><code>digest.md5_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with md5.</entry></row>
     <row><entry><code>digest.base64_encode(<replaceable>string</replaceable>)</code></entry><entry>          Returns base64 encoding from a regular string.</entry></row>
     <row><entry><code>digest.base64_decode(<replaceable>string</replaceable>)</code></entry><entry>          Returns a regular string from a base64 encoding.</entry></row>
+    <row><entry><code>digest.urandom(<replaceable>integer</replaceable>)</code></entry><entry>               Returns array of random bytes with length = <replaceable>integer</replaceable>.</entry></row>
+    <row><entry><code>digest.guava(<replaceable>integer, integer</replaceable>)</code></entry><entry>        Returns a number made with consistent hash. See <link linkend="note-guava">note</link>.</entry></row>
     </tbody>
     </tgroup>                                   
     </informaltable>
-   <note><simpara>
-   <code>box.digest.crc32(<replaceable>string</replaceable>)</code> uses the
+   <note xml:id="note-crc32"><simpara>
+   <code>digest.crc32(<replaceable>string</replaceable>)</code> uses the
    <link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use">
    CRC-32C (Castagnoli)</link> polynomial value: hexadecimal 11EDC6F41 / decimal 4812730177.
    If it is necessary to be compatible with other checksum functions in other programming languages,
    ensure that the other functions use the same polynomial value.
    For example, in Python, install the crcmod package and say:
    <code>import crcmod ... fun = crcmod.mkCrcFun('4812730177') ... fun('string')</code>.
+   </simpara></note>
+   <note xml:id="note-guava"><simpara>
+   <code>digest.guava(<replaceable>integer, integer</replaceable>)</code> uses the
+   <link xlink:href="https://en.wikipedia.org/wiki/Consistent_hashing">
+   Consistent Hashing</link> algorithm of the Google guava library.
+   The first parameter should be a hash code; the second parameter should be the number of buckets;
+   the returned value will be an integer between 0 and the number of buckets.
+   For example, <code>digest.guava(10863919174838991, 11)</code> will return 8.
    </simpara></note>
 
    </para>
@@ -1021,7 +1031,7 @@ procedures.
             <para>
               Returns: (type = string) the status of <code>fiber</code>.
               One of: <quote>dead</quote>,
-              <quote>suspended</quote>, <quote>attached</quote>
+              <quote>suspended</quote>,
               or <quote>running</quote>.
             </para>
         </listitem>
@@ -1041,7 +1051,7 @@ procedures.
             <para>
               Returns: (type = string) the status of <code>fiber</code>.
               One of: <quote>dead</quote>,
-              <quote>suspended</quote>, <quote>attached</quote>
+              <quote>suspended</quote>,
               or <quote>running</quote>.
             </para>
         </listitem>

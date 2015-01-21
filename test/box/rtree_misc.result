@@ -184,6 +184,15 @@ s.index.spatial:max()
 ---
 - error: RTREE does not support max()
 ...
+-- seems that drop can't fail
+s.index.spatial:drop()
+---
+...
+s.index.spatial:select({})
+---
+- error: '[string "return s.index.spatial:select({}) "]:1: attempt to index field
+    ''spatial'' (a nil value)'
+...
 s:drop()
 ---
 ...

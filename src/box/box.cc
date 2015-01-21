@@ -227,7 +227,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		 */
 		return;
 	}
-	recovery_finalize(recovery);
+	recovery_finalize(recovery, cfg_geti("rows_per_wal"));
 
 	/*
 	 * notify engines about end of recovery.
@@ -391,7 +391,6 @@ void
 box_init()
 {
 	box_check_config();
-	title("loading", NULL);
 
 	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
@@ -399,7 +398,6 @@ box_init()
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_getd("slab_alloc_factor"));
-
 	engine_init();
 
 	schema_init();
@@ -410,37 +408,46 @@ box_init()
 	 * as a default session user when running triggers.
 	 */
 	session_init();
-
-	/* recovery initialization */
-	recovery = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-		      recover_row, NULL, box_snapshot_cb, cfg_geti("rows_per_wal"));
-	recovery_set_remote(recovery, cfg_gets("replication_source"));
-	recovery_update_io_rate_limit(recovery,
-				      cfg_getd("snap_io_rate_limit"));
-	recovery_setup_panic(recovery,
-			     cfg_geti("panic_on_snap_error"),
-			     cfg_geti("panic_on_wal_error"));
-
 	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 
-	if (recovery_has_data(recovery)) {
-		/* Process existing snapshot */
-		recover_snap(recovery);
-		space_end_recover_snapshot();
-	} else if (recovery_has_remote(recovery)) {
-		/* Initialize a new replica */
-		replica_bootstrap(recovery);
-		space_end_recover_snapshot();
-		snapshot_save(recovery);
-	} else {
-		/* Initialize the first server of a new cluster */
-		recovery_bootstrap(recovery);
-		box_set_cluster_uuid();
-		box_set_server_uuid();
-		space_end_recover_snapshot();
-		snapshot_save(recovery);
+	title("loading", NULL);
+
+	try {
+
+		/* recovery initialization */
+		recovery = recovery_new(cfg_gets("snap_dir"),
+					cfg_gets("wal_dir"),
+					recover_row, NULL);
+		recovery_set_remote(recovery,
+				    cfg_gets("replication_source"));
+		recovery_update_io_rate_limit(recovery,
+					      cfg_getd("snap_io_rate_limit"));
+		recovery_setup_panic(recovery,
+				     cfg_geti("panic_on_snap_error"),
+				     cfg_geti("panic_on_wal_error"));
+
+		if (recovery_has_data(recovery)) {
+			/* Process existing snapshot */
+			recover_snap(recovery);
+			space_end_recover_snapshot();
+		} else if (recovery_has_remote(recovery)) {
+			/* Initialize a new replica */
+			replica_bootstrap(recovery);
+			space_end_recover_snapshot();
+			snapshot_save(recovery, box_snapshot_cb);
+		} else {
+			/* Initialize the first server of a new cluster */
+			recovery_bootstrap(recovery);
+			box_set_cluster_uuid();
+			box_set_server_uuid();
+			space_end_recover_snapshot();
+			snapshot_save(recovery, box_snapshot_cb);
+		}
+		fiber_gc();
+	} catch (Exception *e) {
+		e->log();
+		panic("can't scan a data directory");
 	}
-	fiber_gc();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
@@ -448,7 +455,6 @@ box_init()
 	title("hot_standby", NULL);
 
 	const char *listen = cfg_gets("listen");
-
 	/*
 	 * application server configuration).
 	 */
@@ -464,7 +470,6 @@ box_init()
 	too_long_threshold = cfg_getd("too_long_threshold");
 	iobuf_set_readahead(cfg_geti("readahead"));
 }
-
 
 void
 box_atfork()
@@ -557,7 +562,7 @@ box_snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, log_fd);
-	snapshot_save(recovery);
+	snapshot_save(recovery, box_snapshot_cb);
 
 	exit(EXIT_SUCCESS);
 	return 0;

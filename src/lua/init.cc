@@ -386,6 +386,8 @@ run_script(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
+	int argc = va_arg(ap, int);
+	char **argv = va_arg(ap, char **);
 
 	/*
 	 * Return control to tarantool_lua_run_script.
@@ -413,6 +415,9 @@ run_script(va_list ap)
 		lua_remove(L, -2); /* remove package.loaded */
 	}
 	try {
+		lua_checkstack(L, argc - 1);
+		for (int i = 1; i < argc; i++)
+			lua_pushstring(L, argv[i]);
 		lbox_call(L, lua_gettop(L) - 1, 0);
 	} catch (Exception *e) {
 		panic("%s", e->errmsg());
@@ -428,7 +433,7 @@ run_script(va_list ap)
 }
 
 void
-tarantool_lua_run_script(char *path)
+tarantool_lua_run_script(char *path, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
 	/*
@@ -439,7 +444,7 @@ tarantool_lua_run_script(char *path)
 	 * a separate fiber.
 	 */
 	script_fiber = fiber_new(title, run_script);
-	fiber_call(script_fiber, tarantool_L, path);
+	fiber_call(script_fiber, tarantool_L, path, argc, argv);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.

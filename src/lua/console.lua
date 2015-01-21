@@ -6,6 +6,7 @@ local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
 local urilib = require('uri')
+local ffi = require('ffi')
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = require('yaml').new()
@@ -23,19 +24,28 @@ local function format(status, ...)
     local function wrapnull(v)
         return v == nil and formatter.NULL or v
     end
-    if not status then
-        local v = ...
-        return formatter.encode({{error = wrapnull(v) }})
+    local err
+    if status then
+        local count = select('#', ...)
+        if count == 0 then
+            return "---\n...\n"
+        end
+        local res = {}
+        for i=1,count,1 do
+            table.insert(res, wrapnull(select(i, ...)))
+        end
+        -- serializer can raise an exception
+        status, err = pcall(formatter.encode, res)
+        if status then
+            return err
+        else
+            err = 'console: an exception occurred during formatting result: '..
+                tostring(err)
+        end
+    else
+        err = wrapnull(...)
     end
-    local count = select('#', ...)
-    if count == 0 then
-        return "---\n...\n"
-    end
-    local res = {}
-    for i=1,count,1 do
-        table.insert(res, wrapnull(select(i, ...)))
-    end
-    return formatter.encode(res)
+    return formatter.encode({{error = err }})
 end
 
 --
@@ -288,8 +298,9 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
+    local version = ffi.string(ffi.C.tarantool_version())
     state:print(string.format("%-63s\n%-63s\n",
-        "Tarantool ".. box.info.version.." (Lua console)",
+        "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
     repl(state)
     log.info("client %s:%s disconnected", peer.host, peer.port)

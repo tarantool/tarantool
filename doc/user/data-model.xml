@@ -302,7 +302,7 @@ Since all data-change operations end with an implicit yield and
 an implicit commit, and since no data-change operation can change
 more than one tuple, there is no need for any locking.
 Consider, for example, a Lua function that does three Tarantool operations:<programlisting>
-s:sel...{999}                  -- this does not yield and does not commit
+s:select{999}                  -- this does not yield and does not commit
 s:update({...},{{...}})        -- this yields and commits
 s:select{999}                  -- this does not yield and does not commit */</programlisting>
 The combination <quote>SELECT plus UPDATE</quote> is an atomic transaction:

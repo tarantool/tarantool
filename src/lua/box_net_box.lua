@@ -40,6 +40,9 @@ local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
 
+local SPACE_SPACE_ID    = 280
+local SPACE_INDEX_ID    = 288
+
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
 local sequence_mt = { __serialize = 'sequence' }
@@ -475,8 +478,9 @@ local remote_methods = {
                 eval_str = eval_str .. tostring(arg)
             else
                 arg = tostring(arg)
-                arg = string.gsub(arg, '"', '\\"')
-                eval_str = eval_str .. '"' .. arg .. '"'
+                arg = string.gsub(arg, ']]', ']].."]]"..[[')
+                arg = string.gsub(arg, "\n", ']].."\\n"..[[')
+                eval_str = eval_str .. '[[' .. arg .. ']]'
             end
         end
         eval_str = eval_str .. ")\n"
@@ -865,9 +869,9 @@ local remote_methods = {
         self:_switch_state('schema')
 
         local spaces = self:_request_internal('select',
-            true, box.schema.SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, SPACE_SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
         local indexes = self:_request_internal('select',
-            true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, SPACE_INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
 

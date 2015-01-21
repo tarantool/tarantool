@@ -46,9 +46,8 @@ struct fiber;
 struct tbuf;
 struct recovery_state;
 
-typedef void (row_handler)(struct recovery_state *, void *,
+typedef void (apply_row_f)(struct recovery_state *, void *,
 			   struct xrow_header *packet);
-typedef void (snapshot_handler)(struct xlog *);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -108,17 +107,12 @@ struct recovery_state {
 		struct relay relay;
 	};
 	/**
-	 * row_handler is a module callback invoked during initial
-	 * recovery and when reading rows from the master.  It is
-	 * presented with the most recent format of data.
-	 * row_reader is responsible for converting data from old
-	 * formats.
+	 * apply_row is a module callback invoked during initial
+	 * recovery and when reading rows from the master.
 	 */
-	row_handler *row_handler;
-	void *row_handler_param;
-	snapshot_handler *snapshot_handler;
+	apply_row_f *apply_row;
+	void *apply_row_param;
 	uint64_t snap_io_rate_limit;
-	int rows_per_wal;
 	enum wal_mode wal_mode;
 	struct tt_uuid server_uuid;
 	uint32_t server_id;
@@ -128,9 +122,7 @@ struct recovery_state {
 
 struct recovery_state *
 recovery_new(const char *snap_dirname, const char *wal_dirname,
-	     row_handler row_handler, void *row_handler_param,
-	     snapshot_handler snapshot_handler,
-	     int rows_per_wal);
+	     apply_row_f apply_row, void *apply_row_param);
 
 void
 recovery_delete(struct recovery_state *r);
@@ -151,20 +143,23 @@ recovery_has_data(struct recovery_state *r)
 void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
-void recovery_finalize(struct recovery_state *r);
+void recovery_finalize(struct recovery_state *r, int rows_per_wal);
 
-int recover_xlog(struct recovery_state *r, struct xlog *l);
 int wal_write(struct recovery_state *r, struct xrow_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
-void recovery_process(struct recovery_state *r, struct xrow_header *packet);
+void recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
 
 struct fio_batch;
 
 void
 snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		   struct xrow_header *packet);
-void snapshot_save(struct recovery_state *r);
+
+typedef void (snapshot_f)(struct xlog *);
+
+void
+snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -5,24 +5,22 @@ local console = require('console')
 local socket = require('socket')
 local yaml = require('yaml')
 local fiber = require('fiber')
+local ffi = require('ffi')
+
+-- Supress console log messages
+ffi.C.box_set_log_level(4)
 
 local CONSOLE_SOCKET = '/tmp/tarantool-test-console.sock'
 local IPROTO_SOCKET = '/tmp/tarantool-test-iproto.sock'
 os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
-box.cfg{
-    listen=IPROTO_SOCKET;
-    slab_alloc_arena=0.1,
-    logger="tarantool.log",
-}
-
 --
 local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(26)
+test:plan(28)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -55,6 +53,12 @@ client:write("require('console').delimiter();\n")
 test:is(yaml.decode(client:read(EOL))[1], ';', "get delimiter is ';'")
 client:write("require('console').delimiter('');\n")
 test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
+
+box.cfg{
+    listen=IPROTO_SOCKET;
+    slab_alloc_arena=0.1,
+    logger="tarantool.log",
+}
 
 -- Connect to iproto console (CALL)
 client:write(string.format("require('console').connect('/')\n"))
@@ -93,6 +97,14 @@ test:is(state.remote.host, "unix/", "remote state.remote.host")
 test:is(state.remote.port, IPROTO_SOCKET, "remote state.remote.port")
 test:is(state.prompt, string.format("%s:%s", "unix/", IPROTO_SOCKET),
         "remote state.prompt")
+
+-- Check exception handling (gh-643)
+client:write("error('test')\n")
+test:ok(yaml.decode(client:read(EOL))[1].error:match('test') ~= nil,
+    "exception handling")
+client:write("setmetatable({}, { __serialize = function() error('test') end})\n")
+test:ok(yaml.decode(client:read(EOL))[1].error:match('test') ~= nil,
+    "exception handling")
 
 -- Disconnect from iproto
 client:write("~.\n")

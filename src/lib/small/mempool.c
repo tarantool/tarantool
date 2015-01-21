@@ -50,16 +50,13 @@ mslab_create(struct mslab *slab, struct mempool *pool)
 	slab->pool = pool;
 	slab->free_idx = 0;
 	slab->free_list = 0;
-	/* A bit is set if a slot is free. */
-	memset(slab->map, 0xFF, sizeof(slab->map[0]) * pool->mapsize);
 }
 
 /** Beginning of object data in the slab. */
 static inline void *
 mslab_offset(struct mslab *slab)
 {
-	return (char *) slab + mslab_sizeof() +
-		MEMPOOL_MAP_SIZEOF * slab->pool->mapsize;
+	return (char *) slab + slab->pool->objoffset;
 }
 
 /** Pointer to an object from object index. */
@@ -69,39 +66,19 @@ mslab_obj(struct mslab *slab, uint32_t idx)
 	return mslab_offset(slab) + idx * slab->pool->objsize;
 }
 
-/** Object index from pointer to object */
-static inline uint32_t
-mslab_idx(struct mslab *slab, void *ptr)
-{
-	/*
-	 * @todo: consider optimizing this division with
-	 * multiply-shift method described in Hacker's Delight,
-	 * p. 187.
-	 */
-	return ((uint32_t)(ptr - mslab_offset(slab)))/slab->pool->objsize;
-}
-
 void *
 mslab_alloc(struct mslab *slab)
 {
 	assert(slab->nfree);
 	void *result;
-	uint32_t idx;
 	if (slab->free_list) {
 		/* Recycle an object from the garbage pool. */
-		idx = mslab_idx(slab, slab->free_list);
 		result = slab->free_list;
 		slab->free_list = *(void **)slab->free_list;
 	} else {
 		/* Use an object from the "untouched" area of the slab. */
-		idx = slab->free_idx++;
-		result = mslab_obj(slab, idx);
+		result = mslab_obj(slab, slab->free_idx++);
 	}
-
-	/* Mark the position as occupied. */
-	const uint32_t slot = idx / MEMPOOL_MAP_BIT;
-	const uint32_t bit_no = idx & (MEMPOOL_MAP_BIT-1);
-	slab->map[slot] ^= ((mbitmap_t) 1) << (mbitmap_t) bit_no;
 
 	/* If the slab is full, remove it from the rb tree. */
 	if (--slab->nfree == 0)
@@ -116,13 +93,6 @@ mslab_free(struct mempool *pool, struct mslab *slab, void *ptr)
 	/* put object to garbage list */
 	*(void **)ptr = slab->free_list;
 	slab->free_list = ptr;
-
-	uint32_t idx = mslab_idx(slab, ptr);
-
-	/* Mark the position as free. */
-	const uint32_t slot = idx / MEMPOOL_MAP_BIT;
-	const uint32_t bit_no = idx & (MEMPOOL_MAP_BIT-1);
-	slab->map[slot] |= ((mbitmap_t) 1) << bit_no;
 
 	slab->nfree++;
 
@@ -161,35 +131,12 @@ mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 	pool->spare = NULL;
 	pool->objsize = objsize;
 	pool->slab_order = order;
-	/* Account for slab meta. */
-	uint32_t slab_size = slab_order_size(pool->cache, pool->slab_order) -
-		mslab_sizeof();
+	/* Total size of slab */
+	uint32_t slab_size = slab_order_size(pool->cache, pool->slab_order);
 	/* Calculate how many objects will actually fit in a slab. */
-	/*
-	 * We have 'slab_size' bytes for X objects and
-	 * X / 8 bits in free/used array.
-	 *
-	 * Therefore the formula for objcount is:
-	 *
-	 * X * objsize + X/8 = slab_size
-	 * X = (8 * slab_size)/(8 * objsize + 1)
-	 */
-	uint32_t objcount = (CHAR_BIT * slab_size)/(CHAR_BIT * objsize + 1);
-	/* How many elements of slab->map can map objcount. */
-	assert(objcount);
-	uint32_t mapsize = (objcount + MEMPOOL_MAP_BIT - 1)/MEMPOOL_MAP_BIT;
-	/* Adjust the result of integer division, which may be too large. */
-	while (objcount * objsize + mapsize * MEMPOOL_MAP_SIZEOF > slab_size) {
-		objcount--;
-		mapsize = (objcount + MEMPOOL_MAP_BIT - 1)/MEMPOOL_MAP_BIT;
-	}
-	assert(mapsize * MEMPOOL_MAP_BIT >= objcount);
-	/* The wasted memory should be under objsize */
-	assert(slab_size - objcount * objsize -
-	       mapsize * MEMPOOL_MAP_SIZEOF < objsize ||
-	       mapsize * MEMPOOL_MAP_BIT == objcount);
-	pool->objcount = objcount;
-	pool->mapsize = mapsize;
+	pool->objcount = (slab_size - mslab_sizeof()) / objsize;
+	assert(pool->objcount);
+	pool->objoffset = slab_size - pool->objcount * pool->objsize;
 }
 
 void
