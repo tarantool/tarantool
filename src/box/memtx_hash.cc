@@ -30,6 +30,15 @@
 #include "say.h"
 #include "tuple.h"
 #include "errinj.h"
+#include "memory.h"
+
+/** For all memory used by all tree indexes. */
+extern struct quota memtx_quota;
+static struct slab_arena index_arena;
+static struct slab_cache index_arena_slab_cache;
+static struct mempool hash_extent_pool;
+/** Number of allocated extents. */
+static bool index_arena_initialized = false;
 
 #include "third_party/PMurHash.h"
 
@@ -38,17 +47,17 @@ enum {
 };
 
 static inline bool
-mh_index_eq(struct tuple *const *tuple_a, struct tuple *const *tuple_b,
+equal(struct tuple *tuple_a, struct tuple *tuple_b,
 	    const struct key_def *key_def)
 {
-	return tuple_compare(*tuple_a, *tuple_b, key_def) == 0;
+	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
 }
 
 static inline bool
-mh_index_eq_key(const char *key, struct tuple *const *tuple,
+equal_key(struct tuple *tuple, const char *key,
 		const struct key_def *key_def)
 {
-	return tuple_compare_with_key(*tuple, key, key_def->part_count,
+	return tuple_compare_with_key(tuple, key, key_def->part_count,
 				      key_def) == 0;
 }
 
@@ -88,15 +97,15 @@ mh_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 }
 
 static inline uint32_t
-mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
+tuple_hash(struct tuple *tuple, const struct key_def *key_def)
 {
 	const struct key_part *part = key_def->parts;
 	/*
 	 * Speed up the simplest case when we have a
-	 * single-part hash over an integer field.
+	 * single-part hash_table over an integer field.
 	 */
 	if (key_def->part_count == 1 && part->type == NUM) {
-		const char *field = tuple_field(*tuple, part->fieldno);
+		const char *field = tuple_field(tuple, part->fieldno);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
@@ -108,7 +117,7 @@ mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 	uint32_t total_size = 0;
 
 	for ( ; part < key_def->parts + key_def->part_count; part++) {
-		const char *field = tuple_field(*tuple, part->fieldno);
+		const char *field = tuple_field(tuple, part->fieldno);
 		total_size += mh_hash_field(&h, &carry, &field, part->type);
 	}
 
@@ -116,7 +125,7 @@ mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 }
 
 static inline uint32_t
-mh_index_hash_key(const char *key, const struct key_def *key_def)
+key_hash(const char *key, const struct key_def *key_def)
 {
 	const struct key_part *part = key_def->parts;
 
@@ -138,26 +147,21 @@ mh_index_hash_key(const char *key, const struct key_def *key_def)
 	return PMurHash32_Result(h, carry, total_size);
 }
 
-#define mh_int_t uint32_t
-#define mh_arg_t const struct key_def *
-
-#define mh_hash(a, arg) mh_index_hash(a, arg)
-#define mh_hash_key(a, arg) mh_index_hash_key(a, arg)
-#define mh_eq(a, b, arg) mh_index_eq(a, b, arg)
-#define mh_eq_key(a, b, arg) mh_index_eq_key(a, b, arg)
-
-#define mh_key_t const char *
-typedef struct tuple * mh_node_t;
-#define mh_name _index
-#define MH_SOURCE 1
-#define mh_bytemap 1
-#include "salad/mhash.h"
+#define LIGHT_NAME _index
+#define LIGHT_DATA_TYPE struct tuple *
+#define LIGHT_KEY_TYPE const char *
+#define LIGHT_CMP_ARG_TYPE struct key_def *
+#define LIGHT_EQUAL(a, b, c) equal(a, b, c)
+#define LIGHT_EQUAL_KEY(a, b, c) equal_key(a, b, c)
+#define HASH_INDEX_EXTENT_SIZE (16 * 1024)
+typedef uint32_t hash_t;
+#include "salad/light.h"
 
 /* {{{ MemtxHash Iterators ****************************************/
 
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
-	struct mh_index_t *hash;
+	struct light_index_core *hash_table;
 	uint32_t h_pos;
 };
 
@@ -174,10 +178,13 @@ hash_iterator_ge(struct iterator *ptr)
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
-	while (it->h_pos < mh_end(it->hash)) {
-		if (mh_exist(it->hash, it->h_pos))
-			return *mh_index_node(it->hash, it->h_pos++);
+	if (it->h_pos < it->hash_table->table_size) {
+		struct tuple *res = light_index_get(it->hash_table, it->h_pos);
 		it->h_pos++;
+		while (it->h_pos < it->hash_table->table_size
+		       && !light_index_pos_valid(it->hash_table, it->h_pos))
+			it->h_pos++;
+		return res;
 	}
 	return NULL;
 }
@@ -197,48 +204,80 @@ hash_iterator_eq(struct iterator *it)
 
 /* }}} */
 
+static void *
+extent_alloc()
+{
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
+	return mempool_alloc(&hash_extent_pool);
+}
+
+static void
+extent_free(void *extent)
+{
+	return mempool_free(&hash_extent_pool, extent);
+}
+
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 MemtxHash::MemtxHash(struct key_def *key_def)
 	: Index(key_def)
 {
-	hash = mh_index_new();
-	if (hash == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash),
-			  "MemtxHash", "hash");
+	if (index_arena_initialized == false) {
+		const uint32_t SLAB_SIZE = 4 * 1024 * 1024;
+		if (slab_arena_create(&index_arena, &memtx_quota,
+				      0, SLAB_SIZE, MAP_PRIVATE)) {
+			panic_syserror("failed to initialize index arena");
+		}
+		slab_cache_create(&index_arena_slab_cache, &index_arena,
+				  SLAB_SIZE);
+		mempool_create(&hash_extent_pool, &index_arena_slab_cache,
+			HASH_INDEX_EXTENT_SIZE);
+		index_arena_initialized = true;
 	}
+	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
+	if (hash_table == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash_table),
+			  "MemtxHash", "hash_table");
+	}
+	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
+			   extent_alloc, extent_free, this->key_def);
 }
 
 MemtxHash::~MemtxHash()
 {
-	mh_index_delete(hash);
+	light_index_destroy(hash_table);
+	free(hash_table);
 }
 
 void
 MemtxHash::reserve(uint32_t size_hint)
 {
-	mh_index_reserve(hash, size_hint, key_def);
+	(void)size_hint;
 }
 
 size_t
 MemtxHash::size() const
 {
-	return mh_size(hash);
+	return hash_table->count;
 }
 
 size_t
 MemtxHash::memsize() const
 {
-        return mh_index_memsize(hash);
+        return matras_extents_count(&hash_table->mtable) * HASH_INDEX_EXTENT_SIZE;
 }
 
 struct tuple *
 MemtxHash::random(uint32_t rnd) const
 {
-	uint32_t k = mh_index_random(hash, rnd);
-	if (k != mh_end(hash))
-		return *mh_index_node(hash, k);
-	return NULL;
+	if (hash_table->count == 0)
+		return NULL;
+	rnd %= (hash_table->table_size);
+	while (!light_index_pos_valid(hash_table, rnd)) {
+		rnd++;
+		rnd %= (hash_table->table_size);
+	}
+	return light_index_get(hash_table, rnd);
 }
 
 struct tuple *
@@ -248,9 +287,10 @@ MemtxHash::findByKey(const char *key, uint32_t part_count) const
 	(void) part_count;
 
 	struct tuple *ret = NULL;
-	uint32_t k = mh_index_find(hash, key, key_def);
-	if (k != mh_end(hash))
-		ret = *mh_index_node(hash, k);
+	uint32_t h = key_hash(key, key_def);
+	uint32_t k = light_index_find_key(hash_table, h, key);
+	if (k != light_index_end)
+		ret = light_index_get(hash_table, k);
 	return ret;
 }
 
@@ -261,31 +301,31 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	uint32_t errcode;
 
 	if (new_tuple) {
+		uint32_t h = tuple_hash(new_tuple, key_def);
 		struct tuple *dup_tuple = NULL;
-		struct tuple **dup_node = &dup_tuple;
-		uint32_t pos = mh_index_put(hash, &new_tuple,
-					    &dup_node, key_def);
+		hash_t pos = light_index_replace(hash_table, h, new_tuple, &dup_tuple);
+		if (pos == light_index_end)
+			pos = light_index_insert(hash_table, h, new_tuple);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
-			mh_index_del(hash, pos, key_def);
-			pos = mh_end(hash);
+			light_index_delete(hash_table, pos);
+			pos = light_index_end;
 		});
 
-		if (pos == mh_end(hash)) {
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) pos,
-				  "hash", "key");
+		if (pos == light_index_end) {
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) hash_table->count,
+				  "hash_table", "key");
 		}
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			mh_index_remove(hash, &new_tuple, key_def);
+			light_index_delete(hash_table, pos);
 			if (dup_tuple) {
-				pos = mh_index_put(hash, &dup_tuple, NULL,
-						   key_def);
-				if (pos == mh_end(hash)) {
+				uint32_t pos = light_index_insert(hash_table, h, dup_tuple);
+				if (pos == light_index_end) {
 					panic("Failed to allocate memory in "
-					      "recover of int hash");
+					      "recover of int hash_table");
 				}
 			}
 			tnt_raise(ClientError, errcode, index_id(this));
@@ -296,7 +336,10 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (old_tuple) {
-		mh_index_remove(hash, &old_tuple, key_def);
+		uint32_t h = tuple_hash(old_tuple, key_def);
+		hash_t slot = light_index_find(hash_table, h, old_tuple);
+		assert(slot != light_index_end);
+		light_index_delete(hash_table, slot);
 	}
 	return old_tuple;
 }
@@ -326,21 +369,24 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	assert(ptr->free == hash_iterator_free);
 
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
+	it->hash_table = hash_table;
 
 	switch (type) {
 	case ITER_ALL:
-		it->h_pos = mh_begin(hash);
+		it->h_pos = 0;
+		while (it->h_pos < it->hash_table->table_size
+		       && !light_index_pos_valid(it->hash_table, it->h_pos))
+			it->h_pos++;
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
 		assert(part_count > 0);
-		it->h_pos = mh_index_find(hash, key, key_def);
+		it->h_pos = light_index_find_key(hash_table, key_hash(key, key_def), key);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  "Hash index", "requested iterator type");
 	}
-	it->hash = hash;
 }
 /* }}} */
