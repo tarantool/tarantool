@@ -132,17 +132,15 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	void *env = factory->env;
 	void *c = sp_ctl(env);
 	char pointer[128];
+	char pointer_arg[128];
 	char name[128];
 	snprintf(name, sizeof(name), "%" PRIu32, key_def->space_id);
 	sp_set(c, "db", name);
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.cmp",
 	         key_def->space_id);
 	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)sophia_index_compare);
-	sp_set(c, name, pointer);
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.cmp_arg",
-	         key_def->space_id);
-	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)key_def);
-	sp_set(c, name, pointer);
+	snprintf(pointer_arg, sizeof(pointer_arg), "pointer: %p", (void*)key_def);
+	sp_set(c, name, pointer, pointer_arg);
 	snprintf(name, sizeof(name), "db.%" PRIu32, key_def->space_id);
 	void *db = sp_get(c, name);
 	if (db == NULL)
