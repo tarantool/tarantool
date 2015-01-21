@@ -28,6 +28,8 @@
  */
 #include "engine.h"
 #include "space.h"
+#include "exception.h"
+#include "schema.h"
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>
@@ -107,3 +109,68 @@ void engine_shutdown()
 		delete e;
 	}
 }
+
+static inline void
+engine_begin_recover_cb(EngineFactory *f, void *udate)
+{
+	int64_t lsn = *(int64_t*)udate;
+	f->snapshot(SNAPSHOT_RECOVER, lsn);
+}
+
+void
+engine_begin_recover_snapshot(int64_t snapshot_lsn)
+{
+	/* recover engine snapshot */
+	engine_foreach(engine_begin_recover_cb, &snapshot_lsn);
+}
+
+static void
+do_one_recover_step(struct space *space, void * /* param */)
+{
+	if (space_index(space, 0)) {
+		space->engine->recover(space);
+	} else {
+		/* in case of space has no primary index,
+		 * derive it's engine handler recovery state from
+		 * the global one. */
+		space->engine->initRecovery();
+	}
+}
+
+static inline void
+engine_end_recover_snapshot_cb(EngineFactory *f, void *udate)
+{
+	(void)udate;
+	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
+}
+
+void
+engine_end_recover_snapshot()
+{
+	/*
+	 * For all new spaces created from now on, when the
+	 * PRIMARY key is added, enable it right away.
+	 */
+	engine_foreach(engine_end_recover_snapshot_cb, NULL);
+	space_foreach(do_one_recover_step, NULL);
+}
+
+static inline void
+engine_end_recover_cb(EngineFactory *f, void *udate)
+{
+	(void)udate;
+	f->recoveryEvent(END_RECOVERY);
+}
+
+void
+engine_end_recover()
+{
+	/*
+	 * For all new spaces created after recovery is complete,
+	 * when the primary key is added, enable all keys.
+	 */
+	engine_foreach(engine_end_recover_cb, NULL);
+
+	space_foreach(do_one_recover_step, NULL);
+}
+

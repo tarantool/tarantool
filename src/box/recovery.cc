@@ -1138,6 +1138,14 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 
 /* {{{ box.snapshot() */
 
+int64_t
+recovery_snap_lsn(struct recovery_state *r)
+{
+	/* recover last snapshot lsn */
+	struct vclock *vclock = vclockset_last(&r->snap_dir.index);
+	return vclock ? vclock_signature(vclock) : -1;
+}
+
 void
 snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		   struct xrow_header *row)
@@ -1216,7 +1224,8 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 }
 
 void
-snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler)
+snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler,
+	      bool rename)
 {
 	struct xlog *snap = xlog_create(&r->snap_dir, &r->vclock);
 	if (snap == NULL)
@@ -1230,9 +1239,22 @@ snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler)
 
 	snapshot_handler(snap);
 
+	snap->is_inprogress = rename;
 	xlog_close(snap);
 
 	say_info("done");
+}
+
+int snapshot_rename(struct xdir *dir, int64_t lsn)
+{
+	char dest[PATH_MAX + 1];
+	snprintf(dest, sizeof(dest), "%s",
+	         format_filename(dir, lsn, NONE));
+	const char *from = format_filename(dir, lsn, INPROGRESS);
+	int rc = rename(from, dest);
+	if (rc == -1)
+		say_syserror("can't rename %s to %s", from, dest);
+	return rc;
 }
 
 /* }}} */

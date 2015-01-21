@@ -59,3 +59,10 @@ box.space['name_of_space']:select{'a'}
 box.space['name_of_space']:truncate()
 box.space['name_of_space']:select{'a'}
 s:drop()
+
+-- gh-680: Sophia: assertion on update
+s = box.schema.space.create('tester', {engine='sophia'})
+i = s:create_index('primary',{type = 'tree', parts = {2, 'STR'}})
+s:insert{1,'X'}
+s:update({'X'}, {{'=', 2, 'Y'}})
+s:drop()

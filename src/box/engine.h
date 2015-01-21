@@ -74,6 +74,16 @@ enum engine_recovery_event {
 	END_RECOVERY
 };
 
+/**
+ * Engine specific snapshot event.
+ */
+enum engine_snapshot_event {
+	SNAPSHOT_START,
+	SNAPSHOT_RECOVER,
+	SNAPSHOT_DELETE,
+	SNAPSHOT_WAIT
+};
+
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -127,6 +137,10 @@ public:
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
+	/**
+	 * Engine snapshotting support.
+	 */
+	virtual void snapshot(enum engine_snapshot_event, int64_t) = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -202,5 +216,26 @@ engine_id(Engine *engine)
 {
 	return engine->factory->id;
 }
+
+/**
+ * Tell the engine what the last LSN to recover from is
+ * (during server start.
+ */
+void
+engine_begin_recover_snapshot(int64_t snapshot_lsn);
+
+/**
+ * Called at the end of recovery from snapshot.
+ * Build primary keys in all spaces.
+ * */
+void
+engine_end_recover_snapshot();
+
+/**
+ * Called at the end of recovery.
+ * Build secondary keys in all spaces.
+ */
+void
+engine_end_recover();
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

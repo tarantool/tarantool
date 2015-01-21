@@ -27,6 +27,9 @@ t
 for key = 1, 132 do space:delete({key}) end
 for key = 1, 132 do assert(space:get({key}) == nil) end
 
+-- delete nonexistent
+space:delete({1234})
+
 -- select
 
 for key = 1, 96 do space:insert({key}) end

@@ -87,7 +87,9 @@ sophia_recovery_end(struct space *space)
 	r->state   = READY_ALL_KEYS;
 	r->replace = sophia_replace;
 	r->recover = space_noop;
+	/*
 	sophia_complete_recovery(space);
+	*/
 }
 
 static void
@@ -109,8 +111,8 @@ SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
 {
 	flags = ENGINE_TRANSACTIONAL;
-	env   = NULL;
-	tx    = NULL;
+	env = NULL;
+	tx  = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -151,6 +153,10 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 		recovery.recover = sophia_recovery_end_snapshot;
 		break;
 	case END_RECOVERY:
+		/* complete two-phase recovery */
+		int rc = sp_open(env);
+		if (rc == -1)
+			sophia_raise(env);
 		recovery.state   = READY_NO_KEYS;
 		recovery.replace = sophia_replace;
 		recovery.recover = space_noop;
@@ -271,39 +277,19 @@ SophiaFactory::commit(struct txn *txn)
 		tx = NULL;
 	});
 
-	/* a. prepare transaction for commit */
-	int rc = sp_prepare(tx);
-	if (rc == -1)
-		sophia_raise(env);
-	assert(rc == 0);
-
-	/* b. create transaction log cursor and
-	 *    forge each statement's LSN number.
-	*/
-	void *lc = sp_ctl(tx, "log_cursor");
-	if (lc == NULL) {
-		sp_rollback(tx);
-		sophia_raise(env);
-	}
+	/* a. get max lsn for commit */
+	int64_t lsn = 0;
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->new_tuple == NULL && stmt->old_tuple == NULL)
-			continue;
-		void *v = sp_get(lc);
-		assert(v != NULL);
-		sp_set(v, "lsn", stmt->row->lsn);
-		/* remove tuple reference */
-		if (stmt->new_tuple) {
-			/* 2 refs: iproto case */
-			/* 3 refs: lua case */
-			assert(stmt->new_tuple->refs >= 2);
-			tuple_unref(stmt->new_tuple);
-		}
+		if (stmt->row->lsn > lsn)
+			lsn = stmt->row->lsn;
 	}
-	assert(sp_get(lc) == NULL);
-	sp_destroy(lc);
 
-	/* c. commit transaction */
+	/* b. commit transaction */
+	int rc = sp_prepare(tx, lsn);
+	assert(rc == 0);
+	if (rc == -1)
+		sophia_raise(env);
 	rc = sp_commit(tx);
 	if (rc == -1)
 		sophia_raise(env);
@@ -319,4 +305,107 @@ SophiaFactory::rollback(struct txn *)
 		tx = NULL;
 	});
 	sp_rollback(tx);
+}
+
+static inline void
+sophia_snapshot(void *env, int64_t lsn)
+{
+	/* start asynchronous checkpoint */
+	void *c = sp_ctl(env);
+	int rc = sp_set(c, "scheduler.checkpoint");
+	if (rc == -1)
+		sophia_raise(env);
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	/* ensure snapshot is not already exists */
+	void *o = sp_get(c, snapshot);
+	if (o) {
+		return;
+	}
+	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
+	rc = sp_set(c, "snapshot", snapshot);
+	if (rc == -1)
+		sophia_raise(env);
+}
+
+static inline void
+sophia_snapshot_recover(void *env, int64_t lsn)
+{
+	/* recovered snapshot lsn is >= then last
+	 * engine lsn */
+	char snapshot_lsn[32];
+	snprintf(snapshot_lsn, sizeof(snapshot_lsn), "%" PRIu64, lsn);
+	void *c = sp_ctl(env);
+	int rc = sp_set(c, "snapshot", snapshot_lsn);
+	if (rc == -1)
+		sophia_raise(env);
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	rc = sp_set(c, snapshot, snapshot_lsn);
+	if (rc == -1)
+		sophia_raise(env);
+}
+
+static inline int
+sophia_snapshot_ready(void *env, int64_t lsn)
+{
+	/* get sophia lsn associated with snapshot */
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	void *c = sp_ctl(env);
+	void *o = sp_get(c, snapshot);
+	if (o == NULL) {
+		if (sp_error(env))
+			sophia_raise(env);
+		panic("sophia snapshot %" PRIu64 " does not exist", lsn);
+	}
+	char *pe;
+	char *p = (char *)sp_get(o, "value", NULL);
+	int64_t snapshot_start_lsn = strtoull(p, &pe, 10);
+	sp_destroy(o);
+
+	/* compare with a latest completed checkpoint lsn */
+	o = sp_get(c, "scheduler.checkpoint_lsn_last");
+	if (o == NULL)
+		sophia_raise(env);
+	p = (char *)sp_get(o, "value", NULL);
+	int64_t last_lsn = strtoull(p, &pe, 10);
+	sp_destroy(o);
+	return last_lsn >= snapshot_start_lsn;
+}
+
+static inline void
+sophia_snapshot_delete(void *env, int64_t lsn)
+{
+	char snapshot[32];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	void *c = sp_ctl(env);
+	void *s = sp_get(c, snapshot);
+	if (s == NULL) {
+		if (sp_error(env))
+			sophia_raise(env);
+		panic("sophia snapshot %" PRIu64 " does not exist", lsn);
+	}
+	int rc = sp_destroy(s);
+	if (rc == -1)
+		sophia_raise(env);
+}
+
+void SophiaFactory::snapshot(enum engine_snapshot_event e, int64_t lsn)
+{
+	switch (e) {
+	case SNAPSHOT_START:
+		sophia_snapshot(env, lsn);
+		break;
+	case SNAPSHOT_RECOVER:
+		sophia_snapshot_recover(env, lsn);
+		break;
+	case SNAPSHOT_DELETE:
+		sophia_snapshot_delete(env, lsn);
+		break;
+	case SNAPSHOT_WAIT:
+		while (! sophia_snapshot_ready(env, lsn))
+			fiber_yield_timeout(.020);
+		break;
+	}
 }

@@ -105,20 +105,6 @@ schema_init();
 void
 schema_free();
 
-/**
- * Called at the end of recovery from snapshot.
- * Build primary keys in all spaces.
- * */
-void
-space_end_recover_snapshot();
-
-/**
- * Called at the end of recovery.
- * Build secondary keys in all spaces.
- */
-void
-space_end_recover();
-
 struct space *schema_space(uint32_t id);
 
 /*

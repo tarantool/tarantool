@@ -51,6 +51,7 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "coeio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
@@ -58,6 +59,7 @@ box_process_func box_process = process_ro;
 struct recovery_state *recovery;
 
 int snapshot_pid = 0; /* snapshot processes pid */
+int64_t snapshot_last_lsn = 0;
 
 static void
 box_snapshot_cb(struct xlog *l);
@@ -237,7 +239,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	/*
 	 * notify engines about end of recovery.
 	*/
-	space_end_recover();
+	engine_end_recover();
 
 	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
@@ -432,21 +434,24 @@ box_init()
 				     cfg_geti("panic_on_wal_error"));
 
 		if (recovery_has_data(recovery)) {
+			/* Tell Sophia engine LSN it must recover to. */
+			snapshot_last_lsn = recovery_snap_lsn(recovery);
+			engine_begin_recover_snapshot(snapshot_last_lsn);
 			/* Process existing snapshot */
 			recover_snap(recovery);
-			space_end_recover_snapshot();
+			engine_end_recover_snapshot();
 		} else if (recovery_has_remote(recovery)) {
 			/* Initialize a new replica */
 			replica_bootstrap(recovery);
-			space_end_recover_snapshot();
-			snapshot_save(recovery, box_snapshot_cb);
+			engine_end_recover_snapshot();
+			box_deploy(recovery);
 		} else {
 			/* Initialize the first server of a new cluster */
 			recovery_bootstrap(recovery);
 			box_set_cluster_uuid();
 			box_set_server_uuid();
-			space_end_recover_snapshot();
-			snapshot_save(recovery, box_snapshot_cb);
+			engine_end_recover_snapshot();
+			box_deploy(recovery);
 		}
 		fiber_gc();
 	} catch (Exception *e) {
@@ -532,45 +537,134 @@ box_snapshot_cb(struct xlog *l)
 	space_foreach(snapshot_space, l);
 }
 
+static inline void
+engine_start_snapshot(EngineFactory *f, void *udate)
+{
+	int64_t lsn = *(int64_t*)udate;
+	f->snapshot(SNAPSHOT_START, lsn);
+}
+
+static inline void
+engine_delete_snapshot(EngineFactory *f, void *udate)
+{
+	int64_t lsn = *(int64_t*)udate;
+	f->snapshot(SNAPSHOT_DELETE, lsn);
+}
+
+static inline void
+engine_wait_snapshot(EngineFactory *f, void *udate)
+{
+	int64_t lsn = *(int64_t*)udate;
+	f->snapshot(SNAPSHOT_WAIT, lsn);
+}
+
+static ssize_t
+box_snapshot_rename_cb(va_list ap)
+{
+	uint64_t id = *va_arg(ap, uint64_t*);
+	int *status = va_arg(ap, int*);
+	*status = snapshot_rename(&recovery->snap_dir, id);
+	return 0;
+}
+
 int
 box_snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
 
-	/* flush buffers to avoid multiple output */
-	/* https://github.com/tarantool/tarantool/issues/366 */
+	/* flush buffers to avoid multiple output
+	 *
+	 * https://github.com/tarantool/tarantool/issues/366
+	*/
 	fflush(stdout);
 	fflush(stderr);
-	pid_t p = fork();
-	if (p < 0) {
-		say_syserror("fork");
-		return -1;
-	}
-	if (p > 0) {
-		snapshot_pid = p;
-		/* increment snapshot version */
-		tuple_begin_snapshot();
-		int status = wait_for_child(p);
-		tuple_end_snapshot();
-		snapshot_pid = 0;
-		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
-	}
 
-	slab_arena_mprotect(&memtx_arena);
+	/* create snapshot file */
+	int64_t snap_lsn = vclock_signature(&recovery->vclock);
 
-	cord_set_name("snap");
-	title("dumper", "%" PRIu32, getppid());
-	fiber_set_name(fiber(), "dumper");
+	/* create engine snapshot */
+	engine_foreach(engine_start_snapshot, &snap_lsn);
+
 	/*
-	 * Safety: make sure we don't double-write
-	 * parent stdio buffers at exit().
+	 * Due to fork nature, no threads are recreated.
+	 * This is the only consistency guarantee here for a
+	 * multi-threaded engine.
 	 */
-	close_all_xcpt(1, log_fd);
-	snapshot_save(recovery, box_snapshot_cb);
+	int rc;
+	int status = 0;
+	pid_t pid = fork();
+	switch (pid) {
+	case -1:
+		say_syserror("fork");
+		status = errno;
+		goto error;
+	case  0: /* dumper */
+		slab_arena_mprotect(&memtx_arena);
+		cord_set_name("snap");
+		title("dumper", "%" PRIu32, getppid());
+		fiber_set_name(fiber(), "dumper");
+		/* make sure we don't double-write parent stdio
+		 * buffers at exit() during panic */
+		close_all_xcpt(1, log_fd);
+		/* do not rename snapshot */
+		snapshot_save(recovery, box_snapshot_cb, false);
+		exit(EXIT_SUCCESS);
+		return 0;
+	default: /* waiter */
+		snapshot_pid = pid;
+	}
 
-	exit(EXIT_SUCCESS);
+	/* increment snapshot version */
+	tuple_begin_snapshot();
+
+	/* wait for memtx-part snapshot completion */
+	status = wait_for_child(pid);
+	if (WIFSIGNALED(status))
+		status = EINTR;
+	else
+		status = WEXITSTATUS(status);
+	if (status != 0)
+		goto error;
+
+	/* complete snapshot */
+	tuple_end_snapshot();
+
+	/* wait for engine snapshot completion */
+	engine_foreach(engine_wait_snapshot, &snap_lsn);
+
+	/* rename snapshot on completion */
+	rc = coeio_custom(box_snapshot_rename_cb,
+	                  TIMEOUT_INFINITY, &snap_lsn, &status);
+	if (rc == -1 || status == -1)
+		goto error;
+
+	/* remove previous snapshot reference */
+	engine_foreach(engine_delete_snapshot, &snapshot_last_lsn);
+
+	snapshot_last_lsn = snap_lsn;
+	snapshot_pid = 0;
 	return 0;
+
+error:
+	/* rollback snapshot creation */
+	if (snap_lsn != snapshot_last_lsn)
+		engine_foreach(engine_delete_snapshot, &snap_lsn);
+	tuple_end_snapshot();
+	snapshot_pid = 0;
+	return status;
+}
+
+void
+box_deploy(struct recovery_state *r)
+{
+	/* create memtx snapshot */
+	snapshot_save(r, box_snapshot_cb, true);
+
+	/* create engine snapshot and wait for completion */
+	uint64_t snap_lsn = vclock_signature(&r->vclock);
+	engine_foreach(engine_start_snapshot, &snap_lsn);
+	engine_foreach(engine_wait_snapshot, &snap_lsn);
 }
 
 const char *

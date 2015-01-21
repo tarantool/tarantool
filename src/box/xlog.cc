@@ -616,7 +616,8 @@ xlog_rename(struct xlog *l)
 	new_filename[suffix - filename] = '\0';
 
 	if (rename(filename, new_filename) != 0) {
-		say_syserror("%s: rename to %s failed", filename, new_filename);
+		say_syserror("%s: rename to %s failed", filename,
+			     new_filename);
 
 		return -1;
 	}

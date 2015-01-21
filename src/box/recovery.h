@@ -172,6 +172,13 @@ void recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
 
 struct fio_batch;
 
+/**
+ * Return LSN of the most recent snapshot or -1 if there is
+ * no snapshot.
+ */
+int64_t
+recovery_snap_lsn(struct recovery_state *r);
+
 void
 snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		   struct xrow_header *packet);
@@ -179,7 +186,11 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 typedef void (snapshot_f)(struct xlog *);
 
 void
-snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler);
+snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler,
+	      bool rename);
+
+int
+snapshot_rename(struct xdir *dir, int64_t lsn);
 
 #if defined(__cplusplus)
 } /* extern "C" */

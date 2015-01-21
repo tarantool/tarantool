@@ -163,19 +163,6 @@ space_cache_replace(struct space *space)
 	return p_old ? (struct space *) p_old->val : NULL;
 }
 
-static void
-do_one_recover_step(struct space *space, void * /* param */)
-{
-	if (space_index(space, 0)) {
-		space->engine->recover(space);
-	} else {
-		/* in case of space has no primary index,
-		 * derive it's engine handler recovery state from
-		 * the global one. */
-		space->engine->initRecovery();
-	}
-}
-
 /** A wrapper around space_new() for data dictionary spaces. */
 struct space *
 sc_space_new(struct space_def *space_def,
@@ -305,44 +292,6 @@ schema_init()
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */, NUM);
 	(void) sc_space_new(&def, key_def, &alter_space_on_replace_index);
 	key_def_delete(key_def);
-}
-
-static inline void
-space_end_recover_snapshot_cb(EngineFactory *f, void *udate)
-{
-	(void)udate;
-	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
-}
-
-void
-space_end_recover_snapshot()
-{
-	/*
-	 * For all new spaces created from now on, when the
-	 * PRIMARY key is added, enable it right away.
-	 */
-	engine_foreach(space_end_recover_snapshot_cb, NULL);
-
-	space_foreach(do_one_recover_step, NULL);
-}
-
-static inline void
-space_end_recover_cb(EngineFactory *f, void *udate)
-{
-	(void)udate;
-	f->recoveryEvent(END_RECOVERY);
-}
-
-void
-space_end_recover()
-{
-	/*
-	 * For all new spaces created after recovery is complete,
-	 * when the primary key is added, enable all keys.
-	 */
-	engine_foreach(space_end_recover_cb, NULL);
-
-	space_foreach(do_one_recover_step, NULL);
 }
 
 void
