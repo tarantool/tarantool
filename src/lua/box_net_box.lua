@@ -35,6 +35,7 @@ local KEY               = 0x20
 local TUPLE             = 0x21
 local FUNCTION_NAME     = 0x22
 local USER              = 0x23
+local EXPR              = 0x27
 local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
@@ -130,7 +131,7 @@ local proto = {
         end
         return request(
             { [SYNC] = sync, [TYPE] = EVAL  },
-            { [FUNCTION_NAME] = expr, [TUPLE] = args }
+            { [EXPR] = expr, [TUPLE] = args }
         )
     end,
 

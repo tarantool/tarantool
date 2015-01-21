@@ -198,20 +198,16 @@ lbox_request_create(struct request *request,
 	if (key > 0) {
 		struct obuf key_buf;
 		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode(L, luaL_msgpack_default, &key_buf, key);
+		luamp_encode_tuple(L, luaL_msgpack_default, &key_buf, key);
 		request->key = obuf_join(&key_buf);
 		request->key_end = request->key + obuf_size(&key_buf);
-		if (mp_typeof(*request->key) != MP_ARRAY)
-			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
 	if (tuple > 0) {
 		struct obuf tuple_buf;
 		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode(L, luaL_msgpack_default, &tuple_buf, tuple);
+		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf, tuple);
 		request->tuple = obuf_join(&tuple_buf);
 		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
-		if (mp_typeof(*request->tuple) != MP_ARRAY)
-			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
 }
 
@@ -554,8 +550,8 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		int has_keys = lua_next(L, 1);
 		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
 			do {
-				int top = lua_gettop(L);
-				luamp_encodestack(L, out, top, top);
+				luamp_encode_tuple(L, luaL_msgpack_default,
+						   out, -1);
 				++count;
 				lua_pop(L, 1);
 			} while (lua_next(L, 1));
@@ -565,7 +561,12 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		}
 	}
 	for (int i = 1; i <= nrets; ++i) {
-		luamp_encodestack(L, out, i, i);
+		if (lua_istable(L, i) || lua_istuple(L, i)) {
+			luamp_encode_tuple(L, luaL_msgpack_default, out, i);
+		} else {
+			luamp_encode_array(luaL_msgpack_default, out, 1);
+			luamp_encode(L, luaL_msgpack_default, out, i);
+		}
 		++count;
 	}
 
@@ -594,13 +595,7 @@ static inline void
 execute_eval(lua_State *L, struct request *request, struct obuf *out)
 {
 	/* Check permissions */
-	struct credentials *credentials = current_user();
-	if (!(credentials->universal_access & PRIV_X)) {
-		/* Access violation, report error. */
-		struct user *user = user_cache_find(credentials->uid);
-		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(PRIV_X), user->name, "eval");
-	}
+	access_check_universe(PRIV_X);
 
 	/* Compile expression */
 	const char *expr = request->key;
@@ -611,7 +606,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	/* Unpack arguments */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);
-	luaL_checkstack(L, arg_count, "call: out of stack");
+	luaL_checkstack(L, arg_count, "eval: out of stack");
 	for (uint32_t i = 0; i < arg_count; i++) {
 		luamp_decode(L, luaL_msgpack_default, &args);
 	}

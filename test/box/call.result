@@ -372,45 +372,338 @@ call space:delete(4)
 space:drop()
 ---
 ...
-box.schema.user.drop('test')
+space = box.schema.create_space('tweedledum')
 ---
 ...
-eval (return 2+2)()
+index = space:create_index('primary', { type = 'tree' })
 ---
-[4]
+...
+eval (return 1)()
+---
+[1]
+
+function f(...) return 1 end
+---
+...
+call f()
+---
+- [1]
 
 eval (return 1, 2, 3)()
 ---
 [1, 2, 3]
 
-eval (return ...)(1,2,3)
+function f(...) return 1, 2, 3 end
 ---
-[1, 2, 3]
+...
+call f()
+---
+- [1]
+- [2]
+- [3]
 
-eval (return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil)()
+eval (return true)()
 ---
-- {k: v1}
-- true
-- {xx: 10, yy: 15}
-- null
+[true]
+
+function f(...) return true end
+---
+...
+call f()
+---
+- [true]
 
 eval (return nil)()
 ---
 [null]
 
-eval (return)()
+function f(...) return nil end
+---
+...
+call f()
+---
+- [null]
+
+eval (return )()
 ---
 []
 
-eval (error("exception"))()
+function f(...) return  end
 ---
-error: {code: ER_PROC_LUA, reason: 'eval:1: exception'}
+...
+call f()
+---
+[]
 
-eval (box.error(0))()
+eval (return {})()
+---
+- []
+
+function f(...) return {} end
+---
+...
+call f()
+---
+- []
+
+eval (return {1})()
+---
+- [1]
+
+function f(...) return {1} end
+---
+...
+call f()
+---
+- [1]
+
+eval (return {1, 2, 3})()
+---
+- [1, 2, 3]
+
+function f(...) return {1, 2, 3} end
+---
+...
+call f()
+---
+- [1, 2, 3]
+
+eval (return {k1 = 'v1', k2 = 'v2'})()
+---
+- {k1: v1, k2: v2}
+
+function f(...) return {k1 = 'v1', k2 = 'v2'} end
+---
+...
+call f()
+---
+error: {code: ER_TUPLE_NOT_ARRAY, reason: Tuple/Key must be MsgPack array}
+
+t = box.tuple.new('tuple', {1, 2, 3}, { k1 = 'v', k2 = 'v2'})
+---
+...
+eval (return t)()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+function f(...) return t end
+---
+...
+call f()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+eval (return t, t, t)()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+function f(...) return t, t, t end
+---
+...
+call f()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+eval (return {t})()
+---
+- - - tuple
+    - [1, 2, 3]
+    - {k1: v, k2: v2}
+
+function f(...) return {t} end
+---
+...
+call f()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+eval (return {t, t, t})()
+---
+- - - tuple
+    - [1, 2, 3]
+    - {k1: v, k2: v2}
+  - - tuple
+    - [1, 2, 3]
+    - {k1: v, k2: v2}
+  - - tuple
+    - [1, 2, 3]
+    - {k1: v, k2: v2}
+
+function f(...) return {t, t, t} end
+---
+...
+call f()
+---
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+- - tuple
+  - [1, 2, 3]
+  - {k1: v, k2: v2}
+
+eval (return error('exception'))()
+---
+error: {code: ER_PROC_LUA, reason: exception}
+
+function f(...) return error('exception') end
+---
+...
+call f()
+---
+error: {code: ER_PROC_LUA, reason: exception}
+
+eval (return box.error(0))()
 ---
 error: {code: ER_OK, reason: Unknown error}
+
+function f(...) return box.error(0) end
+---
+...
+call f()
+---
+error: {code: ER_OK, reason: Unknown error}
+
+eval (return ...)()
+---
+[]
+
+function f(...) return ... end
+---
+...
+call f()
+---
+[]
+
+eval (return ...)(1,2,3)
+---
+[1, 2, 3]
+
+function f(...) return ... end
+---
+...
+call f(1,2,3)
+---
+- [1]
+- [2]
+- [3]
+
+eval (return ...)(None,None,None)
+---
+[null, null, null]
+
+function f(...) return ... end
+---
+...
+call f(None,None,None)
+---
+- [null]
+- [null]
+- [null]
+
+eval (return ...)({'k2': 'v2', 'k1': 'v1'})
+---
+- {k1: v1, k2: v2}
+
+function f(...) return ... end
+---
+...
+call f({'k2': 'v2', 'k1': 'v1'})
+---
+error: {code: ER_TUPLE_NOT_ARRAY, reason: Tuple/Key must be MsgPack array}
+
+eval (return space:auto_increment({"transaction"}))()
+---
+- [1, transaction]
+
+function f(...) return space:auto_increment({"transaction"}) end
+---
+...
+call f()
+---
+- [2, transaction]
+
+eval (return space:select{})()
+---
+- - [1, transaction]
+  - [2, transaction]
+
+function f(...) return space:select{} end
+---
+...
+call f()
+---
+- [1, transaction]
+- [2, transaction]
+
+eval (return box.begin(), space:auto_increment({"failed"}), box.rollback())()
+---
+- null
+- [3, failed]
+
+function f(...) return box.begin(), space:auto_increment({"failed"}), box.rollback() end
+---
+...
+call f()
+---
+- [null]
+- [3, failed]
+
+eval (return space:select{})()
+---
+- - [1, transaction]
+  - [2, transaction]
+
+function f(...) return space:select{} end
+---
+...
+call f()
+---
+- [1, transaction]
+- [2, transaction]
+
+eval (return require("fiber").sleep(0))()
+---
+[]
+
+function f(...) return require("fiber").sleep(0) end
+---
+...
+call f()
+---
+[]
 
 eval (!invalid expression)()
 ---
 error: {code: ER_PROC_LUA, reason: 'eval:1: unexpected symbol near ''!'''}
 
+space:drop()
+---
+...
+box.schema.user.drop('test')
+---
+...

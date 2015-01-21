@@ -82,6 +82,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
+	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
 	/* }}} */
 };
 
@@ -108,7 +109,7 @@ const uint64_t iproto_body_key_map[IPROTO_EVAL + 1] = {
 	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
 	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
 	bit(USER_NAME) | bit(TUPLE),                           /* AUTH */
-	bit(FUNCTION_NAME) | bit(TUPLE),                       /* EVAL */
+	bit(EXPR)      | bit(TUPLE),                           /* EVAL */
 };
 #undef bit
 
@@ -152,5 +153,6 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"server UUID"       /* 0x24 */
 	"cluster UUID"      /* 0x25 */
 	"vector clock"      /* 0x26 */
+	"expr"              /* 0x27 */
 };
 

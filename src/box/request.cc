@@ -240,6 +240,7 @@ error:
 		case IPROTO_KEY:
 		case IPROTO_FUNCTION_NAME:
 		case IPROTO_USER_NAME:
+		case IPROTO_EXPR:
 			request->key = value;
 			request->key_end = data;
 		default:

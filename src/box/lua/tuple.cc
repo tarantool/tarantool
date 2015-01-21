@@ -97,7 +97,24 @@ lbox_tuple_new(lua_State *L)
 		lua_newtable(L); /* create an empty tuple */
 		++argc;
 	}
-	struct tuple *tuple = lua_totuple(L, 1, argc);
+
+	RegionGuard region_guard(&fiber()->gc);
+	struct obuf buf;
+	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+	if (argc == 1 && (lua_istable(L, 1) || lua_istuple(L, 1))) {
+		/* New format: box.tuple.new({1, 2, 3}) */
+		luamp_encode_tuple(L, luaL_msgpack_default, &buf, 1);
+	} else {
+		/* Backward-compatible format: box.tuple.new(1, 2, 3). */
+		luamp_encode_array(luaL_msgpack_default, &buf, argc);
+		for (int k = 1; k <= argc; ++k) {
+			luamp_encode(L, luaL_msgpack_default, &buf, k);
+		}
+	}
+
+	const char *data = obuf_join(&buf);
+	struct tuple *tuple = tuple_new(tuple_format_ber, data,
+					data + obuf_size(&buf));
 	lbox_pushtuple(L, tuple);
 	return 1;
 }
@@ -168,38 +185,24 @@ lbox_tuple_slice(struct lua_State *L)
 }
 
 /* A MsgPack extensions handler that supports tuples */
-static int
+static mp_type
 luamp_encode_extension_box(struct lua_State *L, int idx, struct obuf *b)
 {
 	struct tuple *tuple = lua_istuple(L, idx);
 	if (tuple != NULL) {
 		tuple_to_obuf(tuple, b);
-		return 0;
+		return MP_ARRAY;
 	}
 
-	return 1;
+	return MP_EXT;
 }
 
-/*
- * A luamp_encode wrapper to support old Tarantool 1.5 API.
- * Will be removed after API change.
- */
-int
-luamp_encodestack(struct lua_State *L, struct obuf *b, int first, int last)
+void
+luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
+		  struct obuf *b, int index)
 {
-	if (first == last && (lua_istable(L, first) || lua_istuple(L, first))) {
-		/* New format */
-		luamp_encode(L, luaL_msgpack_default, b, first);
-		return 1;
-	} else {
-		/* Backward-compatible format */
-		/* sic: first > last */
-		luamp_encode_array(luaL_msgpack_default, b, last + 1 - first);
-		for (int k = first; k <= last; ++k) {
-			luamp_encode(L, luaL_msgpack_default, b, k);
-		}
-		return last + 1 - first;
-	}
+	if (luamp_encode(L, cfg, b, index) != MP_ARRAY)
+		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 }
 
 static void *
@@ -328,29 +331,6 @@ static const struct luaL_reg lbox_tuplelib[] = {
 static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 	{NULL, NULL}
 };
-
-
-struct tuple *
-lua_totuple(struct lua_State *L, int first, int last)
-{
-	RegionGuard region_guard(&fiber()->gc);
-	struct obuf buf;
-	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-
-	try {
-		luamp_encodestack(L, &buf, first, last);
-	} catch (Exception *e) {
-		throw;
-	} catch (...) {
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-	}
-	const char *data = obuf_join(&buf);
-	if (unlikely(mp_typeof(*data) != MP_ARRAY))
-		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	struct tuple *tuple = tuple_new(tuple_format_ber, data,
-					data + obuf_size(&buf));
-	return tuple;
-}
 
 /* }}} */
 

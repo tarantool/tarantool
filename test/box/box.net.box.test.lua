@@ -45,6 +45,12 @@ cn:eval('error("exception")')
 cn:eval('box.error(0)')
 cn:eval('!invalid expression')
 
+remote.self:eval('return 1+1, 2+2')
+remote.self:eval('return')
+remote.self:eval('error("exception")')
+remote.self:eval('box.error(0)')
+remote.self:eval('!invalid expression')
+
 box.schema.user.revoke('guest','execute','universe')
 box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()

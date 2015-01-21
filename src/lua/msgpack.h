@@ -80,7 +80,7 @@ luamp_encode_nil(struct luaL_serializer *cfg);
 void
 luamp_encode_bool(struct luaL_serializer *cfg, struct obuf *buf, bool val);
 
-void
+enum mp_type
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *buf,
 	     int index);
 
@@ -88,7 +88,7 @@ void
 luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	     const char **data);
 
-typedef int
+typedef enum mp_type
 (*luamp_encode_extension_f)(struct lua_State *, int, struct obuf *);
 
 /**

@@ -119,24 +119,59 @@ admin("function field_x(key, field_index) return space:get(key)[field_index] end
 sql("call field_x(4, 1)")
 sql("call field_x(4, 2)")
 sql("call space:delete(4)")
-
 admin("space:drop()")
-admin("box.schema.user.drop('test')")
+
+admin("space = box.schema.create_space('tweedledum')")
+admin("index = space:create_index('primary', { type = 'tree' })")
+
 
 def lua_eval(name, *args):
     print 'eval (%s)(%s)' % (name, ','.join([ str(arg) for arg in args]))
     print '---'
-    print sql.py_con.eval(name, *args)
+    print sql.py_con.eval(name, args)
 
-lua_eval('return 2+2')
-lua_eval('return 1, 2, 3')
-lua_eval('return ...', 1, 2, 3)
-lua_eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
-lua_eval('return nil')
-lua_eval('return')
-lua_eval('error("exception")')
-lua_eval('box.error(0)')
+def lua_call(name, *args):
+    print 'call %s(%s)' % (name, ','.join([ str(arg) for arg in args]))
+    print '---'
+    print sql.py_con.call(name, args)
+
+def test(expr, *args):
+    lua_eval('return ' + expr, *args)
+    admin('function f(...) return ' + expr + ' end')
+    lua_call('f', *args)
+
+# Return values
+test("1")
+test("1, 2, 3")
+test("true")
+test("nil")
+test("")
+test("{}")
+test("{1}")
+test("{1, 2, 3}")
+test("{k1 = 'v1', k2 = 'v2'}")
+admin("t = box.tuple.new('tuple', {1, 2, 3}, { k1 = 'v', k2 = 'v2'})")
+test("t")
+test("t, t, t")
+test("{t}")
+test("{t, t, t}")
+test("error('exception')")
+test("box.error(0)")
+test('...')
+test('...', 1, 2, 3)
+test('...',  None, None, None)
+test('...', { 'k1': 'v1', 'k2': 'v2'})
+# Transactions
+test('space:auto_increment({"transaction"})')
+test('space:select{}')
+test('box.begin(), space:auto_increment({"failed"}), box.rollback()')
+test('space:select{}')
+test('require("fiber").sleep(0)')
+# Other
 lua_eval('!invalid expression')
+
+admin("space:drop()")
+admin("box.schema.user.drop('test')")
 
 # Re-connect after removing user
 sql.py_con.close()

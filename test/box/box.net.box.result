@@ -65,7 +65,7 @@ cn:call('test_foo', 'a', 'b', 'c')
 ...
 cn:eval('return 2+2')
 ---
-- error: Execute access denied for user 'guest' to function 'eval'
+- error: Execute access denied for user 'guest'
 ...
 box.schema.user.grant('guest','execute','universe')
 ---
@@ -82,9 +82,7 @@ cn:call('unexists_procedure')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Tuple/Key must be MsgPack array
 ...
 cn:call(nil, 'a', 'b', 'c')
 ---
@@ -131,6 +129,26 @@ cn:eval('box.error(0)')
 cn:eval('!invalid expression')
 ---
 - error: 'eval:1: unexpected symbol near ''!'''
+...
+remote.self:eval('return 1+1, 2+2')
+---
+- 2
+- 4
+...
+remote.self:eval('return')
+---
+...
+remote.self:eval('error("exception")')
+---
+- error: '[string "error("exception")"]:1: exception'
+...
+remote.self:eval('box.error(0)')
+---
+- error: Unknown error
+...
+remote.self:eval('!invalid expression')
+---
+- error: '[string "return !invalid expression"]:1: unexpected symbol near ''!'''
 ...
 box.schema.user.revoke('guest','execute','universe')
 ---
@@ -214,7 +232,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:238: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:239: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -457,9 +475,7 @@ cn:call('pause')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Tuple/Key must be MsgPack array
 ...
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
@@ -470,9 +486,7 @@ remote.self:call('test_foo', 'a', 'b', 'c')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- - [{'a': 1}]
-  - [{'b': 2}]
-  - ['c']
+- error: Tuple/Key must be MsgPack array
 ...
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end

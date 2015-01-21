@@ -38,15 +38,11 @@ struct tuple;
 void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
-
 struct tuple *lua_istuple(struct lua_State *L, int narg);
 
-struct tuple*
-lua_totuple(struct lua_State *L, int first, int last);
-
-int
-luamp_encodestack(struct lua_State *L, struct obuf *b,
-		  int first, int last);
+void
+luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
+		  struct obuf *b, int index);
 
 void
 box_lua_tuple_init(struct lua_State *L);
