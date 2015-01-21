@@ -34,7 +34,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static RLIST_HEAD(engines);
+RLIST_HEAD(engines);
+
 uint32_t engine_flags[BOX_ENGINE_MAX];
 int n_engines;
 
@@ -74,7 +75,7 @@ Engine::Engine(EngineFactory *f)
 /** Register engine factory instance. */
 void engine_register(EngineFactory *engine)
 {
-	rlist_add_entry(&engines, engine, link);
+	rlist_add_tail_entry(&engines, engine, link);
 	engine->id = ++n_engines;
 	engine_flags[engine->id] = engine->flags;
 }
@@ -91,15 +92,6 @@ engine_find(const char *name)
 	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
 }
 
-/** Call a visitor function on every registered engine. */
-void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
-                    void *udata)
-{
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link)
-		func(e, udata);
-}
-
 /** Shutdown all engine factories. */
 void engine_shutdown()
 {
@@ -110,18 +102,14 @@ void engine_shutdown()
 	}
 }
 
-static inline void
-engine_begin_recover_cb(EngineFactory *f, void *udate)
-{
-	int64_t lsn = *(int64_t*)udate;
-	f->snapshot(SNAPSHOT_RECOVER, lsn);
-}
-
 void
 engine_begin_recover_snapshot(int64_t snapshot_lsn)
 {
 	/* recover engine snapshot */
-	engine_foreach(engine_begin_recover_cb, &snapshot_lsn);
+	EngineFactory *f;
+	engine_foreach(f) {
+		f->snapshot(SNAPSHOT_RECOVER, snapshot_lsn);
+	}
 }
 
 static void
@@ -137,13 +125,6 @@ do_one_recover_step(struct space *space, void * /* param */)
 	}
 }
 
-static inline void
-engine_end_recover_snapshot_cb(EngineFactory *f, void *udate)
-{
-	(void)udate;
-	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
-}
-
 void
 engine_end_recover_snapshot()
 {
@@ -151,15 +132,11 @@ engine_end_recover_snapshot()
 	 * For all new spaces created from now on, when the
 	 * PRIMARY key is added, enable it right away.
 	 */
-	engine_foreach(engine_end_recover_snapshot_cb, NULL);
+	EngineFactory *f;
+	engine_foreach(f) {
+		f->recoveryEvent(END_RECOVERY_SNAPSHOT);
+	}
 	space_foreach(do_one_recover_step, NULL);
-}
-
-static inline void
-engine_end_recover_cb(EngineFactory *f, void *udate)
-{
-	(void)udate;
-	f->recoveryEvent(END_RECOVERY);
 }
 
 void
@@ -169,8 +146,10 @@ engine_end_recover()
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
-	engine_foreach(engine_end_recover_cb, NULL);
-
+	EngineFactory *f;
+	engine_foreach(f) {
+		f->recoveryEvent(END_RECOVERY);
+	}
 	space_foreach(do_one_recover_step, NULL);
 }
 

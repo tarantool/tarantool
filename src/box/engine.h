@@ -40,6 +40,7 @@ enum engine_flags {
 };
 
 extern uint32_t engine_flags[BOX_ENGINE_MAX];
+extern struct rlist engines;
 
 /** Reflects what space_replace() is supposed to do. */
 enum engine_recovery_state {
@@ -184,8 +185,7 @@ public:
 void engine_register(EngineFactory *engine);
 
 /** Call a visitor function on every registered engine. */
-void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
-                    void *udata);
+#define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
 /** Find engine factory by name. */
 EngineFactory *engine_find(const char *name);

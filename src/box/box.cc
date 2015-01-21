@@ -546,27 +546,6 @@ box_snapshot_cb(struct xlog *l)
 	space_foreach(snapshot_space, l);
 }
 
-static inline void
-engine_start_snapshot(EngineFactory *f, void *udate)
-{
-	int64_t lsn = *(int64_t*)udate;
-	f->snapshot(SNAPSHOT_START, lsn);
-}
-
-static inline void
-engine_delete_snapshot(EngineFactory *f, void *udate)
-{
-	int64_t lsn = *(int64_t*)udate;
-	f->snapshot(SNAPSHOT_DELETE, lsn);
-}
-
-static inline void
-engine_wait_snapshot(EngineFactory *f, void *udate)
-{
-	int64_t lsn = *(int64_t*)udate;
-	f->snapshot(SNAPSHOT_WAIT, lsn);
-}
-
 static ssize_t
 box_snapshot_rename_cb(va_list ap)
 {
@@ -593,7 +572,10 @@ box_snapshot(void)
 	int64_t snap_lsn = vclock_signature(&recovery->vclock);
 
 	/* create engine snapshot */
-	engine_foreach(engine_start_snapshot, &snap_lsn);
+	EngineFactory *f;
+	engine_foreach(f) {
+		f->snapshot(SNAPSHOT_START, snap_lsn);
+	}
 
 	/*
 	 * Due to fork nature, no threads are recreated.
@@ -640,7 +622,9 @@ box_snapshot(void)
 	tuple_end_snapshot();
 
 	/* wait for engine snapshot completion */
-	engine_foreach(engine_wait_snapshot, &snap_lsn);
+	engine_foreach(f) {
+		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
+	}
 
 	/* rename snapshot on completion */
 	rc = coeio_custom(box_snapshot_rename_cb,
@@ -649,7 +633,9 @@ box_snapshot(void)
 		goto error;
 
 	/* remove previous snapshot reference */
-	engine_foreach(engine_delete_snapshot, &snapshot_last_lsn);
+	engine_foreach(f) {
+		f->snapshot(SNAPSHOT_DELETE, snapshot_last_lsn);
+	}
 
 	snapshot_last_lsn = snap_lsn;
 	snapshot_pid = 0;
@@ -657,8 +643,11 @@ box_snapshot(void)
 
 error:
 	/* rollback snapshot creation */
-	if (snap_lsn != snapshot_last_lsn)
-		engine_foreach(engine_delete_snapshot, &snap_lsn);
+	if (snap_lsn != snapshot_last_lsn) {
+		engine_foreach(f) {
+			f->snapshot(SNAPSHOT_DELETE, snap_lsn);
+		}
+	}
 	tuple_end_snapshot();
 	snapshot_pid = 0;
 	return status;
@@ -672,8 +661,11 @@ engine_save_snapshot(struct recovery_state *r)
 
 	/* create engine snapshot and wait for completion */
 	uint64_t snap_lsn = vclock_signature(&r->vclock);
-	engine_foreach(engine_start_snapshot, &snap_lsn);
-	engine_foreach(engine_wait_snapshot, &snap_lsn);
+	EngineFactory *f;
+	engine_foreach(f)
+		f->snapshot(SNAPSHOT_START, snap_lsn);
+	engine_foreach(f)
+		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
 }
 
 const char *
