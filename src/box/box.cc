@@ -242,7 +242,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	/*
 	 * notify engines about end of recovery.
 	*/
-	engine_end_recover();
+	engine_end_recovery();
 
 	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));

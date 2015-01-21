@@ -39,8 +39,9 @@ struct SophiaFactory: public EngineFactory {
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
-	virtual void recoveryEvent(enum engine_recovery_event);
-	virtual void set_snapshot_lsn(int64_t);
+	virtual void begin_recover_snapshot(int64_t);
+	virtual void end_recover_snapshot();
+	virtual void end_recovery();
 	virtual void snapshot(enum engine_snapshot_event, int64_t);
 	void *env;
 	void *tx;

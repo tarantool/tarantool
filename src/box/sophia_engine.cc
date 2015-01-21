@@ -145,23 +145,23 @@ SophiaFactory::open()
 }
 
 void
-SophiaFactory::recoveryEvent(enum engine_recovery_event event)
+SophiaFactory::end_recover_snapshot()
 {
-	switch (event) {
-	case END_RECOVERY_SNAPSHOT:
-		recovery.replace = sophia_replace_recover;
-		recovery.recover = sophia_recovery_end_snapshot;
-		break;
-	case END_RECOVERY:
-		/* complete two-phase recovery */
-		int rc = sp_open(env);
-		if (rc == -1)
-			sophia_raise(env);
-		recovery.state   = READY_NO_KEYS;
-		recovery.replace = sophia_replace;
-		recovery.recover = space_noop;
-		break;
-	}
+	recovery.replace = sophia_replace_recover;
+	recovery.recover = sophia_recovery_end_snapshot;
+}
+
+
+void
+SophiaFactory::end_recovery()
+{
+	/* complete two-phase recovery */
+	int rc = sp_open(env);
+	if (rc == -1)
+		sophia_raise(env);
+	recovery.state   = READY_NO_KEYS;
+	recovery.replace = sophia_replace;
+	recovery.recover = space_noop;
 }
 
 Index*
@@ -392,7 +392,7 @@ sophia_snapshot_delete(void *env, int64_t lsn)
 }
 
 void
-SophiaFactory::set_snapshot_lsn(int64_t lsn)
+SophiaFactory::begin_recover_snapshot(int64_t lsn)
 {
 	sophia_snapshot_recover(env, lsn);
 }

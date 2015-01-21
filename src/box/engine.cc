@@ -56,9 +56,6 @@ void EngineFactory::commit(struct txn*)
 void EngineFactory::rollback(struct txn*)
 {}
 
-void EngineFactory::recoveryEvent(enum engine_recovery_event)
-{}
-
 Engine::Engine(EngineFactory *f)
 	:factory(f)
 {
@@ -101,7 +98,7 @@ engine_begin_recover_snapshot(int64_t snapshot_lsn)
 	/* recover engine snapshot */
 	EngineFactory *f;
 	engine_foreach(f) {
-		f->set_snapshot_lsn(snapshot_lsn);
+		f->begin_recover_snapshot(snapshot_lsn);
 	}
 }
 
@@ -127,13 +124,13 @@ engine_end_recover_snapshot()
 	 */
 	EngineFactory *f;
 	engine_foreach(f) {
-		f->recoveryEvent(END_RECOVERY_SNAPSHOT);
+		f->end_recover_snapshot();
 	}
 	space_foreach(do_one_recover_step, NULL);
 }
 
 void
-engine_end_recover()
+engine_end_recovery()
 {
 	/*
 	 * For all new spaces created after recovery is complete,
@@ -141,7 +138,7 @@ engine_end_recover()
 	 */
 	EngineFactory *f;
 	engine_foreach(f) {
-		f->recoveryEvent(END_RECOVERY);
+		f->end_recovery();
 	}
 	space_foreach(do_one_recover_step, NULL);
 }

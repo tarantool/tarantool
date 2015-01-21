@@ -67,15 +67,6 @@ enum engine_recovery_state {
 };
 
 /**
- * Engine specific recovery events that represents
- * global recovery stage change.
- */
-enum engine_recovery_event {
-	END_RECOVERY_SNAPSHOT,
-	END_RECOVERY
-};
-
-/**
  * Engine specific snapshot event.
  */
 enum engine_snapshot_event {
@@ -117,8 +108,6 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Engine *open() = 0;
-	/* Inform engine about a recovery stage change. */
-	virtual void recoveryEvent(enum engine_recovery_event);
 	/**
 	 * Check a key definition for violation of
 	 * various limits.
@@ -139,8 +128,15 @@ public:
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
-	virtual void set_snapshot_lsn(int64_t lsn) = 0;
-
+	/** Recovery */
+	virtual void begin_recover_snapshot(int64_t snapshot_lsn) = 0;
+	/* Inform engine about a recovery stage change. */
+	virtual void end_recover_snapshot() = 0;
+	/**
+	 * Inform the engine about the global recovery
+	 * state change (end of recovery from the binary log).
+	 */
+	virtual void end_recovery() = 0;
 	/**
 	 * Engine snapshotting support.
 	 */
@@ -239,6 +235,6 @@ engine_end_recover_snapshot();
  * Build secondary keys in all spaces.
  */
 void
-engine_end_recover();
+engine_end_recovery();
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

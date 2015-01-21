@@ -36,9 +36,10 @@ struct MemtxFactory: public EngineFactory {
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);
-	virtual void recoveryEvent(enum engine_recovery_event event);
 	virtual void rollback(struct txn*);
-	virtual void set_snapshot_lsn(int64_t lsn);
+	virtual void begin_recover_snapshot(int64_t lsn);
+	virtual void end_recover_snapshot();
+	virtual void end_recovery();
 	virtual void snapshot(enum engine_snapshot_event, int64_t);
 };
 

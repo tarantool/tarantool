@@ -80,16 +80,15 @@ MemtxFactory::MemtxFactory()
 }
 
 void
-MemtxFactory::recoveryEvent(enum engine_recovery_event event)
+MemtxFactory::end_recover_snapshot()
 {
-	switch (event) {
-	case END_RECOVERY_SNAPSHOT:
-		recovery.recover = space_build_primary_key;
-		break;
-	case END_RECOVERY:
-		recovery.recover = space_build_all_keys;
-		break;
-	}
+	recovery.recover = space_build_primary_key;
+}
+
+void
+MemtxFactory::end_recovery()
+{
+	recovery.recover = space_build_all_keys;
 }
 
 Engine *MemtxFactory::open()
@@ -214,7 +213,7 @@ MemtxFactory::rollback(struct txn *txn)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxFactory::set_snapshot_lsn(int64_t /* lsn */)
+MemtxFactory::begin_recover_snapshot(int64_t /* lsn */)
 {
 	/*
 	 * memtx snapshotting supported directly by box.
