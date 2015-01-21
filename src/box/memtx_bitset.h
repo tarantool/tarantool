@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,31 +29,33 @@
  * SUCH DAMAGE.
  */
 
+/**
+ * @brief Index API wrapper for bitset_index
+ * @see bitset/index.h
+ */
 #include "index.h"
+#include "bitset/index.h"
 
-#include <salad/rtree.h>
+struct bitset_index;
+struct bitset_expr;
 
-class RTreeIndex: public Index
-{
+class MemtxBitset: public Index {
 public:
-	RTreeIndex(struct key_def *key_def);
-	~RTreeIndex();
-
-	virtual void beginBuild();
+	MemtxBitset(struct key_def *key_def);
+	virtual ~MemtxBitset();
 	virtual size_t size() const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
-                                      struct tuple *new_tuple,
-                                      enum dup_replace_mode mode);
+				      struct tuple *new_tuple,
+				      enum dup_replace_mode mode);
 
-	virtual size_t memsize() const;
+        virtual size_t memsize() const;
 	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
-                                  enum iterator_type type,
-                                  const char *key, uint32_t part_count) const;
-
-protected:
-	struct rtree tree;
+				  enum iterator_type type,
+				  const char *key, uint32_t part_count) const;
+private:
+	struct bitset_index index;
 };
 
-#endif /* TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED */

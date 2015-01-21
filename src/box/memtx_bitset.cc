@@ -27,12 +27,11 @@
  * SUCH DAMAGE.
  */
 
-#include "bitset_index.h"
+#include "memtx_bitset.h"
 
 #include <string.h>
 
 #include "tuple.h"
-#include "bitset/index.h"
 
 static inline struct tuple *
 value_to_tuple(size_t value);
@@ -90,7 +89,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return value_to_tuple(value);
 }
 
-BitsetIndex::BitsetIndex(struct key_def *key_def)
+MemtxBitset::MemtxBitset(struct key_def *key_def)
 	: Index(key_def)
 {
 	assert(!this->key_def->is_unique);
@@ -99,25 +98,25 @@ BitsetIndex::BitsetIndex(struct key_def *key_def)
 		panic_syserror("bitset_index_create");
 }
 
-BitsetIndex::~BitsetIndex()
+MemtxBitset::~MemtxBitset()
 {
 	bitset_index_destroy(&index);
 }
 
 size_t
-BitsetIndex::size() const
+MemtxBitset::size() const
 {
 	return bitset_index_size(&index);
 }
 
 size_t
-BitsetIndex::memsize() const
+MemtxBitset::memsize() const
 {
 	return 0;
 }
 
 struct iterator *
-BitsetIndex::allocIterator() const
+MemtxBitset::allocIterator() const
 {
 	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
 			malloc(sizeof(*it));
@@ -134,11 +133,11 @@ BitsetIndex::allocIterator() const
 }
 
 struct tuple *
-BitsetIndex::findByKey(const char *key, uint32_t part_count) const
+MemtxBitset::findByKey(const char *key, uint32_t part_count) const
 {
 	(void) key;
 	(void) part_count;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "findByKey()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, "MemtxBitset", "findByKey()");
 	return NULL;
 }
 
@@ -163,7 +162,7 @@ make_key(const char *field, uint32_t *key_len)
 }
 
 struct tuple *
-BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
 {
 	assert(!key_def->is_unique);
@@ -190,7 +189,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		size_t value = tuple_to_value(new_tuple);
 		if (bitset_index_insert(&index, key, key_len, value) < 0) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
-				  "BitsetIndex", "insert");
+				  "MemtxBitset", "insert");
 		}
 	}
 
@@ -198,7 +197,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 void
-BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
+MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 			  const char *key, uint32_t part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
@@ -241,19 +240,19 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "BitsetIndex", "requested iterator type");
+				  "MemtxBitset", "requested iterator type");
 		}
 
 		if (rc != 0) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  0, "BitsetIndex", "iterator expression");
+				  0, "MemtxBitset", "iterator expression");
 		}
 
 		if (bitset_index_init_iterator((bitset_index *) &index,
 					       &it->bitset_it,
 					       &expr) != 0) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  0, "BitsetIndex", "iterator state");
+				  0, "MemtxBitset", "iterator state");
 		}
 
 		bitset_expr_destroy(&expr);

@@ -1,6 +1,5 @@
-#ifndef TARANTOOL_BOX_INDEX_BITSET_H_INCLUDED
-#define TARANTOOL_BOX_INDEX_BITSET_H_INCLUDED
-
+#ifndef TARANTOOL_BOX_MEMTX_HASH_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_HASH_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,34 +29,31 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @brief Objective C wrapper for bitset_index
- * @see bitset/index.h
- */
-
 #include "index.h"
-#include "bitset/index.h"
 
-struct bitset_index;
-struct bitset_expr;
+struct mh_index_t;
 
-class BitsetIndex: public Index {
+class MemtxHash: public Index {
 public:
-	BitsetIndex(struct key_def *key_def);
-	virtual ~BitsetIndex();
+	MemtxHash(struct key_def *key_def);
+	~MemtxHash();
+
+	virtual void reserve(uint32_t size_hint);
 	virtual size_t size() const;
+	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
 
-        virtual size_t memsize() const;
 	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
-private:
-	struct bitset_index index;
+	virtual size_t memsize() const;
+
+protected:
+	struct mh_index_t *hash;
 };
 
-#endif /* TARANTOOL_BOX_INDEX_BITSET_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_HASH_H_INCLUDED */

@@ -93,7 +93,7 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in TreeIndex for replace
+- error: Failed to allocate 16384 bytes in MemtxTree for replace
 ...
 s:delete{1}
 ---
@@ -156,7 +156,7 @@ check_iter_and_size()
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in TreeIndex for replace
+- error: Failed to allocate 16384 bytes in MemtxTree for replace
 ...
 s:delete{2}
 ---
@@ -185,7 +185,7 @@ res
 ...
 for i = 3501,4500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in TreeIndex for replace
+- error: Failed to allocate 16384 bytes in MemtxTree for replace
 ...
 s:delete{3}
 ---

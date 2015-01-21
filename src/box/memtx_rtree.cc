@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "rtree_index.h"
+#include "memtx_rtree.h"
 #include "tuple.h"
 #include "space.h"
 #include "errinj.h"
@@ -95,7 +95,7 @@ inline void extract_rectangle(struct rtree_rect *rect,
 	}
 	rtree_rect_normalize(rect);
 }
-/* {{{ TreeIndex Iterators ****************************************/
+/* {{{ MemtxRTree Iterators ****************************************/
 
 struct index_rtree_iterator {
         struct iterator base;
@@ -119,7 +119,7 @@ index_rtree_iterator_next(struct iterator *i)
 
 /* }}} */
 
-/* {{{ TreeIndex  **********************************************************/
+/* {{{ MemtxRTree  **********************************************************/
 
 static void *
 rtree_page_alloc()
@@ -133,7 +133,7 @@ rtree_page_free(void *page)
 {
 	return mempool_free(&rtree_page_pool, page);
 }
-RTreeIndex::~RTreeIndex()
+MemtxRTree::~MemtxRTree()
 {
 	// Iterator has to be destroye prior to tree
 	if (m_position != NULL) {
@@ -143,7 +143,7 @@ RTreeIndex::~RTreeIndex()
 	rtree_destroy(&tree);
 }
 
-RTreeIndex::RTreeIndex(struct key_def *key_def)
+MemtxRTree::MemtxRTree(struct key_def *key_def)
   : Index(key_def)
 {
 	assert(key_def->part_count == 1);
@@ -159,19 +159,19 @@ RTreeIndex::RTreeIndex(struct key_def *key_def)
 }
 
 size_t
-RTreeIndex::size() const
+MemtxRTree::size() const
 {
 	return rtree_number_of_records(&tree);
 }
 
 size_t
-RTreeIndex::memsize() const
+MemtxRTree::memsize() const
 {
         return rtree_used_size(&tree);
 }
 
 struct tuple *
-RTreeIndex::findByKey(const char *key, uint32_t part_count) const
+MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 {
 	rtree_rect rect;
         struct rtree_iterator iterator;
@@ -219,13 +219,13 @@ RTreeIndex::findByKey(const char *key, uint32_t part_count) const
 	}
         struct tuple *result = NULL;
         if (rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator))
-        	result = (struct tuple *)rtree_iterator_next(&iterator);
+		result = (struct tuple *)rtree_iterator_next(&iterator);
         rtree_iterator_destroy(&iterator);
         return result;
 }
 
 struct tuple *
-RTreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
                     enum dup_replace_mode)
 {
         struct rtree_rect rect;
@@ -242,7 +242,7 @@ RTreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-RTreeIndex::allocIterator() const
+MemtxRTree::allocIterator() const
 {
 	index_rtree_iterator *it = new index_rtree_iterator;
 	memset(it, 0, sizeof(*it));
@@ -250,7 +250,7 @@ RTreeIndex::allocIterator() const
 	if (it == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
 			  sizeof(struct index_rtree_iterator),
-			  "RTreeIndex", "iterator");
+			  "MemtxRTree", "iterator");
 	}
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;
@@ -258,7 +258,7 @@ RTreeIndex::allocIterator() const
 }
 
 void
-RTreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
+MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
                          const char *key, uint32_t part_count) const
 {
         struct rtree_rect rect;
@@ -348,7 +348,7 @@ RTreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 }
 
 void
-RTreeIndex::beginBuild()
+MemtxRTree::beginBuild()
 {
 	rtree_purge(&tree);
 }

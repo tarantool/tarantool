@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tree_index.h"
+#include "memtx_tree.h"
 #include "tuple.h"
 #include "space.h"
 #include "errinj.h"
@@ -71,7 +71,7 @@ int tree_index_qcompare(const void* a, const void *b, void *c)
 		*(struct tuple **)b, (struct key_def *)c);
 }
 
-/* {{{ TreeIndex Iterators ****************************************/
+/* {{{ MemtxTree Iterators ****************************************/
 struct tree_iterator {
 	struct iterator base;
 	const struct bps_tree_index *tree;
@@ -186,7 +186,7 @@ tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 }
 /* }}} */
 
-/* {{{ TreeIndex  **********************************************************/
+/* {{{ MemtxTree  **********************************************************/
 
 static void *
 extent_alloc()
@@ -201,7 +201,7 @@ extent_free(void *extent)
 	return mempool_free(&tree_extent_pool, extent);
 }
 
-TreeIndex::TreeIndex(struct key_def *key_def_arg)
+MemtxTree::MemtxTree(struct key_def *key_def_arg)
 	: Index(key_def_arg), build_array(0), build_array_size(0),
 	  build_array_alloc_size(0)
 {
@@ -220,33 +220,33 @@ TreeIndex::TreeIndex(struct key_def *key_def_arg)
 	bps_tree_index_create(&tree, key_def, extent_alloc, extent_free);
 }
 
-TreeIndex::~TreeIndex()
+MemtxTree::~MemtxTree()
 {
 	bps_tree_index_destroy(&tree);
 	free(build_array);
 }
 
 size_t
-TreeIndex::size() const
+MemtxTree::size() const
 {
 	return bps_tree_index_size(&tree);
 }
 
 size_t
-TreeIndex::memsize() const
+MemtxTree::memsize() const
 {
 	return bps_tree_index_mem_used(&tree);
 }
 
 struct tuple *
-TreeIndex::random(uint32_t rnd) const
+MemtxTree::random(uint32_t rnd) const
 {
 	struct tuple **res = bps_tree_index_random(&tree, rnd);
 	return res ? *res : 0;
 }
 
 struct tuple *
-TreeIndex::findByKey(const char *key, uint32_t part_count) const
+MemtxTree::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
 
@@ -258,7 +258,7 @@ TreeIndex::findByKey(const char *key, uint32_t part_count) const
 }
 
 struct tuple *
-TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
 	uint32_t errcode;
@@ -271,7 +271,7 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		bps_tree_index_insert(&tree, new_tuple, &dup_tuple);
 		if (!tree_res) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  BPS_TREE_EXTENT_SIZE, "TreeIndex", "replace");
+				  BPS_TREE_EXTENT_SIZE, "MemtxTree", "replace");
 		}
 
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
@@ -292,14 +292,14 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-TreeIndex::allocIterator() const
+MemtxTree::allocIterator() const
 {
 	struct tree_iterator *it = (struct tree_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
 			  sizeof(struct tree_iterator),
-			  "TreeIndex", "iterator");
+			  "MemtxTree", "iterator");
 	}
 
 	it->key_def = key_def;
@@ -310,7 +310,7 @@ TreeIndex::allocIterator() const
 }
 
 void
-TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
+MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 			const char *key, uint32_t part_count) const
 {
 	assert(part_count == 0 || key != NULL);
@@ -379,13 +379,13 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 }
 
 void
-TreeIndex::beginBuild()
+MemtxTree::beginBuild()
 {
 	assert(bps_tree_index_size(&tree) == 0);
 }
 
 void
-TreeIndex::reserve(uint32_t size_hint)
+MemtxTree::reserve(uint32_t size_hint)
 {
 	if (size_hint < build_array_alloc_size)
 		return;
@@ -395,7 +395,7 @@ TreeIndex::reserve(uint32_t size_hint)
 }
 
 void
-TreeIndex::buildNext(struct tuple *tuple)
+MemtxTree::buildNext(struct tuple *tuple)
 {
 	if (!build_array) {
 		build_array = (struct tuple**)malloc(BPS_TREE_EXTENT_SIZE);
@@ -415,7 +415,7 @@ TreeIndex::buildNext(struct tuple *tuple)
 }
 
 void
-TreeIndex::endBuild()
+MemtxTree::endBuild()
 {
 	qsort_arg(build_array, build_array_size, sizeof(struct tuple *), tree_index_qcompare, key_def);
 	bps_tree_index_build(&tree, build_array, build_array_size);

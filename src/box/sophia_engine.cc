@@ -31,7 +31,7 @@
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "engine.h"
-#include "engine_sophia.h"
+#include "sophia_engine.h"
 #include "txn.h"
 #include "index.h"
 #include "sophia_index.h"

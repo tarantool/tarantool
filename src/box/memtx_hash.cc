@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "hash_index.h"
+#include "memtx_hash.h"
 #include "say.h"
 #include "tuple.h"
 #include "errinj.h"
@@ -153,7 +153,7 @@ typedef struct tuple * mh_node_t;
 #define mh_bytemap 1
 #include "salad/mhash.h"
 
-/* {{{ HashIndex Iterators ****************************************/
+/* {{{ MemtxHash Iterators ****************************************/
 
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
@@ -197,43 +197,43 @@ hash_iterator_eq(struct iterator *it)
 
 /* }}} */
 
-/* {{{ HashIndex -- implementation of all hashes. **********************/
+/* {{{ MemtxHash -- implementation of all hashes. **********************/
 
-HashIndex::HashIndex(struct key_def *key_def)
+MemtxHash::MemtxHash(struct key_def *key_def)
 	: Index(key_def)
 {
 	hash = mh_index_new();
 	if (hash == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash),
-			  "HashIndex", "hash");
+			  "MemtxHash", "hash");
 	}
 }
 
-HashIndex::~HashIndex()
+MemtxHash::~MemtxHash()
 {
 	mh_index_delete(hash);
 }
 
 void
-HashIndex::reserve(uint32_t size_hint)
+MemtxHash::reserve(uint32_t size_hint)
 {
 	mh_index_reserve(hash, size_hint, key_def);
 }
 
 size_t
-HashIndex::size() const
+MemtxHash::size() const
 {
 	return mh_size(hash);
 }
 
 size_t
-HashIndex::memsize() const
+MemtxHash::memsize() const
 {
         return mh_index_memsize(hash);
 }
 
 struct tuple *
-HashIndex::random(uint32_t rnd) const
+MemtxHash::random(uint32_t rnd) const
 {
 	uint32_t k = mh_index_random(hash, rnd);
 	if (k != mh_end(hash))
@@ -242,7 +242,7 @@ HashIndex::random(uint32_t rnd) const
 }
 
 struct tuple *
-HashIndex::findByKey(const char *key, uint32_t part_count) const
+MemtxHash::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
 	(void) part_count;
@@ -255,7 +255,7 @@ HashIndex::findByKey(const char *key, uint32_t part_count) const
 }
 
 struct tuple *
-HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
 	uint32_t errcode;
@@ -302,14 +302,14 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-HashIndex::allocIterator() const
+MemtxHash::allocIterator() const
 {
 	struct hash_iterator *it = (struct hash_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
 			  sizeof(struct hash_iterator),
-			  "HashIndex", "iterator");
+			  "MemtxHash", "iterator");
 	}
 
 	it->base.next = hash_iterator_ge;
@@ -318,7 +318,7 @@ HashIndex::allocIterator() const
 }
 
 void
-HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
+MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 			const char *key, uint32_t part_count) const
 {
 	assert(part_count == 0 || key != NULL);

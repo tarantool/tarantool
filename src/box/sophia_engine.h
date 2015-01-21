@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED
-#define TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED
+#ifndef TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED
+#define TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -48,4 +48,4 @@ struct SophiaFactory: public EngineFactory {
 void sophia_info(void (*)(const char*, const char*, void*), void*);
 void sophia_raise(void*);
 
-#endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */
+#endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */

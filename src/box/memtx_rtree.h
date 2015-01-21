@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,52 +31,29 @@
 
 #include "index.h"
 
-struct tuple;
-struct key_data;
+#include <salad/rtree.h>
 
-int
-tree_index_compare(const struct tuple *a, const struct tuple *b, struct key_def *key_def);
-
-int
-tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_def);
-
-#define BPS_TREE_NAME _index
-#define BPS_TREE_BLOCK_SIZE (512)
-#define BPS_TREE_EXTENT_SIZE (16*1024)
-#define BPS_TREE_COMPARE(a, b, arg) tree_index_compare(a, b, arg)
-#define BPS_TREE_COMPARE_KEY(a, b, arg) tree_index_compare_key(a, b, arg)
-#define bps_tree_elem_t struct tuple *
-#define bps_tree_key_t struct key_data *
-#define bps_tree_arg_t struct key_def *
-
-#include "salad/bps_tree.h"
-
-class TreeIndex: public Index {
+class MemtxRTree: public Index
+{
 public:
-	TreeIndex(struct key_def *key_def);
-	virtual ~TreeIndex();
+	MemtxRTree(struct key_def *key_def);
+	~MemtxRTree();
 
 	virtual void beginBuild();
-	virtual void reserve(uint32_t size_hint);
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
 	virtual size_t size() const;
-	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
+                                      struct tuple *new_tuple,
+                                      enum dup_replace_mode mode);
 
 	virtual size_t memsize() const;
 	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+                                  enum iterator_type type,
+                                  const char *key, uint32_t part_count) const;
 
-// protected:
-	struct bps_tree_index tree;
-	struct tuple **build_array;
-	size_t build_array_size, build_array_alloc_size;
+protected:
+	struct rtree tree;
 };
 
-#endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED */

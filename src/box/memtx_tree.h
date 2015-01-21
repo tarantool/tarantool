@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_TREE_INDEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,14 +31,35 @@
 
 #include "index.h"
 
-struct mh_index_t;
+struct tuple;
+struct key_data;
 
-class HashIndex: public Index {
+int
+tree_index_compare(const struct tuple *a, const struct tuple *b, struct key_def *key_def);
+
+int
+tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_def);
+
+#define BPS_TREE_NAME _index
+#define BPS_TREE_BLOCK_SIZE (512)
+#define BPS_TREE_EXTENT_SIZE (16*1024)
+#define BPS_TREE_COMPARE(a, b, arg) tree_index_compare(a, b, arg)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) tree_index_compare_key(a, b, arg)
+#define bps_tree_elem_t struct tuple *
+#define bps_tree_key_t struct key_data *
+#define bps_tree_arg_t struct key_def *
+
+#include "salad/bps_tree.h"
+
+class MemtxTree: public Index {
 public:
-	HashIndex(struct key_def *key_def);
-	~HashIndex();
+	MemtxTree(struct key_def *key_def);
+	virtual ~MemtxTree();
 
+	virtual void beginBuild();
 	virtual void reserve(uint32_t size_hint);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
 	virtual size_t size() const;
 	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
@@ -46,14 +67,16 @@ public:
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
 
+	virtual size_t memsize() const;
 	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
-	virtual size_t memsize() const;
 
-protected:
-	struct mh_index_t *hash;
+// protected:
+	struct bps_tree_index tree;
+	struct tuple **build_array;
+	size_t build_array_size, build_array_alloc_size;
 };
 
-#endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */
+#endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */

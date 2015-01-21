@@ -26,15 +26,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "memtx_engine.h"
 #include "tuple.h"
-#include "engine.h"
-#include "engine_memtx.h"
 #include "txn.h"
 #include "index.h"
-#include "hash_index.h"
-#include "tree_index.h"
-#include "rtree_index.h"
-#include "bitset_index.h"
+#include "memtx_hash.h"
+#include "memtx_tree.h"
+#include "memtx_rtree.h"
+#include "memtx_bitset.h"
 #include "space.h"
 #include "salad/rlist.h"
 #include <stdlib.h>
@@ -103,13 +102,13 @@ MemtxFactory::createIndex(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
-		return new HashIndex(key_def);
+		return new MemtxHash(key_def);
 	case TREE:
-		return new TreeIndex(key_def);
+		return new MemtxTree(key_def);
 	case RTREE:
-		return new RTreeIndex(key_def);
+		return new MemtxRTree(key_def);
 	case BITSET:
-		return new BitsetIndex(key_def);
+		return new MemtxBitset(key_def);
 	default:
 		assert(false);
 		return NULL;

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
-#define TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
+#ifndef TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "engine.h"
 
 struct MemtxFactory: public EngineFactory {
 	MemtxFactory();
@@ -40,4 +41,4 @@ struct MemtxFactory: public EngineFactory {
 	virtual void snapshot(enum engine_snapshot_event, int64_t);
 };
 
-#endif /* TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

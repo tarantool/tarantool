@@ -29,13 +29,13 @@ add_library(box
     tuple_update.cc
     key_def.cc
     index.cc
-    hash_index.cc
-    tree_index.cc
-    rtree_index.cc
-    bitset_index.cc
+    memtx_hash.cc
+    memtx_tree.cc
+    memtx_rtree.cc
+    memtx_bitset.cc
     engine.cc
-    engine_memtx.cc
-    engine_sophia.cc
+    memtx_engine.cc
+    sophia_engine.cc
     sophia_index.cc
     space.cc
     alter.cc

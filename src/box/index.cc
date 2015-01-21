@@ -27,10 +27,6 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
-#include "hash_index.h"
-#include "tree_index.h"
-#include "bitset_index.h"
-#include "sophia_index.h"
 #include "tuple.h"
 #include "say.h"
 #include "schema.h"

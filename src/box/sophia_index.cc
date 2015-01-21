@@ -34,7 +34,7 @@
 #include "schema.h"
 #include "space.h"
 #include "cfg.h"
-#include "engine_sophia.h"
+#include "sophia_engine.h"
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sophia.h>
