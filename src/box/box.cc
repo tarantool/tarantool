@@ -64,6 +64,9 @@ int64_t snapshot_last_lsn = 0;
 static void
 box_snapshot_cb(struct xlog *l);
 
+static void
+engine_save_snapshot(struct recovery_state *r);
+
 /** The snapshot row metadata repeats the structure of REPLACE request. */
 struct request_replace_body {
 	uint8_t m_body;
@@ -386,6 +389,12 @@ box_free(void)
 static void
 engine_init()
 {
+	/*
+	 * Sic: order is important here, since
+	 * memtx must be the first to participate
+	 * in snapshotting (in enigne_foreach order),
+	 * so it must be registered first.
+	 */
 	MemtxFactory *memtx = new MemtxFactory();
 	engine_register(memtx);
 
@@ -444,14 +453,14 @@ box_init()
 			/* Initialize a new replica */
 			replica_bootstrap(recovery);
 			engine_end_recover_snapshot();
-			box_deploy(recovery);
+			engine_save_snapshot(recovery);
 		} else {
 			/* Initialize the first server of a new cluster */
 			recovery_bootstrap(recovery);
 			box_set_cluster_uuid();
 			box_set_server_uuid();
 			engine_end_recover_snapshot();
-			box_deploy(recovery);
+			engine_save_snapshot(recovery);
 		}
 		fiber_gc();
 	} catch (Exception *e) {
@@ -656,7 +665,7 @@ error:
 }
 
 void
-box_deploy(struct recovery_state *r)
+engine_save_snapshot(struct recovery_state *r)
 {
 	/* create memtx snapshot */
 	snapshot_save(r, box_snapshot_cb, true);
