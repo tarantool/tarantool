@@ -31,6 +31,13 @@ local default_sophia_cfg = {
     page_size    = 131072
 }
 
+local sophia_template = {
+    memory_limit = 'number',
+    threads      = 'number',
+    node_size    = 'number',
+    page_size    = 'number'
+}
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -77,7 +84,7 @@ local template = {
     snap_dir            = 'string',
     wal_dir             = 'string',
     sophia_dir          = 'string',
-    sophia              = 'table',
+    sophia              = 'sophia',
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',
@@ -114,7 +121,7 @@ local dynamic_cfg = {
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
 }
 
-local function prepare_cfg(table)
+local function prepare_cfg(table, default_cfg, template, wrapper_cfg)
     if table == nil then
         return {}
     end
@@ -134,6 +141,16 @@ local function prepare_cfg(table)
             v = default_cfg[k]
         elseif template[k] == 'any' then
             -- any type is ok
+        elseif template[k] == 'sophia' then
+            if type(v) ~= 'table' then
+                error("Error: cfg parameter sophia should be a table")
+            end
+            v = prepare_cfg(v, default_sophia_cfg, sophia_template, {})
+            for i,j in pairs(default_sophia_cfg) do
+                if v[i] == nil then
+                    v[i] = j
+                end
+            end
         elseif (string.find(template[k], ',') == nil) then
             -- one type
             if type(v) ~= template[k] then
@@ -155,7 +172,7 @@ local function prepare_cfg(table)
 end
 
 local function reload_cfg(oldcfg, newcfg)
-    newcfg = prepare_cfg(newcfg)
+    newcfg = prepare_cfg(newcfg, default_cfg, template, wrapper_cfg)
     for key, val in pairs(newcfg) do
         if dynamic_cfg[key] == nil then
             box.error(box.error.RELOAD_CFG, key);
@@ -187,7 +204,7 @@ setmetatable(box, {
 })
 
 local function load_cfg(cfg)
-    cfg = prepare_cfg(cfg)
+    cfg = prepare_cfg(cfg, default_cfg, template, wrapper_cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
