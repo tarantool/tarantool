@@ -117,10 +117,6 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Engine *open() = 0;
-	/** Called at server shutdown. */
-	virtual void shutdown();
-	/** Recover engine, called once at startup. */
-	virtual void recover();
 	/* Inform engine about a recovery stage change. */
 	virtual void recoveryEvent(enum engine_recovery_event);
 	/**
@@ -144,6 +140,7 @@ public:
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
 	virtual void set_snapshot_lsn(int64_t lsn) = 0;
+
 	/**
 	 * Engine snapshotting support.
 	 */

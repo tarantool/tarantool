@@ -47,12 +47,6 @@ EngineFactory::EngineFactory(const char *engine_name)
 void EngineFactory::init()
 {}
 
-void EngineFactory::recover()
-{}
-
-void EngineFactory::shutdown()
-{}
-
 void EngineFactory::begin(struct txn*, struct space*)
 {}
 
@@ -97,7 +91,6 @@ void engine_shutdown()
 {
 	EngineFactory *e, *tmp;
 	rlist_foreach_entry_safe(e, &engines, link, tmp) {
-		e->shutdown();
 		delete e;
 	}
 }
