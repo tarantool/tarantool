@@ -322,7 +322,7 @@ file_log:seek(0, 'SEEK_END') ~= 0
 
 --# setopt delimiter ';'
 
-require('fiber').create(
+_ = fiber.create(
    function()
          conn = require('net.box').new(box.cfg.listen)
          conn.call('no_such_function', {})
@@ -337,7 +337,7 @@ while true do
          return "Failure"
       end
    end
-   require('fiber').sleep(0.1)
+   fiber.sleep(0.01)
 end;
 
 --# setopt delimiter ''
