@@ -108,6 +108,8 @@ sophia_recovery_begin_snapshot(struct space *space)
 
 SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
+	 ,m_prev_checkpoint_lsn(-1)
+	 ,m_checkpoint_lsn(-1)
 {
 	flags = ENGINE_TRANSACTIONAL;
 	env = NULL;
@@ -399,20 +401,39 @@ SophiaFactory::begin_recover_snapshot(int64_t lsn)
 int
 SophiaFactory::begin_checkpoint(int64_t lsn)
 {
-	sophia_snapshot(env, lsn);
-	return 0;
+	assert(m_checkpoint_lsn == -1);
+	if (lsn != m_prev_checkpoint_lsn) {
+		sophia_snapshot(env, lsn);
+		m_checkpoint_lsn = lsn;
+		return 0;
+	}
+	errno = EEXIST;
+	return -1;
 }
 
 int
-SophiaFactory::wait_checkpoint(int64_t lsn)
+SophiaFactory::wait_checkpoint()
 {
-	while (! sophia_snapshot_ready(env, lsn))
+	assert(m_checkpoint_lsn != -1);
+	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
 		fiber_yield_timeout(.020);
 	return 0;
 }
 
 void
-SophiaFactory::delete_checkpoint(int64_t lsn)
+SophiaFactory::commit_checkpoint()
 {
-	sophia_delete_checkpoint(env, lsn);
+	if (m_prev_checkpoint_lsn >= 0)
+		sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
+	m_prev_checkpoint_lsn = m_checkpoint_lsn;
+	m_checkpoint_lsn = -1;
+}
+
+void
+SophiaFactory::abort_checkpoint()
+{
+	if (m_checkpoint_lsn >= 0) {
+		sophia_delete_checkpoint(env, m_checkpoint_lsn);
+		m_checkpoint_lsn = -1;
+	}
 }

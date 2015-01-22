@@ -143,3 +143,39 @@ engine_end_recovery()
 	space_foreach(do_one_recover_step, NULL);
 }
 
+int
+engine_checkpoint(int64_t checkpoint_id)
+{
+	static bool snapshot_is_in_progress = false;
+	if (snapshot_is_in_progress)
+		return EINPROGRESS;
+
+	snapshot_is_in_progress = true;
+
+	/* create engine snapshot */
+	EngineFactory *f;
+	engine_foreach(f) {
+		if (f->begin_checkpoint(checkpoint_id))
+			goto error;
+	}
+
+	/* wait for engine snapshot completion */
+	engine_foreach(f) {
+		if (f->wait_checkpoint())
+			goto error;
+	}
+
+	/* remove previous snapshot reference */
+	engine_foreach(f) {
+		f->commit_checkpoint();
+	}
+	snapshot_is_in_progress = false;
+	return 0;
+error:
+	int save_errno = errno;
+	/* rollback snapshot creation */
+	engine_foreach(f)
+		f->abort_checkpoint();
+	snapshot_is_in_progress = false;
+	return save_errno;
+}

@@ -131,14 +131,16 @@ public:
 	 * Wait for a checkpoint to complete. The LSN
 	 * must match one in begin_checkpoint().
 	 */
-	virtual int wait_checkpoint(int64_t) = 0;
+	virtual int wait_checkpoint() = 0;
 	/**
-	 * Delete a snapshot - in case one
-	 * of the engines failed to save a snapshot,
-	 * delete it in all other engines, otherwise,
-	 * delete the previous snapshot in all engines.
+	 * All engines prepared their checkpoints,
+	 * fix up the changes.
 	 */
-	virtual void delete_checkpoint(int64_t) = 0;
+	virtual void commit_checkpoint() = 0;
+	/**
+	 * An error in one of the engines, abort checkpoint.
+	 */
+	virtual void abort_checkpoint() = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -234,5 +236,11 @@ engine_end_recover_snapshot();
  */
 void
 engine_end_recovery();
+
+/**
+ * Save a snapshot.
+ */
+int
+engine_checkpoint(int64_t checkpoint_id);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

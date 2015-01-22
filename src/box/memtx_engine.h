@@ -41,8 +41,15 @@ struct MemtxFactory: public EngineFactory {
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
 	virtual int begin_checkpoint(int64_t);
-	virtual int wait_checkpoint(int64_t);
-	virtual void delete_checkpoint(int64_t);
+	virtual int wait_checkpoint();
+	virtual void commit_checkpoint();
+	virtual void abort_checkpoint();
+private:
+	/**
+	 * LSN of the snapshot which is in progress.
+	 */
+	int64_t m_snapshot_lsn;
+	pid_t m_snapshot_pid;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

@@ -44,10 +44,14 @@ struct SophiaFactory: public EngineFactory {
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
 	virtual int begin_checkpoint(int64_t);
-	virtual int wait_checkpoint(int64_t);
-	virtual void delete_checkpoint(int64_t);
+	virtual int wait_checkpoint();
+	virtual void commit_checkpoint();
+	virtual void abort_checkpoint();
 	void *env;
 	void *tx;
+private:
+	int64_t m_prev_checkpoint_lsn;
+	int64_t m_checkpoint_lsn;
 };
 
 void sophia_info(void (*)(const char*, const char*, void*), void*);
