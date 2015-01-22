@@ -3,7 +3,7 @@
 	url = https://github.com/tarantool/luajit.git
 [submodule "test/lib/tarantool-python"]
 	path = test/lib/tarantool-python
-	url = https://github.com/mailru/tarantool-python.git
+	url = https://github.com/tarantool/tarantool-python.git
 [submodule "test/lib/msgpack-python"]
 	path = test/lib/msgpack-python
 	url = https://github.com/msgpack/msgpack-python.git
