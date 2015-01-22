@@ -100,15 +100,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	 */
 	remote->addr_len = sizeof(remote->addrstorage);
 	/* Prepare null-terminated strings for coio_connect() */
-	char host[URI_MAXHOST] = { '\0' };
-	if (uri->host) {
-		snprintf(host, sizeof(host), "%.*s", (int) uri->host_len,
-			 uri->host);
-	}
-	char service[URI_MAXSERVICE];
-	snprintf(service, sizeof(service), "%.*s", (int) uri->service_len,
-		 uri->service);
-	coio_connect(coio, host, service, &remote->addr, &remote->addr_len, 0);
+	coio_connect(coio, uri, &remote->addr, &remote->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greeting, sizeof(greeting));
 
