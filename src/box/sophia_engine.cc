@@ -112,6 +112,7 @@ SophiaFactory::SophiaFactory()
 	flags = ENGINE_TRANSACTIONAL;
 	env = NULL;
 	tx  = NULL;
+	sophia_dir_exists = 0;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -125,6 +126,7 @@ SophiaFactory::init()
 		panic("failed to create sophia environment");
 	void *c = sp_ctl(env);
 	sp_set(c, "sophia.path", cfg_gets("sophia_dir"));
+	sp_set(c, "sophia.path_create", "0");
 	sp_set(c, "scheduler.threads", cfg_gets("sophia.threads"));
 	sp_set(c, "memory.limit", cfg_gets("sophia.memory_limit"));
 	sp_set(c, "compaction.node_size", cfg_gets("sophia.node_size"));
@@ -135,6 +137,8 @@ SophiaFactory::init()
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_raise(env);
+	if (access(cfg_gets("sophia_dir"), F_OK) == 0)
+		sophia_dir_exists = 1;
 }
 
 Engine*
