@@ -15,5 +15,5 @@
 	url = https://github.com/rtsisyk/luafun.git
 [submodule "sophia"]
        path = third_party/sophia
-       url = https://github.com/pmwkaa/sophia.git
+       url = https://github.com/tarantool/sophia.git
        branch = dev
