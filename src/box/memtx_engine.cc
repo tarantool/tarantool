@@ -46,14 +46,14 @@
 #include "tarantool.h"
 #include "coeio.h"
 
-struct Memtx: public Engine {
-	Memtx(EngineFactory *e)
-		: Engine(e)
+struct MemtxSpace: public Handler {
+	MemtxSpace(Engine *e)
+		: Handler(e)
 	{ }
-	virtual ~Memtx()
+	virtual ~MemtxSpace()
 	{
 		/* do nothing */
-		/* factory->close(this); */
+		/* engine->close(this); */
 	}
 };
 
@@ -78,8 +78,8 @@ memtx_recovery_prepare(struct engine_recovery *r)
 	r->replace = space_replace_no_keys;
 }
 
-MemtxFactory::MemtxFactory()
-	:EngineFactory("memtx"),
+MemtxEngine::MemtxEngine()
+	:Engine("memtx"),
 	m_snapshot_lsn(-1),
 	m_snapshot_pid(0)
 {
@@ -89,24 +89,24 @@ MemtxFactory::MemtxFactory()
 }
 
 void
-MemtxFactory::end_recover_snapshot()
+MemtxEngine::end_recover_snapshot()
 {
 	recovery.recover = space_build_primary_key;
 }
 
 void
-MemtxFactory::end_recovery()
+MemtxEngine::end_recovery()
 {
 	recovery.recover = space_build_all_keys;
 }
 
-Engine *MemtxFactory::open()
+Handler *MemtxEngine::open()
 {
-	return new Memtx(this);
+	return new MemtxSpace(this);
 }
 
 Index *
-MemtxFactory::createIndex(struct key_def *key_def)
+MemtxEngine::createIndex(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
@@ -124,7 +124,7 @@ MemtxFactory::createIndex(struct key_def *key_def)
 }
 
 void
-MemtxFactory::dropIndex(Index *index)
+MemtxEngine::dropIndex(Index *index)
 {
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
@@ -134,7 +134,7 @@ MemtxFactory::dropIndex(Index *index)
 }
 
 void
-MemtxFactory::keydefCheck(struct key_def *key_def)
+MemtxEngine::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
@@ -209,7 +209,7 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-MemtxFactory::rollback(struct txn *txn)
+MemtxEngine::rollback(struct txn *txn)
 {
 	struct txn_stmt *stmt;
 	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
@@ -222,7 +222,7 @@ MemtxFactory::rollback(struct txn *txn)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxFactory::begin_recover_snapshot(int64_t /* lsn */)
+MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)
 {
 	/*
 	 * memtx snapshotting supported directly by box.
@@ -381,7 +381,7 @@ snapshot_save(struct recovery_state *r)
 }
 
 int
-MemtxFactory::begin_checkpoint(int64_t lsn)
+MemtxEngine::begin_checkpoint(int64_t lsn)
 {
 	assert(m_snapshot_lsn == -1);
 	assert(m_snapshot_pid == 0);
@@ -425,7 +425,7 @@ MemtxFactory::begin_checkpoint(int64_t lsn)
 }
 
 int
-MemtxFactory::wait_checkpoint()
+MemtxEngine::wait_checkpoint()
 {
 	assert(m_snapshot_lsn >= 0);
 	assert(m_snapshot_pid > 0);
@@ -458,7 +458,7 @@ snapshot_rename_cb(va_list ap)
 }
 
 void
-MemtxFactory::commit_checkpoint()
+MemtxEngine::commit_checkpoint()
 {
 	/* begin_checkpoint() must have been done */
 	assert(m_snapshot_lsn >= 0);
@@ -483,7 +483,7 @@ snapshot_unlink_cb(va_list ap)
 }
 
 void
-MemtxFactory::abort_checkpoint()
+MemtxEngine::abort_checkpoint()
 {
 	if (m_snapshot_pid > 0) {
 		assert(m_snapshot_lsn >= 0);

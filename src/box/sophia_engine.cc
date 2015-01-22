@@ -57,8 +57,8 @@ void sophia_raise(void *env)
 
 void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
 {
-	SophiaFactory *factory = (SophiaFactory*)engine_find("sophia");
-	void *env = factory->env;
+	SophiaEngine *engine = (SophiaEngine*)engine_find("sophia");
+	void *env = engine->env;
 	void *c = sp_ctl(env);
 	void *o, *cur = sp_cursor(c);
 	if (cur == NULL)
@@ -71,18 +71,18 @@ void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
 	sp_destroy(cur);
 }
 
-struct Sophia: public Engine {
-	Sophia(EngineFactory*);
+struct SophiaSpace: public Handler {
+	SophiaSpace(Engine*);
 };
 
-Sophia::Sophia(EngineFactory *e)
-	:Engine(e)
+SophiaSpace::SophiaSpace(Engine *e)
+	:Handler(e)
 { }
 
 static void
 sophia_recovery_end(struct space *space)
 {
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->state   = READY_ALL_KEYS;
 	r->replace = sophia_replace;
 	r->recover = space_noop;
@@ -94,7 +94,7 @@ sophia_recovery_end(struct space *space)
 static void
 sophia_recovery_end_snapshot(struct space *space)
 {
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->state   = READY_PRIMARY_KEY;
 	r->recover = sophia_recovery_end;
 }
@@ -102,12 +102,12 @@ sophia_recovery_end_snapshot(struct space *space)
 static void
 sophia_recovery_begin_snapshot(struct space *space)
 {
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->recover = sophia_recovery_end_snapshot;
 }
 
-SophiaFactory::SophiaFactory()
-	:EngineFactory("sophia")
+SophiaEngine::SophiaEngine()
+	:Engine("sophia")
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
 {
@@ -120,7 +120,7 @@ SophiaFactory::SophiaFactory()
 }
 
 void
-SophiaFactory::init()
+SophiaEngine::init()
 {
 	env = sp_env();
 	if (env == NULL)
@@ -139,14 +139,14 @@ SophiaFactory::init()
 		sophia_raise(env);
 }
 
-Engine*
-SophiaFactory::open()
+Handler *
+SophiaEngine::open()
 {
-	return new Sophia(this);
+	return new SophiaSpace(this);
 }
 
 void
-SophiaFactory::end_recover_snapshot()
+SophiaEngine::end_recover_snapshot()
 {
 	recovery.replace = sophia_replace_recover;
 	recovery.recover = sophia_recovery_end_snapshot;
@@ -154,7 +154,7 @@ SophiaFactory::end_recover_snapshot()
 
 
 void
-SophiaFactory::end_recovery()
+SophiaEngine::end_recovery()
 {
 	/* complete two-phase recovery */
 	int rc = sp_open(env);
@@ -166,7 +166,7 @@ SophiaFactory::end_recovery()
 }
 
 Index*
-SophiaFactory::createIndex(struct key_def *key_def)
+SophiaEngine::createIndex(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case TREE: return new SophiaIndex(key_def);
@@ -199,7 +199,7 @@ drop_repository(char *path)
 }
 
 void
-SophiaFactory::dropIndex(Index *index)
+SophiaEngine::dropIndex(Index *index)
 {
 	SophiaIndex *i = (SophiaIndex*)index;
 	int rc = sp_destroy(i->db);
@@ -214,7 +214,7 @@ SophiaFactory::dropIndex(Index *index)
 }
 
 void
-SophiaFactory::keydefCheck(struct key_def *key_def)
+SophiaEngine::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case TREE:
@@ -253,9 +253,9 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-SophiaFactory::begin(struct txn *txn, struct space *space)
+SophiaEngine::begin(struct txn *txn, struct space *space)
 {
-	assert(space->engine->factory == this);
+	assert(space->handler->engine == this);
 	if (txn->n_stmts == 1) {
 		assert(tx == NULL);
 		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
@@ -270,7 +270,7 @@ SophiaFactory::begin(struct txn *txn, struct space *space)
 }
 
 void
-SophiaFactory::commit(struct txn *txn)
+SophiaEngine::commit(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
@@ -298,7 +298,7 @@ SophiaFactory::commit(struct txn *txn)
 }
 
 void
-SophiaFactory::rollback(struct txn *)
+SophiaEngine::rollback(struct txn *)
 {
 	if (tx == NULL)
 		return;
@@ -393,13 +393,13 @@ sophia_delete_checkpoint(void *env, int64_t lsn)
 }
 
 void
-SophiaFactory::begin_recover_snapshot(int64_t lsn)
+SophiaEngine::begin_recover_snapshot(int64_t lsn)
 {
 	sophia_snapshot_recover(env, lsn);
 }
 
 int
-SophiaFactory::begin_checkpoint(int64_t lsn)
+SophiaEngine::begin_checkpoint(int64_t lsn)
 {
 	assert(m_checkpoint_lsn == -1);
 	if (lsn != m_prev_checkpoint_lsn) {
@@ -412,7 +412,7 @@ SophiaFactory::begin_checkpoint(int64_t lsn)
 }
 
 int
-SophiaFactory::wait_checkpoint()
+SophiaEngine::wait_checkpoint()
 {
 	assert(m_checkpoint_lsn != -1);
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
@@ -421,7 +421,7 @@ SophiaFactory::wait_checkpoint()
 }
 
 void
-SophiaFactory::commit_checkpoint()
+SophiaEngine::commit_checkpoint()
 {
 	if (m_prev_checkpoint_lsn >= 0)
 		sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
@@ -430,7 +430,7 @@ SophiaFactory::commit_checkpoint()
 }
 
 void
-SophiaFactory::abort_checkpoint()
+SophiaEngine::abort_checkpoint()
 {
 	if (m_checkpoint_lsn >= 0) {
 		sophia_delete_checkpoint(env, m_checkpoint_lsn);

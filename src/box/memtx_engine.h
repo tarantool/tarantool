@@ -30,9 +30,9 @@
  */
 #include "engine.h"
 
-struct MemtxFactory: public EngineFactory {
-	MemtxFactory();
-	virtual Engine *open();
+struct MemtxEngine: public Engine {
+	MemtxEngine();
+	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);

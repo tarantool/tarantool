@@ -378,10 +378,10 @@ engine_init()
 	 * in snapshotting (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxFactory *memtx = new MemtxFactory();
+	MemtxEngine *memtx = new MemtxEngine();
 	engine_register(memtx);
 
-	SophiaFactory *sophia = new SophiaFactory();
+	SophiaEngine *sophia = new SophiaEngine();
 	sophia->init();
 	engine_register(sophia);
 }

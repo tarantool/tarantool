@@ -30,10 +30,10 @@
  */
 #include "engine.h"
 
-struct SophiaFactory: public EngineFactory {
-	SophiaFactory();
+struct SophiaEngine: public Engine {
+	SophiaEngine();
 	virtual void init();
-	virtual Engine *open();
+	virtual Handler *open();
 	virtual Index *createIndex(struct key_def*);
 	virtual void dropIndex(Index*);
 	virtual void keydefCheck(struct key_def*f);

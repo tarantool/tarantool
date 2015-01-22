@@ -82,17 +82,17 @@ struct engine_recovery {
 	engine_replace_f replace;
 };
 
-struct Engine;
+struct Handler;
 
 /** Engine instance */
-class EngineFactory: public Object {
+class Engine: public Object {
 public:
-	EngineFactory(const char *engine_name);
-	virtual ~EngineFactory() {}
+	Engine(const char *engine_name);
+	virtual ~Engine() {}
 	/** Called once at startup. */
 	virtual void init();
 	/** Create a new engine instance for a space. */
-	virtual Engine *open() = 0;
+	virtual Handler *open() = 0;
 	/**
 	 * Check a key definition for violation of
 	 * various limits.
@@ -155,10 +155,10 @@ public:
 
 /** Engine handle - an operator of a space */
 
-struct Engine: public Object {
+struct Handler: public Object {
 public:
-	Engine(EngineFactory *f);
-	virtual ~Engine() {}
+	Handler(Engine *f);
+	virtual ~Handler() {}
 
 	inline struct tuple *
 	replace(struct space *space,
@@ -173,21 +173,21 @@ public:
 	}
 
 	inline void initRecovery() {
-		recovery = factory->recovery;
+		recovery = engine->recovery;
 	}
 
 	engine_recovery recovery;
-	EngineFactory *factory;
+	Engine *engine;
 };
 
-/** Register engine factory instance. */
-void engine_register(EngineFactory *engine);
+/** Register engine engine instance. */
+void engine_register(Engine *engine);
 
 /** Call a visitor function on every registered engine. */
 #define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
-/** Find engine factory by name. */
-EngineFactory *engine_find(const char *name);
+/** Find engine engine by name. */
+Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
@@ -211,9 +211,9 @@ engine_can_be_temporary(uint32_t flags)
 }
 
 static inline uint32_t
-engine_id(Engine *engine)
+engine_id(Handler *space)
 {
-	return engine->factory->id;
+	return space->engine->id;
 }
 
 /**
