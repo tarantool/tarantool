@@ -20,7 +20,7 @@ local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(28)
+test:plan(30)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -80,13 +80,12 @@ client:write(string.format("require('console').connect('test:pass@%s')\n",
 test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
     'remote access denied')
 
--- Add permissions to execute `dostring` for `guest`
-box.schema.func.create('dostring')
-box.schema.user.grant('test', 'execute', 'function', 'dostring')
+-- Add permissions to execute for `test`
+box.schema.user.grant('test', 'execute', 'universe')
 
 client:write(string.format("require('console').connect('test:pass@%s')\n",
     IPROTO_SOCKET))
-test:is(yaml.decode(client:read(EOL)), '', "remote connect")
+test:ok(yaml.decode(client:read(EOL)), "remote connect")
 
 -- Execute some command
 client:write("require('fiber').id()\n")
@@ -112,6 +111,14 @@ client:write("~.\n")
 client:write("require('fiber').id()\n")
 local fid1x = yaml.decode(client:read(EOL))[1]
 test:is(fid1, fid1x, "remote disconnect")
+
+-- Connect to admin port
+client:write(string.format("require('console').connect('%s')\n",
+    CONSOLE_SOCKET))
+test:ok(yaml.decode(client:read(EOL))[1], 'admin connect')
+client:write("2 + 2\n")
+test:ok(yaml.decode(client:read(EOL))[1] == 4, "admin eval")
+-- there is no way to disconnect here
 
 -- Disconect from console
 client:shutdown()

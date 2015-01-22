@@ -495,8 +495,12 @@ local remote_methods = {
         end
 
         expr = tostring(expr)
-        local res = self:_request('eval', true, expr, {...})
-        local data = res.body[DATA]
+        local data
+        if self.console then
+            data = self:call('dostring', expr, ...)[1]
+        else
+            data = self:_request('eval', true, expr, {...}).body[DATA]
+        end
         local data_len = #data
         if data_len == 1 then
             return data[1]
