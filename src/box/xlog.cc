@@ -371,7 +371,7 @@ row_reader(FILE *f, struct xrow_header *row)
 error:
 		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf), "%s: failed to read or parse row header"
-			 " at offset %zu", fio_filename(fileno(f)),
+			 " at offset %" PRIu64, fio_filename(fileno(f)),
 			 (uint64_t) ftello(f));
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
@@ -389,7 +389,7 @@ error:
 	if (len > IPROTO_BODY_LEN_MAX) {
 		char buf[PATH_MAX];
 		snprintf(buf, sizeof(buf),
-			 "%s: row is too big at offset %zu",
+			 "%s: row is too big at offset %" PRIu64,
 			 fio_filename(fileno(f)), (uint64_t) ftello(f));
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
 	}
@@ -418,7 +418,7 @@ error:
 		char buf[PATH_MAX];
 
 		snprintf(buf, sizeof(buf), "%s: row checksum mismatch (expected %u)"
-			 " at offset %zu",
+			 " at offset %" PRIu64,
 			 fio_filename(fileno(f)), (unsigned) crc32c,
 			 (uint64_t) ftello(f));
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);

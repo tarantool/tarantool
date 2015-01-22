@@ -45,16 +45,14 @@ struct coio_service
 };
 
 int
-coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
-		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout, int host_hint);
+coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
+		     socklen_t *addr_len, ev_tstamp timeout);
 
 static inline int
-coio_connect(struct ev_io *coio, const char *host, const char *service,
-	     struct sockaddr *addr, socklen_t *addr_len, int host_hint)
+coio_connect(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
+		socklen_t *addr_len)
 {
-	return coio_connect_timeout(coio, host, service, addr, addr_len,
-				    TIMEOUT_INFINITY, host_hint);
+	return coio_connect_timeout(coio, uri, addr, addr_len, TIMEOUT_INFINITY);
 }
 
 void
