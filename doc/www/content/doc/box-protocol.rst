@@ -102,6 +102,7 @@ Let's list them here too:
     <tuple>         ::= 0x21
     <function_name> ::= 0x22
     <username>      ::= 0x23
+    <expression>    ::= 0x27
     <data>          ::= 0x30
     <error>         ::= 0x31
 
@@ -116,6 +117,7 @@ Let's list them here too:
     <delete>  ::= 0x05
     <call>    ::= 0x06
     <auth>    ::= 0x07
+    <eval>    ::= 0x80
     -- Admin command codes
     <ping>    ::= 0x40
 
@@ -347,6 +349,23 @@ It's an error to specify an argument of a type that differs from expected type.
     +=======================+==================+
                         MP_MAP
 
+
+* EVAL: CODE - 0x08
+  Evaulate Lua expression
+
+.. code-block:: bash
+
+    EVAL BODY:
+
+    +=======================+==================+
+    |                       |                  |
+    |   0x27: EXPRESSION    |   0x21: TUPLE    |
+    | MP_INT: MP_STRING     | MP_INT: MP_ARRAY |
+    |                       |                  |
+    +=======================+==================+
+                        MP_MAP
+
+
 --------------------------------------------------------------------------------
                          Response packet structure
 --------------------------------------------------------------------------------
@@ -368,6 +387,7 @@ We'll show whole packets here:
      MP_INT                MP_MAP                      MP_MAP
 
 Set of tuples in the response :code:`<data>` expects a msgpack array of tuples as value
+EVAL command returns arbitrary `MP_ARRAY` with arbitrary MsgPack values.
 
 .. code-block:: bash
 

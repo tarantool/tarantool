@@ -126,6 +126,32 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 	return 0;
 }
 
+void
+coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
+		   const char *service, int host_hint)
+{
+	ai_local->ai_next = NULL;
+	if (host_hint == 1) { // IPv4
+		ai_local->ai_addrlen = sizeof(sockaddr_in);
+		ai_local->ai_addr = (sockaddr*)malloc(ai_local->ai_addrlen);
+		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
+		((sockaddr_in*)ai_local->ai_addr)->sin_family = AF_INET;
+		((sockaddr_in*)ai_local->ai_addr)->sin_port =
+			htons((uint16_t)atoi(service));
+		inet_pton(AF_INET, host,
+			&((sockaddr_in*)ai_local->ai_addr)->sin_addr);
+	} else { // IPv6
+		ai_local->ai_addrlen = sizeof(sockaddr_in6);
+		ai_local->ai_addr = (sockaddr*)malloc(ai_local->ai_addrlen);
+		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
+		((sockaddr_in6*)ai_local->ai_addr)->sin6_family = AF_INET6;
+		((sockaddr_in6*)ai_local->ai_addr)->sin6_port =
+			htons((uint16_t)atoi(service));
+		inet_pton(AF_INET6, host,
+			&((sockaddr_in6*)ai_local->ai_addr)->sin6_addr);
+	}
+}
+
 /**
  * Resolve hostname:service from \a uri and connect to the first available
  * address with a specified timeout.
@@ -145,10 +171,17 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
  * @retval 0 connected
  */
 int
-coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
-		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout, int host_hint)
+coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
+		     socklen_t *addr_len, ev_tstamp timeout)
 {
+	char host[URI_MAXHOST] = { '\0' };
+	if (uri->host) {
+		snprintf(host, sizeof(host), "%.*s", (int) uri->host_len,
+			 uri->host);
+	}
+	char service[URI_MAXSERVICE];
+	snprintf(service, sizeof(service), "%.*s", (int) uri->service_len,
+		 uri->service);
 	/* try to resolve a hostname */
 	struct ev_loop *loop = loop();
 	ev_tstamp start, delay;
@@ -173,23 +206,8 @@ coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
 
 	struct addrinfo *ai = NULL;
 	struct addrinfo ai_local;
-	if (host_hint) {
-		ai_local.ai_next = NULL;
-		if (host_hint == 1) { // IPv4
-			ai_local.ai_addrlen = sizeof(sockaddr_in);
-			ai_local.ai_addr = (sockaddr*)malloc(ai_local.ai_addrlen);
-			memset(ai_local.ai_addr, 0, ai_local.ai_addrlen);
-			((sockaddr_in*)ai_local.ai_addr)->sin_family = AF_INET;
-			((sockaddr_in*)ai_local.ai_addr)->sin_port = htons((uint16_t)atoi(service));
-			inet_pton(AF_INET, host, &((sockaddr_in*)ai_local.ai_addr)->sin_addr);
-		} else { // IPv6
-			ai_local.ai_addrlen = sizeof(sockaddr_in6);
-			ai_local.ai_addr = (sockaddr*)malloc(ai_local.ai_addrlen);
-			memset(ai_local.ai_addr, 0, ai_local.ai_addrlen);
-			((sockaddr_in6*)ai_local.ai_addr)->sin6_family = AF_INET6;
-			((sockaddr_in6*)ai_local.ai_addr)->sin6_port = htons((uint16_t)atoi(service));
-			inet_pton(AF_INET6, host, &((sockaddr_in6*)ai_local.ai_addr)->sin6_addr);
-		}
+	if (uri->host_hint) {
+		coio_fill_addrinfo(&ai_local, host, service, uri->host_hint);
 		ai = &ai_local;
 	} else {
 		ai = coeio_resolve(SOCK_STREAM, host, service, delay);
@@ -197,7 +215,10 @@ coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
 	if (ai == NULL)
 		return -1; /* timeout */
 
-	auto addrinfo_guard = make_scoped_guard([=]{ if (!host_hint) freeaddrinfo(ai); else free(ai_local.ai_addr); });
+	auto addrinfo_guard = make_scoped_guard([=] {
+		if (!uri->host_hint) freeaddrinfo(ai);
+		else free(ai_local.ai_addr);
+	});
 	evio_timeout_update(loop(), start, &delay);
 
 	coio_timeout_init(&start, &delay, timeout);

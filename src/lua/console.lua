@@ -90,7 +90,7 @@ local function remote_eval(self, line)
         return ""
     end
     --
-    -- call remote 'console.eval' function using 'dostring' and return result
+    -- call remote 'console.eval' function
     --
     local status, res = pcall(self.remote.eval, self.remote,
         "return require('console').eval(...)", line)
@@ -99,7 +99,7 @@ local function remote_eval(self, line)
         return format(status, res)
     end
     -- return formatted output from remote
-    return res[1][1]
+    return res
 end
 
 --
@@ -282,12 +282,13 @@ local function connect(uri)
     end
 
     -- check permissions
-    remote:call('dostring', 'return true')
+    remote:eval('return true')
     -- override methods
     self.remote = remote
     self.eval = remote_eval
     self.prompt = string.format("%s:%s", self.remote.host, self.remote.port)
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
+    return true
 end
 
 local function client_handler(client, peer)
