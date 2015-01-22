@@ -573,10 +573,8 @@ box_snapshot(void)
 
 	/* create engine snapshot */
 	EngineFactory *f;
-	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_START, snap_lsn);
-	}
-
+	engine_foreach(f)
+		f->begin_checkpoint(snap_lsn);
 	/*
 	 * Due to fork nature, no threads are recreated.
 	 * This is the only consistency guarantee here for a
@@ -622,9 +620,8 @@ box_snapshot(void)
 	tuple_end_snapshot();
 
 	/* wait for engine snapshot completion */
-	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
-	}
+	engine_foreach(f)
+		f->wait_checkpoint(snap_lsn);
 
 	/* rename snapshot on completion */
 	rc = coeio_custom(box_snapshot_rename_cb,
@@ -634,7 +631,7 @@ box_snapshot(void)
 
 	/* remove previous snapshot reference */
 	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_DELETE, snapshot_last_lsn);
+		f->delete_checkpoint(snapshot_last_lsn);
 	}
 
 	snapshot_last_lsn = snap_lsn;
@@ -644,9 +641,8 @@ box_snapshot(void)
 error:
 	/* rollback snapshot creation */
 	if (snap_lsn != snapshot_last_lsn) {
-		engine_foreach(f) {
-			f->snapshot(SNAPSHOT_DELETE, snap_lsn);
-		}
+		engine_foreach(f)
+			f->delete_checkpoint(snap_lsn);
 	}
 	tuple_end_snapshot();
 	snapshot_pid = 0;
@@ -663,9 +659,9 @@ engine_save_snapshot(struct recovery_state *r)
 	uint64_t snap_lsn = vclock_signature(&r->vclock);
 	EngineFactory *f;
 	engine_foreach(f)
-		f->snapshot(SNAPSHOT_START, snap_lsn);
+		f->begin_checkpoint(snap_lsn);
 	engine_foreach(f)
-		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
+		f->wait_checkpoint(snap_lsn);
 }
 
 const char *

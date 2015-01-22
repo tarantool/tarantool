@@ -43,7 +43,9 @@ struct SophiaFactory: public EngineFactory {
 	virtual void begin_recover_snapshot(int64_t);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
-	virtual void snapshot(enum engine_snapshot_event, int64_t);
+	virtual int begin_checkpoint(int64_t);
+	virtual int wait_checkpoint(int64_t);
+	virtual void delete_checkpoint(int64_t);
 	void *env;
 	void *tx;
 };

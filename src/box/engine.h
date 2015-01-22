@@ -66,21 +66,6 @@ enum engine_recovery_state {
 	READY_ALL_KEYS
 };
 
-/**
- * Engine specific snapshot event.
- */
-enum engine_snapshot_event {
-	/** Begin two-face snapshot creation in this engine. */
-	SNAPSHOT_START,
-	/** Wait for completion of the two-phase snapshot creation */
-	SNAPSHOT_WAIT,
-	/**
-	 * On success, delete previous snapshot, on failure,
-	 * delete the last snapshot (passed in as lsn.
-	 */
-	SNAPSHOT_DELETE,
-};
-
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -138,9 +123,22 @@ public:
 	 */
 	virtual void end_recovery() = 0;
 	/**
-	 * Engine snapshotting support.
+	 * Begin a two-phase snapshot creation in this
+	 * engine (snapshot is a memtx idea of a checkpoint).
 	 */
-	virtual void snapshot(enum engine_snapshot_event, int64_t) = 0;
+	virtual int begin_checkpoint(int64_t) = 0;
+	/**
+	 * Wait for a checkpoint to complete. The LSN
+	 * must match one in begin_checkpoint().
+	 */
+	virtual int wait_checkpoint(int64_t) = 0;
+	/**
+	 * Delete a snapshot - in case one
+	 * of the engines failed to save a snapshot,
+	 * delete it in all other engines, otherwise,
+	 * delete the previous snapshot in all engines.
+	 */
+	virtual void delete_checkpoint(int64_t) = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -160,7 +158,7 @@ public:
 	Engine(EngineFactory *f);
 	virtual ~Engine() {}
 
-	inline struct tuple*
+	inline struct tuple *
 	replace(struct space *space,
 	        struct tuple *old_tuple,
 	        struct tuple *new_tuple, enum dup_replace_mode mode)

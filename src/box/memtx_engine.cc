@@ -221,11 +221,19 @@ MemtxFactory::begin_recover_snapshot(int64_t /* lsn */)
 	 */
 }
 
-void
-MemtxFactory::snapshot(enum engine_snapshot_event, int64_t /* lsn */)
+int
+MemtxFactory::begin_checkpoint(int64_t /* lsn */)
 {
-	/*
-	 * memtx snapshotting supported directly by box.
-	 * do nothing here.
-	 */
+	return 0;
+}
+
+int
+MemtxFactory::wait_checkpoint(int64_t /* lsn */)
+{
+	return 0;
+}
+
+void
+MemtxFactory::delete_checkpoint(int64_t /* lsn */)
+{
 }

@@ -374,7 +374,7 @@ sophia_snapshot_ready(void *env, int64_t lsn)
 }
 
 static inline void
-sophia_snapshot_delete(void *env, int64_t lsn)
+sophia_delete_checkpoint(void *env, int64_t lsn)
 {
 	char snapshot[32];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
@@ -396,19 +396,23 @@ SophiaFactory::begin_recover_snapshot(int64_t lsn)
 	sophia_snapshot_recover(env, lsn);
 }
 
-void
-SophiaFactory::snapshot(enum engine_snapshot_event e, int64_t lsn)
+int
+SophiaFactory::begin_checkpoint(int64_t lsn)
 {
-	switch (e) {
-	case SNAPSHOT_START:
-		sophia_snapshot(env, lsn);
-		break;
-	case SNAPSHOT_WAIT:
-		while (! sophia_snapshot_ready(env, lsn))
-			fiber_yield_timeout(.020);
-		break;
-	case SNAPSHOT_DELETE:
-		sophia_snapshot_delete(env, lsn);
-		break;
-	}
+	sophia_snapshot(env, lsn);
+	return 0;
+}
+
+int
+SophiaFactory::wait_checkpoint(int64_t lsn)
+{
+	while (! sophia_snapshot_ready(env, lsn))
+		fiber_yield_timeout(.020);
+	return 0;
+}
+
+void
+SophiaFactory::delete_checkpoint(int64_t lsn)
+{
+	sophia_delete_checkpoint(env, lsn);
 }
