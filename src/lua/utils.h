@@ -353,12 +353,6 @@ luaL_register_module(struct lua_State *L, const char *modname,
 		     const struct luaL_Reg *methods);
 
 /**
- * Convert Lua string, number or cdata (u64) to 64bit value
- */
-uint64_t
-luaL_tointeger64(struct lua_State *L, int idx);
-
-/**
  * push uint64_t to Lua stack
  *
  * @param L is a Lua State

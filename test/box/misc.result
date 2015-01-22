@@ -312,6 +312,14 @@ tonumber64(1), 1
 - 1
 ...
 -- Testing 64bit
+tonumber64()
+---
+- error: 'tonumber64: wrong number of arguments'
+...
+tonumber64('invalid number')
+---
+- null
+...
 tonumber64(123)
 ---
 - 123
@@ -320,7 +328,7 @@ tonumber64('123')
 ---
 - 123
 ...
-type(tonumber64('4294967296')) == 'cdata'
+type(tonumber64('4294967296')) == 'number'
 ---
 - true
 ...
@@ -342,11 +350,11 @@ tonumber64('18446744073709551615') + 1
 ...
 tonumber64(-1)
 ---
-- 18446744073709551615
+- -1
 ...
 tonumber64('184467440737095516155')
 ---
-- error: 'lua_tointeger64: bad argument'
+- null
 ...
 string.byte(require('msgpack').encode(tonumber64(123)))
 ---
@@ -359,16 +367,16 @@ tonumber64(tonumber64(2))
 ...
 tostring(tonumber64(tonumber64(3)))
 ---
-- 3ULL
+- '3'
 ...
 --  A test case for Bug#1131108 'tonumber64 from negative int inconsistency'
 tonumber64(-1)
 ---
-- 18446744073709551615
+- -1
 ...
 tonumber64(-1LL)
 ---
-- 18446744073709551615
+- -1
 ...
 tonumber64(-1ULL)
 ---
@@ -388,7 +396,7 @@ tonumber64(-1ULL)
 ...
 tonumber64(-1.0)
 ---
-- 18446744073709551615
+- -1
 ...
 6LL - 7LL
 ---

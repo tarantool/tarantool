@@ -110,57 +110,6 @@ static const char *lua_modules[] = {
  * {{{ box Lua library: common functions
  */
 
-uint64_t
-tarantool_lua_tointeger64(struct lua_State *L, int idx)
-{
-	uint64_t result = 0;
-
-	switch (lua_type(L, idx)) {
-	case LUA_TNUMBER:
-		result = lua_tonumber(L, idx);
-		break;
-	case LUA_TSTRING:
-	{
-		const char *arg = luaL_checkstring(L, idx);
-		char *arge;
-		errno = 0;
-		result = strtoull(arg, &arge, 10);
-		if (errno != 0 || arge == arg)
-			luaL_error(L, "lua_tointeger64: bad argument");
-		break;
-	}
-	case LUA_TCDATA:
-	{
-		uint32_t ctypeid = 0;
-		void *cdata = luaL_checkcdata(L, idx, &ctypeid);
-		if (ctypeid != CTID_INT64 && ctypeid != CTID_UINT64) {
-			luaL_error(L,
-				   "lua_tointeger64: unsupported cdata type");
-		}
-		result = *(uint64_t*)cdata;
-		break;
-	}
-	default:
-		luaL_error(L, "lua_tointeger64: unsupported type: %s",
-			   lua_typename(L, lua_type(L, idx)));
-	}
-
-	return result;
-}
-const char *
-tarantool_lua_tostring(struct lua_State *L, int index)
-{
-	/* we need an absolute index */
-	if (index < 0)
-		index = lua_gettop(L) + index + 1;
-	lua_getglobal(L, "tostring");
-	lua_pushvalue(L, index);
-	/* pops both "tostring" and its argument */
-	lua_call(L, 1, 1);
-	lua_replace(L, index);
-	return lua_tostring(L, index);
-}
-
 /**
  * Convert lua number or string to lua cdata 64bit number.
  */
@@ -169,9 +118,35 @@ lbox_tonumber64(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "tonumber64: wrong number of arguments");
-	uint64_t result = tarantool_lua_tointeger64(L, 1);
-	*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
-				     sizeof(uint64_t)) = result;
+
+	switch (lua_type(L, 1)) {
+	case LUA_TNUMBER:
+		lua_pushvalue(L, 1);
+		return 1;
+	case LUA_TSTRING:
+	{
+		const char *arg = luaL_checkstring(L, 1);
+		char *arge;
+		errno = 0;
+		unsigned long long result = strtoull(arg, &arge, 10);
+		if (errno == 0 && arge != arg) {
+			luaL_pushnumber64(L, result);
+			return 1;
+		}
+		break;
+	}
+	case LUA_TCDATA:
+	{
+		uint32_t ctypeid = 0;
+		luaL_checkcdata(L, 1, &ctypeid);
+		if (ctypeid >= CTID_INT8 && ctypeid <= CTID_DOUBLE) {
+			lua_pushvalue(L, 1);
+			return 1;
+		}
+		break;
+	}
+	}
+	lua_pushnil(L);
 	return 1;
 }
 
