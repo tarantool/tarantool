@@ -8,6 +8,10 @@ function sophia_printdir()
 	return ls
 end
 
+function sophia_mkdir(dir)
+	os.execute("mkdir sophia_test")
+end
+
 function sophia_rmdir(dir)
 	os.execute("rm -rf sophia_test")
 end
@@ -24,6 +28,7 @@ end
 
 if not file_exists("lock") then
 	sophia_rmdir()
+	sophia_mkdir()
 end
 
 local sophia = {
@@ -38,7 +43,7 @@ box.cfg {
     slab_alloc_arena = 0.1,
     pid_file         = "tarantool.pid",
     rows_per_wal     = 50,
-    sophia_dir       = "sophia_test",
+    sophia_dir       = "./sophia_test",
     sophia           = sophia
 }
 
