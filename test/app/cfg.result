@@ -1,11 +1,12 @@
 TAP version 13
-1..13
+1..17
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
 ok - invalid rows_per_wal
 ok - box is not started
 ok - exception on unconfigured box
+ok - sophia_dir is not auto-created
 ok - configured box
 ok - cfg.wal_mode default value
 ok - cfg.wal_mode default value
@@ -13,3 +14,6 @@ ok - cfg.wal_mode change
 ok - cfg.wal_mode default value
 ok - cfg.wal_mode change
 ok - cfg.wal_mode default value
+ok - sophia_dir is invalid
+ok - snap_dir is invalid
+ok - wal_dir is invalid
