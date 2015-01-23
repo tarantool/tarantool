@@ -201,7 +201,7 @@ key_def_check(struct key_def *key_def)
 		space_cache_find(key_def->space_id);
 
 	/* validate key_def->type */
-	space->engine->factory->keydefCheck(key_def);
+	space->handler->engine->keydefCheck(key_def);
 }
 
 void
@@ -227,8 +227,8 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 	identifier_check(def->engine_name);
 
 	if (def->temporary) {
-		EngineFactory *factory = engine_find(def->engine_name);
-		if (! engine_can_be_temporary(factory->flags))
+		Engine *engine = engine_find(def->engine_name);
+		if (! engine_can_be_temporary(engine->flags))
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 			         (unsigned) def->id,
 			         "space does not support temporary flag");

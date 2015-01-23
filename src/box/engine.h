@@ -66,21 +66,6 @@ enum engine_recovery_state {
 	READY_ALL_KEYS
 };
 
-/**
- * Engine specific snapshot event.
- */
-enum engine_snapshot_event {
-	/** Begin two-face snapshot creation in this engine. */
-	SNAPSHOT_START,
-	/** Wait for completion of the two-phase snapshot creation */
-	SNAPSHOT_WAIT,
-	/**
-	 * On success, delete previous snapshot, on failure,
-	 * delete the last snapshot (passed in as lsn.
-	 */
-	SNAPSHOT_DELETE,
-};
-
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -97,17 +82,17 @@ struct engine_recovery {
 	engine_replace_f replace;
 };
 
-struct Engine;
+struct Handler;
 
 /** Engine instance */
-class EngineFactory: public Object {
+class Engine: public Object {
 public:
-	EngineFactory(const char *engine_name);
-	virtual ~EngineFactory() {}
+	Engine(const char *engine_name);
+	virtual ~Engine() {}
 	/** Called once at startup. */
 	virtual void init();
 	/** Create a new engine instance for a space. */
-	virtual Engine *open() = 0;
+	virtual Handler *open() = 0;
 	/**
 	 * Check a key definition for violation of
 	 * various limits.
@@ -138,9 +123,24 @@ public:
 	 */
 	virtual void end_recovery() = 0;
 	/**
-	 * Engine snapshotting support.
+	 * Begin a two-phase snapshot creation in this
+	 * engine (snapshot is a memtx idea of a checkpoint).
 	 */
-	virtual void snapshot(enum engine_snapshot_event, int64_t) = 0;
+	virtual int begin_checkpoint(int64_t) = 0;
+	/**
+	 * Wait for a checkpoint to complete. The LSN
+	 * must match one in begin_checkpoint().
+	 */
+	virtual int wait_checkpoint() = 0;
+	/**
+	 * All engines prepared their checkpoints,
+	 * fix up the changes.
+	 */
+	virtual void commit_checkpoint() = 0;
+	/**
+	 * An error in one of the engines, abort checkpoint.
+	 */
+	virtual void abort_checkpoint() = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -155,12 +155,12 @@ public:
 
 /** Engine handle - an operator of a space */
 
-struct Engine: public Object {
+struct Handler: public Object {
 public:
-	Engine(EngineFactory *f);
-	virtual ~Engine() {}
+	Handler(Engine *f);
+	virtual ~Handler() {}
 
-	inline struct tuple*
+	inline struct tuple *
 	replace(struct space *space,
 	        struct tuple *old_tuple,
 	        struct tuple *new_tuple, enum dup_replace_mode mode)
@@ -173,21 +173,21 @@ public:
 	}
 
 	inline void initRecovery() {
-		recovery = factory->recovery;
+		recovery = engine->recovery;
 	}
 
 	engine_recovery recovery;
-	EngineFactory *factory;
+	Engine *engine;
 };
 
-/** Register engine factory instance. */
-void engine_register(EngineFactory *engine);
+/** Register engine engine instance. */
+void engine_register(Engine *engine);
 
 /** Call a visitor function on every registered engine. */
 #define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
-/** Find engine factory by name. */
-EngineFactory *engine_find(const char *name);
+/** Find engine engine by name. */
+Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
@@ -211,9 +211,9 @@ engine_can_be_temporary(uint32_t flags)
 }
 
 static inline uint32_t
-engine_id(Engine *engine)
+engine_id(Handler *space)
 {
-	return engine->factory->id;
+	return space->engine->id;
 }
 
 /**
@@ -236,5 +236,11 @@ engine_end_recover_snapshot();
  */
 void
 engine_end_recovery();
+
+/**
+ * Save a snapshot.
+ */
+int
+engine_checkpoint(int64_t checkpoint_id);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

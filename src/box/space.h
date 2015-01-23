@@ -41,7 +41,7 @@ struct space {
 	 * life cycle, throughout phases of recovery or with
 	 * deletion and addition of indexes.
 	 */
-	Engine *engine;
+	Handler *handler;
 
 	/** Triggers fired after space_replace() -- see txn_replace(). */
 	struct rlist on_replace;
@@ -101,7 +101,7 @@ space_is_temporary(struct space *space) { return space->def.temporary; }
 
 /** Return true if space is run under sophia engine. */
 static inline bool
-space_is_sophia(struct space *space) { return strcmp(space->engine->factory->name, "sophia") == 0; }
+space_is_sophia(struct space *space) { return strcmp(space->handler->engine->name, "sophia") == 0; }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -192,7 +192,7 @@ static inline struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	return space->engine->replace(space, old_tuple, new_tuple, mode);
+	return space->handler->replace(space, old_tuple, new_tuple, mode);
 }
 
 struct tuple *
@@ -220,7 +220,7 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 /**
  * Allocate and initialize a space. The space
  * needs to be loaded before it can be used
- * (see space->engine.recover()).
+ * (see space->handler->recover()).
  */
 struct space *
 space_new(struct space_def *space_def, struct rlist *key_list);

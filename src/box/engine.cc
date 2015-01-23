@@ -39,43 +39,43 @@ RLIST_HEAD(engines);
 uint32_t engine_flags[BOX_ENGINE_MAX];
 int n_engines;
 
-EngineFactory::EngineFactory(const char *engine_name)
+Engine::Engine(const char *engine_name)
 	:name(engine_name),
 	 link(RLIST_INITIALIZER(link))
 {}
 
-void EngineFactory::init()
+void Engine::init()
 {}
 
-void EngineFactory::begin(struct txn*, struct space*)
+void Engine::begin(struct txn*, struct space*)
 {}
 
-void EngineFactory::commit(struct txn*)
+void Engine::commit(struct txn*)
 {}
 
-void EngineFactory::rollback(struct txn*)
+void Engine::rollback(struct txn*)
 {}
 
-Engine::Engine(EngineFactory *f)
-	:factory(f)
+Handler::Handler(Engine *f)
+	:engine(f)
 {
-	/* derive recovery state from engine factory */
+	/* derive recovery state from engine */
 	initRecovery();
 }
 
-/** Register engine factory instance. */
-void engine_register(EngineFactory *engine)
+/** Register engine instance. */
+void engine_register(Engine *engine)
 {
 	rlist_add_tail_entry(&engines, engine, link);
 	engine->id = ++n_engines;
 	engine_flags[engine->id] = engine->flags;
 }
 
-/** Find factory engine by name. */
-EngineFactory *
+/** Find engine by name. */
+Engine *
 engine_find(const char *name)
 {
-	EngineFactory *e;
+	Engine *e;
 	engine_foreach(e) {
 		if (strcmp(e->name, name) == 0)
 			return e;
@@ -86,7 +86,7 @@ engine_find(const char *name)
 /** Shutdown all engine factories. */
 void engine_shutdown()
 {
-	EngineFactory *e, *tmp;
+	Engine *e, *tmp;
 	rlist_foreach_entry_safe(e, &engines, link, tmp) {
 		delete e;
 	}
@@ -96,9 +96,9 @@ void
 engine_begin_recover_snapshot(int64_t snapshot_lsn)
 {
 	/* recover engine snapshot */
-	EngineFactory *f;
-	engine_foreach(f) {
-		f->begin_recover_snapshot(snapshot_lsn);
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->begin_recover_snapshot(snapshot_lsn);
 	}
 }
 
@@ -106,12 +106,12 @@ static void
 do_one_recover_step(struct space *space, void * /* param */)
 {
 	if (space_index(space, 0)) {
-		space->engine->recover(space);
+		space->handler->recover(space);
 	} else {
 		/* in case of space has no primary index,
 		 * derive it's engine handler recovery state from
 		 * the global one. */
-		space->engine->initRecovery();
+		space->handler->initRecovery();
 	}
 }
 
@@ -122,9 +122,9 @@ engine_end_recover_snapshot()
 	 * For all new spaces created from now on, when the
 	 * PRIMARY key is added, enable it right away.
 	 */
-	EngineFactory *f;
-	engine_foreach(f) {
-		f->end_recover_snapshot();
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->end_recover_snapshot();
 	}
 	space_foreach(do_one_recover_step, NULL);
 }
@@ -136,10 +136,46 @@ engine_end_recovery()
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
-	EngineFactory *f;
-	engine_foreach(f) {
-		f->end_recovery();
-	}
+	Engine *engine;
+	engine_foreach(engine)
+		engine->end_recovery();
+
 	space_foreach(do_one_recover_step, NULL);
 }
 
+int
+engine_checkpoint(int64_t checkpoint_id)
+{
+	static bool snapshot_is_in_progress = false;
+	if (snapshot_is_in_progress)
+		return EINPROGRESS;
+
+	snapshot_is_in_progress = true;
+
+	/* create engine snapshot */
+	Engine *engine;
+	engine_foreach(engine) {
+		if (engine->begin_checkpoint(checkpoint_id))
+			goto error;
+	}
+
+	/* wait for engine snapshot completion */
+	engine_foreach(engine) {
+		if (engine->wait_checkpoint())
+			goto error;
+	}
+
+	/* remove previous snapshot reference */
+	engine_foreach(engine) {
+		engine->commit_checkpoint();
+	}
+	snapshot_is_in_progress = false;
+	return 0;
+error:
+	int save_errno = errno;
+	/* rollback snapshot creation */
+	engine_foreach(engine)
+		engine->abort_checkpoint();
+	snapshot_is_in_progress = false;
+	return save_errno;
+}

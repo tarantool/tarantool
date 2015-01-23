@@ -30,10 +30,10 @@
  */
 #include "engine.h"
 
-struct SophiaFactory: public EngineFactory {
-	SophiaFactory();
+struct SophiaEngine: public Engine {
+	SophiaEngine();
 	virtual void init();
-	virtual Engine *open();
+	virtual Handler *open();
 	virtual Index *createIndex(struct key_def*);
 	virtual void dropIndex(Index*);
 	virtual void keydefCheck(struct key_def*f);
@@ -43,9 +43,15 @@ struct SophiaFactory: public EngineFactory {
 	virtual void begin_recover_snapshot(int64_t);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
-	virtual void snapshot(enum engine_snapshot_event, int64_t);
+	virtual int begin_checkpoint(int64_t);
+	virtual int wait_checkpoint();
+	virtual void commit_checkpoint();
+	virtual void abort_checkpoint();
 	void *env;
 	void *tx;
+private:
+	int64_t m_prev_checkpoint_lsn;
+	int64_t m_checkpoint_lsn;
 };
 
 void sophia_info(void (*)(const char*, const char*, void*), void*);

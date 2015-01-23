@@ -68,7 +68,7 @@ struct txn {
 	 */
 	bool autocommit;
 	/** Engine involved in multi-statement transaction. */
-	EngineFactory *engine;
+	Engine *engine;
 	/** Triggers on fiber yield and stop to abort transaction for in-memory engine */
 	struct trigger fiber_on_yield, fiber_on_stop;
 };

@@ -30,9 +30,9 @@
  */
 #include "engine.h"
 
-struct MemtxFactory: public EngineFactory {
-	MemtxFactory();
-	virtual Engine *open();
+struct MemtxEngine: public Engine {
+	MemtxEngine();
+	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);
@@ -40,7 +40,16 @@ struct MemtxFactory: public EngineFactory {
 	virtual void begin_recover_snapshot(int64_t lsn);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
-	virtual void snapshot(enum engine_snapshot_event, int64_t);
+	virtual int begin_checkpoint(int64_t);
+	virtual int wait_checkpoint();
+	virtual void commit_checkpoint();
+	virtual void abort_checkpoint();
+private:
+	/**
+	 * LSN of the snapshot which is in progress.
+	 */
+	int64_t m_snapshot_lsn;
+	pid_t m_snapshot_pid;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

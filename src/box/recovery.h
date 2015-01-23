@@ -177,20 +177,7 @@ struct fio_batch;
  * no snapshot.
  */
 int64_t
-recovery_snap_lsn(struct recovery_state *r);
-
-void
-snapshot_write_row(struct recovery_state *r, struct xlog *l,
-		   struct xrow_header *packet);
-
-typedef void (snapshot_f)(struct xlog *);
-
-void
-snapshot_save(struct recovery_state *r, snapshot_f snapshot_handler,
-	      bool rename);
-
-int
-snapshot_rename(struct xdir *dir, int64_t lsn);
+recovery_last_checkpoint(struct recovery_state *r);
 
 #if defined(__cplusplus)
 } /* extern "C" */

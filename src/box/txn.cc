@@ -160,20 +160,20 @@ txn_engine_begin_stmt(struct txn *txn, struct space *space)
 	 * b. only one engine can be used in a multi-statement
 	 *    transaction
 	 */
-	EngineFactory *factory = space->engine->factory;
+	Engine *engine = space->handler->engine;
 	if (txn->n_stmts == 1) {
 		/* First statement. */
-		txn->engine = factory;
+		txn->engine = engine;
 		if (txn->autocommit == false) {
-			if (! engine_transactional(factory->flags))
+			if (! engine_transactional(engine->flags))
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 				          space->def.engine_name, "transactions");
 		}
 	} else {
-		if (txn->engine->id != engine_id(space->engine))
+		if (txn->engine->id != engine_id(space->handler))
 			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	}
-	factory->begin(txn, space);
+	engine->begin(txn, space);
 }
 
 struct txn *

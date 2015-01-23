@@ -59,23 +59,6 @@ box_process_func box_process = process_ro;
 struct recovery_state *recovery;
 
 int snapshot_pid = 0; /* snapshot processes pid */
-int64_t snapshot_last_lsn = 0;
-
-static void
-box_snapshot_cb(struct xlog *l);
-
-static void
-engine_save_snapshot(struct recovery_state *r);
-
-/** The snapshot row metadata repeats the structure of REPLACE request. */
-struct request_replace_body {
-	uint8_t m_body;
-	uint8_t k_space_id;
-	uint8_t m_space_id;
-	uint32_t v_space_id;
-	uint8_t k_tuple;
-} __attribute__((packed));
-
 static void
 process_ro(struct request *request, struct port *port)
 {
@@ -395,10 +378,10 @@ engine_init()
 	 * in snapshotting (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxFactory *memtx = new MemtxFactory();
+	MemtxEngine *memtx = new MemtxEngine();
 	engine_register(memtx);
 
-	SophiaFactory *sophia = new SophiaFactory();
+	SophiaEngine *sophia = new SophiaEngine();
 	sophia->init();
 	engine_register(sophia);
 }
@@ -444,8 +427,9 @@ box_init()
 
 		if (recovery_has_data(recovery)) {
 			/* Tell Sophia engine LSN it must recover to. */
-			snapshot_last_lsn = recovery_snap_lsn(recovery);
-			engine_begin_recover_snapshot(snapshot_last_lsn);
+			int64_t checkpoint_id =
+				recovery_last_checkpoint(recovery);
+			engine_begin_recover_snapshot(checkpoint_id);
 			/* Process existing snapshot */
 			recover_snap(recovery);
 			engine_end_recover_snapshot();
@@ -453,14 +437,14 @@ box_init()
 			/* Initialize a new replica */
 			replica_bootstrap(recovery);
 			engine_end_recover_snapshot();
-			engine_save_snapshot(recovery);
+			box_snapshot();
 		} else {
 			/* Initialize the first server of a new cluster */
 			recovery_bootstrap(recovery);
 			box_set_cluster_uuid();
 			box_set_server_uuid();
 			engine_end_recover_snapshot();
-			engine_save_snapshot(recovery);
+			box_snapshot();
 		}
 		fiber_gc();
 	} catch (Exception *e) {
@@ -498,174 +482,12 @@ box_atfork()
 	recovery_atfork(recovery);
 }
 
-static void
-snapshot_write_tuple(struct xlog *l,
-		     uint32_t n, struct tuple *tuple)
-{
-	struct request_replace_body body;
-	body.m_body = 0x82; /* map of two elements. */
-	body.k_space_id = IPROTO_SPACE_ID;
-	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(n);
-	body.k_tuple = IPROTO_TUPLE;
-
-	struct xrow_header row;
-	memset(&row, 0, sizeof(struct xrow_header));
-	row.type = IPROTO_INSERT;
-
-	row.bodycnt = 2;
-	row.body[0].iov_base = &body;
-	row.body[0].iov_len = sizeof(body);
-	row.body[1].iov_base = tuple->data;
-	row.body[1].iov_len = tuple->bsize;
-	snapshot_write_row(recovery, l, &row);
-}
-
-static void
-snapshot_space(struct space *sp, void *udata)
-{
-	if (space_is_temporary(sp))
-		return;
-	if (space_is_sophia(sp))
-		return;
-	struct tuple *tuple;
-	struct xlog *l = (struct xlog *)udata;
-	Index *pk = space_index(sp, 0);
-	if (pk == NULL)
-		return;
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	while ((tuple = it->next(it)))
-		snapshot_write_tuple(l, space_id(sp), tuple);
-}
-
-static void
-box_snapshot_cb(struct xlog *l)
-{
-	space_foreach(snapshot_space, l);
-}
-
-static ssize_t
-box_snapshot_rename_cb(va_list ap)
-{
-	uint64_t id = *va_arg(ap, uint64_t*);
-	int *status = va_arg(ap, int*);
-	*status = snapshot_rename(&recovery->snap_dir, id);
-	return 0;
-}
-
 int
-box_snapshot(void)
+box_snapshot()
 {
-	if (snapshot_pid)
-		return EINPROGRESS;
-
-	/* flush buffers to avoid multiple output
-	 *
-	 * https://github.com/tarantool/tarantool/issues/366
-	*/
-	fflush(stdout);
-	fflush(stderr);
-
 	/* create snapshot file */
-	int64_t snap_lsn = vclock_signature(&recovery->vclock);
-
-	/* create engine snapshot */
-	EngineFactory *f;
-	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_START, snap_lsn);
-	}
-
-	/*
-	 * Due to fork nature, no threads are recreated.
-	 * This is the only consistency guarantee here for a
-	 * multi-threaded engine.
-	 */
-	int rc;
-	int status = 0;
-	pid_t pid = fork();
-	switch (pid) {
-	case -1:
-		say_syserror("fork");
-		status = errno;
-		goto error;
-	case  0: /* dumper */
-		slab_arena_mprotect(&memtx_arena);
-		cord_set_name("snap");
-		title("dumper", "%" PRIu32, getppid());
-		fiber_set_name(fiber(), "dumper");
-		/* make sure we don't double-write parent stdio
-		 * buffers at exit() during panic */
-		close_all_xcpt(1, log_fd);
-		/* do not rename snapshot */
-		snapshot_save(recovery, box_snapshot_cb, false);
-		exit(EXIT_SUCCESS);
-		return 0;
-	default: /* waiter */
-		snapshot_pid = pid;
-	}
-
-	/* increment snapshot version */
-	tuple_begin_snapshot();
-
-	/* wait for memtx-part snapshot completion */
-	status = wait_for_child(pid);
-	if (WIFSIGNALED(status))
-		status = EINTR;
-	else
-		status = WEXITSTATUS(status);
-	if (status != 0)
-		goto error;
-
-	/* complete snapshot */
-	tuple_end_snapshot();
-
-	/* wait for engine snapshot completion */
-	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
-	}
-
-	/* rename snapshot on completion */
-	rc = coeio_custom(box_snapshot_rename_cb,
-	                  TIMEOUT_INFINITY, &snap_lsn, &status);
-	if (rc == -1 || status == -1)
-		goto error;
-
-	/* remove previous snapshot reference */
-	engine_foreach(f) {
-		f->snapshot(SNAPSHOT_DELETE, snapshot_last_lsn);
-	}
-
-	snapshot_last_lsn = snap_lsn;
-	snapshot_pid = 0;
-	return 0;
-
-error:
-	/* rollback snapshot creation */
-	if (snap_lsn != snapshot_last_lsn) {
-		engine_foreach(f) {
-			f->snapshot(SNAPSHOT_DELETE, snap_lsn);
-		}
-	}
-	tuple_end_snapshot();
-	snapshot_pid = 0;
-	return status;
-}
-
-void
-engine_save_snapshot(struct recovery_state *r)
-{
-	/* create memtx snapshot */
-	snapshot_save(r, box_snapshot_cb, true);
-
-	/* create engine snapshot and wait for completion */
-	uint64_t snap_lsn = vclock_signature(&r->vclock);
-	EngineFactory *f;
-	engine_foreach(f)
-		f->snapshot(SNAPSHOT_START, snap_lsn);
-	engine_foreach(f)
-		f->snapshot(SNAPSHOT_WAIT, snap_lsn);
+	int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+	return engine_checkpoint(checkpoint_id);
 }
 
 const char *

@@ -454,8 +454,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * since engine.recover does different things depending on
 	 * the recovery phase.
 	 */
-	alter->new_space->engine->recovery =
-		alter->old_space->engine->recovery;
+	alter->new_space->handler->recovery =
+		alter->old_space->handler->recovery;
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
@@ -507,7 +507,7 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "can not change space engine");
 
 	engine_recovery *recovery =
-		&alter->old_space->engine->recovery;
+		&alter->old_space->handler->recovery;
 
 	if (def.field_count != 0 &&
 	    def.field_count != alter->old_space->def.field_count &&
@@ -519,8 +519,8 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "can not change field count on a non-empty space");
 	}
 
-	EngineFactory *factory = alter->old_space->engine->factory;
-	if (def.temporary && !engine_can_be_temporary(factory->flags)) {
+	Engine *engine = alter->old_space->handler->engine;
+	if (def.temporary && !engine_can_be_temporary(engine->flags)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
 			  "space does not support temporary flag");
@@ -600,7 +600,7 @@ DropIndex::alter(struct alter_space *alter)
 	 *   can be put back online properly with
 	 *   engine_no_keys.recover.
 	 */
-	alter->new_space->engine->initRecovery();
+	alter->new_space->handler->initRecovery();
 }
 
 void
@@ -615,7 +615,7 @@ DropIndex::commit(struct alter_space *alter)
 	Index *pk = index_find(alter->old_space, 0);
 	if (pk == NULL)
 		return;
-	alter->old_space->engine->factory->dropIndex(pk);
+	alter->old_space->handler->engine->dropIndex(pk);
 }
 
 /** Change non-essential (no data change) properties of an index. */
@@ -790,7 +790,7 @@ AddIndex::alter(struct alter_space *alter)
 	 * Possible both during and after recovery.
 	 */
 	engine_recovery *recovery =
-		&alter->new_space->engine->recovery;
+		&alter->new_space->handler->recovery;
 
 	if (recovery->state == READY_NO_KEYS) {
 		if (new_key_def->iid == 0) {

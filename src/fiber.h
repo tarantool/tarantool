@@ -46,21 +46,28 @@
 #endif /* defined(__cplusplus) */
 #include "salad/rlist.h"
 
-#define FIBER_NAME_MAX REGION_NAME_MAX
-#define FIBER_READING_INBOX (1 << 0)
-/** This fiber can be cancelled synchronously. */
-#define FIBER_CANCELLABLE   (1 << 1)
-/** Indicates that a fiber has been cancelled. */
-#define FIBER_CANCEL        (1 << 2)
-/** This fiber was created via stored procedures API. */
-#define FIBER_USER_MODE     (1 << 3)
-/** This fiber was marked as ready for wake up */
-#define FIBER_READY	    (1 << 4)
+enum { FIBER_NAME_MAX = REGION_NAME_MAX };
 
-/** This is thrown by fiber_* API calls when the fiber is
+enum {
+	/**
+	 * It's safe to resume (wakeup) this fiber
+	 * with a spurious wakeup if it is suspended
+	 * (e.g. to force it to check that it's been
+	 * cancelled).
+	 */
+	FIBER_CANCELLABLE = 1 << 0,
+	/** Indicates that a fiber has been cancelled. */
+	FIBER_CANCEL      = 1 << 1,
+	/** This fiber was created via stored procedures API. */
+	FIBER_USER_MODE   = 1 << 2,
+	/** This fiber was marked as ready for wake up */
+	FIBER_READY	  = 1 << 3,
+};
+
+/**
+ * This is thrown by fiber_* API calls when the fiber is
  * cancelled.
  */
-
 #if defined(__cplusplus)
 class FiberCancelException: public Exception {
 public:
@@ -214,9 +221,15 @@ cord_destroy(struct cord *cord);
 void fiber_init(void);
 void fiber_free(void);
 typedef void(*fiber_func)(va_list);
-struct fiber *fiber_new(const char *name, fiber_func f);
-void fiber_set_name(struct fiber *fiber, const char *name);
-int wait_for_child(pid_t pid);
+
+struct fiber *
+fiber_new(const char *name, fiber_func f);
+
+void
+fiber_set_name(struct fiber *fiber, const char *name);
+
+int
+wait_for_child(pid_t pid);
 
 static inline const char *
 fiber_name(struct fiber *f)
@@ -227,40 +240,62 @@ fiber_name(struct fiber *f)
 bool
 fiber_checkstack();
 
-void fiber_yield(void);
-void fiber_yield_to(struct fiber *f);
+void
+fiber_yield(void);
+
+void
+fiber_yield_to(struct fiber *f);
 
 /**
  * @brief yield & check for timeout
  * @return true if timeout exceeded
  */
-bool fiber_yield_timeout(ev_tstamp delay);
+bool
+fiber_yield_timeout(ev_tstamp delay);
 
+void
+fiber_destroy_all();
 
-void fiber_destroy_all();
+void
+fiber_gc(void);
 
-void fiber_gc(void);
-void fiber_call(struct fiber *callee, ...);
-void fiber_wakeup(struct fiber *f);
-struct fiber *fiber_find(uint32_t fid);
-/** Cancel a fiber. A cancelled fiber will have
+void
+fiber_call(struct fiber *callee, ...);
+
+void
+fiber_wakeup(struct fiber *f);
+
+struct fiber *
+fiber_find(uint32_t fid);
+
+/**
+ * Cancel a fiber. A cancelled fiber will have
  * tnt_FiberCancelException raised in it.
  *
  * A fiber can be cancelled only if it is
  * FIBER_CANCELLABLE flag is set.
  */
-void fiber_cancel(struct fiber *f);
-/** Check if the current fiber has been cancelled.  Raises
+void
+fiber_cancel(struct fiber *f);
+
+/**
+ * Check if the current fiber has been cancelled.  Raises
  * tnt_FiberCancelException
  */
-void fiber_testcancel(void);
-/** Make it possible or not possible to cancel the current
- * fiber.
+void
+fiber_testcancel(void);
+
+/**
+ * Make it possible or not possible to wakeup the current
+ * fiber immediately when it's cancelled.
  *
- * return previous state.
+ * @return previous state.
  */
-bool fiber_setcancellable(bool enable);
-void fiber_sleep(ev_tstamp s);
+bool
+fiber_setcancellable(bool yesno);
+
+void
+fiber_sleep(ev_tstamp s);
 
 void
 fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int revents);
@@ -299,9 +334,9 @@ fiber_get_key(struct fiber *fiber, enum fiber_key key)
  * \sa fiber_key_on_gc()
  */
 typedef void (*fiber_key_gc_cb)(enum fiber_key key, void *arg);
-
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 
-int fiber_stat(fiber_stat_cb cb, void *cb_ctx);
+int
+fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

@@ -100,12 +100,12 @@ space_new(struct space_def *def, struct rlist *key_list)
 	tuple_format_ref(space->format, 1);
 	space->index_id_max = index_id_max;
 	/* init space engine instance */
-	EngineFactory *engine = engine_find(def->engine_name);
-	space->engine = engine->open();
+	Engine *engine = engine_find(def->engine_name);
+	space->handler = engine->open();
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
 		space->index_map[key_def->iid] =
-			space->engine->factory->createIndex(key_def);
+			space->handler->engine->createIndex(key_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;
@@ -120,8 +120,8 @@ space_delete(struct space *space)
 		delete space->index[j];
 	if (space->format)
 		tuple_format_ref(space->format, -1);
-	if (space->engine)
-		delete space->engine;
+	if (space->handler)
+		delete space->handler;
 
 	trigger_destroy(&space->on_replace);
 	free(space);
@@ -249,7 +249,7 @@ space_build_secondary_keys(struct space *space)
 			say_info("Space %d: done", space_id(space));
 		}
 	}
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->state   = READY_ALL_KEYS;
 	r->recover = space_noop; /* mark the end of recover */
 	r->replace = space_replace_all_keys;
@@ -260,7 +260,7 @@ void
 space_end_build_primary_key(struct space *space)
 {
 	space->index[0]->endBuild();
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->state   = READY_PRIMARY_KEY;
 	r->replace = space_replace_primary_key;
 	r->recover = space_build_secondary_keys;
@@ -273,7 +273,7 @@ void
 space_begin_build_primary_key(struct space *space)
 {
 	space->index[0]->beginBuild();
-	engine_recovery *r = &space->engine->recovery;
+	engine_recovery *r = &space->handler->recovery;
 	r->replace = space_replace_build_next;
 	r->recover = space_end_build_primary_key;
 }

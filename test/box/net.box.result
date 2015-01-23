@@ -835,16 +835,13 @@ file_log:seek(0, 'SEEK_END') ~= 0
 - true
 ...
 --# setopt delimiter ';'
-require('fiber').create(
+_ = fiber.create(
    function()
          conn = require('net.box').new(box.cfg.listen)
          conn.call('no_such_function', {})
    end
 );
 ---
-- status: suspended
-  name: lua
-  id: 157
 ...
 while true do
    local line = file_log:read(2048)
@@ -855,7 +852,7 @@ while true do
          return "Failure"
       end
    end
-   require('fiber').sleep(0.1)
+   fiber.sleep(0.01)
 end;
 ---
 - Success
