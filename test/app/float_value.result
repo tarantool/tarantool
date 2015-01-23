@@ -10,7 +10,7 @@ box.cfg
 9	logger_nonblock:true
 10	snap_dir:.
 11	coredump:false
-12	sophia_dir:./sophia
+12	sophia_dir:.
 13	wal_mode:write
 14	snapshot_period:0
 15	panic_on_snap_error:true
