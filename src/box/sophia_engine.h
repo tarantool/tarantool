@@ -44,7 +44,6 @@ struct SophiaFactory: public EngineFactory {
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
 	virtual void snapshot(enum engine_snapshot_event, int64_t);
-	int sophia_dir_exists;
 	void *env;
 	void *tx;
 };

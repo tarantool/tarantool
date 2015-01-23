@@ -154,14 +154,6 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	struct space *space = space_cache_find(key_def->space_id);
 	SophiaFactory *factory =
 		(SophiaFactory*)space->engine->factory;
-	if (! factory->sophia_dir_exists) {
-		int rc = mkdir(cfg_gets("sophia_dir"), 0755);
-		if (rc == -1) {
-			tnt_raise(SystemError, "failed to create directory '%s'",
-			          cfg_gets("sophia_dir"));
-		}
-		factory->sophia_dir_exists = 1;
-	}
 	env = factory->env;
 	db = sophia_configure(space, key_def);
 	if (db == NULL)
