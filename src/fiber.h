@@ -162,8 +162,13 @@ struct cord {
 	struct rlist zombie_fibers;
 	/** Fibers, ready for execution */
 	struct rlist ready_fibers;
-	/** A watcher to have a single async event for all ready fibers. */
-	ev_async ready_async;
+	/** A watcher to have a single async event for all ready fibers.
+	 * This technique is necessary to be able to suspend
+	 * a single fiber on a few watchers (for example,
+	 * a timeout and an event from network, whichever comes
+	 * first).
+	 * */
+	ev_async wakeup_event;
 	/** A memory cache for (struct fiber) */
 	struct mempool fiber_pool;
 	/** A runtime slab cache for general use in this cord. */
