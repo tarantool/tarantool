@@ -67,8 +67,6 @@ fiber_call(struct fiber *callee, ...)
 
 	callee->csw++;
 
-	callee->flags &= ~FIBER_READY;
-
 	va_start(callee->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 	va_end(callee->f_data);
@@ -91,9 +89,8 @@ fiber_checkstack()
 void
 fiber_wakeup(struct fiber *f)
 {
-	if (f->flags & FIBER_READY)
-		return;
-	f->flags |= FIBER_READY;
+	/** Remove the fiber from whatever wait list it is on. */
+	rlist_del(&f->state);
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready_fibers))
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);

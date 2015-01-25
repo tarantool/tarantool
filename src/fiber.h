@@ -60,8 +60,6 @@ enum {
 	FIBER_CANCEL      = 1 << 1,
 	/** This fiber was created via stored procedures API. */
 	FIBER_USER_MODE   = 1 << 2,
-	/** This fiber was marked as ready for wake up */
-	FIBER_READY	  = 1 << 3,
 };
 
 /**
