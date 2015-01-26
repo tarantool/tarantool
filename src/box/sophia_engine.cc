@@ -127,6 +127,7 @@ SophiaEngine::init()
 		panic("failed to create sophia environment");
 	void *c = sp_ctl(env);
 	sp_set(c, "sophia.path", cfg_gets("sophia_dir"));
+	sp_set(c, "sophia.path_create", "0");
 	sp_set(c, "scheduler.threads", cfg_gets("sophia.threads"));
 	sp_set(c, "memory.limit", cfg_gets("sophia.memory_limit"));
 	sp_set(c, "compaction.node_size", cfg_gets("sophia.node_size"));

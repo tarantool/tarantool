@@ -33,7 +33,7 @@ box.cfg
   logger_nonblock: true
   snap_dir: .
   coredump: false
-  sophia_dir: ./sophia
+  sophia_dir: .
   wal_mode: write
   snapshot_period: 0
   panic_on_snap_error: true

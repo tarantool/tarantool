@@ -393,25 +393,25 @@ box_init()
 
 	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_getd("slab_alloc_factor"));
-	engine_init();
-
-	schema_init();
-	user_cache_init();
-	/*
-	 * The order is important: to initialize sessions,
-	 * we need to access the admin user, which is used
-	 * as a default session user when running triggers.
-	 */
-	session_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
-
-	title("loading", NULL);
 
 	try {
+		engine_init();
+
+		schema_init();
+		user_cache_init();
+		/*
+		 * The order is important: to initialize sessions,
+		 * we need to access the admin user, which is used
+		 * as a default session user when running triggers.
+		 */
+		session_init();
+
+		title("loading", NULL);
 
 		/* recovery initialization */
 		recovery = recovery_new(cfg_gets("snap_dir"),
@@ -449,7 +449,7 @@ box_init()
 		fiber_gc();
 	} catch (Exception *e) {
 		e->log();
-		panic("can't scan a data directory");
+		panic("can't initialize storage: %s", e->errmsg());
 	}
 
 	title("orphan", NULL);
