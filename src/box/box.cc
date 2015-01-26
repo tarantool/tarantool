@@ -47,11 +47,9 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
-#include "fiber.h"
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
-#include "coeio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;

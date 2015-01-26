@@ -161,4 +161,17 @@ coio_stat_init(ev_stat *stat, const char *path);
 void
 coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
 
+/**
+ * Wait for a child to end.
+ * @note this is a cancellation point (can throw
+ * FiberCancelException).
+ *
+ * @retval exit status of the child.
+ *
+ * This call only works in the main thread.
+ */
+int
+coio_waitpid(pid_t pid);
+
+
 #endif /* TARANTOOL_COIO_H_INCLUDED */

@@ -683,3 +683,33 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp timeout)
 	ev_stat_stop(loop(), stat);
 	fiber_testcancel();
 }
+
+typedef void (*ev_child_cb)(ev_loop *, ev_child *, int);
+
+/**
+ * Wait for a forked child to complete.
+ * @return process return status
+ */
+int
+coio_waitpid(pid_t pid)
+{
+	assert(cord_is_main());
+	ev_child cw;
+	ev_init(&cw, (ev_child_cb) fiber_schedule);
+	ev_child_set(&cw, pid, 0);
+	cw.data = fiber();
+	ev_child_start(loop(), &cw);
+	/*
+	 * It's not safe to spuriously wakeup this fiber since
+	 * in this case the server will leave a zombie process
+	 * behind.
+	 */
+	bool allow_cancel = fiber_setcancellable(false);
+	fiber_yield();
+	fiber_setcancellable(allow_cancel);
+	ev_child_stop(loop(), &cw);
+	int status = cw.rstatus;
+	fiber_testcancel();
+	return status;
+}
+

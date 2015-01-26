@@ -227,6 +227,10 @@ cord_set_name(const char *name)
 void
 cord_destroy(struct cord *cord);
 
+/** True if this cord represents the process main thread. */
+bool
+cord_is_main();
+
 void fiber_init(void);
 void fiber_free(void);
 typedef void(*fiber_func)(va_list);
@@ -236,9 +240,6 @@ fiber_new(const char *name, fiber_func f);
 
 void
 fiber_set_name(struct fiber *fiber, const char *name);
-
-int
-wait_for_child(pid_t pid);
 
 static inline const char *
 fiber_name(struct fiber *f)

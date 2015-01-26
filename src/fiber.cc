@@ -245,36 +245,6 @@ fiber_sleep(ev_tstamp delay)
 	fiber_testcancel();
 }
 
-typedef void (*ev_child_cb)(ev_loop *, ev_child *, int);
-
-/** Wait for a forked child to complete.
- * @note: this is a cancellation point (@sa fiber_testcancel()).
- * @return process return status
-*/
-
-int
-wait_for_child(pid_t pid)
-{
-	assert(cord() == &main_cord);
-	ev_child cw;
-	ev_init(&cw, (ev_child_cb) fiber_schedule);
-	ev_child_set(&cw, pid, 0);
-	cw.data = fiber();
-	ev_child_start(loop(), &cw);
-	/*
-	 * It's not safe to spuriously wakeup this fiber since
-	 * in this case the server will leave a zombie process
-	 * behind.
-	 */
-	bool allow_cancel = fiber_setcancellable(false);
-	fiber_yield();
-	fiber_setcancellable(allow_cancel);
-	ev_child_stop(loop(), &cw);
-	int status = cw.rstatus;
-	fiber_testcancel();
-	return status;
-}
-
 void
 fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 {
@@ -610,6 +580,12 @@ cord_join(struct cord *cord)
 	}
 	cord_destroy(cord);
 	return res;
+}
+
+bool
+cord_is_main()
+{
+	return cord() == &main_cord;
 }
 
 void

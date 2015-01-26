@@ -45,6 +45,7 @@
 #include "schema.h"
 #include "tarantool.h"
 #include "coeio_file.h"
+#include "coio.h"
 
 struct MemtxSpace: public Handler {
 	MemtxSpace(Engine *e)
@@ -430,7 +431,7 @@ MemtxEngine::wait_checkpoint()
 	assert(m_snapshot_lsn >= 0);
 	assert(m_snapshot_pid > 0);
 	/* wait for memtx-part snapshot completion */
-	int rc = wait_for_child(m_snapshot_pid);
+	int rc = coio_waitpid(m_snapshot_pid);
 	if (WIFSIGNALED(rc))
 		rc = EINTR;
 	else
