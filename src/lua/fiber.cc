@@ -301,7 +301,6 @@ lbox_fiber_create(struct lua_State *L)
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Not a system fiber. */
-	f->flags |= FIBER_USER_MODE;
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	/* Move the arguments to the new coro */
@@ -459,9 +458,6 @@ static int
 lbox_fiber_cancel(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	if (! (f->flags & FIBER_USER_MODE))
-		luaL_error(L, "fiber.cancel(): subject fiber does "
-			   "not permit cancel");
 	fiber_cancel(f);
 	return 0;
 }
@@ -476,9 +472,6 @@ lbox_fiber_kill(struct lua_State *L)
 	struct fiber *f = fiber_find(fid);
 	if (f == NULL)
 		luaL_error(L, "fiber.kill(): fiber not found");
-	if (! (f->flags & FIBER_USER_MODE))
-		luaL_error(L, "fiber.kill(): subject fiber does "
-			   "not permit cancel");
 	fiber_cancel(f);
 	return 0;
 }
