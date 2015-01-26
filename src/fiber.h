@@ -58,10 +58,6 @@ enum {
 	FIBER_CANCELLABLE = 1 << 0,
 	/** Indicates that a fiber has been cancelled. */
 	FIBER_CANCEL      = 1 << 1,
-	/** This fiber was created via stored procedures API. */
-	FIBER_USER_MODE   = 1 << 2,
-	/** This fiber was marked as ready for wake up */
-	FIBER_READY	  = 1 << 3,
 };
 
 /**
@@ -115,6 +111,11 @@ struct fiber {
 	struct rlist on_yield;
 	/** Triggers invoked before this fiber stops.  Must not throw. */
 	struct rlist on_stop;
+	/**
+	 * The list of fibers awaiting for this fiber's timely
+	 * (or untimely) death.
+	 */
+	struct rlist wake;
 
 	/* This struct is considered as non-POD when compiling by g++.
 	 * You can safetly ignore all offset_of-related warnings.
@@ -123,7 +124,6 @@ struct fiber {
 	void (*f) (va_list);
 	va_list f_data;
 	uint32_t flags;
-	struct fiber *waiter;
 	void *fls[FIBER_KEY_MAX]; /* fiber local storage */
 };
 

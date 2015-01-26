@@ -67,8 +67,6 @@ fiber_call(struct fiber *callee, ...)
 
 	callee->csw++;
 
-	callee->flags &= ~FIBER_READY;
-
 	va_start(callee->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 	va_end(callee->f_data);
@@ -91,9 +89,8 @@ fiber_checkstack()
 void
 fiber_wakeup(struct fiber *f)
 {
-	if (f->flags & FIBER_READY)
-		return;
-	f->flags |= FIBER_READY;
+	/** Remove the fiber from whatever wait list it is on. */
+	rlist_del(&f->state);
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready_fibers))
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
@@ -123,37 +120,21 @@ void
 fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
+	struct fiber *self = fiber();
 
 	f->flags |= FIBER_CANCEL;
 
-	if (f == fiber()) {
-		fiber_testcancel();
-		return;
-	}
-	/*
-	 * The subject fiber is passing through a wait
-	 * point and can be kicked out of it right away.
-	 */
-	if (f->flags & FIBER_CANCELLABLE)
-		fiber_call(f);
-
-	if (f->fid) {
-		/*
-		 * The fiber is not dead. We have no other
-		 * choice but wait for it to discover that
-		 * it has been cancelled, and die.
-		 */
-		assert(f->waiter == NULL);
-		f->waiter = fiber();
+	if (f != self) {
+		rlist_add_tail_entry(&f->wake, self, state);
+		fiber_wakeup(f);
 		fiber_yield();
 	}
 	/*
-	 * Here we can't even check f->fid is 0 since
-	 * f could have already been reused. Knowing
-	 * at least that we can't get scheduled ourselves
-	 * unless asynchronously woken up is somewhat a relief.
+	 * Check if we're ourselves cancelled.
+	 * This also implements cancel for the case when
+	 * f == fiber().
 	 */
-	fiber_testcancel(); /* Check if we're ourselves cancelled. */
+	fiber_testcancel();
 }
 
 bool
@@ -303,19 +284,23 @@ fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 	fiber_call((struct fiber *) watcher->data);
 }
 
+static inline void
+fiber_schedule_list(struct rlist *list)
+{
+	while (! rlist_empty(list)) {
+		struct fiber *f;
+		f = rlist_shift_entry(list, struct fiber, state);
+		fiber_call(f);
+	}
+}
+
 static void
 fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
 {
 	(void) watcher;
 	(void) revents;
 	struct cord *cord = cord();
-
-	while (! rlist_empty(&cord->ready_fibers)) {
-		struct fiber *f = rlist_first_entry(&cord->ready_fibers,
-						    struct fiber, state);
-		rlist_del_entry(f, state);
-		fiber_call(f);
-	}
+	fiber_schedule_list(&cord->ready_fibers);
 }
 
 struct fiber *
@@ -362,10 +347,8 @@ static void
 fiber_zombificate()
 {
 	struct fiber *fiber = fiber();
-	if (fiber->waiter)
-		fiber_wakeup(fiber->waiter);
-	rlist_del(&fiber->state);
-	fiber->waiter = NULL;
+	fiber_schedule_list(&fiber->wake);
+	rlist_del(&fiber->state);               /* safety */
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
 #if !defined(NDEBUG)
@@ -466,9 +449,9 @@ fiber_new(const char *name, void (*f) (va_list))
 	rlist_create(&fiber->state);
 	rlist_create(&fiber->on_yield);
 	rlist_create(&fiber->on_stop);
+	rlist_create(&fiber->wake);
 	memset(fiber->fls, 0, sizeof(fiber->fls)); /* clear local storage */
 	fiber->flags = 0;
-	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 

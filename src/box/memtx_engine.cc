@@ -44,7 +44,7 @@
 #include "recovery.h"
 #include "schema.h"
 #include "tarantool.h"
-#include "coeio.h"
+#include "coeio_file.h"
 
 struct MemtxSpace: public Handler {
 	MemtxSpace(Engine *e)
@@ -443,20 +443,6 @@ MemtxEngine::wait_checkpoint()
 	return rc;
 }
 
-static ssize_t
-snapshot_rename_cb(va_list ap)
-{
-	int64_t lsn = *va_arg(ap, int64_t *);
-	struct xdir *dir = &recovery->snap_dir;
-	char to[PATH_MAX];
-	snprintf(to, sizeof(to), "%s", format_filename(dir, lsn, NONE));
-	const char *from = format_filename(dir, lsn, INPROGRESS);
-	int rc = rename(from, to);
-	if (rc == -1)
-		panic("can't rename %s to %s", from, to);
-	return rc;
-}
-
 void
 MemtxEngine::commit_checkpoint()
 {
@@ -464,22 +450,18 @@ MemtxEngine::commit_checkpoint()
 	assert(m_snapshot_lsn >= 0);
 	/* wait_checkpoint() must have been done. */
 	assert(m_snapshot_pid == 0);
+
+	struct xdir *dir = &::recovery->snap_dir;
 	/* rename snapshot on completion */
-	int rc = coeio_custom(snapshot_rename_cb,
-			      TIMEOUT_INFINITY, &m_snapshot_lsn);
+	char to[PATH_MAX];
+	snprintf(to, sizeof(to), "%s",
+		 format_filename(dir, m_snapshot_lsn, NONE));
+	char *from = format_filename(dir, m_snapshot_lsn, INPROGRESS);
+	int rc = coeio_rename(from, to);
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
 	m_snapshot_lsn = -1;
-}
-
-static ssize_t
-snapshot_unlink_cb(va_list ap)
-{
-	int64_t lsn = *va_arg(ap, int64_t*);
-	char *filename = format_filename(&recovery->snap_dir, lsn,
-					 INPROGRESS);
-	return inprogress_log_unlink(filename);
 }
 
 void
@@ -491,8 +473,12 @@ MemtxEngine::abort_checkpoint()
 		 * An error in the other engine's first phase.
 		 */
 		wait_checkpoint();
-		(void) coeio_custom(snapshot_unlink_cb,
-				    TIMEOUT_INFINITY, &m_snapshot_lsn);
+	}
+	if (m_snapshot_lsn > 0) {
+		/** Remove garbage .inprogress file. */
+		char *filename = format_filename(&::recovery->snap_dir,
+						m_snapshot_lsn, INPROGRESS);
+		(void) coeio_unlink(filename);
 	}
 	m_snapshot_lsn = -1;
 }

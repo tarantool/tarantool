@@ -862,7 +862,7 @@ lbox_bsdsocket_abort(struct lua_State *L)
 {
 	int fid = lua_tointeger(L, 1);
 	struct fiber *fiber = fiber_find(fid);
-	if (fiber == NULL || !(fiber->flags & FIBER_USER_MODE))
+	if (fiber == NULL)
 		return 0;
 	fiber_wakeup(fiber);
 	return 0;
