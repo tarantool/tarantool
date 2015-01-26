@@ -51,13 +51,17 @@ enum { FIBER_NAME_MAX = REGION_NAME_MAX };
 enum {
 	/**
 	 * It's safe to resume (wakeup) this fiber
-	 * with a spurious wakeup if it is suspended
-	 * (e.g. to force it to check that it's been
-	 * cancelled).
+	 * with a spurious wakeup if it is suspended,
+	 * e.g. to force it to check that it's been
+	 * cancelled.
 	 */
-	FIBER_CANCELLABLE = 1 << 0,
-	/** Indicates that a fiber has been cancelled. */
-	FIBER_CANCEL      = 1 << 1,
+	FIBER_IS_CANCELLABLE = 1 << 0,
+	/**
+	 * Indicates that a fiber has been requested to end
+	 * prematurely.
+	 */
+	FIBER_IS_CANCELLED      = 1 << 1,
+	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
 /**
@@ -248,9 +252,6 @@ fiber_checkstack();
 void
 fiber_yield(void);
 
-void
-fiber_yield_to(struct fiber *f);
-
 /**
  * @brief yield & check for timeout
  * @return true if timeout exceeded
@@ -275,10 +276,11 @@ fiber_find(uint32_t fid);
 
 /**
  * Cancel a fiber. A cancelled fiber will have
- * tnt_FiberCancelException raised in it.
+ * FiberCancelException raised in it.
  *
- * A fiber can be cancelled only if it is
- * FIBER_CANCELLABLE flag is set.
+ * Waits for the fiber to end.
+ * A fiber without flag FIBER_IS_CANCELLABLE can not be
+ * spuriously woken up.
  */
 void
 fiber_cancel(struct fiber *f);

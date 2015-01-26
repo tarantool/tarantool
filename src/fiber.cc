@@ -99,14 +99,13 @@ fiber_wakeup(struct fiber *f)
 
 /** Cancel the subject fiber.
 *
- * Note: this is not guaranteed to succeed, and requires a level
- * of cooperation on behalf of the fiber. A fiber may opt to set
- * FIBER_CANCELLABLE to false, and never test that it was
- * cancelled.  Such fiber can not ever be cancelled, and
+ * Note: this is not guaranteed to return immediately, since
+ * requires a level of cooperation on behalf of the fiber. A fiber
+ * may opt to set FIBER_IS_CANCELLABLE to false, and never test that
+ * it was cancelled. Such fiber can not ever be cancelled, and
  * for such fiber this call will lead to an infinite wait.
- * However, fiber_testcancel() is embedded to the rest of fiber_*
- * API (@sa fiber_yield()), which makes most of the fibers that opt in,
- * cancellable.
+ * However, as long as most of the cooperative code calls fiber_testcancel(),
+ * most of the fibers are cancellable.
  *
  * Currently cancellation can only be synchronous: this call
  * returns only when the subject fiber has terminated.
@@ -122,11 +121,12 @@ fiber_cancel(struct fiber *f)
 	assert(f->fid != 0);
 	struct fiber *self = fiber();
 
-	f->flags |= FIBER_CANCEL;
+	f->flags |= FIBER_IS_CANCELLED;
 
 	if (f != self) {
 		rlist_add_tail_entry(&f->wake, self, state);
-		fiber_wakeup(f);
+		if (f->flags & FIBER_IS_CANCELLABLE)
+			fiber_wakeup(f);
 		fiber_yield();
 	}
 	/*
@@ -140,7 +140,7 @@ fiber_cancel(struct fiber *f)
 bool
 fiber_is_cancelled()
 {
-	return fiber()->flags & FIBER_CANCEL;
+	return fiber()->flags & FIBER_IS_CANCELLED;
 }
 
 /** Test if this fiber is in a cancellable state and was indeed
@@ -152,7 +152,7 @@ fiber_testcancel(void)
 {
 	/*
 	 * Fiber can catch FiberCancelException using try..catch block in C or
-	 * pcall()/xpcall() in Lua. However, FIBER_CANCEL flag is still set
+	 * pcall()/xpcall() in Lua. However, FIBER_IS_CANCELLED flag is still set
 	 * and the subject fiber will be killed by subsequent unprotected call
 	 * of this function.
 	 */
@@ -166,13 +166,13 @@ fiber_testcancel(void)
  * a cancellation point.
  */
 bool
-fiber_setcancellable(bool enable)
+fiber_setcancellable(bool yesno)
 {
-	bool prev = fiber()->flags & FIBER_CANCELLABLE;
-	if (enable == true)
-		fiber()->flags |= FIBER_CANCELLABLE;
+	bool prev = fiber()->flags & FIBER_IS_CANCELLABLE;
+	if (yesno == true)
+		fiber()->flags |= FIBER_IS_CANCELLABLE;
 	else
-		fiber()->flags &= ~FIBER_CANCELLABLE;
+		fiber()->flags &= ~FIBER_IS_CANCELLABLE;
 	return prev;
 }
 
@@ -235,18 +235,9 @@ fiber_yield_timeout(ev_tstamp delay)
 	return state.timed_out;
 }
 
-void
-fiber_yield_to(struct fiber *f)
-{
-	fiber_wakeup(f);
-	fiber_yield();
-	fiber_testcancel();
-}
-
 /**
  * @note: this is a cancellation point (@sa fiber_testcancel())
  */
-
 void
 fiber_sleep(ev_tstamp delay)
 {
@@ -270,7 +261,14 @@ wait_for_child(pid_t pid)
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber();
 	ev_child_start(loop(), &cw);
+	/*
+	 * It's not safe to spuriously wakeup this fiber since
+	 * in this case the server will leave a zombie process
+	 * behind.
+	 */
+	bool allow_cancel = fiber_setcancellable(false);
 	fiber_yield();
+	fiber_setcancellable(allow_cancel);
 	ev_child_stop(loop(), &cw);
 	int status = cw.rstatus;
 	fiber_testcancel();
@@ -356,7 +354,7 @@ fiber_zombificate()
 #endif /* !defined(NDEBUG) */
 	unregister_fid(fiber);
 	fiber->fid = 0;
-	fiber->flags = 0;
+	fiber->flags = FIBER_DEFAULT_FLAGS;
 	region_free(&fiber->gc);
 	rlist_move_entry(&cord()->zombie_fibers, fiber, link);
 }
@@ -451,7 +449,7 @@ fiber_new(const char *name, void (*f) (va_list))
 	rlist_create(&fiber->on_stop);
 	rlist_create(&fiber->wake);
 	memset(fiber->fls, 0, sizeof(fiber->fls)); /* clear local storage */
-	fiber->flags = 0;
+	fiber->flags = FIBER_DEFAULT_FLAGS;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 

@@ -1125,7 +1125,15 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
+	/**
+	 * It's not safe to spuriously wakeup this fiber
+	 * since in that case it will ignore a possible
+	 * error from WAL writer and not roll back the
+	 * transaction.
+	 */
+	bool cancellable = fiber_setcancellable(false);
 	fiber_yield(); /* Request was inserted. */
+	fiber_setcancellable(cancellable);
 	return req->res;
 }
 

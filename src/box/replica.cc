@@ -226,7 +226,6 @@ pull_from_remote(va_list ap)
 		const char *err = NULL;
 		try {
 			struct xrow_header row;
-			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
 				remote_set_status(&r->remote, "connecting");
 				err = "can't connect to master";
@@ -248,7 +247,6 @@ pull_from_remote(va_list ap)
 			 * from the binary log.
 			 */
 			remote_read_row(&coio, iobuf, &row);
-			fiber_setcancellable(false);
 			err = NULL;
 			r->remote.recovery_lag = ev_now(loop) - row.tm;
 			r->remote.recovery_last_update_tstamp =

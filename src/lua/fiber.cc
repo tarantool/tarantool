@@ -414,18 +414,14 @@ lbox_fiber_sleep(struct lua_State *L)
 	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
 		luaL_error(L, "fiber.sleep(delay): bad arguments");
 	double delay = lua_tonumber(L, 1);
-	fiber_setcancellable(true);
 	fiber_sleep(delay);
-	fiber_setcancellable(false);
 	return 0;
 }
 
 static int
 lbox_fiber_yield(struct lua_State * /* L */)
 {
-	fiber_setcancellable(true);
 	fiber_sleep(0);
-	fiber_setcancellable(false);
 	return 0;
 }
 
@@ -534,7 +530,12 @@ static int
 lbox_fiber_wakeup(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	fiber_wakeup(f);
+	/*
+	 * It's unsafe to wakeup fibers which don't expect
+	 * it.
+	 */
+	if (f->flags & FIBER_IS_CANCELLABLE)
+		fiber_wakeup(f);
 	return 0;
 }
 
