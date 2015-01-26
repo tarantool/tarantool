@@ -96,12 +96,12 @@ fiber_wakeup(struct fiber *f)
 	f->flags |= FIBER_READY;
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready_fibers))
-		ev_async_send(cord->loop, &cord->ready_async);
+		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
 	rlist_move_tail_entry(&cord->ready_fibers, f, state);
 }
 
 /** Cancel the subject fiber.
- *
+*
  * Note: this is not guaranteed to succeed, and requires a level
  * of cooperation on behalf of the fiber. A fiber may opt to set
  * FIBER_CANCELLABLE to false, and never test that it was
@@ -304,7 +304,7 @@ fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 }
 
 static void
-fiber_ready_async(ev_loop * /* loop */, ev_async *watcher, int revents)
+fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
 {
 	(void) watcher;
 	(void) revents;
@@ -529,15 +529,15 @@ cord_create(struct cord *cord, const char *name)
 	cord->max_fid = 100;
 	Exception::init(cord);
 
-	ev_async_init(&cord->ready_async, fiber_ready_async);
-	ev_async_start(cord->loop, &cord->ready_async);
+	ev_async_init(&cord->wakeup_event, fiber_schedule_wakeup);
+	ev_async_start(cord->loop, &cord->wakeup_event);
 	snprintf(cord->name, sizeof(cord->name), "%s", name);
 }
 
 void
 cord_destroy(struct cord *cord)
 {
-	ev_async_stop(cord->loop, &cord->ready_async);
+	ev_async_stop(cord->loop, &cord->wakeup_event);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
 		fiber_destroy_all(cord);
