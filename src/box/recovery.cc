@@ -1091,7 +1091,7 @@ wal_writer_thread(void *worker_args)
  * WAL writer main entry point: queue a single request
  * to be written to disk and wait until this task is completed.
  */
-int
+int64_t
 wal_write(struct recovery_state *r, struct xrow_header *row)
 {
 	/*
@@ -1126,12 +1126,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
 	fiber_yield(); /* Request was inserted. */
-
-	/* req->res is -1 on error */
-	if (req->res < 0)
-		return -1; /* error */
-
-	return 0; /* success */
+	return req->res;
 }
 
 /* }}} */

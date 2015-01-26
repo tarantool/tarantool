@@ -46,6 +46,7 @@ enum { VCLOCK_MAX = 16 };
 
 /** Cluster vector clock */
 struct vclock {
+	int64_t signature;
 	int64_t lsn[VCLOCK_MAX];
 	/** To order binary logs by vector clock. */
 	rb_node(struct vclock) link;
@@ -66,6 +67,7 @@ static inline void
 vclock_create(struct vclock *vclock)
 {
 	memset(vclock, 0xff, sizeof(*vclock));
+	vclock->signature = 0;
 }
 
 static inline bool
@@ -84,6 +86,7 @@ static inline int64_t
 vclock_inc(struct vclock *vclock, uint32_t server_id)
 {
 	assert(vclock_has(vclock, server_id));
+	vclock->signature++;
 	return ++vclock->lsn[server_id];
 }
 
@@ -103,12 +106,18 @@ vclock_size(const struct vclock *vclock)
 }
 
 static inline int64_t
+vclock_sum(const struct vclock *vclock)
+{
+	int64_t sum = 0;
+	vclock_foreach(vclock, server)
+		sum += server.lsn;
+	return sum;
+}
+
+static inline int64_t
 vclock_signature(const struct vclock *vclock)
 {
-	int64_t signt = 0;
-	vclock_foreach(vclock, server)
-		signt += server.lsn;
-	return signt;
+	return vclock->signature;
 }
 
 int64_t
@@ -226,6 +235,7 @@ vclock_del_server(struct vclock *vclock, uint32_t server_id)
 {
 	assert(vclock_has(vclock, server_id));
 	vclock->lsn[server_id] = -1;
+	vclock->signature = vclock_sum(vclock);
 }
 
 #endif /* defined(__cplusplus) */

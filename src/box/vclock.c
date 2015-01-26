@@ -45,6 +45,7 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 		      (unsigned) server_id,
 		      (long long) prev_lsn, (long long) lsn);
 	}
+	vclock->signature += lsn - ((prev_lsn >= 0) ? prev_lsn : 0);
 	vclock->lsn[server_id] = lsn;
 	return prev_lsn;
 }
@@ -80,7 +81,6 @@ rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 		*end = chunk + cap;
 		*buf = chunk;
 	}
-
 
 	return rc;
 }
@@ -176,6 +176,7 @@ vclock_from_string(struct vclock *vclock, const char *str)
 		goto error;
 	end:
 		if (*p == '\0') {
+			vclock->signature = vclock_sum(vclock);
 			return 0;
 		} else if (isblank(*p)) {
 			++p;

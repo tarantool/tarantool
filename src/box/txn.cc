@@ -48,7 +48,6 @@ fiber_set_txn(struct fiber *fiber, struct txn *txn)
 	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
 }
 
-
 static void
 txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
@@ -212,29 +211,27 @@ txn_commit(struct txn *txn)
 	assert(txn == in_txn());
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-		trigger_clear(&txn->fiber_on_yield);
-		trigger_clear(&txn->fiber_on_stop);
+
+	trigger_clear(&txn->fiber_on_yield);
+	trigger_clear(&txn->fiber_on_stop);
+
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if ((!stmt->old_tuple && !stmt->new_tuple) ||
 		    space_is_temporary(stmt->space))
 			continue;
-
-		int res = 0;
 		/* txn_commit() must be done after txn_add_redo() */
-		assert(recovery->wal_mode == WAL_NONE ||
-		       stmt->row != NULL);
+		assert(recovery->wal_mode == WAL_NONE || stmt->row != NULL);
 		ev_tstamp start = ev_now(loop()), stop;
-		res = wal_write(recovery, stmt->row);
+		int64_t res = wal_write(recovery, stmt->row);
 		stop = ev_now(loop());
-
 		if (stop - start > too_long_threshold && stmt->row != NULL) {
 			say_warn("too long %s: %.3f sec",
 				 iproto_type_name(stmt->row->type),
 				 stop - start);
 		}
-
-		if (res)
+		if (res < 0)
 			tnt_raise(LoggedError, ER_WAL_IO);
+		txn->signature = res;
 	}
 	if (txn->engine)
 		txn->engine->commit(txn);

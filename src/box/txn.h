@@ -43,12 +43,10 @@ struct space;
 struct txn_stmt {
 	/** Doubly linked list of all statements. */
 	struct rlist next;
-
 	/** Undo info. */
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
-
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 };
@@ -62,6 +60,8 @@ struct txn {
 	struct rlist on_commit, on_rollback;
 	/** Total number of statements in this txn. */
 	int n_stmts;
+	/** Commit signature (LSN sum) */
+	int64_t signature;
 	/**
 	 * True if this transaction is running in autocommit mode
 	 * (statement end causes an automatic transaction commit).

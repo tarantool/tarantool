@@ -278,17 +278,10 @@ SophiaEngine::commit(struct txn *txn)
 	auto scoped_guard = make_scoped_guard([=] {
 		tx = NULL;
 	});
-
-	/* a. get max lsn for commit */
-	int64_t lsn = 0;
-	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->row->lsn > lsn)
-			lsn = stmt->row->lsn;
-	}
-
-	/* b. commit transaction */
-	int rc = sp_prepare(tx, lsn);
+	/* commit transaction using transaction
+	 * commit signature */
+	assert(txn->signature >= 0);
+	int rc = sp_prepare(tx, txn->signature);
 	assert(rc == 0);
 	if (rc == -1)
 		sophia_raise(env);
