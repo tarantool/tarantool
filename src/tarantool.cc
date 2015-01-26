@@ -145,7 +145,7 @@ sig_snapshot(ev_loop * /* loop */, struct ev_signal * /* w */,
 			" the signal is ignored");
 		return;
 	}
-	fiber_call(fiber_new("snapshot", (fiber_func)box_snapshot));
+	fiber_start(fiber_new("snapshot", (fiber_func)box_snapshot));
 }
 
 static void

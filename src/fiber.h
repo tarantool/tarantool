@@ -267,7 +267,10 @@ void
 fiber_gc(void);
 
 void
-fiber_call(struct fiber *callee, ...);
+fiber_start(struct fiber *callee, ...);
+
+void
+fiber_call(struct fiber *callee);
 
 void
 fiber_wakeup(struct fiber *f);

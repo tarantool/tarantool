@@ -220,7 +220,7 @@ iproto_queue_schedule(ev_loop * /* loop */, struct ev_async *watcher,
 					      struct fiber, state);
 		else
 			f = fiber_new("iproto", iproto_queue_handler);
-		fiber_call(f, i_queue);
+		fiber_start(f, i_queue);
 	}
 }
 
@@ -815,7 +815,7 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 static void on_bind(void *arg __attribute__((unused)))
 {
-	fiber_call(fiber_new("leave_local_hot_standby",
+	fiber_start(fiber_new("leave_local_hot_standby",
 			     (fiber_func) box_leave_local_standby_mode));
 }
 

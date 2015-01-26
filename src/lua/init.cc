@@ -444,7 +444,7 @@ tarantool_lua_run_script(char *path, int argc, char **argv)
 	 * a separate fiber.
 	 */
 	script_fiber = fiber_new(title, run_script);
-	fiber_call(script_fiber, tarantool_L, path, argc, argv);
+	fiber_start(script_fiber, tarantool_L, path, argc, argv);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.

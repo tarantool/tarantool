@@ -306,7 +306,7 @@ lbox_fiber_create(struct lua_State *L)
 	/* Move the arguments to the new coro */
 	lua_xmove(L, child_L, lua_gettop(L));
 	lbox_pushfiber(L, f);
-	fiber_call(f, coro_ref, child_L);
+	fiber_start(f, coro_ref, child_L);
 	return 1;
 }
 

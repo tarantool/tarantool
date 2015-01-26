@@ -49,10 +49,11 @@ update_last_stack_frame(struct fiber *fiber)
 #else
 	(void)fiber;
 #endif /* ENABLE_BACKTRACE */
+
 }
 
 void
-fiber_call(struct fiber *callee, ...)
+fiber_call(struct fiber *callee)
 {
 	struct fiber *caller = fiber();
 	struct cord *cord = cord();
@@ -67,8 +68,14 @@ fiber_call(struct fiber *callee, ...)
 
 	callee->csw++;
 
-	va_start(callee->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+}
+
+void
+fiber_start(struct fiber *callee, ...)
+{
+	va_start(callee->f_data, callee);
+	fiber_call(callee);
 	va_end(callee->f_data);
 }
 

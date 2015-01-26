@@ -24,7 +24,7 @@ stat_notify_test(FILE *f, const char *filename)
 	header();
 
 	struct fiber *touch = fiber_new("touch", touch_f);
-	fiber_call(touch, f);
+	fiber_start(touch, f);
 	ev_stat stat;
 	note("filename: %s", filename);
 	coio_stat_init(&stat, filename);

@@ -311,7 +311,7 @@ recovery_follow_remote(struct recovery_state *r)
 	f = fiber_new(name, pull_from_remote);
 
 	r->remote.reader = f;
-	fiber_call(f, r);
+	fiber_start(f, r);
 }
 
 void
