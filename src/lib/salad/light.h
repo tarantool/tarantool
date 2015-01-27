@@ -112,7 +112,10 @@ struct LIGHT(record) {
 	/* slot of the next record in chain */
 	uint32_t next;
 	/* the value */
-	LIGHT_DATA_TYPE value;
+	union {
+		LIGHT_DATA_TYPE value;
+		uint64_t uint64_padding;
+	};
 };
 
 /**
