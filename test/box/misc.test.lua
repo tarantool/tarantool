@@ -95,9 +95,11 @@ myinsert = nil
 tonumber64(1), 1
 
 -- Testing 64bit
+tonumber64()
+tonumber64('invalid number')
 tonumber64(123)
 tonumber64('123')
-type(tonumber64('4294967296')) == 'cdata'
+type(tonumber64('4294967296')) == 'number'
 tonumber64('9223372036854775807') == tonumber64('9223372036854775807')
 tonumber64('9223372036854775807') - tonumber64('9223372036854775800')
 tonumber64('18446744073709551615') == tonumber64('18446744073709551615')
