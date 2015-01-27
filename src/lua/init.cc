@@ -121,7 +121,6 @@ lbox_tonumber64(struct lua_State *L)
 
 	switch (lua_type(L, 1)) {
 	case LUA_TNUMBER:
-		lua_pushvalue(L, 1);
 		return 1;
 	case LUA_TSTRING:
 	{
