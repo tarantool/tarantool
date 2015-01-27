@@ -12,18 +12,7 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
-local function normalize_uri(port)
-    if port == nil then
-        return nil
-    end
-    return tostring(port);
-end
-
--- arguments that can be number or string
-local wrapper_cfg = {
-    listen             = normalize_uri,
-}
-
+-- see default_cfg below
 local default_sophia_cfg = {
     memory_limit = 0,
     threads      = 5,
@@ -66,9 +55,17 @@ local default_cfg = {
     snapshot_count      = 6,
 }
 
+-- see template_cfg below
+local sophia_template_cfg = {
+    memory_limit = 'number',
+    threads      = 'number',
+    node_size    = 'number',
+    page_size    = 'number'
+}
+
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
-local template = {
+local template_cfg = {
     listen              = 'string, number',
     slab_alloc_arena    = 'number',
     slab_alloc_minimal  = 'number',
@@ -77,7 +74,7 @@ local template = {
     snap_dir            = 'string',
     wal_dir             = 'string',
     sophia_dir          = 'string',
-    sophia              = 'table',
+    sophia              = sophia_template_cfg,
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',
@@ -100,6 +97,18 @@ local template = {
     snapshot_count      = 'number',
 }
 
+local function normalize_uri(port)
+    if port == nil then
+        return nil
+    end
+    return tostring(port);
+end
+
+-- options that require special handling
+local modify_cfg = {
+    listen             = normalize_uri,
+}
+
 -- dynamically settable options
 local dynamic_cfg = {
     wal_mode                = ffi.C.box_set_wal_mode,
@@ -114,52 +123,74 @@ local dynamic_cfg = {
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
 }
 
-local function prepare_cfg(table)
-    if table == nil then
+local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
+    if cfg == nil then
         return {}
     end
-    if type(table) ~= 'table' then
+    if type(cfg) ~= 'table' then
         error("Error: cfg should be a table")
     end
     -- just pass {.. dont_check = true, ..} to disable check below
-    if table.dont_check then
+    if cfg.dont_check then
         return
     end
-    local newtable = {}
-    for k,v in pairs(table) do
-        if template[k] == nil then
-            error("Error: cfg parameter '" .. k .. "' is unexpected")
+    readable_prefix = ''
+    if prefix ~= nil and prefix ~= '' then
+        readable_prefix = prefix .. '.'
+    end
+    local new_cfg = {}
+    for k,v in pairs(cfg) do
+        readable_name = readable_prefix .. k;
+        if template_cfg[k] == nil then
+            error("Error: cfg parameter '" .. readable_name .. "' is unexpected")
         elseif v == "" or v == nil then
             -- "" and NULL = ffi.cast('void *', 0) set option to default value
             v = default_cfg[k]
-        elseif template[k] == 'any' then
+        elseif template_cfg[k] == 'any' then
             -- any type is ok
-        elseif (string.find(template[k], ',') == nil) then
+        elseif type(template_cfg[k]) == 'table' then
+            if type(v) ~= 'table' then
+                error("Error: cfg parameter '" .. readable_name .. "' should be a table")
+            end
+            v = prepare_cfg(v, default_cfg[k], template_cfg[k], modify_cfg[k], readable_name)
+        elseif (string.find(template_cfg[k], ',') == nil) then
             -- one type
-            if type(v) ~= template[k] then
-                error("Error: cfg parameter '" .. k .. "' should be of type " .. template[k])
+            if type(v) ~= template_cfg[k] then
+                error("Error: cfg parameter '" .. readable_name .. "' should be of type " .. template_cfg[k])
             end
         else
-            local good_types = string.gsub(template[k], ' ', '');
+            local good_types = string.gsub(template_cfg[k], ' ', '');
             if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
                 good_types = string.gsub(good_types, ',', ', ');
-                error("Error: cfg parameter '" .. k .. "' should be one of types: " .. template[k])
+                error("Error: cfg parameter '" .. readable_name .. "' should be one of types: " .. template_cfg[k])
             end
         end
-        if wrapper_cfg[k] ~= nil then
-            v = wrapper_cfg[k](v)
+        if modify_cfg ~= nil and type(modify_cfg[k]) == 'function' then
+            v = modify_cfg[k](v)
         end
-        newtable[k] = v
+        new_cfg[k] = v
     end
-    return newtable
+    return new_cfg
+end
+
+local function apply_default_cfg(cfg, default_cfg)
+    for k,v in pairs(default_cfg) do
+        if cfg[k] == nil then
+            cfg[k] = v
+        elseif type(v) == 'table' then
+            apply_default_cfg(cfg[k], v)
+        end
+    end
 end
 
 local function reload_cfg(oldcfg, newcfg)
-    newcfg = prepare_cfg(newcfg)
+    newcfg = prepare_cfg(newcfg, default_cfg, template_cfg, modify_cfg)
     for key, val in pairs(newcfg) do
         if dynamic_cfg[key] == nil then
             box.error(box.error.RELOAD_CFG, key);
         end
+    end
+    for key, val in pairs(newcfg) do
         dynamic_cfg[key](val)
         rawset(oldcfg, key, val)
     end
@@ -187,12 +218,8 @@ setmetatable(box, {
 })
 
 local function load_cfg(cfg)
-    cfg = prepare_cfg(cfg)
-    for k,v in pairs(default_cfg) do
-        if cfg[k] == nil then
-            cfg[k] = v
-        end
-    end
+    cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    apply_default_cfg(cfg, default_cfg);
     -- Save new box.cfg
     box.cfg = cfg
     if not pcall(ffi.C.check_cfg) then

@@ -32,10 +32,7 @@ if not file_exists("lock") then
 end
 
 local sophia = {
-	memory_limit = 0,
-	threads      = 3, -- test case
-	node_size    = 134217728,
-	page_size    = 131072
+	threads = 3 -- test case
 }
 
 box.cfg {
