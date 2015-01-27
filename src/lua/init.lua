@@ -6,10 +6,10 @@ local ffi = require('ffi')
 ffi.cdef[[
 char *
 tarantool_error_message(void);
-const char *
-tarantool_version(void);
 double
 tarantool_uptime(void);
+typedef int32_t pid_t;
+pid_t getpid(void);
 ]]
 
 local pcall_lua = pcall
@@ -32,9 +32,15 @@ dostring = function(s, ...)
     return chunk(...)
 end
 
--- This function automatically called by the server for
--- any new admin client.
-function motd()
-	return "Tarantool " .. ffi.string(ffi.C.tarantool_version()),
-		   "Uptime: " .. math.floor(ffi.C.tarantool_uptime())
+local function uptime()
+    return tonumber(ffi.C.tarantool_uptime());
 end
+
+local function pid()
+    return tonumber(ffi.C.getpid())
+end
+
+return {
+    uptime = uptime;
+    pid = pid;
+}

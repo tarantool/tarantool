@@ -66,9 +66,8 @@ end;
 ...
 function test_box_info()
     local tmp = box.info()
-    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
-    local buildstr = {'flags', 'target', 'compiler', 'options'}
-    local str = {'version', 'status' }
+    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime'}
+    local str = {'status' }
     local failed = {}
     if check_type(tmp.server, 'table') == false then
         table.insert(failed1, 'box.info().server')
@@ -88,20 +87,6 @@ function test_box_info()
         else
             tmp[v] = nil
         end
-    end
-    if type(tmp.build) == 'table' then
-        for k, v in ipairs(buildstr) do
-            if check_type(tmp.build[v], 'string') == false then
-                table.insert(failed, 'box.info().build.'..v)
-            else
-                tmp.build[v] = nil
-            end
-        end
-        if #tmp.build == 0 then
-            tmp.build = nil
-        end
-    else
-        table.insert(failed, 'box.info().build failed')
     end
     if #tmp > 0 or #failed > 0 then
         return 'box.info() is not ok.', 'failed: ', failed, tmp

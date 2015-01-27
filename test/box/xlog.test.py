@@ -61,7 +61,7 @@ wal_inprogress = os.path.join(server.vardir, filename + ".inprogress")
 wal = os.path.join(server.vardir, filename)
 server.admin("box.space[0]:insert{4, 'fourth tuple'}")
 server.admin("box.space[0]:insert{5, 'Unfinished record'}")
-pid = int(yaml.load(server.admin("box.info.pid", silent=True))[0])
+pid = int(yaml.load(server.admin("require('tarantool').pid()", silent=True))[0])
 from signal import SIGKILL
 if pid > 0:
     os.kill(pid, SIGKILL)

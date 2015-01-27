@@ -299,7 +299,7 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
-    local version = ffi.string(ffi.C.tarantool_version())
+    local version = ffi.string(_TARANTOOL)
     state:print(string.format("%-63s\n%-63s\n",
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))

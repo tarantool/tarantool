@@ -17,6 +17,8 @@ ffi.cdef[[
         S_INFO,
         S_DEBUG
     };
+
+    pid_t logger_pid;
 ]]
 
 local function say(level, fmt, ...)
@@ -59,4 +61,8 @@ return {
     rotate = function()
         ffi.C.say_logrotate(0)
     end,
+
+    logger_pid = function()
+        return tonumber(ffi.C.logger_pid)
+    end
 }

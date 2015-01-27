@@ -12,15 +12,7 @@ box.info['unknown_variable']
 ---
 - null
 ...
-string.match(box.info.version, '^[1-9]') ~= nil
----
-- true
-...
 string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
----
-- true
-...
-string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
@@ -39,22 +31,6 @@ box.info.recovery_last_update
 box.info.status
 ---
 - running
-...
-string.len(box.info.build.target) > 0
----
-- true
-...
-string.len(box.info.build.compiler) > 0
----
-- true
-...
-string.len(box.info.build.flags) > 0
----
-- true
-...
-string.len(box.info.build.options) > 0
----
-- true
 ...
 string.len(box.info.uptime) > 0
 ---
@@ -75,9 +51,7 @@ table.sort(t)
 ...
 t
 ---
-- - build
-  - logger_pid
-  - pid
+- - pid
   - recovery_lag
   - recovery_last_update
   - server
@@ -86,7 +60,6 @@ t
   - status
   - uptime
   - vclock
-  - version
 ...
 box.info.snapshot_pid
 ---

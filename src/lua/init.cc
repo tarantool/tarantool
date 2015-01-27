@@ -84,12 +84,8 @@ extern char uuid_lua[],
 	tap_lua[],
 	fio_lua[];
 
-static const char *lua_sources[] = {
-	init_lua,
-	NULL
-};
-
 static const char *lua_modules[] = {
+	"tarantool", init_lua,
 	"msgpackffi", msgpackffi_lua,
 	"fun", fun_lua,
 	"digest", digest_lua,
@@ -257,6 +253,50 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pop(L, 1); /* package */
 }
 
+static int
+luaopen_tarantool(lua_State *L)
+{
+	/* Set _G._TARANTOOL (like _VERSION) */
+	lua_pushstring(L, tarantool_version());
+	lua_setfield(L, LUA_GLOBALSINDEX, "_TARANTOOL");
+
+	static const struct luaL_reg initlib[] = {
+		{NULL, NULL}
+	};
+	luaL_register_module(L, "tarantool", initlib);
+
+	/* version */
+	lua_pushstring(L, tarantool_version());
+	lua_setfield(L, -2, "version");
+
+	/* build */
+	lua_pushstring(L, "build");
+	lua_newtable(L);
+
+	/* build.target */
+	lua_pushstring(L, "target");
+	lua_pushstring(L, BUILD_INFO);
+	lua_settable(L, -3);
+
+	/* build.options */
+	lua_pushstring(L, "options");
+	lua_pushstring(L, BUILD_OPTIONS);
+	lua_settable(L, -3);
+
+	/* build.compiler */
+	lua_pushstring(L, "compiler");
+	lua_pushstring(L, COMPILER_INFO);
+	lua_settable(L, -3);
+
+	/* build.flags */
+	lua_pushstring(L, "flags");
+	lua_pushstring(L, TARANTOOL_C_FLAGS);
+	lua_settable(L, -3);
+
+	lua_settable(L, -3);    /* box.info.build */
+	return 1;
+}
+
 void
 tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 {
@@ -317,15 +357,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 	lua_pop(L, 1); /* _LOADED */
 
-	/* Load Lua extension */
-	for (const char **s = lua_sources; *s; s++) {
-		if (luaL_dostring(L, *s))
-			panic("Error loading Lua source %.160s...: %s",
-			      *s, lua_tostring(L, -1));
-	}
+	luaopen_tarantool(L);
+	lua_pop(L, 1);
 
 	box_lua_init(L);
-
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);

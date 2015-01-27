@@ -112,9 +112,9 @@ lbox_info_snapshot_pid(struct lua_State *L)
 }
 
 static int
-lbox_info_logger_pid(struct lua_State *L)
+lbox_info_pid(struct lua_State *L)
 {
-	lua_pushnumber(L, logger_pid);
+	lua_pushnumber(L, getpid());
 	return 1;
 }
 
@@ -150,7 +150,7 @@ lbox_info_dynamic_meta [] =
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},
-	{"logger_pid", lbox_info_logger_pid},
+	{"pid", lbox_info_pid},
 	{"sophia", lbox_info_sophia},
 	{NULL, NULL}
 };
@@ -172,47 +172,6 @@ lbox_info_index(struct lua_State *L)
 	return 1;
 }
 
-/** Push a bunch of compile-time or start-time constants into a Lua table. */
-static void
-lbox_info_init_static_values(struct lua_State *L)
-{
-	/* tarantool version */
-	lua_pushstring(L, "version");
-	lua_pushstring(L, tarantool_version());
-	lua_settable(L, -3);
-
-	/* pid */
-	lua_pushstring(L, "pid");
-	lua_pushnumber(L, getpid());
-	lua_settable(L, -3);
-
-	/* build */
-	lua_pushstring(L, "build");
-	lua_newtable(L);
-
-	/* box.info.build.target */
-	lua_pushstring(L, "target");
-	lua_pushstring(L, BUILD_INFO);
-	lua_settable(L, -3);
-
-	/* box.info.build.options */
-	lua_pushstring(L, "options");
-	lua_pushstring(L, BUILD_OPTIONS);
-	lua_settable(L, -3);
-
-	/* box.info.build.compiler */
-	lua_pushstring(L, "compiler");
-	lua_pushstring(L, COMPILER_INFO);
-	lua_settable(L, -3);
-
-	/* box.info.build.flags */
-	lua_pushstring(L, "flags");
-	lua_pushstring(L, TARANTOOL_C_FLAGS);
-	lua_settable(L, -3);
-
-	lua_settable(L, -3);    /* box.info.build */
-}
-
 /**
  * When user invokes box.info(), return a table of key/value
  * pairs containing the current info.
@@ -221,7 +180,6 @@ static int
 lbox_info_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	lbox_info_init_static_values(L);
 	for (int i = 0; lbox_info_dynamic_meta[i].name; i++) {
 		lua_pushstring(L, lbox_info_dynamic_meta[i].name);
 		lbox_info_dynamic_meta[i].func(L);
@@ -253,9 +211,11 @@ box_lua_info_init(struct lua_State *L)
 	lua_pushcfunction(L, lbox_info_call);
 	lua_settable(L, -3);
 
-	lua_setmetatable(L, -2);
+	lua_pushstring(L, "__serialize");
+	lua_pushcfunction(L, lbox_info_call);
+	lua_settable(L, -3);
 
-	lbox_info_init_static_values(L);
+	lua_setmetatable(L, -2);
 
 	lua_pop(L, 1); /* info module */
 }
