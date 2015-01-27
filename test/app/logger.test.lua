@@ -1,5 +1,8 @@
 #!/usr/bin/env tarantool
 
+local test = require('tap').test('log')
+test:plan(2)
+
 --
 -- Check that Tarantool creates ADMIN session for #! script
 -- 
@@ -16,7 +19,16 @@ while file:read() do
 end
 log.info(message)
 local line = file:read()
-print(line:sub(-message:len()))
+test:is(line:sub(-message:len()), message, "message")
+
+--
+-- gh-700: Crash on calling log.info() with formatting characters
+--
+log.info("gh-700: %%s %%f %%d")
+test:is(file:read():match('I>%s+(.*)'), "gh-700: %s %f %d", "formatting")
+
 file:close()
 log.rotate()
+
+test:check()
 os.exit()

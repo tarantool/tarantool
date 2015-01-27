@@ -37,7 +37,7 @@ local function say(level, fmt, ...)
             file = 'eval'
         end
     end
-    ffi.C._say(level, file, line, nil, str)
+    ffi.C._say(level, file, line, nil, "%s", str)
 end
 
 return {
