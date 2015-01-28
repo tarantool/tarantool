@@ -394,8 +394,13 @@ recover_remaining_wals(struct recovery_state *r)
 	last_signature = current_vclock != NULL ?
 		vclock_signature(current_vclock) : -1;
 	/* if the caller already opened WAL for us, recover from it first */
-	if (r->current_wal != NULL)
+	if (r->current_wal != NULL) {
+		if (r->signature == -1) {
+			r->signature
+				= vclock_signature(&r->current_wal->vclock);
+		}
 		goto recover_current_wal;
+	}
 
 	while (1) {
 		current_vclock = vclockset_isearch(&r->wal_dir.index, &r->vclock);
