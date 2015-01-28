@@ -464,11 +464,6 @@ box_init()
 	} else {
 		box_leave_local_standby_mode(NULL);
 	}
-	if (cfg_getd("io_collect_interval") > 0) {
-		ev_set_io_collect_interval(loop(),
-					   cfg_getd("io_collect_interval"));
-	}
-	too_long_threshold = cfg_getd("too_long_threshold");
 	iobuf_set_readahead(cfg_geti("readahead"));
 }
 

@@ -29,7 +29,6 @@ index = space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
 
 box.cfg{snapshot_period = PERIOD, snapshot_count = 2 }
 
-
 no = 1
 -- first xlog
 for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end

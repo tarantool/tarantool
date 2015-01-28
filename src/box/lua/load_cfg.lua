@@ -12,6 +12,8 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
+local log = require('log')
+
 -- see default_cfg below
 local default_sophia_cfg = {
     memory_limit = 0,
@@ -191,8 +193,11 @@ local function reload_cfg(oldcfg, newcfg)
         end
     end
     for key, val in pairs(newcfg) do
-        dynamic_cfg[key](val)
-        rawset(oldcfg, key, val)
+        if oldcfg[key] ~= val then
+            dynamic_cfg[key](val)
+            rawset(oldcfg, key, val)
+            log.info("set '%s' configuration option to '%s'", key, val)
+        end
     end
     if type(box.on_reload_configuration) == 'function' then
         box.on_reload_configuration()
@@ -240,8 +245,12 @@ local function load_cfg(cfg)
             __call = reload_cfg,
         })
     ffi.C.load_cfg()
-    for _, k in pairs({'snapshot_count', 'snapshot_period' }) do
-        dynamic_cfg[k](cfg[k])
+    for key, fun in pairs(dynamic_cfg) do
+        local val = cfg[key]
+        if val ~= default_cfg[key] then
+            fun(cfg[key])
+            log.info("set '%s' configuration option to '%s'", key, val)
+        end
     end
 end
 box.cfg = load_cfg

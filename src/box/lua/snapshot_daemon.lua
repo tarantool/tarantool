@@ -11,7 +11,7 @@ do
 
     local daemon = {
         snapshot_period = 0;
-        snapshot_count = 0;
+        snapshot_count = 6;
     }
 
     local function sprintf(fmt, ...) return string.format(fmt, ...) end
@@ -220,11 +220,6 @@ do
     setmetatable(daemon, {
         __index = {
             set_snapshot_period = function(snapshot_period)
-                if daemon.snapshot_period == snapshot_period then
-                    return
-                end
-                log.info("%s: new snapshot period is %s", PREFIX,
-                         tostring(snapshot_period))
                 daemon.snapshot_period = snapshot_period
                 reload(daemon)
                 return
@@ -235,12 +230,7 @@ do
                     box.error(box.error.CFG,
                         "snapshot_count must be integer")
                 end
-                if daemon.snapshot_count == snapshot_count then
-                    return
-                end
                 daemon.snapshot_count = snapshot_count
-                log.info("%s: new snapshot count is %s", PREFIX,
-                    tostring(snapshot_count))
                 reload(daemon)
            end
         }
