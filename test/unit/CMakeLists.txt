@@ -92,3 +92,7 @@ add_executable(scramble.test scramble.c
 
 add_executable(guava.test guava.c)
 target_link_libraries(guava.test salad)
+
+add_executable(find_path.test find_path.c
+    ${CMAKE_SOURCE_DIR}/src/find_path.c
+)

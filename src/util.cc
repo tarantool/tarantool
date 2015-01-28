@@ -403,27 +403,39 @@ symbols_load(const char *name)
 
 	bfd_init();
 	h = bfd_openr(path, NULL);
-	if (h == NULL)
+	if (h == NULL) {
+		say_syserror("bfd_open(%s) failed", path);
 		goto out;
+	}
 
-	if (bfd_check_format(h, bfd_archive))
+	if (bfd_check_format(h, bfd_archive)) {
+		say_warn("bfd_check_format() failed");
 		goto out;
+	}
 
-	if (!bfd_check_format_matches(h, bfd_object, &matching))
+	if (!bfd_check_format_matches(h, bfd_object, &matching)) {
+		say_warn("bfd_check_format_matches() failed");
 		goto out;
+	}
 
 	storage_needed = bfd_get_symtab_upper_bound(h);
 
-	if (storage_needed <= 0)
+	if (storage_needed <= 0) {
+		say_warn("storage_needed is out of bounds");
 		goto out;
+	}
 
 	symbol_table = (asymbol **) malloc(storage_needed);
-	if (symbol_table == NULL)
+	if (symbol_table == NULL) {
+		say_warn("failed to allocate symbol table");
 		goto out;
+	}
 
 	number_of_symbols = bfd_canonicalize_symtab (h, symbol_table);
-	if (number_of_symbols < 0)
+	if (number_of_symbols < 0) {
+		say_warn("failed to canonicalize symbol table");
 		goto out;
+	}
 
 	for (int i = 0; i < number_of_symbols; i++) {
 		struct bfd_section *section;
@@ -441,8 +453,10 @@ symbols_load(const char *name)
 			symbol_count++;
 	}
 
-	if (symbol_count == 0)
+	if (symbol_count == 0) {
+		say_warn("symbol count is 0");
 		goto out;
+	}
 
 	j = 0;
 	symbols = (struct symbol *) malloc(symbol_count * sizeof(struct symbol));
@@ -482,7 +496,7 @@ symbols_load(const char *name)
 
 out:
 	if (symbol_count == 0)
-		say_warn("no symbols found in %s", name);
+		say_warn("no symbols found in %s", path);
 
 	if (symbol_table)
 		free(symbol_table);

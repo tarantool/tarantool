@@ -28,6 +28,10 @@ find_path(const char *argv0)
 		int rc = -1;
 #if defined(__linux__)
 		rc = readlink("/proc/self/exe", buf, size);
+		if (rc >= 0) {
+			/* readlink() does not add a trailing zero */
+			buf[rc] = '\0';
+		}
 #elif defined(__FreeBSD__)
 		int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
 		rc = sysctl(mib, 4, buf, &size, NULL, 0);
