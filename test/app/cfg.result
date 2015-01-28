@@ -1,5 +1,5 @@
 TAP version 13
-1..17
+1..18
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
@@ -14,6 +14,7 @@ ok - cfg.wal_mode change
 ok - cfg.wal_mode default value
 ok - cfg.wal_mode change
 ok - cfg.wal_mode default value
+ok - work_dir is invalid
 ok - sophia_dir is invalid
 ok - snap_dir is invalid
 ok - wal_dir is invalid

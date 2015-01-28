@@ -2,7 +2,7 @@
 
 local tap = require('tap')
 local test = tap.test('cfg')
-test:plan(17)
+test:plan(18)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -67,6 +67,11 @@ test:is(box.cfg.wal_mode, "write", "cfg.wal_mode default value")
 
 -- gh-684: Inconsistency with box.cfg and directories
 local script = io.open('script.lua', 'w')
+script:write([[ box.cfg{ logger="tarantool.log", work_dir='invalid' } ]])
+script:close()
+test:isnt(os.execute("/bin/sh -c 'tarantool ./script.lua 2> /dev/null'"), 0, 'work_dir is invalid')
+
+script = io.open('script.lua', 'w')
 script:write([[ pcall( box.cfg, { logger="tarantool.log", sophia_dir='invalid' }) ]])
 script:close()
 test:isnt(os.execute("/bin/sh -c 'tarantool ./script.lua 2> /dev/null'"), 0, 'sophia_dir is invalid')
