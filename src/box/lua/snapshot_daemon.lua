@@ -9,7 +9,10 @@ do
 
     local PREFIX = 'snapshot_daemon'
 
-    local daemon = { status = 'stopped' }
+    local daemon = {
+        snapshot_period = 0;
+        snapshot_count = 0;
+    }
 
     local function sprintf(fmt, ...) return string.format(fmt, ...) end
 
@@ -31,11 +34,11 @@ do
     -- create snapshot by several options
     local function make_snapshot(last_snap)
 
-        if box.cfg.snapshot_period == nil then
+        if daemon.snapshot_period == nil then
             return false
         end
 
-        if not(box.cfg.snapshot_period > 0) then
+        if not(daemon.snapshot_period > 0) then
             return false
         end
 
@@ -61,13 +64,13 @@ do
             log.error("can't stat %s: %s", snaps[#snaps], errno.strerror())
             return false
         end
-        if snstat.mtime <= fiber.time() + box.cfg.snapshot_period then
+        if snstat.mtime <= fiber.time() + daemon.snapshot_period then
             return snapshot(snaps)
         end
     end
 
     -- check filesystem and current time
-    local function process()
+    local function process(self)
         local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
 
         if snaps == nil then
@@ -81,11 +84,11 @@ do
         end
 
         -- cleanup code
-        if box.cfg.snapshot_count == nil then
+        if daemon.snapshot_count == nil then
             return
         end
 
-        if not (box.cfg.snapshot_count > 0) then
+        if not (self.snapshot_count > 0) then
             return
         end
 
@@ -99,7 +102,7 @@ do
             return
         end
 
-        while #snaps > box.cfg.snapshot_count do
+        while #snaps > self.snapshot_count do
             local rm = snaps[1]
             table.remove(snaps, 1)
 
@@ -141,16 +144,16 @@ do
     end
 
 
-    local function next_snap_interval()
+    local function next_snap_interval(self)
         
         -- don't do anything in hot_standby mode
         if box.info.status ~= 'running' or
-            box.cfg.snapshot_period == nil or
-            box.cfg.snapshot_period <= 0 then
+            self.snapshot_period == nil or
+            self.snapshot_period <= 0 then
             return nil
         end
 
-        local interval = box.cfg.snapshot_period / 10
+        local interval = self.snapshot_period / 10
 
         local time = fiber.time()
         local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
@@ -167,11 +170,11 @@ do
 
 
         -- there is no activity in xlogs
-        if box.cfg.snapshot_period * 2 + stat.mtime < time then
+        if self.snapshot_period * 2 + stat.mtime < time then
             return interval
         end
 
-        local time_left = box.cfg.snapshot_period + stat.mtime - time
+        local time_left = self.snapshot_period + stat.mtime - time
         if time_left > 0 then
             return time_left
         end
@@ -182,89 +185,64 @@ do
 
     local function daemon_fiber(self)
         fiber.name(PREFIX)
-        log.info("%s", self.status)
+        log.info("started")
         while true do
-            local interval = next_snap_interval()
-
-            if interval ~= nil then
-                fiber.sleep(interval)
-                if self.status ~= 'started' then
-                    break
-                end
-
-                local s, e = pcall(process)
+            local interval = next_snap_interval(self)
+            if interval == nil then
+                break
+            end
+            if self.control:get(interval) == nil then
+                local s, e = pcall(process, self)
 
                 if not s then
                     log.error(e)
                 end
             else
-                -- daemon is disabled
-                -- do nothing, waiting for change event wakes us up
-                fiber.sleep(3600 * 24 * 365 * 100)
+                log.info("reloaded")
             end
         end
-        log.info("%s", self.status)
-        log.info("finished daemon fiber")
+        log.info("stopped")
+        self.control:close()
+        self.control = nil
+        self.fiber = nil
+    end
+
+    local function reload(self)
+        if self.snapshot_period > 0 and self.fiber == nil then
+            self.control = fiber.channel(5)
+            self.fiber = fiber.create(daemon_fiber, self)
+        elseif self.fiber ~= nil then
+            -- wake up daemon
+            self.control:put(true)
+        end
     end
 
     setmetatable(daemon, {
         __index = {
-            start = function()
-                local daemon = box.internal[PREFIX] or daemon
-                if daemon.status == 'started' then
-                    error("snapshot daemon has already been started")
-                end
-                daemon.status = 'started'
-                if box.cfg.snapshot_period > 0 then
-                    daemon.fiber = fiber.create(daemon_fiber, daemon)
-                end
-            end,
-
-            stop = function()
-                local daemon = box.internal[PREFIX] or daemon
-                if daemon.status == 'stopped' then
-                    error("snapshot daemon has already been stopped")
-                end
-                daemon.status = 'stopped'
-                if daemon.fiber ~= nil then
-                    daemon.fiber:wakeup()
-                end
-                daemon.fiber = nil
-            end,
-
             set_snapshot_period = function(snapshot_period)
-                local daemon = box.internal[PREFIX] or daemon
-                log.info("%s: new snapshot period is %s", PREFIX,
-                         tostring(snapshot_period))
-
-                if daemon.status ~= 'started' then
+                if daemon.snapshot_period == snapshot_period then
                     return
                 end
-
-                if daemon.fiber == nil then
-                    daemon.fiber = fiber.create(daemon_fiber, daemon)
-                end
-                daemon.fiber:wakeup()
-                return snapshot_period
+                log.info("%s: new snapshot period is %s", PREFIX,
+                         tostring(snapshot_period))
+                daemon.snapshot_period = snapshot_period
+                reload(daemon)
+                return
             end,
 
             set_snapshot_count = function(snapshot_count)
                 if math.floor(snapshot_count) ~= snapshot_count then
-                    box.error(box.error.PROC_LUA,
+                    box.error(box.error.CFG,
                         "snapshot_count must be integer")
                 end
-                local daemon = box.internal[PREFIX] or daemon
-                log.info("%s: new snapshot count is %s", PREFIX,
-                    tostring(snapshot_count))
-                if daemon.status ~= 'started' then
+                if daemon.snapshot_count == snapshot_count then
                     return
                 end
-
-                if daemon.fiber ~= nil then
-                    daemon.fiber:wakeup()
-                end
-                return snapshot_period
-            end
+                daemon.snapshot_count = snapshot_count
+                log.info("%s: new snapshot count is %s", PREFIX,
+                    tostring(snapshot_count))
+                reload(daemon)
+           end
         }
     })
 

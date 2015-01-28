@@ -240,8 +240,9 @@ local function load_cfg(cfg)
             __call = reload_cfg,
         })
     ffi.C.load_cfg()
-
-    box.internal.snapshot_daemon.start()
+    for _, k in pairs({'snapshot_count', 'snapshot_period' }) do
+        dynamic_cfg[k](cfg[k])
+    end
 end
 box.cfg = load_cfg
 jit.off(load_cfg)

@@ -72,3 +72,20 @@ space:drop()
 PERIOD
 
 box.cfg{ snapshot_count = .2 }
+
+daemon = box.internal.snapshot_daemon
+-- stop daemon
+box.cfg{ snapshot_period = 0 }
+-- wait daemon to stop
+while daemon.fiber ~= nil do fiber.sleep(0) end
+daemon.fiber == nil
+-- start daemon
+box.cfg{ snapshot_period = 10 }
+daemon.fiber ~= nil
+-- reload configuration
+box.cfg{ snapshot_period = 15, snapshot_count = 20 }
+daemon.snapshot_period == 15
+daemon.snapshot_count = 20
+
+-- stop daemon
+box.cfg{ snapshot_count = 0 }
