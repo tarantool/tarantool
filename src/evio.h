@@ -101,7 +101,6 @@ struct evio_service
 void
 evio_service_init(ev_loop *loop,
 		  struct evio_service *service, const char *name,
-		  const char *uri,
 		  void (*on_accept)(struct evio_service *,
 				    int, struct sockaddr *, socklen_t),
 		  void *on_accept_param);
@@ -118,7 +117,7 @@ evio_service_on_bind(struct evio_service *service,
 
 /** Bind to the port and begin listening. */
 void
-evio_service_start(struct evio_service *service);
+evio_service_start(struct evio_service *service, const char *uri);
 
 /** If started, stop event flow and close the acceptor socket. */
 void
@@ -129,6 +128,12 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
 evio_close(ev_loop *loop, struct ev_io *evio);
+
+static inline bool
+evio_service_is_active(struct evio_service *service)
+{
+	return ev_is_active(&service->ev) || ev_is_active(&service->timer);
+}
 
 static inline bool
 evio_is_active(struct ev_io *ev)

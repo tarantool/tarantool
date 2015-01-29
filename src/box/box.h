@@ -117,6 +117,9 @@ void
 box_check_config();
 
 void
+box_set_listen(const char *uri);
+
+void
 box_set_replication_source(const char *source);
 
 void box_set_wal_mode(const char *mode);

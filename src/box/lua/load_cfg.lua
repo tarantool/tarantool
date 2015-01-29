@@ -5,6 +5,7 @@ ffi.cdef([[
 void check_cfg();
 void load_cfg();
 void box_set_wal_mode(const char *mode);
+void box_set_listen(const char *uri);
 void box_set_replication_source(const char *source);
 void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
@@ -114,6 +115,7 @@ local modify_cfg = {
 -- dynamically settable options
 local dynamic_cfg = {
     wal_mode                = ffi.C.box_set_wal_mode,
+    listen                  = ffi.C.box_set_listen,
     replication_source      = ffi.C.box_set_replication_source,
     log_level               = ffi.C.box_set_log_level,
     io_collect_interval     = ffi.C.box_set_io_collect_interval,
@@ -185,14 +187,16 @@ local function apply_default_cfg(cfg, default_cfg)
     end
 end
 
-local function reload_cfg(oldcfg, newcfg)
-    newcfg = prepare_cfg(newcfg, default_cfg, template_cfg, modify_cfg)
-    for key, val in pairs(newcfg) do
+local function reload_cfg(oldcfg, cfg)
+    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    -- iterate over original table because prepare_cfg() may store NILs
+    for key in pairs(cfg) do
         if dynamic_cfg[key] == nil then
             box.error(box.error.RELOAD_CFG, key);
         end
     end
-    for key, val in pairs(newcfg) do
+    for key in pairs(cfg) do
+        local val = newcfg[key]
         if oldcfg[key] ~= val then
             dynamic_cfg[key](val)
             rawset(oldcfg, key, val)
