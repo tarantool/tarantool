@@ -395,6 +395,7 @@ box_init()
 
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
+		   cfg_geti("slab_alloc_maximal"),
 		   cfg_getd("slab_alloc_factor"));
 
 	try {

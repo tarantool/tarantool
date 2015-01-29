@@ -228,8 +228,7 @@ MemtxHash::MemtxHash(struct key_def *key_def)
 				      0, SLAB_SIZE, MAP_PRIVATE)) {
 			panic_syserror("failed to initialize index arena");
 		}
-		slab_cache_create(&index_arena_slab_cache, &index_arena,
-				  SLAB_SIZE);
+		slab_cache_create(&index_arena_slab_cache, &index_arena);
 		mempool_create(&hash_extent_pool, &index_arena_slab_cache,
 			HASH_INDEX_EXTENT_SIZE);
 		index_arena_initialized = true;

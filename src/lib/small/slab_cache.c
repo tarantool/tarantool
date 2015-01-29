@@ -159,24 +159,18 @@ slab_merge(struct slab_cache *cache, struct slab *slab, struct slab *buddy)
 }
 
 void
-slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
-		  uint32_t order0_size)
+slab_cache_create(struct slab_cache *cache, struct slab_arena *arena)
 {
 	cache->arena = arena;
 
-	if (order0_size < sysconf(_SC_PAGESIZE))
-		order0_size = sysconf(_SC_PAGESIZE);
+	long lowest_order0_size = small_round(sysconf(_SC_PAGESIZE));
+	assert(arena->slab_size >= lowest_order0_size);
+	cache->order_max = small_lb(arena->slab_size / lowest_order0_size);
+	if (cache->order_max > ORDER_MAX - 1)
+		cache->order_max = ORDER_MAX - 1;
 
-	cache->order0_size = small_round(order0_size);
-
-	if (cache->order0_size > arena->slab_size)
-		cache->order0_size = arena->slab_size;
-
+	cache->order0_size = arena->slab_size >> cache->order_max;
 	cache->order0_size_lb = small_lb(cache->order0_size);
-
-	cache->order_max = (small_lb(arena->slab_size) -
-			    cache->order0_size_lb);
-	assert(cache->order_max < ORDER_MAX);
 
 	slab_list_create(&cache->allocated);
 	for (uint8_t i = 0; i <= cache->order_max; i++)

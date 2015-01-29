@@ -89,7 +89,7 @@ struct mslab {
  * Mempool will try to allocate blocks large enough to have overhead
  * less than specified below
  */
-static const double expected_overhead_max = 0.05;
+static const double expected_overhead_max = 0.01;
 
 static inline uint32_t
 mslab_sizeof()
@@ -194,6 +194,8 @@ mempool_create(struct mempool *pool, struct slab_cache *cache,
 	size_t expected_loss = objsize > sizeof(struct mslab)
 		? objsize : sizeof(struct mslab);
 	size_t slab_size_min = (size_t)(expected_loss / expected_overhead_max);
+	if (slab_size_min > cache->arena->slab_size)
+		slab_size_min = cache->arena->slab_size;
 
 	/*
 	 * Calculate the amount of usable space in a slab.
@@ -201,6 +203,7 @@ mempool_create(struct mempool *pool, struct slab_cache *cache,
 	 * SLAB_ORDER_MAX.
 	 */
 	uint8_t order = slab_order(cache, slab_size_min);
+	assert(order <= cache->order_max);
 	return mempool_create_with_order(pool, cache, objsize, order);
 }
 

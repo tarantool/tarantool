@@ -470,7 +470,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->id = pthread_self();
 	cord->loop = cord->id == main_thread_id ?
 		ev_default_loop(EVFLAG_AUTO) : ev_loop_new(EVFLAG_AUTO);
-	slab_cache_create(&cord->slabc, &runtime, 0);
+	slab_cache_create(&cord->slabc, &runtime);
 	mempool_create(&cord->fiber_pool, &cord->slabc,
 		       sizeof(struct fiber));
 	rlist_create(&cord->fibers);

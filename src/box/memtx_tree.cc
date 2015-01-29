@@ -211,8 +211,7 @@ MemtxTree::MemtxTree(struct key_def *key_def_arg)
 				      0, SLAB_SIZE, MAP_PRIVATE)) {
 			panic_syserror("failed to initialize index arena");
 		}
-		slab_cache_create(&index_arena_slab_cache, &index_arena,
-				  SLAB_SIZE);
+		slab_cache_create(&index_arena_slab_cache, &index_arena);
 		mempool_create(&tree_extent_pool, &index_arena_slab_cache,
 			       BPS_TREE_EXTENT_SIZE);
 		index_arena_initialized = true;
