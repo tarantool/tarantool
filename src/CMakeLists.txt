@@ -14,7 +14,6 @@ include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${READLINE_INCLUDE_DIR})
 
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
 lua_source(lua_sources lua/init.lua)
 lua_source(lua_sources lua/uuid.lua)
@@ -30,7 +29,6 @@ lua_source(lua_sources lua/help.lua)
 lua_source(lua_sources lua/help_en_US.lua)
 lua_source(lua_sources lua/tap.lua)
 lua_source(lua_sources lua/fio.lua)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 
 add_custom_target(generate_lua_sources

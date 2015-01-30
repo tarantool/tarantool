@@ -43,6 +43,11 @@ function(lua_source varname filename)
     set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.new.c")
     set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.c")
     get_filename_component(module ${filename} NAME_WE)
+    get_filename_component(dstdir ${dstfile} DIRECTORY)
+    if (IS_DIRECTORY ${dstdir})
+    else()
+        file(MAKE_DIRECTORY ${dstdir})
+    endif()
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
         COMMAND ${ECHO} 'const char ${module}_lua[] =' > ${tmpfile}
