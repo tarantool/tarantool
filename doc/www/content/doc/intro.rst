@@ -1,6 +1,8 @@
 :title: Overview
 :slug: intro
-:save_as: intro.html
+:save_as: doc/introduction.html
+:url: doc/introduction.html
+:template: old_page
 
 ===============================================================================
                              What is Tarantool?

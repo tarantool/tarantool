@@ -4,8 +4,8 @@ configure_file(
     )
 
 configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/www/content/pages/download.rst.in"
-    "${PROJECT_BINARY_DIR}/doc/www/content/pages/download.rst"
+    "${PROJECT_SOURCE_DIR}/doc/www/content/newsite/download.yml.in"
+    "${PROJECT_BINARY_DIR}/doc/www/content/newsite/download.yml"
     )
 
 add_subdirectory(man)

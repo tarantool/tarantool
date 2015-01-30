@@ -2,7 +2,7 @@
 :slug: box-protocol
 :save_as: doc/box-protocol.html
 :url: doc/box-protocol.html
-:template: documentation
+:template: old_documentation
 
 --------------------------------------------------------------------------------
                               Notion in diagrams
