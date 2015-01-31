@@ -41,6 +41,7 @@ void *ffi_symbols[] = {
 	(void *) password_prepare,
 	(void *) tarantool_error_message,
 	(void *) load_cfg,
+	(void *) box_set_listen,
 	(void *) box_set_replication_source,
 	(void *) box_set_wal_mode,
 	(void *) box_set_log_level,

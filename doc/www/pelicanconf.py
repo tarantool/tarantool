@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*- #
 from __future__ import unicode_literals
 import re
+import urlparse
 
 AUTHOR = u'Tarantool'
 SITENAME = u'Tarantool - a NoSQL database in a Lua script'
@@ -13,7 +14,7 @@ TIMEZONE = 'Europe/Moscow'
 
 DEFAULT_LANG = u'en'
 
-PLUGINS = ['plugins.documentation']
+PLUGINS = ['plugins.documentation', 'plugins.beautifulsite']
 
 # Feed generation is usually not desired when developing
 FEED_ALL_ATOM = None
@@ -22,11 +23,13 @@ TRANSLATION_FEED_ATOM = None
 
 DEFAULT_PAGINATION = False
 
-DOCS_PATH = ['doc']
-ARTICLE_EXCLUDES = ['doc']
+DOCS_PATH  = ['doc']
+BSITE_PATH = ['newsite']
+ARTICLE_EXCLUDES = ['doc', 'newsite']
 
 JINJA_FILTERS = {
         're_replace': (lambda s, i, o: re.sub(i, o, s)),
+        'url_split':  (lambda s: re.sub('www\.', '', urlparse.urlsplit(s).netloc))
 }
 
 INDEX_SAVE_AS = ''
@@ -41,13 +44,22 @@ STATIC_PATHS = [
     'robots.txt',
     'ycsb',
     'js/highcharts.js',
-    'js/tabs.js'
+    'js/ie8.js',
+    'js/index_tabs.js',
+    'js/main.js',
+    'js/old_tabs.js'
+    'js/select.js'
 ]
+
 EXTRA_PATH_METADATA = {
-    'robots.txt'      : { 'path': 'robots.txt'   },
-    'ycsb'            : { 'path': 'ycsb'         },
-    'js/highcharts.js': { 'path': 'highcharts.js'},
-    'js/tabs.js'      : { 'path': 'tabs.js'      },
+    'robots.txt'      : { 'path': 'robots.txt'      },
+    'ycsb'            : { 'path': 'ycsb'            },
+    'js/highcharts.js': { 'path': 'js/highcharts.js'},
+    'js/ie8.js'       : { 'path': 'js/ie8.js'       },
+    'js/index_tabs.js': { 'path': 'js/index_tabs.js'},
+    'js/main.js'      : { 'path': 'js/main.js'      },
+    'js/old_tabs.js'  : { 'path': 'js/old_tabs.js'  },
+    'js/select.js'    : { 'path': 'js/select.js'    },
 }
 
 # Uncomment following line if you want document-relative URLs when developing

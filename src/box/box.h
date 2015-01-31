@@ -117,6 +117,9 @@ void
 box_check_config();
 
 void
+box_set_listen(const char *uri);
+
+void
 box_set_replication_source(const char *source);
 
 void box_set_wal_mode(const char *mode);
@@ -124,6 +127,7 @@ void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
 void box_set_snap_io_rate_limit(double limit);
 void box_set_too_long_threshold(double threshold);
+void box_set_readahead(int readahead);
 
 extern struct recovery_state *recovery;
 

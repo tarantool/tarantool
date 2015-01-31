@@ -50,11 +50,14 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "evio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
+
+static struct evio_service binary; /* iproto binary listener */
 
 int snapshot_pid = 0; /* snapshot processes pid */
 static void
@@ -94,8 +97,8 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 
 /* {{{ configuration bindings */
 
-void
-box_check_replication_source(const char *source)
+static void
+box_check_uri(const char *source, const char *option_name)
 {
 	if (source == NULL)
 		return;
@@ -103,7 +106,7 @@ box_check_replication_source(const char *source)
 
 	/* URI format is [host:]service */
 	if (uri_parse(&uri, source) || !uri.service) {
-		tnt_raise(ClientError, ER_CFG, "replication source, "
+		tnt_raise(ClientError, ER_CFG, option_name,
 			  "expected host:service or /unix.socket");
 	}
 }
@@ -113,9 +116,17 @@ box_check_wal_mode(const char *mode_name)
 {
 	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
-	if (mode == WAL_MODE_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "wal_mode is not recognized");
+	if (mode == WAL_MODE_MAX)
+		tnt_raise(ClientError, ER_CFG, "wal_mode", mode_name);
+}
+
+static void
+box_check_readahead(int readahead)
+{
+	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
+	if (readahead < READAHEAD_MIN || readahead > READAHEAD_MAX) {
+		tnt_raise(ClientError, ER_CFG, "readahead",
+			  "specified value is out of bounds");
 	}
 }
 
@@ -123,19 +134,21 @@ void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	box_check_replication_source(cfg_gets("replication_source"));
+	box_check_uri(cfg_gets("listen"), "listen");
+	box_check_uri(cfg_gets("replication_source"), "replication_source");
+	box_check_readahead(cfg_geti("readahead"));
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
-		tnt_raise(ClientError, ER_CFG,
-			  "rows_per_wal must be greater than one");
+		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
+			  "the value must be greater than one");
 	}
 }
 
 extern "C" void
 box_set_replication_source(const char *source)
 {
-	box_check_replication_source(source);
+	box_check_uri(source, "replication_source");
 	bool old_is_replica = recovery->remote.reader;
 	bool new_is_replica = source != NULL;
 
@@ -163,6 +176,20 @@ box_set_replication_source(const char *source)
 }
 
 extern "C" void
+box_set_listen(const char *uri)
+{
+	box_check_uri(uri, "listen");
+	if (evio_service_is_active(&binary))
+		evio_service_stop(&binary);
+
+	if (uri != NULL) {
+		evio_service_start(&binary, uri);
+	} else {
+		box_leave_local_standby_mode(NULL);
+	}
+}
+
+extern "C" void
 box_set_wal_mode(const char *mode_name)
 {
 	box_check_wal_mode(mode_name);
@@ -170,10 +197,14 @@ box_set_wal_mode(const char *mode_name)
 		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode != recovery->wal_mode &&
 	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
-		tnt_raise(ClientError, ER_CFG,
-			  "wal_mode cannot switch to/from fsync");
+		tnt_raise(ClientError, ER_CFG, "wal_mode",
+			  "cannot switch to/from fsync");
 	}
-	recovery_update_mode(recovery, mode);
+	/** Really update WAL mode only after we left local hot standby,
+	 * since local hot standby expects it to be NONE.
+	 */
+	if (recovery->finalize)
+		recovery_update_mode(recovery, mode);
 }
 
 extern "C" void
@@ -198,6 +229,13 @@ extern "C" void
 box_set_too_long_threshold(double threshold)
 {
 	too_long_threshold = threshold;
+}
+
+extern "C" void
+box_set_readahead(int readahead)
+{
+	box_check_readahead(readahead);
+	iobuf_set_readahead(readahead);
 }
 
 /* }}} configuration bindings */
@@ -418,8 +456,6 @@ box_init()
 					recover_row, NULL);
 		recovery_set_remote(recovery,
 				    cfg_gets("replication_source"));
-		recovery_update_io_rate_limit(recovery,
-					      cfg_getd("snap_io_rate_limit"));
 		recovery_setup_panic(recovery,
 				     cfg_geti("panic_on_snap_error"),
 				     cfg_geti("panic_on_wal_error"));
@@ -456,16 +492,20 @@ box_init()
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
-	const char *listen = cfg_gets("listen");
-	/*
-	 * application server configuration).
+	iproto_init(&binary);
+	/**
+	 * listen is a dynamic option, so box_set_listen()
+	 * will be called after box_init() as long as there
+	 * is a value for listen in the configuration table.
+	 *
+	 * However, if cfg.listen is nil, box_set_listen() will
+	 * not be called - which means that we need to leave
+	 * local hot standby here. The idea is to leave
+	 * local hot standby immediately if listen is not given,
+	 * and only after binding to the listen uri otherwise.
 	 */
-	if (listen) {
-		iproto_init(listen);
-	} else {
+	if (cfg_gets("listen") == NULL)
 		box_leave_local_standby_mode(NULL);
-	}
-	iobuf_set_readahead(cfg_geti("readahead"));
 }
 
 void

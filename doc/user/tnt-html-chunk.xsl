@@ -13,6 +13,6 @@
     chapter toc
     book toc
   </xsl:param>
-  <xsl:param name="html.stylesheet" select="'tnt.css'"/>
+  <xsl:param name="html.stylesheet" select="'/theme/docbook.css'"/>
   <xsl:param name="collect.xref.targets">all</xsl:param>
 </xsl:stylesheet>

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Documentation(Content):
     mandatory_properties = ('title', )
-    default_template = 'documentation'
+    default_template = 'old_documentation'
 
 class DocumentationContainer(object):
     def __init__(self, opage):
@@ -38,7 +38,7 @@ class DocumentationGenerator(Generator):
                 'title'   : BSHTML(page).find('title').getText(),
                 'url'     : relpath if op else os.path.dirname(relpath),
                 'save_as' : relpath,
-                'template': 'documentation'
+                'template': 'old_documentation'
             })()
         self.add_source_path(page)
         return page

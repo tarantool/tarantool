@@ -5,8 +5,10 @@ ffi.cdef([[
 void check_cfg();
 void load_cfg();
 void box_set_wal_mode(const char *mode);
+void box_set_listen(const char *uri);
 void box_set_replication_source(const char *source);
 void box_set_log_level(int level);
+void box_set_readahead(int readahead);
 void box_set_io_collect_interval(double interval);
 void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
@@ -39,7 +41,7 @@ local default_cfg = {
     log_level           = 5,
     io_collect_interval = nil,
     readahead           = 16320,
-    snap_io_rate_limit  = nil,
+    snap_io_rate_limit  = nil, -- no limit
     too_long_threshold  = 0.5,
     wal_mode            = "write",
     rows_per_wal        = 500000,
@@ -116,9 +118,11 @@ local modify_cfg = {
 -- dynamically settable options
 local dynamic_cfg = {
     wal_mode                = ffi.C.box_set_wal_mode,
+    listen                  = ffi.C.box_set_listen,
     replication_source      = ffi.C.box_set_replication_source,
     log_level               = ffi.C.box_set_log_level,
     io_collect_interval     = ffi.C.box_set_io_collect_interval,
+    readahead               = ffi.C.box_set_readahead,
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
 
@@ -187,14 +191,16 @@ local function apply_default_cfg(cfg, default_cfg)
     end
 end
 
-local function reload_cfg(oldcfg, newcfg)
-    newcfg = prepare_cfg(newcfg, default_cfg, template_cfg, modify_cfg)
-    for key, val in pairs(newcfg) do
+local function reload_cfg(oldcfg, cfg)
+    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    -- iterate over original table because prepare_cfg() may store NILs
+    for key in pairs(cfg) do
         if dynamic_cfg[key] == nil then
             box.error(box.error.RELOAD_CFG, key);
         end
     end
-    for key, val in pairs(newcfg) do
+    for key in pairs(cfg) do
+        local val = newcfg[key]
         if oldcfg[key] ~= val then
             dynamic_cfg[key](val)
             rawset(oldcfg, key, val)
@@ -249,9 +255,11 @@ local function load_cfg(cfg)
     ffi.C.load_cfg()
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
-        if val ~= default_cfg[key] then
+        if val ~= nil then
             fun(cfg[key])
-            log.info("set '%s' configuration option to '%s'", key, val)
+            if val ~= default_cfg[key] then
+                log.info("set '%s' configuration option to '%s'", key, val)
+            end
         end
     end
 end

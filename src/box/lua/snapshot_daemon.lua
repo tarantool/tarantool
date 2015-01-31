@@ -227,8 +227,8 @@ do
 
             set_snapshot_count = function(snapshot_count)
                 if math.floor(snapshot_count) ~= snapshot_count then
-                    box.error(box.error.CFG,
-                        "snapshot_count must be integer")
+                    box.error(box.error.CFG, "snapshot_count",
+                             "must be an integer")
                 end
                 daemon.snapshot_count = snapshot_count
                 reload(daemon)
