@@ -36,7 +36,7 @@
                         title.html('Workload F');
                         image.renderChart('/ycsb/F_throughput.json');
                         break;
-                    } case 'Load' : {
+                    } case 'LOAD' : {
                         title.html('Insert Only');
                         image.renderChart('/ycsb/LOAD_throughput.json');
                         break;
@@ -82,9 +82,9 @@
                     image.renderChart('/ycsb/F_READ_latency.json');
                 } else if (title == 'Workload F' && link.html() == 'Throughput') {
                     image.renderChart('/ycsb/F_throughput.json')
-                } else if (title == 'Workload LOAD' && link.html() == 'Latency') {
+                } else if (title == 'Insert Only' && link.html() == 'Latency') {
                     image.renderChart('/ycsb/LOAD_INSERT_latency.json');
-                } else if (title == 'Workload LOAD' && link.html() == 'Throughput') {
+                } else if (title == 'Insert Only' && link.html() == 'Throughput') {
                     image.renderChart('/ycsb/LOAD_throughput.json')
                 }
 
