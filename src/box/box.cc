@@ -200,7 +200,11 @@ box_set_wal_mode(const char *mode_name)
 		tnt_raise(ClientError, ER_CFG, "wal_mode",
 			  "cannot switch to/from fsync");
 	}
-	recovery_update_mode(recovery, mode);
+	/** Really update WAL mode only after we left local hot standby,
+	 * since local hot standby expects it to be NONE.
+	 */
+	if (recovery->finalize)
+		recovery_update_mode(recovery, mode);
 }
 
 extern "C" void
@@ -451,8 +455,6 @@ box_init()
 					recover_row, NULL);
 		recovery_set_remote(recovery,
 				    cfg_gets("replication_source"));
-		recovery_update_io_rate_limit(recovery,
-					      cfg_getd("snap_io_rate_limit"));
 		recovery_setup_panic(recovery,
 				     cfg_geti("panic_on_snap_error"),
 				     cfg_geti("panic_on_wal_error"));
