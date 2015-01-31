@@ -285,7 +285,6 @@ evio_service_timer_cb(ev_loop *loop, ev_timer *watcher, int /* revents */)
 void
 evio_service_init(ev_loop *loop,
 		  struct evio_service *service, const char *name,
-		  const char *uri,
 		  void (*on_accept)(struct evio_service *, int,
 				    struct sockaddr *, socklen_t),
 		  void *on_accept_param)
@@ -294,17 +293,6 @@ evio_service_init(ev_loop *loop,
 	snprintf(service->name, sizeof(service->name), "%s", name);
 
 	service->loop = loop;
-
-	struct uri u;
-	if (uri_parse(&u, uri) || u.service == NULL)
-		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
-
-	snprintf(service->serv, sizeof(service->serv), "%.*s",
-		 (int) u.service_len, u.service);
-	if (u.host != NULL && strncmp(u.host, "*", u.host_len) != 0) {
-		snprintf(service->host, sizeof(service->host), "%.*s",
-			(int) u.host_len, u.host);
-	} /* else { service->host[0] = '\0'; } */
 
 	service->on_accept = on_accept;
 	service->on_accept_param = on_accept_param;
@@ -323,9 +311,22 @@ evio_service_init(ev_loop *loop,
  * binding periodically.
  */
 void
-evio_service_start(struct evio_service *service)
+evio_service_start(struct evio_service *service, const char *uri)
 {
+	struct uri u;
+	if (uri_parse(&u, uri) || u.service == NULL)
+		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
+
+	snprintf(service->serv, sizeof(service->serv), "%.*s",
+		 (int) u.service_len, u.service);
+	if (u.host != NULL && strncmp(u.host, "*", u.host_len) != 0) {
+		snprintf(service->host, sizeof(service->host), "%.*s",
+			(int) u.host_len, u.host);
+	} /* else { service->host[0] = '\0'; } */
+
 	assert(! ev_is_active(&service->ev));
+
+	say_info("%s: started", evio_service_name(service));
 
 	if (evio_service_bind_and_listen(service)) {
 		/* Try again after a delay. */
@@ -345,6 +346,8 @@ evio_service_start(struct evio_service *service)
 void
 evio_service_stop(struct evio_service *service)
 {
+	say_info("%s: stopped", evio_service_name(service));
+
 	if (! ev_is_active(&service->ev)) {
 		ev_timer_stop(service->loop, &service->timer);
 	} else {

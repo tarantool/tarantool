@@ -2,7 +2,8 @@
 
 local tap = require('tap')
 local test = tap.test('cfg')
-test:plan(18)
+local socket = require('socket')
+test:plan(21)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -12,12 +13,13 @@ test:is(type(box.cfg), 'function', 'box is not started')
 
 local function invalid(name, val)
     local status, result = pcall(box.cfg, {[name]=val})
-    test:ok(not status and result:match('Incorrect option'), 'invalid '..name)
+    test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
 invalid('replication_source', '//guest@localhost:3301')
 invalid('wal_mode', 'invalid')
 invalid('rows_per_wal', -1)
+invalid('listen', '//!')
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
@@ -85,6 +87,19 @@ script = io.open('script.lua', 'w')
 script:write([[ box.cfg{ logger="tarantool.log", wal_dir='invalid' } ]])
 script:close()
 test:isnt(os.execute("/bin/sh -c 'tarantool ./script.lua 2> /dev/null'"), 0, 'wal_dir is invalid')
+
+-- box.cfg { listen = xx }
+local path = './tarantool.sock'
+os.remove(path)
+box.cfg{ listen = 'unix/:'..path }
+s = socket.tcp_connect('unix/', path)
+test:isnt(s, nil, "dynamic listen")
+if s then s:close() end
+box.cfg{ listen = '' }
+s = socket.tcp_connect('unix/', path)
+test:isnil(s, 'dynamic listen')
+if s then s:close() end
+os.remove(path)
 
 test:check()
 os.exit(0)

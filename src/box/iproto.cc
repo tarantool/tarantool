@@ -821,24 +821,17 @@ static void on_bind(void *arg __attribute__((unused)))
 
 /** Initialize a read-write port. */
 void
-iproto_init(const char *uri)
+iproto_init(struct evio_service *service)
 {
-	/* Run a primary server. */
-	if (!uri)
-		return;
-
-	static struct evio_service primary;
-	evio_service_init(loop(), &primary, "primary",
-			  uri,
-			  iproto_on_accept, NULL);
-	evio_service_on_bind(&primary, on_bind, NULL);
-	evio_service_start(&primary);
-
 	mempool_create(&iproto_request_pool, &cord()->slabc,
 		       sizeof(struct iproto_request));
 	iproto_queue_init(&request_queue);
 	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
+
+	evio_service_init(loop(), service, "binary",
+			  iproto_on_accept, NULL);
+	evio_service_on_bind(service, on_bind, NULL);
 }
 
 /* vim: set foldmethod=marker */

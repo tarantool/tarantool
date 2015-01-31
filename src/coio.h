@@ -151,7 +151,6 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 
 void
 coio_service_init(struct coio_service *service, const char *name,
-		  const char *uri,
 		  void (*handler)(va_list ap), void *handler_param);
 
 

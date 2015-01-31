@@ -1,9 +1,10 @@
 TAP version 13
-1..18
+1..21
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
 ok - invalid rows_per_wal
+ok - invalid listen
 ok - box is not started
 ok - exception on unconfigured box
 ok - sophia_dir is not auto-created
@@ -18,3 +19,5 @@ ok - work_dir is invalid
 ok - sophia_dir is invalid
 ok - snap_dir is invalid
 ok - wal_dir is invalid
+ok - dynamic listen
+ok - dynamic listen

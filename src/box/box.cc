@@ -50,11 +50,14 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "evio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
+
+static struct evio_service binary; /* iproto binary listener */
 
 int snapshot_pid = 0; /* snapshot processes pid */
 static void
@@ -94,8 +97,8 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 
 /* {{{ configuration bindings */
 
-void
-box_check_replication_source(const char *source)
+static void
+box_check_uri(const char *source, const char *what)
 {
 	if (source == NULL)
 		return;
@@ -103,7 +106,7 @@ box_check_replication_source(const char *source)
 
 	/* URI format is [host:]service */
 	if (uri_parse(&uri, source) || !uri.service) {
-		tnt_raise(ClientError, ER_CFG, "replication source, "
+		tnt_raise(ClientError, ER_CFG, what,
 			  "expected host:service or /unix.socket");
 	}
 }
@@ -113,29 +116,28 @@ box_check_wal_mode(const char *mode_name)
 {
 	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
-	if (mode == WAL_MODE_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "wal_mode is not recognized");
-	}
+	if (mode == WAL_MODE_MAX)
+		tnt_raise(ClientError, ER_CFG, "wal_mode", mode_name);
 }
 
 void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	box_check_replication_source(cfg_gets("replication_source"));
+	box_check_uri(cfg_gets("listen"), "listen");
+	box_check_uri(cfg_gets("replication_source"), "replication_source");
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
-		tnt_raise(ClientError, ER_CFG,
-			  "rows_per_wal must be greater than one");
+		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
+			  "must be greater than one");
 	}
 }
 
 extern "C" void
 box_set_replication_source(const char *source)
 {
-	box_check_replication_source(source);
+	box_check_uri(source, "replication_source");
 	bool old_is_replica = recovery->remote.reader;
 	bool new_is_replica = source != NULL;
 
@@ -163,6 +165,20 @@ box_set_replication_source(const char *source)
 }
 
 extern "C" void
+box_set_listen(const char *uri)
+{
+	box_check_uri(uri, "listen");
+	if (evio_service_is_active(&binary))
+		evio_service_stop(&binary);
+
+	if (uri != NULL) {
+		evio_service_start(&binary, uri);
+	} else {
+		box_leave_local_standby_mode(NULL);
+	}
+}
+
+extern "C" void
 box_set_wal_mode(const char *mode_name)
 {
 	box_check_wal_mode(mode_name);
@@ -170,8 +186,8 @@ box_set_wal_mode(const char *mode_name)
 		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode != recovery->wal_mode &&
 	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
-		tnt_raise(ClientError, ER_CFG,
-			  "wal_mode cannot switch to/from fsync");
+		tnt_raise(ClientError, ER_CFG, "wal_mode",
+			  "cannot switch to/from fsync");
 	}
 	recovery_update_mode(recovery, mode);
 }
@@ -455,15 +471,13 @@ box_init()
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
+	iproto_init(&binary);
 	const char *listen = cfg_gets("listen");
 	/*
 	 * application server configuration).
 	 */
-	if (listen) {
-		iproto_init(listen);
-	} else {
+	if (listen == NULL)
 		box_leave_local_standby_mode(NULL);
-	}
 	iobuf_set_readahead(cfg_geti("readahead"));
 }
 
