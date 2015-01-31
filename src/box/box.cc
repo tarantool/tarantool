@@ -98,7 +98,7 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 /* {{{ configuration bindings */
 
 static void
-box_check_uri(const char *source, const char *what)
+box_check_uri(const char *source, const char *option_name)
 {
 	if (source == NULL)
 		return;
@@ -106,7 +106,7 @@ box_check_uri(const char *source, const char *what)
 
 	/* URI format is [host:]service */
 	if (uri_parse(&uri, source) || !uri.service) {
-		tnt_raise(ClientError, ER_CFG, what,
+		tnt_raise(ClientError, ER_CFG, option_name,
 			  "expected host:service or /unix.socket");
 	}
 }
@@ -120,17 +120,28 @@ box_check_wal_mode(const char *mode_name)
 		tnt_raise(ClientError, ER_CFG, "wal_mode", mode_name);
 }
 
+static void
+box_check_readahead(int readahead)
+{
+	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
+	if (readahead < READAHEAD_MIN || readahead > READAHEAD_MAX) {
+		tnt_raise(ClientError, ER_CFG, "readahead",
+			  "specified value is out of bounds");
+	}
+}
+
 void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_uri(cfg_gets("replication_source"), "replication_source");
+	box_check_readahead(cfg_geti("readahead"));
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
 		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
-			  "must be greater than one");
+			  "the value must be greater than one");
 	}
 }
 
@@ -214,6 +225,13 @@ extern "C" void
 box_set_too_long_threshold(double threshold)
 {
 	too_long_threshold = threshold;
+}
+
+extern "C" void
+box_set_readahead(int readahead)
+{
+	box_check_readahead(readahead);
+	iobuf_set_readahead(readahead);
 }
 
 /* }}} configuration bindings */
@@ -472,13 +490,19 @@ box_init()
 	title("hot_standby", NULL);
 
 	iproto_init(&binary);
-	const char *listen = cfg_gets("listen");
-	/*
-	 * application server configuration).
+	/**
+	 * listen is a dynamic option, so box_set_listen()
+	 * will be called after box_init() as long as there
+	 * is a value for listen in the configuration table.
+	 *
+	 * However, if cfg.listen is nil, box_set_listen() will
+	 * not be called - which means that we need to leave
+	 * local hot standby here. The idea is to leave
+	 * local hot standby immediately if listen is not given,
+	 * and only after binding to the listen uri otherwise.
 	 */
-	if (listen == NULL)
+	if (cfg_gets("listen") == NULL)
 		box_leave_local_standby_mode(NULL);
-	iobuf_set_readahead(cfg_geti("readahead"));
 }
 
 void

@@ -110,7 +110,7 @@ struct errcode_record {
 	/* 56 */_(ER_USER_MAX,			2, "A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		2, "Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
-	/* 59 */_(ER_CFG,			2, "Incorrect '%s' option value: %s") \
+	/* 59 */_(ER_CFG,			2, "Incorrect value for option '%s': %s") \
 	/* 60 */_(ER_SOPHIA,			2, "%s") \
 	/* 61 */_(ER_LOCAL_SERVER_IS_NOT_ACTIVE,2, "Local server is not active") \
 	/* 62 */_(ER_UNKNOWN_SERVER,		2, "Server %u is not registered with the cluster") \

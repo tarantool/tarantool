@@ -127,6 +127,7 @@ void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
 void box_set_snap_io_rate_limit(double limit);
 void box_set_too_long_threshold(double threshold);
+void box_set_readahead(int readahead);
 
 extern struct recovery_state *recovery;
 

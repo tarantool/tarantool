@@ -114,7 +114,7 @@ PERIOD
 ...
 box.cfg{ snapshot_count = .2 }
 ---
-- error: 'Incorrect ''snapshot_count'' option value: must be integer'
+- error: 'Incorrect value for option ''snapshot_count'': must be an integer'
 ...
 daemon = box.internal.snapshot_daemon
 ---
