@@ -125,6 +125,8 @@ mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 			  uint32_t objsize, uint8_t order)
 {
 	assert(order <= cache->order_max);
+	lifo_init(&pool->link);
+	lifo_init(&pool->delayed);
 	pool->cache = cache;
 	slab_list_create(&pool->slabs);
 	mslab_tree_new(&pool->free_slabs);

@@ -154,8 +154,6 @@ struct small_alloc {
 	 */
 	float factor;
 	uint32_t objsize_max;
-	/** All slabs in all mempools have the same order. */
-	uint8_t slab_order;
 	/**
 	 * If true, smfree_delayed puts items to delayed list.
 	 */

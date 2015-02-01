@@ -50,12 +50,14 @@ struct slab_arena memtx_arena;
 static struct slab_cache memtx_slab_cache;
 struct small_alloc memtx_alloc;
 
-/* Lowest allowed objsize_min setting of tuple arena */
-const uint32_t MIN_TUPLE_SIZE_NOT_LESS_THAN = 16;
-/* Lowest allowed objsize_max setting of tuple arena */
-const uint32_t MAX_TUPLE_SIZE_NOT_LESS_THAN = 16 * 1024;
-/* Lowest allowed slab size for tuple arena */
-const size_t SLAB_SIZE_NOT_LESS_THAN = 1024 * 1024;
+enum {
+	/** Lowest allowed slab_alloc_minimal */
+	OBJSIZE_MIN = 16,
+	/** Lowest allowed slab_alloc_maximal */
+	OBJSIZE_MAX_MIN = 16 * 1024,
+	/** Lowest allowed slab size, for mmapped slabs */
+	SLAB_SIZE_MIN = 1024 * 1024
+};
 
 /** Extract all available type info from keys. */
 void
@@ -534,18 +536,19 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	tuple_format_ref(tuple_format_ber, 1);
 
 	/* Apply lowest allowed objsize bounds */
-	if (objsize_min < MIN_TUPLE_SIZE_NOT_LESS_THAN)
-		objsize_min = MIN_TUPLE_SIZE_NOT_LESS_THAN;
-	if (objsize_max < MAX_TUPLE_SIZE_NOT_LESS_THAN)
-		objsize_max = MAX_TUPLE_SIZE_NOT_LESS_THAN;
+	if (objsize_min < OBJSIZE_MIN)
+		objsize_min = OBJSIZE_MIN;
+	if (objsize_max < OBJSIZE_MAX_MIN)
+		objsize_max = OBJSIZE_MAX_MIN;
 
 	/* Calculate slab size for tuple arena */
-	size_t max_slab_size = small_round(objsize_max * 4);
-	if (max_slab_size < SLAB_SIZE_NOT_LESS_THAN)
-		max_slab_size = SLAB_SIZE_NOT_LESS_THAN;
+	size_t slab_size = small_round(objsize_max * 4);
+	if (slab_size < SLAB_SIZE_MIN)
+		slab_size = SLAB_SIZE_MIN;
 
-	size_t max_size = tuple_arena_max_size * 1024 * 1024 * 1024;
-	quota_init(&memtx_quota, max_size);
+	/** Preallocate entire quota. */
+	size_t prealloc = tuple_arena_max_size * 1024 * 1024 * 1024;
+	quota_init(&memtx_quota, prealloc);
 
 	int flags;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
@@ -554,20 +557,20 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 		flags = MAP_PRIVATE;
 	} else {
 		say_info("mapping %zu bytes for a shared arena...",
-			max_size);
+			prealloc);
 		flags = MAP_SHARED;
 	}
 
 	if (slab_arena_create(&memtx_arena, &memtx_quota,
-			      max_size, max_slab_size, flags)) {
+			      prealloc, slab_size, flags)) {
 		if (ENOMEM == errno) {
 			panic("failed to preallocate %zu bytes: "
 			      "Cannot allocate memory, check option "
 			      "'slab_alloc_arena' in box.cfg(..)",
-			      max_size);
+			      prealloc);
 		} else {
 			panic_syserror("failed to preallocate %zu bytes",
-				       max_size);
+				       prealloc);
 		}
 	}
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);

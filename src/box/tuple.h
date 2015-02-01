@@ -139,6 +139,12 @@ tuple_format_ref(struct tuple_format *format, int count)
  */
 struct tuple
 {
+	/*
+	 * sic: the header of the tuple is used
+	 * to store a free list pointer in smfree_delayed.
+	 * Please don't change it without understanding
+	 * how smfree_delayed and snapshotting COW works.
+	 */
 	/** snapshot generation version */
 	uint32_t version;
 	/** reference counter */

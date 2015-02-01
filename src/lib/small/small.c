@@ -42,15 +42,6 @@ enum {
 	STEP_SIZE_LB = 3,
 };
 
-/**
- * Extended lifo struct for store object size in addition to pointer
- * to the next object in the list
- */
-struct small_lifo_ext {
-	struct lifo base;
-	size_t size;
-};
-
 rb_proto(, factor_tree_, factor_tree_t, struct factor_pool)
 
 /** Used for search in the tree. */
@@ -109,15 +100,10 @@ small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 {
 	alloc->cache = cache;
 	/* Align sizes. */
-	objsize_min = small_align(objsize_min, sizeof(STEP_SIZE));
-	/* An object must be large enough to contain struct small_lifo_ext */
-	if (objsize_min < sizeof(struct small_lifo_ext))
-		objsize_min = small_align(sizeof(struct small_lifo_ext),
-					  sizeof(STEP_SIZE));
-	alloc->slab_order = cache->order_max;
+	objsize_min = small_align(objsize_min, STEP_SIZE);
 	/* Make sure at least 4 largest objects can fit in a slab. */
 	alloc->objsize_max =
-		mempool_objsize_max(slab_order_size(cache, alloc->slab_order));
+		mempool_objsize_max(slab_order_size(cache, cache->order_max));
 	assert(alloc->objsize_max > objsize_min + STEP_POOL_MAX * STEP_SIZE);
 
 	struct mempool *step_pool;
@@ -180,14 +166,18 @@ smfree_batch(struct small_alloc *alloc)
 		return;
 
 	const int BATCH = 100;
+	struct mempool *pool = lifo_peek(&alloc->delayed);
 
 	for (int i = 0; i < BATCH; i++) {
-		void *item = lifo_pop(&alloc->delayed);
-		if (item == NULL)
-			break;
-		struct small_lifo_ext *ext = (struct small_lifo_ext *) item;
-		size_t size = ext->size;
-		smfree(alloc, item, size);
+		void *item = lifo_pop(&pool->delayed);
+		if (item == NULL) {
+			(void) lifo_pop(&alloc->delayed);
+			pool = lifo_peek(&alloc->delayed);
+			if (pool == NULL)
+				break;
+			continue;
+		}
+		mempool_free(pool, item);
 	}
 }
 
@@ -256,33 +246,20 @@ small_recycle_pool(struct small_alloc *alloc, struct mempool *pool)
 	}
 }
 
-/** Free memory chunk allocated by the small allocator. */
-/**
- * Free a small objects.
- *
- * This boils down to finding the object's mempool and delegating
- * to mempool_free().
- *
- * If the pool becomes completely empty, and it's a factored pool,
- * and the factored pool's cache is empty, put back the empty
- * factored pool into the factored pool cache.
- */
-void
-smfree(struct small_alloc *alloc, void *ptr, size_t size)
+static inline struct mempool *
+mempool_find(struct small_alloc *alloc, size_t size)
 {
 	struct mempool *pool;
 	if (size <= alloc->step_pool_objsize_max) {
 		/* Allocated in a stepped pool. */
-		int idx;
-		if (size <= alloc->step_pools[0].objsize)
-			idx = 0;
-		else {
-			idx = (size - alloc->step_pools[0].objsize
-			       + STEP_SIZE - 1) >> STEP_SIZE_LB;
+		if (size <= alloc->step_pools[0].objsize) {
+			pool = &alloc->step_pools[0];
+		} else {
+			int idx = (size - alloc->step_pools[0].objsize
+				   + STEP_SIZE - 1) >> STEP_SIZE_LB;
+			pool = &alloc->step_pools[idx];
+			assert(size + STEP_SIZE > pool->objsize);
 		}
-		pool = &alloc->step_pools[idx];
-		assert(size <= pool->objsize &&
-		       (size + STEP_SIZE > pool->objsize || idx == 0));
 	} else {
 		/* Allocated in a factor pool. */
 		struct factor_pool pattern;
@@ -294,6 +271,24 @@ smfree(struct small_alloc *alloc, void *ptr, size_t size)
 		pool = &upper_bound->pool;
 	}
 	assert(size <= pool->objsize);
+	return pool;
+}
+
+/** Free memory chunk allocated by the small allocator. */
+/**
+ * Free a small object.
+ *
+ * This boils down to finding the object's mempool and delegating
+ * to mempool_free().
+ *
+ * If the pool becomes completely empty, and it's a factored pool,
+ * and the factored pool's cache is empty, put back the empty
+ * factored pool into the factored pool cache.
+ */
+void
+smfree(struct small_alloc *alloc, void *ptr, size_t size)
+{
+	struct mempool *pool = mempool_find(alloc, size);
 	mempool_free(pool, ptr);
 
 	if (mempool_used(pool) == 0)
@@ -308,11 +303,11 @@ smfree(struct small_alloc *alloc, void *ptr, size_t size)
 void
 smfree_delayed(struct small_alloc *alloc, void *ptr, size_t size)
 {
-	assert(size >= sizeof(struct small_lifo_ext));
 	if (alloc->is_delayed_free_mode && ptr) {
-		struct small_lifo_ext *ext = (struct small_lifo_ext *)ptr;
-		ext->size = size;
-		lifo_push(&alloc->delayed, ptr);
+		struct mempool *pool = mempool_find(alloc, size);
+		if (lifo_is_empty(&pool->delayed))
+			lifo_push(&alloc->delayed, &pool->link);
+		lifo_push(&pool->delayed, ptr);
 	} else {
 		smfree(alloc, ptr, size);
 	}
