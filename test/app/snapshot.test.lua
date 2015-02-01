@@ -45,7 +45,7 @@ if box.space.test == nil then
     box.space.test:create_index('primary')
 end
 
-require('console').listen(3303)
+-- require('console').listen(3303)
 
 fiber.create(noise)
 fiber.create(purge)
