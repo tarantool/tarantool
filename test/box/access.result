@@ -475,6 +475,10 @@ box.schema.user.exists('guest')
 ---
 - true
 ...
+box.schema.user.exists(nil)
+---
+- false
+...
 box.schema.user.exists(0)
 ---
 - true
@@ -520,6 +524,14 @@ box.schema.func.exists('box.schema.user.info')
 ---
 - true
 ...
+box.schema.func.exists()
+---
+- false
+...
+box.schema.func.exists(nil)
+---
+- false
+...
 -- gh-665: user.exists() should nto be true for roles
 box.schema.user.exists('public')
 ---
@@ -528,6 +540,10 @@ box.schema.user.exists('public')
 box.schema.role.exists('public')
 ---
 - true
+...
+box.schema.role.exists(nil)
+---
+- false
 ...
 -- test if_exists/if_not_exists in grant/revoke
 box.schema.user.grant('guest', 'read,write,execute', 'universe')

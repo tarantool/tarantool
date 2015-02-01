@@ -79,7 +79,7 @@ local function role_resolve(name_or_id)
     local tuple
     if type(name_or_id) == 'string' then
         tuple = _user.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) ~= 'nil' then
         tuple = _user:get{name_or_id}
     end
     if tuple == nil or tuple[4] ~= 'role' then
@@ -94,7 +94,7 @@ local function user_resolve(name_or_id)
     local tuple
     if type(name_or_id) == 'string' then
         tuple = _user.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) ~= 'nil' then
         tuple = _user:get{name_or_id}
     end
     if tuple == nil or tuple[4] ~= 'user' then
@@ -1003,10 +1003,10 @@ end
 
 function box.schema.func.exists(name_or_id)
     local _func = box.space[box.schema.FUNC_ID]
-    local tuple 
+    local tuple = nil
     if type(name_or_id) == 'string' then
         tuple = _func.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) == 'number' then
         tuple = _func:get{name_or_id}
     end
     return tuple ~= nil
