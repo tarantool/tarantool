@@ -144,6 +144,7 @@ struct errcode_record {
 	/* 90 */_(ER_ROLE_GRANTED,		2, "User '%s' already has role '%s'") \
 	/* 91 */_(ER_PRIV_NOT_GRANTED,		2, "User '%s' does not have %s access on %s '%s'") \
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		2, "User '%s' does not have role '%s'") \
+	/* 93 */_(ER_MISSING_SNAPSHOT,		2, "Can't find snapshot") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

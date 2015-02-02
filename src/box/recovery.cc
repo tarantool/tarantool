@@ -354,6 +354,8 @@ recover_snap(struct recovery_state *r)
 	 * have created it from a bootstrap copy.
 	 */
 	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	if (res == NULL)
+	    tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_signature(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
