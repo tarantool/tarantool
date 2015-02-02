@@ -58,16 +58,16 @@ fiber_call(struct fiber *callee)
 	struct fiber *caller = fiber();
 	struct cord *cord = cord();
 
-	assert(cord->sp + 1 - cord->stack < FIBER_CALL_STACK);
+	assert(cord->call_stack_depth < FIBER_CALL_STACK);
 	assert(caller);
 
+	cord->call_stack_depth++;
 	cord->fiber = callee;
-	*cord->sp++ = caller;
+	callee->caller = caller;
 
 	update_last_stack_frame(caller);
 
 	callee->csw++;
-
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
@@ -82,8 +82,7 @@ fiber_start(struct fiber *callee, ...)
 bool
 fiber_checkstack()
 {
-	struct cord *cord = cord();
-	if (cord->sp + 1 - cord->stack >= FIBER_CALL_STACK)
+	if (cord()->call_stack_depth + 1 >= FIBER_CALL_STACK)
 		return true;
 	return false;
 }
@@ -192,8 +191,10 @@ void
 fiber_yield(void)
 {
 	struct cord *cord = cord();
-	struct fiber *callee = *(--cord->sp);
 	struct fiber *caller = cord->fiber;
+	struct fiber *callee = caller->caller;
+	cord->call_stack_depth--;
+	caller->caller = &cord->sched;
 
 	/** By convention, these triggers must not throw. */
 	if (! rlist_empty(&caller->on_yield))
@@ -413,6 +414,7 @@ fiber_new(const char *name, void (*f) (va_list))
 		region_create(&fiber->gc, &cord->slabc);
 
 		rlist_add_entry(&cord->fibers, fiber, link);
+		fiber->caller = &cord->sched;
 	}
 
 	fiber->f = f;
@@ -483,7 +485,6 @@ cord_create(struct cord *cord, const char *name)
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 
-	cord->sp = cord->stack;
 	cord->max_fid = 100;
 	Exception::init(cord);
 

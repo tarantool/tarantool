@@ -101,6 +101,11 @@ struct fiber {
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
+	/**
+	 * The fiber which should be scheduled when
+	 * this fiber yields.
+	 */
+	struct fiber *caller;
 	int csw;
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
@@ -145,13 +150,8 @@ struct cord {
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
 	struct ev_loop *loop;
-	/** Call stack - in case one fiber decides to call
-	 * another with fiber_call(). This is not used
-	 * currently, all fibers are called by the sched
-         */
-	struct fiber *stack[FIBER_CALL_STACK];
-	/** Stack pointer in fiber call stack. */
-	struct fiber **sp;
+	/** Depth of the fiber call stack. */
+	int call_stack_depth;
 	/**
 	 * Every new fiber gets a new monotonic id. Ids 1-100 are
 	 * reserved.

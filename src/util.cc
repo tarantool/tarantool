@@ -231,7 +231,8 @@ fmemopen(void *buf, size_t size, const char *mode)
 static char backtrace_buf[4096 * 4];
 
 /*
- * note, stack unwinding code assumes that binary is compiled with frame pointers
+ * note, stack unwinding code assumes that binary is compiled with
+ * frame pointers
  */
 
 struct frame {
@@ -250,6 +251,11 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 	char *end = p + sizeof(backtrace_buf) - 1;
 	int frameno = 0;
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
+		/**
+		 * The stack may be overwritten by the callback
+		 * in case of optimized builds.
+		 */
+		struct frame *prev_frame = frame->rbp;
 		p += snprintf(p, end - p, "#%-2d %p in ", frameno++, frame->ret);
 
 		if (p >= end)
@@ -275,7 +281,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 			break;
 
 #endif
-		frame = frame->rbp;
+		frame = prev_frame;
 	}
 out:
 	*p = '\0';
@@ -293,6 +299,11 @@ backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
 	const char *sym = NULL;
 	size_t offset = 0;
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
+		/**
+		 * The stack may be overwritten by the callback
+		 * in case of optimized builds.
+		 */
+		struct frame *prev_frame = frame->rbp;
 #ifdef HAVE_BFD
 		struct symbol *s = addr2symbol(frame->ret);
 		if (s != NULL) {
@@ -307,7 +318,7 @@ backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
 		int rc = cb(frameno, frame->ret, sym, offset, cb_ctx);
 		if (rc != 0)
 			return;
-		frame = frame->rbp;
+		frame = prev_frame;
 		sym = NULL;
 		offset = 0;
 		frameno++;
