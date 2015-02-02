@@ -2,7 +2,74 @@ import os
 import sys
 import re
 import yaml
+import uuid
 from lib.tarantool_server import TarantoolServer
+
+## Get cluster uuid
+cluster_uuid = ''
+try:
+    cluster_uuid = yaml.load(server.admin("box.space._schema:get('cluster')",
+        silent = True))[0][1]
+    uuid.UUID('{' + cluster_uuid + '}')
+    print 'ok - cluster uuid'
+except Exception as e:
+    print 'not ok - invalid cluster uuid', e
+
+print '-------------------------------------------------------------'
+print ' gh-696: Check global READ permissions for replication'
+print '-------------------------------------------------------------'
+
+# Generate replica cluster UUID
+replica_uuid = str(uuid.uuid4())
+
+## Universal read permission is required to perform JOIN/SUBSCRIBE
+rows = list(server.sql.py_con.join(replica_uuid))
+print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
+    'ok' or 'not ok', '-', 'join without read permissions to universe'
+rows = list(server.sql.py_con.subscribe(cluster_uuid, replica_uuid))
+print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
+    'ok' or 'not ok', '-', 'subscribe without read permissions to universe'
+
+## Write permission to space `_cluster` is required to perform JOIN
+server.admin("box.schema.user.grant('guest', 'read', 'universe')")
+server.sql.py_con.close() # re-connect with new permissions
+rows = list(server.sql.py_con.join(replica_uuid))
+print len(rows) == 1 and rows[0].return_message.find('Write access') >= 0 and \
+    'ok' or 'not ok', '-', 'join without write permissions to _cluster'
+
+def check_join(msg):
+    ok = True
+    for resp in server.sql.py_con.join(replica_uuid):
+        if resp.completion_status != 0:
+            print 'not ok', '-', msg, resp.return_message
+            ok = False
+
+    server.sql.py_con.close() # JOIN brokes protocol
+    if not ok:
+        return
+    tuples = server.sql.py_con.space('_cluster').select(replica_uuid, index = 1)
+    if len(tuples) == 0:
+        print 'not ok', '-', msg, 'missing entry in _cluster'
+        return
+    server_id = tuples[0][0]
+    print 'ok', '-', msg
+    return server_id
+
+## JOIN with permissions
+server.admin("box.schema.user.grant('guest', 'write', 'space', '_cluster')")
+server.sql.py_con.close() # re-connect with new permissions
+server_id = check_join('join with granted permissions')
+server.sql.py_con.space('_cluster').delete(server_id)
+
+# JOIN with granted role
+server.admin("box.schema.user.revoke('guest', 'read', 'universe')")
+server.admin("box.schema.user.revoke('guest', 'write', 'space', '_cluster')")
+server.admin("box.schema.user.grant('guest', 'replication')")
+server.sql.py_con.close() # re-connect with new permissions
+server_id = check_join('join with granted role')
+server.sql.py_con.space('_cluster').delete(server_id)
+server.admin("box.schema.user.revoke('guest', 'replication')")
+server.admin('box.snapshot()')
 
 print '-------------------------------------------------------------'
 print 'gh-434: Assertion if replace _cluster tuple'
