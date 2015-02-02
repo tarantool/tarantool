@@ -344,6 +344,9 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 void
 box_process_join(int fd, struct xrow_header *header)
 {
+	/* Check permissions */
+	access_check_universe(PRIV_R);
+
 	assert(header->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(header, &server_uuid);
@@ -357,6 +360,9 @@ box_process_join(int fd, struct xrow_header *header)
 void
 box_process_subscribe(int fd, struct xrow_header *header)
 {
+	/* Check permissions */
+	access_check_universe(PRIV_R);
+
 	/* process SUBSCRIBE request via replication relay */
 	replication_subscribe(fd, header);
 }
