@@ -207,7 +207,6 @@ fiber_yield(void)
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
-
 struct fiber_watcher_data {
 	struct fiber *f;
 	bool timed_out;
@@ -320,9 +319,8 @@ fiber_gc(void)
  */
 
 static void
-fiber_zombificate()
+fiber_zombificate(struct fiber *fiber)
 {
-	struct fiber *fiber = fiber();
 	fiber_schedule_list(&fiber->wake);
 	rlist_del(&fiber->state);               /* safety */
 	fiber_set_name(fiber, "zombie");
@@ -341,26 +339,27 @@ static void
 fiber_loop(void *data __attribute__((unused)))
 {
 	for (;;) {
-		assert(fiber() != NULL && fiber()->f != NULL &&
-		       fiber()->fid != 0);
+		struct fiber *fiber = fiber();
+
+		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
 		try {
-			fiber()->f(fiber()->f_data);
+			fiber->f(fiber->f_data);
 		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
-				 fiber_name(fiber()));
-			say_info("fiber `%s': exiting", fiber_name(fiber()));
+				 fiber_name(fiber));
+			say_info("fiber `%s': exiting", fiber_name(fiber));
 		} catch (Exception *e) {
 			e->log();
 		} catch (...) {
 			/* This can only happen in case of a server bug. */
 			say_error("fiber `%s': unknown exception",
-				fiber_name(fiber()));
-			panic("fiber `%s': exiting", fiber_name(fiber()));
+				fiber_name(fiber));
+			panic("fiber `%s': exiting", fiber_name(fiber));
 		}
 		/** By convention, these triggers must not throw. */
-		if (! rlist_empty(&fiber()->on_stop))
-			trigger_run(&fiber()->on_stop, NULL);
-		fiber_zombificate();
+		if (! rlist_empty(&fiber->on_stop))
+			trigger_run(&fiber->on_stop, NULL);
+		fiber_zombificate(fiber);
 		fiber_yield();	/* give control back to scheduler */
 	}
 }
