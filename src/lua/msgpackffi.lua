@@ -289,6 +289,9 @@ on_encode(ffi.typeof('double'), encode_double)
 -- Decoder
 --------------------------------------------------------------------------------
 
+local array_mt = { __serialize = 'seq' }
+local map_mt = { __serialize = 'map' }
+
 local decode_r
 
 local function decode_u8(data)
@@ -367,7 +370,7 @@ local function decode_array(data, size)
     for i=1,size,1 do
         table.insert(arr, decode_r(data))
     end
-    return arr
+    return setmetatable(arr, array_mt)
 end
 
 local function decode_map(data, size)
@@ -379,7 +382,7 @@ local function decode_map(data, size)
         local val = decode_r(data);
         map[key] = val
     end
-    return map
+    return setmetatable(map, map_mt)
 end
 
 local decoder_hint = {

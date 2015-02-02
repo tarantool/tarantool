@@ -157,8 +157,10 @@ ok - table
     # offsets: end
 ok - offsets
     # other
-    1..1
+    1..3
     ok - gh-633 double decode
+    ok - array save __serialize
+    ok - map save __serialize
     # other: end
 ok - other
 # msgpackffi: end
