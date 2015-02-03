@@ -2,7 +2,7 @@
     var dOn = $(document);
 
     dOn.on({
-        click: function(){
+        click: function(event){
             event.preventDefault();
             link = $(this).children('a')
             if (!(link.hasClass('p-active'))) {
@@ -49,7 +49,7 @@
     }, '.b-benchmark-catalog .b-switcher-item')
 
     dOn.on({
-        click: function(){
+        click: function(event){
             event.preventDefault();
             link = $(this).children('a')
             if (!(link.hasClass('p-active'))) {
@@ -92,7 +92,7 @@
         }
     }, '.b-benchmark-type .b-switcher-item')
 
-    dOn.ready(function() {
+    dOn.ready(function(event) {
         var image = $('#b-benchmark-grapf-image');
         image.renderChart('/ycsb/A_throughput.json');
     });

@@ -47,20 +47,11 @@ STATIC_PATHS = [
     'js/ie8.js',
     'js/index_tabs.js',
     'js/main.js',
-    'js/old_tabs.js'
-    'js/select.js'
+    'js/old_tabs.js',
+    'js/select.js',
 ]
 
-EXTRA_PATH_METADATA = {
-    'robots.txt'      : { 'path': 'robots.txt'      },
-    'ycsb'            : { 'path': 'ycsb'            },
-    'js/highcharts.js': { 'path': 'js/highcharts.js'},
-    'js/ie8.js'       : { 'path': 'js/ie8.js'       },
-    'js/index_tabs.js': { 'path': 'js/index_tabs.js'},
-    'js/main.js'      : { 'path': 'js/main.js'      },
-    'js/old_tabs.js'  : { 'path': 'js/old_tabs.js'  },
-    'js/select.js'    : { 'path': 'js/select.js'    },
-}
+EXTRA_PATH_METADATA = {}
 
 # Uncomment following line if you want document-relative URLs when developing
 #RELATIVE_URLS = True
