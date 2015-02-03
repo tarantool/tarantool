@@ -164,7 +164,6 @@ local function client_print(self, output)
     elseif not output then
         -- disconnect peer
         local peer = self.client:peer()
-        log.info("client %s:%s disconnected", peer.host, peer.port)
         self.client:shutdown()
         self.client:close()
         self.client = nil
