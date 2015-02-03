@@ -41,7 +41,7 @@ blocks  :
       - "2014"
     -
       - "Tarantool 1.5.3 is released"
-      - "https://groups.google.com/forum/#!topic/tarantool/F3qc_zemEYg"
+      - "https://groups.google.com/forum/#!topic/tarantool/ol0cECHea-Y"
       - "01.08"
       - "2014"
     -
@@ -51,12 +51,14 @@ blocks  :
       - "2014"
   support:
     - format: rst
-      content: We are happy to provide help on tarantool@groups.google.com.
+      content: >
+          We are happy to provide help on
+          `tarantool@groups.google.com <https://groups.google.com/forum/#!forum/tarantool>`_.
     - format: rst
       content: >
         If you need immediate help, try to ping maintainers on
         `\#tarantool <http://webchat.freenode.net/?channels=tarantool>`_
-        channel ar `<irc.freenode.net>`_.
+        channel ar `irc.freenode.net <irc://irc.freenode.net>`_.
     - format: rst
       content: >
         Terms of commercial 24x7 support are available upon request,

@@ -1,6 +1,7 @@
 {# Modify i_links to add records to site #}
 {% set i_links = [
   ("Overview", "/"),
+  ("Try", "http://try.tarantool.org"),
   ("Documentation", "/documentation.html"),
   ("Downloads", "/download.html"),
   ("Rocks", "http://rocks.tarantool.org")
@@ -14,6 +15,7 @@
           (item[0] == "Overview" and page.slug == "index") or
           (item[0] == "Documentation" and page.slug == "documentation") or
           (item[0] == "Downloads" and page.slug == "download") or
+          (item[0] == "Try" and page.slug == "dtry") or
           (item[0] == "Rocks" and page.slug == "rocks")
         %}
         <a href="{{ item[1] }}" class="b-menu-item-url p-active">{{ item[0] }}</a>
