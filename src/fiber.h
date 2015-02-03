@@ -350,4 +350,26 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** Report libev time (cheap). */
+inline double
+fiber_time(void)
+{
+	return ev_now(loop());
+}
+
+/** Report libev time as 64-bit integer */
+inline uint64_t
+fiber_time64(void)
+{
+	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
 #endif /* TARANTOOL_FIBER_H_INCLUDED */
