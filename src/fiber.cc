@@ -98,9 +98,9 @@ fiber_wakeup(struct fiber *f)
 	/** Remove the fiber from whatever wait list it is on. */
 	rlist_del(&f->state);
 	struct cord *cord = cord();
-	if (rlist_empty(&cord->ready_fibers))
+	if (rlist_empty(&cord->ready))
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
-	rlist_move_tail_entry(&cord->ready_fibers, f, state);
+	rlist_move_tail_entry(&cord->ready, f, state);
 }
 
 /** Cancel the subject fiber.
@@ -275,7 +275,7 @@ fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
 	(void) watcher;
 	(void) revents;
 	struct cord *cord = cord();
-	fiber_schedule_list(&cord->ready_fibers);
+	fiber_schedule_list(&cord->ready);
 }
 
 struct fiber *
@@ -314,25 +314,28 @@ fiber_gc(void)
 	region_free(&fiber()->gc);
 }
 
-
-/** Destroy the currently active fiber and prepare it for reuse.
- */
-
+/** Common part of fiber_new() and fiber_recycle(). */
 static void
-fiber_zombificate(struct fiber *fiber)
+fiber_reset(struct fiber *fiber)
 {
-	fiber_schedule_list(&fiber->wake);
+	rlist_create(&fiber->on_yield);
+	rlist_create(&fiber->on_stop);
+	fiber->flags = FIBER_DEFAULT_FLAGS;
+}
+
+/** Destroy an active fiber and prepare it for reuse. */
+static void
+fiber_recycle(struct fiber *fiber)
+{
+	fiber_reset(fiber);
 	rlist_del(&fiber->state);               /* safety */
-	fiber_set_name(fiber, "zombie");
+	fiber->gc.name[0] = '\0';
 	fiber->f = NULL;
-#if !defined(NDEBUG)
-	memset(fiber->fls, '#', sizeof(fiber->fls));
-#endif /* !defined(NDEBUG) */
+	memset(fiber->fls, 0, sizeof(fiber->fls));
 	unregister_fid(fiber);
 	fiber->fid = 0;
-	fiber->flags = FIBER_DEFAULT_FLAGS;
 	region_free(&fiber->gc);
-	rlist_move_entry(&cord()->zombie_fibers, fiber, link);
+	rlist_move_entry(&cord()->dead, fiber, link);
 }
 
 static void
@@ -359,7 +362,8 @@ fiber_loop(void *data __attribute__((unused)))
 		/** By convention, these triggers must not throw. */
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, NULL);
-		fiber_zombificate(fiber);
+		fiber_schedule_list(&fiber->wake);
+		fiber_recycle(fiber);
 		fiber_yield();	/* give control back to scheduler */
 	}
 }
@@ -400,34 +404,29 @@ fiber_new(const char *name, void (*f) (va_list))
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
 
-	if (! rlist_empty(&cord->zombie_fibers)) {
-		fiber = rlist_first_entry(&cord->zombie_fibers,
+	if (! rlist_empty(&cord->dead)) {
+		fiber = rlist_first_entry(&cord->dead,
 					  struct fiber, link);
-		rlist_move_entry(&cord->fibers, fiber, link);
+		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
-		fiber = (struct fiber *) mempool_alloc(&cord->fiber_pool);
-		memset(fiber, 0, sizeof(*fiber));
+		fiber = (struct fiber *) mempool_alloc0(&cord->fiber_pool);
 
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
 		region_create(&fiber->gc, &cord->slabc);
 
-		rlist_add_entry(&cord->fibers, fiber, link);
-		fiber->caller = &cord->sched;
+		rlist_create(&fiber->state);
+		rlist_create(&fiber->wake);
+		fiber_reset(fiber);
+
+		rlist_add_entry(&cord->alive, fiber, link);
 	}
 
 	fiber->f = f;
-
 	/* fids from 0 to 100 are reserved */
 	if (++cord->max_fid < 100)
-		cord->max_fid = 100;
+		cord->max_fid = 101;
 	fiber->fid = cord->max_fid;
-	rlist_create(&fiber->state);
-	rlist_create(&fiber->on_yield);
-	rlist_create(&fiber->on_stop);
-	rlist_create(&fiber->wake);
-	memset(fiber->fls, 0, sizeof(fiber->fls)); /* clear local storage */
-	fiber->flags = FIBER_DEFAULT_FLAGS;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 
@@ -459,9 +458,9 @@ void
 fiber_destroy_all(struct cord *cord)
 {
 	struct fiber *f;
-	rlist_foreach_entry(f, &cord->fibers, link)
+	rlist_foreach_entry(f, &cord->alive, link)
 		fiber_destroy(f);
-	rlist_foreach_entry(f, &cord->zombie_fibers, link)
+	rlist_foreach_entry(f, &cord->dead, link)
 		fiber_destroy(f);
 }
 
@@ -474,9 +473,9 @@ cord_create(struct cord *cord, const char *name)
 	slab_cache_create(&cord->slabc, &runtime);
 	mempool_create(&cord->fiber_pool, &cord->slabc,
 		       sizeof(struct fiber));
-	rlist_create(&cord->fibers);
-	rlist_create(&cord->ready_fibers);
-	rlist_create(&cord->zombie_fibers);
+	rlist_create(&cord->alive);
+	rlist_create(&cord->ready);
+	rlist_create(&cord->dead);
 	cord->fiber_registry = mh_i32ptr_new();
 
 	cord->sched.fid = 1;
@@ -614,7 +613,7 @@ int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
 	struct fiber *fiber;
 	struct cord *cord = cord();
 	int res;
-	rlist_foreach_entry(fiber, &cord->fibers, link) {
+	rlist_foreach_entry(fiber, &cord->alive, link) {
 		res = cb(fiber, cb_ctx);
 		if (res != 0)
 			return res;

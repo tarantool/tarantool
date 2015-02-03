@@ -98,6 +98,9 @@ enum fiber_key {
 };
 
 struct fiber {
+	struct tarantool_coro coro;
+	/* A garbage-collected memory pool. */
+	struct region gc;
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
@@ -106,14 +109,15 @@ struct fiber {
 	 * this fiber yields.
 	 */
 	struct fiber *caller;
+	/** Number of context switches. */
 	int csw;
-	struct tarantool_coro coro;
-	/* A garbage-collected memory pool. */
-	struct region gc;
 	/** Fiber id. */
 	uint32_t fid;
-
+	/** Fiber flags */
+	uint32_t flags;
+	/** Link in cord->alive or cord->dead list. */
 	struct rlist link;
+	/** Link in cord->ready list. */
 	struct rlist state;
 
 	/** Triggers invoked before this fiber yields. Must not throw. */
@@ -126,14 +130,15 @@ struct fiber {
 	 */
 	struct rlist wake;
 
-	/* This struct is considered as non-POD when compiling by g++.
-	 * You can safetly ignore all offset_of-related warnings.
+	/**
+	 * This struct is considered as non-POD when compiling by g++.
+	 * You can safely ignore all offset_of-related warnings.
 	 * See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
 	 */
 	void (*f) (va_list);
 	va_list f_data;
-	uint32_t flags;
-	void *fls[FIBER_KEY_MAX]; /* fiber local storage */
+	/** Fiber local storage */
+	void *fls[FIBER_KEY_MAX];
 };
 
 enum { FIBER_CALL_STACK = 16 };
@@ -161,11 +166,11 @@ struct cord {
 	/** A helper hash to map id -> fiber. */
 	struct mh_i32ptr_t *fiber_registry;
 	/** All fibers */
-	struct rlist fibers;
-	/** A cache of dead fibers for reuse */
-	struct rlist zombie_fibers;
+	struct rlist alive;
 	/** Fibers, ready for execution */
-	struct rlist ready_fibers;
+	struct rlist ready;
+	/** A cache of dead fibers for reuse */
+	struct rlist dead;
 	/** A watcher to have a single async event for all ready fibers.
 	 * This technique is necessary to be able to suspend
 	 * a single fiber on a few watchers (for example,
