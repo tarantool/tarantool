@@ -207,7 +207,7 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 	 * its stack and crash the server when
 	 * this stack is accessed in the worker thread.
 	 */
-	bool cancellable = fiber_setcancellable(false);
+	bool cancellable = fiber_set_cancellable(false);
 	va_start(task.ap, timeout);
 	struct eio_req *req = eio_custom(coeio_custom_cb, 0,
 					 coeio_on_complete, &task);
@@ -223,7 +223,7 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 		errno = task.errorno;
 	}
 	va_end(task.ap);
-	fiber_setcancellable(cancellable);
+	fiber_set_cancellable(cancellable);
 	return task.result;
 }
 
@@ -298,10 +298,11 @@ cord_cojoin(struct cord *cord)
 {
 	assert(cord() != cord); /* Can't join self. */
 	int rc = coeio_custom(cord_cojoin_cb, TIMEOUT_INFINITY, cord);
-	if (rc == 0 && cord->exception) {
-		Exception::move(cord, cord());
+	if (rc == 0 && cord->fiber->exception) {
+		Exception::move(&cord->fiber->exception, &fiber()->exception);
 		cord_destroy(cord);
-		cord()->exception->raise(); /* re-throw exception from cord */
+		 /* re-throw exception in this fiber */
+		fiber()->exception->raise();
 	}
 	cord_destroy(cord);
 	return rc;

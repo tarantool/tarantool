@@ -55,12 +55,25 @@ enum {
 	 * e.g. to force it to check that it's been
 	 * cancelled.
 	 */
-	FIBER_IS_CANCELLABLE = 1 << 0,
+	FIBER_IS_CANCELLABLE	= 1 << 0,
 	/**
 	 * Indicates that a fiber has been requested to end
 	 * prematurely.
 	 */
-	FIBER_IS_CANCELLED      = 1 << 1,
+	FIBER_IS_CANCELLED	= 1 << 1,
+	/**
+	 * The fiber will garbage collect automatically
+	 * when fiber function ends. The alternative
+	 * is that some other fiber will wait for
+	 * the end of this fiber and garbage collect it
+	 * with fiber_join().
+	 */
+	FIBER_IS_JOINABLE = 1 << 2,
+	/**
+	 * This flag is set when fiber function ends and before
+	 * the fiber is recycled.
+	 */
+	FIBER_IS_DEAD		= 1 << 4,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -139,6 +152,8 @@ struct fiber {
 	va_list f_data;
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
+	/** Exception which caused this fiber's death. */
+	class Exception *exception;
 };
 
 enum { FIBER_CALL_STACK = 16 };
@@ -183,9 +198,6 @@ struct cord {
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
 	char name[FIBER_NAME_MAX];
-	/** Last thrown exception */
-	class Exception *exception;
-	size_t exception_size;
 };
 
 extern __thread struct cord *cord_ptr;
@@ -308,7 +320,20 @@ fiber_testcancel(void);
  * @return previous state.
  */
 bool
-fiber_setcancellable(bool yesno);
+fiber_set_cancellable(bool yesno);
+
+/**
+ * Make a fiber joinable (false by default).
+ */
+void
+fiber_set_joinable(struct fiber *fiber, bool yesno);
+
+/**
+ * Wait till the argument fiber ends execution.
+ * The fiber must not be detached (set fiber_set_joinable()).
+ */
+void
+fiber_join(struct fiber *f);
 
 void
 fiber_sleep(ev_tstamp s);

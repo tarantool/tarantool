@@ -1137,9 +1137,9 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	 * error from WAL writer and not roll back the
 	 * transaction.
 	 */
-	bool cancellable = fiber_setcancellable(false);
+	bool cancellable = fiber_set_cancellable(false);
 	fiber_yield(); /* Request was inserted. */
-	fiber_setcancellable(cancellable);
+	fiber_set_cancellable(cancellable);
 	return req->res;
 }
 

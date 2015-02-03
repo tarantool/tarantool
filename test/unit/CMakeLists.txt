@@ -58,8 +58,11 @@ target_link_libraries(vclock.test core small)
 add_executable(quota.test quota.cc unit.c)
 target_link_libraries(quota.test pthread)
 
-add_executable(fiber.test fiber.cc)
+add_executable(fiber.test fiber.cc unit.c)
 target_link_libraries(fiber.test core)
+
+add_executable(fiber_stress.test fiber_stress.cc)
+target_link_libraries(fiber_stress.test core)
 
 add_executable(coio.test coio.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/sio.cc

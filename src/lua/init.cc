@@ -383,8 +383,9 @@ char *history = NULL;
 extern "C" const char *
 tarantool_error_message(void)
 {
-	assert(cord()->exception != NULL); /* called only from error handler */
-	return cord()->exception->errmsg();
+	/* called only from error handler */
+	assert(fiber()->exception != NULL);
+	return fiber()->exception->errmsg();
 }
 
 /**

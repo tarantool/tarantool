@@ -703,9 +703,9 @@ coio_waitpid(pid_t pid)
 	 * in this case the server will leave a zombie process
 	 * behind.
 	 */
-	bool allow_cancel = fiber_setcancellable(false);
+	bool allow_cancel = fiber_set_cancellable(false);
 	fiber_yield();
-	fiber_setcancellable(allow_cancel);
+	fiber_set_cancellable(allow_cancel);
 	ev_child_stop(loop(), &cw);
 	int status = cw.rstatus;
 	fiber_testcancel();

@@ -35,63 +35,35 @@
 #include <errno.h>
 #include <typeinfo>
 
+/** out_of_memory::size is zero-initialized by the linker. */
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
 
 void *
 Exception::operator new(size_t size)
 {
-	struct cord *cord = cord();
+	struct fiber *fiber = fiber();
 
-	if (cord->exception == &out_of_memory) {
-		assert(cord->exception_size == 0);
-		cord->exception = NULL;
-	}
-	if (cord->exception) {
+	if (fiber->exception && fiber->exception->size == 0)
+		fiber->exception = NULL;
+
+	if (fiber->exception) {
 		/* Explicitly call destructor for previous exception */
-		cord->exception->~Exception();
-		if (cord->exception_size >= size) {
+		fiber->exception->~Exception();
+		if (fiber->exception->size >= size) {
 			/* Reuse memory allocated for exception */
-			return cord->exception;
+			return fiber->exception;
 		}
-		free(cord->exception);
+		free(fiber->exception);
 	}
-	cord->exception = (Exception *) malloc(size);
-	if (cord->exception) {
-		cord->exception_size = size;
-		return cord->exception;
+	fiber->exception = (Exception *) malloc(size);
+	if (fiber->exception) {
+		fiber->exception->size = size;
+		return fiber->exception;
 	}
-	cord->exception = &out_of_memory;
-	cord->exception_size = 0;
-	throw cord->exception;
+	fiber->exception = &out_of_memory;
+	throw fiber->exception;
 }
-
-void
-Exception::init(struct cord *cord)
-{
-	cord->exception = NULL;
-	cord->exception_size = 0;
-}
-
-void
-Exception::cleanup(struct cord *cord)
-{
-	if (cord->exception != NULL && cord->exception != &out_of_memory) {
-		cord->exception->~Exception();
-		free(cord->exception);
-	}
-	Exception::init(cord);
-}
-
-void
-Exception::move(struct cord *from, struct cord *to)
-{
-	Exception::cleanup(to);
-	to->exception = from->exception;
-	to->exception_size = from->exception_size;
-	Exception::init(from);
-}
-
 
 void
 Exception::operator delete(void * /* ptr */)
