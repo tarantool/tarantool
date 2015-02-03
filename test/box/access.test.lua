@@ -148,6 +148,10 @@ session.su('user1')
 box.schema.user.passwd('new_password')
 session.su('admin')
 box.space._user.index.name:select{'user1'}
+box.schema.user.passwd('user1', 'extra_new_password')
+box.space._user.index.name:select{'user1'}
+box.schema.user.passwd('invalid_user', 'some_password')
+box.schema.user.passwd()
 box.schema.user.drop('user1')
 box.space._user.index.name:select{'user1'}
 -- ----------------------------------------------------------

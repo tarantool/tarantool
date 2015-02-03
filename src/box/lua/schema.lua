@@ -1021,14 +1021,27 @@ box.schema.user.password = function(password)
     return ffi.string(buf)
 end
 
-box.schema.user.passwd = function(new_password)
-    local uid = session.uid()
+box.schema.user.passwd = function(name, new_password)
+    local current_uid = session.uid()
+    local uid
+    if new_password ~= nil then
+        uid = user_resolve(name)
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, name)
+        end
+    elseif name ~= nil then
+        -- change password for current user
+        new_password = name
+        uid = current_uid
+    else
+        error('Usage: box.schema.user.passwd([user,] password)')
+    end
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
     box.session.su('admin')
     _user:update({uid}, {{"=", 5, auth_mech_list}})
-    box.session.su(uid)
+    box.session.su(current_uid)
 end
 
 box.schema.user.create = function(name, opts)
