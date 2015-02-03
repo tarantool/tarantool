@@ -4,6 +4,14 @@ fiber = require('fiber')
 ch = fiber.channel()
 ---
 ...
+ch:size()
+---
+- 1
+...
+ch:count()
+---
+- 0
+...
 ch:is_full()
 ---
 - false
@@ -19,6 +27,10 @@ ch:get(.1)
 ch:put()
 ---
 - error: 'usage: channel:put(var [, timeout])'
+...
+ch:count()
+---
+- 0
 ...
 ch:put('test')
 ---
@@ -43,6 +55,10 @@ ch:put(234)
 ch:put(345, .5)
 ---
 - false
+...
+ch:count()
+---
+- 1
 ...
 ch:is_full()
 ---
@@ -116,9 +132,17 @@ ch:has_writers()
 ---
 - false
 ...
+ch:count()
+---
+- 0
+...
 ch:put(box.info.pid)
 ---
 - true
+...
+ch:count()
+---
+- 1
 ...
 ch:is_full()
 ---
