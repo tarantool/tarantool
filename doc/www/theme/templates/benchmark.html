@@ -1,0 +1,54 @@
+﻿{% extends "base" %}
+
+{% block header_scripts %}
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="js/highcharts.js"></script>
+<script src="js/bench_tabs.js"></script>
+{% endblock header_scripts %}
+
+{% block content %}
+<section class="b-lightgray_block b-benchmark_top b-clearbox">
+  <div class="b-block-wrapper">
+    <h1 class="b-section-title">YCSB - Benchmark results:</h1>
+  </div>
+</section>
+
+<section class="b-block b-benchmark b-benchmark_page">
+  <div class="b-block-wrapper">
+    <article class="b-article">
+      {{ page.blocks.content }}
+    </article>
+    <div class="b-block-wrapper_bench">
+      <div class="b-benchmark-catalog">
+        <ul class="b-switcher">
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url p-active">A</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">B</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">C</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">D</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">E</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">F</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">LOAD</a></li>
+        </ul>
+      </div>
+      <div class="b-benchmark-type">
+        <h3 class="b-benchmark-type-title">Workload A</h3>
+      </div>
+    </div>
+    <div class="b-benchmark-grapf"><div id="b-benchmark-grapf-image_1"></div></div>
+    <div class="b-block-wrapper_bench">
+      <div class="b-benchmark-type">
+        <ul class="b-switcher">
+          <li class="b-switcher-item">
+            <a href="#" class="b-switcher-item-url p-active">READ Latency</a>
+          </li>
+          <li class="b-switcher-item">
+            <a href="#" class="b-switcher-item-url">UPDATE Latency</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="b-benchmark-grapf"><div id="b-benchmark-grapf-image_2"></div></div>
+</section>
+{% endblock content %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

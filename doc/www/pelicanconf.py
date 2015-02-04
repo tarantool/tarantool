@@ -46,6 +46,7 @@ STATIC_PATHS = [
     'js/highcharts.js',
     'js/ie8.js',
     'js/index_tabs.js',
+    'js/bench_tabs.js',
     'js/main.js',
     'js/old_tabs.js',
     'js/select.js',

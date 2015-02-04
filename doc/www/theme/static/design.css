@@ -633,6 +633,7 @@ input.b-button.p-smaller {
     padding: 0 0 0px 0;
     height: 36px;
     margin-bottom: 20px;
+    margin-top: 20px;
 }
 .b-benchmark .b-section-title {
     margin:0 0 20px 0;
@@ -645,6 +646,9 @@ input.b-button.p-smaller {
     float:right;
     margin:0 0 0px 0;
     text-align:center;
+}
+.b-benchmark_page .b-benchmark-type {
+    float: inherit;
 }
 .b-benchmark-type .b-switcher-item {
     font-size:14px;
@@ -669,11 +673,13 @@ input.b-button.p-smaller {
 .b-benchmark-more {
     text-align:center;
     font-size:18px;
-    padding:40px 0 0 0;
+/*    padding:40px 0 0 0;*/
+    padding:0px;
 }
 .b-benchmark-grapf {
-    width:743px;
-    margin:0 auto;
+    width:      743px;
+    min-height: 400px;
+    margin:    0 auto;
 }
 #b-benchmark-grapf-image {
     width:743px;
@@ -885,7 +891,7 @@ input.b-button.p-smaller {
 .b-benchmark .b-article {
     color:#757575;
     line-height:1.2em;
-    margin-bottom:45px;
+    margin-bottom:25px;
 }
 .b-benchmark .b-article h2,
 .b-benchmark .b-article h3,
@@ -900,7 +906,7 @@ input.b-button.p-smaller {
     padding-bottom:12px;
 }
 .b-benchmark  .b-benchmark-grapf {
-    margin-bottom:45px;
+/*    margin-bottom:45px;*/
 }
 .b-documentation_top.p-documentation_in .b-block-wrapper {
     width:941px;
