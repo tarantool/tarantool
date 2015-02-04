@@ -172,6 +172,16 @@ lbox_info_index(struct lua_State *L)
 	return 1;
 }
 
+/** Push a bunch of compile-time or start-time constants into a Lua table. */
+static void
+lbox_info_init_static_values(struct lua_State *L)
+{
+	/* tarantool version */
+	lua_pushstring(L, "version");
+	lua_pushstring(L, tarantool_version());
+	lua_settable(L, -3);
+}
+
 /**
  * When user invokes box.info(), return a table of key/value
  * pairs containing the current info.
@@ -180,6 +190,7 @@ static int
 lbox_info_call(struct lua_State *L)
 {
 	lua_newtable(L);
+	lbox_info_init_static_values(L);
 	for (int i = 0; lbox_info_dynamic_meta[i].name; i++) {
 		lua_pushstring(L, lbox_info_dynamic_meta[i].name);
 		lbox_info_dynamic_meta[i].func(L);
@@ -216,6 +227,8 @@ box_lua_info_init(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_setmetatable(L, -2);
+
+	lbox_info_init_static_values(L);
 
 	lua_pop(L, 1); /* info module */
 }

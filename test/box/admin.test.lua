@@ -20,7 +20,7 @@ end;
 function test_box_info()
     local tmp = box.info()
     local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime'}
-    local str = {'status' }
+    local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.server, 'table') == false then
         table.insert(failed1, 'box.info().server')

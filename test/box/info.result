@@ -12,6 +12,10 @@ box.info['unknown_variable']
 ---
 - null
 ...
+string.match(box.info.version, '^[1-9]') ~= nil
+---
+- true
+...
 string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
 - true
@@ -60,6 +64,7 @@ t
   - status
   - uptime
   - vclock
+  - version
 ...
 box.info.snapshot_pid
 ---
