@@ -113,7 +113,7 @@ struct errcode_record {
 	/* 59 */_(ER_CFG,			2, "Incorrect value for option '%s': %s") \
 	/* 60 */_(ER_SOPHIA,			2, "%s") \
 	/* 61 */_(ER_LOCAL_SERVER_IS_NOT_ACTIVE,2, "Local server is not active") \
-	/* 62 */_(ER_UNKNOWN_SERVER,		2, "Server %u is not registered with the cluster") \
+	/* 62 */_(ER_UNKNOWN_SERVER,		2, "Server %s is not registered with the cluster") \
 	/* 63 */_(ER_CLUSTER_ID_MISMATCH,	2, "Cluster id of the replica %s doesn't match cluster id of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		2, "Invalid UUID: %s") \
 	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \

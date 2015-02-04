@@ -134,7 +134,7 @@ fill_lsn(struct recovery_state *r, struct xrow_header *row)
 			 * if we're fed a strangely broken xlog.
 			 */
 			tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-				  (unsigned) row->server_id);
+				  int2str(row->server_id));
 		}
 		vclock_follow(&r->vclock,  row->server_id, row->lsn);
 	}
