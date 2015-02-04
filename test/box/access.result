@@ -127,6 +127,54 @@ box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 ---
 ...
+-- sudo
+box.schema.user.create('tester')
+---
+...
+-- admin -> user
+session.user()
+---
+- admin
+...
+session.su('tester', function() return session.user() end)
+---
+- tester
+...
+session.user()
+---
+- admin
+...
+-- user -> admin
+session.su('tester')
+---
+...
+session.user()
+---
+- tester
+...
+session.su('admin', function() return session.user() end)
+---
+- admin
+...
+session.user()
+---
+- tester
+...
+-- drop current user
+session.su('admin', function() return box.schema.user.drop('tester') end)
+---
+...
+session.user()
+---
+- null
+...
+session.su('admin')
+---
+...
+session.user()
+---
+- admin
+...
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
 --------------------------------------------------------------------------------
@@ -346,8 +394,19 @@ box.schema.user.passwd('invalid_user', 'some_password')
 ...
 box.schema.user.passwd()
 ---
-- error: '[string "-- schema.lua (internal file)..."]:1037: Usage: box.schema.user.passwd([user,]
+- error: '[string "-- schema.lua (internal file)..."]:1033: Usage: box.schema.user.passwd([user,]
     password)'
+...
+session.su('user1')
+---
+...
+-- permission denied
+box.schema.user.passwd('admin', 'xxx')
+---
+- error: Read access denied for user 'user1' to space '_user'
+...
+session.su('admin')
+---
 ...
 box.schema.user.drop('user1')
 ---

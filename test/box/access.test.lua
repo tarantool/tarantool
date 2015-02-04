@@ -60,6 +60,25 @@ box.schema.user.revoke('rich', 'public')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 
+-- sudo
+box.schema.user.create('tester')
+-- admin -> user
+session.user()
+session.su('tester', function() return session.user() end)
+session.user()
+
+-- user -> admin
+session.su('tester')
+session.user()
+session.su('admin', function() return session.user() end)
+session.user()
+
+-- drop current user
+session.su('admin', function() return box.schema.user.drop('tester') end)
+session.user()
+session.su('admin')
+session.user()
+
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
 --------------------------------------------------------------------------------
@@ -152,6 +171,10 @@ box.schema.user.passwd('user1', 'extra_new_password')
 box.space._user.index.name:select{'user1'}
 box.schema.user.passwd('invalid_user', 'some_password')
 box.schema.user.passwd()
+session.su('user1')
+-- permission denied
+box.schema.user.passwd('admin', 'xxx')
+session.su('admin')
 box.schema.user.drop('user1')
 box.space._user.index.name:select{'user1'}
 -- ----------------------------------------------------------
