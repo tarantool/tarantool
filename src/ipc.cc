@@ -29,37 +29,12 @@
 #include "ipc.h"
 #include "fiber.h"
 #include <stdlib.h>
-#include "salad/rlist.h"
-
-struct ipc_channel {
-	struct rlist readers, writers;
-	struct fiber *bcast;		/* broadcast waiter */
-	struct fiber *close;		/* close waiter */
-	bool closed;			/* channel is closed */
-	unsigned size;
-	unsigned beg;
-	unsigned count;
-	void *bcast_msg;
-	void *item[0];
-};
 
 static void
 ipc_channel_create(struct ipc_channel *ch);
 
 static void
 ipc_channel_destroy(struct ipc_channel *ch);
-
-bool
-ipc_channel_is_empty(struct ipc_channel *ch)
-{
-	return ch->count == 0;
-}
-
-bool
-ipc_channel_is_full(struct ipc_channel *ch)
-{
-	return ch->count >= ch->size;
-}
 
 struct ipc_channel *
 ipc_channel_new(unsigned size)
@@ -212,12 +187,6 @@ ipc_channel_close(struct ipc_channel *ch)
 		fiber_wakeup(ch->bcast);
 }
 
-bool
-ipc_channel_is_closed(struct ipc_channel *ch)
-{
-	return ch->closed;
-}
-
 int
 ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 			ev_tstamp timeout)
@@ -289,18 +258,6 @@ void
 ipc_channel_put(struct ipc_channel *ch, void *data)
 {
 	ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
-}
-
-bool
-ipc_channel_has_readers(struct ipc_channel *ch)
-{
-	return !rlist_empty(&ch->readers);
-}
-
-bool
-ipc_channel_has_writers(struct ipc_channel *ch)
-{
-	return !rlist_empty(&ch->writers);
 }
 
 int
