@@ -76,11 +76,16 @@ tt_uuid_is_nil(const struct tt_uuid *uu);
 extern inline bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
 
-static __thread char buf[UUID_STR_LEN + 1];
-
 char *
 tt_uuid_str(const struct tt_uuid *uu)
 {
+	enum { BUFS = 4 };
+	static __thread char bufs[BUFS][UUID_STR_LEN + 1];
+	static __thread int bufno = BUFS - 1;
+
+	bufno = (bufno + 1) % BUFS;
+	char *buf = bufs[bufno];
+
 	tt_uuid_to_string(uu, buf);
 	return buf;
 }
