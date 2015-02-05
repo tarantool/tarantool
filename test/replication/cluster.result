@@ -22,6 +22,10 @@ box.schema.user.grant('guest', 'replication')
 ---
 ...
 ok - join with granted role
+-------------------------------------------------------------
+gh-707: Master crashes on JOIN if it does not have snapshot files
+-------------------------------------------------------------
+ok - join without snapshots
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
