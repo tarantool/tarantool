@@ -411,8 +411,8 @@ recover_remaining_wals(struct recovery_state *r)
 			break; /* No more WALs */
 
 		current_signature = vclock_signature(current_vclock);
-		if (current_signature == r->signature) {
-			if (current_signature == last_signature)
+		if (current_signature <= r->signature) {
+			if (r->signature == last_signature)
 				break;
 			say_error("missing xlog between %020lld and %020lld",
 				  (long long) current_signature,
