@@ -39,7 +39,7 @@ local function format(status, ...)
         if status then
             return err
         else
-            err = 'console: an exception occurred during formatting result: '..
+            err = 'console: an exception occurred when formatting the output: '..
                 tostring(err)
         end
     else
