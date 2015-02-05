@@ -269,11 +269,10 @@ space:delete{'Vincent', 'The Wolf!', 0}
 ...
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 1, 'Updated' }, {'=', 5, 'New'}})
 ---
-- ['Updated', 'The Wolf!', 1, 'I said a please would be nice.', 'New']
+- error: Tuple update/replace failed (different key?) in index 0
 ...
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 ---
-- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
 ...
 -- Checking Vincent's last messages
 space.index['primary']:select({'Vincent', 'The Wolf!'})

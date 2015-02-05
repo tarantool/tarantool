@@ -42,13 +42,13 @@ space:delete{1667655012}
 space:insert{1953719668, 'old', 1684234849}
 -- test that insert produces a duplicate key error
 space:insert{1953719668, 'old', 1684234849}
-space:update(1953719668, {{'=', 1, 1936941424}, {'=', 2, 'new'}})
+space:update(1953719668, {{'=', 1, 1953719668}, {'=', 2, 'new'}})
 space:update(1234567890, {{'+', 3, 1}})
-space:update(1936941424, {{'+', 3, 1}})
-space:update(1936941424, {{'-', 3, 1}})
-space:update(1936941424, {{'-', 3, 1}})
-space:update(1936941424, {{'+', 3, 1}})
-space:delete{1936941424}
+space:update(1953719668, {{'+', 3, 1}})
+space:update(1953719668, {{'-', 3, 1}})
+space:update(1953719668, {{'-', 3, 1}})
+space:update(1953719668, {{'+', 3, 1}})
+space:delete{1953719668}
 -- must be read-only
 
 space:insert{1953719668}

@@ -71,11 +71,11 @@ _space:delete{_index.id}
 --
 _space:update({_space.id}, {{'+', 1, 1}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: Tuple update/replace failed (different key?) in index 0
 ...
 _space:update({_space.id}, {{'+', 1, 2}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: Tuple update/replace failed (different key?) in index 0
 ...
 --
 -- Create a space

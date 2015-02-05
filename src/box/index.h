@@ -216,7 +216,7 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 			 * dup_replace_mode is DUP_REPLACE, and
 			 * a tuple with the same key is not found.
 			 */
-			return ER_TUPLE_NOT_FOUND;
+			return old_tuple ? ER_TUPLE_REPLACE_FAILED : ER_TUPLE_NOT_FOUND;
 		}
 	} else { /* dup_tuple != NULL */
 		if (dup_tuple != old_tuple &&

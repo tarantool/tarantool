@@ -680,7 +680,7 @@ s.index.third.id
 s.index.second:drop()
 ---
 ...
-s.index.third:alter({id = 1, name = 'second'})
+s.index.third:alter({name = 'second'})
 ---
 ...
 s.index.third
@@ -693,7 +693,7 @@ s.index.second.name
 ...
 s.index.second.id
 ---
-- 1
+- 2
 ...
 s:drop()
 ---

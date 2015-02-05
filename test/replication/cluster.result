@@ -136,11 +136,11 @@ box.info.vclock[10]
 ...
 box.space._cluster:update(10, {{'=', 1, 11}})
 ---
-- [11, '<replica uuid>']
+- error: Tuple update/replace failed (different key?) in index 0
 ...
 box.info.server.id
 ---
-- 11
+- 10
 ...
 box.info.server.ro
 ---
@@ -156,11 +156,11 @@ box.info.vclock[2]
 ...
 box.info.vclock[10]
 ---
-- null
+- 0
 ...
 box.info.vclock[11]
 ---
-- 0
+- null
 ...
 box.schema.user.revoke('guest', 'replication')
 ---

@@ -245,7 +245,7 @@ index = s:create_index('third', { type = 'hash', parts = {  3, 'num' } })
 s.index.third:rename('second')
 s.index.third.id
 s.index.second:drop()
-s.index.third:alter({id = 1, name = 'second'})
+s.index.third:alter({name = 'second'})
 s.index.third
 s.index.second.name
 s.index.second.id

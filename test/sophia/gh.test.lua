@@ -65,4 +65,9 @@ s = box.schema.space.create('tester', {engine='sophia'})
 i = s:create_index('primary',{type = 'tree', parts = {2, 'STR'}})
 s:insert{1,'X'}
 s:update({'X'}, {{'=', 2, 'Y'}})
+s:select{'X'}
+s:select{'Y'}
+s:update({'X'}, {{'=', 3, 'Z'}})
+s:select{'X'}
+s:select{'Y'}
 s:drop()

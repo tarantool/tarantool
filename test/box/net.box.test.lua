@@ -93,7 +93,8 @@ cn.space.net_box_test_space:update({123}, { { '+', 2, 1 } })
 cn.space.net_box_test_space:update(123, { { '+', 2, 1 } })
 cn.space.net_box_test_space:select{123}
 
-cn.space.net_box_test_space:update({123}, { { '=', 1, 2 } })
+cn.space.net_box_test_space:insert(cn.space.net_box_test_space:get{123}:update{ { '=', 1, 2 } })
+cn.space.net_box_test_space:delete{123}
 cn.space.net_box_test_space:select{2}
 cn.space.net_box_test_space:select({234}, { iterator = 'LT' })
 

@@ -44,6 +44,7 @@ struct MemtxEngine: public Engine {
 	virtual int wait_checkpoint();
 	virtual void commit_checkpoint();
 	virtual void abort_checkpoint();
+	virtual bool auto_verify_update_primary_key() override { return true; }
 private:
 	/**
 	 * LSN of the snapshot which is in progress.

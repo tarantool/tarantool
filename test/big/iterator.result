@@ -935,10 +935,18 @@ box.space.test:insert{1}
 ---
 - [1]
 ...
-gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
+gen1, param1, state1 = space.index.t1:pairs({}, {iterator = box.index.ALL})
 ---
 ...
-gen(param, state)
+gen1(param1, state1)
+---
+- <iterator state>
+- [0]
+...
+gen2, param2, state2 = space.index.t2:pairs({}, {iterator = box.index.ALL})
+---
+...
+gen2(param2, state2)
 ---
 - <iterator state>
 - [0]
@@ -949,12 +957,27 @@ id = space.index.t1.id
 box.schema.index.drop(space.id, id)
 ---
 ...
-box.schema.index.alter(space.id, space.index.t2.id, {id = id})
----
-...
-gen(param, state)
+gen1(param1, state1)
 ---
 - null
+...
+gen2(param2, state2)
+---
+- <iterator state>
+- [1]
+...
+gen2, param2, state2 = space.index.t2:pairs({}, {iterator = box.index.ALL})
+---
+...
+gen2(param2, state2)
+---
+- <iterator state>
+- [0]
+...
+gen2(param2, state2)
+---
+- <iterator state>
+- [1]
 ...
 space:drop()
 ---

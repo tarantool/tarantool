@@ -141,6 +141,17 @@ public:
 	 * An error in one of the engines, abort checkpoint.
 	 */
 	virtual void abort_checkpoint() = 0;
+	/**
+	 * Identifies that engine can handle changes
+	 *  of primary key during update.
+	 * During update operation user could change primary
+	 *  key of a tuple, that is prohibited. Some engine can
+	 *  track this situation and abort the operation; such
+	 *  engines should return true; others - false.
+	 * If the method return false, additional verification
+	 *  will be started.
+	 */
+	virtual bool auto_verify_update_primary_key() = 0;
 public:
 	/** Name of the engine. */
 	const char *name;

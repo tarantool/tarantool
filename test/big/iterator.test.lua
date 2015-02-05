@@ -183,14 +183,21 @@ idx3 = space:create_index('t2', {type='TREE',unique=true})
 box.space.test:insert{0}
 box.space.test:insert{1}
 
-gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
-gen(param, state)
+gen1, param1, state1 = space.index.t1:pairs({}, {iterator = box.index.ALL})
+gen1(param1, state1)
+
+gen2, param2, state2 = space.index.t2:pairs({}, {iterator = box.index.ALL})
+gen2(param2, state2)
 
 id = space.index.t1.id
 box.schema.index.drop(space.id, id)
-box.schema.index.alter(space.id, space.index.t2.id, {id = id})
 
-gen(param, state)
+gen1(param1, state1)
+gen2(param2, state2)
+
+gen2, param2, state2 = space.index.t2:pairs({}, {iterator = box.index.ALL})
+gen2(param2, state2)
+gen2(param2, state2)
 
 space:drop()
 

@@ -109,6 +109,7 @@ sql("call myinsert(3, 'old', 2)")
 # test that insert produces a duplicate key error
 sql("call myinsert(3, 'old', 2)")
 admin("space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})")
+admin("space:insert(space:get{3}:update{{'=', 1, 4}, {'=', 2, 'new'}}) space:delete{3}")
 sql("call space:get(4)")
 sql("call space:select(4)")
 admin("space:update({4}, {{'+', 3, 1}})")

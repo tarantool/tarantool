@@ -160,7 +160,27 @@ s:insert{1,'X'}
 ...
 s:update({'X'}, {{'=', 2, 'Y'}})
 ---
-- [1, 'Y']
+- error: Tuple update/replace failed (different key?) in index 0
+...
+s:select{'X'}
+---
+- - [1, 'X']
+...
+s:select{'Y'}
+---
+- []
+...
+s:update({'X'}, {{'=', 3, 'Z'}})
+---
+- [1, 'X', 'Z']
+...
+s:select{'X'}
+---
+- - [1, 'X', 'Z']
+...
+s:select{'Y'}
+---
+- []
 ...
 s:drop()
 ---

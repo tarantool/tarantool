@@ -95,7 +95,9 @@ execute_update(struct request *request, struct port *port)
 					       request->field_base);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
+	if (!space->handler->engine->auto_verify_update_primary_key())
+		space_verify_tuple_update(space, old_tuple, new_tuple);
+	txn_replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
 	txn_commit_stmt(txn, port);
 }
 
