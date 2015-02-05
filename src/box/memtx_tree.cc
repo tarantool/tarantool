@@ -34,14 +34,6 @@
 #include "fiber.h"
 #include <third_party/qsort_arg.h>
 
-/** For all memory used by all tree indexes. */
-extern struct quota memtx_quota;
-static struct slab_arena index_arena;
-static struct slab_cache index_arena_slab_cache;
-static struct mempool tree_extent_pool;
-/** Number of allocated extents. */
-static bool index_arena_initialized = false;
-
 /* {{{ Utilities. *************************************************/
 
 struct key_data
@@ -188,35 +180,14 @@ tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 
 /* {{{ MemtxTree  **********************************************************/
 
-static void *
-extent_alloc()
-{
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
-	return mempool_alloc(&tree_extent_pool);
-}
-
-static void
-extent_free(void *extent)
-{
-	return mempool_free(&tree_extent_pool, extent);
-}
-
 MemtxTree::MemtxTree(struct key_def *key_def_arg)
 	: Index(key_def_arg), build_array(0), build_array_size(0),
 	  build_array_alloc_size(0)
 {
-	if (index_arena_initialized == false) {
-		const uint32_t SLAB_SIZE = 4 * 1024 * 1024;
-		if (slab_arena_create(&index_arena, &memtx_quota,
-				      0, SLAB_SIZE, MAP_PRIVATE)) {
-			panic_syserror("failed to initialize index arena");
-		}
-		slab_cache_create(&index_arena_slab_cache, &index_arena);
-		mempool_create(&tree_extent_pool, &index_arena_slab_cache,
-			       BPS_TREE_EXTENT_SIZE);
-		index_arena_initialized = true;
-	}
-	bps_tree_index_create(&tree, key_def, extent_alloc, extent_free);
+	memtx_index_arena_init();
+	bps_tree_index_create(&tree, key_def,
+			      memtx_index_extent_alloc,
+			      memtx_index_extent_free);
 }
 
 MemtxTree::~MemtxTree()

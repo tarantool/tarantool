@@ -30,6 +30,7 @@
  */
 
 #include "index.h"
+#include "memtx_engine.h"
 
 struct tuple;
 struct key_data;
@@ -42,7 +43,7 @@ tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_de
 
 #define BPS_TREE_NAME _index
 #define BPS_TREE_BLOCK_SIZE (512)
-#define BPS_TREE_EXTENT_SIZE (16*1024)
+#define BPS_TREE_EXTENT_SIZE MEMTX_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, arg) tree_index_compare(a, b, arg)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) tree_index_compare_key(a, b, arg)
 #define bps_tree_elem_t struct tuple *
