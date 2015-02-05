@@ -41,18 +41,36 @@ extern "C" {
 #include "tarantool.h"
 #include "box/box.h"
 #include "lua/utils.h"
+#include "fiber.h"
 
 static int
-lbox_info_recovery_lag(struct lua_State *L)
+lbox_info_replication(struct lua_State *L)
 {
-	lua_pushnumber(L, recovery->remote.recovery_lag);
-	return 1;
-}
+	struct recovery_state *r = recovery;
 
-static int
-lbox_info_recovery_last_update_tstamp(struct lua_State *L)
-{
-	lua_pushnumber(L, recovery->remote.recovery_last_update_tstamp);
+	lua_newtable(L);
+
+	lua_pushstring(L, "status");
+	lua_pushstring(L, r->remote.status);
+	lua_settable(L, -3);
+
+	if (r->remote.reader) {
+		lua_pushstring(L, "lag");
+		lua_pushnumber(L, r->remote.lag);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "idle");
+		lua_pushnumber(L, ev_now(loop()) - r->remote.last_row_time);
+		lua_settable(L, -3);
+
+		if (r->remote.reader->exception) {
+			lua_pushstring(L, "message");
+			lua_pushstring(L,
+				       r->remote.reader->exception->errmsg());
+			lua_settable(L, -3);
+		}
+	}
+
 	return 1;
 }
 
@@ -81,6 +99,8 @@ static int
 lbox_info_vclock(struct lua_State *L)
 {
 	lua_createtable(L, 0, vclock_size(&recovery->vclock));
+	/* Request compact output flow */
+	luaL_setmaphint(L, -1);
 	vclock_foreach(&recovery->vclock, it) {
 		lua_pushinteger(L, it.id);
 		luaL_pushnumber64(L, it.lsn);
@@ -118,6 +138,7 @@ lbox_info_pid(struct lua_State *L)
 	return 1;
 }
 
+#if 0
 void sophia_info(void (*)(const char*, const char*, void*), void*);
 
 static void
@@ -139,19 +160,21 @@ lbox_info_sophia(struct lua_State *L)
 	sophia_info(lbox_info_sophia_cb, (void*)L);
 	return 1;
 }
+#endif
 
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
-	{"recovery_lag", lbox_info_recovery_lag},
-	{"recovery_last_update", lbox_info_recovery_last_update_tstamp},
 	{"vclock", lbox_info_vclock},
 	{"server", lbox_info_server},
+	{"replication", lbox_info_replication},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},
 	{"pid", lbox_info_pid},
+#if 0
 	{"sophia", lbox_info_sophia},
+#endif
 	{NULL, NULL}
 };
 

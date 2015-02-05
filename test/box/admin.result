@@ -67,13 +67,18 @@ end;
 ...
 function test_box_info()
     local tmp = box.info()
-    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime'}
+    local num = {'pid', 'snapshot_pid', 'uptime'}
     local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.server, 'table') == false then
         table.insert(failed1, 'box.info().server')
     else
         tmp.server = nil
+    end
+    if check_type(tmp.replication, 'table') == false then
+        table.insert(failed1, 'box.info().replication')
+    else
+        tmp.replication = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then

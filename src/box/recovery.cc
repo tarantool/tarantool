@@ -201,6 +201,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	xdir_check(&r->wal_dir);
 
 	wal_watcher_init(&r->watcher);
+	recovery_init_remote(r);
 
 	guard.is_active = false;
 	return r;

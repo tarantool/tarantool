@@ -25,6 +25,24 @@ exception_f(va_list ap)
 }
 
 static void
+no_exception_f(va_list ap)
+{
+	try {
+		tnt_raise(OutOfMemory, 42, "allocator", "exception");
+	} catch (Exception *e) {
+		;
+	}
+}
+
+static void
+cancel_dead_f(va_list ap)
+{
+	note("cancel dead has started");
+	fiber_set_cancellable(true);
+	tnt_raise(OutOfMemory, 42, "allocator", "exception");
+}
+
+static void
 fiber_join_test()
 {
 	header();
@@ -50,6 +68,30 @@ fiber_join_test()
 	} catch (Exception *e) {
 		note("exception propagated");
 	}
+
+	/*
+	 * A fiber which is using exception should not
+	 * push them up the stack.
+	 */
+	fiber = fiber_new("no_exception", no_exception_f);
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	fiber_join(fiber);
+	/*
+	 * Trying to cancel a dead joinable cancellable fiber lead to
+	 * a crash, because cancel would try to schedule it.
+	 */
+	fiber = fiber_new("cancel_dead", cancel_dead_f);
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	/** Let the fiber schedule */
+	fiber_wakeup(fiber());
+	fiber_yield();
+	note("by this time the fiber should be dead already");
+	fiber_cancel(fiber);
+	Exception::cleanup(&fiber->exception);
+	fiber_join(fiber);
+
 	footer();
 }
 

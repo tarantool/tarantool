@@ -133,7 +133,11 @@ fiber_cancel(struct fiber *f)
 
 	f->flags |= FIBER_IS_CANCELLED;
 
-	if (f != self) {
+	/**
+	 * Don't wait for self and for fibers which are already
+	 * dead.
+	 */
+	if (f != self && !(f->flags & FIBER_IS_DEAD)) {
 		rlist_add_tail_entry(&f->wake, self, state);
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
@@ -205,6 +209,8 @@ fiber_join(struct fiber *fiber)
 	} else {
 		rlist_add_tail_entry(&fiber->wake, fiber(), state);
 		fiber_yield();
+		/* @todo: make this branch async-cancel-safe */
+		assert(! (fiber->flags & FIBER_IS_DEAD));
 		/*
 		 * Let the fiber recycle.
 		 * This can't be done here since there may be other
@@ -384,6 +390,11 @@ fiber_loop(void *data __attribute__((unused)))
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
 		try {
 			fiber->f(fiber->f_data);
+			/*
+			 * Make sure a leftover exception does not
+			 * propagate up to the joiner.
+			 */
+			Exception::cleanup(&fiber->exception);
 		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
 				 fiber_name(fiber));

@@ -24,13 +24,9 @@ string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
 - false
 ...
-box.info.recovery_lag
+box.info.replication.status
 ---
-- 0
-...
-box.info.recovery_last_update
----
-- 0
+- off
 ...
 box.info.status
 ---
@@ -56,11 +52,9 @@ table.sort(t)
 t
 ---
 - - pid
-  - recovery_lag
-  - recovery_last_update
+  - replication
   - server
   - snapshot_pid
-  - sophia
   - status
   - uptime
   - vclock

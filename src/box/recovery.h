@@ -79,7 +79,8 @@ enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 /** State of a replication connection to the master */
 struct remote {
 	struct fiber *reader;
-	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+	const char *status;
+	ev_tstamp lag, last_row_time;
 	bool warning_said;
 	char source[REMOTE_SOURCE_MAXLEN];
 	struct uri uri;
