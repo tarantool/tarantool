@@ -263,7 +263,7 @@ pull_from_remote(va_list ap)
 			remote_set_status(&r->remote, "off");
 			throw;
 		} catch (Exception *e) {
-			remote_set_status(&r->remote, "failed");
+			remote_set_status(&r->remote, "disconnected");
 			if (! r->remote.warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
