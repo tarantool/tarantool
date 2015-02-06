@@ -22,7 +22,7 @@
 
 
 
-#define PLAN		47
+#define PLAN		65
 
 #define ITEMS		7
 
@@ -97,6 +97,29 @@ main(void)
 		done = fread(buf, 1, 12, f);
 		is(done, 12, "Hello world is read (%zu bytes)", done);
 		is(memcmp(buf, "Hello, world", 12), 0, "data");
+
+		is(fseek(f, 7L, SEEK_SET), 0, "set odd position");
+		is(ftell(f), 7L, "check odd position");
+		is(fread(buf, 1, 4096, f), 5, "read from odd position (size)");
+		is(memcmp(buf, "world", 5), 0, "read from odd position (data)");
+
+		is(fseek(f, 0L, SEEK_SET), 0, "set start position");
+		is(ftell(f), 0L, "check start position");
+
+		is(fseek(f, 0L, SEEK_END), 0, "set eof position");
+		is(ftell(f), 12L, "check eof position");
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
+		ok(feof(f), "feof");
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
+		ok(feof(f), "feof");
+
+		is(fseek(f, -1L, SEEK_END), 0, "set -1 position");
+		is(ftell(f), 11L, "check -1 position");
+		is(fread(buf, 1, 4096, f), 1, "read from -1 position (size)");
+		is(memcmp(buf, "d", 1), 0, "read from -1 position (data)");
+		ok(feof(f), "feof");
+
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
 
 		is(fseek(f, 0L, SEEK_SET), 0, "set new position");
 		done = fread(buf + 1, 1, 12, f);

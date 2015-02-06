@@ -18,6 +18,16 @@
 #include <unistd.h>
 #include <tarantool/config.h>
 
+/* Use special implemention if we have O_DIRECT and FOPENCOOKIE or FUNOPEN */
+#if defined(O_DIRECT) && (defined(HAVE_FUNOPEN) || defined(HAVE_FOPENCOOKIE))
+#define FIOB_DIRECT
+#endif
+
+#if defined(FIOB_DIRECT)
+enum {
+	FIOB_ALIGN = 4096,
+	FIOB_BSIZE = FIOB_ALIGN * 256
+};
 
 struct fiob {
 	int fd;
@@ -37,29 +47,11 @@ struct fiob {
 #endif
 };
 
-static ssize_t
-fiob_readf(struct fiob *f, char *buf, size_t count)
+static inline off_t
+fiob_ceil(off_t off)
 {
-	ssize_t to_read = (ssize_t) count;
-	while (to_read > 0) {
-		ssize_t nrd = read(f->fd, buf, to_read);
-		if (nrd < 0) {
-			if (errno == EINTR) {
-				errno = 0;
-				continue;
-			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return count != to_read ? count - to_read : -1;
-			say_syserror("read, [%s]", f->path);
-			return -1; /* XXX: file position is unspecified */
-		}
-		if (nrd == 0)
-			break;
-
-		buf += nrd;
-		to_read -= nrd;
-	}
-	return count - to_read;
+	/* ceil to FIOB_ALIGN */
+	return (off + FIOB_ALIGN - 1) & ~(off_t) (FIOB_ALIGN - 1);
 }
 
 #ifdef HAVE_FUNOPEN
@@ -67,13 +59,87 @@ static int
 fiob_read(void *cookie, char *buf, int len)
 #else
 static ssize_t
-fiob_read(void *cookie, char *buf, size_t len)
+fiob_read(void *cookie, char *buf, size_t count)
 #endif
 {
 	struct fiob *f = (struct fiob *)cookie;
-	return fiob_readf(f, buf, len);
-}
+	ssize_t to_read = (ssize_t) count;
 
+	/* The number of starting bytes in f->buf to skip due to alignment */
+	off_t skip = 0;
+	while (to_read > 0) {
+		/* Align `to_read' FIOB_ALIGN to be <= size of f->buf */
+		ssize_t to_read_al = MIN(fiob_ceil(to_read), f->bsize);
+		/*
+		 * Optimistically try to read aligned size into the aligned
+		 * buffer. If the current file position is not aligned then
+		 * read(2) returns EINVAL. In this case seek to an aligned
+		 * position and try again. This trick saves one extra
+		 * syscall for general workflow.
+		 */
+		ssize_t nrd = read(f->fd, f->buf, to_read_al);
+		if (nrd < 0) {
+			if (errno == EINTR) {
+				errno = 0;
+				continue;
+			} else if (errno == EINVAL && skip == 0) {
+				/*
+				 * read(2) can return EINVAL only in 3 cases:
+				 *  1. read buffer is not aligned - handled in
+				 *     fiob_open().
+				 *  2. read size is not aligned - handled above
+				 *  3. current file position is not aligned -
+				 *     handled here.
+				 */
+				off_t pos = lseek(f->fd, 0, SEEK_CUR);
+				if (pos < 0) {
+					say_syserror("lseek, [%s]", f->path);
+					return -1;
+				}
+				/* Calculate aligned position */
+				skip = pos % FIOB_ALIGN;
+				pos -= skip;
+				if (skip == 0) {
+					/* Position is aligned. */
+					errno = EINVAL;
+					say_error("read, [%s]", f->path);
+					return -1;
+				}
+				/* Seek to the new position */
+				if (lseek(f->fd, pos, SEEK_SET) != pos) {
+					say_syserror("lseek, [%s]", f->path);
+					return -1;
+				}
+				/* Try to read again. */
+				continue;
+			}
+			say_syserror("read, [%s]", f->path);
+			return -1; /* XXX: file position is unspecified */
+		}
+		/* Ignore starting bytes if the position was aligned. */
+		nrd -= skip;
+		if (nrd == 0)
+			break;
+		if (nrd > to_read) {
+			/*
+			 * A few more bytes have been read because `to_read'
+			 * is not aligned to FIOB_ALIGN. Set the file position
+			 * to the expected libc value and ignore extra bytes.
+			 */
+			if (lseek(f->fd, to_read - nrd, SEEK_CUR) < 0) {
+				say_syserror("lseek, [%s]", f->path);
+				return -1;
+			}
+			nrd = to_read;
+		}
+
+		memcpy(buf, f->buf + skip, nrd); /* see nrd -= skip */
+		skip = 0; /* reset alignment offset */
+		buf += nrd;
+		to_read -= nrd;
+	}
+	return count - to_read;
+}
 
 static ssize_t
 fiob_writef(struct fiob *f, const char *buf, size_t count)
@@ -87,8 +153,6 @@ fiob_writef(struct fiob *f, const char *buf, size_t count)
 				errno = 0;
 				continue;
 			}
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return count != to_write ? count - to_write : -1;
 			say_syserror("write, [%s]", f->path);
 			return -1; /* XXX: file position is unspecified */
 		}
@@ -101,17 +165,13 @@ fiob_writef(struct fiob *f, const char *buf, size_t count)
 	return count - to_write;
 }
 
-
 static int
 fiob_flushb(struct fiob *f)
 {
-	if (!f->buf || !f->bfill)
+	if (!f->bfill)
 		return 0;
 
-	size_t tlen = f->bfill / 4096;
-	if (f->bfill % 4096)
-		tlen++;
-	tlen *= 4096;
+	size_t tlen = fiob_ceil(f->bfill);
 
 	if (fiob_writef(f, f->buf, tlen) < 0) {
 		return -1;
@@ -140,9 +200,6 @@ fiob_write(void *cookie, const char *buf, size_t len)
 
 	if (len == 0)
 		return 0;
-
-	if (!f->buf)
-		return fiob_writef(f, buf, len);
 
 	ssize_t bytes_left = len;
 	ssize_t tocopy;
@@ -223,22 +280,23 @@ fiob_close(void *cookie)
 	errno = save_errno;
 	return res;
 }
+#endif /* defined(FIOB_DIRECT) */
 
-/** open file. The same as fiob_open but receives additional open (2) flags */
+/** open file. The same as fopen but receives additional open (2) flags */
 FILE *
 fiob_open(const char *path, const char *mode)
 {
 	int omode = 0666;
 	int flags = 0;
 	int save_errno;
-
-	size_t bsize = 0;
-	void *buf = NULL;
-
+	int fd = -1;
+	FILE *file = NULL;
+#if defined (FIOB_DIRECT)
+	struct fiob *f = NULL;
+#endif /* defined(FIOB_DIRECT) */
 	int um = umask(0722);
 	umask(um);
 	omode &= ~um;
-
 
 	if (strchr(mode, 'r')) {
 		if (strchr(mode, '+'))
@@ -267,55 +325,50 @@ fiob_open(const char *path, const char *mode)
 	if (strchr(mode, 'x'))
 		flags |= O_EXCL;
 #endif
-
-	/* O_DIRECT */
-	if (strchr(mode, 'd')) {
-#ifdef O_DIRECT
-		flags |= O_DIRECT;
-#endif
-		bsize = O_DIRECT_BSIZE;
-		posix_memalign(&buf, 4096, bsize);
-		if (!buf) {
-			errno = ENOMEM;
-			return NULL;
-		}
-		/* for valgrind */
-		memset(buf, 0, bsize);
-	}
-
 	/* O_SYNC */
 	if (strchr(mode, 's')) {
 		flags |= WAL_SYNC_FLAG;
 	}
 
-	struct fiob *f = (struct fiob *)calloc(1, sizeof(struct fiob));
-	if (!f) {
-		free(buf);
-		errno = ENOMEM;
-		return NULL;
+#if defined(FIOB_DIRECT)
+	if (strchr(mode, 'd')) {
+	    /* Try to open file with O_DIRECT */
+	    fd = open(path, flags | O_DIRECT, omode);
 	}
+	if (fd < 0) {
+#endif /* defined(FIOB_DIRECT) */
+		/* Fallback to libc implementation */
+		fd = open(path, flags, omode);
+		if (fd < 0)
+			goto error;
+		file = fdopen(fd, mode);
+		if (!file)
+			goto error;
+		return file;
+#if defined(FIOB_DIRECT)
+	}
+
+	f = (struct fiob *)calloc(1, sizeof(struct fiob));
+	if (!f)
+		goto error;
+
+	f->fd = fd;
+	f->bsize = FIOB_BSIZE;
+	if (posix_memalign(&f->buf, FIOB_ALIGN, f->bsize))
+		goto error;
+
+	/* for valgrind */
+	memset(f->buf, 0, f->bsize);
 
 	f->path = strdup(path);
-	if (!f->path) {
-		errno = ENOMEM;
+	if (!f->path)
 		goto error;
-	}
-
-	f->buf = buf;
-	f->bsize = bsize;
-
-	f->fd = open(path, flags, omode);
-	if (f->fd < 0)
-		goto error;
-
-
 
 	f->io.read	= fiob_read;
 	f->io.write	= fiob_write;
 	f->io.seek	= fiob_seek;
 	f->io.close	= fiob_close;
 
-	FILE *file;
 #ifdef HAVE_FUNOPEN
 	file = funopen(f,
 		       f->io.read, f->io.write, f->io.seek, f->io.close);
@@ -333,16 +386,21 @@ fiob_open(const char *path, const char *mode)
 #endif
 
 	return file;
+#endif /* defined(FIOB_DIRECT) */
 
 error:
 	save_errno = errno;
 	say_syserror("Can't open '%s'", path);
-	if (f->fd > 0)
-		close(f->fd);
+	if (fd >= 0)
+		close(fd);
 
-	free(f->buf);
-	free(f->path);
-	free(f);
+#if defined(FIOB_DIRECT)
+	if (f) {
+		free(f->buf);
+		free(f->path);
+		free(f);
+	}
+#endif /* FIOB_DIRECT */
 
 	errno = save_errno;
 	return NULL;
