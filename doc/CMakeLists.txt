@@ -13,7 +13,6 @@ add_subdirectory(man)
 if (ENABLE_DOC)
     add_subdirectory(user)
     add_subdirectory(sphinx)
-    add_subdirectory(developer)
     add_subdirectory(www)
 endif()
 

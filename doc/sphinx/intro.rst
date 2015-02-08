@@ -2,7 +2,7 @@
 :slug: intro
 :save_as: doc/introduction.html
 :url: doc/introduction.html
-:template: old_page
+:template: documentation_rst
 
 ===============================================================================
                              What is Tarantool?
