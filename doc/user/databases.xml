@@ -3169,6 +3169,12 @@ To change the current user's password, say
 </para>
 
 <para>
+To change a different user's password, say
+<code>box.schema.user.passwd(<replaceable>user-name</replaceable>, <replaceable>password</replaceable>)</code>.
+(Only the admin user can perform this function.)
+</para>
+
+<para>
 To drop a user, say
 <code>box.schema.user.drop(<replaceable>user-name</replaceable>)</code>.
 </para>
