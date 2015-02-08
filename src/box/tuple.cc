@@ -303,6 +303,93 @@ tuple_ref_exception()
 	tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
 }
 
+uint32_t tuple_bigrefs[TUPLE_BIGREF_MASK + 1];
+
+/* organize free slots in a kind of two level skip list
+ * this will help us to keep cache locality */
+struct bigref_list {
+	uint16_t jump;
+	uint16_t next;
+} __attribute__((packed));
+
+static struct {
+	uint32_t capa;
+	uint32_t free;
+	uint32_t rand;
+} bigrefs = { 0, 0xffff, 0 };
+
+uint16_t
+tuple_bigref_alloc()
+{
+	uint16_t slot;
+	struct bigref_list *list = (struct bigref_list*)tuple_bigrefs;
+	if (bigrefs.free == 0xffff) {
+		if (bigrefs.capa > TUPLE_BIGREF_MASK) {
+			/* if you are here, then you already allocate 8Gb of pointers */
+			tuple_ref_exception();
+		}
+		list[bigrefs.capa].next = 0xffff;
+		list[bigrefs.capa].jump = 0xffff;
+		bigrefs.free = bigrefs.capa;
+		bigrefs.capa++;
+	}
+	slot = bigrefs.free;
+	bigrefs.free = list[slot].next;
+	/* c++ have very strict aliasing rules, so that do not use tuple_bigrefs here */
+	list[slot].next = 0;
+	list[slot].jump = 0;
+	return slot | TUPLE_BIGREF;
+}
+
+static inline uint32_t
+bigrefs_rand()
+{
+	/* well, i'm not sure that random is needed here,
+	 * perhaps simple counter is more appropriate.
+	 * just cause of SkipList traditions :) */
+	uint32_t r = bigrefs.rand;
+	bigrefs.rand = r * 9 + 1;
+	/* every 32 links insert second level link */
+	return (r >> 27) ^ 31;
+}
+
+void
+tuple_bigref_free(struct tuple* tuple)
+{
+	struct bigref_list *list = (struct bigref_list*)tuple_bigrefs;
+	uint16_t slot = tuple->refs & TUPLE_BIGREF_MASK;
+	uint16_t free = bigrefs.free;
+	tuple->refs = TUPLE_REF_MAX;
+	/* organize free slots in a kind of two level skip list
+	 * this will help us to keep cache locality */
+	if (free == 0xffff) {
+		list[slot].next = 0xffff;
+		list[slot].jump = 0xffff;
+		bigrefs.free = slot;
+	} else if (free > slot) {
+		list[slot].next = free;
+		/* copy "second level" link or insert new */
+		list[slot].jump = bigrefs_rand() ? list[free].jump : free;
+		bigrefs.free = slot;
+	} else {
+		uint16_t last_jump, next;
+		while ((next = list[free].jump) < slot)
+			free = next;
+		last_jump = free;
+		while ((next = list[free].next) < slot)
+			free = next;
+		list[slot] = list[free];
+		list[free].next = slot;
+		if (bigrefs_rand() == 0) {
+			/* insert "second level" link in a skip list */
+			while (last_jump != slot) {
+				list[last_jump].jump = slot;
+				last_jump = list[last_jump].next;
+			}
+		}
+	}
+}
+
 const char *
 tuple_seek(struct tuple_iterator *it, uint32_t i)
 {

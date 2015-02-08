@@ -32,7 +32,7 @@
 #include "key_def.h" /* for enum field_type */
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
-enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
+enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = 0x7fff, TUPLE_BIGREF_MASK = 0x7fff, TUPLE_BIGREF = 0x8000 };
 
 /** Common quota for tuples and indexes */
 extern struct quota memtx_quota;
@@ -193,24 +193,41 @@ tuple_delete(struct tuple *tuple);
 void
 tuple_ref_exception();
 
+extern uint32_t tuple_bigrefs[TUPLE_BIGREF_MASK+1];
+/**
+ * Allocate bigref slot.
+ * Throws if no free slots left.
+ */
+uint16_t
+tuple_bigref_alloc();
+
+/**
+ * Free bigref slot
+ */
+void
+tuple_bigref_free(struct tuple* tuple);
+
 /**
  * Increment tuple reference counter.
- * Throws if overflow detected.
+ * Throws if no free bigref slots left.
  *
  * @pre tuple->refs + count >= 0
  */
 extern "C" inline void
 tuple_ref(struct tuple *tuple)
 {
-	if (tuple->refs + 1 > TUPLE_REF_MAX)
-		tuple_ref_exception();
-
-	tuple->refs++;
+	if (tuple->refs < TUPLE_REF_MAX) {
+		tuple->refs++;
+	} else if (tuple->refs > TUPLE_REF_MAX) {
+		tuple_bigrefs[tuple->refs & TUPLE_BIGREF_MASK]++;
+	} else {
+		tuple->refs = tuple_bigref_alloc();
+	}
 }
 
 /**
  * Increment tuple reference counter.
- * Returns -1 if overflow detected, 0 otherwise
+ * Returns -1 if no bigref slots left, 0 otherwise
  *
  * @pre tuple->refs + count >= 0
  */
@@ -235,10 +252,15 @@ tuple_unref(struct tuple *tuple)
 {
 	assert(tuple->refs - 1 >= 0);
 
-	tuple->refs--;
-
-	if (tuple->refs == 0)
-		tuple_delete(tuple);
+	if (tuple->refs <= TUPLE_REF_MAX) {
+		tuple->refs--;
+		if (tuple->refs == 0)
+			tuple_delete(tuple);
+	} else if (tuple_bigrefs[tuple->refs & TUPLE_BIGREF_MASK]) {
+		tuple_bigrefs[tuple->refs & TUPLE_BIGREF_MASK]--;
+	} else {
+		tuple_bigref_free(tuple);
+	}
 }
 
 /** Make tuple references exception-friendly in absence of @finally. */
