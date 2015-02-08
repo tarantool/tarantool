@@ -154,8 +154,6 @@ struct small_alloc {
 	 */
 	float factor;
 	uint32_t objsize_max;
-	/** All slabs in all mempools have the same order. */
-	uint8_t slab_order;
 	/**
 	 * If true, smfree_delayed puts items to delayed list.
 	 */
@@ -186,9 +184,6 @@ small_alloc_destroy(struct small_alloc *alloc);
 void *
 smalloc_nothrow(struct small_alloc *alloc, size_t size);
 
-void
-small_recycle_pool(struct small_alloc *alloc, struct mempool *pool);
-
 /** Free memory chunk allocated by the small allocator. */
 /**
  * Free a small objects.
@@ -200,35 +195,16 @@ small_recycle_pool(struct small_alloc *alloc, struct mempool *pool);
  * and the factored pool's cache is empty, put back the empty
  * factored pool into the factored pool cache.
  */
-static inline void
-smfree(struct small_alloc *alloc, void *ptr)
-{
-	struct mslab *slab = (struct mslab *)
-		slab_from_ptr(alloc->cache, ptr, alloc->slab_order);
-	struct mempool *pool = slab->pool;
-	pool->slabs.stats.used -= pool->objsize;
-	mslab_free(pool, slab, ptr);
-	/*
-	 * Don't keep around empty factored pools
-	 * if the allocator is out of them.
-	 */
-	if (mempool_used(pool) == 0)
-		small_recycle_pool(alloc, pool);
-}
+void
+smfree(struct small_alloc *alloc, void *ptr, size_t size);
 
 /**
  * Free memory chunk allocated by the small allocator
  * if not in snapshot mode, otherwise put to the delayed
  * free list.
  */
-static inline void
-smfree_delayed(struct small_alloc *alloc, void *ptr)
-{
-	if (alloc->is_delayed_free_mode && ptr)
-		lifo_push(&alloc->delayed, ptr);
-	else
-		smfree(alloc, ptr);
-}
+void
+smfree_delayed(struct small_alloc *alloc, void *ptr, size_t size);
 
 /**
  * @brief Return an unique index associated with a chunk allocated

@@ -3,10 +3,10 @@
 box.info.unknown_variable
 box.info[23]
 box.info['unknown_variable']
+string.match(box.info.version, '^[1-9]') ~= nil
 string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 #box.info.server > 0
-box.info.recovery_lag
-box.info.recovery_last_update
+box.info.replication.status
 box.info.status
 string.len(box.info.uptime) > 0
 string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil

@@ -32,5 +32,10 @@ log.rotate()
 
 test:ok(log.logger_pid() >= 0, "logger_pid()")
 
+-- logger uses 'debug', try to set it to nil
+debug = nil
+log.info("debug is nil")
+debug = require('debug')
+
 test:check()
 os.exit()

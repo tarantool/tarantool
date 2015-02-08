@@ -29,6 +29,7 @@ local default_cfg = {
     listen              = nil,
     slab_alloc_arena    = 1.0,
     slab_alloc_minimal  = 64,
+    slab_alloc_maximal  = 1024 * 1024,
     slab_alloc_factor   = 2.0,
     work_dir            = nil,
     snap_dir            = ".",
@@ -40,7 +41,7 @@ local default_cfg = {
     log_level           = 5,
     io_collect_interval = nil,
     readahead           = 16320,
-    snap_io_rate_limit  = nil,
+    snap_io_rate_limit  = nil, -- no limit
     too_long_threshold  = 0.5,
     wal_mode            = "write",
     rows_per_wal        = 500000,
@@ -73,6 +74,7 @@ local template_cfg = {
     listen              = 'string, number',
     slab_alloc_arena    = 'number',
     slab_alloc_minimal  = 'number',
+    slab_alloc_maximal  = 'number',
     slab_alloc_factor   = 'number',
     work_dir            = 'string',
     snap_dir            = 'string',
@@ -253,9 +255,11 @@ local function load_cfg(cfg)
     ffi.C.load_cfg()
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
-        if val ~= default_cfg[key] then
+        if val ~= nil then
             fun(cfg[key])
-            log.info("set '%s' configuration option to '%s'", key, val)
+            if val ~= default_cfg[key] then
+                log.info("set '%s' configuration option to '%s'", key, val)
+            end
         end
     end
 end

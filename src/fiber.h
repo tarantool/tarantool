@@ -55,12 +55,25 @@ enum {
 	 * e.g. to force it to check that it's been
 	 * cancelled.
 	 */
-	FIBER_IS_CANCELLABLE = 1 << 0,
+	FIBER_IS_CANCELLABLE	= 1 << 0,
 	/**
 	 * Indicates that a fiber has been requested to end
 	 * prematurely.
 	 */
-	FIBER_IS_CANCELLED      = 1 << 1,
+	FIBER_IS_CANCELLED	= 1 << 1,
+	/**
+	 * The fiber will garbage collect automatically
+	 * when fiber function ends. The alternative
+	 * is that some other fiber will wait for
+	 * the end of this fiber and garbage collect it
+	 * with fiber_join().
+	 */
+	FIBER_IS_JOINABLE = 1 << 2,
+	/**
+	 * This flag is set when fiber function ends and before
+	 * the fiber is recycled.
+	 */
+	FIBER_IS_DEAD		= 1 << 4,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -98,17 +111,26 @@ enum fiber_key {
 };
 
 struct fiber {
-#ifdef ENABLE_BACKTRACE
-	void *last_stack_frame;
-#endif
-	int csw;
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
 	struct region gc;
+#ifdef ENABLE_BACKTRACE
+	void *last_stack_frame;
+#endif
+	/**
+	 * The fiber which should be scheduled when
+	 * this fiber yields.
+	 */
+	struct fiber *caller;
+	/** Number of context switches. */
+	int csw;
 	/** Fiber id. */
 	uint32_t fid;
-
+	/** Fiber flags */
+	uint32_t flags;
+	/** Link in cord->alive or cord->dead list. */
 	struct rlist link;
+	/** Link in cord->ready list. */
 	struct rlist state;
 
 	/** Triggers invoked before this fiber yields. Must not throw. */
@@ -121,14 +143,17 @@ struct fiber {
 	 */
 	struct rlist wake;
 
-	/* This struct is considered as non-POD when compiling by g++.
-	 * You can safetly ignore all offset_of-related warnings.
+	/**
+	 * This struct is considered as non-POD when compiling by g++.
+	 * You can safely ignore all offset_of-related warnings.
 	 * See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
 	 */
 	void (*f) (va_list);
 	va_list f_data;
-	uint32_t flags;
-	void *fls[FIBER_KEY_MAX]; /* fiber local storage */
+	/** Fiber local storage */
+	void *fls[FIBER_KEY_MAX];
+	/** Exception which caused this fiber's death. */
+	class Exception *exception;
 };
 
 enum { FIBER_CALL_STACK = 16 };
@@ -145,13 +170,8 @@ struct cord {
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
 	struct ev_loop *loop;
-	/** Call stack - in case one fiber decides to call
-	 * another with fiber_call(). This is not used
-	 * currently, all fibers are called by the sched
-         */
-	struct fiber *stack[FIBER_CALL_STACK];
-	/** Stack pointer in fiber call stack. */
-	struct fiber **sp;
+	/** Depth of the fiber call stack. */
+	int call_stack_depth;
 	/**
 	 * Every new fiber gets a new monotonic id. Ids 1-100 are
 	 * reserved.
@@ -161,11 +181,11 @@ struct cord {
 	/** A helper hash to map id -> fiber. */
 	struct mh_i32ptr_t *fiber_registry;
 	/** All fibers */
-	struct rlist fibers;
-	/** A cache of dead fibers for reuse */
-	struct rlist zombie_fibers;
+	struct rlist alive;
 	/** Fibers, ready for execution */
-	struct rlist ready_fibers;
+	struct rlist ready;
+	/** A cache of dead fibers for reuse */
+	struct rlist dead;
 	/** A watcher to have a single async event for all ready fibers.
 	 * This technique is necessary to be able to suspend
 	 * a single fiber on a few watchers (for example,
@@ -178,9 +198,6 @@ struct cord {
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
 	char name[FIBER_NAME_MAX];
-	/** Last thrown exception */
-	class Exception *exception;
-	size_t exception_size;
 };
 
 extern __thread struct cord *cord_ptr;
@@ -303,7 +320,20 @@ fiber_testcancel(void);
  * @return previous state.
  */
 bool
-fiber_setcancellable(bool yesno);
+fiber_set_cancellable(bool yesno);
+
+/**
+ * Make a fiber joinable (false by default).
+ */
+void
+fiber_set_joinable(struct fiber *fiber, bool yesno);
+
+/**
+ * Wait till the argument fiber ends execution.
+ * The fiber must not be detached (set fiber_set_joinable()).
+ */
+void
+fiber_join(struct fiber *f);
 
 void
 fiber_sleep(ev_tstamp s);
@@ -349,5 +379,27 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** Report libev time (cheap). */
+inline double
+fiber_time(void)
+{
+	return ev_now(loop());
+}
+
+/** Report libev time as 64-bit integer */
+inline uint64_t
+fiber_time64(void)
+{
+	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

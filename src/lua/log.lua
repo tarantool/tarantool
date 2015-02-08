@@ -22,6 +22,7 @@ ffi.cdef[[
 ]]
 
 local function say(level, fmt, ...)
+    local debug = require('debug')
     local str = string.format(fmt, ...)
     local frame = debug.getinfo(3, "Sl")
     local line = 0

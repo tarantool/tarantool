@@ -10,6 +10,7 @@
 #include <tarantool.h>
 #include "lua/bsdsocket.h"
 #include "lua/digest.h"
+#include "fiber.h"
 #include "base64.h"
 #include "random.h"
 #include <lib/salad/guava.h>
@@ -56,4 +57,6 @@ void *ffi_symbols[] = {
 	(void *) SHA1internal,
 	(void *) guava,
 	(void *) random_bytes,
+	(void *) fiber_time,
+	(void *) fiber_time64
 };

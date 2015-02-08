@@ -162,8 +162,7 @@ struct slab_cache {
 };
 
 void
-slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
-		  uint32_t order0_size);
+slab_cache_create(struct slab_cache *cache, struct slab_arena *arena);
 
 void
 slab_cache_destroy(struct slab_cache *cache);

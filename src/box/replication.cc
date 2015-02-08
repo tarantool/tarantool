@@ -685,9 +685,6 @@ replication_relay_subscribe(struct recovery_state *r)
 	r->server_id = r->relay.server_id;
 
 	recovery_follow_local(r, 0.1);
-	ev_run(loop(), 0);
-
-	say_crit("exiting the relay loop");
 }
 
 /** The main loop of replication client service process. */
@@ -748,7 +745,6 @@ replication_relay_loop(struct relay *relay)
 	sio_setfl(relay->sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
-	int rc = EXIT_SUCCESS;
 	struct recovery_state *r = NULL;
 	try {
 		r = recovery_new(cfg_snap_dir, cfg_wal_dir,
@@ -759,9 +755,10 @@ replication_relay_loop(struct relay *relay)
 		replication_relay_subscribe(r);
 	} catch (Exception *e) {
 		say_error("relay error: %s", e->errmsg());
-		rc = EXIT_FAILURE;
+		if (r)
+			recovery_delete(r);
+		exit(EXIT_FAILURE);
 	}
-	if (r)
-		recovery_delete(r);
-	exit(rc);
+	/** Return control back to the sched. */
+	fiber_yield();
 }

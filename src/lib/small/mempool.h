@@ -33,6 +33,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "small/slab_cache.h"
+#include "small/lifo.h"
 #define RB_COMPACT 1
 #include "third_party/rb.h"
 
@@ -86,10 +87,11 @@ struct mslab {
 };
 
 /**
- * Mempool will try to allocate blocks large enough to have overhead
- * less than specified below
+ * Mempool will try to allocate blocks large enough to ensure
+ * the overhead from internal fragmentation is less than the
+ * specified below.
  */
-static const double expected_overhead_max = 0.05;
+static const double OVERHEAD_RATIO = 0.01;
 
 static inline uint32_t
 mslab_sizeof()
@@ -114,6 +116,14 @@ typedef rb_tree(struct mslab) mslab_tree_t;
 /** A memory pool. */
 struct mempool
 {
+	/**
+	 * A link in delayed free list of pools. Must be the first
+	 * member in the struct.
+	 * @sa smfree_delayed().
+	 */
+	struct lifo link;
+	/** List of pointers for delayed free. */
+	struct lifo delayed;
 	/** The source of empty slabs. */
 	struct slab_cache *cache;
 	/** All slabs. */
@@ -191,16 +201,18 @@ static inline void
 mempool_create(struct mempool *pool, struct slab_cache *cache,
 	       uint32_t objsize)
 {
-	size_t expected_loss = objsize > sizeof(struct mslab)
-		? objsize : sizeof(struct mslab);
-	size_t slab_size_min = (size_t)(expected_loss / expected_overhead_max);
-
+	size_t overhead = (objsize > sizeof(struct mslab) ?
+			   objsize : sizeof(struct mslab));
+	size_t slab_size = (size_t) (overhead / OVERHEAD_RATIO);
+	if (slab_size > cache->arena->slab_size)
+		slab_size = cache->arena->slab_size;
 	/*
 	 * Calculate the amount of usable space in a slab.
 	 * @note: this asserts that slab_size_min is less than
 	 * SLAB_ORDER_MAX.
 	 */
-	uint8_t order = slab_order(cache, slab_size_min);
+	uint8_t order = slab_order(cache, slab_size);
+	assert(order <= cache->order_max);
 	return mempool_create_with_order(pool, cache, objsize, order);
 }
 

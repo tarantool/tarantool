@@ -1,0 +1,10 @@
+(null): fiber `cancel' has been cancelled
+(null): fiber `cancel': exiting
+(null): SystemError Failed to allocate 42 bytes in allocator for exception: Cannot allocate memory
+(null): SystemError Failed to allocate 42 bytes in allocator for exception: Cannot allocate memory
+	*** fiber_join_test ***
+# exception propagated
+# cancel dead has started
+# by this time the fiber should be dead already
+	*** fiber_join_test: done ***
+ 

@@ -32,11 +32,12 @@
 #include <stdarg.h>
 #include "say.h"
 
-struct cord;
-
 enum { TNT_ERRMSG_MAX = 512 };
 
 class Exception: public Object {
+protected:
+	/** Allocated size. */
+	size_t size;
 public:
 	void *operator new(size_t size);
 	void operator delete(void*);
@@ -55,11 +56,26 @@ public:
 	virtual void log() const;
 	virtual ~Exception() {}
 
-	static void init(struct cord *cord);
+	static void init(Exception **what)
+	{
+		*what = NULL;
+	}
 	/** Clear the last error saved in the current thread's TLS */
-	static void cleanup(struct cord *cord);
+	static inline void cleanup(Exception **what)
+	{
+		if (*what != NULL && (*what)->size > 0) {
+			(*what)->~Exception();
+			free(*what);
+		}
+		Exception::init(what);
+	}
 	/** Move an exception from one thread to another. */
-	static void move(struct cord *from, struct cord *to);
+	static void move(Exception **from, Exception **to)
+	{
+		Exception::cleanup(to);
+		*to = *from;
+		Exception::init(from);
+	}
 protected:
 	Exception(const char *file, unsigned line);
 	/* The copy constructor is needed for C++ throw */

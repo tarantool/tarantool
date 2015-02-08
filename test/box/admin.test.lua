@@ -19,13 +19,18 @@ end;
 
 function test_box_info()
     local tmp = box.info()
-    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime'}
-    local str = {'status' }
+    local num = {'pid', 'snapshot_pid', 'uptime'}
+    local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.server, 'table') == false then
         table.insert(failed1, 'box.info().server')
     else
         tmp.server = nil
+    end
+    if check_type(tmp.replication, 'table') == false then
+        table.insert(failed1, 'box.info().replication')
+    else
+        tmp.replication = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then
@@ -49,13 +54,13 @@ function test_box_info()
 end;
 
 function test_slab(tbl)
-    local num = {'items', 'bytes_used', 'item_size', 'slabs', 'bytes_free'}
+    local num = {'item_size', 'item_count', 'slab_size', 'slab_count', 'mem_used', 'mem_free'}
     local failed = {}
     for k, v in ipairs(num) do
-        if check_type(tmp[v], 'number') == false then
+        if check_type(tbl[v], 'number') == false then
             table.insert(failed, 'box.slab.info().<slab_size>.'..v)
         else
-            tmp[v] = nil
+            tbl[v] = nil
         end
     end
     if #tbl > 0 or #failed > 0 then

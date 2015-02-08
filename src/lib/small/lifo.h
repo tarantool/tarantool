@@ -65,6 +65,12 @@ lifo_pop(struct lifo *head)
 	return elem;
 }
 
+static inline void *
+lifo_peek(struct lifo *head)
+{
+	return head->next;
+}
+
 static inline bool
 lifo_is_empty(struct lifo *head)
 {

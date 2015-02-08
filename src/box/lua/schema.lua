@@ -79,7 +79,7 @@ local function role_resolve(name_or_id)
     local tuple
     if type(name_or_id) == 'string' then
         tuple = _user.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) ~= 'nil' then
         tuple = _user:get{name_or_id}
     end
     if tuple == nil or tuple[4] ~= 'role' then
@@ -94,7 +94,7 @@ local function user_resolve(name_or_id)
     local tuple
     if type(name_or_id) == 'string' then
         tuple = _user.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) ~= 'nil' then
         tuple = _user:get{name_or_id}
     end
     if tuple == nil or tuple[4] ~= 'user' then
@@ -1003,10 +1003,10 @@ end
 
 function box.schema.func.exists(name_or_id)
     local _func = box.space[box.schema.FUNC_ID]
-    local tuple 
+    local tuple = nil
     if type(name_or_id) == 'string' then
         tuple = _func.index.name:get{name_or_id}
-    else
+    elseif type(name_or_id) == 'number' then
         tuple = _func:get{name_or_id}
     end
     return tuple ~= nil
@@ -1021,14 +1021,29 @@ box.schema.user.password = function(password)
     return ffi.string(buf)
 end
 
-box.schema.user.passwd = function(new_password)
-    local uid = session.uid()
+local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
-    box.session.su('admin')
     _user:update({uid}, {{"=", 5, auth_mech_list}})
-    box.session.su(uid)
+end
+
+box.schema.user.passwd = function(name, new_password)
+    if name == nil then
+        error('Usage: box.schema.user.passwd([user,] password)')
+    end
+    if new_password == nil then
+        -- change password for current user
+        new_password = name
+        box.session.su('admin', chpasswd, session.uid(), new_password)
+    else
+        -- change password for other user
+        local uid = user_resolve(name)
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, name)
+        end
+        return chpasswd(uid, new_password)
+    end
 end
 
 box.schema.user.create = function(name, opts)

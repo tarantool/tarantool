@@ -53,9 +53,8 @@ lbox_raise(lua_State *L)
 	int top = lua_gettop(L);
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
-		if (cord()->exception == NULL)
-			return 0;
-		cord()->exception->raise();
+		if (fiber()->exception)
+			fiber()->exception->raise();
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
 		code = lua_tointeger(L, 2);

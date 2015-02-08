@@ -972,13 +972,13 @@ local function tcp_connect(host, port, timeout)
 end
 
 local function tcp_server_handler(server, sc, from)
-    fiber.name(sprintf("%s/client/%s:%s", server.name, from.host, from.port))
+    fiber.name(sprintf("%s/%s:%s", server.name, from.host, from.port))
     server.handler(sc, from)
     sc:close()
 end
 
 local function tcp_server_loop(server, s, addr)
-    fiber.name(sprintf("%s/listen/%s:%s", server.name, addr.host, addr.port))
+    fiber.name(sprintf("%s/%s:%s", server.name, addr.host, addr.port))
     while s:readable() do
         local sc, from = s:accept()
         if sc == nil then

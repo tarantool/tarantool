@@ -467,6 +467,7 @@ user_cache_init()
 	struct user *user = user_cache_replace(&def);
 	/* 0 is the auth token and user id by default. */
 	assert(user->uid == GUEST && user->auth_token == GUEST);
+	(void)user;
 
 	memset(&def, 0, sizeof(def));
 	snprintf(def.name, sizeof(def.name), "admin");

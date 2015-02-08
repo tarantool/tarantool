@@ -51,4 +51,7 @@ recovery_set_remote(struct recovery_state *r, const char *source);
 bool
 recovery_has_remote(struct recovery_state *r);
 
+void
+recovery_init_remote(struct recovery_state *r);
+
 #endif /* TARANTOOL_REPLICA_H_INCLUDED */

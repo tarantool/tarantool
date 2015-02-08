@@ -32,7 +32,7 @@ free_checked(int *ptr)
 	int pos = ptr[0];
 	fail_unless(ptrs[pos] == ptr);
 	ptrs[pos][0] = ptrs[pos][ptr[1]/sizeof(int)-1] = INT_MAX;
-	smfree(&alloc, ptrs[pos]);
+	smfree(&alloc, ptrs[pos], ptrs[pos][1]);
 	ptrs[pos] = NULL;
 }
 
@@ -98,7 +98,7 @@ int main()
 
 	slab_arena_create(&arena, &quota, 0, 4000000,
 			  MAP_PRIVATE);
-	slab_cache_create(&cache, &arena, 0);
+	slab_cache_create(&cache, &arena);
 
 	small_alloc_basic();
 

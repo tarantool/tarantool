@@ -39,7 +39,7 @@ local function format(status, ...)
         if status then
             return err
         else
-            err = 'console: an exception occurred during formatting result: '..
+            err = 'console: an exception occurred when formatting the output: '..
                 tostring(err)
         end
     else
@@ -164,7 +164,6 @@ local function client_print(self, output)
     elseif not output then
         -- disconnect peer
         local peer = self.client:peer()
-        log.info("client %s:%s disconnected", peer.host, peer.port)
         self.client:shutdown()
         self.client:close()
         self.client = nil

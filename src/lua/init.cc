@@ -74,6 +74,7 @@ extern char uuid_lua[],
 	fun_lua[],
 	digest_lua[],
 	init_lua[],
+	fiber_lua[],
 	log_lua[],
 	uri_lua[],
 	bsdsocket_lua[],
@@ -86,6 +87,7 @@ extern char uuid_lua[],
 
 static const char *lua_modules[] = {
 	"tarantool", init_lua,
+	"fiber", fiber_lua,
 	"msgpackffi", msgpackffi_lua,
 	"fun", fun_lua,
 	"digest", digest_lua,
@@ -383,8 +385,9 @@ char *history = NULL;
 extern "C" const char *
 tarantool_error_message(void)
 {
-	assert(cord()->exception != NULL); /* called only from error handler */
-	return cord()->exception->errmsg();
+	/* called only from error handler */
+	assert(fiber()->exception != NULL);
+	return fiber()->exception->errmsg();
 }
 
 /**

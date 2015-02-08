@@ -21,9 +21,9 @@ box.cfg
 - snapshot_count: 6
   too_long_threshold: 0.5
   slab_alloc_factor: 2
-  slab_alloc_minimal: 64
+  slab_alloc_maximal: 1048576
   background: false
-  readahead: 16320
+  slab_alloc_arena: 0.1
   sophia:
     page_size: 131072
     threads: 5
@@ -33,16 +33,17 @@ box.cfg
   logger_nonblock: true
   snap_dir: .
   coredump: false
+  slab_alloc_minimal: 64
   sophia_dir: .
   wal_mode: write
-  snapshot_period: 0
+  wal_dir: .
   panic_on_snap_error: true
   panic_on_wal_error: false
   log_level: 5
-  wal_dir: .
+  readahead: 16320
   pid_file: tarantool.pid
   rows_per_wal: 50
-  slab_alloc_arena: 0.1
+  snapshot_period: 0
   wal_dir_rescan_delay: 0.1
 ...
 space:insert{1, 'tuple'}
@@ -66,13 +67,18 @@ end;
 ...
 function test_box_info()
     local tmp = box.info()
-    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime'}
-    local str = {'status' }
+    local num = {'pid', 'snapshot_pid', 'uptime'}
+    local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.server, 'table') == false then
         table.insert(failed1, 'box.info().server')
     else
         tmp.server = nil
+    end
+    if check_type(tmp.replication, 'table') == false then
+        table.insert(failed1, 'box.info().replication')
+    else
+        tmp.replication = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then
@@ -97,13 +103,13 @@ end;
 ---
 ...
 function test_slab(tbl)
-    local num = {'items', 'bytes_used', 'item_size', 'slabs', 'bytes_free'}
+    local num = {'item_size', 'item_count', 'slab_size', 'slab_count', 'mem_used', 'mem_free'}
     local failed = {}
     for k, v in ipairs(num) do
-        if check_type(tmp[v], 'number') == false then
+        if check_type(tbl[v], 'number') == false then
             table.insert(failed, 'box.slab.info().<slab_size>.'..v)
         else
-            tmp[v] = nil
+            tbl[v] = nil
         end
     end
     if #tbl > 0 or #failed > 0 then

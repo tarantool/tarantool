@@ -46,33 +46,47 @@ extern "C" {
 static int
 small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 {
+	/** Don't publish information about empty slabs. */
+	if (stats->slabcount == 0)
+		return 0;
+
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
 	/*
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
-	lua_pushnumber(L, stats->objsize);
+	/** Assign next slab size to the next member of an array. */
+	lua_pushnumber(L, lua_objlen(L, -1) + 1);
 	lua_newtable(L);
+	/**
+	 * This is in fact only to force YaML flow "compact" for this
+	 * table.
+	 */
+	luaL_setmaphint(L, -1);
 
-	lua_pushstring(L, "slabs");
-	luaL_pushnumber64(L, stats->slabcount);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "items");
-	luaL_pushnumber64(L, stats->objcount);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "bytes_used");
+	lua_pushstring(L, "mem_used");
 	luaL_pushnumber64(L, stats->totals.used);
 	lua_settable(L, -3);
 
-	lua_pushstring(L, "bytes_free");
+	lua_pushstring(L, "slab_size");
+	luaL_pushnumber64(L, stats->slabsize);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "mem_free");
 	luaL_pushnumber64(L, stats->totals.total - stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
 	luaL_pushnumber64(L, stats->objsize);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "slab_count");
+	luaL_pushnumber64(L, stats->slabcount);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "item_count");
+	luaL_pushnumber64(L, stats->objcount);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
@@ -89,7 +103,6 @@ lbox_slab_info(struct lua_State *L)
 	lua_newtable(L);
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
-	luaL_setmaphint(L, -1);
 	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
 	lua_settable(L, -3);
 
