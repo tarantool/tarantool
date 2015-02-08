@@ -340,7 +340,7 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
               Returns: (type = tuple) the inserted tuple.
             </para>
             <para>
-              Possible errors: If a tuple with the same primary key already exists, returns ER_TUPLE_FOUND.
+              Possible errors: If a tuple with the same unique-key value already exists, returns ER_TUPLE_FOUND.
             </para>
             <para>
               Example: <code>box.space.tester:insert{5000,'tuple number five thousand'}</code>.
@@ -632,6 +632,10 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             </para>
             <para>
             Returns: (type = tuple) the inserted tuple.
+            </para>
+            <para>
+            Possible errors: If a different tuple with the same unique-key value already exists, returns ER_TUPLE_FOUND.
+            (This would only happen if there was a secondary index. By default secondary indexes are unique.)
             </para>
             <para>
               Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
