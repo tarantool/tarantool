@@ -1282,7 +1282,7 @@ the status is dead because the cancel worked.<programlisting>
                 Parameters: <code>message</code>, <code>timeout</code>.
             </para>
             <para>
-                Returns: If <code>timeout</code> is provided,
+                Returns: (type = boolean) If <code>timeout</code> is provided,
                 and the channel doesn't become empty for the duration
                 of the timeout,
                 <code>channel:put()</code>
@@ -1350,6 +1350,17 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
+    <term><emphasis role="lua"><replaceable>channel</replaceable>:count()</emphasis></term>
+    <listitem>
+        <para>
+           Find out how many messages are on the channel. The answer is 0 if the channel is empty.
+        </para>
+        <para>
+           Returns: (type = number) the number of messages.
+        </para>
+    </listitem>
+    </varlistentry>
+     <varlistentry>
         <term><emphasis role="lua"><replaceable>channel</replaceable>:is_full()</emphasis></term>
         <listitem>
             <para>
