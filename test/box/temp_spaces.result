@@ -59,7 +59,8 @@ box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ''}})
 ---
-- error: 'Can''t modify space 512: can not switch temporary flag on a non-empty space'
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
+    space'
 ...
 --# stop server default
 --# start server default
@@ -122,7 +123,8 @@ box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
-- error: 'Can''t modify space 512: can not switch temporary flag on a non-empty space'
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
+    space'
 ...
 s:delete{1}
 ---

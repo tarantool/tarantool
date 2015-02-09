@@ -66,7 +66,7 @@ s:drop()
 -- gh-436: No error when creating temporary sophia space
 s = box.schema.create_space('tester',{engine='sophia', temporary=true})
 ---
-- error: 'Can''t modify space 512: space does not support temporary flag'
+- error: 'Can''t modify space ''tester'': space does not support temporary flag'
 ...
 -- gh-432: Sophia: ignored limit
 s = box.schema.create_space('tester',{id = 89, engine='sophia'})

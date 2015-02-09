@@ -423,7 +423,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * Plus, implicit locks are evil.
 	 */
 	if (space->on_replace == space_alter_on_replace)
-		tnt_raise(ER_ALTER, space_id(space));
+		tnt_raise(ER_ALTER_SPACE, space_name(space));
 #endif
 	alter->old_space = old_space;
 	alter->space_def = old_space->def;
@@ -498,12 +498,12 @@ ModifySpace::prepare(struct alter_space *alter)
 {
 	if (def.id != space_id(alter->old_space))
 		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  (unsigned) space_id(alter->old_space),
+			  space_name(alter->old_space),
 			  "space id is immutable");
 
 	if (strcmp(def.engine_name, alter->old_space->def.engine_name) != 0)
 		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  (unsigned) space_id(alter->old_space),
+			  space_name(alter->old_space),
 			  "can not change space engine");
 
 	engine_recovery *recovery =
@@ -515,21 +515,21 @@ ModifySpace::prepare(struct alter_space *alter)
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  (unsigned) def.id,
+			  space_name(alter->old_space),
 			  "can not change field count on a non-empty space");
 	}
 
 	Engine *engine = alter->old_space->handler->engine;
 	if (def.temporary && !engine_can_be_temporary(engine->flags)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  (unsigned) def.id,
+			  space_name(alter->old_space),
 			  "space does not support temporary flag");
 	}
 	if (def.temporary != alter->old_space->def.temporary &&
 	    recovery->state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  (unsigned) space_id(alter->old_space),
+			  space_name(alter->old_space),
 			  "can not switch temporary flag on a non-empty space");
 	}
 }
@@ -583,13 +583,13 @@ DropIndex::alter(struct alter_space *alter)
 	 */
 	if (space_is_system(alter->new_space))
 		tnt_raise(ClientError, ER_LAST_DROP,
-			  space_id(alter->new_space));
+			  space_name(alter->new_space));
 	/*
 	 * Can't drop primary key before secondary keys.
 	 */
 	if (alter->new_space->index_count) {
 		tnt_raise(ClientError, ER_DROP_PRIMARY_KEY,
-			  (unsigned) alter->new_space->def.id);
+			  space_name(alter->new_space));
 	}
 	/*
 	 * OK to drop the primary key. Put the space back to
@@ -1011,12 +1011,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
-				  (unsigned) space_id(old_space),
+				  space_name(old_space),
 				  "the space has indexes");
 		}
 		if (schema_find_grants("space", old_space->def.id)) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
-				  (unsigned) space_id(old_space),
+				  space_name(old_space),
 				  "the space has grants");
 		}
 		/* @todo lock space metadata until commit. */

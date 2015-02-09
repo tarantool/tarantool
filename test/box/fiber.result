@@ -141,7 +141,7 @@ space:insert{1953719668, 'old', 1684234849}
 -- test that insert produces a duplicate key error
 space:insert{1953719668, 'old', 1684234849}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in index 'primary'
 ...
 space:update(1953719668, {{'=', 1, 1936941424}, {'=', 2, 'new'}})
 ---
