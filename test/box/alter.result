@@ -60,22 +60,22 @@ _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 --
 _space:delete{_space.id}
 ---
-- error: 'Can''t drop space 280: the space has indexes'
+- error: 'Can''t drop space ''_space'': the space has indexes'
 ...
 _space:delete{_index.id}
 ---
-- error: 'Can''t drop space 288: the space has indexes'
+- error: 'Can''t drop space ''_index'': the space has indexes'
 ...
 --
 -- Can't change properties of a space
 --
 _space:update({_space.id}, {{'+', 1, 1}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: 'Can''t modify space ''_space'': space id is immutable'
 ...
 _space:update({_space.id}, {{'+', 1, 2}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: 'Can''t modify space ''_space'': space id is immutable'
 ...
 --
 -- Create a space
@@ -175,7 +175,7 @@ _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
 ---
-- error: Can't drop the primary key in a system space, space id 288
+- error: Can't drop the primary key in a system space, space '_index'
 ...
 _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 ---

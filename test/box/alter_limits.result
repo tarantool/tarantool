@@ -97,17 +97,19 @@ s:drop()
 -- too long space name
 box.schema.create_space(string.rep('tweedledee', 100))
 ---
-- error: 'Failed to create space 512: space name is too long'
+- error: 'Failed to create space ''tweedledeetweedledeetweedledeetw'': space name
+    is too long'
 ...
 -- too long space engine name
 box.schema.create_space('tweedleedee', { engine = string.rep('too-long', 100) })
 ---
-- error: 'Failed to create space 512: space engine name is too long'
+- error: 'Failed to create space ''tweedleedee'': space engine name is too long'
 ...
 -- space name limit
 box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
 ---
-- error: 'Failed to create space 512: space name is too long'
+- error: 'Failed to create space ''tttttttttttttttttttttttttttttttt'': space name
+    is too long'
 ...
 s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
 ---
@@ -196,7 +198,8 @@ box.space['tweedledum']
 -- rename space - bad name
 s:rename(string.rep('t', box.schema.NAME_MAX * 2))
 ---
-- error: 'Can''t modify space 512: space name is too long'
+- error: 'Can''t modify space ''tttttttttttttttttttttttttttttttt'': space name is
+    too long'
 ...
 s.name
 ---
@@ -239,7 +242,7 @@ index = s:create_index('primary')
 -- field_count actually works
 s:insert{1}
 ---
-- error: Tuple field count 1 does not match space 512 field count 2
+- error: Tuple field count 1 does not match space 'test' field count 2
 ...
 s:insert{1, 2}
 ---
@@ -247,7 +250,7 @@ s:insert{1, 2}
 ...
 s:insert{1, 2, 3}
 ---
-- error: Tuple field count 3 does not match space 512 field count 2
+- error: Tuple field count 3 does not match space 'test' field count 2
 ...
 s:select{}
 ---
@@ -259,7 +262,8 @@ FIELD_COUNT = 4
 -- increase field_count -- error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 ---
-- error: 'Can''t modify space 512: can not change field count on a non-empty space'
+- error: 'Can''t modify space ''test'': can not change field count on a non-empty
+    space'
 ...
 s:select{}
 ---
@@ -268,7 +272,8 @@ s:select{}
 -- decrease field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 1}})
 ---
-- error: 'Can''t modify space 512: can not change field count on a non-empty space'
+- error: 'Can''t modify space ''test'': can not change field count on a non-empty
+    space'
 ...
 -- remove field_count - ok
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
@@ -282,7 +287,8 @@ s:select{}
 -- increase field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 ---
-- error: 'Can''t modify space 512: can not change field count on a non-empty space'
+- error: 'Can''t modify space ''test'': can not change field count on a non-empty
+    space'
 ...
 s:truncate()
 ---
@@ -303,7 +309,7 @@ s:select{}
 -- field_count actually works
 s:insert{3, 4}
 ---
-- error: Tuple field count 2 does not match space 512 field count 3
+- error: Tuple field count 2 does not match space 'test' field count 3
 ...
 s:insert{3, 4, 5}
 ---
@@ -311,7 +317,7 @@ s:insert{3, 4, 5}
 ...
 s:insert{3, 4, 5, 6}
 ---
-- error: Tuple field count 4 does not match space 512 field count 3
+- error: Tuple field count 4 does not match space 'test' field count 3
 ...
 s:insert{7, 8, 9}
 ---
@@ -366,28 +372,31 @@ for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
 -- unknown index type
 index = s:create_index('test', { type = 'nosuchtype' })
 ---
-- error: Unsupported index type supplied for index 1 in space 512
+- error: Unsupported index type supplied for index 'test' in space 'test'
 ...
 -- hash index is not unique
 index = s:create_index('test', { type = 'hash', unique = false })
 ---
-- error: 'Can''t create or modify index 1 in space 512: HASH index must be unique'
+- error: 'Can''t create or modify index ''test'' in space ''test'': HASH index must
+    be unique'
 ...
 -- bitset index is unique
 index = s:create_index('test', { type = 'bitset', unique = true })
 ---
-- error: 'Can''t create or modify index 1 in space 512: BITSET can not be unique'
+- error: 'Can''t create or modify index ''test'' in space ''test'': BITSET can not
+    be unique'
 ...
 -- bitset index is multipart
 index = s:create_index('test', { type = 'bitset', parts = {1, 'num', 2, 'num'}})
 ---
-- error: 'Can''t create or modify index 1 in space 512: BITSET index key can not be
-    multipart'
+- error: 'Can''t create or modify index ''test'' in space ''test'': BITSET index key
+    can not be multipart'
 ...
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
 ---
-- error: 'Can''t create or modify index 1 in space 512: part count must be positive'
+- error: 'Can''t create or modify index ''test'' in space ''test'': part count must
+    be positive'
 ...
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = { 1 }})
@@ -398,7 +407,8 @@ index = s:create_index('test', { type = 'hash', parts = { 1 }})
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
 ---
-- error: 'Can''t create or modify index 1 in space 512: unknown field type'
+- error: 'Can''t create or modify index ''test'' in space ''test'': unknown field
+    type'
 ...
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
@@ -409,15 +419,18 @@ index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 -- big field no
 index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'num' }})
 ---
-- error: 'Can''t create or modify index 1 in space 512: field no is too big'
+- error: 'Can''t create or modify index ''test'' in space ''test'': field no is too
+    big'
 ...
 index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX - 1, 'num' }})
 ---
-- error: 'Can''t create or modify index 1 in space 512: field no is too big'
+- error: 'Can''t create or modify index ''test'' in space ''test'': field no is too
+    big'
 ...
 index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX + 90, 'num' }})
 ---
-- error: 'Can''t create or modify index 1 in space 512: field no is too big'
+- error: 'Can''t create or modify index ''test'' in space ''test'': field no is too
+    big'
 ...
 index = s:create_index('test', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX + 1, 'num' }})
 ---
@@ -438,7 +451,8 @@ s = box.schema.create_space('test')
 -- same part can't be indexed twice
 index = s:create_index('t1', { type = 'hash', parts = { 1, 'num', 1, 'str' }})
 ---
-- error: 'Can''t create or modify index 0 in space 512: same key part is indexed twice'
+- error: 'Can''t create or modify index ''t1'' in space ''test'': same key part is
+    indexed twice'
 ...
 -- a lot of key parts
 parts = {}
@@ -457,7 +471,7 @@ end;
 ...
 index = s:create_index('t1', { type = 'hash', parts = parts});
 ---
-- error: 'Can''t create or modify index 0 in space 512: too many key parts'
+- error: 'Can''t create or modify index ''t1'' in space ''test'': too many key parts'
 ...
 parts = {};
 ---
@@ -496,8 +510,8 @@ index = s:create_index('t1', { type = 'hash' })
 -- field type contradicts field type of another index
 index = s:create_index('t2', { type = 'hash', parts = { 1, 'str' }})
 ---
-- error: Ambiguous field type in index 1, key part 0. Requested type is STR but the
-    field has previously been defined as NUM
+- error: Ambiguous field type in index 't2', key part 0. Requested type is STR but
+    the field has previously been defined as NUM
 ...
 -- ok
 index = s:create_index('t2', { type = 'hash', parts = { 2, 'str' }})
@@ -506,7 +520,7 @@ index = s:create_index('t2', { type = 'hash', parts = { 2, 'str' }})
 -- don't allow drop of the primary key in presence of other keys
 s.index[0]:drop()
 ---
-- error: Can't drop primary key in space 512 while secondary keys exist
+- error: Can't drop primary key in space 'test' while secondary keys exist
 ...
 -- cleanup
 s:drop()
@@ -579,7 +593,8 @@ s.index.new.name
 -- too long name
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
 ---
-- error: 'Can''t create or modify index 0 in space 512: index name is too long'
+- error: 'Can''t create or modify index ''tttttttttttttttttttttttttttttttt_'' in space
+    ''test'': index name is too long'
 ...
 s.index[0].name
 ---
@@ -624,12 +639,14 @@ s.index.primary.alter({unique=false})
 ...
 s.index.primary:alter({unique=false})
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': primary key
+    must be unique'
 ...
 -- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': primary key must
+    be unique'
 ...
 --# push filter 'function: .*' to 'function <pointer>'
 s.index.primary
@@ -776,8 +793,8 @@ box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
 -- ambiguous field type
 index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 ---
-- error: Ambiguous field type in index 2, key part 0. Requested type is STR but the
-    field has previously been defined as NUM
+- error: Ambiguous field type in index 'str', key part 0. Requested type is STR but
+    the field has previously been defined as NUM
 ...
 -- create index on a non-existing field
 index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'str'}})
@@ -815,7 +832,8 @@ s = box.schema.create_space('test')
 -- primary key must be unique
 index = s:create_index('primary', { unique = false })
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': primary key
+    must be unique'
 ...
 -- create primary key
 index = s:create_index('primary', { type = 'hash' })
