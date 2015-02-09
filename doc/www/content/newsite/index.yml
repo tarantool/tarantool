@@ -80,12 +80,12 @@ blocks  :
           end
 
           local function handler(self)
-              local host = self.req.peer.host
+              local host = self.peer.host
               local response = {
                   host = host;
                   counter = hosts:inc(host);
               }
-              self:render{ json = response }
+              return self:render{ json = response }
           end
 
           httpd = require('http.server')
