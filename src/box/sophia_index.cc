@@ -322,7 +322,7 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		if (errcode) {
 			if (dup_tuple)
 				tuple_unref(dup_tuple);
-			tnt_raise(ClientError, errcode, index_id(this));
+			tnt_raise(ClientError, errcode, index_name(this));
 		}
 		int rc;
 		rc = sophia_index_stmt(engine->tx, db, 0, key_def, new_tuple);

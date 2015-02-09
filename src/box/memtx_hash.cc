@@ -297,7 +297,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_id(this));
+			tnt_raise(ClientError, errcode, index_name(this));
 		}
 
 		if (dup_tuple)
