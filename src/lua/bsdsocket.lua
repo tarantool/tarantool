@@ -958,11 +958,7 @@ local function tcp_connect(host, port, timeout)
     local stop = box.time() + timeout
     local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
-    if dns == nil then
-        return nil
-    end
-
-    if #dns == 0 then
+    if dns == nil or #dns == 0 then
         box.errno(box.errno.EINVAL)
         return nil
     end
@@ -977,6 +973,7 @@ local function tcp_connect(host, port, timeout)
             return s
         end
     end
+    -- errno is set by tcp_connect_remote()
     return nil
 end
 
