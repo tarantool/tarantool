@@ -270,12 +270,25 @@ SophiaEngine::begin(struct txn *txn, struct space *space)
 	assert(tx != NULL);
 }
 
+static inline void
+sophia_txn_gc(struct txn *txn)
+{
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (! stmt->new_tuple)
+			continue;
+		assert(stmt->new_tuple->refs >= 2);
+		tuple_unref(stmt->new_tuple);
+	}
+}
+
 void
 SophiaEngine::commit(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
+		sophia_txn_gc(txn);
 		tx = NULL;
 	});
 	/* commit transaction using transaction
@@ -292,11 +305,12 @@ SophiaEngine::commit(struct txn *txn)
 }
 
 void
-SophiaEngine::rollback(struct txn *)
+SophiaEngine::rollback(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
+		sophia_txn_gc(txn);
 		tx = NULL;
 	});
 	sp_rollback(tx);
