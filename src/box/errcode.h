@@ -54,7 +54,7 @@ struct errcode_record {
 	/*  0 */_(ER_UNKNOWN,			2, "Unknown error") \
 	/*  1 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  2 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
-	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in index '%s'") \
+	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index '%s'") \
 	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
