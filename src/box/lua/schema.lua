@@ -22,6 +22,8 @@ ffi.cdef[[
     };
     size_t
     boxffi_index_len(uint32_t space_id, uint32_t index_id);
+    size_t
+    boxffi_index_memsize(uint32_t space_id, uint32_t index_id);
     struct tuple *
     boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
     struct iterator *
@@ -566,6 +568,14 @@ function box.schema.space.bless(space)
     -- __len and __index
     index_mt.len = function(index)
         local ret = builtin.boxffi_index_len(index.space_id, index.id)
+        if ret == -1 then
+            box.error()
+        end
+        return tonumber(ret)
+    end
+    -- index.memsize
+    index_mt.memsize = function(index)
+        local ret = builtin.boxffi_index_memsize(index.space_id, index.id)
         if ret == -1 then
             box.error()
         end

@@ -33,6 +33,7 @@ void *ffi_symbols[] = {
 	(void *) tuple_ref_nothrow,
 	(void *) tuple_unref,
 	(void *) boxffi_index_len,
+	(void *) boxffi_index_memsize,
 	(void *) boxffi_index_random,
 	(void *) boxffi_index_iterator,
 	(void *) boxffi_tuple_update,
