@@ -12,6 +12,6 @@ try:
 except:
     print "Expected error:", sys.exc_info()[0]
 else:
-    print "Error! exception did not occured"
+    print "Error! exception did not occur"
 
 
