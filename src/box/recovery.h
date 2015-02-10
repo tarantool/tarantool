@@ -61,14 +61,6 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
-/** State of a replication relay. */
-struct relay {
-	/** Replica connection */
-	int sock;
-	/* Request sync */
-	uint64_t sync;
-};
-
 enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
 /** State of a replication connection to the master */
@@ -101,12 +93,7 @@ struct recovery_state {
 	 * locally or send to the replica.
 	 */
 	struct fiber *watcher;
-	union {
-		/** slave->master state */
-		struct remote remote;
-		/** master->slave state */
-		struct relay relay;
-	};
+	struct remote remote;
 	/**
 	 * apply_row is a module callback invoked during initial
 	 * recovery and when reading rows from the master.

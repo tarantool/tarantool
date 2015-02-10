@@ -29,9 +29,6 @@
 #include "replica.h"
 #include "recovery.h"
 #include "tarantool.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include "xlog.h"
 #include "fiber.h"

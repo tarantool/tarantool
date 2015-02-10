@@ -113,6 +113,8 @@ enum fiber_key {
 	FIBER_KEY_MAX = 4
 };
 
+typedef void(*fiber_func)(va_list);
+
 struct fiber {
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
@@ -221,6 +223,15 @@ cord_start(struct cord *cord, const char *name,
 	   void *(*f)(void *), void *arg);
 
 /**
+ * Like cord_start(), but starts the event loop and
+ * a fiber in the event loop. The event loop ends when the
+ * fiber in main fiber dies/returns. The exception of the main
+ * fiber is propagated to cord_cojoin().
+ */
+int
+cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
+
+/**
  * Wait for \a cord to terminate. If \a cord has already
  * terminated, then returns immediately.
  *
@@ -252,7 +263,6 @@ cord_is_main();
 
 void fiber_init(void);
 void fiber_free(void);
-typedef void(*fiber_func)(va_list);
 
 struct fiber *
 fiber_new(const char *name, fiber_func f);

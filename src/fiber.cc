@@ -407,10 +407,15 @@ fiber_loop(void *data __attribute__((unused)))
 				fiber_name(fiber));
 			panic("fiber `%s': exiting", fiber_name(fiber));
 		}
-		/** By convention, these triggers must not throw. */
+		fiber_schedule_list(&fiber->wake);
+		/**
+		 * By convention, these triggers must not throw.
+		 * Call triggers after scheduling, since an
+		 * on_stop trigger of the first fiber may
+		 * break the event loop.
+		 */
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
-		fiber_schedule_list(&fiber->wake);
 		if (fiber->flags & FIBER_IS_JOINABLE) {
 			/*
 			 * The fiber needs to be joined,
@@ -615,6 +620,7 @@ void *cord_thread_func(void *p)
 	return res;
 }
 
+
 int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 {
@@ -653,6 +659,64 @@ cord_join(struct cord *cord)
 	}
 	cord_destroy(cord);
 	return res;
+}
+
+void
+break_ev_loop_f(struct trigger * /* trigger */, void * /* event */)
+{
+	ev_break(loop(), EVBREAK_ALL);
+}
+
+struct costart_ctx
+{
+	fiber_func run;
+	void *arg;
+};
+
+/** Replication acceptor fiber handler. */
+static void *
+cord_costart_thread_func(void *arg)
+{
+	struct costart_ctx ctx = *(struct costart_ctx *) arg;
+	free(arg);
+
+	struct fiber *f = fiber_new("main", ctx.run);
+
+	struct trigger break_ev_loop = {
+		rlist_nil, break_ev_loop_f, NULL, NULL
+	};
+	/*
+	 * Got to be in a trigger, to break the loop even
+	 * in case of an exception.
+	 */
+	trigger_add(&f->on_stop, &break_ev_loop);
+	fiber_start(f, ctx.arg);
+	if (f->fid > 0) {
+		/* The fiber hasn't died right away at start. */
+		ev_run(loop(), 0);
+	}
+	if (f->exception) {
+		Exception::move(&f->exception, &fiber()->exception);
+		fiber()->exception->raise();
+	}
+
+	return NULL;
+}
+
+int
+cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg)
+{
+	/** Must be allocated to avoid races. */
+	struct costart_ctx *ctx = (struct costart_ctx *) malloc(sizeof(*ctx));
+	if (ctx == NULL)
+		return -1;
+	ctx->run = f;
+	ctx->arg = arg;
+	if (cord_start(cord, name, cord_costart_thread_func, ctx) == -1) {
+		free(ctx);
+		return -1;
+	}
+	return 0;
 }
 
 bool

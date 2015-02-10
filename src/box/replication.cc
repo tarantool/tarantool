@@ -42,61 +42,74 @@
 #include "coeio.h"
 #include "coio.h"
 #include "cfg.h"
+#include "trigger.h"
 
 static void
-replication_send_row(struct recovery_state *r, void * /* param */,
-			   struct xrow_header *packet);
+replication_send_row(struct recovery_state *r, void *param,
+		     struct xrow_header *packet);
 
-/** Replication acceptor fiber handler. */
-static void *
-replication_join_thread(void *arg)
+/** State of a replication relay. */
+class Relay {
+public:
+	/** Replica connection */
+	struct ev_io io;
+	/* Request sync */
+	uint64_t sync;
+	struct recovery_state *r;
+
+	Relay(int fd_arg, uint64_t sync_arg)
+	{
+		r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+				 replication_send_row, this);
+		coio_init(&io);
+		io.fd = fd_arg;
+		sync = sync_arg;
+	}
+	~Relay()
+	{
+		recovery_delete(r);
+	}
+};
+
+static inline void
+relay_set_cord_name(int fd)
 {
-	struct recovery_state *r = (struct recovery_state *) arg;
+	char name[FIBER_NAME_MAX];
+	struct sockaddr_storage peer;
+	socklen_t addrlen = sizeof(peer);
+	getpeername(fd, ((struct sockaddr*)&peer), &addrlen);
+	snprintf(name, sizeof(name), "relay/%s",
+		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+	cord_set_name(name);
+}
 
-	/* Turn off the non-blocking mode, if any. */
-	int nonblock = sio_getfl(r->relay.sock) & O_NONBLOCK;
-	sio_setfl(r->relay.sock, O_NONBLOCK, 0);
-	auto socket_guard = make_scoped_guard([=]{
-		/* Restore non-blocking mode */
-		sio_setfl(r->relay.sock, O_NONBLOCK, nonblock);
-	});
+void
+replication_join_f(va_list ap)
+{
+	Relay *relay = va_arg(ap, Relay *);
+	struct recovery_state *r = relay->r;
 
+	relay_set_cord_name(relay->io.fd);
 	/* Send snapshot */
 	recover_snap(r);
 
 	/* Send response to JOIN command = end of stream */
 	struct xrow_header row;
 	xrow_encode_vclock(&row, &r->vclock);
-	row.sync = r->relay.sync;
+	row.sync = relay->sync;
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(&row, iov);
-	sio_writev_all(r->relay.sock, iov, iovcnt);
-
+	coio_writev(&relay->io, iov, iovcnt, 0);
 	say_info("snapshot sent");
-	return NULL;
 }
 
 void
 replication_join(int fd, struct xrow_header *packet)
 {
-	struct recovery_state *r;
-	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-			 replication_send_row, NULL);
-	auto recovery_guard = make_scoped_guard([&]{
-		recovery_delete(r);
-	});
-	r->relay.sock = fd;
-	r->relay.sync = packet->sync;
-
-	char name[FIBER_NAME_MAX];
-	struct sockaddr_storage peer;
-	socklen_t addrlen = sizeof(peer);
-	getpeername(r->relay.sock, ((struct sockaddr*)&peer), &addrlen);
-	snprintf(name, sizeof(name), "relay/%s",
-		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+	Relay relay(fd, packet->sync);
 
 	struct cord cord;
-	cord_start(&cord, name, replication_join_thread, r);
+	cord_costart(&cord, "join", replication_join_f, &relay);
 	cord_cojoin(&cord);
 }
 
@@ -108,77 +121,51 @@ replication_join(int fd, struct xrow_header *packet)
 static void
 replication_subscribe_f(va_list ap)
 {
-	struct recovery_state *r = va_arg(ap, struct recovery_state *);
+	Relay *relay = va_arg(ap, Relay *);
+	struct recovery_state *r = relay->r;
 
+	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, 0.1);
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
 	 * relay.
 	 */
-	struct ev_io sock_read_ev;
-	sock_read_ev.data = fiber();
-	ev_io_init(&sock_read_ev, (ev_io_cb) fiber_schedule,
-		   r->relay.sock, EV_READ);
+	struct ev_io read_ev;
+	read_ev.data = fiber();
+	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule,
+		   relay->io.fd, EV_READ);
 
 	while (true) {
-		ev_io_start(loop(), &sock_read_ev);
+		ev_io_start(loop(), &read_ev);
 		fiber_yield();
-		ev_io_stop(loop(), &sock_read_ev);
+		ev_io_stop(loop(), &read_ev);
 
 		uint8_t data;
-		int rc = recv(r->relay.sock, &data, sizeof(data), 0);
+		int rc = recv(read_ev.fd, &data, sizeof(data), 0);
 
 		if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
 			say_info("the replica has closed its socket, exiting");
 			goto end;
 		}
-		if (rc < 0)
+		if (rc < 0 && errno != EINTR && errno != EAGAIN &&
+		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 	}
 end:
 	recovery_stop_local(r);
-	ev_break(loop(), EVBREAK_ALL);
-}
-
-static void *
-replication_subscribe_thread(void *arg)
-{
-	struct recovery_state *r = (struct recovery_state *) arg;
-
-	/* Turn off the non-blocking mode, if any. */
-	int nonblock = sio_getfl(r->relay.sock) & O_NONBLOCK;
-	sio_setfl(r->relay.sock, O_NONBLOCK, 0);
-	auto socket_guard = make_scoped_guard([=]{
-		/* Restore non-blocking mode */
-		sio_setfl(r->relay.sock, O_NONBLOCK, nonblock);
-	});
-
-	struct fiber *f = fiber_new("subscribe", replication_subscribe_f);
-	fiber_start(f, r);
-	ev_run(loop(), 0);
-
 	say_crit("exiting the relay loop");
-	return 0;
 }
 
 /** Replication acceptor fiber handler. */
 void
 replication_subscribe(int fd, struct xrow_header *packet)
 {
-	struct recovery_state *r;
-	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-			 replication_send_row, NULL);
-
-	auto recovery_guard = make_scoped_guard([&]{
-		recovery_delete(r);
-	});
-
-	r->relay.sock = fd;
-	r->relay.sync = packet->sync;
+	Relay relay(fd, packet->sync);
 
 	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
+	struct recovery_state *r = relay.r;
 	xrow_decode_subscribe(packet, &uu, &server_uuid, &r->vclock);
 
 	/**
@@ -200,23 +187,17 @@ replication_subscribe(int fd, struct xrow_header *packet)
 			  tt_uuid_str(&server_uuid));
 	}
 
-	char name[FIBER_NAME_MAX];
-	struct sockaddr_storage peer;
-	socklen_t addrlen = sizeof(peer);
-	getpeername(r->relay.sock, ((struct sockaddr*)&peer), &addrlen);
-	snprintf(name, sizeof(name), "relay/%s",
-		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
-
 	struct cord cord;
-	cord_start(&cord, name, replication_subscribe_thread, r);
+	cord_costart(&cord, "subscribe", replication_subscribe_f, &relay);
 	cord_cojoin(&cord);
 }
 
 /** Send a single row to the client. */
 static void
-replication_send_row(struct recovery_state *r, void * /* param */,
-			   struct xrow_header *packet)
+replication_send_row(struct recovery_state *r, void *param,
+		     struct xrow_header *packet)
 {
+	Relay *relay = (Relay *) param;
 	assert(iproto_type_is_dml(packet->type));
 
 	/*
@@ -228,10 +209,10 @@ replication_send_row(struct recovery_state *r, void * /* param */,
 	 * replica's own rows back).
 	 */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
-		packet->sync = r->relay.sync;
+		packet->sync = relay->sync;
 		struct iovec iov[XROW_IOVMAX];
 		int iovcnt = xrow_to_iovec(packet, iov);
-		sio_writev_all(r->relay.sock, iov, iovcnt);
+		coio_writev(&relay->io, iov, iovcnt, 0);
 	}
 	/*
 	 * Update local vclock. During normal operation wal_write()
