@@ -218,7 +218,11 @@ fiob_write(void *cookie, const char *buf, size_t len)
 		assert(f->bfill == f->bsize);
 		ssize_t res = fiob_writef(f, f->buf, f->bsize);
 		if (res < 0)
+#if defined(HAVE_FUNOPEN)
 			return res;
+#else
+			return 0;
+#endif
 		tocopy = f->bsize > bytes_left ? bytes_left : f->bsize;
 		/*
 		 * We must memcpy because O_DIRECT requires

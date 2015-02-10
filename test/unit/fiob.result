@@ -1,4 +1,4 @@
-1..65
+1..68
 ok 1 - tempdir is created
 ok 2 - common open
 ok 3 - Hello world is written (12 bytes)
@@ -64,3 +64,6 @@ ok 62 - all records were written properly
 ok 63 - eof
 ok 64 - feof
 ok 65 - fclose
+ok 66 - fopen for writing
+ok 67 - fwrite failed
+ok 68 - fwrite failed

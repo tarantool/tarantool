@@ -22,7 +22,7 @@
 
 
 
-#define PLAN		65
+#define PLAN		68
 
 #define ITEMS		7
 
@@ -229,7 +229,18 @@ main(void)
 		is(fclose(f), 0, "fclose");
 	}
 
-
+	{
+		FILE *f = fiob_open("/dev/full", "wd");
+		setvbuf(f, NULL, _IONBF, 0);
+		isnt(f, NULL, "fopen for writing");
+		errno = 0;
+		fputs("test\n", f);
+		/* flush buffer */
+		int r = fseek(f, 0, SEEK_SET);
+		is(errno, ENOSPC, "fwrite failed");
+		is(r, EOF, "fwrite failed");
+		fclose(f);
+	}
 
 	if (fork() == 0)
 		execl("/bin/rm", "/bin/rm", "-fr", td, NULL);
