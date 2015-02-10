@@ -45,7 +45,6 @@ struct CoioGuard {
 	~CoioGuard() { ev_io_stop(loop(), ev_io); }
 };
 
-typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
 /** Note: this function does not throw */

@@ -282,6 +282,8 @@ SLIST_HEAD(iobuf_cache, iobuf) iobuf_cache;
 struct iobuf *
 iobuf_new(const char *name)
 {
+	/* Does not work in multiple cords yet. */
+	assert(cord_is_main());
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
 		iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);

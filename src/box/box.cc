@@ -433,7 +433,6 @@ box_init()
 {
 	box_check_config();
 
-	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
 	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 

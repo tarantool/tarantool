@@ -150,9 +150,6 @@ wal_writer_start(struct recovery_state *state, int rows_per_wal);
 void
 wal_writer_stop(struct recovery_state *r);
 
-static void
-recovery_stop_local(struct recovery_state *r);
-
 /**
  * Throws an exception in  case of error.
  */
@@ -598,7 +595,7 @@ recovery_follow_local(struct recovery_state *r,
 	fiber_start(r->watcher, r, wal_dir_rescan_delay);
 }
 
-static void
+void
 recovery_stop_local(struct recovery_state *r)
 {
 	if (r->watcher) {

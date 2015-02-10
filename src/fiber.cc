@@ -468,7 +468,8 @@ fiber_new(const char *name, void (*f) (va_list))
 	} else {
 		fiber = (struct fiber *) mempool_alloc0(&cord->fiber_pool);
 
-		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
+		tarantool_coro_create(&fiber->coro, &cord->slabc,
+				      fiber_loop, NULL);
 
 		region_create(&fiber->gc, &cord->slabc);
 
@@ -497,20 +498,20 @@ fiber_new(const char *name, void (*f) (va_list))
  * cord_destroy().
  */
 void
-fiber_destroy(struct fiber *f)
+fiber_destroy(struct cord *cord, struct fiber *f)
 {
 	if (f == fiber()) {
 		/** End of the application. */
-		assert(cord() == &main_cord);
+		assert(cord == &main_cord);
 		return;
 	}
-	assert(f != &cord()->sched);
+	assert(f != &cord->sched);
 
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
 	region_destroy(&f->gc);
-	tarantool_coro_destroy(&f->coro);
+	tarantool_coro_destroy(&f->coro, &cord->slabc);
 	Exception::cleanup(&f->exception);
 }
 
@@ -519,9 +520,9 @@ fiber_destroy_all(struct cord *cord)
 {
 	struct fiber *f;
 	rlist_foreach_entry(f, &cord->alive, link)
-		fiber_destroy(f);
+		fiber_destroy(cord, f);
 	rlist_foreach_entry(f, &cord->dead, link)
-		fiber_destroy(f);
+		fiber_destroy(cord, f);
 }
 
 void
@@ -539,6 +540,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
+	cord->call_stack_depth = 0;
 	cord->sched.fid = 1;
 	fiber_reset(&cord->sched);
 	Exception::init(&cord->sched.exception);
@@ -556,6 +558,7 @@ cord_create(struct cord *cord, const char *name)
 void
 cord_destroy(struct cord *cord)
 {
+	slab_cache_set_thread(&cord->slabc);
 	ev_async_stop(cord->loop, &cord->wakeup_event);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
@@ -583,6 +586,7 @@ void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
 	cord() = ct_arg->cord;
+	slab_cache_set_thread(&cord()->slabc);
 	struct cord *cord = cord();
 	cord_create(cord, ct_arg->name);
 	/** Can't possibly be the main thread */

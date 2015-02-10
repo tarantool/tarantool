@@ -43,6 +43,9 @@
 
 #if defined(__cplusplus)
 #include "exception.h"
+#else
+#define class struct
+class Exception;
 #endif /* defined(__cplusplus) */
 #include "salad/rlist.h"
 
@@ -157,7 +160,6 @@ struct fiber {
 };
 
 enum { FIBER_CALL_STACK = 16 };
-class Exception;
 
 /**
  * @brief An independent execution unit that can be managed by a separate OS
@@ -167,8 +169,6 @@ class Exception;
 struct cord {
 	/** The fiber that is currently being executed. */
 	struct fiber *fiber;
-	/** The "main" fiber of this cord, the scheduler. */
-	struct fiber sched;
 	struct ev_loop *loop;
 	/** Depth of the fiber call stack. */
 	int call_stack_depth;
@@ -197,6 +197,8 @@ struct cord {
 	struct mempool fiber_pool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
+	/** The "main" fiber of this cord, the scheduler. */
+	struct fiber sched;
 	char name[FIBER_NAME_MAX];
 };
 

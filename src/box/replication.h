@@ -30,14 +30,6 @@
  */
 struct xrow_header;
 
-/**
- * Pre-fork replication spawner process.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_prefork(const char *snap_dir, const char *wal_dir);
-
 void
 replication_join(int fd, struct xrow_header *packet);
 

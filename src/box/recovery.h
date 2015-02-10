@@ -65,13 +65,8 @@ extern const char *wal_mode_STRS[];
 struct relay {
 	/** Replica connection */
 	int sock;
-	/* Request type - SUBSCRIBE or JOIN */
-	uint32_t type;
 	/* Request sync */
 	uint64_t sync;
-	/* Only used in SUBSCRIBE request */
-	uint32_t server_id;
-	struct vclock vclock;
 };
 
 enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
@@ -149,6 +144,8 @@ recovery_has_data(struct recovery_state *r)
 void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
+void recovery_stop_local(struct recovery_state *r);
+
 void recovery_finalize(struct recovery_state *r, int rows_per_wal);
 
 int64_t wal_write(struct recovery_state *r, struct xrow_header *packet);
