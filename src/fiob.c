@@ -330,22 +330,21 @@ fiob_open(const char *path, const char *mode)
 		flags |= WAL_SYNC_FLAG;
 	}
 
+	fd = open(path, flags, omode);
+	if (fd < 0)
+		goto error;
 #if defined(FIOB_DIRECT)
-	if (strchr(mode, 'd')) {
-	    /* Try to open file with O_DIRECT */
-	    fd = open(path, flags | O_DIRECT, omode);
-	}
-	if (fd < 0) {
-#endif /* defined(FIOB_DIRECT) */
-		/* Fallback to libc implementation */
-		fd = open(path, flags, omode);
-		if (fd < 0)
-			goto error;
-		file = fdopen(fd, mode);
-		if (!file)
-			goto error;
-		return file;
-#if defined(FIOB_DIRECT)
+	if (strchr(mode, 'd') == NULL)
+		goto fdopen;
+
+	/* Try to enable O_DIRECT */
+	flags = fcntl(fd, F_GETFL);
+	if (flags != -1 && fcntl(fd, F_SETFL, flags | O_DIRECT) != -1) {
+		say_debug("using O_DIRECT for %s", path);
+	} else {
+#if defined(NDEBUG) /* Don't use opencookie in release mode without O_DIRECT */
+		goto fdopen;
+#endif /* defined(NDEBUG) */
 	}
 
 	f = (struct fiob *)calloc(1, sizeof(struct fiob));
@@ -386,7 +385,14 @@ fiob_open(const char *path, const char *mode)
 #endif
 
 	return file;
+
+fdopen:
 #endif /* defined(FIOB_DIRECT) */
+	/* Fallback to libc implementation */
+	file = fdopen(fd, mode);
+	if (!file)
+		goto error;
+	return file;
 
 error:
 	save_errno = errno;

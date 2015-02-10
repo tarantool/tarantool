@@ -77,7 +77,8 @@ main(void)
 {
 	plan(PLAN);
 
-	char *td = mkdtemp(strdup("/tmp/fiob.XXXXXX"));
+	/* don't create test files in /tmp - tmpfs doesn't support O_DIRECT */
+	char *td = mkdtemp(strdup("./fiob.XXXXXX"));
 	isnt(td, NULL, "tempdir is created");
 
 	static char buf[4096];
