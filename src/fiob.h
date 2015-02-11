@@ -28,8 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#define O_DIRECT_BSIZE		( 4096 * 256 )
-
 #include <sys/types.h>
 #include <stdio.h>
 
