@@ -78,6 +78,7 @@ check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 
 check_function_exists(funopen HAVE_FUNOPEN)
+check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
