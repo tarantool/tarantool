@@ -16,7 +16,7 @@
 #include <say.h>
 #include <assert.h>
 #include <unistd.h>
-#include <tarantool/config.h>
+#include <trivia/config.h>
 
 /* Use special implemention if we have O_DIRECT and FOPENCOOKIE or FUNOPEN */
 #if defined(O_DIRECT) && (defined(HAVE_FUNOPEN) || defined(HAVE_FOPENCOOKIE))
