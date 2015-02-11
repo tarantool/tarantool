@@ -3,11 +3,6 @@ compiler:
   - clang
   - gcc
 
-branches:
-  only:
-    - master
-    - stable
-
 addons:
   postgresql: "9.1"
 
