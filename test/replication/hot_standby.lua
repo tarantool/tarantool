@@ -1,5 +1,6 @@
 #!/usr/bin/env tarantool
 
+require('console').listen(os.getenv('ADMIN'))
 box.cfg({
     listen              = os.getenv("MASTER"),
     slab_alloc_arena    = 0.1,
@@ -10,4 +11,3 @@ box.cfg({
     snap_dir            = "..",
 })
 
-require('console').listen(os.getenv('ADMIN'))

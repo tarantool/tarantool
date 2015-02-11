@@ -253,6 +253,14 @@ recovery_delete(struct recovery_state *r)
 }
 
 void
+recovery_exit(struct recovery_state *r)
+{
+	/* Avoid fibers, there is no event loop */
+	r->watcher = NULL;
+	recovery_delete(r);
+}
+
+void
 recovery_apply_row(struct recovery_state *r, struct xrow_header *row)
 {
 	/* Check lsn */

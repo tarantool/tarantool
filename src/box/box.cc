@@ -50,7 +50,7 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
-#include "evio.h"
+#include "coio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
@@ -182,11 +182,10 @@ box_set_listen(const char *uri)
 	if (evio_service_is_active(&binary))
 		evio_service_stop(&binary);
 
-	if (uri != NULL) {
-		evio_service_start(&binary, uri);
-	} else {
-		box_leave_local_standby_mode(NULL);
-	}
+	if (uri != NULL)
+		coio_service_start(&binary, uri);
+
+	box_leave_local_standby_mode(NULL);
 }
 
 extern "C" void
@@ -200,7 +199,8 @@ box_set_wal_mode(const char *mode_name)
 		tnt_raise(ClientError, ER_CFG, "wal_mode",
 			  "cannot switch to/from fsync");
 	}
-	/** Really update WAL mode only after we left local hot standby,
+	/**
+	 * Really update WAL mode only after we left local hot standby,
 	 * since local hot standby expects it to be NONE.
 	 */
 	if (recovery->finalize)
@@ -243,14 +243,13 @@ box_set_readahead(int readahead)
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
-	if (recovery->finalize) {
-		/*
-		 * Nothing to do: this happens when the server
-		 * binds to both ports, and one of the callbacks
-		 * is called first.
-		 */
+	/*
+	 * recovery->finalize is true when listen is changed
+	 * dynamically.
+	 */
+	if (recovery->finalize)
 		return;
-	}
+
 	try {
 		recovery_finalize(recovery, cfg_geti("rows_per_wal"));
 	} catch (Exception *e) {
@@ -268,7 +267,9 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 
 	if (recovery_has_remote(recovery))
 		recovery_follow_remote(recovery);
-
+	/* Enter read-write mode. */
+	if (recovery->server_id > 0)
+		box_set_ro(false);
 	title("running", NULL);
 	say_info("ready to accept requests");
 }
@@ -405,7 +406,7 @@ box_free(void)
 	user_cache_free();
 	schema_free();
 	tuple_free();
-	recovery_delete(recovery);
+	recovery_exit(recovery);
 	recovery = NULL;
 	engine_shutdown();
 	stat_free();

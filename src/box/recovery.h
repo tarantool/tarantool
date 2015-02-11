@@ -115,6 +115,10 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 void
 recovery_delete(struct recovery_state *r);
 
+/* to be called at exit */
+void
+recovery_exit(struct recovery_state *r);
+
 void
 recovery_atfork(struct recovery_state *r);
 
