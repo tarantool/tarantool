@@ -537,7 +537,7 @@ lbox_bsdsocket_push_protocol(struct lua_State *L, int protonumber)
 	if (p) {
 		lua_pushstring(L, p->p_name);
 	} else {
-		lua_pushinteger(L, p->p_proto);
+		lua_pushinteger(L, protonumber);
 	}
 	return 1;
 }
