@@ -111,13 +111,14 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
-static void
+static enum wal_mode
 box_check_wal_mode(const char *mode_name)
 {
 	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode == WAL_MODE_MAX)
 		tnt_raise(ClientError, ER_CFG, "wal_mode", mode_name);
+	return (enum wal_mode) mode;
 }
 
 static void
@@ -130,6 +131,17 @@ box_check_readahead(int readahead)
 	}
 }
 
+static void
+box_check_rows_per_wal(int rows_per_wal)
+{
+	/* check rows_per_wal configuration */
+	if (rows_per_wal <= 1) {
+		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
+			  "the value must be greater than one");
+	}
+
+}
+
 void
 box_check_config()
 {
@@ -137,12 +149,7 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_uri(cfg_gets("replication_source"), "replication_source");
 	box_check_readahead(cfg_geti("readahead"));
-
-	/* check rows_per_wal configuration */
-	if (cfg_geti("rows_per_wal") <= 1) {
-		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
-			  "the value must be greater than one");
-	}
+	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
 }
 
 extern "C" void
@@ -191,9 +198,7 @@ box_set_listen(const char *uri)
 extern "C" void
 box_set_wal_mode(const char *mode_name)
 {
-	box_check_wal_mode(mode_name);
-	enum wal_mode mode = (enum wal_mode)
-		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
+	enum wal_mode mode = box_check_wal_mode(mode_name);
 	if (mode != recovery->wal_mode &&
 	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
 		tnt_raise(ClientError, ER_CFG, "wal_mode",
@@ -251,7 +256,20 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		return;
 
 	try {
-		recovery_finalize(recovery, cfg_geti("rows_per_wal"));
+		/*
+		 * It is hypothetically possible to change values of
+		 * box.cfg.rows_per_wal and box.cfg.wal_mode **after** calling
+		 * load_cfg() and **before** leaving hot standby mode
+		 * (for example, via a background fiber). Check configuration
+		 * options again, finalize the recovery process and start WAL
+		 * writer with the provided values.
+		 */
+		int rows_per_wal = cfg_geti("rows_per_wal");
+		const char *wal_mode_str = cfg_gets("wal_mode");
+		box_check_rows_per_wal(rows_per_wal);
+		enum wal_mode wal_mode = box_check_wal_mode(wal_mode_str);
+
+		recovery_finalize(recovery, wal_mode, rows_per_wal);
 	} catch (Exception *e) {
 		e->log();
 		panic("unable to successfully finalize recovery");
@@ -263,7 +281,6 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	engine_end_recovery();
 
 	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
-	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	if (recovery_has_remote(recovery))
 		recovery_follow_remote(recovery);
