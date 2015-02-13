@@ -34,3 +34,39 @@ lua ffi
 ---
  - nil
 ...
+lua type(os.execute)
+---
+ - function
+...
+lua type(os.exit)
+---
+ - function
+...
+lua type(os.rename)
+---
+ - function
+...
+lua type(os.tmpname)
+---
+ - function
+...
+lua type(os.remove)
+---
+ - function
+...
+lua type(io)
+---
+ - table
+...
+lua type(require)
+---
+ - function
+...
+lua type(package)
+---
+ - table
+...
+lua ffi
+---
+ - nil
+...
