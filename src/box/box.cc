@@ -131,7 +131,7 @@ box_check_readahead(int readahead)
 	}
 }
 
-static void
+static int
 box_check_rows_per_wal(int rows_per_wal)
 {
 	/* check rows_per_wal configuration */
@@ -139,7 +139,7 @@ box_check_rows_per_wal(int rows_per_wal)
 		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
 			  "the value must be greater than one");
 	}
-
+	return rows_per_wal;
 }
 
 void
@@ -150,6 +150,8 @@ box_check_config()
 	box_check_uri(cfg_gets("replication_source"), "replication_source");
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	box_check_wal_mode(cfg_gets("wal_mode"));
+
 }
 
 extern "C" void
@@ -191,8 +193,6 @@ box_set_listen(const char *uri)
 
 	if (uri != NULL)
 		coio_service_start(&binary, uri);
-
-	box_leave_local_standby_mode(NULL);
 }
 
 extern "C" void
@@ -245,51 +245,6 @@ box_set_readahead(int readahead)
 
 /* }}} configuration bindings */
 
-void
-box_leave_local_standby_mode(void *data __attribute__((unused)))
-{
-	/*
-	 * recovery->finalize is true when listen is changed
-	 * dynamically.
-	 */
-	if (recovery->finalize)
-		return;
-
-	try {
-		/*
-		 * It is hypothetically possible to change values of
-		 * box.cfg.rows_per_wal and box.cfg.wal_mode **after** calling
-		 * load_cfg() and **before** leaving hot standby mode
-		 * (for example, via a background fiber). Check configuration
-		 * options again, finalize the recovery process and start WAL
-		 * writer with the provided values.
-		 */
-		int rows_per_wal = cfg_geti("rows_per_wal");
-		const char *wal_mode_str = cfg_gets("wal_mode");
-		box_check_rows_per_wal(rows_per_wal);
-		enum wal_mode wal_mode = box_check_wal_mode(wal_mode_str);
-
-		recovery_finalize(recovery, wal_mode, rows_per_wal);
-	} catch (Exception *e) {
-		e->log();
-		panic("unable to successfully finalize recovery");
-	}
-
-	/*
-	 * notify engines about end of recovery.
-	*/
-	engine_end_recovery();
-
-	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
-
-	if (recovery_has_remote(recovery))
-		recovery_follow_remote(recovery);
-	/* Enter read-write mode. */
-	if (recovery->server_id > 0)
-		box_set_ro(false);
-	title("running", NULL);
-	say_info("ready to accept requests");
-}
 
 /**
  * Execute a request against a given space id with
@@ -446,89 +401,98 @@ engine_init()
 	engine_register(sophia);
 }
 
-void
-box_init()
+static inline void
+box_do_init(void)
 {
-	box_check_config();
-
-	stat_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
-
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_geti("slab_alloc_maximal"),
 		   cfg_getd("slab_alloc_factor"));
 
+	stat_init();
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+
+	engine_init();
+
+	schema_init();
+	user_cache_init();
+	/*
+	 * The order is important: to initialize sessions,
+	 * we need to access the admin user, which is used
+	 * as a default session user when running triggers.
+	 */
+	session_init();
+
+	title("loading", NULL);
+
+	/* recovery initialization */
+	recovery = recovery_new(cfg_gets("snap_dir"),
+				cfg_gets("wal_dir"),
+				recover_row, NULL);
+	recovery_set_remote(recovery,
+			    cfg_gets("replication_source"));
+	recovery_setup_panic(recovery,
+			     cfg_geti("panic_on_snap_error"),
+			     cfg_geti("panic_on_wal_error"));
+
+	if (recovery_has_data(recovery)) {
+		/* Tell Sophia engine LSN it must recover to. */
+		int64_t checkpoint_id =
+			recovery_last_checkpoint(recovery);
+		engine_begin_recover_snapshot(checkpoint_id);
+		/* Process existing snapshot */
+		recover_snap(recovery);
+		engine_end_recover_snapshot();
+	} else if (recovery_has_remote(recovery)) {
+		/* Initialize a new replica */
+		replica_bootstrap(recovery);
+		engine_end_recover_snapshot();
+		box_snapshot();
+	} else {
+		/* Initialize the first server of a new cluster */
+		recovery_bootstrap(recovery);
+		box_set_cluster_uuid();
+		box_set_server_uuid();
+		engine_end_recover_snapshot();
+		box_snapshot();
+	}
+	fiber_gc();
+
+	title("orphan", NULL);
+	recovery_follow_local(recovery, cfg_getd("wal_dir_rescan_delay"));
+	title("hot_standby", NULL);
+
+	iproto_init(&binary);
+	box_set_listen(cfg_gets("listen"));
+
+	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
+	recovery_finalize(recovery, wal_mode, rows_per_wal);
+
+	engine_end_recovery();
+
+	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
+
+	if (recovery_has_remote(recovery))
+		recovery_follow_remote(recovery);
+	/* Enter read-write mode. */
+	if (recovery->server_id > 0)
+		box_set_ro(false);
+	title("running", NULL);
+	say_info("ready to accept requests");
+
+	fiber_gc();
+}
+
+void
+box_init()
+{
 	try {
-		engine_init();
-
-		schema_init();
-		user_cache_init();
-		/*
-		 * The order is important: to initialize sessions,
-		 * we need to access the admin user, which is used
-		 * as a default session user when running triggers.
-		 */
-		session_init();
-
-		title("loading", NULL);
-
-		/* recovery initialization */
-		recovery = recovery_new(cfg_gets("snap_dir"),
-					cfg_gets("wal_dir"),
-					recover_row, NULL);
-		recovery_set_remote(recovery,
-				    cfg_gets("replication_source"));
-		recovery_setup_panic(recovery,
-				     cfg_geti("panic_on_snap_error"),
-				     cfg_geti("panic_on_wal_error"));
-
-		if (recovery_has_data(recovery)) {
-			/* Tell Sophia engine LSN it must recover to. */
-			int64_t checkpoint_id =
-				recovery_last_checkpoint(recovery);
-			engine_begin_recover_snapshot(checkpoint_id);
-			/* Process existing snapshot */
-			recover_snap(recovery);
-			engine_end_recover_snapshot();
-		} else if (recovery_has_remote(recovery)) {
-			/* Initialize a new replica */
-			replica_bootstrap(recovery);
-			engine_end_recover_snapshot();
-			box_snapshot();
-		} else {
-			/* Initialize the first server of a new cluster */
-			recovery_bootstrap(recovery);
-			box_set_cluster_uuid();
-			box_set_server_uuid();
-			engine_end_recover_snapshot();
-			box_snapshot();
-		}
-		fiber_gc();
+		box_do_init();
 	} catch (Exception *e) {
 		e->log();
 		panic("can't initialize storage: %s", e->errmsg());
 	}
-
-	title("orphan", NULL);
-	recovery_follow_local(recovery,
-			      cfg_getd("wal_dir_rescan_delay"));
-	title("hot_standby", NULL);
-
-	iproto_init(&binary);
-	/**
-	 * listen is a dynamic option, so box_set_listen()
-	 * will be called after box_init() as long as there
-	 * is a value for listen in the configuration table.
-	 *
-	 * However, if cfg.listen is nil, box_set_listen() will
-	 * not be called - which means that we need to leave
-	 * local hot standby here. The idea is to leave
-	 * local hot standby immediately if listen is not given,
-	 * and only after binding to the listen uri otherwise.
-	 */
-	if (cfg_gets("listen") == NULL)
-		box_leave_local_standby_mode(NULL);
 }
 
 void
