@@ -237,7 +237,7 @@ local function load_cfg(cfg)
     box.cfg = cfg
     if not pcall(ffi.C.check_cfg) then
         box.cfg = load_cfg -- restore original box.cfg
-        return box.error() -- re-throw exception from check_cfg(0
+        return box.error() -- re-throw exception from check_cfg()
     end
     -- Restore box members after initial configuration
     for k, v in pairs(box_configured) do

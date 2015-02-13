@@ -151,7 +151,6 @@ box_check_config()
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
-
 }
 
 extern "C" void
@@ -245,7 +244,6 @@ box_set_readahead(int readahead)
 
 /* }}} configuration bindings */
 
-
 /**
  * Execute a request against a given space id with
  * a variable-argument tuple described in format.
@@ -319,15 +317,16 @@ box_process_join(int fd, struct xrow_header *header)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_R);
+	access_check_space(space_cache_find(SC_CLUSTER_ID), PRIV_W);
 
 	assert(header->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(header, &server_uuid);
 
-	box_on_cluster_join(&server_uuid);
-
 	/* Process JOIN request via replication relay */
 	replication_join(fd, header);
+	/** Register the server with the cluster. */
+	box_on_cluster_join(&server_uuid);
 }
 
 void
@@ -402,7 +401,7 @@ engine_init()
 }
 
 static inline void
-box_do_init(void)
+box_init(void)
 {
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
@@ -485,10 +484,10 @@ box_do_init(void)
 }
 
 void
-box_init()
+box_load_cfg()
 {
 	try {
-		box_do_init();
+		box_init();
 	} catch (Exception *e) {
 		e->log();
 		panic("can't initialize storage: %s", e->errmsg());

@@ -40,15 +40,10 @@ extern "C" {
  * subsystem of Tarantool.
  */
 
-struct txn;
-struct tbuf;
 struct port;
-struct fio_batch;
-struct xlog;
-struct lua_State;
 
 /** To be called at program start. */
-void box_init();
+void box_load_cfg();
 /** To be called at program end. */
 void box_free(void);
 
@@ -84,21 +79,10 @@ extern uint32_t snapshot_version;
  */
 int box_snapshot(void);
 
-/** Basic initialization of the storage dir. */
-void
-box_init_storage(const char *dirname);
-
 /**
  * Spit out some basic module status (master/slave, etc.
  */
 const char *box_status(void);
-/**
- * Called to enter master or replica
- * mode (depending on the configuration) after
- * binding to the primary port.
- */
-void
-box_leave_local_standby_mode(void *data __attribute__((unused)));
 
 void
 box_process_auth(struct request *request);
@@ -116,12 +100,8 @@ box_process_subscribe(int fd, struct xrow_header *header);
 void
 box_check_config();
 
-void
-box_set_listen(const char *uri);
-
-void
-box_set_replication_source(const char *source);
-
+void box_set_listen(const char *uri);
+void box_set_replication_source(const char *source);
 void box_set_wal_mode(const char *mode);
 void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
