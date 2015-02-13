@@ -180,9 +180,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
 
-	if (r->wal_mode == WAL_FSYNC)
-		(void) strcat(r->wal_dir.open_wflags, "s");
-
 	vclock_create(&r->vclock);
 
 	xdir_scan(&r->snap_dir);
@@ -522,7 +519,8 @@ recover_current_wal:
 }
 
 void
-recovery_finalize(struct recovery_state *r, int rows_per_wal)
+recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
+		  int rows_per_wal)
 {
 
 	recovery_stop_local(r);
@@ -558,6 +556,10 @@ recovery_finalize(struct recovery_state *r, int rows_per_wal)
 
 		recovery_close_log(r);
 	}
+
+	r->wal_mode = wal_mode;
+	if (r->wal_mode == WAL_FSYNC)
+		(void) strcat(r->wal_dir.open_wflags, "s");
 
 	wal_writer_start(r, rows_per_wal);
 }

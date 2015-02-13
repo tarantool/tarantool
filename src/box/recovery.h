@@ -137,7 +137,8 @@ void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_stop_local(struct recovery_state *r);
 
-void recovery_finalize(struct recovery_state *r, int rows_per_wal);
+void recovery_finalize(struct recovery_state *r, enum wal_mode mode,
+		       int rows_per_wal);
 
 int64_t wal_write(struct recovery_state *r, struct xrow_header *packet);
 
