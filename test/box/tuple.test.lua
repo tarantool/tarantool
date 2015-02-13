@@ -66,12 +66,26 @@ box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
 box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})
 box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
 
---
--- A test case for #107 "box.tuple.unpack asserts on extra arguments"
---
 t=box.tuple.new{'a','b','c'}
-t:unpack(5)
-t:unpack(1, 2, 3, 4, 5)
+t:totable()
+t:unpack()
+t:totable(1)
+t:unpack(1)
+t:totable(2)
+t:unpack(2)
+t:totable(1, 3)
+t:unpack(1, 3)
+t:totable(2, 3)
+t:unpack(2, 3)
+t:totable(2, 4)
+t:unpack(2, 4)
+t:totable(nil, 2)
+t:unpack(nil, 2)
+t:totable(2, 1)
+t:unpack(2, 1)
+
+t:totable(0)
+t:totable(1, 0)
 
 --
 -- Check that tuple:totable correctly sets serializer hints
