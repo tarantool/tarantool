@@ -8,9 +8,9 @@
                              What is Tarantool?
 ===============================================================================
 
-Tarantool is a NoSQL database running and a Lua application server. The code is
-available for free under the terms of `BSD license`_. Supported platforms are
-GNU/Linux, Mac OS and FreeBSD.
+Tarantool is a NoSQL database management system running in a Lua application
+server. The code is available for free under the terms of `BSD license`_.
+Supported platforms are GNU/Linux, Mac OS and FreeBSD.
 
 ===============================================================================
                      An overview of the architecture

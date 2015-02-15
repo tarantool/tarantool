@@ -13,7 +13,7 @@ ADMIN = 1
 --
 _space:insert{_space.id, ADMIN, 'test', 5 }
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 --
 -- Bad space id
@@ -27,14 +27,14 @@ _space:insert{'hello', 'world', 'test'}
 --
 _space:insert{_space.id, ADMIN, 'test', 'world'}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 --
 -- There is already a tuple for the system space
 --
 _space:insert{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
@@ -42,7 +42,7 @@ _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ...
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 _space:replace{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
@@ -60,22 +60,22 @@ _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 --
 _space:delete{_space.id}
 ---
-- error: 'Can''t drop space 280: the space has indexes'
+- error: 'Can''t drop space ''_space'': the space has indexes'
 ...
 _space:delete{_index.id}
 ---
-- error: 'Can''t drop space 288: the space has indexes'
+- error: 'Can''t drop space ''_index'': the space has indexes'
 ...
 --
 -- Can't change properties of a space
 --
 _space:update({_space.id}, {{'+', 1, 1}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: 'Can''t modify space ''_space'': space id is immutable'
 ...
 _space:update({_space.id}, {{'+', 1, 2}})
 ---
-- error: 'Can''t modify space 280: space id is immutable'
+- error: 'Can''t modify space ''_space'': space id is immutable'
 ...
 --
 -- Create a space
@@ -138,7 +138,7 @@ space:replace{0}
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 _index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
@@ -146,7 +146,7 @@ _index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ...
 _index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 _index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
@@ -175,7 +175,7 @@ _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
 ---
-- error: Can't drop the primary key in a system space, space id 288
+- error: Can't drop the primary key in a system space, space '_index'
 ...
 _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 ---
@@ -323,7 +323,7 @@ auto = box.schema.create_space('auto_original')
 ...
 auto2 = box.schema.create_space('auto', {id = auto.id})
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 box.schema.space.drop('auto')
 ---

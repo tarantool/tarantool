@@ -66,7 +66,14 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 		/* Assign local server id */
 		assert(r->server_id == 0);
 		r->server_id = server_id;
-		box_set_ro(false);
+		/*
+		 * Leave read-only mode
+		 * if this is a running server.
+		 * Otherwise, read only is switched
+		 * off after recovery_finalize().
+		 */
+		if (r->finalize)
+			box_set_ro(false);
 	}
 }
 

@@ -85,6 +85,7 @@ endif()
 check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
+check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
 
 #

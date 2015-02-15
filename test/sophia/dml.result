@@ -106,7 +106,7 @@ space = box.schema.create_space('test', { id = 105, engine = 'sophia' })
 ...
 index = space:create_index('primary', {type = 'hash'})
 ---
-- error: Unsupported index type supplied for index 0 in space 105
+- error: Unsupported index type supplied for index 'primary' in space 'test'
 ...
 space:drop()
 ---
@@ -120,8 +120,8 @@ index1 = space:create_index('primary')
 ...
 index2 = space:create_index('secondary')
 ---
-- error: 'Can''t create or modify index 1 in space 106: Sophia TREE secondary indexes
-    are not supported'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': Sophia TREE
+    secondary indexes are not supported'
 ...
 space:drop()
 ---

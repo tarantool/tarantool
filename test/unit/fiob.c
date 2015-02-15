@@ -22,7 +22,7 @@
 
 
 
-#define PLAN		47
+#define PLAN		67
 
 #define ITEMS		7
 
@@ -77,7 +77,8 @@ main(void)
 {
 	plan(PLAN);
 
-	char *td = mkdtemp(strdup("/tmp/fiob.XXXXXX"));
+	/* don't create test files in /tmp - tmpfs doesn't support O_DIRECT */
+	char *td = mkdtemp(strdup("./fiob.XXXXXX"));
 	isnt(td, NULL, "tempdir is created");
 	if (td == 0) {
 		diag("Can't create temporary dir: %s", strerror(errno));
@@ -101,6 +102,29 @@ main(void)
 		done = fread(buf, 1, 12, f);
 		is(done, 12, "Hello world is read (%zu bytes)", done);
 		is(memcmp(buf, "Hello, world", 12), 0, "data");
+
+		is(fseek(f, 7L, SEEK_SET), 0, "set odd position");
+		is(ftell(f), 7L, "check odd position");
+		is(fread(buf, 1, 4096, f), 5, "read from odd position (size)");
+		is(memcmp(buf, "world", 5), 0, "read from odd position (data)");
+
+		is(fseek(f, 0L, SEEK_SET), 0, "set start position");
+		is(ftell(f), 0L, "check start position");
+
+		is(fseek(f, 0L, SEEK_END), 0, "set eof position");
+		is(ftell(f), 12L, "check eof position");
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
+		ok(feof(f), "feof");
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
+		ok(feof(f), "feof");
+
+		is(fseek(f, -1L, SEEK_END), 0, "set -1 position");
+		is(ftell(f), 11L, "check -1 position");
+		is(fread(buf, 1, 4096, f), 1, "read from -1 position (size)");
+		is(memcmp(buf, "d", 1), 0, "read from -1 position (data)");
+		ok(feof(f), "feof");
+
+		is(fread(buf, 1, 4096, f), 0, "read from eof position (size)");
 
 		is(fseek(f, 0L, SEEK_SET), 0, "set new position");
 		done = fread(buf + 1, 1, 12, f);
@@ -214,7 +238,21 @@ main(void)
 		is(fclose(f), 0, "fclose");
 	}
 
-
+	{
+		FILE *f = fiob_open("/dev/full", "wd");
+		if (f) {
+			errno = 0;
+			fputs("test", f);
+			/* flush buffer && close file */
+			int r = fclose(f);
+			is(errno, ENOSPC, "fwrite failed");
+			is(r, EOF, "fwrite failed");
+		} else {
+			/* System doesn't have /dev/full */
+			ok(1, "fwrite failed");
+			ok(1, "fwrite failed")
+		}
+	}
 
 	if (fork() == 0)
 		execl("/bin/rm", "/bin/rm", "-fr", td, NULL);

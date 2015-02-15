@@ -72,8 +72,9 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	int n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
+		struct space *space = space_cache_find(space_id);
 		tnt_raise(LoggedError, ER_MODIFY_INDEX,
-			  (unsigned) iid, (unsigned) space_id,
+			  name, space_name(space),
 			  "index name is too long");
 	}
 	if (!identifier_is_valid(def->name)) {
@@ -146,41 +147,43 @@ key_list_del_key(struct rlist *key_list, uint32_t iid)
 void
 key_def_check(struct key_def *key_def)
 {
+	struct space *space = space_cache_find(key_def->space_id);
+
 	if (key_def->iid >= BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id,
+			  key_def->name,
+			  space_name(space),
 			  "index id too big");
 	}
 	if (key_def->iid == 0 && key_def->is_unique == false) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id,
+			  key_def->name,
+			  space_name(space),
 			  "primary key must be unique");
 	}
 	if (key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id,
+			  key_def->name,
+			  space_name(space),
 			  "part count must be positive");
 	}
 	if (key_def->part_count > BOX_INDEX_PART_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id,
+			  key_def->name,
+			  space_name(space),
 			  "too many key parts");
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (key_def->parts[i].type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "unknown field type");
 		}
 		if (key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "field no is too big");
 		}
 		for (uint32_t j = 0; j < i; j++) {
@@ -191,17 +194,15 @@ key_def_check(struct key_def *key_def)
 			if (key_def->parts[i].fieldno ==
 			    key_def->parts[j].fieldno) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  (unsigned) key_def->iid,
-					  (unsigned) key_def->space_id,
+					  key_def->name,
+					  space_name(space),
 					  "same key part is indexed twice");
 			}
 		}
 	}
-	struct space *space =
-		space_cache_find(key_def->space_id);
 
 	/* validate key_def->type */
-	space->handler->engine->keydefCheck(key_def);
+	space->handler->engine->keydefCheck(space, key_def);
 }
 
 void
@@ -210,18 +211,18 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 {
 	if (def->id > BOX_SPACE_MAX) {
 		tnt_raise(ClientError, errcode,
-			  (unsigned) def->id,
+			  def->name,
 			  "space id is too big");
 	}
 	if (namelen >= sizeof(def->name)) {
 		tnt_raise(ClientError, errcode,
-			  (unsigned) def->id,
+			  def->name,
 			  "space name is too long");
 	}
 	identifier_check(def->name);
 	if (engine_namelen >= sizeof(def->engine_name)) {
 		tnt_raise(ClientError, errcode,
-			  (unsigned) def->id,
+			  def->name,
 			  "space engine name is too long");
 	}
 	identifier_check(def->engine_name);
@@ -230,7 +231,7 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 		Engine *engine = engine_find(def->engine_name);
 		if (! engine_can_be_temporary(engine->flags))
 			tnt_raise(ClientError, ER_ALTER_SPACE,
-			         (unsigned) def->id,
+				  def->name,
 			         "space does not support temporary flag");
 	}
 }

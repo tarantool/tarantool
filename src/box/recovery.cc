@@ -150,9 +150,6 @@ wal_writer_start(struct recovery_state *state, int rows_per_wal);
 void
 wal_writer_stop(struct recovery_state *r);
 
-static void
-recovery_stop_local(struct recovery_state *r);
-
 /**
  * Throws an exception in  case of error.
  */
@@ -182,9 +179,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	xdir_create(&r->snap_dir, snap_dirname, SNAP, &r->server_uuid);
 
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
-
-	if (r->wal_mode == WAL_FSYNC)
-		(void) strcat(r->wal_dir.open_wflags, "s");
 
 	vclock_create(&r->vclock);
 
@@ -253,6 +247,14 @@ recovery_delete(struct recovery_state *r)
 		xlog_close(r->current_wal);
 	}
 	free(r);
+}
+
+void
+recovery_exit(struct recovery_state *r)
+{
+	/* Avoid fibers, there is no event loop */
+	r->watcher = NULL;
+	recovery_delete(r);
 }
 
 void
@@ -348,13 +350,15 @@ recover_snap(struct recovery_state *r)
 	/**
 	 * Don't rescan the directory, it's done when
 	 * recovery is initialized.
-	 * Don't check if the directory index is empty, there must
-	 * be at least one existing snapshot, otherwise we would
-	 * have created it from a bootstrap copy.
 	 */
 	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such case.
+	 */
 	if (res == NULL)
-	    tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_signature(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
@@ -515,7 +519,8 @@ recover_current_wal:
 }
 
 void
-recovery_finalize(struct recovery_state *r, int rows_per_wal)
+recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
+		  int rows_per_wal)
 {
 
 	recovery_stop_local(r);
@@ -551,6 +556,10 @@ recovery_finalize(struct recovery_state *r, int rows_per_wal)
 
 		recovery_close_log(r);
 	}
+
+	r->wal_mode = wal_mode;
+	if (r->wal_mode == WAL_FSYNC)
+		(void) strcat(r->wal_dir.open_wflags, "s");
 
 	wal_writer_start(r, rows_per_wal);
 }
@@ -598,7 +607,7 @@ recovery_follow_local(struct recovery_state *r,
 	fiber_start(r->watcher, r, wal_dir_rescan_delay);
 }
 
-static void
+void
 recovery_stop_local(struct recovery_state *r)
 {
 	if (r->watcher) {

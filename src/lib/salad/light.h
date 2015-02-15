@@ -234,6 +234,7 @@ LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @brief Get a value from a desired position
  * @param ht - pointer to a hash table struct
  * @param slotpos - ID of an record
+ *  ID must be vaild, check it by light_pos_valid (asserted).
  */
 LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos);
@@ -242,6 +243,7 @@ LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @brief Determine if posision holds a value
  * @param ht - pointer to a hash table struct
  * @param slotpos - ID of an record
+ *  ID must be in valid range [0, ht->table_size) (asserted).
  */
 bool
 LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos);
@@ -667,8 +669,10 @@ LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value
 inline LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
 {
+	assert(slotpos < ht->table_size);
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
 		matras_get(&ht->mtable, slotpos);
+	assert(record->next != slotpos);
 	return record->value;
 }
 
@@ -680,6 +684,7 @@ LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
 inline bool
 LIGHT(pos_valid)(LIGHT(core) *ht, uint32_t slotpos)
 {
+	assert(slotpos < ht->table_size);
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
 		matras_get(&ht->mtable, slotpos);
 	return record->next != slotpos;

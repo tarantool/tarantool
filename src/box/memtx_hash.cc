@@ -170,13 +170,10 @@ hash_iterator_ge(struct iterator *ptr)
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
-	if (it->h_pos < it->hash_table->table_size) {
-		struct tuple *res = light_index_get(it->hash_table, it->h_pos);
+	while (it->h_pos < it->hash_table->table_size) {
+		if (light_index_pos_valid(it->hash_table, it->h_pos))
+			return light_index_get(it->hash_table, it->h_pos++);
 		it->h_pos++;
-		while (it->h_pos < it->hash_table->table_size
-		       && !light_index_pos_valid(it->hash_table, it->h_pos))
-			it->h_pos++;
-		return res;
 	}
 	return NULL;
 }
@@ -297,7 +294,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_id(this));
+			tnt_raise(ClientError, errcode, index_name(this));
 		}
 
 		if (dup_tuple)

@@ -250,7 +250,7 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			bps_tree_index_delete(&tree, new_tuple);
 			if (dup_tuple)
 				bps_tree_index_insert(&tree, dup_tuple, 0);
-			tnt_raise(ClientError, errcode, index_id(this));
+			tnt_raise(ClientError, errcode, index_name(this));
 		}
 		if (dup_tuple)
 			return dup_tuple;

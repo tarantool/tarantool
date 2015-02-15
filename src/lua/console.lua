@@ -163,7 +163,6 @@ local function client_print(self, output)
         return
     elseif not output then
         -- disconnect peer
-        local peer = self.client:peer()
         self.client:shutdown()
         self.client:close()
         self.client = nil

@@ -144,14 +144,14 @@ MemtxEngine::dropIndex(Index *index)
 }
 
 void
-MemtxEngine::keydefCheck(struct key_def *key_def)
+MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
 		if (! key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "HASH index must be unique");
 		}
 		break;
@@ -161,35 +161,35 @@ MemtxEngine::keydefCheck(struct key_def *key_def)
 	case RTREE:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "RTREE index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "RTREE index can not be unique");
 		}
 		break;
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "BITSET index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "BITSET can not be unique");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id);
+			  key_def->name,
+			  space_name(space));
 		break;
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
@@ -198,16 +198,16 @@ MemtxEngine::keydefCheck(struct key_def *key_def)
 		case STRING:
 			if (key_def->type == RTREE) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  (unsigned) key_def->iid,
-					  (unsigned) key_def->space_id,
+					  key_def->name,
+					  space_name(space),
 					  "RTREE index field type must be ARRAY");
 			}
 			break;
 		case ARRAY:
 			if (key_def->type != RTREE) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  (unsigned) key_def->iid,
-					  (unsigned) key_def->space_id,
+					  key_def->name,
+					  space_name(space),
 					  "ARRAY field type is not supported");
 			}
 			break;

@@ -227,23 +227,91 @@ box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
 ---
 - ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
 ...
---
--- A test case for #107 "box.tuple.unpack asserts on extra arguments"
---
 t=box.tuple.new{'a','b','c'}
 ---
 ...
-t:unpack(5)
+t:totable()
+---
+- ['a', 'b', 'c']
+...
+t:unpack()
 ---
 - a
 - b
 - c
 ...
-t:unpack(1, 2, 3, 4, 5)
+t:totable(1)
+---
+- ['a', 'b', 'c']
+...
+t:unpack(1)
 ---
 - a
 - b
 - c
+...
+t:totable(2)
+---
+- ['b', 'c']
+...
+t:unpack(2)
+---
+- b
+- c
+...
+t:totable(1, 3)
+---
+- ['a', 'b', 'c']
+...
+t:unpack(1, 3)
+---
+- a
+- b
+- c
+...
+t:totable(2, 3)
+---
+- ['b', 'c']
+...
+t:unpack(2, 3)
+---
+- b
+- c
+...
+t:totable(2, 4)
+---
+- ['b', 'c']
+...
+t:unpack(2, 4)
+---
+- b
+- c
+...
+t:totable(nil, 2)
+---
+- ['a', 'b']
+...
+t:unpack(nil, 2)
+---
+- a
+- b
+...
+t:totable(2, 1)
+---
+- []
+...
+t:unpack(2, 1)
+---
+...
+t:totable(0)
+---
+- error: '[string "-- tuple.lua (internal file)..."]:123: tuple.totable: invalid second
+    argument'
+...
+t:totable(1, 0)
+---
+- error: '[string "-- tuple.lua (internal file)..."]:132: tuple.totable: invalid third
+    argument'
 ...
 --
 -- Check that tuple:totable correctly sets serializer hints
@@ -735,12 +803,12 @@ t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
 ...
 t:update()
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:157: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:172: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update(10)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:157: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:172: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update({})

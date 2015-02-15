@@ -1,14 +1,9 @@
 ---
-title   : "Tarantool - Downloads"
+title   : "Tarantool - Download"
 slug    : "download"
 save_as : "download.html"
 template: "download"
 blocks :
-  links:
-    - ["Overview", "/intro.html"]
-    - ["Documentation", "/documentation.html"]
-    - ["Downloads", "/download.html"]
-    - ["Rocks", "http://rocks.tarantool.org"]
   top :
     title : "Binary downloads"
     content:

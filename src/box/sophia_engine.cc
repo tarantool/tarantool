@@ -215,40 +215,40 @@ SophiaEngine::dropIndex(Index *index)
 }
 
 void
-SophiaEngine::keydefCheck(struct key_def *key_def)
+SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case TREE:
 		if (! key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "Sophia TREE index must be unique");
 		}
 		if (key_def->iid != 0) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "Sophia TREE secondary indexes are not supported");
 		}
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "Sophia TREE index key can not be multipart");
 		}
 		if (key_def->parts[0].type != NUM &&
 		    key_def->parts[0].type != STRING) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "Sophia TREE index field type must be STR or NUM");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id);
+			  key_def->name,
+			  space_name(space));
 		break;
 	}
 }
@@ -270,12 +270,25 @@ SophiaEngine::begin(struct txn *txn, struct space *space)
 	assert(tx != NULL);
 }
 
+static inline void
+sophia_txn_gc(struct txn *txn)
+{
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (! stmt->new_tuple)
+			continue;
+		assert(stmt->new_tuple->refs >= 2);
+		tuple_unref(stmt->new_tuple);
+	}
+}
+
 void
 SophiaEngine::commit(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
+		sophia_txn_gc(txn);
 		tx = NULL;
 	});
 	/* commit transaction using transaction
@@ -292,11 +305,12 @@ SophiaEngine::commit(struct txn *txn)
 }
 
 void
-SophiaEngine::rollback(struct txn *)
+SophiaEngine::rollback(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
+		sophia_txn_gc(txn);
 		tx = NULL;
 	});
 	sp_rollback(tx);

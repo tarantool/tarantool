@@ -137,7 +137,7 @@ class TarantoolLog(object):
                 if pos != -1:
                     return pos
 
-    def seek_from(self, msg, proc=None):
+    def seek_wait(self, msg, proc=None):
         while True:
             if os.path.exists(self.path):
                 break
@@ -155,7 +155,7 @@ class TarantoolLog(object):
                     time.sleep(0.001)
                     f.seek(cur_pos, os.SEEK_SET)
                     continue
-                if log_str.find(msg) != -1:
+                if re.findall(msg, log_str):
                     return
                 cur_pos = f.tell()
 
@@ -532,7 +532,9 @@ class TarantoolServer(Server):
         2) wait until server tells us his status
 
         """
-        self.logfile_pos.seek_from('entering the event loop', self.process if not self.gdb else None)
+        msg = 'entering the event loop|will retry binding'
+        self.logfile_pos.seek_wait(
+            msg, self.process if not self.gdb else None)
         while True:
             try:
                 temp = AdminConnection('localhost', self.admin.port)

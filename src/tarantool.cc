@@ -483,7 +483,7 @@ load_cfg()
 
 	say_crit("version %s", tarantool_version());
 	say_crit("log level %i", cfg_geti("log_level"));
-	box_init();
+	box_load_cfg();
 }
 
 void

@@ -40,8 +40,10 @@ struct tarantool_coro {
 
 void
 tarantool_coro_create(struct tarantool_coro *ctx,
+		      struct slab_cache *cache,
 		      void (*f) (void *), void *data);
 void
-tarantool_coro_destroy(struct tarantool_coro *ctx);
+tarantool_coro_destroy(struct tarantool_coro *ctx,
+		       struct slab_cache *cache);
 
 #endif /* TARANTOOL_CORO_H_INCLUDED */

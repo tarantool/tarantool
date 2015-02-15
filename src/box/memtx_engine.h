@@ -35,7 +35,7 @@ struct MemtxEngine: public Engine {
 	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
-	virtual void keydefCheck(struct key_def *key_def);
+	virtual void keydefCheck(struct space *space, struct key_def *key_def);
 	virtual void rollback(struct txn*);
 	virtual void begin_recover_snapshot(int64_t lsn);
 	virtual void end_recover_snapshot();

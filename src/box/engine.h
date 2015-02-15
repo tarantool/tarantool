@@ -97,7 +97,7 @@ public:
 	 * Check a key definition for violation of
 	 * various limits.
 	 */
-	virtual void keydefCheck(struct key_def*) = 0;
+	virtual void keydefCheck(struct space *space, struct key_def*) = 0;
 	/**
 	 * Create an instance of space index. Used in alter
 	 * space.

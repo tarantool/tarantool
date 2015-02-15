@@ -4,29 +4,35 @@ s = box.schema.create_space('spatial')
 -- rtree index as primary key must be forbidden (unique)
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: RTREE index can not be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    can not be unique'
 ...
 -- any non-unique index as primary key must be forbidden
 i = s:create_index('spatial', { type = 'hash', unique = false, parts = {1, 'num'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': primary
+    key must be unique'
 ...
 i = s:create_index('spatial', { type = 'tree', unique = false, parts = {1, 'num'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': primary
+    key must be unique'
 ...
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': primary
+    key must be unique'
 ...
 -- tree and hash indexes over array field is not possible
 i = s:create_index('primary', { type = 'tree', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: ARRAY field type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
+    type is not supported'
 ...
 i = s:create_index('primary', { type = 'hash', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index 0 in space 512: ARRAY field type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
+    type is not supported'
 ...
 -- normal indexes
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
@@ -47,25 +53,26 @@ i = s:insert{1, {2, 3, 4}}
 -- rtree index must be one-part
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'array', 2, 'array'}})
 ---
-- error: 'Can''t create or modify index 2 in space 512: RTREE index key can not be
-    multipart'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    key can not be multipart'
 ...
 -- unique rtree index is not possible
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 ---
-- error: 'Can''t create or modify index 2 in space 512: RTREE index can not be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    can not be unique'
 ...
 -- num rtree index is not possible
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'num'}})
 ---
-- error: 'Can''t create or modify index 2 in space 512: RTREE index field type must
-    be ARRAY'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    field type must be ARRAY'
 ...
 -- str rtree index is not possible
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'str'}})
 ---
-- error: 'Can''t create or modify index 2 in space 512: RTREE index field type must
-    be ARRAY'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    field type must be ARRAY'
 ...
 -- normal rtree index
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
@@ -127,15 +134,17 @@ s:insert{1, 2, {3, 4, 5, 6}}
 -- invalid alters
 s.index.spatial:alter({unique = true})
 ---
-- error: 'Can''t create or modify index 2 in space 512: RTREE index can not be unique'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': RTREE index
+    can not be unique'
 ...
 s.index.spatial:alter({type = 'tree'})
 ---
-- error: 'Can''t create or modify index 2 in space 512: ARRAY field type is not supported'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': ARRAY field
+    type is not supported'
 ...
 box.space[box.schema.SPACE_ID]:update({s.id}, {{"=", 4, 'sophia'}})
 ---
-- error: 'Can''t modify space 512: can not change space engine'
+- error: 'Can''t modify space ''spatial'': can not change space engine'
 ...
 -- chech that truncate works
 s.index.spatial:select({0, 0, 10, 10}, {iterator = 'le'})
@@ -202,7 +211,7 @@ s = box.schema.create_space('sophia', {engine = 'sophia'})
 -- rtree indexes are not enabled in sophia
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 ---
-- error: Unsupported index type supplied for index 0 in space 512
+- error: Unsupported index type supplied for index 'spatial' in space 'sophia'
 ...
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 ---
@@ -210,7 +219,7 @@ i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 -- ... even secondary
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 ---
-- error: Unsupported index type supplied for index 1 in space 512
+- error: Unsupported index type supplied for index 'spatial' in space 'sophia'
 ...
 s:drop()
 ---
