@@ -9,7 +9,7 @@
     <title>Writing and running Lua code</title>
 
     <para>
-      Procedures can be defined and invoked interactively, for example::
+      Procedures can be defined and invoked interactively, for example:
       <programlisting><computeroutput>tarantool> <userinput>function f1() return 'hello' end</userinput>
 ---
 ...
@@ -1282,7 +1282,7 @@ the status is dead because the cancel worked.<programlisting>
                 Parameters: <code>message</code>, <code>timeout</code>.
             </para>
             <para>
-                Returns: If <code>timeout</code> is provided,
+                Returns: (type = boolean) If <code>timeout</code> is provided,
                 and the channel doesn't become empty for the duration
                 of the timeout,
                 <code>channel:put()</code>
@@ -1350,6 +1350,17 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
+    <term><emphasis role="lua"><replaceable>channel</replaceable>:count()</emphasis></term>
+    <listitem>
+        <para>
+           Find out how many messages are on the channel. The answer is 0 if the channel is empty.
+        </para>
+        <para>
+           Returns: (type = number) the number of messages.
+        </para>
+    </listitem>
+    </varlistentry>
+     <varlistentry>
         <term><emphasis role="lua"><replaceable>channel</replaceable>:is_full()</emphasis></term>
         <listitem>
             <para>
@@ -1609,6 +1620,8 @@ end
        <row><entry><link linkend="socket-error">error</link></entry><entry>error checking</entry></row>
        <row><entry><link linkend="socket-getaddrinfo">getaddrinfo</link></entry><entry>information</entry></row>
        <row><entry><link linkend="socket-getsockopt">getsockopt</link></entry><entry>information</entry></row>
+       <row><entry><link linkend="socket-peer">peer</link></entry><entry>information</entry></row>
+       <row><entry><link linkend="socket-name">name</link></entry><entry>information</entry></row>  
        </tbody>
       </tgroup>
       </table>
@@ -1691,10 +1704,10 @@ end
              Send data over a connected socket.
             </para>
             <para>
-             Parameters: <code>data</code>.
+             Parameters: <code>data</code> (type = string).
             </para>
             <para>
-             Returns: true if success, false if error.
+             Returns: (type = boolean) true if success, false if error.
             </para>
             <para>
              Notes: The function <code>sock:write(...)</code> has the same parameters and same effect.
@@ -1721,7 +1734,7 @@ end
               of this call.
             </para>
             <para>
-              Parameters: <code>size</code>.
+              Parameters: <code>size</code>(type = integer).
             </para>
             <para>
               Returns: (type = string) a string of the requested length on success.
@@ -1774,13 +1787,13 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua"><replaceable>sock</replaceable>:bind(<replaceable>host, port</replaceable>)</emphasis></term>
+     <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua"><replaceable>sock</replaceable>:bind(<replaceable>host</replaceable>[, <replaceable>port</replaceable>])</emphasis></term>
         <listitem>
             <para>
                 Bind a socket to the given host/port.
                 A UDP socket after binding can be used
-                to receive data (see <code>recvfrom()</code>). A TCP socket
-                can be used to accept new connections, after it's
+                to receive data (see <code><link linkend="socket-recvfrom">recvfrom()</link></code>). A TCP socket
+                can be used to accept new connections, after it has
                 been put in listen mode.
             </para>
             <para>
@@ -1804,7 +1817,7 @@ end
                 on BSD the backlog may be <constant>SOMAXCONN</constant>.
             </para>
             <para>
-               Returns: true for success, false for error.
+               Returns: (type = boolean) true for success, false for error.
             </para>
         </listitem>
     </varlistentry>
@@ -1823,18 +1836,20 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua"><replaceable>sock</replaceable>:sendto(<replaceable>data, host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua"><replaceable>sock</replaceable>:sendto(<replaceable>host, port, data</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
             </para>
             <para>
-               Parameters: <code>data</code>, <code>host</code>.
+                Parameters: <code>host</code>, <code>port</code>, <code>data</code> (type = string), .
             </para>
             <para>
-               Returns: (type = number) the number of bytes sent on success, <code>0, status, errno, errstr</code>
-                on error.
+                Returns: if successful: (type = integer) the number of bytes sent.
             </para>
+            <para>
+                Returns: if not successful: status, errno, errstr.
+            </para>            
         </listitem>
     </varlistentry>
 
@@ -1845,11 +1860,18 @@ end
                 Receive a message on a UDP socket.
             </para>
             <para>
-                Parameters: <code>limit</code>, <code>timeout</code>.
+                Parameters: <code>limit</code> (type = integer).
             </para>
             <para>
-                Returns: (type = string) Message, <code>nil</code>, client address, client port on success,
-                <code>"", status, errno, errstr</code> on error or timeout.
+                Returns: if successful: (type = string) message, (type = table) a table containing "host" and "family" and "port" fields.
+            </para>
+            <para>
+                Returns: if not successful: status, errno, errstr.
+            </para>
+            <para>
+             Example: after <code>message_content, message_sender = recvfrom(1)</code> the value of <code>message_content</code>
+             might be a string containing 'X' and the value of <code>message_sender</code> might be a table containing
+             message_sender.host = '18.44.0.1', message_sender.family = 'AF_INET', message_sender.port = 43065.
             </para>
         </listitem>
     </varlistentry>
@@ -1967,6 +1989,34 @@ end
     </varlistentry>
     
     <varlistentry>
+     <term xml:id="socket-name" xreflabel="socket-name"><emphasis role="lua"><replaceable>sock</replaceable>:name()</emphasis></term>
+        <listitem>
+            <para>
+             The <code>sock:name()</code> function is used to get information about the near side of the connection.
+             If a socket was bound to xyz.com:45, then <code>sock:name</code> will return information about [host:xyz.com, port:45].
+             The equivalent POSIX function is <code>getsockname()</code>.
+            </para>
+            <para>
+               Returns: A table containing these fields: "host", "family", "type", "protocol", "port".
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term xml:id="socket-peer" xreflabel="socket-peer"><emphasis role="lua"><replaceable>sock</replaceable>:peer()</emphasis></term>
+        <listitem>
+            <para>
+             The <code>sock:peer()</code> function is used to get information about the far side of a connection.
+              If a TCP connection has been made to a distant host tarantool.org:80, <code>sock:peer</code> will return information about [host:tarantool.org, port:80].
+              The equivalent POSIX function is <code>getpeername()</code>.
+            </para>
+            <para>
+               Returns: A table containing these fields: "host", "family", "type", "protocol", "port".
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
      <term xml:id="socket-getaddrinfo" xreflabel="socket-getaddrinfo"><emphasis role="lua">socket.getaddrinfo(<replaceable>host</replaceable>, <replaceable>type</replaceable> [, <replaceable>{option-list}</replaceable>)</emphasis></term>
         <listitem>
             <para>
@@ -2001,7 +2051,7 @@ end
 </variablelist>
 
 
- <bridgehead renderas="sect4">Example showing use of socket over the Internet</bridgehead>
+ <bridgehead renderas="sect4">Socket example #1: use of a TCP socket over the Internet</bridgehead>
  <para>
  In this example a connection is made over the internet between the Tarantool server
  and <link xlink:href="http://tarantool.org">tarantool.org</link>,
@@ -2042,6 +2092,61 @@ end
 - true
 ...
 </programlisting>
+</para>
+
+<bridgehead renderas="sect4">Socket example #2: Example showing use of a UDP socket on localhost</bridgehead>
+ <para>
+Here is an example with datagrams.
+Set up two connections on 127.0.0.1 (localhost): sock_1 and sock_2.
+Using sock_2, send a message to sock_1.
+Using sock_1, receive a message.
+Display the received message.
+Close both connections.
+This is not a useful way for a computer to communicate with itself,
+but shows that the system works.
+<programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_1:bind('127.0.0.1')</userinput>
+---
+- true
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_2:sendto('127.0.0.1', sock_1:name().port,'X')</userinput>
+---
+- true
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> message = sock_1:recvfrom()</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> message</userinput>
+---
+- X
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_1:close()</userinput>
+---
+- true
+...
+
+<prompt>tarantool&gt;</prompt> <userinput> sock_2:close()</userinput>
+---
+- true
+...
+</programlisting>
+
 </para>
 
 </section>

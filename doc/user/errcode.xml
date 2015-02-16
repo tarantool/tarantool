@@ -80,6 +80,12 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/sr
     <listitem><para>An error occurred during update of a field.
     </para></listitem>
   </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="ER_TUPLE_FOUND" xreflabel="ER_TUPLE_FOUND">ER_TUPLE_FOUND</term>
+    <listitem><para>.Duplicate key exists in unique index ...
+    </para></listitem>
+  </varlistentry>
 
 </variablelist>
 

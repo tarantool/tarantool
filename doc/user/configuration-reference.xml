@@ -266,7 +266,7 @@ Starting  ARG
           <entry xml:id="primary_port" xreflabel="primary_port">listen</entry>
           <entry>integer or string</entry>
           <entry>null</entry>
-          <entry>no</entry>
+          <entry>yes</entry>
           <entry>The read/write data port number or <link linkend="URI">URI</link> (Universal Resource Identifier) string.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
@@ -386,6 +386,17 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           stored in. A lower value  may result in less wasted
           memory depending on the total amount of memory available
           and the distribution of item sizes.</entry>
+        </row>
+        
+        <row>
+          <entry>sophia</entry>
+          <entry>table</entry>
+          <entry>(see the note)</entry>
+          <entry>no</entry>
+          <entry>The default sophia configuration can be changed with
+           sophia={page_size=<replaceable>number</replaceable>, threads=<replaceable>number</replaceable>,
+           node_size=<replaceable>number</replaceable>, memory_limit=<replaceable>number</replaceable> }.
+           This method may change in the future.</entry>
         </row>
 
       </tbody>
@@ -618,7 +629,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>readahead</entry>
           <entry>integer</entry>
           <entry>16320</entry>
-          <entry>no</entry>
+          <entry>yes</entry>
           <entry>The size of the read-ahead buffer associated with a
           client connection. The larger the buffer, the more
           memory an active connection consumes and the more requests
