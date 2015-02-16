@@ -240,7 +240,8 @@ sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	/* Accept a connection. */
 	int newfd = accept(fd, addr, addrlen);
-	if (newfd < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+	if (newfd < 0 &&
+	    (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
 		tnt_raise(SocketError, fd, "accept");
 	return newfd;
 }

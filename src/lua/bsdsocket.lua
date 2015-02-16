@@ -511,8 +511,19 @@ socket_methods.accept = function(self)
         self._errno = boxerrno()
         return nil
     end
-    return bless_socket(cfd), from
+    local c = bless_socket(cfd)
+    if c == nil then
+        self._errno = box.errno()
+        return nil
+    end
+    return c, from
 end
+
+local errno_is_transient = {
+    [box.errno.EAGAIN] = true;
+    [box.errno.EWOULDBLOCK] = true;
+    [box.errno.EINTR] = true;
+}
 
 local function readchunk(self, size, timeout)
     if self.rbuf == nil then
@@ -549,8 +560,8 @@ local function readchunk(self, size, timeout)
                 self.rbuf = nil
                 return data
             end
-        elseif self:errno() ~= boxerrno.EAGAIN then
-            self._errno = boxerrno()
+        elseif not errno_is_transient[self:errno()] then
+            self._errno = box.errno()
             return nil
         end
     end
@@ -634,8 +645,8 @@ local function readline(self, limit, eol, timeout)
                return data
             end
 
-        elseif self:errno() ~= boxerrno.EAGAIN then
-            self._errno = boxerrno()
+        elseif not error_is_transient[self:errno()] then
+            self._errno = box.errno()
             return nil
         end
     end
@@ -674,7 +685,7 @@ socket_methods.write = function(self, octets, timeout)
 
         local written = self:syswrite(octets)
         if written == nil then
-            if self:errno() ~= boxerrno.EAGAIN then
+            if not errno_is_transient[self:errno()] then
                 return false
             end
         end
@@ -976,16 +987,22 @@ end
 
 local function tcp_server_loop(server, s, addr)
     fiber.name(sprintf("%s/%s:%s", server.name, addr.host, addr.port))
+    log.info("started")
     while s:readable() do
         local sc, from = s:accept()
         if sc == nil then
-            break
+            if not errno_is_transient[s:errno()] then
+                log.error('accept() failed: '..s:error())
+            end
+        else
+            fiber.create(tcp_server_handler, server, sc, from)
         end
-        fiber.create(tcp_server_handler, server, sc, from)
     end
+    -- Socket was closed
     if addr.family == 'AF_UNIX' and addr.port then
         fio.unlink(addr.port) -- remove unix socket
     end
+    log.info("stopped")
 end
 
 local function tcp_server_usage()
