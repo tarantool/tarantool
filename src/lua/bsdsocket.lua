@@ -513,16 +513,16 @@ socket_methods.accept = function(self)
     end
     local c = bless_socket(cfd)
     if c == nil then
-        self._errno = box.errno()
+        self._errno = boxerrno()
         return nil
     end
     return c, from
 end
 
 local errno_is_transient = {
-    [box.errno.EAGAIN] = true;
-    [box.errno.EWOULDBLOCK] = true;
-    [box.errno.EINTR] = true;
+    [boxerrno.EAGAIN] = true;
+    [boxerrno.EWOULDBLOCK] = true;
+    [boxerrno.EINTR] = true;
 }
 
 local function readchunk(self, size, timeout)
@@ -561,7 +561,7 @@ local function readchunk(self, size, timeout)
                 return data
             end
         elseif not errno_is_transient[self:errno()] then
-            self._errno = box.errno()
+            self._errno = boxerrno()
             return nil
         end
     end
@@ -646,7 +646,7 @@ local function readline(self, limit, eol, timeout)
             end
 
         elseif not error_is_transient[self:errno()] then
-            self._errno = box.errno()
+            self._errno = boxerrno()
             return nil
         end
     end

@@ -327,7 +327,6 @@ local function listen(uri)
         error(string.format('failed to create server %s:%s: %s',
             host, port, errno.strerror()))
     end
-    log.info("started on %s:%s", addr.host, addr.port)
     return s
 end
 
