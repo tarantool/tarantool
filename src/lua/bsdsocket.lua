@@ -995,8 +995,8 @@ local function tcp_server_handler(server, sc, from)
 end
 
 local function tcp_server_loop(server, s, addr)
-    print('started')
     box.fiber.name(sprintf("%s/listen/%s:%s", server.name, addr.host, addr.port))
+    print('started')
     while s:readable() do
         local sc, from = s:accept()
         if sc == nil then
