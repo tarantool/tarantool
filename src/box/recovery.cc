@@ -576,7 +576,7 @@ recovery_follow_f(va_list ap)
 	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
 	fiber_set_user(fiber(), &admin_credentials);
 
-	while (true) {
+	while (! fiber_is_cancelled()) {
 		recover_remaining_wals(r);
 		/**
 		 * Allow an immediate wakeup/break loop
@@ -590,8 +590,6 @@ recovery_follow_f(va_list ap)
 		} else {
 			fiber_yield_timeout(wal_dir_rescan_delay);
 		}
-		if (fiber_is_cancelled())
-			return;
 		fiber_set_cancellable(false);
 	}
 }
