@@ -525,6 +525,13 @@ local errno_is_transient = {
     [boxerrno.EINTR] = true;
 }
 
+local errno_is_fatal = {
+    [boxerrno.EBADF] = true;
+    [boxerrno.EINVAL] = true;
+    [boxerrno.EOPNOTSUPP] = true;
+    [boxerrno.ENOTSOCK] = true;
+}
+
 local function readchunk(self, size, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
@@ -991,8 +998,12 @@ local function tcp_server_loop(server, s, addr)
     while s:readable() do
         local sc, from = s:accept()
         if sc == nil then
-            if not errno_is_transient[s:errno()] then
+            local errno = s:errno()
+            if not errno_is_transient[errno] then
                 log.error('accept() failed: '..s:error())
+            end
+            if  errno_is_fatal[errno] then
+                break
             end
         else
             fiber.create(tcp_server_handler, server, sc, from)
