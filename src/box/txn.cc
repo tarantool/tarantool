@@ -268,8 +268,11 @@ txn_rollback_stmt()
 		return txn_rollback();
 	struct txn_stmt *stmt = txn_stmt(txn);
 	if (stmt->old_tuple || stmt->new_tuple) {
-		space_replace(stmt->space, stmt->new_tuple,
-			      stmt->old_tuple, DUP_INSERT);
+		if (! space_is_sophia(stmt->space)) {
+			space_replace(stmt->space,
+			              stmt->new_tuple,
+			              stmt->old_tuple, DUP_INSERT);
+		}
 		if (stmt->new_tuple)
 			tuple_unref(stmt->new_tuple);
 	}
