@@ -305,12 +305,11 @@ SophiaEngine::commit(struct txn *txn)
 }
 
 void
-SophiaEngine::rollback(struct txn *txn)
+SophiaEngine::rollback(struct txn *)
 {
 	if (tx == NULL)
 		return;
 	auto scoped_guard = make_scoped_guard([=] {
-		sophia_txn_gc(txn);
 		tx = NULL;
 	});
 	sp_rollback(tx);
