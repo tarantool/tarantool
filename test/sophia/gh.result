@@ -160,7 +160,7 @@ s:insert{1,'X'}
 ...
 s:update({'X'}, {{'=', 2, 'Y'}})
 ---
-- error: Tuple update/replace failed (different key?) in index 0
+- error: Attempt to modify a tuple field which is part of index primary
 ...
 s:select{'X'}
 ---

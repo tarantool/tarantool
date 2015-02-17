@@ -93,8 +93,10 @@ MemtxEngine::MemtxEngine()
 	m_snapshot_lsn(-1),
 	m_snapshot_pid(0)
 {
-	flags = ENGINE_TRANSACTIONAL | ENGINE_NO_YIELD |
-	        ENGINE_CAN_BE_TEMPORARY;
+	flags = ENGINE_TRANSACTIONAL |
+		ENGINE_NO_YIELD |
+	        ENGINE_CAN_BE_TEMPORARY |
+		ENGINE_AUTO_CHECK_UPDATE;
 	memtx_recovery_prepare(&recovery);
 }
 

@@ -294,13 +294,13 @@ space_stat(struct space *space);
 
 /**
  * Checks that primary key of a tuple did not change during update,
- *  otherwise throws ClientError.
- * You should not call this method,
- *  if an engine can control it by itself.
+ * otherwise throws ClientError.
+ * You should not call this method, if an engine can control it by
+ * itself.
  */
 void
-space_verify_tuple_update(struct space *space,
-			  struct tuple *old_tuple,
-			  struct tuple *new_tuple);
+space_check_update(struct space *space,
+		   struct tuple *old_tuple,
+		   struct tuple *new_tuple);
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

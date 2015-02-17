@@ -71,11 +71,11 @@ _space:delete{_index.id}
 --
 _space:update({_space.id}, {{'+', 1, 1}})
 ---
-- error: Tuple update/replace failed (different key?) in index 10231720
+- error: Attempt to modify a tuple field which is part of index primary
 ...
 _space:update({_space.id}, {{'+', 1, 2}})
 ---
-- error: Tuple update/replace failed (different key?) in index 10231720
+- error: Attempt to modify a tuple field which is part of index primary
 ...
 --
 -- Create a space

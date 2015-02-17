@@ -142,7 +142,7 @@ box.info.vclock[10]
 ...
 box.space._cluster:update(10, {{'=', 1, 11}})
 ---
-- error: Tuple update/replace failed (different key?) in index 0
+- error: Attempt to modify a tuple field which is part of index primary
 ...
 box.info.server.id
 ---

@@ -269,7 +269,7 @@ space:delete{'Vincent', 'The Wolf!', 0}
 ...
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 1, 'Updated' }, {'=', 5, 'New'}})
 ---
-- error: Tuple update/replace failed (different key?) in index 0
+- error: Attempt to modify a tuple field which is part of index primary
 ...
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 ---

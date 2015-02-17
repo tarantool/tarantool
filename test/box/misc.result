@@ -182,7 +182,8 @@ end;
 ...
 t;
 ---
-- - 'box.error.EXACT_MATCH : 19'
+- - 'box.error.CANT_UPDATE_PRIMARY_KEY : 94'
+  - 'box.error.EXACT_MATCH : 19'
   - 'box.error.NO_SUCH_TRIGGER : 34'
   - 'box.error.CLUSTER_ID_IS_RO : 65'
   - 'box.error.INDEX_TYPE : 13'
@@ -198,7 +199,6 @@ t;
   - 'box.error.NO_SUCH_FUNCTION : 51'
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
-  - 'box.error.TUPLE_REPLACE_FAILED : 93'
   - 'box.error.DROP_USER : 44'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.MODIFY_INDEX : 14'

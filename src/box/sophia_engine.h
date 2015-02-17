@@ -47,7 +47,6 @@ struct SophiaEngine: public Engine {
 	virtual int wait_checkpoint();
 	virtual void commit_checkpoint();
 	virtual void abort_checkpoint();
-	virtual bool auto_verify_update_primary_key() override { return false; }
 	void *env;
 	void *tx;
 private:

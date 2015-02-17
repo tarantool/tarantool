@@ -36,7 +36,19 @@ struct tuple;
 enum engine_flags {
 	ENGINE_TRANSACTIONAL = 1,
 	ENGINE_NO_YIELD = 2,
-	ENGINE_CAN_BE_TEMPORARY = 4
+	ENGINE_CAN_BE_TEMPORARY = 4,
+	/**
+	 * Identifies that engine can handle changes
+	 * of primary key during update.
+	 * During update operation user could change primary
+	 * key of a tuple, which is prohibited, to avoid funny
+	 * effects during replication. Some engines can
+	 * track down this situation and abort the operation;
+	 * such engines should set this flag.
+	 * If the flag is not set, the server will verify
+	 * that the primary key is not changed.
+	 */
+	ENGINE_AUTO_CHECK_UPDATE = 8,
 };
 
 extern uint32_t engine_flags[BOX_ENGINE_MAX];
@@ -141,17 +153,6 @@ public:
 	 * An error in one of the engines, abort checkpoint.
 	 */
 	virtual void abort_checkpoint() = 0;
-	/**
-	 * Identifies that engine can handle changes
-	 *  of primary key during update.
-	 * During update operation user could change primary
-	 *  key of a tuple, that is prohibited. Some engine can
-	 *  track this situation and abort the operation; such
-	 *  engines should return true; others - false.
-	 * If the method return false, additional verification
-	 *  will be started.
-	 */
-	virtual bool auto_verify_update_primary_key() = 0;
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -219,6 +220,12 @@ static inline bool
 engine_can_be_temporary(uint32_t flags)
 {
 	return flags & ENGINE_CAN_BE_TEMPORARY;
+}
+
+static inline bool
+engine_auto_check_update(uint32_t flags)
+{
+	return flags & ENGINE_AUTO_CHECK_UPDATE;
 }
 
 static inline uint32_t

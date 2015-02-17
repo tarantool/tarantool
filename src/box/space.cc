@@ -357,21 +357,16 @@ space_stat(struct space *sp)
 	return &space_stat;
 }
 
-/**
- * Checks that primary key of a tuple did not change during update,
- *  otherwise throws ClientError.
- * You should not call this method,
- *  if an engine can control it by itself.
- */
 void
-space_verify_tuple_update(struct space *space,
-			  struct tuple *old_tuple,
-			  struct tuple *new_tuple)
+space_check_update(struct space *space,
+		   struct tuple *old_tuple,
+		   struct tuple *new_tuple)
 {
 	assert(space->index_count > 0);
-	Index *indx = space->index[0];
-	if (tuple_compare(old_tuple, new_tuple, indx->key_def))
-		tnt_raise(ClientError, ER_TUPLE_REPLACE_FAILED, index_id(indx));
+	Index *index = space->index[0];
+	if (tuple_compare(old_tuple, new_tuple, index->key_def))
+		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
+			  index_name(index));
 }
 
 /* vim: set fm=marker */
