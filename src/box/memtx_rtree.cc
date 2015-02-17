@@ -29,14 +29,15 @@
 #include "memtx_rtree.h"
 #include "tuple.h"
 #include "space.h"
+#include "memtx_engine.h"
 #include "errinj.h"
 #include "fiber.h"
 #include "small/small.h"
 
-/** For all memory used by all rtree indexes. */
-static struct mempool rtree_page_pool;
-/** Number of allocated pages. */
-static int rtree_page_pool_initialized = 0;
+/**
+ * Single-linked list of free rtree pages
+ */
+static void *rtree_free_pages = 0;
 
 /* {{{ Utilities. *************************************************/
 
@@ -125,17 +126,40 @@ static void *
 rtree_page_alloc()
 {
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
-	return mempool_alloc(&rtree_page_pool);
+	if (!rtree_free_pages) {
+		/**
+		 * No free pages in list - let's allocate new extent, split it
+		 * into pages and add them to the list.
+		 */
+		char *extent = (char *)memtx_index_extent_alloc();
+		if (!extent) {
+			panic("%s", "Memory allocation failed in rtree");
+			return 0;
+		}
+		assert(MEMTX_EXTENT_SIZE % RTREE_PAGE_SIZE == 0);
+		assert(RTREE_PAGE_SIZE >= sizeof(void *));
+		for (size_t i = 0; i < MEMTX_EXTENT_SIZE; i += RTREE_PAGE_SIZE) {
+			*(void **)(extent + i) = rtree_free_pages;
+			rtree_free_pages = (void *)(extent + i);
+		}
+	}
+	/* Now we surely have a free page in free list */
+	void *res = rtree_free_pages;
+	rtree_free_pages = *(void **)rtree_free_pages;
+	return res;
 }
 
 static void
 rtree_page_free(void *page)
 {
-	return mempool_free(&rtree_page_pool, page);
+	/* Just add to free list. */
+	*(void **)page = rtree_free_pages;
+	rtree_free_pages = page;
 }
+
 MemtxRTree::~MemtxRTree()
 {
-	// Iterator has to be destroye prior to tree
+	// Iterator has to be destroyed prior to tree
 	if (m_position != NULL) {
 		index_rtree_iterator_free(m_position);
 		m_position = NULL;
@@ -150,11 +174,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	assert(key_def->parts[0].type = ARRAY);
 	assert(key_def->is_unique == false);
 
-	if (rtree_page_pool_initialized == 0) {
-		mempool_create(&rtree_page_pool, &cord()->slabc,
-			       RTREE_PAGE_SIZE);
-		rtree_page_pool_initialized = 1;
-	}
+	memtx_index_arena_init();
 	rtree_init(&tree, rtree_page_alloc, rtree_page_free);
 }
 
