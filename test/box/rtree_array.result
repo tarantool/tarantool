@@ -1,27 +1,15 @@
 s = box.schema.create_space('spatial')
 ---
 ...
-s:create_index('primary')
+_ = s:create_index('primary')
 ---
-- unique: true
-  parts:
-  - type: NUM
-    fieldno: 1
-  id: 0
-  space_id: 512
-  name: primary
-  type: TREE
 ...
-s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
+spatial = s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
 ---
-- unique: false
-  parts:
-  - type: ARRAY
-    fieldno: 2
-  id: 1
-  space_id: 512
-  name: spatial
-  type: RTREE
+...
+spatial.type
+---
+- RTREE
 ...
 s:insert{1,{0.0,0.0}}
 ---

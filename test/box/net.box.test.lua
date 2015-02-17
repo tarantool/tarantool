@@ -297,7 +297,7 @@ gh594()
 
 -- #636: Reload schema on demand
 sp = box.schema.create_space('test_old')
-sp:create_index('primary')
+_ = sp:create_index('primary')
 sp:insert{1, 2, 3}
 
 con = remote.new(box.cfg.listen)
@@ -306,7 +306,7 @@ con.space.test_old:select{}
 con.space.test == nil
 
 sp = box.schema.create_space('test')
-sp:create_index('primary')
+_ = sp:create_index('primary')
 sp:insert{2, 3, 4}
 
 con.space.test == nil

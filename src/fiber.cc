@@ -695,7 +695,8 @@ cord_costart_thread_func(void *arg)
 		/* The fiber hasn't died right away at start. */
 		ev_run(loop(), 0);
 	}
-	if (f->exception) {
+	if (f->exception &&
+	    typeid(f->exception) != typeid(FiberCancelException)) {
 		Exception::move(&f->exception, &fiber()->exception);
 		fiber()->exception->raise();
 	}

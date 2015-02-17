@@ -46,7 +46,7 @@ session.su('test')
 -- in future we may  introduce a separate privilege
 box.schema.create_space('test')
 ---
-- error: Read access denied for user 'test' to space '_space'
+- error: Write access denied for user 'test' to space '_schema'
 ...
 -- su() goes through because called from admin
 -- console, and it has no access checks
@@ -394,7 +394,7 @@ box.schema.user.passwd('invalid_user', 'some_password')
 ...
 box.schema.user.passwd()
 ---
-- error: '[string "-- schema.lua (internal file)..."]:1043: Usage: box.schema.user.passwd([user,]
+- error: '[string "-- schema.lua (internal file)..."]:1047: Usage: box.schema.user.passwd([user,]
     password)'
 ...
 session.su('user1')

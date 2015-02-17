@@ -16,6 +16,7 @@ _priv = box.space[box.schema.PRIV_ID]
 _cluster = box.space[box.schema.CLUSTER_ID]
 -- define schema version
 _schema:insert{'version', 1, 6}
+_schema:insert{'max_id', box.schema.SYSTEM_ID_MAX}
 -- define system spaces
 --
 -- _schema
