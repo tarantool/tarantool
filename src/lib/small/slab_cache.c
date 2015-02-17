@@ -66,6 +66,7 @@ static inline void
 slab_assert(struct slab_cache *cache, struct slab *slab)
 {
 	(void) slab;
+	assert(pthread_equal(cache->thread_id, pthread_self()));
 	assert(slab->magic == slab_magic);
 	assert(slab->order <= cache->order_max + 1);
 	if (slab->order <= cache->order_max) {
@@ -179,6 +180,7 @@ slab_cache_create(struct slab_cache *cache, struct slab_arena *arena)
 	slab_list_create(&cache->allocated);
 	for (uint8_t i = 0; i <= cache->order_max; i++)
 		slab_list_create(&cache->orders[i]);
+	slab_cache_set_thread(cache);
 }
 
 void

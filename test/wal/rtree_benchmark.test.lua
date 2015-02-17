@@ -1,6 +1,6 @@
 s = box.schema.create_space('rtreebench')
-s:create_index('primary')
-s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
+_ = s:create_index('primary')
+_ = s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
 
 n_records = 20000
 n_iterations = 10000

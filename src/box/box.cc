@@ -50,7 +50,7 @@
 #include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
-#include "evio.h"
+#include "coio.h"
 
 static void process_ro(struct request *request, struct port *port);
 box_process_func box_process = process_ro;
@@ -111,13 +111,14 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
-static void
+static enum wal_mode
 box_check_wal_mode(const char *mode_name)
 {
 	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode == WAL_MODE_MAX)
 		tnt_raise(ClientError, ER_CFG, "wal_mode", mode_name);
+	return (enum wal_mode) mode;
 }
 
 static void
@@ -130,6 +131,17 @@ box_check_readahead(int readahead)
 	}
 }
 
+static int
+box_check_rows_per_wal(int rows_per_wal)
+{
+	/* check rows_per_wal configuration */
+	if (rows_per_wal <= 1) {
+		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
+			  "the value must be greater than one");
+	}
+	return rows_per_wal;
+}
+
 void
 box_check_config()
 {
@@ -137,12 +149,8 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_uri(cfg_gets("replication_source"), "replication_source");
 	box_check_readahead(cfg_geti("readahead"));
-
-	/* check rows_per_wal configuration */
-	if (cfg_geti("rows_per_wal") <= 1) {
-		tnt_raise(ClientError, ER_CFG, "rows_per_wal",
-			  "the value must be greater than one");
-	}
+	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
 extern "C" void
@@ -182,25 +190,21 @@ box_set_listen(const char *uri)
 	if (evio_service_is_active(&binary))
 		evio_service_stop(&binary);
 
-	if (uri != NULL) {
-		evio_service_start(&binary, uri);
-	} else {
-		box_leave_local_standby_mode(NULL);
-	}
+	if (uri != NULL)
+		coio_service_start(&binary, uri);
 }
 
 extern "C" void
 box_set_wal_mode(const char *mode_name)
 {
-	box_check_wal_mode(mode_name);
-	enum wal_mode mode = (enum wal_mode)
-		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
+	enum wal_mode mode = box_check_wal_mode(mode_name);
 	if (mode != recovery->wal_mode &&
 	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
 		tnt_raise(ClientError, ER_CFG, "wal_mode",
 			  "cannot switch to/from fsync");
 	}
-	/** Really update WAL mode only after we left local hot standby,
+	/**
+	 * Really update WAL mode only after we left local hot standby,
 	 * since local hot standby expects it to be NONE.
 	 */
 	if (recovery->finalize)
@@ -239,39 +243,6 @@ box_set_readahead(int readahead)
 }
 
 /* }}} configuration bindings */
-
-void
-box_leave_local_standby_mode(void *data __attribute__((unused)))
-{
-	if (recovery->finalize) {
-		/*
-		 * Nothing to do: this happens when the server
-		 * binds to both ports, and one of the callbacks
-		 * is called first.
-		 */
-		return;
-	}
-	try {
-		recovery_finalize(recovery, cfg_geti("rows_per_wal"));
-	} catch (Exception *e) {
-		e->log();
-		panic("unable to successfully finalize recovery");
-	}
-
-	/*
-	 * notify engines about end of recovery.
-	*/
-	engine_end_recovery();
-
-	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
-	box_set_wal_mode(cfg_gets("wal_mode"));
-
-	if (recovery_has_remote(recovery))
-		recovery_follow_remote(recovery);
-
-	title("running", NULL);
-	say_info("ready to accept requests");
-}
 
 /**
  * Execute a request against a given space id with
@@ -346,15 +317,16 @@ box_process_join(int fd, struct xrow_header *header)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_R);
+	access_check_space(space_cache_find(SC_CLUSTER_ID), PRIV_W);
 
 	assert(header->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(header, &server_uuid);
 
-	box_on_cluster_join(&server_uuid);
-
 	/* Process JOIN request via replication relay */
 	replication_join(fd, header);
+	/** Register the server with the cluster. */
+	box_on_cluster_join(&server_uuid);
 }
 
 void
@@ -405,7 +377,7 @@ box_free(void)
 	user_cache_free();
 	schema_free();
 	tuple_free();
-	recovery_delete(recovery);
+	recovery_exit(recovery);
 	recovery = NULL;
 	engine_shutdown();
 	stat_free();
@@ -428,90 +400,98 @@ engine_init()
 	engine_register(sophia);
 }
 
-void
-box_init()
+static inline void
+box_init(void)
 {
-	box_check_config();
-
-	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
-	stat_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
-
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_geti("slab_alloc_maximal"),
 		   cfg_getd("slab_alloc_factor"));
 
+	stat_init();
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+
+	engine_init();
+
+	schema_init();
+	user_cache_init();
+	/*
+	 * The order is important: to initialize sessions,
+	 * we need to access the admin user, which is used
+	 * as a default session user when running triggers.
+	 */
+	session_init();
+
+	title("loading", NULL);
+
+	/* recovery initialization */
+	recovery = recovery_new(cfg_gets("snap_dir"),
+				cfg_gets("wal_dir"),
+				recover_row, NULL);
+	recovery_set_remote(recovery,
+			    cfg_gets("replication_source"));
+	recovery_setup_panic(recovery,
+			     cfg_geti("panic_on_snap_error"),
+			     cfg_geti("panic_on_wal_error"));
+
+	if (recovery_has_data(recovery)) {
+		/* Tell Sophia engine LSN it must recover to. */
+		int64_t checkpoint_id =
+			recovery_last_checkpoint(recovery);
+		engine_begin_recover_snapshot(checkpoint_id);
+		/* Process existing snapshot */
+		recover_snap(recovery);
+		engine_end_recover_snapshot();
+	} else if (recovery_has_remote(recovery)) {
+		/* Initialize a new replica */
+		replica_bootstrap(recovery);
+		engine_end_recover_snapshot();
+		box_snapshot();
+	} else {
+		/* Initialize the first server of a new cluster */
+		recovery_bootstrap(recovery);
+		box_set_cluster_uuid();
+		box_set_server_uuid();
+		engine_end_recover_snapshot();
+		box_snapshot();
+	}
+	fiber_gc();
+
+	title("orphan", NULL);
+	recovery_follow_local(recovery, cfg_getd("wal_dir_rescan_delay"));
+	title("hot_standby", NULL);
+
+	iproto_init(&binary);
+	box_set_listen(cfg_gets("listen"));
+
+	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
+	recovery_finalize(recovery, wal_mode, rows_per_wal);
+
+	engine_end_recovery();
+
+	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
+
+	if (recovery_has_remote(recovery))
+		recovery_follow_remote(recovery);
+	/* Enter read-write mode. */
+	if (recovery->server_id > 0)
+		box_set_ro(false);
+	title("running", NULL);
+	say_info("ready to accept requests");
+
+	fiber_gc();
+}
+
+void
+box_load_cfg()
+{
 	try {
-		engine_init();
-
-		schema_init();
-		user_cache_init();
-		/*
-		 * The order is important: to initialize sessions,
-		 * we need to access the admin user, which is used
-		 * as a default session user when running triggers.
-		 */
-		session_init();
-
-		title("loading", NULL);
-
-		/* recovery initialization */
-		recovery = recovery_new(cfg_gets("snap_dir"),
-					cfg_gets("wal_dir"),
-					recover_row, NULL);
-		recovery_set_remote(recovery,
-				    cfg_gets("replication_source"));
-		recovery_setup_panic(recovery,
-				     cfg_geti("panic_on_snap_error"),
-				     cfg_geti("panic_on_wal_error"));
-
-		if (recovery_has_data(recovery)) {
-			/* Tell Sophia engine LSN it must recover to. */
-			int64_t checkpoint_id =
-				recovery_last_checkpoint(recovery);
-			engine_begin_recover_snapshot(checkpoint_id);
-			/* Process existing snapshot */
-			recover_snap(recovery);
-			engine_end_recover_snapshot();
-		} else if (recovery_has_remote(recovery)) {
-			/* Initialize a new replica */
-			replica_bootstrap(recovery);
-			engine_end_recover_snapshot();
-			box_snapshot();
-		} else {
-			/* Initialize the first server of a new cluster */
-			recovery_bootstrap(recovery);
-			box_set_cluster_uuid();
-			box_set_server_uuid();
-			engine_end_recover_snapshot();
-			box_snapshot();
-		}
-		fiber_gc();
+		box_init();
 	} catch (Exception *e) {
 		e->log();
 		panic("can't initialize storage: %s", e->errmsg());
 	}
-
-	title("orphan", NULL);
-	recovery_follow_local(recovery,
-			      cfg_getd("wal_dir_rescan_delay"));
-	title("hot_standby", NULL);
-
-	iproto_init(&binary);
-	/**
-	 * listen is a dynamic option, so box_set_listen()
-	 * will be called after box_init() as long as there
-	 * is a value for listen in the configuration table.
-	 *
-	 * However, if cfg.listen is nil, box_set_listen() will
-	 * not be called - which means that we need to leave
-	 * local hot standby here. The idea is to leave
-	 * local hot standby immediately if listen is not given,
-	 * and only after binding to the listen uri otherwise.
-	 */
-	if (cfg_gets("listen") == NULL)
-		box_leave_local_standby_mode(NULL);
 }
 
 void

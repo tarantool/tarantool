@@ -30,12 +30,23 @@
  */
 #include <stdbool.h>
 #include <tarantool_ev.h>
+#include "salad/rlist.h"
 
 /**
  * @brief CHANNELS
  */
 
-struct ipc_channel;
+struct ipc_channel {
+	struct rlist readers, writers;
+	struct fiber *bcast;		/* broadcast waiter */
+	struct fiber *close;		/* close waiter */
+	bool closed;			/* channel is closed */
+	unsigned size;
+	unsigned beg;
+	unsigned count;
+	void *bcast_msg;
+	void *item[0];
+};
 
 /**
  * @brief Allocate and construct new IPC channel
@@ -99,8 +110,11 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data);
  *		char *msg = ipc_channel_get(ch);
  * @endcode
  */
-bool
-ipc_channel_is_empty(struct ipc_channel *ch);
+static inline bool
+ipc_channel_is_empty(struct ipc_channel *ch)
+{
+	return ch->count == 0;
+}
 
 /**
  * @brief check if channel is full
@@ -112,8 +126,11 @@ ipc_channel_is_empty(struct ipc_channel *ch);
  *		ipc_channel_put(ch, "message");
  * @endcode
  */
-bool
-ipc_channel_is_full(struct ipc_channel *ch);
+static inline bool
+ipc_channel_is_full(struct ipc_channel *ch)
+{
+	return ch->count >= ch->size;
+}
 
 /**
  * @brief put data into channel in timeout
@@ -154,15 +171,41 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout);
  * @brief return true if channel has reader fibers that wait data
  * @param channel
  */
-bool
-ipc_channel_has_readers(struct ipc_channel *ch);
+static inline bool
+ipc_channel_has_readers(struct ipc_channel *ch)
+{
+	return !rlist_empty(&ch->readers);
+}
 
 /**
  * @brief return true if channel has writer fibers that wait data
  * @param channel
  */
-bool
-ipc_channel_has_writers(struct ipc_channel *ch);
+static inline bool
+ipc_channel_has_writers(struct ipc_channel *ch)
+{
+	return !rlist_empty(&ch->writers);
+}
+
+/**
+ * @brief return channel size
+ * @param channel
+ */
+static inline unsigned
+ipc_channel_size(struct ipc_channel *ch)
+{
+	return ch->size;
+}
+
+/**
+ * @brief return the number of items
+ * @param channel
+ */
+static inline unsigned
+ipc_channel_count(struct ipc_channel *ch)
+{
+	return ch->count;
+}
 
 /**
  * @brief close the channel. Wake up readers and writers (if they exist)
@@ -173,7 +216,10 @@ ipc_channel_close(struct ipc_channel *ch);
 /**
  * @brief return true if the channel is closed
  */
-bool
-ipc_channel_is_closed(struct ipc_channel *ch);
+static inline bool
+ipc_channel_is_closed(struct ipc_channel *ch)
+{
+	return ch->closed;
+}
 
 #endif /* TARANTOOL_IPC_H_INCLUDED */

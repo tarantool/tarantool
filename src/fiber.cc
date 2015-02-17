@@ -133,7 +133,11 @@ fiber_cancel(struct fiber *f)
 
 	f->flags |= FIBER_IS_CANCELLED;
 
-	if (f != self) {
+	/**
+	 * Don't wait for self and for fibers which are already
+	 * dead.
+	 */
+	if (f != self && !(f->flags & FIBER_IS_DEAD)) {
 		rlist_add_tail_entry(&f->wake, self, state);
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
@@ -205,6 +209,8 @@ fiber_join(struct fiber *fiber)
 	} else {
 		rlist_add_tail_entry(&fiber->wake, fiber(), state);
 		fiber_yield();
+		/* @todo: make this branch async-cancel-safe */
+		assert(! (fiber->flags & FIBER_IS_DEAD));
 		/*
 		 * Let the fiber recycle.
 		 * This can't be done here since there may be other
@@ -384,6 +390,11 @@ fiber_loop(void *data __attribute__((unused)))
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
 		try {
 			fiber->f(fiber->f_data);
+			/*
+			 * Make sure a leftover exception does not
+			 * propagate up to the joiner.
+			 */
+			Exception::cleanup(&fiber->exception);
 		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
 				 fiber_name(fiber));
@@ -396,10 +407,15 @@ fiber_loop(void *data __attribute__((unused)))
 				fiber_name(fiber));
 			panic("fiber `%s': exiting", fiber_name(fiber));
 		}
-		/** By convention, these triggers must not throw. */
+		fiber_schedule_list(&fiber->wake);
+		/**
+		 * By convention, these triggers must not throw.
+		 * Call triggers after scheduling, since an
+		 * on_stop trigger of the first fiber may
+		 * break the event loop.
+		 */
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
-		fiber_schedule_list(&fiber->wake);
 		if (fiber->flags & FIBER_IS_JOINABLE) {
 			/*
 			 * The fiber needs to be joined,
@@ -457,7 +473,8 @@ fiber_new(const char *name, void (*f) (va_list))
 	} else {
 		fiber = (struct fiber *) mempool_alloc0(&cord->fiber_pool);
 
-		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
+		tarantool_coro_create(&fiber->coro, &cord->slabc,
+				      fiber_loop, NULL);
 
 		region_create(&fiber->gc, &cord->slabc);
 
@@ -486,20 +503,20 @@ fiber_new(const char *name, void (*f) (va_list))
  * cord_destroy().
  */
 void
-fiber_destroy(struct fiber *f)
+fiber_destroy(struct cord *cord, struct fiber *f)
 {
 	if (f == fiber()) {
 		/** End of the application. */
-		assert(cord() == &main_cord);
+		assert(cord == &main_cord);
 		return;
 	}
-	assert(f != &cord()->sched);
+	assert(f != &cord->sched);
 
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
 	region_destroy(&f->gc);
-	tarantool_coro_destroy(&f->coro);
+	tarantool_coro_destroy(&f->coro, &cord->slabc);
 	Exception::cleanup(&f->exception);
 }
 
@@ -508,9 +525,9 @@ fiber_destroy_all(struct cord *cord)
 {
 	struct fiber *f;
 	rlist_foreach_entry(f, &cord->alive, link)
-		fiber_destroy(f);
+		fiber_destroy(cord, f);
 	rlist_foreach_entry(f, &cord->dead, link)
-		fiber_destroy(f);
+		fiber_destroy(cord, f);
 }
 
 void
@@ -528,6 +545,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
+	cord->call_stack_depth = 0;
 	cord->sched.fid = 1;
 	fiber_reset(&cord->sched);
 	Exception::init(&cord->sched.exception);
@@ -545,6 +563,7 @@ cord_create(struct cord *cord, const char *name)
 void
 cord_destroy(struct cord *cord)
 {
+	slab_cache_set_thread(&cord->slabc);
 	ev_async_stop(cord->loop, &cord->wakeup_event);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
@@ -572,6 +591,7 @@ void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
 	cord() = ct_arg->cord;
+	slab_cache_set_thread(&cord()->slabc);
 	struct cord *cord = cord();
 	cord_create(cord, ct_arg->name);
 	/** Can't possibly be the main thread */
@@ -599,6 +619,7 @@ void *cord_thread_func(void *p)
 	}
 	return res;
 }
+
 
 int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
@@ -638,6 +659,65 @@ cord_join(struct cord *cord)
 	}
 	cord_destroy(cord);
 	return res;
+}
+
+void
+break_ev_loop_f(struct trigger * /* trigger */, void * /* event */)
+{
+	ev_break(loop(), EVBREAK_ALL);
+}
+
+struct costart_ctx
+{
+	fiber_func run;
+	void *arg;
+};
+
+/** Replication acceptor fiber handler. */
+static void *
+cord_costart_thread_func(void *arg)
+{
+	struct costart_ctx ctx = *(struct costart_ctx *) arg;
+	free(arg);
+
+	struct fiber *f = fiber_new("main", ctx.run);
+
+	struct trigger break_ev_loop = {
+		rlist_nil, break_ev_loop_f, NULL, NULL
+	};
+	/*
+	 * Got to be in a trigger, to break the loop even
+	 * in case of an exception.
+	 */
+	trigger_add(&f->on_stop, &break_ev_loop);
+	fiber_start(f, ctx.arg);
+	if (f->fid > 0) {
+		/* The fiber hasn't died right away at start. */
+		ev_run(loop(), 0);
+	}
+	if (f->exception &&
+	    typeid(f->exception) != typeid(FiberCancelException)) {
+		Exception::move(&f->exception, &fiber()->exception);
+		fiber()->exception->raise();
+	}
+
+	return NULL;
+}
+
+int
+cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg)
+{
+	/** Must be allocated to avoid races. */
+	struct costart_ctx *ctx = (struct costart_ctx *) malloc(sizeof(*ctx));
+	if (ctx == NULL)
+		return -1;
+	ctx->run = f;
+	ctx->arg = arg;
+	if (cord_start(cord, name, cord_costart_thread_func, ctx) == -1) {
+		free(ctx);
+		return -1;
+	}
+	return 0;
 }
 
 bool

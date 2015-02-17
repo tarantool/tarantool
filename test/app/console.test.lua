@@ -128,11 +128,12 @@ client:close()
 -- Stop console
 server:shutdown()
 server:close()
+fiber.sleep(0) -- workaround for gh-712: console.test.lua fails in Fedora
 -- Check that admon console has been stopped
 test:isnil(socket.tcp_connect("unix/", CONSOLE_SOCKET), "console.listen stopped")
 
--- Stop iproto (not implemented yet)
--- box.cfg{listen = nil}
+-- Stop iproto
+box.cfg{listen = ''}
 os.remove(IPROTO_SOCKET)
 
 local s = console.listen('127.0.0.1:0')

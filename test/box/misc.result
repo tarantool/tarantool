@@ -208,6 +208,7 @@ t;
   - 'box.error.LAST_DROP : 15'
   - 'box.error.USER_EXISTS : 46'
   - 'box.error.WAL_IO : 40'
+  - 'box.error.MISSING_SNAPSHOT : 93'
   - 'box.error.CREATE_USER : 43'
   - 'box.error.DROP_PRIMARY_KEY : 17'
   - 'box.error.PRIV_GRANTED : 89'
@@ -293,7 +294,7 @@ pcall(myinsert, {1, 'hello'})
 pcall(myinsert, {1, 'hello'})
 ---
 - false
-- Duplicate key exists in unique index 0
+- Duplicate key exists in unique index 'primary'
 ...
 box.space.tweedledum:truncate()
 ---

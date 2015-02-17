@@ -3,6 +3,7 @@ import sys
 import re
 import yaml
 import uuid
+import glob
 from lib.tarantool_server import TarantoolServer
 
 ## Get cluster uuid
@@ -68,6 +69,25 @@ server.admin("box.schema.user.grant('guest', 'replication')")
 server.sql.py_con.close() # re-connect with new permissions
 server_id = check_join('join with granted role')
 server.sql.py_con.space('_cluster').delete(server_id)
+
+print '-------------------------------------------------------------'
+print 'gh-707: Master crashes on JOIN if it does not have snapshot files'
+print 'gh-480: If socket is closed while JOIN, replica wont reconnect'
+print '-------------------------------------------------------------'
+
+for k in glob.glob(os.path.join(server.vardir, '*.snap')):
+    os.unlink(k)
+
+# remember the number of servers in _cluster table
+server_count = len(server.sql.py_con.space('_cluster').select(()))
+
+rows = list(server.sql.py_con.join(replica_uuid))
+print len(rows) == 1 and rows[0].return_message.find('snapshot') >= 0 and \
+    'ok' or 'not ok', '-', 'join without snapshots'
+
+print server_count == len(server.sql.py_con.space('_cluster').select(())) and\
+    'ok' or 'not ok', '-', '_cluster does not changed after unsuccessful JOIN'
+
 server.admin("box.schema.user.revoke('guest', 'replication')")
 server.admin('box.snapshot()')
 

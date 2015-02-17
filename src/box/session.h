@@ -188,6 +188,12 @@ credentials_init(struct credentials *cr, struct user *user)
 }
 
 static inline void
+credentials_copy(struct credentials *dst, struct credentials *src)
+{
+	*dst = *src;
+}
+
+static inline void
 access_check_universe(uint8_t access)
 {
 	struct credentials *credentials = current_user();

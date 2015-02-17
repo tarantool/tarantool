@@ -22,6 +22,8 @@ ffi.cdef[[
     };
     size_t
     boxffi_index_len(uint32_t space_id, uint32_t index_id);
+    size_t
+    boxffi_index_memsize(uint32_t space_id, uint32_t index_id);
     struct tuple *
     boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
     struct iterator *
@@ -238,12 +240,16 @@ box.schema.space.create = function(name, options)
     end
     local id = options.id
     if not id then
-        id = _space.index[0]:max()[1]
-        if id < box.schema.SYSTEM_ID_MAX then
-            id = box.schema.SYSTEM_ID_MAX + 1
-        else
-            id = id + 1
+        local _schema = box.space._schema
+        local max_id = _schema:update({'max_id'}, {{'+', 2, 1}})
+        if max_id == nil then
+            id = _space.index.primary:max()[1]
+            if id < box.schema.SYSTEM_ID_MAX then
+                id = box.schema.SYSTEM_ID_MAX
+            end
+            max_id = _schema:insert{'max_id', id + 1}
         end
+        id = max_id[2]
     end
     local uid = nil
     if options.user then
@@ -566,6 +572,14 @@ function box.schema.space.bless(space)
     -- __len and __index
     index_mt.len = function(index)
         local ret = builtin.boxffi_index_len(index.space_id, index.id)
+        if ret == -1 then
+            box.error()
+        end
+        return tonumber(ret)
+    end
+    -- index.memsize
+    index_mt.memsize = function(index)
+        local ret = builtin.boxffi_index_memsize(index.space_id, index.id)
         if ret == -1 then
             box.error()
         end
@@ -1021,14 +1035,29 @@ box.schema.user.password = function(password)
     return ffi.string(buf)
 end
 
-box.schema.user.passwd = function(new_password)
-    local uid = session.uid()
+local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
-    box.session.su('admin')
     _user:update({uid}, {{"=", 5, auth_mech_list}})
-    box.session.su(uid)
+end
+
+box.schema.user.passwd = function(name, new_password)
+    if name == nil then
+        error('Usage: box.schema.user.passwd([user,] password)')
+    end
+    if new_password == nil then
+        -- change password for current user
+        new_password = name
+        box.session.su('admin', chpasswd, session.uid(), new_password)
+    else
+        -- change password for other user
+        local uid = user_resolve(name)
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, name)
+        end
+        return chpasswd(uid, new_password)
+    end
 end
 
 box.schema.user.create = function(name, opts)

@@ -228,7 +228,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space:insert{234, 1,2,3}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
@@ -763,16 +763,8 @@ gh594()
 sp = box.schema.create_space('test_old')
 ---
 ...
-sp:create_index('primary')
+_ = sp:create_index('primary')
 ---
-- unique: true
-  parts:
-  - type: NUM
-    fieldno: 1
-  id: 0
-  space_id: 512
-  name: primary
-  type: TREE
 ...
 sp:insert{1, 2, 3}
 ---
@@ -796,16 +788,8 @@ con.space.test == nil
 sp = box.schema.create_space('test')
 ---
 ...
-sp:create_index('primary')
+_ = sp:create_index('primary')
 ---
-- unique: true
-  parts:
-  - type: NUM
-    fieldno: 1
-  id: 0
-  space_id: 513
-  name: primary
-  type: TREE
 ...
 sp:insert{2, 3, 4}
 ---

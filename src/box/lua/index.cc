@@ -47,6 +47,16 @@ check_index(uint32_t space_id, uint32_t index_id)
 }
 
 size_t
+boxffi_index_memsize(uint32_t space_id, uint32_t index_id)
+{
+       try {
+               return check_index(space_id, index_id)->memsize();
+       } catch (Exception *) {
+               return (size_t) -1; /* handled by box.error() in Lua */
+       }
+}
+
+size_t
 boxffi_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {

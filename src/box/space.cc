@@ -238,15 +238,15 @@ space_build_secondary_keys(struct space *space)
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
-			say_info("Building secondary indexes in space %d...",
-				 space_id(space));
+			say_info("Building secondary indexes in space '%s'...",
+				 space_name(space));
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
 			index_build(space->index[j], pk);
 
 		if (n_tuples > 0) {
-			say_info("Space %d: done", space_id(space));
+			say_info("Space '%s': done", space_name(space));
 		}
 	}
 	engine_recovery *r = &space->handler->recovery;
@@ -309,7 +309,7 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 	uint32_t field_count = tuple_field_count(new_tuple);
 	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
 		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
-			  field_count, sp->def.id, sp->def.field_count);
+			  field_count, space_name(sp), sp->def.field_count);
 }
 
 void

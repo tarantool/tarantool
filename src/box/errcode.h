@@ -54,28 +54,28 @@ struct errcode_record {
 	/*  0 */_(ER_UNKNOWN,			2, "Unknown error") \
 	/*  1 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  2 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
-	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index %u") \
-	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index %u") \
+	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index '%s'") \
+	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
 	/*  7 */_(ER_READONLY,			2, "Can't modify data because this server in read-only mode.") \
 	/*  8 */_(ER_INJECTION,			2, "Error injection '%s'") \
-	/*  9 */_(ER_CREATE_SPACE,		2, "Failed to create space %u: %s") \
+	/*  9 */_(ER_CREATE_SPACE,		2, "Failed to create space '%s': %s") \
 	/* 10 */_(ER_SPACE_EXISTS,		2, "Space '%s' already exists") \
-	/* 11 */_(ER_DROP_SPACE,		2, "Can't drop space %u: %s") \
-	/* 12 */_(ER_ALTER_SPACE,		2, "Can't modify space %u: %s") \
-	/* 13 */_(ER_INDEX_TYPE,		2, "Unsupported index type supplied for index %u in space %u") \
-	/* 14 */_(ER_MODIFY_INDEX,		2, "Can't create or modify index %u in space %u: %s") \
-	/* 15 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
+	/* 11 */_(ER_DROP_SPACE,		2, "Can't drop space '%s': %s") \
+	/* 12 */_(ER_ALTER_SPACE,		2, "Can't modify space '%s': %s") \
+	/* 13 */_(ER_INDEX_TYPE,		2, "Unsupported index type supplied for index '%s' in space '%s'") \
+	/* 14 */_(ER_MODIFY_INDEX,		2, "Can't create or modify index '%s' in space '%s': %s") \
+	/* 15 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space '%s'") \
 	/* 16 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
-	/* 17 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
+	/* 17 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space '%s' while secondary keys exist") \
 	/* 18 */_(ER_KEY_PART_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
 	/* 19 */_(ER_EXACT_MATCH,		2, "Invalid key part count in an exact match (expected %u, got %u)") \
 	/* 20 */_(ER_INVALID_MSGPACK,		2, "Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			2, "msgpack.encode: can not encode Lua type '%s'") \
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		2, "Tuple/Key must be MsgPack array") \
 	/* 23 */_(ER_FIELD_TYPE,		2, "Tuple field %u type does not match one required by operation: expected %s") \
-	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	2, "Ambiguous field type in index %u, key part %u. Requested type is %s but the field has previously been defined as %s") \
+	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	2, "Ambiguous field type in index '%s', key part %u. Requested type is %s but the field has previously been defined as %s") \
 	/* 25 */_(ER_SPLICE,			2, "SPLICE error on field %u: %s") \
 	/* 26 */_(ER_ARG_TYPE,			2, "Argument type in operation '%c' on field %u does not match field type: expected a %s") \
 	/* 27 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
@@ -89,7 +89,7 @@ struct errcode_record {
 	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
-	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space %u field count %u") \
+	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space '%s' field count %u") \
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found by get()") \
@@ -144,7 +144,8 @@ struct errcode_record {
 	/* 90 */_(ER_ROLE_GRANTED,		2, "User '%s' already has role '%s'") \
 	/* 91 */_(ER_PRIV_NOT_GRANTED,		2, "User '%s' does not have %s access on %s '%s'") \
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		2, "User '%s' does not have role '%s'") \
-	/* 93 */_(ER_TUPLE_REPLACE_FAILED,	2, "Tuple update/replace failed (different key?) in index %u") \
+	/* 93 */_(ER_MISSING_SNAPSHOT,		2, "Can't find snapshot") \
+	/* 94 */_(ER_TUPLE_REPLACE_FAILED,	2, "Tuple update/replace failed (different key?) in index %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

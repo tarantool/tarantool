@@ -511,8 +511,26 @@ socket_methods.accept = function(self)
         self._errno = boxerrno()
         return nil
     end
-    return bless_socket(cfd), from
+    local c = bless_socket(cfd)
+    if c == nil then
+        self._errno = boxerrno()
+        return nil
+    end
+    return c, from
 end
+
+local errno_is_transient = {
+    [boxerrno.EAGAIN] = true;
+    [boxerrno.EWOULDBLOCK] = true;
+    [boxerrno.EINTR] = true;
+}
+
+local errno_is_fatal = {
+    [boxerrno.EBADF] = true;
+    [boxerrno.EINVAL] = true;
+    [boxerrno.EOPNOTSUPP] = true;
+    [boxerrno.ENOTSOCK] = true;
+}
 
 local function readchunk(self, size, timeout)
     if self.rbuf == nil then
@@ -549,7 +567,7 @@ local function readchunk(self, size, timeout)
                 self.rbuf = nil
                 return data
             end
-        elseif self:errno() ~= boxerrno.EAGAIN then
+        elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
         end
@@ -634,7 +652,7 @@ local function readline(self, limit, eol, timeout)
                return data
             end
 
-        elseif self:errno() ~= boxerrno.EAGAIN then
+        elseif not error_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
         end
@@ -674,7 +692,7 @@ socket_methods.write = function(self, octets, timeout)
 
         local written = self:syswrite(octets)
         if written == nil then
-            if self:errno() ~= boxerrno.EAGAIN then
+            if not errno_is_transient[self:errno()] then
                 return false
             end
         end
@@ -949,11 +967,7 @@ local function tcp_connect(host, port, timeout)
     local stop = fiber.time() + timeout
     local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
-    if dns == nil then
-        return nil
-    end
-
-    if #dns == 0 then
+    if dns == nil or #dns == 0 then
         boxerrno(boxerrno.EINVAL)
         return nil
     end
@@ -968,6 +982,7 @@ local function tcp_connect(host, port, timeout)
             return s
         end
     end
+    -- errno is set by tcp_connect_remote()
     return nil
 end
 
@@ -979,16 +994,26 @@ end
 
 local function tcp_server_loop(server, s, addr)
     fiber.name(sprintf("%s/%s:%s", server.name, addr.host, addr.port))
+    log.info("started")
     while s:readable() do
         local sc, from = s:accept()
         if sc == nil then
-            break
+            local errno = s:errno()
+            if not errno_is_transient[errno] then
+                log.error('accept() failed: '..s:error())
+            end
+            if  errno_is_fatal[errno] then
+                break
+            end
+        else
+            fiber.create(tcp_server_handler, server, sc, from)
         end
-        fiber.create(tcp_server_handler, server, sc, from)
     end
+    -- Socket was closed
     if addr.family == 'AF_UNIX' and addr.port then
         fio.unlink(addr.port) -- remove unix socket
     end
+    log.info("stopped")
 end
 
 local function tcp_server_usage()

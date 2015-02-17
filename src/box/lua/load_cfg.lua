@@ -131,6 +131,13 @@ local dynamic_cfg = {
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
 }
 
+local dynamic_cfg_skip_at_load = {
+    wal_mode                = true,
+    listen                  = true,
+    replication_source      = true,
+}
+
+
 local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     if cfg == nil then
         return {}
@@ -237,7 +244,7 @@ local function load_cfg(cfg)
     box.cfg = cfg
     if not pcall(ffi.C.check_cfg) then
         box.cfg = load_cfg -- restore original box.cfg
-        return box.error() -- re-throw exception from check_cfg(0
+        return box.error() -- re-throw exception from check_cfg()
     end
     -- Restore box members after initial configuration
     for k, v in pairs(box_configured) do
@@ -255,7 +262,7 @@ local function load_cfg(cfg)
     ffi.C.load_cfg()
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
-        if val ~= nil then
+        if val ~= nil and not dynamic_cfg_skip_at_load[key] then
             fun(cfg[key])
             if val ~= default_cfg[key] then
                 log.info("set '%s' configuration option to '%s'", key, val)

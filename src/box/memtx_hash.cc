@@ -29,16 +29,8 @@
 #include "memtx_hash.h"
 #include "say.h"
 #include "tuple.h"
+#include "memtx_engine.h"
 #include "errinj.h"
-#include "memory.h"
-
-/** For all memory used by all tree indexes. */
-extern struct quota memtx_quota;
-static struct slab_arena index_arena;
-static struct slab_cache index_arena_slab_cache;
-static struct mempool hash_extent_pool;
-/** Number of allocated extents. */
-static bool index_arena_initialized = false;
 
 #include "third_party/PMurHash.h"
 
@@ -153,7 +145,7 @@ key_hash(const char *key, const struct key_def *key_def)
 #define LIGHT_CMP_ARG_TYPE struct key_def *
 #define LIGHT_EQUAL(a, b, c) equal(a, b, c)
 #define LIGHT_EQUAL_KEY(a, b, c) equal_key(a, b, c)
-#define HASH_INDEX_EXTENT_SIZE (16 * 1024)
+#define HASH_INDEX_EXTENT_SIZE MEMTX_EXTENT_SIZE
 typedef uint32_t hash_t;
 #include "salad/light.h"
 
@@ -178,13 +170,10 @@ hash_iterator_ge(struct iterator *ptr)
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
-	if (it->h_pos < it->hash_table->table_size) {
-		struct tuple *res = light_index_get(it->hash_table, it->h_pos);
+	while (it->h_pos < it->hash_table->table_size) {
+		if (light_index_pos_valid(it->hash_table, it->h_pos))
+			return light_index_get(it->hash_table, it->h_pos++);
 		it->h_pos++;
-		while (it->h_pos < it->hash_table->table_size
-		       && !light_index_pos_valid(it->hash_table, it->h_pos))
-			it->h_pos++;
-		return res;
 	}
 	return NULL;
 }
@@ -204,42 +193,20 @@ hash_iterator_eq(struct iterator *it)
 
 /* }}} */
 
-static void *
-extent_alloc()
-{
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
-	return mempool_alloc(&hash_extent_pool);
-}
-
-static void
-extent_free(void *extent)
-{
-	return mempool_free(&hash_extent_pool, extent);
-}
-
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 MemtxHash::MemtxHash(struct key_def *key_def)
 	: Index(key_def)
 {
-	if (index_arena_initialized == false) {
-		const uint32_t SLAB_SIZE = 4 * 1024 * 1024;
-		if (slab_arena_create(&index_arena, &memtx_quota,
-				      0, SLAB_SIZE, MAP_PRIVATE)) {
-			panic_syserror("failed to initialize index arena");
-		}
-		slab_cache_create(&index_arena_slab_cache, &index_arena);
-		mempool_create(&hash_extent_pool, &index_arena_slab_cache,
-			HASH_INDEX_EXTENT_SIZE);
-		index_arena_initialized = true;
-	}
+	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
 	if (hash_table == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash_table),
 			  "MemtxHash", "hash_table");
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
-			   extent_alloc, extent_free, this->key_def);
+			   memtx_index_extent_alloc, memtx_index_extent_free,
+			   this->key_def);
 }
 
 MemtxHash::~MemtxHash()
@@ -327,7 +294,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_id(this));
+			tnt_raise(ClientError, errcode, index_name(this));
 		}
 
 		if (dup_tuple)

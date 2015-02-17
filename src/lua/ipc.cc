@@ -231,6 +231,26 @@ lbox_ipc_channel_has_writers(struct lua_State *L)
 }
 
 static int
+lbox_ipc_channel_size(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:has_writers()");
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushinteger(L, ipc_channel_size(ch));
+	return 1;
+}
+
+static int
+lbox_ipc_channel_count(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:has_writers()");
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushinteger(L, ipc_channel_count(ch));
+	return 1;
+}
+
+static int
 lbox_ipc_channel_close(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
@@ -265,6 +285,8 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"broadcast",	lbox_ipc_channel_broadcast},
 		{"has_readers",	lbox_ipc_channel_has_readers},
 		{"has_writers",	lbox_ipc_channel_has_writers},
+		{"count",	lbox_ipc_channel_count},
+		{"size",	lbox_ipc_channel_size},
 		{"close",	lbox_ipc_channel_close},
 		{"is_closed",	lbox_ipc_channel_is_closed},
 		{NULL, NULL}

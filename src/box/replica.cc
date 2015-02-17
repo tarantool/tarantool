@@ -29,9 +29,6 @@
 #include "replica.h"
 #include "recovery.h"
 #include "tarantool.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include "xlog.h"
 #include "fiber.h"
@@ -202,9 +199,7 @@ replica_bootstrap(struct recovery_state *r)
 static void
 remote_set_status(struct remote *remote, const char *status)
 {
-	(void) remote;
-	(void) status;
-	/* title("replica", "%s/%s", uri_to_string(&remote->uri), status); */
+	remote->status = status;
 }
 
 static void
@@ -248,8 +243,8 @@ pull_from_remote(va_list ap)
 			 */
 			remote_read_row(&coio, iobuf, &row);
 			err = NULL;
-			r->remote.recovery_lag = ev_now(loop) - row.tm;
-			r->remote.recovery_last_update_tstamp =
+			r->remote.lag = ev_now(loop) - row.tm;
+			r->remote.last_row_time =
 				ev_now(loop);
 
 			if (iproto_type_is_error(row.type))
@@ -262,10 +257,10 @@ pull_from_remote(va_list ap)
 			remote_set_status(&r->remote, "stopped");
 			throw;
 		} catch (FiberCancelException *e) {
-			remote_set_status(&r->remote, "failed");
+			remote_set_status(&r->remote, "off");
 			throw;
 		} catch (Exception *e) {
-			remote_set_status(&r->remote, "failed");
+			remote_set_status(&r->remote, "disconnected");
 			if (! r->remote.warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
@@ -299,7 +294,6 @@ void
 recovery_follow_remote(struct recovery_state *r)
 {
 	char name[FIBER_NAME_MAX];
-	struct fiber *f;
 
 	assert(r->remote.reader == NULL);
 	assert(recovery_has_remote(r));
@@ -308,7 +302,13 @@ recovery_follow_remote(struct recovery_state *r)
 	say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
-	f = fiber_new(name, pull_from_remote);
+
+	struct fiber *f = fiber_new(name, pull_from_remote);
+	/**
+	 * So that we can safely grab the status of the
+	 * fiber any time we want.
+	 */
+	fiber_set_joinable(f, true);
 
 	r->remote.reader = f;
 	fiber_start(f, r);
@@ -318,8 +318,16 @@ void
 recovery_stop_remote(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
-	fiber_cancel(r->remote.reader);
+	struct fiber *f = r->remote.reader;
 	r->remote.reader = NULL;
+	fiber_cancel(f);
+	/**
+	 * If the remote died from an exception, don't throw it
+	 * up.
+	 */
+	Exception::cleanup(&f->exception);
+	fiber_join(f);
+	r->remote.status = "off";
 }
 
 void
@@ -345,3 +353,8 @@ recovery_has_remote(struct recovery_state *r)
 	return r->remote.source[0];
 }
 
+void
+recovery_init_remote(struct recovery_state *r)
+{
+	r->remote.status = "off";
+}

@@ -114,23 +114,38 @@ local tuple_totable_mt = {
     __serialize = 'seq'; -- enables flow mode for yaml
 }
 
-local function tuple_totable(tuple)
+local function tuple_totable(tuple, i, j)
     -- use a precreated iterator for tuple_next
     builtin.tuple_rewind(next_it, tuple)
-    local ret = {}
-    while true do
-        local field = builtin.tuple_next(next_it)
-        if field == nil then
-            break
+    local field
+    if i ~= nil then
+        if i < 1 then
+            error('tuple.totable: invalid second argument')
         end
+        field = builtin.tuple_seek(next_it, i - 1)
+    else
+        i = 1
+        field = builtin.tuple_next(next_it)
+    end
+    if j ~= nil then
+        if j <= 0 then
+            error('tuple.totable: invalid third argument')
+        end
+    else
+        j = 4294967295
+    end
+    local ret = {}
+    while field ~= nil and i <= j do
         local val = msgpackffi.decode_unchecked(field)
         table.insert(ret, val)
+        i = i + 1
+        field = builtin.tuple_next(next_it)
     end
     return setmetatable(ret, tuple_totable_mt)
 end
 
-local function tuple_unpack(tuple)
-    return unpack(tuple_totable(tuple))
+local function tuple_unpack(tuple, i, j)
+    return unpack(tuple_totable(tuple, i, j))
 end
 
 local function tuple_find(tuple, offset, val)

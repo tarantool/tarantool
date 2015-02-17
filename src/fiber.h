@@ -43,6 +43,9 @@
 
 #if defined(__cplusplus)
 #include "exception.h"
+#else
+#define class struct
+class Exception;
 #endif /* defined(__cplusplus) */
 #include "salad/rlist.h"
 
@@ -110,6 +113,8 @@ enum fiber_key {
 	FIBER_KEY_MAX = 4
 };
 
+typedef void(*fiber_func)(va_list);
+
 struct fiber {
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
@@ -157,7 +162,6 @@ struct fiber {
 };
 
 enum { FIBER_CALL_STACK = 16 };
-class Exception;
 
 /**
  * @brief An independent execution unit that can be managed by a separate OS
@@ -167,8 +171,6 @@ class Exception;
 struct cord {
 	/** The fiber that is currently being executed. */
 	struct fiber *fiber;
-	/** The "main" fiber of this cord, the scheduler. */
-	struct fiber sched;
 	struct ev_loop *loop;
 	/** Depth of the fiber call stack. */
 	int call_stack_depth;
@@ -197,6 +199,8 @@ struct cord {
 	struct mempool fiber_pool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
+	/** The "main" fiber of this cord, the scheduler. */
+	struct fiber sched;
 	char name[FIBER_NAME_MAX];
 };
 
@@ -217,6 +221,15 @@ extern __thread struct cord *cord_ptr;
 int
 cord_start(struct cord *cord, const char *name,
 	   void *(*f)(void *), void *arg);
+
+/**
+ * Like cord_start(), but starts the event loop and
+ * a fiber in the event loop. The event loop ends when the
+ * fiber in main fiber dies/returns. The exception of the main
+ * fiber is propagated to cord_cojoin().
+ */
+int
+cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
 
 /**
  * Wait for \a cord to terminate. If \a cord has already
@@ -250,7 +263,6 @@ cord_is_main();
 
 void fiber_init(void);
 void fiber_free(void);
-typedef void(*fiber_func)(va_list);
 
 struct fiber *
 fiber_new(const char *name, fiber_func f);
@@ -379,5 +391,27 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** Report libev time (cheap). */
+inline double
+fiber_time(void)
+{
+	return ev_now(loop());
+}
+
+/** Report libev time as 64-bit integer */
+inline uint64_t
+fiber_time64(void)
+{
+	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

@@ -48,6 +48,7 @@
 #include "box/cluster.h"
 #include "vclock.h"
 #include "session.h"
+#include "coio.h"
 
 /*
  * Recovery subsystem
@@ -149,12 +150,6 @@ wal_writer_start(struct recovery_state *state, int rows_per_wal);
 void
 wal_writer_stop(struct recovery_state *r);
 
-static void
-wal_watcher_stop(struct recovery_state *r);
-
-static void
-wal_watcher_init(struct wal_watcher *watcher);
-
 /**
  * Throws an exception in  case of error.
  */
@@ -185,9 +180,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
 
-	if (r->wal_mode == WAL_FSYNC)
-		(void) strcat(r->wal_dir.open_wflags, "s");
-
 	vclock_create(&r->vclock);
 
 	xdir_scan(&r->snap_dir);
@@ -200,7 +192,8 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	 */
 	xdir_check(&r->wal_dir);
 
-	wal_watcher_init(&r->watcher);
+	r->watcher = NULL;
+	recovery_init_remote(r);
 
 	guard.is_active = false;
 	return r;
@@ -239,7 +232,7 @@ recovery_close_log(struct recovery_state *r)
 void
 recovery_delete(struct recovery_state *r)
 {
-	wal_watcher_stop(r);
+	recovery_stop_local(r);
 
 	if (r->writer)
 		wal_writer_stop(r);
@@ -254,6 +247,14 @@ recovery_delete(struct recovery_state *r)
 		xlog_close(r->current_wal);
 	}
 	free(r);
+}
+
+void
+recovery_exit(struct recovery_state *r)
+{
+	/* Avoid fibers, there is no event loop */
+	r->watcher = NULL;
+	recovery_delete(r);
 }
 
 void
@@ -349,11 +350,15 @@ recover_snap(struct recovery_state *r)
 	/**
 	 * Don't rescan the directory, it's done when
 	 * recovery is initialized.
-	 * Don't check if the directory index is empty, there must
-	 * be at least one existing snapshot, otherwise we would
-	 * have created it from a bootstrap copy.
 	 */
 	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such case.
+	 */
+	if (res == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_signature(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
@@ -379,10 +384,9 @@ recover_snap(struct recovery_state *r)
  * This function will not close r->current_wal if
  * recovery was successful.
  */
-static int
+static void
 recover_remaining_wals(struct recovery_state *r)
 {
-	int result = 0;
 	struct xlog *next_wal;
 	int64_t current_signature, last_signature;
 	struct vclock *current_vclock;
@@ -394,7 +398,7 @@ recover_remaining_wals(struct recovery_state *r)
 	current_vclock = vclockset_last(&r->wal_dir.index);
 	last_signature = current_vclock != NULL ?
 		vclock_signature(current_vclock) : -1;
-	/* if the caller already opened WAL for us, recover from it first */
+	/* If the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL) {
 		if (r->signature == -1) {
 			r->signature
@@ -409,8 +413,8 @@ recover_remaining_wals(struct recovery_state *r)
 			break; /* No more WALs */
 
 		current_signature = vclock_signature(current_vclock);
-		if (current_signature == r->signature) {
-			if (current_signature == last_signature)
+		if (current_signature <= r->signature) {
+			if (r->signature == last_signature)
 				break;
 			say_error("missing xlog between %020lld and %020lld",
 				  (long long) current_signature,
@@ -452,7 +456,6 @@ recover_remaining_wals(struct recovery_state *r)
 				    &r->wal_dir, current_signature, INPROGRESS)) != 0)
 					panic("can't unlink 'inprogres' WAL");
 			}
-			result = 0;
 			break;
 		}
 		assert(r->current_wal == NULL);
@@ -462,14 +465,9 @@ recover_remaining_wals(struct recovery_state *r)
 
 recover_current_wal:
 		rows_before = r->current_wal->rows;
-		try {
-			result = recover_xlog(r, r->current_wal);
-		} catch (Exception *e) {
-			say_error("failure reading from %s",
-				  r->current_wal->filename);
-			e->log();
-			break;
-		}
+
+		int result = recover_xlog(r, r->current_wal);
+
 
 		if (r->current_wal->rows > 0 &&
 		    r->current_wal->rows != rows_before) {
@@ -513,29 +511,25 @@ recover_current_wal:
 	 * we lose some logs it is a fatal error.
 	 */
 	if (last_signature > r->signature) {
-		say_error("not all WALs have been successfully read");
-		result = -1;
+		tnt_raise(XlogError,
+			  "not all WALs have been successfully read");
 	}
 
 	region_free(&fiber()->gc);
-	return result;
 }
 
 void
-recovery_finalize(struct recovery_state *r, int rows_per_wal)
+recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
+		  int rows_per_wal)
 {
-	int result;
 
-	wal_watcher_stop(r);
+	recovery_stop_local(r);
 
 	r->finalize = true;
 
-	result = recover_remaining_wals(r);
+	recover_remaining_wals(r);
 
-	if (result < 0)
-		panic("unable to successfully finalize recovery");
-
-	if (r->current_wal != NULL && result != LOG_EOF) {
+	if (r->current_wal != NULL) {
 		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
 
 		if (!r->current_wal->is_inprogress) {
@@ -555,12 +549,17 @@ recovery_finalize(struct recovery_state *r, int rows_per_wal)
 			if (xlog_rename(r->current_wal) != 0)
 				panic("can't rename 'inprogress' WAL '%s'",
 				      r->current_wal->filename);
-		} else
+		} else {
 			panic("too many rows in 'inprogress' WAL '%s'",
 			      r->current_wal->filename);
+		}
 
 		recovery_close_log(r);
 	}
+
+	r->wal_mode = wal_mode;
+	if (r->wal_mode == WAL_FSYNC)
+		(void) strcat(r->wal_dir.open_wflags, "s");
 
 	wal_writer_start(r, rows_per_wal);
 }
@@ -570,114 +569,51 @@ recovery_finalize(struct recovery_state *r, int rows_per_wal)
 
 /* {{{ Local recovery: support of hot standby and replication relay */
 
-static void recovery_rescan_file(ev_loop *, ev_stat *w, int /* revents */);
-
 static void
-recovery_watch_file(ev_loop *loop, struct wal_watcher *watcher,
-		    struct xlog *wal)
+recovery_follow_f(va_list ap)
 {
-	strncpy(watcher->filename, wal->filename, PATH_MAX);
-	ev_stat_init(&watcher->stat, recovery_rescan_file,
-		     watcher->filename, 0.);
-	ev_stat_start(loop, &watcher->stat);
-}
-
-static void
-recovery_stop_file(struct wal_watcher *watcher)
-{
-	ev_stat_stop(loop(), &watcher->stat);
-}
-
-static void
-recovery_rescan_dir(ev_loop * loop, ev_timer *w, int /* revents */)
-{
-	struct recovery_state *r = (struct recovery_state *) w->data;
-	struct wal_watcher *watcher = &r->watcher;
-	struct xlog *save_current_wal = r->current_wal;
-
-	/**
-	 * local hot standby is running from an ev
-	 * watcher, without fiber infrastructure (todo: fix),
-	 * but to run queries we need at least a current
-	 * user.
-	 */
+	struct recovery_state *r = va_arg(ap, struct recovery_state *);
+	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
 	fiber_set_user(fiber(), &admin_credentials);
-	int result;
-	try {
-		 result = recover_remaining_wals(r);
-	} catch (Exception *e) {
-		e->log();
-		result = -1;
-	}
-	fiber_set_user(fiber(), NULL);
-	if (result < 0)
-		panic("recover failed: %i", result);
-	if (save_current_wal != r->current_wal) {
-		if (save_current_wal != NULL)
-			recovery_stop_file(watcher);
-		if (r->current_wal != NULL)
-			recovery_watch_file(loop, watcher, r->current_wal);
-	}
-}
 
-static void
-recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
-{
-	struct recovery_state *r = (struct recovery_state *) w->data;
-	struct wal_watcher *watcher = &r->watcher;
-	fiber_set_user(fiber(), &admin_credentials);
-	try {
-		if (recover_xlog(r, r->current_wal) == LOG_EOF) {
-			say_info("done `%s'", r->current_wal->filename);
-			recovery_close_log(r);
-			recovery_stop_file(watcher);
-			/* Don't wait for wal_dir_rescan_delay. */
-			recovery_rescan_dir(loop, &watcher->dir_timer, 0);
+	while (! fiber_is_cancelled()) {
+		recover_remaining_wals(r);
+		/**
+		 * Allow an immediate wakeup/break loop
+		 * from recovery_stop_local().
+		 */
+		fiber_set_cancellable(true);
+		if (r->current_wal != NULL) {
+			ev_stat stat;
+			coio_stat_init(&stat, r->current_wal->filename);
+			coio_stat_stat_timeout(&stat, wal_dir_rescan_delay);
+		} else {
+			fiber_yield_timeout(wal_dir_rescan_delay);
 		}
-	} catch (Exception *e) {
-		e->log();
-		panic("recover failed");
+		fiber_set_cancellable(false);
 	}
-	fiber_set_user(fiber(), NULL);
 }
-
-static void
-wal_watcher_init(struct wal_watcher *watcher)
-{
-	watcher->filename[0] = '\0';
-	ev_init(&watcher->dir_timer, recovery_rescan_dir);
-	ev_init(&watcher->stat, recovery_rescan_file);
-}
-
 
 void
-recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
+recovery_follow_local(struct recovery_state *r,
+		      ev_tstamp wal_dir_rescan_delay)
 {
 	assert(r->writer == NULL);
-	ev_loop *loop = loop();
-
-	struct wal_watcher  *watcher = &r->watcher;
-
-	ev_timer_init(&watcher->dir_timer, recovery_rescan_dir,
-		      wal_dir_rescan_delay, wal_dir_rescan_delay);
-	watcher->dir_timer.data = watcher->stat.data = r;
-	ev_timer_start(loop, &watcher->dir_timer);
-	/*
-	 * recover() leaves the current wal open if it has no
-	 * EOF marker.
-	 */
-	if (r->current_wal != NULL)
-		recovery_watch_file(loop, watcher, r->current_wal);
+	assert(r->watcher == NULL);
+	r->watcher = fiber_new(fiber_name(fiber()), recovery_follow_f);
+	fiber_set_joinable(r->watcher, true);
+	fiber_start(r->watcher, r, wal_dir_rescan_delay);
 }
 
-static void
-wal_watcher_stop(struct recovery_state *r)
+void
+recovery_stop_local(struct recovery_state *r)
 {
-	struct wal_watcher *watcher = &r->watcher;
-	if (ev_is_active(&watcher->dir_timer))
-		ev_timer_stop(loop(), &watcher->dir_timer);
-	if (ev_is_active(&watcher->stat))
-		ev_stat_stop(loop(), &watcher->stat);
+	if (r->watcher) {
+		struct fiber *f = r->watcher;
+		r->watcher = NULL;
+		fiber_cancel(f);
+		fiber_join(f);
+	}
 }
 
 /* }}} */

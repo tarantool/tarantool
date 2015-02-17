@@ -241,6 +241,12 @@ index_id(const Index *index)
 	return index->key_def->iid;
 }
 
+static inline const char *
+index_name(const Index *index)
+{
+	return index->key_def->name;
+}
+
 /** True if this index is a primary key. */
 static inline bool
 index_is_primary(const Index *index)

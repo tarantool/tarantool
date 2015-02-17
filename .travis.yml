@@ -3,11 +3,6 @@ compiler:
   - clang
   - gcc
 
-branches:
-  only:
-    - master
-    - stable
-
 addons:
   postgresql: "9.1"
 
@@ -29,6 +24,7 @@ install:
 script:
   - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
   - make -j8
+  - make test-force || echo
 
 notifications:
   irc:

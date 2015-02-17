@@ -1,6 +1,7 @@
 html {
     height:100%;
     font-size:100%;
+    overflow-y: scroll;
     -webkit-text-size-adjust:100%;
     -ms-text-size-adjust:100%;
     -webkit-font-smoothing:antialiased;
@@ -883,7 +884,8 @@ input.b-button.p-smaller {
 }
 .b-documentation_top .b-block-wrapper,
 .b-benchmark_top .b-block-wrapper {
-    padding:20px 0 21px 0;
+/*    padding:20px 0 21px 0;*/
+    padding:35px 0 35px 0;
 }
 .b-benchmark_top .b-section-title {
     margin:0;
@@ -913,7 +915,8 @@ input.b-button.p-smaller {
     padding-left:19px;
 }
 .b-documentation_top .b-section-title {
-    margin:0 0 17px 0;
+/*    margin:0 0 17px 0;*/
+    margin:0;
 }
 .b-tcontents-list,
 .b-tcontents-sublist {
@@ -1239,8 +1242,10 @@ input.b-button.p-smaller {
     font-size:14px;
 }
 .b-downloads_top .b-block-wrapper {
-    padding-top:29px;
-    padding-bottom:46px;
+/*    padding-top:29px;*/
+/*    padding-bottom:46px;*/
+    padding-top: 35px;
+    padding-bottom: 35px;
 }
 .b-downloads_top .b-section-title {
     margin:0 0 2px 0;
@@ -1407,7 +1412,8 @@ div.b-rock-list-item-ico {
     margin: 0 0 2px;
 }
 .b-rocks .b-rock-list {
-    padding: 85px 0 125px 0;
+/*    padding: 85px 0 125px 0;*/
+    padding: 50px 0;
 }
 .b-docs_list-footer {
     margin:0 0 0 90px;

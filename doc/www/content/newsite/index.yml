@@ -6,7 +6,7 @@ template: "index"
 blocks  :
   header:
     - "Tarantool"
-    - "A NoSQL database in a Lua Script"
+    - "A NoSQL database running in a Lua application server"
     - >
       Tarantool combines the network programming power of Node.JS
       with data persitence capabilities of Redis.
@@ -80,12 +80,12 @@ blocks  :
           end
 
           local function handler(self)
-              local host = self.req.peer.host
+              local host = self.peer.host
               local response = {
                   host = host;
                   counter = hosts:inc(host);
               }
-              self:render{ json = response }
+              return self:render{ json = response }
           end
 
           httpd = require('http.server')

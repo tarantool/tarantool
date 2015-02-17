@@ -30,6 +30,7 @@
 #include "lua/utils.h"
 #include "lua/trigger.h"
 #include "box/user.h"
+#include "scoped_guard.h"
 
 extern "C" {
 #include <lua.h>
@@ -95,7 +96,8 @@ lbox_session_user(struct lua_State *L)
 static int
 lbox_session_su(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
+	int top = lua_gettop(L);
+	if (top < 1)
 		luaL_error(L, "session.su(): bad arguments");
 	struct session *session = current_session();
 	if (session == NULL)
@@ -108,8 +110,18 @@ lbox_session_su(struct lua_State *L)
 	} else {
 		user = user_cache_find(lua_tointeger(L, 1));
 	}
+	struct credentials orig_cr;
+	credentials_copy(&orig_cr, &session->credentials);
 	credentials_init(&session->credentials, user);
-	return 0;
+	if (top == 1)
+		return 0; /* su */
+
+	/* sudo */
+	auto scoped_guard = make_scoped_guard([&] {
+		credentials_copy(&session->credentials, &orig_cr);
+	});
+	lua_call(L, top - 2, LUA_MULTRET);
+	return lua_gettop(L) - 1;
 }
 
 /**

@@ -46,6 +46,15 @@
 #include "tarantool.h"
 #include "coeio_file.h"
 #include "coio.h"
+#include "errinj.h"
+
+/** For all memory used by all indexes. */
+extern struct quota memtx_quota;
+static bool memtx_index_arena_initialized = false;
+static struct slab_arena memtx_index_arena;
+static struct slab_cache memtx_index_arena_slab_cache;
+static struct mempool memtx_index_extent_pool;
+
 
 struct MemtxSpace: public Handler {
 	MemtxSpace(Engine *e)
@@ -135,14 +144,14 @@ MemtxEngine::dropIndex(Index *index)
 }
 
 void
-MemtxEngine::keydefCheck(struct key_def *key_def)
+MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
 		if (! key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "HASH index must be unique");
 		}
 		break;
@@ -152,35 +161,35 @@ MemtxEngine::keydefCheck(struct key_def *key_def)
 	case RTREE:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "RTREE index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "RTREE index can not be unique");
 		}
 		break;
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "BITSET index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
+				  key_def->name,
+				  space_name(space),
 				  "BITSET can not be unique");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id);
+			  key_def->name,
+			  space_name(space));
 		break;
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
@@ -189,16 +198,16 @@ MemtxEngine::keydefCheck(struct key_def *key_def)
 		case STRING:
 			if (key_def->type == RTREE) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  (unsigned) key_def->iid,
-					  (unsigned) key_def->space_id,
+					  key_def->name,
+					  space_name(space),
 					  "RTREE index field type must be ARRAY");
 			}
 			break;
 		case ARRAY:
 			if (key_def->type != RTREE) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  (unsigned) key_def->iid,
-					  (unsigned) key_def->space_id,
+					  key_def->name,
+					  space_name(space),
 					  "ARRAY field type is not supported");
 			}
 			break;
@@ -482,4 +491,51 @@ MemtxEngine::abort_checkpoint()
 		(void) coeio_unlink(filename);
 	}
 	m_snapshot_lsn = -1;
+}
+
+/**
+ * Initialize arena for indexes.
+ * The arena is used for memtx_index_extent_alloc
+ *  and memtx_index_extent_free.
+ * Can be called several times, only first call do the work.
+ */
+void
+memtx_index_arena_init()
+{
+	if (memtx_index_arena_initialized) {
+		/* already done.. */
+		return;
+	}
+	/* Creating arena */
+	if (slab_arena_create(&memtx_index_arena, &memtx_quota,
+			      0, MEMTX_SLAB_SIZE, MAP_PRIVATE)) {
+		panic_syserror("failed to initialize index arena");
+	}
+	/* Creating slab cache */
+	slab_cache_create(&memtx_index_arena_slab_cache, &memtx_index_arena);
+	/* Creating mempool */
+	mempool_create(&memtx_index_extent_pool,
+		       &memtx_index_arena_slab_cache,
+		       MEMTX_EXTENT_SIZE);
+	/* Done */
+	memtx_index_arena_initialized = true;
+}
+
+/**
+ * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
+ */
+void *
+memtx_index_extent_alloc()
+{
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
+	return mempool_alloc(&memtx_index_extent_pool);
+}
+
+/**
+ * Free a block previously allocated by memtx_index_extent_alloc
+ */
+void
+memtx_index_extent_free(void *extent)
+{
+	return mempool_free(&memtx_index_extent_pool, extent);
 }

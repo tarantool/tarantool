@@ -1,14 +1,9 @@
 ---
-title   : "Tarantool - Downloads"
+title   : "Tarantool - Download"
 slug    : "download"
 save_as : "download.html"
 template: "download"
 blocks :
-  links:
-    - ["Overview", "/intro.html"]
-    - ["Documentation", "/documentation.html"]
-    - ["Downloads", "/download.html"]
-    - ["Rocks", "http://rocks.tarantool.org"]
   top :
     title : "Binary downloads"
     content:
@@ -74,7 +69,7 @@ blocks :
 
           .. code-block:: bash
 
-            $ brew install raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb --devel
+            $ brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb --devel
 
           Please upgrade ``clang`` to version 3.2 or later using
           ``Command Line Tools for Xcode`` disk image version 4.6+

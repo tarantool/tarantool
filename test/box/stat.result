@@ -42,7 +42,7 @@ box.stat.DELETE.total
 ...
 box.stat.UPDATE.total
 ---
-- 0
+- 1
 ...
 box.stat.REPLACE.total
 ---
@@ -50,7 +50,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 3
+- 2
 ...
 --# stop server default
 --# start server default

@@ -813,12 +813,6 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	iproto_queue_push(&request_queue, ireq);
 }
 
-static void on_bind(void *arg __attribute__((unused)))
-{
-	fiber_start(fiber_new("leave_local_hot_standby",
-			     (fiber_func) box_leave_local_standby_mode));
-}
-
 /** Initialize a read-write port. */
 void
 iproto_init(struct evio_service *service)
@@ -831,7 +825,6 @@ iproto_init(struct evio_service *service)
 
 	evio_service_init(loop(), service, "binary",
 			  iproto_on_accept, NULL);
-	evio_service_on_bind(service, on_bind, NULL);
 }
 
 /* vim: set foldmethod=marker */

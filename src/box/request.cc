@@ -85,6 +85,7 @@ execute_update(struct request *request, struct port *port)
 		txn_commit_stmt(txn, port);
 		return;
 	}
+	TupleGuard old_guard(old_tuple);
 
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
@@ -116,8 +117,10 @@ execute_delete(struct request *request, struct port *port)
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
-	if (old_tuple != NULL)
+	if (old_tuple != NULL) {
+		TupleGuard old_guard(old_tuple);
 		txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	}
 	txn_commit_stmt(txn, port);
 }
 

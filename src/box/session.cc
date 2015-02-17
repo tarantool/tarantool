@@ -169,6 +169,11 @@ session_init()
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_init(&admin_credentials, admin_user);
+	/**
+	 * When session_init() is called, admin user access is not
+	 * loaded yet (is 0), force global access.
+	 */
+	admin_credentials.universal_access = PRIV_ALL;
 }
 
 void

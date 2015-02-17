@@ -34,6 +34,7 @@
 #include <assert.h>
 #include "salad/rlist.h"
 #include "slab_arena.h"
+#include <pthread.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -159,6 +160,9 @@ struct slab_cache {
 	 * next_in_list link may be reused for some other purpose.
          */
 	struct slab_list orders[ORDER_MAX+1];
+#ifndef _NDEBUG
+	pthread_t thread_id;
+#endif
 };
 
 void
@@ -224,6 +228,18 @@ slab_order_size(struct slab_cache *cache, uint8_t order)
 	return size << (order + cache->order0_size_lb);
 }
 
+/**
+ * Debug only: track that all allocations
+ * are made from a single thread.
+ */
+static inline void
+slab_cache_set_thread(struct slab_cache *cache)
+{
+	(void) cache;
+#ifndef _NDEBUG
+	cache->thread_id = pthread_self();
+#endif
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

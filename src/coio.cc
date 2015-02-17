@@ -45,7 +45,6 @@ struct CoioGuard {
 	~CoioGuard() { ev_io_stop(loop(), ev_io); }
 };
 
-typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
 /** Note: this function does not throw */
@@ -663,6 +662,25 @@ coio_service_init(struct coio_service *service, const char *name,
 			  coio_service_on_accept, service);
 	service->handler = handler;
 	service->handler_param = handler_param;
+}
+
+static void
+on_bind(void *arg)
+{
+	fiber_wakeup((struct fiber *) arg);
+}
+
+void
+coio_service_start(struct evio_service *service, const char *uri)
+{
+	assert(service->on_bind == NULL);
+	assert(service->on_bind_param == NULL);
+	service->on_bind = on_bind;
+	service->on_bind_param = fiber();
+	evio_service_start(service, uri);
+	fiber_yield();
+	service->on_bind_param = NULL;
+	service->on_bind = NULL;
 }
 
 void

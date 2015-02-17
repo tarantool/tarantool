@@ -39,7 +39,7 @@ local function format(status, ...)
         if status then
             return err
         else
-            err = 'console: an exception occurred during formatting result: '..
+            err = 'console: an exception occurred when formatting the output: '..
                 tostring(err)
         end
     else
@@ -163,7 +163,6 @@ local function client_print(self, output)
         return
     elseif not output then
         -- disconnect peer
-        local peer = self.client:peer()
         self.client:shutdown()
         self.client:close()
         self.client = nil
@@ -328,7 +327,6 @@ local function listen(uri)
         error(string.format('failed to create server %s:%s: %s',
             host, port, errno.strerror()))
     end
-    log.info("started on %s:%s", addr.host, addr.port)
     return s
 end
 

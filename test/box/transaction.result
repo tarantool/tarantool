@@ -64,7 +64,7 @@ f:status();
 -- transactions and system spaces
 box.begin() box.schema.space.create('test');
 ---
-- error: Space _space does not support multi-statement transactions
+- error: Space _schema does not support multi-statement transactions
 ...
 box.rollback();
 ---

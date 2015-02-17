@@ -538,7 +538,7 @@ hash.index['field3']:get{10}
 -- TupleFound (primary key)
 hash:insert{1, 10, 10, 10}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 hash.index['primary']:get{10}
 ---
@@ -580,7 +580,7 @@ hash.index['field3']:get{10}
 -- TupleFound (key --1)
 hash:insert{10, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 hash.index['primary']:get{10}
 ---
@@ -627,7 +627,7 @@ hash.index['field1']:get{0}
 -- TupleFound (key --3)
 hash:insert{10, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 'primary'
 ...
 hash.index['primary']:get{10}
 ---
@@ -670,6 +670,26 @@ hash.index['field3']:get{10}
 hash.index['field3']:get{0}
 ---
 - [0, 0, 0, 0]
+...
+hash:drop()
+---
+...
+hash = box.schema.create_space('tweedledum')
+---
+...
+hi = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+---
+...
+hash:insert{0}
+---
+- [0]
+...
+hash:insert{16}
+---
+- [16]
+...
+for _, tuple in hi:pairs(nil, {iterator = box.index.ALL}) do hash:delete{tuple[1]} end
+---
 ...
 hash:drop()
 ---
