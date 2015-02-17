@@ -60,7 +60,7 @@ box.schema.user.grant('grantee', 'liaison')
 box.schema.user.grant('test', 'read,write', 'universe')
 box.session.su('test')
 s = box.schema.space.create('test')
-s:create_index('i1')
+_ = s:create_index('i1')
 box.schema.role.grant('liaison', 'read,write', 'space', 'test')
 box.session.su('grantee')
 box.space.test:insert{1}

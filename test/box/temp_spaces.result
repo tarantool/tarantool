@@ -1,4 +1,7 @@
 -- temporary spaces
+_space = box.space._space
+---
+...
 -- not a temporary
 FLAGS = 6
 ---
@@ -53,18 +56,28 @@ s:len()
 ---
 - 1
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'temporary', []]
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ''}})
+s.temporary
+---
+- true
+...
+_ = _space:update(s.id, {{'=', FLAGS, ''}})
 ---
 - error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
     space'
 ...
+s.temporary
+---
+- true
+...
 --# stop server default
 --# start server default
 FLAGS = 6
+---
+...
+_space = box.space._space
 ---
 ...
 s = box.space.t
@@ -78,33 +91,29 @@ s.temporary
 ---
 - true
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'no-temporary', []]
 ...
 s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ',:asfda:temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, ',:asfda:temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, ',:asfda:temporary', []]
 ...
 s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'a,b,c,d,e'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'a,b,c,d,e'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'a,b,c,d,e', []]
 ...
 s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'temporary', []]
 ...
 s.temporary
 ---
@@ -117,22 +126,28 @@ s:insert{1, 2, 3}
 ---
 - [1, 2, 3]
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'temporary', []]
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
+s.temporary
+---
+- true
+...
+_ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
 - error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
     space'
+...
+s.temporary
+---
+- true
 ...
 s:delete{1}
 ---
 - [1, 2, 3]
 ...
-box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
+_ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'no-temporary', []]
 ...
 s:drop()
 ---

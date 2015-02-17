@@ -240,12 +240,16 @@ box.schema.space.create = function(name, options)
     end
     local id = options.id
     if not id then
-        id = _space.index[0]:max()[1]
-        if id < box.schema.SYSTEM_ID_MAX then
-            id = box.schema.SYSTEM_ID_MAX + 1
-        else
-            id = id + 1
+        local _schema = box.space._schema
+        local max_id = _schema:update({'max_id'}, {{'+', 2, 1}})
+        if max_id == nil then
+            id = _space.index.primary:max()[1]
+            if id < box.schema.SYSTEM_ID_MAX then
+                id = box.schema.SYSTEM_ID_MAX
+            end
+            max_id = _schema:insert{'max_id', id + 1}
         end
+        id = max_id[2]
     end
     local uid = nil
     if options.user then

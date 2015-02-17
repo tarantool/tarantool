@@ -191,16 +191,8 @@ box.session.su('test')
 s = box.schema.space.create('test')
 ---
 ...
-s:create_index('i1')
+_ = s:create_index('i1')
 ---
-- unique: true
-  parts:
-  - type: NUM
-    fieldno: 1
-  id: 0
-  space_id: 512
-  name: i1
-  type: TREE
 ...
 box.schema.role.grant('liaison', 'read,write', 'space', 'test')
 ---

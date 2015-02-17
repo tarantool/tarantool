@@ -19,7 +19,7 @@ s:drop()
 ...
 s:drop()
 ---
-- error: Space '#512' does not exist
+- error: Space '#518' does not exist
 ...
 --
 -- Check double create user
@@ -167,7 +167,7 @@ s:drop()
 ...
 gs = box.schema.create_space('guest_space')
 ---
-- error: Read access denied for user 'guest' to space '_space'
+- error: Write access denied for user 'guest' to space '_schema'
 ...
 box.schema.func.create('guest_func')
 ---

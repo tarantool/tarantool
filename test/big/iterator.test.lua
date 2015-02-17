@@ -165,7 +165,8 @@ space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 -- Check that iterators successfully invalidated when index deleted
 gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
 index_space = box.space[box.schema.INDEX_ID]
-index_space:delete{space.id, space.index['i1'].id}
+_ = index_space:delete{space.id, space.index['i1'].id}
+type(_)
 gen(param, state)
 
 space:drop()
