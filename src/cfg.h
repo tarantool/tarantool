@@ -36,4 +36,11 @@ cfg_gets(const char *param);
 
 double
 cfg_getd(const char *param);
+
+int
+cfg_getarr_size(const char *name);
+
+const char *
+cfg_getarr_elem(const char *name, int i);
+
 #endif /* INCLUDES_TARANTOOL_CFG_H */
