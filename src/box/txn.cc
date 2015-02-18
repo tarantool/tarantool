@@ -328,27 +328,6 @@ boxffi_txn_begin()
 	return 0;
 }
 
-int
-boxffi_txn_commit()
-{
-	try {
-		struct txn *txn = in_txn();
-		/**
-		 * COMMIT is like BEGIN or ROLLBACK
-		 * a "transaction-initiating statement".
-		 * Do nothing if transaction is not started,
-		 * it's the same as BEGIN + COMMIT.
-		 */
-		if (txn) {
-			txn_commit(txn);
-			txn_finish(txn);
-		}
-	} catch (Exception  *e) {
-		return -1; /* pass exception through FFI */
-	}
-	return 0;
-}
-
 void
 boxffi_txn_rollback()
 {

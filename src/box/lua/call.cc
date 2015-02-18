@@ -329,6 +329,23 @@ lbox_delete(lua_State *L)
 	return lua_gettop(L) - 3;
 }
 
+static int
+lbox_commit(lua_State * /* L */)
+{
+	struct txn *txn = in_txn();
+	/**
+	 * COMMIT is like BEGIN or ROLLBACK
+	 * a "transaction-initiating statement".
+	 * Do nothing if transaction is not started,
+	 * it's the same as BEGIN + COMMIT.
+	*/
+	if (txn) {
+		txn_commit(txn);
+		txn_finish(txn);
+	}
+	return 0;
+}
+
 /**
  * A helper to find a Lua function by name and put it
  * on top of the stack.
@@ -655,6 +672,7 @@ lbox_snapshot(struct lua_State *L)
 
 static const struct luaL_reg boxlib[] = {
 	{"snapshot", lbox_snapshot},
+	{"commit", lbox_commit},
 	{NULL, NULL}
 };
 

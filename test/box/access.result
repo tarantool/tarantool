@@ -394,8 +394,7 @@ box.schema.user.passwd('invalid_user', 'some_password')
 ...
 box.schema.user.passwd()
 ---
-- error: '[string "-- schema.lua (internal file)..."]:1047: Usage: box.schema.user.passwd([user,]
-    password)'
+- error: 'Usage: box.schema.user.passwd([user,] password)'
 ...
 session.su('user1')
 ---

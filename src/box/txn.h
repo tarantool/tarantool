@@ -160,13 +160,6 @@ extern "C" {
 int
 boxffi_txn_begin();
 
-/**
- * @retval 0 - success
- * @retval -1 - commit failed
- */
-int
-boxffi_txn_commit();
-
 void
 boxffi_txn_rollback();
 

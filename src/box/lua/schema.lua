@@ -55,9 +55,6 @@ ffi.cdef[[
     int
     boxffi_txn_begin();
 
-    int
-    boxffi_txn_commit();
-
     void
     boxffi_txn_rollback();
 ]]
@@ -204,11 +201,8 @@ box.begin = function()
         box.error()
     end
 end
-box.commit = function()
-    if ffi.C.boxffi_txn_commit() == -1 then
-        box.error()
-    end
-end
+-- box.commit yields, so it's defined in call.cc
+
 box.rollback = ffi.C.boxffi_txn_rollback;
 
 box.schema.space = {}
@@ -1044,7 +1038,7 @@ end
 
 box.schema.user.passwd = function(name, new_password)
     if name == nil then
-        error('Usage: box.schema.user.passwd([user,] password)')
+        box.error(box.error.PROC_LUA, "Usage: box.schema.user.passwd([user,] password)")
     end
     if new_password == nil then
         -- change password for current user
