@@ -652,7 +652,7 @@ local function readline(self, limit, eol, timeout)
                return data
             end
 
-        elseif not error_is_transient[self:errno()] then
+        elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
         end
