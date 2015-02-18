@@ -100,7 +100,7 @@ cfg_getarr_elem(const char *name, int i)
 {
 	cfg_get(name);
 	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
-	lua_rawgeti(tarantool_L, -1, i);
+	lua_rawgeti(tarantool_L, -1, i + 1);
 	const char *val = cfg_converts(tarantool_L);
 	lua_pop(tarantool_L, 2);
 	return val;
