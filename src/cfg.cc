@@ -52,8 +52,9 @@ cfg_geti(const char *param)
 	return val;
 }
 
+/* Support simultaneous cfg_gets("str1") and cfg_gets("str2") */
 static const char *
-cfg_converts(struct lua_State *L)
+cfg_tostring(struct lua_State *L)
 {
 	static char __thread values[MAX_STR_OPTS][MAX_OPT_VAL_LEN];
 	static int __thread i = 0;
@@ -69,9 +70,8 @@ cfg_converts(struct lua_State *L)
 const char *
 cfg_gets(const char *param)
 {
-	/* Support simultaneous cfg_gets("str1") and cfg_gets("str2") */
 	cfg_get(param);
-	const char *val = cfg_converts(tarantool_L);
+	const char *val = cfg_tostring(tarantool_L);
 	lua_pop(tarantool_L, 1);
 	return val;
 }
@@ -101,7 +101,7 @@ cfg_getarr_elem(const char *name, int i)
 	cfg_get(name);
 	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
 	lua_rawgeti(tarantool_L, -1, i + 1);
-	const char *val = cfg_converts(tarantool_L);
+	const char *val = cfg_tostring(tarantool_L);
 	lua_pop(tarantool_L, 2);
 	return val;
 }
