@@ -52,22 +52,27 @@ cfg_geti(const char *param)
 	return val;
 }
 
+static const char *
+cfg_converts(struct lua_State *L)
+{
+	static char __thread values[MAX_STR_OPTS][MAX_OPT_VAL_LEN];
+	static int __thread i = 0;
+	if (lua_isnil(L, -1))
+		return NULL;
+	else {
+		snprintf(values[i % MAX_STR_OPTS], MAX_OPT_VAL_LEN,
+			 "%s", lua_tostring(L, -1));
+		return values[i++ % MAX_STR_OPTS];
+	}
+}
+
 const char *
 cfg_gets(const char *param)
 {
 	/* Support simultaneous cfg_gets("str1") and cfg_gets("str2") */
-	static char __thread values[MAX_STR_OPTS][MAX_OPT_VAL_LEN];
-	static int __thread i = 0;
-	struct lua_State *L = tarantool_L;
-	char *val;
 	cfg_get(param);
-	if (lua_isnil(L, -1))
-		val = NULL;
-	else {
-		val = values[i++ % MAX_STR_OPTS];
-		snprintf(val, MAX_OPT_VAL_LEN, "%s", lua_tostring(L, -1));
-	}
-	lua_pop(L, 1);
+	const char *val = cfg_converts(tarantool_L);
+	lua_pop(tarantool_L, 1);
 	return val;
 }
 
@@ -77,6 +82,27 @@ cfg_getd(const char *param)
 	cfg_get(param);
 	double val = lua_tonumber(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
+	return val;
+}
+
+int
+cfg_getarr_size(const char *name)
+{
+	cfg_get(name);
+	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
+	int result = luaL_getn(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return result;
+}
+
+const char *
+cfg_getarr_elem(const char *name, int i)
+{
+	cfg_get(name);
+	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
+	lua_rawgeti(tarantool_L, -1, i + 1);
+	const char *val = cfg_converts(tarantool_L);
+	lua_pop(tarantool_L, 2);
 	return val;
 }
 
