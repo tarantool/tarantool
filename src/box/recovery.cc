@@ -408,7 +408,9 @@ recover_remaining_wals(struct recovery_state *r)
 	}
 
 	while (1) {
-		current_vclock = vclockset_isearch(&r->wal_dir.index, &r->vclock);
+		current_vclock = vclockset_match(&r->wal_dir.index,
+						 &r->vclock,
+						 r->wal_dir.panic_if_error);
 		if (current_vclock == NULL)
 			break; /* No more WALs */
 

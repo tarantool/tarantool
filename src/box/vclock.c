@@ -191,6 +191,12 @@ static int
 vclockset_node_compare(const struct vclock *a, const struct vclock *b)
 {
 	int res = vclock_compare(a, b);
+	/*
+	 * In a vclock set, we do not allow vclock objects which
+	 * are note strictly ordered.
+	 * See also xdir_scan(), in which we check & skip
+	 * duplicate vclocks.
+	 */
 	if (res == VCLOCK_ORDER_UNDEFINED)
 		return 0;
 	return res;

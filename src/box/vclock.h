@@ -181,21 +181,39 @@ typedef rb_tree(struct vclock) vclockset_t;
 rb_proto(, vclockset_, vclockset_t, struct vclock);
 
 /**
- * @brief Inclusive search
- * @param set
- * @param key
+ * A proximity search in a set of vclock objects.
+ *
+ * The set is normally the index of vclocks in the binary
+ * log files of the current directory. The task of the search is
+ * to find the first log,
+ *
  * @return a vclock that <= than \a key
  */
 static inline struct vclock *
-vclockset_isearch(vclockset_t *set, struct vclock *key)
+vclockset_match(vclockset_t *set, struct vclock *key,
+		bool panic_if_error)
 {
-	struct vclock *res = vclockset_psearch(set, key);
-	while (res != NULL) {
-		if (vclock_compare(res, key) <= 0)
-			return res;
-		res = vclockset_prev(set, res);
+	struct vclock *match = vclockset_psearch(set, key);
+	/**
+	 * vclockset comparator returns 0 for
+	 * incomparable keys. So the match doesn't have to be
+	 * strictly preceding the search key, it may be
+	 * incomparable. If this is the case, unwind until
+	 * we get to a key which is strictly below the search
+	 * pattern.
+	 */
+	while (match != NULL) {
+		if (vclock_compare(match, key) <= 0)
+			return match;
+		/* The order is undefined, try the previous vclock. */
+		match = vclockset_prev(set, match);
 	}
-	return NULL;
+	/*
+	 * There is no xlog which is strictly less than the search
+	 * pattern. Return the fist successor log - it is either
+	 * strictly greater, or incomparable with the key.
+	 */
+	return panic_if_error ? NULL: vclockset_first(set);
 }
 
 #if defined(__cplusplus)

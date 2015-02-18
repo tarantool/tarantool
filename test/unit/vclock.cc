@@ -231,7 +231,7 @@ test_isearch()
 		}
 
 		int64_t check = *(query + NODE_N);
-		struct vclock *res = vclockset_isearch(&set, &vclock);
+		struct vclock *res = vclockset_match(&set, &vclock, true);
 		int64_t value = res != NULL ? vclock_signature(res) : INT64_MAX;
 		is(value, check, "query #%d", q + 1);
 	}
