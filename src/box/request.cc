@@ -152,6 +152,7 @@ execute_select(struct request *request, struct port *port)
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
+		TupleGuard tuple_gc(tuple);
 		if (offset > 0) {
 			offset--;
 			continue;

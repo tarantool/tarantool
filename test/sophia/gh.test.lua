@@ -1,30 +1,34 @@
 
 -- gh-283: Sophia: hang after three creates and drops
 
-s = box.schema.create_space('space0', {id = 33, engine='sophia'})
+s = box.schema.create_space('space0', {engine='sophia'})
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 s:insert{'a', 'b', 'c'}
 s:drop()
+sophia_schedule()
 
-s = box.schema.create_space('space0', {id = 33, engine='sophia'})
+s = box.schema.create_space('space0', {engine='sophia'})
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 s:insert{'a', 'b', 'c'}
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
 s:drop()
+sophia_schedule()
 
-s = box.schema.create_space('space0', {id = 33, engine='sophia'})
+s = box.schema.create_space('space0', {engine='sophia'})
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 s:insert{'a', 'b', 'c'}
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
 s:drop()
+sophia_schedule()
 
 -- gh-280: Sophia: crash if insert without index
 
 s = box.schema.create_space('test', {engine='sophia'})
 s:insert{'a'}
 s:drop()
+sophia_schedule()
 
 -- gh-436: No error when creating temporary sophia space
 
@@ -32,7 +36,7 @@ s = box.schema.create_space('tester',{engine='sophia', temporary=true})
 
 -- gh-432: Sophia: ignored limit
 
-s = box.schema.create_space('tester',{id = 89, engine='sophia'})
+s = box.schema.create_space('tester',{engine='sophia'})
 i = s:create_index('sophia_index', {})
 for v=1, 100 do s:insert({v}) end
 t = s:select({''},{iterator='GT', limit =1})
@@ -40,8 +44,9 @@ t
 t = s:select({},{iterator='GT', limit =1})
 t
 s:drop()
+sophia_schedule()
 
-s = box.schema.create_space('tester', {id = 90, engine='sophia'})
+s = box.schema.create_space('tester', {engine='sophia'})
 i = s:create_index('sophia_index', {type = 'tree', parts = {1, 'STR'}})
 for v=1, 100 do s:insert({tostring(v)}) end
 t = s:select({''},{iterator='GT', limit =1})
@@ -49,16 +54,7 @@ t
 t = s:select({},{iterator='GT', limit =1})
 t
 s:drop()
-
--- gh-282: Sophia: truncate() does nothing
-
-s = box.schema.create_space('name_of_space', {id = 33, engine='sophia'})
-i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})
-s:insert{'a', 'b', 'c'}
-box.space['name_of_space']:select{'a'}
-box.space['name_of_space']:truncate()
-box.space['name_of_space']:select{'a'}
-s:drop()
+sophia_schedule()
 
 -- gh-680: Sophia: assertion on update
 s = box.schema.space.create('tester', {engine='sophia'})
@@ -71,3 +67,4 @@ s:update({'X'}, {{'=', 3, 'Z'}})
 s:select{'X'}
 s:select{'Y'}
 s:drop()
+sophia_schedule()
