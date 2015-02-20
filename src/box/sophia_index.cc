@@ -214,11 +214,8 @@ SophiaIndex::random(uint32_t rnd) const
 	struct space *space = space_cache_find(key_def->space_id);
 	int valuesize;
 	void *value = sp_get(o, "value", &valuesize);
-	struct tuple *ret =
-		tuple_new(space->format, (char*)value,
-		          (char*)value + valuesize);
-	tuple_ref(ret);
-	return ret;
+	return tuple_new(space->format, (char*)value,
+	                 (char*)value + valuesize);
 }
 
 size_t
@@ -376,10 +373,7 @@ sophia_iterator_next(struct iterator *ptr)
 		return NULL;
 	int valuesize = 0;
 	const char *value = (const char*)sp_get(o, "value", &valuesize);
-	struct tuple *ret =
-		tuple_new(it->space->format, value, value + valuesize);
-	tuple_ref(ret);
-	return ret;
+	return tuple_new(it->space->format, value, value + valuesize);
 }
 
 struct tuple *
@@ -394,12 +388,8 @@ sophia_iterator_eq(struct iterator *ptr)
 	ptr->next = sophia_iterator_last;
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	struct tuple *tuple =
-		sophia_index_get(it->env, it->db, it->tx, it->key, it->keysize,
-	                     it->space->format);
-	if (tuple)
-		tuple_ref(tuple);
-	return tuple;
+	return sophia_index_get(it->env, it->db, it->tx, it->key, it->keysize,
+	                        it->space->format);
 }
 
 struct iterator *

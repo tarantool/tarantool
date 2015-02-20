@@ -176,41 +176,26 @@ SophiaEngine::createIndex(struct key_def *key_def)
 	}
 }
 
-static inline int
-drop_repository(char *path)
-{
-	DIR *dir = opendir(path);
-	if (dir == NULL)
-		return -1;
-	char file[1024];
-	struct dirent *de;
-	while ((de = readdir(dir))) {
-		if (de->d_name[0] == '.')
-			continue;
-		snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
-		int rc = unlink(file);
-		if (rc == -1) {
-			closedir(dir);
-			return -1;
-		}
-	}
-	closedir(dir);
-	return rmdir(path);
-}
-
 void
 SophiaEngine::dropIndex(Index *index)
 {
 	SophiaIndex *i = (SophiaIndex*)index;
-	int rc = sp_destroy(i->db);
+	/* schedule asynchronous drop */
+	int rc = sp_drop(i->db);
+	if (rc == -1)
+		sophia_raise(env);
+	/* unref db object */
+	rc = sp_destroy(i->db);
+	if (rc == -1)
+		sophia_raise(env);
+	/* maybe start asynchronous database
+	 * shutdown: last snapshot might hold a
+	 * db pointer. */
+	rc = sp_destroy(i->db);
 	if (rc == -1)
 		sophia_raise(env);
 	i->db  = NULL;
 	i->env = NULL;
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%" PRIu32,
-	         cfg_gets("sophia_dir"), index->key_def->space_id);
-	drop_repository(path);
 }
 
 void
@@ -279,7 +264,8 @@ SophiaEngine::commit(struct txn *txn)
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (! stmt->new_tuple)
 			continue;
-		assert(stmt->new_tuple->refs >= 2);
+		assert(stmt->new_tuple->refs >= 1 &&
+		       stmt->new_tuple->refs < UINT8_MAX);
 		tuple_unref(stmt->new_tuple);
 	}
 	auto scoped_guard = make_scoped_guard([=] {
@@ -303,7 +289,7 @@ SophiaEngine::rollback(struct txn *txn)
 {
 	if (txn->engine_tx == NULL)
 		return;
-	sp_rollback(txn->engine_tx);
+	sp_destroy(txn->engine_tx);
 	txn->engine_tx = NULL;
 }
 
@@ -435,4 +421,12 @@ SophiaEngine::abort_checkpoint()
 		sophia_delete_checkpoint(env, m_checkpoint_lsn);
 		m_checkpoint_lsn = -1;
 	}
+}
+
+int sophia_schedule(void)
+{
+	SophiaEngine *engine = (SophiaEngine *)engine_find("sophia");
+	assert(engine->env != NULL);
+	void *c = sp_ctl(engine->env);
+	return sp_set(c, "scheduler.run");
 }

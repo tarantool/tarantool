@@ -1,67 +1,74 @@
 -- space create/drop
-space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
-sophia_printdir()
+sophia_dir()[1]
 ---
-- 
+- 0
 ...
 space:drop()
 ---
 ...
-sophia_printdir()
+sophia_schedule()
 ---
-- 
+- 0
+...
+sophia_dir()[1]
+---
+- 0
 ...
 -- index create/drop
-space = box.schema.create_space('test', { id = 101, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')
 ---
 ...
-sophia_printdir()
+sophia_dir()[1]
 ---
-- '101
-
-'
+- 1
 ...
 space:drop()
 ---
 ...
-sophia_printdir()
+sophia_schedule()
 ---
-- 
+- 1
+...
+sophia_dir()[1]
+---
+- 0
 ...
 -- index create/drop alter
-space = box.schema.create_space('test', { id = 102, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')
 ---
 ...
-sophia_printdir()
+sophia_dir()[1]
 ---
-- '102
-
-'
+- 1
 ...
 _index = box.space[box.schema.INDEX_ID]
 ---
 ...
 _index:delete{102, 0}
 ---
-- [102, 0, 'primary', 'tree', 1, 1, 0, 'num']
-...
-sophia_printdir()
----
-- 
 ...
 space:drop()
 ---
 ...
+sophia_schedule()
+---
+- 1
+...
+sophia_dir()[1]
+---
+- 0
+...
 -- index create/drop tree string
-space = box.schema.create_space('test', { id = 103, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
@@ -71,17 +78,19 @@ space:insert({'test'})
 ---
 - ['test']
 ...
-sophia_printdir()
----
-- '103
-
-'
-...
 space:drop()
 ---
 ...
+sophia_schedule()
+---
+- 1
+...
+sophia_dir()[1]
+---
+- 0
+...
 -- index create/drop tree num
-space = box.schema.create_space('test', { id = 104, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
@@ -91,17 +100,19 @@ space:insert({13})
 ---
 - [13]
 ...
-sophia_printdir()
----
-- '104
-
-'
-...
 space:drop()
 ---
 ...
+sophia_schedule()
+---
+- 1
+...
+sophia_dir()[1]
+---
+- 0
+...
 -- index create hash 
-space = box.schema.create_space('test', { id = 105, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary', {type = 'hash'})
@@ -111,8 +122,16 @@ index = space:create_index('primary', {type = 'hash'})
 space:drop()
 ---
 ...
+sophia_schedule()
+---
+- 0
+...
+sophia_dir()[1]
+---
+- 0
+...
 -- secondary index create
-space = box.schema.create_space('test', { id = 106, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index1 = space:create_index('primary')
@@ -126,12 +145,16 @@ index2 = space:create_index('secondary')
 space:drop()
 ---
 ...
-sophia_printdir()
+sophia_schedule()
 ---
-- 
+- 1
+...
+sophia_dir()[1]
+---
+- 0
 ...
 -- index size
-space = box.schema.create_space('test', { id = 107, engine = 'sophia' })
+space = box.schema.create_space('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')
@@ -162,4 +185,8 @@ primary:len()
 ...
 space:drop()
 ---
+...
+sophia_schedule()
+---
+- 1
 ...

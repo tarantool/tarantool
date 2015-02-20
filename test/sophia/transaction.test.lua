@@ -1,5 +1,5 @@
 
-space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
+space = box.schema.create_space('test', { engine = 'sophia' })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 
 -- begin/rollback
