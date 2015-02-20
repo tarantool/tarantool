@@ -1,5 +1,5 @@
 ---
-title   : "Tarantool - A NoSQL database in a Lua Script"
+title   : "Tarantool - A NoSQL database running in a Lua application server"
 slug    : "index"
 save_as : "index.html"
 template: "index"
@@ -58,7 +58,7 @@ blocks  :
       content: >
         If you need immediate help, try to ping maintainers on
         `\#tarantool <http://webchat.freenode.net/?channels=tarantool>`_
-        channel ar `irc.freenode.net <irc://irc.freenode.net>`_.
+        channel at `irc.freenode.net <irc://irc.freenode.net>`_.
     - format: rst
       content: >
         Terms of commercial 24x7 support are available upon request,

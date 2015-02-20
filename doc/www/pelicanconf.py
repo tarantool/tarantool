@@ -5,7 +5,7 @@ import re
 import urlparse
 
 AUTHOR = u'Tarantool'
-SITENAME = u'Tarantool - a NoSQL database in a Lua script'
+SITENAME = u'Tarantool - a NoSQL database running in a Lua application server'
 SITEURL = 'http://tarantool.org'
 
 PATH = 'content'
