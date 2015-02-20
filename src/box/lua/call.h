@@ -60,7 +60,7 @@ void
 port_ffi_destroy(struct port_ffi *port);
 
 int
-boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 	      int iterator, uint32_t offset, uint32_t limit,
 	      const char *key, const char *key_end);
 

@@ -48,6 +48,9 @@ boxffi_index_len(uint32_t space_id, uint32_t index_id);
 struct tuple *
 boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
 
+struct tuple *
+boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key);
+
 struct iterator *
 boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		      const char *key);

@@ -209,23 +209,6 @@ tuple_ref(struct tuple *tuple)
 }
 
 /**
- * Increment tuple reference counter.
- * Returns -1 if overflow detected, 0 otherwise
- *
- * @pre tuple->refs + count >= 0
- */
-extern "C" inline int
-tuple_ref_nothrow(struct tuple *tuple)
-{
-	try {
-		tuple_ref(tuple);
-	} catch (Exception *e) {
-		return -1;
-	}
-	return 0;
-}
-
-/**
  * Decrement tuple reference counter. If it has reached zero, free the tuple.
  *
  * @pre tuple->refs + count >= 0

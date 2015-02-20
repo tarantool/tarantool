@@ -26,6 +26,8 @@ ffi.cdef[[
     boxffi_index_memsize(uint32_t space_id, uint32_t index_id);
     struct tuple *
     boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
+    struct tuple *
+    boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key);
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
@@ -47,7 +49,7 @@ ffi.cdef[[
     port_ffi_destroy(struct port_ffi *port);
 
     int
-    boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+    boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
               int iterator, uint32_t offset, uint32_t limit,
               const char *key, const char *key_end);
     void password_prepare(const char *password, int len,
@@ -544,7 +546,9 @@ local iterator_gen = function(param, state)
     end
     -- next() modifies state in-place
     local tuple = builtin.boxffi_iterator_next(state)
-    if tuple ~= nil then
+    if tuple == ffi.cast('void *', -1) then
+        return box.error() -- error
+    elseif tuple ~= nil then
         return state, box.tuple.bless(tuple) -- new state, value
     else
         return nil
@@ -559,7 +563,6 @@ end
 local port = ffi.new('struct port_ffi')
 builtin.port_ffi_create(port)
 ffi.gc(port, builtin.port_ffi_destroy)
-local port_t = ffi.typeof('struct port *')
 
 function box.schema.space.bless(space)
     local index_mt = {}
@@ -614,7 +617,7 @@ function box.schema.space.bless(space)
         elseif tuple ~= nil then
             return box.tuple.bless(tuple)
         else
-            return nil
+            return
         end
     end
     -- iteration
@@ -677,17 +680,13 @@ function box.schema.space.bless(space)
 
     index_mt.get = function(index, key)
         local key, key_end = msgpackffi.encode_tuple(key)
-        port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.space_id,
-           index.id, box.index.EQ, 0, 2, key, key_end) ~=0 then
-            return box.error()
-        end
-        if port.size == 0 then
-            return
-        elseif port.size == 1 then
-            return box.tuple.bless(port.ret[0])
+        local tuple = builtin.boxffi_index_get(index.space_id, index.id, key)
+        if tuple == ffi.cast('void *', -1) then
+            return box.error() -- error
+        elseif tuple ~= nil then
+            return box.tuple.bless(tuple)
         else
-            box.error(box.error.MORE_THAN_ONE_TUPLE)
+            return
         end
     end
 
@@ -720,15 +719,15 @@ function box.schema.space.bless(space)
             end
         end
 
-        port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.space_id,
+        if builtin.boxffi_select(port, index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
             return box.error()
         end
 
         local ret = {}
         for i=0,port.size - 1,1 do
-            table.insert(ret, box.tuple.bless(port.ret[i]))
+            -- tuple.bless must never fail
+            ret[i + 1] = box.tuple.bless(port.ret[i])
         end
         return ret
     end

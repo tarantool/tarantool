@@ -10,18 +10,18 @@ index = b:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 box.begin()
 for key = 1, 10 do a:insert({key}) end
 t = {}
-for key = 1, 10 do table.insert(t, a:get({key})) end
+for key = 1, 10 do table.insert(t, a:select({key})[1]) end
 t
 for key = 1, 10 do b:insert({key}) end
 t = {}
-for key = 1, 10 do table.insert(t, b:get({key})) end
+for key = 1, 10 do table.insert(t, b:select({key})[1]) end
 t
 box.rollback()
 
 t = {}
-for key = 1, 10 do assert(a:get({key}) == nil) end
+for key = 1, 10 do assert(#a:select({key}) == 0) end
 t
-for key = 1, 10 do assert(b:get({key}) == nil) end
+for key = 1, 10 do assert(#b:select({key}) == 0) end
 t
 
 -- begin/commit insert
@@ -35,10 +35,10 @@ t = {}
 box.commit()
 
 t = {}
-for key = 1, 10 do table.insert(t, a:get({key})) end
+for key = 1, 10 do table.insert(t, a:select({key})[1]) end
 t
 t = {}
-for key = 1, 10 do table.insert(t, b:get({key})) end
+for key = 1, 10 do table.insert(t, b:select({key})[1]) end
 t
 
 -- begin/commit delete
@@ -49,9 +49,9 @@ for key = 1, 10 do b:delete({key}) end
 box.commit()
 
 t = {}
-for key = 1, 10 do assert(a:get({key}) == nil) end
+for key = 1, 10 do assert(#a:select({key}) == 0) end
 t
-for key = 1, 10 do assert(b:get({key}) == nil) end
+for key = 1, 10 do assert(#b:select({key}) == 0) end
 t
 
 a:drop()

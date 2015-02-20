@@ -26,14 +26,15 @@ errinj.set("some-injection") -- check error
 ---
 - 'error: can''t find error injection ''some-injection'''
 ...
-space:get{222444}
+space:select{222444}
 ---
+- []
 ...
 errinj.set("ERRINJ_TESTING", true)
 ---
 - ok
 ...
-space:get{222444}
+space:select{222444}
 ---
 - error: Error injection 'ERRINJ_TESTING'
 ...

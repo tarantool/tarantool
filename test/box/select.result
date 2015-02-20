@@ -15,15 +15,15 @@ for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 --------------------------------------------------------------------------------
 s.index[0]:get()
 ---
-- error: More than one tuple found by get()
+- error: Invalid key part count in an exact match (expected 1, got 0)
 ...
 s.index[0]:get({})
 ---
-- error: More than one tuple found by get()
+- error: Invalid key part count in an exact match (expected 1, got 0)
 ...
 s.index[0]:get(nil)
 ---
-- error: More than one tuple found by get()
+- error: Invalid key part count in an exact match (expected 1, got 0)
 ...
 s.index[0]:get(1)
 ---
@@ -35,7 +35,7 @@ s.index[0]:get({1})
 ...
 s.index[0]:get({1, 2})
 ---
-- error: Invalid key part count (expected [0..1], got 2)
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
 s.index[0]:get(0)
 ---
@@ -53,11 +53,11 @@ s.index[0]:get({"0"})
 ...
 s.index[1]:get(1)
 ---
-- error: More than one tuple found by get()
+- error: Invalid key part count in an exact match (expected 2, got 1)
 ...
 s.index[1]:get({1})
 ---
-- error: More than one tuple found by get()
+- error: Invalid key part count in an exact match (expected 2, got 1)
 ...
 s.index[1]:get({1, 2})
 ---

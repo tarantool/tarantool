@@ -183,7 +183,7 @@ test:drop()
 --
 box.space._priv:get{1}
 ---
-- [1, 1, 'universe', 0, 7]
+- error: Invalid key part count in an exact match (expected 3, got 1)
 ...
 u = box.space._user:get{1}
 ---

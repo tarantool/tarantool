@@ -32,6 +32,7 @@
 #include "box/space.h"
 #include "box/schema.h"
 #include "box/user_def.h"
+#include "box/tuple.h"
 #include "box/lua/tuple.h"
 #include "fiber.h"
 
@@ -70,7 +71,31 @@ struct tuple *
 boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd)
 {
 	try {
-		return check_index(space_id, index_id)->random(rnd);
+		Index *index = check_index(space_id, index_id);
+		struct tuple *tuple = index->random(rnd);
+		if (tuple == NULL)
+			return NULL;
+		tuple_ref(tuple); /* must not throw in this case */
+		return tuple;
+	}  catch (Exception *) {
+		return (struct tuple *) -1; /* handled by box.error() in Lua */
+	}
+}
+
+struct tuple *
+boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key)
+{
+	try {
+		Index *index = check_index(space_id, index_id);
+		if (!index->key_def->is_unique)
+			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		primary_key_validate(index->key_def, key, part_count);
+		struct tuple *tuple = index->findByKey(key, part_count);
+		if (tuple == NULL)
+			return NULL;
+		tuple_ref(tuple); /* must not throw in this case */
+		return tuple;
 	}  catch (Exception *) {
 		return (struct tuple *) -1; /* handled by box.error() in Lua */
 	}
@@ -120,20 +145,27 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 struct tuple*
 boxffi_iterator_next(struct iterator *itr)
 {
-	if (itr->sc_version != sc_version) {
-		try {
+	try {
+		if (itr->sc_version != sc_version) {
 			Index *index = check_index(itr->space_id, itr->index_id);
 			if (index != itr->index)
 				return NULL;
 			if (index->sc_version > itr->sc_version)
 				return NULL;
 			itr->sc_version = sc_version;
-		} catch (Exception *) {
-			/* space or index does not exist, nothing to fetch */
-			return NULL;
 		}
+	} catch (Exception *) {
+		return NULL; /* invalidate iterator */
 	}
-	return itr->next(itr);
+	try {
+		struct tuple *tuple = itr->next(itr);
+		if (tuple == NULL)
+			return NULL;
+		tuple_ref(tuple); /* must not throw in this case */
+		return tuple;
+	} catch (Exception *) {
+		return (struct tuple *) -1; /* handled by box.error() in Lua */
+	}
 }
 
 /* }}} */
