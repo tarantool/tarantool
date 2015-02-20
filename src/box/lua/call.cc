@@ -240,7 +240,6 @@ port_ffi_create(struct port_ffi *port)
 	port->vtab = &port_ffi_vtab;
 }
 
-
 static inline void
 port_ffi_clear(struct port_ffi *port)
 {
@@ -254,10 +253,7 @@ port_ffi_clear(struct port_ffi *port)
 void
 port_ffi_destroy(struct port_ffi *port)
 {
-	port_ffi_clear(port);
 	free(port->ret);
-	port->ret = NULL;
-	port->capacity = 0;
 }
 
 int
@@ -275,11 +271,20 @@ boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 	request.key = key;
 	request.key_end = key_end;
 
+	/*
+	 * A single instance of port_ffi object is used
+	 * for all selects, reset it.
+	 */
 	port->size = 0;
 	try {
 		box_process(&request, (struct port *) port);
 		return 0;
 	} catch (Exception *e) {
+		/*
+		 * The tuples will be not blessed and garbage
+		 * collected, unreference them here, to avoid
+		 * a leak.
+		 */
 		port_ffi_clear(port);
 		/* will be hanled by box.error() in Lua */
 		return -1;
