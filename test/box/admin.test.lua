@@ -1,7 +1,7 @@
 --# stop server default
 --# start server default
 
-space = box.schema.create_space('tweedledum', { id = 0 })
+space = box.schema.space.create('tweedledum', { id = 0 })
 index = space:create_index('primary', { type = 'hash' })
 
 --# push filter 'listen: .*' to 'listen: <uri>'

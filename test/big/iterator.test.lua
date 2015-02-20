@@ -2,7 +2,7 @@ dofile('utils.lua')
 
 # Tree single-part unique
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true})
 -- Tree single-part non-unique
 idx2 = space:create_index('i1', { type = 'tree', parts = {2, 'str'}, unique = false})
@@ -176,7 +176,7 @@ space:drop()
 -- Iterator safety after changing schema
 -------------------------------------------------------------------------------
 
-space = box.schema.create_space('test', {temporary=true})
+space = box.schema.space.create('test', {temporary=true})
 idx1 = space:create_index('primary', {type='HASH',unique=true})
 idx2 = space:create_index('t1', {type='TREE',unique=true})
 idx3 = space:create_index('t2', {type='TREE',unique=true})
@@ -207,7 +207,7 @@ space:drop()
 -- Iterator is not checked for wrong type; accept lowercase iterator
 -------------------------------------------------------------------------------
 
-space = box.schema.create_space('test', {temporary=true})
+space = box.schema.space.create('test', {temporary=true})
 idx1 = space:create_index('primary', {type='TREE',unique=true})
 space:insert{0}
 space:insert{1}

@@ -4,10 +4,10 @@ session = box.session
 --
 -- Check a double create space
 --
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 - error: Space 'test' already exists
 ...
@@ -31,7 +31,7 @@ box.schema.user.create('testus')
 ---
 - error: User 'testus' already exists
 ...
-s = box.schema.create_space('admin_space')
+s = box.schema.space.create('admin_space')
 ---
 ...
 index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
@@ -165,7 +165,7 @@ s:drop()
 ---
 - error: Read access denied for user 'guest' to space '_index'
 ...
-gs = box.schema.create_space('guest_space')
+gs = box.schema.space.create('guest_space')
 ---
 - error: Write access denied for user 'guest' to space '_schema'
 ...
@@ -224,7 +224,7 @@ box.schema.func.drop('uniuser_func')
 --
 -- Check create and drop space
 --
-us = box.schema.create_space('uniuser_space')
+us = box.schema.space.create('uniuser_space')
 ---
 ...
 us:drop()
@@ -258,7 +258,7 @@ box.space._space:select(280)
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
 ...
-us = box.schema.create_space('uniuser_space')
+us = box.schema.space.create('uniuser_space')
 ---
 ...
 box.schema.func.create('uniuser_func')
@@ -415,7 +415,7 @@ box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 --
 -- Check that itertors check privileges
 --
-s = box.schema.create_space('glade') 
+s = box.schema.space.create('glade') 
 ---
 ...
 box.schema.user.grant('testuser', 'read', 'space', 'glade')

@@ -20,7 +20,7 @@ wal = os.path.join(server.vardir, filename)
 
 server.start()
 
-server.admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+server.admin("space = box.schema.space.create('tweedledum', { id = 0 })")
 if os.access(wal_inprogress, os.F_OK):
   print ".xlog.inprogress exists"
 
@@ -144,10 +144,10 @@ wal_old = os.path.join(server.vardir, "old_" + filename)
 wal = os.path.join(server.vardir, filename)
 
 # Create wal#1
-server.admin("space = box.schema.create_space('test')")
-server.admin("index = box.space['test']:create_index('primary')")
-server.admin("box.space['test']:insert{1, 'first tuple'}")
-server.admin("box.space['test']:insert{2, 'second tuple'}")
+server.admin("space = box.schema.space.create('test')")
+server.admin("index = box.space.test:create_index('primary')")
+server.admin("box.space.test:insert{1, 'first tuple'}")
+server.admin("box.space.test:insert{2, 'second tuple'}")
 server.stop()
 
 # Save wal #1
@@ -159,16 +159,16 @@ lsn += 4
 
 # Create another wal#1
 server.start()
-server.admin("space = box.schema.create_space('test')")
-server.admin("index = box.space['test']:create_index('primary')")
-server.admin("box.space['test']:insert{1, 'first tuple'}")
-server.admin("box.space['test']:delete{1}")
+server.admin("space = box.schema.space.create('test')")
+server.admin("index = box.space.test:create_index('primary')")
+server.admin("box.space.test:insert{1, 'first tuple'}")
+server.admin("box.space.test:delete{1}")
 server.stop()
 
 # Create wal#2
 server.start()
-server.admin("box.space['test']:insert{1, 'third tuple'}")
-server.admin("box.space['test']:insert{2, 'fourth tuple'}")
+server.admin("box.space.test:insert{1, 'third tuple'}")
+server.admin("box.space.test:insert{2, 'fourth tuple'}")
 server.stop()
 
 if os.access(wal, os.F_OK):
@@ -186,9 +186,9 @@ if server.logfile_pos.seek_once(line) >= 0:
     print "'%s' exists in server log" % line
 print
 
-server.admin("box.space['test']:get{1}")
-server.admin("box.space['test']:get{2}")
-server.admin("box.space['test']:len()")
+server.admin("box.space.test:get{1}")
+server.admin("box.space.test:get{2}")
+server.admin("box.space.test:len()")
 
 
 #
@@ -199,7 +199,7 @@ server.stop()
 server.deploy()
 
 # Create wal#1
-server.admin("space = box.schema.create_space('test')")
+server.admin("space = box.schema.space.create('test')")
 server.admin("index = box.space.test:create_index('primary')")
 server.admin("box.space.test:insert{1, 'first tuple'}")
 server.admin("box.space.test:insert{2, 'second tuple'}")
@@ -235,7 +235,7 @@ server.stop()
 server.deploy()
 
 # Create wal#1
-server.admin("space = box.schema.create_space('test')")
+server.admin("space = box.schema.space.create('test')")
 server.admin("index = box.space.test:create_index('primary')")
 server.stop()
 server.start()

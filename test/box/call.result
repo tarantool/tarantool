@@ -183,7 +183,7 @@ call f1('jason', 1, 'test', 2, 'stewart')
 ---
 - ['jason', 1, 'test', 2, 'stewart']
 ...
-space = box.schema.create_space('tweedledum', { id = 0 })
+space = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
@@ -375,7 +375,7 @@ call space:delete(4)
 space:drop()
 ---
 ...
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'tree' })

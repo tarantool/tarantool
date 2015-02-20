@@ -22,7 +22,7 @@ local function test_replace(old_tuple, new_tuple)
 end
 
 
-box.schema.create_space('abc')
+box.schema.space.create('abc')
 box.space.abc:create_index('pk', { type = 'tree' })
 box.space.abc:on_replace(test_replace)
 

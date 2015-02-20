@@ -16,7 +16,7 @@ if box.space.tweedledum ~= nil then
     box.space.space1:drop()
 end
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
 print[[

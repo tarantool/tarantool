@@ -1,7 +1,7 @@
 --
 -- Insert test
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
 i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str', 2, 'str', 3, 'num'}, unique = true })
 
@@ -159,7 +159,7 @@ space = nil
 -- Bug #1082356
 -- Space #19, https://bugs.launchpad.net/tarantool/+bug/1082356
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
 i1 = space:create_index('primary', { type = 'tree', parts = {1, 'num', 3, 'num'}, unique = true })
 

@@ -1,7 +1,7 @@
 
 -- space create/drop
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 sophia_dir()[1]
 space:drop()
 sophia_schedule()
@@ -9,7 +9,7 @@ sophia_dir()[1]
 
 -- index create/drop
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
 sophia_dir()[1]
 space:drop()
@@ -18,7 +18,7 @@ sophia_dir()[1]
 
 -- index create/drop alter
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
 sophia_dir()[1]
 _index = box.space[box.schema.INDEX_ID]
@@ -29,7 +29,7 @@ sophia_dir()[1]
 
 -- index create/drop tree string
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
 space:insert({'test'})
 space:drop()
@@ -38,7 +38,7 @@ sophia_dir()[1]
 
 -- index create/drop tree num
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
 space:insert({13})
 space:drop()
@@ -47,7 +47,7 @@ sophia_dir()[1]
 
 -- index create hash 
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', {type = 'hash'})
 space:drop()
 sophia_schedule()
@@ -55,7 +55,7 @@ sophia_dir()[1]
 
 -- secondary index create
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index1 = space:create_index('primary')
 index2 = space:create_index('secondary')
 space:drop()
@@ -64,7 +64,7 @@ sophia_dir()[1]
 
 -- index size
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
 primary = space.index[0]
 primary:len()

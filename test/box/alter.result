@@ -232,7 +232,7 @@ box.space[1000]
 --------------------------------------------------------------------------------
 -- #197: box.space.space0:len() returns an error if there is no index
 --------------------------------------------------------------------------------
-space = box.schema.create_space('gh197')
+space = box.schema.space.create('gh197')
 ---
 ...
 space:len()
@@ -253,43 +253,43 @@ space:drop()
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
 --------------------------------------------------------------------------------
 -- invalid identifiers
-box.schema.create_space('invalid.identifier')
+box.schema.space.create('invalid.identifier')
 ---
 - error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-box.schema.create_space('invalid identifier')
+box.schema.space.create('invalid identifier')
 ---
 - error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
 ...
-box.schema.create_space('primary ')
+box.schema.space.create('primary ')
 ---
 - error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
-box.schema.create_space('5')
+box.schema.space.create('5')
 ---
 - error: Invalid identifier '5' (expected letters, digits or an underscore)
 ...
-box.schema.create_space('')
+box.schema.space.create('')
 ---
 - error: Invalid identifier '' (expected letters, digits or an underscore)
 ...
 -- valid identifiers
-box.schema.create_space('_Abcde'):drop()
+box.schema.space.create('_Abcde'):drop()
 ---
 ...
-box.schema.create_space('_5'):drop()
+box.schema.space.create('_5'):drop()
 ---
 ...
-box.schema.create_space('valid_identifier'):drop()
+box.schema.space.create('valid_identifier'):drop()
 ---
 ...
-box.schema.create_space('ынтыпрайзный_空間'):drop() -- unicode
+box.schema.space.create('ынтыпрайзный_空間'):drop() -- unicode
 ---
 ...
-box.schema.create_space('utf8_наше_Фсё'):drop() -- unicode
+box.schema.space.create('utf8_наше_Фсё'):drop() -- unicode
 ---
 ...
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
 -- invalid identifiers
@@ -318,10 +318,10 @@ space:drop()
 ...
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
-auto = box.schema.create_space('auto_original')
+auto = box.schema.space.create('auto_original')
 ---
 ...
-auto2 = box.schema.create_space('auto', {id = auto.id})
+auto2 = box.schema.space.create('auto', {id = auto.id})
 ---
 - error: Duplicate key exists in unique index 'primary'
 ...
@@ -333,7 +333,7 @@ auto2
 ---
 - null
 ...
-box.schema.create_space('auto_original', {id = auto.id})
+box.schema.space.create('auto_original', {id = auto.id})
 ---
 - error: Space 'auto_original' already exists
 ...
@@ -343,7 +343,7 @@ auto:drop()
 -- ------------------------------------------------------------------
 -- gh-281 Crash after rename + replace + delete with multi-part index
 -- ------------------------------------------------------------------
-s = box.schema.create_space('space')
+s = box.schema.space.create('space')
 ---
 ...
 index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
@@ -374,19 +374,19 @@ s:drop()
 -- ------------------------------------------------------------------
 -- gh-362 Appropriate error messages in create_index
 -- ------------------------------------------------------------------
-s = box.schema.create_space(42)
+s = box.schema.space.create(42)
 ---
 - error: Illegal parameters, name should be a string
 ...
-s = box.schema.create_space("test", "bug")
+s = box.schema.space.create("test", "bug")
 ---
 - error: Illegal parameters, options should be a table
 ...
-s = box.schema.create_space("test", {unknown = 'param'})
+s = box.schema.space.create("test", {unknown = 'param'})
 ---
 - error: Illegal parameters, options parameter 'unknown' is unexpected
 ...
-s = box.schema.create_space("test")
+s = box.schema.space.create("test")
 ---
 ...
 index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
@@ -417,7 +417,7 @@ for i=1,W do
     fiber.create(function()
         for k=1,N do
             local space_id = math.random(2147483647)
-            local space = box.schema.create_space(string.format('space_%d', space_id))
+            local space = box.schema.space.create(string.format('space_%d', space_id))
             space:create_index('pk', { type = 'tree' })
             space:drop()
         end

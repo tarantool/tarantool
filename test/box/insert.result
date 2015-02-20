@@ -1,6 +1,6 @@
 -- gh-186 New implementation of box.replace does not check that tuple is
 -- array
-s = box.schema.create_space('s')
+s = box.schema.space.create('s')
 ---
 ...
 index = s:create_index('pk')

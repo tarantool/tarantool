@@ -48,16 +48,16 @@ box.schema.FORMAT_ID_MAX
 -- ----------------------------------------------------------------
 -- CREATE SPACE
 -- ----------------------------------------------------------------
-s = box.schema.create_space('tweedledum')
+s = box.schema.space.create('tweedledum')
 ---
 ...
 -- space already exists
-box.schema.create_space('tweedledum')
+box.schema.space.create('tweedledum')
 ---
 - error: Space 'tweedledum' already exists
 ...
 -- create if not exists
-s = box.schema.create_space('tweedledum', { if_not_exists = true })
+s = box.schema.space.create('tweedledum', { if_not_exists = true })
 ---
 ...
 s:drop()
@@ -69,12 +69,12 @@ s:drop()
 - error: Space 'tweedledum' does not exist
 ...
 -- no such engine
-box.schema.create_space('tweedleedee', { engine = 'unknown' })
+box.schema.space.create('tweedleedee', { engine = 'unknown' })
 ---
 - error: Space engine 'unknown' does not exist
 ...
 -- explicit space id
-s = box.schema.create_space('tweedledum', { id = 3000 })
+s = box.schema.space.create('tweedledum', { id = 3000 })
 ---
 ...
 s.id
@@ -82,12 +82,12 @@ s.id
 - 3000
 ...
 -- duplicate id
-box.schema.create_space('tweedledee', { id = 3000 })
+box.schema.space.create('tweedledee', { id = 3000 })
 ---
 - error: Duplicate key exists in unique index 'primary'
 ...
 -- stupid space id
-box.schema.create_space('tweedledee', { id = 'tweedledee' })
+box.schema.space.create('tweedledee', { id = 'tweedledee' })
 ---
 - error: Illegal parameters, options parameter 'id' should be of type number
 ...
@@ -95,23 +95,23 @@ s:drop()
 ---
 ...
 -- too long space name
-box.schema.create_space(string.rep('tweedledee', 100))
+box.schema.space.create(string.rep('tweedledee', 100))
 ---
 - error: 'Failed to create space ''tweedledeetweedledeetweedledeetw'': space name
     is too long'
 ...
 -- too long space engine name
-box.schema.create_space('tweedleedee', { engine = string.rep('too-long', 100) })
+box.schema.space.create('tweedleedee', { engine = string.rep('too-long', 100) })
 ---
 - error: 'Failed to create space ''tweedleedee'': space engine name is too long'
 ...
 -- space name limit
-box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
+box.schema.space.create(string.rep('t', box.schema.NAME_MAX)..'_')
 ---
 - error: 'Failed to create space ''tttttttttttttttttttttttttttttttt'': space name
     is too long'
 ...
-s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 1)..'_')
 ---
 ...
 s.name
@@ -121,7 +121,7 @@ s.name
 s:drop()
 ---
 ...
-s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 2)..'_')
 ---
 ...
 s.name
@@ -132,7 +132,7 @@ s:drop()
 ---
 ...
 -- space with no indexes - test update, delete, select, truncate
-s = box.schema.create_space('tweedledum')
+s = box.schema.space.create('tweedledum')
 ---
 ...
 s:insert{0}
@@ -219,7 +219,7 @@ s:drop()
 ---
 ...
 -- create a space with reserved id (ok, but warns in the log)
-s = box.schema.create_space('test', { id = 256 })
+s = box.schema.space.create('test', { id = 256 })
 ---
 ...
 s.id
@@ -229,7 +229,7 @@ s.id
 s:drop()
 ---
 ...
-s = box.schema.create_space('test', { field_count = 2 })
+s = box.schema.space.create('test', { field_count = 2 })
 ---
 ...
 s.field_count
@@ -352,7 +352,7 @@ s:drop()
 -- CREATE INDEX
 -- ----------------------------------------------------------------
 --
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 --# setopt delimiter ';'
@@ -443,7 +443,7 @@ index = s:create_index('t2', { type = 'hash', parts = { box.schema.INDEX_FIELD_M
 s:drop()
 ---
 ...
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 -- same part can't be indexed twice
@@ -499,7 +499,7 @@ s:drop()
 ---
 ...
 -- check costraints in tuple_format_new()
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 index = s:create_index('t1', { type = 'hash' })
@@ -525,7 +525,7 @@ s:drop()
 ---
 ...
 -- index name, name manipulation
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 index = s:create_index('primary', { type = 'hash' })
@@ -624,7 +624,7 @@ s:drop()
 ---
 ...
 -- modify index
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 index = s:create_index('primary', { type = 'hash' })
@@ -711,7 +711,7 @@ s:drop()
 -- ----------------------------------------------------------------
 -- BUILD INDEX: changes of a non-empty index
 -- ----------------------------------------------------------------
-s = box.schema.create_space('full')
+s = box.schema.space.create('full')
 ---
 ...
 index = s:create_index('primary', { type = 'tree', parts =  { 1, 'str' }})
@@ -818,7 +818,7 @@ s:drop()
 ---
 ...
 -- unique -> non-unique transition
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 -- primary key must be unique
@@ -874,7 +874,7 @@ s:drop()
 -- ----------------------------------------------------------------
 -- SPACE CACHE: what happens to a space cache when an object is gone
 -- ----------------------------------------------------------------
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
 ---
 ...
 s1 = s
@@ -912,7 +912,7 @@ s:drop()
 -- during recovery regardless of when they are created
 -- ----------------------------------------------------------------
 -- primary, secondary keys in a snapshot
-s_empty = box.schema.create_space('s_empty')
+s_empty = box.schema.space.create('s_empty')
 ---
 ...
 indexe1 = s_empty:create_index('primary')
@@ -921,7 +921,7 @@ indexe1 = s_empty:create_index('primary')
 indexe2 = s_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
 ---
 ...
-s_full = box.schema.create_space('s_full')
+s_full = box.schema.space.create('s_full')
 ---
 ...
 indexf1 = s_full:create_index('primary')
@@ -950,10 +950,10 @@ s_full:insert{5, 5, 'e'}
 ---
 - [5, 5, 'e']
 ...
-s_nil = box.schema.create_space('s_nil')
+s_nil = box.schema.space.create('s_nil')
 ---
 ...
-s_drop = box.schema.create_space('s_drop')
+s_drop = box.schema.space.create('s_drop')
 ---
 ...
 box.snapshot()
@@ -981,7 +981,7 @@ s_nil:insert{13, 14, 15, 16, 17}
 ---
 - [13, 14, 15, 16, 17]
 ...
-r_empty = box.schema.create_space('r_empty')
+r_empty = box.schema.space.create('r_empty')
 ---
 ...
 indexe1 = r_empty:create_index('primary')
@@ -990,7 +990,7 @@ indexe1 = r_empty:create_index('primary')
 indexe2 = r_empty:create_index('secondary', { type = 'hash', unique = true, parts = {2, 'num'}})
 ---
 ...
-r_full = box.schema.create_space('r_full')
+r_full = box.schema.space.create('r_full')
 ---
 ...
 indexf1 = r_full:create_index('primary', { type = 'tree', unique = true, parts = {1, 'num'}})
@@ -1034,7 +1034,7 @@ s_full:insert{8, 8, 'h'}
 ---
 - [8, 8, 'h']
 ...
-r_disabled = box.schema.create_space('r_disabled')
+r_disabled = box.schema.space.create('r_disabled')
 ---
 ...
 --# stop server default

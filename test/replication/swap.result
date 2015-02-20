@@ -10,7 +10,7 @@ while box.info.server.id == 0 do require('fiber').sleep(0.01) end
 while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end
 ---
 ...
-s = box.schema.create_space('tweedledum', {id = 0})
+s = box.schema.space.create('tweedledum', {id = 0})
 ---
 ...
 index = s:create_index('primary', {type = 'hash'})

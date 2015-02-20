@@ -1,8 +1,8 @@
 
-a = box.schema.create_space('test', { engine = 'sophia' })
+a = box.schema.space.create('test', { engine = 'sophia' })
 index = a:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 
-b = box.schema.create_space('test_tmp', { engine = 'sophia' })
+b = box.schema.space.create('test_tmp', { engine = 'sophia' })
 index = b:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 
 -- begin/rollback

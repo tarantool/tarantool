@@ -1,4 +1,4 @@
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
@@ -114,7 +114,7 @@ space:drop()
 --
 -- Check range scan over multipart keys
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
@@ -165,7 +165,7 @@ space:drop()
 --
 -- Lua 64bit numbers support
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type  = 'tree', parts = {1, 'num'}, unique = true })
@@ -272,7 +272,7 @@ space:drop()
 --
 -- lua select_reverse_range() testing
 -- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
@@ -360,7 +360,7 @@ space:drop()
 --
 -- Tests for box.index iterators
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
@@ -484,7 +484,7 @@ space:drop()
 -- Tests for lua idx:count()
 --
 -- https://blueprints.launchpad.net/tarantool/+spec/lua-builtin-size-of-subtree
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
@@ -582,7 +582,7 @@ space:drop()
 --
 -- Tests for lua tuple:transform()
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
@@ -765,7 +765,7 @@ space:drop()
 -- http://bugs.launchpad.net/tarantool/+bug/1038784
 --  https://bugs.launchpad.net/tarantool/+bug/1006354
 --  lua box.auto_increment() testing
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
@@ -849,7 +849,7 @@ space:drop()
 -- Truncate hangs when primary key is not in linear or starts at the first field
 -- https://bugs.launchpad.net/tarantool/+bug/1042798
 --
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'tree', parts = {3, 'num', 2, 'num'}, unique = true })
@@ -899,7 +899,7 @@ space:drop()
 dofile('index_random_test.lua')
 ---
 ...
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })

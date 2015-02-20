@@ -1,4 +1,4 @@
-s = box.schema.create_space('tweedledum')
+s = box.schema.space.create('tweedledum')
 ---
 ...
 index = s:create_index('pk')
@@ -315,7 +315,7 @@ s:drop()
 ---
 ...
 -- #521: Cryptic error message in update operation
-s = box.schema.create_space('tweedledum')
+s = box.schema.space.create('tweedledum')
 ---
 ...
 index = s:create_index('pk')

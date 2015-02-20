@@ -4,7 +4,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 -- Test case for #273: IPROTO_ITERATOR ignored in network protocol
 --------------------------------------------------------------------------------
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'tree'})
 for i=1,5 do space:insert{i} end
 

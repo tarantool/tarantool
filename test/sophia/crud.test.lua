@@ -1,7 +1,7 @@
 
 -- insert
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 sophia_dir()[1]
 for key = 1, 132 do space:insert({key}) end

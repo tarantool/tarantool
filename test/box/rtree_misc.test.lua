@@ -1,4 +1,4 @@
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 
 -- rtree index as primary key must be forbidden (unique)
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {1, 'array'}})
@@ -81,7 +81,7 @@ s.index.spatial:select({})
 
 s:drop()
 
-s = box.schema.create_space('sophia', {engine = 'sophia'})
+s = box.schema.space.create('sophia', {engine = 'sophia'})
 -- rtree indexes are not enabled in sophia
 i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'array'}})
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
@@ -90,7 +90,7 @@ i = s:create_index('spatial', { type = 'rtree', unique = true, parts = {3, 'arra
 s:drop()
 
 -- rtree in temp space must work fine
-s = box.schema.create_space('spatial', {temporary = true})
+s = box.schema.space.create('spatial', {temporary = true})
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
 s:insert{1, 2, {3, 4, 5, 6}}
@@ -98,7 +98,7 @@ s.index.spatial:select({0, 0, 10, 10}, {iterator = 'le'})
 s:drop()
 
 -- snapshot test
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
 for i = 1,10 do s:insert{i, i, {i, i, i + 1, i + 1}} end

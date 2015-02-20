@@ -6,7 +6,7 @@ os.execute("touch mt")
 --# stop server default
 --# start server default
 
-space = box.schema.create_space('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
 
 for key = 1, 351 do space:insert({key}) end

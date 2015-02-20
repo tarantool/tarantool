@@ -2,8 +2,8 @@ session = box.session
 --
 -- Check a double create space
 --
-s = box.schema.create_space('test')
-s = box.schema.create_space('test')
+s = box.schema.space.create('test')
+s = box.schema.space.create('test')
 --
 -- Check a double drop space
 --
@@ -15,7 +15,7 @@ s:drop()
 box.schema.user.create('testus')
 box.schema.user.create('testus')
 
-s = box.schema.create_space('admin_space')
+s = box.schema.space.create('admin_space')
 index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 s:insert({1})
 s:insert({2})
@@ -66,7 +66,7 @@ s:select(1)
 s:insert({4})
 s:delete({3})
 s:drop()
-gs = box.schema.create_space('guest_space')
+gs = box.schema.space.create('guest_space')
 box.schema.func.create('guest_func')
 
 session.su('admin')
@@ -94,7 +94,7 @@ box.schema.func.drop('uniuser_func')
 --
 -- Check create and drop space
 --
-us = box.schema.create_space('uniuser_space')
+us = box.schema.space.create('uniuser_space')
 us:drop()
 --
 -- Check create and drop user
@@ -108,7 +108,7 @@ box.space.admin_space:select()
 box.space._user:select(1)
 box.space._space:select(280)
 
-us = box.schema.create_space('uniuser_space')
+us = box.schema.space.create('uniuser_space')
 box.schema.func.create('uniuser_func')
 
 session.su('admin')
@@ -173,7 +173,7 @@ box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 --
 -- Check that itertors check privileges
 --
-s = box.schema.create_space('glade') 
+s = box.schema.space.create('glade') 
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
 index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 s:insert({1, 'A'})

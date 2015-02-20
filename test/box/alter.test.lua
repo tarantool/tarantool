@@ -85,7 +85,7 @@ box.space[1000]
 -- #197: box.space.space0:len() returns an error if there is no index
 --------------------------------------------------------------------------------
 
-space = box.schema.create_space('gh197')
+space = box.schema.space.create('gh197')
 space:len()
 space:truncate()
 space:pairs():totable()
@@ -96,20 +96,20 @@ space:drop()
 --------------------------------------------------------------------------------
 
 -- invalid identifiers
-box.schema.create_space('invalid.identifier')
-box.schema.create_space('invalid identifier')
-box.schema.create_space('primary ')
-box.schema.create_space('5')
-box.schema.create_space('')
+box.schema.space.create('invalid.identifier')
+box.schema.space.create('invalid identifier')
+box.schema.space.create('primary ')
+box.schema.space.create('5')
+box.schema.space.create('')
 
 -- valid identifiers
-box.schema.create_space('_Abcde'):drop()
-box.schema.create_space('_5'):drop()
-box.schema.create_space('valid_identifier'):drop()
-box.schema.create_space('ынтыпрайзный_空間'):drop() -- unicode
-box.schema.create_space('utf8_наше_Фсё'):drop() -- unicode
+box.schema.space.create('_Abcde'):drop()
+box.schema.space.create('_5'):drop()
+box.schema.space.create('valid_identifier'):drop()
+box.schema.space.create('ынтыпрайзный_空間'):drop() -- unicode
+box.schema.space.create('utf8_наше_Фсё'):drop() -- unicode
 
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 
 -- invalid identifiers
 space:create_index('invalid.identifier')
@@ -121,17 +121,17 @@ space:create_index('')
 space:drop()
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
-auto = box.schema.create_space('auto_original')
-auto2 = box.schema.create_space('auto', {id = auto.id})
+auto = box.schema.space.create('auto_original')
+auto2 = box.schema.space.create('auto', {id = auto.id})
 box.schema.space.drop('auto')
 auto2
-box.schema.create_space('auto_original', {id = auto.id})
+box.schema.space.create('auto_original', {id = auto.id})
 auto:drop()
 
 -- ------------------------------------------------------------------
 -- gh-281 Crash after rename + replace + delete with multi-part index
 -- ------------------------------------------------------------------
-s = box.schema.create_space('space')
+s = box.schema.space.create('space')
 index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 s:insert{1, 'a'}
 box.space.space.index.primary:rename('secondary')
@@ -143,10 +143,10 @@ s:drop()
 -- ------------------------------------------------------------------
 -- gh-362 Appropriate error messages in create_index
 -- ------------------------------------------------------------------
-s = box.schema.create_space(42)
-s = box.schema.create_space("test", "bug")
-s = box.schema.create_space("test", {unknown = 'param'})
-s = box.schema.create_space("test")
+s = box.schema.space.create(42)
+s = box.schema.space.create("test", "bug")
+s = box.schema.space.create("test", {unknown = 'param'})
+s = box.schema.space.create("test")
 index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
 index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
 index = s:create_index('primary', {unique = true, parts = 'bug'})
@@ -166,7 +166,7 @@ for i=1,W do
     fiber.create(function()
         for k=1,N do
             local space_id = math.random(2147483647)
-            local space = box.schema.create_space(string.format('space_%d', space_id))
+            local space = box.schema.space.create(string.format('space_%d', space_id))
             space:create_index('pk', { type = 'tree' })
             space:drop()
         end

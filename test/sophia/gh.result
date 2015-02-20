@@ -1,5 +1,5 @@
 -- gh-283: Sophia: hang after three creates and drops
-s = box.schema.create_space('space0', {engine='sophia'})
+s = box.schema.space.create('space0', {engine='sophia'})
 ---
 ...
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
@@ -16,7 +16,7 @@ sophia_schedule()
 ---
 - 1
 ...
-s = box.schema.create_space('space0', {engine='sophia'})
+s = box.schema.space.create('space0', {engine='sophia'})
 ---
 ...
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
@@ -40,7 +40,7 @@ sophia_schedule()
 ---
 - 1
 ...
-s = box.schema.create_space('space0', {engine='sophia'})
+s = box.schema.space.create('space0', {engine='sophia'})
 ---
 ...
 i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
@@ -65,7 +65,7 @@ sophia_schedule()
 - 1
 ...
 -- gh-280: Sophia: crash if insert without index
-s = box.schema.create_space('test', {engine='sophia'})
+s = box.schema.space.create('test', {engine='sophia'})
 ---
 ...
 s:insert{'a'}
@@ -80,12 +80,12 @@ sophia_schedule()
 - 0
 ...
 -- gh-436: No error when creating temporary sophia space
-s = box.schema.create_space('tester',{engine='sophia', temporary=true})
+s = box.schema.space.create('tester',{engine='sophia', temporary=true})
 ---
 - error: 'Can''t modify space ''tester'': space does not support temporary flag'
 ...
 -- gh-432: Sophia: ignored limit
-s = box.schema.create_space('tester',{engine='sophia'})
+s = box.schema.space.create('tester',{engine='sophia'})
 ---
 ...
 i = s:create_index('sophia_index', {})
@@ -116,7 +116,7 @@ sophia_schedule()
 ---
 - 1
 ...
-s = box.schema.create_space('tester', {engine='sophia'})
+s = box.schema.space.create('tester', {engine='sophia'})
 ---
 ...
 i = s:create_index('sophia_index', {type = 'tree', parts = {1, 'STR'}})

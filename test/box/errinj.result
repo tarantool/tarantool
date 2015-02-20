@@ -1,7 +1,7 @@
 errinj = require('box.error.injection')
 ---
 ...
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
@@ -153,16 +153,16 @@ space:drop()
 ---
 ...
 -- Check how well we handle a failed log write in DDL
-s_disabled = box.schema.create_space('disabled')
+s_disabled = box.schema.space.create('disabled')
 ---
 ...
-s_withindex = box.schema.create_space('withindex')
+s_withindex = box.schema.space.create('withindex')
 ---
 ...
 index1 = s_withindex:create_index('primary', { type = 'hash' })
 ---
 ...
-s_withdata = box.schema.create_space('withdata')
+s_withdata = box.schema.space.create('withdata')
 ---
 ...
 index2 = s_withdata:create_index('primary', { type = 'tree' })
@@ -183,7 +183,7 @@ errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-test = box.schema.create_space('test')
+test = box.schema.space.create('test')
 ---
 - error: Failed to write to disk
 ...
@@ -235,7 +235,7 @@ errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-test = box.schema.create_space('test')
+test = box.schema.space.create('test')
 ---
 ...
 index5 = s_disabled:create_index('primary', { type = 'hash' })

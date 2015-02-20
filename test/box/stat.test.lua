@@ -7,7 +7,7 @@ box.stat.UPDATE.total
 box.stat.REPLACE.total
 box.stat.SELECT.total
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
 -- check stat_cleanup

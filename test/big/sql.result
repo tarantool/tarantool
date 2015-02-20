@@ -4,7 +4,7 @@ box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 ---
 ...
-s = box.schema.create_space('tweedledum', { id = 0 })
+s = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
 index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })

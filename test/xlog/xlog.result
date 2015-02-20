@@ -1,7 +1,7 @@
 
 # Inprogress xlog must be renamed before second insert.
 
-space = box.schema.create_space('tweedledum', { id = 0 })
+space = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
 .xlog.inprogress exists
@@ -31,40 +31,40 @@ box.space[0]:insert{5, 'Unfinished record'}
 ...
 .xlog exists
 .xlog.inprogress hash been successfully renamed
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
-index = box.space['test']:create_index('primary')
+index = box.space.test:create_index('primary')
 ---
 ...
-box.space['test']:insert{1, 'first tuple'}
+box.space.test:insert{1, 'first tuple'}
 ---
 - [1, 'first tuple']
 ...
-box.space['test']:insert{2, 'second tuple'}
+box.space.test:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
 .xlog exists
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
-index = box.space['test']:create_index('primary')
+index = box.space.test:create_index('primary')
 ---
 ...
-box.space['test']:insert{1, 'first tuple'}
----
-- [1, 'first tuple']
-...
-box.space['test']:delete{1}
+box.space.test:insert{1, 'first tuple'}
 ---
 - [1, 'first tuple']
 ...
-box.space['test']:insert{1, 'third tuple'}
+box.space.test:delete{1}
+---
+- [1, 'first tuple']
+...
+box.space.test:insert{1, 'third tuple'}
 ---
 - [1, 'third tuple']
 ...
-box.space['test']:insert{2, 'fourth tuple'}
+box.space.test:insert{2, 'fourth tuple'}
 ---
 - [2, 'fourth tuple']
 ...
@@ -73,19 +73,19 @@ check log line for 'Duplicate key'
 
 'Duplicate key' exists in server log
 
-box.space['test']:get{1}
+box.space.test:get{1}
 ---
 - [1, 'first tuple']
 ...
-box.space['test']:get{2}
+box.space.test:get{2}
 ---
 - [2, 'second tuple']
 ...
-box.space['test']:len()
+box.space.test:len()
 ---
 - 2
 ...
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
 index = box.space.test:create_index('primary')
@@ -117,7 +117,7 @@ box.space.test:select{}
   - [2, 'second tuple']
   - [4, 'fourth tuple']
 ...
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
 index = box.space.test:create_index('primary')

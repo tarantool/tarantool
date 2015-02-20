@@ -6,7 +6,7 @@ dofile('utils.lua')
 -------------------------------------------------------------------------------
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------
-hash = box.schema.create_space('tweedledum')
+hash = box.schema.space.create('tweedledum')
 tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
 
 -- Insert valid fields
@@ -289,7 +289,7 @@ hash.index['field3']:get{0}
 
 hash:drop()
 
-hash = box.schema.create_space('tweedledum')
+hash = box.schema.space.create('tweedledum')
 hi = hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
 hash:insert{0}
 hash:insert{16}
