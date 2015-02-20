@@ -1,6 +1,6 @@
 --# stop server default
 --# start server default
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 --# setopt delimiter ';'
 i = 1;

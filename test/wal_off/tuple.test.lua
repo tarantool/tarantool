@@ -7,12 +7,8 @@
 -- gh-372 Assertion with a function that inserts increasingly
 -- large tables
 -- -------------------------------------------------------
-tester = box.schema.create_space('tester')
----
-...
+tester = box.schema.space.create('tester')
 index = tester:create_index('primary',{})
----
-...
 --# setopt delimiter ';'
 function tuple_max()
     local n = 'a'
@@ -21,23 +17,9 @@ function tuple_max()
         tester:insert{#n, n}
     end
 end;
----
-...
 --# setopt delimiter=''
 tuple_max()
----
-- error: Failed to allocate 1048599 bytes in slab allocator for tuple
-...
 tuple_max = string.rep('a', 1000000)
----
-...
 #tuple_max
----
-- 1000000
-...
 t = tester:insert{#tuple_max, tuple_max}
----
-...
 tester:drop()
----
-...
