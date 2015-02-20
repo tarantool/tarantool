@@ -19,7 +19,7 @@ s:drop()
 ...
 s:drop()
 ---
-- error: Space '#518' does not exist
+- error: Space 'test' does not exist
 ...
 --
 -- Check double create user
@@ -585,7 +585,9 @@ box.space._space:select()
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
-  - [288, 1, '_index', 'memtx', 0, '']
+  - [288, 1, '_index', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
   - [296, 1, '_func', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
   - [304, 1, '_user', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',

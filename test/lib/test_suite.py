@@ -114,12 +114,14 @@ class TestSuite:
                         failed_tests.append(test.name)
             color_stdout(shortsep, "\n", schema='separator')
             self.server.stop(silent=False)
+            # don't delete core files or state of the data dir
+            # in case of exception, which is raised when the
+            # server crashes
+            self.server.cleanup()
         except (KeyboardInterrupt) as e:
             color_stdout("\n%s\n" % shortsep, schema='separator')
             self.server.stop(silent=False)
             raise
-        finally:
-            self.server.cleanup()
 
         if failed_tests:
             color_stdout("Failed {0} tests: {1}.\n".format(len(failed_tests),

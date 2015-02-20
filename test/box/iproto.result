@@ -150,3 +150,6 @@ STR 65536
 space:drop()
 ---
 ...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

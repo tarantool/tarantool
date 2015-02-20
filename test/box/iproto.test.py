@@ -210,3 +210,4 @@ for test in TESTS:
     print
 
 admin("space:drop()")
+admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")

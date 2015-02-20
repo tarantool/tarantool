@@ -1133,7 +1133,6 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	Index *index = space_index(space, iid);
 	if (index == NULL)
 		return false;
-	assert(strcmp(index->key_def->name, "owner") == 0);
 	struct iterator *it = index->position();
 	char key[6];
 	assert(mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
@@ -1149,10 +1148,15 @@ bool
 user_has_data(struct user *user)
 {
 	uint32_t uid = user->uid;
-	uint32_t spaces[] = { SC_SPACE_ID, SC_FUNC_ID, SC_PRIV_ID };
-	uint32_t *end = spaces + sizeof(spaces)/sizeof(*spaces);
-	for (uint32_t *i = spaces; i < end; i++) {
-		if (space_has_data(*i, 1, uid))
+	uint32_t spaces[] = { SC_SPACE_ID, SC_FUNC_ID, SC_PRIV_ID, SC_PRIV_ID };
+	/*
+	 * owner index id #1 for _space and _func and _priv.
+	 * For _priv also check that the user has no grants.
+	 */
+	uint32_t indexes[] = { 1, 1, 1, 0 };
+	uint32_t count = sizeof(spaces)/sizeof(*spaces);
+	for (int i = 0; i < count; i++) {
+		if (space_has_data(spaces[i], indexes[i], uid))
 			return true;
 	}
 	if (! user_map_is_empty(&user->users))

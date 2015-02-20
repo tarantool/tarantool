@@ -96,14 +96,14 @@ s:select{}
 -- decrease field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 1}})
 -- remove field_count - ok
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
+_ = box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
 s:select{}
 -- increase field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 s:truncate()
 s:select{}
 -- set field_count of an empty space
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
+_ = box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 s:select{}
 -- field_count actually works
 s:insert{3, 4}
@@ -233,9 +233,8 @@ s.index.primary.alter({unique=false})
 s.index.primary:alter({unique=false})
 -- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})
---# push filter 'function: .*' to 'function <pointer>'
-s.index.primary
---# clear filter
+s.index.primary.name
+s.index.primary.id
 s.index.pk.type
 s.index.pk.unique
 s.index.pk:rename('primary')
@@ -270,7 +269,7 @@ index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'num
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select{}
-box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
+_ = box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
 -- ambiguous field type
 index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 -- create index on a non-existing field

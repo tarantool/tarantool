@@ -64,6 +64,14 @@ format[5] = {name='field_count', type='num'}
 format[6] = {name='flags', type='str'}
 format[7] = {name='format', type='*'}
 _space:format(format)
+format = {}
+format[1] = {name = 'id', type = 'num'}
+format[2] = {name = 'iid', type = 'num'}
+format[3] = {name = 'name', type = 'str'}
+format[4] = {name = 'type', type = 'str'}
+format[5] = {name = 'unique', type = 'num'}
+format[6] = {name = 'part_count', type = 'num'}
+_index:format(format)
 format={}
 format[1] = {name='id', type='num'}
 format[2] = {name='owner', type='num'}

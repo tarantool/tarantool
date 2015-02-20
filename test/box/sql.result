@@ -19,6 +19,9 @@ call f()
 index = box.space.test:create_index('primary', { type = 'hash' })
 ---
 ...
+box.schema.func.drop('f')
+---
+...
 ping
 ---
 - ok

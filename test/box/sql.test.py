@@ -9,6 +9,7 @@ sql.authenticate('test', 'test')
 # call from sql to have the right owner
 sql("call f()")
 admin("index = box.space.test:create_index('primary', { type = 'hash' })")
+admin("box.schema.func.drop('f')")
 sql("ping")
 # xxx: bug -- currently selects no rows
 sql("select * from t0")

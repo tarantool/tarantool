@@ -272,7 +272,7 @@ end
 
 box.schema.create_space = box.schema.space.create
 
-box.schema.space.drop = function(space_id)
+box.schema.space.drop = function(space_id, space_name)
     check_param(space_id, 'space_id', 'number')
 
     local _space = box.space[box.schema.SPACE_ID]
@@ -288,7 +288,10 @@ box.schema.space.drop = function(space_id)
         box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
     if _space:delete{space_id} == nil then
-        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+        if space_name == nil then
+            space_name = '#'..tostring(space_id)
+        end
+        box.error(box.error.NO_SUCH_SPACE, space_name)
     end
 end
 
@@ -560,6 +563,19 @@ local port = ffi.new('struct port_ffi')
 builtin.port_ffi_create(port)
 ffi.gc(port, builtin.port_ffi_destroy)
 local port_t = ffi.typeof('struct port *')
+
+-- Helper function for nicer error messages
+-- in some cases when space object is misused
+-- Takes time so should not be used for DML.
+local function space_object_check(space)
+        if type(space) ~= 'table' then
+            space = { name = space }
+        end
+        local s = box.space[space.id]
+        if s == nil then
+            box.error(box.error.NO_SUCH_SPACE, space.name)
+        end
+end
 
 function box.schema.space.bless(space)
     local index_mt = {}
@@ -865,20 +881,22 @@ function box.schema.space.bless(space)
         return box.schema.space.format(space.id, format)
     end
     space_mt.drop = function(space)
-        return box.schema.space.drop(space.id)
+        return box.schema.space.drop(space.id, space.name)
     end
     space_mt.rename = function(space, name)
+        space_object_check(space)
         return box.schema.space.rename(space.id, name)
     end
     space_mt.create_index = function(space, name, options)
+        space_object_check(space)
         return box.schema.index.create(space.id, name, options)
     end
     space_mt.run_triggers = function(space, yesno)
-        local space = ffi.C.space_by_id(space.id)
-        if space == nil then
+        local s = ffi.C.space_by_id(space.id)
+        if s == nil then
             box.error(box.error.NO_SUCH_SPACE, space.name)
         end
-        ffi.C.space_run_triggers(space, yesno)
+        ffi.C.space_run_triggers(s, yesno)
     end
     space_mt.__index = space_mt
 
