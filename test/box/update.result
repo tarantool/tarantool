@@ -336,3 +336,445 @@ s:update({1}, {'=', 1, 1})
 s:drop()
 ---
 ...
+-- #528: Different types in arithmetical update, overflow check
+ffi = require('ffi')
+---
+...
+s = box.schema.create_space('tweedledum')
+---
+...
+index = s:create_index('pk')
+---
+...
+s:insert{0, -1}
+---
+- [0, -1]
+...
+-- + --
+s:update({0}, {{'+', 2, "a"}}) -- err
+---
+- error: 'Argument type in operation ''+'' on field 2 does not match field type: expected
+    a NUMBER'
+...
+s:update({0}, {{'+', 2, 10}}) -- neg(ative) + pos(itive) = pos(itive) 9
+---
+- [0, 9]
+...
+s:update({0}, {{'+', 2, 5}}) -- pos + pos = pos 14
+---
+- [0, 14]
+...
+s:update({0}, {{'+', 2, -4}}) -- pos + neg = pos 10
+---
+- [0, 10]
+...
+s:update({0}, {{'+', 2, -22}}) -- pos + neg = neg -12
+---
+- [0, -12]
+...
+s:update({0}, {{'+', 2, -3}}) -- neg + neg = neg -15
+---
+- [0, -15]
+...
+s:update({0}, {{'+', 2, 7}}) -- neg + pos = neg -8
+---
+- [0, -8]
+...
+-- - --
+s:update({0}, {{'-', 2, "a"}}) -- err
+---
+- error: 'Argument type in operation ''-'' on field 2 does not match field type: expected
+    a NUMBER'
+...
+s:update({0}, {{'-', 2, 16}}) -- neg(ative) - pos(itive) = neg(ative) -24
+---
+- [0, -24]
+...
+s:update({0}, {{'-', 2, -4}}) -- neg - neg = neg 20
+---
+- [0, -20]
+...
+s:update({0}, {{'-', 2, -32}}) -- neg - neg = pos 12
+---
+- [0, 12]
+...
+s:update({0}, {{'-', 2, 3}}) -- pos - pos = pos 9
+---
+- [0, 9]
+...
+s:update({0}, {{'-', 2, -5}}) -- pos - neg = pos 14
+---
+- [0, 14]
+...
+s:update({0}, {{'-', 2, 17}}) -- pos - pos = neg -3
+---
+- [0, -3]
+...
+-- * --
+s:update({0}, {{'*', 2, "a"}}) -- err
+---
+- error: 'Argument type in operation ''*'' on field 2 does not match field type: expected
+    a NUMBER'
+...
+s:update({0}, {{'*', 2, 2}}) -- neg(ative) * pos(itive) = nrg(itive) -6
+---
+- [0, -6]
+...
+s:update({0}, {{'*', 2, -3}}) -- neg * neg = pos 18
+---
+- [0, 18]
+...
+s:update({0}, {{'*', 2, 2}}) -- pos * pos = pos 36
+---
+- [0, 36]
+...
+s:update({0}, {{'*', 2, -5}}) -- pos * neg = neg -180
+---
+- [0, -180]
+...
+s:update({0}, {{'*', 2, -22}}) -- neg * 0 = 0 0
+---
+- [0, 3960]
+...
+s:update({0}, {{'*', 2, 10}}) -- 0 * pos = 0 0
+---
+- [0, 39600]
+...
+s:update({0}, {{'*', 2, -10}}) -- 0 * neg = 0 0
+---
+- [0, -396000]
+...
+s:replace{0, -1} -- -1
+---
+- [0, -1]
+...
+s:update({0}, {{'*', 2, 0}}) -- pos * 0 = 0 0
+---
+- [0, 0]
+...
+-- bit --
+s:update({0}, {{'|', 2, 24}}) -- 24
+---
+- [0, 24]
+...
+s:update({0}, {{'|', 2, 2}}) -- 26
+---
+- [0, 26]
+...
+s:update({0}, {{'&', 2, 50}}) -- 18
+---
+- [0, 18]
+...
+s:update({0}, {{'^', 2, 6}}) -- 20
+---
+- [0, 20]
+...
+s:update({0}, {{'|', 2, -1}}) -- err
+---
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'&', 2, -1}}) -- err
+---
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'^', 2, -1}}) -- err
+---
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:replace{0, -1} -- -1
+---
+- [0, -1]
+...
+s:update({0}, {{'|', 2, 2}}) -- err
+---
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'&', 2, 40}}) -- err
+---
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'^', 2, 6}}) -- err
+---
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:replace{0, 1.5} -- 1.5
+---
+- [0, 1.5]
+...
+s:update({0}, {{'|', 2, 2}}) -- err
+---
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'&', 2, 40}}) -- err
+---
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'^', 2, 6}}) -- err
+---
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
+    a positive integer'
+...
+-- double
+s:replace{0, 5} -- 5
+---
+- [0, 5]
+...
+s:update({0}, {{'+', 2, 1.5}}) -- int + double = double 6.5
+---
+- [0, 6.5]
+...
+s:update({0}, {{'*', 2, 2}}) -- double * int = double! 13
+---
+- [0, 13]
+...
+s:update({0}, {{'|', 2, 2}}) -- err (double!)
+---
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'-', 2, 0.5}}) -- double - double = double 12.5
+---
+- [0, 12.5]
+...
+s:update({0}, {{'+', 2, 1.5}}) -- double + double = double 14
+---
+- [0, 14]
+...
+s:update({0}, {{'*', 2, -1.5}}) -- double * double = double -21
+---
+- [0, -21]
+...
+s:update({0}, {{'*', 2, -2}}) -- double * int = double 42
+---
+- [0, 42]
+...
+-- float
+s:replace{0, ffi.new("float", 1.5)} -- 1.5
+---
+- [0, 1.5]
+...
+s:update({0}, {{'+', 2, 2}}) -- float + int = float 3.5
+---
+- [0, 3.5]
+...
+s:update({0}, {{'*', 2, 2}}) -- float * int = float! 7
+---
+- [0, 7]
+...
+s:update({0}, {{'|', 2, 2}}) -- err (float!)
+---
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
+    a positive integer'
+...
+s:update({0}, {{'-', 2, ffi.new("float", 1.5)}}) -- float - float = float 5.5
+---
+- [0, 5.5]
+...
+s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + float = float 9
+---
+- [0, 9]
+...
+s:update({0}, {{'*', 2, ffi.new("float", -1.5)}}) -- float * float = float -13.5
+---
+- [0, -13.5]
+...
+s:update({0}, {{'*', 2, -2}}) -- float * int = float 27
+---
+- [0, 27]
+...
+s:update({0}, {{'*', 2, 0}}) -- float * int = float 0
+---
+- [0, 0]
+...
+s:update({0}, {{'+', 2, ffi.new("float", 1.2)}}) -- float + float = float 1.2
+---
+- [0, 1.2000000476837]
+...
+-- overflow --
+s:replace{0, 0xfffffffffffffffeull}
+---
+- [0, 18446744073709551614]
+...
+s:update({0}, {{'+', 2, 1}}) -- ok
+---
+- [0, 18446744073709551615]
+...
+s:update({0}, {{'+', 2, 1}}) -- overflow
+---
+- error: 'Error: integer overflow during ''+'' update of field 2'
+...
+s:update({0}, {{'+', 2, 100500}}) -- overflow
+---
+- error: 'Error: integer overflow during ''+'' update of field 2'
+...
+s:replace{0, 1}
+---
+- [0, 1]
+...
+s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- overflow
+---
+- error: 'Error: integer overflow during ''+'' update of field 2'
+...
+s:replace{0, 0xffffffff}
+---
+- [0, 4294967295]
+...
+s:update({0}, {{'*', 2, 0xffffffff}})  -- ok
+---
+- [0, 18446744065119617025]
+...
+s:update({0}, {{'*', 2, 2}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, 0xffffffff}
+---
+- [0, 4294967295]
+...
+s:update({0}, {{'*', 2, 0x100000001ull}})  -- ok
+---
+- [0, 18446744073709551615]
+...
+s:replace{0, 0xffffffff}
+---
+- [0, 4294967295]
+...
+s:update({0}, {{'*', 2, 0x100000002ull}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, 0x100000000ull}
+---
+- [0, 4294967296]
+...
+s:update({0}, {{'*', 2, 0x100000000ull}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, -1}
+---
+- [0, -1]
+...
+s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- ok
+---
+- [0, 18446744073709551614]
+...
+s:replace{0, 0}
+---
+- [0, 0]
+...
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
+---
+- [0, -9223372036854775807]
+...
+s:replace{0, -1}
+---
+- [0, -1]
+...
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
+---
+- [0, -9223372036854775808]
+...
+s:update({0}, {{'*', 2, 2}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, -2}
+---
+- [0, -2]
+...
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- overflow
+---
+- error: 'Error: integer overflow during ''-'' update of field 2'
+...
+s:replace{0, 1}
+---
+- [0, 1]
+...
+s:update({0}, {{'-', 2, 0xffffffffffffffffull}})  -- overflow
+---
+- error: 'Error: integer overflow during ''-'' update of field 2'
+...
+s:replace{0, 0xffffffffffffffefull}
+---
+- [0, 18446744073709551599]
+...
+s:update({0}, {{'-', 2, -16}})  -- ok
+---
+- [0, 18446744073709551615]
+...
+s:update({0}, {{'-', 2, -16}})  -- overflow
+---
+- error: 'Error: integer overflow during ''-'' update of field 2'
+...
+s:replace{0, 0x4000000000000000ull}
+---
+- [0, 4611686018427387904]
+...
+s:update({0}, {{'*', 2, -2}})  -- ok
+---
+- [0, -9223372036854775808]
+...
+s:update({0}, {{'*', 2, -2}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, 0x4000000000000001ull}
+---
+- [0, 4611686018427387905]
+...
+s:update({0}, {{'*', 2, -2}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, -0x4000000000000000ll}
+---
+- [0, -4611686018427387904]
+...
+s:update({0}, {{'+', 2, -0x4000000000000000ll}})  -- ok
+---
+- [0, -9223372036854775808]
+...
+s:replace{0, -0x4000000000000000ll}
+---
+- [0, -4611686018427387904]
+...
+s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
+---
+- error: 'Error: integer overflow during ''+'' update of field 2'
+...
+s:replace{0, -0xffffffffll}
+---
+- [0, -4294967295]
+...
+s:update({0}, {{'*', 2, -0x100000001ll}})  -- ok
+---
+- [0, 18446744073709551615]
+...
+s:replace{0, 0xffffffff}
+---
+- [0, 4294967295]
+...
+s:update({0}, {{'*', 2, -0x100000002ll}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:replace{0, 0x100000000ull}
+---
+- [0, 4294967296]
+...
+s:update({0}, {{'*', 2, -0x100000000ll}})  -- overflow
+---
+- error: 'Error: integer overflow during ''*'' update of field 2'
+...
+s:drop()
+---
+...

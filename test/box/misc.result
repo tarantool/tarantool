@@ -205,6 +205,7 @@ t;
   - 'box.error.PASSWORD_MISMATCH : 47'
   - 'box.error.NO_SUCH_ENGINE : 57'
   - 'box.error.ACCESS_DENIED : 42'
+  - 'box.error.UPDATE_INTEGER_OVERFLOW : 95'
   - 'box.error.LAST_DROP : 15'
   - 'box.error.USER_EXISTS : 46'
   - 'box.error.WAL_IO : 40'
