@@ -111,7 +111,7 @@ SophiaEngine::SophiaEngine()
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
 {
-	flags = ENGINE_TRANSACTIONAL;
+	flags = 0;
 	env = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;

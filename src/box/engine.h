@@ -34,9 +34,8 @@ struct space;
 struct tuple;
 
 enum engine_flags {
-	ENGINE_TRANSACTIONAL = 1,
-	ENGINE_NO_YIELD = 2,
-	ENGINE_CAN_BE_TEMPORARY = 4,
+	ENGINE_NO_YIELD = 1,
+	ENGINE_CAN_BE_TEMPORARY = 2,
 	/**
 	 * Identifies that engine can handle changes
 	 * of primary key during update.
@@ -48,7 +47,7 @@ enum engine_flags {
 	 * If the flag is not set, the server will verify
 	 * that the primary key is not changed.
 	 */
-	ENGINE_AUTO_CHECK_UPDATE = 8,
+	ENGINE_AUTO_CHECK_UPDATE = 4,
 };
 
 extern uint32_t engine_flags[BOX_ENGINE_MAX];
@@ -203,12 +202,6 @@ Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
-
-static inline bool
-engine_transactional(uint32_t flags)
-{
-	return flags & ENGINE_TRANSACTIONAL;
-}
 
 static inline bool
 engine_no_yield(uint32_t flags)
