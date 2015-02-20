@@ -113,7 +113,6 @@ SophiaEngine::SophiaEngine()
 {
 	flags = ENGINE_TRANSACTIONAL;
 	env = NULL;
-	tx  = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -258,22 +257,22 @@ SophiaEngine::begin(struct txn *txn, struct space *space)
 {
 	assert(space->handler->engine == this);
 	if (txn->n_stmts == 1) {
-		assert(tx == NULL);
+		assert(txn->engine_tx == NULL);
 		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 		(void) index;
 		assert(index->db != NULL);
-		tx = sp_begin(env);
-		if (tx == NULL)
+		txn->engine_tx = sp_begin(env);
+		if (txn->engine_tx == NULL)
 			sophia_raise(env);
 		return;
 	}
-	assert(tx != NULL);
+	assert(txn->engine_tx != NULL);
 }
 
 void
 SophiaEngine::commit(struct txn *txn)
 {
-	if (tx == NULL)
+	if (txn->engine_tx == NULL)
 		return;
 	/* free involved tuples */
 	struct txn_stmt *stmt;
@@ -284,28 +283,28 @@ SophiaEngine::commit(struct txn *txn)
 		tuple_unref(stmt->new_tuple);
 	}
 	auto scoped_guard = make_scoped_guard([=] {
-		tx = NULL;
+		txn->engine_tx = NULL;
 	});
 	/* commit transaction using transaction
 	 * commit signature */
 	assert(txn->signature >= 0);
-	int rc = sp_prepare(tx, txn->signature);
+	int rc = sp_prepare(txn->engine_tx, txn->signature);
 	assert(rc == 0);
 	if (rc == -1)
 		sophia_raise(env);
-	rc = sp_commit(tx);
+	rc = sp_commit(txn->engine_tx);
 	if (rc == -1)
 		sophia_raise(env);
 	assert(rc == 0);
 }
 
 void
-SophiaEngine::rollback(struct txn *)
+SophiaEngine::rollback(struct txn *txn)
 {
-	if (tx == NULL)
+	if (txn->engine_tx == NULL)
 		return;
-	sp_rollback(tx);
-	tx = NULL;
+	sp_rollback(txn->engine_tx);
+	txn->engine_tx = NULL;
 }
 
 static inline void
