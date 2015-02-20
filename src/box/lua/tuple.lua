@@ -16,8 +16,6 @@ struct tuple
     char data[0];
 } __attribute__((packed));
 
-int
-tuple_ref_nothrow(struct tuple *tuple);
 void
 tuple_unref(struct tuple *tuple);
 uint32_t
@@ -56,13 +54,8 @@ local tuple_gc = function(tuple)
 end
 
 local tuple_bless = function(tuple)
-    -- tuple_ref(..) may throw to prevent reference counter to overflow,
-    -- which is not allowed in ffi call, so we'll use nothrow version
-    if (builtin.tuple_ref_nothrow(tuple) ~= 0) then
-        box.error();
-    end
-    local tuple2 = ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
-    return tuple2
+    -- must never fail:
+    return ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
 end
 
 local tuple_iterator_t = ffi.typeof('struct tuple_iterator')

@@ -89,7 +89,7 @@ hash.index['primary']:get{1, 'foo'}
 -- primary index select with extra part
 hash.index['primary']:get{1, 'foo', 0, 0}
 ---
-- error: Invalid key part count (expected [0..3], got 4)
+- error: Invalid key part count in an exact match (expected 3, got 4)
 ...
 -- primary index select with wrong type
 hash.index['primary']:get{1, 'foo', 'baz'}

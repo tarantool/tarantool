@@ -6,9 +6,9 @@ index = space:create_index('primary', { type = 'hash' })
 errinj.info()
 errinj.set("some-injection", true)
 errinj.set("some-injection") -- check error
-space:get{222444}
+space:select{222444}
 errinj.set("ERRINJ_TESTING", true)
-space:get{222444}
+space:select{222444}
 errinj.set("ERRINJ_TESTING", false)
 
 -- Check how well we handle a failed log write

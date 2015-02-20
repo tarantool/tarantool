@@ -32,7 +32,7 @@ space.index['minmax']:get{'new', 'world'}
 --  https://bugs.launchpad.net/tarantool/+bug/904208
 space.index['minmax']:get{'new', 'world', 'order'}
 ---
-- error: Invalid key part count (expected [0..2], got 3)
+- error: Invalid key part count in an exact match (expected 2, got 3)
 ...
 space:delete{'brave'}
 ---
@@ -47,7 +47,7 @@ space:insert{'item 1', 'alabama', 'song'}
 ...
 space.index['minmax']:get{'alabama'}
 ---
-- ['item 1', 'alabama', 'song']
+- error: Invalid key part count in an exact match (expected 2, got 1)
 ...
 space:insert{'item 2', 'california', 'dreaming '}
 ---
@@ -734,7 +734,7 @@ t:find(2, '2')
 ...
 t:find(89, '2')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:91: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:84: error: invalid key to ''next'''
 ...
 t:findall(4, '3')
 ---
