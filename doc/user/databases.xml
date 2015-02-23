@@ -2621,7 +2621,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
               stalls of the garbage collector.
             </para>
             <para>
-             Example: <code><userinput>conn:close()</userinput></code>.
+             Example: <code><userinput>conn:close()</userinput></code>. 
             </para>
         </listitem>
     </varlistentry>

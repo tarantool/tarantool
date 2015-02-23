@@ -21,7 +21,7 @@ tarantool> <userinput>f1()</userinput>
 </programlisting>
       In the above example, the requests are being handled in interactive mode
       for evaluation as a chunk of Lua code.
-    </para>
+    </para> 
     <para>
       Thus, the request "<code>function f1() return 'hello' end</code>"
       causes definition of the Lua function which will be identified as f1().

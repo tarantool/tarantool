@@ -10,7 +10,7 @@
 
 <para>
 This chapter shows how to download, how to install, and how to start Tarantool for the first time.
-</para>
+</para> 
 
 <para>
 For production, if possible, you should download a binary (executable) package.
