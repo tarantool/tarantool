@@ -222,7 +222,7 @@ Use layman to add the overlay to your system:
 <title>FreeBSD</title>
 <para>
 With your browser go to the FreeBSD ports page
-<link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
+<link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>.
 Enter the search term: tarantool.
 Choose the package you want.
 </para>
@@ -286,8 +286,8 @@ A program for managing the build process.
 Here are names of tools and libraries which may have to be installed in advance,
 using <quote><computeroutput>sudo apt-get</computeroutput></quote> (for Ubuntu), <quote><computeroutput>sudo yum install</computeroutput></quote> (for CentOS),
 or the equivalent on other platforms. Different platforms may use slightly
-different names. Do not worry about the <quote>optional, for build with -DENABLE_DOC</quote>
-ones unless you intend to work on the documentation.</para>
+different names. Do not worry about the ones marked <quote>optional, for build with -DENABLE_DOC</quote>
+unless you intend to work on the documentation.</para>
 <itemizedlist>
  <listitem><para>binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces</para></listitem>
  <listitem><para> gcc or clang                        # see above</para></listitem>
@@ -434,8 +434,8 @@ Assuming you downloaded to <filename>~/tarantool</filename>,
 the principal steps are:<programlisting><userinput><command>mkdir</command> ~/tarantool/bin    # make a subdirectory named <filename>bin</filename>
 <command>ln</command> /usr/bin/python ~/tarantool/bin/python # link python to bin (this may require superuser privilege)
 <command>cd</command> ~/tarantool/test #get on the test subdirectory
-PATH=~/tarantool/bin:$PATH ./run #run tests using python</userinput></programlisting>
- 
+PATH=~/tarantool/bin:$PATH ./test-run.py #run tests using python</userinput></programlisting>
+
 
 The output should contain reassuring reports, for example
 <programlisting><computeroutput>======================================================================
@@ -607,8 +607,7 @@ to send requests to the listen URI via (a) telnet,
 <para>
 1. Switch to another terminal. On Linux, for example, this
 means starting another instance of a Bash shell.
-There will be no usage of the database this time,
-so feel free to use <computeroutput><command>cd</command></computeroutput> to switch to another default directory.
+There is no need to use <computeroutput><command>cd</command></computeroutput> to switch to the ~/tarantool_sandbox directory.
 </para>
 <para>
 2. Start the second instance of Tarantool.
