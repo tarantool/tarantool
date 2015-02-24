@@ -6,6 +6,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libreadline-dev,
  libncurses5-dev,
  libiberty-dev | binutils-dev,
+ binutils-dev,
  libmysqlclient-dev,
  libpq-dev
 Section: database
@@ -97,9 +98,6 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  tarantool (= ${binary:Version})
-Recommends:
- tarantool-postgresql-module,
- tarantool-mysql-module
 Description: Tarantool in-memory database - all plug-ins bundle
  Tarantool is an in-memory database and Lua application server.
  This package provides (or depends on) all Tarantool additional
