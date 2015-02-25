@@ -596,7 +596,7 @@ function aexitst(ai, host, port)
             return true
         end
     end
-    return false
+    return ai 
 end;
 ---
 ...

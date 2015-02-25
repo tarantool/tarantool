@@ -906,6 +906,11 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 		 * (when we close the file), and try to reopen the next
 		 * WAL. In other words, make sure that replication relays
 		 * try to open the next WAL only when it exists.
+		 *
+		 * On the other hand, this creates a nasty race
+		 * condition when a relay sees a newer file
+		 * without possibly have read all the content
+		 * of the previous file.
 		 */
 		if (wal_to_close) {
 			/*

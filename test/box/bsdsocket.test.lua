@@ -190,7 +190,7 @@ function aexitst(ai, host, port)
             return true
         end
     end
-    return false
+    return ai 
 end;
 
 aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
