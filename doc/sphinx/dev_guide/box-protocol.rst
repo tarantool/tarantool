@@ -5,8 +5,12 @@
 :template: documentation_rst
 
 --------------------------------------------------------------------------------
-                              Notion in diagrams
+                               IProto Protocol
 --------------------------------------------------------------------------------
+
+================================================================================
+                              Notion in diagrams
+================================================================================
 
 .. code-block:: bash
 
@@ -37,15 +41,15 @@ MsgPack data types:
 * **MP_OBJECT** - Any MsgPack object
 
 
---------------------------------------------------------------------------------
+================================================================================
                                     Overview
---------------------------------------------------------------------------------
+================================================================================
 
 IPROTO is a binary request/response protocol.
 
---------------------------------------------------------------------------------
+================================================================================
                          Greeting Package
---------------------------------------------------------------------------------
+================================================================================
 
 .. code-block:: bash
 
@@ -68,9 +72,9 @@ to the client. The first 64 bytes of the greeting contain server version. The
 second 44 bytes contain a base64-encoded random string, to use in authentification
 packet. And it ends with 20 bytes of spaces.
 
---------------------------------------------------------------------------------
+================================================================================
                          Unified package structure
---------------------------------------------------------------------------------
+================================================================================
 
 Once a greeting is read, the protocol becomes pure request/response and features
 a complete access to Tarantool functionality, including:
@@ -156,9 +160,9 @@ They only differ in the allowed set of keys and values, the key defines the
 type of value that follows. If a body has no keys, entire msgpack map for
 the body may be missing. Such is the case, for example, in <ping> request.
 
---------------------------------------------------------------------------------
+================================================================================
                             Authentication
---------------------------------------------------------------------------------
+================================================================================
 
 When a client connects to the server, the server responds with a 128-byte
 text greeting message. Part of the greeting is base-64 encoded session salt -
@@ -201,9 +205,9 @@ and password, encrypted according to the specified mechanism. Authentication in
 Tarantool is optional, if no authentication is performed, session user is 'guest'.
 The server responds to authentication packet with a standard response with 0 tuples.
 
---------------------------------------------------------------------------------
+================================================================================
                                   Requests
---------------------------------------------------------------------------------
+================================================================================
 
 * SELECT: CODE - 0x01
   Find tuples matching the search pattern
@@ -250,15 +254,20 @@ The server responds to authentication packet with a standard response with 0 tup
 
     UPDATE BODY:
 
-    +==================+==================+==================+=======================+
-    |                  |                  |                  |          +~~~~~~~~~~+ |
-    |                  |                  |                  |          |          | |
-    |                  |                  |                  | (TUPLE)  |    OP    | |
-    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x20: KEY      |    0x21: |          | |
-    | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |  MP_INT: +~~~~~~~~~~+ |
-    |                  |                  |                  |            MP_ARRAY   |
-    +==================+==================+==================+=======================+
-                                       MP_MAP
+    +==================+=======================+
+    |                  |                       |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID      |
+    | MP_INT: MP_INT   | MP_INT: MP_INT        |
+    |                  |                       |
+    +==================+=======================+
+    |                  |          +~~~~~~~~~~+ |
+    |                  |          |          | |
+    |                  | (TUPLE)  |    OP    | |
+    |   0x20: KEY      |    0x21: |          | |
+    | MP_INT: MP_ARRAY |  MP_INT: +~~~~~~~~~~+ |
+    |                  |            MP_ARRAY   |
+    +==================+=======================+
+                     MP_MAP
 
 .. code-block:: bash
 
@@ -271,7 +280,8 @@ The server responds to authentication packet with a standard response with 0 tup
         * Bitwise OR  OP = '|' . space[key][field_no] |= argument
         Works on any fields:
         * Delete      OP = '#'
-          delete <argument> fields starting from <field_no> in the space[<key>]
+          delete <argument> fields starting
+          from <field_no> in the space[<key>]
 
     0           2
     +-----------+==========+==========+
@@ -366,9 +376,9 @@ It's an error to specify an argument of a type that differs from expected type.
                         MP_MAP
 
 
---------------------------------------------------------------------------------
+================================================================================
                          Response packet structure
---------------------------------------------------------------------------------
+================================================================================
 
 We'll show whole packets here:
 
@@ -411,9 +421,9 @@ Convenience macros which define hexadecimal constants for return codes
 can be found in `src/errcode.h
 <https://github.com/tarantool/tarantool/blob/master/src/errcode.h>`_
 
---------------------------------------------------------------------------------
+================================================================================
                          Replication packet structure
---------------------------------------------------------------------------------
+================================================================================
 
 .. code-block:: bash
 
@@ -447,8 +457,8 @@ can be found in `src/errcode.h
                    MP_MAP                                   MP_MAP
 
     Then server, which we connect to, will send last SNAP file by, simply,
-    creating a number of INSERT's (with additional LSN and ServerID) (don't reply)
-    Then it'll send a vclock's MP_MAP and close a socket.
+    creating a number of INSERT's (with additional LSN and ServerID)
+    (don't reply). Then it'll send a vclock's MP_MAP and close a socket.
 
     +================+================++============================+
     |                |                ||        +~~~~~~~~~~~~~~~~~+ |
@@ -465,13 +475,19 @@ can be found in `src/errcode.h
     Then you must send SUBSCRIBE:
 
                                   HEADER
-    +================+================+===================+===================+
-    |                |                |    SERVER_UUID    |    CLUSTER_UUID   |
-    |   0x00: 0x41   |   0x01: SYNC   |   0x24: UUID      |   0x25: UUID      |
-    | MP_INT: MP_INT | MP_INT: MP_INT | MP_INT: MP_STRING | MP_INT: MP_STRING |
-    |                |                |                   |                   |
-    +================+================+===================+===================+
-                                    MP_MAP
+    +===================+===================+
+    |                   |                   |
+    |     0x00: 0x41    |    0x01: SYNC     |
+    |   MP_INT: MP_INT  |  MP_INT: MP_INT   |
+    |                   |                   |
+    +===================+===================+
+    |    SERVER_UUID    |    CLUSTER_UUID   |
+    |   0x24: UUID      |   0x25: UUID      |
+    | MP_INT: MP_STRING | MP_INT: MP_STRING |
+    |                   |                   |
+    +===================+===================+
+                     MP_MAP
+
           BODY
     +================+
     |                |
@@ -484,9 +500,9 @@ can be found in `src/errcode.h
     Then you must process every query that'll came through other masters.
     Every request between masters will have Additional LSN and SERVER_ID.
 
---------------------------------------------------------------------------------
+================================================================================
                                 XLOG / SNAP
---------------------------------------------------------------------------------
+================================================================================
 
 XLOG and SNAP have the same format. They start with:
 

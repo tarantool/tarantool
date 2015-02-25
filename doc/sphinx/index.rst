@@ -1,35 +1,23 @@
-===============================================================================
-                                 Documentation
-===============================================================================
+-------------------------------------------------------------------------------
+                                    Documentation
+-------------------------------------------------------------------------------
+
+
+.. toctree::
+    :maxdepth: 1
+
+    intro.rst
 
 .. raw:: html
 
     <div class="toctree-wrapper compound">
       <ul>
-        <li class="toctree-l1">Content:
-          <ul>
-            <li class="toctree-l2">
-              <a class="reference internal" href="/doc/user_guide/">
-                User Guide (Multi page HTML)
-              </a>
-            </li>
-            <li class="toctree-l2">
-              <a class="reference internal" href="/doc/user_guide.html">
-                User Guide (Single page HTML)
-              </a>
-            </li>
-            <li class="toctree-l2">
-              <a class="reference internal" href="/doc/dev_guide.html">
-                Developer Guide
-              </a>
-            </li>
-          </ul>
-        </li>
+        <li class="toctree-l1"><a href="/doc/user_guide/">User Guide</a></li>
       </ul>
     </div>
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
-    box-protocol.rst
     faq.rst
+    dev_guide/index.rst
