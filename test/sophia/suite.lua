@@ -8,7 +8,7 @@ ffi.cdef[[
 ]]
 
 function sophia_schedule()
-	return ffi.C.sophia_schedule()
+	ffi.C.sophia_schedule()
 end
 
 function sophia_dir()

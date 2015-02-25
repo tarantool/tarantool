@@ -152,10 +152,17 @@ SophiaEngine::end_recover_snapshot()
 	recovery.recover = sophia_recovery_end_snapshot;
 }
 
+static inline void
+sophia_snapshot_recover(void *env, int64_t lsn);
 
 void
 SophiaEngine::end_recovery()
 {
+	/* create snapshot reference after tarantool
+	 * recovery, to ensure correct ref
+	 * counting. */
+	if (m_checkpoint_lsn != -1)
+		sophia_snapshot_recover(env, m_checkpoint_lsn);
 	/* complete two-phase recovery */
 	int rc = sp_open(env);
 	if (rc == -1)
@@ -301,7 +308,7 @@ sophia_snapshot(void *env, int64_t lsn)
 	int rc = sp_set(c, "scheduler.checkpoint");
 	if (rc == -1)
 		sophia_raise(env);
-	char snapshot[32];
+	char snapshot[128];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
 	/* ensure snapshot is not already exists */
 	void *o = sp_get(c, snapshot);
@@ -325,7 +332,7 @@ sophia_snapshot_recover(void *env, int64_t lsn)
 	int rc = sp_set(c, "snapshot", snapshot_lsn);
 	if (rc == -1)
 		sophia_raise(env);
-	char snapshot[32];
+	char snapshot[128];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
 	rc = sp_set(c, snapshot, snapshot_lsn);
 	if (rc == -1)
@@ -336,7 +343,7 @@ static inline int
 sophia_snapshot_ready(void *env, int64_t lsn)
 {
 	/* get sophia lsn associated with snapshot */
-	char snapshot[32];
+	char snapshot[128];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
 	void *c = sp_ctl(env);
 	void *o = sp_get(c, snapshot);
@@ -363,7 +370,7 @@ sophia_snapshot_ready(void *env, int64_t lsn)
 static inline void
 sophia_delete_checkpoint(void *env, int64_t lsn)
 {
-	char snapshot[32];
+	char snapshot[128];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
 	void *c = sp_ctl(env);
 	void *s = sp_get(c, snapshot);
@@ -380,7 +387,8 @@ sophia_delete_checkpoint(void *env, int64_t lsn)
 void
 SophiaEngine::begin_recover_snapshot(int64_t lsn)
 {
-	sophia_snapshot_recover(env, lsn);
+	m_prev_checkpoint_lsn = lsn;
+	m_checkpoint_lsn = lsn;
 }
 
 int
