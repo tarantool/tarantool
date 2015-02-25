@@ -161,8 +161,11 @@ SophiaEngine::end_recovery()
 	/* create snapshot reference after tarantool
 	 * recovery, to ensure correct ref
 	 * counting. */
-	if (m_checkpoint_lsn != -1)
+	if (m_checkpoint_lsn >= 0) {
 		sophia_snapshot_recover(env, m_checkpoint_lsn);
+		m_prev_checkpoint_lsn = m_checkpoint_lsn;
+		m_checkpoint_lsn = -1;
+	}
 	/* complete two-phase recovery */
 	int rc = sp_open(env);
 	if (rc == -1)
@@ -387,7 +390,6 @@ sophia_delete_checkpoint(void *env, int64_t lsn)
 void
 SophiaEngine::begin_recover_snapshot(int64_t lsn)
 {
-	m_prev_checkpoint_lsn = lsn;
 	m_checkpoint_lsn = lsn;
 }
 

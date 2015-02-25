@@ -258,7 +258,8 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count) const
 	mp_next(&keyptr);
 	size_t keysize = keyptr - key;
 	struct space *space = space_cache_find(key_def->space_id);
-	return sophia_index_get(env, db, NULL, key, keysize, space->format);
+	void *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	return sophia_index_get(env, db, tx, key, keysize, space->format);
 }
 
 struct tuple *
