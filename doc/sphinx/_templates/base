@@ -1,16 +1,18 @@
 {% import "menu" as menu %}
+{% include "custom_sphinx" with context %}
+
 <!doctype html>
 
 <html>
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-    <title>{{ page.title }}</title>
+    <title>{{ title }}</title>
     <link rel="shortcut icon" href="/theme/favicon.ico" />
     <link rel="stylesheet"    href="/theme/design.css" />
     <link rel="stylesheet"    href="/theme/pygmentize.css" />
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-    <!--script src="/js/select.js"></script-->
+    <script src="/js/select.js"></script>
     <!--[if lt IE 9]>
       <script src="scripts/ie8.js"></script>
       <link rel="stylesheet" href="/theme/new/ie8.css" />
@@ -19,13 +21,17 @@
     {% endblock header_scripts %}
     {% include "script" ignore missing %}
   </head>
-  <body class="p-main">
+  {% if render_sidebar %}
+  <body class="p-cols_design">
+  {% else %}
+  <body class="b-main">
+  {% endif%}
     <div class="b-wrapper">
       <!-- HEADER > -->
       <header class="b-header">
         <div class="b-header-wrapper">
           <nav class="b-header_menu">
-            {{ menu.i_menu(page) }}
+            {{ menu.i_menu({slug:'documentation'}) }}
           </nav>
         </div>
       </header>
@@ -42,7 +48,7 @@
       <div class="b-footer-wrapper">
         <nav class="b-footer_menu">
           <div class="b-footer-copyright">© 2015 - Tarantool. All right reserved.</div>
-          {{ menu.i_menu(page) }}
+          {{ menu.i_menu({slug:'documentation'}) }}
           <div class="b-footer-other">
             <a href="http://stable.tarantool.org">1.5 web site and downloads</a>
           </div>

@@ -1,12 +1,6 @@
-:title: Overview
-:slug: intro
-:save_as: doc/introduction.html
-:url: doc/introduction.html
-:template: old_page
-
-===============================================================================
-                             What is Tarantool?
-===============================================================================
+-------------------------------------------------------------------------------
+                             Overview
+-------------------------------------------------------------------------------
 
 Tarantool is a NoSQL database management system running in a Lua application
 server. The code is available for free under the terms of `BSD license`_.
