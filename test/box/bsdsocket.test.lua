@@ -184,17 +184,20 @@ s:close()
 os.remove('/tmp/tarantool-test-socket')
 
 --# setopt delimiter ';'
-function aexitst(ai, host, port)
+function aexitst(ai, hostnames, port)
     for i, a in pairs(ai) do
-        if a.host == host and a.port == port then
-            return true
+        for j, host in pairs(hostnames) do
+            if a.host == host and a.port == port then
+                return true
+            end
         end
     end
-    return ai 
+    return ai
 end;
 
+
 aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
-    type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
+    type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
 --# setopt delimiter ''
 
 #(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
