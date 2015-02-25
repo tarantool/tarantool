@@ -1000,7 +1000,7 @@ local function tcp_server_loop(server, s, addr)
         if sc == nil then
             local errno = s:errno()
             if not errno_is_transient[errno] then
-                log.error('accept() failed: '..s:error())
+                log.error('accept('..s..') failed: '..s:error())
             end
             if  errno_is_fatal[errno] then
                 break

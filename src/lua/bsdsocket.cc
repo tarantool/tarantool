@@ -812,6 +812,8 @@ lbox_bsdsocket_accept(struct lua_State *L)
 
 	int sc = accept(fh, (struct sockaddr*)&fa, &len);
 	if (sc < 0) {
+		if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+			say_syserror("accept(%d)", fh);
 		lua_pushnil(L);
 		return 1;
 	}
