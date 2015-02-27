@@ -28,8 +28,7 @@ another DBMS, and Tarantool.
 <para>
 It will be necessary to build Tarantool from source,
 as described in
-<olink
-targetptr="getting-started-source"><quote>Downloading and building a source package</quote></olink>.
+<link xlink:href="http://tarantool.org/doc/dev_guide/building_from_source.html"><quote>Building from source</quote></link>
 </para>
 
 <para>
