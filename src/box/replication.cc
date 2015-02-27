@@ -34,6 +34,7 @@
 #include "xlog.h"
 #include "evio.h"
 #include "iproto_constants.h"
+#include "box/engine.h"
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
@@ -44,9 +45,9 @@
 #include "cfg.h"
 #include "trigger.h"
 
-static void
+void
 replication_send_row(struct recovery_state *r, void *param,
-		     struct xrow_header *packet);
+                     struct xrow_header *packet);
 
 /** State of a replication relay. */
 class Relay {
@@ -90,8 +91,9 @@ replication_join_f(va_list ap)
 	struct recovery_state *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
+
 	/* Send snapshot */
-	recover_snap(r);
+	engine_join(r);
 
 	/* Send response to JOIN command = end of stream */
 	struct xrow_header row;
@@ -193,9 +195,9 @@ replication_subscribe(int fd, struct xrow_header *packet)
 }
 
 /** Send a single row to the client. */
-static void
+void
 replication_send_row(struct recovery_state *r, void *param,
-		     struct xrow_header *packet)
+                     struct xrow_header *packet)
 {
 	Relay *relay = (Relay *) param;
 	assert(iproto_type_is_dml(packet->type));

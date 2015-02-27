@@ -34,7 +34,11 @@
 #include "txn.h"
 #include "index.h"
 #include "sophia_index.h"
+#include "recovery.h"
 #include "space.h"
+#include "request.h"
+#include "iproto_constants.h"
+#include "replication.h"
 #include "salad/rlist.h"
 #include <sophia.h>
 #include <stdlib.h>
@@ -150,6 +154,75 @@ SophiaEngine::end_recover_snapshot()
 {
 	recovery.replace = sophia_replace_recover;
 	recovery.recover = sophia_recovery_end_snapshot;
+}
+
+static inline void
+sophia_send_row(struct recovery_state *r, char *tuple,
+                uint32_t tuple_size)
+{
+	struct request req;
+	request_create(&req, IPROTO_REPLACE);
+	req.space_id  = 0;
+	req.index_id  = 0;
+	req.tuple     = tuple;
+	req.tuple_end = tuple + tuple_size;
+
+	struct xrow_header row;
+	row.type = IPROTO_REPLACE;
+	row.lsn = 0;
+	row.server_id = 0;
+	row.bodycnt = request_encode(&req, row.body);
+
+	replication_send_row(r, /* Relay* */ NULL, &row);
+}
+
+void
+SophiaEngine::join(struct recovery_state *r)
+{
+
+	return;
+
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	if (res == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	int64_t signt = vclock_signature(res);
+
+	/* get snapshot object */
+	char id[128];
+	snprintf(id, sizeof(id), "snapshot.%" PRIu64, signt);
+	void *c = sp_ctl(env);
+	void *snapshot = sp_get(c, id);
+	assert(snapshot != NULL);
+
+	/* iterate through a list of databases which took a
+	 * part in the snapshot */
+	void *db_cursor = sp_ctl(snapshot, "db_view");
+	if (db_cursor == NULL)
+		sophia_raise(env);
+	while (sp_get(db_cursor)) {
+		void *db = sp_object(db_cursor);
+		/* send database */
+		void *o = sp_object(db);
+		void *cursor = sp_cursor(snapshot, o);
+		if (cursor == NULL) {
+			sp_destroy(db_cursor);
+			sophia_raise(env);
+		}
+		while (sp_get(cursor)) {
+			o = sp_object(cursor);
+			uint32_t tuple_size = 0;
+			char *tuple = (char *)sp_get(o, "value", &tuple_size);
+			try {
+				sophia_send_row(r, tuple, tuple_size);
+			} catch (...) {
+				sp_destroy(cursor);
+				sp_destroy(db_cursor);
+				throw;
+			}
+		}
+		sp_destroy(cursor);
+	}
+	sp_destroy(db_cursor);
 }
 
 static inline void

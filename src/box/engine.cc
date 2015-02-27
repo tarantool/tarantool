@@ -179,3 +179,12 @@ error:
 	snapshot_is_in_progress = false;
 	return save_errno;
 }
+
+void
+engine_join(struct recovery_state *r)
+{
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->join(r);
+	}
+}

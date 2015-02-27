@@ -41,5 +41,9 @@ replication_join(int fd, struct xrow_header *packet);
 void
 replication_subscribe(int fd, struct xrow_header *packet);
 
+void
+replication_send_row(struct recovery_state *r, void *param,
+                     struct xrow_header *packet);
+
 #endif // TARANTOOL_REPLICATION_H_INCLUDED
 

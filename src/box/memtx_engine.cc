@@ -111,6 +111,12 @@ MemtxEngine::end_recovery()
 	recovery.recover = space_build_all_keys;
 }
 
+void
+MemtxEngine::join(struct recovery_state *r)
+{
+	recover_snap(r);
+}
+
 Handler *MemtxEngine::open()
 {
 	return new MemtxSpace(this);

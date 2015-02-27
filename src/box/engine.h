@@ -118,6 +118,8 @@ public:
 	 * Delete all tuples in the index on drop.
 	 */
 	virtual void dropIndex(Index*) = 0;
+
+	virtual void join(struct recovery_state*) = 0;
 	/**
 	 * Engine specific transaction life-cycle routines.
 	 */
@@ -253,5 +255,11 @@ engine_end_recovery();
  */
 int
 engine_checkpoint(int64_t checkpoint_id);
+
+/**
+ * Send a snapshot.
+ */
+void
+engine_join(struct recovery_state*);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */
