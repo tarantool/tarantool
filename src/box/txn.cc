@@ -144,6 +144,7 @@ txn_begin(bool autocommit)
 		rlist_nil, txn_on_yield_or_stop, NULL, NULL
 	};
 	txn->autocommit = autocommit;
+	txn->engine_tx = NULL;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
