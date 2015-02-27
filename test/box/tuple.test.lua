@@ -91,7 +91,7 @@ t:totable(1, 0)
 -- Check that tuple:totable correctly sets serializer hints
 --
 box.tuple.new{1, 2, 3}:totable()
-getmetatable(box.tuple.new{1, 2, 3}:totable())
+getmetatable(box.tuple.new{1, 2, 3}:totable()).__serialize
 
 --  A test case for the key as an tuple
 space = box.schema.space.create('tweedledum')
@@ -279,5 +279,14 @@ msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 
 -- restore configuration
 msgpack.cfg{encode_load_metatables = encode_load_metatables}
+
+-- gh-738: Serializer hints are unclear
+t = box.tuple.new({1, 2, {}})
+map = t[3]
+getmetatable(map) ~= nil
+map
+map['test'] = 48
+map
+getmetatable(map) == nil
 
 space:drop()

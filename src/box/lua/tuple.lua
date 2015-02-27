@@ -102,11 +102,6 @@ local function tuple_ipairs(tuple, pos)
     return fun.wrap(it, tuple, pos)
 end
 
--- a precreated metatable for totable()
-local tuple_totable_mt = {
-    __serialize = 'seq'; -- enables flow mode for yaml
-}
-
 local function tuple_totable(tuple, i, j)
     -- use a precreated iterator for tuple_next
     builtin.tuple_rewind(next_it, tuple)
@@ -134,7 +129,7 @@ local function tuple_totable(tuple, i, j)
         i = i + 1
         field = builtin.tuple_next(next_it)
     end
-    return setmetatable(ret, tuple_totable_mt)
+    return setmetatable(ret, msgpackffi.array_mt)
 end
 
 local function tuple_unpack(tuple, i, j)
