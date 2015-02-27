@@ -146,7 +146,7 @@ struct errcode_record {
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		2, "User '%s' does not have role '%s'") \
 	/* 93 */_(ER_MISSING_SNAPSHOT,		2, "Can't find snapshot") \
 	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	2, "Attempt to modify a tuple field which is part of index %s") \
-	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   2, "Error: integer overflow during '%c' update of field %u") \
+	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   2, "Integer overflow when performing '%c' operation on field %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

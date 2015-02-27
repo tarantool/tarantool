@@ -42,13 +42,13 @@
  * add or remove fields. Only one operation on the same field
  * is allowed.
  *
- * Supported field change operations are: SET, ADD, SUBSTRACT,
+ * Supported field change operations are: SET, ADD, SUBTRACT,
  * MULTIPLY; bitwise AND, XOR and OR; SPLICE.
  *
- * Supported tuple change operations are: SET (when SET field_no
- * == last_field_no + 1), DELETE, INSERT, PUSH and POP.
+ * Supported tuple change operations are: SET, DELETE, INSERT,
+ * PUSH and POP.
  * If the number of fields in a tuple is altered by an operation,
- * field index of all following operation is evaluated against the
+ * field index of all following operations is evaluated against the
  * new tuple.
  *
  * Despite the allowed complexity, a typical use case for UPDATE
@@ -84,7 +84,7 @@
  * In particular, if a field is deleted by an operation,
  * it disappears from the rope and all subsequent operations
  * on this field number instead affect the field following the
- * one.
+ * deleted one.
  */
 
 /** Update internal state */
@@ -104,21 +104,46 @@ struct op_set_arg {
 	const char *value;
 };
 
+/**
+ * MsgPack format code of an arithmetic argument or result.
+ * MsgPack codes are not used to simplify type calculation.
+ */
 enum arith_type {
-	AT_DOUBLE = 0,
-	AT_FLOAT = 1,
-	AT_NEGAT_INT = 2,
-	AT_POSIT_UINT = 3
+	AT_DOUBLE = 0, /* MP_DOUBLE */
+	AT_FLOAT = 1, /* MP_FLOAT */
+	AT_INT = 2, /* MP_INT */
+	AT_UINT = 3 /* MP_UINT */
 };
 
-/** Argument of ADD, AND, XOR, OR and etc operations. */
-struct op_arith_arg {
+/**
+ * Argument (left and right) and result of ADD, AND, XOR, OR,
+ * SUBTRACT, MULTIPLY.
+ *
+ * To perform an arithmetic operation, update first loads
+ * left and right arguments into corresponding value objects,
+ * then performs arithmetics on types of arguments, thus
+ * calculating the type of the result, and then
+ * performs the requested operation according to the calculated
+ * type rules.
+ *
+ * The rules are as follows:
+ * - when one of the argument types is double, the result is
+ *   double
+ * - when one of the argument types is float, the result is
+ *   float
+ * - for integer arguments, the result type code depends on
+ *   the range in which falls the result of the operation.
+ *   If the result is in negative range, it's MP_INT, otherwise
+ *   it's MP_UINT. If the result is out of bounds of (-2^63,
+ *   2^64), and exception is raised for overflow.
+ */
+struct arith_value {
 	enum arith_type type;
 	union {
-		uint64_t posit_uint;
-		int64_t negat_int;
-		double dbl;
-		float flt;
+		uint64_t v_uint64;
+		int64_t v_int64;
+		double v_double;
+		float v_float;
 	};
 };
 
@@ -137,7 +162,7 @@ struct op_splice_arg {
 
 union update_op_arg {
 	struct op_set_arg set;
-	struct op_arith_arg arith;
+	struct arith_value arith;
 	struct op_splice_arg splice;
 };
 
@@ -195,6 +220,7 @@ update_field_init(struct update_field *field,
 	field->tail_len = tail_len;
 }
 
+/** Read a field index or any other integer field. */
 static inline int64_t
 mp_read_int(struct tuple_update *update, struct update_op *op,
 	    const char **expr)
@@ -210,29 +236,33 @@ mp_read_int(struct tuple_update *update, struct update_op *op,
 	return field_no;
 }
 
-static inline struct op_arith_arg
-mp_read_arith_arg(struct tuple_update *update, struct update_op *op,
+/**
+ * Load an argument of an arithmetic operation either from tuple
+ * or from the UPDATE command.
+ */
+static inline struct arith_value
+mp_read_arith_value(struct tuple_update *update, struct update_op *op,
 		  const char **expr)
 {
-	struct op_arith_arg result;
+	struct arith_value result;
 	if (mp_typeof(**expr) == MP_UINT) {
-		result.type = AT_POSIT_UINT;
-		result.posit_uint = mp_decode_uint(expr);
+		result.type = AT_UINT;
+		result.v_uint64 = mp_decode_uint(expr);
 	} else if (mp_typeof(**expr) == MP_INT) {
 		int64_t val = mp_decode_int(expr);
 		if (val < 0) {
-			result.type = AT_NEGAT_INT;
-			result.negat_int = val;
+			result.type = AT_INT;
+			result.v_int64 = val;
 		} else {
-			result.type = AT_POSIT_UINT;
-			result.posit_uint = (uint64_t)val;
+			result.type = AT_UINT;
+			result.v_uint64 = (uint64_t) val;
 		}
 	} else if (mp_typeof(**expr) == MP_DOUBLE) {
 		result.type = AT_DOUBLE;
-		result.dbl = mp_decode_double(expr);
+		result.v_double = mp_decode_double(expr);
 	} else if (mp_typeof(**expr) == MP_FLOAT) {
 		result.type = AT_FLOAT;
-		result.flt = mp_decode_float(expr);
+		result.v_float = mp_decode_float(expr);
 	} else {
 		tnt_raise(ClientError, ER_ARG_TYPE, (char ) op->opcode,
 			  update->index_base + op->field_no, "NUMBER");
@@ -240,18 +270,23 @@ mp_read_arith_arg(struct tuple_update *update, struct update_op *op,
 	return result;
 }
 
+/** Return the MsgPack size of an arithmetic operation result. */
 static inline uint32_t
-mp_sizeof_arith_arg(struct op_arith_arg arg)
+mp_sizeof_arith_value(struct arith_value arg)
 {
-	if (arg.type == AT_POSIT_UINT) {
-		return mp_sizeof_uint(arg.posit_uint);
-	} else if (arg.type == AT_NEGAT_INT) {
-		return mp_sizeof_int(arg.negat_int);
+	/*
+	 * Arrange branches according to the likelihood of the
+	 * result type.
+	 */
+	if (arg.type == AT_UINT) {
+		return mp_sizeof_uint(arg.v_uint64);
+	} else if (arg.type == AT_INT) {
+		return mp_sizeof_int(arg.v_int64);
 	} else if (arg.type == AT_DOUBLE) {
-		return mp_sizeof_double(arg.dbl);
+		return mp_sizeof_double(arg.v_double);
 	} else {
 		assert(arg.type == AT_FLOAT);
-		return mp_sizeof_float(arg.flt);
+		return mp_sizeof_float(arg.v_float);
 	}
 }
 
@@ -342,35 +377,35 @@ do_op_delete(struct tuple_update *update, struct update_op *op,
 		rope_erase(update->rope, op->field_no);
 }
 
-static inline struct op_arith_arg
-make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
+static inline struct arith_value
+make_arith_operation(struct arith_value arg1, struct arith_value arg2,
 		     char opcode, uint32_t err_fieldno)
 {
-	struct op_arith_arg result;
+	struct arith_value result;
 
 	arith_type lowest_type = arg1.type;
 	if (arg1.type > arg2.type)
 		lowest_type = arg2.type;
 
-	if (lowest_type == AT_POSIT_UINT) {
+	if (lowest_type == AT_UINT) {
 		/* both operands are UINT */
-		result.type = AT_POSIT_UINT; /* could be overwritten below */
-		uint64_t a = arg1.posit_uint;
-		uint64_t b = arg2.posit_uint;
+		result.type = AT_UINT; /* could be overwritten below */
+		uint64_t a = arg1.v_uint64;
+		uint64_t b = arg2.v_uint64;
 		switch(opcode) {
 		case '+':
-			result.posit_uint = a + b;
-			if (result.posit_uint < a || result.posit_uint < b)
+			result.v_uint64 = a + b;
+			if (result.v_uint64 < a || result.v_uint64 < b)
 				tnt_raise(ClientError,
 					  ER_UPDATE_INTEGER_OVERFLOW,
 					  opcode, err_fieldno);
 			break;
 		case '-':
 			if (a >= b) {
-				result.posit_uint = a - b;
+				result.v_uint64 = a - b;
 			} else {
-				result.type = AT_NEGAT_INT;
-				result.negat_int = (int64_t)(a - b);
+				result.type = AT_INT;
+				result.v_int64 = (int64_t)(a - b);
 				if (b - a > -INT64_MIN)
 					tnt_raise(ClientError,
 						  ER_UPDATE_INTEGER_OVERFLOW,
@@ -378,7 +413,7 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 			}
 			break;
 		case '*':
-			result.posit_uint = a * b;
+			result.v_uint64 = a * b;
 			{
 				uint64_t ah = a >> 32, al = a & 0xFFFFFFFF;
 				uint64_t bh = b >> 32, bl = b & 0xFFFFFFFF;
@@ -391,51 +426,51 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 			}
 			break;
 		case '&':
-			result.posit_uint = a & b;
+			result.v_uint64 = a & b;
 			break;
 		case '|':
-			result.posit_uint = a | b;
+			result.v_uint64 = a | b;
 			break;
 		case '^':
-			result.posit_uint = a ^ b;
+			result.v_uint64 = a ^ b;
 			break;
 		default:
 			assert(false); /* checked by update_read_ops */
 			break;
 		}
-	} else if (lowest_type == AT_NEGAT_INT) {
+	} else if (lowest_type == AT_INT) {
 		/* both operands are integers; at least one - negative */
-		int test = ((int)arg2.type - (int)AT_NEGAT_INT) * 2
-			 + ((int)arg1.type - (int)AT_NEGAT_INT);
+		int test = ((int)arg2.type - (int)AT_INT) * 2
+			 + ((int)arg1.type - (int)AT_INT);
 		if (test == 2) {
 			/* first is negative, second is positive */
-			assert(arg1.type == AT_NEGAT_INT);
-			assert(arg2.type == AT_POSIT_UINT);
-			int64_t a = arg1.negat_int;
-			uint64_t b = arg2.posit_uint;
+			assert(arg1.type == AT_INT);
+			assert(arg2.type == AT_UINT);
+			int64_t a = arg1.v_int64;
+			uint64_t b = arg2.v_uint64;
 			uint64_t ma = (uint64_t)(-a); /* modulus a */
 			switch(opcode) {
 			case '+':
 				if (b >= ma) {
-					result.type = AT_POSIT_UINT;
-					result.posit_uint = b - ma;
+					result.type = AT_UINT;
+					result.v_uint64 = b - ma;
 				} else {
-					result.type = AT_NEGAT_INT;
-					result.negat_int = ((int64_t)b) + a;
+					result.type = AT_INT;
+					result.v_int64 = ((int64_t)b) + a;
 				}
 				break;
 			case '-':
-				result.type = AT_NEGAT_INT;
-				result.negat_int = a - b;
-				if (b >= -INT64_MIN || result.negat_int > a ||
-				    result.negat_int > -b)
+				result.type = AT_INT;
+				result.v_int64 = a - b;
+				if (b >= -INT64_MIN || result.v_int64 > a ||
+				    result.v_int64 > -b)
 					tnt_raise(ClientError,
 						  ER_UPDATE_INTEGER_OVERFLOW,
 						  opcode, err_fieldno);
 				break;
 			case '*':
-				result.type = AT_NEGAT_INT;
-				result.negat_int = a * (int64_t)b;
+				result.type = AT_INT;
+				result.v_int64 = a * (int64_t)b;
 				{
 					uint64_t ah = ma >> 32,
 						 al = ma & 0xFFFFFFFF;
@@ -450,9 +485,9 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 							  ER_UPDATE_INTEGER_OVERFLOW,
 							  opcode, err_fieldno);
 				}
-				if (result.negat_int == 0) {
-					result.type = AT_POSIT_UINT;
-					result.posit_uint = 0;
+				if (result.v_int64 == 0) {
+					result.type = AT_UINT;
+					result.v_uint64 = 0;
 				}
 				break;
 			default:
@@ -462,33 +497,33 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 			}
 		} else if (test == 1) {
 			/* first is positive, second is negative */
-			assert(arg1.type == AT_POSIT_UINT);
-			assert(arg2.type == AT_NEGAT_INT);
-			uint64_t a = arg1.posit_uint;
-			int64_t b = arg2.negat_int;
+			assert(arg1.type == AT_UINT);
+			assert(arg2.type == AT_INT);
+			uint64_t a = arg1.v_uint64;
+			int64_t b = arg2.v_int64;
 			uint64_t mb = (uint64_t)(-b); /* modulus b */
 			switch(opcode) {
 			case '+':
 				if (a >= mb) {
-					result.type = AT_POSIT_UINT;
-					result.posit_uint = a - mb;
+					result.type = AT_UINT;
+					result.v_uint64 = a - mb;
 				} else {
-					result.type = AT_NEGAT_INT;
-					result.negat_int = ((int64_t)a) + b;
+					result.type = AT_INT;
+					result.v_int64 = ((int64_t)a) + b;
 				}
 				break;
 			case '-':
-				result.type = AT_POSIT_UINT;
-				result.posit_uint = a + mb;
-				if (result.posit_uint < a ||
-				    result.posit_uint < mb)
+				result.type = AT_UINT;
+				result.v_uint64 = a + mb;
+				if (result.v_uint64 < a ||
+				    result.v_uint64 < mb)
 					tnt_raise(ClientError,
 						  ER_UPDATE_INTEGER_OVERFLOW,
 						  opcode, err_fieldno);
 				break;
 			case '*':
-				result.type = AT_NEGAT_INT;
-				result.negat_int = ((int64_t)a) * b;
+				result.type = AT_INT;
+				result.v_int64 = ((int64_t)a) * b;
 				{
 					uint64_t ah = a >> 32,
 						 al = a & 0xFFFFFFFF;
@@ -503,9 +538,9 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 							  ER_UPDATE_INTEGER_OVERFLOW,
 							  opcode, err_fieldno);
 				}
-				if (result.negat_int == 0) {
-					result.type = AT_POSIT_UINT;
-					result.posit_uint = 0;
+				if (result.v_int64 == 0) {
+					result.type = AT_UINT;
+					result.v_uint64 = 0;
 				}
 				break;
 			default:
@@ -516,33 +551,33 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		} else {
 			/* both are negative */
 			assert(test == 0);
-			assert(arg1.type == AT_NEGAT_INT);
-			assert(arg2.type == AT_NEGAT_INT);
-			int64_t a = arg1.negat_int;
-			int64_t b = arg2.negat_int;
+			assert(arg1.type == AT_INT);
+			assert(arg2.type == AT_INT);
+			int64_t a = arg1.v_int64;
+			int64_t b = arg2.v_int64;
 			uint64_t ma = (uint64_t)(-a); /* modulus a */
 			uint64_t mb = (uint64_t)(-b); /* modulus b */
 			switch(opcode) {
 			case '+':
-				result.type = AT_NEGAT_INT;
-				result.negat_int = a + b;
-				if (result.negat_int > a || result.negat_int > b)
+				result.type = AT_INT;
+				result.v_int64 = a + b;
+				if (result.v_int64 > a || result.v_int64 > b)
 					tnt_raise(ClientError,
 						  ER_UPDATE_INTEGER_OVERFLOW,
 						  opcode, err_fieldno);
 				break;
 			case '-':
 				if (a >= b) {
-					result.type = AT_POSIT_UINT;
-					result.posit_uint = (uint64_t)(a - b);
+					result.type = AT_UINT;
+					result.v_uint64 = (uint64_t)(a - b);
 				} else {
-					result.type = AT_NEGAT_INT;
-					result.negat_int = a - b;
+					result.type = AT_INT;
+					result.v_int64 = a - b;
 				}
 				break;
 			case '*':
-				result.type = AT_POSIT_UINT;
-				result.posit_uint = ma * mb;
+				result.type = AT_UINT;
+				result.v_uint64 = ma * mb;
 				{
 					uint64_t ah = ma >> 32,
 						 al = ma & 0xFFFFFFFF;
@@ -566,25 +601,25 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		/* At least one of operands is double or float */
 		double a;
 		if (arg1.type == AT_DOUBLE) {
-			a = arg1.dbl;
+			a = arg1.v_double;
 		} else if (arg1.type == AT_FLOAT) {
-			a = arg1.flt;
-		} else if (arg1.type == AT_POSIT_UINT) {
-			a = arg1.posit_uint;
+			a = arg1.v_float;
+		} else if (arg1.type == AT_UINT) {
+			a = arg1.v_uint64;
 		} else {
-			assert(arg1.type == AT_NEGAT_INT);
-			a = arg1.negat_int;
+			assert(arg1.type == AT_INT);
+			a = arg1.v_int64;
 		}
 		double b;
 		if (arg2.type == AT_DOUBLE) {
-			b = arg2.dbl;
+			b = arg2.v_double;
 		} else if (arg2.type == AT_FLOAT) {
-			b = arg2.flt;
-		} else if (arg2.type == AT_POSIT_UINT) {
-			b = arg2.posit_uint;
+			b = arg2.v_float;
+		} else if (arg2.type == AT_UINT) {
+			b = arg2.v_uint64;
 		} else {
-			assert(arg2.type == AT_NEGAT_INT);
-			b = arg2.negat_int;
+			assert(arg2.type == AT_INT);
+			b = arg2.v_int64;
 		}
 		double c;
 		switch(opcode) {
@@ -599,38 +634,44 @@ make_arith_operation(struct op_arith_arg arg1, struct op_arith_arg arg2,
 		if (lowest_type == AT_DOUBLE) {
 			/* result is DOUBLE */
 			result.type = AT_DOUBLE;
-			result.dbl = c;
+			result.v_double = c;
 		} else {
 			/* result is FLOAT */
 			assert(lowest_type == AT_FLOAT);
 			result.type = AT_FLOAT;
-			result.flt = (float)c;
+			result.v_float = (float)c;
 		}
 	}
 	return result;
 }
 
 static void
-do_op_arith(struct tuple_update *update, struct update_op *op,
-	    const char **expr)
+prepare_op_arith(struct tuple_update *update, struct update_op *op,
+		 const char **expr, struct arith_value *left)
 {
 	op_check_field_no(update, op->field_no, rope_size(update->rope) - 1);
 
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
-
-	struct op_arith_arg *result = &op->arg.arith;
-	*result = mp_read_arith_arg(update, op, expr);
 	if (field->op) {
 		tnt_raise(ClientError, ER_UPDATE_FIELD, update->index_base +
 			  op->field_no, "double update of the same field");
 	}
 	field->op = op;
 	const char *old = field->old;
-	struct op_arith_arg first = mp_read_arith_arg(update, op, &old);
-	*result = make_arith_operation(first, *result, op->opcode,
-				       update->index_base + op->field_no);
-	op->new_field_len = mp_sizeof_arith_arg(*result);
+	*left = mp_read_arith_value(update, op, &old);
+	op->arg.arith = mp_read_arith_value(update, op, expr);
+}
+
+static void
+do_op_arith(struct tuple_update *update, struct update_op *op,
+	    const char **expr)
+{
+	struct arith_value left;
+	prepare_op_arith(update, op, expr, &left);
+	op->arg.arith = make_arith_operation(left, op->arg.arith, op->opcode,
+					     update->index_base + op->field_no);
+	op->new_field_len = mp_sizeof_arith_value(op->arg.arith);
 }
 
 static void
@@ -703,18 +744,18 @@ store_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
 }
 
 static void
-store_op_arith(struct op_arith_arg *arg, const char *in __attribute__((unused)), char *out)
+store_op_arith(struct arith_value *arg, const char *in __attribute__((unused)), char *out)
 {
-	if (arg->type == AT_POSIT_UINT) {
-		mp_encode_uint(out, arg->posit_uint);
-	} else if (arg->type == AT_NEGAT_INT) {
-		assert(arg->negat_int < 0);
-		mp_encode_int(out, arg->negat_int);
+	if (arg->type == AT_UINT) {
+		mp_encode_uint(out, arg->v_uint64);
+	} else if (arg->type == AT_INT) {
+		assert(arg->v_int64 < 0);
+		mp_encode_int(out, arg->v_int64);
 	} else if (arg->type == AT_DOUBLE) {
-		mp_encode_double(out, arg->dbl);
+		mp_encode_double(out, arg->v_double);
 	} else {
 		assert(arg->type == AT_FLOAT);
-		mp_encode_float(out, arg->flt);
+		mp_encode_float(out, arg->v_float);
 	}
 }
 

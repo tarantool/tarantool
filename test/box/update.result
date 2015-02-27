@@ -609,11 +609,11 @@ s:update({0}, {{'+', 2, 1}}) -- ok
 ...
 s:update({0}, {{'+', 2, 1}}) -- overflow
 ---
-- error: 'Error: integer overflow during ''+'' update of field 2'
+- error: Integer overflow when performing '+' operation on field 2
 ...
 s:update({0}, {{'+', 2, 100500}}) -- overflow
 ---
-- error: 'Error: integer overflow during ''+'' update of field 2'
+- error: Integer overflow when performing '+' operation on field 2
 ...
 s:replace{0, 1}
 ---
@@ -621,7 +621,7 @@ s:replace{0, 1}
 ...
 s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''+'' update of field 2'
+- error: Integer overflow when performing '+' operation on field 2
 ...
 s:replace{0, 0xffffffff}
 ---
@@ -633,7 +633,7 @@ s:update({0}, {{'*', 2, 0xffffffff}})  -- ok
 ...
 s:update({0}, {{'*', 2, 2}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, 0xffffffff}
 ---
@@ -649,7 +649,7 @@ s:replace{0, 0xffffffff}
 ...
 s:update({0}, {{'*', 2, 0x100000002ull}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, 0x100000000ull}
 ---
@@ -657,7 +657,7 @@ s:replace{0, 0x100000000ull}
 ...
 s:update({0}, {{'*', 2, 0x100000000ull}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, -1}
 ---
@@ -685,7 +685,7 @@ s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
 ...
 s:update({0}, {{'*', 2, 2}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, -2}
 ---
@@ -693,7 +693,7 @@ s:replace{0, -2}
 ...
 s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''-'' update of field 2'
+- error: Integer overflow when performing '-' operation on field 2
 ...
 s:replace{0, 1}
 ---
@@ -701,7 +701,7 @@ s:replace{0, 1}
 ...
 s:update({0}, {{'-', 2, 0xffffffffffffffffull}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''-'' update of field 2'
+- error: Integer overflow when performing '-' operation on field 2
 ...
 s:replace{0, 0xffffffffffffffefull}
 ---
@@ -713,7 +713,7 @@ s:update({0}, {{'-', 2, -16}})  -- ok
 ...
 s:update({0}, {{'-', 2, -16}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''-'' update of field 2'
+- error: Integer overflow when performing '-' operation on field 2
 ...
 s:replace{0, 0x4000000000000000ull}
 ---
@@ -725,7 +725,7 @@ s:update({0}, {{'*', 2, -2}})  -- ok
 ...
 s:update({0}, {{'*', 2, -2}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, 0x4000000000000001ull}
 ---
@@ -733,7 +733,7 @@ s:replace{0, 0x4000000000000001ull}
 ...
 s:update({0}, {{'*', 2, -2}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, -0x4000000000000000ll}
 ---
@@ -749,7 +749,7 @@ s:replace{0, -0x4000000000000000ll}
 ...
 s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''+'' update of field 2'
+- error: Integer overflow when performing '+' operation on field 2
 ...
 s:replace{0, -0xffffffffll}
 ---
@@ -765,7 +765,7 @@ s:replace{0, 0xffffffff}
 ...
 s:update({0}, {{'*', 2, -0x100000002ll}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:replace{0, 0x100000000ull}
 ---
@@ -773,7 +773,7 @@ s:replace{0, 0x100000000ull}
 ...
 s:update({0}, {{'*', 2, -0x100000000ll}})  -- overflow
 ---
-- error: 'Error: integer overflow during ''*'' update of field 2'
+- error: Integer overflow when performing '*' operation on field 2
 ...
 s:drop()
 ---
