@@ -224,3 +224,36 @@ table.docutils.footnote {
 tr.field td p {
     padding: 0px;
 }
+
+.b-cols_content {
+    width:960px;
+    margin:0 auto;
+    padding:0 0 30px 0;
+}
+.b-cols_content_left {
+    position:relative;
+    float:left;
+    width:295px;
+    padding:30px 0 0 0;
+}
+.b-cols_content_right {
+    float:right;
+    width:100%;
+    margin:0 0 0 -295px;
+}
+.b-cols_content_right-slot {
+    margin:0 0 0 340px;
+    padding:18px 0 0 0;
+}
+
+.p-cols_design .b-wrapper {
+    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAEAAAAAARAQMAAABnOfukAAAABlBMVEUAAAD19fWydBufAAAAAXRSTlMAQObYZgAAADZJREFUaN7t0gEBAAAIAiD/n7YBTRA2kO4InwDruiMIgAAIgAAIgAAIsK47ggAIgAAIgAAIwAHksoxHlAvP9AAAAABJRU5ErkJggg==') 50% -0px repeat-y;
+}
+
+div.highlight {
+    overflow-x: scroll;
+}
+
+div.toctree-wrapper.compound {
+    padding: 20px 0px 0px 0px;
+}
