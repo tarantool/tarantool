@@ -62,13 +62,23 @@ end
 local socket_t = ffi.typeof('struct socket');
 
 local function socket_cdata_gc(socket)
-    ffi.C.close(socket.fd)
+    if socket.fd < 0 then
+        log.error("socket: attempt to double close on gc")
+        return
+    end
+    if ffi.C.close(socket.fd) ~= 0 then
+        log.error("socket: failed to close fd=%d on gc: %s", socket.fd,
+            boxerrno.strerror())
+    end
 end
 
 local function check_socket(self)
     local socket = type(self) == 'table' and self.socket
     if not ffi.istype(socket_t, socket) then
         error('Usage: socket:method()');
+    end
+    if socket.fd < 0 then
+        error("attempt to use closed socket")
     end
     return socket.fd
 end
@@ -83,7 +93,7 @@ local function bless_socket(fd)
         return nil
     end
 
-    local socket = ffi.new(socket_t, fd);
+    local socket = ffi.new(socket_t, { fd = fd });
     ffi.gc(socket, socket_cdata_gc)
     return setmetatable({ socket = socket }, socket_mt)
 end
@@ -295,11 +305,13 @@ socket_methods.close = function(self)
     end
 
     self._errno = nil
-    if ffi.C.close(fd) < 0 then
+    local r = ffi.C.close(fd)
+    self.socket.fd = -1
+    ffi.gc(self.socket, nil)
+    if r ~= 0 then
         self._errno = boxerrno()
         return false
     end
-    ffi.gc(self.socket, nil)
     return true
 end
 
@@ -1000,7 +1012,7 @@ local function tcp_server_loop(server, s, addr)
         if sc == nil then
             local errno = s:errno()
             if not errno_is_transient[errno] then
-                log.error('accept('..s..') failed: '..s:error())
+                log.error('accept(%s) failed: %s', tostring(s), s:error())
             end
             if  errno_is_fatal[errno] then
                 break
