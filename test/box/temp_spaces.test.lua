@@ -2,21 +2,21 @@
 _space = box.space._space
 -- not a temporary
 FLAGS = 6
-s = box.schema.create_space('t', { temporary = true })
+s = box.schema.space.create('t', { temporary = true })
 s.temporary
 s:drop()
 
 -- not a temporary, too
-s = box.schema.create_space('t', { temporary = false })
+s = box.schema.space.create('t', { temporary = false })
 s.temporary
 s:drop()
 
 -- not a temporary, too
-s = box.schema.create_space('t', { temporary = nil })
+s = box.schema.space.create('t', { temporary = nil })
 s.temporary
 s:drop()
 
-s = box.schema.create_space('t', { temporary = true })
+s = box.schema.space.create('t', { temporary = true })
 index = s:create_index('primary', { type = 'hash' })
 
 s:insert{1, 2, 3}

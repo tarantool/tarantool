@@ -6,6 +6,7 @@
 #include <box/lua/index.h>
 #include <box/lua/tuple.h>
 #include <box/lua/call.h>
+#include <box/sophia_engine.h>
 #include <lua/init.h>
 #include <tarantool.h>
 #include "lua/bsdsocket.h"
@@ -60,5 +61,6 @@ void *ffi_symbols[] = {
 	(void *) guava,
 	(void *) random_bytes,
 	(void *) fiber_time,
-	(void *) fiber_time64
+	(void *) fiber_time64,
+	(void *) sophia_schedule
 };

@@ -1,8 +1,9 @@
 
 -- insert
 
-space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+sophia_dir()[1]
 for key = 1, 132 do space:insert({key}) end
 t = {}
 for key = 1, 132 do table.insert(t, space:get({key})) end
@@ -44,9 +45,6 @@ index:select(7,  {iterator = box.index.LE})
 index:select({}, {iterator = box.index.LT})
 index:select(7,  {iterator = box.index.LT})
 
--- random
-
-dofile('index_random_test.lua')
-index_random_test(space, 'primary')
-
 space:drop()
+sophia_schedule()
+sophia_dir()[1]

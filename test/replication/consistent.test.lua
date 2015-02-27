@@ -43,7 +43,7 @@ a = box.net.box.new('127.0.0.1', replica_port)
 a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
-s = box.schema.create_space('tweedledum', {id = 0});
+s = box.schema.space.create('tweedledum', {id = 0});
 index = s:create_index('primary', {type = 'hash'})
 _insert(1, 10, 'master')
 _select(1, 10)

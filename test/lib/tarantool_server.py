@@ -378,6 +378,8 @@ class TarantoolServer(Server):
         ini.update(_ini)
         Server.__init__(self, ini)
         self.testdir = os.path.abspath(os.curdir)
+        self.sourcedir = os.path.abspath(os.path.join(os.path.basename(
+            sys.argv[0]), "..", ".."))
         self.re_vardir_cleanup += [
             "*.snap", "*.xlog", "*.inprogress",
             "*.sup", "*.lua", "*.pid"]

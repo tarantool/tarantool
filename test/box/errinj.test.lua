@@ -1,6 +1,6 @@
 errinj = require('box.error.injection')
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
 errinj.info()
@@ -46,16 +46,16 @@ space:truncate()
 space:drop()
 
 -- Check how well we handle a failed log write in DDL
-s_disabled = box.schema.create_space('disabled')
-s_withindex = box.schema.create_space('withindex')
+s_disabled = box.schema.space.create('disabled')
+s_withindex = box.schema.space.create('withindex')
 index1 = s_withindex:create_index('primary', { type = 'hash' })
-s_withdata = box.schema.create_space('withdata')
+s_withdata = box.schema.space.create('withdata')
 index2 = s_withdata:create_index('primary', { type = 'tree' })
 s_withdata:insert{1, 2, 3, 4, 5}
 s_withdata:insert{4, 5, 6, 7, 8}
 index3 = s_withdata:create_index('secondary', { type = 'hash', parts = {2, 'num', 3, 'num' }})
 errinj.set("ERRINJ_WAL_IO", true)
-test = box.schema.create_space('test')
+test = box.schema.space.create('test')
 s_disabled:create_index('primary', { type = 'hash' })
 s_disabled.enabled
 s_disabled:insert{0}
@@ -68,7 +68,7 @@ box.space['withdata'].enabled
 index4 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
 s_withdata.index.another
 errinj.set("ERRINJ_WAL_IO", false)
-test = box.schema.create_space('test')
+test = box.schema.space.create('test')
 index5 = s_disabled:create_index('primary', { type = 'hash' })
 s_disabled.enabled
 s_disabled:insert{0}

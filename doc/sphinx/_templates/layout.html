@@ -1,0 +1,74 @@
+{% extends "base" %}
+{% import "breadcrumbs" as breadcrumbs with context %}
+{% import "navbar" as navbar with context %}
+
+{% block header_scripts %}
+  <link rel="stylesheet" href="/doc/_static/sphinx_design.css" />
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+  <script>
+  $(document).ready(function () {
+    $("div>h1").remove();
+    $("h2, h3, h4, h5, h6").each(
+      function(i, el) {
+        var icon = '<i class="fa fa-link"></i>';
+        var hlink = $(el).find(".headerlink");
+        var hlink_id = hlink.attr("href");
+        if (typeof(hlink_id) != 'undefined') {
+          $(hlink).remove();
+          $(el).prepend($("<a />").addClass("headerlink").attr("href", hlink_id).html(icon));
+        }
+      }
+    )
+  });
+  </script>
+  {{ super() }}
+{% endblock header_scripts %}
+
+
+{% if title != 'Documentation' %}
+{% set render_sidebar = true %}
+{% endif %}
+
+{% block content %}
+{% if render_sidebar %}
+<section class="b-lightgray_block b-documentation_top b-clearbox p-documentation_in">
+{% else %}
+<section class="b-lightgray_block b-documentation_top b-clearbox">
+{% endif %}
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">{{ title }}</h2>
+    <!--div class="b-search">
+      <input class="b-search-text" data-placeholder="Search in documentation" />
+      <input class="b-search-but" type="submit" />
+    </div-->
+  </div>
+</section>
+{% if render_sidebar %}
+<div class="b-cols_content b-clearbox">
+  <div class="b-cols_content_left">
+    {{ toctree(maxdepth=2) }}
+    {% block sidebar %} {% endblock %}
+  </div>
+  <div class="b-cols_content_right">
+    <div class="b-cols_content_right-slot">
+      {{ breadcrumbs.breadcrumbs() }}
+      <!--{{ navbar.navbar(True) }}-->
+{% else %}
+<section class="b-block b-documentation">
+  <div class="b-block-wrapper">
+{% endif %}
+      <article class="b-article">
+        {% block body %} {% endblock %}
+      </article>
+{% if render_sidebar %}
+    {{ navbar.navbar(False) }}
+    </div>
+  </div>
+</div>
+{% else %}
+  </div>
+</section>
+{% endif %}
+{% endblock content%}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

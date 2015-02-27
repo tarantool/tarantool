@@ -1,6 +1,6 @@
 errinj = require('box.error.injection')
 
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 
 s:create_index('primary')
 s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})

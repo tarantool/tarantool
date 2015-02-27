@@ -1,0 +1,55 @@
+box.cfg.wal_mode
+---
+- none
+...
+space = box.schema.space.create('tweedledum')
+---
+...
+index = space:create_index('primary', { type = 'hash' })
+---
+...
+space:insert{1}
+---
+- [1]
+...
+space:insert{2}
+---
+- [2]
+...
+space:insert{3}
+---
+- [3]
+...
+space.index['primary']:get(1)
+---
+- [1]
+...
+space.index['primary']:get(2)
+---
+- [2]
+...
+space.index['primary']:get(3)
+---
+- [3]
+...
+space.index['primary']:get(4)
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.snapshot()
+---
+- error: can't save snapshot, errno 17 (File exists)
+...
+space:truncate()
+---
+...
+box.snapshot()
+---
+- ok
+...
+space:drop()
+---
+...

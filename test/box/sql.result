@@ -1,4 +1,4 @@
-function f() box.schema.create_space('test', { id = 0 }) end
+function f() box.schema.space.create('test', { id = 0 }) end
 ---
 ...
 box.schema.user.create('test', { password = 'test' })

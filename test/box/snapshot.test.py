@@ -3,7 +3,7 @@ import yaml
 import time
 from signal import SIGUSR1
 
-admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+admin("space = box.schema.space.create('tweedledum', { id = 0 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
 
 print """#

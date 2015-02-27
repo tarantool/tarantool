@@ -111,9 +111,8 @@ SophiaEngine::SophiaEngine()
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
 {
-	flags = ENGINE_TRANSACTIONAL;
+	flags = 0;
 	env = NULL;
-	tx  = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
 	recovery.replace = sophia_replace_recover;
@@ -177,41 +176,26 @@ SophiaEngine::createIndex(struct key_def *key_def)
 	}
 }
 
-static inline int
-drop_repository(char *path)
-{
-	DIR *dir = opendir(path);
-	if (dir == NULL)
-		return -1;
-	char file[1024];
-	struct dirent *de;
-	while ((de = readdir(dir))) {
-		if (de->d_name[0] == '.')
-			continue;
-		snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
-		int rc = unlink(file);
-		if (rc == -1) {
-			closedir(dir);
-			return -1;
-		}
-	}
-	closedir(dir);
-	return rmdir(path);
-}
-
 void
 SophiaEngine::dropIndex(Index *index)
 {
 	SophiaIndex *i = (SophiaIndex*)index;
-	int rc = sp_destroy(i->db);
+	/* schedule asynchronous drop */
+	int rc = sp_drop(i->db);
+	if (rc == -1)
+		sophia_raise(env);
+	/* unref db object */
+	rc = sp_destroy(i->db);
+	if (rc == -1)
+		sophia_raise(env);
+	/* maybe start asynchronous database
+	 * shutdown: last snapshot might hold a
+	 * db pointer. */
+	rc = sp_destroy(i->db);
 	if (rc == -1)
 		sophia_raise(env);
 	i->db  = NULL;
 	i->env = NULL;
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%" PRIu32,
-	         cfg_gets("sophia_dir"), index->key_def->space_id);
-	drop_repository(path);
 }
 
 void
@@ -258,54 +242,55 @@ SophiaEngine::begin(struct txn *txn, struct space *space)
 {
 	assert(space->handler->engine == this);
 	if (txn->n_stmts == 1) {
-		assert(tx == NULL);
+		assert(txn->engine_tx == NULL);
 		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 		(void) index;
 		assert(index->db != NULL);
-		tx = sp_begin(env);
-		if (tx == NULL)
+		txn->engine_tx = sp_begin(env);
+		if (txn->engine_tx == NULL)
 			sophia_raise(env);
 		return;
 	}
-	assert(tx != NULL);
+	assert(txn->engine_tx != NULL);
 }
 
 void
 SophiaEngine::commit(struct txn *txn)
 {
-	if (tx == NULL)
+	if (txn->engine_tx == NULL)
 		return;
 	/* free involved tuples */
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (! stmt->new_tuple)
 			continue;
-		assert(stmt->new_tuple->refs >= 2);
+		assert(stmt->new_tuple->refs >= 1 &&
+		       stmt->new_tuple->refs < UINT8_MAX);
 		tuple_unref(stmt->new_tuple);
 	}
 	auto scoped_guard = make_scoped_guard([=] {
-		tx = NULL;
+		txn->engine_tx = NULL;
 	});
 	/* commit transaction using transaction
 	 * commit signature */
 	assert(txn->signature >= 0);
-	int rc = sp_prepare(tx, txn->signature);
+	int rc = sp_prepare(txn->engine_tx, txn->signature);
 	assert(rc == 0);
 	if (rc == -1)
 		sophia_raise(env);
-	rc = sp_commit(tx);
+	rc = sp_commit(txn->engine_tx);
 	if (rc == -1)
 		sophia_raise(env);
 	assert(rc == 0);
 }
 
 void
-SophiaEngine::rollback(struct txn *)
+SophiaEngine::rollback(struct txn *txn)
 {
-	if (tx == NULL)
+	if (txn->engine_tx == NULL)
 		return;
-	sp_rollback(tx);
-	tx = NULL;
+	sp_destroy(txn->engine_tx);
+	txn->engine_tx = NULL;
 }
 
 static inline void
@@ -436,4 +421,12 @@ SophiaEngine::abort_checkpoint()
 		sophia_delete_checkpoint(env, m_checkpoint_lsn);
 		m_checkpoint_lsn = -1;
 	}
+}
+
+int sophia_schedule(void)
+{
+	SophiaEngine *engine = (SophiaEngine *)engine_find("sophia");
+	assert(engine->env != NULL);
+	void *c = sp_ctl(engine->env);
+	return sp_set(c, "scheduler.run");
 }

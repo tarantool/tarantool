@@ -1,7 +1,7 @@
 dofile('utils.lua')
 ---
 ...
-hash = box.schema.create_space('tweedledum')
+hash = box.schema.space.create('tweedledum')
 ---
 ...
 tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num', 2, 'str', 3, 'num'}, unique = true })

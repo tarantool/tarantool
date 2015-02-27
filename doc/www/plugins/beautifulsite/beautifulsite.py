@@ -9,7 +9,7 @@ import itertools
 
 import re
 import yaml
-import docutils
+import docutils.core
 import collections
 
 from BeautifulSoup import BeautifulSoup as BSHTML

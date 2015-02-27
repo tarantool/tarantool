@@ -1,4 +1,4 @@
-s = box.schema.create_space('select', { temporary = true })
+s = box.schema.space.create('select', { temporary = true })
 ---
 ...
 index1 = s:create_index('primary', { type = 'tree' })
@@ -538,7 +538,7 @@ s:select(2)
 s:drop()
 ---
 ...
-s = box.schema.create_space('select', { temporary = true })
+s = box.schema.space.create('select', { temporary = true })
 ---
 ...
 index = s:create_index('primary', { type = 'tree' })

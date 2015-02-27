@@ -68,7 +68,7 @@ sql("call f3()")
 sql("call f1('jason')")
 sql("call f1('jason', 1, 'test', 2, 'stewart')")
 
-admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+admin("space = box.schema.space.create('tweedledum', { id = 0 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
 
 admin("function myreplace(...) return space:replace{...} end")
@@ -122,7 +122,7 @@ sql("call field_x(4, 2)")
 sql("call space:delete(4)")
 admin("space:drop()")
 
-admin("space = box.schema.create_space('tweedledum')")
+admin("space = box.schema.space.create('tweedledum')")
 admin("index = space:create_index('primary', { type = 'tree' })")
 
 

@@ -36,7 +36,7 @@ replica.uri = '%s:%s@%s' % (LOGIN, PASSWORD, replica.sql.uri)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.sql.py_con.authenticate(LOGIN, PASSWORD)
 
-master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
+master.admin("s = box.schema.space.create('tweedledum', {id = 0})")
 master.admin("index = s:create_index('primary', {type = 'hash'})")
 
 ### gh-343: replica.cc must not add login and password to proc title

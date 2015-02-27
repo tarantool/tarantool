@@ -21,7 +21,7 @@ tarantool> <userinput>f1()</userinput>
 </programlisting>
       In the above example, the requests are being handled in interactive mode
       for evaluation as a chunk of Lua code.
-    </para>
+    </para> 
     <para>
       Thus, the request "<code>function f1() return 'hello' end</code>"
       causes definition of the Lua function which will be identified as f1().
@@ -630,7 +630,7 @@ tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
 <programlisting>tarantool&gt; <userinput>json=require('json')</userinput>
 ---
 ...
- tarantool&gt; <userinput>json.decode('123')</userinput>
+tarantool&gt; <userinput>json.decode('123')</userinput>
 ---
 - 123
 ...
@@ -1220,7 +1220,7 @@ Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fiber_of_:cancel()</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_x:cancel()</userinput>
 ... fiber `lua' has been cancelled
 ... fiber `lua': exiting
 ---
@@ -2259,21 +2259,21 @@ but shows that the system works.
         Returns: (type = table) fields which describe the file's block size, creation time, size, and other attributes.
       </para>
      <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>fio.lstat('/tarantool-master/src/tarantool')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>fio.lstat('/etc')</userinput>
 ---
-- inode: 739885
+- inode: 1048577
   rdev: 0
-  size: 4516886
-  atime: 1409423158
-  mode: 33277
-  mtime: 1409419499
-  nlink: 1
-  uid: 1000
+  size: 12288
+  atime: 1421340698
+  mode: 16877
+  mtime: 1424615337
+  nlink: 160
+  uid: 0
   blksize: 4096
-  gid: 1000
-  ctime: 1409419499
+  gid: 0
+  ctime: 1424615337
   dev: 2049
-  blocks: 8848
+  blocks: 24
 ...
 </programlisting>
   </listitem>
@@ -2850,7 +2850,7 @@ less tarantool.txt
            Parameters: (type = string) test-name = an arbitrary name to give for the test outputs.
          </para>
          <para>
-          Example: <code>tap = require('tap') taptest = tap.test('test-name')</code>.
+          Example: <code><userinput>tap = require('tap') taptest = tap.test('test-name')</userinput></code>.
          </para>
        </listitem>
     </varlistentry>
@@ -3086,14 +3086,14 @@ ok - some subtests for test2
 tarantool> <userinput>type(123456789012345), type(tonumber64(123456789012345))</userinput>
 ---
 - number
-- cdata
+- number
 ...
 tarantool> <userinput>i = tonumber64('1000000000')</userinput>
 ---
 ...
 tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinput>
 ---
- - cdata
+ - number
  - 500000000
  - 999999998
  - 2000000000
@@ -3317,12 +3317,6 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 <prompt>tarantool></prompt> <userinput>num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',</userinput>
 <prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
 ---
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
----
-- 666
-- string
-- 666666666666666
 ...
 <prompt>tarantool></prompt> <userinput>console.delimiter('') -- back to normal: commands end with line feed!</userinput>
 </programlisting>

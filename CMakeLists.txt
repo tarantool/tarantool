@@ -44,7 +44,6 @@ include(GNUInstallDirs)
 
 include(cmake/utils.cmake)
 include(cmake/pod2man.cmake)
-
 # the order is significant: we need to know os and compiler to configure libs
 include(cmake/arch.cmake)
 include(cmake/os.cmake)
@@ -52,6 +51,7 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/profile.cmake)
 include(cmake/FindReadline.cmake)
+include(cmake/FindSphinx.cmake)
 include(cmake/systemd.cmake)
 
 if (NOT READLINE_FOUND)

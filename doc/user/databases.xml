@@ -343,7 +343,7 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
               Possible errors: If a tuple with the same unique-key value already exists, returns ER_TUPLE_FOUND.
             </para>
             <para>
-              Example: <code>box.space.tester:insert{5000,'tuple number five thousand'}</code>.
+             Example: <code><userinput>box.space.tester:insert{5000,'tuple number five thousand'}</userinput></code>.
             </para>
         </listitem>
     </varlistentry>
@@ -455,7 +455,7 @@ tarantool&gt; <userinput> s:select{}      -- must equal 0 fields, so returns all
                shorthand.
              </para>
             <para>
-              Example: <code>box.space.tester:get{1}</code>.
+             Example: <code><userinput>box.space.tester:get{1}</userinput></code>
             </para>
         </listitem>
     </varlistentry>
@@ -641,7 +641,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
               Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
             </para>
             <para>
-              Example: <code>box.space.tester:replace{5000,'New value'}</code>.
+             Example: <code><userinput>box.space.tester:replace{5000,'New value'}</userinput></code>
             </para>
         </listitem>
     </varlistentry>
@@ -696,6 +696,9 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                </para>
                <para>
                Returns: (type = tuple) the updated tuple.
+              </para>
+              <para>
+               Possible errors: it is illegal to modify a primary-key field.
               </para>
             <para>
               Complexity Factors: Index size, Index type, number of indexes accessed, WAL settings.
@@ -859,7 +862,7 @@ tarantool> <userinput>box.space.tester:delete('a')</userinput>
 ---
 - 512
 - 0
-- HASH
+- TREE
 ...
 </programlisting>
             </para>
@@ -1091,7 +1094,8 @@ console.delimiter('')!</programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
 - - 'cluster 1ec4e1f8-8f1b-4304-bb22-6c47ce0cf9c6 '
-- - 'version 1 6 '
+  - 'max_id 520 '
+  - 'version 1 6 '
 ...
 </programlisting>
             </para>
@@ -1109,14 +1113,19 @@ console.delimiter('')!</programlisting>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-              The following function will display all fields in all tuples of _space.
+              The following function will display all simple fields in all tuples of _space.
 <programlisting>console = require('console'); console.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._space:pairs() do
     i = 1
     line = ''
-    while i &lt;= #v do line = line .. v[i] .. ' ' i = i + 1 end
+    while i &lt;= #v do
+      if type(v[i]) ~= 'table' then
+        line = line .. v[i] .. ' '
+      end
+      i = i + 1
+    end
     table.insert(ta, line)
   end
   return ta
@@ -1126,14 +1135,16 @@ console.delimiter('')!</programlisting>
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
-- - '33 0 tester sophia 0  '
-  - '272 1 _schema memtx 0 '
-  - '280 1 _space memtx 0 '
-  - '288 1 _index memtx 0 '
-  - '296 1 _func memtx 0 '
-  - '304 1 _user memtx 0 '
-  - '312 1 _priv memtx 0 '
-  - '320 1 _cluster memtx 0 '
+- - '272 1 _schema memtx 0  '
+  - '280 1 _space memtx 0  '
+  - '288 1 _index memtx 0  '
+  - '296 1 _func memtx 0  '
+  - '304 1 _user memtx 0  '
+  - '312 1 _priv memtx 0  '
+  - '320 1 _cluster memtx 0  '
+  - '512 1 tester memtx 0  '
+  - '513 1 origin sophia 0  '
+  - '514 1 archive memtx 0  '
 ...
 </programlisting>
             </para>
@@ -1179,13 +1190,17 @@ console.delimiter('')!</programlisting>
   - '296 1 owner tree 0 1 1 num '
   - '296 2 name tree 1 1 2 str '
   - '304 0 primary tree 1 1 0 num '
+  - '304 1 owner tree 0 1 1 num '
   - '304 2 name tree 1 1 2 str '
   - '312 0 primary tree 1 3 1 num 2 str 3 num '
-  - '312 1 owner tree 0 1 1 num '
+  - '312 1 owner tree 0 1 0 num '
+  - '312 2 object tree 0 2 2 str 3 num '
   - '320 0 primary tree 1 1 0 num '
   - '320 1 uuid tree 1 1 1 str '
-...  
-</programlisting>
+  - '512 0 primary tree 1 1 0 num '
+  - '513 0 first tree 1 1 0 NUM '
+  - '514 0 first tree 1 1 0 STR '
+...</programlisting>
             </para>
         </listitem>
     </varlistentry>
@@ -1268,14 +1283,19 @@ console.delimiter('')!
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
-- - space1 tuple_count =0
-  - tester tuple_count =3. first field in first tuple = 1
-  - _schema tuple_count =1. first field in first tuple = version
-  - _space tuple_count =7. first field in first tuple = 33
-  - _index tuple_count =13. first field in first tuple = 272
-  - _func tuple_count =0
-  - _user tuple_count =2. first field in first tuple = 0
-  - _priv tuple_count =0
+- - _schema tuple_count =3. first field in first tuple = cluster
+  - _space tuple_count =15. first field in first tuple = 272
+  - _index tuple_count =25. first field in first tuple = 272
+  - _func tuple_count =1. first field in first tuple = 1
+  - _user tuple_count =4. first field in first tuple = 0
+  - _priv tuple_count =6. first field in first tuple = 1
+  - _cluster tuple_count =1. first field in first tuple = 1
+  - tester tuple_count =2. first field in first tuple = 1
+  - origin tuple_count =0
+  - archive tuple_count =13. first field in first tuple = test_0@tarantool.org
+  - space55 tuple_count =0
+  - tmp tuple_count =0
+  - forty_second_space tuple_count =1. first field in first tuple = 1
 ...
 </programlisting>
 </para>
@@ -1339,7 +1359,6 @@ console.delimiter('')!
   space_id: 513
   name: primary
   type: TREE
-  etc.
 ...</programlisting></listitem>
     </varlistentry>
 
@@ -2081,45 +2100,12 @@ tarantool&gt; <userinput>t:transform(2,2,'x')</userinput>
 
     <varlistentry>
         <term>
-         <emphasis role="lua"><replaceable>tuple-value</replaceable>:slice(<replaceable>start-field-number [, end-field-number]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:slice(<replaceable>n</replaceable>)</code>
-              will return all fields starting with field number n, and
-              <code>t:slice(<replaceable>n1</replaceable>,<replaceable>n2</replaceable>)</code>
-              will return all fields starting with field number n1, but
-              stopping <emphasis>before</emphasis> field number n2.
-              In the following example, a tuple named t is created
-              and then, starting from the second field, fields before the fourth field are selected,
-              then the result is returned.
-            </para>
-            <para>
-              Parameters: <code>start-field-number</code> = base 1, may be negative, <code>end-field-number</code> = optional, base 1, may be negative.
-              Negative values are counted from the end, for example -2 means the second-last field.
-            </para>
-            <para>
-              Returns: (type = scalar) one or more field values.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
----
-...
-tarantool&gt; <userinput>t:slice(2, 4)</userinput>
----
- - Fld#2
- - Fld#3
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
             <emphasis role="lua"><replaceable>tuple-value</replaceable>:unpack()</emphasis>
         </term>
         <listitem>
             <para>
               If t is a tuple instance, <code>t:unpack(<replaceable>n</replaceable>)</code>
-              will return all fields. In effect, <code>unpack()</code> is the same as <code>slice(1, -1)</code>.
+              will return all fields.
             </para>
             <para>
               Returns: (type = scalar) field(s) from the tuple.
@@ -2341,24 +2327,19 @@ tarantool> <userinput>box.cfg</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool> <userinput>box.info()</userinput>
----
 - server:
-    lsn: 0
+    lsn: 158
     ro: false
-    uuid: 137128fb-addd-41ee-9f9a-7d6deaef61e7
+    uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64
     id: 1
-  version: 1.6.3-439-g7e1011b
-  status: running
-  vclock:
-  - 0
-  pid: 21740
-  recovery_last_update: 0
-  recovery_lag: 0
-  logger_pid: 0
-  uptime: 2880
+  pid: 32561
+  version: 1.6.4-411-gcff798b
   snapshot_pid: 0
-  build:
-    [ build flags and options are omitted from this example ]
+  status: running
+  vclock: {1: 158}
+  replication:
+    status: off
+  uptime: 2778
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -2378,7 +2359,7 @@ tarantool> <userinput>box.info.logger_pid</userinput>
 ...
 tarantool> <userinput>box.info.version</userinput>
 ---
-- 1.6.3-439-g7e1011b
+- 1.6.4-411-gcff798b
 ...
 tarantool> <userinput>box.info.uptime</userinput>
 ---
@@ -2399,16 +2380,6 @@ tarantool> <userinput>box.info.recovery_last_update</userinput>
 tarantool> <userinput>box.info.snapshot_pid</userinput>
 ---
  - 0
-...
-tarantool> <userinput>box.info.build</userinput>
----
-- flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
-         -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
-         -Wno-strict-aliasing -fopenmp -pthread'
-  target: Linux-x86_64-Debug
-  compiler: /usr/bin/cc /usr/bin/c++
-  options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
-    -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
 ...
 </programlisting>
         </listitem>
@@ -2457,16 +2428,16 @@ tarantool&gt; <userinput>box.slab.info().arena_size</userinput>
 ...
 tarantool&gt; <userinput>box.slab.info().slabs</userinput>
 ---
- 64
- 128
+- - {mem_free: 9320, mem_used: 6976, 'item_count': 109, 'item_size': 64, 'slab_count': 1,
+    'slab_size': 16384}
+  - {mem_free: 16224, mem_used: 72, 'item_count': 1, 'item_size': 72, 'slab_count': 1,
+    'slab_size': 16384}
+  etc.
 ...
-tarantool&gt; <userinput>box.slab.info().slabs[64]</userinput>
+tarantool&gt; <userinput>box.slab.info().slabs[1]</userinput>
 ---
- items: 1
- bytes_used: 160
- item_size: 64
- slabs: 1
- bytes_free: 4194144
+- {mem_free: 9320, mem_used: 6976, 'item_count': 109, 'item_size': 64, 'slab_count': 1,
+  'slab_size': 16384}
 ...
 </programlisting></listitem>
     </varlistentry>
@@ -2494,6 +2465,9 @@ tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
 - DELETE:
     total: 48902544
     rps: 147
+  EVAL:
+    total: 0
+    rps: 0
   SELECT:
     total: 388322317
     rps: 1246
@@ -2515,7 +2489,7 @@ tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
 ...
 tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
 ---
-- total: 33
+- total: 48902544
   rps: 0
 ...
 </programlisting></listitem>
@@ -2597,8 +2571,8 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
                Returns: (type = userdata) conn object).
             </para>
             <para>
-               Examples: <code>conn = net_box:new('localhost', 3301)</code>,
-               <code>conn = net_box:new('127.0.0.1', box.cfg.listen, {wait_connect = false, user = 'guest', password = ''})</code>.
+             Examples: <code><userinput>conn = net_box:new('localhost', 3301)</userinput></code>,
+             <code><userinput>conn = net_box:new('127.0.0.1', box.cfg.listen, {wait_connect = false, user = 'guest', password = ''})</userinput></code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2612,7 +2586,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
             </para>
             <para>
                Returns: (type = boolean) <code>true</code> on success,
-               <code>false</code> on error. Example: <code>net_box.self:ping()</code>.
+               <code>false</code> on error. Example: <code><userinput>net_box.self:ping()</userinput></code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2626,7 +2600,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
             </para>
             <para>
                Returns: (type = boolean) <code>true</code> when connected,
-               <code>false</code> on failure. Example: <code>net_box.self:wait_connected()</code>.
+               <code>false</code> on failure. Example: <code><userinput>net_box.self:wait_connected()</userinput></code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2647,7 +2621,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
               stalls of the garbage collector.
             </para>
             <para>
-              Example: <code>conn:close()</code>.
+             Example: <code><userinput>conn:close()</userinput></code>. 
             </para>
         </listitem>
     </varlistentry>
@@ -2719,7 +2693,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
               That is, conn:call is a remote stored-procedure call.
             </para>
             <para>
-              Example: <code>conn:call('box.space.tester:insert',{2})</code>.
+             Example: <code><userinput>conn:call('function5')</userinput></code>.
             </para>
         </listitem>
     </varlistentry>

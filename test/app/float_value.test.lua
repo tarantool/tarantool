@@ -14,7 +14,7 @@ box.cfg{
 if box.space.space1 ~= nil then
     box.space.space1:drop()
 end
-s = box.schema.create_space('space1')
+s = box.schema.space.create('space1')
 s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 
 t = {}

@@ -1,13 +1,18 @@
 
 -- snapshot
 
-space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
+os.execute("touch mt")
+
+--# stop server default
+--# start server default
+
+space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
-sophia_printdir()
 
 for key = 1, 351 do space:insert({key}) end
 box.snapshot()
 
+os.execute("rm -f mt")
 os.execute("touch lock")
 
 --# stop server default

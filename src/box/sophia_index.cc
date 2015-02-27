@@ -33,6 +33,7 @@
 #include "errinj.h"
 #include "schema.h"
 #include "space.h"
+#include "txn.h"
 #include "cfg.h"
 #include "sophia_engine.h"
 #include <sys/stat.h>
@@ -83,15 +84,15 @@ sophia_replace_recover(struct space *space,
                        enum dup_replace_mode)
 {
 	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
-	SophiaEngine *engine = (SophiaEngine *)space->handler->engine;
-	assert(engine->tx != NULL);
+	struct txn *txn = in_txn();
+	assert(txn != NULL && txn->engine_tx != NULL);
 	int rc;
 	if (old_tuple) {
-		rc = sophia_index_stmt(engine->tx, index->db, 1,
+		rc = sophia_index_stmt(txn->engine_tx, index->db, 1,
 		                       index->key_def,
 		                       old_tuple);
 	} else {
-		rc = sophia_index_stmt(engine->tx, index->db, 0,
+		rc = sophia_index_stmt(txn->engine_tx, index->db, 0,
 		                       index->key_def,
 		                       new_tuple);
 	}
@@ -213,11 +214,8 @@ SophiaIndex::random(uint32_t rnd) const
 	struct space *space = space_cache_find(key_def->space_id);
 	int valuesize;
 	void *value = sp_get(o, "value", &valuesize);
-	struct tuple *ret =
-		tuple_new(space->format, (char*)value,
-		          (char*)value + valuesize);
-	tuple_ref(ret);
-	return ret;
+	return tuple_new(space->format, (char*)value,
+	                 (char*)value + valuesize);
 }
 
 size_t
@@ -268,9 +266,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
                      enum dup_replace_mode mode)
 {
 	struct space *space = space_cache_find(key_def->space_id);
-	SophiaEngine *engine =
-		(SophiaEngine *)space->handler->engine;
-	assert(engine->tx != NULL);
+	struct txn *txn = in_txn();
+	assert(txn != NULL && txn->engine_tx != NULL);
 
 	/* do not involve in tarantool transaction regarding old_tuple,
 	 * always return NULL.
@@ -280,7 +277,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	int rc;
 	if (old_tuple && new_tuple == NULL) {
 		assert(old_tuple != NULL);
-		rc = sophia_index_stmt(engine->tx, db, 1, key_def, old_tuple);
+		rc = sophia_index_stmt(txn->engine_tx, db, 1, key_def,
+				       old_tuple);
 		if (rc == -1)
 			sophia_raise(env);
 		return NULL;
@@ -289,7 +287,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	/* update */
 	if (old_tuple && new_tuple) {
 		/* assume no primary key update is supported */
-		rc = sophia_index_stmt(engine->tx, db, 0, key_def, new_tuple);
+		rc = sophia_index_stmt(txn->engine_tx, db, 0, key_def,
+				       new_tuple);
 		if (rc == -1)
 			sophia_raise(env);
 		return NULL;
@@ -303,7 +302,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		mp_next(&keyptr);
 		size_t keysize = keyptr - key;
 		struct tuple *dup_tuple =
-			sophia_index_get(env, db, engine->tx, key, keysize, space->format);
+			sophia_index_get(env, db, txn->engine_tx, key,
+					 keysize, space->format);
 		if (dup_tuple) {
 			tuple_ref(dup_tuple);
 			int error = 0;
@@ -316,7 +316,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		}
 	}
 	case DUP_REPLACE_OR_INSERT:
-		rc = sophia_index_stmt(engine->tx, db, 0, key_def, new_tuple);
+		rc = sophia_index_stmt(txn->engine_tx, db, 0, key_def,
+				       new_tuple);
 		if (rc == -1)
 			sophia_raise(env);
 		break;
@@ -372,10 +373,7 @@ sophia_iterator_next(struct iterator *ptr)
 		return NULL;
 	int valuesize = 0;
 	const char *value = (const char*)sp_get(o, "value", &valuesize);
-	struct tuple *ret =
-		tuple_new(it->space->format, value, value + valuesize);
-	tuple_ref(ret);
-	return ret;
+	return tuple_new(it->space->format, value, value + valuesize);
 }
 
 struct tuple *
@@ -390,12 +388,8 @@ sophia_iterator_eq(struct iterator *ptr)
 	ptr->next = sophia_iterator_last;
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	struct tuple *tuple =
-		sophia_index_get(it->env, it->db, it->tx, it->key, it->keysize,
-	                     it->space->format);
-	if (tuple)
-		tuple_ref(tuple);
-	return tuple;
+	return sophia_index_get(it->env, it->db, it->tx, it->key, it->keysize,
+	                        it->space->format);
 }
 
 struct iterator *
@@ -438,16 +432,11 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	it->db = db;
 	it->space = space_cache_find(key_def->space_id);
 	it->tx = NULL;
-	SophiaEngine *engine =
-		(SophiaEngine *)it->space->handler->engine;
-	/*
-	it->tx = engine->tx;
-	*/
 	const char *compare;
 	switch (type) {
 	case ITER_EQ:
 		it->base.next = sophia_iterator_eq;
-		it->tx = engine->tx;
+		it->tx = in_txn() ? in_txn()->engine_tx : NULL;
 		return;
 	case ITER_ALL:
 	case ITER_GE: compare = ">=";

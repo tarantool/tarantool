@@ -1,8 +1,6 @@
 
 function index_random_test(space, index_no)
 	local COUNT = 1028
-	-- clear the space
-	space:truncate()
 	-- randomize
 	math.randomseed(os.time())
 	-- insert values into the index

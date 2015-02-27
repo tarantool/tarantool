@@ -1,4 +1,4 @@
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 _ = s:create_index('primary')
 spatial = s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
 

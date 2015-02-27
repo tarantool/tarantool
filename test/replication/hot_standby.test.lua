@@ -60,7 +60,7 @@ box.info.status
 --# set connection default
 box.info.status
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
 -- set begin lsn on master, replica and hot_standby.

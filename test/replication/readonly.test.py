@@ -38,7 +38,7 @@ replica.admin('box.cfg{replication_source = ""}')
 replica.admin('box.info.server.id')
 replica.admin('box.info.server.ro')
 replica.admin('box.info.server.lsn')
-replica.admin('space = box.schema.create_space("ro")')
+replica.admin('space = box.schema.space.create("ro")')
 replica.admin('box.info.vclock[%d]' % replica_id)
 
 replica.stop()

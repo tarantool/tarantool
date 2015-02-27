@@ -15,7 +15,7 @@
     applications, and the Tarantool Database Server which is an established
     NoSQL DBMS. Thus it serves all the purposes that have made node.js and Twisted popular in
     other environments, with the additional twist that it has a data persistence level.
-  </para>
+  </para> 
 
   <para> 
     The code is free. The open-source license is  <citetitle
@@ -112,9 +112,10 @@
   </para>
 
   <para>
-    Unlike most NoSQL DBMSs, Tarantool supports <emphasis role="strong">
-    secondary index keys and multi-part index keys</emphasis>
-    as well as primary keys. The possible index types are
+    Unlike most NoSQL DBMSs, Tarantool supports
+    <emphasis role="strong">secondary index keys</emphasis> as well as primary keys, and
+    <emphasis role="strong">multi-part index keys</emphasis>.
+    The possible index types are
     HASH, TREE, BITSET, and RTREE.
   </para>
 

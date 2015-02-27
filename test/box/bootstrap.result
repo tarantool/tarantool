@@ -1,4 +1,4 @@
-dofile("<builddir>/extra/schema_erase.lua")
+dofile("<sourcedir>/extra/schema_erase.lua")
 ---
 ...
 box.space._schema:select{}
@@ -29,7 +29,7 @@ box.space._priv:select{}
 ---
 - []
 ...
-dofile("<builddir>/extra/schema_fill.lua")
+dofile("<sourcedir>/extra/schema_fill.lua")
 ---
 ...
 box.snapshot()

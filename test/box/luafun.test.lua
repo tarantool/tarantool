@@ -2,7 +2,7 @@
 -- # luafun integration
 --------------------------------------------------------------------------------
 
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 for i = 1,5,1 do space:replace({i, i}) end
 

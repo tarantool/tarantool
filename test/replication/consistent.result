@@ -57,7 +57,7 @@ a:close()
 ---
 - true
 ...
-s = box.schema.create_space('tweedledum', {id = 0});
+s = box.schema.space.create('tweedledum', {id = 0});
 ---
 ...
 index = s:create_index('primary', {type = 'hash'})

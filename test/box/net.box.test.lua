@@ -4,7 +4,7 @@ log = require 'log'
 msgpack = require 'msgpack'
 
 LISTEN = require('uri').parse(box.cfg.listen)
-space = box.schema.create_space('net_box_test_space')
+space = box.schema.space.create('net_box_test_space')
 index = space:create_index('primary', { type = 'tree' })
 
 -- low level connection
@@ -297,7 +297,7 @@ end;
 gh594()
 
 -- #636: Reload schema on demand
-sp = box.schema.create_space('test_old')
+sp = box.schema.space.create('test_old')
 _ = sp:create_index('primary')
 sp:insert{1, 2, 3}
 
@@ -306,7 +306,7 @@ con:ping()
 con.space.test_old:select{}
 con.space.test == nil
 
-sp = box.schema.create_space('test')
+sp = box.schema.space.create('test')
 _ = sp:create_index('primary')
 sp:insert{2, 3, 4}
 

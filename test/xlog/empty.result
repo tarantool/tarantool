@@ -1,0 +1,8 @@
+.xlog.inprogress exists
+_ = box.schema.space.create('test')
+---
+- error: Failed to write to disk
+...
+_ = box.schema.space.create('test')
+---
+...

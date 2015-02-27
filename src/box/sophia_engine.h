@@ -48,7 +48,6 @@ struct SophiaEngine: public Engine {
 	virtual void commit_checkpoint();
 	virtual void abort_checkpoint();
 	void *env;
-	void *tx;
 private:
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
@@ -56,5 +55,9 @@ private:
 
 void sophia_info(void (*)(const char*, const char*, void*), void*);
 void sophia_raise(void*);
+
+extern "C" {
+int sophia_schedule(void);
+}
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */

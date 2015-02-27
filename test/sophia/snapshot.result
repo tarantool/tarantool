@@ -1,5 +1,5 @@
 -- snapshot
-space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
+space = box.schema.space.create('test', { id = 100, engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')

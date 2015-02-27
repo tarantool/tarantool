@@ -1,4 +1,4 @@
-ts = box.schema.create_space('test_space')
+ts = box.schema.space.create('test_space')
 ---
 ...
 ti = ts:create_index('primary', { type = 'hash' })

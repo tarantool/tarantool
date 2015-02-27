@@ -4,7 +4,7 @@ dofile('utils.lua')
 # Tree single-part unique
 ---
 ...
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 idx1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true})
@@ -918,7 +918,7 @@ space:drop()
 -- Iterator: https://github.com/tarantool/tarantool/issues/464
 -- Iterator safety after changing schema
 -------------------------------------------------------------------------------
-space = box.schema.create_space('test', {temporary=true})
+space = box.schema.space.create('test', {temporary=true})
 ---
 ...
 idx1 = space:create_index('primary', {type='HASH',unique=true})
@@ -989,7 +989,7 @@ space:drop()
 -- Iterator: https://github.com/tarantool/tarantool/issues/498
 -- Iterator is not checked for wrong type; accept lowercase iterator
 -------------------------------------------------------------------------------
-space = box.schema.create_space('test', {temporary=true})
+space = box.schema.space.create('test', {temporary=true})
 ---
 ...
 idx1 = space:create_index('primary', {type='TREE',unique=true})

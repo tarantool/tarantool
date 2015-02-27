@@ -1,7 +1,7 @@
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-space = box.schema.create_space('test', {id =  42})
+space = box.schema.space.create('test', {id =  42})
 ---
 ...
 index = space:create_index('primary', { type = 'tree'})

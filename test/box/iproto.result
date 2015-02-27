@@ -73,7 +73,7 @@ box.cfg.wal_mode
 ---
 - write
 ...
-space = box.schema.create_space('test', { id = 567 })
+space = box.schema.space.create('test', { id = 567 })
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
@@ -101,7 +101,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
 space:drop()
 ---
 ...
-space = box.schema.create_space('test')
+space = box.schema.space.create('test')
 ---
 ...
 index = space:create_index('primary', { type = 'hash', parts = {1, 'str'}})

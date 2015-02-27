@@ -1,6 +1,6 @@
 import tarantool
 
-admin("function f() box.schema.create_space('test', { id = 0 }) end")
+admin("function f() box.schema.space.create('test', { id = 0 }) end")
 admin("box.schema.user.create('test', { password = 'test' })")
 admin("box.schema.func.create('f')")
 admin("box.schema.user.grant('test', 'Write', 'space', '_space')")

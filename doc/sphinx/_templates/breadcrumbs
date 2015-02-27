@@ -1,0 +1,19 @@
+{% macro breadcrumbs() %}
+{% if title != 'Documentation' %}
+<div class="b-page_header">
+  <ul class="b-path-list">
+    <li class="b-path-list-item">
+      <a href="/doc/" class="b-path-list-item-url">Documentation</a>
+    </li>
+  {% for elem in parents %}
+    <li class="b-path-list-item">
+      <a href="{{ elem.link|e }}" class="b-path-list-item-url">{{ elem.title }}</a>
+    </li>
+  {% endfor %}
+    <li class="b-path-list-item"><span class="b-path_current">{{ title }}</span></li>
+  </ul>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

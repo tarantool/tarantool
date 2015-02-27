@@ -13,8 +13,8 @@ box.cfg.io_collect_interval
 -- Valgrind reports use of not initialized memory after 'reload
 -- configuration'
 --
-space = box.schema.create_space('tweedledum', { id = 0 })
-index = space:create_index('primary', { type = 'hash'})
+space = box.schema.space.create('tweedledum')
+index = space:create_index('primary')
 space:insert{1, 'tuple'}
 box.snapshot()
 box.cfg{}

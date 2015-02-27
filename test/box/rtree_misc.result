@@ -1,4 +1,4 @@
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 ---
 ...
 -- rtree index as primary key must be forbidden (unique)
@@ -205,7 +205,7 @@ s.index.spatial:select({})
 s:drop()
 ---
 ...
-s = box.schema.create_space('sophia', {engine = 'sophia'})
+s = box.schema.space.create('sophia', {engine = 'sophia'})
 ---
 ...
 -- rtree indexes are not enabled in sophia
@@ -225,7 +225,7 @@ s:drop()
 ---
 ...
 -- rtree in temp space must work fine
-s = box.schema.create_space('spatial', {temporary = true})
+s = box.schema.space.create('spatial', {temporary = true})
 ---
 ...
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
@@ -246,7 +246,7 @@ s:drop()
 ---
 ...
 -- snapshot test
-s = box.schema.create_space('spatial')
+s = box.schema.space.create('spatial')
 ---
 ...
 i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})

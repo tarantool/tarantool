@@ -1,4 +1,4 @@
-space = box.schema.create_space('tweedledum')
+space = box.schema.space.create('tweedledum')
 ---
 ...
 i0 = space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
