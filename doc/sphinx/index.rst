@@ -21,3 +21,4 @@
 
     faq.rst
     dev_guide/index.rst
+    reference/index.rst
