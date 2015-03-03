@@ -28,7 +28,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 struct xrow_header;
+
+/** State of a replication relay. */
+class Relay {
+public:
+	/** Replica connection */
+	struct ev_io io;
+	/* Request sync */
+	uint64_t sync;
+	struct recovery_state *r;
+	Relay(int fd_arg, uint64_t sync_arg);
+	~Relay();
+};
 
 void
 replication_join(int fd, struct xrow_header *packet);

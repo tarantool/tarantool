@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
+#include "replication.h"
 #include "space.h"
 #include <stdlib.h>
 #include <string.h>

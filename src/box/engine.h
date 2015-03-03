@@ -119,7 +119,7 @@ public:
 	 */
 	virtual void dropIndex(Index*) = 0;
 
-	virtual void join(struct recovery_state*) = 0;
+	virtual void join(Relay*) = 0;
 	/**
 	 * Engine specific transaction life-cycle routines.
 	 */
@@ -260,6 +260,6 @@ engine_checkpoint(int64_t checkpoint_id);
  * Send a snapshot.
  */
 void
-engine_join(struct recovery_state*);
+engine_join(Relay*);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

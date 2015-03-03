@@ -43,7 +43,7 @@ struct SophiaEngine: public Engine {
 	virtual void begin_recover_snapshot(int64_t);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
-	virtual void join(struct recovery_state*);
+	virtual void join(Relay*);
 	virtual int begin_checkpoint(int64_t);
 	virtual int wait_checkpoint();
 	virtual void commit_checkpoint();

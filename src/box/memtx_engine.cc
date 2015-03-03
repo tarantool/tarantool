@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
+#include "replication.h"
 #include "memtx_engine.h"
 #include "tuple.h"
 #include "txn.h"
@@ -35,6 +37,7 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
+#include "request.h"
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>
@@ -112,9 +115,9 @@ MemtxEngine::end_recovery()
 }
 
 void
-MemtxEngine::join(struct recovery_state *r)
+MemtxEngine::join(Relay *relay)
 {
-	recover_snap(r);
+	recover_snap(relay->r);
 }
 
 Handler *MemtxEngine::open()
@@ -246,15 +249,6 @@ MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)
 	 * do nothing here.
 	 */
 }
-
-/** The snapshot row metadata repeats the structure of REPLACE request. */
-struct request_replace_body {
-	uint8_t m_body;
-	uint8_t k_space_id;
-	uint8_t m_space_id;
-	uint32_t v_space_id;
-	uint8_t k_tuple;
-} __attribute__((packed));
 
 static void
 snapshot_write_row(struct recovery_state *r, struct xlog *l,

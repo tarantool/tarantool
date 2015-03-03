@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
+#include "box/replication.h"
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
 #include "lua/utils.h"

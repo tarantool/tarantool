@@ -26,13 +26,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
 #include "replication.h"
 #include <say.h>
 #include <fiber.h>
 
 #include "recovery.h"
 #include "xlog.h"
-#include "evio.h"
 #include "iproto_constants.h"
 #include "box/engine.h"
 #include "box/cluster.h"
@@ -45,32 +45,23 @@
 #include "cfg.h"
 #include "trigger.h"
 
+Relay::Relay(int fd_arg, uint64_t sync_arg)
+{
+	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+			 replication_send_row, this);
+	coio_init(&io);
+	io.fd = fd_arg;
+	sync = sync_arg;
+}
+
+Relay::~Relay()
+{
+	recovery_delete(r);
+}
+
 void
 replication_send_row(struct recovery_state *r, void *param,
                      struct xrow_header *packet);
-
-/** State of a replication relay. */
-class Relay {
-public:
-	/** Replica connection */
-	struct ev_io io;
-	/* Request sync */
-	uint64_t sync;
-	struct recovery_state *r;
-
-	Relay(int fd_arg, uint64_t sync_arg)
-	{
-		r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-				 replication_send_row, this);
-		coio_init(&io);
-		io.fd = fd_arg;
-		sync = sync_arg;
-	}
-	~Relay()
-	{
-		recovery_delete(r);
-	}
-};
 
 static inline void
 relay_set_cord_name(int fd)
@@ -93,7 +84,7 @@ replication_join_f(va_list ap)
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send snapshot */
-	engine_join(r);
+	engine_join(relay);
 
 	/* Send response to JOIN command = end of stream */
 	struct xrow_header row;

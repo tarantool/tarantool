@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
+#include "replication.h"
 #include "engine.h"
 #include "space.h"
 #include "exception.h"
@@ -181,10 +183,10 @@ error:
 }
 
 void
-engine_join(struct recovery_state *r)
+engine_join(Relay *relay)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(r);
+		engine->join(relay);
 	}
 }

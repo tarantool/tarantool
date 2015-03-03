@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "evio.h"
+#include "replication.h"
 #include "sophia_engine.h"
 #include "cfg.h"
 #include "xrow.h"
@@ -90,9 +92,6 @@ sophia_recovery_end(struct space *space)
 	r->state   = READY_ALL_KEYS;
 	r->replace = sophia_replace;
 	r->recover = space_noop;
-	/*
-	sophia_complete_recovery(space);
-	*/
 }
 
 static void
@@ -157,32 +156,34 @@ SophiaEngine::end_recover_snapshot()
 }
 
 static inline void
-sophia_send_row(struct recovery_state *r, char *tuple,
+sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
                 uint32_t tuple_size)
 {
-	struct request req;
-	request_create(&req, IPROTO_REPLACE);
-	req.space_id  = 0;
-	req.index_id  = 0;
-	req.tuple     = tuple;
-	req.tuple_end = tuple + tuple_size;
-
+	struct recovery_state *r = relay->r;
+	struct request_replace_body body;
+	body.m_body = 0x82; /* map of two elements. */
+	body.k_space_id = IPROTO_SPACE_ID;
+	body.m_space_id = 0xce; /* uint32 */
+	body.v_space_id = mp_bswap_u32(space_id);
+	body.k_tuple = IPROTO_TUPLE;
 	struct xrow_header row;
-	row.type = IPROTO_REPLACE;
-	row.lsn = 0;
-	row.server_id = 0;
-	row.bodycnt = request_encode(&req, row.body);
-
-	replication_send_row(r, /* Relay* */ NULL, &row);
+	row.type = IPROTO_INSERT;
+	row.lsn = vclock_inc(&r->vclock, r->server_id);
+	row.server_id = r->server_id;
+	row.bodycnt = 2;
+	row.body[0].iov_base = &body;
+	row.body[0].iov_len = sizeof(body);
+	row.body[1].iov_base = tuple;
+	row.body[1].iov_len = tuple_size;
+	replication_send_row(r, relay, &row);
 }
 
 void
-SophiaEngine::join(struct recovery_state *r)
+SophiaEngine::join(Relay *relay)
 {
-
 	return;
 
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	struct vclock *res = vclockset_last(&relay->r->snap_dir.index);
 	if (res == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signt = vclock_signature(res);
@@ -201,6 +202,13 @@ SophiaEngine::join(struct recovery_state *r)
 		sophia_raise(env);
 	while (sp_get(db_cursor)) {
 		void *db = sp_object(db_cursor);
+
+		/* get space id */
+		void *dbctl = sp_ctl(db);
+		void *oid = sp_get(dbctl, "id");
+		uint32_t space_id = *(uint32_t*)sp_get(oid, "value", NULL);
+		sp_destroy(oid);
+
 		/* send database */
 		void *o = sp_object(db);
 		void *cursor = sp_cursor(snapshot, o);
@@ -213,7 +221,7 @@ SophiaEngine::join(struct recovery_state *r)
 			uint32_t tuple_size = 0;
 			char *tuple = (char *)sp_get(o, "value", &tuple_size);
 			try {
-				sophia_send_row(r, tuple, tuple_size);
+				sophia_send_row(relay, space_id, tuple, tuple_size);
 			} catch (...) {
 				sp_destroy(cursor);
 				sp_destroy(db_cursor);
@@ -233,7 +241,7 @@ SophiaEngine::end_recovery()
 {
 	/* create snapshot reference after tarantool
 	 * recovery, to ensure correct ref
-	 * counting. */
+	 * counting */
 	if (m_checkpoint_lsn >= 0) {
 		sophia_snapshot_recover(env, m_checkpoint_lsn);
 		m_prev_checkpoint_lsn = m_checkpoint_lsn;

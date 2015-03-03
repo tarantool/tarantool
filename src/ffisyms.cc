@@ -1,6 +1,9 @@
+
 #include <bit/bit.h>
 #include <lib/msgpuck/msgpuck.h>
 #include "scramble.h"
+#include <evio.h>
+#include <box/replication.h>
 #include <box/box.h>
 #include <box/tuple.h>
 #include <box/lua/index.h>
