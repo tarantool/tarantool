@@ -168,21 +168,19 @@ sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
 	body.k_tuple = IPROTO_TUPLE;
 	struct xrow_header row;
 	row.type = IPROTO_INSERT;
-	row.lsn = vclock_inc(&r->vclock, r->server_id);
-	row.server_id = r->server_id;
+	row.lsn = vclock_inc(&r->vclock_join, r->server_id);
+	row.server_id = 0;
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = tuple;
 	row.body[1].iov_len = tuple_size;
-	replication_send_row(r, relay, &row);
+	relay_send(relay, &row);
 }
 
 void
 SophiaEngine::join(Relay *relay)
 {
-	return;
-
 	struct vclock *res = vclockset_last(&relay->r->snap_dir.index);
 	if (res == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
@@ -197,7 +195,7 @@ SophiaEngine::join(Relay *relay)
 
 	/* iterate through a list of databases which took a
 	 * part in the snapshot */
-	void *db_cursor = sp_ctl(snapshot, "db_view");
+	void *db_cursor = sp_ctl(snapshot, "db_list");
 	if (db_cursor == NULL)
 		sophia_raise(env);
 	while (sp_get(db_cursor)) {
@@ -205,8 +203,10 @@ SophiaEngine::join(Relay *relay)
 
 		/* get space id */
 		void *dbctl = sp_ctl(db);
-		void *oid = sp_get(dbctl, "id");
-		uint32_t space_id = *(uint32_t*)sp_get(oid, "value", NULL);
+		void *oid = sp_get(dbctl, "name");
+		char *name = (char*)sp_get(oid, "value", NULL);
+		char *pe = NULL;
+		uint32_t space_id = strtoul(name, &pe, 10);
 		sp_destroy(oid);
 
 		/* send database */

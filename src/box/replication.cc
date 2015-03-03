@@ -45,6 +45,10 @@
 #include "cfg.h"
 #include "trigger.h"
 
+void
+replication_send_row(struct recovery_state *r, void *param,
+                     struct xrow_header *packet);
+
 Relay::Relay(int fd_arg, uint64_t sync_arg)
 {
 	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
@@ -58,10 +62,6 @@ Relay::~Relay()
 {
 	recovery_delete(r);
 }
-
-void
-replication_send_row(struct recovery_state *r, void *param,
-                     struct xrow_header *packet);
 
 static inline void
 relay_set_cord_name(int fd)
@@ -185,6 +185,15 @@ replication_subscribe(int fd, struct xrow_header *packet)
 	cord_cojoin(&cord);
 }
 
+void
+relay_send(Relay *relay, struct xrow_header *packet)
+{
+	packet->sync = relay->sync;
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(packet, iov);
+	coio_writev(&relay->io, iov, iovcnt, 0);
+}
+
 /** Send a single row to the client. */
 void
 replication_send_row(struct recovery_state *r, void *param,
@@ -201,12 +210,8 @@ replication_send_row(struct recovery_state *r, void *param,
 	 * it not from the same server (i.e. don't send
 	 * replica's own rows back).
 	 */
-	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
-		packet->sync = relay->sync;
-		struct iovec iov[XROW_IOVMAX];
-		int iovcnt = xrow_to_iovec(packet, iov);
-		coio_writev(&relay->io, iov, iovcnt, 0);
-	}
+	if (packet->server_id == 0 || packet->server_id != r->server_id)
+		relay_send(relay, packet);
 	/*
 	 * Update local vclock. During normal operation wal_write()
 	 * updates local vclock. In relay mode we have to update

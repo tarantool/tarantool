@@ -79,6 +79,7 @@ struct remote {
 };
 
 struct recovery_state {
+	struct vclock vclock_join;
 	struct vclock vclock;
 	/** The WAL we're currently reading/writing from/to. */
 	struct xlog *current_wal;
