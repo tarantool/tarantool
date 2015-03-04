@@ -136,6 +136,10 @@ public:
 	 */
 	virtual void end_recovery() = 0;
 	/**
+	 * Notify engine about a JOIN start (slave-side)
+	 */
+	virtual void begin_join() = 0;
+	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 */
@@ -235,6 +239,12 @@ engine_id(Handler *space)
  */
 void
 engine_begin_recover_snapshot(int64_t snapshot_lsn);
+
+/**
+ * Called at the start of JOIN routine.
+ */
+void
+engine_begin_join();
 
 /**
  * Called at the end of recovery from snapshot.

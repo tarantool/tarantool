@@ -444,6 +444,7 @@ box_init(void)
 		engine_end_recover_snapshot();
 	} else if (recovery_has_remote(recovery)) {
 		/* Initialize a new replica */
+		engine_begin_join();
 		replica_bootstrap(recovery);
 		engine_end_recover_snapshot();
 		box_snapshot();

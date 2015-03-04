@@ -240,6 +240,11 @@ MemtxEngine::rollback(struct txn *txn)
 	}
 }
 
+void
+MemtxEngine::begin_join()
+{
+}
+
 /** Called at start to tell memtx to recover to a given LSN. */
 void
 MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)

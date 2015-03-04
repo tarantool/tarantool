@@ -113,6 +113,7 @@ SophiaEngine::SophiaEngine()
 	:Engine("sophia")
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
+	 ,recovery_complete(0)
 {
 	flags = 0;
 	env = NULL;
@@ -239,6 +240,8 @@ sophia_snapshot_recover(void *env, int64_t lsn);
 void
 SophiaEngine::end_recovery()
 {
+	if (recovery_complete)
+		return;
 	/* create snapshot reference after tarantool
 	 * recovery, to ensure correct ref
 	 * counting */
@@ -254,6 +257,7 @@ SophiaEngine::end_recovery()
 	recovery.state   = READY_NO_KEYS;
 	recovery.replace = sophia_replace;
 	recovery.recover = space_noop;
+	recovery_complete = 1;
 }
 
 Index*
@@ -382,6 +386,14 @@ SophiaEngine::rollback(struct txn *txn)
 		return;
 	sp_destroy(txn->engine_tx);
 	txn->engine_tx = NULL;
+}
+
+void
+SophiaEngine::begin_join()
+{
+	/* put engine to recovery-complete state to
+	 * correctly support join */
+	end_recovery();
 }
 
 static inline void

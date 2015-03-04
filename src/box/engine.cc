@@ -104,6 +104,16 @@ engine_begin_recover_snapshot(int64_t snapshot_lsn)
 	}
 }
 
+void
+engine_begin_join()
+{
+	/* recover engine snapshot */
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->begin_join();
+	}
+}
+
 static void
 do_one_recover_step(struct space *space, void * /* param */)
 {

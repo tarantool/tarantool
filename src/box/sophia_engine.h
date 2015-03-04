@@ -40,6 +40,7 @@ struct SophiaEngine: public Engine {
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
+	virtual void begin_join();
 	virtual void begin_recover_snapshot(int64_t);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
@@ -52,6 +53,7 @@ struct SophiaEngine: public Engine {
 private:
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
+	int recovery_complete;
 };
 
 void sophia_info(void (*)(const char*, const char*, void*), void*);
