@@ -44,6 +44,7 @@ class Tarantool < Formula
     args << "-DENABLE_CLIENT=True" if build.stable?
     args << "-DCMAKE_INSTALL_SYSCONFDIR=#{prefix}/etc"
     args << "-DCMAKE_INSTALL_LOCALSTATEDIR=#{prefix}/var"
+    args << "-DREADLINE_ROOT=/usr/local/Cellar"
     args += std_cmake_args
 
     ohai "Preparing"
