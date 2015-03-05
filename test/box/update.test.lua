@@ -114,3 +114,84 @@ s:insert{1, 2, 3}
 s:update({1})
 s:update({1}, {'=', 1, 1})
 s:drop()
+
+-- #528: Different types in arithmetical update, overflow check
+ffi = require('ffi')
+s = box.schema.create_space('tweedledum')
+index = s:create_index('pk')
+s:insert{0, -1}
+-- + --
+s:update({0}, {{'+', 2, "a"}}) -- err
+s:update({0}, {{'+', 2, 10}}) -- neg(ative) + pos(itive) = pos(itive) 9
+s:update({0}, {{'+', 2, 5}}) -- pos + pos = pos 14
+s:update({0}, {{'+', 2, -4}}) -- pos + neg = pos 10
+s:update({0}, {{'+', 2, -22}}) -- pos + neg = neg -12
+s:update({0}, {{'+', 2, -3}}) -- neg + neg = neg -15
+s:update({0}, {{'+', 2, 7}}) -- neg + pos = neg -8
+-- - --
+s:update({0}, {{'-', 2, "a"}}) -- err
+s:update({0}, {{'-', 2, 16}}) -- neg(ative) - pos(itive) = neg(ative) -24
+s:update({0}, {{'-', 2, -4}}) -- neg - neg = neg 20
+s:update({0}, {{'-', 2, -32}}) -- neg - neg = pos 12
+s:update({0}, {{'-', 2, 3}}) -- pos - pos = pos 9
+s:update({0}, {{'-', 2, -5}}) -- pos - neg = pos 14
+s:update({0}, {{'-', 2, 17}}) -- pos - pos = neg -3
+-- bit --
+s:replace{0, 0} -- 0
+s:update({0}, {{'|', 2, 24}}) -- 24
+s:update({0}, {{'|', 2, 2}}) -- 26
+s:update({0}, {{'&', 2, 50}}) -- 18
+s:update({0}, {{'^', 2, 6}}) -- 20
+s:update({0}, {{'|', 2, -1}}) -- err
+s:update({0}, {{'&', 2, -1}}) -- err
+s:update({0}, {{'^', 2, -1}}) -- err
+s:replace{0, -1} -- -1
+s:update({0}, {{'|', 2, 2}}) -- err
+s:update({0}, {{'&', 2, 40}}) -- err
+s:update({0}, {{'^', 2, 6}}) -- err
+s:replace{0, 1.5} -- 1.5
+s:update({0}, {{'|', 2, 2}}) -- err
+s:update({0}, {{'&', 2, 40}}) -- err
+s:update({0}, {{'^', 2, 6}}) -- err
+-- double
+s:replace{0, 5} -- 5
+s:update({0}, {{'+', 2, 1.5}}) -- int + double = double 6.5
+s:update({0}, {{'|', 2, 2}}) -- err (double!)
+s:update({0}, {{'-', 2, 0.5}}) -- double - double = double 6
+s:update({0}, {{'+', 2, 1.5}}) -- double + double = double 7.5
+-- float
+s:replace{0, ffi.new("float", 1.5)} -- 1.5
+s:update({0}, {{'+', 2, 2}}) -- float + int = float 3.5
+s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + int = float 7
+s:update({0}, {{'|', 2, 2}}) -- err (float!)
+s:update({0}, {{'-', 2, ffi.new("float", 1.5)}}) -- float - float = float 5.5
+s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + float = float 9
+s:update({0}, {{'-', 2, ffi.new("float", 9)}}) -- float + float = float 0
+s:update({0}, {{'+', 2, ffi.new("float", 1.2)}}) -- float + float = float 1.2
+-- overflow --
+s:replace{0, 0xfffffffffffffffeull}
+s:update({0}, {{'+', 2, 1}}) -- ok
+s:update({0}, {{'+', 2, 1}}) -- overflow
+s:update({0}, {{'+', 2, 100500}}) -- overflow
+s:replace{0, 1}
+s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- overflow
+s:replace{0, -1}
+s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- ok
+s:replace{0, 0}
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
+s:replace{0, -1}
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
+s:replace{0, -2}
+s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- overflow
+s:replace{0, 1}
+s:update({0}, {{'-', 2, 0xffffffffffffffffull}})  -- overflow
+s:replace{0, 0xffffffffffffffefull}
+s:update({0}, {{'-', 2, -16}})  -- ok
+s:update({0}, {{'-', 2, -16}})  -- overflow
+s:replace{0, -0x4000000000000000ll}
+s:update({0}, {{'+', 2, -0x4000000000000000ll}})  -- ok
+s:replace{0, -0x4000000000000000ll}
+s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
+
+s:drop()
+
