@@ -136,18 +136,8 @@ s:update({0}, {{'-', 2, -32}}) -- neg - neg = pos 12
 s:update({0}, {{'-', 2, 3}}) -- pos - pos = pos 9
 s:update({0}, {{'-', 2, -5}}) -- pos - neg = pos 14
 s:update({0}, {{'-', 2, 17}}) -- pos - pos = neg -3
--- * --
-s:update({0}, {{'*', 2, "a"}}) -- err
-s:update({0}, {{'*', 2, 2}}) -- neg(ative) * pos(itive) = nrg(itive) -6
-s:update({0}, {{'*', 2, -3}}) -- neg * neg = pos 18
-s:update({0}, {{'*', 2, 2}}) -- pos * pos = pos 36
-s:update({0}, {{'*', 2, -5}}) -- pos * neg = neg -180
-s:update({0}, {{'*', 2, -22}}) -- neg * 0 = 0 0
-s:update({0}, {{'*', 2, 10}}) -- 0 * pos = 0 0
-s:update({0}, {{'*', 2, -10}}) -- 0 * neg = 0 0
-s:replace{0, -1} -- -1
-s:update({0}, {{'*', 2, 0}}) -- pos * 0 = 0 0
 -- bit --
+s:replace{0, 0} -- 0
 s:update({0}, {{'|', 2, 24}}) -- 24
 s:update({0}, {{'|', 2, 2}}) -- 26
 s:update({0}, {{'&', 2, 50}}) -- 18
@@ -166,22 +156,17 @@ s:update({0}, {{'^', 2, 6}}) -- err
 -- double
 s:replace{0, 5} -- 5
 s:update({0}, {{'+', 2, 1.5}}) -- int + double = double 6.5
-s:update({0}, {{'*', 2, 2}}) -- double * int = double! 13
 s:update({0}, {{'|', 2, 2}}) -- err (double!)
-s:update({0}, {{'-', 2, 0.5}}) -- double - double = double 12.5
-s:update({0}, {{'+', 2, 1.5}}) -- double + double = double 14
-s:update({0}, {{'*', 2, -1.5}}) -- double * double = double -21
-s:update({0}, {{'*', 2, -2}}) -- double * int = double 42
+s:update({0}, {{'-', 2, 0.5}}) -- double - double = double 6
+s:update({0}, {{'+', 2, 1.5}}) -- double + double = double 7.5
 -- float
 s:replace{0, ffi.new("float", 1.5)} -- 1.5
 s:update({0}, {{'+', 2, 2}}) -- float + int = float 3.5
-s:update({0}, {{'*', 2, 2}}) -- float * int = float! 7
+s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + int = float 7
 s:update({0}, {{'|', 2, 2}}) -- err (float!)
 s:update({0}, {{'-', 2, ffi.new("float", 1.5)}}) -- float - float = float 5.5
 s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + float = float 9
-s:update({0}, {{'*', 2, ffi.new("float", -1.5)}}) -- float * float = float -13.5
-s:update({0}, {{'*', 2, -2}}) -- float * int = float 27
-s:update({0}, {{'*', 2, 0}}) -- float * int = float 0
+s:update({0}, {{'-', 2, ffi.new("float", 9)}}) -- float + float = float 0
 s:update({0}, {{'+', 2, ffi.new("float", 1.2)}}) -- float + float = float 1.2
 -- overflow --
 s:replace{0, 0xfffffffffffffffeull}
@@ -190,22 +175,12 @@ s:update({0}, {{'+', 2, 1}}) -- overflow
 s:update({0}, {{'+', 2, 100500}}) -- overflow
 s:replace{0, 1}
 s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- overflow
-s:replace{0, 0xffffffff}
-s:update({0}, {{'*', 2, 0xffffffff}})  -- ok
-s:update({0}, {{'*', 2, 2}})  -- overflow
-s:replace{0, 0xffffffff}
-s:update({0}, {{'*', 2, 0x100000001ull}})  -- ok
-s:replace{0, 0xffffffff}
-s:update({0}, {{'*', 2, 0x100000002ull}})  -- overflow
-s:replace{0, 0x100000000ull}
-s:update({0}, {{'*', 2, 0x100000000ull}})  -- overflow
 s:replace{0, -1}
 s:update({0}, {{'+', 2, 0xffffffffffffffffull}})  -- ok
 s:replace{0, 0}
 s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
 s:replace{0, -1}
 s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- ok
-s:update({0}, {{'*', 2, 2}})  -- overflow
 s:replace{0, -2}
 s:update({0}, {{'-', 2, 0x7fffffffffffffffull}})  -- overflow
 s:replace{0, 1}
@@ -213,21 +188,10 @@ s:update({0}, {{'-', 2, 0xffffffffffffffffull}})  -- overflow
 s:replace{0, 0xffffffffffffffefull}
 s:update({0}, {{'-', 2, -16}})  -- ok
 s:update({0}, {{'-', 2, -16}})  -- overflow
-s:replace{0, 0x4000000000000000ull}
-s:update({0}, {{'*', 2, -2}})  -- ok
-s:update({0}, {{'*', 2, -2}})  -- overflow
-s:replace{0, 0x4000000000000001ull}
-s:update({0}, {{'*', 2, -2}})  -- overflow
 s:replace{0, -0x4000000000000000ll}
 s:update({0}, {{'+', 2, -0x4000000000000000ll}})  -- ok
 s:replace{0, -0x4000000000000000ll}
 s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
-s:replace{0, -0xffffffffll}
-s:update({0}, {{'*', 2, -0x100000001ll}})  -- ok
-s:replace{0, 0xffffffff}
-s:update({0}, {{'*', 2, -0x100000002ll}})  -- overflow
-s:replace{0, 0x100000000ull}
-s:update({0}, {{'*', 2, -0x100000000ll}})  -- overflow
 
 s:drop()
 
