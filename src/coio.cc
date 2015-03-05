@@ -57,21 +57,6 @@ coio_init(struct ev_io *coio)
 	coio->fd = -1;
 }
 
-static inline void
-coio_fiber_yield(struct ev_io *coio)
-{
-	/**
-	 * We may create an event in one fiber, but wait for it
-	 * in another. Hence we set the coroutine right before the
-	 * yield.
-	 */
-	coio->data = fiber();
-	fiber_yield();
-#ifdef DEBUG
-	coio->data = NULL;
-#endif
-}
-
 static inline bool
 coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
 {
