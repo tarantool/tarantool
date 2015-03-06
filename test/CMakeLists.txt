@@ -3,6 +3,8 @@ enable_tnt_compile_flags()
 add_compile_flags("C;CXX"
     "-Wno-unused-parameter")
 
+cmake_policy(SET CMP0037 OLD)
+
 add_custom_target(test
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
 
