@@ -330,12 +330,14 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_json(L);
 	lua_pop(L, 1);
 
+#if defined(HAVE_GNU_READLINE)
 	/*
 	 * Disable libreadline signals handlers. All signals are handled in
 	 * main thread by libev watchers.
 	 */
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
+#endif
 	static const struct luaL_reg consolelib[] = {
 		{"readline", tarantool_console_readline},
 		{"add_history", tarantool_console_add_history},
