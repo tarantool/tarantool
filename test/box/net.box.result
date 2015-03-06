@@ -605,6 +605,14 @@ remote.self:timeout(123).space.net_box_test_space:select{234}
 ---
 - - [234, 1, 2, 3]
 ...
+remote.self:is_connected()
+---
+- true
+...
+remote.self:wait_connected()
+---
+- true
+...
 -- cleanup database after tests
 space:drop()
 ---
