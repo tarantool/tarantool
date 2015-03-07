@@ -351,7 +351,7 @@ void
 fiber_sleep(ev_tstamp s);
 
 void
-fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int revents);
+fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int revents);
 
 /**
  * \brief Associate \a value with \a key in fiber local storage

@@ -134,7 +134,9 @@ recovery_has_data(struct recovery_state *r)
 }
 void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);
-void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
+void recovery_follow_local(struct recovery_state *r,
+			   const char *name,
+			   ev_tstamp wal_dir_rescan_delay);
 void recovery_stop_local(struct recovery_state *r);
 
 void recovery_finalize(struct recovery_state *r, enum wal_mode mode,
