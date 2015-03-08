@@ -1390,7 +1390,7 @@ console.delimiter('')!
                 access to all tuples and spaces until it
                 encounters a "context switch": by causing a write to
                 disk, network, or by an explicit call to <emphasis
-                role="lua" xlink:href="#fiber.yield">fiber.yield()</emphasis>.
+                  role="lua" xlink:href="/doc/reference/fiber.html#fiber.yield">fiber.yield()</emphasis>.
                 When the execution flow returns to the yielded
                 procedure, the data set could have changed significantly.
                 Iteration, resumed after a yield point, does not

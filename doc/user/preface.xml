@@ -170,25 +170,18 @@
    database"</link>.
  </para>
  <para>
-   Chapter 3 <link linkend="lua-and-packages">"Lua and the Tarantool Lua packages"</link> begins with explanations
-   about Lua and Tarantool's connection with Lua. Those explanations are
-   necessary; however, the detailed instructions about each package can be
-   regarded as reference material, skip over them lightly until their
-   functionality is needed.
- </para>
- <para>
-    Chapter 4 <link linkend="databases">"Databases"</link> is about the Tarantool NoSQL DBMS.
+    Chapter 3 <link linkend="databases">"Databases"</link> is about the Tarantool NoSQL DBMS.
     If the only intent is to use Tarantool as a Lua application server,
     most of the material in this chapter and in the following chapter
-    (Chapter 5 <link linkend="replication">"Replication"</link>) will not be necessary. Once again, the
+    (Chapter 4 <link linkend="replication">"Replication"</link>) will not be necessary. Once again, the
     detailed instructions about each package can be regarded as reference
     material.
  </para>
  <para>
-    Chapter 6 <link linkend="server-administration">"Server administration"</link> and Chapter 7 <link linkend="configuration-reference">"Configuration reference"</link>
+    Chapter 5 <link linkend="server-administration">"Server administration"</link> and Chapter 8 <link linkend="configuration-reference">"Configuration reference"</link>
     are primarily for administrators; however, every user should know
     something about how the server is configured so the section about
-    <code>box.cfg</code> is not skippable. Chapter 8 <link linkend="connectors">"Connectors"</link> is strictly for
+    <code>box.cfg</code> is not skippable. Chapter 9 <link linkend="connectors">"Connectors"</link> is strictly for
     users who are connecting from a different language such as C or Perl or
     Python -- other users will find no immediate need for this chapter.
  </para>
