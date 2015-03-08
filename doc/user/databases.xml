@@ -293,7 +293,7 @@ tarantool> <userinput>s = box.schema.space.create('space55', {if_not_exists = tr
                          <entry>unique</entry><entry>index is unique</entry><entry>true|false</entry><entry>true</entry>
                         </row>
                         <row>
-                         <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_no, 'NUM'|STR'}</entry><entry>{1, 'NUM'}</entry>
+                         <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_number, 'NUM'|STR'}</entry><entry>{1, 'NUM'}</entry>
                         </row>
                         <row>
                          <entry>if_not_exists</entry><entry>no error if duplicate name</entry><entry>true|false</entry><entry>false</entry>
@@ -649,7 +649,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
     <varlistentry>
         <term>
           <emphasis role="lua" xml:id="box.update">
-          box.space.<replaceable>space-name</replaceable>:update({<replaceable>key {, operator, field_no, value}...</replaceable>})
+          box.space.<replaceable>space-name</replaceable>:update({<replaceable>key {, operator, field_number, value}...</replaceable>})
           </emphasis>
         </term>
         <listitem>
@@ -658,7 +658,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                </para>
   <para>
    The <code>update</code> function supports operations on fields &mdash;
-    assignment, arithmetic (if the field is unsigned numeric),
+    assignment, arithmetic,
     cutting and pasting fragments of a field,
     deleting or inserting a field.  Multiple
     operations can be combined in a single update request, and in this
@@ -674,18 +674,19 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             <para>
              Parameters: <code>space-name</code>,
               <code>key</code> = primary-key field values, must be passed as a Lua table if key is multi-part,
-                <code>{operator, field_no, value}</code> = a group of arguments
+                <code>{operator, field_number, value}</code> = a group of arguments
                 for each operation, indicating what the operation is, what field
                 the operation will apply to, and what value will be applied.
-                For some operations the field number can be -1, meaning
+                Possible operators are:
+                <quote>+</quote> or <quote>-</quote> for addition or subtraction (values must be numeric),
+                <quote>&amp;</quote> or <quote>|</quote> or <quote>^</quote> for bitwise AND or OR or exclusive-OR
+                (values must be unsigned numeric),
+                <quote>:</quote> for string splice,
+                <quote>!</quote> for insertion,
+                <quote>#</quote> for deletion,
+                <quote>=</quote> for assignment.
+                For <quote>!</quote> and <quote>=</quote> operations the field number can be -1, meaning
                 the last field in the tuple.
-                Possible operators are: <quote>+</quote>
-                for addition, <quote>-</quote> for subtraction,
-                <quote>&amp;</quote> for bitwise AND,
-                <quote>|</quote> for bitwise OR, <quote>^</quote>
-                for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice, <quote>!</quote> for insert,
-                <quote>#</quote> for delete.
                 Thus in the instruction <code>s:update(44, {{'+',1,55},{'=',3,'x'}})</code>
                 the primary-key value is 44,
                 the operators are '+' and '='
@@ -698,7 +699,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                Returns: (type = tuple) the updated tuple.
               </para>
               <para>
-               Possible errors: it is illegal to modify a primary-key field.
+               Possible errors: it is illegal to update a primary-key field.
               </para>
             <para>
               Complexity Factors: Index size, Index type, number of indexes accessed, WAL settings.
@@ -2163,7 +2164,7 @@ tarantool> <userinput>tmp</userinput>
     
     <varlistentry>
         <term>
-            <emphasis role="lua"><replaceable>tuple-value</replaceable>:update(<replaceable>{{format, field_no, value}...}</replaceable>)</emphasis>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:update(<replaceable>{{format, field_number, value}...}</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2172,16 +2173,16 @@ tarantool> <userinput>tmp</userinput>
             <para>
               This function updates a tuple which is not in a space.
               Compare the function
-              <code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code>,
+              <code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_number, value}...</replaceable>)</code>,
               which updates a tuple in a space.
             </para>
             <para>
               Parameters: briefly:
               <code>format</code> indicates the type of update operation such as '=' for 'assign new value',
-              <code>field_no</code> indicates the field number to change such as 2 for field number 2,
+              <code>field_number</code> indicates the field number to change such as 2 for field number 2,
               <code>value</code> indicates the string which operates on the field such as 'B' for a new assignable value = 'B'.
-              For details: see the description for <code>format</code>, <code>field_no</code>, and <code>value</code>
-              in the section <olink targetptr="box.update"><code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code></olink>.
+              For details: see the description for <code>format</code>, <code>field_number</code>, and <code>value</code>
+              in the section <olink targetptr="box.update"><code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_number, value}...</replaceable>)</code></olink>.
             </para>
             <para>
               Returns: (type = tuple) the new tuple.
