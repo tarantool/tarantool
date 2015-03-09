@@ -129,6 +129,8 @@ local dynamic_cfg = {
     -- snapshot_daemon
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
+    -- do nothing, affects new replicas, which query this value on start
+    wal_dir_rescan_delay    = function() end
 }
 
 local dynamic_cfg_skip_at_load = {
