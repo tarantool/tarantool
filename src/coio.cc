@@ -53,23 +53,8 @@ coio_init(struct ev_io *coio)
 {
 	/* Prepare for ev events. */
 	coio->data = fiber();
-	ev_init(coio, (ev_io_cb) fiber_schedule);
+	ev_init(coio, (ev_io_cb) fiber_schedule_cb);
 	coio->fd = -1;
-}
-
-static inline void
-coio_fiber_yield(struct ev_io *coio)
-{
-	/**
-	 * We may create an event in one fiber, but wait for it
-	 * in another. Hence we set the coroutine right before the
-	 * yield.
-	 */
-	coio->data = fiber();
-	fiber_yield();
-#ifdef DEBUG
-	coio->data = NULL;
-#endif
 }
 
 static inline bool
@@ -686,7 +671,7 @@ coio_service_start(struct evio_service *service, const char *uri)
 void
 coio_stat_init(ev_stat *stat, const char *path)
 {
-	ev_stat_init(stat, (ev_stat_cb) fiber_schedule, path, 0.0);
+	ev_stat_init(stat, (ev_stat_cb) fiber_schedule_cb, path, 0.0);
 }
 
 void
@@ -712,7 +697,7 @@ coio_waitpid(pid_t pid)
 {
 	assert(cord_is_main());
 	ev_child cw;
-	ev_init(&cw, (ev_child_cb) fiber_schedule);
+	ev_init(&cw, (ev_child_cb) fiber_schedule_cb);
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber();
 	ev_child_start(loop(), &cw);

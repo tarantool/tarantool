@@ -55,6 +55,7 @@ public:
 	struct ev_io io;
 	/* Request sync */
 	uint64_t sync;
+	ev_tstamp wal_dir_rescan_delay;
 	struct recovery_state *r;
 
 	Relay(int fd_arg, uint64_t sync_arg)
@@ -64,6 +65,7 @@ public:
 		coio_init(&io);
 		io.fd = fd_arg;
 		sync = sync_arg;
+		wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	}
 	~Relay()
 	{
@@ -125,7 +127,8 @@ replication_subscribe_f(va_list ap)
 	struct recovery_state *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
-	recovery_follow_local(r, 0.1);
+	recovery_follow_local(r, fiber_name(fiber()),
+			      relay->wal_dir_rescan_delay);
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
@@ -133,7 +136,7 @@ replication_subscribe_f(va_list ap)
 	 */
 	struct ev_io read_ev;
 	read_ev.data = fiber();
-	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule,
+	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule_cb,
 		   relay->io.fd, EV_READ);
 
 	while (true) {

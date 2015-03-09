@@ -1151,6 +1151,7 @@ remote.self = {
     close = function() end,
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
+    is_connected = function(self) return true end,
     call = function(_box, proc_name, ...)
         if type(_box) ~= 'table' then
             box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")

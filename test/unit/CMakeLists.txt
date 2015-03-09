@@ -17,6 +17,7 @@ add_executable(rope_avl.test rope_avl.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c
 add_executable(rope_stress.test rope_stress.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c)
 add_executable(rope.test rope.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rope.c)
 add_executable(bit.test bit.c bit.c)
+add_executable(int96.test int96.cc)
 target_link_libraries(bit.test bit)
 add_executable(bitset_basic.test bitset_basic.c)
 target_link_libraries(bitset_basic.test bitset)

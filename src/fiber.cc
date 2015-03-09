@@ -296,7 +296,7 @@ fiber_sleep(ev_tstamp delay)
 }
 
 void
-fiber_schedule(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
+fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 {
 	assert(fiber() == &cord()->sched);
 	fiber_call((struct fiber *) watcher->data);

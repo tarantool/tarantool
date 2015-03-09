@@ -56,7 +56,7 @@ fiob_ceil(off_t off)
 
 #ifdef HAVE_FUNOPEN
 static int
-fiob_read(void *cookie, char *buf, int len)
+fiob_read(void *cookie, char *buf, int count)
 #else
 static ssize_t
 fiob_read(void *cookie, char *buf, size_t count)

@@ -458,7 +458,8 @@ box_init(void)
 	fiber_gc();
 
 	title("orphan", NULL);
-	recovery_follow_local(recovery, cfg_getd("wal_dir_rescan_delay"));
+	recovery_follow_local(recovery, "hot_standby",
+			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
 	iproto_init(&binary);

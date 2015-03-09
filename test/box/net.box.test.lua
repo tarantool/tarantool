@@ -216,7 +216,8 @@ cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', passw
 remote.self:ping()
 remote.self.space.net_box_test_space:select{234}
 remote.self:timeout(123).space.net_box_test_space:select{234}
-
+remote.self:is_connected()
+remote.self:wait_connected()
 
 
 -- cleanup database after tests
