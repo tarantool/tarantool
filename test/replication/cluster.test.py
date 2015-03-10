@@ -94,16 +94,17 @@ server.admin('box.snapshot()')
 print '-------------------------------------------------------------'
 print 'gh-434: Assertion if replace _cluster tuple'
 print '-------------------------------------------------------------'
+server.stop()
+script = server.script
+server.script = "replication/panic.lua"
+server.deploy()
 
 new_uuid = '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
 
+# Check log message
 # Requires panic_on_wal_error = false
 server.admin("box.space._cluster:replace{{1, '{0}'}}".format(new_uuid))
 server.admin("box.info.server.uuid")
-
-# Check log message
-server.stop()
-server.start()
 
 line = "server UUID changed to " + new_uuid
 print "check log line for '%s'" % line
@@ -124,6 +125,7 @@ server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
 
 # Cleanup
 server.stop()
+server.script = script
 server.deploy()
 
 print '-------------------------------------------------------------'

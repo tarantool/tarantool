@@ -496,7 +496,6 @@ void
 recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 		  int rows_per_wal)
 {
-
 	recovery_stop_local(r);
 
 	r->finalize = true;

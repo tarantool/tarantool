@@ -38,7 +38,7 @@ box.cfg
   wal_mode: write
   wal_dir: .
   panic_on_snap_error: true
-  panic_on_wal_error: false
+  panic_on_wal_error: true
   log_level: 5
   readahead: 16320
   pid_file: tarantool.pid

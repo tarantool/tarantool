@@ -19,7 +19,7 @@ box.cfg
 14	wal_mode:write
 15	rows_per_wal:500000
 16	panic_on_snap_error:true
-17	panic_on_wal_error:false
+17	panic_on_wal_error:true
 18	wal_dir:.
 19	log_level:5
 20	readahead:16320

@@ -172,7 +172,6 @@ execute_select(struct request *request, struct port *port)
 void
 request_create(struct request *request, uint32_t type)
 {
-
 	memset(request, 0, sizeof(*request));
 	request->type = type;
 }
