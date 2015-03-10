@@ -383,7 +383,7 @@ console.connect('localhost:3301')
 box.space.tester:select{2}</userinput></programlisting>
 </para>
 <para>
-The requests are saying "use the <link linkend="sp-console">console package</link> to connect to the
+The requests are saying "use the <ulink url="/doc/reference/console.html">console package</ulink> to connect to the
 Tarantool server that's listening on localhost:3301, send a request
 to that server, and display the result." The result in this case is one of
 the tuples that was inserted earlier.

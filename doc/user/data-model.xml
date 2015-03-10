@@ -158,7 +158,7 @@ The syntax details for defining spaces and indexes are in section
     So Tarantool will store a number as a float if the value contains a decimal point, and otherwise will store as an integer.
     Tarantool can store signed numbers, but not in indexed fields -- when a field has a 'NUM' index, the values must be unsigned 64-bit integers.
     Large numbers can be entered with exponential notation, for example 9e99.
-    Large integers greater than 100,000,000,000,000 (1e14) should be entered with the <link linkend="tonumber64">tonumber64</link> function.
+    Large integers greater than 100,000,000,000,000 (1e14) should be entered with the <ulink url="/doc/reference/other.html">tonumber64</ulink> function.
     Storage is variable-length, so the smallest number requires only one byte but the largest number requires nine bytes.
     </para>
     <para>
@@ -173,9 +173,9 @@ The syntax details for defining spaces and indexes are in section
     as "null". Nils may be compared to values of any types with == (is-equal) or ~=
     (is-not-equal), but other operations will not work. Nils may not be used in Lua tables;
     the workaround is to use
-    <link linkend="yaml-null"><code>yaml.NULL</code></link>
-    or <link linkend="json-null"><code>json.NULL</code></link>
-    or <link linkend="msgpack-null"><code>msgpack.NULL</code></link>.
+    <ulink url="/doc/reference/yaml.html"><code>yaml.NULL</code></ulink>
+    or <ulink url="/doc/reference/json.html"><code>json.NULL</code></ulink>
+    or <ulink url="/doc/reference/msgpack.html"><code>msgpack.NULL</code></ulink>.
     </para>
     <para>
       A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.

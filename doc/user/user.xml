@@ -10,7 +10,6 @@
 <title>Tarantool User Guide, version &tnt_version;</title>
 <xi:include href="preface.xml"/>
 <xi:include href="tutorial.xml"/>
-<xi:include href="lua-and-packages.xml"/>
 <xi:include href="databases.xml"/>
 <xi:include href="triggers.xml"/>
 <xi:include href="replication.xml"/>
