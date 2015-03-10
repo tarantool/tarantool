@@ -1001,6 +1001,7 @@ end
 local function tcp_server_handler(server, sc, from)
     fiber.name(sprintf("%s/%s:%s", server.name, from.host, from.port))
     server.handler(sc, from)
+    sc:shutdown()
     sc:close()
 end
 
