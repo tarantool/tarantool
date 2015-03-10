@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                   tap
+                                Package `tap`
 -------------------------------------------------------------------------------
 
 The tap package streamlines the testing of other packages. It allows writing of
@@ -30,14 +30,14 @@ one can run tests and then use the results for statistics, decision-making, and 
 
 .. class:: taptest
 
-    .. method:: :plan(count)
+    .. method:: plan(count)
 
         Indicate how many tests will be performed.
 
         :param number count:
         :return: nil
 
-    .. method:: :check()
+    .. method:: check()
 
         Checks the number of tests performed. This check should only be done
         after all planned tests are complete, so ordinarily ``taptest:check()``
@@ -48,14 +48,14 @@ one can run tests and then use the results for statistics, decision-making, and 
 
         :return: nil
 
-    .. method:: :diag(message)
+    .. method:: diag(message)
 
         Display a diagnostic message.
 
         :param string message: the message to be displayed.
         :return: nil
 
-    .. method:: :ok(condition, test-name)
+    .. method:: ok(condition, test-name)
 
         This is a basic function which is used by other functions. Depending
         on the value of ``condition``, print 'ok' or 'not ok' along with
@@ -87,7 +87,7 @@ one can run tests and then use the results for statistics, decision-making, and 
             - true
             ...
 
-    .. method:: :fail(test-name)
+    .. method:: fail(test-name)
 
         ``taptest:fail('x')`` is equivalent to ``taptest:ok(false, 'x')``.
         Displays the message.
@@ -97,7 +97,7 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true or false.
         :rtype:  boolean
 
-    .. method:: :skip(message)
+    .. method:: skip(message)
 
         ``taptest:skip('x')`` is equivalent to
         ``taptest:ok(true, 'x' .. '# skip')``.
@@ -115,7 +115,7 @@ one can run tests and then use the results for statistics, decision-making, and 
             - true
             ...
 
-    .. method:: :is(got, expected, test-name)
+    .. method:: is(got, expected, test-name)
 
         Check whether the first argument equals the second argument.
         Displays extensive message if the result is false.
@@ -126,7 +126,7 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true or false.
         :rtype:  boolean
 
-    .. method:: :isnt(got, expected, test-name)
+    .. method:: isnt(got, expected, test-name)
 
         This is the negation of ``taptest:is(...)``.
 
@@ -137,13 +137,13 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true of false.
         :rtype:  boolean
 
-    .. method:: :isnil(value, test-name)
-                :isstring(value, test-name)
-                :isnumber(value, test-name)
-                :istable(value, test-name)
-                :isboolean(value, test-name)
-                :isudata(value, test-name)
-                :iscdata(value, test-name)
+    .. method:: isnil(value, test-name)
+                isstring(value, test-name)
+                isnumber(value, test-name)
+                istable(value, test-name)
+                isboolean(value, test-name)
+                isudata(value, test-name)
+                iscdata(value, test-name)
 
         Test whether a value has a particular type. Displays a long message if
         the value is not of the specified type.
@@ -154,7 +154,7 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true of false.
         :rtype:  boolean
 
-    .. method:: :is_deeply(got, expected, test-name)
+    .. method:: is_deeply(got, expected, test-name)
 
         Recursive version of ``tap-test:is(...)``, which can be be used to
         compare tables as well as scalar values.

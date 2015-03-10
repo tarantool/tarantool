@@ -2,16 +2,16 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                 Fiber-IPC
+                                 Package `fiber-ipc`
 -------------------------------------------------------------------------------
 
-The ``fiber-IPC`` package allows sending and receiving messages between
+The ``fiber-ipc`` package allows sending and receiving messages between
 different processes. The words "different processes" in this context
 mean different connections, different sessions, or different fibers.
 
 Call ``fiber.channel()`` to allocate space and get a channel object,
 which will be called channel for examples in this section. Call the
-other ``fiber-IPC`` routines, via channel, to send messages, receive
+other ``fiber-ipc`` routines, via channel, to send messages, receive
 messages, or check ipc status. Message exchange is synchronous. The
 channel is garbage collected when no one is using it, as with any
 other Lua object. Use object-oriented syntax, for example
@@ -32,7 +32,7 @@ other Lua object. Use object-oriented syntax, for example
 
 .. class:: channel
 
-    .. method:: :put(message[, timeout])
+    .. method:: put(message[, timeout])
 
         Send a message using a channel. If the channel is full,
         ``channel:put()`` blocks until there is a free slot in the channel.
@@ -44,13 +44,13 @@ other Lua object. Use object-oriented syntax, for example
                 Otherwise it returns true.
         :rtype:  boolean
 
-    .. method:: :close()
+    .. method:: close()
 
         Close the channel. All waiters in the channel will be woken up.
         All following ``channel:put()`` or ``channel:get()`` operations will
         return an error (``nil``).
 
-    .. method:: :get([timeout])
+    .. method:: get([timeout])
 
         Fetch a message from a channel. If the channel is empty,
         ``channel:get()`` blocks until there is a message.
@@ -60,7 +60,7 @@ other Lua object. Use object-oriented syntax, for example
                 ``channel:put()`` or ``channel:broadcast()``.
         :rtype:  lua_object
 
-    .. method:: :broadcast(message)
+    .. method:: broadcast(message)
 
         If the channel is empty, ``channel:broadcast()`` is equivalent to
         ``channel:put()``. Otherwise, ``channel:broadcast()`` sends the
@@ -68,28 +68,28 @@ other Lua object. Use object-oriented syntax, for example
 
         :param message:
 
-    .. method:: :is_empty()
+    .. method:: is_empty()
 
         Check whether the specified channel is empty (has no messages).
 
         :return: true if the specified channel is empty
         :rtype:  boolean
 
-    .. method:: :count()
+    .. method:: count()
 
         Find out how many messages are on the channel. The answer is 0 if the channel is empty.
 
         :return: the number of messages.
         :rtype:  number
 
-    .. method:: :is_full()
+    .. method:: is_full()
 
         Check whether the specified channel is full.
 
         :return: true if the specified channel is full (has no room for a new message).
         :rtype:  boolean
 
-    .. method:: :has_readers()
+    .. method:: has_readers()
 
         Check whether the specified channel is empty and has readers waiting for
         a message (because they have issued ``channel:get()`` and then blocked).
@@ -97,7 +97,7 @@ other Lua object. Use object-oriented syntax, for example
         :return: true if blocked users are waiting. Otherwise false.
         :rtype:  boolean
 
-    .. method:: :has_writers()
+    .. method:: has_writers()
 
         Check whether the specified channel is full and has writers waiting
         (because they have issued ``channel:put()`` and then blocked due to lack of room).
@@ -105,7 +105,7 @@ other Lua object. Use object-oriented syntax, for example
         :return: true if blocked users are waiting. Otherwise false.
         :rtype:  boolean
 
-    .. method:: :is_closed()
+    .. method:: is_closed()
 
         :return: true if the specified channel is already closed. Otherwise false.
         :rtype:  boolean

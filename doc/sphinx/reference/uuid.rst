@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                     UUID
+                            Package `uuid`
 -------------------------------------------------------------------------------
 
 A "UUID" is a `Universally unique identifier`_. If an application requires that
@@ -50,7 +50,7 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
 
 .. class:: uuid_cdata
 
-    .. method:: :bin([byte-order])
+    .. method:: bin([byte-order])
 
         :param byte-order: |br| 'l' - little-endian,
                            |br| 'b' - big-endian,
@@ -60,12 +60,12 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
         :return: UUID converted from cdata input value.
         :rtype: 16-byte binary string
 
-    .. method:: :str()
+    .. method:: str()
 
         :return: UUID converted from cdata input value.
         :rtype: 36-byte hexadecimal string
 
-    .. method:: :isnil()
+    .. method:: isnil()
 
         The all-zero UUID value can be expressed as uuid.NULL, or as
         ``uuid.fromstr('00000000-0000-0000-0000-000000000000')``.

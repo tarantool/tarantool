@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                   fio
+                                   Package `fio`
 -------------------------------------------------------------------------------
 
 Tarantool supports file input/output with an API that is similar to POSIX
@@ -284,7 +284,7 @@ access the same file simultaneously.
 
 .. class:: file-handle
 
-    .. method:: :close()
+    .. method:: close()
 
         Close a file that was opened with ``fio.open``. For details type "man 2 close".
 
@@ -299,8 +299,8 @@ access the same file simultaneously.
             - true
             ...
 
-    .. method:: :pread(count, offset)
-                :pwrite(new-string, offset)
+    .. method:: pread(count, offset)
+                pwrite(new-string, offset)
 
         Perform read/write random-access operation on a file, without affecting
         the current seek position of the file.
@@ -322,8 +322,8 @@ access the same file simultaneously.
               insert in
             ...
 
-    .. method:: :read(count)
-                :write(new-string)
+    .. method:: read(count)
+                write(new-string)
 
         Perform non-random-access read or write on a file. For details type
         "man 2 read" or "man 2 write".
@@ -348,7 +348,7 @@ access the same file simultaneously.
             - true
             ...
 
-    .. method:: :truncate(new-size)
+    .. method:: truncate(new-size)
 
         Change the size of an open file. Differs from ``fio.truncate``, which
         changes the size of a closed file.
@@ -364,7 +364,7 @@ access the same file simultaneously.
             - true
             ...
 
-    .. method:: :seek(position [, offset-from])
+    .. method:: seek(position [, offset-from])
 
         Shift position in the file to the specified position. For details type
         "man 2 seek".
@@ -385,7 +385,7 @@ access the same file simultaneously.
             ...
 
 
-    .. method:: :stat()
+    .. method:: stat()
 
         Return statistics about an open file. This differs from ``fio.stat``
         which return statistics about a closed file. For details type "man 2 stat".
@@ -413,8 +413,8 @@ access the same file simultaneously.
               blocks: 8
             ...
 
-    .. method:: :fsync()
-                :fdatasync()
+    .. method:: fsync()
+                fdatasync()
 
         Ensure that file changes are written to disk, for an open file.
         Compare ``fio.sync``, which is for all files. For details type

@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                              socket
+                            Package `socket`
 -------------------------------------------------------------------------------
 
 The ``socket`` package allows exchanging data via BSD sockets with a local or
@@ -91,7 +91,7 @@ the function invocations will look like ``sock:function_name(...)``.
 .. function:: __call(domain, type, protocol)
 
     Create a new TCP or UDP socket. The argument values
-    are the same as in the `Linux man page`_.
+    are the same as in the `Linux man page <http://man7.org/linux/man-pages/man2/socket.2.html>`_.
 
     :param domain:
     :param type:
@@ -152,10 +152,11 @@ the function invocations will look like ``sock:function_name(...)``.
 
 .. class:: socket_object
 
-    .. method:: :sysconnect(host, port)
+    .. method:: sysconnect(host, port)
 
         Connect a socket to a remote host. The argument values are the same as
-        in the Linux man page. The host must be an IP address.
+        in the `Linux man page <http://man7.org/linux/man-pages/man2/connect.2.html>`_.
+        The host must be an IP address.
 
         Parameters:
             * Either:
@@ -179,7 +180,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
             sock:sysconnect('127.0.0.1', 80)
 
-    .. method:: :send(data)
+    .. method:: send(data)
 
         Send data over a connected socket.
 
@@ -192,12 +193,12 @@ the function invocations will look like ``sock:function_name(...)``.
             The function ``sock:write(...)`` has
             the same parameters and same effect.
 
-    .. method:: :syswrite(size)
+    .. method:: syswrite(size)
 
         Write as much as possible data to the socket buffer if non-blocking.
         Rarely used. For details see `this description`_.
 
-    .. method:: :recv(size)
+    .. method:: recv(size)
 
         Read ``size`` bytes from a connected socket. An internal read-ahead
         buffer is used to reduce the cost of this call.
@@ -210,11 +211,11 @@ the function invocations will look like ``sock:function_name(...)``.
                     end, returns the remainder read from the socket (possibly
                     an empty string), followed by "eof" status.
 
-    .. method:: :read(limit [, timeout])
-                :read(delimiter [, timeout])
-                :read({limit=limit} [, timeout])
-                :read({delimiter=delimiter} [,timeout])
-                :read({limit=limit, delimiter=delimiter} [, timeout])
+    .. method:: read(limit [, timeout])
+                read(delimiter [, timeout])
+                read({limit=limit} [, timeout])
+                read({delimiter=delimiter} [,timeout])
+                read({limit=limit, delimiter=delimiter} [, timeout])
 
         Read from a connected socket until some condition is true, and return
         the bytes that were read.
@@ -234,12 +235,12 @@ the function invocations will look like ``sock:function_name(...)``.
                  expression.
         :rtype: string
 
-    .. method:: :sysread(size)
+    .. method:: sysread(size)
 
         Return all available data from the socket buffer if non-blocking.
         Rarely used. For details see `this description`_.
 
-    .. method:: :bind(host [, port])
+    .. method:: bind(host [, port])
 
         Bind a socket to the given host/port. A UDP socket after binding
         can be used to receive data (see :meth:`socket_object.recvfrom()`).
@@ -254,7 +255,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :exception: nil, status, errno, errstr on error.
 
 
-    .. method:: :listen(backlog)
+    .. method:: listen(backlog)
 
         Start listening for incoming connections.
 
@@ -265,7 +266,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: true for success, false for error.
         :rtype:  boolean
 
-    .. method:: :accept()
+    .. method:: accept()
 
         Accept a new client connection and create a new connected socket.
         It is good practice to set the socket's blocking mode explicitly
@@ -275,7 +276,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :rtype: userdata
         :exception: nil
 
-    .. method:: :sendto(host, port, data)
+    .. method:: sendto(host, port, data)
 
         Send a message on a UDP socket to a specified host.
 
@@ -287,7 +288,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :rtype:  number
         :exception: status, errno, errstr.
 
-    .. method:: :recvfrom(limit)
+    .. method:: recvfrom(limit)
 
         Receive a message on a UDP socket.
 
@@ -308,7 +309,7 @@ the function invocations will look like ``sock:function_name(...)``.
         ``message_sender.family = 'AF_INET'``,
         ``message_sender.port = 43065``.
 
-    .. method:: :shutdown(how)
+    .. method:: shutdown(how)
 
         Shutdown a reading end, a writing end, or both ends of a socket.
 
@@ -317,7 +318,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: true or false.
         :rtype:  boolean
 
-    .. method:: :close()
+    .. method:: close()
 
         Close (destroy) a socket. A closed socket should not be used any more.
         A socket is closed automatically when its userdata is garbage collected by Lua.
@@ -326,8 +327,8 @@ the function invocations will look like ``sock:function_name(...)``.
                  sock is already closed, sock:close() returns false.
         :rtype:  boolean
 
-    .. method:: :error()
-                :errno()
+    .. method:: error()
+                errno()
 
         Retrieve information about the last error that occurred on a socket, if any.
         Errors do not cause throwing of exceptions so these functions are usually necessary.
@@ -336,9 +337,10 @@ the function invocations will look like ``sock:function_name(...)``.
                  If there is no error, then ``sock:errno()`` will return 0 and ``sock:error()``.
         :rtype:  number, string
 
-    .. method:: :setsockopt(level, name, value)
+    .. method:: setsockopt(level, name, value)
 
-        Set socket flags. The argument values are the same as in the `Linux man page`_.
+        Set socket flags. The argument values are the same as in the
+        `Linux man page <http://man7.org/linux/man-pages/man2/setsockopt.2.html>`_.
         The ones that Tarantool accepts are:
 
             * SO_ACCEPTCONN
@@ -370,19 +372,20 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Setting SO_LINGER is done with ``sock:linger(active)``.
 
-    .. method:: :getsockopt(level, name)
+    .. method:: getsockopt(level, name)
 
         Get socket flags. For a list of possible flags see ``sock:setsockopt()``.
 
-    .. method:: :linger([active])
+    .. method:: linger([active])
 
-        Set or clear the SO_LINGER flag. For a description of the flag, see `Linux man page`_.
+        Set or clear the SO_LINGER flag. For a description of the flag, see
+        `Linux man page <http://man7.org/linux/man-pages/man1/loginctl.1.html>`_.
 
         :param boolean active:
 
         :return: new active and timeout values.
 
-    .. method:: :nonblock([flag])
+    .. method:: nonblock([flag])
 
         ``sock:nonblock()`` returns the current flag value. |br|
         ``sock:nonblock(false)`` sets the flag to false and returns false. |br|
@@ -390,15 +393,15 @@ the function invocations will look like ``sock:function_name(...)``.
         This function may be useful before invoking a function which might
         otherwise block indefinitely.
 
-    .. method:: :readable([timeout])
-                :writeable([timeout])
-                :wait([timout])
+    .. method:: readable([timeout])
+                writeable([timeout])
+                wait([timout])
 
         ``sock:readable()`` waits until something is readable, or until a timeout value expires. |br|
         ``sock:writable()`` waits until something is writable, or until a timeout value expires. |br|
         ``sock:wait()`` waits until something is either readable or writable, or until a timeout value expires.
 
-    .. method:: :name()
+    .. method:: name()
 
         The ``The sock:name()`` function is used to get information about the
         near side of the connection. If a socket was bound to ``xyz.com:45``,
@@ -408,7 +411,7 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: A table containing these fields: "host", "family", "type", "protocol", "port".
         :rtype:  table
 
-    .. method:: :peer()
+    .. method:: peer()
 
         The ``sock:peer()`` function is used to get information about the far side of a connection.
         If a TCP connection has been made to a distant host ``tarantool.org:80``, ``sock:peer()``
@@ -420,8 +423,6 @@ the function invocations will look like ``sock:function_name(...)``.
 
 .. _Lua pattern:      http://www.lua.org/pil/20.2.html
 .. _this description: https://github.com/tarantool/tarantool/wiki/sockets%201.6
-.. _linux man page:
-
 
 =================================================
                     Example

@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                    Fiber
+                            Package `fiber`
 -------------------------------------------------------------------------------
 
 The ``fiber`` package allows for creating, running and managing *fibers*.
@@ -104,21 +104,21 @@ can be reused when another fiber is created.
 
 .. class:: fiber_object
 
-    .. method:: :id()
+    .. method:: id()
 
         :param self: fiber object, for example the fiber
                      object returned by ``fiber.create``
         :return: id of the fiber.
         :rtype: number
 
-    .. method:: :name()
+    .. method:: name()
 
         :param self: fiber object, for example the fiber
                      object returned by ``fiber.create``
         :return: name of the fiber.
         :rtype: number
 
-    .. method:: :name(name)
+    .. method:: name(name)
 
         Change the fiber name. By default the Tarantool server's
         interactive-mode fiber is named 'interactive' and new
@@ -131,7 +131,7 @@ can be reused when another fiber is created.
         :param string name: the new name of the fiber.
         :return: nil
 
-    .. method:: :status()
+    .. method:: status()
 
         Return the status of the specified fiber.
 
@@ -141,7 +141,7 @@ can be reused when another fiber is created.
                  “suspended”, or “running”.
         :rtype: string
 
-    .. method:: :cancel()
+    .. method:: cancel()
 
         Cancel a fiber. Running and suspended fibers can be canceled.
         After a fiber has been canceled, attempts to operate on it will

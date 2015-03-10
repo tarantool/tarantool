@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                     MsgPack
+                                    Package `msgpack`
 -------------------------------------------------------------------------------
 
 The ``msgpack`` package takes strings in MsgPack_ format and decodes them, or takes a

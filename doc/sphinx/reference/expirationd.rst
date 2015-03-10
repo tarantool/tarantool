@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                   expirationd
+                                   Package `expirationd`
 -------------------------------------------------------------------------------
 
 For a commercial-grade example of a Lua rock that works with Tarantool, let us
