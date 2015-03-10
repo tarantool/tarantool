@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                   console
+                                   Package `console`
 -------------------------------------------------------------------------------
 
 The console package allows one Tarantool server to access another Tarantool

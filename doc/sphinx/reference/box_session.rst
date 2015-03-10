@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                     box.session
+                            Package `box.session`
 -------------------------------------------------------------------------------
 
 The ``box.session`` package allows querying the session state, writing to a

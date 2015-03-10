@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                     YAML
+                            Package `yaml`
 -------------------------------------------------------------------------------
 
 The ``yaml`` package takes strings in YAML_ format and decodes them, or takes a

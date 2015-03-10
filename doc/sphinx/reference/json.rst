@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                     JSON
+                          Package `json`
 -------------------------------------------------------------------------------
 
 The json package provides JSON manipulation routines. It is based on the

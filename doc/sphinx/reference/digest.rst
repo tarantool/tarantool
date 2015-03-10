@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                                   Digest
+                            Package `digest`
 -------------------------------------------------------------------------------
 
 A "digest" is a value which is returned by a `Cryptographic hash function`_ applied
