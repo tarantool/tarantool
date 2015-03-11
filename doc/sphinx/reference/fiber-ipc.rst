@@ -30,7 +30,7 @@ other Lua object. Use object-oriented syntax, for example
     :return: new channel.
     :rtype:  userdata
 
-.. class:: channel
+.. class:: channel_object
 
     .. method:: put(message[, timeout])
 

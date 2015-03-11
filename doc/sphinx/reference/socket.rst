@@ -61,7 +61,7 @@ are ``errno``, ``error``.
     |    teardown    +-------------+
     |                | close       |
     +----------------+-------------+
-    |                | errno       |
+    |                | error       |
     | error checking +-------------+
     |                | errno       |
     +----------------+-------------+
@@ -149,13 +149,12 @@ the function invocations will look like ``sock:function_name(...)``.
 
         socket.tcp_server('localhost', 3302, function () end).
 
-
 .. class:: socket_object
 
     .. method:: sysconnect(host, port)
 
         Connect a socket to a remote host. The argument values are the same as
-        in the `Linux man page <http://man7.org/linux/man-pages/man2/connect.2.html>`_.
+        in the Linux man page [1]_.
         The host must be an IP address.
 
         Parameters:
@@ -181,17 +180,13 @@ the function invocations will look like ``sock:function_name(...)``.
             sock:sysconnect('127.0.0.1', 80)
 
     .. method:: send(data)
+                write(data)
 
         Send data over a connected socket.
 
         :param string data:
         :return: true if success, false if error.
         :rtype:  boolean
-
-        .. NOTE::
-
-            The function ``sock:write(...)`` has
-            the same parameters and same effect.
 
     .. method:: syswrite(size)
 
@@ -243,7 +238,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: bind(host [, port])
 
         Bind a socket to the given host/port. A UDP socket after binding
-        can be used to receive data (see :meth:`socket_object.recvfrom()`).
+        can be used to receive data (see :func:`socket_object.recvfrom`).
         A TCP socket can be used to accept new connections, after it has
         been put in listen mode.
 
@@ -264,7 +259,7 @@ the function invocations will look like ``sock:function_name(...)``.
                         may be ``SOMAXCONN``.
 
         :return: true for success, false for error.
-        :rtype:  boolean
+        :rtype: boolean.
 
     .. method:: accept()
 
@@ -340,7 +335,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: setsockopt(level, name, value)
 
         Set socket flags. The argument values are the same as in the
-        `Linux man page <http://man7.org/linux/man-pages/man2/setsockopt.2.html>`_.
+        Linux man page [2]_.
         The ones that Tarantool accepts are:
 
             * SO_ACCEPTCONN
@@ -379,7 +374,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: linger([active])
 
         Set or clear the SO_LINGER flag. For a description of the flag, see
-        `Linux man page <http://man7.org/linux/man-pages/man1/loginctl.1.html>`_.
+        Linux man page [3]_.
 
         :param boolean active:
 
@@ -514,3 +509,8 @@ computer to communicate with itself, but shows that the system works.
 
 
 .. _luasocket: https://github.com/diegonehab/luasocket
+
+.. [1] http://man7.org/linux/man-pages/man2/connect.2.html
+.. [2] http://man7.org/linux/man-pages/man2/setsockopt.2.html
+.. [3] http://man7.org/linux/man-pages/man1/loginctl.1.html
+
