@@ -1,6 +1,7 @@
 -- bsdsocket.lua (internal file)
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
+local LIMIT_INFINITY = 4294967295
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
@@ -544,15 +545,18 @@ local errno_is_fatal = {
     [boxerrno.ENOTSOCK] = true;
 }
 
-local function readchunk(self, size, timeout)
+local function readchunk(self, limit, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
     end
 
-    if string.len(self.rbuf) >= size then
+    if self.rlen >= limit then
         self._errno = nil
-        local data = string.sub(self.rbuf, 1, size)
-        self.rbuf = string.sub(self.rbuf, size + 1)
+        local data = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+        self.rlen = self.rlen - limit
+        self.rpos = self.rpos + limit
         return data
     end
 
@@ -565,20 +569,25 @@ local function readchunk(self, size, timeout)
 
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread()
+        local to_read
+        if limit ~= LIMIT_INFINITY then
+            to_read = limit - self.rlen
+        end
+        local data = self:sysread(to_read)
         if data ~= nil then
-            self.rbuf = self.rbuf .. data
-            if string.len(self.rbuf) >= size then
-               data = string.sub(self.rbuf, 1, size)
-               self.rbuf = string.sub(self.rbuf, size + 1)
+            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
+            self.rpos = 1
+            self.rlen = string.len(self.rbuf)
+            if string.len(data) == 0 then   -- eof
+                limit = self.rlen
+            end
+            if self.rlen >= limit then
+               data = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+               self.rlen = self.rlen - limit
+               self.rpos = self.rpos + limit
                return data
             end
 
-            if string.len(data) == 0 then   -- eof
-                data = self.rbuf
-                self.rbuf = nil
-                return data
-            end
         elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
@@ -589,27 +598,32 @@ local function readchunk(self, size, timeout)
 end
 
 local function readline_check(self, eols, limit)
-    local rbuf = self.rbuf
-    if string.len(rbuf) == 0 then
+    if limit == 0 then
+        return ''
+    end
+    if self.rlen == 0 then
         return nil
     end
 
     local shortest
     for i, eol in ipairs(eols) do
-        local data = string.match(rbuf, "^(.-" .. eol .. ")")
+        local data = string.match(self.rbuf, "^(.-" .. eol .. ")", self.rpos)
         if data ~= nil then
             if string.len(data) > limit then
                 data = string.sub(data, 1, limit)
             end
-            if shortest == nil then
-                shortest = data
-            elseif #shortest > #data then
+            if shortest == nil or string.len(shortest) > string.len(data) then
                 shortest = data
             end
         end
     end
-    if shortest == nil and #rbuf >= limit then
-        return string.sub(rbuf, 1, limit)
+    if shortest == nil and self.rlen >= limit then
+        shortest = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+    end
+    if shortest ~= nil then
+        local len = string.len(shortest)
+        self.rpos = self.rpos + len
+        self.rlen = self.rlen - len
     end
     return shortest
 end
@@ -617,15 +631,13 @@ end
 local function readline(self, limit, eol, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
     end
 
     self._errno = nil
-    if limit == 0 then
-        return ''
-    end
     local data = readline_check(self, eol, limit)
     if data ~= nil then
-        self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
         return data
     end
 
@@ -640,28 +652,21 @@ local function readline(self, limit, eol, timeout)
         
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread()
+        local to_read
+        if limit ~= LIMIT_INFINITY then
+            to_read = limit - self.rlen
+        end
+        local data = self:sysread(to_read)
         if data ~= nil then
-            self.rbuf = self.rbuf .. data
-
-            -- eof
-            if string.len(data) == 0 then
-                data = self.rbuf
-                self.rbuf = nil
-                return data
+            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
+            self.rpos = 1
+            self.rlen = string.len(self.rbuf)
+            if string.len(data) == 0 then       -- eof
+                limit = self.rlen
             end
-
             data = readline_check(self, eol, limit)
             if data ~= nil then
-                self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
                 return data
-            end
-
-            -- limit
-            if string.len(self.rbuf) >= limit then
-               data = string.sub(self.rbuf, 1, limit)
-               self.rbuf = string.sub(self.rbuf, limit + 1)
-               return data
             end
 
         elseif not errno_is_transient[self:errno()] then
@@ -669,6 +674,7 @@ local function readline(self, limit, eol, timeout)
             return nil
         end
     end
+    return nil
 end
 
 socket_methods.read = function(self, opts, timeout)
@@ -677,7 +683,7 @@ socket_methods.read = function(self, opts, timeout)
     if type(opts) == 'number' then
         return readchunk(self, opts, timeout)
     elseif type(opts) == 'string' then
-        return readline(self, 4294967295, { opts }, timeout)
+        return readline(self, LIMIT_INFINITY, { opts }, timeout)
     elseif type(opts) == 'table' then
         local chunk = opts.chunk or opts.size or 4294967295
         local delimiter = opts.delimiter or opts.line
