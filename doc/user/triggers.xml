@@ -106,7 +106,7 @@
         </term>
         <listitem><para>
         Define a trigger for execution when a new session is created due to
-        an event such as <link linkend="console-connect"><code>console.connect()</code></link>.
+        an event such as <ulink url="/doc/reference/console.html#console.connect"><code>console.connect()</code></ulink>.
         The trigger function will be the first
         thing executed after a new session is created.
         If the trigger fails by raising an error, the error
@@ -164,7 +164,7 @@
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               After the following series of requests, the server
-              will write a message using the <link linkend="sp-log">log package</link>
+              will write a message using the <ulink url="/doc/reference/log.html">log package</ulink>
               whenever any user connects or disconnects.
 <programlisting>
 console = require('console'); console.delimiter('!') --this means ignore line feeds until next '!'

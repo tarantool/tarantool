@@ -5,22 +5,7 @@
 {% block header_scripts %}
   <link rel="stylesheet" href="/doc/_static/sphinx_design.css" />
   <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
-  <script>
-  $(document).ready(function () {
-    $("div>h1").remove();
-    $("h2, h3, h4, h5, h6").each(
-      function(i, el) {
-        var icon = '<i class="fa fa-link"></i>';
-        var hlink = $(el).find(".headerlink");
-        var hlink_id = hlink.attr("href");
-        if (typeof(hlink_id) != 'undefined') {
-          $(hlink).remove();
-          $(el).prepend($("<a />").addClass("headerlink").attr("href", hlink_id).html(icon));
-        }
-      }
-    )
-  });
-  </script>
+  <script type="text/javascript" src="../_static/headers.js"></script>
   {{ super() }}
 {% endblock header_scripts %}
 

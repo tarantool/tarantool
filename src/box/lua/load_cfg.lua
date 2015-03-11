@@ -151,13 +151,13 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     if cfg.dont_check then
         return
     end
-    readable_prefix = ''
+    local readable_prefix = ''
     if prefix ~= nil and prefix ~= '' then
         readable_prefix = prefix .. '.'
     end
     local new_cfg = {}
     for k,v in pairs(cfg) do
-        readable_name = readable_prefix .. k;
+        local readable_name = readable_prefix .. k;
         if template_cfg[k] == nil then
             error("Error: cfg parameter '" .. readable_name .. "' is unexpected")
         elseif v == "" or v == nil then

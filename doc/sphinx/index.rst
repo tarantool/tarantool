@@ -7,6 +7,7 @@
     :maxdepth: 1
 
     intro.rst
+    faq.rst
 
 .. raw:: html
 
@@ -19,5 +20,5 @@
 .. toctree::
     :maxdepth: 1
 
-    faq.rst
+    reference/index.rst
     dev_guide/index.rst

@@ -32,9 +32,6 @@
 #include <inttypes.h>
 #include <assert.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 /**
  * 96-bit signed integer.
  * 1)Negative integer is stored as 96-bit two's complement
@@ -42,13 +39,13 @@ extern "C" {
  * Actually (1) == (2), as the wave-particle duality.
  * Designed for storing integers in range [INT64_MIN, UINT64_MAX],
  * and detecting overflow (out of range [INT64_MIN, UINT64_MAX])
- * after operations (addition, substruction) on them.
+ * after operations (addition, subtraction) on them.
  * The base fact is when two uint64_t or int64_t values
- * are converted to int96, and then added or substructed, the
+ * are converted to int96, and then added or subtracted, the
  * int96 arithmetics cannot overflow. Actually you need at least
  * billions of adding UINT64_MAX or INT64_MIN to make it overflow.
  * Addition is implemented directly;
- * For substraction use addition of inverted number.
+ * For subtraction use addition of inverted number.
  */
 
 /**
@@ -154,7 +151,7 @@ int96_is_neg_int64(const struct int96_num *num)
 
 /**
  * Get number as negative int64_t,
- * the nymber is expected to be valid range (assert)
+ * the number is expected to be valid range (assert)
  */
 static inline int64_t
 int96_extract_neg_int64(const struct int96_num *num)
@@ -162,9 +159,5 @@ int96_extract_neg_int64(const struct int96_num *num)
 	assert(int96_is_neg_int64(num));
 	return (int64_t)int96_get_low64bit(num);
 }
-
-#ifdef __cplusplus
-} /* extern "C" { */
-#endif
 
 #endif /* #ifndef TARANTOOL_LIB_BIT_INT96_H_INCLUDED */

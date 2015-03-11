@@ -281,10 +281,10 @@ replica for select requests).
 <userinput>mkdir -p ~/tarantool_test_node_1</userinput>
 <userinput>cd ~/tarantool_test_node_1</userinput>
 <userinput>rm -R ~/tarantool_test_node_1/*</userinput>
-<userinput>~/tarantool-master/src/tarantool</userinput>
+<userinput>~/tarantool/src/tarantool</userinput>
 <userinput>box.cfg{listen=3301}</userinput>
-<userinput>box.schema.user.create('replication', {password = 'password'})</userinput>
-<userinput>box.schema.user.grant('replication','read,write','universe')</userinput>
+<userinput>box.schema.user.create('replicator', {password = 'password'})</userinput>
+<userinput>box.schema.user.grant('replicator','read,write','universe')</userinput>
 <userinput>box.space._cluster:select({0},{iterator='GE'})</userinput>
 </programlisting>
 </para>
@@ -302,16 +302,16 @@ Now the screen looks like this: (except that UUID values are always different):
 $ <userinput>mkdir -p ~/tarantool_test_node_1</userinput>
 $ <userinput>cd ~/tarantool_test_node_1</userinput>
 ~/tarantool_test_node_1$ <userinput>rm -R ~/tarantool_test_node_1/*</userinput>
-~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-~/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
+~/tarantool_test_node_1$ <userinput>~/tarantool/src/tarantool</userinput>
+~/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
-tarantool&gt; <userinput>box.schema.user.create('replication', {password = 'password'})</userinput>
+tarantool&gt; <userinput>box.schema.user.create('replicator', {password = 'password'})</userinput>
 2014-10-13 11:12:56.052 [25018] wal I> creating `./00000000000000000000.xlog.inprogress'
 ---
 ...
-tarantool&gt; <userinput>box.schema.user.grant('replication','read,write','universe')</userinput>
+tarantool&gt; <userinput>box.schema.user.grant('replicator','read,write','universe')</userinput>
 ---
 ...
 tarantool&gt; <userinput>box.space._cluster:select({0},{iterator='GE'})</userinput>
@@ -345,8 +345,8 @@ execute these commands:<programlisting>
 <userinput>mkdir -p ~/tarantool_test_node_2</userinput>
 <userinput>cd ~/tarantool_test_node_2</userinput>
 <userinput>rm -R ~/tarantool_test_node_2/*</userinput>
-<userinput>~/tarantool-master/src/tarantool</userinput>
-<userinput>box.cfg{listen=3302, replication_source='replication:password@localhost:3301'}</userinput>
+<userinput>~/tarantool/src/tarantool</userinput>
+<userinput>box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}</userinput>
 <userinput>box.space._cluster:select({0},{iterator='GE'})</userinput></programlisting>
 The result is that a replica is set up.
 Messages appear on Terminal #1 confirming that the
@@ -381,10 +381,10 @@ tarantool&gt; 2014-10-13 11:20:08.691 [25020] main/101/spawner I> created a repl
 ~/tarantool_test_node_2$ <userinput>mkdir -p ~/tarantool_test_node_2</userinput>
 ~/tarantool_test_node_2$ <userinput>cd ~/tarantool_test_node_2</userinput>
 ~/tarantool_test_node_2$ <userinput>rm -R ~/tarantool_test_node_2/*</userinput>
-~/tarantool_test_node_2$ <userinput>~/tarantool-master/src/tarantool</userinput>
-/home/username/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
+~/tarantool_test_node_2$ <userinput>~/tarantool/src/tarantool</userinput>
+/home/username/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
-tarantool&gt; <userinput>box.cfg{listen=3302, replication_source='replication:password@localhost:3301'}</userinput>
+tarantool&gt; <userinput>box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}</userinput>
 ... ...
 ---
 ...
@@ -435,10 +435,10 @@ tarantool&gt; <userinput>s:insert{1,'Tuple inserted on Terminal #1'}</userinput>
 ~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
 ~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
 ~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
-~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
-/home/username/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
+~/tarantool_test_node_2$ ~/tarantool/src/tarantool
+/home/username/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
-tarantool&gt; box.cfg{listen=3302, replication_source='replication:password@localhost:3301'}
+tarantool&gt; box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}
 ... ...
 ---
 ...
@@ -446,7 +446,6 @@ tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
 2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
 2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 I> authenticated
 2014-10-13 11:20:08.901 [25579] wal I> creating `./00000000000000000000.xlog.inprogress'
-
 ---
 - - [1, '6190d919-1133-4452-b123-beca0b178b32']
   - [2, '236230b8-af3e-406b-b709-15a60b44c20c']
@@ -633,7 +632,7 @@ even though Terminal #1 is down.
 </para>
 <para>
 On Terminal #1 execute these commands:<programlisting>
-<userinput>~/tarantool-master/src/tarantool</userinput>
+<userinput>~/tarantool/src/tarantool</userinput>
 <userinput>box.cfg{listen=3301}</userinput>
 <userinput>box.space.tester:select({0},{iterator='GE'})</userinput></programlisting>
 Now the screen looks like this (ignoring the repeated messages on terminal #2 saying "failed to connect"):
@@ -661,8 +660,8 @@ total 8
 total 8
 -rw-rw-r-- 1  1781 Oct 13 11:20 00000000000000000000.snap
 -rw-rw-r-- 1   588 Oct 13 11:38 00000000000000000000.xlog
-~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-/home/username/tarantool-master/src/tarantool: version 1.6.3-515-g0a06cce
+~/tarantool_test_node_1$ <userinput>~/tarantool/src/tarantool</userinput>
+/home/username/tarantool/src/tarantool: version 1.6.3-515-g0a06cce
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
@@ -712,7 +711,7 @@ to act as a replication source.
 </para>
 <para>
 On Terminal #1, say:<programlisting>
-<userinput>box.cfg{replication_source='replication:password@localhost:3302'}</userinput>
+<userinput>box.cfg{replication_source='replicator:password@localhost:3302'}</userinput>
 <userinput>box.space.tester:select({0},{iterator='GE'})</userinput></programlisting>
 The screen now looks like this:
     <informaltable>
@@ -722,7 +721,7 @@ The screen now looks like this:
      </thead>
     <tbody>
      <row><entry><programlisting>... ...
-~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+~/tarantool_test_node_1$ ~/tarantool/src/tarantool
 ~/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; box.cfg{listen=3301}
@@ -737,7 +736,7 @@ tarantool&gt; box.space.tester:select({0},{iterator='GE'})
 ---
 - - [1, 'Tuple inserted on Terminal #1']
 ...
-tarantool&gt; <userinput>box.cfg{replication_source='replication:password@localhost:3302'}</userinput>
+tarantool&gt; <userinput>box.cfg{replication_source='replicator:password@localhost:3302'}</userinput>
 2014-10-13 12:10:21.485 [28987] main/101/interactive C> starting replication from localhost:3302
 ---
 ...

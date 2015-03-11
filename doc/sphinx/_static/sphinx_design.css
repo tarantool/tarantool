@@ -250,10 +250,71 @@ tr.field td p {
     background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAEAAAAAARAQMAAABnOfukAAAABlBMVEUAAAD19fWydBufAAAAAXRSTlMAQObYZgAAADZJREFUaN7t0gEBAAAIAiD/n7YBTRA2kO4InwDruiMIgAAIgAAIgAAIsK47ggAIgAAIgAAIwAHksoxHlAvP9AAAAABJRU5ErkJggg==') 50% -0px repeat-y;
 }
 
-div.highlight {
-    overflow-x: scroll;
-}
-
 div.toctree-wrapper.compound {
     padding: 20px 0px 0px 0px;
+}
+
+div.highlight {
+    -webkit-border-radius: 7px;
+    -moz-border-radius: 7px;
+    border-radius: 7px;
+    overflow-x: auto;
+    margin: 5px 0px;
+    font-size: 13px;
+}
+
+div.admonition {
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    padding: 10px;
+    margin: 5px 0;
+}
+
+div.admonition.note {
+    background: rgb(223,223,223);
+}
+
+div.admonition.warning {
+    background: rgb(255,228,228);
+}
+
+p.admonition-title {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+p.admonition-title .fa {
+    margin: 0 10px 0 0;
+}
+
+.descname {
+    font-weight: 600;
+}
+
+dd table.field-list {
+    margin-top: 10px;
+}
+
+td.field-body {
+    padding-left: 10px;
+    padding-bottom: 10px;
+}
+
+th.field-name {
+    text-align: left;
+    font-weight: normal;
+}
+
+table.docutils.field-list {
+    font-size: 13px;
+}
+
+div.table tbody {
+    vertical-align: middle;
+    text-align: center;
+}
+
+div.table td {
+    padding: 5px 15px;
 }
