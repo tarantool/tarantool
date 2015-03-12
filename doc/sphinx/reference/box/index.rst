@@ -19,11 +19,15 @@ no arguments. The packages inside the box library are:
     box_tuple
     box_space
     box_index
+    box_session
+    box_error
+    box_tuple
+    box_introspection
     net_box
-    box_cfg
-    box_info
-    box_slab
-    box_stat
+    admin
+    atomic
+    authentication
+    limitations
 
 Every package contains one or more Lua functions. A few packages contain
 members as well as functions. The functions allow data definition (create

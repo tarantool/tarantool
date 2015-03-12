@@ -19,7 +19,6 @@ Lua functions can run in the background and perform administrative tasks.
     msgpack
     fiber
     fiber-ipc
-    box_session
     socket
     fio
     console
