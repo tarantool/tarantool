@@ -2,6 +2,7 @@
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local LIMIT_INFINITY = 4294967295
+local READAHEAD = 16380
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
@@ -178,7 +179,7 @@ end
 
 socket_methods.sysread = function(self, size)
     local fd = check_socket(self)
-    size = size or 4096
+    size = size or READAHEAD
     self._errno = nil
     local buf = ffi.new('char[?]', size)
     local res = ffi.C.read(fd, buf, size)
@@ -554,7 +555,7 @@ local function readchunk(self, limit, timeout)
 
     if self.rlen >= limit then
         self._errno = nil
-        local data = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+        local data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
         self.rlen = self.rlen - limit
         self.rpos = self.rpos + limit
         return data
@@ -570,7 +571,7 @@ local function readchunk(self, limit, timeout)
         timeout = timeout - ( fiber.time() - started )
 
         local to_read
-        if limit ~= LIMIT_INFINITY then
+        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
             to_read = limit - self.rlen
         end
         local data = self:sysread(to_read)
@@ -582,7 +583,7 @@ local function readchunk(self, limit, timeout)
                 limit = self.rlen
             end
             if self.rlen >= limit then
-               data = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+               data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
                self.rlen = self.rlen - limit
                self.rpos = self.rpos + limit
                return data
@@ -618,7 +619,7 @@ local function readline_check(self, eols, limit)
         end
     end
     if shortest == nil and self.rlen >= limit then
-        shortest = string.sub(self.rbuf, self.rpos, self.rpos + limit)
+        shortest = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
     end
     if shortest ~= nil then
         local len = string.len(shortest)
@@ -653,7 +654,7 @@ local function readline(self, limit, eol, timeout)
         timeout = timeout - ( fiber.time() - started )
 
         local to_read
-        if limit ~= LIMIT_INFINITY then
+        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
             to_read = limit - self.rlen
         end
         local data = self:sysread(to_read)
