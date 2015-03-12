@@ -592,7 +592,7 @@ local remote_methods = {
         self:_switch_state('error')
         self:_error_waiters(emsg)
         self.rbuf = ''
-        self.wbuf = ''
+        self.wbuf = {}
         self.handshake = ''
     end,
 
@@ -791,7 +791,7 @@ local remote_methods = {
                 elseif string.len(self.handshake) ~= 128 then
                     self:_fatal("Can't read handshake")
                 else
-                    self.wbuf = ''
+                    self.wbuf = {}
                     self.rbuf = ''
 
                     if string.match(self.handshake, '^Tarantool .*console') then
@@ -985,7 +985,7 @@ local remote_methods = {
                 break
             end
 
-            if string.len(self.wbuf) == 0 then
+            if self.wbuf[1] == nil then
 
                 local wstate = self._to_rstate[self.state]
                 if wstate ~= nil then
@@ -998,12 +998,17 @@ local remote_methods = {
                     break
                 end
                 if self:_is_rw_state() then
-                    if #self.wbuf > 0 then
-                        local written = self.s:syswrite(self.wbuf)
+                    if self.wbuf[1] ~= nil then
+                        local s = table.concat(self.wbuf)
+                        self.wbuf = {}
+                        local written = self.s:syswrite(s)
                         if written ~= nil then
-                            self.wbuf = string.sub(self.wbuf,
-                                tonumber(1 + written))
+                            if written ~= #s then
+                                table.insert(self.wbuf,
+                                             string.sub(s, written + 1))
+                            end
                         else
+                            table.insert(self.wbuf, s)
                             self:_fatal(errno.strerror(errno()))
                         end
                     end
@@ -1062,7 +1067,7 @@ local remote_methods = {
             self.timeouts[fid] = TIMEOUT_INFINITY
         end
 
-        self.wbuf = self.wbuf .. request
+        table.insert(self.wbuf, request)
 
         local wstate = self._to_wstate[self.state]
         if wstate ~= nil then
