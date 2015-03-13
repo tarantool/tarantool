@@ -592,6 +592,8 @@ local remote_methods = {
         self:_switch_state('error')
         self:_error_waiters(emsg)
         self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
         self.wbuf = {}
         self.handshake = ''
     end,
@@ -615,11 +617,14 @@ local remote_methods = {
 
     _check_console_response = function(self)
         while true do
-            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n')
+            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n',
+                                      self.rpos)
             if resp == nil then
                 break
             end
-            self.rbuf = string.sub(self.rbuf, #resp + 1)
+            local len = #resp
+            self.rpos = self.rpos + len
+            self.rlen = self.rlen - len
 
             local result = yaml.decode(resp)
             if result ~= nil then
@@ -656,30 +661,28 @@ local remote_methods = {
         end
 
         while true do
-            if #self.rbuf < 5 then
+            if self.rlen < 5 then
                 break
             end
 
-            local len, off = msgpack.decode(self.rbuf)
+            local len, off = msgpack.decode(self.rbuf, self.rpos)
             -- wait for correct package length
-            local roff = off + len - 1
-            if roff > #self.rbuf then
+            if off + len > #self.rbuf + 1 then
                 break
             end
-
-            local pkt = string.sub(self.rbuf, 1, roff)
-            self.rbuf = string.sub(self.rbuf, roff + 1)
-
 
             local hdr, body
-            hdr, off = msgpack.decode(pkt, off)
-            if off <= #pkt then
-                body, off = msgpack.decode(pkt, off)
+            hdr, off = msgpack.decode(self.rbuf, off)
+            if off <= #self.rbuf then
+                body, off = msgpack.decode(self.rbuf, off)
                 -- disable YAML flow output (useful for admin console)
                 setmetatable(body, mapping_mt)
             else
                 body = {}
             end
+
+            self.rpos = off
+            self.rlen = #self.rbuf + 1 - self.rpos
 
             local sync = hdr[SYNC]
 
@@ -793,6 +796,8 @@ local remote_methods = {
                 else
                     self.wbuf = {}
                     self.rbuf = ''
+                    self.rpos = 1
+                    self.rlen = 0;
 
                     if string.match(self.handshake, '^Tarantool .*console') then
                         self.console = true
@@ -959,10 +964,13 @@ local remote_methods = {
                     local data = self.s:sysread()
 
                     if data ~= nil then
-                        if data == '' then
+                        if #data == 0 then
                             self:_fatal('Remote host closed connection')
                         else
-                            self.rbuf = self.rbuf .. data
+                            self.rbuf = string.sub(self.rbuf, self.rpos) ..
+                                        data
+                            self.rpos = 1
+                            self.rlen = #self.rbuf
                             self:_check_response()
                         end
                     else
