@@ -45,6 +45,11 @@ determined long-term attacks, so passwords should be guarded and changed occasio
     To see more about the details of the algorithm for the purpose of writing a new
     client application, read the `scramble.h`_ header file.
 
+.. _Cryptographic hash function: https://en.wikipedia.org/wiki/Cryptographic_hash
+.. _Salt Value: https://en.wikipedia.org/wiki/Salt_%28cryptography%29
+.. _MySQL introduced several years ago: http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html
+.. _scramble.h: https://github.com/tarantool/tarantool/blob/master/src/scramble.h
+
 ===========================================================
                 Users and the _user space
 ===========================================================
@@ -121,6 +126,8 @@ selects a tuple in the ``_user`` space, and then drops the user.
 .. NOTE::
 
     The maximum number of users is 32.
+
+.. _URI: http://tarantool.org/doc/user_guide.html#URI
 
 ===========================================================
                Priveleges and _priv space
@@ -228,6 +235,9 @@ will set up and configure objects, then grant privileges to appropriate non-admi
 users. Typically a guest user will use ``box.session.su()`` to change into a non-generic
 user to whom admin has granted more than the default privileges. For example,
 admin might say:
+
+.. _admin: http://tarantool.org/doc/user_guide.html#admin_port
+.. _connectors: http://tarantool.org/doc/user_guide.html#connectors
 
 .. code-block:: lua
 

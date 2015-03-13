@@ -28,6 +28,7 @@ no arguments. The packages inside the box library are:
     atomic
     authentication
     limitations
+    triggers
 
 Every package contains one or more Lua functions. A few packages contain
 members as well as functions. The functions allow data definition (create
