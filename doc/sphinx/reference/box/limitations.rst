@@ -47,3 +47,5 @@ Limitations which are only applicable for the sophia storage engine
     not supported. Indexes must be unique, that is, the option unique=false
     is not supported. The ``alter()``, ``len()``, and ``count()`` functions
     are not supported.
+
+.. _slab_alloc_arena: http://tarantool.org/doc/user_guide.html#slab_alloc_arena
