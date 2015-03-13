@@ -255,6 +255,7 @@ div.toctree-wrapper.compound {
 }
 
 div.highlight {
+    text-align: left;
     -webkit-border-radius: 7px;
     -moz-border-radius: 7px;
     border-radius: 7px;

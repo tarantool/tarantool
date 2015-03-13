@@ -21,4 +21,5 @@
     :maxdepth: 1
 
     reference/index.rst
+    book/index.rst
     dev_guide/index.rst
