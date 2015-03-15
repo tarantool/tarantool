@@ -58,9 +58,9 @@ Target: Linux-x86_64-Debug
             indicates possible incompatible changes,
             and <literal>&lt;patch&gt;</literal> stands for the number of
             bug fix releases made after the start of the
-            milestone. The optional commit number and
-            commit SHA1 are output for non-released versions
-            only, and indicate how much this particular build has diverged
+            milestone. For non-released versions only, there may be a
+            commit number and commit SHA1
+            to indicate how much this particular build has diverged
             from the last release.
          </member>
           <member>
@@ -74,7 +74,7 @@ Target: Linux-x86_64-Debug
         xlink:href="http://www.kernel.org/pub/software/scm/git/docs/git-describe.html">git describe</link> to produce its version id, and
         this id can be used at any time to check out the
         corresponding source from our <link
-        xlink:href="git://github.com/tarantool/tarantool.git">git repository</link>.
+        xlink:href="http://github.com/tarantool/tarantool.git">git repository</link>.
       </para></note>
     </listitem>
 
@@ -98,9 +98,7 @@ is mandatory if the user name is specified,
 unless the user name is 'guest'.
 So, formally, the URI syntax is
 <code>[host:]port</code>
-or <code>[username:password@]host:port</code>
-or if username='guest' it may be
-<code>[username@]host:port</code>.
+or <code>[username:password@]host:port</code>.
 If host is omitted, then 'localhost' is assumed.
 If username:password is omitted, then 'guest' is assumed.
 Some examples:
@@ -112,7 +110,6 @@ Some examples:
     <tbody>
     <row><entry>port</entry><entry>                  3301</entry></row>
     <row><entry>host:port</entry><entry>             127.0.0.1:3301</entry></row>
-    <row><entry>guest@host:port</entry><entry>       guest@mail.ru:3301</entry></row>
     <row><entry>username:password@host:port</entry><entry>                  guest:sesame@mail.ru:3301</entry></row>
     </tbody>
     </tgroup>                                   
@@ -141,6 +138,7 @@ box.cfg{
     rows_per_wal        = 50
 }
 print('Starting ',arg[1])</programlisting>
+and suppose the environment variable LISTEN_URI contains 3301,
 and suppose the command line is <code>~/tarantool/src/tarantool script.lua ARG</code>.
 Then the screen might look like this:<programlisting>
 <prompt>$</prompt> <userinput>export LISTEN_URI=3301</userinput>
@@ -148,7 +146,6 @@ Then the screen might look like this:<programlisting>
 ... main/101/script.lua C> version 1.6.3-439-g7e1011b
 ... main/101/script.lua C> log level 5
 ... main/101/script.lua I> mapping 107374184 bytes for a shared arena...
-... main/101/spawner C> initialized
 ... main/101/script.lua I> recovery start
 ... main/101/script.lua I> recovering from `./00000000000000000000.snap'
 ... main/101/script.lua I> primary: bound to 0.0.0.0:3301
@@ -442,7 +439,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
 
         <row>
           <entry>snapshot_count</entry>
-          <entry>float</entry>
+          <entry>integer</entry>
           <entry>6</entry>
           <entry>yes</entry>
           <entry>
@@ -731,7 +728,8 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <para>
           Local hot standby is a feature which provides a simple form of failover without replication.
           To initiate it, start a second instance of the Tarantool server on the same computer with
-          the same <code>box.cfg</code> configuration settings -- including the same directories and same URIs.
+          the same <code>box.cfg</code> configuration settings -- including the same directories and
+          same non-null URIs.
           A warning should appear with a message like
           "W> primary: [URI] is already in use, will retry binding after [n] seconds".
           This is fine.
