@@ -73,7 +73,7 @@ local function say(level, fmt, ...)
     ffi.C._say(level, file, line, nil, "%s", str)
 end
 
-return {
+package.loaded.log = {
     warn = function (fmt, ...)
         say(ffi.C.S_WARN, fmt, ...)
     end,
