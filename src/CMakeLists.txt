@@ -66,6 +66,7 @@ lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
+lua_source(lua_sources lua/log.lua)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box

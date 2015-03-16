@@ -79,10 +79,12 @@ struct lua_State *tarantool_L;
 extern char uuid_lua[];
 extern char session_lua[];
 extern char digest_lua[];
+extern char log_lua[];
 static const char *lua_sources[] = {
 	uuid_lua,
 	session_lua,
 	digest_lua,
+        log_lua,
 	NULL
 };
 
