@@ -1,0 +1,21 @@
+.. code-block:: lua
+
+    ... ...
+    tarantool> 2014-10-13 11:20:08.691 [25020] main/101/spawner I> created a replication relay: pid = 25583
+    2014-10-13 11:20:08.691 [25583] main/101/relay/127.0.0.1:50883 I> recovery start
+    2014-10-13 11:20:08.691 [25583] main/101/relay/127.0.0.1:50883 I> recovering from `./00000000000000000000.snap'
+    2014-10-13 11:20:08.692 [25583] main/101/relay/127.0.0.1:50883 I> snapshot sent
+    2014-10-13 11:20:08.789 [25020] main/101/spawner I> created a replication relay: pid = 25585
+    2014-10-13 11:20:08.890 [25585] main/101/relay/127.0.0.1:50884 I> recover from `./00000000000000000000.xlog'
+    ---
+    ...
+    tarantool> s = box.schema.space.create('tester')
+    ---
+    ...
+    tarantool> i = s:create_index('primary', {})
+    ---
+    ...
+    tarantool> s:insert{1,'Tuple inserted on Terminal #1'}
+    ---
+    - [1, 'Tuple inserted on Terminal #1']
+    ...

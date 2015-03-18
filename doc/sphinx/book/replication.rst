@@ -213,15 +213,219 @@ a cluster and adding a replica.
 
 Start two shells. Put them side by side on the screen.
 
-+-------------------------------------------------------------------------------+-------------------------------------------------------------------------------+
-|                                   Terminal #1                                 |                                   Terminal #2                                 |
-+===============================================================================+===============================================================================+
-|                                                                               |                                                                               |
-| .. code-block:: lua                                                           | .. code-block:: lua                                                           |
-|                                                                               |                                                                               |
-|     $                                                                         |     $                                                                         |
-|                                                                               |                                                                               |
-+-------------------------------------------------------------------------------+-------------------------------------------------------------------------------+
+.. container:: table-wide
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    +----------------------+---------------------+
+    |      Terminal #1     |      Terminal #2    |
+    +======================+=====================+
+    |                      |                     |
+    | .. code-block:: lua  | .. code-block:: lua |
+    |                      |                     |
+    |     $                |     $               |
+    |                      |                     |
+    +----------------------+---------------------+
+
+On the first shell, which we'll call Terminal #1, execute these commands:
+
+.. code-block:: bash
+
+    # Terminal 1
+    mkdir -p ~/tarantool_test_node_1
+    cd ~/tarantool_test_node_1
+    rm -R ~/tarantool_test_node_1/*
+    ~/tarantool/src/tarantool
+    box.cfg{listen=3301}
+    box.schema.user.create('replicator', {password = 'password'})
+    box.schema.user.grant('replicator','read,write','universe')
+    box.space._cluster:select({0},{iterator='GE'})
+
+The result is that a new cluster is set up, and the UUID is displayed.
+Now the screen looks like this: (except that UUID values are always different):
+
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/1-1.rst | .. include:: replication/1-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+On the second shell, which we'll call Terminal #2, execute these commands:
+
+.. code-block:: bash
+
+    # Terminal 2
+    mkdir -p ~/tarantool_test_node_2
+    cd ~/tarantool_test_node_2
+    rm -R ~/tarantool_test_node_2/*
+    ~/tarantool/src/tarantool
+    box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}
+    box.space._cluster:select({0},{iterator='GE'})
+
+The result is that a replica is set up. Messages appear on Terminal #1
+confirming that the replica has connected and that the WAL contents have
+been shipped to the replica. Messages appear on Terminal #2 showing that
+replication is starting. Also on Terminal#2 the _cluster UUID value is
+displayed, and it is the same as the _cluster UUID value that was displayed
+on Terminal #1, because both servers are in the same cluster.
+
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/2-1.rst | .. include:: replication/2-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+On Terminal #1, execute these requests:
+
+.. code-block:: lua
+
+    s = box.schema.space.create('tester')
+    i = s:create_index('primary', {})
+    s:insert{1,'Tuple inserted on Terminal #1'}
+
+Now the screen looks like this:
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/3-1.rst | .. include:: replication/3-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+The creation and insertion were successful on Terminal #1.
+Nothing has happened on Terminal #2.
+
+On Terminal #2, execute these requests:
+
+.. code-block:: lua
+
+    s = box.space.tester
+    s:select({1},{iterator='GE'})
+    s:insert{2,'Tuple inserted on Terminal #2'}
+
+Now the screen looks like this:
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/4-1.rst | .. include:: replication/4-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+The selection and insertion were successful on Terminal #2. Nothing has
+happened on Terminal #1.
+
+On Terminal #1, execute these Tarantool requests and shell commands:
+
+.. code-block:: lua
+
+    os.exit()
+    ls -l ~/tarantool_test_node_1
+    ls -l ~/tarantool_test_node_2
+
+Now Tarantool #1 is stopped. Messages appear on Terminal #2 announcing that fact.
+The "ls -l" commands show that both servers have made snapshots, which have the
+same size because they both contain the same tuples.
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/5-1.rst | .. include:: replication/5-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+On Terminal #2, ignore the repeated messages saying "failed to connect",
+and execute these requests:
+
+.. code-block:: lua
+
+    box.space.tester:select({0},{iterator='GE'})
+    box.space.tester:insert{3,'Another'}
+
+Now the screen looks like this (ignoring the repeated messages saying
+"failed to connect"):
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/6-1.rst | .. include:: replication/6-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+Terminal #2 has done a select and an insert, even though Terminal #1 is down.
+
+On Terminal #1 execute these commands:
+
+.. code-block:: lua
+
+    ~/tarantool/src/tarantool
+    box.cfg{listen=3301}
+    box.space.tester:select({0},{iterator='GE'})
+    
+Now the screen looks like this (ignoring the repeated messages on terminal
+#2 saying "failed to connect"):
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/7-1.rst | .. include:: replication/7-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+The master has reconnected to the cluster, and has NOT found what the replica
+wrote while the master was away. That is not a surprise -- the replica has not
+been asked to act as a replication source.
+
+On Terminal #1, say:
+
+.. code-block:: lua
+
+    box.cfg{replication_source='replicator:password@localhost:3302'}
+    box.space.tester:select({0},{iterator='GE'})
+
+The screen now looks like this:
+
+.. container:: table-wide
+
+    +----------------------------------+----------------------------------+
+    |          Terminal #1             |          Terminal #2             |
+    +==================================+==================================+
+    |                                  |                                  |
+    | .. include:: replication/8-1.rst | .. include:: replication/8-2.rst |
+    |                                  |                                  |
+    +----------------------------------+----------------------------------+
+
+This shows that the two servers are once again in synch, and that each server
+sees what the other server wrote.
+
+To clean up, say "``os.exit()``" on both Terminal #1 and Terminal #2, and then
+on either terminal say:
+
+.. code-block:: lua
+
+    cd ~
+    rm -R ~/tarantool_test_node_1
+    rm -R ~/tarantool_test_node_2
