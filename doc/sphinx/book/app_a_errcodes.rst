@@ -12,6 +12,10 @@ All such messages, however, are logged in the error log. Below follow only gener
 descriptions of some popular codes. A complete list of errors can be found in file
 `errcode.h`_ in the source tree.
 
+.. _errcode.h: https://github.com/tarantool/tarantool/blob/master/src/box/errcode.h
+
+.. _ER_MEMORY_ISSUE:
+
 ===========================================================
                 List of error codes
 ===========================================================
@@ -23,7 +27,7 @@ ER_ILLEGAL_PARAMS
     Illegal parameters. Malformed protocol message.
 
 ER_MEMORY_ISSUE
-    Out of memory: `slab_alloc_arena`_ limit is reached.
+    Out of memory: :ref:`slab_alloc_arena` limit is reached.
 
 ER_WAL_IO
     Failed to write to disk. May mean: failed to record a change in the

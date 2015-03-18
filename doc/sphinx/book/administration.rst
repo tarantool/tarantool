@@ -33,7 +33,7 @@ used this way, ``tarantool`` is a client program as well as a server program.
 This section shows all legal syntax for the tarantool program, with short notes
 and examples. Other client programs may have similar options and request
 syntaxes. Some of the information in this section is duplicated in the
-`Configuration Reference`_ chapter.
+:doc:`/book/configuration` chapter.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Conventions used in this section
@@ -101,6 +101,8 @@ single quotes. Double quotes are legal but single quotes are preferred.
 Enclosing in double square brackets is good for multi-line strings as
 described in `Lua documentation`_.
 
+.. _Lua documentation: http://www.lua.org/pil/2.4.html
+
 Example:
 
 .. code-block:: lua
@@ -115,6 +117,8 @@ Single-byte tokens are: * or , or ( or ). Examples: * , ( ).
 
 Tokens must be separated from each other by one or more spaces, except that
 spaces are not necessary around single-byte tokens or string literals.
+
+.. _setting delimiter:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         Requests
@@ -141,10 +145,13 @@ To go back to normal mode: ``console.delimiter('')string-literal``. Example:
     console.delimiter('')!
 
 For a condensed Backus-Naur Form [BNF] description of the suggested form of
-client requests, see `doc/box-protocol.html`_ and `doc/sql.txt`_.
+client requests, see `doc/dev_guide/box-protocol.html`_.
+
+.. _doc/dev_guide/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
 
 In *interactive* mode, one types requests and gets results. Typically the
-requests are typed in by the user following prompts. Here is an example of an interactive-mode tarantool client session:
+requests are typed in by the user following prompts. Here is an example of
+an interactive-mode tarantool client session:
 
 .. code-block:: bash
 

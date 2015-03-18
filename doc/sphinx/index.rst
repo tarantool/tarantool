@@ -2,24 +2,12 @@
                                     Documentation
 -------------------------------------------------------------------------------
 
-
 .. toctree::
     :maxdepth: 1
 
     intro.rst
     faq.rst
-
-.. raw:: html
-
-    <div class="toctree-wrapper compound">
-      <ul>
-        <li class="toctree-l1"><a href="/doc/user_guide/">User Guide</a></li>
-      </ul>
-    </div>
-
-.. toctree::
-    :maxdepth: 1
-
+    getting_started
     reference/index.rst
     book/index.rst
     dev_guide/index.rst

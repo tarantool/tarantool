@@ -5,7 +5,8 @@
                         Configuration reference
 -------------------------------------------------------------------------------
 
-This chapter provides a reference of options which can be set on the command line or in an initialization file.
+This chapter provides a reference of options which can be set on the command
+line or in an initialization file.
 
 Tarantool is started by entering the command:
 
@@ -59,6 +60,11 @@ Tarantool is started by entering the command:
         can be used at any time to check out the corresponding source from our
         `git repository`_.
 
+.. _git describe: http://www.kernel.org/pub/software/scm/git/docs/git-describe.html
+.. _git repository: git://github.com/tarantool/tarantool.git
+
+
+
 =====================================================================
                                 URI
 =====================================================================
@@ -73,6 +79,8 @@ syntax is ``[host:]port`` or ``[username:password@]host:port`` or if
 ``username='guest'`` it may be ``[username@]host:port``. If host is omitted,
 then 'localhost' is assumed. If username:password is omitted, then 'guest'
 is assumed. Some examples:
+
+.. _generic syntax for a URI schema: http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax
 
 .. container:: table
 
@@ -131,6 +139,14 @@ Then the screen might look like this:
     Starting  ARG
     ... main C> entering the event loop
 
+.. _local_hot_standby:
+.. _replication_port:
+.. _slab_alloc_arena:
+.. _replication_source:
+.. _snap_dir:
+.. _wal_dir:
+.. _snapshot daemon:
+
 =====================================================================
                 Configuration parameters
 =====================================================================
@@ -167,7 +183,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                   |           |          |          | current directory. If not specified, defaults   |
     |                   |           |          |          | to the current directory.                       |
     +-------------------+-----------+----------+----------+-------------------------------------------------+
-    | wal_dir           | string    | "."      |    no    | A directory where write-ahead log (.xlog) files |
+    |   wal_dir         | string    | "."      |    no    | A directory where write-ahead log (.xlog) files |
     |                   |           |          |          | are stored. Can be relative to work_dir. Most   |
     |                   |           |          |          | commonly used so that snapshot files and        |
     |                   |           |          |          | write-ahead log files can be stored on separate |
@@ -176,7 +192,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     | snap_dir          | string    | "."      |    no    | A directory where snapshot (.snap) files will   |
     |                   |           |          |          | be stored. Can be relative to work_dir. If not  |
     |                   |           |          |          | specified, defaults to work_dir. See also       |
-    |                   |           |          |          | `wal_dir`_.                                     |
+    |                   |           |          |          | :ref:`wal_dir`.                                 |
     +-------------------+-----------+----------+----------+-------------------------------------------------+
     | sophia_dir        | string    | "sophia" |    no    | A directory where sophia files will be stored.  |
     |                   |           |          |          | Can be relative to work_dir. If not specified,  |
@@ -201,7 +217,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                   |           |          |          | "tarantool.pid".                                |
     +-------------------+-----------+----------+----------+-------------------------------------------------+
     | custom_proc_title | string    | "null"   |    no    | Inject the given string into                    |
-    |                   |           |          |          | `server process title`_ (what's shown in the    |
+    |                   |           |          |          | :doc:`app_b_proctitle`  (what's shown in the    |
     |                   |           |          |          | COMMAND column for ps and top commands).        |
     +-------------------+-----------+----------+----------+-------------------------------------------------+
     | background        | boolean   | false    |    no    | Run the server as a background task. The logger |
@@ -235,44 +251,44 @@ for binary logging and snapshots, for replication, for networking, and for loggi
 
     **Configuring the storage**
 
-    +--------------------+-----------+----------+----------+-------------------------------------------------+
-    | Name               | Type      | Default  | Dynamic? | Description                                     |
-    +====================+===========+==========+==========+=================================================+
-    | slab_alloc_arena   | float     | null     |    no    | How much memory Tarantool allocates to actually |
-    |                    |           |          |          | store tuples, in gigabytes. When the limit is   |
-    |                    |           |          |          | reached, INSERT or UPDATE requests begin        |
-    |                    |           |          |          | failing with error `ER_MEMORY_ISSUE`_. While    |
-    |                    |           |          |          | the server does not go beyond the defined limit |
-    |                    |           |          |          | to allocate tuples, there is additional memory  |
-    |                    |           |          |          | used to store indexes and connection            |
-    |                    |           |          |          | information. Depending on actual configuration  |
-    |                    |           |          |          | and workload, Tarantool can consume up to 20%   |
-    |                    |           |          |          | more than the limit set here.                   |
-    +--------------------+-----------+----------+----------+-------------------------------------------------+
-    | slab_alloc_minimal | integer   | null     |    no    | Size of the smallest allocation unit. It can be |
-    |                    |           |          |          | tuned down if most of the tuples are very small |
-    +--------------------+-----------+----------+----------+-------------------------------------------------+
-    | slab_alloc_factor  | float     | 2.0      |    no    | Use slab_alloc_factor as the multiplier for     |
-    |                    |           |          |          | computing the sizes of memory chunks that       |
-    |                    |           |          |          | tuples are stored in. A lower value may result  |
-    |                    |           |          |          | in less wasted memory depending on the total    |
-    |                    |           |          |          | amount of memory available and the distribution |
-    |                    |           |          |          | of item sizes.                                  |
-    +--------------------+-----------+----------+----------+-------------------------------------------------+
-    | sophia             | table     | (see the |    no    | The default sophia configuration can be changed |
-    |                    |           | note)    |          | with                                            |
-    |                    |           |          |          |                                                 |
-    |                    |           |          |          | .. code-block:: lua                             |
-    |                    |           |          |          |                                                 |
-    |                    |           |          |          |    sophia = {                                   |
-    |                    |           |          |          |        page_size = number,                      |
-    |                    |           |          |          |        threads = number,                        |
-    |                    |           |          |          |        node_size = number,                      |
-    |                    |           |          |          |        memory_limit = number                    |
-    |                    |           |          |          |    }                                            |
-    |                    |           |          |          |                                                 |
-    |                    |           |          |          | This method may change in the future.           |
-    +--------------------+-----------+----------+----------+-------------------------------------------------+
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
+    | Name                     | Type      | Default  | Dynamic? | Description                                     |
+    +==========================+===========+==========+==========+=================================================+
+    |   slab_alloc_arena       | float     | null     |    no    | How much memory Tarantool allocates to actually |
+    |                          |           |          |          | store tuples, in gigabytes. When the limit is   |
+    |                          |           |          |          | reached, INSERT or UPDATE requests begin        |
+    |                          |           |          |          | failing with error :ref:`ER_MEMORY_ISSUE`. While|
+    |                          |           |          |          | the server does not go beyond the defined limit |
+    |                          |           |          |          | to allocate tuples, there is additional memory  |
+    |                          |           |          |          | used to store indexes and connection            |
+    |                          |           |          |          | information. Depending on actual configuration  |
+    |                          |           |          |          | and workload, Tarantool can consume up to 20%   |
+    |                          |           |          |          | more than the limit set here.                   |
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
+    | slab_alloc_minimal       | integer   | null     |    no    | Size of the smallest allocation unit. It can be |
+    |                          |           |          |          | tuned down if most of the tuples are very small |
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
+    | slab_alloc_factor        | float     | 2.0      |    no    | Use slab_alloc_factor as the multiplier for     |
+    |                          |           |          |          | computing the sizes of memory chunks that       |
+    |                          |           |          |          | tuples are stored in. A lower value may result  |
+    |                          |           |          |          | in less wasted memory depending on the total    |
+    |                          |           |          |          | amount of memory available and the distribution |
+    |                          |           |          |          | of item sizes.                                  |
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
+    | sophia                   | table     | (see the |    no    | The default sophia configuration can be changed |
+    |                          |           | note)    |          | with                                            |
+    |                          |           |          |          |                                                 |
+    |                          |           |          |          | .. code-block:: lua                             |
+    |                          |           |          |          |                                                 |
+    |                          |           |          |          |    sophia = {                                   |
+    |                          |           |          |          |        page_size = number,                      |
+    |                          |           |          |          |        threads = number,                        |
+    |                          |           |          |          |        node_size = number,                      |
+    |                          |           |          |          |        memory_limit = number                    |
+    |                          |           |          |          |    }                                            |
+    |                          |           |          |          |                                                 |
+    |                          |           |          |          | This method may change in the future.           |
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
 
     **Snapshot daemon**
 
@@ -325,7 +341,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                      |           |          |          | performance by setting a limit on how many          |
     |                      |           |          |          | megabytes per second it can write to disk. The same |
     |                      |           |          |          | can be achieved by splitting `wal_dir`_ and         |
-    |                      |           |          |          | `snap_dir`_ locations and moving snapshots to a     |
+    |                      |           |          |          | :ref:`snap_dir` locations and moving snapshots to a |
     |                      |           |          |          | separate disk.                                      |
     +----------------------+-----------+----------+----------+-----------------------------------------------------+
     | wal_mode             | string    | "write"  | **yes**  | Specify fiber-WAL-disk synchronization mode as:     |

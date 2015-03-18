@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
-                              The `box` library
+                              Database
 -------------------------------------------------------------------------------
 
 As well as executing Lua chunks or defining their own functions, users can exploit
@@ -21,7 +21,6 @@ no arguments. The packages inside the box library are:
     box_index
     box_session
     box_error
-    box_tuple
     box_introspection
     net_box
     admin

@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                        Server administration
+                    Replication
 -------------------------------------------------------------------------------
 
 Replication allows multiple Tarantool servers to work on copies of the same
@@ -381,7 +381,7 @@ On Terminal #1 execute these commands:
     ~/tarantool/src/tarantool
     box.cfg{listen=3301}
     box.space.tester:select({0},{iterator='GE'})
-    
+
 Now the screen looks like this (ignoring the repeated messages on terminal
 #2 saying "failed to connect"):
 
@@ -429,3 +429,9 @@ on either terminal say:
     cd ~
     rm -R ~/tarantool_test_node_1
     rm -R ~/tarantool_test_node_2
+
+.. _replication_source: :ref:`replication_source`
+.. _snap_dir: :ref:`snap_dir`
+.. _wal_dir:  :ref:`wal_dir`
+.. _snapshot daemon: :ref:`snapshot daemon`
+.. _uri: :ref:`URI`

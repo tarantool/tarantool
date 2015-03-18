@@ -27,4 +27,3 @@ Lua functions can run in the background and perform administrative tasks.
     pickle
     other
     expirationd
-    box/index

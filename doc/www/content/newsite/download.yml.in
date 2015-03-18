@@ -69,7 +69,7 @@ blocks :
 
           .. code-block:: bash
 
-            $ brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb --devel
+            $ brew install http://build.tarantool.org/tarantool.rb --devel
 
           Please upgrade ``clang`` to version 3.2 or later using
           ``Command Line Tools for Xcode`` disk image version 4.6+

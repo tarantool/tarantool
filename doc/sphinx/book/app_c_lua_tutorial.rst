@@ -27,9 +27,9 @@ learning, type the statements in with the tarantool client while reading along.
                         Configure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We are going to use the "tarantool_sandbox" that was created in section `Starting
-Tarantool and making your first database`_. So there is a single space, and a
-numeric primary key, and a running tarantool server which also serves as a client.
+We are going to use the "tarantool_sandbox" that was created in section
+:ref:`first database`. So there is a single space, and a numeric primary key,
+and a running tarantool server which also serves as a client.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         Delimiter
@@ -45,6 +45,8 @@ not send to the server until you see an exclamation mark.”
 
 From now on it will be possible to use multiple-line statements, but it will be
 necessary to end all statements with exclamation marks.
+
+.. _declare a delimiter: :ref:`setting delimiter`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            Create a function that returns string
@@ -335,7 +337,7 @@ a SELECT request.
     box.space.tester:select{1}!
 
 For more about Tarantool insert and replace calls, see Tarantool manual section
-`Package `box.space``_.
+:mod:`box.space`
 
 The screen now looks like this:
 
@@ -528,6 +530,9 @@ string, and the parameter is t[2] which is a reference to a JSON string. There's
 a bit of hard coding here, we're assuming that the second field in the tuple is
 where the JSON string was inserted. For example, we're assuming a tuple looks like
 
+.. _index.iterator: :func:`box.space.space-name.index[.index-name]:pairs`
+.. _protected call: http://www.lua.org/pil/8.4.html
+
 .. code-block:: json
 
     field[1]: 444
@@ -557,7 +562,7 @@ the database is in perfect shape can skip this kind of thing.
 
 And the function is complete. Time to test it. Starting with an empty database,
 defined the same way as the sandbox database that was introduced in
-“ `Starting Tarantool and making your first database`_ ”,
+“ :ref:`first database` ”,
 
 .. code-block:: lua
 

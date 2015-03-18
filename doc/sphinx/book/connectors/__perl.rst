@@ -55,3 +55,7 @@ will print “Connection refused”.
 
 The example program only shows one command and does not show all that's
 necessary for good practice. For that, please see `DR::Tarantool`_ CPAN repository.
+
+.. _DR::Tarantool: http://search.cpan.org/~unera/DR-Tarantool/
+.. _CPAN, the Comprehensive Perl Archive Network: https://en.wikipedia.org/wiki/Cpan
+.. _described earlier: https://en.wikipedia.org/wiki/Cpan

@@ -28,3 +28,6 @@ The example program only shows one request and does not show all that's
 necessary for good practice. For that, see http://github.com/tarantool/tarantool-python.
 For an example of a Python API for `Queue managers on Tarantool`_, see
 https://github.com/tarantool/tarantool-queue-python.
+
+.. _described earlier: https://en.wikipedia.org/wiki/Cpan
+.. _Queue managers on Tarantool: https://github.com/tarantool/queue

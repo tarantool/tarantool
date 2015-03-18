@@ -58,3 +58,6 @@ applications.
 
 The example program only shows one command and does not show all that's necessary
 for good practice. For that, please see `tarantool-php`_ project at GitHub.
+
+.. _described earlier: https://en.wikipedia.org/wiki/Cpan
+.. _tarantool-php: https://github.com/tarantool/tarantool-php

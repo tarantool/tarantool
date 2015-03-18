@@ -18,10 +18,10 @@ A Tarantool server process title follows the following naming scheme:
 * **running** -- ordinary node "ready to accept requests",
 * **loading** -- ordinary node recovering from old snap and wal files,
 * **orphan** -- not in a cluster,
-* **hot_standby** -- see section `local_hot_standby`_,
+* **hot_standby** -- see section :ref:`local_hot_standby`,
 * **dumper + process-id** -- saving files before exiting,
 * **spawner** -- controls other processes,
-* **replica + URI/status** -- replication node accepting connections on `replication_port`_,
+* **replica + URI/status** -- replication node accepting connections on :ref:`replication_port`,
 * **relay + sockaddr** -- serves a single replication connection,
 
 For example:
