@@ -5,7 +5,7 @@
 {% block header_scripts %}
   <link rel="stylesheet" href="/doc/_static/sphinx_design.css" />
   <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
-  <script type="text/javascript" src="../_static/headers.js"></script>
+  <script type="text/javascript" src="/doc/_static/headers.js"></script>
   {{ super() }}
 {% endblock header_scripts %}
 
@@ -36,17 +36,16 @@
   </div>
   <div class="b-cols_content_right">
     <div class="b-cols_content_right-slot">
-      {{ breadcrumbs.breadcrumbs() }}
-      <!--{{ navbar.navbar(True) }}-->
 {% else %}
 <section class="b-block b-documentation">
   <div class="b-block-wrapper">
 {% endif %}
+  {{ breadcrumbs.breadcrumbs() }}
       <article class="b-article">
         {% block body %} {% endblock %}
       </article>
+  {{ navbar.navbar(False) }}
 {% if render_sidebar %}
-    {{ navbar.navbar(False) }}
     </div>
   </div>
 </div>

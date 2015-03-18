@@ -14,7 +14,7 @@ TIMEZONE = 'Europe/Moscow'
 
 DEFAULT_LANG = u'en'
 
-PLUGINS = ['plugins.documentation', 'plugins.beautifulsite']
+PLUGINS = ['plugins.beautifulsite']
 
 # Feed generation is usually not desired when developing
 FEED_ALL_ATOM = None
@@ -23,7 +23,6 @@ TRANSLATION_FEED_ATOM = None
 
 DEFAULT_PAGINATION = False
 
-DOCS_PATH  = ['doc']
 BSITE_PATH = ['newsite']
 ARTICLE_EXCLUDES = ['doc', 'newsite']
 

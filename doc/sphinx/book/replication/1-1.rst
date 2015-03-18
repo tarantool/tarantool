@@ -1,0 +1,22 @@
+.. code-block:: bash
+
+    $ # Terminal 1
+    $ mkdir -p ~/tarantool_test_node_1
+    $ cd ~/tarantool_test_node_1
+    ~/tarantool_test_node_1$ rm -R ~/tarantool_test_node_1/*
+    ~/tarantool_test_node_1$ ~/tarantool/src/tarantool
+    ~/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
+    type 'help' for interactive help
+    tarantool> box.cfg{listen=3301}
+    ... ...
+    tarantool> box.schema.user.create('replicator', {password = 'password'})
+    2014-10-13 11:12:56.052 [25018] wal I> creating `./00000000000000000000.xlog.inprogress'
+    ---
+    ...
+    tarantool> box.schema.user.grant('replicator','read,write','universe')
+    ---
+    ...
+    tarantool> box.space._cluster:select({0},{iterator='GE'})
+    ---
+    - - [1, '6190d919-1133-4452-b123-beca0b178b32']
+    ...
