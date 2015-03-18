@@ -5,10 +5,10 @@
 .. toctree::
 
     intro
+    box/index
     replication
     configuration
     administration
-    box/index
     connectors/index
     app_a_errcodes
     app_b_proctitle

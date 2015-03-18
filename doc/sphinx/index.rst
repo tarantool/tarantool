@@ -8,6 +8,6 @@
     intro.rst
     faq.rst
     getting_started
-    reference/index.rst
     book/index.rst
+    reference/index.rst
     dev_guide/index.rst
