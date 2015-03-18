@@ -102,8 +102,16 @@ fiber_wakeup(struct fiber *f)
 	/** Remove the fiber from whatever wait list it is on. */
 	rlist_del(&f->state);
 	struct cord *cord = cord();
-	if (rlist_empty(&cord->ready))
-		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
+	if (rlist_empty(&cord->ready)) {
+		/*
+		 * ev_feed_event() is possibly faster,
+		 * but custom event gets scheduled in the
+		 * same event loop iteration, which can
+		 * produce unfair scheduling (see the case of
+		 * fiber_sleep(0))
+		 */
+		ev_async_send(cord->loop, &cord->wakeup_event);
+	}
 	rlist_move_tail_entry(&cord->ready, f, state);
 }
 
@@ -203,21 +211,15 @@ void
 fiber_join(struct fiber *fiber)
 {
 	assert(fiber->flags & FIBER_IS_JOINABLE);
-	if (fiber->flags & FIBER_IS_DEAD) {
-		/* The fiber is already dead. */
-		fiber_recycle(fiber);
-	} else {
+
+	if (! (fiber->flags & FIBER_IS_DEAD)) {
 		rlist_add_tail_entry(&fiber->wake, fiber(), state);
 		fiber_yield();
-		/* @todo: make this branch async-cancel-safe */
-		assert(! (fiber->flags & FIBER_IS_DEAD));
-		/*
-		 * Let the fiber recycle.
-		 * This can't be done here since there may be other
-		 * waiters in fiber->wake list, which must run first.
-		 */
-		fiber_set_joinable(fiber, false);
 	}
+	assert(fiber->flags & FIBER_IS_DEAD);
+	/* The fiber is already dead. */
+	fiber_recycle(fiber);
+
 	Exception::move(&fiber->exception, &fiber()->exception);
 	if (fiber()->exception &&
 	    typeid(*fiber()->exception) != typeid(FiberCancelException)) {
@@ -291,7 +293,13 @@ fiber_yield_timeout(ev_tstamp delay)
 void
 fiber_sleep(ev_tstamp delay)
 {
-	fiber_yield_timeout(delay);
+	if (delay == 0) {
+		/* Faster than starting and stopping a timer. */
+		fiber_wakeup(fiber());
+		fiber_yield();
+	} else {
+		fiber_yield_timeout(delay);
+	}
 	fiber_testcancel();
 }
 
@@ -305,9 +313,13 @@ fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
 static inline void
 fiber_schedule_list(struct rlist *list)
 {
-	while (! rlist_empty(list)) {
+	/** Don't schedule both lists at the same time. */
+	struct rlist copy;
+	rlist_create(&copy);
+	rlist_swap(list, &copy);
+	while (! rlist_empty(&copy)) {
 		struct fiber *f;
-		f = rlist_shift_entry(list, struct fiber, state);
+		f = rlist_shift_entry(&copy, struct fiber, state);
 		fiber_call(f);
 	}
 }
@@ -407,25 +419,17 @@ fiber_loop(void *data __attribute__((unused)))
 				fiber_name(fiber));
 			panic("fiber `%s': exiting", fiber_name(fiber));
 		}
-		fiber_schedule_list(&fiber->wake);
-		/**
-		 * By convention, these triggers must not throw.
-		 * Call triggers after scheduling, since an
-		 * on_stop trigger of the first fiber may
-		 * break the event loop.
-		 */
+		fiber->flags |= FIBER_IS_DEAD;
+		while (! rlist_empty(&fiber->wake)) {
+		       struct fiber *f;
+		       f = rlist_shift_entry(&fiber->wake, struct fiber,
+					     state);
+		       fiber_wakeup(f);
+	        }
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
-		if (fiber->flags & FIBER_IS_JOINABLE) {
-			/*
-			 * The fiber needs to be joined,
-			 * and the joiner has not shown up yet,
-			 * wait.
-			 */
-			fiber->flags |= FIBER_IS_DEAD;
-		} else {
+		if (! (fiber->flags & FIBER_IS_JOINABLE))
 			fiber_recycle(fiber);
-		}
 		fiber_yield();	/* give control back to scheduler */
 	}
 }
