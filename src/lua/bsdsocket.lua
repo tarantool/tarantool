@@ -561,14 +561,8 @@ local function readchunk(self, limit, timeout)
         return data
     end
 
-    while timeout > 0 do
+    while true do
         local started = fiber.time()
-
-        if not self:readable(timeout) then
-            return nil
-        end
-
-        timeout = timeout - ( fiber.time() - started )
 
         local to_read
         if limit ~= LIMIT_INFINITY and limit > READAHEAD then
@@ -588,11 +582,18 @@ local function readchunk(self, limit, timeout)
                self.rpos = self.rpos + limit
                return data
             end
-
         elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
         end
+
+        if not self:readable(timeout) then
+            return nil
+        end
+        if timeout <= 0 then
+            break
+        end
+        timeout = timeout - ( fiber.time() - started )
     end
     self._errno = boxerrno.ETIMEDOUT
     return nil
@@ -680,7 +681,7 @@ end
 
 socket_methods.read = function(self, opts, timeout)
     check_socket(self)
-    timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
+    timeout = timeout or TIMEOUT_INFINITY
     if type(opts) == 'number' then
         return readchunk(self, opts, timeout)
     elseif type(opts) == 'string' then
@@ -706,9 +707,7 @@ socket_methods.write = function(self, octets, timeout)
     end
 
     local started = fiber.time()
-    while timeout > 0 and self:writable(timeout) do
-        timeout = timeout - ( fiber.time() - started )
-
+    while true do
         local written = self:syswrite(octets)
         if written == nil then
             if not errno_is_transient[self:errno()] then
@@ -721,6 +720,10 @@ socket_methods.write = function(self, octets, timeout)
         end
         if written > 0 then
             octets = string.sub(octets, written + 1)
+        end
+        timeout = timeout - (fiber.time() - started)
+        if timeout <= 0 or self:writable(timeout) then
+            break
         end
     end
 end
