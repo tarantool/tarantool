@@ -14,6 +14,8 @@
 {% set render_sidebar = true %}
 {% endif %}
 
+{% set render_sidebar = false %}
+
 {% block content %}
 {% if render_sidebar %}
 <section class="b-lightgray_block b-documentation_top b-clearbox p-documentation_in">
@@ -36,17 +38,16 @@
   </div>
   <div class="b-cols_content_right">
     <div class="b-cols_content_right-slot">
-      {{ breadcrumbs.breadcrumbs() }}
-      <!--{{ navbar.navbar(True) }}-->
 {% else %}
 <section class="b-block b-documentation">
   <div class="b-block-wrapper">
 {% endif %}
+  {{ breadcrumbs.breadcrumbs() }}
       <article class="b-article">
         {% block body %} {% endblock %}
       </article>
+  {{ navbar.navbar(False) }}
 {% if render_sidebar %}
-    {{ navbar.navbar(False) }}
     </div>
   </div>
 </div>

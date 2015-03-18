@@ -4,6 +4,9 @@
 
 .. toctree::
 
+    replication
+    configuration
+    administration
     connectors/index
     app_a_errcodes
     app_b_proctitle

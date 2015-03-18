@@ -592,7 +592,9 @@ local remote_methods = {
         self:_switch_state('error')
         self:_error_waiters(emsg)
         self.rbuf = ''
-        self.wbuf = ''
+        self.rpos = 1
+        self.rlen = 0
+        self.wbuf = {}
         self.handshake = ''
     end,
 
@@ -615,11 +617,14 @@ local remote_methods = {
 
     _check_console_response = function(self)
         while true do
-            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n')
+            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n',
+                                      self.rpos)
             if resp == nil then
                 break
             end
-            self.rbuf = string.sub(self.rbuf, #resp + 1)
+            local len = #resp
+            self.rpos = self.rpos + len
+            self.rlen = self.rlen - len
 
             local result = yaml.decode(resp)
             if result ~= nil then
@@ -656,30 +661,28 @@ local remote_methods = {
         end
 
         while true do
-            if #self.rbuf < 5 then
+            if self.rlen < 5 then
                 break
             end
 
-            local len, off = msgpack.decode(self.rbuf)
+            local len, off = msgpack.decode(self.rbuf, self.rpos)
             -- wait for correct package length
-            local roff = off + len - 1
-            if roff > #self.rbuf then
+            if off + len > #self.rbuf + 1 then
                 break
             end
-
-            local pkt = string.sub(self.rbuf, 1, roff)
-            self.rbuf = string.sub(self.rbuf, roff + 1)
-
 
             local hdr, body
-            hdr, off = msgpack.decode(pkt, off)
-            if off <= #pkt then
-                body, off = msgpack.decode(pkt, off)
+            hdr, off = msgpack.decode(self.rbuf, off)
+            if off <= #self.rbuf then
+                body, off = msgpack.decode(self.rbuf, off)
                 -- disable YAML flow output (useful for admin console)
                 setmetatable(body, mapping_mt)
             else
                 body = {}
             end
+
+            self.rpos = off
+            self.rlen = #self.rbuf + 1 - self.rpos
 
             local sync = hdr[SYNC]
 
@@ -791,8 +794,10 @@ local remote_methods = {
                 elseif string.len(self.handshake) ~= 128 then
                     self:_fatal("Can't read handshake")
                 else
-                    self.wbuf = ''
+                    self.wbuf = {}
                     self.rbuf = ''
+                    self.rpos = 1
+                    self.rlen = 0;
 
                     if string.match(self.handshake, '^Tarantool .*console') then
                         self.console = true
@@ -959,10 +964,13 @@ local remote_methods = {
                     local data = self.s:sysread()
 
                     if data ~= nil then
-                        if data == '' then
+                        if #data == 0 then
                             self:_fatal('Remote host closed connection')
                         else
-                            self.rbuf = self.rbuf .. data
+                            self.rbuf = string.sub(self.rbuf, self.rpos) ..
+                                        data
+                            self.rpos = 1
+                            self.rlen = #self.rbuf
                             self:_check_response()
                         end
                     else
@@ -985,7 +993,7 @@ local remote_methods = {
                 break
             end
 
-            if string.len(self.wbuf) == 0 then
+            if self.wbuf[1] == nil then
 
                 local wstate = self._to_rstate[self.state]
                 if wstate ~= nil then
@@ -998,12 +1006,17 @@ local remote_methods = {
                     break
                 end
                 if self:_is_rw_state() then
-                    if #self.wbuf > 0 then
-                        local written = self.s:syswrite(self.wbuf)
+                    if self.wbuf[1] ~= nil then
+                        local s = table.concat(self.wbuf)
+                        self.wbuf = {}
+                        local written = self.s:syswrite(s)
                         if written ~= nil then
-                            self.wbuf = string.sub(self.wbuf,
-                                tonumber(1 + written))
+                            if written ~= #s then
+                                table.insert(self.wbuf,
+                                             string.sub(s, written + 1))
+                            end
                         else
+                            table.insert(self.wbuf, s)
                             self:_fatal(errno.strerror(errno()))
                         end
                     end
@@ -1062,7 +1075,7 @@ local remote_methods = {
             self.timeouts[fid] = TIMEOUT_INFINITY
         end
 
-        self.wbuf = self.wbuf .. request
+        table.insert(self.wbuf, request)
 
         local wstate = self._to_wstate[self.state]
         if wstate ~= nil then

@@ -1,4 +1,4 @@
-.. include:: ../directives.rst
+.. include:: ../../directives.rst
 .. highlight:: lua
 
 -------------------------------------------------------------------------------

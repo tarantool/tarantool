@@ -1,4 +1,3 @@
-
 {% import "menu" as menu %}
 {% include "custom_sphinx" with context %}
 

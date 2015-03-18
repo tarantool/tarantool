@@ -340,7 +340,6 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                      |           |          |          | changes to write-ahead-log files for the sake of    |
     |                      |           |          |          | replication or local hot standby.                   |
     +----------------------+-----------+----------+----------+-----------------------------------------------------+
-    |                      |           |          |          |
 
     **Replication**
 
@@ -364,9 +363,94 @@ for binary logging and snapshots, for replication, for networking, and for loggi
 
     **Networking**
 
-    ho
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | Name                 | Type      | Default  | Dynamic? | Description                                         |
+    +======================+===========+==========+==========+=====================================================+
+    | io_collect_interval  | float     | null     | **yes**  | The server will sleep for io_collect_interval       |
+    |                      |           |          |          | seconds between iterations of the event loop. Can   |
+    |                      |           |          |          | be used to reduce CPU load in deployments in which  |
+    |                      |           |          |          | the number of client connections is large, but      |
+    |                      |           |          |          | requests are not so frequent (for example, each     |
+    |                      |           |          |          | connection issues just a handful of requests per    |
+    |                      |           |          |          | second).                                            |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | readahead            | integer   | 16320    | **yes**  | The size of the read-ahead buffer associated with a |
+    |                      |           |          |          | client connection. The larger the buffer, the more  |
+    |                      |           |          |          | memory an active connection consumes and the more   |
+    |                      |           |          |          | requests can be read from the operating system      |
+    |                      |           |          |          | buffer in a single system call. The rule of thumb   |
+    |                      |           |          |          | is to make sure the buffer can contain at least a   |
+    |                      |           |          |          | few dozen requests. Therefore, if a typical tuple   |
+    |                      |           |          |          | in a request is large, e.g. a few kilobytes or even |
+    |                      |           |          |          | megabytes, the read-ahead buffer size should be     |
+    |                      |           |          |          | increased. If batched request processing is not     |
+    |                      |           |          |          | used, it's prudent to leave this setting at its     |
+    |                      |           |          |          | default.                                            |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
 
     **Logging**
 
-    
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | Name                 | Type      | Default  | Dynamic? | Description                                         |
+    +======================+===========+==========+==========+=====================================================+
+    | log_level            | integer   | true     | **yes**  | How verbose the logging is. There are six log       |
+    |                      |           |          |          | verbosity classes: 1 -- SYSERROR, 2 -- ERROR,       |
+    |                      |           |          |          | 3 -- CRITICAL, 4 -- WARNING, 5 -- INFO, 6 -- DEBUG. |
+    |                      |           |          |          | By setting log_level, one can enable logging of all |
+    |                      |           |          |          | classes below or equal to the given level.          |
+    |                      |           |          |          | Tarantool prints its logs to the standard error     |
+    |                      |           |          |          | stream by default, but this can be changed with     |
+    |                      |           |          |          | the "logger" configuration parameter.               |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | logger               | string    | "null"   | no       | By default, the log is sent to the standard error   |
+    |                      |           |          |          | stream (``stderr``). If logger is specified, the    |
+    |                      |           |          |          | log is sent to the file named in the string.        |
+    |                      |           |          |          | Example setting: ``logger = 'tarantool.log'`` (this |
+    |                      |           |          |          | will open tarantool.log for output on the server's  |
+    |                      |           |          |          | default directory).                                 |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | logger_nonblock      | boolean   | true     | no       | If logger_nonblock equals true, Tarantool does not  |
+    |                      |           |          |          | block on the log file descriptor when it's not      |
+    |                      |           |          |          | ready for write, and drops the message instead. If  |
+    |                      |           |          |          | log_level is high, and a lot of messages go to the  |
+    |                      |           |          |          | log file, setting logger_nonblock to true may       |
+    |                      |           |          |          | improve logging performance at the cost of some log |
+    |                      |           |          |          | messages getting lost.                              |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
+    | too_long_threshold   | float     | 0.5      | **yes**  | If processing a request takes longer than the given |
+    |                      |           |          |          | value (in seconds), warn about it in the log. Has   |
+    |                      |           |          |          | effect only if log_level is less than or equal to   |
+    |                      |           |          |          | 4 (WARNING).                                        |
+    +----------------------+-----------+----------+----------+-----------------------------------------------------+
 
+=====================================================================
+                         Local hot standby
+=====================================================================
+
+Local hot standby is a feature which provides a simple form of failover without
+replication. To initiate it, start a second instance of the Tarantool server on
+the same computer with the same :func:`box.cfg` configuration settings -
+including the same directories and same URIs. A warning should appear with a
+message like
+
+.. code-block:: lua
+
+    W> primary: [URI] is already in use, will retry binding after [n] seconds
+
+This is fine. It means that the second instance is ready to take over if the
+first instance goes down.
+
+The expectation is that there will be two instances of the server using the
+same configuration. The first one to start will be the "primary" instance.
+The second one to start will be the "standby" instance. The standby instance
+will initialize and will try to connect on listen address and admin address,
+but will fail because the primary instance has already taken them. So the
+standby instance goes into a loop, reading the write ahead log which the
+primary instance is writing (so the two instances are always in synch),
+and trying to connect on the ports. If the primary instance goes down for any
+reason, the ports will become free so the standby instance will succeed in
+connecting, and will become the primary instance. Thus there is no noticeable
+downtime if the primary instance goes down.
+
+If this ``local_hot_standby`` feature is being used, then ``replication_source``
+should be an empty string and ``wal_mode`` should not be equal to "none".
