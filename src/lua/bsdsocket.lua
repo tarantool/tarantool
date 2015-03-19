@@ -722,7 +722,7 @@ socket_methods.write = function(self, octets, timeout)
             octets = string.sub(octets, written + 1)
         end
         timeout = timeout - (fiber.time() - started)
-        if timeout <= 0 or self:writable(timeout) then
+        if timeout <= 0 or not self:writable(timeout) then
             break
         end
     end
