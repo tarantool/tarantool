@@ -106,6 +106,27 @@ local fiber = require 'fiber'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
+configs = {
+  system = nil,
+  user   = os.getenv('HOME') .. '/.config/tarantool/tarantool',
+}
+
+if not fio.stat(configs.user) then
+    configs.user = nil
+end
+
+config_list = {
+    '/etc/sysconfig/tarantool',
+    '/etc/default/tarantool',
+    '/usr/local/etc/tarantool/tarantool',
+}
+
+for _, c in pairs(config_list) do
+    if fio.stat(c) then
+        configs.system = c
+        break
+    end
+end
 
 local available_commands = {
     'start',
@@ -119,6 +140,9 @@ local available_commands = {
 local function usage()
     log.error("Usage: %s {%s} instance_name",
         arg[0], table.concat(available_commands, '|'))
+    for c, f in pairs(configs) do
+        log.error("Config [%6s]: %s", c, f)
+    end
     os.exit(1)
 end
 
@@ -164,10 +188,19 @@ end
 
 shift_argv(arg, 0, 2)
 
-if fio.stat('/etc/sysconfig/tarantool') then
-    dofile('/etc/sysconfig/tarantool')
-elseif fio.stat('/etc/default/tarantool') then
-    dofile('/etc/default/tarantool')
+local instance_lua = nil
+
+for _, c in pairs({'user', 'system'}) do
+    dofile(configs[c])
+    if instance_dir then
+        instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
+        if fio.stat(instance_lua) then
+            log.info('Found %s.lua in %s', instance, instance_dir)
+            break
+        end
+    end
+    instance_dir = nil
+    instance_lua = nil
 end
 
 if default_cfg == nil then
@@ -176,6 +209,7 @@ end
 
 if instance_dir == nil then
     instance_dir = '/etc/tarantool/instances.enabled'
+    instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
 end
 
 default_cfg.pid_file   = default_cfg.pid_file and default_cfg.pid_file or "/var/run/tarantool"
