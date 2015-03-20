@@ -65,6 +65,9 @@ target_link_libraries(fiber.test core)
 add_executable(fiber_stress.test fiber_stress.cc)
 target_link_libraries(fiber_stress.test core)
 
+add_executable(ipc.test ipc.cc ${CMAKE_SOURCE_DIR}/src/ipc.cc)
+target_link_libraries(ipc.test core)
+
 add_executable(coio.test coio.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/sio.cc
         ${CMAKE_SOURCE_DIR}/src/evio.cc

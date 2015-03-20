@@ -105,12 +105,12 @@ fiber_wakeup(struct fiber *f)
 	if (rlist_empty(&cord->ready)) {
 		/*
 		 * ev_feed_event() is possibly faster,
-		 * but custom event gets scheduled in the
+		 * but EV_CUSTOM event gets scheduled in the
 		 * same event loop iteration, which can
-		 * produce unfair scheduling (see the case of
+		 * produce unfair scheduling, (see the case of
 		 * fiber_sleep(0))
 		 */
-		ev_async_send(cord->loop, &cord->wakeup_event);
+		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
 	}
 	rlist_move_tail_entry(&cord->ready, f, state);
 }
@@ -293,13 +293,11 @@ fiber_yield_timeout(ev_tstamp delay)
 void
 fiber_sleep(ev_tstamp delay)
 {
-	if (delay == 0) {
-		/* Faster than starting and stopping a timer. */
-		fiber_wakeup(fiber());
-		fiber_yield();
-	} else {
-		fiber_yield_timeout(delay);
-	}
+	/*
+	 * We don't use fiber_wakeup() here to ensure there is
+	 * no infinite wakeup loop in case of fiber_sleep(0).
+	 */
+	fiber_yield_timeout(delay);
 	fiber_testcancel();
 }
 
