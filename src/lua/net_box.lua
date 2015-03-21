@@ -345,6 +345,11 @@ local function index_metatable(self)
     }
 end
 
+local errno_is_transient = {
+    [errno.EAGAIN] = true;
+    [errno.EWOULDBLOCK] = true;
+    [errno.EINTR] = true;
+}
 
 local remote = {}
 
@@ -416,7 +421,6 @@ local remote_methods = {
         self.ch = { sync = {}, fid = {} }
         self.wait = { state = {} }
         self.timeouts = {}
-
 
         fiber.create(function() self:_connect_worker() end)
         fiber.create(function() self:_read_worker() end)
@@ -949,34 +953,28 @@ local remote_methods = {
 
     _read_worker = function(self)
         fiber.name('net.box.read')
-        while self.state ~= 'closed' do
+        while true do
             self:_wait_state(self._r_states)
             if self.state == 'closed' then
                 break
             end
 
-            if self.s:readable() then
-                if self.state == 'closed' then
-                    break
-                end
+            local data = self.s:sysread()
 
-                if self:_is_r_state() then
-                    local data = self.s:sysread()
-
-                    if data ~= nil then
-                        if #data == 0 then
-                            self:_fatal('Remote host closed connection')
-                        else
-                            self.rbuf = string.sub(self.rbuf, self.rpos) ..
-                                        data
-                            self.rpos = 1
-                            self.rlen = #self.rbuf
-                            self:_check_response()
-                        end
-                    else
-                        self:_fatal(errno.strerror(errno()))
-                    end
+            if data ~= nil then
+                if #data == 0 then
+                    self:_fatal('Remote host closed connection')
+                else
+                    self.rbuf = string.sub(self.rbuf, self.rpos) ..
+                                data
+                    self.rpos = 1
+                    self.rlen = #self.rbuf
+                    self:_check_response()
                 end
+            elseif errno_is_transient[errno()] then
+                self.s:readable()
+            else
+                self:_fatal(errno.strerror(errno()))
             end
         end
     end,
@@ -986,42 +984,36 @@ local remote_methods = {
 
     _write_worker = function(self)
         fiber.name('net.box.write')
-        while self.state ~= 'closed' do
+        while true do
             self:_wait_state(self._rw_states)
-
             if self.state == 'closed' then
                 break
             end
 
-            if self.wbuf[1] == nil then
-
+            if self.wbuf[1] ~= nil then
+                local s = table.concat(self.wbuf)
+                self.wbuf = {}
+                local written = self.s:syswrite(s)
+                if written ~= nil then
+                    if written ~= #s then
+                        table.insert(self.wbuf,
+                                     string.sub(s, written + 1))
+                    end
+                elseif errno_is_transient[errno()] then
+                -- the write is with a timeout to detect FIN
+                -- packet on the receiving end, and close the connection.
+                -- Every second sockets we iterate the while loop
+                -- and check the connection state
+                    self.s:writable(1)
+                else
+                    table.insert(self.wbuf, s)
+                    self:_fatal(errno.strerror(errno()))
+                end
+            else
                 local wstate = self._to_rstate[self.state]
                 if wstate ~= nil then
                     self:_switch_state(wstate)
                 end
-
-            elseif self.s:writable(.5) then
-
-                if self.state == 'closed' then
-                    break
-                end
-                if self:_is_rw_state() then
-                    if self.wbuf[1] ~= nil then
-                        local s = table.concat(self.wbuf)
-                        self.wbuf = {}
-                        local written = self.s:syswrite(s)
-                        if written ~= nil then
-                            if written ~= #s then
-                                table.insert(self.wbuf,
-                                             string.sub(s, written + 1))
-                            end
-                        else
-                            table.insert(self.wbuf, s)
-                            self:_fatal(errno.strerror(errno()))
-                        end
-                    end
-                end
-
             end
         end
     end,
