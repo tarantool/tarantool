@@ -2,67 +2,80 @@
                              Overview
 -------------------------------------------------------------------------------
 
-Tarantool is a NoSQL database management system running in a Lua application
-server. The code is available for free under the terms of `BSD license`_.
-Supported platforms are GNU/Linux, Mac OS and FreeBSD.
+
+Tarantool is a Lua application server integrated with a database management system.
+It has a "fiber" model which means that many applications can run simultaneously on
+a single thread, while the Tarantool server can run multiple threads for input-output
+and background maintenance. It integrates the LuaJIT -- "Just In Time" -- Lua compiler,
+Lua libraries for most common applications, and the Tarantool Database Server which
+is an established NoSQL DBMS. Thus it serves all the purposes that have made node.js
+and Twisted popular in other environments, with the additional twist that it has a
+data persistence level.
+
+The code is free. The open-source license is *`BSD license`_*. The supported platforms
+are GNU/Linux, Mac OS and FreeBSD.
+
+Tarantool database is deeply integrated with the application server. On
+the surface, Tarantool is simply a Lua language interpreter, and the database
+is one of many built-in Lua packages. But the exposed database API not only 
+allows to persist Lua objects to disk, but to manage object collections, create
+or drop secondary keys, configure and monitor replication, perform controlled
+fail-over, execute Lua code upon database events. 
+Remote database instances are accessible transparently via remote
+procedure invocation API.
+
+Unlike popular application development frameworks based on a "reactor" pattern,
+networking in server-side Lua is sequential, yet very efficient, as it is built
+on top of the **cooperative multitasking** environment that Tarantool itself
+uses. A key feature is that the functions can access and modify databases
+atomically.  Thus some developers look at it as a DBMS with a popular stored
+procedure language, while others look at it as a replacement for multiple
+components of multi-tier Web application architectures. Performance is a few
+thousand transactions per second on a laptop, scalable upwards or outwards to
+server farms.
 
 ===============================================================================
-                     An overview of the architecture
+                     Key features
 ===============================================================================
 
-The server **maintains all its data in random-access memory**, and therefore
-has very low read latency. At the same time, a copy of the data is kept on
-non-volatile storage (a disk drive), and inserts and updates are performed
-atomically.
+Tarantool data storage is built around **storage engine** concept, when
+different sets of algorithms and data structures can be used for different
+collections of objects. Two storage engines are built-in: in-memory engine,
+which represents 100% of data and indexes in RAM, and a two-level B-tree,
+for data sets exceeding the amount of available RAM from 10 to up to 1000
+times. All storage engines in Tarantool support transactions and
+replication by using a common **write ahead log**. This ensures consistency
+and crash safety of the persistent state. The logging subsystem supports
+group commit.
 
-To ensure atomicity, consistency and crash-safety of the persistent copy, a
-write-ahead log (WAL) is maintained, and each change is recorded in the WAL
-before it is considered complete. The logging subsystem supports group commit.
-
-If update and delete rate is high, a constantly growing write-ahead log file
-(or files) can pose a disk space problem, and significantly increase time
-necessary to restart from disk.  A simple solution is employed: the server
-**can be requested to save a concise snapshot** of its current data. The
-underlying operating system's **"copy-on-write"** feature is employed to take
-the snapshot in a quick, resource-savvy and non-blocking manner. The
-**"copy-on-write"** technique guarantees that snapshotting has minimal impact
-on server performance.
-
-**Tarantool is lock-free**. Instead of the operating system's concurrency
-primitives, such as threads and mutexes, Tarantool uses a cooperative
-multitasking environment to simultaneously operate on thousands of
-connections. A fixed number of independent execution threads within
-the server do not share state, but exchange data using low overhead
-message queues. While this approach limits server scalability to a
-few CPU cores, it removes competition for the memory bus and sets the
-scalability limit to the top of memory and network throughput. CPU
+**Tarantool in-memory engine is lock-free**. Instead of the operating system's
+concurrency primitives, such as mutexes, it uses cooperative multitasking to
+handle thousands of connections simultaneously. There is a fixed number of
+independent execution threads. The threads do not share state. Instead they
+exchange data using low-overhead message queues. While this approach limits the
+number of cores that the server will use, it removes competition for the memory
+bus and ensures peak scalability of memory access and network throughput. CPU
 utilization of a typical highly-loaded Tarantool server is under 10%.
 
-===============================================================================
-                             Key features
-===============================================================================
+**Tarantool disk-based engine** is a fusion of ideas from modern filesystems, 
+log-structured merge trees and classical B-trees. All data is organized
+into **branches**, each branch is represented by a file on disk. Branch 
+size is a configuration option and normally is around 64MB. Each 
+branch is a collection of pages, serving different purposes. Pages 
+in a fully merged branch contain non-overlapping ranges of keys. A branch
+can be partially merged if there were a lot of changes in its key range
+recently. In that case some pages represent new keys and values in the
+branch. The disk-based engine is append only: new data never overwrites
+the old.
 
-Unlike most of NoSQL databases, Tarantool supports primary, **secondary keys,
-multi-part keys**, HASH, TREE and BITSET index types.
+Unlike most NoSQL DBMSs, Tarantool supports **secondary index keys** as well as
+primary keys, and **multi-part index keys**. The possible index types are HASH,
+TREE, BITSET, and RTREE.
 
-Tarantool supports **Lua stored procedures**, which can access and modify data
-atomically. Procedures can be created, modified and dropped at runtime.
-
-Use of Lua as an extension language does not end with stored procedures: Lua
-programs can be used during startup, to define triggers and background tasks,
-interact with networked peers. Unlike popular application development
-frameworks implemented around "reactor" pattern, networking in server-side Lua
-is sequential, yet very efficient, as is built on top of the cooperating
-multitasking environment used by the server itself.
-
-Extended with Lua, Tarantool typically replaces more not one but a few existing
-components with a single well-performing system, changing and simplifying
-complex multi-tier Web application architectures.
-
-Tarantool supports replication. Replicas may run locally or on a remote host.
-Tarantool replication is asynchronous and does not block writes to the master.
-When or if the master becomes unavailable, the replica can be switched to
-assume the role of the master without server restart.
+Tarantool supports **asynchronous replication**, locally or to remote hosts. 
+The replication architecture can be **master-master**, that is, many nodes may
+both handle the loads and receive what others have handled, for the same data
+sets.
 
 ===============================================================================
                        How stable is the software?
