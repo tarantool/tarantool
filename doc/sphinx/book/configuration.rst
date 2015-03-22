@@ -265,8 +265,12 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                          |           |          |          | and workload, Tarantool can consume up to 20%   |
     |                          |           |          |          | more than the limit set here.                   |
     +--------------------------+-----------+----------+----------+-------------------------------------------------+
-    | slab_alloc_minimal       | integer   | null     |    no    | Size of the smallest allocation unit. It can be |
+    | slab_alloc_minimal       | integer   | 64       |    no    | Size of the smallest allocation unit. It can be |
     |                          |           |          |          | tuned down if most of the tuples are very small |
+    +--------------------------+-----------+----------+----------+-------------------------------------------------+
+    | slab_alloc_maximal       | integer   | 1048576  |    no    | Size of the largest allocation unit. It can be  |
+    |                          |           |          |          | tuned down up if it is necessary to store large |
+    |                          |           |          |          | tuples.                                         |
     +--------------------------+-----------+----------+----------+-------------------------------------------------+
     | slab_alloc_factor        | float     | 2.0      |    no    | Use slab_alloc_factor as the multiplier for     |
     |                          |           |          |          | computing the sizes of memory chunks that       |
@@ -295,7 +299,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     +--------------------+-----------+----------+----------+-----------------------------------------------------+
     | Name               | Type      | Default  | Dynamic? | Description                                         |
     +====================+===========+==========+==========+=====================================================+
-    | snapshot_period    | float     | 0        |   yes    | The interval between actions by the snapshot        |
+    | snapshot_period    | integer   | 0        |   yes    | The interval between actions by the snapshot        |
     |                    |           |          |          | daemon, in seconds. The snapshot daemon is a        |
     |                    |           |          |          | fiber which is constantly running. If               |
     |                    |           |          |          | ``snapshot_period`` is set to a value greater       |
@@ -307,7 +311,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                    |           |          |          | the snapshot daemon to create a new database        |
     |                    |           |          |          | snapshot once per hour.                             |
     +--------------------+-----------+----------+----------+-----------------------------------------------------+
-    | snapshot_count     | float     | 6        |   yes    | The maximum number of snapshots that the            |
+    | snapshot_count     | integer   | 6        |   yes    | The maximum number of snapshots that the            |
     |                    |           |          |          | snapshot daemon maintains. For example,             |
     |                    |           |          |          | ``box.cfg{snapshot_period=3600, snapshot_count=10}``|
     |                    |           |          |          | will cause the snapshot daemon to create a new      |
@@ -327,8 +331,9 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     | panic_on_snap_error  | boolean   | true     | no       | If there is an error while reading the snapshot     |
     |                      |           |          |          | file (at server start), abort.                      |
     +----------------------+-----------+----------+----------+-----------------------------------------------------+
-    | panic_on_wal_error   | boolean   | false    | no       | If there is an error while reading a write-ahead    |
-    |                      |           |          |          | log file (at server start), abort.                  |
+    | panic_on_wal_error   | boolean   | true     | no       | If there is an error while reading a write-ahead    |
+    |                      |           |          |          | log file (at server start or to relay to a replica),|
+    |                      |           |          |          | abort.                                              |
     +----------------------+-----------+----------+----------+-----------------------------------------------------+
     | rows_per_val         | integer   | 500000   | no       | How many log records to store in a single           |
     |                      |           |          |          | write-ahead log file. When this limit is reached,   |
@@ -368,10 +373,8 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                      |           |          |          | which replication_source specifies with a `URI`_    |
     |                      |           |          |          | (Universal Resource Identifier), for example        |
     |                      |           |          |          | '``konstantin:secret_password@tarantool.org:3301``' |
-    |                      |           |          |          | The default user name is 'guest'. A replica server  |
-    |                      |           |          |          | does not accept data-change                         |
-    |                      |           |          |          | requests on the ``listen``                          |
-    |                      |           |          |          | port. The replication_source parameter is dynamic,  |
+    |                      |           |          |          | The default user name is 'guest'.                   |
+    |                      |           |          |          | The replication_source parameter is dynamic,        |
     |                      |           |          |          | that is, to enter master mode, simply set           |
     |                      |           |          |          | replication_source to an empty string and issue     |
     |                      |           |          |          | "``box.cfg{replication_source=new-value}``"         |
@@ -424,6 +427,13 @@ for binary logging and snapshots, for replication, for networking, and for loggi
     |                      |           |          |          | Example setting: ``logger = 'tarantool.log'`` (this |
     |                      |           |          |          | will open tarantool.log for output on the server's  |
     |                      |           |          |          | default directory).                                 |
+    |                      |           |          |          | If logger string begins with a pipe, for example    |
+    |                      |           |          |          | '| cronolog tarantool.log', the program specified in|
+    |                      |           |          |          | the option is executed at server start and all log  |
+    |                      |           |          |          | When logging to a file, tarantool reopens the log   |
+    |                      |           |          |          | on SIGHUP. When log is a program, it's pid is saved |
+    |                      |           |          |          | in logger_pid variable of package log. You need to  |
+    |                      |           |          |          | send it a signal to rotate logs.                    |
     +----------------------+-----------+----------+----------+-----------------------------------------------------+
     | logger_nonblock      | boolean   | true     | no       | If logger_nonblock equals true, Tarantool does not  |
     |                      |           |          |          | block on the log file descriptor when it's not      |
@@ -459,14 +469,14 @@ first instance goes down.
 The expectation is that there will be two instances of the server using the
 same configuration. The first one to start will be the "primary" instance.
 The second one to start will be the "standby" instance. The standby instance
-will initialize and will try to connect on listen address and admin address,
-but will fail because the primary instance has already taken them. So the
+will initialize and will try to connect on listen address,
+but will fail because the primary instance has already taken it. So the
 standby instance goes into a loop, reading the write ahead log which the
 primary instance is writing (so the two instances are always in synch),
-and trying to connect on the ports. If the primary instance goes down for any
-reason, the ports will become free so the standby instance will succeed in
+and trying to connect on the port. If the primary instance goes down for any
+reason, the port will become free so the standby instance will succeed in
 connecting, and will become the primary instance. Thus there is no noticeable
 downtime if the primary instance goes down.
 
-If this ``local_hot_standby`` feature is being used, then ``replication_source``
-should be an empty string and ``wal_mode`` should not be equal to "none".
+If this ``local_hot_standby`` feature is being used, then ``wal_mode`` should
+not be equal to "none".

@@ -19,10 +19,7 @@ A Tarantool server process title follows the following naming scheme:
 * **loading** -- ordinary node recovering from old snap and wal files,
 * **orphan** -- not in a cluster,
 * **hot_standby** -- see section :ref:`local_hot_standby`,
-* **dumper + process-id** -- saving files before exiting,
-* **spawner** -- controls other processes,
-* **replica + URI/status** -- replication node accepting connections on :ref:`replication_port`,
-* **relay + sockaddr** -- serves a single replication connection,
+* **dumper + process-id** -- saving a snapshot,
 
 For example:
 
@@ -30,4 +27,3 @@ For example:
 
     $ ps -A -f | grep tarantool
     1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running
-    1000     17704 17701  0 08:27 pts/0    00:00:00 tarantool: spawner

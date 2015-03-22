@@ -12,23 +12,23 @@ reloading configuration, taking snapshots, log rotation.
                         Server signal handling
 =====================================================================
 
-The server is configured to shut down gracefully on SIGTERM and SIGINT (keyboard
-interrupt) or SIGHUP. SIGUSR1 can be used to save a snapshot. All other signals
-are blocked or ignored. The signals are processed in the main event loop. Thus,
-if the control flow never reaches the event loop (thanks to a runaway stored
-procedure), the server stops responding to any signal, and can only be killed
-with SIGKILL (this signal can not be ignored).
-
+The server is configured to shut down gracefully on SIGTERM and SIGINT
+(keyboard interrupt) or SIGHUP. SIGUSR1 can be used to save a snapshot. All
+other signals are blocked or ignored. The signals are processed in the main
+thread event loop. Thus, if the control flow never reaches the event loop
+(thanks to a runaway stored procedure), the server stops responding to any
+signal, and can only be killed with SIGKILL (this signal can not be ignored).
 
 =====================================================================
-                        Utility ``tarantool``
+                        Using ``tarantool`` as a client
 =====================================================================
 
 .. program:: tarantool
 
-If ``tarantool`` is started without an initialization file, then there will be
-a prompt ("``tarantool>``") and it will be possible to enter requests. When
-used this way, ``tarantool`` is a client program as well as a server program.
+If ``tarantool`` is started without a Lua script to run, it automatically
+enters interactive mode. There will be a prompt ("``tarantool>``") and it will
+be possible to enter requests. When used this way, ``tarantool`` can be 
+a client for a remote server.
 
 This section shows all legal syntax for the tarantool program, with short notes
 and examples. Other client programs may have similar options and request
@@ -96,7 +96,7 @@ which is legal according to the rules for Lua identifiers. Procedure
 identifiers are also called function names. Notes: function names are case
 insensitive so ``insert`` and ``Insert`` are not the same thing.
 
-tring literals are: Any sequence of zero or more characters enclosed in
+String literals are: Any sequence of zero or more characters enclosed in
 single quotes. Double quotes are legal but single quotes are preferred.
 Enclosing in double square brackets is good for multi-line strings as
 described in `Lua documentation`_.
@@ -143,11 +143,6 @@ To go back to normal mode: ``console.delimiter('')string-literal``. Example:
       statement_2 = 'b'
     end!
     console.delimiter('')!
-
-For a condensed Backus-Naur Form [BNF] description of the suggested form of
-client requests, see `doc/dev_guide/box-protocol.html`_.
-
-.. _doc/dev_guide/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
 
 In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of

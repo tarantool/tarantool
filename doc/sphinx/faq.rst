@@ -52,19 +52,6 @@
         part of Mail.Ru backbone, so it gets a lot of support from Mail.ru.
 
 
-    :Q: Why is Tarantool primary port number 3303?
-    :A: It's a prime number which is easy to remember, because 3313, 3301, 313, 13 and
-        3 are also prime numbers.
-
-
-    :Q: My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?
-    :A: If the ratio of arena_used to items_used >> 1, that indicates that there is
-        fragmentation accumulated by the slab allocator. Imagine there are a lot of
-        small tuples stored in the system initially, and later on each tuple becomes
-        bigger and doesn't fit into its old slab size. The old slabs are never
-        relinquished by the allocator. Currently this can be solved only by a server restart.
-
-
     :Q: What happens when Tarantool runs out of memory?
     :A: The server stops accepting updates until more memory is available. Read and
         delete requests are served just fine.
