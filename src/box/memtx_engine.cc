@@ -38,6 +38,7 @@
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include "box.h"
 #include "iproto_constants.h"
 #include "xrow.h"
