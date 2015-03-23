@@ -1004,7 +1004,7 @@ local remote_methods = {
                 -- packet on the receiving end, and close the connection.
                 -- Every second sockets we iterate the while loop
                 -- and check the connection state
-                    self.s:writable(1)
+                    while self.s:writable(1) == 0 do end
                 else
                     table.insert(self.wbuf, s)
                     self:_fatal(errno.strerror(errno()))
