@@ -31,7 +31,6 @@ sys.path.insert(0, os.path.abspath('.'))
 
 extensions = [
     'sphinx.ext.todo',
-    'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'ext.filters',
     'ext.lua'
