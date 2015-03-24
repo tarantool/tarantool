@@ -917,22 +917,22 @@ local remote_methods = {
     _read_worker = function(self)
         fiber.name('net.box.read')
         while self:_wait_state(self._r_states) ~= 'closed' do
-            local data = self.s:sysread()
+            if self.s:readable() then
+                local data = self.s:sysread()
 
-            if data ~= nil then
-                if #data == 0 then
-                    self:_fatal('Remote host closed connection')
-                else
-                    self.rbuf = string.sub(self.rbuf, self.rpos) ..
-                                data
-                    self.rpos = 1
-                    self.rlen = #self.rbuf
-                    self:_check_response()
+                if data ~= nil then
+                    if #data == 0 then
+                        self:_fatal('Remote host closed connection')
+                    else
+                        self.rbuf = string.sub(self.rbuf, self.rpos) ..
+                                    data
+                        self.rpos = 1
+                        self.rlen = #self.rbuf
+                        self:_check_response()
+                    end
+                elseif errno_is_transient[errno()] ~= true then
+                    self:_fatal(errno.strerror(errno()))
                 end
-            elseif errno_is_transient[errno()] then
-                self.s:readable()
-            else
-                self:_fatal(errno.strerror(errno()))
             end
         end
     end,
