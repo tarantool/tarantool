@@ -417,6 +417,10 @@ local remote_methods = {
 
         self.is_run = true
         self.state = 'init'
+        self.wbuf = {}
+        self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
 
         self.ch = { sync = {}, fid = {} }
         self.wait = { state = {} }
@@ -516,17 +520,11 @@ local remote_methods = {
     end,
 
     is_connected = function(self)
-        if self.state == 'active' then
-            return true
-        end
-        if self.state == 'activew' then
-            return true
-        end
-        return false
+        return self.state == 'active' or self.state == 'activew'
     end,
 
     wait_connected = function(self, timeout)
-        return self:_wait_state({ 'active', 'activew', 'closed' }, timeout)
+        return self:_wait_state(self._request_states, timeout)
     end,
 
     timeout = function(self, timeout)
@@ -590,7 +588,7 @@ local remote_methods = {
             self.s = nil
         end
 
-        log.warn("%s", tostring(emsg))
+        log.warn("%s:%s: %s", self.host or "", self.port or "", tostring(emsg))
         self.error = emsg
         self.space = {}
         self:_switch_state('error')
@@ -700,17 +698,13 @@ local remote_methods = {
     end,
 
     _switch_state = function(self, state)
-        if self.state == state then
+        if self.state == state or state == nil then
             return
         end
         self.state = state
 
-        local list = self.wait.state[ state ]
-        self.wait.state[ state ] = nil
-
-        if list == nil then
-            return
-        end
+        local list = self.wait.state[ state ] or {}
+        self.wait.state[ state ] = {}
 
         for _, fid in pairs(list) do
             if fid ~= fiber.id() then
@@ -723,57 +717,33 @@ local remote_methods = {
     end,
 
     _wait_state = function(self, states, timeout)
-        if timeout == nil then
-            timeout = TIMEOUT_INFINITY
-        end
-        while timeout > 0 do
+        timeout = timeout or TIMEOUT_INFINITY
+        while timeout > 0 and self:_is_state(states) ~= true do
             local started = fiber.time()
-            for _, state in pairs(states) do
-                if self.state == state then
-                    return true
-                end
-            end
-
             local fid = fiber.id()
             local ch = fiber.channel()
-            for _, state in pairs(states) do
-                if self.wait.state[state] == nil then
-                    self.wait.state[state] = {}
-                end
+            for state, _ in pairs(states) do
+                self.wait.state[state] = self.wait.state[state] or {}
                 self.wait.state[state][fid] = fid
             end
 
             self.ch.fid[fid] = ch
-            local res
-            res = ch:get(timeout)
+            ch:get(timeout)
             self.ch.fid[fid] = nil
 
-            local has_state = false
-            for _, state in pairs(states) do
-                if self.wait.state[state] ~= nil then
-                    self.wait.state[state][fid] = nil
-                end
-                if self.state == state then
-                    has_state = true
-                end
+            for state, _ in pairs(states) do
+                self.wait.state[state][fid] = nil
             end
-
-            if has_state or res == nil then
-                return res
-            end
-
             timeout = timeout - (fiber.time() - started)
         end
+        return self.state
     end,
 
 
     _connect_worker = function(self)
         fiber.name('net.box.connector')
-        while true do
-            self:_wait_state{ 'init', 'error', 'closed' }
-            if self.state == 'closed' then
-                return
-            end
+        local connect_states = { init = true, error = true, closed = true }
+        while self:_wait_state(connect_states) ~= 'closed' do
 
             if self.state == 'error' then
                 if self.opts.reconnect_after == nil then
@@ -798,11 +768,6 @@ local remote_methods = {
                 elseif string.len(self.handshake) ~= 128 then
                     self:_fatal("Can't read handshake")
                 else
-                    self.wbuf = {}
-                    self.rbuf = ''
-                    self.rpos = 1
-                    self.rlen = 0;
-
                     if string.match(self.handshake, '^Tarantool .*console') then
                         self.console = true
                         self:_switch_state('active')
@@ -817,7 +782,7 @@ local remote_methods = {
 
                         xpcall(function() self:_load_schema() end,
                             function(e)
-                                log.info("Can't load schema: %s", tostring(e))
+                                log.error("Can't load schema: %s", tostring(e))
                             end)
 
                         if self.state ~= 'error' and self.state ~= 'closed' then
@@ -831,7 +796,6 @@ local remote_methods = {
 
     _auth = function(self)
         if self.opts.user == nil or self.opts.password == nil then
-            self:_switch_state('authen')
             return
         end
 
@@ -842,35 +806,34 @@ local remote_methods = {
 
         if auth_res.hdr[TYPE] ~= OK then
             self:_fatal(auth_res.body[ERROR])
-            return
         end
-
-        self:_switch_state('authen')
     end,
 
     -- states wakeup _read_worker
     _r_states = {
-        'active', 'activew', 'schema', 'schemaw', 'closed', 'auth', 'authw'
+        active = true, activew = true, schema = true,
+        schemaw = true, auth = true, authw = true,
+        closed = true,
     },
     -- states wakeup _write_worker
-    _rw_states = { 'activew', 'schemaw', 'closed', 'authw' },
+    _rw_states = {
+        activew = true, schemaw = true, authw = true,
+        closed = true,
+    },
+    _request_states = {
+        active = true, activew = true, closed = true,
+    },
+
+    _is_state = function(self, states)
+        return states[self.state] ~= nil
+    end,
 
     _is_r_state = function(self)
-        for _, state in pairs(self._r_states) do
-            if state == self.state then
-                return true
-            end
-        end
-        return false
+        return is_state(self._r_states)
     end,
 
     _is_rw_state = function(self)
-        for _, state in pairs(self._rw_states) do
-            if state == self.state then
-                return true
-            end
-        end
-        return false
+        return is_state(self._rw_states)
     end,
 
     _load_schema = function(self)
@@ -953,12 +916,7 @@ local remote_methods = {
 
     _read_worker = function(self)
         fiber.name('net.box.read')
-        while true do
-            self:_wait_state(self._r_states)
-            if self.state == 'closed' then
-                break
-            end
-
+        while self:_wait_state(self._r_states) ~= 'closed' do
             local data = self.s:sysread()
 
             if data ~= nil then
@@ -984,40 +942,33 @@ local remote_methods = {
 
     _write_worker = function(self)
         fiber.name('net.box.write')
-        while true do
-            self:_wait_state(self._rw_states)
-            if self.state == 'closed' then
-                break
-            end
-
-            if self.wbuf[1] ~= nil then
+        while self:_wait_state(self._rw_states) ~= 'closed' do
+            while self.wbuf[1] ~= nil do
                 local s = table.concat(self.wbuf)
                 self.wbuf = {}
                 local written = self.s:syswrite(s)
                 if written ~= nil then
                     if written ~= #s then
-                        table.insert(self.wbuf,
-                                     string.sub(s, written + 1))
+                        table.insert(self.wbuf, string.sub(s, written + 1))
                     end
-                elseif errno_is_transient[errno()] then
-                -- the write is with a timeout to detect FIN
-                -- packet on the receiving end, and close the connection.
-                -- Every second sockets we iterate the while loop
-                -- and check the connection state
-                    while self.s:writable(1) == 0 do end
                 else
                     table.insert(self.wbuf, s)
-                    self:_fatal(errno.strerror(errno()))
-                end
-            else
-                local wstate = self._to_rstate[self.state]
-                if wstate ~= nil then
-                    self:_switch_state(wstate)
+                    if errno_is_transient[errno()] then
+                    -- the write is with a timeout to detect FIN
+                    -- packet on the receiving end, and close the connection.
+                    -- Every second sockets we iterate the while loop
+                    -- and check the connection state
+                        while self.s:writable(1) == 0 and self.state ~= 'closed' do
+                        end
+                    else
+                        self:_fatal(errno.strerror(errno()))
+                        break
+                    end
                 end
             end
+            self:_switch_state(self._to_rstate[self.state])
         end
     end,
-
 
     _request = function(self, name, raise, ...)
 
@@ -1028,7 +979,7 @@ local remote_methods = {
 
         local started = fiber.time()
 
-        self:_wait_state({ 'active', 'activew', 'closed' }, self.timeouts[fid])
+        self:_wait_state(self._request_states, self.timeouts[fid])
 
         self.timeouts[fid] = self.timeouts[fid] - (fiber.time() - started)
 
@@ -1069,10 +1020,7 @@ local remote_methods = {
 
         table.insert(self.wbuf, request)
 
-        local wstate = self._to_wstate[self.state]
-        if wstate ~= nil then
-            self:_switch_state(wstate)
-        end
+        self:_switch_state(self._to_wstate[self.state])
 
         local ch = fiber.channel()
 

@@ -10,7 +10,7 @@ index = space:create_index('primary', { type = 'tree' })
 -- low level connection
 log.info("create connection")
 cn = remote:new(LISTEN.host, LISTEN.service)
-cn:_wait_state({'active', 'error'}, 1)
+cn:_wait_state({active = true, error = true}, 1)
 log.info("state is %s", cn.state)
 
 cn:ping()
@@ -134,12 +134,12 @@ cn:call('test_foo')
 
 -- -- 2 reconnect
 cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
-cn:_wait_state({'active'}, 1)
+cn:_wait_state({active = true}, 1)
 cn.space ~= nil
 
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 cn:_fatal 'Test error'
-cn:_wait_state({'active', 'activew'}, 2)
+cn:_wait_state({active = true, activew = true}, 2)
 cn:ping()
 cn.state
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
