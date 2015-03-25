@@ -38,7 +38,7 @@ written in Lua for unpacking Tarantool messages is in file `Tnt-dissector`_.
 
 .. _Tnt-dissector: https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua
 .. _Language-specific drivers: `Connectors`_
-.. _doc/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
+.. _doc/box-protocol.html: :doc:`../../dev_guide/box-protocol.rst`
 
 .. container:: table
 

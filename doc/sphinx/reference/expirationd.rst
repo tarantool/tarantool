@@ -104,5 +104,4 @@ by passing different parameters, which will be evident after looking in more det
 at the source code.
 
 .. _expirationd.lua: https://github.com/tarantool/expirationd/blob/master/expirationd.lua
-.. _rock: http://tarantool.org/doc/user_guide.html#rocks
 .. _GitHub: https://github.com/tarantool/expirationd/blob/master/expirationd.lua

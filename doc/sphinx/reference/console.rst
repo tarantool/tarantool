@@ -74,4 +74,4 @@ host/port.
     numeric TCP port. Connections are often made with telnet.
     A typical port value is 3313.
 
-.. _URI: http://tarantool.org/doc/user_guide.html#URI
+.. _URI: :ref:`URI`
