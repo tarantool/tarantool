@@ -42,7 +42,7 @@ extern "C" {
  * }}}
  */
 
-/* {{{ box.fiber Lua library: access to Tarantool fibers
+/* {{{ fiber Lua library: access to Tarantool fibers
  *
  * Each fiber can be running, suspended or dead.
  * When a fiber is created (fiber.create()) it's

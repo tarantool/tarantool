@@ -39,7 +39,7 @@ extern "C" {
 #include <ipc.h>
 #include "lua/utils.h"
 
-static const char channel_lib[]   = "box.fiber.channel";
+static const char channel_lib[]   = "fiber.channel";
 
 #define BROADCAST_MASK	(((size_t)1) << (CHAR_BIT * sizeof(size_t) - 1))
 
@@ -60,7 +60,7 @@ lbox_ipc_channel(struct lua_State *L)
 	}
 	struct ipc_channel *ch = ipc_channel_new(size);
 	if (!ch)
-		luaL_error(L, "box.channel: Not enough memory");
+		luaL_error(L, "fiber.channel: Not enough memory");
 
 	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
 	luaL_getmetatable(L, channel_lib);
