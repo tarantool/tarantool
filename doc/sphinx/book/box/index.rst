@@ -69,7 +69,7 @@ introspection (inspecting contents of spaces, accessing server configuration).
     |                   | is more important than all the others.              |
     +-------------------+-----------------------------------------------------+
 
-.. _wal_mode: http://tarantool.org/doc/user_guide.html#wal_mode
+.. _wal_mode: :ref:`wal_mode`
 
 In the discussion of each data-manipulation function there will be a note about
 which Complexity Factors might affect the function's resource usage.

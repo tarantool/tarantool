@@ -156,7 +156,7 @@ necessary to prioritize requests or to use different authentication ids.
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.
 
-.. _SQL DBMS plugins: http://tarantool.org/doc/user_guide.html#plugins
+.. _SQL DBMS plugins: :doc:`../app_d_plugins`
 
 ===========================================================
                         Example

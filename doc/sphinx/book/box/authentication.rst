@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                            Authentication and authorization
+                    Authentication and authorization
 -------------------------------------------------------------------------------
 
 Understanding the details of security is primarily an issue for administrators,
@@ -127,7 +127,7 @@ selects a tuple in the ``_user`` space, and then drops the user.
 
     The maximum number of users is 32.
 
-.. _URI: http://tarantool.org/doc/user_guide.html#URI
+.. _URI: :ref:`URI`
 
 ===========================================================
                Priveleges and _priv space
@@ -236,8 +236,8 @@ users. Typically a guest user will use ``box.session.su()`` to change into a non
 user to whom admin has granted more than the default privileges. For example,
 admin might say:
 
-.. _admin: http://tarantool.org/doc/user_guide.html#admin_port
-.. _connectors: http://tarantool.org/doc/user_guide.html#connectors
+.. _admin: :ref:`admin_port
+.. _connectors: :doc:`../connectors/index`
 
 .. code-block:: lua
 

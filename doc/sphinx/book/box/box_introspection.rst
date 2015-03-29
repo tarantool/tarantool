@@ -31,7 +31,7 @@ access to those parameters.
           ...
         ...
 
-.. _Configuration: http://tarantool.org/doc/user_guide.html#configuration-file
+.. _Configuration: :doc:`../configuration`
 
 =====================================================================
                          Package `box.info`

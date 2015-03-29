@@ -143,9 +143,12 @@ Then the screen might look like this:
 .. _replication_port:
 .. _slab_alloc_arena:
 .. _replication_source:
+.. _admin_port:
 .. _snap_dir:
 .. _wal_dir:
+.. _wal_mode:
 .. _snapshot daemon:
+.. _logger:
 
 =====================================================================
                 Configuration parameters

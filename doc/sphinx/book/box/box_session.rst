@@ -71,5 +71,6 @@ about defining triggers for connect and disconnect events with
 the section `Authentication and access control`_ for instructions about
 ``box.session`` functions that affect user identification and security.
 
-.. _Triggers on connect and disconnect: http://tarantool.org/doc/user_guide.html#sp-box-session-triggers
-.. _Authentication and access control:  http://tarantool.org/doc/user_guide.html#authentication
+.. _Triggers on connect and disconnect: :doc:`triggers`
+.. _Authentication and access control:  :doc:`authentication`
+

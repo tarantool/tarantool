@@ -211,7 +211,7 @@ explain what the steps are, then on the Internet you can look at some example sc
 9. Make an rpm. |br| This step is optional. It's only for people who want to
    redistribute Tarantool. Package maintainers who want to build with rpmbuild
    should consult the
-   `Tarantool Developer Guide <http://tarantool.org/doc/dev_guide/index.html>`_
+   :doc:`Tarantool Developer Guide <index>`
 
 This is the end of the list of steps to take for source downloads.
 

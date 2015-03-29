@@ -723,8 +723,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_cluster`` is a new system tuple set
     for support of the `replication feature`_.
 
-.. _authorization feature: http://tarantool.org/doc/user_guide.html#authentication
-.. _replication feature: http://tarantool.org/doc/user_guide.html#replication
+.. _authorization feature: :doc:`authentication`
+.. _replication feature: :doc:`replication`
 
 =================================================
                      Example

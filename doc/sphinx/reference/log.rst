@@ -60,6 +60,6 @@ The output from the less command will look approximately like this:
 The 'Error' line is visible in tarantool.txt preceded by the letter E.
 The 'Info' line is not present because the log_level is 3.
 
-.. _logger: http://tarantool.org/doc/user_guide.html#logger
-.. _log file: http://tarantool.org/doc/user_guide.html#logger
-.. _log_level: http://tarantool.org/doc/user_guide.html#logger
+.. _logger: :ref:`logger`
+.. _log file: :ref:`logger`
+.. _log_level: :ref:`logger`
