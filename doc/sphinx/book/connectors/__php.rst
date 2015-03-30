@@ -29,7 +29,7 @@ directory and tell PHP where to find the ``php.ini`` file that contains that lin
 
     cd ~
     cp ./tarantool-php/modules/tarantool.so .
-    export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared
+    export PHP_INI_SCAN_DIR=~/tarantool-php/test/shared
 
 Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples'
 via the PHP API. Before trying to run, check that the server is listening and that

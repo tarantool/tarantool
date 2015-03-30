@@ -51,7 +51,7 @@ will print “Connection refused”.
             0 => {
               name => 'primary', fields => [ 'field1' ] } } } } );
 
-    $tnt->insert('tester' => [ 99999, 'BB' ]);
+    $tnt->insert('examples' => [ 99999, 'BB' ]);
 
 The example program only shows one command and does not show all that's
 necessary for good practice. For that, please see `DR::Tarantool`_ CPAN repository.

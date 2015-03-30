@@ -47,9 +47,9 @@ Tarantool is started by entering the command:
     scheme, in which ``<major>`` number is changed only rarely, ``<minor>`` is
     incremented for each new milestone and indicates possible incompatible
     changes, and ``<patch>`` stands for the number of bug fix releases made after
-    the start of the milestone. The optional commit number and commit SHA1 are
-    output for non-released versions only, and indicate how much this particular
-    build has diverged from the last release.
+    the start of the milestone. For non-released versions only, there may be a
+    commit number and commit SHA1 to indicate how much this particular build has
+    diverged from the last release.
 
     “Target” is the platform tarantool was built on. Some platform-specific details
     may follow this line.
@@ -61,7 +61,7 @@ Tarantool is started by entering the command:
         `git repository`_.
 
 .. _git describe: http://www.kernel.org/pub/software/scm/git/docs/git-describe.html
-.. _git repository: git://github.com/tarantool/tarantool.git
+.. _git repository: http://github.com/tarantool/tarantool.git
 
 
 
@@ -75,10 +75,9 @@ Some configuration parameters and some functions depend on a URI, or
 for login, a password, a host name or host IP address, and a port number. Only
 the port number is always mandatory. The password is mandatory if the user
 name is specified, unless the user name is 'guest'. So, formally, the URI
-syntax is ``[host:]port`` or ``[username:password@]host:port`` or if
-``username='guest'`` it may be ``[username@]host:port``. If host is omitted,
-then 'localhost' is assumed. If username:password is omitted, then 'guest'
-is assumed. Some examples:
+syntax is ``[host:]port`` or ``[username:password@]host:port``
+If host is omitted, then 'localhost' is assumed.
+If username:password is omitted, then 'guest' is assumed. Some examples:
 
 .. _generic syntax for a URI schema: http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax
 
@@ -90,8 +89,6 @@ is assumed. Some examples:
     | port                        | 3301                         |
     +-----------------------------+------------------------------+
     | host:port                   | 127.0.0.1:3301               |
-    +-----------------------------+------------------------------+
-    | guest@host:port             | guest@mail.ru:3301           |
     +-----------------------------+------------------------------+
     | username:password@host:port | notguest:sesame@mail.ru:3301 |
     +-----------------------------+------------------------------+
@@ -121,6 +118,7 @@ server will be used or if ports need to be opened. For example, suppose
     }
     print('Starting ',arg[1])
 
+and suppose the environment variable LISTEN_URI contains 3301,
 and suppose the command line is ``~/tarantool/src/tarantool script.lua ARG``.
 Then the screen might look like this:
 
@@ -131,7 +129,6 @@ Then the screen might look like this:
     ... main/101/script.lua C> version 1.6.3-439-g7e1011b
     ... main/101/script.lua C> log level 5
     ... main/101/script.lua I> mapping 107374184 bytes for a shared arena...
-    ... main/101/spawner C> initialized
     ... main/101/script.lua I> recovery start
     ... main/101/script.lua I> recovering from `./00000000000000000000.snap'
     ... main/101/script.lua I> primary: bound to 0.0.0.0:3301
@@ -459,7 +456,7 @@ for binary logging and snapshots, for replication, for networking, and for loggi
 Local hot standby is a feature which provides a simple form of failover without
 replication. To initiate it, start a second instance of the Tarantool server on
 the same computer with the same :func:`box.cfg` configuration settings -
-including the same directories and same URIs. A warning should appear with a
+including the same directories and same non-null URIs. A warning should appear with a
 message like
 
 .. code-block:: lua
