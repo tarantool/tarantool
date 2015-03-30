@@ -7,17 +7,15 @@
 
 The ``net.box`` package contains connectors to remote database systems. One
 variant, ``box.net.sql``, is for connecting to MySQL or MariaDB or PostgreSQL —
-that variant is the subject of the `SQL DBMS plugins`_ appendix. In this section
-the subject is the built-in variant, ``box.net``. This is for connecting to
-tarantool servers via a network.
+that variant is the subject of the :ref:`SQL DBMS plugins <dbms-plugins>` appendix.
+In this section the subject is the built-in variant, ``box.net``. This is for
+connecting to tarantool servers via a network.
 
 Call ``require('net.box')`` to get a ``net.box`` object, which will be called
 ``net_box`` for examples in this section. Call ``net_box.new()`` to connect and
 get a connection object, which will be called conn for examples in this section.
 Call the other ``net.box()`` routines, passing ``conn:``, to execute requests on
-the remote box. Call `conn:close`_ to disconnect.
-
-.. _conn:close: :func:`connection_object:close`
+the remote box. Call :func:`conn:close <socket_object.close>` to disconnect.
 
 All `net.box`` methods are fiber-safe, that is, it is safe to share and use the
 same connection object across multiple concurrent fibers. In fact, it's perhaps
@@ -155,8 +153,6 @@ necessary to prioritize requests or to use different authentication ids.
         a request is sent, it cannot be revoked from the remote server even if a
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.
-
-.. _SQL DBMS plugins: :doc:`../app_d_plugins`
 
 ===========================================================
                         Example

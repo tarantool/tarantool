@@ -1,6 +1,8 @@
 .. include:: ../directives.rst
 .. highlight:: lua
 
+.. _box-configuration:
+
 -------------------------------------------------------------------------------
                         Configuration reference
 -------------------------------------------------------------------------------
@@ -64,6 +66,7 @@ Tarantool is started by entering the command:
 .. _git repository: http://github.com/tarantool/tarantool.git
 
 
+.. _URI:
 
 =====================================================================
                                 URI

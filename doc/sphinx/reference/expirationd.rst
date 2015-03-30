@@ -103,5 +103,6 @@ some statistics. Of course, expirationd can be customized to do different things
 by passing different parameters, which will be evident after looking in more detail
 at the source code.
 
+.. _rock: http://rocks.tarantool.org/
 .. _expirationd.lua: https://github.com/tarantool/expirationd/blob/master/expirationd.lua
 .. _GitHub: https://github.com/tarantool/expirationd/blob/master/expirationd.lua

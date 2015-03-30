@@ -16,7 +16,7 @@ different parameters when building from source. The section about binaries is
 For development, you will want to download a source package and make the binary
 by yourself using a C/C++ compiler and common tools. Although this is a bit harder,
 it gives more control. And the source packages include additional files, for example
-the Tarantool test suite. The section about source is “`Building from source`_”
+the Tarantool test suite. The section about source is “:ref:`building-from-source` ”
 
 If the installation has already been done, then you should try it out. So we've
 provided some instructions that you can use to make a temporary “sandbox”. In a
@@ -223,7 +223,7 @@ Here is how to create a simple test database after installing.
        ~/tarantool/src/tarantool
 
    The server starts in interactive mode and outputs a command prompt.
-   To turn on the database, `configure`_ it:
+   To turn on the database, :mod:`configure <box.cfg>` it:
 
    .. code-block:: lua
 
@@ -261,7 +261,7 @@ Here is how to create a simple test database after installing.
    convenient for learning it will be used for most examples in
    this manual. Tarantool is waiting for the user to type instructions.
 
-   To create the first space and the first index_, try this:
+   To create the first space and the first :mod:`box.index`, try this:
 
    .. code-block:: lua
 
@@ -314,7 +314,3 @@ Here is how to create a simple test database after installing.
    .. code-block:: lua
 
        tarantool> box.schema.user.grant('guest','read,write,execute','universe')
-
-.. _Building from source: :dev:`/dev_guide/building_from_source`
-.. _configure: :mod:`box.cfg`
-.. _index: :mod:`box.index`

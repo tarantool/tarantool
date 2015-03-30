@@ -13,7 +13,7 @@
 
 The ``box.cfg`` package is for administrators to specify all the server
 configuration parameters; the full description of the parameters is in
-section Configuration_. Use ``box.cfg`` without braces to get read-only
+section :ref:`box-configuration`. Use ``box.cfg`` without braces to get read-only
 access to those parameters.
 
 .. data:: box.cfg
@@ -30,8 +30,6 @@ access to those parameters.
           log_level: 5
           ...
         ...
-
-.. _Configuration: :doc:`../configuration`
 
 =====================================================================
                          Package `box.info`

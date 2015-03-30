@@ -10,7 +10,7 @@ A reference description also follows below:
 
 .. function:: box.snapshot()
 
-    Take a snapshot of all data and store it in `snap_dir`_/<latest-lsn>.snap.
+    Take a snapshot of all data and store it in :ref:`snap_dir <snap_dir>`/<latest-lsn>.snap.
     To take a snapshot, Tarantool first enters the delayed garbage collection
     mode for all data. In this mode, tuples which were allocated before the
     snapshot has started are not freed until the snapshot has finished. To
@@ -23,8 +23,8 @@ A reference description also follows below:
     saved in a matter of minutes. Note, that as long as there are any changes to
     the parent index memory through concurrent updates, there are going to be
     page splits, and therefore one needs to have some extra free memory to run
-    this command. 10% of `slab_alloc_arena`_ is, on average, sufficient. This
-    statement waits until a snapshot is taken and returns operation result.
+    this command. 10% of :ref:`slab_alloc_arena <slab_alloc_arena>` is, on average,
+    sufficient. This statement waits until a snapshot is taken and returns operation result.
 
     .. code-block:: lua
 

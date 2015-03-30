@@ -62,14 +62,13 @@ introspection (inspecting contents of spaces, accessing server configuration).
     |                   | important than the others.                          |
     +-------------------+-----------------------------------------------------+
     | WAL settings      | The important setting for the write-ahead log is    |
-    |                   | `wal_mode`_. If the setting causes no writing or    |
+    |                   | :ref:`wal_mode <wal_mode>`. If the setting causes   |
+    |                   | no writing or                                       |
     |                   | delayed writing, this factor is unimportant. If the |
     |                   | settings causes every data-change request to wait   |
     |                   | for writing to finish on a slow device, this factor |
     |                   | is more important than all the others.              |
     +-------------------+-----------------------------------------------------+
-
-.. _wal_mode: :ref:`wal_mode`
 
 In the discussion of each data-manipulation function there will be a note about
 which Complexity Factors might affect the function's resource usage.

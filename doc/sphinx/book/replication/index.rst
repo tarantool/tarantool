@@ -1,5 +1,7 @@
-.. include:: ../directives.rst
+.. include:: /directives.rst
 .. highlight:: lua
+
+.. _box-replication:
 
 -------------------------------------------------------------------------------
                     Replication
@@ -53,10 +55,10 @@ server is a master and starts its own new cluster with a new unique UUID.
 If this first ``box.cfg`` request occurs with a "replication_source" clause,
 then the server is a replica and its snapshot file, along with the cluster
 information, is constructed from the write-ahead logs of the master.
-Therefore, to start replication, specify `replication_source`_ in a ``box.cfg``
-request. When a replica contacts a master for the first time, it becomes part
-of a cluster. On subsequent occasions, it should always contact a master in
-the same cluster.
+Therefore, to start replication, specify :ref:`replication_source <replication_source>`
+in a ``box.cfg`` request. When a replica contacts a master for the first time,
+it becomes part of a cluster. On subsequent occasions, it should always contact
+a master in the same cluster.
 
 Once connected to the master, the replica requests all changes that happened
 after the latest local LSN. It is therefore necessary to keep WAL files on
@@ -74,7 +76,7 @@ Again, this procedure works only if the master's WAL files are present.
 .. NOTE::
 
     The replica does not inherit the master's configuration parameters, such
-    as the ones that cause the `snapshot daemon`_ to run on the master. To get
+    as the ones that cause the :ref:`snapshot daemon` to run on the master. To get
     the same behavior, one would have to set the relevant parameters explicitly
     so that they are the same on both master and replica.
 
@@ -111,7 +113,8 @@ Step 1. Start the first server thus:
 ... Now a new cluster exists.
 
 Step 2. Check where the second server's files will go by looking at its
-directories (`snap_dir`_ for snapshot files, `wal_dir`_ for .xlog files).
+directories (:ref:`snap_dir <snap_dir>` for snapshot files,
+:ref:`wal_dir <wal_dir>` for .xlog files).
 They must be empty - when the second server joins for the first time, it
 has to be working with a clean slate so that the initial copy of the first
 server's databases can happen without conflicts.
@@ -122,7 +125,7 @@ Step 3. Start the second server thus:
 
     box.cfg{listen=uri#2, replication_source=uri#1}
 
-... where ``uri#1`` = the `URI`_ that the first server is listening on.
+... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
 
 That's all.
 
@@ -199,7 +202,7 @@ servers will end up with different contents.
 :Q: What if replication causes security concerns?
 :A: Prevent unauthorized replication sources by associating a password with
     every user that has access privileges for the relevant spaces. That way,
-    the `URI`_ for the replication_source parameter will always have to have
+    the :ref:`URI` for the replication_source parameter will always have to have
     the long form ``replication_source='username:password@host:port'``.
 
 .. _vector clock: https://en.wikipedia.org/wiki/Vector_clock
@@ -249,7 +252,7 @@ Now the screen looks like this: (except that UUID values are always different):
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/1-1.rst | .. include:: replication/1-2.rst |
+    | .. include:: 1-1.rst             | .. include:: 1-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -279,7 +282,7 @@ on Terminal #1, because both servers are in the same cluster.
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/2-1.rst | .. include:: replication/2-2.rst |
+    | .. include:: 2-1.rst             | .. include:: 2-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -299,7 +302,7 @@ Now the screen looks like this:
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/3-1.rst | .. include:: replication/3-2.rst |
+    | .. include:: 3-1.rst             | .. include:: 3-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -322,7 +325,7 @@ Now the screen looks like this:
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/4-1.rst | .. include:: replication/4-2.rst |
+    | .. include:: 4-1.rst             | .. include:: 4-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -347,7 +350,7 @@ same size because they both contain the same tuples.
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/5-1.rst | .. include:: replication/5-2.rst |
+    | .. include:: 5-1.rst             | .. include:: 5-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -368,7 +371,7 @@ Now the screen looks like this (ignoring the repeated messages saying
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/6-1.rst | .. include:: replication/6-2.rst |
+    | .. include:: 6-1.rst             | .. include:: 6-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -391,7 +394,7 @@ Now the screen looks like this (ignoring the repeated messages on terminal
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/7-1.rst | .. include:: replication/7-2.rst |
+    | .. include:: 7-1.rst             | .. include:: 7-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -414,7 +417,7 @@ The screen now looks like this:
     |          Terminal #1             |          Terminal #2             |
     +==================================+==================================+
     |                                  |                                  |
-    | .. include:: replication/8-1.rst | .. include:: replication/8-2.rst |
+    | .. include:: 8-1.rst             | .. include:: 8-2.rst             |
     |                                  |                                  |
     +----------------------------------+----------------------------------+
 
@@ -429,9 +432,3 @@ on either terminal say:
     cd ~
     rm -R ~/tarantool_test_node_1
     rm -R ~/tarantool_test_node_2
-
-.. _replication_source: :ref:`replication_source`
-.. _snap_dir: :ref:`snap_dir`
-.. _wal_dir:  :ref:`wal_dir`
-.. _snapshot daemon: :ref:`snapshot daemon`
-.. _uri: :ref:`URI`
