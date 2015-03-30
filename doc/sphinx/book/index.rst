@@ -7,7 +7,7 @@
 
     intro
     box/index
-    replication
+    replication/index
     configuration
     administration
     connectors/index

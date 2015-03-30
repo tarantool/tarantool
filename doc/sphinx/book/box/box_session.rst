@@ -65,12 +65,9 @@ client connection.
     - 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
     ...
 
-See the section `Triggers on connect and disconnect`_ for instructions
-about defining triggers for connect and disconnect events with
-``box.session.on_connect()`` and ``box.session.on_disconnect()``. See
-the section `Authentication and access control`_ for instructions about
-``box.session`` functions that affect user identification and security.
-
-.. _Triggers on connect and disconnect: :doc:`triggers`
-.. _Authentication and access control:  :doc:`authentication`
-
+See the section :ref:`Triggers on connect and disconnect <box-triggers>`
+for instructions about defining triggers for connect and disconnect
+events with ``box.session.on_connect()`` and ``box.session.on_disconnect()``.
+See the section :ref:`Authentication and access control <box-authentication>`
+for instructions about ``box.session`` functions that affect user
+identification and security.

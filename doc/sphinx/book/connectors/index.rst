@@ -1,6 +1,8 @@
 .. include:: ../../directives.rst
 .. highlight:: lua
 
+.. _box-connectors:
+
 -------------------------------------------------------------------------------
                             Connectors
 -------------------------------------------------------------------------------
@@ -24,7 +26,7 @@ Unless implementing a client driver, one needn't concern oneself with the
 complications of the binary protocol. `Language-specific drivers`_ provide a
 friendly way to store domain language data structures in Tarantool. A complete
 description of the binary protocol is maintained in annotated Backus-Naur form
-in the source tree: please see `doc/box-protocol.html`_.
+in the source tree: please see :ref:`iproto protocol`.
 
 ====================================================================
                           Packet example
@@ -33,12 +35,15 @@ in the source tree: please see `doc/box-protocol.html`_.
 The Tarantool API exists so that a client program can send a request packet to
 the server, and receive a response. Here is an example of a what the client
 would send for ``box.space[513]:insert{'A', 'BB'}``. The BNF description of the
-components is in file `doc/box-protocol.html`_. A third-party contribution
-written in Lua for unpacking Tarantool messages is in file `Tnt-dissector`_.
+components is in :ref:`iproto protocol`.
+A third-party contribution written in Lua for unpacking Tarantool messages is in
+file `Tnt-dissector`_.
 
 .. _Tnt-dissector: https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua
+
 .. _Language-specific drivers: `Connectors`_
-.. _doc/box-protocol.html: :doc:`../../dev_guide/box-protocol.rst`
+
+.. _doc/box-protocol.html: :doc:`/dev_guide/box-protocol.rst`
 
 .. container:: table
 
@@ -61,7 +66,7 @@ written in Lua for unpacking Tarantool messages is in file `Tnt-dissector`_.
     +---------------------------------+---------+---------+---------+---------+
 
 Now, one could send that packet to the tarantool server, and interpret the response
-(`doc/box-protocol.html`_ has a description of the packet format for responses as
+(:ref:`iproto protocol` has a description of the packet format for responses as
 well as requests). But it would be easier, and less error-prone, if one could invoke
 a routine that formats the packet according to typed parameters. Something like
 ``response=tarantool_routine("insert",0,"A","B");``. And that is why APIs exist for

@@ -711,20 +711,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
 .. data::     _user
 
     ``_user`` is a new system tuple set for
-    support of the `authorization feature`_.
+    support of the :ref:`authorization feature <box-authentication>`.
 
 .. data::     _priv
 
     ``_priv`` is a new system tuple set for
-    support of the `authorization feature`_.
+    support of the :ref:`authorization feature <box-authentication>`.
 
 .. data::     _cluster
 
     ``_cluster`` is a new system tuple set
-    for support of the `replication feature`_.
-
-.. _authorization feature: :doc:`authentication`
-.. _replication feature: :doc:`replication`
+    for support of the :ref:`replication feature <box-replication>`.
 
 =================================================
                      Example

@@ -100,7 +100,7 @@ You can contact developers directly on the `#tarantool`_ IRC channel on freenode
 or via a mailing list, `Tarantool Google group`_.
 
 .. _#tarantool: irc://irc.freenode.net#tarantool
-.. _Tarantool Google group: https://googlegroups.com/group/tarantool
+.. _Tarantool Google group: https://groups.google.com/forum/#!forum/tarantool
 .. _Tarantool Russian-speaking list: https://googlegroups.com/group/tarantool-ru
 .. _Tarantool Gitter chat: https://gitter.im/tarantool/tarantool
 
