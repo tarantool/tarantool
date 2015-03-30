@@ -3,10 +3,11 @@
 -------------------------------------------------------------------------------
 
 .. toctree::
+    :maxdepth: 2
 
     intro
     box/index
-    replication
+    replication/index
     configuration
     administration
     connectors/index

@@ -1,6 +1,8 @@
 .. include:: ../../directives.rst
 .. highlight:: lua
 
+.. _box-connectors:
+
 -------------------------------------------------------------------------------
                             Connectors
 -------------------------------------------------------------------------------
@@ -11,7 +13,7 @@ This chapter documents APIs for various programming languages.
                             Protocol
 =====================================================================
 
-Tarantool protocol was designed with focus on asynchronous I/O and easy integration
+Tarantool protocol was designed with a focus on asynchronous I/O and easy integration
 with proxies. Each client request starts with a variable-length binary header,
 containing request id, request type, server id, log sequence number, and so on.
 
@@ -24,7 +26,7 @@ Unless implementing a client driver, one needn't concern oneself with the
 complications of the binary protocol. `Language-specific drivers`_ provide a
 friendly way to store domain language data structures in Tarantool. A complete
 description of the binary protocol is maintained in annotated Backus-Naur form
-in the source tree: please see `doc/box-protocol.html`_.
+in the source tree: please see :ref:`iproto protocol`.
 
 ====================================================================
                           Packet example
@@ -33,12 +35,9 @@ in the source tree: please see `doc/box-protocol.html`_.
 The Tarantool API exists so that a client program can send a request packet to
 the server, and receive a response. Here is an example of a what the client
 would send for ``box.space[513]:insert{'A', 'BB'}``. The BNF description of the
-components is in file `doc/box-protocol.html`_. A third-party contribution
-written in Lua for unpacking Tarantool messages is in file `Tnt-dissector`_.
+components is in file :ref:`iproto protocol`.
 
-.. _Tnt-dissector: https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua
 .. _Language-specific drivers: `Connectors`_
-.. _doc/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
 
 .. container:: table
 
@@ -61,10 +60,10 @@ written in Lua for unpacking Tarantool messages is in file `Tnt-dissector`_.
     +---------------------------------+---------+---------+---------+---------+
 
 Now, one could send that packet to the tarantool server, and interpret the response
-(`doc/box-protocol.html`_ has a description of the packet format for responses as
+(:ref:`iproto protocol` has a description of the packet format for responses as
 well as requests). But it would be easier, and less error-prone, if one could invoke
 a routine that formats the packet according to typed parameters. Something like
-``response=tarantool_routine("insert",0,"A","B");``. And that is why APIs exist for
+``response=tarantool_routine("insert",513,"A","B");``. And that is why APIs exist for
 drivers for Perl, Python, PHP, and so on.
 
 ====================================================================

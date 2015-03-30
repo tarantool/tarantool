@@ -13,7 +13,7 @@ host/port.
 
 .. function:: connect(uri [, options])
 
-    Connect to the server at URI_, change the prompt from 'tarantool' to
+    Connect to the server at :ref:`URI`, change the prompt from 'tarantool' to
     'host:port', and act henceforth as a client until the user ends the
     session or types ``control-D``.
 
@@ -56,7 +56,7 @@ host/port.
 .. function:: listen(host, port)
 
     Listen on host:port. The primary way of listening for incoming requests
-    is via the host and port, or URI_, specified in ``box.cfg{listen=...}``.
+    is via the host and port, or :ref:`URI`, specified in ``box.cfg{listen=...}``.
     The alternative way of listening is via the host and port, or URI,
     specified in ``console.listen(...)``. This alternative way is called
     "administrative" or simply "admin port".
@@ -66,12 +66,10 @@ host/port.
     :param string host:
     :param number port:
 
-    The "admin" address is the port or URI_ to listen on for administrative
+    The "admin" address is the port or :ref:`URI` to listen on for administrative
     connections. It has no default value, so it must be specified if
     connections will occur via telnet. It is not used unless assigned a
-    value. The parameters may be expressed with URI_ = Universal Resource
+    value. The parameters may be expressed with :ref:`URI` = Universal Resource
     Identifier format, for example "unix://unix_domain_socket", or as a
     numeric TCP port. Connections are often made with telnet.
     A typical port value is 3313.
-
-.. _URI: http://tarantool.org/doc/user_guide.html#URI

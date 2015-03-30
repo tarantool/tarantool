@@ -1,6 +1,8 @@
 .. include:: ../directives.rst
 .. highlight:: lua
 
+.. _dbms-plugins:
+
 -------------------------------------------------------------------------------
                         Appendix D. Plugins
 -------------------------------------------------------------------------------
@@ -21,10 +23,9 @@ To call another DBMS from Tarantool, the essential requirements are: another
 DBMS, and Tarantool.
 
 It will be necessary to build Tarantool from source, as described in
-“ `Building from source`_ ”
+“ :ref:`building-from-source` ”
 
 .. _Tarantool Plugin API wiki page: https://github.com/tarantool/tarantool/wiki/Plugin-API
-.. _Building from source: :doc:`/dev_guide/building_from_source`
 
 The Tarantool plugins allow for connecting to an SQL server and executing SQL
 statements the same way that a MySQL or PostgreSQL client does. The SQL

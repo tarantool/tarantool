@@ -26,9 +26,9 @@ log.info("create connection")
 cn = remote:new(LISTEN.host, LISTEN.service)
 ---
 ...
-cn:_wait_state({'active', 'error'}, 1)
+cn:_wait_state({active = true, error = true}, 1)
 ---
-- true
+- active
 ...
 log.info("state is %s", cn.state)
 ---
@@ -399,9 +399,9 @@ cn:call('test_foo')
 cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
 ---
 ...
-cn:_wait_state({'active'}, 1)
+cn:_wait_state({active = true}, 1)
 ---
-- true
+- active
 ...
 cn.space ~= nil
 ---
@@ -415,9 +415,9 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 cn:_fatal 'Test error'
 ---
 ...
-cn:_wait_state({'active', 'activew'}, 2)
+cn:_wait_state({active = true, activew = true}, 2)
 ---
-- true
+- active
 ...
 cn:ping()
 ---
@@ -588,7 +588,6 @@ cn:timeout(.01):call('ret_after', 1)
 ...
 cn = remote:timeout(0.0000000001):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 ---
-- error: Timeout exceeded
 ...
 cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 ---

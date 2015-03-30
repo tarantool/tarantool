@@ -27,7 +27,8 @@ Number of connections
 
 Space size
     The total maximum size for all spaces is in effect set by
-    `slab_alloc_arena`_, which in turn is limited by the total available memory.
+    :ref:`slab_alloc_arena <slab_alloc_arena>`, which in turn
+    is limited by the total available memory.
 
 Update operations count
     The maximum number of operations that can be in a single update
@@ -47,5 +48,3 @@ Limitations which are only applicable for the sophia storage engine
     not supported. Indexes must be unique, that is, the option unique=false
     is not supported. The ``alter()``, ``len()``, and ``count()`` functions
     are not supported.
-
-.. _slab_alloc_arena: http://tarantool.org/doc/user_guide.html#slab_alloc_arena

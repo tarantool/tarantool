@@ -36,8 +36,8 @@ and a running tarantool server which also serves as a client.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We'll be making functions which go over one line. We don't want the client to
-send to the server after every line. So we `declare a delimiter`_. This means “Do
-not send to the server until you see an exclamation mark.”
+send to the server after every line. So we :ref:`declare a delimter <setting delimiter>`.
+This means “Do not send to the server until you see an exclamation mark.”
 
 .. code-block:: lua
 
@@ -45,8 +45,6 @@ not send to the server until you see an exclamation mark.”
 
 From now on it will be possible to use multiple-line statements, but it will be
 necessary to end all statements with exclamation marks.
-
-.. _declare a delimiter: :ref:`setting delimiter`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            Create a function that returns string
@@ -515,7 +513,8 @@ undeclared variable is "global". That's not desirable for any of the variables
 that are declared in line 1, because all of them are for use only within the function.
 
 LINE 3: WHY "PAIRS()". Our job is to go through all the rows and there are two
-ways to do it: with ``box.space.space-name:pairs()`` or with `index.iterator`_.
+ways to do it: with ``box.space.space-name:pairs()`` or with
+:func:`index.iterator <box.space.space-name.index[.index-name]:pairs>`.
 We preferred ``pairs()`` because it is simpler.
 
 LINE 4: WHY "PCALL". If we simply said "``lua_table = json.decode(t[2]))``", then
@@ -530,7 +529,6 @@ string, and the parameter is t[2] which is a reference to a JSON string. There's
 a bit of hard coding here, we're assuming that the second field in the tuple is
 where the JSON string was inserted. For example, we're assuming a tuple looks like
 
-.. _index.iterator: :func:`box.space.space-name.index[.index-name]:pairs`
 .. _protected call: http://www.lua.org/pil/8.4.html
 
 .. code-block:: json

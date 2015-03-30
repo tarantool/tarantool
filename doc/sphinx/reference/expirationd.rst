@@ -71,7 +71,7 @@ For those who like to see things run, here are the exact steps to get
 expirationd through the test.
 
 1. Get ``expirationd.lua``. There are standard ways - it is after all part
-   of a standard rock_ - but for this purpose just copy the contents of
+   of a standard rock - but for this purpose just copy the contents of
    expirationd.lua_ to a default directory.
 2. Start the Tarantool server as described before.
 3. Execute these requests:
@@ -103,6 +103,6 @@ some statistics. Of course, expirationd can be customized to do different things
 by passing different parameters, which will be evident after looking in more detail
 at the source code.
 
+.. _rock: http://rocks.tarantool.org/
 .. _expirationd.lua: https://github.com/tarantool/expirationd/blob/master/expirationd.lua
-.. _rock: http://tarantool.org/doc/user_guide.html#rocks
 .. _GitHub: https://github.com/tarantool/expirationd/blob/master/expirationd.lua

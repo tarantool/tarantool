@@ -713,6 +713,7 @@ socket_methods.write = function(self, octets, timeout)
             if not errno_is_transient[self:errno()] then
                 return false
             end
+            written = 0
         end
 
         if written == string.len(octets) then

@@ -2,7 +2,7 @@
 .. highlight:: lua
 
 -------------------------------------------------------------------------------
-                        Appendix B. List of error codes
+                        Appendix B. Process title
 -------------------------------------------------------------------------------
 
 Linux and FreeBSD operating systems allow a running process to modify its title,

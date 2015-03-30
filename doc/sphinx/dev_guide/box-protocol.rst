@@ -4,6 +4,8 @@
 :url: doc/box-protocol.html
 :template: documentation_rst
 
+.. _iproto protocol:
+
 --------------------------------------------------------------------------------
                                IProto Protocol
 --------------------------------------------------------------------------------
@@ -48,7 +50,7 @@ MsgPack data types:
 IPROTO is a binary request/response protocol.
 
 ================================================================================
-                         Greeting Package
+                                 Greeting Packet
 ================================================================================
 
 .. code-block:: bash
@@ -73,7 +75,7 @@ second 44 bytes contain a base64-encoded random string, to use in authentificati
 packet. And it ends with 20 bytes of spaces.
 
 ================================================================================
-                         Unified package structure
+                         Unified packet structure
 ================================================================================
 
 Once a greeting is read, the protocol becomes pure request/response and features

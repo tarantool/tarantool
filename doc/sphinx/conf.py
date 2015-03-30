@@ -31,7 +31,6 @@ sys.path.insert(0, os.path.abspath('.'))
 
 extensions = [
     'sphinx.ext.todo',
-    'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'ext.filters',
     'ext.lua'
@@ -77,7 +76,8 @@ version = '.'.join(release.split('.')[0:2])
 # directories to ignore when looking for source files.
 exclude_patterns = ['_build', 'directives.rst', 'book/connectors/__*']
 exclude_patterns += [
-    'book/replication'
+    'book/replication/*-1.rst',
+    'book/replication/*-2.rst'
 ]
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
