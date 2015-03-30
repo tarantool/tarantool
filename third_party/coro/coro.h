@@ -299,7 +299,7 @@ void coro_stack_free (struct coro_stack *stack);
     && !defined CORO_SJLJ    && !defined CORO_LINUX \
     && !defined CORO_IRIX    && !defined CORO_ASM \
     && !defined CORO_PTHREAD && !defined CORO_FIBER
-# if defined WINDOWS && (defined __i386 || (__x86_64 || defined _M_IX86 || defined _M_AMD64)
+# if defined WINDOWS && (defined __i386 || __x86_64 || defined _M_IX86 || defined _M_AMD64)
 #  define CORO_ASM 1
 # elif defined WINDOWS || defined _WIN32
 #  define CORO_LOSER 1 /* you don't win with windoze */
