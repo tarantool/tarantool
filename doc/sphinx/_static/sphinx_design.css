@@ -9,7 +9,7 @@
     margin:0 0 0 70px;
 }
 .toctree-l1 {
-    margin:0 0 20px 0;
+    margin:0 0 10px 0;
 }
 li.toctree-l1>a {
     color:#168de2;
@@ -22,6 +22,7 @@ li.toctree-l1>a:hover {
 }
 .toctree-l1>ul {
     padding:6px 0 0 18px;
+    margin-top: 10px;
 }
 .toctree-l2 {
     font-size:16px;
@@ -250,6 +251,14 @@ tr.field td p {
     background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAEAAAAAARAQMAAABnOfukAAAABlBMVEUAAAD19fWydBufAAAAAXRSTlMAQObYZgAAADZJREFUaN7t0gEBAAAIAiD/n7YBTRA2kO4InwDruiMIgAAIgAAIgAAIsK47ggAIgAAIgAAIwAHksoxHlAvP9AAAAABJRU5ErkJggg==') 50% -0px repeat-y;
 }
 
+.b-cols_content_left .toctree-l1 {
+    margin-bottom: 5px;
+}
+
+.b-cols_content_left .toctree-l1>ul {
+    margin-top: 0px;
+}
+
 div.toctree-wrapper.compound {
     padding: 20px 0px 0px 0px;
 }
@@ -318,4 +327,10 @@ div.table tbody {
 
 div.table td {
     padding: 5px 15px;
+}
+
+p.caption {
+    padding-bottom: 22px;
+    font-size:      24px;
+    font-weight:    bold;
 }

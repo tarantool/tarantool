@@ -5,7 +5,7 @@
 -------------------------------------------------------------------------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     intro.rst
     faq.rst
@@ -13,8 +13,3 @@
     book/index.rst
     reference/index.rst
     dev_guide/index.rst
-
-.. NOTE::
-
-    For one page HTML documentation, please,
-    use `this link </doc/singlehtml.html>`_.

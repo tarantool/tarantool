@@ -41,7 +41,6 @@
     <footer class="b-footer">
       <div class="b-footer-wrapper">
         <nav class="b-footer_menu">
-          <div class="b-footer-copyright">© 2015 - Tarantool. All right reserved.</div>
           {{ menu.i_menu(page) }}
           <div class="b-footer-other">
             <a href="http://stable.tarantool.org">1.5 web site and downloads</a>
