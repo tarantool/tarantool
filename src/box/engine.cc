@@ -108,7 +108,7 @@ engine_begin_join()
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->begin_join();
+		engine->beginJoin();
 	}
 }
 

@@ -178,6 +178,10 @@ sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
 	relay_send(relay, &row);
 }
 
+/**
+ * Relay all data that should be present in the snapshot
+ * to the replica.
+ */
 void
 SophiaEngine::join(Relay *relay)
 {
@@ -388,7 +392,7 @@ SophiaEngine::rollback(struct txn *txn)
 }
 
 void
-SophiaEngine::begin_join()
+SophiaEngine::beginJoin()
 {
 	/* put engine to recovery-complete state to
 	 * correctly support join */

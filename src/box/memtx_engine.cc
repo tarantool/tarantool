@@ -240,7 +240,7 @@ MemtxEngine::rollback(struct txn *txn)
 }
 
 void
-MemtxEngine::begin_join()
+MemtxEngine::beginJoin()
 {
 }
 
