@@ -15,9 +15,9 @@ add_custom_target(sphinx-html ALL
     COMMAND "${SPHINX_EXECUTABLE}"
         -b html
         -d "${SPHINX_BUILD_DIR}"
+        -c html/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_HTML_DIR}"
-        -c html/
     COMMENT "Building HTML documentation with Sphinx"
 )
 
@@ -25,8 +25,8 @@ add_custom_target(sphinx-singlehtml ALL
     COMMAND "${SPHINX_EXECUTABLE}"
         -b singlehtml
         -d "${SPHINX_BUILD_DIR}"
+        -c singlehtml/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_HTML_DIR}"
-        -c singlehtml/
     COMMENT "Building HTML documentation with Sphinx"
 )
