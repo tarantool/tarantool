@@ -26,9 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "evio.h"
-#include "replication.h"
 #include "memtx_engine.h"
+#include "replication.h"
 #include "tuple.h"
 #include "txn.h"
 #include "index.h"
@@ -37,8 +36,8 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
-#include "request.h"
 #include "salad/rlist.h"
+#include "request.h"
 #include <stdlib.h>
 #include <string.h>
 #include "box.h"

@@ -32,6 +32,7 @@
 
 struct space;
 struct tuple;
+class Relay;
 
 enum engine_flags {
 	ENGINE_NO_YIELD = 1,
@@ -117,9 +118,9 @@ public:
 	/**
 	 * Delete all tuples in the index on drop.
 	 */
-	virtual void dropIndex(Index*) = 0;
+	virtual void dropIndex(Index *) = 0;
 
-	virtual void join(Relay*) = 0;
+	virtual void join(Relay *) = 0;
 	/**
 	 * Engine specific transaction life-cycle routines.
 	 */
@@ -270,6 +271,6 @@ engine_checkpoint(int64_t checkpoint_id);
  * Send a snapshot.
  */
 void
-engine_join(Relay*);
+engine_join(Relay *);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */
