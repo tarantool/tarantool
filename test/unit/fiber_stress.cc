@@ -2,8 +2,8 @@
 #include "fiber.h"
 
 enum {
-	ITERATIONS = 5000,
-	FIBERS = 10
+	ITERATIONS = 50000,
+	FIBERS = 100
 };
 
 void yield_f(va_list ap)

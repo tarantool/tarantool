@@ -331,25 +331,25 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	{
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
-		if (cfg->decode_save_metatables)
-			luaL_setarrayhint(L, -1);
 		for (uint32_t i = 0; i < size; i++) {
 			luamp_decode(L, cfg, data);
 			lua_rawseti(L, -2, i + 1);
 		}
+		if (cfg->decode_save_metatables)
+			luaL_setarrayhint(L, -1);
 		return;
 	}
 	case MP_MAP:
 	{
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
-		if (cfg->decode_save_metatables)
-			luaL_setmaphint(L, -1);
 		for (uint32_t i = 0; i < size; i++) {
 			luamp_decode(L, cfg, data);
 			luamp_decode(L, cfg, data);
 			lua_settable(L, -3);
 		}
+		if (cfg->decode_save_metatables)
+			luaL_setmaphint(L, -1);
 		return;
 	}
 	case MP_EXT:

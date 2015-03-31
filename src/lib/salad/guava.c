@@ -31,6 +31,12 @@
 
 #include <stdint.h>
 
+/**
+ * This is implements a consistent hashing algorithm
+ * A Fast, Minimal Memory, Consistent Hash Algorithm
+ * John Lamping, Eric Veach
+ */
+
 static const int64_t K = 2862933555777941757;
 static const double  D = 0x1.0p31;
 

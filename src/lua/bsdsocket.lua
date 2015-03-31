@@ -1,6 +1,8 @@
 -- bsdsocket.lua (internal file)
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
+local LIMIT_INFINITY = 4294967295
+local READAHEAD = 16380
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
@@ -62,13 +64,23 @@ end
 local socket_t = ffi.typeof('struct socket');
 
 local function socket_cdata_gc(socket)
-    ffi.C.close(socket.fd)
+    if socket.fd < 0 then
+        log.error("socket: attempt to double close on gc")
+        return
+    end
+    if ffi.C.close(socket.fd) ~= 0 then
+        log.error("socket: failed to close fd=%d on gc: %s", socket.fd,
+            boxerrno.strerror())
+    end
 end
 
 local function check_socket(self)
     local socket = type(self) == 'table' and self.socket
     if not ffi.istype(socket_t, socket) then
         error('Usage: socket:method()');
+    end
+    if socket.fd < 0 then
+        error("attempt to use closed socket")
     end
     return socket.fd
 end
@@ -83,7 +95,7 @@ local function bless_socket(fd)
         return nil
     end
 
-    local socket = ffi.new(socket_t, fd);
+    local socket = ffi.new(socket_t, { fd = fd });
     ffi.gc(socket, socket_cdata_gc)
     return setmetatable({ socket = socket }, socket_mt)
 end
@@ -167,7 +179,7 @@ end
 
 socket_methods.sysread = function(self, size)
     local fd = check_socket(self)
-    size = size or 4096
+    size = size or READAHEAD
     self._errno = nil
     local buf = ffi.new('char[?]', size)
     local res = ffi.C.read(fd, buf, size)
@@ -295,11 +307,13 @@ socket_methods.close = function(self)
     end
 
     self._errno = nil
-    if ffi.C.close(fd) < 0 then
+    local r = ffi.C.close(fd)
+    self.socket.fd = -1
+    ffi.gc(self.socket, nil)
+    if r ~= 0 then
         self._errno = boxerrno()
         return false
     end
-    ffi.gc(self.socket, nil)
     return true
 end
 
@@ -532,72 +546,86 @@ local errno_is_fatal = {
     [boxerrno.ENOTSOCK] = true;
 }
 
-local function readchunk(self, size, timeout)
+local function readchunk(self, limit, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
     end
 
-    if string.len(self.rbuf) >= size then
+    if self.rlen >= limit then
         self._errno = nil
-        local data = string.sub(self.rbuf, 1, size)
-        self.rbuf = string.sub(self.rbuf, size + 1)
+        local data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
+        self.rlen = self.rlen - limit
+        self.rpos = self.rpos + limit
         return data
     end
 
-    while timeout > 0 do
+    while true do
         local started = fiber.time()
 
-        if not self:readable(timeout) then
-            return nil
+        local to_read
+        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
+            to_read = limit - self.rlen
         end
-
-        timeout = timeout - ( fiber.time() - started )
-
-        local data = self:sysread()
+        local data = self:sysread(to_read)
         if data ~= nil then
-            self.rbuf = self.rbuf .. data
-            if string.len(self.rbuf) >= size then
-               data = string.sub(self.rbuf, 1, size)
-               self.rbuf = string.sub(self.rbuf, size + 1)
-               return data
-            end
-
+            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
+            self.rpos = 1
+            self.rlen = string.len(self.rbuf)
             if string.len(data) == 0 then   -- eof
-                data = self.rbuf
-                self.rbuf = nil
-                return data
+                limit = self.rlen
+            end
+            if self.rlen >= limit then
+               data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
+               self.rlen = self.rlen - limit
+               self.rpos = self.rpos + limit
+               return data
             end
         elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
             return nil
         end
+
+        if not self:readable(timeout) then
+            return nil
+        end
+        if timeout <= 0 then
+            break
+        end
+        timeout = timeout - ( fiber.time() - started )
     end
     self._errno = boxerrno.ETIMEDOUT
     return nil
 end
 
 local function readline_check(self, eols, limit)
-    local rbuf = self.rbuf
-    if string.len(rbuf) == 0 then
+    if limit == 0 then
+        return ''
+    end
+    if self.rlen == 0 then
         return nil
     end
 
     local shortest
     for i, eol in ipairs(eols) do
-        local data = string.match(rbuf, "^(.-" .. eol .. ")")
+        local data = string.match(self.rbuf, "^(.-" .. eol .. ")", self.rpos)
         if data ~= nil then
             if string.len(data) > limit then
                 data = string.sub(data, 1, limit)
             end
-            if shortest == nil then
-                shortest = data
-            elseif #shortest > #data then
+            if shortest == nil or string.len(shortest) > string.len(data) then
                 shortest = data
             end
         end
     end
-    if shortest == nil and #rbuf >= limit then
-        return string.sub(rbuf, 1, limit)
+    if shortest == nil and self.rlen >= limit then
+        shortest = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
+    end
+    if shortest ~= nil then
+        local len = string.len(shortest)
+        self.rpos = self.rpos + len
+        self.rlen = self.rlen - len
     end
     return shortest
 end
@@ -605,15 +633,13 @@ end
 local function readline(self, limit, eol, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
+        self.rpos = 1
+        self.rlen = 0
     end
 
     self._errno = nil
-    if limit == 0 then
-        return ''
-    end
     local data = readline_check(self, eol, limit)
     if data ~= nil then
-        self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
         return data
     end
 
@@ -628,28 +654,21 @@ local function readline(self, limit, eol, timeout)
         
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread()
+        local to_read
+        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
+            to_read = limit - self.rlen
+        end
+        local data = self:sysread(to_read)
         if data ~= nil then
-            self.rbuf = self.rbuf .. data
-
-            -- eof
-            if string.len(data) == 0 then
-                data = self.rbuf
-                self.rbuf = nil
-                return data
+            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
+            self.rpos = 1
+            self.rlen = string.len(self.rbuf)
+            if string.len(data) == 0 then       -- eof
+                limit = self.rlen
             end
-
             data = readline_check(self, eol, limit)
             if data ~= nil then
-                self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
                 return data
-            end
-
-            -- limit
-            if string.len(self.rbuf) >= limit then
-               data = string.sub(self.rbuf, 1, limit)
-               self.rbuf = string.sub(self.rbuf, limit + 1)
-               return data
             end
 
         elseif not errno_is_transient[self:errno()] then
@@ -657,15 +676,16 @@ local function readline(self, limit, eol, timeout)
             return nil
         end
     end
+    return nil
 end
 
 socket_methods.read = function(self, opts, timeout)
     check_socket(self)
-    timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
+    timeout = timeout or TIMEOUT_INFINITY
     if type(opts) == 'number' then
         return readchunk(self, opts, timeout)
     elseif type(opts) == 'string' then
-        return readline(self, 4294967295, { opts }, timeout)
+        return readline(self, LIMIT_INFINITY, { opts }, timeout)
     elseif type(opts) == 'table' then
         local chunk = opts.chunk or opts.size or 4294967295
         local delimiter = opts.delimiter or opts.line
@@ -687,14 +707,13 @@ socket_methods.write = function(self, octets, timeout)
     end
 
     local started = fiber.time()
-    while timeout > 0 and self:writable(timeout) do
-        timeout = timeout - ( fiber.time() - started )
-
+    while true do
         local written = self:syswrite(octets)
         if written == nil then
             if not errno_is_transient[self:errno()] then
                 return false
             end
+            written = 0
         end
 
         if written == string.len(octets) then
@@ -702,6 +721,10 @@ socket_methods.write = function(self, octets, timeout)
         end
         if written > 0 then
             octets = string.sub(octets, written + 1)
+        end
+        timeout = timeout - (fiber.time() - started)
+        if timeout <= 0 or not self:writable(timeout) then
+            break
         end
     end
 end
@@ -989,6 +1012,7 @@ end
 local function tcp_server_handler(server, sc, from)
     fiber.name(sprintf("%s/%s:%s", server.name, from.host, from.port))
     server.handler(sc, from)
+    sc:shutdown()
     sc:close()
 end
 
@@ -1000,7 +1024,7 @@ local function tcp_server_loop(server, s, addr)
         if sc == nil then
             local errno = s:errno()
             if not errno_is_transient[errno] then
-                log.error('accept() failed: '..s:error())
+                log.error('accept(%s) failed: %s', tostring(s), s:error())
             end
             if  errno_is_fatal[errno] then
                 break

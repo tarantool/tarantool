@@ -79,7 +79,7 @@ extern char uuid_lua[],
 	uri_lua[],
 	bsdsocket_lua[],
 	console_lua[],
-	box_net_box_lua[],
+	net_box_lua[],
 	help_lua[],
 	help_en_US_lua[],
 	tap_lua[],
@@ -96,7 +96,7 @@ static const char *lua_modules[] = {
 	"uri", uri_lua,
 	"fio", fio_lua,
 	"socket", bsdsocket_lua,
-	"net.box", box_net_box_lua,
+	"net.box", net_box_lua,
 	"console", console_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
@@ -330,12 +330,14 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_json(L);
 	lua_pop(L, 1);
 
+#if defined(HAVE_GNU_READLINE)
 	/*
 	 * Disable libreadline signals handlers. All signals are handled in
 	 * main thread by libev watchers.
 	 */
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
+#endif
 	static const struct luaL_reg consolelib[] = {
 		{"readline", tarantool_console_readline},
 		{"add_history", tarantool_console_add_history},

@@ -260,6 +260,11 @@ luaL_newserializer(struct lua_State *L, const luaL_Reg *reg)
 
 	luaL_pushnull(L);
 	lua_setfield(L, -2, "NULL");
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_array_metatable_ref);
+	lua_setfield(L, -2, "array_mt");
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_map_metatable_ref);
+	lua_setfield(L, -2, "map_mt");
+
 	return serializer;
 }
 
@@ -678,11 +683,17 @@ tarantool_lua_utils_init(struct lua_State *L)
 	lua_createtable(L, 0, 1);
 	lua_pushliteral(L, "map"); /* YAML will use flow mode */
 	lua_setfield(L, -2, LUAL_SERIALIZE);
+	/* automatically reset hints on table change */
+	luaL_loadstring(L, "setmetatable((...), nil); return rawset(...)");
+	lua_setfield(L, -2, "__newindex");
 	luaL_map_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	lua_createtable(L, 0, 1);
 	lua_pushliteral(L, "seq"); /* YAML will use flow mode */
 	lua_setfield(L, -2, LUAL_SERIALIZE);
+	/* automatically reset hints on table change */
+	luaL_loadstring(L, "setmetatable((...), nil); return rawset(...)");
+	lua_setfield(L, -2, "__newindex");
 	luaL_array_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	fpconv_init();

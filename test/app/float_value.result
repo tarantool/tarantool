@@ -15,7 +15,7 @@ box.cfg
 14	wal_mode:write
 15	wal_dir:.
 16	panic_on_snap_error:true
-17	panic_on_wal_error:false
+17	panic_on_wal_error:true
 18	log_level:5
 19	readahead:16320
 20	slab_alloc_maximal:1048576

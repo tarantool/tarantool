@@ -19,7 +19,6 @@
     {% endblock header_scripts %}
     {% include "script" ignore missing %}
   </head>
-
   <body class="p-main">
     <div class="b-wrapper">
       <!-- HEADER > -->

@@ -2,9 +2,8 @@
 
 local ffi = require('ffi')
 local builtin = ffi.C
-
+local msgpack = require('msgpack') -- .NULL, .array_mt, .map_mt, .cfg
 local MAXNESTING = 16
-local NULL = ffi.cast('void *', 0)
 local int8_ptr_t = ffi.typeof('int8_t *')
 local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
@@ -289,9 +288,6 @@ on_encode(ffi.typeof('double'), encode_double)
 -- Decoder
 --------------------------------------------------------------------------------
 
-local array_mt = { __serialize = 'seq' }
-local map_mt = { __serialize = 'map' }
-
 local decode_r
 
 local function decode_u8(data)
@@ -370,7 +366,10 @@ local function decode_array(data, size)
     for i=1,size,1 do
         table.insert(arr, decode_r(data))
     end
-    return setmetatable(arr, array_mt)
+    if not msgpack.cfg.decode_save_metatables then
+        return arr
+    end
+    return setmetatable(arr, msgpack.array_mt)
 end
 
 local function decode_map(data, size)
@@ -382,7 +381,10 @@ local function decode_map(data, size)
         local val = decode_r(data);
         map[key] = val
     end
-    return setmetatable(map, map_mt)
+    if not msgpack.cfg.decode_save_metatables then
+        return map
+    end
+    return setmetatable(map, msgpack.map_mt)
 end
 
 local decoder_hint = {
@@ -437,7 +439,7 @@ decode_r = function(data)
     elseif c >= 0xe0 then
         return ffi.cast('signed char',c)
     elseif c == 0xc0 then
-        return NULL
+        return msgpack.NULL
     elseif c == 0xc2 then
         return false
     elseif c == 0xc3 then
@@ -515,7 +517,9 @@ end
 --------------------------------------------------------------------------------
 
 return {
-    NULL = NULL;
+    NULL = msgpack.NULL;
+    array_mt = msgpack.array_mt;
+    map_mt = msgpack.map_mt;
     encode = encode;
     on_encode = on_encode;
     decode_unchecked = decode_unchecked;

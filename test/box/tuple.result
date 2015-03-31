@@ -305,12 +305,12 @@ t:unpack(2, 1)
 ...
 t:totable(0)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:116: tuple.totable: invalid second
+- error: '[string "-- tuple.lua (internal file)..."]:111: tuple.totable: invalid second
     argument'
 ...
 t:totable(1, 0)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:125: tuple.totable: invalid third
+- error: '[string "-- tuple.lua (internal file)..."]:120: tuple.totable: invalid third
     argument'
 ...
 --
@@ -320,9 +320,9 @@ box.tuple.new{1, 2, 3}:totable()
 ---
 - [1, 2, 3]
 ...
-getmetatable(box.tuple.new{1, 2, 3}:totable())
+getmetatable(box.tuple.new{1, 2, 3}:totable()).__serialize
 ---
-- __serialize: seq
+- seq
 ...
 --  A test case for the key as an tuple
 space = box.schema.space.create('tweedledum')
@@ -803,12 +803,12 @@ t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
 ...
 t:update()
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:165: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:160: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update(10)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:165: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:160: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update({})
@@ -872,6 +872,32 @@ msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 -- restore configuration
 msgpack.cfg{encode_load_metatables = encode_load_metatables}
 ---
+...
+-- gh-738: Serializer hints are unclear
+t = box.tuple.new({1, 2, {}})
+---
+...
+map = t[3]
+---
+...
+getmetatable(map) ~= nil
+---
+- true
+...
+map
+---
+- []
+...
+map['test'] = 48
+---
+...
+map
+---
+- test: 48
+...
+getmetatable(map) == nil
+---
+- true
 ...
 space:drop()
 ---

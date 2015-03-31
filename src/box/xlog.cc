@@ -566,32 +566,35 @@ restart:
 	return 0;
 eof:
 	/*
-	 * The only two cases of fully read file:
-	 * 1. eof_marker is present and it is the last record in file
-	 * 2. eof_marker is missing but there is no unread data in file
+	 * According to POSIX, if a partial element is read, value
+	 * of the file position indicator for the stream is
+	 * unspecified.
+	 *
+	 * Thus don't trust the current file position, seek to the
+	 * last good position first.
+	 *
+	 * The only case of a fully read file is when eof_marker
+	 * is present and it is the last record in the file. If
+	 * eof_marker is missing, the caller must make the
+	 * decision whether to switch to the next file or not.
 	 */
-	if (ftello(l->f) == i->good_offset + sizeof(eof_marker)) {
-		fseeko(l->f, i->good_offset, SEEK_SET);
-		if (fread(&magic, sizeof(magic), 1, l->f) != 1) {
-
-			say_error("can't read eof marker");
-		} else if (magic == eof_marker) {
+	fseeko(l->f, i->good_offset, SEEK_SET);
+	if (fread(&magic, sizeof(magic), 1, l->f) == 1) {
+		if (magic == eof_marker) {
 			i->good_offset = ftello(l->f);
 			i->eof_read = true;
-		} else if (magic != row_marker) {
-			say_error("eof marker is corrupt: %lu",
-				  (unsigned long) magic);
-		} else {
+		} else if (magic == row_marker) {
 			/*
 			 * Row marker at the end of a file: a sign
 			 * of a corrupt log file in case of
 			 * recovery, but OK in case we're in local
 			 * hot standby or replication relay mode
 			 * (i.e. data is being written to the
-			 * file. Don't pollute the log, the
-			 * condition is taken care of up the
-			 * stack.
+			 * file.
 			 */
+		} else {
+			say_error("EOF marker is corrupt: %lu",
+				  (unsigned long) magic);
 		}
 	}
 	/* No more rows. */

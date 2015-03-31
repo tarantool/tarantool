@@ -13,7 +13,7 @@
 
 <section xml:id="protocol">
  <title>Protocol</title>
-  <para>Tarantool protocol was designed with focus on asynchronous
+  <para>Tarantool protocol was designed with a focus on asynchronous
     I/O and easy integration with proxies. Each client
     request starts with a variable-length binary header, containing
     request id, request type, server id, log sequence number, and
@@ -48,8 +48,6 @@ The Tarantool API exists so that a client program can send a request packet
 to the server, and receive a response. Here is an example of a what the client
  would send for <command>box.space[513]:insert{'A', 'BB'}</command>. The BNF description of the components
 is in file <link xlink:href="http://tarantool.org/doc/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.html</link>.
- A third-party contribution written in Lua for unpacking Tarantool messages is in file 
- <link xlink:href="https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua" xlink:title="tarantool.dis.lua">Tnt-dissector</link>.
 
 </para>
                 <informaltable frame='topbot'>
@@ -114,7 +112,7 @@ and interpret the response (doc/box-protocol.html has a description
 of the packet format for responses as well as requests).
 But it would be easier, and less error-prone, if one could
 invoke a routine that formats the packet according to typed
-parameters. Something like <code>response=tarantool_routine("insert",0,"A","B");</code>.
+parameters. Something like <code>response=tarantool_routine("insert",513,"A","B");</code>.
 And that is why APIs exist for drivers for Perl, Python, PHP, and so on.
 </para>
   </section>
@@ -209,7 +207,7 @@ my $tnt = DR::Tarantool::MsgPack::SyncClient->connect(
         0 => {
           name => 'primary', fields => [ 'field1' ] } } } } );
 
-$tnt->insert('tester' => [ 99999, 'BB' ]);</programlisting>
+$tnt->insert('examples' => [ 99999, 'BB' ]);</programlisting>
     </para>
     <para>
        The example program only shows one command and does not show all that's necessary for
@@ -248,7 +246,7 @@ make
     <programlisting>
 cd ~
 cp ./tarantool-php/modules/tarantool.so .
-export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared</programlisting>
+export PHP_INI_SCAN_DIR=~/tarantool-php/test/shared</programlisting>
     </para>
     <para>
     Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples' via the PHP API.

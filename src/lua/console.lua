@@ -163,9 +163,7 @@ local function client_print(self, output)
         return
     elseif not output then
         -- disconnect peer
-        self.client:shutdown()
-        self.client:close()
-        self.client = nil
+        self.client = nil -- socket will be closed by tcp_server() function
         self.running = nil
         return
     end

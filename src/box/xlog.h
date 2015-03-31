@@ -175,8 +175,6 @@ struct xlog {
 	 * appended to the file.
 	 */
 	size_t rows;
-	/** Used in local hot standby. */
-	int retry;
 	/** Log file name. */
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */

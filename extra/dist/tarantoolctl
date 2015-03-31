@@ -106,6 +106,24 @@ local fiber = require 'fiber'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
+local config_file = os.getenv('HOME') .. '/.config/tarantool/tarantool'
+local usermode = true
+
+if not fio.stat(config_file) then
+    usermode = false
+    local config_list = {
+        '/etc/sysconfig/tarantool',
+        '/etc/default/tarantool',
+        '/usr/local/etc/tarantool/tarantool',
+    }
+
+    for _, c in pairs(config_list) do
+        if fio.stat(c) then
+            config_file = c
+            break
+        end
+    end
+end
 
 local available_commands = {
     'start',
@@ -113,12 +131,14 @@ local available_commands = {
     'logrotate',
     'status',
     'enter',
-    'restart'
+    'restart',
+    'reload'
 }
 
 local function usage()
     log.error("Usage: %s {%s} instance_name",
         arg[0], table.concat(available_commands, '|'))
+    log.error("Config file: %s", config_file)
     os.exit(1)
 end
 
@@ -164,11 +184,18 @@ end
 
 shift_argv(arg, 0, 2)
 
-if fio.stat('/etc/sysconfig/tarantool') then
-    dofile('/etc/sysconfig/tarantool')
-elseif fio.stat('/etc/default/tarantool') then
-    dofile('/etc/default/tarantool')
+local instance_lua = nil
+
+
+dofile(config_file)
+if instance_dir then
+    instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
+    if fio.stat(instance_lua) then
+        log.info('Found %s.lua in %s', instance, instance_dir)
+    end
 end
+instance_dir = nil
+instance_lua = nil
 
 if default_cfg == nil then
     default_cfg = {}
@@ -176,6 +203,7 @@ end
 
 if instance_dir == nil then
     instance_dir = '/etc/tarantool/instances.enabled'
+    instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
 end
 
 default_cfg.pid_file   = default_cfg.pid_file and default_cfg.pid_file or "/var/run/tarantool"
@@ -183,7 +211,10 @@ default_cfg.wal_dir    = default_cfg.wal_dir and default_cfg.wal_dir or "/var/li
 default_cfg.snap_dir   = default_cfg.snap_dir and default_cfg.snap_dir or "/var/lib/tarantool"
 default_cfg.sophia_dir = default_cfg.sophia_dir and default_cfg.sophia_dir or "/var/lib/tarantool"
 default_cfg.logger     = default_cfg.logger and default_cfg.logger or "/var/log/tarantool"
-default_cfg.username   = default_cfg.username and default_cfg.username or "tarantool"
+-- change user name only if not running locally
+if not usermode then
+    default_cfg.username = default_cfg.username and default_cfg.username or "tarantool"
+end
 
 -- create  a path to the control socket (admin console)
 local console_sock = fio.pathjoin(default_cfg.pid_file, instance .. '.control')
@@ -203,7 +234,7 @@ local function mkdir(dirname)
         os.exit(-1)
     end
 
-    if not fio.chown(dirname, default_cfg.username, default_cfg.username) then
+    if not usermode and not fio.chown(dirname, default_cfg.username, default_cfg.username) then
         log.error("Can't chown(%s, %s, %s): %s",
             default_cfg.username, default_cfg.username, dirname, errno.strerror())
     end
@@ -300,7 +331,14 @@ end
 function start()
     log.info("Starting instance...")
     box.cfg = wrapper_cfg
-    dofile(instance_lua)
+    local success, data = pcall(dofile, instance_lua)
+    -- if load fails - show last 10 lines of the log file
+    if not success then
+        print('Start failed: ' .. data)
+        if fio.stat(default_cfg.logger) then
+            os.execute('tail -n 10 ' .. default_cfg.logger)
+        end
+    end
 end
 
 
@@ -354,6 +392,7 @@ elseif cmd == 'enter' then
 elseif cmd == 'status' then
     if fio.stat(force_cfg.pid_file) == nil then
         if errno() == errno.ENOENT then
+            print(instance .. ' is stopped (pid file does not exist)')
             os.exit(1)
         end
         log.error("Cant access pidfile %s: %s",
@@ -380,7 +419,16 @@ elseif cmd == 'status' then
     end
 
     s:close()
+    print(instance .. ' is running (pid:' .. force_cfg.pid_file .. ')')
     os.exit(0)
+elseif cmd == 'reload' then
+    if fio.stat(arg[2]) == nil then
+        if errno() == errno.ENOENT then
+            print(arg[2] .. ': file not found')
+            os.exit(1)
+        end
+    end
+    dofile(arg[2])
 else
     log.error("Unknown command '%s'", cmd)
     os.exit(-1)

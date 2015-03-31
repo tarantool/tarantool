@@ -301,8 +301,10 @@ recover_xlog(struct recovery_state *r, struct xlog *l)
 	 * marker - such snapshots are very likely unfinished
 	 * or corrupted, and should not be trusted.
 	 */
-	if (l->dir->type == SNAP && l->is_inprogress == false && i.eof_read == false)
+	if (l->dir->type == SNAP && l->is_inprogress == false &&
+	    i.eof_read == false) {
 		panic("snapshot `%s' has no EOF marker", l->filename);
+	}
 
 	/*
 	 * xlog_cursor_next() returns 1 when
@@ -393,7 +395,6 @@ recover_remaining_wals(struct recovery_state *r)
 	struct xlog *next_wal;
 	int64_t current_signature, last_signature;
 	struct vclock *current_vclock;
-	size_t rows_before;
 	enum log_suffix suffix;
 
 	xdir_scan(&r->wal_dir);
@@ -447,20 +448,6 @@ recover_remaining_wals(struct recovery_state *r)
 			next_wal = xlog_open(&r->wal_dir, current_signature, suffix);
 		} catch (XlogError *e) {
 			e->log();
-			/*
-			 * When doing final recovery, and dealing with the
-			 * last file, try opening .<ext>.inprogress.
-			 */
-			if (r->finalize && suffix == INPROGRESS) {
-				/*
-				 * There is an .inprogress file, but
-				 * we failed to open it. Try to
-				 * delete it.
-				 */
-				if (inprogress_log_unlink(format_filename(
-				    &r->wal_dir, current_signature, INPROGRESS)) != 0)
-					panic("can't unlink 'inprogres' WAL");
-			}
 			break;
 		}
 		assert(r->current_wal == NULL);
@@ -469,18 +456,11 @@ recover_remaining_wals(struct recovery_state *r)
 		say_info("recover from `%s'", r->current_wal->filename);
 
 recover_current_wal:
-		rows_before = r->current_wal->rows;
-
 		int result = recover_xlog(r, r->current_wal);
 
-
-		if (r->current_wal->rows > 0 &&
-		    r->current_wal->rows != rows_before) {
-			r->current_wal->retry = 0;
-		}
 		/* rows == 0 could indicate an empty WAL */
 		if (r->current_wal->rows == 0) {
-			say_error("read zero records from %s",
+			say_error("read zero records from `%s`",
 				  r->current_wal->filename);
 			break;
 		}
@@ -492,20 +472,12 @@ recover_current_wal:
 			/* last file is not finished */
 			break;
 		} else if (r->finalize && r->current_wal->is_inprogress) {
-			say_warn("fail to find eof on inprogress");
+			say_warn("failed to find EOF in `%s`",
+				 r->current_wal->filename);
 			/* Let recovery_finalize deal with last file */
 			break;
-		} else if (r->current_wal->retry++ < 3) {
-			/*
-			 * If a newer WAL appeared in the directory before
-			 * current_wal was fully read, try re-reading
-			 * one last time. */
-			say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
-				 " trying to re-read (attempt #%d)",
-				 r->current_wal->filename, r->current_wal->retry);
-			goto recover_current_wal;
 		} else {
-			say_warn("WAL `%s' wasn't correctly closed",
+			say_warn("WAL `%s` wasn't correctly closed",
 				 r->current_wal->filename);
 			recovery_close_log(r);
 		}
@@ -527,7 +499,6 @@ void
 recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 		  int rows_per_wal)
 {
-
 	recovery_stop_local(r);
 
 	r->finalize = true;
@@ -600,12 +571,12 @@ recovery_follow_f(va_list ap)
 }
 
 void
-recovery_follow_local(struct recovery_state *r,
+recovery_follow_local(struct recovery_state *r, const char *name,
 		      ev_tstamp wal_dir_rescan_delay)
 {
 	assert(r->writer == NULL);
 	assert(r->watcher == NULL);
-	r->watcher = fiber_new(fiber_name(fiber()), recovery_follow_f);
+	r->watcher = fiber_new(name, recovery_follow_f);
 	fiber_set_joinable(r->watcher, true);
 	fiber_start(r->watcher, r, wal_dir_rescan_delay);
 }
@@ -901,14 +872,11 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 		l = NULL;
 	}
 	if (l == NULL) {
-		/* Open WAL with '.inprogress' suffix. */
-		l = xlog_create(&r->wal_dir, vclock);
 		/*
-		 * Close the file *after* we create the new WAL, since
-		 * this is when replication relays get an inotify alarm
-		 * (when we close the file), and try to reopen the next
-		 * WAL. In other words, make sure that replication relays
-		 * try to open the next WAL only when it exists.
+		 * Close the file *before* we create the new WAL, to
+		 * make sure local hot standby/replication can see
+		 * EOF in the old WAL before switching to the new
+		 * one.
 		 */
 		if (wal_to_close) {
 			/*
@@ -920,6 +888,8 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 			xlog_close(wal_to_close);
 			wal_to_close = NULL;
 		}
+		/* Open WAL with '.inprogress' suffix. */
+		l = xlog_create(&r->wal_dir, vclock);
 	} else if (l->rows == 1) {
 		/*
 		 * Rename WAL after the first successful write
