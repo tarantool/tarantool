@@ -145,7 +145,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
           - [2, 'D']
         ...
 
-    For examples of complex ``select``s, where one can specify which index to
+    For examples of complex ``select`` requests, where one can specify which index to
     search and what condition to use (for example "greater than" instead of
     "equal to") and how many tuples to return, see the later section
     ``box.space.space-name[.index.index-name]:select``.

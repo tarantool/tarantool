@@ -46,7 +46,7 @@ This example assumes that MySQL 5.5 or MySQL 5.6 has been installed (recent
 MariaDB versions should also work).
 
 The example was run on a Linux machine where the base directory had a copy of
-he Tarantool source on ~/tarantool, and a copy of MySQL on ~/mysql-5.5. The
+the Tarantool source on ~/tarantool, and a copy of MySQL on ~/mysql-5.5. The
 mysqld server is already running on the local host 127.0.0.1.
 
 ::
@@ -71,14 +71,12 @@ mysqld server is already running on the local host 127.0.0.1.
     ...
     Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-    mysql>
-
     # Insert a row in database test, and quit.
     mysql> CREATE TABLE IF NOT EXISTS test (s1 INT, s2 VARCHAR(50));
     Query OK, 0 rows affected (0.13 sec)
     mysql> INSERT INTO test.test VALUES (1,'MySQL row');
     Query OK, 1 row affected (0.02 sec)
-    mysql> QUIT
+    mysql> **QUIT**
     Bye
 
     # Build the Tarantool server. Make certain that "cmake" gets the right

@@ -13,7 +13,7 @@ All triggers have the following characteristics.
 
 * They associate a function with an `event`. The request to "define a trigger"
   consists of passing the name of the trigger's function to one of the
-  "on_``event-name...``" functions: ``on_connect()``, ``on_disconnect()``,
+  "on_event-name..." functions: ``on_connect()``, ``on_disconnect()``,
   or ``on_replace()``.
 * They are `defined by any user`. There are no privilege requirements for defining
   triggers.
@@ -35,7 +35,7 @@ All triggers have the following characteristics.
   outside the event context.
 * They are `replaceable`. The request to "redefine a trigger" consists of passing
   the names of a new trigger function and an old trigger function to one of the
-  "on_``event-name...``" functions.
+  "on_event-name..." functions.
 
 ===========================================================
                     Connection triggers

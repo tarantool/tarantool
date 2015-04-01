@@ -16,15 +16,15 @@
 
 
     :Q: Why Lua?
-    :A: Lua is a ligthweight, fast, extensible multi-paradigm language. Lua also happens
+    :A: Lua is a lightweight, fast, extensible multi-paradigm language. Lua also happens
         to be very easy to embed. Lua coroutines relate very closely to Tarantool fibers,
-        and Lua architecture works well with Tarantool internals. Lua is the first, but,
-        hopefully, not the last stored program language for Tarantool.
+        and Lua architecture works well with Tarantool internals. Lua is the first, but
+        hopefully not the last, stored program language for Tarantool.
 
 
     :Q: What's the key advantage of Tarantool?
     :A: Tarantool provides a rich database feature set (HASH, TREE, RTREE, BITSET indexes,
-        secondary indexes, composite indexes, transactions, triggres, asynchronous replication)
+        secondary indexes, composite indexes, transactions, triggers, asynchronous replication)
         in a flexible environment of a Lua interpreter.
         
         These two properties make it possible to code fast, atomic and reliable in-memory
@@ -41,17 +41,17 @@
 
 
     :Q: Who is developing Tarantool?
-    :A: There is a small engineering team employed by Mail.ru -- check out our commit
+    :A: There is a small engineering team employed by Mail.Ru -- check out our commit
         logs on github. The development is fully open, and most of the connectors
-        authors and maintainers in different distributions are from the community.
+        authors and maintainers for different distributions are from the community.
 
 
     :Q: How serious is Mail.Ru about Tarantool?
     :A: Tarantool is an open source project, distributed under a BSD license, and as
-        such does not depend on any one sponsor. However, it is currently and integral
-        part of Mail.Ru backbone, so it gets a lot of support from Mail.ru.
+        such does not depend on any one sponsor. However, it is currently an integral
+        part of Mail.Ru backbone, so it gets a lot of support from Mail.Ru.
 
 
     :Q: What happens when Tarantool runs out of memory?
     :A: The server stops accepting updates until more memory is available. Read and
-        delete requests are served just fine.
+        delete requests continue to be served without difficulty.
