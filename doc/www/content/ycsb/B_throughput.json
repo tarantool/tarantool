@@ -1,1 +1,121 @@
-{"subtitle": {"x": -20, "text": "500000 records and 1000000 operations (More is Better)"}, "yAxis": {"title": {"text": "RPS"}}, "series": [{"data": [{"y": 3975.176, "x": 1}, {"y": 7882.049, "x": 2}, {"y": 14621.448, "x": 4}, {"y": 28187.533, "x": 8}, {"y": 42122.203, "x": 16}, {"y": 59859.493, "x": 32}, {"y": 47449.026, "x": 64}, {"y": 41887.264, "x": 128}], "type": "line", "name": "MongoDB v2.4"}, {"data": [{"y": 5052.938, "x": 1}, {"y": 10033.149, "x": 2}, {"y": 20891.389, "x": 4}, {"y": 38524.572, "x": 8}, {"y": 59520.502, "x": 16}, {"y": 64035.494, "x": 32}, {"y": 73013.635, "x": 64}, {"y": 70809.161, "x": 128}], "type": "line", "name": "Redis 2.6"}, {"data": [{"y": 5998.314, "x": 1}, {"y": 11797.61, "x": 2}, {"y": 24024.746, "x": 4}, {"y": 41903.481, "x": 8}, {"y": 73621.445, "x": 16}, {"y": 86170.538, "x": 32}, {"y": 63612.672, "x": 64}, {"y": 79907.741, "x": 128}], "type": "line", "name": "Tarantool with TREE index"}, {"data": [{"y": 6093.717, "x": 1}, {"y": 12274.474, "x": 2}, {"y": 24258.898, "x": 4}, {"y": 43263.538, "x": 8}, {"y": 75971.671, "x": 16}, {"y": 91558.13, "x": 32}, {"y": 80453.282, "x": 64}, {"y": 100076.598, "x": 128}], "type": "line", "name": "Tarantool with HASH index"}], "title": {"x": -20, "text": "Throughput"}, "chart": {}, "tooltip": {"formatter": "return this.series.name + '<br/>' + this.x + ' clients : ' + this.y + ' RPS'"}, "credits": {"enabled": false}, "xAxis": {"allowDecimals": false, "title": {"text": "Clients"}}, "legend": {}}
+{
+    "chart": {}, 
+    "credits": {
+        "enabled": false
+    }, 
+    "legend": {}, 
+    "series": [
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 28485.608
+                }, 
+                {
+                    "x": 16, 
+                    "y": 44253.794
+                }, 
+                {
+                    "x": 32, 
+                    "y": 70902.442
+                }, 
+                {
+                    "x": 64, 
+                    "y": 75737.47
+                }, 
+                {
+                    "x": 128, 
+                    "y": 74245.59
+                }, 
+                {
+                    "x": 256, 
+                    "y": 76628.854
+                }
+            ], 
+            "name": "Redis 2.8.19", 
+            "type": "line"
+        }, 
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 34893.927
+                }, 
+                {
+                    "x": 16, 
+                    "y": 57192.82
+                }, 
+                {
+                    "x": 32, 
+                    "y": 89315.362
+                }, 
+                {
+                    "x": 64, 
+                    "y": 89415.76
+                }, 
+                {
+                    "x": 128, 
+                    "y": 88026.826
+                }, 
+                {
+                    "x": 256, 
+                    "y": 86866.271
+                }
+            ], 
+            "name": "Tarantool (TREE, 1.6.4-510-g9d9f76d)", 
+            "type": "line"
+        }, 
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 33145.744
+                }, 
+                {
+                    "x": 16, 
+                    "y": 55755.676
+                }, 
+                {
+                    "x": 32, 
+                    "y": 62043.479
+                }, 
+                {
+                    "x": 64, 
+                    "y": 63502.111
+                }, 
+                {
+                    "x": 128, 
+                    "y": 63688.278
+                }, 
+                {
+                    "x": 256, 
+                    "y": 62882.635
+                }
+            ], 
+            "name": "Tarantool (HASH, 1.6.4-510-g9d9f76d)", 
+            "type": "line"
+        }
+    ], 
+    "subtitle": {
+        "text": "2000000 records and 5000000 operations. More is better", 
+        "x": -20
+    }, 
+    "title": {
+        "text": "Throughput", 
+        "x": -20
+    }, 
+    "tooltip": {
+        "formatter": "return this.series.name + '<br/>' + this.x + ' clients :' + this.y + ' rps'"
+    }, 
+    "xAxis": {
+        "allowDecimals": false, 
+        "title": {
+            "text": "Clients"
+        }
+    }, 
+    "yAxis": {
+        "title": {
+            "text": "RPS"
+        }
+    }
+}

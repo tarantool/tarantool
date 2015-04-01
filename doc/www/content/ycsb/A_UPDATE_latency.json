@@ -1,1 +1,121 @@
-{"subtitle": {"x": -20, "text": "500000 records and 1000000 operations (Less is better)"}, "yAxis": {"title": {"text": "Latency(usec)"}}, "series": [{"data": [{"y": 321.91, "x": 1}, {"y": 330.16, "x": 2}, {"y": 369.15, "x": 4}, {"y": 386.98, "x": 8}, {"y": 736.02, "x": 16}, {"y": 1701.42, "x": 32}, {"y": 3901.24, "x": 64}, {"y": 10280.65, "x": 128}], "type": "line", "name": "MongoDB v2.4"}, {"data": [{"y": 154.24, "x": 1}, {"y": 159.41, "x": 2}, {"y": 169.95, "x": 4}, {"y": 192.29, "x": 8}, {"y": 238.97, "x": 16}, {"y": 411.88, "x": 32}, {"y": 800.4, "x": 64}, {"y": 2075.6, "x": 128}], "type": "line", "name": "Redis 2.6"}, {"data": [{"y": 158.11, "x": 1}, {"y": 158.14, "x": 2}, {"y": 164.32, "x": 4}, {"y": 182.27, "x": 8}, {"y": 224.68, "x": 16}, {"y": 415.86, "x": 32}, {"y": 824.18, "x": 64}, {"y": 1554.53, "x": 128}], "type": "line", "name": "Tarantool with TREE index"}, {"data": [{"y": 162.35, "x": 1}, {"y": 157.75, "x": 2}, {"y": 158.12, "x": 4}, {"y": 182.8, "x": 8}, {"y": 211.72, "x": 16}, {"y": 414.68, "x": 32}, {"y": 585.72, "x": 64}, {"y": 1169.48, "x": 128}], "type": "line", "name": "Tarantool with HASH index"}], "title": {"x": -20, "text": "Latency on UPDATE"}, "chart": {}, "tooltip": {"formatter": "return this.series.name + '<br/>' + this.x + ' clients : ' + this.y + ' usec'"}, "credits": {"enabled": false}, "xAxis": {"allowDecimals": false, "title": {"text": "Clients"}}, "legend": {}}
+{
+    "chart": {}, 
+    "credits": {
+        "enabled": false
+    }, 
+    "legend": {}, 
+    "series": [
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 217.73
+                }, 
+                {
+                    "x": 16, 
+                    "y": 300.25
+                }, 
+                {
+                    "x": 32, 
+                    "y": 402.81
+                }, 
+                {
+                    "x": 64, 
+                    "y": 808.84
+                }, 
+                {
+                    "x": 128, 
+                    "y": 1653.34
+                }, 
+                {
+                    "x": 256, 
+                    "y": 3424.24
+                }
+            ], 
+            "name": "Redis 2.8.19", 
+            "type": "line"
+        }, 
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 184.09
+                }, 
+                {
+                    "x": 16, 
+                    "y": 222.08
+                }, 
+                {
+                    "x": 32, 
+                    "y": 387.34
+                }, 
+                {
+                    "x": 64, 
+                    "y": 783.16
+                }, 
+                {
+                    "x": 128, 
+                    "y": 1558.04
+                }, 
+                {
+                    "x": 256, 
+                    "y": 3152.19
+                }
+            ], 
+            "name": "Tarantool (TREE, 1.6.4-510-g9d9f76d)", 
+            "type": "line"
+        }, 
+        {
+            "data": [
+                {
+                    "x": 8, 
+                    "y": 201.19
+                }, 
+                {
+                    "x": 16, 
+                    "y": 260.99
+                }, 
+                {
+                    "x": 32, 
+                    "y": 527.1
+                }, 
+                {
+                    "x": 64, 
+                    "y": 1041.35
+                }, 
+                {
+                    "x": 128, 
+                    "y": 2082.11
+                }, 
+                {
+                    "x": 256, 
+                    "y": 4114.76
+                }
+            ], 
+            "name": "Tarantool (HASH, 1.6.4-510-g9d9f76d)", 
+            "type": "line"
+        }
+    ], 
+    "subtitle": {
+        "text": "2000000 records and 5000000 operations. Less is better", 
+        "x": -20
+    }, 
+    "title": {
+        "text": "Latency on UPDATE", 
+        "x": -20
+    }, 
+    "tooltip": {
+        "formatter": "return this.series.name + '<br/>' + this.x + ' clients :' + this.y + ' usec'"
+    }, 
+    "xAxis": {
+        "allowDecimals": false, 
+        "title": {
+            "text": "Clients"
+        }
+    }, 
+    "yAxis": {
+        "title": {
+            "text": "Latency(usec)"
+        }
+    }
+}

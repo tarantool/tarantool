@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    .ext.filters
+    .ext.custom
     ~~~~~~~~~~~~
 """
 
@@ -14,4 +14,7 @@ def setup(app):
     Adds extra jinja filters.
     '''
     app.connect("builder-inited", add_jinja_filters)
-    return {'version': '0.0.1', 'parallel_read_safe': True}
+    app.add_object_type('confval', 'confval',
+                        objname='configuration value',
+                        indextemplate='pair: %s; configuration value')
+    return {'version': '0.0.2', 'parallel_read_safe': True}

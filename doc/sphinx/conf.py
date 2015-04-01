@@ -11,7 +11,7 @@ master_doc = 'index'
 extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.ifconfig',
-    'ext.filters',
+    'ext.custom',
     'ext.lua'
 ]
 primary_domain = 'lua'

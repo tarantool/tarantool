@@ -31,13 +31,9 @@ function create_li(arr) {
                     'C': ['READ'],
                     'D': ['READ', 'INSERT'],
                     'E': ['SCAN', 'INSERT'],
-                    'F': ['READ', 'READ-MODIFY-WRITE', 'UPDATE'],
-                    'LOAD': ['INSERT']
+                    'F': ['READ', 'READ-MODIFY-WRITE', 'UPDATE']
                 };
                 title.html('Workload ' + link.html());
-                if (link.html() == 'LOAD') {
-                    title.html('Insert Only');
-                }
                 image_1.renderChart('/ycsb/' + link.html() + '_throughput.json');
                 image_2.renderChart('/ycsb/' + link.html() + '_' + table[link.html()][0] + '_latency.json');
                 ul.html(create_li(table[link.html()]));
@@ -54,12 +50,8 @@ function create_li(arr) {
                 link.addClass('p-active');
                 var title = $('.b-benchmark-type-title').html();
                 var image = $('#b-benchmark-grapf-image_2');
-                if (title.search("Workload") != -1) {
-                    image.renderChart("/ycsb/"+ title.replace("Workload ", "") + "_" +
-                                      link.html().replace(" Latency", "") + "_latency.json")
-                } else if (title == 'Insert Only' && link.html() == 'INSERT Latency') {
-                    image.renderChart('/ycsb/LOAD_INSERT_latency.json');
-                }
+                image.renderChart("/ycsb/"+ title.replace("Workload ", "") + "_" +
+                                    link.html().replace(" Latency", "") + "_latency.json")
             }
         }
     }, '.b-benchmark-type .b-switcher-item')
