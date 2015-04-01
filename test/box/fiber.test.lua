@@ -319,5 +319,11 @@ getmetatable(fiber.info())
 zombie = false
 for fid, i in pairs(fiber.info()) do if i.name == 'zombie' then zombie = true end end
 zombie
+-- test case for gh-778 - fiber.id() on a dead fiber
 
+f =  fiber.create(function() end)
+id = f:id()
+fiber.sleep(0)
+f:status() 
+id == f:id()
 fiber = nil

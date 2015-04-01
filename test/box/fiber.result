@@ -780,6 +780,24 @@ zombie
 ---
 - false
 ...
+-- test case for gh-778 - fiber.id() on a dead fiber
+f =  fiber.create(function() end)
+---
+...
+id = f:id()
+---
+...
+fiber.sleep(0)
+---
+...
+f:status() 
+---
+- dead
+...
+id == f:id()
+---
+- true
+...
 fiber = nil
 ---
 ...
