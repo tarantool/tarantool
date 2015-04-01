@@ -139,6 +139,8 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)sophia_index_compare);
 	snprintf(pointer_arg, sizeof(pointer_arg), "pointer: %p", (void*)key_def);
 	sp_set(c, name, pointer, pointer_arg);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".compression", key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia.compression"));
 	snprintf(name, sizeof(name), "db.%" PRIu32, key_def->space_id);
 	void *db = sp_get(c, name);
 	if (db == NULL)
