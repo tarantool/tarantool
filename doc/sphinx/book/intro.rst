@@ -15,7 +15,7 @@ is an established NoSQL DBMS. Thus it serves all the purposes that have made nod
 and Twisted popular in other environments, with the additional twist that it has a
 data persistence level.
 
-The code is free. The open-source license is *`BSD license`_*. The supported platforms
+The code is free. The open-source license is `BSD license`_. The supported platforms
 are GNU/Linux, Mac OS and FreeBSD.
 
 Tarantool database is deeply integrated with the application server. On

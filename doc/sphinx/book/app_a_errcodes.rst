@@ -27,7 +27,7 @@ ER_ILLEGAL_PARAMS
     Illegal parameters. Malformed protocol message.
 
 ER_MEMORY_ISSUE
-    Out of memory: :ref:`slab_alloc_arena` limit is reached.
+    Out of memory: :ref:`slab_alloc_arena <slab_alloc_arena>` limit is reached.
 
 ER_WAL_IO
     Failed to write to disk. May mean: failed to record a change in the
