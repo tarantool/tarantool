@@ -208,6 +208,14 @@ txn_commit(struct txn *txn)
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 
+	/* xxx: temporary workaround to handle transaction
+	 *      conflicts with sophia.
+	 */
+	if (txn->engine) {
+		txn->engine->commit(txn);
+		txn->engine_tx = NULL;
+	}
+
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
 
@@ -229,8 +237,10 @@ txn_commit(struct txn *txn)
 			tnt_raise(LoggedError, ER_WAL_IO);
 		txn->signature = res;
 	}
+	/*
 	if (txn->engine)
 		txn->engine->commit(txn);
+	*/
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
 

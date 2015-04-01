@@ -373,8 +373,9 @@ SophiaEngine::commit(struct txn *txn)
 	if (rc == -1)
 		sophia_raise(env);
 	rc = sp_commit(txn->engine_tx);
-	if (rc == -1)
+	if (rc == -1) {
 		sophia_raise(env);
+	}
 	assert(rc == 0);
 }
 
