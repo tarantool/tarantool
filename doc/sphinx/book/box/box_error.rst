@@ -1,6 +1,3 @@
-.. include:: ../../directives.rst
-.. highlight:: lua
-
 -------------------------------------------------------------------------------
                             Package `box.error`
 -------------------------------------------------------------------------------
@@ -28,9 +25,10 @@ be presented to the client as ``ER_PROC_LUA``.
 .. function:: box.error(code, errtext [, errtext ...])
 
     Emulate a request error, with text based on one of the pre-defined Tarantool
-    errors defined in the file _`errcode.h` in the source tree. Lua constants
-    which correspond to those Tarantool errors are defined as members of
-    ``box.error``, for example ``box.error.NO_SUCH_USER == 45``.
+    errors defined in the file `errcode.h
+    <https://github.com/tarantool/tarantool/blob/master/src/box/errcode.h>`_ in
+    the source tree. Lua constants which correspond to those Tarantool errors are
+    defined as members of ``box.error``, for example ``box.error.NO_SUCH_USER == 45``.
 
     :param number       code: number of a pre-defined error
     :param string errtext(s): part of the message which will accompany the error

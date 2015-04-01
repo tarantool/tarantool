@@ -1,7 +1,3 @@
-.. |br| raw:: html
-
-   <br />
-
 -------------------------------------------------------------------------------
                                 C Style Guide
 -------------------------------------------------------------------------------
@@ -33,7 +29,7 @@ We use Git for revision control. The latest development is happening in the
 out with git clone git://github.com/tarantool/tarantool.git # anonymous read-only access
 
 If you have any questions about Tarantool internals, please post them on the
-developer discussion list, tarantool-developers@lists.launchpad.net. However,
+developer discussion list, https://groups.google.com/forum/#!forum/tarantool. However,
 please be warned: Launchpad silently deletes posts from non-subscribed members,
 thus please be sure to have subscribed to the list prior to posting. Additionally,
 some engineers are always present on #tarantool channel on irc.freenode.net.

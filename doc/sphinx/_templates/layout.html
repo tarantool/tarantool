@@ -9,9 +9,9 @@
   {{ super() }}
 {% endblock header_scripts %}
 
-
-{% if title != 'Documentation' %}
 {% set render_sidebar = true %}
+{% if theme_nosidebar == true or title == 'Documentation' %}
+{%     set render_sidebar = false %}
 {% endif %}
 
 {% block content %}
@@ -40,11 +40,14 @@
 <section class="b-block b-documentation">
   <div class="b-block-wrapper">
 {% endif %}
-  {{ breadcrumbs.breadcrumbs() }}
+  {{- breadcrumbs.breadcrumbs() -}}
       <article class="b-article">
+        {% if render_sidebar == false and title != 'Documentation' %}
+          {{ toctree(maxdepth=2, collapse=false) }}
+        {% endif %}
         {% block body %} {% endblock %}
       </article>
-  {{ navbar.navbar(False) }}
+  {{- navbar.navbar(False) -}}
 {% if render_sidebar %}
     </div>
   </div>

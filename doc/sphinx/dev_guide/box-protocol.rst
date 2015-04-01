@@ -90,7 +90,7 @@ http://msgpack.org
 
 Tarantool protocol mandates use of a few integer constants serving as keys in
 maps used in the protocol. These constants are defined in `src/box/iproto_constants.h
-<https://github.com/tarantool/tarantool/blob/master/src/iproto_constants.h>`_
+<https://github.com/tarantool/tarantool/blob/master/src/box/iproto_constants.h>`_
 
 Let's list them here too:
 
@@ -420,8 +420,8 @@ Error message is present in the response only if there is an error :code:`<error
 expects as value a msgpack string
 
 Convenience macros which define hexadecimal constants for return codes
-can be found in `src/errcode.h
-<https://github.com/tarantool/tarantool/blob/master/src/errcode.h>`_
+can be found in `src/box/errcode.h
+<https://github.com/tarantool/tarantool/blob/master/src/box/errcode.h>`_
 
 ================================================================================
                          Replication packet structure
