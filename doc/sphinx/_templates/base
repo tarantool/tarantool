@@ -1,24 +1,35 @@
 {% import "menu" as menu %}
-{% include "custom_sphinx" with context %}
+
+{% set script_files = ['https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js'] + script_files %}
+{% set css_files = ['/theme/design.css', '/theme/pygmentize.css'] + css_files %}
 
 <!doctype html>
-
 <html>
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>{{ title | cleantitle }}</title>
     <link rel="shortcut icon" href="/theme/favicon.ico" />
-    <link rel="stylesheet"    href="/theme/design.css" />
-    <link rel="stylesheet"    href="/theme/pygmentize.css" />
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-    <script src="/js/select.js"></script>
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '{{ url_root }}',
+        VERSION:     '{{ release|e }}',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '{{ '' if no_search_suffix else file_suffix }}',
+        HAS_SOURCE:  {{ has_source|lower }}
+      };
+    </script>
+    {%- for scriptfile in script_files %}
+    <script type="text/javascript" src="{{ pathto(scriptfile, 1) }}"></script>
+    {%- endfor %}
+    {%- for cssfile in css_files %}
+    <link rel="stylesheet" href="{{ pathto(cssfile, 1) }}">
+    {%- endfor %}
+    {% block extrahead %} {% endblock extrahead %}
     <!--[if lt IE 9]>
-      <script src="scripts/ie8.js"></script>
-      <link rel="stylesheet" href="/theme/new/ie8.css" />
+      <script src="/js/ie8.js"></script>
+      <link rel="stylesheet" href="/theme/ie8.css" />
     <![endif]-->
-    {% block header_scripts %}
-    {% endblock header_scripts %}
     {% include "script" ignore missing %}
   </head>
   {% if render_sidebar %}
@@ -38,8 +49,7 @@
       <!-- < HEADER -->
 
       <div class="b-content b-clearbox">
-        {% block content %}
-        {% endblock content %}
+        {% block content %} {% endblock content %}
       </div>
     </div>
 

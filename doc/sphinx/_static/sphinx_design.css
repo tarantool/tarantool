@@ -334,3 +334,15 @@ p.caption {
     font-size:      24px;
     font-weight:    bold;
 }
+
+#search-results h2 {
+    margin-left: 0px;
+}
+
+ul.search {
+    margin-left: 10px;
+}
+
+ul.search li div.context {
+    margin-top: 5px;
+}

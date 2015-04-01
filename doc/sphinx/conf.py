@@ -46,8 +46,9 @@ html_static_path = ['../_static']
 #html_extra_path = []
 #html_additional_pages = {}
 
+html_copy_source = True
 
-html_use_index = False
+html_use_index = True
 html_show_sphinx = False
 html_show_copyright = False
 

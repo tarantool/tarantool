@@ -2,12 +2,8 @@
 {% import "breadcrumbs" as breadcrumbs with context %}
 {% import "navbar" as navbar with context %}
 
-{% block header_scripts %}
-  <link rel="stylesheet" href="/doc/_static/sphinx_design.css" />
-  <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
-  <script type="text/javascript" src="/doc/_static/headers.js"></script>
-  {{ super() }}
-{% endblock header_scripts %}
+{% set script_files = ['_static/headers.js'] + script_files %}
+{% set css_files = ['_static/sphinx_design.css', '//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'] + css_files %}
 
 {% set render_sidebar = true %}
 {% if theme_nosidebar == true or title == 'Documentation' %}
@@ -15,47 +11,51 @@
 {% endif %}
 
 {% block content %}
-{% if render_sidebar %}
-<section class="b-lightgray_block b-documentation_top b-clearbox p-documentation_in">
-{% else %}
-<section class="b-lightgray_block b-documentation_top b-clearbox">
-{% endif %}
-  <div class="b-block-wrapper">
-    <h2 class="b-section-title">{{ title }}</h2>
-    <!--div class="b-search">
-      <input class="b-search-text" data-placeholder="Search in documentation" />
-      <input class="b-search-but" type="submit" />
-    </div-->
-  </div>
-</section>
-{% if render_sidebar %}
-<div class="b-cols_content b-clearbox">
-  <div class="b-cols_content_left">
-    {{ toctree(maxdepth=2) }}
-    {% block sidebar %} {% endblock %}
-  </div>
-  <div class="b-cols_content_right">
-    <div class="b-cols_content_right-slot">
-{% else %}
-<section class="b-block b-documentation">
-  <div class="b-block-wrapper">
-{% endif %}
-  {{- breadcrumbs.breadcrumbs() -}}
-      <article class="b-article">
-        {% if render_sidebar == false and title != 'Documentation' %}
-          {{ toctree(maxdepth=2, collapse=false) }}
-        {% endif %}
-        {% block body %} {% endblock %}
-      </article>
-  {{- navbar.navbar(False) -}}
-{% if render_sidebar %}
+  {% if render_sidebar %}
+  <section class="b-lightgray_block b-documentation_top b-clearbox p-documentation_in">
+  {% else %}
+  <section class="b-lightgray_block b-documentation_top b-clearbox">
+  {% endif %}
+    <div class="b-block-wrapper">
+      <h2 class="b-section-title">{{ title }}</h2>
+      {%- if builder != "singlehtml" %}
+      <form id="searchbox" role="search" class="search b-search" action="{{ pathto('search') }}" method="get">
+        <input class="b-search-text" name="q" type="text"/>
+        <input class="b-search-but" type="submit" />
+        <input type="hidden" name="check_keywords" value="yes" />
+        <input type="hidden" name="area" value="default" />
+      </div>
+      {%- endif %}
+    </div>
+  </section>
+  {%- if render_sidebar %}
+  <div class="b-cols_content b-clearbox">
+    <div class="b-cols_content_left">
+      {{ toctree(maxdepth=2) }}
+      {% block sidebar %} {% endblock %}
+    </div>
+    <div class="b-cols_content_right">
+      <div class="b-cols_content_right-slot">
+  {% else %}
+  <section class="b-block b-documentation">
+    <div class="b-block-wrapper">
+  {% endif %}
+    {{- breadcrumbs.breadcrumbs() -}}
+        <article class="b-article">
+          {% if render_sidebar == false and title != 'Documentation' %}
+            {{ toctree(maxdepth=2, collapse=false) }}
+          {% endif %}
+          {% block body %} {% endblock %}
+        </article>
+    {{- navbar.navbar(False) -}}
+  {% if render_sidebar %}
+      </div>
     </div>
   </div>
-</div>
-{% else %}
-  </div>
-</section>
-{% endif %}
+  {% else %}
+    </div>
+  </section>
+  {%- endif %}
 {% endblock content%}
 
 {# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

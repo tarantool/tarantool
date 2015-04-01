@@ -11,9 +11,6 @@
                 var title = $('.b-benchmark-type-title');
                 var image = $('#b-benchmark-grapf-image');
                 title.html('Workload ' + link.html());
-                if (link.html() == 'LOAD') {
-                    title.html('Insert Only');
-                }
                 image.renderChart('/ycsb/' + link.html() + '_throughput.json');
                 $('.b-benchmark-type .b-switcher-item-url.p-active').removeClass('p-active');
                 $('.b-benchmark-type .b-switcher-item-url').first().addClass('p-active');
@@ -37,15 +34,10 @@
                     'C': 'READ',
                     'D': 'READ',
                     'E': 'SCAN',
-                    'F': 'READ',
-                    'LOAD': 'INSERT'
+                    'F': 'READ'
                 };
                 var letter = '';
-                if (title == 'Insert Only') {
-                    letter = 'LOAD';
-                } else {
-                    letter = title.replace('Workload ', '');
-                }
+                letter = title.replace('Workload ', '');
                 if (link.html() == 'Latency') {
                     image.renderChart('/ycsb/' + letter +
                         '_' + table[letter] + '_latency.json');
