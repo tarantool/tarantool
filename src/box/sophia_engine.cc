@@ -148,9 +148,20 @@ SophiaEngine::open()
 	return new SophiaSpace(this);
 }
 
+static inline void
+sophia_snapshot_recover(void *env, int64_t lsn);
+
 void
 SophiaEngine::end_recover_snapshot()
 {
+	/* create snapshot reference after tarantool
+	 * recovery, to ensure correct ref counting
+	 * with spaces involved in snapshot. */
+	if (m_checkpoint_lsn >= 0) {
+		sophia_snapshot_recover(env, m_checkpoint_lsn);
+		m_prev_checkpoint_lsn = m_checkpoint_lsn;
+		m_checkpoint_lsn = -1;
+	}
 	recovery.replace = sophia_replace_recover;
 	recovery.recover = sophia_recovery_end_snapshot;
 }
@@ -233,22 +244,11 @@ SophiaEngine::join(Relay *relay)
 	sp_destroy(db_cursor);
 }
 
-static inline void
-sophia_snapshot_recover(void *env, int64_t lsn);
-
 void
 SophiaEngine::end_recovery()
 {
 	if (recovery_complete)
 		return;
-	/* create snapshot reference after tarantool
-	 * recovery, to ensure correct ref
-	 * counting */
-	if (m_checkpoint_lsn >= 0) {
-		sophia_snapshot_recover(env, m_checkpoint_lsn);
-		m_prev_checkpoint_lsn = m_checkpoint_lsn;
-		m_checkpoint_lsn = -1;
-	}
 	/* complete two-phase recovery */
 	int rc = sp_open(env);
 	if (rc == -1)
