@@ -133,22 +133,6 @@ SophiaEngine::open()
 }
 
 static inline void
-sophia_snapshot_recover(void *env, int64_t lsn);
-
-void
-SophiaEngine::endRecoverSnapshot()
-{
-	/* create snapshot reference after tarantool
-	 * recovery, to ensure correct ref counting
-	 * with spaces involved in snapshot. */
-	if (m_checkpoint_lsn >= 0) {
-		sophia_snapshot_recover(env, m_checkpoint_lsn);
-		m_prev_checkpoint_lsn = m_checkpoint_lsn;
-		m_checkpoint_lsn = -1;
-	}
-}
-
-static inline void
 sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
                 uint32_t tuple_size)
 {
@@ -401,19 +385,19 @@ sophia_snapshot(void *env, int64_t lsn)
 }
 
 static inline void
-sophia_snapshot_recover(void *env, int64_t lsn)
+sophia_reference_checkpoint(void *env, int64_t lsn)
 {
 	/* recovered snapshot lsn is >= then last
 	 * engine lsn */
-	char snapshot_lsn[32];
-	snprintf(snapshot_lsn, sizeof(snapshot_lsn), "%" PRIu64, lsn);
+	char checkpoint_id[32];
+	snprintf(checkpoint_id, sizeof(checkpoint_id), "%" PRIu64, lsn);
 	void *c = sp_ctl(env);
-	int rc = sp_set(c, "snapshot", snapshot_lsn);
+	int rc = sp_set(c, "snapshot", checkpoint_id);
 	if (rc == -1)
 		sophia_raise(env);
 	char snapshot[128];
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
-	rc = sp_set(c, snapshot, snapshot_lsn);
+	rc = sp_set(c, snapshot, checkpoint_id);
 	if (rc == -1)
 		sophia_raise(env);
 }
@@ -464,9 +448,24 @@ sophia_delete_checkpoint(void *env, int64_t lsn)
 }
 
 void
-SophiaEngine::beginRecoverSnapshot(int64_t lsn)
+SophiaEngine::recoverToCheckpoint(int64_t checkpoint_id)
 {
-	m_checkpoint_lsn = lsn;
+	/*
+	 * Create a reference to the "current" snapshot,
+	 * to ensure correct reference counting when a new
+	 * snapshot is created.
+	 * Sophia doesn't store snapshot references persistently,
+	 * so, after recovery, we remember the reference to the
+	 * "previous" snapshot, so that when the next snapshot is
+	 * taken, this reference is garbage collected. This
+	 * will also prevent this snapshot from accidental
+	 * garbage collection before a new snapshot is created,
+	 * and thus ensure correct crash recovery in case of crash
+	 * in the period between startup and creation of the first
+	 * snapshot.
+	 */
+	sophia_reference_checkpoint(env, checkpoint_id);
+	m_prev_checkpoint_lsn = checkpoint_id;
 }
 
 int

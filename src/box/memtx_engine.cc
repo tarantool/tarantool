@@ -202,7 +202,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 
 MemtxEngine::MemtxEngine()
 	:Engine("memtx"),
-	m_snapshot_lsn(-1),
+	m_checkpoint_id(-1),
 	m_snapshot_pid(0),
 	m_state(MEMTX_INITIALIZED)
 {
@@ -213,14 +213,11 @@ MemtxEngine::MemtxEngine()
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::beginRecoverSnapshot(int64_t /* lsn */)
+MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 {
 	m_state = MEMTX_READING_SNAPSHOT;
-}
-
-void
-MemtxEngine::endRecoverSnapshot()
-{
+	/* Process existing snapshot */
+	recover_snap(::recovery);
 	m_state = MEMTX_READING_WAL;
 	space_foreach(memtx_end_build_primary_key, this);
 }
@@ -551,7 +548,7 @@ snapshot_save(struct recovery_state *r)
 int
 MemtxEngine::beginCheckpoint(int64_t lsn)
 {
-	assert(m_snapshot_lsn == -1);
+	assert(m_checkpoint_id == -1);
 	assert(m_snapshot_pid == 0);
 	/* flush buffers to avoid multiple output
 	 *
@@ -585,7 +582,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 		break;
 	}
 
-	m_snapshot_lsn = lsn;
+	m_checkpoint_id = lsn;
 	m_snapshot_pid = snapshot_pid;
 	/* increment snapshot version */
 	tuple_begin_snapshot();
@@ -595,7 +592,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 int
 MemtxEngine::waitCheckpoint()
 {
-	assert(m_snapshot_lsn >= 0);
+	assert(m_checkpoint_id >= 0);
 	assert(m_snapshot_pid > 0);
 	/* wait for memtx-part snapshot completion */
 	int rc = coio_waitpid(m_snapshot_pid);
@@ -615,7 +612,7 @@ void
 MemtxEngine::commitCheckpoint()
 {
 	/* beginCheckpoint() must have been done */
-	assert(m_snapshot_lsn >= 0);
+	assert(m_checkpoint_id >= 0);
 	/* waitCheckpoint() must have been done. */
 	assert(m_snapshot_pid == 0);
 
@@ -623,32 +620,32 @@ MemtxEngine::commitCheckpoint()
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
 	snprintf(to, sizeof(to), "%s",
-		 format_filename(dir, m_snapshot_lsn, NONE));
-	char *from = format_filename(dir, m_snapshot_lsn, INPROGRESS);
+		 format_filename(dir, m_checkpoint_id, NONE));
+	char *from = format_filename(dir, m_checkpoint_id, INPROGRESS);
 	int rc = coeio_rename(from, to);
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
-	m_snapshot_lsn = -1;
+	m_checkpoint_id = -1;
 }
 
 void
 MemtxEngine::abortCheckpoint()
 {
 	if (m_snapshot_pid > 0) {
-		assert(m_snapshot_lsn >= 0);
+		assert(m_checkpoint_id >= 0);
 		/**
 		 * An error in the other engine's first phase.
 		 */
 		waitCheckpoint();
 	}
-	if (m_snapshot_lsn > 0) {
+	if (m_checkpoint_id > 0) {
 		/** Remove garbage .inprogress file. */
 		char *filename = format_filename(&::recovery->snap_dir,
-						m_snapshot_lsn, INPROGRESS);
+						m_checkpoint_id, INPROGRESS);
 		(void) coeio_unlink(filename);
 	}
-	m_snapshot_lsn = -1;
+	m_checkpoint_id = -1;
 }
 
 void

@@ -111,13 +111,15 @@ public:
 	virtual void begin(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
-	/** Recovery */
-	virtual void beginRecoverSnapshot(int64_t snapshot_lsn) = 0;
-	/* Inform engine about a recovery stage change. */
-	virtual void endRecoverSnapshot() = 0;
 	/**
-	 * Inform the engine about the global recovery
-	 * state change (end of recovery from the binary log).
+	 * Recover the engine to a checkpoint it has.
+	 * After that the engine will be given rows
+	 * from the binary log to replay.
+	 */
+	virtual void recoverToCheckpoint(int64_t checkpoint_id) = 0;
+	/**
+	 * Inform the engine about the end of recovery from the
+	 * binary log.
 	 */
 	virtual void endRecovery() = 0;
 	/**
@@ -207,20 +209,13 @@ engine_id(Handler *space)
  * (during server start.
  */
 void
-engine_begin_recover_snapshot(int64_t snapshot_lsn);
+engine_recover_to_checkpoint(int64_t checkpoint_id);
 
 /**
  * Called at the start of JOIN routine.
  */
 void
 engine_begin_join();
-
-/**
- * Called at the end of recovery from snapshot.
- * Build primary keys in all spaces.
- * */
-void
-engine_end_recover_snapshot();
 
 /**
  * Called at the end of recovery.

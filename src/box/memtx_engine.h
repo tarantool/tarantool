@@ -48,8 +48,7 @@ struct MemtxEngine: public Engine {
 	virtual void keydefCheck(struct space *space, struct key_def *key_def);
 	virtual void rollback(struct txn*);
 	virtual void beginJoin();
-	virtual void beginRecoverSnapshot(int64_t lsn);
-	virtual void endRecoverSnapshot();
+	virtual void recoverToCheckpoint(int64_t lsn);
 	virtual void endRecovery();
 	virtual void join(Relay*);
 	virtual int beginCheckpoint(int64_t);
@@ -61,7 +60,7 @@ private:
 	/**
 	 * LSN of the snapshot which is in progress.
 	 */
-	int64_t m_snapshot_lsn;
+	int64_t m_checkpoint_id;
 	pid_t m_snapshot_pid;
 	enum memtx_recovery_state m_state;
 };

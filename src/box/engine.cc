@@ -111,12 +111,12 @@ void engine_shutdown()
 }
 
 void
-engine_begin_recover_snapshot(int64_t snapshot_lsn)
+engine_recover_to_checkpoint(int64_t checkpoint_id)
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginRecoverSnapshot(snapshot_lsn);
+		engine->recoverToCheckpoint(checkpoint_id);
 	}
 }
 
@@ -127,19 +127,6 @@ engine_begin_join()
 	Engine *engine;
 	engine_foreach(engine) {
 		engine->beginJoin();
-	}
-}
-
-void
-engine_end_recover_snapshot()
-{
-	/*
-	 * For all new spaces created from now on, when the
-	 * PRIMARY key is added, enable it right away.
-	 */
-	Engine *engine;
-	engine_foreach(engine) {
-		engine->endRecoverSnapshot();
 	}
 }
 

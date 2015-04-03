@@ -438,23 +438,20 @@ box_init(void)
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
-		engine_begin_recover_snapshot(checkpoint_id);
-		/* Process existing snapshot */
-		recover_snap(recovery);
-		engine_end_recover_snapshot();
+		engine_recover_to_checkpoint(checkpoint_id);
 	} else if (recovery_has_remote(recovery)) {
 		/* Initialize a new replica */
 		engine_begin_join();
 		replica_bootstrap(recovery);
-		engine_end_recover_snapshot();
-		box_snapshot();
+		int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+		engine_checkpoint(checkpoint_id);
 	} else {
 		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
-		engine_end_recover_snapshot();
-		box_snapshot();
+		int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+		engine_checkpoint(checkpoint_id);
 	}
 	fiber_gc();
 
