@@ -360,10 +360,15 @@ lbox_commit(lua_State * /* L */)
 	 * Do nothing if transaction is not started,
 	 * it's the same as BEGIN + COMMIT.
 	*/
-	if (txn) {
+	if (! txn)
+		return 0;
+	try {
 		txn_commit(txn);
-		txn_finish(txn);
+	} catch (...) {
+		txn_rollback();
+		throw;
 	}
+	txn_finish(txn);
 	return 0;
 }
 
@@ -615,6 +620,13 @@ done:
 void
 box_lua_call(struct request *request, struct obuf *out)
 {
+	auto txn_guard = make_scoped_guard([=] {
+		struct txn *txn = in_txn();
+		if (txn) {
+			say_warn("transaction is active at CALL return");
+			txn_rollback();
+		}
+	});
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);

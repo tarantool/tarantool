@@ -78,38 +78,6 @@ sophia_index_get(void *env, void *db, void *tx, const char *key, size_t keysize,
 	return tuple_new(format, (char*)value, (char*)value + valuesize);
 }
 
-struct tuple*
-sophia_replace_recover(struct space *space,
-                       struct tuple *old_tuple, struct tuple *new_tuple,
-                       enum dup_replace_mode)
-{
-	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
-	struct txn *txn = in_txn();
-	assert(txn != NULL && txn->engine_tx != NULL);
-	int rc;
-	if (old_tuple) {
-		rc = sophia_index_stmt(txn->engine_tx, index->db, 1,
-		                       index->key_def,
-		                       old_tuple);
-	} else {
-		rc = sophia_index_stmt(txn->engine_tx, index->db, 0,
-		                       index->key_def,
-		                       new_tuple);
-	}
-	if (rc == -1)
-		sophia_raise(index->env);
-	return NULL;
-}
-
-struct tuple *
-sophia_replace(struct space *space,
-               struct tuple *old_tuple, struct tuple *new_tuple,
-               enum dup_replace_mode mode)
-{
-	Index *index = index_find(space, 0);
-	return index->replace(old_tuple, new_tuple, mode);
-}
-
 static inline int
 sophia_index_compare(char *a, size_t asz __attribute__((unused)),
                      char *b, size_t bsz __attribute__((unused)),
@@ -139,6 +107,8 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)sophia_index_compare);
 	snprintf(pointer_arg, sizeof(pointer_arg), "pointer: %p", (void*)key_def);
 	sp_set(c, name, pointer, pointer_arg);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".compression", key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia.compression"));
 	snprintf(name, sizeof(name), "db.%" PRIu32, key_def->space_id);
 	void *db = sp_get(c, name);
 	if (db == NULL)
@@ -164,16 +134,6 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	if (rc == -1)
 		sophia_raise(env);
 	tuple_format_ref(space->format, 1);
-}
-
-void
-sophia_complete_recovery(struct space *space)
-{
-	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
-	assert(space->handler->recovery.recover == space_noop);
-	int rc = sp_open(index->db);
-	if (rc == -1)
-		sophia_raise(index->env);
 }
 
 SophiaIndex::~SophiaIndex()

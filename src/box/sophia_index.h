@@ -52,17 +52,4 @@ public:
 	void *db;
 };
 
-struct tuple *
-sophia_replace_recover(struct space*,
-                       struct tuple*, struct tuple*,
-                       enum dup_replace_mode);
-
-struct tuple *
-sophia_replace(struct space*,
-               struct tuple*, struct tuple*,
-               enum dup_replace_mode);
-
-void
-sophia_complete_recovery(struct space*);
-
 #endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */
