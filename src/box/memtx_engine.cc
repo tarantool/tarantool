@@ -70,6 +70,171 @@ struct MemtxSpace: public Handler {
 };
 
 /**
+ * A version of space_replace for a space which has
+ * no indexes (is not yet fully built).
+ */
+struct tuple *
+space_replace_no_keys(struct space *space, struct tuple * /* old_tuple */,
+                        struct tuple * /* new_tuple */,
+                        enum dup_replace_mode /* mode */)
+{
+       Index *index = index_find(space, 0);
+       assert(index == NULL); /* not reached. */
+       (void) index;
+       return NULL; /* replace found no old tuple */
+}
+
+/**
+ * A short-cut version of space_replace() used during bulk load
+ * from snapshot.
+ */
+struct tuple *
+space_replace_build_next(struct space *space, struct tuple *old_tuple,
+			 struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	assert(old_tuple == NULL && mode == DUP_INSERT);
+	(void) mode;
+	if (old_tuple) {
+		/*
+		 * Called from txn_rollback() In practice
+		 * is impossible: all possible checks for tuple
+		 * validity are done before the space is changed,
+		 * and WAL is off, so this part can't fail.
+		 */
+		panic("Failed to commit transaction when loading "
+		      "from snapshot");
+	}
+	space->index[0]->buildNext(new_tuple);
+	return NULL; /* replace found no old tuple */
+}
+
+/**
+ * A short-cut version of space_replace() used when loading
+ * data from XLOG files.
+ */
+struct tuple *
+space_replace_primary_key(struct space *space, struct tuple *old_tuple,
+			  struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	return space->index[0]->replace(old_tuple, new_tuple, mode);
+}
+
+static struct tuple *
+space_replace_all_keys(struct space *space, struct tuple *old_tuple,
+		       struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	uint32_t i = 0;
+	try {
+		/* Update the primary key */
+		Index *pk = index_find(space, 0);
+		assert(pk->key_def->is_unique);
+		/*
+		 * If old_tuple is not NULL, the index
+		 * has to find and delete it, or raise an
+		 * error.
+		 */
+		old_tuple = pk->replace(old_tuple, new_tuple, mode);
+
+		assert(old_tuple || new_tuple);
+		/* Update secondary keys. */
+		for (i++; i < space->index_count; i++) {
+			Index *index = space->index[i];
+			index->replace(old_tuple, new_tuple, DUP_INSERT);
+		}
+		return old_tuple;
+	} catch (Exception *e) {
+		/* Rollback all changes */
+		for (; i > 0; i--) {
+			Index *index = space->index[i-1];
+			index->replace(new_tuple, old_tuple, DUP_INSERT);
+		}
+		throw;
+	}
+
+	assert(false);
+	return NULL;
+}
+
+/**
+ * Secondary indexes are built in bulk after all data is
+ * recovered. This function enables secondary keys on a space.
+ * Data dictionary spaces are an exception, they are fully
+ * built right from the start.
+ */
+void
+space_build_secondary_keys(struct space *space)
+{
+	if (space->index_id_max > 0) {
+		Index *pk = space->index[0];
+		uint32_t n_tuples = pk->size();
+
+		if (n_tuples > 0) {
+			say_info("Building secondary indexes in space '%s'...",
+				 space_name(space));
+		}
+
+		for (uint32_t j = 1; j < space->index_count; j++)
+			index_build(space->index[j], pk);
+
+		if (n_tuples > 0) {
+			say_info("Space '%s': done", space_name(space));
+		}
+	}
+	engine_recovery *r = &space->handler->recovery;
+	r->state   = READY_ALL_KEYS;
+	r->recover = space_noop; /* mark the end of recover */
+	r->replace = space_replace_all_keys;
+}
+
+/** Build the primary key after loading data from a snapshot. */
+void
+space_end_build_primary_key(struct space *space)
+{
+	space->index[0]->endBuild();
+	engine_recovery *r = &space->handler->recovery;
+	r->state   = READY_PRIMARY_KEY;
+	r->replace = space_replace_primary_key;
+	r->recover = space_build_secondary_keys;
+}
+
+/** Prepare the primary key for bulk load (loading from
+ * a snapshot).
+ */
+void
+space_begin_build_primary_key(struct space *space)
+{
+	space->index[0]->beginBuild();
+	engine_recovery *r = &space->handler->recovery;
+	r->replace = space_replace_build_next;
+	r->recover = space_end_build_primary_key;
+}
+
+/**
+ * Bring a space up to speed if its primary key is added during
+ * XLOG recovery. This is a recovery function called on
+ * spaces which had no primary key at the end of snapshot
+ * recovery, and got one only when reading an XLOG.
+ */
+void
+space_build_primary_key(struct space *space)
+{
+	space_begin_build_primary_key(space);
+	space_end_build_primary_key(space);
+}
+
+/** Bring a space up to speed once it's got a primary key.
+ *
+ * This is a recovery function used for all spaces added after the
+ * end of SNAP/XLOG recovery.
+ */
+void
+space_build_all_keys(struct space *space)
+{
+	space_build_primary_key(space);
+	space_build_secondary_keys(space);
+}
+
+/**
  * This is a vtab with which a newly created space which has no
  * keys is primed.
  * At first it is set to correctly work for spaces created during
