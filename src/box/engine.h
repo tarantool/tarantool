@@ -112,14 +112,14 @@ public:
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
 	/** Recovery */
-	virtual void begin_recover_snapshot(int64_t snapshot_lsn) = 0;
+	virtual void beginRecoverSnapshot(int64_t snapshot_lsn) = 0;
 	/* Inform engine about a recovery stage change. */
-	virtual void end_recover_snapshot() = 0;
+	virtual void endRecoverSnapshot() = 0;
 	/**
 	 * Inform the engine about the global recovery
 	 * state change (end of recovery from the binary log).
 	 */
-	virtual void end_recovery() = 0;
+	virtual void endRecovery() = 0;
 	/**
 	 * Notify engine about a JOIN start (slave-side)
 	 */
@@ -128,21 +128,21 @@ public:
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 */
-	virtual int begin_checkpoint(int64_t) = 0;
+	virtual int beginCheckpoint(int64_t) = 0;
 	/**
 	 * Wait for a checkpoint to complete. The LSN
 	 * must match one in begin_checkpoint().
 	 */
-	virtual int wait_checkpoint() = 0;
+	virtual int waitCheckpoint() = 0;
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	virtual void commit_checkpoint() = 0;
+	virtual void commitCheckpoint() = 0;
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
-	virtual void abort_checkpoint() = 0;
+	virtual void abortCheckpoint() = 0;
 public:
 	/** Name of the engine. */
 	const char *name;

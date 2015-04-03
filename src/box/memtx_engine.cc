@@ -213,20 +213,20 @@ MemtxEngine::MemtxEngine()
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)
+MemtxEngine::beginRecoverSnapshot(int64_t /* lsn */)
 {
 	m_state = MEMTX_READING_SNAPSHOT;
 }
 
 void
-MemtxEngine::end_recover_snapshot()
+MemtxEngine::endRecoverSnapshot()
 {
 	m_state = MEMTX_READING_WAL;
 	space_foreach(memtx_end_build_primary_key, this);
 }
 
 void
-MemtxEngine::end_recovery()
+MemtxEngine::endRecovery()
 {
 	m_state = MEMTX_OK;
 	space_foreach(memtx_build_secondary_keys, this);
@@ -549,7 +549,7 @@ snapshot_save(struct recovery_state *r)
 }
 
 int
-MemtxEngine::begin_checkpoint(int64_t lsn)
+MemtxEngine::beginCheckpoint(int64_t lsn)
 {
 	assert(m_snapshot_lsn == -1);
 	assert(m_snapshot_pid == 0);
@@ -593,7 +593,7 @@ MemtxEngine::begin_checkpoint(int64_t lsn)
 }
 
 int
-MemtxEngine::wait_checkpoint()
+MemtxEngine::waitCheckpoint()
 {
 	assert(m_snapshot_lsn >= 0);
 	assert(m_snapshot_pid > 0);
@@ -612,11 +612,11 @@ MemtxEngine::wait_checkpoint()
 }
 
 void
-MemtxEngine::commit_checkpoint()
+MemtxEngine::commitCheckpoint()
 {
-	/* begin_checkpoint() must have been done */
+	/* beginCheckpoint() must have been done */
 	assert(m_snapshot_lsn >= 0);
-	/* wait_checkpoint() must have been done. */
+	/* waitCheckpoint() must have been done. */
 	assert(m_snapshot_pid == 0);
 
 	struct xdir *dir = &::recovery->snap_dir;
@@ -633,14 +633,14 @@ MemtxEngine::commit_checkpoint()
 }
 
 void
-MemtxEngine::abort_checkpoint()
+MemtxEngine::abortCheckpoint()
 {
 	if (m_snapshot_pid > 0) {
 		assert(m_snapshot_lsn >= 0);
 		/**
 		 * An error in the other engine's first phase.
 		 */
-		wait_checkpoint();
+		waitCheckpoint();
 	}
 	if (m_snapshot_lsn > 0) {
 		/** Remove garbage .inprogress file. */

@@ -136,7 +136,7 @@ static inline void
 sophia_snapshot_recover(void *env, int64_t lsn);
 
 void
-SophiaEngine::end_recover_snapshot()
+SophiaEngine::endRecoverSnapshot()
 {
 	/* create snapshot reference after tarantool
 	 * recovery, to ensure correct ref counting
@@ -231,7 +231,7 @@ SophiaEngine::join(Relay *relay)
 }
 
 void
-SophiaEngine::end_recovery()
+SophiaEngine::endRecovery()
 {
 	if (recovery_complete)
 		return;
@@ -376,7 +376,7 @@ SophiaEngine::beginJoin()
 {
 	/* put engine to recovery-complete state to
 	 * correctly support join */
-	end_recovery();
+	endRecovery();
 }
 
 static inline void
@@ -464,13 +464,13 @@ sophia_delete_checkpoint(void *env, int64_t lsn)
 }
 
 void
-SophiaEngine::begin_recover_snapshot(int64_t lsn)
+SophiaEngine::beginRecoverSnapshot(int64_t lsn)
 {
 	m_checkpoint_lsn = lsn;
 }
 
 int
-SophiaEngine::begin_checkpoint(int64_t lsn)
+SophiaEngine::beginCheckpoint(int64_t lsn)
 {
 	assert(m_checkpoint_lsn == -1);
 	if (lsn != m_prev_checkpoint_lsn) {
@@ -483,7 +483,7 @@ SophiaEngine::begin_checkpoint(int64_t lsn)
 }
 
 int
-SophiaEngine::wait_checkpoint()
+SophiaEngine::waitCheckpoint()
 {
 	assert(m_checkpoint_lsn != -1);
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
@@ -492,7 +492,7 @@ SophiaEngine::wait_checkpoint()
 }
 
 void
-SophiaEngine::commit_checkpoint()
+SophiaEngine::commitCheckpoint()
 {
 	if (m_prev_checkpoint_lsn >= 0)
 		sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
@@ -501,7 +501,7 @@ SophiaEngine::commit_checkpoint()
 }
 
 void
-SophiaEngine::abort_checkpoint()
+SophiaEngine::abortCheckpoint()
 {
 	if (m_checkpoint_lsn >= 0) {
 		sophia_delete_checkpoint(env, m_checkpoint_lsn);

@@ -116,7 +116,7 @@ engine_begin_recover_snapshot(int64_t snapshot_lsn)
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->begin_recover_snapshot(snapshot_lsn);
+		engine->beginRecoverSnapshot(snapshot_lsn);
 	}
 }
 
@@ -139,7 +139,7 @@ engine_end_recover_snapshot()
 	 */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->end_recover_snapshot();
+		engine->endRecoverSnapshot();
 	}
 }
 
@@ -152,7 +152,7 @@ engine_end_recovery()
 	 */
 	Engine *engine;
 	engine_foreach(engine)
-		engine->end_recovery();
+		engine->endRecovery();
 }
 
 int
@@ -167,19 +167,19 @@ engine_checkpoint(int64_t checkpoint_id)
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->begin_checkpoint(checkpoint_id))
+		if (engine->beginCheckpoint(checkpoint_id))
 			goto error;
 	}
 
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
-		if (engine->wait_checkpoint())
+		if (engine->waitCheckpoint())
 			goto error;
 	}
 
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
-		engine->commit_checkpoint();
+		engine->commitCheckpoint();
 	}
 	snapshot_is_in_progress = false;
 	return 0;
@@ -187,7 +187,7 @@ error:
 	int save_errno = errno;
 	/* rollback snapshot creation */
 	engine_foreach(engine)
-		engine->abort_checkpoint();
+		engine->abortCheckpoint();
 	snapshot_is_in_progress = false;
 	return save_errno;
 }
