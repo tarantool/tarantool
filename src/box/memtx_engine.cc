@@ -49,6 +49,7 @@
 #include "coeio_file.h"
 #include "coio.h"
 #include "errinj.h"
+#include "scoped_guard.h"
 
 /** For all memory used by all indexes. */
 extern struct quota memtx_quota;
@@ -211,13 +212,57 @@ MemtxEngine::MemtxEngine()
 		ENGINE_AUTO_CHECK_UPDATE;
 }
 
+/**
+ * Read a snapshot and call apply_row for every snapshot row.
+ * Panic in case of error.
+ *
+ * @pre there is an existing snapshot. Otherwise
+ * recovery_bootstrap() should be used instead.
+ */
+void
+recover_snap(struct recovery_state *r)
+{
+	/* There's no current_wal during initial recover. */
+	assert(r->current_wal == NULL);
+	say_info("recovery start");
+	/**
+	 * Don't rescan the directory, it's done when
+	 * recovery is initialized.
+	 */
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such case.
+	 */
+	if (res == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	int64_t signature = vclock_signature(res);
+
+	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
+	auto guard = make_scoped_guard([=]{
+		xlog_close(snap);
+	});
+	/* Save server UUID */
+	r->server_uuid = snap->server_uuid;
+
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
+
+	say_info("recovering from `%s'", snap->filename);
+	recover_xlog(r, snap);
+}
+
 /** Called at start to tell memtx to recover to a given LSN. */
 void
 MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 {
+	struct recovery_state *r = ::recovery;
 	m_state = MEMTX_READING_SNAPSHOT;
 	/* Process existing snapshot */
-	recover_snap(::recovery);
+	recover_snap(r);
+	/* Replace server vclock using the data from snapshot */
+	vclock_copy(&r->vclock, vclockset_last(&r->snap_dir.index));
 	m_state = MEMTX_READING_WAL;
 	space_foreach(memtx_end_build_primary_key, this);
 }

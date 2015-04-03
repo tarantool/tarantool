@@ -88,7 +88,7 @@ replication_join_f(va_list ap)
 
 	/* Send response to JOIN command = end of stream */
 	struct xrow_header row;
-	xrow_encode_vclock(&row, &r->vclock);
+	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
 	row.sync = relay->sync;
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(&row, iov);

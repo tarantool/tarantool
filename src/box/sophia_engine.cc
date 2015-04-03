@@ -145,8 +145,8 @@ sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
 	body.k_tuple = IPROTO_TUPLE;
 	struct xrow_header row;
 	row.type = IPROTO_INSERT;
-	row.lsn = vclock_inc(&r->vclock_join, r->server_id);
 	row.server_id = 0;
+	row.lsn = vclock_inc(&r->vclock, row.server_id);
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);

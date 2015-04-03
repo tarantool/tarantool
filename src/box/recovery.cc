@@ -181,7 +181,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
 
 	vclock_create(&r->vclock);
-	vclock_create(&r->vclock_join);
 
 	xdir_scan(&r->snap_dir);
 	/**
@@ -274,7 +273,7 @@ recovery_apply_row(struct recovery_state *r, struct xrow_header *row)
  * @retval 0 OK, read full xlog.
  * @retval 1 OK, read some but not all rows, or no EOF marker
  */
-static int
+int
 recover_xlog(struct recovery_state *r, struct xlog *l)
 {
 	struct xlog_cursor i;
@@ -336,52 +335,6 @@ recovery_bootstrap(struct recovery_state *r)
 	/** The snapshot must have a EOF marker. */
 	recover_xlog(r, snap);
 }
-
-/**
- * Read a snapshot and call apply_row for every snapshot row.
- * Panic in case of error.
- *
- * @pre there is an existing snapshot. Otherwise
- * recovery_bootstrap() should be used instead.
- */
-void
-recover_snap(struct recovery_state *r)
-{
-	/* There's no current_wal during initial recover. */
-	assert(r->current_wal == NULL);
-	say_info("recovery start");
-	/**
-	 * Don't rescan the directory, it's done when
-	 * recovery is initialized.
-	 */
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such case.
-	 */
-	if (res == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signature = vclock_signature(res);
-
-	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
-	auto guard = make_scoped_guard([=]{
-		xlog_close(snap);
-	});
-	/* Save server UUID */
-	r->server_uuid = snap->server_uuid;
-
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&r->vclock, 0);
-
-	say_info("recovering from `%s'", snap->filename);
-	recover_xlog(r, snap);
-
-	/* Replace server vclock using the data from snapshot */
-	vclock_copy(&r->vclock_join, &r->vclock);
-	vclock_copy(&r->vclock, &snap->vclock);
-}
-
 
 /** Find out if there are new .xlog files since the current
  * LSN, and read them all up.
