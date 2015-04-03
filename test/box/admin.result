@@ -26,9 +26,10 @@ box.cfg
   slab_alloc_arena: 0.1
   sophia:
     page_size: 131072
+    memory_limit: 0
     threads: 5
     node_size: 134217728
-    memory_limit: 0
+    compression: none
   listen: <uri>
   logger_nonblock: true
   snap_dir: .

@@ -14,7 +14,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 s = box.schema.space.create('space0', {engine='sophia'})
 ---
@@ -38,7 +37,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 s = box.schema.space.create('space0', {engine='sophia'})
 ---
@@ -62,7 +60,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 -- gh-280: Sophia: crash if insert without index
 s = box.schema.space.create('test', {engine='sophia'})
@@ -77,7 +74,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 0
 ...
 -- gh-436: No error when creating temporary sophia space
 s = box.schema.space.create('tester',{engine='sophia', temporary=true})
@@ -114,7 +110,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 s = box.schema.space.create('tester', {engine='sophia'})
 ---
@@ -144,7 +139,6 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 -- gh-680: Sophia: assertion on update
 s = box.schema.space.create('tester', {engine='sophia'})
@@ -186,5 +180,4 @@ s:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...

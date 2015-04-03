@@ -30,26 +30,40 @@
  */
 #include "engine.h"
 
+enum memtx_recovery_state {
+	MEMTX_INITIALIZED,
+	MEMTX_READING_SNAPSHOT,
+	MEMTX_READING_WAL,
+	MEMTX_OK,
+};
+
 struct MemtxEngine: public Engine {
 	MemtxEngine();
 	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
+	virtual void addPrimaryKey(struct space *space);
 	virtual void dropIndex(Index *index);
+	virtual void dropPrimaryKey(struct space *space);
+	virtual bool needToBuildSecondaryKey(struct space *space);
 	virtual void keydefCheck(struct space *space, struct key_def *key_def);
 	virtual void rollback(struct txn*);
+	virtual void beginJoin();
 	virtual void begin_recover_snapshot(int64_t lsn);
 	virtual void end_recover_snapshot();
 	virtual void end_recovery();
+	virtual void join(Relay*);
 	virtual int begin_checkpoint(int64_t);
 	virtual int wait_checkpoint();
 	virtual void commit_checkpoint();
 	virtual void abort_checkpoint();
+	virtual void initSystemSpace(struct space *space);
 private:
 	/**
 	 * LSN of the snapshot which is in progress.
 	 */
 	int64_t m_snapshot_lsn;
 	pid_t m_snapshot_pid;
+	enum memtx_recovery_state m_state;
 };
 
 enum {

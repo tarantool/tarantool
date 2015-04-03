@@ -21,7 +21,8 @@ local default_sophia_cfg = {
     memory_limit = 0,
     threads      = 5,
     node_size    = 134217728,
-    page_size    = 131072
+    page_size    = 131072,
+    compression  = "none"
 }
 
 -- all available options
@@ -65,7 +66,8 @@ local sophia_template_cfg = {
     memory_limit = 'number',
     threads      = 'number',
     node_size    = 'number',
-    page_size    = 'number'
+    page_size    = 'number',
+    compression  = 'string'
 }
 
 -- types of available options
