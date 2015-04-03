@@ -43,11 +43,11 @@
 
     Specify fiber-WAL-disk synchronization mode as:
 
-    * none: write-ahead log is not maintained;
-    * write: fibers wait for their data to be written to
-             the write-ahead log (no :manpage:`fsync(2)`);
-    * fsync: fibers wait for their data, :manpage:`fsync(2)`
-             follows each :manpage:`write(2)`;
+    * ``none``: write-ahead log is not maintained;
+    * ``write``: fibers wait for their data to be written to
+      the write-ahead log (no :manpage:`fsync(2)`);
+    * ``fsync``: fibers wait for their data, :manpage:`fsync(2)`
+      follows each :manpage:`write(2)`;
 
     Type: string |br|
     Default: "write" |br|

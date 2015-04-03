@@ -17,4 +17,7 @@ def setup(app):
     app.add_object_type('confval', 'confval',
                         objname='configuration value',
                         indextemplate='pair: %s; configuration value')
+    app.add_object_type('errcode', 'errcode',
+                        objname='error code value',
+                        indextemplate='pair: %s; error code value')
     return {'version': '0.0.2', 'parallel_read_safe': True}

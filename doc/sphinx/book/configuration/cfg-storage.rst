@@ -2,7 +2,7 @@
 
     How much memory Tarantool allocates to actually store tuples, in gigabytes.
     When the limit is reached, INSERT or UPDATE requests begin failing with
-    error :ref:`ER_MEMORY_ISSUE`. While the server does not go beyond the defined
+    error :errcode:`ER_MEMORY_ISSUE`. While the server does not go beyond the defined
     limit to allocate tuples, there is additional memory used to store indexes
     and connection information. Depending on actual configuration and workload,
     Tarantool can consume up to 20% more than the limit set here.
