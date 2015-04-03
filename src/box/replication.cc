@@ -32,8 +32,8 @@
 
 #include "recovery.h"
 #include "xlog.h"
-#include "evio.h"
 #include "iproto_constants.h"
+#include "box/engine.h"
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
@@ -44,34 +44,24 @@
 #include "cfg.h"
 #include "trigger.h"
 
-static void
+void
 replication_send_row(struct recovery_state *r, void *param,
-		     struct xrow_header *packet);
+                     struct xrow_header *packet);
 
-/** State of a replication relay. */
-class Relay {
-public:
-	/** Replica connection */
-	struct ev_io io;
-	/* Request sync */
-	uint64_t sync;
-	ev_tstamp wal_dir_rescan_delay;
-	struct recovery_state *r;
+Relay::Relay(int fd_arg, uint64_t sync_arg)
+{
+	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+			 replication_send_row, this);
+	coio_init(&io);
+	io.fd = fd_arg;
+	sync = sync_arg;
+	wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
+}
 
-	Relay(int fd_arg, uint64_t sync_arg)
-	{
-		r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-				 replication_send_row, this);
-		coio_init(&io);
-		io.fd = fd_arg;
-		sync = sync_arg;
-		wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
-	}
-	~Relay()
-	{
-		recovery_delete(r);
-	}
-};
+Relay::~Relay()
+{
+	recovery_delete(r);
+}
 
 static inline void
 relay_set_cord_name(int fd)
@@ -92,8 +82,9 @@ replication_join_f(va_list ap)
 	struct recovery_state *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
+
 	/* Send snapshot */
-	recover_snap(r);
+	engine_join(relay);
 
 	/* Send response to JOIN command = end of stream */
 	struct xrow_header row;
@@ -195,10 +186,19 @@ replication_subscribe(int fd, struct xrow_header *packet)
 	cord_cojoin(&cord);
 }
 
+void
+relay_send(Relay *relay, struct xrow_header *packet)
+{
+	packet->sync = relay->sync;
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(packet, iov);
+	coio_writev(&relay->io, iov, iovcnt, 0);
+}
+
 /** Send a single row to the client. */
-static void
+void
 replication_send_row(struct recovery_state *r, void *param,
-		     struct xrow_header *packet)
+                     struct xrow_header *packet)
 {
 	Relay *relay = (Relay *) param;
 	assert(iproto_type_is_dml(packet->type));
@@ -211,12 +211,8 @@ replication_send_row(struct recovery_state *r, void *param,
 	 * it not from the same server (i.e. don't send
 	 * replica's own rows back).
 	 */
-	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
-		packet->sync = relay->sync;
-		struct iovec iov[XROW_IOVMAX];
-		int iovcnt = xrow_to_iovec(packet, iov);
-		coio_writev(&relay->io, iov, iovcnt, 0);
-	}
+	if (packet->server_id == 0 || packet->server_id != r->server_id)
+		relay_send(relay, packet);
 	/*
 	 * Update local vclock. During normal operation wal_write()
 	 * updates local vclock. In relay mode we have to update

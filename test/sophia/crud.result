@@ -1171,7 +1171,6 @@ space:drop()
 ...
 sophia_schedule()
 ---
-- 1
 ...
 sophia_dir()[1]
 ---

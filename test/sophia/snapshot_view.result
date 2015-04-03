@@ -1,0 +1,83 @@
+os.execute("rm -f *.snap")
+---
+- 0
+...
+os.execute("rm -f *.xlog")
+---
+- 0
+...
+os.execute("touch mt")
+---
+- 0
+...
+--# stop server default
+--# start server default
+space = box.schema.create_space('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary')
+---
+...
+for key = 1, 351 do space:insert({key}) end
+---
+...
+box.snapshot()
+---
+- ok
+...
+space:drop()
+---
+...
+sophia_schedule()
+---
+...
+-- remove tarantool xlogs
+os.execute("rm -f *.xlog")
+---
+- 0
+...
+os.execute("rm -f mt")
+---
+- 0
+...
+os.execute("touch lock")
+---
+- 0
+...
+--# stop server default
+--# start server default
+space = box.space['test']
+---
+...
+space:len()
+---
+- 351
+...
+sophia_dir()[1]
+---
+- 1
+...
+space:drop()
+---
+...
+sophia_schedule()
+---
+...
+sophia_dir()[1]
+---
+- 1
+...
+os.execute("rm -f *.snap")
+---
+- 0
+...
+os.execute("rm -f *.xlog")
+---
+- 0
+...
+os.execute("rm -f lock")
+---
+- 0
+...
+--# stop server default
+--# start server default

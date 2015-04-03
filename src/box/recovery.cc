@@ -181,6 +181,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
 
 	vclock_create(&r->vclock);
+	vclock_create(&r->vclock_join);
 
 	xdir_scan(&r->snap_dir);
 	/**
@@ -375,7 +376,9 @@ recover_snap(struct recovery_state *r)
 
 	say_info("recovering from `%s'", snap->filename);
 	recover_xlog(r, snap);
+
 	/* Replace server vclock using the data from snapshot */
+	vclock_copy(&r->vclock_join, &r->vclock);
 	vclock_copy(&r->vclock, &snap->vclock);
 }
 

@@ -290,13 +290,6 @@ static void
 alter_space_commit(struct trigger *trigger, void * /* event */)
 {
 	struct alter_space *alter = (struct alter_space *) trigger->data;
-#if 0
-	/*
-	 * Clear the lock first - should there be an
-	 * exception/bug, the lock must not be left around.
-	 */
-	space_unset_on_replace(space, alter);
-#endif
 	/*
 	 * If an index is unchanged, all its properties, including
 	 * ID are intact. Move this index here. If an index is
@@ -444,18 +437,18 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 		op->alter_def(alter);
 	/*
 	 * Create a new (empty) space for the new definition.
-	 * Sic: the space engine is not the same yet, the
-	 * triggers are not set.
+	 * Sic: the triggers are not moved over yet.
 	 */
 	alter->new_space = space_new(&alter->space_def, &alter->key_list);
 	/*
-	 * Copy the engine, the new space is at the same recovery
-	 * phase as the old one. Do it before performing the alter,
-	 * since engine.recover does different things depending on
-	 * the recovery phase.
+	 * Copy the replace function, the new space is at the same recovery
+	 * phase as the old one. This hack is especially necessary for
+	 * system spaces, which may be altered in some row in the
+	 * snapshot/xlog, but needs to continue staying "fully
+	 * built".
 	 */
-	alter->new_space->handler->recovery =
-		alter->old_space->handler->recovery;
+	alter->new_space->handler->replace =
+		alter->old_space->handler->replace;
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
@@ -506,12 +499,9 @@ ModifySpace::prepare(struct alter_space *alter)
 			  space_name(alter->old_space),
 			  "can not change space engine");
 
-	engine_recovery *recovery =
-		&alter->old_space->handler->recovery;
-
 	if (def.field_count != 0 &&
 	    def.field_count != alter->old_space->def.field_count &&
-	    recovery->state != READY_NO_KEYS &&
+	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -526,7 +516,7 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "space does not support temporary flag");
 	}
 	if (def.temporary != alter->old_space->def.temporary &&
-	    recovery->state != READY_NO_KEYS &&
+	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  space_name(alter->old_space),
@@ -592,15 +582,15 @@ DropIndex::alter(struct alter_space *alter)
 			  space_name(alter->new_space));
 	}
 	/*
-	 * OK to drop the primary key. Put the space back to
-	 * 'READY_NO_KEYS' state, so that:
+	 * OK to drop the primary key. Inform the engine about it,
+	 * since it may have to reset handler->replace function,
+	 * so that:
 	 * - DML returns proper errors rather than crashes the
-	 *   server (thanks to engine_no_keys.replace),
-	 * - When a new primary key is finally added, the space
-	 *   can be put back online properly with
-	 *   engine_no_keys.recover.
+	 *   server
+	 * - when a new primary key is finally added, the space
+	 *   can be put back online properly.
 	 */
-	alter->new_space->handler->initRecovery();
+	alter->new_space->handler->engine->dropPrimaryKey(alter->new_space);
 }
 
 void
@@ -779,20 +769,14 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
  * anyway, so there is no need to fully populate index with data,
  * it is done at the end of recovery.
  *
- * Note, that system  spaces are exception to this, since
+ * Note, that system spaces are exception to this, since
  * they are fully enabled at all times.
  */
 void
 AddIndex::alter(struct alter_space *alter)
 {
-	/*
-	 * READY_NO_KEYS is when a space has no functional keys.
-	 * Possible both during and after recovery.
-	 */
-	engine_recovery *recovery =
-		&alter->new_space->handler->recovery;
-
-	if (recovery->state == READY_NO_KEYS) {
+	Engine *engine = alter->new_space->handler->engine;
+	if (space_index(alter->old_space, 0) == NULL) {
 		if (new_key_def->iid == 0) {
 			/*
 			 * Adding a primary key: bring the space
@@ -804,46 +788,27 @@ AddIndex::alter(struct alter_space *alter)
 			 * key. After recovery, it means building
 			 * all keys.
 			 */
-			recovery->recover(alter->new_space);
+			engine->addPrimaryKey(alter->new_space);
 		} else {
 			/*
-			 * Adding a secondary key: nothing to do.
-			 * Before the end of recovery, nothing to do
-			 * because secondary keys are built in bulk later.
-			 * During normal operation, nothing to do
-			 * because without a primary key there is
-			 * no data in the space, and secondary
-			 * keys are built once the primary is
-			 * added.
-			 * TODO Consider prohibiting this branch
-			 * altogether.
+			 * Adding a secondary key.
 			 */
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(alter->new_space),
+				  "can not add a secondary key before primary");
 		}
 		return;
 	}
+	/**
+	 * If it's a secondary key, and we're not building them
+	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
+	 */
+	if (new_key_def->iid != 0 && !engine->needToBuildSecondaryKey(alter->new_space))
+		return;
+
 	Index *pk = index_find(alter->old_space, 0);
 	Index *new_index = index_find(alter->new_space, new_key_def->iid);
 
-	/* READY_PRIMARY_KEY is a state that only occurs during WAL recovery. */
-	if (recovery->state == READY_PRIMARY_KEY) {
-		if (new_key_def->iid == 0) {
-			/*
-			 * Bulk rebuild of the new primary key
-			 * from old primary key - it is safe to do
-			 * in bulk and without tuple-by-tuple
-			 * verification, since all tuples have
-			 * been verified when inserted, before
-			 * shutdown.
-			 */
-			index_build(new_index, pk);
-		} else {
-			/*
-			 * No need to build a secondary key during
-			 * WAL recovery.
-			 */
-		}
-		return;
-	}
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);

@@ -32,6 +32,7 @@
 
 struct space;
 struct tuple;
+class Relay;
 
 enum engine_flags {
 	ENGINE_NO_YIELD = 1,
@@ -53,45 +54,9 @@ enum engine_flags {
 extern uint32_t engine_flags[BOX_ENGINE_MAX];
 extern struct rlist engines;
 
-/** Reflects what space_replace() is supposed to do. */
-enum engine_recovery_state {
-	/**
-	 * The space is created, but has no data
-	 * and no primary key, or, if there is a primary
-	 * key, it's not ready for use (being built with
-	 * buildNext()).
-	 * Replace is always an error, since there are no
-	 * indexes to add data to.
-	 */
-	READY_NO_KEYS,
-	/**
-	 * The space has a functional primary key.
-	 * Replace adds the tuple to this key.
-	 */
-	READY_PRIMARY_KEY,
-	/**
-	 * The space is fully functional, all keys
-	 * are fully built, replace adds its tuple
-	 * to all keys.
-	 */
-	READY_ALL_KEYS
-};
-
-typedef void (*engine_recover_f)(struct space*);
-
 typedef struct tuple *
 (*engine_replace_f)(struct space *, struct tuple *, struct tuple *,
                     enum dup_replace_mode);
-
-struct engine_recovery {
-	enum engine_recovery_state state;
-	/* Recover is called after each recover step to enable
-	 * keys. When recovery is complete, it enables all keys
-	 * at once and resets itself to a no-op.
-	 */
-	engine_recover_f recover;
-	engine_replace_f replace;
-};
 
 struct Handler;
 
@@ -104,6 +69,7 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *open() = 0;
+	virtual void initSystemSpace(struct space *space);
 	/**
 	 * Check a key definition for violation of
 	 * various limits.
@@ -115,9 +81,30 @@ public:
 	 */
 	virtual Index *createIndex(struct key_def*) = 0;
 	/**
+	 * Called by alter when a primary key added,
+	 * after createIndex is invoked for the new
+	 * key.
+	 */
+	virtual void addPrimaryKey(struct space *space);
+	/**
 	 * Delete all tuples in the index on drop.
 	 */
-	virtual void dropIndex(Index*) = 0;
+	virtual void dropIndex(Index *) = 0;
+	/**
+	 * Called by alter when the primary key is dropped.
+	 * Do whatever is necessary with space/handler object,
+	 * e.g. disable handler replace function, if
+	 * necessary.
+	 */
+	virtual void dropPrimaryKey(struct space *space);
+	/**
+	 * An optimization for MemTX engine, which
+	 * builds all secondary keys after recovery from
+	 * a snapshot.
+	 */
+	virtual bool needToBuildSecondaryKey(struct space *space);
+
+	virtual void join(Relay *) = 0;
 	/**
 	 * Engine specific transaction life-cycle routines.
 	 */
@@ -133,6 +120,10 @@ public:
 	 * state change (end of recovery from the binary log).
 	 */
 	virtual void end_recovery() = 0;
+	/**
+	 * Notify engine about a JOIN start (slave-side)
+	 */
+	virtual void beginJoin() = 0;
 	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
@@ -159,7 +150,6 @@ public:
 	uint32_t id;
 	/** Engine flags */
 	uint32_t flags;
-	struct engine_recovery recovery;
 	/** Used for search for engine by name. */
 	struct rlist link;
 };
@@ -171,23 +161,8 @@ public:
 	Handler(Engine *f);
 	virtual ~Handler() {}
 
-	inline struct tuple *
-	replace(struct space *space,
-	        struct tuple *old_tuple,
-	        struct tuple *new_tuple, enum dup_replace_mode mode)
-	{
-		return recovery.replace(space, old_tuple, new_tuple, mode);
-	}
+	engine_replace_f replace;
 
-	inline void recover(struct space *space) {
-		recovery.recover(space);
-	}
-
-	inline void initRecovery() {
-		recovery = engine->recovery;
-	}
-
-	engine_recovery recovery;
 	Engine *engine;
 };
 
@@ -235,6 +210,12 @@ void
 engine_begin_recover_snapshot(int64_t snapshot_lsn);
 
 /**
+ * Called at the start of JOIN routine.
+ */
+void
+engine_begin_join();
+
+/**
  * Called at the end of recovery from snapshot.
  * Build primary keys in all spaces.
  * */
@@ -253,5 +234,11 @@ engine_end_recovery();
  */
 int
 engine_checkpoint(int64_t checkpoint_id);
+
+/**
+ * Send a snapshot.
+ */
+void
+engine_join(Relay *);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */
