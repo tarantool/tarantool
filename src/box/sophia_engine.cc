@@ -93,29 +93,6 @@ SophiaSpace::SophiaSpace(Engine *e)
 	:Handler(e)
 { }
 
-static void
-sophia_recovery_end(struct space *space)
-{
-	engine_recovery *r = &space->handler->recovery;
-	r->state = READY_ALL_KEYS;
-	r->recover = space_noop;
-}
-
-static void
-sophia_recovery_end_snapshot(struct space *space)
-{
-	engine_recovery *r = &space->handler->recovery;
-	r->state = READY_PRIMARY_KEY;
-	r->recover = sophia_recovery_end;
-}
-
-static void
-sophia_recovery_begin_snapshot(struct space *space)
-{
-	engine_recovery *r = &space->handler->recovery;
-	r->recover = sophia_recovery_end_snapshot;
-}
-
 SophiaEngine::SophiaEngine()
 	:Engine("sophia")
 	 ,m_prev_checkpoint_lsn(-1)
@@ -125,7 +102,7 @@ SophiaEngine::SophiaEngine()
 	flags = 0;
 	env = NULL;
 	recovery.state   = READY_NO_KEYS;
-	recovery.recover = sophia_recovery_begin_snapshot;
+	recovery.recover = space_noop;
 	recovery.replace = sophia_replace;
 }
 
@@ -170,7 +147,6 @@ SophiaEngine::end_recover_snapshot()
 		m_prev_checkpoint_lsn = m_checkpoint_lsn;
 		m_checkpoint_lsn = -1;
 	}
-	recovery.recover = sophia_recovery_end_snapshot;
 }
 
 static inline void
@@ -264,8 +240,6 @@ SophiaEngine::end_recovery()
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_raise(env);
-	recovery.state    = READY_NO_KEYS;
-	recovery.recover  = space_noop;
 	recovery_complete = 1;
 }
 
