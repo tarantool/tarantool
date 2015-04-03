@@ -24,7 +24,7 @@ Number of connections
 
 Space size
     The total maximum size for all spaces is in effect set by
-    :ref:`slab_alloc_arena <slab_alloc_arena>`, which in turn
+    :confval:`slab_alloc_arena`, which in turn
     is limited by the total available memory.
 
 Update operations count

@@ -30,6 +30,7 @@ exclude_patterns = [
     'book/connectors/__*',
     'book/replication/*-1.rst',
     'book/replication/*-2.rst',
+    'book/configuration/cfg-*'
 ]
 
 pygments_style = 'sphinx'

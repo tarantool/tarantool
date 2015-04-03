@@ -30,7 +30,7 @@ a client for a remote server.
 This section shows all legal syntax for the tarantool program, with short notes
 and examples. Other client programs may have similar options and request
 syntaxes. Some of the information in this section is duplicated in the
-:doc:`/book/configuration` chapter.
+:ref:`book-cfg` chapter.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Conventions used in this section

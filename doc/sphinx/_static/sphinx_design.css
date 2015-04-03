@@ -121,10 +121,10 @@ a.headerlink {
     margin: 5px;
     font-size: 16px;
 }
-.b-documentation_top.p-documentation_in .b-section-title {
+.p-documentation_in .b-section-title {
     margin:0 0 17px 0;
 }
-.b-documentation_top.p-documentation_in .b-block-wrapper {
+.p-documentation_in .b-block-wrapper {
     padding: 20px 0 21px 0;
 }
 
@@ -198,6 +198,7 @@ a.headerlink {
 
 .b-page_header {
     margin-bottom: 10px;
+    padding-top: 4px;
 }
 
 .headerlink {
@@ -235,7 +236,7 @@ tr.field td p {
     position:relative;
     float:left;
     width:295px;
-    padding:30px 0 0 0;
+    padding:15px 0 0 0;
 }
 .b-cols_content_right {
     float:right;
@@ -345,4 +346,25 @@ ul.search {
 
 ul.search li div.context {
     margin-top: 5px;
+}
+
+div.b-cols_content_left #searchbox {
+    width: 267px;
+}
+
+div.b-cols_content_left .b-search-text {
+    width: 240px;
+}
+
+.b-documentation_top .b-section-title {
+    float: left;
+}
+
+.b-documentation_top .b-search {
+    float: right;
+}
+
+.b-cols_content>.pin-wrapper {
+    float: left;
+    position: relative;
 }

@@ -2,7 +2,8 @@
 {% import "breadcrumbs" as breadcrumbs with context %}
 {% import "navbar" as navbar with context %}
 
-{% set script_files = ['_static/headers.js'] + script_files %}
+{% set page = {"slug": "documentation"} %}
+{% set script_files = script_files + ['_static/jquery.pin.min.js', '_static/headers.js'] %}
 {% set css_files = ['_static/sphinx_design.css', '//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'] + css_files %}
 
 {% set render_sidebar = true %}
@@ -18,21 +19,18 @@
   {% endif %}
     <div class="b-block-wrapper">
       <h2 class="b-section-title">{{ title }}</h2>
-      {%- if builder != "singlehtml" %}
-      <form id="searchbox" role="search" class="search b-search" action="{{ pathto('search') }}" method="get">
-        <input class="b-search-text" name="q" type="text"/>
-        <input class="b-search-but" type="submit" />
-        <input type="hidden" name="check_keywords" value="yes" />
-        <input type="hidden" name="area" value="default" />
-      </div>
-      {%- endif %}
+      {% if title == 'Documentation' %}
+      {%   include "searchbox.html" %}
+      {% endif %}
     </div>
   </section>
   {%- if render_sidebar %}
   <div class="b-cols_content b-clearbox">
     <div class="b-cols_content_left">
+      {% if title != 'Documentation' %}
+      {%   include "searchbox.html" %}
+      {% endif %}
       {{ toctree(maxdepth=2) }}
-      {% block sidebar %} {% endblock %}
     </div>
     <div class="b-cols_content_right">
       <div class="b-cols_content_right-slot">

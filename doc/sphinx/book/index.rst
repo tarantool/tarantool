@@ -10,7 +10,7 @@
     intro
     box/index
     replication/index
-    configuration
+    configuration/index
     administration
     connectors/index
     app_a_errcodes

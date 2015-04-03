@@ -1,6 +1,6 @@
-{% import "menu" as menu %}
+{% import "menu" as menu with context %}
 
-{% set script_files = ['https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js'] + script_files %}
+{% set script_files = script_files %}
 {% set css_files = ['/theme/design.css', '/theme/pygmentize.css'] + css_files %}
 
 <!doctype html>
@@ -42,7 +42,7 @@
       <header class="b-header">
         <div class="b-header-wrapper">
           <nav class="b-header_menu">
-            {{ menu.i_menu({slug:'documentation'}) }}
+            {{ menu.i_menu(page) }}
           </nav>
         </div>
       </header>
@@ -57,7 +57,7 @@
     <footer class="b-footer">
       <div class="b-footer-wrapper">
         <nav class="b-footer_menu">
-          {{ menu.i_menu({slug:'documentation'}) }}
+          {{ menu.i_menu(page) }}
           <div class="b-footer-other">
             <a href="http://stable.tarantool.org">1.5 web site and downloads</a>
           </div>

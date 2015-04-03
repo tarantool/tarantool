@@ -1,4 +1,3 @@
-
 {# Modify i_links to add records to site #}
 {% set i_links = [
   ("Overview", "http://tarantool.org"),

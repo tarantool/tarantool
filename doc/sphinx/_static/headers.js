@@ -23,7 +23,7 @@ $(document).ready(function () {
       $(el).html(icon + $(el).html());
     }
   );
-
+  $(".b-cols_content_left").pin({containerSelector: ".b-cols_content"});
 });
 
 // vim: syntax=javascript ts=2 sts=2 sw=2 expandtab

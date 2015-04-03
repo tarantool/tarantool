@@ -882,7 +882,10 @@ input.b-button.p-smaller {
         transform:rotate(360deg);
     }
 }
-.b-documentation_top .b-block-wrapper,
+.b-documentation_top .b-block-wrapper {
+    padding:20px 0 21px 0;
+}
+
 .b-benchmark_top .b-block-wrapper {
 /*    padding:20px 0 21px 0;*/
     padding:35px 0 35px 0;
@@ -915,8 +918,7 @@ input.b-button.p-smaller {
     padding-left:19px;
 }
 .b-documentation_top .b-section-title {
-/*    margin:0 0 17px 0;*/
-    margin:0;
+    margin:0 0 17px 0;
 }
 .b-tcontents-list,
 .b-tcontents-sublist {

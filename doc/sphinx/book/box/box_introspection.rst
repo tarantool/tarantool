@@ -10,7 +10,7 @@
 
 The ``box.cfg`` package is for administrators to specify all the server
 configuration parameters; the full description of the parameters is in
-section :ref:`box-configuration`. Use ``box.cfg`` without braces to get read-only
+section :ref:`book-cfg`. Use ``box.cfg`` without braces to get read-only
 access to those parameters.
 
 .. data:: box.cfg
@@ -134,8 +134,8 @@ so bytes_used = 1024); there is 1 item stored in the 136-byte slab
 (and 136*1=136 so bytes_used = 136); the arena_used value is the total of all
 the bytes_used values (1024+136 = 1160); the arena_size value is the arena_used
 value plus the total of all the bytes_free values (1160+4193200+4194088 = 8388448).
-The arena_size and arena_used values are the amount of the % of slab_alloc_arena
-that is already distributed to the slab allocator.
+The arena_size and arena_used values are the amount of the % of
+:confval:`slab_alloc_arena` that is already distributed to the slab allocator.
 
 .. data:: slab
 

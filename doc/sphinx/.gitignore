@@ -1,2 +1,4 @@
 !.gitignore
 *.pyc
+_html_build
+_single_build

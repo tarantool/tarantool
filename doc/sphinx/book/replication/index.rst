@@ -47,12 +47,12 @@ has its own replication state.
 
 A server requires a valid snapshot (.snap) file. A snapshot file is created
 for a server the first time that ``box.cfg`` occurs for it. If this first
-``box.cfg`` request occurs without a "replication_source" clause, then the
+``box.cfg`` request occurs without a ":confval:`replication_source`" clause, then the
 server is a master and starts its own new cluster with a new unique UUID.
-If this first ``box.cfg`` request occurs with a "replication_source" clause,
+If this first ``box.cfg`` request occurs with a ":confval:`replication_source`" clause,
 then the server is a replica and its snapshot file, along with the cluster
 information, is constructed from the write-ahead logs of the master.
-Therefore, to start replication, specify :ref:`replication_source <replication_source>`
+Therefore, to start replication, specify :confval:`replication_source`
 in a ``box.cfg`` request. When a replica contacts a master for the first time,
 it becomes part of a cluster. On subsequent occasions, it should always contact
 a master in the same cluster.
@@ -73,8 +73,8 @@ Again, this procedure works only if the master's WAL files are present.
 .. NOTE::
 
     The replica does not inherit the master's configuration parameters, such
-    as the ones that cause the :ref:`snapshot daemon` to run on the master. To get
-    the same behavior, one would have to set the relevant parameters explicitly
+    as the ones that cause the :ref:`book-cfg-snapshot_daemon` to run on the master.
+    To get the same behavior, one would have to set the relevant parameters explicitly
     so that they are the same on both master and replica.
 
 =====================================================================
@@ -110,8 +110,7 @@ Step 1. Start the first server thus:
 ... Now a new cluster exists.
 
 Step 2. Check where the second server's files will go by looking at its
-directories (:ref:`snap_dir <snap_dir>` for snapshot files,
-:ref:`wal_dir <wal_dir>` for .xlog files).
+directories (:confval:`snap_dir` for snapshot files, :confval:`wal_dir` for .xlog files).
 They must be empty - when the second server joins for the first time, it
 has to be working with a clean slate so that the initial copy of the first
 server's databases can happen without conflicts.
@@ -161,7 +160,7 @@ servers will end up with different contents.
 =====================================================================
 
 :Q: What if there are more than two servers with master-master?
-:A: On each server, specify the replication_source for all the others. For
+:A: On each server, specify the :confval:`replication_source` for all the others. For
     example, server #3 would have a request:
     ``box.cfg{replication_source=uri#1, replication_source=uri#2}``.
 
@@ -199,7 +198,7 @@ servers will end up with different contents.
 :Q: What if replication causes security concerns?
 :A: Prevent unauthorized replication sources by associating a password with
     every user that has access privileges for the relevant spaces. That way,
-    the :ref:`URI` for the replication_source parameter will always have to have
+    the :ref:`URI` for the :confval:`replication_source` parameter will always have to have
     the long form ``replication_source='username:password@host:port'``.
 
 .. _vector clock: https://en.wikipedia.org/wiki/Vector_clock
