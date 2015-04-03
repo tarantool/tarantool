@@ -91,7 +91,9 @@ struct SophiaSpace: public Handler {
 
 SophiaSpace::SophiaSpace(Engine *e)
 	:Handler(e)
-{ }
+{
+	replace = sophia_replace;
+}
 
 SophiaEngine::SophiaEngine()
 	:Engine("sophia")
@@ -101,9 +103,6 @@ SophiaEngine::SophiaEngine()
 {
 	flags = 0;
 	env = NULL;
-	recovery.state   = READY_NO_KEYS;
-	recovery.recover = space_noop;
-	recovery.replace = sophia_replace;
 }
 
 void

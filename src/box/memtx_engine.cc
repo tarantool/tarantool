@@ -57,26 +57,14 @@ static struct slab_arena memtx_index_arena;
 static struct slab_cache memtx_index_arena_slab_cache;
 static struct mempool memtx_index_extent_pool;
 
-
-struct MemtxSpace: public Handler {
-	MemtxSpace(Engine *e)
-		: Handler(e)
-	{ }
-	virtual ~MemtxSpace()
-	{
-		/* do nothing */
-		/* engine->close(this); */
-	}
-};
-
 /**
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
  */
 struct tuple *
-space_replace_no_keys(struct space *space, struct tuple * /* old_tuple */,
-                        struct tuple * /* new_tuple */,
-                        enum dup_replace_mode /* mode */)
+memtx_replace_no_keys(struct space *space, struct tuple * /* old_tuple */,
+		      struct tuple * /* new_tuple */,
+		      enum dup_replace_mode /* mode */)
 {
        Index *index = index_find(space, 0);
        assert(index == NULL); /* not reached. */
@@ -84,12 +72,26 @@ space_replace_no_keys(struct space *space, struct tuple * /* old_tuple */,
        return NULL; /* replace found no old tuple */
 }
 
+struct MemtxSpace: public Handler {
+	MemtxSpace(Engine *e)
+		: Handler(e)
+	{
+		replace = memtx_replace_no_keys;
+	}
+	virtual ~MemtxSpace()
+	{
+		/* do nothing */
+		/* engine->close(this); */
+	}
+};
+
+
 /**
  * A short-cut version of space_replace() used during bulk load
  * from snapshot.
  */
 struct tuple *
-space_replace_build_next(struct space *space, struct tuple *old_tuple,
+memtx_replace_build_next(struct space *space, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	assert(old_tuple == NULL && mode == DUP_INSERT);
@@ -113,14 +115,14 @@ space_replace_build_next(struct space *space, struct tuple *old_tuple,
  * data from XLOG files.
  */
 struct tuple *
-space_replace_primary_key(struct space *space, struct tuple *old_tuple,
+memtx_replace_primary_key(struct space *space, struct tuple *old_tuple,
 			  struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	return space->index[0]->replace(old_tuple, new_tuple, mode);
 }
 
 static struct tuple *
-space_replace_all_keys(struct space *space, struct tuple *old_tuple,
+memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	uint32_t i = 0;
@@ -155,6 +157,17 @@ space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	return NULL;
 }
 
+static void
+memtx_end_build_primary_key(struct space *space, void *param)
+{
+	if (space->handler->engine != param || space_index(space, 0) == NULL ||
+	    space->handler->replace == memtx_replace_all_keys)
+		return;
+
+	space->index[0]->endBuild();
+	space->handler->replace = memtx_replace_primary_key;
+}
+
 /**
  * Secondary indexes are built in bulk after all data is
  * recovered. This function enables secondary keys on a space.
@@ -162,8 +175,12 @@ space_replace_all_keys(struct space *space, struct tuple *old_tuple,
  * built right from the start.
  */
 void
-space_build_secondary_keys(struct space *space)
+memtx_build_secondary_keys(struct space *space, void *param)
 {
+	if (space->handler->engine != param || space_index(space, 0) == NULL ||
+	    space->handler->replace == memtx_replace_all_keys)
+		return;
+
 	if (space->index_id_max > 0) {
 		Index *pk = space->index[0];
 		uint32_t n_tuples = pk->size();
@@ -180,113 +197,93 @@ space_build_secondary_keys(struct space *space)
 			say_info("Space '%s': done", space_name(space));
 		}
 	}
-	engine_recovery *r = &space->handler->recovery;
-	r->state   = READY_ALL_KEYS;
-	r->recover = space_noop; /* mark the end of recover */
-	r->replace = space_replace_all_keys;
-}
-
-/** Build the primary key after loading data from a snapshot. */
-void
-space_end_build_primary_key(struct space *space)
-{
-	space->index[0]->endBuild();
-	engine_recovery *r = &space->handler->recovery;
-	r->state   = READY_PRIMARY_KEY;
-	r->replace = space_replace_primary_key;
-	r->recover = space_build_secondary_keys;
-}
-
-/** Prepare the primary key for bulk load (loading from
- * a snapshot).
- */
-void
-space_begin_build_primary_key(struct space *space)
-{
-	space->index[0]->beginBuild();
-	engine_recovery *r = &space->handler->recovery;
-	r->replace = space_replace_build_next;
-	r->recover = space_end_build_primary_key;
-}
-
-/**
- * Bring a space up to speed if its primary key is added during
- * XLOG recovery. This is a recovery function called on
- * spaces which had no primary key at the end of snapshot
- * recovery, and got one only when reading an XLOG.
- */
-void
-space_build_primary_key(struct space *space)
-{
-	space_begin_build_primary_key(space);
-	space_end_build_primary_key(space);
-}
-
-/** Bring a space up to speed once it's got a primary key.
- *
- * This is a recovery function used for all spaces added after the
- * end of SNAP/XLOG recovery.
- */
-void
-space_build_all_keys(struct space *space)
-{
-	space_build_primary_key(space);
-	space_build_secondary_keys(space);
-}
-
-/**
- * This is a vtab with which a newly created space which has no
- * keys is primed.
- * At first it is set to correctly work for spaces created during
- * recovery from snapshot. In process of recovery it is updated as
- * below:
- *
- * 1) after SNAP is loaded:
- *    recover = space_build_primary_key
- * 2) when all XLOGs are loaded:
- *    recover = space_build_all_keys
-*/
-
-static inline void
-memtx_recovery_prepare(struct engine_recovery *r)
-{
-	r->state   = READY_NO_KEYS;
-	r->recover = space_begin_build_primary_key;
-	r->replace = space_replace_no_keys;
+	space->handler->replace = memtx_replace_all_keys;
 }
 
 MemtxEngine::MemtxEngine()
 	:Engine("memtx"),
 	m_snapshot_lsn(-1),
-	m_snapshot_pid(0)
+	m_snapshot_pid(0),
+	m_state(MEMTX_INITIALIZED)
 {
 	flags = ENGINE_NO_YIELD |
 	        ENGINE_CAN_BE_TEMPORARY |
 		ENGINE_AUTO_CHECK_UPDATE;
-	memtx_recovery_prepare(&recovery);
+}
+
+/** Called at start to tell memtx to recover to a given LSN. */
+void
+MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)
+{
+	m_state = MEMTX_READING_SNAPSHOT;
 }
 
 void
 MemtxEngine::end_recover_snapshot()
 {
-	recovery.recover = space_build_primary_key;
+	m_state = MEMTX_READING_WAL;
+	space_foreach(memtx_end_build_primary_key, this);
 }
 
 void
 MemtxEngine::end_recovery()
 {
-	recovery.recover = space_build_all_keys;
-}
-
-void
-MemtxEngine::join(Relay *relay)
-{
-	recover_snap(relay->r);
+	m_state = MEMTX_OK;
+	space_foreach(memtx_build_secondary_keys, this);
 }
 
 Handler *MemtxEngine::open()
 {
 	return new MemtxSpace(this);
+}
+
+
+static void
+memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
+{
+	switch (state) {
+	case MEMTX_INITIALIZED:
+		panic("can't create space");
+		break;
+	case MEMTX_READING_SNAPSHOT:
+		space->index[0]->beginBuild();
+		space->handler->replace = memtx_replace_build_next;
+		break;
+	case MEMTX_READING_WAL:
+		space->index[0]->beginBuild();
+		space->index[0]->endBuild();
+		space->handler->replace = memtx_replace_primary_key;
+		break;
+	case MEMTX_OK:
+		space->index[0]->beginBuild();
+		space->index[0]->endBuild();
+		space->handler->replace = memtx_replace_all_keys;
+		break;
+	}
+}
+
+void
+MemtxEngine::addPrimaryKey(struct space *space)
+{
+	memtx_add_primary_key(space, m_state);
+}
+
+void
+MemtxEngine::dropPrimaryKey(struct space *space)
+{
+	space->handler->replace = memtx_replace_no_keys;
+}
+
+void
+MemtxEngine::initSystemSpace(struct space *space)
+{
+	memtx_add_primary_key(space, MEMTX_OK);
+}
+
+bool
+MemtxEngine::needToBuildSecondaryKey(struct space *space)
+{
+	return space->handler->replace == memtx_replace_all_keys;
 }
 
 Index *
@@ -407,16 +404,7 @@ MemtxEngine::rollback(struct txn *txn)
 void
 MemtxEngine::beginJoin()
 {
-}
-
-/** Called at start to tell memtx to recover to a given LSN. */
-void
-MemtxEngine::begin_recover_snapshot(int64_t /* lsn */)
-{
-	/*
-	 * memtx snapshotting supported directly by box.
-	 * do nothing here.
-	 */
+	m_state = MEMTX_OK;
 }
 
 static void
@@ -661,6 +649,12 @@ MemtxEngine::abort_checkpoint()
 		(void) coeio_unlink(filename);
 	}
 	m_snapshot_lsn = -1;
+}
+
+void
+MemtxEngine::join(Relay *relay)
+{
+	recover_snap(relay->r);
 }
 
 /**

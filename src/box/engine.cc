@@ -56,11 +56,29 @@ void Engine::commit(struct txn*)
 void Engine::rollback(struct txn*)
 {}
 
+void Engine::initSystemSpace(struct space * /* space */)
+{
+	panic("not implemented");
+}
+
+void
+Engine::addPrimaryKey(struct space * /* space */)
+{
+}
+
+void
+Engine::dropPrimaryKey(struct space * /* space */)
+{
+}
+
+bool Engine::needToBuildSecondaryKey(struct space * /* space */)
+{
+	return true;
+}
+
 Handler::Handler(Engine *f)
 	:engine(f)
 {
-	/* derive recovery state from engine */
-	initRecovery();
 }
 
 /** Register engine instance. */
@@ -112,19 +130,6 @@ engine_begin_join()
 	}
 }
 
-static void
-do_one_recover_step(struct space *space, void * /* param */)
-{
-	if (space_index(space, 0)) {
-		space->handler->recover(space);
-	} else {
-		/* in case of space has no primary index,
-		 * derive it's engine handler recovery state from
-		 * the global one. */
-		space->handler->initRecovery();
-	}
-}
-
 void
 engine_end_recover_snapshot()
 {
@@ -136,7 +141,6 @@ engine_end_recover_snapshot()
 	engine_foreach(engine) {
 		engine->end_recover_snapshot();
 	}
-	space_foreach(do_one_recover_step, NULL);
 }
 
 void
@@ -149,8 +153,6 @@ engine_end_recovery()
 	Engine *engine;
 	engine_foreach(engine)
 		engine->end_recovery();
-
-	space_foreach(do_one_recover_step, NULL);
 }
 
 int
