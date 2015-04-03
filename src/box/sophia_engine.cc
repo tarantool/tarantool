@@ -76,6 +76,15 @@ void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
 	sp_destroy(cur);
 }
 
+static struct tuple *
+sophia_replace(struct space *space, struct tuple *old_tuple,
+               struct tuple *new_tuple,
+               enum dup_replace_mode mode)
+{
+	Index *index = index_find(space, 0);
+	return index->replace(old_tuple, new_tuple, mode);
+}
+
 struct SophiaSpace: public Handler {
 	SophiaSpace(Engine*);
 };
@@ -88,8 +97,7 @@ static void
 sophia_recovery_end(struct space *space)
 {
 	engine_recovery *r = &space->handler->recovery;
-	r->state   = READY_ALL_KEYS;
-	r->replace = sophia_replace;
+	r->state = READY_ALL_KEYS;
 	r->recover = space_noop;
 }
 
@@ -97,7 +105,7 @@ static void
 sophia_recovery_end_snapshot(struct space *space)
 {
 	engine_recovery *r = &space->handler->recovery;
-	r->state   = READY_PRIMARY_KEY;
+	r->state = READY_PRIMARY_KEY;
 	r->recover = sophia_recovery_end;
 }
 
@@ -118,7 +126,7 @@ SophiaEngine::SophiaEngine()
 	env = NULL;
 	recovery.state   = READY_NO_KEYS;
 	recovery.recover = sophia_recovery_begin_snapshot;
-	recovery.replace = sophia_replace_recover;
+	recovery.replace = sophia_replace;
 }
 
 void
@@ -162,7 +170,6 @@ SophiaEngine::end_recover_snapshot()
 		m_prev_checkpoint_lsn = m_checkpoint_lsn;
 		m_checkpoint_lsn = -1;
 	}
-	recovery.replace = sophia_replace_recover;
 	recovery.recover = sophia_recovery_end_snapshot;
 }
 
@@ -253,9 +260,8 @@ SophiaEngine::end_recovery()
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_raise(env);
-	recovery.state   = READY_NO_KEYS;
-	recovery.replace = sophia_replace;
-	recovery.recover = space_noop;
+	recovery.state    = READY_NO_KEYS;
+	recovery.recover  = space_noop;
 	recovery_complete = 1;
 }
 
