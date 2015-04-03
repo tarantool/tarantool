@@ -35,14 +35,14 @@ blocks  :
     - "authentication and access control"
   news:
     -
+      - "Tarantool Meetup in Avito"
+      - "http://www.meetup.com/Tarantool/events/220924229/"
+      - "04.03"
+      - "2015"
+    -
       - "Tarantool 1.6.4 is released"
       - "https://groups.google.com/forum/#!topic/tarantool/F3qc_zemEYg"
       - "24.11"
-      - "2014"
-    -
-      - "Tarantool 1.5.3 is released"
-      - "https://groups.google.com/forum/#!topic/tarantool/ol0cECHea-Y"
-      - "01.08"
       - "2014"
     -
       - "Lua Workshop in Russia"
@@ -67,7 +67,7 @@ blocks  :
     format: rst
     content: |
       .. code-block:: lua
-          :linenos: inline
+          :linenos: none
 
           #!/usr/bin/env tarantool
 
