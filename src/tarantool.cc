@@ -75,7 +75,6 @@ int main_argc;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
-static bool start_loop = true;
 
 extern const void *opt_def;
 

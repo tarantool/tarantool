@@ -34,6 +34,7 @@
 struct lua_State;
 struct luaL_Reg;
 struct tbuf;
+extern bool start_loop;
 
 /**
  * This is a callback used by tarantool_lua_init() to open

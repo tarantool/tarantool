@@ -67,6 +67,7 @@ struct lua_State *tarantool_L;
  * The fiber running the startup Lua script
  */
 struct fiber *script_fiber;
+bool start_loop = true;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[],
@@ -427,6 +428,7 @@ run_script(va_list ap)
 		lua_getfield(L, -1, "start");
 		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
+		start_loop = false;
 	}
 	try {
 		lua_checkstack(L, argc - 1);
