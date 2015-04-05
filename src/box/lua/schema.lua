@@ -1004,12 +1004,16 @@ end
 
 box.schema.func = {}
 box.schema.func.create = function(name, opts)
+    opts = opts or {}
     local _func = box.space[box.schema.FUNC_ID]
     local func = _func.index.name:get{name}
     if func then
+        if not opts.if_not_exists then
             box.error(box.error.FUNCTION_EXISTS, name)
+        end
+        return
     end
-    check_param_table(opts, { setuid = 'boolean' })
+    check_param_table(opts, { setuid = 'boolean', if_not_exists = 'boolean' })
     opts = update_param_table(opts, { setuid = false })
     opts.setuid = opts.setuid and 1 or 0
     _func:auto_increment{session.uid(), name, opts.setuid}
@@ -1073,11 +1077,13 @@ end
 
 box.schema.user.create = function(name, opts)
     local uid = user_or_role_resolve(name)
+    opts = opts or {}
+    check_param_table(opts, { password = 'string', if_not_exists = 'boolean' })
     if uid then
-        box.error(box.error.USER_EXISTS, name)
-    end
-    if opts == nil then
-        opts = {}
+        if not opts.if_not_exists then
+            box.error(box.error.USER_EXISTS, name)
+        end
+        return
     end
     auth_mech_list = {}
     if opts.password then
@@ -1259,10 +1265,15 @@ box.schema.role.exists = function(name)
     end
 end
 
-box.schema.role.create = function(name)
+box.schema.role.create = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, { if_not_exists = 'boolean' })
     local uid = user_or_role_resolve(name)
     if uid then
-        box.error(box.error.ROLE_EXISTS, name)
+        if not opts.if_not_exists then
+            box.error(box.error.ROLE_EXISTS, name)
+        end
+        return
     end
     local _user = box.space[box.schema.USER_ID]
     _user:auto_increment{session.uid(), name, 'role'}

@@ -250,3 +250,6 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_ex
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
+box.schema.func.create('dummy', { if_not_exists = true })
+box.schema.func.create('dummy', { if_not_exists = true })
+box.schema.func.drop('dummy')
