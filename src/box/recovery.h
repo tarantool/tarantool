@@ -30,6 +30,7 @@
  */
 #include <stdbool.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
