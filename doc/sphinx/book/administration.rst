@@ -194,7 +194,7 @@ With ``tarantoolctl`` one can say: "start an instance of the Tarantool server
 which runs a single user-written Lua program, allocating disk resources
 specifically for that program, via a standardized deployment method."
 If Tarantool was downloaded from source, then the script is in
-:file:`~/extra/dist/tarantoolctl`. If Tarantool was installed with Debian or
+:file:`[tarantool]/extra/dist/tarantoolctl`. If Tarantool was installed with Debian or
 Red Hat installation packages, the script is renamed :program:`tarantoolctl`
 and is in :file:`/usr/bin/tarantoolctl`. The script handles such things as:
 starting, stopping, rotating logs, logging in to the application's console,
@@ -205,6 +205,7 @@ and checking status.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The :program:`tarantoolctl` script will read a configuration file named
+:file:`~/.config/tarantool/default`, or 
 :file:`/etc/sysconfig/tarantool`, or :file:`/etc/default/tarantool`. Most
 of the settings are similar to the settings used by ``box.cfg{...};``
 however, tarantoolctl adjusts some of them by adding an application name.
@@ -262,7 +263,7 @@ The settings in the above script are:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The command format is ``tarantoolctl operation application-name``, where
-operation is one of: start, stop, status, logrotate, enter. Thus ...
+operation is one of: start, stop, enter, logrotate, status, reload. Thus ...
 
 .. option:: start <app_name>
 
@@ -274,15 +275,19 @@ operation is one of: start, stop, status, logrotate, enter. Thus ...
 
 .. option:: enter <app_name>
 
-    show <app_name>'s admin console, if it has one
+    shows <app_name>'s admin console, if it has one
 
 .. option:: logrotate <app_name>
 
-    rotate <app_name>'s log files (make new, remove old)
+    rotates <app_name>'s log files (make new, remove old)
 
 .. option:: status <app_name>
 
-    check <app_name>'s status
+    checks <app_name>'s status
+
+.. option:: reload <file_name>
+
+   reloads <file_name>.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl
