@@ -66,7 +66,7 @@ All triggers have the following characteristics.
         If a trigger always results in an error, it may become impossible to
         connect to the server to reset it.
 
-.. function:: box.sessio.non_disconnect(trigger-function [, old-trigger-function])
+.. function:: box.session.on_disconnect(trigger-function [, old-trigger-function])
 
     Define a trigger for execution after a client has disconnected. If the trigger
     function causes an error, the error is logged but otherwise is ignored. The
