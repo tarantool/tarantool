@@ -649,3 +649,21 @@ box.schema.func.create('dummy', { if_not_exists = true })
 box.schema.func.drop('dummy')
 ---
 ...
+-- gh-664 roles: accepting bad syntax for create
+box.schema.user.create('user', 'blah')
+---
+- error: Illegal parameters, options should be a table
+...
+box.schema.user.drop('user', 'blah')
+---
+- error: Illegal parameters, options should be a table
+...
+-- gh-664 roles: accepting bad syntax for create
+box.schema.func.create('func', 'blah')
+---
+- error: Illegal parameters, options should be a table
+...
+box.schema.func.drop('blah', 'blah')
+---
+- error: Illegal parameters, options should be a table
+...

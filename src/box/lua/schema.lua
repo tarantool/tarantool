@@ -1005,6 +1005,7 @@ end
 box.schema.func = {}
 box.schema.func.create = function(name, opts)
     opts = opts or {}
+    check_param_table(opts, { setuid = 'boolean', if_not_exists = 'boolean' })
     local _func = box.space[box.schema.FUNC_ID]
     local func = _func.index.name:get{name}
     if func then
@@ -1013,16 +1014,32 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    check_param_table(opts, { setuid = 'boolean', if_not_exists = 'boolean' })
     opts = update_param_table(opts, { setuid = false })
     opts.setuid = opts.setuid and 1 or 0
     _func:auto_increment{session.uid(), name, opts.setuid}
 end
 
-box.schema.func.drop = function(name)
+box.schema.func.drop = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
     local _func = box.space[box.schema.FUNC_ID]
     local _priv = box.space[box.schema.PRIV_ID]
-    local fid = object_resolve('function', name)
+    local fid
+    local tuple
+    if type(name) == 'string' then
+        tuple = _func.index.name:get{name}
+    else
+        tuple = _func:get{name}
+    end
+    if tuple then
+        fid = tuple[1]
+    end
+    if fid == nil then
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_FUNCTION, name)
+        end
+        return
+    end
     local privs = _priv.index.object:select{'function', fid}
     for k, tuple in pairs(privs) do
         box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
@@ -1103,10 +1120,15 @@ box.schema.user.exists = function(name)
     end
 end
 
-box.schema.user.drop = function(name)
+box.schema.user.drop = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_or_role_resolve(name)
     if uid == nil then
-        box.error(box.error.NO_SUCH_USER, name)
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_USER, name)
+        end
+        return
     end
     -- recursive delete of user data
     local _priv = box.space[box.schema.PRIV_ID]
@@ -1279,10 +1301,15 @@ box.schema.role.create = function(name, opts)
     _user:auto_increment{session.uid(), name, 'role'}
 end
 
-box.schema.role.drop = function(name)
+box.schema.role.drop = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_or_role_resolve(name)
     if uid == nil then
-        box.error(box.error.NO_SUCH_ROLE, name)
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_ROLE, name)
+        end
+        return
     end
     return box.schema.user.drop(name)
 end
