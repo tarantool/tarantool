@@ -61,4 +61,4 @@
 
     Type: float |br|
     Default: 0.1 |br|
-    Dynamic: no |br|
+    Dynamic: **yes** |br|
