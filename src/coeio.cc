@@ -151,19 +151,19 @@ static int
 coeio_on_complete(eio_req *req)
 {
 	/*
-	 * Don't touch the task if the request is cancelled:
-	 * the task is allocated on the caller's stack and
-	 * may be already gone. Don't wakeup the caller
-	 * if the task is cancelled: in this case the caller
-	 * is already woken up, avoid double wake-up.
+	 * If the request is cancelled, libeio doesn't
+	 * invoke finish callback. Indeed, it can't do
+	 * anything since its execution context has
+	 * already been gone.
 	 */
-	if (! EIO_CANCELLED(req)) {
-		struct coeio_task *task = (struct coeio_task *) req->data;
-		task->result = req->result;
-		task->errorno = req->errorno;
-		task->complete = 1;
-		fiber_wakeup(task->fiber);
-	}
+	assert(!EIO_CANCELLED(req));
+
+	struct coeio_task *task = (struct coeio_task *) req->data;
+	task->result = req->result;
+	task->errorno = req->errorno;
+	task->complete = 1;
+	fiber_wakeup(task->fiber);
+
 	return 0;
 }
 
