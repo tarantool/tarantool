@@ -4,7 +4,9 @@ import sys
 admin("box.schema.user.create('test', { password = 'test' })")
 admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
 sql.authenticate('test', 'test')
-admin("function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end")
+# workaround for gh-770 centos 6 float representation
+admin('exp_notation = 1e123')
+admin("function f1() return 'testing', 1, false, -1, 1.123, math.abs(exp_notation - 1e123) < 0.1, nil end")
 admin("f1()")
 sql("call f1()")
 admin("f1=nil")

@@ -4,7 +4,10 @@ box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 ---
 ...
-function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end
+exp_notation = 1e123
+---
+...
+function f1() return 'testing', 1, false, -1, 1.123, math.abs(exp_notation - 1e123) < 0.1, nil end
 ---
 ...
 f1()
@@ -14,7 +17,7 @@ f1()
 - false
 - -1
 - 1.123
-- 1e+123
+- true
 - null
 ...
 call f1()
@@ -24,7 +27,7 @@ call f1()
 - [False]
 - [-1]
 - [1.123]
-- [1e+123]
+- [True]
 - [None]
 ...
 f1=nil
