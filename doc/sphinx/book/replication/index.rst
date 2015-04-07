@@ -95,7 +95,7 @@ the old master went down, they would have to be re-applied manually.
 
 
 =====================================================================
-  Instructions for quick startup of a new two-server simple cluster
+        Quick startup of a new two-server simple cluster
 =====================================================================
 
 Step 1. Start the first server thus:
@@ -342,7 +342,7 @@ Now the screen looks like this: (except that UUID values are always different):
                 }, '#catalog-2 .b-tab_switcher-item');
                 dOn.ready(function(event) {
                     maxHeight = Math.max($('#terminal-2-1').height(), $('#terminal-2-2').height());
-                    $('#catalog-2-content').height(maxHeight);
+                    $('#catalog-2-content').height(maxHeight + 10);
                     $('#terminal-2-1').height(maxHeight);
                     $('#terminal-2-2').height(maxHeight);
                     $('#terminal-2-1').show();
