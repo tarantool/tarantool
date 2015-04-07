@@ -261,3 +261,5 @@ box.schema.user.drop('user', 'blah')
 -- gh-664 roles: accepting bad syntax for create
 box.schema.func.create('func', 'blah')
 box.schema.func.drop('blah', 'blah')
+-- gh-758 attempt to set password for user guest
+box.schema.user.passwd('guest', 'sesame')

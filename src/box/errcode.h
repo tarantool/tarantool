@@ -147,6 +147,7 @@ struct errcode_record {
 	/* 93 */_(ER_MISSING_SNAPSHOT,		2, "Can't find snapshot") \
 	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	2, "Attempt to modify a tuple field which is part of index %s") \
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   2, "Integer overflow when performing '%c' operation on field %u") \
+	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
