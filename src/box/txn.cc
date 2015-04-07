@@ -89,7 +89,8 @@ txn_replace(struct txn *txn, struct space *space,
 	}
 	stmt->space = space;
 
-	/* Memtx doesn't allow yields between statements of
+	/*
+	 * Memtx doesn't allow yields between statements of
 	 * a transaction. Set a trigger which would roll
 	 * back the transaction if there is a yield.
 	 */
@@ -103,7 +104,6 @@ txn_replace(struct txn *txn, struct space *space,
 			}
 		}
 	}
-
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -184,21 +184,12 @@ txn_begin_stmt(struct request *request, struct space *space)
 }
 
 void
-txn_commit_stmt(struct txn *txn, struct port *port)
+txn_commit_stmt(struct txn *txn)
 {
-	struct txn_stmt *stmt;
-	struct tuple *tuple;
-	stmt = txn_stmt(txn);
-	if (txn->autocommit)
+	if (txn->autocommit) {
 		txn_commit(txn);
-	/* Adding result to port must be after possible WAL write.
-	 * The reason is that any yield between port_add_tuple and port_eof
-	 * calls could lead to sending not finished response to iproto socket.
-	 */
-	if ((tuple = stmt->new_tuple) || (tuple = stmt->old_tuple))
-		port_add_tuple(port, tuple);
-	if (txn->autocommit)
-		txn_finish(txn);
+		txn_finish(txn, true);
+	}
 }
 
 void
@@ -207,15 +198,6 @@ txn_commit(struct txn *txn)
 	assert(txn == in_txn());
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-
-	/* xxx: temporary workaround to handle transaction
-	 *      conflicts with sophia.
-	 */
-	if (txn->engine) {
-		txn->engine->commit(txn);
-		txn->engine_tx = NULL;
-	}
-
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
 
@@ -237,21 +219,19 @@ txn_commit(struct txn *txn)
 			tnt_raise(LoggedError, ER_WAL_IO);
 		txn->signature = res;
 	}
-	/*
+
+	/* xxx: engine commit may throw on conflict or error */
 	if (txn->engine)
 		txn->engine->commit(txn);
-	*/
+
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
 
 void
-txn_finish(struct txn *txn)
+txn_finish(struct txn *txn, bool commit)
 {
-	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->old_tuple)
-			tuple_unref(stmt->old_tuple);
-	}
+	if (txn->engine)
+		txn->engine->finish(txn, commit);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -273,16 +253,9 @@ txn_rollback_stmt()
 	if (txn->autocommit)
 		return txn_rollback();
 	struct txn_stmt *stmt = txn_stmt(txn);
-	if (stmt->old_tuple || stmt->new_tuple) {
-		if (! space_is_sophia(stmt->space)) {
-			space_replace(stmt->space,
-			              stmt->new_tuple,
-			              stmt->old_tuple, DUP_INSERT);
-		}
-		if (stmt->new_tuple)
-			tuple_unref(stmt->new_tuple);
-	}
-	stmt->old_tuple = stmt->new_tuple = NULL;
+	txn->engine->rollbackStmt(stmt);
+	stmt->old_tuple = NULL;
+	stmt->new_tuple = NULL;
 	stmt->space = NULL;
 	stmt->row = NULL;
 }
@@ -296,18 +269,10 @@ txn_rollback()
 	if (txn->engine)
 		txn->engine->rollback(txn);
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
-	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->new_tuple)
-			tuple_unref(stmt->new_tuple);
-	}
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);
 		trigger_clear(&txn->fiber_on_stop);
-	TRASH(txn);
-	/** Free volatile txn memory. */
-	fiber_gc();
-	fiber_set_txn(fiber(), NULL);
+	txn_finish(txn, false);
 }
 
 void

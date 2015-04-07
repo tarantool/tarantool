@@ -97,7 +97,7 @@ txn_begin_stmt(struct request *request, struct space *space);
  * the current transaction as well.
  */
 void
-txn_commit_stmt(struct txn *txn, struct port *port);
+txn_commit_stmt(struct txn *txn);
 
 /**
  * Rollback a statement. In autocommit mode,
@@ -125,7 +125,7 @@ txn_commit(struct txn *txn);
  * @pre txn == in_txn()
  */
 void
-txn_finish(struct txn *txn);
+txn_finish(struct txn *txn, bool commit);
 
 /** Rollback a transaction, if any. */
 void

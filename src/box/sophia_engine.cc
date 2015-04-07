@@ -320,15 +320,6 @@ SophiaEngine::commit(struct txn *txn)
 {
 	if (txn->engine_tx == NULL)
 		return;
-	/* free involved tuples */
-	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (! stmt->new_tuple)
-			continue;
-		assert(stmt->new_tuple->refs >= 1 &&
-		       stmt->new_tuple->refs < UINT8_MAX);
-		tuple_unref(stmt->new_tuple);
-	}
 	auto scoped_guard = make_scoped_guard([=] {
 		txn->engine_tx = NULL;
 	});
@@ -336,14 +327,33 @@ SophiaEngine::commit(struct txn *txn)
 	 * commit signature */
 	assert(txn->signature >= 0);
 	int rc = sp_prepare(txn->engine_tx, txn->signature);
-	assert(rc == 0);
-	if (rc == -1)
+	switch (rc) {
+	case 0:
+		break;
+	case 1: /* rollback */
+		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
+		break;
+	case 2: /* lock */
+		sp_destroy(txn->engine_tx);
+		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
+		break;
+	case -1:
 		sophia_raise(env);
+		break;
+	}
 	rc = sp_commit(txn->engine_tx);
 	if (rc == -1) {
-		sophia_raise(env);
+		panic("sophia commit failed: txn->signature = %" PRIu64, txn->signature);
 	}
-	assert(rc == 0);
+}
+
+void
+SophiaEngine::rollbackStmt(struct txn_stmt *stmt)
+{
+	if (stmt->old_tuple)
+		tuple_unref(stmt->old_tuple);
+	if (stmt->new_tuple)
+		tuple_unref(stmt->new_tuple);
 }
 
 void
@@ -353,6 +363,18 @@ SophiaEngine::rollback(struct txn *txn)
 		return;
 	sp_destroy(txn->engine_tx);
 	txn->engine_tx = NULL;
+}
+
+void
+SophiaEngine::finish(struct txn *txn, bool)
+{
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->old_tuple)
+			tuple_unref(stmt->old_tuple);
+		if (stmt->new_tuple)
+			tuple_unref(stmt->new_tuple);
+	}
 }
 
 void

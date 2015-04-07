@@ -368,7 +368,7 @@ lbox_commit(lua_State * /* L */)
 		txn_rollback();
 		throw;
 	}
-	txn_finish(txn);
+	txn_finish(txn, true);
 	return 0;
 }
 

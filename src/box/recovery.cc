@@ -970,7 +970,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	 */
 	fill_lsn(r, row);
 	if (r->wal_mode == WAL_NONE)
-		return 0;
+		return vclock_sum(&r->vclock);
 
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
@@ -1004,7 +1004,9 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	bool cancellable = fiber_set_cancellable(false);
 	fiber_yield(); /* Request was inserted. */
 	fiber_set_cancellable(cancellable);
-	return req->res;
+	if (req->res == -1)
+		return -1;
+	return vclock_sum(&r->vclock);
 }
 
 /* }}} */

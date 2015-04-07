@@ -54,6 +54,12 @@ void Engine::commit(struct txn*)
 void Engine::rollback(struct txn*)
 {}
 
+void Engine::rollbackStmt(struct txn_stmt*)
+{}
+
+void Engine::finish(struct txn*, bool)
+{}
+
 void Engine::initSystemSpace(struct space * /* space */)
 {
 	panic("not implemented");

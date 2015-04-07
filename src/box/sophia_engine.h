@@ -34,12 +34,14 @@ struct SophiaEngine: public Engine {
 	SophiaEngine();
 	virtual void init();
 	virtual Handler *open();
-	virtual Index *createIndex(struct key_def*);
+	virtual Index *createIndex(struct key_def *);
 	virtual void dropIndex(Index*);
-	virtual void keydefCheck(struct space *space, struct key_def*f);
-	virtual void begin(struct txn*, struct space*);
-	virtual void commit(struct txn*);
-	virtual void rollback(struct txn*);
+	virtual void keydefCheck(struct space *space, struct key_def *f);
+	virtual void begin(struct txn *txn, struct space *space);
+	virtual void commit(struct txn *txn);
+	virtual void rollbackStmt(struct txn_stmt *stmt);
+	virtual void rollback(struct txn *txn);
+	virtual void finish(struct txn *txn, bool is_commit);
 	virtual void beginJoin();
 	virtual void recoverToCheckpoint(int64_t);
 	virtual void endRecovery();
@@ -52,6 +54,7 @@ struct SophiaEngine: public Engine {
 private:
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
+public:
 	int recovery_complete;
 };
 

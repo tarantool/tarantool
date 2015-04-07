@@ -433,6 +433,19 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 }
 
 void
+MemtxEngine::rollbackStmt(struct txn_stmt *stmt)
+{
+	if (stmt->old_tuple || stmt->new_tuple)
+	{
+		space_replace(stmt->space,
+		              stmt->new_tuple,
+		              stmt->old_tuple, DUP_INSERT);
+		if (stmt->new_tuple)
+			tuple_unref(stmt->new_tuple);
+	}
+}
+
+void
 MemtxEngine::rollback(struct txn *txn)
 {
 	struct txn_stmt *stmt;
@@ -441,6 +454,24 @@ MemtxEngine::rollback(struct txn *txn)
 			space_replace(stmt->space, stmt->new_tuple,
 				      stmt->old_tuple, DUP_INSERT);
 		}
+	}
+}
+
+void
+MemtxEngine::finish(struct txn *txn, bool commit)
+{
+	struct txn_stmt *stmt;
+	if (commit) {
+		rlist_foreach_entry(stmt, &txn->stmts, next) {
+			if (stmt->old_tuple)
+				tuple_unref(stmt->old_tuple);
+		}
+		return;
+	}
+	/* rollback */
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->new_tuple)
+			tuple_unref(stmt->new_tuple);
 	}
 }
 

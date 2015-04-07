@@ -203,6 +203,7 @@ t;
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.PASSWORD_MISMATCH : 47'
+  - 'box.error.TRANSACTION_CONFLICT : 97'
   - 'box.error.NO_SUCH_ENGINE : 57'
   - 'box.error.FIELD_TYPE : 23'
   - 'box.error.ACCESS_DENIED : 42'

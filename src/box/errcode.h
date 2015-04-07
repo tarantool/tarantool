@@ -148,6 +148,7 @@ struct errcode_record {
 	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	2, "Attempt to modify a tuple field which is part of index '%s' in space '%s'") \
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   2, "Integer overflow when performing '%c' operation on field %u") \
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
+	/* 97 */_(ER_TRANSACTION_CONFLICT,      2, "Transaction has been aborted by conflict") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

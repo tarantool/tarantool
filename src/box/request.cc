@@ -64,7 +64,13 @@ execute_replace(struct request *request, struct port *port)
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 
 	txn_replace(txn, space, NULL, new_tuple, mode);
-	txn_commit_stmt(txn, port);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, new_tuple);
 }
 
 static void
@@ -82,7 +88,7 @@ execute_update(struct request *request, struct port *port)
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL) {
-		txn_commit_stmt(txn, port);
+		txn_commit_stmt(txn);
 		return;
 	}
 	TupleGuard old_guard(old_tuple);
@@ -99,7 +105,13 @@ execute_update(struct request *request, struct port *port)
 	if (! engine_auto_check_update(space->handler->engine->flags))
 		space_check_update(space, old_tuple, new_tuple);
 	txn_replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
-	txn_commit_stmt(txn, port);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, new_tuple);
 }
 
 static void
@@ -116,14 +128,20 @@ execute_delete(struct request *request, struct port *port)
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
-
-	if (old_tuple != NULL) {
-		TupleGuard old_guard(old_tuple);
-		txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	if (old_tuple == NULL) {
+		txn_commit_stmt(txn);
+		return;
 	}
-	txn_commit_stmt(txn, port);
+	TupleGuard old_guard(old_tuple);
+	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, old_tuple);
 }
-
 
 static void
 execute_select(struct request *request, struct port *port)
@@ -142,6 +160,7 @@ execute_select(struct request *request, struct port *port)
 	enum iterator_type type = (enum iterator_type) request->iterator;
 
 	const char *key = request->key;
+
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 
 	struct iterator *it = index->position();
