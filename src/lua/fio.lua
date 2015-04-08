@@ -210,7 +210,7 @@ fio.dirname = function(path)
         return nil
     end
     path = tostring(path)
-    path = ffi.new('char[?]', #path, path)
+    path = ffi.new('char[?]', #path + 1, path)
     return ffi.string(ffi.C.dirname(path))
 end
 
