@@ -40,10 +40,10 @@ blocks  :
       Tarantool support is available
       `here <https://github.com/bigbes92/YCSB>`_. Since YCSB
       was developed to compare cloud key/value servers, it
-      provides a very narrow view benchmarking kit is more
-      appropriate. This is why Yahoo! Cloud secondary keys
-      or overhead of locking (which Tarantool doesn't have)
-      is not tested at all.
+      provides a very narrow view at performance of a tested
+      server. For example, performance of secondary keys or
+      overhead of locking (which Tarantool doesn't have) is
+      not tested at all.
 
       .. |copy| unicode:: U+000A9
 
