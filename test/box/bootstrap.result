@@ -53,15 +53,30 @@ box.space._space:select{}
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
+  - [281, 1, '_vspace', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
+      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
+        'name': 'format', 'type': '*'}]]
   - [288, 1, '_index', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
+  - [289, 1, '_vindex', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
   - [296, 1, '_func', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
+  - [297, 1, '_vfunc', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
   - [304, 1, '_user', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'auth', 'type': '*'}]]
+  - [305, 1, '_vuser', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'auth', 'type': '*'}]]
   - [312, 1, '_priv', 'memtx', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
+        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
+  - [313, 1, '_vpriv', 'sysview', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
         'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
         'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
   - [320, 1, '_cluster', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
@@ -73,17 +88,31 @@ box.space._index:select{}
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [280, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [280, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [281, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [281, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [281, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
   - [288, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
+  - [289, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
+  - [289, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
   - [296, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [296, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [296, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [297, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [297, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [297, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [304, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [304, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [305, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [305, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [305, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
   - [312, 1, 'owner', 'tree', 0, 1, 0, 'num']
   - [312, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num']
+  - [313, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
+  - [313, 1, 'owner', 'tree', 0, 1, 0, 'num']
+  - [313, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num']
   - [320, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
 ...
@@ -103,6 +132,11 @@ box.space._priv:select{}
 - - [1, 0, 'role', 2, 4]
   - [1, 1, 'universe', 0, 7]
   - [1, 2, 'function', 1, 4]
+  - [1, 2, 'space', 281, 1]
+  - [1, 2, 'space', 289, 1]
+  - [1, 2, 'space', 297, 1]
+  - [1, 2, 'space', 305, 1]
+  - [1, 2, 'space', 313, 1]
   - [1, 3, 'space', 320, 2]
   - [1, 3, 'universe', 0, 1]
 ...

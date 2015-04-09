@@ -38,14 +38,19 @@ enum schema_id {
 	SC_SCHEMA_ID = 272,
 	/** Space id of _space. */
 	SC_SPACE_ID = 280,
+	SC_VSPACE_ID = 281,
 	/** Space id of _index. */
 	SC_INDEX_ID = 288,
+	SC_VINDEX_ID = 289,
 	/** Space id of _func. */
 	SC_FUNC_ID = 296,
+	SC_VFUNC_ID = 297,
 	/** Space id of _user. */
 	SC_USER_ID = 304,
+	SC_VUSER_ID = 305,
 	/** Space id of _priv. */
 	SC_PRIV_ID = 312,
+	SC_VPRIV_ID = 313,
 	/** Space id of _cluster. */
 	SC_CLUSTER_ID = 320,
 	/** End of the reserved range of system spaces. */

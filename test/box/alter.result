@@ -69,11 +69,11 @@ _space:delete{_index.id}
 --
 -- Can't change properties of a space
 --
-_space:update({_space.id}, {{'+', 1, 1}})
+_space:update({_space.id}, {{'-', 1, 1}})
 ---
 - error: Attempt to modify a tuple field which is part of index primary
 ...
-_space:update({_space.id}, {{'+', 1, 2}})
+_space:update({_space.id}, {{'-', 1, 2}})
 ---
 - error: Attempt to modify a tuple field which is part of index primary
 ...
@@ -158,17 +158,31 @@ _index:select{}
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [280, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [280, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [281, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [281, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [281, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
   - [288, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
+  - [289, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
+  - [289, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
   - [296, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [296, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [296, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [297, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [297, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [297, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [304, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [304, 1, 'owner', 'tree', 0, 1, 1, 'num']
   - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [305, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [305, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [305, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
   - [312, 1, 'owner', 'tree', 0, 1, 0, 'num']
   - [312, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num']
+  - [313, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
+  - [313, 1, 'owner', 'tree', 0, 1, 0, 'num']
+  - [313, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num']
   - [320, 0, 'primary', 'tree', 1, 1, 0, 'num']
   - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
 ...

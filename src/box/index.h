@@ -177,14 +177,14 @@ public:
 	virtual void reserve(uint32_t /* size_hint */);
 	virtual void buildNext(struct tuple *tuple);
 	virtual void endBuild();
-	virtual size_t size() const = 0;
+	virtual size_t size() const;
 	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) = 0;
-	virtual size_t memsize() const = 0;
+	virtual size_t memsize() const;
 	/**
 	 * Create a structure to represent an iterator. Must be
 	 * initialized separately.

@@ -42,6 +42,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
+#include "sysview_engine.h"
 #include "sophia_engine.h"
 #include "space.h"
 #include "port.h"
@@ -394,6 +395,9 @@ engine_init()
 	 */
 	MemtxEngine *memtx = new MemtxEngine();
 	engine_register(memtx);
+
+	SysviewEngine *sysview = new SysviewEngine();
+	engine_register(sysview);
 
 	SophiaEngine *sophia = new SophiaEngine();
 	sophia->init();

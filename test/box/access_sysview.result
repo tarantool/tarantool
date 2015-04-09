@@ -1,0 +1,455 @@
+session = box.session
+---
+...
+--
+-- Basic tests
+--
+#box.space._vspace:select{} == #box.space._space:select{}
+---
+- true
+...
+#box.space._vindex:select{} == #box.space._index:select{}
+---
+- true
+...
+#box.space._vuser:select{} == #box.space._user:select{}
+---
+- true
+...
+#box.space._vpriv:select{} == #box.space._priv:select{}
+---
+- true
+...
+#box.space._vfunc:select{} == #box.space._func:select{}
+---
+- true
+...
+-- error: sysview does not support replace()
+box.space._vspace:replace({1, 1, 'test'})
+---
+- error: sysview does not support replace()
+...
+session.su('guest')
+---
+...
+--
+-- _vspace + _vindex
+--
+-- _vXXXX views are visible for 'public' role
+#box.space._vspace.index[2]:select('_vspace') ~= 0
+---
+- true
+...
+#box.space._vspace.index[2]:select('_vindex') ~= 0
+---
+- true
+...
+#box.space._vspace.index[2]:select('_vuser') ~= 0
+---
+- true
+...
+#box.space._vspace.index[2]:select('_vfunc') ~= 0
+---
+- true
+...
+#box.space._vspace.index[2]:select('_vpriv') ~= 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vspace.id) > 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vindex.id) > 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vuser.id) > 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vfunc.id) > 0
+---
+- true
+...
+#box.space._vindex:select(box.space._vpriv.id) > 0
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.role.revoke('guest', 'public')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vspace:select{}
+---
+- error: Read access denied for user 'guest' to space '_vspace'
+...
+#box.space._vindex:select{}
+---
+- error: Read access denied for user 'guest' to space '_vindex'
+...
+#box.space._vuser:select{}
+---
+- error: Read access denied for user 'guest' to space '_vuser'
+...
+#box.space._vpriv:select{}
+---
+- error: Read access denied for user 'guest' to space '_vpriv'
+...
+#box.space._vfunc:select{}
+---
+- error: Read access denied for user 'guest' to space '_vfunc'
+...
+box.session.su('admin')
+---
+...
+box.schema.role.grant('guest', 'public')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vspace:select{}
+---
+- 5
+...
+#box.space._vindex:select{}
+---
+- 14
+...
+box.session.su('admin')
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s = box.space.test:create_index('primary')
+---
+...
+box.schema.role.grant('public', 'read', 'space', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+box.space._vspace.index[2]:get('test') ~= nil
+---
+- true
+...
+#box.space._vindex:select(box.space.test.id) == 1
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.role.revoke('public', 'read', 'space', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+box.space._vspace.index[2]:get('test') == nil
+---
+- true
+...
+#box.space._vindex:select(box.space.test.id) == 0
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('guest', 'read', 'space', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+box.space._vspace.index[2]:get('test') ~= nil
+---
+- true
+...
+#box.space._vindex:select(box.space.test.id) == 1
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'read', 'space', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+box.space._vspace.index[2]:get('test') == nil
+---
+- true
+...
+#box.space._vindex:select(box.space.test.id) == 0
+---
+- true
+...
+-- check universe permissions
+box.session.su('admin')
+---
+...
+box.schema.user.grant('guest', 'read', 'universe')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vspace:select{}
+---
+- 13
+...
+#box.space._vindex:select{}
+---
+- 32
+...
+#box.space._vuser:select{}
+---
+- 4
+...
+#box.space._vpriv:select{}
+---
+- 11
+...
+#box.space._vfunc:select{}
+---
+- 1
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'read', 'universe')
+---
+...
+box.schema.user.grant('guest', 'write', 'universe')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vspace:select{}
+---
+- 13
+...
+#box.space._vindex:select{}
+---
+- 32
+...
+#box.space._vuser:select{}
+---
+- 1
+...
+#box.space._vpriv:select{}
+---
+- 2
+...
+#box.space._vfunc:select{}
+---
+- 1
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'write', 'universe')
+---
+...
+box.space.test:drop()
+---
+...
+box.session.su('guest')
+---
+...
+--
+-- _vuser
+--
+-- a guest user can read information about itself
+t = box.space._vuser:select(); return #t == 1 and t[1][3] == 'guest'
+---
+- true
+...
+#box.space._vuser:select{}
+---
+- 1
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('guest', 'read,write', 'universe')
+---
+...
+box.session.su('guest')
+---
+...
+box.schema.user.create('tester')
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'read,write', 'universe')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vuser.index[2]:select('tester') > 0
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.drop('tester')
+---
+...
+box.session.su('guest')
+---
+...
+--
+-- _vpriv
+--
+-- a guest user can see granted 'public' role
+box.space._vpriv.index[2]:select('role')[1][2] == session.uid()
+---
+- true
+...
+cnt = #box.space._vpriv:select{}
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('guest', 'read,write', 'space', '_schema')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vpriv:select{} == cnt + 1
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'read,write', 'space', '_schema')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vpriv:select{} == cnt
+---
+- true
+...
+--
+-- _vfunc
+--
+cnt = #box.space._vfunc:select{}
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.func.create('test')
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vfunc:select{} = cnt + 1
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'execute', 'function', 'test')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vfunc:select{} == cnt
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vfunc:select{} == cnt + 1
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...
+box.schema.func.drop('test')
+---
+...
+box.session.su('guest')
+---
+...
+#box.space._vfunc:select{} == cnt
+---
+- true
+...
+--
+-- view:alter() tests
+--
+session.su('admin')
+---
+...
+box.space._vspace.index[1]:alter({parts = { 2, 'str' }})
+---
+...
+box.space._vspace.index[1]:select('xxx')
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+box.space._vspace.index[1]:select(1)
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+box.space._vspace.index[1]:alter({parts = { 2, 'num' }})
+---
+...
+box.space._space.index[1]:drop()
+---
+...
+box.space._vspace.index[1]:select(1)
+---
+- error: 'No index #1 is defined in space ''_space'''
+...
+s = box.space._space:create_index('owner', {parts = { 2, 'num' }, id = 1, unique = false})
+---
+...
+#box.space._vspace.index[1]:select(1) > 0
+---
+- true
+...
+session = nil
+---
+...

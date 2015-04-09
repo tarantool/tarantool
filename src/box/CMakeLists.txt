@@ -35,6 +35,8 @@ add_library(box
     memtx_bitset.cc
     engine.cc
     memtx_engine.cc
+    sysview_engine.cc
+    sysview_index.cc
     sophia_engine.cc
     sophia_index.cc
     space.cc

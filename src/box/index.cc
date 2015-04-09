@@ -152,6 +152,14 @@ Index::~Index()
 	key_def_delete(key_def);
 }
 
+size_t
+Index::size() const
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def->type],
+		  "size()");
+}
+
 struct tuple *
 Index::random(uint32_t rnd) const
 {
@@ -170,6 +178,12 @@ Index::findByTuple(struct tuple *tuple) const
 		  index_type_strs[key_def->type],
 		  "findByTuple()");
 	return NULL;
+}
+
+size_t
+Index::memsize() const
+{
+	return 0;
 }
 
 void

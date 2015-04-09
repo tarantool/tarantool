@@ -585,15 +585,30 @@ box.space._space:select()
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
+  - [281, 1, '_vspace', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
+      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
+        'name': 'format', 'type': '*'}]]
   - [288, 1, '_index', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
+  - [289, 1, '_vindex', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
   - [296, 1, '_func', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
+  - [297, 1, '_vfunc', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
   - [304, 1, '_user', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'auth', 'type': '*'}]]
+  - [305, 1, '_vuser', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'auth', 'type': '*'}]]
   - [312, 1, '_priv', 'memtx', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
+        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
+  - [313, 1, '_vpriv', 'sysview', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
         'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
         'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
   - [320, 1, '_cluster', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'uuid',

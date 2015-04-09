@@ -1,3 +1,9 @@
+_space:run_triggers(false)
+_index:run_triggers(false)
+_user:run_triggers(false)
+_func:run_triggers(false)
+_priv:run_triggers(false)
+
 -- Guest user id - the default user
 GUEST = 0
 -- Super User ID
@@ -148,3 +154,42 @@ _priv:insert{1, RPL_ID, 'universe', 0, 1}
 _priv:insert{1, RPL_ID, 'space', box.schema.CLUSTER_ID, 2}
 -- grant role 'public' to 'guest'
 _priv:insert{1, 0, 'role', 2, 4}
+
+--
+-- Create system views
+--
+
+_space:run_triggers(true)
+
+local views = {
+    [box.schema.SPACE_ID] = box.schema.VSPACE_ID;
+    [box.schema.INDEX_ID] = box.schema.VINDEX_ID;
+    [box.schema.USER_ID] = box.schema.VUSER_ID;
+    [box.schema.FUNC_ID] = box.schema.VFUNC_ID;
+    [box.schema.PRIV_ID] = box.schema.VPRIV_ID;
+}
+
+for source_id, target_id in pairs(views) do
+    local def = _space:get(source_id):totable()
+    def[1] = target_id
+    def[3] = "_v"..def[3]:sub(2)
+    def[4] = 'sysview'
+    _space:insert(def)
+    local idefs = {}
+    for _, idef in _index:pairs(source_id, { iterator = 'EQ'}) do
+        idef = idef:totable()
+        idef[1] = target_id
+        table.insert(idefs, idef)
+    end
+    for _, idef in ipairs(idefs) do
+        _index:insert(idef)
+    end
+    -- public can read system views
+    _priv:insert{1, PUBLIC, 'space', target_id, 1}
+end
+
+_space:run_triggers(true)
+_index:run_triggers(true)
+_user:run_triggers(true)
+_func:run_triggers(true)
+_priv:run_triggers(true)
