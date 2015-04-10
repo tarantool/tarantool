@@ -1037,6 +1037,8 @@ luaopen_json(lua_State *L)
     json_create_tokens();
     luaL_json_default = luaL_newserializer(L, jsonlib);
     luaL_register_module(L, "json", NULL);
+    luaL_pushnull(L);
+    lua_setfield(L, -2, "null"); /* compatibility with cjson */
     return 1;
 }
 

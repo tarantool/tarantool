@@ -14,9 +14,15 @@ local function is_array(s)
     return string.sub(s, 1, 1) == "["
 end
 
+local function test_misc(test, s)
+    test:plan(2)
+    test:iscdata(s.NULL, 'void *', '.NULL is cdata')
+    test:ok(s.NULL == nil, '.NULL == nil')
+end
+
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(8)
+    test:plan(9)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -25,4 +31,5 @@ tap.test("json", function(test)
     test:test("nil", common.test_nil, serializer)
     test:test("table", common.test_table, serializer, is_array, is_map)
     test:test("ucdata", common.test_ucdata, serializer)
+    test:test("misc", test_misc, serializer)
 end)
