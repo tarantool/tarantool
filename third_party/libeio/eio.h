@@ -256,20 +256,20 @@ struct eio_req
   eio_tstamp nv1;  /* utime, futime: atime; busy: sleep time */
   eio_tstamp nv2;  /* utime, futime: mtime */
 
-  int type;        /* EIO_xxx constant ETP */
   int int1;        /* all applicable requests: file descriptor; sendfile: output fd; open, msync, mlockall, readdir: flags */
   long int2;       /* chown, fchown: uid; sendfile: input fd; open, chmod, mkdir, mknod: file mode, seek: whence, sync_file_range, fallocate: flags */
   long int3;       /* chown, fchown: gid; rename, link: working directory of new name */
   int errorno;     /* errno value on syscall return */
 
-#if __i386 || __amd64
-  unsigned char cancelled;
-#else
-  sig_atomic_t cancelled;
-#endif
-
   unsigned char flags; /* private */
-  signed char pri;     /* the priority */
+
+  signed char type;/* EIO_xxx constant ETP */
+  signed char pri;     /* the priority ETP */
+#if __i386 || __amd64
+  unsigned char cancelled; /* ETP */
+#else
+  sig_atomic_t  cancelled; /* ETP */
+#endif
 
   void *data;
   eio_cb finish;
@@ -278,7 +278,7 @@ struct eio_req
 
   EIO_REQ_MEMBERS
 
-  eio_req *grp, *grp_prev, *grp_next, *grp_first; /* private */
+  eio_req *grp, *grp_prev, *grp_next, *grp_first; /* private ETP */
 };
 
 /* _private_ request flags */

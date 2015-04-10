@@ -106,8 +106,12 @@ local fiber = require 'fiber'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
-local config_file = os.getenv('HOME') .. '/.config/tarantool/tarantool'
+local config_file
 local usermode = true
+
+if os.getenv('HOME') then
+    config_file = os.getenv('HOME') .. '/.config/tarantool/tarantool'
+end
 
 if not fio.stat(config_file) then
     usermode = false

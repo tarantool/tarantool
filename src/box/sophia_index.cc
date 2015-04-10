@@ -272,7 +272,10 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 				error = 1;
 			tuple_unref(dup_tuple);
 			if (error) {
-				tnt_raise(ClientError, ER_TUPLE_FOUND, index_name(this));
+				struct space *sp =
+					space_cache_find(key_def->space_id);
+				tnt_raise(ClientError, ER_TUPLE_FOUND,
+					  index_name(this), space_name(sp));
 			}
 		}
 	}

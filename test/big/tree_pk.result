@@ -364,7 +364,7 @@ s0.index['i3']:select{10}
 -- TupleFound (primary key)
 s0:insert{1, 10, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 s0.index['primary']:get{10}
 ---
@@ -409,7 +409,7 @@ s0.index['i3']:select{10}
 -- TupleFound (key #1)
 s0:insert{10, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 s0.index['primary']:get{10}
 ---
@@ -434,7 +434,7 @@ s0.index['i1']:select{0}
 -- TupleFound (key #1)
 s0:replace{2, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'i1'
+- error: Duplicate key exists in unique index 'i1' in space 'tweedledum'
 ...
 s0.index['primary']:get{10}
 ---
@@ -459,7 +459,7 @@ s0.index['i1']:select{0}
 -- TupleFound (key #3)
 s0:insert{10, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 s0.index['primary']:get{10}
 ---
@@ -484,7 +484,7 @@ s0.index['i3']:select{0}
 -- TupleFound (key #3)
 s0:replace{2, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 'i1'
+- error: Duplicate key exists in unique index 'i1' in space 'tweedledum'
 ...
 s0.index['primary']:get{10}
 ---

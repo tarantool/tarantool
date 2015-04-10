@@ -1,6 +1,6 @@
 TAP version 13
 # json
-1..8
+1..9
     # unsigned
     1..56
     ok - encode/decode for 0
@@ -184,4 +184,10 @@ ok - table
     ok - udata  hook priority
     # ucdata: end
 ok - ucdata
+    # misc
+    1..2
+    ok - .NULL is cdata
+    ok - .NULL == nil
+    # misc: end
+ok - misc
 # json: end

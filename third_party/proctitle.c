@@ -220,7 +220,7 @@ init_set_proc_title(int argc, char **argv)
 	ps_buffer_fixed_size = 0;
 #else
 	{
-		char basename_buf[PATH_MAX];
+		char basename_buf[PATH_MAX+1];
 
 		/*
 		 * At least partially mimic FreeBSD, which for
@@ -228,7 +228,7 @@ init_set_proc_title(int argc, char **argv)
 		 *
 		 * a.out: custom title here (a.out)
 	         */
-		snprintf(basename_buf, sizeof basename_buf, "%s", argv[0]);
+		snprintf(basename_buf, PATH_MAX, "%s", argv[0]);
 		snprintf(ps_buffer, ps_buffer_size, "%s: ", basename(basename_buf));
 	}
 

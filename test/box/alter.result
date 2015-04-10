@@ -13,7 +13,7 @@ ADMIN = 1
 --
 _space:insert{_space.id, ADMIN, 'test', 5 }
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 --
 -- Bad space id
@@ -27,14 +27,14 @@ _space:insert{'hello', 'world', 'test'}
 --
 _space:insert{_space.id, ADMIN, 'test', 'world'}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 --
 -- There is already a tuple for the system space
 --
 _space:insert{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
@@ -42,7 +42,7 @@ _space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ...
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 _space:replace{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
@@ -71,11 +71,13 @@ _space:delete{_index.id}
 --
 _space:update({_space.id}, {{'+', 1, 1}})
 ---
-- error: Attempt to modify a tuple field which is part of index primary
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    '_space'
 ...
 _space:update({_space.id}, {{'+', 1, 2}})
 ---
-- error: Attempt to modify a tuple field which is part of index primary
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    '_space'
 ...
 --
 -- Create a space
@@ -138,7 +140,7 @@ space:replace{0}
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
 _index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
@@ -146,7 +148,7 @@ _index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ...
 _index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
 _index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
@@ -323,7 +325,7 @@ auto = box.schema.space.create('auto_original')
 ...
 auto2 = box.schema.space.create('auto', {id = auto.id})
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 box.schema.space.drop('auto')
 ---

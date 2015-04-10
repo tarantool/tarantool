@@ -106,3 +106,21 @@ box.session.su('admin')
 c:close()
 box.schema.user.drop('test')
 test:drop()
+--
+-- gh-508 - wrong check for universal access of setuid functions
+--
+-- notice that guest can execute stuff, but can't read space _func
+box.schema.user.grant('guest', 'execute', 'universe')
+function f1() return box.space._func:get(1)[4] end
+function f2() return box.space._func:get(2)[4] end
+box.schema.func.create('f1')
+box.schema.func.create('f2',{setuid=true})
+c = net.new(box.cfg.listen)
+-- should return access denied
+c:call('f1')
+-- should work (used to return access denied, because was not setuid
+c:call('f2')
+c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
+box.schema.func.drop('f1')
+box.schema.func.drop('f2')

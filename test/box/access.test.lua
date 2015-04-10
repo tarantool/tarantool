@@ -253,3 +253,13 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exist
 box.schema.func.create('dummy', { if_not_exists = true })
 box.schema.func.create('dummy', { if_not_exists = true })
 box.schema.func.drop('dummy')
+
+-- gh-664 roles: accepting bad syntax for create
+box.schema.user.create('user', 'blah')
+box.schema.user.drop('user', 'blah')
+
+-- gh-664 roles: accepting bad syntax for create
+box.schema.func.create('func', 'blah')
+box.schema.func.drop('blah', 'blah')
+-- gh-758 attempt to set password for user guest
+box.schema.user.passwd('guest', 'sesame')

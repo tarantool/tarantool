@@ -538,7 +538,7 @@ hash.index['field3']:get{10}
 -- TupleFound (primary key)
 hash:insert{1, 10, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 hash.index['primary']:get{10}
 ---
@@ -580,7 +580,7 @@ hash.index['field3']:get{10}
 -- TupleFound (key --1)
 hash:insert{10, 0, 10, 10}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 hash.index['primary']:get{10}
 ---
@@ -627,7 +627,7 @@ hash.index['field1']:get{0}
 -- TupleFound (key --3)
 hash:insert{10, 10, 10, 0}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 hash.index['primary']:get{10}
 ---

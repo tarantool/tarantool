@@ -13,6 +13,7 @@
 }
 li.toctree-l1>a {
     color:#168de2;
+
     font-size:20px;
     margin:0;
     text-decoration:none;
@@ -187,7 +188,8 @@ a.headerlink {
 .b-article h2,
 .b-article h3,
 .b-article h4,
-.b-article h5 {
+.b-article h5,
+.b-article h6 {
     margin: 16px 0 16px -25px;
     font-weight: bold;
 }
@@ -211,12 +213,24 @@ a.headerlink {
   -ms-transition: opacity 0.2s ease-in-out 0.1s;
 }
 
+[id^="lua-object"  ],
+[id^="lua-function"],
+[id^="lua-data"    ] {
+    margin-left: -25px;
+}
+
+[id^="lua-object"  ]:hover .headerlink,
+[id^="lua-function"]:hover .headerlink,
+[id^="lua-data"    ]:hover .headerlink {
+    opacity: 1;
+}
+
 h2:hover .headerlink,
 h3:hover .headerlink,
 h4:hover .headerlink,
 h5:hover .headerlink,
 h6:hover .headerlink {
-  opacity: 1;
+    opacity: 1;
 }
 
 table.docutils.footnote {
@@ -367,4 +381,71 @@ div.b-cols_content_left .b-search-text {
 .b-cols_content>.pin-wrapper {
     float: left;
     position: relative;
+}
+
+.b-switcher-item-url {
+    -webkit-transition: all 0.2s ease-in-out;
+    -moz-transition: all 0.2s ease-in-out;
+    -o-transition: all 0.2s ease-in-out;
+    -ms-transition: all 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out;
+}
+.b-tab_switcher {
+    display:inline-block;
+    border:2px solid #797979;
+    background:#fff;
+    -webkit-border-radius: 6px 6px 0 0;
+    -moz-border-radius: 6px 6px 0 0;
+    border-radius: 6px 6px 0 0;
+    font-size: 0;
+    padding: 0px !important;
+}
+
+.b-tab_switcher-item {
+    display:inline-block;
+    font-size:16px;
+    color:#262626;
+    border-right:2px solid #797979;
+    padding: 0px !important;
+}
+.b-tab_switcher-item:last-child {
+    border: 0;
+}
+.b-tab_switcher-item-url {
+    display:inline-block;
+    color:#797979;
+    text-decoration:none;
+    padding:8px 19px;
+    text-transform:uppercase;
+}
+.b-tab_switcher-item-url:hover {
+    background:#c9c9c9;
+    color:#fff
+}
+.b-tab_switcher-item-url.p-active {
+    background:#797979;
+    color:#fff;
+}
+.b-tab_switcher-item:first-child .b-tab_switcher-item-url {
+    -webkit-border-radius: 4px 0 0 0px;
+    -moz-border-radius: 4px 0 0 0px;
+    border-radius: 4px 0 0 0px;
+}
+.b-tab_switcher-item:last-child .b-tab_switcher-item-url {
+    -webkit-border-radius: 0 4px 0px 0;
+    -moz-border-radius: 0 4px 0px 0;
+    border-radius: 0 4px 0px 0;
+}
+
+.b-documentation-tab-content {
+    border: 2px solid #797979;
+    margin-top: -2px;
+    padding: 5px;
+    -webkit-border-radius: 0 6px 6px 6px;
+    -moz-border-radius: 0 6px 6px 6px;
+    border-radius: 0 6px 6px 6px;
+}
+
+.b-documentation-tab div {
+    height: 100%;
 }

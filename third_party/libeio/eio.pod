@@ -27,7 +27,7 @@ or C<readlink>.
 
 It also offers wrappers around C<sendfile> (Solaris, Linux, HP-UX and
 FreeBSD, with emulation on other platforms) and C<readahead> (Linux, with
-emulation elsewhere>).
+emulation elsewhere).
 
 The goal is to enable you to write fully non-blocking programs. For
 example, in a game server, you would not want to freeze for a few seconds
@@ -178,7 +178,7 @@ lot by removing the idle watcher logic):
 
     ev_idle_init (&repeat_watcher, repeat);
     ev_async_init (&ready_watcher, ready);
-    ev_async_start (loop &watcher);
+    ev_async_start (loop, &watcher);
 
     eio_init (want_poll, 0);
   }
@@ -292,21 +292,7 @@ Cancel the request (and all its subrequests). If the request is currently
 executing it might still continue to execute, and in other cases it might
 still take a while till the request is cancelled.
 
-Even if cancelled, the finish callback will still be invoked - the
-callbacks of all cancellable requests need to check whether the request
-has been cancelled by calling C<EIO_CANCELLED (req)>:
-
-  static int
-  my_eio_cb (eio_req *req)
-  {
-    if (EIO_CANCELLED (req))
-      return 0;
-  }
-
-In addition, cancelled requests will I<either> have C<< req->result >>
-set to C<-1> and C<errno> to C<ECANCELED>, or I<otherwise> they were
-successfully executed, despite being cancelled (e.g. when they have
-already been executed at the time they were cancelled).
+When cancelled, the finish callback will not be invoked.
 
 C<EIO_CANCELLED> is still true for requests that have successfully
 executed, as long as C<eio_cancel> was called on them at some point.
@@ -632,7 +618,7 @@ These requests are specific to libeio and do not correspond to any OS call.
 
 =item eio_mtouch (void *addr, size_t length, int flags, int pri, eio_cb cb, void *data)
 
-Reads (C<flags == 0>) or modifies (C<flags == EIO_MT_MODIFY) the given
+Reads (C<flags == 0>) or modifies (C<flags == EIO_MT_MODIFY>) the given
 memory area, page-wise, that is, it reads (or reads and writes back) the
 first octet of every page that spans the memory area.
 
@@ -790,8 +776,6 @@ sure you I<always> set C<< grp->result >> to some sensible value.
 void eio_grp_limit     (eio_req *grp, int limit);
 
 
-=back
-
 
 =head1 LOW LEVEL REQUEST API
 
@@ -928,10 +912,8 @@ was written to use very little stackspace, but when using C<EIO_CUSTOM>
 requests, you might want to increase this.
 
 If this symbol is undefined (the default) then libeio will use its default
-stack size (C<sizeof (void *) * 4096> currently). If it is defined, but
-C<0>, then the default operating system stack size will be used. In all
-other cases, the value must be an expression that evaluates to the desired
-stack size.
+stack size (C<sizeof (void *) * 4096> currently). In all other cases, the
+value must be an expression that evaluates to the desired stack size.
 
 =back
 

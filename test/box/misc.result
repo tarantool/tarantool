@@ -204,6 +204,7 @@ t;
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.PASSWORD_MISMATCH : 47'
   - 'box.error.NO_SUCH_ENGINE : 57'
+  - 'box.error.FIELD_TYPE : 23'
   - 'box.error.ACCESS_DENIED : 42'
   - 'box.error.UPDATE_INTEGER_OVERFLOW : 95'
   - 'box.error.LAST_DROP : 15'
@@ -232,7 +233,7 @@ t;
   - 'box.error.ALTER_SPACE : 12'
   - 'box.error.ACTIVE_TRANSACTION : 79'
   - 'box.error.NO_CONNECTION : 77'
-  - 'box.error.FIELD_TYPE : 23'
+  - 'box.error.GUEST_USER_PASSWORD : 96'
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
   - 'box.error.REPLICA_MAX : 73'
@@ -295,7 +296,7 @@ pcall(myinsert, {1, 'hello'})
 pcall(myinsert, {1, 'hello'})
 ---
 - false
-- Duplicate key exists in unique index 'primary'
+- Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 box.space.tweedledum:truncate()
 ---

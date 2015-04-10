@@ -478,7 +478,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if (orig_credentials->universal_access & PRIV_ALL)
+	if ((orig_credentials->universal_access & PRIV_ALL) == PRIV_ALL)
 		return;
 	access &= ~orig_credentials->universal_access;
 	/*

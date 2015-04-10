@@ -511,7 +511,7 @@ that are declared in line 1, because all of them are for use only within the fun
 
 LINE 3: WHY "PAIRS()". Our job is to go through all the rows and there are two
 ways to do it: with ``box.space.space-name:pairs()`` or with
-:func:`index.iterator <box.space.space-name.index[.index-name]:pairs>`.
+:func:`index.iterator <index_object.pairs>`.
 We preferred ``pairs()`` because it is simpler.
 
 LINE 4: WHY "PCALL". If we simply said "``lua_table = json.decode(t[2]))``", then

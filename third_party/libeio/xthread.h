@@ -17,8 +17,8 @@
 
 #ifdef _WIN32
 
-#define NTDDI_VERSION NTDDI_WIN2K // needed to get win2000 api calls
-#define _WIN32_WINNT 0x400
+//#define NTDDI_VERSION NTDDI_WIN2K // needed to get win2000 api calls, fails with mingw
+#define _WIN32_WINNT 0x400 // maybe working alternative for mingw
 #include <stdio.h>//D
 #include <fcntl.h>
 #include <io.h>
@@ -26,6 +26,12 @@
 #include <winsock2.h>
 #include <process.h>
 #include <windows.h>
+
+/* work around some bugs in ptw32 */
+#if defined(__MINGW32__) && defined(_TIMESPEC_DEFINED)
+#define HAVE_STRUCT_TIMESPEC 1
+#endif
+
 #include <pthread.h>
 #define sigset_t int
 #define sigfillset(a)

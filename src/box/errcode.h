@@ -54,8 +54,8 @@ struct errcode_record {
 	/*  0 */_(ER_UNKNOWN,			2, "Unknown error") \
 	/*  1 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  2 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
-	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index '%s'") \
-	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index '%s'") \
+	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index '%s' in space '%s'") \
+	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index '%s' in space '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
 	/*  7 */_(ER_READONLY,			2, "Can't modify data because this server in read-only mode.") \
@@ -145,8 +145,9 @@ struct errcode_record {
 	/* 91 */_(ER_PRIV_NOT_GRANTED,		2, "User '%s' does not have %s access on %s '%s'") \
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		2, "User '%s' does not have role '%s'") \
 	/* 93 */_(ER_MISSING_SNAPSHOT,		2, "Can't find snapshot") \
-	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	2, "Attempt to modify a tuple field which is part of index %s") \
+	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	2, "Attempt to modify a tuple field which is part of index '%s' in space '%s'") \
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   2, "Integer overflow when performing '%c' operation on field %u") \
+	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

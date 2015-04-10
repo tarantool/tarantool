@@ -364,7 +364,7 @@ abspath(const char *filename)
 	if (filename[0] == '/')
 		return strdup(filename);
 
-	char *abspath = (char *) malloc(PATH_MAX);
+	char *abspath = (char *) malloc(PATH_MAX + 1);
 	if (abspath == NULL)
 		return NULL;
 

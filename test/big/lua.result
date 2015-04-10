@@ -106,7 +106,7 @@ space:insert{'1', 'hello', 'world'}
 ...
 space:insert{'2', 'hello', 'world'}
 ---
-- error: Duplicate key exists in unique index 'minmax'
+- error: Duplicate key exists in unique index 'minmax' in space 'tweedledum'
 ...
 space:drop()
 ---

@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign no-dependencies
 
 VERSION_INFO = 1:0
 
-EXTRA_DIST = LICENSE Changes autogen.sh
+EXTRA_DIST = LICENSE Changes autogen.sh etp.c
 
 #man_MANS = ev.3
 

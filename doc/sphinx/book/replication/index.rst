@@ -95,7 +95,7 @@ the old master went down, they would have to be re-applied manually.
 
 
 =====================================================================
-  Instructions for quick startup of a new two-server simple cluster
+        Quick startup of a new two-server simple cluster
 =====================================================================
 
 Step 1. Start the first server thus:
@@ -212,17 +212,68 @@ a cluster and adding a replica.
 
 Start two shells. Put them side by side on the screen.
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------+---------------------+
-    |      Terminal #1     |      Terminal #2    |
-    +======================+=====================+
-    |                      |                     |
-    | .. code-block:: lua  | .. code-block:: lua |
-    |                      |                     |
-    |     $                |     $               |
-    |                      |                     |
-    +----------------------+---------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-1
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-1-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-1-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-1-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-1-1
+
+            .. code-block:: lua
+
+                $ 
+
+        .. container:: b-documentation_tab
+            :name: terminal-1-2
+
+            .. code-block:: lua
+
+                $ 
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-1 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-1 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-1-1').height(), $('#terminal-1-2').height());
+                    $('#catalog-1-content').height(maxHeight + 10);
+                    $('#terminal-1-1').height(maxHeight);
+                    $('#terminal-1-2').height(maxHeight);
+                    $('#terminal-1-1').show();
+                    $('#terminal-1-2').hide();
+                });
+            })();
+        </script>
 
 On the first shell, which we'll call Terminal #1, execute these commands:
 
@@ -241,16 +292,64 @@ On the first shell, which we'll call Terminal #1, execute these commands:
 The result is that a new cluster is set up, and the UUID is displayed.
 Now the screen looks like this: (except that UUID values are always different):
 
+.. container:: b-block-wrapper_doc
 
-.. container:: table-wide
+    .. container:: b-doc_catalog
+        :name: catalog-2
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 1-1.rst             | .. include:: 1-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-2-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-2-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-2-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-2-1
+
+            .. include:: 1-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-2-2
+
+            .. include:: 1-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-2 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-2 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-2-1').height(), $('#terminal-2-2').height());
+                    $('#catalog-2-content').height(maxHeight + 10);
+                    $('#terminal-2-1').height(maxHeight);
+                    $('#terminal-2-2').height(maxHeight);
+                    $('#terminal-2-1').show();
+                    $('#terminal-2-2').hide();
+                });
+            })();
+        </script>
 
 On the second shell, which we'll call Terminal #2, execute these commands:
 
@@ -271,16 +370,64 @@ replication is starting. Also on Terminal#2 the _cluster UUID value is
 displayed, and it is the same as the _cluster UUID value that was displayed
 on Terminal #1, because both servers are in the same cluster.
 
+.. container:: b-block-wrapper_doc
 
-.. container:: table-wide
+    .. container:: b-doc_catalog
+        :name: catalog-3
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 2-1.rst             | .. include:: 2-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-3-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-3-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-3-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-3-1
+
+            .. include:: 2-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-3-2
+
+            .. include:: 2-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-3 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-3 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-3-1').height(), $('#terminal-3-2').height());
+                    $('#catalog-3-content').height(maxHeight + 10);
+                    $('#terminal-3-1').height(maxHeight);
+                    $('#terminal-3-2').height(maxHeight);
+                    $('#terminal-3-1').show();
+                    $('#terminal-3-2').hide();
+                });
+            })();
+        </script>
 
 On Terminal #1, execute these requests:
 
@@ -292,15 +439,64 @@ On Terminal #1, execute these requests:
 
 Now the screen looks like this:
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 3-1.rst             | .. include:: 3-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-4
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-4-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-4-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-4-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-4-1
+
+            .. include:: 3-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-4-2
+
+            .. include:: 3-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-4 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-4 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-4-1').height(), $('#terminal-4-2').height());
+                    $('#catalog-4-content').height(maxHeight + 10);
+                    $('#terminal-4-1').height(maxHeight);
+                    $('#terminal-4-2').height(maxHeight);
+                    $('#terminal-4-1').show();
+                    $('#terminal-4-2').hide();
+                });
+            })();
+        </script>
 
 The creation and insertion were successful on Terminal #1.
 Nothing has happened on Terminal #2.
@@ -315,15 +511,64 @@ On Terminal #2, execute these requests:
 
 Now the screen looks like this:
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 4-1.rst             | .. include:: 4-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-5
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-5-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-5-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-5-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-5-1
+
+            .. include:: 4-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-5-2
+
+            .. include:: 4-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-5 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-5 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-5-1').height(), $('#terminal-5-2').height());
+                    $('#catalog-5-content').height(maxHeight + 10);
+                    $('#terminal-5-1').height(maxHeight);
+                    $('#terminal-5-2').height(maxHeight);
+                    $('#terminal-5-1').show();
+                    $('#terminal-5-2').hide();
+                });
+            })();
+        </script>
 
 The selection and insertion were successful on Terminal #2. Nothing has
 happened on Terminal #1.
@@ -340,15 +585,64 @@ Now Tarantool #1 is stopped. Messages appear on Terminal #2 announcing that fact
 The "ls -l" commands show that both servers have made snapshots, which have the
 same size because they both contain the same tuples.
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 5-1.rst             | .. include:: 5-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-6
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-6-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-6-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-6-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-6-1
+
+            .. include:: 5-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-6-2
+
+            .. include:: 5-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-6 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-6 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-6-1').height(), $('#terminal-6-2').height());
+                    $('#catalog-6-content').height(maxHeight + 10);
+                    $('#terminal-6-1').height(maxHeight);
+                    $('#terminal-6-2').height(maxHeight);
+                    $('#terminal-6-1').show();
+                    $('#terminal-6-2').hide();
+                });
+            })();
+        </script>
 
 On Terminal #2, ignore the repeated messages saying "failed to connect",
 and execute these requests:
@@ -361,15 +655,64 @@ and execute these requests:
 Now the screen looks like this (ignoring the repeated messages saying
 "failed to connect"):
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 6-1.rst             | .. include:: 6-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-7
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-7-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-7-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-7-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-7-1
+
+            .. include:: 6-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-7-2
+
+            .. include:: 6-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-7 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-7 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-7-1').height(), $('#terminal-7-2').height());
+                    $('#catalog-7-content').height(maxHeight + 10);
+                    $('#terminal-7-1').height(maxHeight);
+                    $('#terminal-7-2').height(maxHeight);
+                    $('#terminal-7-1').show();
+                    $('#terminal-7-2').hide();
+                });
+            })();
+        </script>
 
 Terminal #2 has done a select and an insert, even though Terminal #1 is down.
 
@@ -384,15 +727,64 @@ On Terminal #1 execute these commands:
 Now the screen looks like this (ignoring the repeated messages on terminal
 #2 saying "failed to connect"):
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 7-1.rst             | .. include:: 7-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-8
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-8-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-8-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-8-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-8-1
+
+            .. include:: 7-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-8-2
+
+            .. include:: 7-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-8 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-8 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-8-1').height(), $('#terminal-8-2').height());
+                    $('#catalog-8-content').height(maxHeight + 10);
+                    $('#terminal-8-1').height(maxHeight);
+                    $('#terminal-8-2').height(maxHeight);
+                    $('#terminal-8-1').show();
+                    $('#terminal-8-2').hide();
+                });
+            })();
+        </script>
 
 The master has reconnected to the cluster, and has NOT found what the replica
 wrote while the master was away. That is not a surprise -- the replica has not
@@ -407,15 +799,64 @@ On Terminal #1, say:
 
 The screen now looks like this:
 
-.. container:: table-wide
+.. container:: b-block-wrapper_doc
 
-    +----------------------------------+----------------------------------+
-    |          Terminal #1             |          Terminal #2             |
-    +==================================+==================================+
-    |                                  |                                  |
-    | .. include:: 8-1.rst             | .. include:: 8-2.rst             |
-    |                                  |                                  |
-    +----------------------------------+----------------------------------+
+    .. container:: b-doc_catalog
+        :name: catalog-9
+
+        .. raw:: html
+
+            <ul class="b-tab_switcher">
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-9-1" class="b-tab_switcher-item-url p-active">Terminal #1</a>
+                </li>
+                <li class="b-tab_switcher-item">
+                    <a href="#terminal-9-2" class="b-tab_switcher-item-url">Terminal #2</a>
+                </li>
+            </ul>
+
+    .. container:: b-documentation_tab_content
+        :name: catalog-9-content
+
+        .. container:: b-documentation_tab
+            :name: terminal-9-1
+
+            .. include:: 8-1.rst
+
+        .. container:: b-documentation_tab
+            :name: terminal-9-2
+
+            .. include:: 8-2.rst
+
+    .. raw:: html
+
+        <script>
+            (function(){
+                var dOn = $(document);
+                dOn.on({
+                    click: function(event) {
+                        event.preventDefault();
+                        link = $(this).children('a');
+                        target = link.attr('href');
+                        if (!(link.hasClass('p-active'))) {
+                            active = $('#catalog-9 .b-tab_switcher-item-url.p-active');
+                            $(active.attr('href')).hide();
+                            active.removeClass('p-active');
+                            link.addClass('p-active');
+                            $(link.attr('href')).show();
+                        }
+                    }
+                }, '#catalog-9 .b-tab_switcher-item');
+                dOn.ready(function(event) {
+                    maxHeight = Math.max($('#terminal-9-1').height(), $('#terminal-9-2').height());
+                    $('#catalog-9-content').height(maxHeight + 10);
+                    $('#terminal-9-1').height(maxHeight);
+                    $('#terminal-9-2').height(maxHeight);
+                    $('#terminal-9-1').show();
+                    $('#terminal-9-2').hide();
+                });
+            })();
+        </script>
 
 This shows that the two servers are once again in synch, and that each server
 sees what the other server wrote.
