@@ -84,7 +84,7 @@ s.id
 -- duplicate id
 box.schema.space.create('tweedledee', { id = 3000 })
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 -- stupid space id
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
@@ -681,7 +681,7 @@ index = s:create_index('third', { type = 'hash', parts = {  3, 'num' } })
 ...
 s.index.third:rename('second')
 ---
-- error: Duplicate key exists in unique index 'name'
+- error: Duplicate key exists in unique index 'name' in space '_index'
 ...
 s.index.third.id
 ---
@@ -762,12 +762,12 @@ s.index.primary:select{}
 -- a duplicate in the created index
 index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'num'} })
 ---
-- error: Duplicate key exists in unique index 'nodups'
+- error: Duplicate key exists in unique index 'nodups' in space 'full'
 ...
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 ---
-- error: Duplicate key exists in unique index 'year'
+- error: Duplicate key exists in unique index 'year' in space 'full'
 ...
 s.index.primary:select{}
 ---
@@ -844,7 +844,7 @@ s:insert{2, 1}
 ...
 s.index.secondary:alter{ unique = true }
 ---
-- error: Duplicate key exists in unique index 'secondary'
+- error: Duplicate key exists in unique index 'secondary' in space 'test'
 ...
 s:delete{2}
 ---
@@ -855,7 +855,7 @@ s.index.secondary:alter{ unique = true }
 ...
 s:insert{2, 1}
 ---
-- error: Duplicate key exists in unique index 'secondary'
+- error: Duplicate key exists in unique index 'secondary' in space 'test'
 ...
 s:insert{2, 2}
 ---

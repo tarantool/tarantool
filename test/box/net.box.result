@@ -228,7 +228,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space:insert{234, 1,2,3}
 ---
-- error: Duplicate key exists in unique index 'primary'
+- error: Duplicate key exists in unique index 'primary' in space 'net_box_test_space'
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---

@@ -29,6 +29,7 @@
 #include "memtx_tree.h"
 #include "tuple.h"
 #include "space.h"
+#include "schema.h" /* space_cache_find() */
 #include "errinj.h"
 #include "memory.h"
 #include "fiber.h"
@@ -250,7 +251,9 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			bps_tree_index_delete(&tree, new_tuple);
 			if (dup_tuple)
 				bps_tree_index_insert(&tree, dup_tuple, 0);
-			tnt_raise(ClientError, errcode, index_name(this));
+			struct space *sp = space_cache_find(key_def->space_id);
+			tnt_raise(ClientError, errcode, index_name(this),
+				  space_name(sp));
 		}
 		if (dup_tuple)
 			return dup_tuple;

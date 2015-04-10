@@ -269,7 +269,8 @@ space:delete{'Vincent', 'The Wolf!', 0}
 ...
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 1, 'Updated' }, {'=', 5, 'New'}})
 ---
-- error: Attempt to modify a tuple field which is part of index primary
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    'tweedledum'
 ...
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 ---

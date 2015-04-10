@@ -30,6 +30,8 @@
 #include "say.h"
 #include "tuple.h"
 #include "memtx_engine.h"
+#include "space.h"
+#include "schema.h" /* space_cache_find() */
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"
@@ -294,7 +296,9 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_name(this));
+			struct space *sp = space_cache_find(key_def->space_id);
+			tnt_raise(ClientError, errcode, index_name(this),
+				  space_name(sp));
 		}
 
 		if (dup_tuple)

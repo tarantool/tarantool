@@ -202,7 +202,7 @@ space_check_update(struct space *space,
 	Index *index = space->index[0];
 	if (tuple_compare(old_tuple, new_tuple, index->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			  index_name(index));
+			  index_name(index), space_name(space));
 }
 
 /* vim: set fm=marker */

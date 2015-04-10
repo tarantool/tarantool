@@ -296,7 +296,7 @@ pcall(myinsert, {1, 'hello'})
 pcall(myinsert, {1, 'hello'})
 ---
 - false
-- Duplicate key exists in unique index 'primary'
+- Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 box.space.tweedledum:truncate()
 ---

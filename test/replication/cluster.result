@@ -142,7 +142,8 @@ box.info.vclock[10]
 ...
 box.space._cluster:update(10, {{'=', 1, 11}})
 ---
-- error: Attempt to modify a tuple field which is part of index primary
+- error: Attempt to modify a tuple field which is part of index 'primary' in space
+    '_cluster'
 ...
 box.info.server.id
 ---
