@@ -19,6 +19,7 @@
     console
     log
     tap
+    fun
     pickle
     other
     expirationd
