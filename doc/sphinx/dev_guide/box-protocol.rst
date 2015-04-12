@@ -123,7 +123,7 @@ Let's list them here too:
     <delete>  ::= 0x05
     <call>    ::= 0x06
     <auth>    ::= 0x07
-    <eval>    ::= 0x80
+    <eval>    ::= 0x08
     -- Admin command codes
     <ping>    ::= 0x40
 
