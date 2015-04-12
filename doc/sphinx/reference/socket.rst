@@ -395,7 +395,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
     .. method:: name()
 
-        The ``The sock:name()`` function is used to get information about the
+        The ``sock:name()`` function is used to get information about the
         near side of the connection. If a socket was bound to ``xyz.com:45``,
         then ``sock:name`` will return information about ``[host:xyz.com, port:45]``.
         The equivalent POSIX function is ``getsockname()``.
@@ -503,6 +503,58 @@ computer to communicate with itself, but shows that the system works.
     ---
     - true
     ...
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Use tcp_server to accept file contents sent with socat
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here is an example of the tcp_server function, reading
+strings from the client and printing them. On the client
+side, the Linux socat utility will be used to ship a
+whole file for the tcp_server function to read.
+
+Start two shells. The first shell will be the server.
+The second shell will be the client.
+
+On the first shell, start Tarantool and say:
+
+.. code-block:: lua
+
+    box.cfg{}
+    socket = require('socket')
+    console = require('console'); console.delimiter('!')
+    socket.tcp_server('0.0.0.0',
+                  3302,
+                  function(s)
+                    while true do
+                      request = s:read("\n");
+                      if request == "" then break end
+                      if request == nil then break end
+                      print(request)
+                      end
+                    end)
+    console.delimiter('')!
+The above code means: use tcp_server() to wait for a
+connection from any host on port 3302. When it happens,
+enter a loop that reads on the socket and prints what it
+reads. The "delimiter" for the read function is "\\n" so
+each read() will read a string as far as the next line feed,
+including the line feed.
+
+On the second shell, create a file that contains a few
+lines. The contents don't matter. Suppose the first line
+contains A, the second line contains B, the third line
+contains C. Call this file "tmp.txt".
+
+On the second shell, use the socat utility to ship the
+tmp.txt file to the server's host and port:
+
+.. code-block:: lua
+
+    socat TCP:localhost:3302 ./tmp.txt
+
+Now watch what happens on the first shell.
+The strings "A", "B", "C" are printed.
 
 
 .. _luasocket: https://github.com/diegonehab/luasocket
