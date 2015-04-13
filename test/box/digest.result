@@ -166,3 +166,50 @@ lua box.digest.guava(1673758223894951030, 11)
 ---
  - 7
 ...
+lua box.digest.murmur('1234')
+---
+ - 1859914009
+...
+lua mur = box.digest.murmur.new{seed=13}
+---
+...
+lua nulldigest = mur:digest()
+---
+...
+lua mur:update('1234')
+---
+...
+lua mur:digest()
+---
+ - 1859914009
+...
+lua mur_new = mur:copy()
+---
+...
+lua mur_new:update('1234')
+---
+...
+lua mur_new:digest() ~= mur:digest()
+---
+ - true
+...
+lua mur:clear()
+---
+...
+lua nulldigest == mur:digest()
+---
+ - true
+...
+lua mur = box.digest.murmur.new{seed=14}
+---
+...
+lua mur:update('1234')
+---
+...
+lua mur:digest()
+---
+ - 1689834281
+...
+lua mur, mur_new, nulldigest = nil, nil, nil
+---
+...
