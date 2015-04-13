@@ -37,7 +37,7 @@
             "type": "line"
         }, 
         {
-            "color": "#8bbc21", 
+            "color": "#2f7ed8", 
             "data": [
                 {
                     "x": 8, 
@@ -64,11 +64,11 @@
                     "y": 2800.53
                 }
             ], 
-            "name": "Tarantool (TREE, 1.6.4-564-ge6e1429)", 
+            "name": "Tarantool (HASH, 1.6.4-564-ge6e1429)", 
             "type": "line"
         }, 
         {
-            "color": "#2f7ed8", 
+            "color": "#8bbc21", 
             "data": [
                 {
                     "x": 8, 
@@ -95,7 +95,7 @@
                     "y": 2879.66
                 }
             ], 
-            "name": "Tarantool (HASH, 1.6.4-564-ge6e1429)", 
+            "name": "Tarantool (TREE, 1.6.4-564-ge6e1429)", 
             "type": "line"
         }
     ], 
