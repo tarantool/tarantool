@@ -5,7 +5,7 @@
 box.cfg
 1	snapshot_count:6
 2	pid_file:box.pid
-3	slab_alloc_factor:2
+3	slab_alloc_factor:1.1
 4	slab_alloc_maximal:1048576
 5	background:false
 6	logger:tarantool.log

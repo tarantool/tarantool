@@ -12,7 +12,7 @@ t
 ---
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
-  - 'slab_alloc_factor: 2'
+  - 'slab_alloc_factor: 1.1'
   - 'slab_alloc_maximal: 1048576'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
@@ -46,7 +46,7 @@ t
 ---
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
-  - 'slab_alloc_factor: 2'
+  - 'slab_alloc_factor: 1.1'
   - 'slab_alloc_maximal: 1048576'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
@@ -117,7 +117,7 @@ box.cfg{sophia = {threads = "threads"}}
 box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads, box.cfg.sophia.page_size
 ---
 - 1
-- 2
+- 1.1
 - 5
 - 131072
 ...
@@ -132,7 +132,7 @@ box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads, box
 box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads, box.cfg.sophia.page_size
 ---
 - 0.2
-- 2
+- 1.1
 - 5
 - 131072
 ...
@@ -147,7 +147,7 @@ box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads, box
 box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads, box.cfg.sophia.page_size
 ---
 - 0.2
-- 2
+- 1.1
 - 10
 - 131072
 ...

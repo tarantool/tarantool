@@ -20,7 +20,7 @@ box.cfg
 ---
 - snapshot_count: 6
   too_long_threshold: 0.5
-  slab_alloc_factor: 2
+  slab_alloc_factor: 1.1
   slab_alloc_maximal: 1048576
   background: false
   slab_alloc_arena: 0.1

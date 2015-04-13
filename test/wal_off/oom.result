@@ -15,11 +15,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 22911 bytes in slab allocator for tuple
+- error: Failed to allocate 24643 bytes in slab allocator for tuple
 ...
 space:len();
 ---
-- 5722
+- 6155
 ...
 i = 1;
 ---
@@ -29,11 +29,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 4203 bytes in slab allocator for tuple
+- error: Failed to allocate 5187 bytes in slab allocator for tuple
 ...
 space:len();
 ---
-- 6767
+- 7446
 ...
 i = 1;
 ---
@@ -43,12 +43,12 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 1043 bytes in slab allocator for tuple
+- error: Failed to allocate 2751 bytes in slab allocator for tuple
 ...
 --# setopt delimiter ''
 space:len()
 ---
-- 7022
+- 8128
 ...
 space.index['primary']:get{0}
 ---

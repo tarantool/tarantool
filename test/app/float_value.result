@@ -1,7 +1,7 @@
 box.cfg
 1	snapshot_count:6
 2	pid_file:box.pid
-3	slab_alloc_factor:2
+3	slab_alloc_factor:1.1
 4	rows_per_wal:50
 5	background:false
 6	logger:tarantool.log
