@@ -530,6 +530,27 @@ SetuidGuard::~SetuidGuard()
 }
 
 /**
+ * A quick approximation if a Lua table is an array.
+ *
+ * JSON can only have strings as keys, so if the first
+ * table key is 1, it's definitely not a json map,
+ * and very likely an array.
+ */
+static inline bool
+lua_isarray(struct lua_State *L, int i)
+{
+	if (lua_istable(L, i) == false)
+		return false;
+	lua_pushnil(L);
+	if (lua_next(L, i) == 0) /* the table is empty */
+		return true;
+	bool index_starts_at_1 = lua_isnumber(L, -2) &&
+		lua_tonumber(L, -2) == 1;
+	lua_pop(L, 2);
+	return index_starts_at_1;
+}
+
+/**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
@@ -583,7 +604,7 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 
 	/** Check if we deal with a table of tables. */
 	int nrets = lua_gettop(L);
-	if (nrets == 1 && lua_istable(L, 1)) {
+	if (nrets == 1 && lua_isarray(L, 1)) {
 		/*
 		 * The table is not empty and consists of tables
 		 * or tuples. Treat each table element as a tuple,
@@ -604,7 +625,7 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		}
 	}
 	for (int i = 1; i <= nrets; ++i) {
-		if (lua_istable(L, i) || lua_istuple(L, i)) {
+		if (lua_isarray(L, i) || lua_istuple(L, i)) {
 			luamp_encode_tuple(L, luaL_msgpack_default, out, i);
 		} else {
 			luamp_encode_array(luaL_msgpack_default, out, 1);
