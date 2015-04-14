@@ -89,6 +89,7 @@ functions for insert or update or delete - the _user space is special so
 there are special functions which have appropriate error checking.
 
 To create a new user, say ``box.schema.user.create(user-name)`` or
+``box.schema.user.create(user-name, {if_not_exists=true})`` or
 ``box.schema.user.create(user-name, {password=password})``. The form
 ``box.schema.user.create(user-name, {password=password})`` is better because
 in a :ref:`URI` (Uniform Resource Identifier) it is usually illegal to include a
@@ -179,7 +180,7 @@ create Lua functions in the usual way, by saying
 that their names can be used within grant/revoke functions.
 
 The function for creating a ``_func`` tuple is:
-``box.schema.func.create(function-name)``.
+``box.schema.func.create(function-name [, {if_not_exists=true} ])``.
 
 The function for dropping a ``_func`` tuple is:
 ``box.schema.func.drop(function-name)``.
@@ -267,7 +268,7 @@ or indirectly.
 
 .. module:: box.schema.role
 
-.. function:: create(role-name)
+.. function:: create(role-name [, {if_not_exists=true} ] )
 
     Create a new role.
 
