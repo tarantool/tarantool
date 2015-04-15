@@ -69,6 +69,14 @@ struct xdir {
 	 * are skipped.
 	 */
 	bool panic_if_error;
+
+	/**
+	 * When reading files in this directory, skip
+	 * files which have .inprogress suffix: these
+	 * files are temporary.
+	 */
+	bool skip_filename_with_suffix;
+
 	/**
 	 * true if a log file in this directory can by fsync()ed
 	 * at close in a separate thread (we use this technique to
