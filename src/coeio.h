@@ -58,11 +58,46 @@ extern "C" {
 
 void coeio_init(void);
 void coeio_reinit(void);
-ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
 
-struct addrinfo *
-coeio_resolve(int socktype, const char *host, const char *port,
-              ev_tstamp timeout);
+struct coeio_task;
+
+typedef ssize_t (*async_task_cb)(struct async_task *task); /* like eio_req */
+typedef ssize_t (*async_call_cb)(va_list ap);
+typedef void (*async_timeout_cb)(struct async_task *task); /* like eio_req */
+
+/**
+ * A single task context.
+ */
+struct async_task {
+	struct eio_req base; /* eio_task - must be first */
+	/** The calling fiber. */
+	struct fiber *fiber;
+	/** Callbacks. */
+	union {
+		struct { /* async_task() */
+			async_task_cb task_cb;
+			async_timeout_cb timeout_cb;
+		};
+		struct { /* async_call() */
+			async_call_cb call_cb;
+			va_list ap;
+		};
+	};
+	/** Callback results. */
+	int complete;
+};
+
+ssize_t
+async_task(struct async_task *task, async_task_cb func,
+	   async_timeout_cb on_timeout, ev_tstamp timeout);
+
+ssize_t
+async_call(ssize_t (*func)(va_list ap), ...);
+
+int
+async_getaddrinfo(const char *host, const char *port,
+		  const struct addrinfo *hints, struct addrinfo **res,
+		  ev_tstamp timeout);
 
 #if defined(__cplusplus)
 }

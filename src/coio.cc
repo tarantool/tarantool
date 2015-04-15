@@ -194,7 +194,16 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		coio_fill_addrinfo(&ai_local, host, service, uri->host_hint);
 		ai = &ai_local;
 	} else {
-		ai = coeio_resolve(SOCK_STREAM, host, service, delay);
+	    struct addrinfo hints;
+	    memset(&hints, 0, sizeof(struct addrinfo));
+	    hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
+	    hints.ai_socktype = SOCK_STREAM;
+	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
+	    hints.ai_protocol = 0;
+	    int rc = async_getaddrinfo(host, service, &hints, &ai, delay);
+	    if (rc != 0) {
+		ai = NULL;
+	    }
 	}
 	if (ai == NULL)
 		return -1; /* timeout */

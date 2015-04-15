@@ -659,18 +659,16 @@ require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 - Connection refused
 ...
 --# setopt delimiter ';'
-json.encode(socket.getaddrinfo('ya.ru', '80',
-    { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
+socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+    flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
 ---
-- '[]'
+- - host: 127.0.0.1
+    family: AF_INET
+    type: SOCK_DGRAM
+    protocol: udp
+    port: 80
 ...
 --# setopt delimiter ''
-json.encode(socket.getaddrinfo('ya.ru', '80',
-    { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
-
----
-- '[]'
-...
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...

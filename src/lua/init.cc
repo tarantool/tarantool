@@ -191,7 +191,10 @@ tarantool_console_readline(struct lua_State *L)
 	}
 
 	char *line;
-	coeio_custom(readline_cb, TIMEOUT_INFINITY, &line, prompt);
+	if (async_call(readline_cb, &line, prompt) != 0) {
+		lua_pushnil(L);
+		return 1;
+	}
 	auto scoped_guard = make_scoped_guard([&] { free(line); });
 	if (!line) {
 		lua_pushnil(L);

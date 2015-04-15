@@ -216,8 +216,8 @@ string.match(tostring(sc), ', peer') == nil
 require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 
 --# setopt delimiter ';'
-json.encode(socket.getaddrinfo('ya.ru', '80',
-    { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
+socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+    flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
 --# setopt delimiter ''
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')

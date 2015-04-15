@@ -282,7 +282,7 @@ lua_pg_execute(struct lua_State *L)
 	}
 
 	PGresult *res = NULL;
-	if (coeio_custom(pg_exec, TIMEOUT_INFINITY, conn,
+	if (async_call(pg_exec, conn,
 			sql, count, paramTypes, paramValues,
 			paramLengths, paramFormats, &res) == -1) {
 
@@ -444,7 +444,7 @@ lbox_net_pg_connect(struct lua_State *L)
 
 	const char *constr = lua_tostring(L, -1);
 
-	if (coeio_custom(pg_connect, TIMEOUT_INFINITY, constr, &conn) == -1) {
+	if (async_call(pg_connect, constr, &conn) == -1) {
 		luaL_error(L, "Can't connect to postgresql: %s",
 			strerror(errno));
 	}

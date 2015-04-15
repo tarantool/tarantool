@@ -320,7 +320,7 @@ lua_mysql_execute(struct lua_State *L)
 	sql = lua_tolstring(L, -1, &len);
 
 
-	int res = coeio_custom(exec_mysql, TIMEOUT_INFINITY, mysql, sql, len);
+	int res = async_call(exec_mysql, mysql, sql, len);
 	lua_pop(L, 1);
 	if (res == -1)
 		luaL_error(L, "%s", strerror(errno));
@@ -331,8 +331,7 @@ lua_mysql_execute(struct lua_State *L)
 	int resno = 0;
 	do {
 		MYSQL_RES *result = NULL;
-		res = coeio_custom(fetch_result, TIMEOUT_INFINITY,
-			mysql, &result, resno);
+		res = async_call(fetch_result, mysql, &result, resno);
 		if (res == -1)
 			luaL_error(L, "%s", strerror(errno));
 
@@ -408,8 +407,7 @@ lbox_net_mysql_connect(struct lua_State *L)
 	}
 
 
-	if (coeio_custom(connect_mysql, TIMEOUT_INFINITY, mysql,
-					host, port, user, pass, db) == -1) {
+	if (async_call(connect_mysql, mysql, host, port, user, pass, db) == -1) {
 		mysql_close(mysql);
 		luaL_error(L, "%s", strerror(errno));
 	}

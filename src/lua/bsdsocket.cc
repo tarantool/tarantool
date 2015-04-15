@@ -442,32 +442,6 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 	return 1;
 }
 
-static ssize_t
-bsdsocket_getaddrinfo_cb(va_list ap)
-{
-	const char *host = va_arg(ap, const char *);
-	const char *port = va_arg(ap, const char *);
-	const struct addrinfo *hints = va_arg(ap, const struct addrinfo *);
-	struct addrinfo **res = va_arg(ap, struct addrinfo **);
-	int *res_errno = va_arg(ap, int *);
-
-	int rc = getaddrinfo(host, port, hints, res);
-
-	switch (rc) {
-	case EAI_NONAME:
-		*res = NULL;
-	case 0:
-		return 0;
-
-	case EAI_SYSTEM:
-		*res_errno = errno;
-		return -1;
-	default:
-		*res_errno = rc;
-		return -1;
-	}
-}
-
 static int
 lbox_bsdsocket_push_family(struct lua_State *L, int family)
 {
@@ -684,13 +658,10 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 		lua_pop(L, 1);
 	}
 
-	int res_errno = 0;
-	int dns_res = coeio_custom(bsdsocket_getaddrinfo_cb, timeout,
-				   host, port, &hints, &result, &res_errno);
+	int dns_res = async_getaddrinfo(host, port, &hints, &result, timeout);
 	lua_pop(L, 2);	/* host, port */
 
 	if (dns_res != 0) {
-		errno = res_errno;
 		lua_pushnil(L);
 		return 1;
 	}
