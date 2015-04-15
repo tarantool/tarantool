@@ -61,7 +61,7 @@ static void
 ipc_channel_create(struct ipc_channel *ch)
 {
 	ch->beg = ch->count = 0;
-	ch->closed = false;
+	ch->readonly = ch->closed = false;
 	ch->close = NULL;
 	ch->bcast = NULL;
 	rlist_create(&ch->readers);
@@ -95,6 +95,8 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 	void *res;
 	/* channel is empty */
 	while (ch->count == 0) {
+		if (ch->readonly)
+			return NULL;
 		/* try to be in FIFO order */
 		if (first_try) {
 			rlist_add_tail_entry(&ch->readers, fiber(), state);
@@ -121,7 +123,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 			goto exit;
 		}
 
-		if (ch->closed) {
+		if (ch->readonly) {
 			res = NULL;
 			goto exit;
 		}
@@ -139,7 +141,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 	}
 
 exit:
-	if (ch->closed && ch->close) {
+	if (ch->readonly && ch->close) {
 		fiber_wakeup(ch->close);
 		ch->close = NULL;
 	}
@@ -168,11 +170,11 @@ ipc_channel_close_waiter(struct ipc_channel *ch, struct fiber *f)
 }
 
 void
-ipc_channel_close(struct ipc_channel *ch)
+ipc_channel_shutdown(struct ipc_channel *ch)
 {
-	if (ch->closed)
+	if (ch->readonly)
 		return;
-	ch->closed = true;
+	ch->readonly = true;
 
 	struct fiber *f;
 	while(!rlist_empty(&ch->readers)) {
@@ -187,11 +189,23 @@ ipc_channel_close(struct ipc_channel *ch)
 		fiber_wakeup(ch->bcast);
 }
 
+void
+ipc_channel_close(struct ipc_channel *ch)
+{
+	if (ch->closed)
+		return;
+	assert(ch->readonly);
+	assert(ch->count == 0);
+	assert(rlist_empty(&ch->readers));
+	assert(rlist_empty(&ch->writers));
+	assert(ch->bcast == NULL);
+	ch->closed = true;
+}
 int
 ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 			ev_tstamp timeout)
 {
-	if (ch->closed) {
+	if (ch->readonly) {
 		errno = EBADF;
 		return -1;
 	}
@@ -223,7 +237,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 			goto exit;
 		}
 
-		if (ch->closed) {
+		if (ch->readonly) {
 			errno = EBADF;
 			res = -1;
 			goto exit;
@@ -245,7 +259,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 	}
 	res = 0;
 exit:
-	if (ch->closed && ch->close) {
+	if (ch->readonly && ch->close) {
 		int save_errno = errno;
 		fiber_wakeup(ch->close);
 		ch->close = NULL;
@@ -264,7 +278,7 @@ int
 ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 {
 	/* do nothing at closed channel */
-	if (ch->closed)
+	if (ch->readonly)
 		return 0;
 
 	/* broadcast in broadcast: marasmus */
@@ -285,7 +299,7 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 
 	unsigned cnt = 0;
 	while (!rlist_empty(&ch->readers)) {
-		if (ch->closed)
+		if (ch->readonly)
 			break;
 		f = rlist_first_entry(&ch->readers, struct fiber, state);
 
@@ -301,7 +315,7 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 			break;
 	}
 
-	if (ch->closed && ch->close) {
+	if (ch->readonly && ch->close) {
 		fiber_wakeup(ch->close);
 		ch->close = NULL;
 	}

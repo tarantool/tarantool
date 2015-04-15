@@ -256,6 +256,20 @@ lbox_ipc_channel_close(struct lua_State *L)
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "usage: channel:close()");
 	struct ipc_channel *ch = lbox_check_channel(L, 1);
+
+	/* Shutdown the channel for writing and wakeup waiters */
+	ipc_channel_shutdown(ch);
+
+	/* Discard all remaining items*/
+	while (!ipc_channel_is_empty(ch)) {
+		/* Never yields because channel is not empty */
+		size_t vref = (size_t)ipc_channel_get_timeout(ch, 0);
+		assert(vref);
+		assert((vref & BROADCAST_MASK) == 0);
+		/* Unref lua items */
+		luaL_unref(L, LUA_REGISTRYINDEX, vref);
+	}
+	/* Close the channel */
 	ipc_channel_close(ch);
 	return 0;
 }

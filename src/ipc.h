@@ -40,6 +40,7 @@ struct ipc_channel {
 	struct rlist readers, writers;
 	struct fiber *bcast;		/* broadcast waiter */
 	struct fiber *close;		/* close waiter */
+	bool readonly;			/* channel is for read only */
 	bool closed;			/* channel is closed */
 	unsigned size;
 	unsigned beg;
@@ -208,13 +209,31 @@ ipc_channel_count(struct ipc_channel *ch)
 }
 
 /**
- * @brief close the channel. Wake up readers and writers (if they exist)
+ * @brief shutdown channel for writing.
+ * Wake up readers and writers (if they exist)
+ */
+void
+ipc_channel_shutdown(struct ipc_channel *ch);
+
+/**
+ * @brief return true if the channel is closed for writing
+ */
+static inline bool
+ipc_channel_is_readonly(struct ipc_channel *ch)
+{
+	return ch->readonly;
+}
+
+/**
+ * @brief close the channel.
+ * @pre ipc_channel_is_readonly(ch) && ipc_channel_is_empty(ch)
  */
 void
 ipc_channel_close(struct ipc_channel *ch);
 
 /**
- * @brief return true if the channel is closed
+ * @brief return true if the channel is closed for both
+ * for reading and writing.
  */
 static inline bool
 ipc_channel_is_closed(struct ipc_channel *ch)
