@@ -185,7 +185,7 @@ space_stat(struct space *sp)
 		if (index) {
 			space_stat.index[i].id      = i;
 			space_stat.index[i].keys    = index->size();
-			space_stat.index[i].memsize = index->memsize();
+			space_stat.index[i].bsize   = index->bsize();
 		} else
 			space_stat.index[i].id = -1;
 	}

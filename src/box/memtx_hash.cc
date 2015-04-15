@@ -230,7 +230,7 @@ MemtxHash::size() const
 }
 
 size_t
-MemtxHash::memsize() const
+MemtxHash::bsize() const
 {
         return matras_extents_count(&hash_table->mtable) * HASH_INDEX_EXTENT_SIZE;
 }

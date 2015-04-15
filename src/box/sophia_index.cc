@@ -194,7 +194,7 @@ SophiaIndex::size() const
 }
 
 size_t
-SophiaIndex::memsize() const
+SophiaIndex::bsize() const
 {
 	void *c = sp_ctl(env);
 	char name[128];

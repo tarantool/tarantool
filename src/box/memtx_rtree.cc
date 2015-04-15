@@ -185,9 +185,9 @@ MemtxRTree::size() const
 }
 
 size_t
-MemtxRTree::memsize() const
+MemtxRTree::bsize() const
 {
-        return rtree_used_size(&tree);
+	return rtree_used_size(&tree);
 }
 
 struct tuple *
