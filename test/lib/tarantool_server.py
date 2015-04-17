@@ -205,15 +205,6 @@ class GdbMixin(Mixin):
         "name": "tarantool-gdb"
     }
 
-    def start_and_exit(self):
-        if re.search(r'^/', self._admin.port):
-            if os.path.exists(self._admin.port):
-                os.unlink(self._admin.port)
-        color_stdout('You started the server in gdb mode.\n', schema='info')
-        color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
-        TarantoolServer.start_and_exit(self)
-
-
     def prepare_args(self):
         if not find_in_path('screen'):
             raise OSError('`screen` executables not found in PATH')
@@ -372,8 +363,8 @@ class TarantoolServer(Server):
             'lua_libs': [],
             'valgrind': False,
             'vardir': None,
-            'start_and_exit': False,
-            'use_unix_sockets': False
+            'use_unix_sockets': False,
+            'tarantool_port': None
         }
         ini.update(_ini)
         Server.__init__(self, ini)
@@ -392,8 +383,8 @@ class TarantoolServer(Server):
         self.script = ini['script']
         self.lua_libs = ini['lua_libs']
         self.valgrind = ini['valgrind']
-        self._start_and_exit = ini['start_and_exit']
         self.use_unix_sockets = ini['use_unix_sockets']
+        self._start_against_running = ini['tarantool_port']
 
     def __del__(self):
         self.stop()
@@ -415,6 +406,11 @@ class TarantoolServer(Server):
         raise RuntimeError("Can't find server executable in " + path)
 
     def install(self, silent=True):
+        if self._start_against_running:
+            self._sql = self._start_against_running
+            self._admin = int(self._start_against_running) + 1
+            return
+
         if not silent:
             color_stdout('Installing the server ...\n', schema='serv_text')
             color_stdout('    Found executable at ', schema='serv_text')
@@ -437,12 +433,9 @@ class TarantoolServer(Server):
             self._admin = find_port(port)
         self._sql = find_port(port + 1)
 
-    def deploy(self, silent=True, wait = True):
+    def deploy(self, silent=True, wait=True):
         self.install(silent)
-        if not self._start_and_exit:
-            self.start(silent=silent, wait=wait)
-        else:
-            self.start_and_exit()
+        self.start(silent=silent, wait=wait)
 
     def copy_files(self):
         if self.script:
@@ -456,21 +449,14 @@ class TarantoolServer(Server):
     def prepare_args(self):
         return shlex.split(self.script_dst if self.script else self.binary)
 
-    def start_and_exit(self):
-        color_stdout('Starting the server {0} on ports {1} ...\n'.format(
-            os.path.basename(self.binary) if not self.script else self.script_dst,
-            ', '.join([': '.join([str(j) for j in i]) for i in self.conf.items() if i[0].find('port') != -1])
-            ), schema='serv_text')
-        with daemon.DaemonContext():
-            self.start()
-            self.process.wait()
-
     def start(self, silent=True, wait = True):
+        if self._start_against_running:
+            return
         if self.status == 'started':
             if not silent:
                 color_stdout('The server is already started.\n', schema='lerror')
             return
-        if not silent or self._start_and_exit:
+        if not silent:
             color_stdout("Starting the server ...\n", schema='serv_text')
             color_stdout("Starting ", schema='serv_text')
             color_stdout((os.path.basename(self.binary) if not self.script else self.script_dst) + " \n", schema='path')
@@ -496,6 +482,8 @@ class TarantoolServer(Server):
         self.process.wait()
 
     def stop(self, silent=True):
+        if self._start_against_running:
+            return
         if self.status != 'started':
             if not silent:
                 color_stdout('The server is not started.\n', schema='lerror')
@@ -572,8 +560,10 @@ class TarantoolServer(Server):
 
     def print_log(self, lines):
         color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
-        with open(self.logfile, 'r') as log:
-            return log.readlines()[-lines:]
+        if os.path.exists(self.logfile):
+            with open(self.logfile, 'r') as log:
+                return log.readlines()[-lines:]
+        color_stdout("    Can't find log:\n", schema='error')
 
     def test_option_get(self, option_list_str, silent=False):
         args = [self.binary] + shlex.split(option_list_str)

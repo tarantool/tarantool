@@ -31,9 +31,7 @@ class UnittestServer(Server):
         self.builddir = ini['builddir']
         self.debug = False
 
-    def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               init_lua=None, silent=True, need_init=True):
+    def deploy(self, vardir=None, silent=True, wait=True):
         self.vardir = vardir
         if not os.access(self.vardir, os.F_OK):
             os.makedirs(self.vardir)
