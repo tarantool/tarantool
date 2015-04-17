@@ -34,7 +34,7 @@ box.cfg
   logger_nonblock: true
   snap_dir: .
   coredump: false
-  slab_alloc_minimal: 64
+  slab_alloc_minimal: 16
   sophia_dir: .
   wal_mode: write
   wal_dir: .

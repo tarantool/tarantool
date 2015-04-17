@@ -141,6 +141,7 @@ small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 	factor_tree_new(&alloc->factor_pools);
 	(void) factor_pool_create(alloc, NULL, alloc->objsize_max);
 
+	lifo_init(&alloc->delayed);
 	alloc->is_delayed_free_mode = false;
 }
 

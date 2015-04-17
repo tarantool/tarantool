@@ -61,15 +61,26 @@ mmap_checked(size_t size, size_t align, int flags)
 	/* The size must be a multiple of alignment */
 	assert((size & (align - 1)) == 0);
 	/*
-	 * mmap twice the requested amount to be able to align
-	 * the mapped address.
-	 * @todo all mappings except the first are likely to
-	 * be aligned already. Find out if trying to map
-	 * optimistically exactly the requested amount and fall
-	 * back to double-size mapping is a viable strategy.
+	 * All mappings except the first are likely to
+	 * be aligned already.  Be optimistic by trying
+	 * to map exactly the requested amount.
 	 */
-	void *map = mmap(NULL, size + align, PROT_READ | PROT_WRITE,
+	void *map = mmap(NULL, size, PROT_READ | PROT_WRITE,
 			 flags | MAP_ANONYMOUS, -1, 0);
+	if (map == MAP_FAILED)
+		return NULL;
+	if (((intptr_t) map & (align - 1)) == 0)
+		return map;
+	munmap_checked(map, size);
+
+	/*
+	 * mmap twice the requested amount to be able to align
+	 * the mapped address.  This can lead to virtual memory
+	 * fragmentation depending on the kernels allocation
+	 * strategy.
+	 */
+	map = mmap(NULL, size + align, PROT_READ | PROT_WRITE,
+		   flags | MAP_ANONYMOUS, -1, 0);
 	if (map == MAP_FAILED)
 		return NULL;
 

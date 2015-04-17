@@ -177,11 +177,11 @@ ipc_channel_shutdown(struct ipc_channel *ch)
 	ch->readonly = true;
 
 	struct fiber *f;
-	while(!rlist_empty(&ch->readers)) {
+	while (!rlist_empty(&ch->readers)) {
 		f = rlist_first_entry(&ch->readers, struct fiber, state);
 		ipc_channel_close_waiter(ch, f);
 	}
-	while(!rlist_empty(&ch->writers)) {
+	while (!rlist_empty(&ch->writers)) {
 		f = rlist_first_entry(&ch->writers, struct fiber, state);
 		ipc_channel_close_waiter(ch, f);
 	}
