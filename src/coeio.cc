@@ -191,7 +191,6 @@ async_on_call(eio_req *req)
  * func sets errno, the errno is preserved across the call.
  *
  * @retval -1 and errno = ENOMEM if failed to create a task
- * @retval -1 and errno = ETIMEDOUT if timed out
  * @retval the function return (errno is preserved).
  *
  * @code
@@ -210,6 +209,8 @@ ssize_t
 async_call(ssize_t (*func)(va_list ap), ...)
 {
 	struct async_task *task = (struct async_task *) calloc(1, sizeof(*task));
+	if (task == NULL)
+		return -1; /* errno = ENOMEM */
 	/* from eio.c: REQ() definition */
 	task->base.type = EIO_CUSTOM;
 	task->base.feed = async_on_call;
