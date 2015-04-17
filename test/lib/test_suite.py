@@ -80,15 +80,10 @@ class TestSuite:
     def run_all(self):
         """For each file in the test suite, run client program
         assuming each file represents an individual test."""
-
         if not self.tests:
             # noting to test, exit
             return []
         self.server.deploy(silent=False)
-
-        if self.args.start_and_exit:
-            color_stdout("    Start and exit requested, exiting...\n", schema='info')
-            exit(0)
 
         longsep = '='*70
         shortsep = '-'*60

@@ -37,9 +37,7 @@ class AppServer(Server):
         self.debug = False
         self.lua_libs = ini['lua_libs']
 
-    def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               init_lua=None, silent=True, need_init=True):
+    def deploy(self, vardir=None, silent=True, need_init=True):
         self.vardir = vardir
         if not os.access(self.vardir, os.F_OK):
             os.makedirs(self.vardir)

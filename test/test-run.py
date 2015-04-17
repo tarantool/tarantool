@@ -82,21 +82,13 @@ class Options:
                 Default: false.""")
 
         parser.add_argument(
-                "--start-and-exit",
-                dest = "start_and_exit",
-                action = "store_true",
-                default = False,
-                help = """Start the server from the first specified suite and
-                exit without running any tests. Default: false.""")
-
-        parser.add_argument(
                 "--gdb",
                 dest = "gdb",
                 action = "store_true",
                 default = False,
                 help = """Start the server under 'gdb' debugger in detached
-                Screen. See also --start-and-exit. This option is mutually
-                exclusive with --valgrind. Default: false.""")
+                Screen. This option is mutually exclusive with --valgrind.
+                Default: false.""")
 
         parser.add_argument(
                 "--valgrind",
@@ -116,6 +108,12 @@ class Options:
                 dest = "stress",
                 default = None,
                 help = """Name of streess TestSuite to run""")
+
+        parser.add_argument(
+                "--tarantool-port",
+                dest = "tarantool_port",
+                default = None,
+                help = """Listen port number to run tests against. Admin port number must be listen+1""")
 
         parser.add_argument(
                 "--vardir",
