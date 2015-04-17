@@ -10,7 +10,7 @@ struct elem_t {
 	long second;
 	bool operator!= (const struct elem_t& another) const
 	{
-		return first == another.first && second == another.second; 
+		return first != another.first || second != another.second;
 	}
 };
 
@@ -38,15 +38,19 @@ static int compare_key(const elem_t &a, long b)
 	return a.first < b ? -1 : a.first > b ? 1 : 0;
 }
 
+int total_extents_allocated = 0;
+
 static void *
 extent_alloc()
 {
+	total_extents_allocated++;
 	return malloc(BPS_TREE_EXTENT_SIZE);
 }
 
 static void
 extent_free(void *extent)
 {
+	total_extents_allocated--;
 	free(extent);
 }
 
@@ -115,7 +119,7 @@ itr_check()
 		printf("\n");
 	}
 	
-	/* Iteratete forward all elements 5 times */
+	/* Iterate forward all elements 5 times */
 	{
 		bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
@@ -135,7 +139,7 @@ itr_check()
 		}
 	}
 	
-	/* Iteratete backward all elements 5 times */
+	/* Iterate backward all elements 5 times */
 	{
 		bps_tree_test_iterator itr = bps_tree_test_itr_last(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
@@ -389,9 +393,90 @@ itr_invalidate_check()
 	footer();
 }
 
+static void
+itr_freeze_check()
+{
+	header();
+
+	const int test_rounds_size = 10;
+	const int test_data_size = 1000;
+	elem_t comp_buf1[test_data_size];
+	elem_t comp_buf2[test_data_size];
+	const int test_data_mod = 2000;
+	srand(0);
+	struct bps_tree_test tree;
+
+	for (int i = 0; i < 10; i++) {
+		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+		int comp_buf_size1 = 0;
+		int comp_buf_size2 = 0;
+		for (int j = 0; j < test_data_size; j++) {
+			elem_t e;
+			e.first = rand() % test_data_mod;
+			e.second = 0;
+			bps_tree_test_insert(&tree, e, 0);
+		}
+		struct bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
+		elem_t *e;
+		while ((e = bps_tree_test_itr_get_elem(&tree, &itr))) {
+			comp_buf1[comp_buf_size1++] = *e;
+			bps_tree_test_itr_next(&tree, &itr);
+		}
+		struct bps_tree_test_iterator itr1 = bps_tree_test_itr_first(&tree);
+		bps_tree_test_itr_freeze(&tree, &itr1);
+		struct bps_tree_test_iterator itr2 = bps_tree_test_itr_first(&tree);
+		bps_tree_test_itr_freeze(&tree, &itr2);
+		for (int j = 0; j < test_data_size; j++) {
+			elem_t e;
+			e.first = rand() % test_data_mod;
+			e.second = 0;
+			bps_tree_test_insert(&tree, e, 0);
+		}
+		int tested_count = 0;
+		while ((e = bps_tree_test_itr_get_elem(&tree, &itr1))) {
+			if (*e != comp_buf1[tested_count]) {
+				fail("version restore failed (1)", "true");
+			}
+			tested_count++;
+			if (tested_count > comp_buf_size1) {
+				fail("version restore failed (2)", "true");
+			}
+			bps_tree_test_itr_next(&tree, &itr1);
+		}
+		bps_tree_test_itr_destroy(&tree, &itr1);
+		for (int j = 0; j < test_data_size; j++) {
+			elem_t e;
+			e.first = rand() % test_data_mod;
+			e.second = 0;
+			bps_tree_test_delete(&tree, e);
+		}
+
+		tested_count = 0;
+		while ((e = bps_tree_test_itr_get_elem(&tree, &itr2))) {
+			if (*e != comp_buf1[tested_count]) {
+				fail("version restore failed (1)", "true");
+			}
+			tested_count++;
+			if (tested_count > comp_buf_size1) {
+				fail("version restore failed (2)", "true");
+			}
+			bps_tree_test_itr_next(&tree, &itr2);
+		}
+
+		bps_tree_test_destroy(&tree);
+	}
+
+	footer();
+}
+
+
 int
 main(void)
 {
 	itr_check();
 	itr_invalidate_check();
+	itr_freeze_check();
+	if (total_extents_allocated) {
+		fail("memory leak", "true");
+	}
 }

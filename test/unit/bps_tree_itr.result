@@ -11,4 +11,6 @@ Key 20000, empty range [eof, eof):  <->
 	*** itr_check: done ***
  	*** itr_invalidate_check ***
 	*** itr_invalidate_check: done ***
+ 	*** itr_freeze_check ***
+	*** itr_freeze_check: done ***
  
