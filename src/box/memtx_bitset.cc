@@ -110,7 +110,7 @@ MemtxBitset::size() const
 }
 
 size_t
-MemtxBitset::memsize() const
+MemtxBitset::bsize() const
 {
 	return 0;
 }

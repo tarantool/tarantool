@@ -458,3 +458,62 @@ count > 2000, #res, res;
   - true
 ...
 --# setopt delimiter ''
+--
+-- gh-756: channel:close() leaks memory
+--
+ffi = require('ffi')
+---
+...
+ffi.cdef[[ struct gh756 { int k; }; ]]
+---
+...
+ct = ffi.metatype('struct gh756', { __gc = function() refs = refs - 1; end })
+---
+...
+-- create 10 objects and put they to a channel
+refs = 10
+---
+...
+ch = fiber.channel(refs)
+---
+...
+for i=1,refs do ch:put(ffi.new(ct, i)) end
+---
+...
+-- get an object from the channel, run GC and check the number of objects
+ch:get().k == 1
+---
+- true
+...
+collectgarbage('collect')
+---
+- 0
+...
+refs
+---
+- 9
+...
+ch:get().k == 2
+---
+- true
+...
+collectgarbage('collect')
+---
+- 0
+...
+refs
+---
+- 8
+...
+-- close the channel and check the number of objects
+ch:close()
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+refs -- must be zero
+---
+- 0
+...

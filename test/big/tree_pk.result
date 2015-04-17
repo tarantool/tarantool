@@ -7,6 +7,9 @@ s0 = box.schema.space.create('tweedledum')
 i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 ---
 ...
+bsize = i0:bsize()
+---
+...
 -- integer keys
 s0:insert{1, 'tuple'}
 ---
@@ -23,6 +26,10 @@ s0:insert{2, 'tuple 2'}
 box.snapshot()
 ---
 - ok
+...
+i0:bsize() > bsize
+---
+- true
 ...
 s0:insert{3, 'tuple 3'}
 ---

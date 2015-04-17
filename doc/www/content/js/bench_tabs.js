@@ -11,6 +11,8 @@ function create_li(arr) {
     return tmparr.join('');
 }
 
+
+
 (function(){
     var dOn = $(document);
 
@@ -31,11 +33,18 @@ function create_li(arr) {
                     'C': ['READ'],
                     'D': ['READ', 'INSERT'],
                     'E': ['SCAN', 'INSERT'],
-                    'F': ['READ', 'READ-MODIFY-WRITE', 'UPDATE']
+                    'F': ['READ', 'READ-MODIFY-WRITE', 'UPDATE'],
+                    'MEM': []
                 };
                 title.html('Workload ' + link.html());
-                image_1.renderChart('/ycsb/' + link.html() + '_throughput.json');
-                image_2.renderChart('/ycsb/' + link.html() + '_' + table[link.html()][0] + '_latency.json');
+                if (link.html() == 'MEM') {
+                    title.html('Memory footprint')
+                    image_1.renderChart('/ycsb/MEM.json');
+                    image_2.highcharts().destroy()
+                } else {
+                    image_1.renderChart('/ycsb/' + link.html() + '_throughput.json');
+                    image_2.renderChart('/ycsb/' + link.html() + '_' + table[link.html()][0] + '_latency.json');
+                }
                 ul.html(create_li(table[link.html()]));
             }
         }

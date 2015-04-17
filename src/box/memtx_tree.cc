@@ -204,7 +204,7 @@ MemtxTree::size() const
 }
 
 size_t
-MemtxTree::memsize() const
+MemtxTree::bsize() const
 {
 	return bps_tree_index_mem_used(&tree);
 }

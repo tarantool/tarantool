@@ -3,11 +3,15 @@ dofile('utils.lua')
 s0 = box.schema.space.create('tweedledum')
 i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 
+bsize = i0:bsize()
+
 -- integer keys
 s0:insert{1, 'tuple'}
 box.snapshot()
 s0:insert{2, 'tuple 2'}
 box.snapshot()
+
+i0:bsize() > bsize
 
 s0:insert{3, 'tuple 3'}
 s0.index['primary']:get{1}

@@ -2,4 +2,4 @@
                             Java
 =====================================================================
 
-Please, see http://dgreenru.github.io/tarantool-java/.
+See http://github.com/tarantool/tarantool-java/.

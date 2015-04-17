@@ -271,7 +271,7 @@ space_run_triggers(struct space *space, bool yesno);
 struct index_stat {
 	int32_t id;
 	int64_t keys;
-	int64_t memsize;
+	int64_t bsize;
 };
 
 struct space_stat {

@@ -49,6 +49,7 @@ STATIC_PATHS = [
     'js/main.js',
     'js/old_tabs.js',
     'js/select.js',
+    'js/filesize.min.js'
 ]
 
 EXTRA_PATH_METADATA = {}

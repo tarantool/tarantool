@@ -150,9 +150,9 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"server UUID"       /* 0x24 */
-	"cluster UUID"      /* 0x25 */
-	"vector clock"      /* 0x26 */
-	"expr"              /* 0x27 */
+	"server UUID",      /* 0x24 */
+	"cluster UUID",     /* 0x25 */
+	"vector clock",     /* 0x26 */
+	"expression",       /* 0x27 */
 };
 
