@@ -157,3 +157,29 @@ for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
 count > 2000, #res, res;
 
 --# setopt delimiter ''
+
+--
+-- gh-756: channel:close() leaks memory
+--
+
+ffi = require('ffi')
+ffi.cdef[[ struct gh756 { int k; }; ]]
+ct = ffi.metatype('struct gh756', { __gc = function() refs = refs - 1; end })
+
+-- create 10 objects and put they to a channel
+refs = 10
+ch = fiber.channel(refs)
+for i=1,refs do ch:put(ffi.new(ct, i)) end
+
+-- get an object from the channel, run GC and check the number of objects
+ch:get().k == 1
+collectgarbage('collect')
+refs
+ch:get().k == 2
+collectgarbage('collect')
+refs
+
+-- close the channel and check the number of objects
+ch:close()
+collectgarbage('collect')
+refs -- must be zero
