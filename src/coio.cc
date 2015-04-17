@@ -200,7 +200,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_socktype = SOCK_STREAM;
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
-	    int rc = async_getaddrinfo(host, service, &hints, &ai, delay);
+	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
 	    if (rc != 0) {
 		ai = NULL;
 	    }

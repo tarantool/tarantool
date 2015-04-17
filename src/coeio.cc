@@ -117,9 +117,9 @@ coeio_reinit(void)
 }
 
 static void
-async_on_exec(eio_req *req)
+coio_on_exec(eio_req *req)
 {
-	struct async_task *task = (struct async_task *) req;
+	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->task_cb(task);
 }
 
@@ -128,11 +128,11 @@ async_on_exec(eio_req *req)
  * eio_request is complete.
  */
 static int
-async_on_finish(eio_req *req)
+coio_on_finish(eio_req *req)
 {
-	struct async_task *task = (struct async_task *) req;
+	struct coio_task *task = (struct coio_task *) req;
 	if (task->fiber == NULL) {
-		/* timed out (only async_task() )*/
+		/* timed out (only coio_task() )*/
 		if (task->timeout_cb != NULL) {
 			task->timeout_cb(task);
 		}
@@ -145,14 +145,14 @@ async_on_finish(eio_req *req)
 }
 
 ssize_t
-async_task(struct async_task *task, async_task_cb func,
-	   async_timeout_cb on_timeout, ev_tstamp timeout)
+coio_task(struct coio_task *task, coio_task_cb func,
+	   coio_task_timeout_cb on_timeout, ev_tstamp timeout)
 {
 	/* from eio.c: REQ() definition */
 	memset(&task->base, 0, sizeof(task->base));
 	task->base.type = EIO_CUSTOM;
-	task->base.feed = async_on_exec;
-	task->base.finish = async_on_finish;
+	task->base.feed = coio_on_exec;
+	task->base.finish = coio_on_finish;
 	/* task->base.destroy = NULL; */
 	/* task->base.pri = 0; */
 
@@ -174,9 +174,9 @@ async_task(struct async_task *task, async_task_cb func,
 }
 
 static void
-async_on_call(eio_req *req)
+coio_on_call(eio_req *req)
 {
-	struct async_task *task = (struct async_task *) req;
+	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->call_cb(task->ap);
 }
 
@@ -201,20 +201,20 @@ async_on_call(eio_req *req)
  *	         return open(filename, flags);
  *	}
  *
- *	 if (coeio_custom(openfile_cb, 0.10, "/tmp/file", 0) == -1)
+ *	 if (coio_call(openfile_cb, 0.10, "/tmp/file", 0) == -1)
  *		// handle errors.
  *	...
  */
 ssize_t
-async_call(ssize_t (*func)(va_list ap), ...)
+coio_call(ssize_t (*func)(va_list ap), ...)
 {
-	struct async_task *task = (struct async_task *) calloc(1, sizeof(*task));
+	struct coio_task *task = (struct coio_task *) calloc(1, sizeof(*task));
 	if (task == NULL)
 		return -1; /* errno = ENOMEM */
 	/* from eio.c: REQ() definition */
 	task->base.type = EIO_CUSTOM;
-	task->base.feed = async_on_call;
-	task->base.finish = async_on_finish;
+	task->base.feed = coio_on_call;
+	task->base.finish = coio_on_finish;
 	/* task->base.destroy = NULL; */
 	/* task->base.pri = 0; */
 
@@ -241,7 +241,7 @@ async_call(ssize_t (*func)(va_list ap), ...)
 }
 
 struct async_getaddrinfo_task {
-	struct async_task base;
+	struct coio_task base;
 	struct addrinfo *result;
 	int rc;
 	char *host;
@@ -258,7 +258,7 @@ struct async_getaddrinfo_task {
  * coeio (libeio).
 */
 static ssize_t
-getaddrinfo_cb(struct async_task *ptr)
+getaddrinfo_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) ptr;
@@ -282,7 +282,7 @@ getaddrinfo_cb(struct async_task *ptr)
 }
 
 static void
-getaddrinfo_free_cb(struct async_task *ptr)
+getaddrinfo_free_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
 		(struct async_getaddrinfo_task *) ptr;
@@ -294,9 +294,9 @@ getaddrinfo_free_cb(struct async_task *ptr)
 }
 
 int
-async_getaddrinfo(const char *host, const char *port,
-		  const struct addrinfo *hints, struct addrinfo **res,
-		  ev_tstamp timeout)
+coio_getaddrinfo(const char *host, const char *port,
+		 const struct addrinfo *hints, struct addrinfo **res,
+		 ev_tstamp timeout)
 {
 	int rc = EAI_SYSTEM;
 	int save_errno = 0;
@@ -324,8 +324,8 @@ async_getaddrinfo(const char *host, const char *port,
 		}
 	}
 	/* do resolving */
-	/* async_task() don't throw. */
-	if (async_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
+	/* coio_task() don't throw. */
+	if (coio_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
 		       timeout) == -1) {
 		/* timed out */
 		errno = ETIMEDOUT;
@@ -356,7 +356,7 @@ int
 cord_cojoin(struct cord *cord)
 {
 	assert(cord() != cord); /* Can't join self. */
-	int rc = async_call(cord_cojoin_cb, cord);
+	int rc = coio_call(cord_cojoin_cb, cord);
 	if (rc == 0 && cord->fiber->exception) {
 		Exception::move(&cord->fiber->exception, &fiber()->exception);
 		cord_destroy(cord);

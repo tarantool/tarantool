@@ -191,7 +191,7 @@ tarantool_console_readline(struct lua_State *L)
 	}
 
 	char *line;
-	if (async_call(readline_cb, &line, prompt) != 0) {
+	if (coio_call(readline_cb, &line, prompt) != 0) {
 		lua_pushnil(L);
 		return 1;
 	}
