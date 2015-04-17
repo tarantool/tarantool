@@ -64,8 +64,8 @@ void matras_alloc_test()
 {
 	std::cout << "Testing matras_alloc..." << std::endl;
 	unsigned int maxCapacity =  PROV_EXTENT_SIZE / PROV_BLOCK_SIZE;
-	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
-	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
+	maxCapacity *= PROV_EXTENT_SIZE / sizeof(struct matras_record);
+	maxCapacity *= PROV_EXTENT_SIZE / sizeof(struct matras_record);
 
 	struct matras pta;
 
@@ -136,10 +136,10 @@ void matras_alloc_test()
 
 		for (unsigned int j = 0; j < maxCapacity; j++) {
 			unsigned int res = 0;
-			unsigned int prev_block_count = pta.block_count;
+			unsigned int prev_block_count = pta.block_counts[0];
 			void *data = matras_alloc(&pta, &res);
 			if (!data) {
-				check(prev_block_count == pta.block_count, "Created count changed during memory fail!");
+				check(prev_block_count == pta.block_counts[0], "Created count changed during memory fail!");
 				break;
 			}
 		}
@@ -150,9 +150,102 @@ void matras_alloc_test()
 	std::cout << "Testing matras_alloc successfully finished" << std::endl;
 }
 
+typedef uint64_t type_t;
+const size_t VER_EXTENT_SIZE = 512;
+int extents_in_use = 0;
+
+void *all()
+{
+	extents_in_use++;
+	return malloc(VER_EXTENT_SIZE);
+}
+
+void dea(void *p)
+{
+	extents_in_use--;
+	free(p);
+}
+void
+matras_vers_test()
+{
+	std::cout << "Testing matras versions..." << std::endl;
+
+	std::vector<type_t> comps[MATRAS_VERSION_COUNT];
+	int use_mask = 1;
+	int cur_num_or_ver = 1;
+	struct matras local;
+	matras_create(&local, VER_EXTENT_SIZE, sizeof(type_t), all, dea);
+	type_t val = 0;
+	for (int s = 10; s < 8000; s = int(s * 1.5)) {
+		for (int k = 0; k < 800; k++) {
+			bool check_me = false;
+			if (rand() % 16 == 0) {
+				bool add_ver;
+				if (cur_num_or_ver == 1)
+					add_ver = true;
+				else if (cur_num_or_ver == MATRAS_VERSION_COUNT)
+					add_ver = false;
+				else
+					add_ver = rand() % 2 == 0;
+				if (add_ver) {
+					cur_num_or_ver++;
+					int new_ver = matras_new_version(&local);
+					use_mask |= (1 << new_ver);
+					comps[new_ver] = comps[0];
+				} else {
+					cur_num_or_ver--;
+					int del_ver;
+					do {
+						del_ver = 1 + rand() % (MATRAS_VERSION_COUNT - 1);
+					} while ((use_mask & (1 << del_ver)) == 0);
+					matras_delete_version(&local, del_ver);
+					comps[del_ver].clear();
+					use_mask &= ~(1 << del_ver);
+				}
+				check_me = true;
+			} else {
+				check_me = rand() % 16 == 0;
+				if (rand() % 8 == 0 && comps[0].size() > 0) {
+					matras_dealloc(&local);
+					comps[0].pop_back();
+				}
+				int p = rand() % s;
+				int mod = 0;
+				while (p >= comps[0].size()) {
+					comps[0].push_back(val * 10000 + mod);
+					matras_id_t tmp;
+					type_t *ptrval = (type_t *)matras_alloc(&local, &tmp);
+					*ptrval = val * 10000 + mod;
+					mod++;
+				}
+				val++;
+				comps[0][p] = val;
+				matras_before_change(&local, p);
+				*(type_t *)matras_get(&local, p) = val;
+			}
+			int checkres = matras_debug_selfcheck(&local);
+			check(checkres == 0, "internal check failed");
+			for (int i = 0; i < MATRAS_VERSION_COUNT; i++) {
+				if ((use_mask & (1 << i)) == 0)
+					continue;
+				check(comps[i].size() == local.block_counts[i], "size mismatch");
+				for (int j = 0; j < comps[i].size(); j++) {
+					type_t val1 = comps[i][j];
+					type_t val2 = *(type_t *)matras_getv(&local, j, i);
+					check(val1 == val2, "data mismatch");
+				}
+			}
+		}
+	}
+	matras_destroy(&local);
+	check(extents_in_use == 0, "memory leak");
+
+	std::cout << "Testing matras_version successfully finished" << std::endl;
+}
 
 int
 main(int, const char **)
 {
 	matras_alloc_test();
+	matras_vers_test();
 }

@@ -980,7 +980,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 	assert(tree->size == 0);
 	assert(tree->root == 0);
 	assert(tree->garbage_head == 0);
-	assert(tree->matras.block_count == 0);
+	assert(tree->matras.block_counts[0] == 0);
 	if (array_size == 0)
 		return true;
 	bps_tree_block_id_t leaf_count = (array_size +

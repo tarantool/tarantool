@@ -439,7 +439,7 @@ LIGHT(prepare_first_insert)(struct LIGHT(core) *ht)
 {
 	assert(ht->count == 0);
 	assert(ht->table_size == 0);
-	assert(ht->mtable.block_count == 0);
+	assert(ht->mtable.block_counts[0] == 0);
 
 	uint32_t slot;
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
@@ -695,7 +695,7 @@ inline int
 LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 {
 	int res = 0;
-	if (ht->table_size != ht->mtable.block_count)
+	if (ht->table_size != ht->mtable.block_counts[0])
 		res |= 64;
 	uint32_t empty_slot = ht->empty_slot;
 	if (empty_slot == LIGHT(end)) {

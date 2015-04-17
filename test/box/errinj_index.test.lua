@@ -22,7 +22,7 @@ res = {}
 for _, t in s.index[0]:pairs() do table.insert(res, t) end
 res
 
-for i = 501,2500 do s:insert{i, i} end
+for i = 501,5000 do s:insert{i, i} end
 s:delete{1}
 
 res = {}
@@ -32,27 +32,27 @@ res = {}
 for i = 501,510 do table.insert(res, (s:get{i})) end
 res
 res = {}
-for i = 2001,2010 do table.insert(res, (s:get{i})) end
+for i = 4001,4010 do table.insert(res, (s:get{i})) end
 res
 
---count must be greater that 1000 but less than 2000
-function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 1000 and "fail 1" or count >= 2000 and "fail 2" or "ok" end
+--count must be greater that 2000 but less than 4000
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 2000 and "fail 1" or count >= 4000 and "fail 2" or "ok" end
 check_iter_and_size()
 
-for i = 2501,3500 do s:insert{i, i} end
+for i = 5001,6000 do s:insert{i, i} end
 s:delete{2}
 check_iter_and_size()
 res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
 
-for i = 3501,4500 do s:insert{i, i} end
+for i = 6001,7000 do s:insert{i, i} end
 s:delete{3}
 check_iter_and_size()
 
 errinj.set("ERRINJ_INDEX_ALLOC", false)
 
-for i = 4501,5500 do s:insert{i, i} end
+for i = 7001,8000 do s:insert{i, i} end
 res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
@@ -61,7 +61,7 @@ res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
 res = {}
-for i = 5001,5010 do table.insert(res, (s:get{i})) end
+for i = 7501,7510 do table.insert(res, (s:get{i})) end
 res
 s:drop()
 
