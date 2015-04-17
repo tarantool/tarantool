@@ -363,7 +363,8 @@ class TarantoolServer(Server):
             'lua_libs': [],
             'valgrind': False,
             'vardir': None,
-            'use_unix_sockets': False
+            'use_unix_sockets': False,
+            'tarantool_port': None
         }
         ini.update(_ini)
         Server.__init__(self, ini)
@@ -383,7 +384,7 @@ class TarantoolServer(Server):
         self.lua_libs = ini['lua_libs']
         self.valgrind = ini['valgrind']
         self.use_unix_sockets = ini['use_unix_sockets']
-#        self._start_against_running = ini['tarantool_port']
+        self._start_against_running = ini['tarantool_port']
 
     def __del__(self):
         self.stop()
@@ -405,6 +406,11 @@ class TarantoolServer(Server):
         raise RuntimeError("Can't find server executable in " + path)
 
     def install(self, silent=True):
+        if self._start_against_running:
+            self._sql = self._start_against_running
+            self._admin = int(self._start_against_running) + 1
+            return
+
         if not silent:
             color_stdout('Installing the server ...\n', schema='serv_text')
             color_stdout('    Found executable at ', schema='serv_text')
@@ -444,6 +450,8 @@ class TarantoolServer(Server):
         return shlex.split(self.script_dst if self.script else self.binary)
 
     def start(self, silent=True, wait = True):
+        if self._start_against_running:
+            return
         if self.status == 'started':
             if not silent:
                 color_stdout('The server is already started.\n', schema='lerror')
@@ -474,6 +482,8 @@ class TarantoolServer(Server):
         self.process.wait()
 
     def stop(self, silent=True):
+        if self._start_against_running:
+            return
         if self.status != 'started':
             if not silent:
                 color_stdout('The server is not started.\n', schema='lerror')
@@ -550,8 +560,10 @@ class TarantoolServer(Server):
 
     def print_log(self, lines):
         color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
-        with open(self.logfile, 'r') as log:
-            return log.readlines()[-lines:]
+        if os.path.exists(self.logfile):
+            with open(self.logfile, 'r') as log:
+                return log.readlines()[-lines:]
+        color_stdout("    Can't find log:\n", schema='error')
 
     def test_option_get(self, option_list_str, silent=False):
         args = [self.binary] + shlex.split(option_list_str)
