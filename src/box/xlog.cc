@@ -81,6 +81,7 @@ xdir_create(struct xdir *dir, const char *dirname,
 		dir->filetype = "SNAP\n";
 		dir->filename_ext = ".snap";
 		dir->panic_if_error = true;
+		dir->skip_filename_with_suffix = true;
 	} else {
 		strcpy(dir->open_wflags, "wx");
 		dir->sync_is_async = true;
@@ -268,7 +269,7 @@ xdir_scan(struct xdir *dir)
 					     ext_len) == 0 &&
 				     strcmp(suffix, inprogress_suffix) == 0);
 		}
-		if (!ext_is_ok)
+		if (!ext_is_ok || (suffix && dir->skip_filename_with_suffix))
 			continue;
 
 		long long signature = strtoll(dent->d_name, &ext, 10);

@@ -31,3 +31,16 @@ box.space[0]:insert{5, 'Unfinished record'}
 ...
 .xlog exists
 .xlog.inprogress hash been successfully renamed
+box.snapshot()
+---
+- ok
+...
+box.space._schema:insert({'test', 'test'})
+---
+- ['test', 'test']
+...
+box.snapshot()
+---
+- ok
+...
+.snap.inprogress is ignored

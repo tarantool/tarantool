@@ -115,3 +115,25 @@ lsn += 1
 # if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
 #    print "00000000000000000006.xlog.inprogress has been successfully deleted"
 
+server.start()
+orig_lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
+
+# create .snap.inprogress
+admin("box.snapshot()")
+admin("box.space._schema:insert({'test', 'test'})")
+admin("box.snapshot()")
+lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
+snapshot = str(lsn).zfill(20) + ".snap"
+snapshot = os.path.join(server.vardir, snapshot)
+server.stop()
+os.rename(snapshot, snapshot + ".inprogress")
+# remove .xlogs
+for f in os.listdir(server.vardir):
+    if f.endswith(".xlog"):
+        os.remove(os.path.join(server.vardir, f))
+
+# check that .snap.inprogress is ignored during scan
+server.start()
+lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
+if lsn == orig_lsn:
+    print ".snap.inprogress is ignored"
