@@ -99,6 +99,9 @@ space_name(struct space *space) { return space->def.name; }
 static inline bool
 space_is_temporary(struct space *space) { return space->def.temporary; }
 
+static inline bool
+space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }
+
 /** Return true if space is run under sophia engine. */
 static inline bool
 space_is_sophia(struct space *space) { return strcmp(space->handler->engine->name, "sophia") == 0; }

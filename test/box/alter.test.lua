@@ -33,8 +33,8 @@ _space:delete{_index.id}
 --
 -- Can't change properties of a space
 --
-_space:update({_space.id}, {{'+', 1, 1}})
-_space:update({_space.id}, {{'+', 1, 2}})
+_space:update({_space.id}, {{'-', 1, 1}})
+_space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --

@@ -51,7 +51,6 @@ enum engine_flags {
 	ENGINE_AUTO_CHECK_UPDATE = 4,
 };
 
-extern uint32_t engine_flags[BOX_ENGINE_MAX];
 extern struct rlist engines;
 
 typedef struct tuple *

@@ -173,18 +173,6 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 
 	space_def_init_flags(def, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
-	if (errcode != ER_ALTER_SPACE &&
-	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
-		say_warn("\n"
-"*******************************************************\n"
-"* Creating a space with a reserved id %3u.            *\n"
-"* Ids in range %3u-%3u may be used for a system space *\n"
-"* the future. Assuming you know what you're doing.    *\n"
-"*******************************************************",
-			 (unsigned) def->id,
-			 (unsigned) SC_SYSTEM_ID_MIN,
-			 (unsigned) SC_SYSTEM_ID_MAX);
-	}
 	access_check_ddl(def->uid);
 }
 

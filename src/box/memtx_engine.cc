@@ -555,7 +555,7 @@ snapshot_space(struct space *sp, void *udata)
 {
 	if (space_is_temporary(sp))
 		return;
-	if (space_is_sophia(sp))
+	if (!space_is_memtx(sp))
 		return;
 	struct tuple *tuple;
 	struct xlog *l = (struct xlog *)udata;

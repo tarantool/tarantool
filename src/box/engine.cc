@@ -36,8 +36,6 @@
 
 RLIST_HEAD(engines);
 
-uint32_t engine_flags[BOX_ENGINE_MAX];
-int n_engines;
 
 Engine::Engine(const char *engine_name)
 	:name(engine_name),
@@ -84,9 +82,9 @@ Handler::Handler(Engine *f)
 /** Register engine instance. */
 void engine_register(Engine *engine)
 {
+	static int n_engines;
 	rlist_add_tail_entry(&engines, engine, link);
-	engine->id = ++n_engines;
-	engine_flags[engine->id] = engine->flags;
+	engine->id = n_engines++;
 }
 
 /** Find engine by name. */
