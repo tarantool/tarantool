@@ -33,7 +33,7 @@
 
 struct sysview_iterator;
 
-typedef bool (*sysview_predicate_f)(struct tuple *);
+typedef bool (*sysview_predicate_f)(struct space *source, struct tuple *);
 
 class SysviewIndex: public Index {
 public:

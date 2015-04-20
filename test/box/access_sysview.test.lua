@@ -94,7 +94,6 @@ box.schema.user.revoke('guest', 'read', 'universe')
 box.schema.user.grant('guest', 'write', 'universe')
 box.session.su('guest')
 
-#box.space._vspace:select{}
 #box.space._vindex:select{}
 #box.space._vuser:select{}
 #box.space._vpriv:select{}
@@ -105,6 +104,22 @@ box.schema.user.revoke('guest', 'write', 'universe')
 box.space.test:drop()
 box.session.su('guest')
 
+-- read access to original space also allow to read a view
+box.session.su('admin')
+space_cnt = #box.space._space:select{}
+index_cnt = #box.space._index:select{}
+box.schema.user.grant('guest', 'read', 'space', '_space')
+box.schema.user.grant('guest', 'read', 'space', '_index')
+box.session.su('guest')
+#box.space._vspace:select{} == space_cnt
+#box.space._vindex:select{} == index_cnt
+box.session.su('admin')
+box.schema.user.revoke('guest', 'read', 'space', '_space')
+box.schema.user.revoke('guest', 'read', 'space', '_index')
+box.session.su('guest')
+#box.space._vspace:select{} < space_cnt
+#box.space._vindex:select{} < index_cnt
+
 --
 -- _vuser
 --
@@ -112,7 +127,16 @@ box.session.su('guest')
 -- a guest user can read information about itself
 t = box.space._vuser:select(); return #t == 1 and t[1][3] == 'guest'
 
-#box.space._vuser:select{}
+-- read access to original space also allow to read a view
+box.session.su('admin')
+user_cnt = #box.space._user:select{}
+box.schema.user.grant('guest', 'read', 'space', '_user')
+box.session.su('guest')
+#box.space._vuser:select{} == user_cnt
+box.session.su('admin')
+box.schema.user.revoke('guest', 'read', 'space', '_user')
+box.session.su('guest')
+#box.space._vuser:select{} < user_cnt
 
 box.session.su('admin')
 box.schema.user.grant('guest', 'read,write', 'universe')
@@ -137,7 +161,18 @@ box.session.su('guest')
 -- a guest user can see granted 'public' role
 box.space._vpriv.index[2]:select('role')[1][2] == session.uid()
 
+-- read access to original space also allow to read a view
+box.session.su('admin')
+box.schema.user.grant('guest', 'read', 'space', '_priv')
+priv_cnt = #box.space._priv:select{}
+box.session.su('guest')
+#box.space._vpriv:select{} == priv_cnt
+box.session.su('admin')
+box.schema.user.revoke('guest', 'read', 'space', '_priv')
+box.session.su('guest')
 cnt = #box.space._vpriv:select{}
+
+cnt < priv_cnt
 
 box.session.su('admin')
 box.schema.user.grant('guest', 'read,write', 'space', '_schema')
@@ -155,10 +190,22 @@ box.session.su('guest')
 -- _vfunc
 --
 
-cnt = #box.space._vfunc:select{}
-
 box.session.su('admin')
 box.schema.func.create('test')
+
+-- read access to original space also allow to read a view
+func_cnt = #box.space._func:select{}
+box.schema.user.grant('guest', 'read', 'space', '_func')
+box.session.su('guest')
+#box.space._vfunc:select{} == func_cnt
+box.session.su('admin')
+box.schema.user.revoke('guest', 'read', 'space', '_func')
+box.session.su('guest')
+cnt = #box.space._vfunc:select{}
+
+cnt < func_cnt
+
+box.session.su('admin')
 box.schema.user.grant('guest', 'execute', 'function', 'test')
 box.session.su('guest')
 

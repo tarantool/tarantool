@@ -35,6 +35,7 @@
 struct sysview_iterator {
 	struct iterator base;
 	struct iterator *source;
+	struct space *space;
 };
 
 static inline struct sysview_iterator *
@@ -63,7 +64,7 @@ sysview_iterator_next(struct iterator *iterator)
 	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
 	struct tuple *tuple;
 	while ((tuple = it->source->next(it->source)) != NULL) {
-		if (index->predicate(tuple))
+		if (index->predicate(it->space, tuple))
 			return tuple;
 	}
 	return NULL;
@@ -121,6 +122,7 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	pk->initIterator(it->source, type, key, part_count);
 	iterator->index = (Index *) this;
 	iterator->next = sysview_iterator_next;
+	it->space = source;
 }
 
 struct tuple *
@@ -132,7 +134,7 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *tuple = pk->findByKey(key, part_count);
-	if (tuple == NULL || !predicate(tuple))
+	if (tuple == NULL || !predicate(source, tuple))
 		return NULL;
 	return tuple;
 }
@@ -148,11 +150,16 @@ SysviewIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 static bool
-vspace_predicate(struct tuple *tuple)
+vspace_predicate(struct space *source, struct tuple *tuple)
 {
+	struct credentials *cr = current_user();
+	if (PRIV_R & cr->universal_access)
+		return true; /* read access to unverse */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to original space */
+
 	uint32_t space_id = tuple_field_u32(tuple, 0);
 	struct space *space = space_cache_find(space_id);
-	struct credentials *cr = current_user();
 	uint8_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
 		space->def.uid == cr->uid);
@@ -169,11 +176,14 @@ SysviewVindexIndex::SysviewVindexIndex(struct key_def *key_def)
 }
 
 static bool
-vuser_predicate(struct tuple *tuple)
+vuser_predicate(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if (PRIV_R & cr->universal_access)
-		return true;
+		return true; /* read access to unverse */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to original space */
+
 	uint32_t uid = tuple_field_u32(tuple, 0);
 	uint32_t owner_id = tuple_field_u32(tuple, 1);
 	return uid == cr->uid || owner_id == cr->uid;
@@ -185,11 +195,14 @@ SysviewVuserIndex::SysviewVuserIndex(struct key_def *key_def)
 }
 
 static bool
-vpriv_predicate(struct tuple *tuple)
+vpriv_predicate(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if (PRIV_R & cr->universal_access)
-		return true;
+		return true; /* read access to unverse */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to original space */
+
 	uint32_t grantor_id = tuple_field_u32(tuple, 0);
 	uint32_t grantee_id = tuple_field_u32(tuple, 1);
 	return grantor_id == cr->uid || grantee_id == cr->uid;
@@ -201,18 +214,20 @@ SysviewVprivIndex::SysviewVprivIndex(struct key_def *key_def)
 }
 
 static bool
-vfunc_predicate(struct tuple *tuple)
+vfunc_predicate(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
-	if (PRIV_X & cr->universal_access)
-		return true;
-	uint32_t owner_id = tuple_field_u32(tuple, 1);
-	if (owner_id == cr->uid)
-		return true;
+	if ((PRIV_R | PRIV_X) & cr->universal_access)
+		return true; /* read or execute access to unverse */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to original space */
+
 	const char *name = tuple_field_cstr(tuple, 2);
 	uint32_t name_len = strlen(name);
 	struct func_def *func = func_by_name(name, name_len);
-	if (func != NULL && (PRIV_X & func->access[cr->auth_token].effective))
+	assert(func != NULL);
+	uint8_t effective = func->access[cr->auth_token].effective;
+	if (func->uid == cr->uid || (PRIV_X & effective))
 		return true;
 	return false;
 }
