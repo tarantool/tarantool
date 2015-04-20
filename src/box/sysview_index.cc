@@ -64,16 +64,16 @@ sysview_iterator_next(struct iterator *iterator)
 	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
 	struct tuple *tuple;
 	while ((tuple = it->source->next(it->source)) != NULL) {
-		if (index->predicate(it->space, tuple))
+		if (index->filter(it->space, tuple))
 			return tuple;
 	}
 	return NULL;
 }
 
 SysviewIndex::SysviewIndex(struct key_def *key_def, uint32_t source_space_id,
-		     uint32_t source_index_id, sysview_predicate_f predicate)
+		     uint32_t source_index_id, sysview_filter_f filter)
 	: Index(key_def), source_space_id(source_space_id),
-	  source_index_id(source_index_id), predicate(predicate)
+	  source_index_id(source_index_id), filter(filter)
 {
 }
 
@@ -134,7 +134,7 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *tuple = pk->findByKey(key, part_count);
-	if (tuple == NULL || !predicate(source, tuple))
+	if (tuple == NULL || !filter(source, tuple))
 		return NULL;
 	return tuple;
 }
@@ -150,7 +150,7 @@ SysviewIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 static bool
-vspace_predicate(struct space *source, struct tuple *tuple)
+vspace_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if (PRIV_R & cr->universal_access)
@@ -166,17 +166,17 @@ vspace_predicate(struct space *source, struct tuple *tuple)
 }
 
 SysviewVspaceIndex::SysviewVspaceIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_SPACE_ID, key_def->iid, vspace_predicate)
+	: SysviewIndex(key_def, SC_SPACE_ID, key_def->iid, vspace_filter)
 {
 }
 
 SysviewVindexIndex::SysviewVindexIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_INDEX_ID, key_def->iid, vspace_predicate)
+	: SysviewIndex(key_def, SC_INDEX_ID, key_def->iid, vspace_filter)
 {
 }
 
 static bool
-vuser_predicate(struct space *source, struct tuple *tuple)
+vuser_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if (PRIV_R & cr->universal_access)
@@ -190,12 +190,12 @@ vuser_predicate(struct space *source, struct tuple *tuple)
 }
 
 SysviewVuserIndex::SysviewVuserIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_USER_ID, key_def->iid, vuser_predicate)
+	: SysviewIndex(key_def, SC_USER_ID, key_def->iid, vuser_filter)
 {
 }
 
 static bool
-vpriv_predicate(struct space *source, struct tuple *tuple)
+vpriv_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if (PRIV_R & cr->universal_access)
@@ -209,12 +209,12 @@ vpriv_predicate(struct space *source, struct tuple *tuple)
 }
 
 SysviewVprivIndex::SysviewVprivIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_PRIV_ID, key_def->iid, vpriv_predicate)
+	: SysviewIndex(key_def, SC_PRIV_ID, key_def->iid, vpriv_filter)
 {
 }
 
 static bool
-vfunc_predicate(struct space *source, struct tuple *tuple)
+vfunc_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = current_user();
 	if ((PRIV_R | PRIV_X) & cr->universal_access)
@@ -233,6 +233,6 @@ vfunc_predicate(struct space *source, struct tuple *tuple)
 }
 
 SysviewVfuncIndex::SysviewVfuncIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_FUNC_ID, key_def->iid, vfunc_predicate)
+	: SysviewIndex(key_def, SC_FUNC_ID, key_def->iid, vfunc_filter)
 {
 }

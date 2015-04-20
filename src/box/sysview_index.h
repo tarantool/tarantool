@@ -33,12 +33,12 @@
 
 struct sysview_iterator;
 
-typedef bool (*sysview_predicate_f)(struct space *source, struct tuple *);
+typedef bool (*sysview_filter_f)(struct space *source, struct tuple *);
 
 class SysviewIndex: public Index {
 public:
 	SysviewIndex(struct key_def *key_def, uint32_t source_space_id,
-		     uint32_t source_index_id, sysview_predicate_f predicate);
+		     uint32_t source_index_id, sysview_filter_f filter);
 	virtual ~SysviewIndex();
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
@@ -52,7 +52,7 @@ public:
 
 	uint32_t source_space_id;
 	uint32_t source_index_id;
-	sysview_predicate_f predicate;
+	sysview_filter_f filter;
 };
 
 class SysviewVspaceIndex: public SysviewIndex {
