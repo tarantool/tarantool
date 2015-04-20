@@ -68,6 +68,7 @@ The json package provides JSON manipulation routines. It is based on the
         - world
         ...
 
+.. _json-null:
 
 .. data:: NULL
 

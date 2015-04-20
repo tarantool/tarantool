@@ -16,7 +16,7 @@ different parameters when building from source. The section about binaries is
 For development, you will want to download a source package and make the binary
 by yourself using a C/C++ compiler and common tools. Although this is a bit harder,
 it gives more control. And the source packages include additional files, for example
-the Tarantool test suite. The section about source is “:ref:`building-from-source` ”
+the Tarantool test suite. The section about source is “:ref:`building-from-source` ”.
 
 If the installation has already been done, then you should try it out. So we've
 provided some instructions that you can use to make a temporary “sandbox”. In a
@@ -27,14 +27,14 @@ statements. The section about sandbox is “`Starting Tarantool and making your 
             Downloading and installing a binary package
 =====================================================================
 
-The repositories for the “stable” release are at tarantool.org/dist/stable.
-The repositories for the “master” release are at tarantool.org/dist/master.
+The repositories for the “stable” release are at `tarantool.org/dist/stable`_.
+The repositories for the “master” release are at `tarantool.org/dist/master`_.
 Since this is the manual for the “master” release, all instructions use
-tarantool.org/dist/master.
+`tarantool.org/dist/master`_.
 
 An automatic build system creates, tests and publishes packages for every
 push into the master branch. Therefore if you looked at
-tarantool.org/dist/master you would see that there are source files and
+`tarantool.org/dist/master`_ you would see that there are source files and
 subdirectories for the packages that will be described in this section.
 
 To download and install the package that's appropriate for your environment,
@@ -48,7 +48,7 @@ More advice for binary downloads is at http://tarantool.org/download.html.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is always an up-to-date Debian repository at
-http://tarantool.org/dist/master/debian The repository contains builds for
+http://tarantool.org/dist/master/debian. The repository contains builds for
 Debian unstable "Sid", stable "Wheezy", forthcoming "Jessie". Add the
 tarantool.org repository to your apt sources list. $release is an environment
 variable which will contain the Debian version code e.g. "Wheezy":
@@ -74,7 +74,7 @@ variable which will contain the Debian version code e.g. "Wheezy":
 There is always an up-to-date Ubuntu repository at
 http://tarantool.org/dist/master/ubuntu The repository contains builds for
 Ubuntu 12.04 "precise", 13.10 "saucy", and 14.04 "trusty". Add the tarantool.org
-repository to your apt sources list $release is an environment variable which
+repository to your apt sources list. $release is an environment variable which
 will contain the Ubuntu version code e.g. "precise". If you want the version
 that comes with Ubuntu, start with the lines that follow the '# install' comment:
 
@@ -191,9 +191,11 @@ This is actually a “homebrew” recipe so it's not a true binary download,
 some source code is involved. First upgrade Clang (the C compiler) to version 3.2
 or later using Command Line Tools for Xcode disk image version 4.6+ from Apple
 Developer web-site. Then download the recipe file from
-build.tarantool.org/tarantool.rb. Make the file executable, execute it,
+`tarantool.org/dist/master/tarantool.rb`_. Make the file executable, execute it,
 and the script in the file should handle the necessary steps with cmake, make,
 and make install.
+
+.. _tarantool.org/dist/master/tarantool.rb: http://tarantool.org/dist/master/tarantool.rb
 
 .. _first database:
 
@@ -203,8 +205,7 @@ and make install.
 
 Here is how to create a simple test database after installing.
 
-1. Create a new directory. It's just for tests, you can delete it when
-    the tests are over.
+1. Create a new directory. It's just for tests, you can delete it when the tests are over.
 
    .. code-block:: bash
 
@@ -261,7 +262,7 @@ Here is how to create a simple test database after installing.
    convenient for learning it will be used for most examples in
    this manual. Tarantool is waiting for the user to type instructions.
 
-   To create the first space and the first :mod:`box.index`, try this:
+   To create the first space and the first :ref:`index <box.index>`, try this:
 
    .. code-block:: lua
 
@@ -314,3 +315,82 @@ Here is how to create a simple test database after installing.
    .. code-block:: lua
 
        tarantool> box.schema.user.grant('guest','read,write,execute','universe')
+
+.. _tarantool.org/dist/stable: http://tarantool.org/dist/stable
+.. _tarantool.org/dist/master: http://tarantool.org/dist/master
+
+
+=====================================================================
+        Starting another Tarantool instance and connecting remotely
+=====================================================================
+
+In the previous section the first request was with "box.cfg{listen=3301}".
+The "listen" value can be any form of URI (uniform resource identifier);
+in this case it's just a local port: port 3301.
+It's possible to send requests to the listen URI via (a) telnet,
+(b) a connector (which will be the subject of Chapter 8),
+or (c) another instance of Tarantool. Let's try (c).
+
+1. Switch to another terminal.
+On Linux, for example, this means starting another instance of a Bash shell.
+There is no need to use cd to switch to the ~/tarantool_sandbox directory.
+
+2. Start the second instance of Tarantool. The server name is tarantool.
+
+.. code-block:: lua
+
+   #if you downloaded a binary with apt-get or yum, say this:
+   /usr/bin/tarantool
+   #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+   ~/tarantool/bin/tarantool
+   #if you built from a source download, say this:
+   ~/tarantool/src/tarantool 
+
+3. Try these requests:
+
+.. code-block:: lua
+
+   console = require('console')
+   console.connect('localhost:3301')
+   box.space.tester:select{2}
+
+The requests are saying "use the :ref:`console package <package-console>`
+to connect to the Tarantool server that's listening
+on localhost:3301, send a request to that server,
+and display the result." The result in this case is
+one of the tuples that was inserted earlier.
+Your terminal screen should now look like this:
+
+.. code-block:: lua
+
+   ...
+
+   tarantool> console = require('console')
+   ---
+   ...
+
+   tarantool> console.connect('localhost:3301')
+   2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
+   ---
+   ...
+
+   localhost:3301> box.space.tester:select{2}
+   ---
+   - - [2, 'Music']
+   ...
+
+   localhost:3301>
+
+You can repeat box.space...:insert{} and box.space...:select{}
+indefinitely, on either Tarantool instance.
+When the testing is over: To drop the space: s:drop().
+To stop tarantool: Ctrl+C. To stop tarantool (an alternative):
+os.exit(). To stop tarantool (from another terminal):
+sudo pkill -f tarantool.
+To destroy the test: rm -r ~/tarantool_sandbox.
+
+To review ... If you followed all the instructions
+in this chapter, then so far you have: installed Tarantool
+from either a binary or a source repository,
+started up the Tarantool server, inserted and selected tuples.
+

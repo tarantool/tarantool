@@ -16,7 +16,7 @@
     Default: true |br|
     Dynamic: no |br|
 
-.. confval:: rows_per_val
+.. confval:: rows_per_wal
 
     How many log records to store in a single write-ahead log file.
     When this limit is reached, Tarantool creates another WAL file

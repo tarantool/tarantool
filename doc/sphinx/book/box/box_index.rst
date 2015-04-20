@@ -45,6 +45,8 @@ API is a direct binding to corresponding methods of index objects of type
             type: TREE
             ...
 
+    .. _index-iterator:
+
     .. function:: pairs(bitset-value | field-value..., iterator-type)
 
         This method provides iteration support within an index. Parameter type is

@@ -23,6 +23,8 @@ series of non-MsgPack values and encodes them.
     :return: the original contents formatted as a Lua table.
     :rtype: table
 
+.. _msgpack-null:
+
 .. data:: NULL
 
     A value comparable to Lua "nil" which may be useful as a placeholder in a tuple.

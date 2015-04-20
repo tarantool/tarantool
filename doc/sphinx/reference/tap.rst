@@ -191,7 +191,7 @@ Tarantool as a script processor by saying ./tap.lua.
 
 The output from the above script will look approximately like this:
 
-.. code-block:: tap
+.. code-block:: none
 
     TAP version 13
     1..2
