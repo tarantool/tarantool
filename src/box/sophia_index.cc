@@ -252,7 +252,6 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	/* delete */
 	if (old_tuple && new_tuple == NULL) {
 		sophia_write(env, db, tx, SOPHIA_DELETE, key_def, old_tuple);
-		tuple_ref(old_tuple);
 		return old_tuple;
 	}
 
@@ -273,11 +272,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		struct tuple *dup_tuple =
 			sophia_read(env, db, tx, key, keysize, space->format);
 		if (dup_tuple) {
-			tuple_ref(dup_tuple);
-			int error = 0;
-			if (tuple_compare(dup_tuple, new_tuple, key_def) == 0)
-				error = 1;
-			tuple_unref(dup_tuple);
+			int error = tuple_compare(dup_tuple, new_tuple, key_def) == 0;
+			tuple_delete(dup_tuple);
 			if (error) {
 				struct space *sp =
 					space_cache_find(key_def->space_id);

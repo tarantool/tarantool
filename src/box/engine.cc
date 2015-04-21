@@ -45,19 +45,16 @@ Engine::Engine(const char *engine_name)
 void Engine::init()
 {}
 
-void Engine::begin(struct txn*, struct space*)
+void Engine::beginStatement(struct txn *)
 {}
 
-void Engine::commit(struct txn*)
+void Engine::commit(struct txn *)
 {}
 
-void Engine::rollback(struct txn*)
+void Engine::rollback(struct txn *)
 {}
 
-void Engine::rollbackStmt(struct txn_stmt*)
-{}
-
-void Engine::finish(struct txn*, bool)
+void Engine::rollbackStatement(struct txn_stmt *)
 {}
 
 void Engine::initSystemSpace(struct space * /* space */)

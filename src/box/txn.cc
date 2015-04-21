@@ -83,10 +83,7 @@ txn_replace(struct txn *txn, struct space *space,
 	 * another transaction in rollback().
 	 */
 	stmt->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
-	if (new_tuple) {
-		stmt->new_tuple = new_tuple;
-		tuple_ref(stmt->new_tuple);
-	}
+	stmt->new_tuple = new_tuple;
 	stmt->space = space;
 
 	/*
@@ -144,52 +141,31 @@ txn_begin(bool autocommit)
 		rlist_nil, txn_on_yield_or_stop, NULL, NULL
 	};
 	txn->autocommit = autocommit;
-	txn->engine_tx = NULL;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
 
-static void
-txn_engine_begin_stmt(struct txn *txn, struct space *space)
-{
-	assert(txn->n_stmts >= 1);
-	/**
-	 * Notify storage engine about the transaction.
-	 * Ensure various storage engine constraints:
-	 * a. check if it supports multi-statement transactions
-	 * b. only one engine can be used in a multi-statement
-	 *    transaction
-	 */
-	Engine *engine = space->handler->engine;
-	if (txn->n_stmts == 1) {
-		/* First statement. */
-		txn->engine = engine;
-	} else {
-		if (txn->engine->id != engine_id(space->handler))
-			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-	}
-	engine->begin(txn, space);
-}
-
 struct txn *
-txn_begin_stmt(struct request *request, struct space *space)
+txn_begin_stmt(struct request *request, Engine *engine)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
+
+	if (txn->engine == NULL) {
+		assert(txn->n_stmts == 0);
+		txn->engine = engine;
+	} else if (txn->engine != engine) {
+		/**
+		 * Only one engine can be used in
+		 * a multi-statement transaction currently.
+		 */
+		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	}
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	txn_add_redo(stmt, request);
-	txn_engine_begin_stmt(txn, space);
+	engine->beginStatement(txn);
 	return txn;
-}
-
-void
-txn_commit_stmt(struct txn *txn)
-{
-	if (txn->autocommit) {
-		txn_commit(txn);
-		txn_finish(txn, true);
-	}
 }
 
 void
@@ -220,18 +196,10 @@ txn_commit(struct txn *txn)
 		txn->signature = res;
 	}
 
+	trigger_run(&txn->on_commit, txn); /* must not throw. */
 	/* xxx: engine commit may throw on conflict or error */
 	if (txn->engine)
 		txn->engine->commit(txn);
-
-	trigger_run(&txn->on_commit, txn); /* must not throw. */
-}
-
-void
-txn_finish(struct txn *txn, bool commit)
-{
-	if (txn->engine)
-		txn->engine->finish(txn, commit);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -253,7 +221,7 @@ txn_rollback_stmt()
 	if (txn->autocommit)
 		return txn_rollback();
 	struct txn_stmt *stmt = txn_stmt(txn);
-	txn->engine->rollbackStmt(stmt);
+	txn->engine->rollbackStatement(stmt);
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
 	stmt->space = NULL;
@@ -266,13 +234,16 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
+	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	if (txn->engine)
 		txn->engine->rollback(txn);
-	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);
 		trigger_clear(&txn->fiber_on_stop);
-	txn_finish(txn, false);
+	TRASH(txn);
+	/** Free volatile txn memory. */
+	fiber_gc();
+	fiber_set_txn(fiber(), NULL);
 }
 
 void

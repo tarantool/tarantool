@@ -299,20 +299,14 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 }
 
 void
-SophiaEngine::begin(struct txn *txn, struct space *space)
+SophiaEngine::beginStatement(struct txn *txn)
 {
-	assert(space->handler->engine == this);
+	assert(txn->engine_tx == NULL || txn->n_stmts != 1);
 	if (txn->n_stmts == 1) {
-		assert(txn->engine_tx == NULL);
-		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
-		(void) index;
-		assert(index->db != NULL);
 		txn->engine_tx = sp_begin(env);
 		if (txn->engine_tx == NULL)
 			sophia_raise(env);
-		return;
 	}
-	assert(txn->engine_tx != NULL);
 }
 
 void
@@ -343,38 +337,22 @@ SophiaEngine::commit(struct txn *txn)
 	}
 	rc = sp_commit(txn->engine_tx);
 	if (rc == -1) {
-		panic("sophia commit failed: txn->signature = %" PRIu64, txn->signature);
+		panic("sophia commit failed: txn->signature = %"
+		      PRIu64, txn->signature);
 	}
 }
 
 void
-SophiaEngine::rollbackStmt(struct txn_stmt *stmt)
+SophiaEngine::rollbackStatement(struct txn_stmt *)
 {
-	if (stmt->old_tuple)
-		tuple_unref(stmt->old_tuple);
-	if (stmt->new_tuple)
-		tuple_unref(stmt->new_tuple);
+	panic("not implemented");
 }
 
 void
 SophiaEngine::rollback(struct txn *txn)
 {
-	if (txn->engine_tx == NULL)
-		return;
-	sp_destroy(txn->engine_tx);
-	txn->engine_tx = NULL;
-}
-
-void
-SophiaEngine::finish(struct txn *txn, bool)
-{
-	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->old_tuple)
-			tuple_unref(stmt->old_tuple);
-		if (stmt->new_tuple)
-			tuple_unref(stmt->new_tuple);
-	}
+	if (txn->engine_tx)
+		sp_destroy(txn->engine_tx);
 }
 
 void

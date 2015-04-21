@@ -37,11 +37,10 @@ struct SophiaEngine: public Engine {
 	virtual Index *createIndex(struct key_def *);
 	virtual void dropIndex(Index*);
 	virtual void keydefCheck(struct space *space, struct key_def *f);
-	virtual void begin(struct txn *txn, struct space *space);
+	virtual void beginStatement(struct txn *txn);
 	virtual void commit(struct txn *txn);
-	virtual void rollbackStmt(struct txn_stmt *stmt);
+	virtual void rollbackStatement(struct txn_stmt *stmt);
 	virtual void rollback(struct txn *txn);
-	virtual void finish(struct txn *txn, bool is_commit);
 	virtual void beginJoin();
 	virtual void recoverToCheckpoint(int64_t);
 	virtual void endRecovery();

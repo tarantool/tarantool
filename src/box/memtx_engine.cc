@@ -109,6 +109,7 @@ memtx_replace_build_next(struct space *space, struct tuple *old_tuple,
 		      "from snapshot");
 	}
 	space->index[0]->buildNext(new_tuple);
+	tuple_ref(new_tuple);
 	return NULL; /* replace found no old tuple */
 }
 
@@ -120,7 +121,10 @@ struct tuple *
 memtx_replace_primary_key(struct space *space, struct tuple *old_tuple,
 			  struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	return space->index[0]->replace(old_tuple, new_tuple, mode);
+	struct tuple *dup = space->index[0]->replace(old_tuple, new_tuple, mode);
+	if (new_tuple)
+		tuple_ref(new_tuple);
+	return dup;
 }
 
 static struct tuple *
@@ -145,7 +149,6 @@ memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			Index *index = space->index[i];
 			index->replace(old_tuple, new_tuple, DUP_INSERT);
 		}
-		return old_tuple;
 	} catch (Exception *e) {
 		/* Rollback all changes */
 		for (; i > 0; i--) {
@@ -154,9 +157,9 @@ memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		}
 		throw;
 	}
-
-	assert(false);
-	return NULL;
+	if (new_tuple)
+		tuple_ref(new_tuple);
+	return old_tuple;
 }
 
 static void
@@ -433,7 +436,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 }
 
 void
-MemtxEngine::rollbackStmt(struct txn_stmt *stmt)
+MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
 {
 	if (stmt->old_tuple || stmt->new_tuple)
 	{
@@ -455,23 +458,19 @@ MemtxEngine::rollback(struct txn *txn)
 				      stmt->old_tuple, DUP_INSERT);
 		}
 	}
-}
-
-void
-MemtxEngine::finish(struct txn *txn, bool commit)
-{
-	struct txn_stmt *stmt;
-	if (commit) {
-		rlist_foreach_entry(stmt, &txn->stmts, next) {
-			if (stmt->old_tuple)
-				tuple_unref(stmt->old_tuple);
-		}
-		return;
-	}
-	/* rollback */
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->new_tuple)
 			tuple_unref(stmt->new_tuple);
+	}
+}
+
+void
+MemtxEngine::commit(struct txn *txn)
+{
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->old_tuple)
+			tuple_unref(stmt->old_tuple);
 	}
 }
 

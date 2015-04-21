@@ -86,27 +86,6 @@ in_txn()
 }
 
 /**
- * Start a new statement. If no current transaction,
- * start a new transaction with autocommit = true.
- */
-struct txn *
-txn_begin_stmt(struct request *request, struct space *space);
-
-/**
- * End a statement. In autocommit mode, end
- * the current transaction as well.
- */
-void
-txn_commit_stmt(struct txn *txn);
-
-/**
- * Rollback a statement. In autocommit mode,
- * rolls back the entire transaction.
- */
-void
-txn_rollback_stmt();
-
-/**
  * Start a transaction explicitly.
  * @pre no transaction is active
  */
@@ -114,22 +93,40 @@ struct txn *
 txn_begin(bool autocommit);
 
 /**
- * Commit a transaction. txn_finish must be called after that.
+ * Commit a transaction.
  * @pre txn == in_txn()
  */
 void
 txn_commit(struct txn *txn);
 
-/**
- * Finish a transaction. Must be called after txn_commit.
- * @pre txn == in_txn()
- */
-void
-txn_finish(struct txn *txn, bool commit);
-
 /** Rollback a transaction, if any. */
 void
 txn_rollback();
+
+/**
+ * Start a new statement. If no current transaction,
+ * start a new transaction with autocommit = true.
+ */
+struct txn *
+txn_begin_stmt(struct request *request, Engine *engine);
+
+/**
+ * End a statement. In autocommit mode, end
+ * the current transaction as well.
+ */
+static inline void
+txn_commit_stmt(struct txn *txn)
+{
+	if (txn->autocommit)
+		txn_commit(txn);
+}
+
+/**
+ * Rollback a statement. In autocommit mode,
+ * rolls back the entire transaction.
+ */
+void
+txn_rollback_stmt();
 
 /**
  * Raise an error if this is a multi-statement

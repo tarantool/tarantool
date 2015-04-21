@@ -54,7 +54,7 @@ static void
 execute_replace(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
-	struct txn *txn = txn_begin_stmt(request, space);
+	struct txn *txn = txn_begin_stmt(request, space->handler->engine);
 
 	access_check_space(space, PRIV_W);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
@@ -77,7 +77,7 @@ static void
 execute_update(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
-	struct txn *txn = txn_begin_stmt(request, space);
+	struct txn *txn = txn_begin_stmt(request, space->handler->engine);
 
 	access_check_space(space, PRIV_W);
 	Index *pk = index_find(space, 0);
@@ -118,7 +118,7 @@ static void
 execute_delete(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
-	struct txn *txn = txn_begin_stmt(request, space);
+	struct txn *txn = txn_begin_stmt(request, space->handler->engine);
 
 	access_check_space(space, PRIV_W);
 

@@ -105,24 +105,19 @@ public:
 
 	virtual void join(Relay *) = 0;
 	/**
-	 * Engine specific transaction life-cycle routines.
+	 * Begin a new statement in an existing or new
+	 * transaction.
+	 * We use a single call to save a virtual method call
+	 * since it's always clear from txn whether it's
+	 * autocommit mode or not, the first statement or
+	 * a subsequent statement.  Effectively it means that
+	 * transaction in the engine begins with the first
+	 * statement.
 	 */
-	virtual void begin(struct txn *, struct space *);
+	virtual void beginStatement(struct txn *);
 	virtual void commit(struct txn *);
-	virtual void rollbackStmt(struct txn_stmt *);
+	virtual void rollbackStatement(struct txn_stmt *);
 	virtual void rollback(struct txn *);
-	/**
-	 * Called at the end of a transaction, if a transaction
-	 * has committed. Is an
-	 * artifact of autocommit mode, when commit
-	 * happens *before* the result is sent to the client,
-	 * and is used to dereference tuples which otherwise
-	 * could have been freed already at commit.
-	 * Has nothing to do in case of rollback, since
-	 * in that case the client doesn't get any tuples
-	 * back, so they can be freed already in rollback.
-	 */
-	virtual void finish(struct txn *, bool);
 	/**
 	 * Recover the engine to a checkpoint it has.
 	 * After that the engine will be given rows
