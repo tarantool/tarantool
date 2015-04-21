@@ -640,22 +640,21 @@ done:
 void
 box_lua_call(struct request *request, struct obuf *out)
 {
-	auto txn_guard = make_scoped_guard([=] {
-		struct txn *txn = in_txn();
-		if (txn) {
-			say_warn("transaction is active at CALL return");
-			txn_rollback();
-		}
-	});
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);
 		LuarefGuard coro_ref(tarantool_L);
 		execute_call(L, request, out);
+		if (in_txn()) {
+			say_warn("a transaction is active at CALL return");
+			txn_rollback();
+		}
 	} catch (Exception *e) {
+		txn_rollback();
 		/* Let all well-behaved exceptions pass through. */
 		throw;
 	} catch (...) {
+		txn_rollback();
 		/* Convert Lua error to a Tarantool exception. */
 		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
 	}
