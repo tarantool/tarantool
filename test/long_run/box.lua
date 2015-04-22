@@ -2,6 +2,7 @@
 
 require('suite')
 
+os.execute("rm -rf sophia_test")
 os.execute("mkdir -p sophia_test")
 
 local sophia = {

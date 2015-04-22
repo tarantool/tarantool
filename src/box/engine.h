@@ -115,6 +115,7 @@ public:
 	 * statement.
 	 */
 	virtual void beginStatement(struct txn *);
+	virtual void prepare(struct txn *);
 	virtual void commit(struct txn *);
 	virtual void rollbackStatement(struct txn_stmt *);
 	virtual void rollback(struct txn *);

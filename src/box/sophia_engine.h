@@ -38,6 +38,7 @@ struct SophiaEngine: public Engine {
 	virtual void dropIndex(Index*);
 	virtual void keydefCheck(struct space *space, struct key_def *f);
 	virtual void beginStatement(struct txn *txn);
+	virtual void prepare(struct txn *txn);
 	virtual void commit(struct txn *txn);
 	virtual void rollbackStatement(struct txn_stmt *stmt);
 	virtual void rollback(struct txn *txn);

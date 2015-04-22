@@ -48,6 +48,9 @@ void Engine::init()
 void Engine::beginStatement(struct txn *)
 {}
 
+void Engine::prepare(struct txn *)
+{}
+
 void Engine::commit(struct txn *)
 {}
 

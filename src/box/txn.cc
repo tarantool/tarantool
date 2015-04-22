@@ -177,6 +177,10 @@ txn_commit(struct txn *txn)
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
 
+	/* Do transaction conflict resolving */
+	if (txn->engine)
+		txn->engine->prepare(txn);
+
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if ((!stmt->old_tuple && !stmt->new_tuple) ||
 		    space_is_temporary(stmt->space))
@@ -197,7 +201,6 @@ txn_commit(struct txn *txn)
 	}
 
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
-	/* xxx: engine commit may throw on conflict or error */
 	if (txn->engine)
 		txn->engine->commit(txn);
 	TRASH(txn);

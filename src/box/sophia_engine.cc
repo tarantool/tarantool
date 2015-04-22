@@ -310,36 +310,35 @@ SophiaEngine::beginStatement(struct txn *txn)
 }
 
 void
-SophiaEngine::commit(struct txn *txn)
+SophiaEngine::prepare(struct txn *txn)
 {
-	if (txn->engine_tx == NULL)
-		return;
-	auto scoped_guard = make_scoped_guard([=] {
-		txn->engine_tx = NULL;
-	});
-	/* commit transaction using transaction
-	 * commit signature */
-	assert(txn->signature >= 0);
-	int rc = sp_prepare(txn->engine_tx, txn->signature);
+	int rc = sp_prepare(txn->engine_tx);
 	switch (rc) {
-	case 0:
-		break;
 	case 1: /* rollback */
-		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
-		break;
+		txn->engine_tx = NULL;
 	case 2: /* lock */
-		sp_destroy(txn->engine_tx);
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;
 	case -1:
 		sophia_raise(env);
 		break;
 	}
-	rc = sp_commit(txn->engine_tx);
+}
+
+void
+SophiaEngine::commit(struct txn *txn)
+{
+	if (txn->engine_tx == NULL)
+		return;
+	/* commit transaction using transaction
+	 * commit signature */
+	assert(txn->signature >= 0);
+	int rc = sp_commit(txn->engine_tx, txn->signature);
 	if (rc == -1) {
 		panic("sophia commit failed: txn->signature = %"
 		      PRIu64, txn->signature);
 	}
+	txn->engine_tx = NULL;
 }
 
 void
@@ -351,8 +350,10 @@ SophiaEngine::rollbackStatement(struct txn_stmt *)
 void
 SophiaEngine::rollback(struct txn *txn)
 {
-	if (txn->engine_tx)
+	if (txn->engine_tx) {
 		sp_destroy(txn->engine_tx);
+		txn->engine_tx = NULL;
+	}
 }
 
 void
