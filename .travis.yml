@@ -6,6 +6,9 @@ compiler:
 addons:
   postgresql: "9.1"
 
+before_install:
+  - git submodule update --init --recursive
+
 before_script:
   - psql -c "CREATE USER tarantool WITH PASSWORD 'tarantool';" -U postgres
   - psql -c "CREATE DATABASE tarantool;" -U postgres
