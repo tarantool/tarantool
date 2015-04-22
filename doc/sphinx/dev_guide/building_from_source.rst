@@ -129,12 +129,12 @@ explain what the steps are, then on the Internet you can look at some example sc
    .. code-block:: bash
 
      cd ~/tarantool
-     git submodule init
-     git submodule update
+     git submodule init --recursive
+     git submodule update --recursive
      cd ../
 
    On rare occasions, the submodules will need to be updated again with the
-   command: ``git submodule update --init``.
+   command: ``git submodule update --init --recursive``.
 
 6. Use CMake to initiate the build.
 
