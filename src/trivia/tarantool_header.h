@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <sys/types.h> /* ssize_t */
 
-#include <lua.h>
 
 /**
  * \file
@@ -18,3 +17,5 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+#include <lua.h>  /* does not have extern C wrappers */

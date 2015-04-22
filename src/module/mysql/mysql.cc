@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include "tarantool.h"
+#include <tarantool.h>
 
 #include <stddef.h>
 
