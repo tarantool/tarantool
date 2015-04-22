@@ -50,7 +50,7 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 	return prev_lsn;
 }
 
-static inline __attribute__ ((format(FORMAT_PRINTF, 4, 0))) int
+static inline __attribute__ ((format(printf, 4, 0))) int
 rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 {
 	int rc = 0;

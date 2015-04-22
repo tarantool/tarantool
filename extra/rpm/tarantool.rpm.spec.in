@@ -300,6 +300,7 @@ chkconfig --del tarantool
 "%{_includedir}/tarantool/lua.hpp"
 "%{_includedir}/tarantool/luajit.h"
 "%{_includedir}/tarantool/lualib.h"
+"%{_includedir}/tarantool/module.h"
 
 %files common
 %defattr(-,root,root,-)

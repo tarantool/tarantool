@@ -641,7 +641,7 @@ luaL_register_module(struct lua_State *L, const char *modname,
 }
 
 int
-luaL_pushnumber64(struct lua_State *L, uint64_t val)
+luaL_pushuint64(struct lua_State *L, uint64_t val)
 {
 	if (val < (1ULL << 52)) {
 		/* push lua_Number (double) */
@@ -655,7 +655,7 @@ luaL_pushnumber64(struct lua_State *L, uint64_t val)
 }
 
 int
-luaL_pushinumber64(struct lua_State *L, int64_t val)
+luaL_pushint64(struct lua_State *L, int64_t val)
 {
 	if (val > (-1LL << 52) && val < (1LL << 52)) {
 		/* push lua_Number (double) */

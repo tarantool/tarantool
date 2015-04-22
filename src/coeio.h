@@ -30,21 +30,11 @@
  */
 
 #include "trivia/config.h"
-#include "trivia/util.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+#include <sys/types.h> /* ssize_t */
 #include <stdarg.h>
-#include <unistd.h>
-#include <coro.h>
-#include "third_party/tarantool_ev.h"
+
 #include "third_party/tarantool_eio.h"
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
-#define ERESOLVE -1
 
 #if defined(__cplusplus)
 extern "C" {
@@ -89,15 +79,19 @@ struct coio_task {
 
 ssize_t
 coio_task(struct coio_task *task, coio_task_cb func,
-	  coio_task_timeout_cb on_timeout, ev_tstamp timeout);
+	  coio_task_timeout_cb on_timeout, double timeout);
 
+/** \cond public */
 ssize_t
 coio_call(ssize_t (*func)(va_list ap), ...);
+
+struct addrinfo;
 
 int
 coio_getaddrinfo(const char *host, const char *port,
 		 const struct addrinfo *hints, struct addrinfo **res,
-		 ev_tstamp timeout);
+		 double timeout);
+/** \endcond public */
 
 #if defined(__cplusplus)
 }

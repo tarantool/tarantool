@@ -143,8 +143,13 @@ endif()
 set (common_libraries ${common_libraries} ${LIBUUID_LIBRARIES})
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
+set(api_headers say.h coeio.h lua/utils.h)
+
 add_subdirectory(lib)
 add_subdirectory(box)
+
+apigen(${api_headers})
+
 # Save CMAKE_XXX_FLAGS from this directory for config.h (used in --version)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)

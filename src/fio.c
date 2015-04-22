@@ -39,6 +39,7 @@
 #include <lib/bit/bit.h>
 
 #include <say.h>
+#include <trivia/util.h>
 
 const char *
 fio_filename(int fd)

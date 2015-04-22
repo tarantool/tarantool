@@ -36,6 +36,8 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#include <trivia/util.h>
+
 #define BIND_RETRY_DELAY 0.1
 
 static void

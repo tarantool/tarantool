@@ -27,12 +27,18 @@
  * SUCH DAMAGE.
  */
 #include "coeio.h"
-#include "fiber.h"
-#include "exception.h"
-#include <errno.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/socket.h>
+
+#include "fiber.h"
+#include "exception.h"
+#include "third_party/tarantool_ev.h"
 
 /*
  * Asynchronous IO Tasks (libeio wrapper).
@@ -146,7 +152,7 @@ coio_on_finish(eio_req *req)
 
 ssize_t
 coio_task(struct coio_task *task, coio_task_cb func,
-	   coio_task_timeout_cb on_timeout, ev_tstamp timeout)
+	  coio_task_timeout_cb on_timeout, double timeout)
 {
 	/* from eio.c: REQ() definition */
 	memset(&task->base, 0, sizeof(task->base));
@@ -296,7 +302,7 @@ getaddrinfo_free_cb(struct coio_task *ptr)
 int
 coio_getaddrinfo(const char *host, const char *port,
 		 const struct addrinfo *hints, struct addrinfo **res,
-		 ev_tstamp timeout)
+		 double timeout)
 {
 	int rc = EAI_SYSTEM;
 	int save_errno = 0;

@@ -32,11 +32,11 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#include "trivia/util.h" /* for FORMAT_PRINTF */
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/** \cond public */
 
 enum say_level {
 	S_FATAL,		/* do not this value use directly */
@@ -47,6 +47,8 @@ enum say_level {
 	S_INFO,
 	S_DEBUG
 };
+
+/** \endcond public */
 
 extern int log_fd;
 extern pid_t logger_pid;
@@ -66,12 +68,13 @@ void say_logger_init(const char *logger, int log_level, int nonblock,
 
 void vsay(int level, const char *filename, int line, const char *error,
           const char *format, va_list ap)
-          __attribute__ ((format(FORMAT_PRINTF, 5, 0)));
+          __attribute__ ((format(printf, 5, 0)));
 
+/** \cond public */
 typedef void (*sayfunc_t)(int level, const char *filename, int line, const char *error,
                           const char *format, ...);
 
-extern sayfunc_t _say __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
+extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
 
 #define say(level, ...) ({ _say(level, __FILE__, __LINE__, __VA_ARGS__); })
 
@@ -84,7 +87,7 @@ extern sayfunc_t _say __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
 #define say_warn(...)			say(S_WARN, NULL, __VA_ARGS__)
 #define say_info(...)			say(S_INFO, NULL, __VA_ARGS__)
 #define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
-
+/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

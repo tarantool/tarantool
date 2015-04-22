@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include "module.h"
+
 #include <stddef.h>
 
 extern "C" {
@@ -39,14 +41,8 @@ extern "C" {
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <coeio.h>
-#include "third_party/tarantool_ev.h"
 
-#include <lua/init.h>
-#include <lua/utils.h>
-#include <say.h>
 #include <mysql.h>
-#include <scoped_guard.h>
 
 /**
  * gets MYSQL connector from lua stack (or object)
@@ -164,8 +160,8 @@ fetch_result(va_list ap)
 /**
  * push results to lua stack
  */
-int
-lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
+static int
+lua_mysql_pushresult(struct lua_State *L, MYSQL *mysql,
 	MYSQL_RES *result, int resno)
 {
 	int tidx;
@@ -187,6 +183,7 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 			lua_pushnumber(L, v);
 			return 2;
 		}
+		mysql_free_result(result);
 		luaL_error(L, "%s", mysql_error(mysql));
 	}
 
@@ -225,7 +222,7 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 				case MYSQL_TYPE_LONGLONG:
 				case MYSQL_TYPE_TIMESTAMP: {
 					long long v = atoll(row[i]);
-					luaL_pushnumber64(L, v);
+					luaL_pushuint64(L, v);
 					break;
 				}
 
@@ -249,10 +246,9 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 	v += mysql_affected_rows(mysql);
 	lua_pop(L, 1);
 	lua_pushnumber(L, v);
+	mysql_free_result(result);
 	return 2;
 }
-
-
 
 /**
  * mysql:execute() method
@@ -335,10 +331,7 @@ lua_mysql_execute(struct lua_State *L)
 		if (res == -1)
 			luaL_error(L, "%s", strerror(errno));
 
-		auto scope_guard = make_scoped_guard([&]{
-			mysql_free_result(result);
-		});
-		lua_push_mysql_result(L, mysql, result, resno++);
+		lua_mysql_pushresult(L, mysql, result, resno++);
 
 	} while(mysql_more_results(mysql));
 
