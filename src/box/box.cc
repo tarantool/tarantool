@@ -35,7 +35,7 @@
 #include "replication.h"
 #include "replica.h"
 #include <stat.h>
-#include <tarantool.h>
+#include "main.h"
 #include "tuple.h"
 #include "lua/call.h"
 #include "session.h"

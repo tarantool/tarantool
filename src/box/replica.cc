@@ -28,7 +28,7 @@
  */
 #include "replica.h"
 #include "recovery.h"
-#include "tarantool.h"
+#include "main.h"
 
 #include "xlog.h"
 #include "fiber.h"

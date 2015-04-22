@@ -46,7 +46,7 @@
 #include "xrow.h"
 #include "recovery.h"
 #include "schema.h"
-#include "tarantool.h"
+#include "main.h"
 #include "coeio_file.h"
 #include "coio.h"
 #include "errinj.h"

@@ -9,7 +9,7 @@
 #include <box/lua/call.h>
 #include <box/sophia_engine.h>
 #include <lua/init.h>
-#include <tarantool.h>
+#include "main.h"
 #include "lua/bsdsocket.h"
 #include "lua/digest.h"
 #include "fiber.h"

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include "module/tarantool.h"
+#include "tarantool.h"
 
 extern "C" {
 	#include <libpq-fe.h>

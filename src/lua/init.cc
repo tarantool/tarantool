@@ -28,7 +28,7 @@
  */
 #include "lua/init.h"
 #include "lua/utils.h"
-#include "tarantool.h"
+#include "main.h"
 #include "box/box.h"
 #if defined(__FreeBSD__) || defined(__APPLE__)
 #include "libgen.h"

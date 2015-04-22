@@ -31,7 +31,7 @@
 #include "box.h"
 #include "tuple.h"
 #include "space.h"
-#include <tarantool.h>
+#include "main.h"
 #include "cluster.h"
 #include "recovery.h"
 #include <fiber.h>

@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "tarantool.h"
+#include "main.h"
 
 static int level = 0;
 static FILE *trace_fd = NULL;

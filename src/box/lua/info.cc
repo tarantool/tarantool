@@ -38,7 +38,7 @@ extern "C" {
 #include "box/replica.h"
 #include "box/recovery.h"
 #include "box/cluster.h"
-#include "tarantool.h"
+#include "main.h"
 #include "box/box.h"
 #include "lua/utils.h"
 #include "fiber.h"

@@ -46,7 +46,7 @@ src/box/bootstrap.h
 src/lua/*.lua.c
 src/box/lua/*.lua.c
 src/tarantool
-src/module/tarantool.h
+src/trivia/tarantool.h
 tarantool-*.tar.gz
 test/lib/*.pyc
 test/lib/*/*.pyc

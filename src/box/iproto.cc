@@ -33,7 +33,7 @@
 #include <stdio.h>
 
 #include "iproto_port.h"
-#include "tarantool.h"
+#include "main.h"
 #include "fiber.h"
 #include "say.h"
 #include "evio.h"
