@@ -28,7 +28,7 @@
  */
 #include "lua/init.h"
 #include "lua/utils.h"
-#include "tarantool.h"
+#include "main.h"
 #include "box/box.h"
 #if defined(__FreeBSD__) || defined(__APPLE__)
 #include "libgen.h"
@@ -128,7 +128,7 @@ lbox_tonumber64(struct lua_State *L)
 		errno = 0;
 		unsigned long long result = strtoull(arg, &arge, 10);
 		if (errno == 0 && arge != arg) {
-			luaL_pushnumber64(L, result);
+			luaL_pushuint64(L, result);
 			return 1;
 		}
 		break;

@@ -44,6 +44,7 @@
 #endif /* #ifdef TARGET_OS_LINUX */
 
 #include "say.h"
+#include "trivia/util.h"
 
 SocketError::SocketError(const char *file, unsigned line, int fd,
 			 const char *format, ...)

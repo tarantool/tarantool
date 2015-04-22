@@ -291,10 +291,10 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	double d;
 	switch (mp_typeof(**data)) {
 	case MP_UINT:
-		luaL_pushnumber64(L, mp_decode_uint(data));
+		luaL_pushuint64(L, mp_decode_uint(data));
 		break;
 	case MP_INT:
-		luaL_pushinumber64(L, mp_decode_int(data));
+		luaL_pushint64(L, mp_decode_int(data));
 		break;
 	case MP_FLOAT:
 		d = mp_decode_float(data);

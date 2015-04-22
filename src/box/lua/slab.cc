@@ -66,27 +66,27 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	luaL_setmaphint(L, -1);
 
 	lua_pushstring(L, "mem_used");
-	luaL_pushnumber64(L, stats->totals.used);
+	luaL_pushuint64(L, stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "slab_size");
-	luaL_pushnumber64(L, stats->slabsize);
+	luaL_pushuint64(L, stats->slabsize);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "mem_free");
-	luaL_pushnumber64(L, stats->totals.total - stats->totals.used);
+	luaL_pushuint64(L, stats->totals.total - stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
-	luaL_pushnumber64(L, stats->objsize);
+	luaL_pushuint64(L, stats->objsize);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "slab_count");
-	luaL_pushnumber64(L, stats->slabcount);
+	luaL_pushuint64(L, stats->slabcount);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_count");
-	luaL_pushnumber64(L, stats->objcount);
+	luaL_pushuint64(L, stats->objcount);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
@@ -107,11 +107,11 @@ lbox_slab_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
-	luaL_pushnumber64(L, totals.used);
+	luaL_pushuint64(L, totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_size");
-	luaL_pushnumber64(L, totals.total);
+	luaL_pushuint64(L, totals.total);
 	lua_settable(L, -3);
 
 	char value[32];
@@ -140,11 +140,11 @@ lbox_runtime_info(struct lua_State *L)
 	lua_newtable(L);
 
 	lua_pushstring(L, "used");
-	luaL_pushnumber64(L, runtime.used);
+	luaL_pushuint64(L, runtime.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "maxalloc");
-	luaL_pushnumber64(L, quota_get(runtime.quota));
+	luaL_pushuint64(L, quota_get(runtime.quota));
 	lua_settable(L, -3);
 
 	return 1;

@@ -52,6 +52,8 @@ extern "C" {
 
 struct lua_State;
 
+/** \cond public */
+
 /**
  * @brief Allocate a new block of memory with the given size, push onto the
  * stack a new cdata of type ctypeid with the block address, and return
@@ -63,7 +65,7 @@ struct lua_State;
  * @sa luaL_checkcdata
  * @return memory associated with this cdata
  */
-void *
+LUA_API void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size);
 
 /**
@@ -74,7 +76,7 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size);
  * @sa luaL_pushcdata
  * @return memory associated with this cdata
  */
-void *
+LUA_API void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
 
 /**
@@ -85,7 +87,7 @@ luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
  * @param idx object
  * @return 1
  */
-int
+LUA_API int
 luaL_setcdatagc(struct lua_State *L, int idx);
 
 /**
@@ -96,8 +98,10 @@ luaL_setcdatagc(struct lua_State *L, int idx);
 * @sa luaL_checkcdata
 * @return CTypeID
 */
-uint32_t
+LUA_API uint32_t
 luaL_ctypeid(struct lua_State *L, const char *ctypename);
+
+/** \endcond public */
 
 static inline lua_Integer
 luaL_arrlen(struct lua_State *L, int idx)
@@ -352,6 +356,8 @@ void
 luaL_register_module(struct lua_State *L, const char *modname,
 		     const struct luaL_Reg *methods);
 
+/** \cond public */
+
 /**
  * push uint64_t to Lua stack
  *
@@ -359,12 +365,16 @@ luaL_register_module(struct lua_State *L, const char *modname,
  * @param val is a value to push
  *
  */
-int luaL_pushnumber64(struct lua_State *L, uint64_t val);
+LUA_API int
+luaL_pushuint64(struct lua_State *L, uint64_t val);
 
 /**
  * @copydoc luaL_pushnumber64
  */
-int luaL_pushinumber64(struct lua_State *L, int64_t val);
+LUA_API int
+luaL_pushint64(struct lua_State *L, int64_t val);
+
+/** \endcond public */
 
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.

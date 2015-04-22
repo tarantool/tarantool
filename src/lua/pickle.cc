@@ -209,12 +209,12 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'l':
 			CHECK_SIZE(s + 7);
-			luaL_pushnumber64(L, *(uint64_t*) s);
+			luaL_pushuint64(L, *(uint64_t*) s);
 			s += 8;
 			break;
 		case 'q':
 			CHECK_SIZE(s + 7);
-			luaL_pushnumber64(L, bswap_u64(*(uint64_t*) s));
+			luaL_pushuint64(L, bswap_u64(*(uint64_t*) s));
 			s += 8;
 			break;
 		case 'd':

@@ -224,12 +224,12 @@ static void load_scalar(struct lua_yaml_loader *loader) {
       char *endptr = NULL;
       long long ival = strtoll(str, &endptr, 10);
       if (endptr == str + length && ival != LLONG_MAX) {
-         luaL_pushinumber64(loader->L, ival);
+         luaL_pushint64(loader->L, ival);
          return;
       }
       unsigned long long uval = strtoull(str, &endptr, 10);
       if (endptr == str + length) {
-         luaL_pushnumber64(loader->L, uval);
+         luaL_pushuint64(loader->L, uval);
          return;
       }
       double dval = fpconv_strtod(str, &endptr);

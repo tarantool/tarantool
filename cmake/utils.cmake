@@ -79,3 +79,28 @@ function(bin_source varname srcfile dstfile)
         DEPENDS ${srcfile} bin2c)
 
 endfunction()
+
+# A helper function to extract public API
+function(apigen)
+    set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/tarantool.h")
+    set (tmpfile "${dstfile}.new")
+    set (headers)
+    # Get absolute path for header files (required of out-of-source build)
+    foreach (header ${ARGN})
+        list(APPEND headers ${CMAKE_CURRENT_SOURCE_DIR}/${header})
+    endforeach()
+
+    add_custom_command(OUTPUT ${dstfile}
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h > ${tmpfile}
+        COMMAND cat ${headers} | ${CMAKE_SOURCE_DIR}/extra/apigen >> ${tmpfile}
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h >> ${tmpfile}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
+        COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
+        DEPENDS ${srcfiles}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h
+        )
+
+    add_custom_target(generate_module_api ALL DEPENDS ${dstfile})
+    install(FILES ${dstfile} DESTINATION ${MODULE_INCLUDEDIR})
+endfunction()

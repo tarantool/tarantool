@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include "tarantool.h"
+
 extern "C" {
 	#include <libpq-fe.h>
 	#undef PACKAGE_VERSION
@@ -52,12 +54,7 @@ extern "C" {
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <coeio.h>
-#include "third_party/tarantool_ev.h"
 
-#include <lua/init.h>
-#include <say.h>
-#include <scoped_guard.h>
 
 static PGconn *
 lua_check_pgconn(struct lua_State *L, int index)
@@ -103,7 +100,7 @@ pg_exec(va_list ap)
 
 /** push query result into lua stack */
 static int
-lua_push_pgres(struct lua_State *L, PGresult *r)
+lua_pg_pushresult(struct lua_State *L, PGresult *r)
 {
 	if (!r)
 		luaL_error(L, "PG internal error: zero rults");
@@ -120,21 +117,28 @@ lua_push_pgres(struct lua_State *L, PGresult *r)
 				lua_pushnumber(L, v);
 			}
 			lua_pushstring(L, PQcmdStatus(r));
+			PQclear(r);
 			return 3;
 
 		case PGRES_TUPLES_OK:
 			break;
 
 		case PGRES_BAD_RESPONSE:
+			PQclear(r);
 			luaL_error(L, "Broken postgresql response");
+			return 0;
 
 		case PGRES_FATAL_ERROR:
 		case PGRES_NONFATAL_ERROR:
 		case PGRES_EMPTY_QUERY:
-			luaL_error(L, "%s", PQresultErrorMessage(r));
+			lua_pushstring(L, PQresultErrorMessage(r));
+			PQclear(r);
+			luaL_error(L, "%s", lua_tostring(L, -1));
+			return 0;
 
 		default:
-			luaL_error(L, "box.net.sql.pg: internal error");
+			luaL_error(L, "pg: unsupported result type");
+			return 0;
 	}
 
 	lua_newtable(L);
@@ -192,6 +196,7 @@ lua_push_pgres(struct lua_State *L, PGresult *r)
 		lua_pushnumber(L, v);
 	}
 	lua_pushstring(L, PQcmdStatus(r));
+	PQclear(r);
 	return 3;
 }
 
@@ -290,11 +295,8 @@ lua_pg_execute(struct lua_State *L)
 			strerror(errno));
 	}
 
-	auto scope_guard = make_scoped_guard([&]{
-		PQclear(res);
-	});
 	lua_settop(L, 0);
-	return lua_push_pgres(L, res);
+	return lua_pg_pushresult(L, res);
 }
 
 /**
