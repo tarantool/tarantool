@@ -115,9 +115,26 @@ public:
 	 * statement.
 	 */
 	virtual void beginStatement(struct txn *);
+	/**
+	 * Called before a WAL write is made to prepare
+	 * a transaction for commit in the engine.
+	 */
 	virtual void prepare(struct txn *);
+	/**
+	 * End the transaction in the engine, the transaction
+	 * has been successfully written to the WAL.
+	 * This method can't throw: if any error happens here,
+	 * there is no better option than panic.
+	 */
 	virtual void commit(struct txn *);
+	/*
+	 * Called to roll back effects of a statement if an
+	 * error happens, e.g., in a trigger.
+	 */
 	virtual void rollbackStatement(struct txn_stmt *);
+	/*
+	 * Roll back and end the transaction in the engine.
+	 */
 	virtual void rollback(struct txn *);
 	/**
 	 * Recover the engine to a checkpoint it has.
