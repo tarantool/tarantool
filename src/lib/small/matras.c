@@ -221,7 +221,7 @@ matras_dealloc(struct matras *m)
 {
 	assert(m->block_counts[0]);
 	matras_id_t last = m->block_counts[0] - 1;
-	matras_before_change(m, last);
+	matras_touch(m, last);
 	m->block_counts[0] = last;
 	/* Current block_count is the ID of deleting block */
 
@@ -471,7 +471,7 @@ matras_delete_version(struct matras *m, matras_id_t ver_id)
  * Returns true if ok, and false if failed to allocate memory.
  */
 void *
-matras_before_change(struct matras *m, matras_id_t id)
+matras_touch(struct matras *m, matras_id_t id)
 {
 	assert(id < m->block_counts[0]);
 

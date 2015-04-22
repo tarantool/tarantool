@@ -220,7 +220,7 @@ matras_vers_test()
 				}
 				val++;
 				comps[0][p] = val;
-				matras_before_change(&local, p);
+				matras_touch(&local, p);
 				*(type_t *)matras_get(&local, p) = val;
 			}
 			int checkres = matras_debug_selfcheck(&local);

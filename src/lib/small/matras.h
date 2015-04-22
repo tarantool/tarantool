@@ -283,7 +283,7 @@ matras_delete_version(struct matras *m, matras_id_t ver_id);
  * Only needed (and does any work) if some versions are used.
  */
 void *
-matras_before_change(struct matras *m, matras_id_t id);
+matras_touch(struct matras *m, matras_id_t id);
 
 /*
  * Debug check that ensures internal consistency.
