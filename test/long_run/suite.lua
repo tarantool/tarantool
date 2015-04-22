@@ -10,15 +10,11 @@ function string_function()
 	return random_string
 end
 
-function delete_replace_update_cleanup()
+function delete_replace_update(engine_name)
+	local string_value
 	if (box.space._space.index.name:select{'tester'}[1] ~= nil) then
 		box.space.tester:drop()
 	end
-end
-
-function delete_replace_update(engine_name)
-	local string_value
-	delete_replace_update_cleanup()
 	box.schema.space.create('tester', {engine=engine_name})
 	box.space.tester:create_index('primary',{type = 'tree', parts = {2, 'STR'}})
 
@@ -68,6 +64,7 @@ function delete_replace_update(engine_name)
 		counter = counter + 1
 	end
 
+	box.space.tester:drop()
 	return {counter, random_number, string_value_2, string_value_3}
 end
 
@@ -105,5 +102,6 @@ function delete_insert(engine_name)
 
 		counter = counter + 1
 	end
-	return {counter, string_value_2, string_value_3}
+	box.space.tester:drop()
+	return {counter, string_value_2}
 end

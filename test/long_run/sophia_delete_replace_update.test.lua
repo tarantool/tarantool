@@ -17,5 +17,3 @@ delete_replace_update(engine_name)
 
 math.randomseed(5)
 delete_replace_update(engine_name)
-
-delete_replace_update_cleanup()
