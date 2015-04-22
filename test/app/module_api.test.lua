@@ -2,8 +2,7 @@
 
 box.cfg{logger = "tarantool.log"}
 
-local work_dir = require('fio').dirname(arg[0])
-package.cpath = work_dir..'/?.so;'
+package.cpath = '../app/?.so;'..package.cpath
 
 local test = require('tap').test("module_api", function(test)
     test:plan(7)

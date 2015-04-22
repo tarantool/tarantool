@@ -84,10 +84,15 @@ endfunction()
 function(apigen)
     set (dstfile "${CMAKE_BINARY_DIR}/src/module.h")
     set (tmpfile "${dstfile}.new")
+    set (headers)
+    # Get absolute path for header files (required of out-of-source build)
+    foreach (header ${ARGN})
+        list(APPEND headers ${CMAKE_CURRENT_SOURCE_DIR}/${header})
+    endforeach()
 
     add_custom_command(OUTPUT ${dstfile}
         COMMAND cat ${CMAKE_SOURCE_DIR}/src/module_header.h > ${tmpfile}
-        COMMAND cat ${ARGN} | ${CMAKE_SOURCE_DIR}/extra/apigen >> ${tmpfile}
+        COMMAND cat ${headers} | ${CMAKE_SOURCE_DIR}/extra/apigen >> ${tmpfile}
         COMMAND cat ${CMAKE_SOURCE_DIR}/src/module_footer.h >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
