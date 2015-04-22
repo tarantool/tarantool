@@ -91,9 +91,9 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-for i = 501,2500 do s:insert{i, i} end
+for i = 501,5000 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
+- error: Failed to allocate 32768 bytes in MemtxTree for replace
 ...
 s:delete{1}
 ---
@@ -139,24 +139,24 @@ res
 res = {}
 ---
 ...
-for i = 2001,2010 do table.insert(res, (s:get{i})) end
+for i = 4001,4010 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
 ---
 - []
 ...
---count must be greater that 1000 but less than 2000
-function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 1000 and "fail 1" or count >= 2000 and "fail 2" or "ok" end
+--count must be greater that 2000 but less than 4000
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 2000 and "fail 1" or count >= 4000 and "fail 2" or "ok" end
 ---
 ...
 check_iter_and_size()
 ---
 - ok
 ...
-for i = 2501,3500 do s:insert{i, i} end
+for i = 5001,6000 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
+- error: Failed to allocate 32768 bytes in MemtxTree for replace
 ...
 s:delete{2}
 ---
@@ -183,9 +183,9 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-for i = 3501,4500 do s:insert{i, i} end
+for i = 6001,7000 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
+- error: Failed to allocate 32768 bytes in MemtxTree for replace
 ...
 s:delete{3}
 ---
@@ -199,7 +199,7 @@ errinj.set("ERRINJ_INDEX_ALLOC", false)
 ---
 - ok
 ...
-for i = 4501,5500 do s:insert{i, i} end
+for i = 7001,8000 do s:insert{i, i} end
 ---
 ...
 res = {}
@@ -240,21 +240,21 @@ res
 res = {}
 ---
 ...
-for i = 5001,5010 do table.insert(res, (s:get{i})) end
+for i = 7501,7510 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
 ---
-- - [5001, 5001]
-  - [5002, 5002]
-  - [5003, 5003]
-  - [5004, 5004]
-  - [5005, 5005]
-  - [5006, 5006]
-  - [5007, 5007]
-  - [5008, 5008]
-  - [5009, 5009]
-  - [5010, 5010]
+- - [7501, 7501]
+  - [7502, 7502]
+  - [7503, 7503]
+  - [7504, 7504]
+  - [7505, 7505]
+  - [7506, 7506]
+  - [7507, 7507]
+  - [7508, 7508]
+  - [7509, 7509]
+  - [7510, 7510]
 ...
 s:drop()
 ---

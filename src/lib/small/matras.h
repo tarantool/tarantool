@@ -59,7 +59,7 @@
  *  level 1 extent
  *  - second N2 bits - level 1 extent id - stores the address of
  *  the extent which contains actual blocks
- *  - remaining N3 bits - block number in level 1 extent
+ *  - remaining N3 bits - block number in level 2 extent
  * (Actual values of N1 and N2 are a function of block size B).
  * Calculation of N1, N2 and N3 depends on sizes of blocks,
  * extents and sizeof(void *).
@@ -70,7 +70,7 @@
  * instance:
  *
  * 1) can provide not more than
- *    pow(M / sizeof(void*), L - 1) * (M / N)
+ *    pow(M / sizeof(void*) / 2, L - 1) * (M / N)
  *    blocks
  * 2) costs (L - 1) random memory accesses to provide a new block
  *    or restore a block pointer from block id
@@ -79,6 +79,19 @@
  * Of course, the integer type used for block id (matras_id_t,
  * usually is a typedef to uint32) also limits the maximum number
  * of objects that can be block_count by an instance of matras.
+ *
+ * Additionally matras provides freezing all allocated data. At
+ * any moment user can call matras_new_version method for achieving
+ * unique ID of current data state. Then the user could change,
+ * allocate and dealocate main matras data, meanwhile getting data
+ * from previusly freezed version. This works through copy-on-write
+ * mechanism, thus is cheap enough, and of course this works only
+ * if user correctly notifies mastras about chainging data.
+ * An impotant property of implemented copy-on-write mechnism - is
+ * that main data does not moved, i.e. before data modification the
+ * extent is copied to another location to become the extent
+ * for freezed version. Thus main block address with some particular
+ * block ID is unchanged.
  */
 /* }}} */
 
@@ -90,6 +103,7 @@ typedef uint32_t matras_id_t;
 #endif
 
 #include <assert.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -104,8 +118,27 @@ extern "C" {
  * of size M). Is allowed to return NULL, but is not allowed
  * to throw an exception
  */
-typedef void *(*prov_alloc_func)();
-typedef void (*prov_free_func)(void *);
+typedef void *(*matras_alloc_func)();
+typedef void (*matras_free_func)(void *);
+
+typedef uint32_t matras_version_tag_t;
+
+struct matras_record {
+	/* pointer to next level of a tree */
+	union {
+		struct matras_record *ptr;
+		matras_version_tag_t ptr_padded;
+	};
+	/* version tag - bitmask of all version referencing ptr above */
+	union {
+		matras_version_tag_t tag;
+		void *tag_padded;
+	};
+};
+
+enum {
+	MATRAS_VERSION_COUNT = 8
+};
 
 /**
  * matras - memory allocator of blocks of equal
@@ -113,13 +146,15 @@ typedef void (*prov_free_func)(void *);
  */
 struct matras {
 	/* Pointer to the root extent of matras */
-	void *extent;
+	struct matras_record roots[MATRAS_VERSION_COUNT];
+	/* A number of already allocated blocks */
+	matras_id_t block_counts[MATRAS_VERSION_COUNT];
+	/* Bit mask of used versions */
+	matras_version_tag_t ver_occ_mask;
 	/* Block size (N) */
 	matras_id_t block_size;
 	/* Extent size (M) */
 	matras_id_t extent_size;
-	/* A number of already allocated blocks */
-	matras_id_t block_count;
 	/* binary logarithm  of maximum possible created blocks count */
 	matras_id_t log2_capacity;
 	/* See "Shifts and masks explanation" below  */
@@ -127,9 +162,9 @@ struct matras {
 	/* See "Shifts and masks explanation" below  */
 	matras_id_t mask1, mask2;
 	/* External extent allocator */
-	prov_alloc_func alloc_func;
+	matras_alloc_func alloc_func;
 	/* External extent deallocator */
-	prov_free_func free_func;
+	matras_free_func free_func;
 };
 
 /*
@@ -160,7 +195,7 @@ struct matras {
  */
 void
 matras_create(struct matras *m, matras_id_t extent_size, matras_id_t block_size,
-	      prov_alloc_func alloc_func, prov_free_func free_func);
+	      matras_alloc_func alloc_func, matras_free_func free_func);
 
 /**
  * Free all memory used by an instance of matras and
@@ -217,12 +252,45 @@ matras_dealloc_range(struct matras *m, matras_id_t range_count);
 static void *
 matras_get(const struct matras *m, matras_id_t id);
 
+/**
+ * Convert block id of a specified version into block address.
+ */
+static void *
+matras_getv(const struct matras *m, matras_id_t id, matras_id_t version);
+
 /*
  * Getting number of allocated extents (of size extent_size each)
 */
 matras_id_t
 matras_extents_count(const struct matras *m);
 
+/*
+ * Create new version of matras memory.
+ * Return 0 if all version IDs are occupied.
+ */
+matras_id_t
+matras_new_version(struct matras *m);
+
+/*
+ * Delete memory version by specified ID.
+ */
+void
+matras_delete_version(struct matras *m, matras_id_t ver_id);
+
+/*
+ * Notify matras that memory at given ID will be changed.
+ * Returns true if ok, and false if failed to allocate memory.
+ * Only needed (and does any work) if some versions are used.
+ */
+void *
+matras_before_change(struct matras *m, matras_id_t id);
+
+/*
+ * Debug check that ensures internal consistency.
+ * Must return 0. If i returns not 0, smth is terribly wrong.
+ */
+matras_version_tag_t
+matras_debug_selfcheck(const struct matras *m);
 
 /**
  * matras_get implementation
@@ -230,14 +298,32 @@ matras_extents_count(const struct matras *m);
 static inline void *
 matras_get(const struct matras *m, matras_id_t id)
 {
-	assert(id < m->block_count);
+	assert(id < m->block_counts[0]);
 
 	/* see "Shifts and masks explanation" for details */
 	matras_id_t n1 = id >> m->shift1;
 	matras_id_t n2 = (id & m->mask1) >> m->shift2;
 	matras_id_t n3 = (id & m->mask2);
 
-	return (((char***)m->extent)[n1][n2] + n3 * m->block_size);
+	char *extent = (char *)m->roots[0].ptr[n1].ptr[n2].ptr;
+	return &extent[n3 * m->block_size];
+}
+
+/**
+ * matras_getv implementation
+ */
+static inline void *
+matras_getv(const struct matras *m, matras_id_t id, matras_id_t version)
+{
+	assert(id < m->block_counts[version]);
+
+	/* see "Shifts and masks explanation" for details */
+	matras_id_t n1 = id >> m->shift1;
+	matras_id_t n2 = (id & m->mask1) >> m->shift2;
+	matras_id_t n3 = (id & m->mask2);
+
+	char *extent = (char *)m->roots[version].ptr[n1].ptr[n2].ptr;
+	return &extent[n3 * m->block_size];
 }
 
 #if defined(__cplusplus)

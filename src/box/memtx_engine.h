@@ -68,7 +68,7 @@ private:
 };
 
 enum {
-	MEMTX_EXTENT_SIZE = 16 * 1024,
+	MEMTX_EXTENT_SIZE = 32 * 1024,
 	MEMTX_SLAB_SIZE = 4 * 1024 * 1024
 };
 
