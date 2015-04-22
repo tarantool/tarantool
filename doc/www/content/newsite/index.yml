@@ -35,6 +35,11 @@ blocks  :
     - "authentication and access control"
   news:
     -
+      - "Tarantool 1.6.5 is released"
+      - "https://groups.google.com/d/msg/tarantool/zIM68T93Be0/nqwe6If74PwJ"
+      - "22.04"
+      - "2015"
+    -
       - "Tarantool Meetup in Avito"
       - "http://www.meetup.com/Tarantool/events/220924229/"
       - "04.03"
@@ -43,11 +48,6 @@ blocks  :
       - "Tarantool 1.6.4 is released"
       - "https://groups.google.com/forum/#!topic/tarantool/F3qc_zemEYg"
       - "24.11"
-      - "2014"
-    -
-      - "Lua Workshop in Russia"
-      - "http://www.lua.org/wshop14.html"
-      - "14.11"
       - "2014"
   support:
     - format: rst
