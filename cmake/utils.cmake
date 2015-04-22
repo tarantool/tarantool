@@ -82,7 +82,7 @@ endfunction()
 
 # A helper function to extract public API
 function(apigen)
-    set (dstfile "${CMAKE_BINARY_DIR}/src/module.h")
+    set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/tarantool.h")
     set (tmpfile "${dstfile}.new")
     set (headers)
     # Get absolute path for header files (required of out-of-source build)
@@ -91,14 +91,14 @@ function(apigen)
     endforeach()
 
     add_custom_command(OUTPUT ${dstfile}
-        COMMAND cat ${CMAKE_SOURCE_DIR}/src/module_header.h > ${tmpfile}
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h > ${tmpfile}
         COMMAND cat ${headers} | ${CMAKE_SOURCE_DIR}/extra/apigen >> ${tmpfile}
-        COMMAND cat ${CMAKE_SOURCE_DIR}/src/module_footer.h >> ${tmpfile}
+        COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
         DEPENDS ${srcfiles}
-                ${CMAKE_SOURCE_DIR}/src/module_header.h
-                ${CMAKE_SOURCE_DIR}/src/module_footer.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h
         )
 
     add_custom_target(generate_module_api ALL DEPENDS ${dstfile})

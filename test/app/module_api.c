@@ -1,4 +1,4 @@
-#include "module.h"
+#include "module/tarantool.h"
 
 #include <errno.h>
 #include <sys/types.h>
