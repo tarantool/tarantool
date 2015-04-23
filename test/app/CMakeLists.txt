@@ -1,5 +1,5 @@
+include_directories(${CMAKE_BINARY_DIR}/src/trivia)
 add_library(module_api SHARED module_api.c)
 target_link_libraries(module_api -rdynamic)
 set_target_properties(module_api PROPERTIES PREFIX "")
 add_dependencies(module_api generate_module_api)
-target_include_directories(module_api PUBLIC ${CMAKE_BINARY_DIR}/src/trivia)
