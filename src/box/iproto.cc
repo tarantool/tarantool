@@ -653,6 +653,7 @@ iproto_process(struct iproto_request *ireq)
 	if (unlikely(! evio_is_active(&con->output)))
 		return;
 
+	ireq->session->sync = ireq->header.sync;
 	struct obuf_svp svp = obuf_create_svp(out);
 	try {
 		switch (ireq->header.type) {
