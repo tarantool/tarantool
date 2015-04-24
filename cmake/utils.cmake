@@ -87,7 +87,11 @@ function(apigen)
     set (headers)
     # Get absolute path for header files (required of out-of-source build)
     foreach (header ${ARGN})
-        list(APPEND headers ${CMAKE_CURRENT_SOURCE_DIR}/${header})
+        if (IS_ABSOLUTE ${header})
+            list(APPEND headers ${header})
+        else()
+            list(APPEND headers ${CMAKE_CURRENT_SOURCE_DIR}/${header})
+        endif()
     endforeach()
 
     add_custom_command(OUTPUT ${dstfile}
@@ -101,6 +105,6 @@ function(apigen)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h
         )
 
-    add_custom_target(generate_module_api ALL DEPENDS ${dstfile})
+    add_custom_target(generate_module_api ALL DEPENDS ${srcfiles} ${dstfile})
     install(FILES ${dstfile} DESTINATION ${MODULE_INCLUDEDIR})
 endfunction()

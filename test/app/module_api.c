@@ -8,6 +8,22 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#define STR2(x) #x
+#define STR(x) STR2(x)
+
+/* Test for constants */
+static const char *consts[] = {
+	PACKAGE_VERSION,
+	STR(PACKAGE_VERSION_MINOR),
+	STR(PACKAGE_VERSION_MAJOR),
+	STR(PACKAGE_VERSION_PATCH),
+	TARANTOOL_C_FLAGS,
+	TARANTOOL_CXX_FLAGS,
+	MODULE_LIBDIR,
+	MODULE_LUADIR,
+	MODULE_INCLUDEDIR
+};
+
 static int
 test_say(lua_State *L)
 {
@@ -88,6 +104,7 @@ test_pushint64(lua_State *L)
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
+	(void) consts;
 	static const struct luaL_reg lib[] = {
 		{"test_say", test_say },
 		{"test_coio_call", test_coio_call },
