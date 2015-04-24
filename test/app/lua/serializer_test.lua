@@ -1,6 +1,6 @@
 local ffi = require('ffi')
 
-local function rt(test, s, x)
+local function rt(test, s, x, t)
     local buf1 = s.encode(x)
     local x1, offset1 = s.decode(buf1)
     local xstr
@@ -19,133 +19,131 @@ local function rt(test, s, x)
         xstr = tostring(x)
     end
     test:is_deeply(x, x1, "encode/decode for "..xstr)
+    if t ~= nil then
+        test:is(type(x1), t, "encode/decode type for "..xstr)
+    end
 end
 
 local function test_unsigned(test, s)
-    test:plan(56)
-    rt(test, s, 0)
-    rt(test, s, 0LL)
-    rt(test, s, 0ULL)
+    test:plan(118)
+    rt(test, s, 0, "number")
+    rt(test, s, 0LL, "number")
+    rt(test, s, 0ULL, "number")
 
-    rt(test, s, 1)
-    rt(test, s, 1LL)
-    rt(test, s, 1ULL)
+    rt(test, s, 1, "number")
+    rt(test, s, 1LL, "number")
+    rt(test, s, 1ULL, "number")
 
-    rt(test, s, 127)
-    rt(test, s, 127LL)
-    rt(test, s, 127ULL)
+    rt(test, s, 127, "number")
+    rt(test, s, 127LL, "number")
+    rt(test, s, 127ULL, "number")
 
-    rt(test, s, 128)
-    rt(test, s, 128LL)
-    rt(test, s, 128ULL)
+    rt(test, s, 128, "number")
+    rt(test, s, 128LL, "number")
+    rt(test, s, 128ULL, "number")
 
-    rt(test, s, 255)
-    rt(test, s, 255LL)
-    rt(test, s, 255ULL)
+    rt(test, s, 255, "number")
+    rt(test, s, 255LL, "number")
+    rt(test, s, 255ULL, "number")
 
-    rt(test, s, 256)
-    rt(test, s, 256LL)
-    rt(test, s, 256ULL)
+    rt(test, s, 256, "number")
+    rt(test, s, 256LL, "number")
+    rt(test, s, 256ULL, "number")
 
-    rt(test, s, 65535)
-    rt(test, s, 65535LL)
-    rt(test, s, 65535ULL)
+    rt(test, s, 65535, "number")
+    rt(test, s, 65535LL, "number")
+    rt(test, s, 65535ULL, "number")
 
-    rt(test, s, 65536)
-    rt(test, s, 65536LL)
-    rt(test, s, 65536ULL)
+    rt(test, s, 65536, "number")
+    rt(test, s, 65536LL, "number")
+    rt(test, s, 65536ULL, "number")
 
-    rt(test, s, 4294967294)
-    rt(test, s, 4294967294LL)
-    rt(test, s, 4294967294ULL)
+    rt(test, s, 4294967294, "number")
+    rt(test, s, 4294967294LL, "number")
+    rt(test, s, 4294967294ULL, "number")
 
-    rt(test, s, 4294967295)
-    rt(test, s, 4294967295LL)
-    rt(test, s, 4294967295ULL)
+    rt(test, s, 4294967295, "number")
+    rt(test, s, 4294967295LL, "number")
+    rt(test, s, 4294967295ULL, "number")
 
-    rt(test, s, 4294967296)
-    rt(test, s, 4294967296LL)
-    rt(test, s, 4294967296ULL)
+    rt(test, s, 4294967296, "number")
+    rt(test, s, 4294967296LL, "number")
+    rt(test, s, 4294967296ULL, "number")
 
-    rt(test, s, 4294967297)
-    rt(test, s, 4294967297LL)
-    rt(test, s, 4294967297ULL)
+    rt(test, s, 4294967297, "number")
+    rt(test, s, 4294967297LL, "number")
+    rt(test, s, 4294967297ULL, "number")
 
-    rt(test, s, 9007199254740992)
-    rt(test, s, 9007199254740992LL)
-    rt(test, s, 9007199254740992ULL)
+    -- 1e52 - maximum int that can be stored to double without losing precision
+    rt(test, s, 4503599627370495, "number")
+    rt(test, s, 4503599627370495LL, "number")
+    rt(test, s, 4503599627370495ULL, "number")
+    rt(test, s, 4503599627370496, "cdata")
+    rt(test, s, 4503599627370496LL, "cdata")
+    rt(test, s, 4503599627370496ULL, "cdata")
 
-    rt(test, s, 9223372036854775807LL)
-    rt(test, s, 9223372036854775807ULL)
+    rt(test, s, 9223372036854775807LL, "cdata")
+    rt(test, s, 9223372036854775807ULL, "cdata")
 
-    rt(test, s, 9223372036854775808ULL)
-    rt(test, s, 9223372036854775809ULL)
-    rt(test, s, 18446744073709551614ULL)
-    rt(test, s, 18446744073709551615ULL)
+    rt(test, s, 9223372036854775808ULL, "cdata")
+    rt(test, s, 9223372036854775809ULL, "cdata")
+    rt(test, s, 18446744073709551614ULL, "cdata")
+    rt(test, s, 18446744073709551615ULL, "cdata")
 
-    rt(test, s, -1ULL)
+    rt(test, s, -1ULL, "cdata")
 
-    rt(test, s, ffi.new('uint8_t', 128))
-    rt(test, s, ffi.new('int8_t', -128))
-    rt(test, s, ffi.new('uint16_t', 128))
-    rt(test, s, ffi.new('int16_t', -128))
-    rt(test, s, ffi.new('uint32_t', 128))
-    rt(test, s, ffi.new('int32_t', -128))
-    rt(test, s, ffi.new('uint64_t', 128))
-    rt(test, s, ffi.new('int64_t', -128))
+    rt(test, s, ffi.new('uint8_t', 128), 'number')
+    rt(test, s, ffi.new('int8_t', -128), 'number')
+    rt(test, s, ffi.new('uint16_t', 128), 'number')
+    rt(test, s, ffi.new('int16_t', -128), 'number')
+    rt(test, s, ffi.new('uint32_t', 128), 'number')
+    rt(test, s, ffi.new('int32_t', -128), 'number')
+    rt(test, s, ffi.new('uint64_t', 128), 'number')
+    rt(test, s, ffi.new('int64_t', -128), 'number')
 
-    rt(test, s, ffi.new('char', 128))
-    rt(test, s, ffi.new('char', -128))
+    rt(test, s, ffi.new('char', 128), 'number')
+    rt(test, s, ffi.new('char', -128), 'number')
 end
 
 local function test_signed(test, s)
-    test:plan(30)
+    test:plan(48)
 
-    rt(test, s, -1)
-    rt(test, s, -1LL)
+    rt(test, s, -1, 'number')
+    rt(test, s, -1LL, 'number')
 
-    rt(test, s, -31)
-    rt(test, s, -31LL)
+    rt(test, s, -31, 'number')
+    rt(test, s, -31LL, 'number')
 
-    rt(test, s, -32)
-    rt(test, s, -32LL)
+    rt(test, s, -32, 'number')
+    rt(test, s, -32LL, 'number')
 
-    rt(test, s, -127)
-    rt(test, s, -127LL)
+    rt(test, s, -127, 'number')
+    rt(test, s, -127LL, 'number')
 
-    rt(test, s, -128)
-    rt(test, s, -128LL)
+    rt(test, s, -128, 'number')
+    rt(test, s, -128LL, 'number')
 
-    rt(test, s, -32767)
-    rt(test, s, -32767LL)
+    rt(test, s, -32767, 'number')
+    rt(test, s, -32767LL, 'number')
 
-    rt(test, s, -32768)
-    rt(test, s, -32768LL)
+    rt(test, s, -32768, 'number')
+    rt(test, s, -32768LL, 'number')
 
-    rt(test, s, -2147483647)
-    rt(test, s, -2147483647LL)
+    rt(test, s, -2147483647, 'number')
+    rt(test, s, -2147483647LL, 'number')
 
-    rt(test, s, -2147483648)
-    rt(test, s, -2147483648LL)
+    rt(test, s, -2147483648, 'number')
+    rt(test, s, -2147483648LL, 'number')
 
-    -- 1e53 - maximum int that can be stored to double without losing precision
+    -- 1e52 - maximum int that can be stored to double without losing precision
+    rt(test, s, -4503599627370495, "number")
+    rt(test, s, -4503599627370495LL, "number")
+    rt(test, s, -4503599627370496, "cdata")
+    rt(test, s, -4503599627370496LL, "cdata")
 
-    rt(test, s, 9007199254740991)
-    rt(test, s, 9007199254740991ULL)
-    rt(test, s, 9007199254740991LL)
+    rt(test, s, -9223372036854775806LL, 'cdata')
 
-    rt(test, s, 9007199254740992)
-    rt(test, s, 9007199254740992ULL)
-    rt(test, s, 9007199254740992LL)
-
-    rt(test, s, -9007199254740991)
-    rt(test, s, -9007199254740991LL)
-    rt(test, s, -9007199254740992)
-    rt(test, s, -9007199254740992LL)
-
-    rt(test, s, -9223372036854775806LL)
-
-    rt(test, s, -9223372036854775807LL)
+    rt(test, s, -9223372036854775807LL, 'cdata')
 end
 
 local function test_double(test, s)

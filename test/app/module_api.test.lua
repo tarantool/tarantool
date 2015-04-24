@@ -2,7 +2,7 @@
 
 box.cfg{logger = "tarantool.log"}
 
-package.cpath = '../app/?.so;'..package.cpath
+package.cpath = '../app/?.so;../app/?.dylib;'..package.cpath
 
 local test = require('tap').test("module_api", function(test)
     test:plan(7)

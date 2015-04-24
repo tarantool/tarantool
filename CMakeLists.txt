@@ -364,8 +364,6 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/src/trivia/config.h.cmake"
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
     )
-install(FILES ${PROJECT_BINARY_DIR}/src/trivia/config.h
-    DESTINATION ${MODULE_INCLUDEDIR})
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")

@@ -290,34 +290,39 @@ on_encode(ffi.typeof('double'), encode_double)
 
 local decode_r
 
+local NUMBER_INT_MAX = 4503599627370496LL -- 2^52
+
 local function decode_u8(data)
     local num = ffi.cast(uint8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
-    return num
+    return tonumber(num)
 end
 
 local function decode_u16(data)
     local num = bswap_u16(ffi.cast(uint16_ptr_t, data[0])[0])
     data[0] = data[0] + 2
-    return num
+    return tonumber(num)
 end
 
 local function decode_u32(data)
     local num = bswap_u32(ffi.cast(uint32_ptr_t, data[0])[0])
     data[0] = data[0] + 4
-    return num
+    return tonumber(num)
 end
 
 local function decode_u64(data)
     local num = bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])
     data[0] = data[0] + 8
-    return num
+    if num < NUMBER_INT_MAX then
+        return tonumber(num) -- return as 'number'
+    end
+    return num -- return as 'cdata'
 end
 
 local function decode_i8(data)
     local num = ffi.cast(int8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
-    return num
+    return tonumber(num)
 end
 
 local function decode_i16(data)
@@ -333,9 +338,13 @@ local function decode_i32(data)
 end
 
 local function decode_i64(data)
-    local num = bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])
+    local num = ffi.cast('int64_t', ffi.cast('uint64_t',
+        bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])))
     data[0] = data[0] + 8
-    return ffi.cast('int64_t', ffi.cast('uint64_t', num))
+    if num > -NUMBER_INT_MAX and num < NUMBER_INT_MAX then
+        return tonumber(num) -- return as 'number'
+    end
+    return num -- return as 'cdata'
 end
 
 local bswap_buf = ffi.new('char[8]')
@@ -427,17 +436,15 @@ decode_r = function(data)
     local c = data[0][0]
     data[0] = data[0] + 1
     if c <= 0x7f then
-        return c -- fixint
+        return tonumber(c) -- fixint
     elseif c >= 0xa0 and c <= 0xbf then
         return decode_str(data, bit.band(c, 0x1f)) -- fixstr
     elseif c >= 0x90 and c <= 0x9f then
         return decode_array(data, bit.band(c, 0xf)) -- fixarray
     elseif c >= 0x80 and c <= 0x8f then
         return decode_map(data, bit.band(c, 0xf)) -- fixmap
-    elseif c <= 0x7f then
-        return c2
     elseif c >= 0xe0 then
-        return ffi.cast('signed char',c)
+        return tonumber(ffi.cast('signed char',c)) -- negfixint
     elseif c == 0xc0 then
         return msgpack.NULL
     elseif c == 0xc2 then
