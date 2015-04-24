@@ -193,6 +193,10 @@ a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
 ---
 - true
 ...
+a:eval('return session.sync() ~= 0')
+---
+- true
+...
 a:close()
 ---
 ...
@@ -217,6 +221,10 @@ session.uid()
 session.user()
 ---
 - admin
+...
+session.sync()
+---
+- 0
 ...
 fiber = nil
 ---

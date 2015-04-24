@@ -75,6 +75,7 @@ session.on_disconnect(audit_disconnect)
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 a = net.box:new(LISTEN.host, LISTEN.service)
 a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
+a:eval('return session.sync() ~= 0')
 a:close()
 
 -- cleanup
@@ -86,6 +87,7 @@ space:drop()
 
 session.uid()
 session.user()
+session.sync()
 fiber = nil
 session = nil
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

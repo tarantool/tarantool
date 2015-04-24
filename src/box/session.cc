@@ -76,6 +76,7 @@ session_create(int fd, uint64_t cookie)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;
+	session->sync = 0;
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user);
 	if (fd >= 0)

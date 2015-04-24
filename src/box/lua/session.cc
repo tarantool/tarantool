@@ -61,6 +61,18 @@ lbox_session_id(struct lua_State *L)
 }
 
 /**
+ * Return the id of currently executed request.
+ * Many requests share the same session so this is only
+ * valid at session start. 0 for non-iproto sessions.
+ */
+static int
+lbox_session_sync(struct lua_State *L)
+{
+	lua_pushnumber(L, current_session()->sync);
+	return 1;
+}
+
+/**
  * Session user id.
  * Note: effective user id (current_user()->uid)
  * may be different in a setuid function.
@@ -249,6 +261,7 @@ box_lua_session_init(struct lua_State *L)
 {
 	static const struct luaL_reg sessionlib[] = {
 		{"id", lbox_session_id},
+		{"sync", lbox_session_sync},
 		{"uid", lbox_session_uid},
 		{"user", lbox_session_user},
 		{"su", lbox_session_su},

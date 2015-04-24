@@ -48,10 +48,24 @@ enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 struct session {
 	/** Session id. */
 	uint32_t id;
-	/** File descriptor - socket of the connected peer. */
+	/** File descriptor - socket of the connected peer.
+	 * Only if the session has a peer.
+	 */
 	int fd;
-	/** Peer cookie - description of the peer. */
+	/**
+	 * Peer cookie - description of the peer.
+	 * Only if the session has a peer.
+	 */
 	uint64_t cookie;
+	/**
+	 * For iproto requests, we set this field
+	 * to the value of packet sync. Since the
+	 * session may be reused between many requests,
+	 * the value is true only at the beginning
+	 * of the request, and gets distorted after
+	 * the first yield.
+	 */
+	uint64_t sync;
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
 	/** Cached user id and global grants */
