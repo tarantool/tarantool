@@ -31,67 +31,85 @@
 
 /* {{{ Description */
 /*
- * matras - Memory Address TRanslation Allocator (Smile)
- * matras is as an allocator, that provides blocks of specified
- * size (N), and provides an integer incrementally-growing ID for
- * each returned block.
+ * matras - Memory Address TRanSlation Allocator (Smile)
+ * matras is as allocator, that provides aligned blocks of specified
+ * size (N), and a 32-bit integer identifiers for
+ * each returned block. Block identifiers grow incrementally
+ * starting from 0.
  *
  * The block size (N) must be a power of 2 (checked by assert in
- * a debug build). matras can restore the pointer to block
- * by block ID, so one can store such ID instead of storing
- * pointer to block.
+ * the debug build). matras can restore a pointer to the block
+ * give block ID, so one can store such 32-bit ids instead of
+ * storing pointers to blocks.
  *
  * Since block IDs grow incrementally from 0 and matras
  * instance stores the number of provided blocks, there is a
  * simple way to iterate over all provided blocks.
- * matras in its turn allocates extents of memory by means of
- * the supplied allocator, each extent having the same size (M).
- * M must be a power of 2.
- * There is no way to free a single block, except block with the
- * maximum ID.
+ *
+ * Implementation
+ * --------------
+ * To support block allocation, matras allocates extents of memory
+ * by means of the supplied allocator, each extent having the same
+ * size (M), M is a power of 2 and a multiple of N.
+ * There is no way to free a single block, except the last one,
+ * allocated, which happens to be the one with the largest ID.
  * Destroying a matras instance frees all allocated extents.
  *
- * There is an important compile-time setting - recursion level
- * (L).
- * Imagine block id is uint32 and recursion level is 3. This
- * means that block id value consists of 3 parts:
- *  - first N1 bits - level 0 extent id - stores the address of
- *  level 1 extent
- *  - second N2 bits - level 1 extent id - stores the address of
- *  the extent which contains actual blocks
- *  - remaining N3 bits - block number in level 2 extent
- * (Actual values of N1 and N2 are a function of block size B).
- * Calculation of N1, N2 and N3 depends on sizes of blocks,
- * extents and sizeof(void *).
+ * Address translation
+ * -------------------
+ * To implement 32-bit address space for block identifiers,
+ * matras maintains a simple tree of address translation tables.
  *
- * By this moment, matras is implemented only with L = 3
+ * * First N1 bits of the identifier denote a level 0 extend
+ *   id, which stores the address of level 1 extent.
  *
- * To sum up, with a given N, M and L (see above) the matras
- * instance:
+ * * Second N2 bits of block identifier stores the address
+ *   of a level 2 extent, which stores actual blocks.
+ *
+ * * The remaining N3 bits denote the block number
+ *   within the extent.
+ *
+ * Actual values of N1 and N2 are a function of block size B,
+ * extent size M and sizeof(void *).
+ *
+ * To sum up, with a given N and M matras instance:
  *
  * 1) can provide not more than
- *    pow(M / sizeof(void*) / 2, L - 1) * (M / N)
- *    blocks
- * 2) costs (L - 1) random memory accesses to provide a new block
+ *    pow(M / sizeof(void*) / 2, 2) * (M / N)   blocks
+ *
+ * 2) costs 2 random memory accesses to provide a new block
  *    or restore a block pointer from block id
+ *
  * 3) has an approximate memory overhead of size (L * M)
  *
  * Of course, the integer type used for block id (matras_id_t,
  * usually is a typedef to uint32) also limits the maximum number
- * of objects that can be block_count by an instance of matras.
+ * of objects that can be allocated by a single instance of matras.
  *
- * Additionally matras provides freezing all allocated data. At
- * any moment user can call matras_new_version method for achieving
- * unique ID of current data state. Then the user could change,
- * allocate and dealocate main matras data, meanwhile getting data
- * from previusly freezed version. This works through copy-on-write
- * mechanism, thus is cheap enough, and of course this works only
- * if user correctly notifies mastras about chainging data.
- * An impotant property of implemented copy-on-write mechnism - is
- * that main data does not moved, i.e. before data modification the
- * extent is copied to another location to become the extent
- * for freezed version. Thus main block address with some particular
- * block ID is unchanged.
+ * Versioning
+ * ----------
+ * Starting from Tarantool 1.6, matras implements a way to create
+ * a consistent read view of allocated data with
+ * matras_create_read_view(). Once a read view is
+ * created, the same block identifier can return two different
+ * physical addresses in two views: the created view
+ * and the current or latest view. Multiple read views can be
+ * created.  To work correctly with possibly existing read views,
+ * the application must inform matras that data in a block is about to
+ * change, using matras_touch() call. Only a block which belong to
+ * the current, i.e. latest, view, can be changed: created
+ * views are immutable.
+ *
+ * The implementation of read views is based on copy-on-write
+ * technique, which is cheap enough as long as not too many
+ * objects have to be touched while a view exists.
+ * Another important property of the copy-on-write mechanism is
+ * that whenever a write occurs, the writer pays the penalty
+ * and copies the block to a new location, and gets a new physical
+ * address for the same block id. The reader keeps using the
+ * old address. This makes it possible to access the
+ * created read view in a concurrent thread, as long as this
+ * thread is created after the read view itself is created.
  */
 /* }}} */
 
@@ -262,7 +280,7 @@ matras_getv(const struct matras *m, matras_id_t id, matras_id_t version);
  * Getting number of allocated extents (of size extent_size each)
 */
 matras_id_t
-matras_extents_count(const struct matras *m);
+matras_extent_count(const struct matras *m);
 
 /*
  * Create new version of matras memory.

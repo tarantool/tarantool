@@ -80,7 +80,7 @@ void matras_alloc_test()
 			check(data, "Alloc returned NULL");
 			void *test_data = matras_get(&pta, res);
 			check(data == test_data, "Alloc and Get mismatch");
-			size_t provConsumedMemory = (size_t)matras_extents_count(&pta) * PROV_EXTENT_SIZE;
+			size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
 			check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (1)");
 			check(res == j, "Index mismatch");
 			{
@@ -107,7 +107,7 @@ void matras_alloc_test()
 			}
 			AllocatedItems.insert(data);
 		}
-		size_t provConsumedMemory = (size_t)matras_extents_count(&pta) * PROV_EXTENT_SIZE;
+		size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
 		check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (2)");
 		matras_destroy(&pta);
 		check(AllocatedCount == 0, "Not all memory freed (1)");
@@ -121,7 +121,7 @@ void matras_alloc_test()
 		}
 		for (unsigned int j = 0; j < i; j++) {
 			matras_dealloc(&pta);
-			size_t provConsumedMemory = (size_t)matras_extents_count(&pta) * PROV_EXTENT_SIZE;
+			size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
 			check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (3)");
 		}
 		check(AllocatedCount == 0, "Not all memory freed (2)");

@@ -1157,7 +1157,7 @@ bps_tree_size(const struct bps_tree *tree)
 inline size_t
 bps_tree_mem_used(const struct bps_tree *tree)
 {
-	size_t res = matras_extents_count(&tree->matras);
+	size_t res = matras_extent_count(&tree->matras);
 	res *= BPS_TREE_EXTENT_SIZE;
 	return res;
 }

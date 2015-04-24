@@ -290,7 +290,7 @@ matras_dealloc_range(struct matras *m, matras_id_t range_count)
  * Return the number of allocated extents (of size m->extent_size each)
  */
 matras_id_t
-matras_extents_count(const struct matras *m)
+matras_extent_count(const struct matras *m)
 {
 	/* matras stores data in a 3-level tree of extents.
 	 * Let's calculate extents count level by level, starting from leafs
