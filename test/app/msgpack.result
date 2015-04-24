@@ -2,97 +2,177 @@ TAP version 13
 # msgpack
 1..9
     # unsigned
-    1..56
+    1..118
     ok - encode/decode for 0
+    ok - encode/decode type for 0
     ok - encode/decode for 0LL
+    ok - encode/decode type for 0LL
     ok - encode/decode for 0ULL
+    ok - encode/decode type for 0ULL
     ok - encode/decode for 1
+    ok - encode/decode type for 1
     ok - encode/decode for 1LL
+    ok - encode/decode type for 1LL
     ok - encode/decode for 1ULL
+    ok - encode/decode type for 1ULL
     ok - encode/decode for 127
+    ok - encode/decode type for 127
     ok - encode/decode for 127LL
+    ok - encode/decode type for 127LL
     ok - encode/decode for 127ULL
+    ok - encode/decode type for 127ULL
     ok - encode/decode for 128
+    ok - encode/decode type for 128
     ok - encode/decode for 128LL
+    ok - encode/decode type for 128LL
     ok - encode/decode for 128ULL
+    ok - encode/decode type for 128ULL
     ok - encode/decode for 255
+    ok - encode/decode type for 255
     ok - encode/decode for 255LL
+    ok - encode/decode type for 255LL
     ok - encode/decode for 255ULL
+    ok - encode/decode type for 255ULL
     ok - encode/decode for 256
+    ok - encode/decode type for 256
     ok - encode/decode for 256LL
+    ok - encode/decode type for 256LL
     ok - encode/decode for 256ULL
+    ok - encode/decode type for 256ULL
     ok - encode/decode for 65535
+    ok - encode/decode type for 65535
     ok - encode/decode for 65535LL
+    ok - encode/decode type for 65535LL
     ok - encode/decode for 65535ULL
+    ok - encode/decode type for 65535ULL
     ok - encode/decode for 65536
+    ok - encode/decode type for 65536
     ok - encode/decode for 65536LL
+    ok - encode/decode type for 65536LL
     ok - encode/decode for 65536ULL
+    ok - encode/decode type for 65536ULL
     ok - encode/decode for 4294967294
+    ok - encode/decode type for 4294967294
     ok - encode/decode for 4294967294LL
+    ok - encode/decode type for 4294967294LL
     ok - encode/decode for 4294967294ULL
+    ok - encode/decode type for 4294967294ULL
     ok - encode/decode for 4294967295
+    ok - encode/decode type for 4294967295
     ok - encode/decode for 4294967295LL
+    ok - encode/decode type for 4294967295LL
     ok - encode/decode for 4294967295ULL
+    ok - encode/decode type for 4294967295ULL
     ok - encode/decode for 4294967296
+    ok - encode/decode type for 4294967296
     ok - encode/decode for 4294967296LL
+    ok - encode/decode type for 4294967296LL
     ok - encode/decode for 4294967296ULL
+    ok - encode/decode type for 4294967296ULL
     ok - encode/decode for 4294967297
+    ok - encode/decode type for 4294967297
     ok - encode/decode for 4294967297LL
+    ok - encode/decode type for 4294967297LL
     ok - encode/decode for 4294967297ULL
-    ok - encode/decode for 9.007199254741e+15
-    ok - encode/decode for 9007199254740992LL
-    ok - encode/decode for 9007199254740992ULL
+    ok - encode/decode type for 4294967297ULL
+    ok - encode/decode for 4.5035996273705e+15
+    ok - encode/decode type for 4.5035996273705e+15
+    ok - encode/decode for 4503599627370495LL
+    ok - encode/decode type for 4503599627370495LL
+    ok - encode/decode for 4503599627370495ULL
+    ok - encode/decode type for 4503599627370495ULL
+    ok - encode/decode for 4.5035996273705e+15
+    ok - encode/decode type for 4.5035996273705e+15
+    ok - encode/decode for 4503599627370496LL
+    ok - encode/decode type for 4503599627370496LL
+    ok - encode/decode for 4503599627370496ULL
+    ok - encode/decode type for 4503599627370496ULL
     ok - encode/decode for 9223372036854775807LL
+    ok - encode/decode type for 9223372036854775807LL
     ok - encode/decode for 9223372036854775807ULL
+    ok - encode/decode type for 9223372036854775807ULL
     ok - encode/decode for 9223372036854775808ULL
+    ok - encode/decode type for 9223372036854775808ULL
     ok - encode/decode for 9223372036854775809ULL
+    ok - encode/decode type for 9223372036854775809ULL
     ok - encode/decode for 18446744073709551614ULL
+    ok - encode/decode type for 18446744073709551614ULL
     ok - encode/decode for 18446744073709551615ULL
+    ok - encode/decode type for 18446744073709551615ULL
     ok - encode/decode for 18446744073709551615ULL
+    ok - encode/decode type for 18446744073709551615ULL
     ok - encode/decode for cdata<unsigned char>:
+    ok - encode/decode type for cdata<unsigned char>:
     ok - encode/decode for cdata<char>:
+    ok - encode/decode type for cdata<char>:
     ok - encode/decode for cdata<unsigned short>:
+    ok - encode/decode type for cdata<unsigned short>:
     ok - encode/decode for cdata<short>:
+    ok - encode/decode type for cdata<short>:
     ok - encode/decode for cdata<unsigned int>:
+    ok - encode/decode type for cdata<unsigned int>:
     ok - encode/decode for cdata<int>:
+    ok - encode/decode type for cdata<int>:
     ok - encode/decode for 128ULL
+    ok - encode/decode type for 128ULL
     ok - encode/decode for -128LL
+    ok - encode/decode type for -128LL
     ok - encode/decode for cdata<char>:
+    ok - encode/decode type for cdata<char>:
     ok - encode/decode for cdata<char>:
+    ok - encode/decode type for cdata<char>:
     # unsigned: end
 ok - unsigned
     # signed
-    1..30
+    1..48
     ok - encode/decode for -1
+    ok - encode/decode type for -1
     ok - encode/decode for -1LL
+    ok - encode/decode type for -1LL
     ok - encode/decode for -31
+    ok - encode/decode type for -31
     ok - encode/decode for -31LL
+    ok - encode/decode type for -31LL
     ok - encode/decode for -32
+    ok - encode/decode type for -32
     ok - encode/decode for -32LL
+    ok - encode/decode type for -32LL
     ok - encode/decode for -127
+    ok - encode/decode type for -127
     ok - encode/decode for -127LL
+    ok - encode/decode type for -127LL
     ok - encode/decode for -128
+    ok - encode/decode type for -128
     ok - encode/decode for -128LL
+    ok - encode/decode type for -128LL
     ok - encode/decode for -32767
+    ok - encode/decode type for -32767
     ok - encode/decode for -32767LL
+    ok - encode/decode type for -32767LL
     ok - encode/decode for -32768
+    ok - encode/decode type for -32768
     ok - encode/decode for -32768LL
+    ok - encode/decode type for -32768LL
     ok - encode/decode for -2147483647
+    ok - encode/decode type for -2147483647
     ok - encode/decode for -2147483647LL
+    ok - encode/decode type for -2147483647LL
     ok - encode/decode for -2147483648
+    ok - encode/decode type for -2147483648
     ok - encode/decode for -2147483648LL
-    ok - encode/decode for 9.007199254741e+15
-    ok - encode/decode for 9007199254740991ULL
-    ok - encode/decode for 9007199254740991LL
-    ok - encode/decode for 9.007199254741e+15
-    ok - encode/decode for 9007199254740992ULL
-    ok - encode/decode for 9007199254740992LL
-    ok - encode/decode for -9.007199254741e+15
-    ok - encode/decode for -9007199254740991LL
-    ok - encode/decode for -9.007199254741e+15
-    ok - encode/decode for -9007199254740992LL
+    ok - encode/decode type for -2147483648LL
+    ok - encode/decode for -4.5035996273705e+15
+    ok - encode/decode type for -4.5035996273705e+15
+    ok - encode/decode for -4503599627370495LL
+    ok - encode/decode type for -4503599627370495LL
+    ok - encode/decode for -4.5035996273705e+15
+    ok - encode/decode type for -4.5035996273705e+15
+    ok - encode/decode for -4503599627370496LL
+    ok - encode/decode type for -4503599627370496LL
     ok - encode/decode for -9223372036854775806LL
+    ok - encode/decode type for -9223372036854775806LL
     ok - encode/decode for -9223372036854775807LL
+    ok - encode/decode type for -9223372036854775807LL
     # signed: end
 ok - signed
     # double
