@@ -79,7 +79,7 @@ matras_destroy(struct matras *m)
 {
 	while(m->ver_occ_mask != 1) {
 		matras_id_t ver = __builtin_ctzl(m->ver_occ_mask ^ 1);
-		matras_delete_version(m, ver);
+		matras_destroy_read_view(m, ver);
 	}
 	if (m->block_counts[0]) {
 		struct matras_record *extent1 = m->roots[0].ptr;
@@ -314,10 +314,10 @@ matras_extent_count(const struct matras *m)
 
 /*
  * Create new version of matras memory.
- * Return 0 if all version IDs are occupied.
+ * Return -1 if all version IDs are occupied.
  */
 matras_id_t
-matras_new_version(struct matras *m)
+matras_create_read_view(struct matras *m)
 {
 	matras_id_t ver_id;
 #ifdef WIN32
@@ -331,7 +331,7 @@ matras_new_version(struct matras *m)
 #endif
 	assert(ver_id > 0);
 	if (ver_id >= MATRAS_VERSION_COUNT)
-		return 0;
+		return -1;
 	m->ver_occ_mask |= ((matras_version_tag_t)1) << ver_id;
 	m->roots[ver_id] = m->roots[0];
 	m->block_counts[ver_id] = m->block_counts[0];
@@ -342,7 +342,7 @@ matras_new_version(struct matras *m)
  * Delete memory version by specified ID.
  */
 void
-matras_delete_version(struct matras *m, matras_id_t ver_id)
+matras_destroy_read_view(struct matras *m, matras_id_t ver_id)
 {
 	matras_version_tag_t me = ((matras_version_tag_t)1) << ver_id;
 	if (m->block_counts[ver_id]) {
@@ -560,7 +560,7 @@ matras_touch(struct matras *m, matras_id_t id)
 
 /*
  * Debug check that ensures internal consistency.
- * Must return 0. If i returns not 0, smth is terribly wrong.
+ * Must return 0. If it returns not 0, smth is terribly wrong.
  */
 matras_version_tag_t
 matras_debug_selfcheck(const struct matras *m)

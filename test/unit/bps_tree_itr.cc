@@ -257,8 +257,8 @@ itr_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			bool res = bps_tree_test_delete(&tree, e);
-			assert(res);
+			int res = bps_tree_test_delete(&tree, e);
+			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
@@ -301,8 +301,8 @@ itr_invalidate_check()
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			bool res = bps_tree_test_insert(&tree, e, 0);
-			assert(res);
+			int res = bps_tree_test_insert(&tree, e, 0);
+			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {
@@ -356,15 +356,15 @@ itr_invalidate_check()
 			elem_t e;
 			e.first = i * test_size * 2;
 			e.second = i * test_size * 2;
-			bool res = bps_tree_test_delete(&tree, e);
-			assert(res);
+			int res = bps_tree_test_delete(&tree, e);
+			assert(res == 0);
 		}
 		for (long i = 0; i < ins_cnt; i++) {
 			elem_t e;
 			e.first = ins_pos * test_size * 2 + i + 1;
 			e.second = e.first;
-			bool res = bps_tree_test_insert(&tree, e, 0);
-			assert(res);
+			int res = bps_tree_test_insert(&tree, e, 0);
+			assert(res == 0);
 		}
 		for (long i = 0; i < test_size; i++) {
 			do {

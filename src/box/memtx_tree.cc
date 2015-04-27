@@ -52,7 +52,7 @@ tree_index_compare(const tuple *a, const tuple *b, struct key_def *key_def)
 	return r;
 }
 int
-tree_index_compare_key(const tuple *a, const key_data *key_data,
+tree_index_compare_key(const tuple *a, const struct key_data *key_data,
 		       struct key_def *key_def)
 {
 	return tuple_compare_with_key(a, key_data->key, key_data->part_count,
@@ -238,9 +238,9 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		struct tuple *dup_tuple = NULL;
 
 		/* Try to optimistically replace the new_tuple. */
-		bool tree_res =
+		int tree_res =
 		bps_tree_index_insert(&tree, new_tuple, &dup_tuple);
-		if (!tree_res) {
+		if (tree_res) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE,
 				  BPS_TREE_EXTENT_SIZE, "MemtxTree", "replace");
 		}

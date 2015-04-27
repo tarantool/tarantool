@@ -284,16 +284,16 @@ matras_extent_count(const struct matras *m);
 
 /*
  * Create new version of matras memory.
- * Return 0 if all version IDs are occupied.
+ * Return -1 if all version IDs are occupied.
  */
 matras_id_t
-matras_new_version(struct matras *m);
+matras_create_read_view(struct matras *m);
 
 /*
  * Delete memory version by specified ID.
  */
 void
-matras_delete_version(struct matras *m, matras_id_t ver_id);
+matras_destroy_read_view(struct matras *m, matras_id_t ver_id);
 
 /*
  * Notify matras that memory at given ID will be changed.
@@ -305,7 +305,7 @@ matras_touch(struct matras *m, matras_id_t id);
 
 /*
  * Debug check that ensures internal consistency.
- * Must return 0. If i returns not 0, smth is terribly wrong.
+ * Must return 0. If it returns not 0, smth is terribly wrong.
  */
 matras_version_tag_t
 matras_debug_selfcheck(const struct matras *m);

@@ -521,7 +521,7 @@ loading_test()
 	for (type_t i = 0; i <= test_count; i++) {
 		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
 
-		if (!bps_tree_test_build(&tree, arr, i))
+		if (bps_tree_test_build(&tree, arr, i))
 			fail("building failed", "true");
 
 		if (bps_tree_test_debug_check(&tree))
