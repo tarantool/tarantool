@@ -63,15 +63,15 @@ static struct mempool memtx_index_extent_pool;
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
  */
-struct tuple *
-memtx_replace_no_keys(struct space *space, struct tuple * /* old_tuple */,
+static void
+memtx_replace_no_keys(struct txn * /* txn */, struct space *space,
+		      struct tuple * /* old_tuple */,
 		      struct tuple * /* new_tuple */,
 		      enum dup_replace_mode /* mode */)
 {
        Index *index = index_find(space, 0);
        assert(index == NULL); /* not reached. */
        (void) index;
-       return NULL; /* replace found no old tuple */
 }
 
 struct MemtxSpace: public Handler {
@@ -88,13 +88,56 @@ struct MemtxSpace: public Handler {
 };
 
 
+static void
+txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
+{
+	txn_rollback(); /* doesn't throw */
+}
+
+/**
+ * Do the plumbing necessary for correct statement-level
+ * and transaction rollback.
+ */
+static void
+memtx_txn_add_undo(struct txn *txn, struct space *space,
+		   struct tuple *old_tuple, struct tuple *new_tuple)
+{
+	/*
+	 * Remember the old tuple only if we replaced it
+	 * successfully, to not remove a tuple inserted by
+	 * another transaction in rollback().
+	 */
+	struct txn_stmt *stmt = txn_stmt(txn);
+	stmt->space = space;
+	stmt->old_tuple = old_tuple;
+	stmt->new_tuple = new_tuple;
+	/* Register a trigger to rollback transaction on yield. */
+	if (txn->autocommit == false && txn->n_stmts == 1) {
+
+		txn->fiber_on_yield = {
+			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+		};
+		txn->fiber_on_stop = {
+			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+		};
+		/*
+		 * Memtx doesn't allow yields between statements of
+		 * a transaction. Set a trigger which would roll
+		 * back the transaction if there is a yield.
+		 */
+		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+	}
+}
+
 /**
  * A short-cut version of space_replace() used during bulk load
  * from snapshot.
  */
-struct tuple *
-memtx_replace_build_next(struct space *space, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode)
+void
+memtx_replace_build_next(struct txn * /* txn */, struct space *space,
+			 struct tuple *old_tuple, struct tuple *new_tuple,
+			 enum dup_replace_mode mode)
 {
 	assert(old_tuple == NULL && mode == DUP_INSERT);
 	(void) mode;
@@ -110,26 +153,27 @@ memtx_replace_build_next(struct space *space, struct tuple *old_tuple,
 	}
 	space->index[0]->buildNext(new_tuple);
 	tuple_ref(new_tuple);
-	return NULL; /* replace found no old tuple */
 }
 
 /**
  * A short-cut version of space_replace() used when loading
  * data from XLOG files.
  */
-struct tuple *
-memtx_replace_primary_key(struct space *space, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode)
+void
+memtx_replace_primary_key(struct txn *txn, struct space *space,
+			  struct tuple *old_tuple, struct tuple *new_tuple,
+			  enum dup_replace_mode mode)
 {
-	struct tuple *dup = space->index[0]->replace(old_tuple, new_tuple, mode);
+	(void) space->index[0]->replace(old_tuple, new_tuple, mode);
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	return dup;
+	memtx_txn_add_undo(txn, space, old_tuple, new_tuple);
 }
 
-static struct tuple *
-memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode)
+static void
+memtx_replace_all_keys(struct txn *txn, struct space *space,
+		       struct tuple *old_tuple, struct tuple *new_tuple,
+		       enum dup_replace_mode mode)
 {
 	uint32_t i = 0;
 	try {
@@ -159,7 +203,7 @@ memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	}
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	return old_tuple;
+	memtx_txn_add_undo(txn, space, old_tuple, new_tuple);
 }
 
 static void
@@ -211,8 +255,7 @@ MemtxEngine::MemtxEngine()
 	m_snapshot_pid(0),
 	m_state(MEMTX_INITIALIZED)
 {
-	flags = ENGINE_NO_YIELD |
-	        ENGINE_CAN_BE_TEMPORARY |
+	flags = ENGINE_CAN_BE_TEMPORARY |
 		ENGINE_AUTO_CHECK_UPDATE;
 }
 
@@ -289,7 +332,7 @@ memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 {
 	switch (state) {
 	case MEMTX_INITIALIZED:
-		panic("can't create space");
+		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_READING_SNAPSHOT:
 		space->index[0]->beginBuild();
@@ -436,32 +479,54 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 }
 
 void
+MemtxEngine::prepare(struct txn *txn)
+{
+	if (txn->autocommit || txn->n_stmts < 1)
+		return;
+	/*
+	 * These triggers are only used for memtx and only
+	 * when autocommit == false, so we are saving
+	 * on calls to trigger_create/trigger_clear.
+	 */
+	trigger_clear(&txn->fiber_on_yield);
+	trigger_clear(&txn->fiber_on_stop);
+}
+
+void
 MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
 {
-	if (stmt->old_tuple || stmt->new_tuple)
-	{
-		space_replace(stmt->space,
-		              stmt->new_tuple,
-		              stmt->old_tuple, DUP_INSERT);
-		if (stmt->new_tuple)
-			tuple_unref(stmt->new_tuple);
+	if (stmt->space == NULL)
+		return;
+	assert(stmt->old_tuple || stmt->new_tuple);
+	struct space *space = stmt->space;
+	int index_count;
+
+	if (space->handler->replace == memtx_replace_all_keys)
+		index_count = space->index_count;
+	else if (space->handler->replace == memtx_replace_primary_key)
+		index_count = 1;
+	else
+		panic("transaction rolled back during snapshot recovery");
+
+	for (int i = 0; i < index_count; i++) {
+		Index *index = space->index[i];
+		index->replace(stmt->new_tuple, stmt->old_tuple, DUP_INSERT);
 	}
+	if (stmt->new_tuple)
+		tuple_unref(stmt->new_tuple);
+
+	stmt->old_tuple = NULL;
+	stmt->new_tuple = NULL;
+	stmt->space = NULL;
 }
 
 void
 MemtxEngine::rollback(struct txn *txn)
 {
+	prepare(txn);
 	struct txn_stmt *stmt;
-	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
-		if (stmt->old_tuple || stmt->new_tuple) {
-			space_replace(stmt->space, stmt->new_tuple,
-				      stmt->old_tuple, DUP_INSERT);
-		}
-	}
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->new_tuple)
-			tuple_unref(stmt->new_tuple);
-	}
+	rlist_foreach_entry_reverse(stmt, &txn->stmts, next)
+		rollbackStatement(stmt);
 }
 
 void

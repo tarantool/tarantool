@@ -76,13 +76,13 @@ void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
 	sp_destroy(cur);
 }
 
-static struct tuple *
-sophia_replace(struct space *space, struct tuple *old_tuple,
-               struct tuple *new_tuple,
+void
+sophia_replace(struct txn * /* txn */, struct space *space,
+	       struct tuple *old_tuple, struct tuple *new_tuple,
                enum dup_replace_mode mode)
 {
 	Index *index = index_find(space, 0);
-	return index->replace(old_tuple, new_tuple, mode);
+	(void) index->replace(old_tuple, new_tuple, mode);
 }
 
 struct SophiaSpace: public Handler {

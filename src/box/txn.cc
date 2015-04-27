@@ -52,9 +52,8 @@ static void
 txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
 	stmt->row = request->header;
-	if (recovery->wal_mode == WAL_NONE || request->header != NULL)
+	if (request->header != NULL)
 		return;
-
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row= (struct xrow_header *)
 		region_alloc0(&fiber()->gc, sizeof(struct xrow_header));
@@ -63,44 +62,15 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	stmt->row = row;
 }
 
-static void
-txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
-{
-	txn_rollback(); /* doesn't throw */
-}
-
 void
 txn_replace(struct txn *txn, struct space *space,
 	    struct tuple *old_tuple, struct tuple *new_tuple,
 	    enum dup_replace_mode mode)
 {
-	struct txn_stmt *stmt;
-	stmt = txn_stmt(txn);
 	assert(old_tuple || new_tuple);
-	/*
-	 * Remember the old tuple only if we replaced it
-	 * successfully, to not remove a tuple inserted by
-	 * another transaction in rollback().
-	 */
-	stmt->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
-	stmt->new_tuple = new_tuple;
-	stmt->space = space;
 
-	/*
-	 * Memtx doesn't allow yields between statements of
-	 * a transaction. Set a trigger which would roll
-	 * back the transaction if there is a yield.
-	 */
-	if (txn->autocommit == false) {
-		if (txn->n_stmts == 1) {
-			if (engine_no_yield(txn->engine->flags)) {
-				trigger_add(&fiber()->on_yield,
-					    &txn->fiber_on_yield);
-				trigger_add(&fiber()->on_stop,
-					    &txn->fiber_on_stop);
-			}
-		}
-	}
+	space->handler->replace(txn, space, old_tuple, new_tuple, mode);
+
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -134,24 +104,19 @@ txn_begin(bool autocommit)
 	rlist_create(&txn->stmts);
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
-	txn->fiber_on_yield = {
-		rlist_nil, txn_on_yield_or_stop, NULL, NULL
-	};
-	txn->fiber_on_stop = {
-		rlist_nil, txn_on_yield_or_stop, NULL, NULL
-	};
 	txn->autocommit = autocommit;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
 
 struct txn *
-txn_begin_stmt(struct request *request, Engine *engine)
+txn_begin_stmt(struct request *request, struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
 
+	Engine *engine = space->handler->engine;
 	if (txn->engine == NULL) {
 		assert(txn->n_stmts == 0);
 		txn->engine = engine;
@@ -163,7 +128,8 @@ txn_begin_stmt(struct request *request, Engine *engine)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	}
 	struct txn_stmt *stmt = txn_stmt_new(txn);
-	txn_add_redo(stmt, request);
+	if (space_is_temporary(space) == false)
+		txn_add_redo(stmt, request);
 	engine->beginStatement(txn);
 	return txn;
 }
@@ -173,20 +139,14 @@ txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
 	struct txn_stmt *stmt;
-	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-	trigger_clear(&txn->fiber_on_yield);
-	trigger_clear(&txn->fiber_on_stop);
 
 	/* Do transaction conflict resolving */
 	if (txn->engine)
 		txn->engine->prepare(txn);
 
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
-		if ((!stmt->old_tuple && !stmt->new_tuple) ||
-		    space_is_temporary(stmt->space))
+		if (stmt->row == NULL)
 			continue;
-		/* txn_commit() must be done after txn_add_redo() */
-		assert(recovery->wal_mode == WAL_NONE || stmt->row != NULL);
 		ev_tstamp start = ev_now(loop()), stop;
 		int64_t res = wal_write(recovery, stmt->row);
 		stop = ev_now(loop());
@@ -200,7 +160,12 @@ txn_commit(struct txn *txn)
 		txn->signature = res;
 	}
 
-	trigger_run(&txn->on_commit, txn); /* must not throw. */
+	/*
+	 * The transaction is in the binary log. No action below
+	 * may throw. In case an error has happened, there is
+	 * no other option but terminate.
+	 */
+	trigger_run(&txn->on_commit, txn);
 	if (txn->engine)
 		txn->engine->commit(txn);
 	TRASH(txn);
@@ -225,9 +190,6 @@ txn_rollback_stmt()
 		return txn_rollback();
 	struct txn_stmt *stmt = txn_stmt(txn);
 	txn->engine->rollbackStatement(stmt);
-	stmt->old_tuple = NULL;
-	stmt->new_tuple = NULL;
-	stmt->space = NULL;
 	stmt->row = NULL;
 }
 
@@ -240,9 +202,6 @@ txn_rollback()
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	if (txn->engine)
 		txn->engine->rollback(txn);
-	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-		trigger_clear(&txn->fiber_on_yield);
-		trigger_clear(&txn->fiber_on_stop);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();

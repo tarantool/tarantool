@@ -119,14 +119,9 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 static void
 fill_lsn(struct recovery_state *r, struct xrow_header *row)
 {
-	if (row == NULL || row->server_id == 0) {
-		/* Local request */
-		int64_t lsn = vclock_inc(&r->vclock, r->server_id);
-		/* row is NULL if wal_mode = NONE */
-		if (row != NULL) {
-			row->server_id = r->server_id;
-			row->lsn = lsn;
-		}
+	if (row->server_id == 0) {
+		row->server_id = r->server_id;
+		row->lsn = vclock_inc(&r->vclock, r->server_id);
 	} else {
 		/* Replication request. */
 		if (!vclock_has(&r->vclock, row->server_id)) {

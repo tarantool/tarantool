@@ -48,6 +48,7 @@ struct MemtxEngine: public Engine {
 	virtual void keydefCheck(struct space *space, struct key_def *key_def);
 	virtual void rollbackStatement(struct txn_stmt *stmt);
 	virtual void rollback(struct txn *txn);
+	virtual void prepare(struct txn *txn);
 	virtual void commit(struct txn *txn);
 	virtual void beginJoin();
 	virtual void recoverToCheckpoint(int64_t lsn);

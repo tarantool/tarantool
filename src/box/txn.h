@@ -108,7 +108,7 @@ txn_rollback();
  * start a new transaction with autocommit = true.
  */
 struct txn *
-txn_begin_stmt(struct request *request, Engine *engine);
+txn_begin_stmt(struct request *request, struct space *space);
 
 /**
  * End a statement. In autocommit mode, end

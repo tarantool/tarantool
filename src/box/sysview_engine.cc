@@ -31,11 +31,12 @@
 #include "schema.h"
 #include "space.h"
 
-static struct tuple *
-sysview_replace(struct space *space, struct tuple *old_tuple,
-		      struct tuple *new_tuple,
-		      enum dup_replace_mode mode)
+static void
+sysview_replace(struct txn *txn, struct space *space,
+		struct tuple *old_tuple, struct tuple *new_tuple,
+		enum dup_replace_mode mode)
 {
+	(void) txn;
 	(void) space;
 	(void) old_tuple;
 	(void) new_tuple;
