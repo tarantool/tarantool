@@ -4,9 +4,6 @@
 enable_tnt_compile_flags()
 
 add_subdirectory(trivia)
-if (NOT TARGET_OS_DARWIN)
-    add_subdirectory(module)
-endif()
 
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
