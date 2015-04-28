@@ -17,8 +17,6 @@
 %global _with_systemd 1
 %endif
 
-%bcond_without postgresql
-%bcond_without mysql
 %bcond_with    systemd
 
 BuildRequires: readline-devel
@@ -102,53 +100,6 @@ It supports replication, online backup, stored procedures in Lua.
 
 This package provides common files
 
-# Tarantool sql module
-%package sql-module
-Summary: Tarantool common sql interface
-Vendor: tarantool.org
-Group: Applications/Databases
-Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%description sql-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a common sql interface to use with
-tarantool-pg-module or by tarantool-mysql-module.
-
-%if %{with postgresql}
-%package pg-module
-Summary: Tarantool PostgreSQL interface
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-pg-module
-BuildRequires: postgresql-devel >= 9.0
-Requires: postgresql-libs >= 9.0
-Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%description pg-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a PostgreSQL interface to use with
-tarantool-sql-module.
-%endif
-
-%if %{with mysql}
-%package mysql-module
-Summary: Tarantool MySQL interface
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-mysql-module
-BuildRequires: mysql-devel >= 5.0
-Requires: mysql-libs >= 5.0
-Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%description mysql-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a MySQL interface to use with
-tarantool-sql-module.
-%endif
-
 ##################################################################
 
 %prep
@@ -207,8 +158,6 @@ tarantool-sql-module.
         .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
         .. ' %{!?scl:-DENABLE_RPM=ON}'
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
-        .. dev_with('postgresql', 'WITH_POSTGRESQL')
-        .. dev_with('mysql', 'WITH_MYSQL')
         .. dev_with('systemd', 'WITH_SYSTEMD')
         .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
 
@@ -269,27 +218,6 @@ chkconfig --del tarantool
 
 "%{_mandir}/man1/tarantool.1.gz"
 
-%files sql-module
-%defattr(-,root,root,-)
-%dir "%{_datadir}/tarantool"
-%dir "%{_datadir}/tarantool/box"
-%dir "%{_datadir}/tarantool/box/net"
-"%{_datadir}/tarantool/box/net/sql.lua"
-
-%if %{with postgresql}
-%files pg-module
-%defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/box"
-"%{_libdir}/tarantool/box/net/pg.so"
-%endif
-
-%if %{with mysql}
-%files mysql-module
-%defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/box"
-"%{_libdir}/tarantool/box/net/mysql.so"
-%endif
-
 %files dev
 %defattr(-,root,root,-)
 %dir "%{_includedir}/tarantool"
@@ -303,11 +231,11 @@ chkconfig --del tarantool
 
 %files common
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/"
 "%{_bindir}/tarantoolctl"
 "%{_mandir}/man1/tarantoolctl.1.gz"
 "%{_sysconfdir}/sysconfig/tarantool"
 %if %{with systemd}
+%dir "%{_libdir}/tarantool/"
 "%{_unitdir}/tarantool.service"
 "%{_libdir}/tarantool/tarantool.init"
 %else
@@ -315,6 +243,8 @@ chkconfig --del tarantool
 %endif
 
 %changelog
+* Tue Apr 28 2015 roman@tarantool.org <roman@tarantool.org> 1.0-3
+- Remove sql-module, pg-module, mysql-module
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2
 - Add SCL support
 - Add --with support

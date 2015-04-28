@@ -1,3 +1,9 @@
+tarantool (1.6.5.20.g51b2e0d-1) unstable; urgency=medium
+
+  * Remove tarantool-mysql-module and tarantool-pg-module.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Tue, 28 Apr 2015 14:34:17 +0300
+
 tarantool (1.6.3.539.g211672f-1) unstable; urgency=medium
 
   * Init infrastructure for tarantool 1.6.

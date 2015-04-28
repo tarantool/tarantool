@@ -21,9 +21,6 @@ License: BSD
 Group: Applications/File
 Requires: %{scl_prefix}tarantool
 Requires: %{scl_prefix}tarantool-dev
-Requires: %{scl_prefix}tarantool-sql-module
-Requires: %{scl_prefix}tarantool-pg-module
-Requires: %{scl_prefix}tarantool-mysql-module
 Requires: scl-utils
 
 %description
