@@ -28,6 +28,13 @@ ffi.cdef[[
     boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
     struct tuple *
     boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key);
+    struct tuple *
+    boxffi_index_min(uint32_t space_id, uint32_t index_id, const char *key);
+    struct tuple *
+    boxffi_index_max(uint32_t space_id, uint32_t index_id, const char *key);
+    ssize_t
+    boxffi_index_count(uint32_t space_id, uint32_t index_id, int type,
+                       const char *key);
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
@@ -580,6 +587,24 @@ local function space_object_check(space)
         end
 end
 
+local function check_iterator_type(opts, key_is_nil)
+    -- Use ALL for {} and nil keys and EQ for other keys
+    local itype = key_is_nil and box.index.ALL or box.index.EQ
+    if opts and opts.iterator then
+        if type(opts.iterator) == "number" then
+            itype = opts.iterator
+        elseif type(opts.iterator) == "string" then
+            itype = box.index[string.upper(opts.iterator)]
+            if itype == nil then
+                box.error(box.error.ITERATOR_TYPE, opts.iterator)
+            end
+        else
+            box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
+        end
+    end
+    return itype
+end
+
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
@@ -604,23 +629,23 @@ function box.schema.space.bless(space)
     index_mt.__index = index_mt
     -- min and max
     index_mt.min = function(index, key)
-        if index.type ~= 'TREE' then
-            box.error(box.error.UNSUPPORTED, index.type, 'min()')
-        end
-        local lst = index:select(key, { iterator = 'GE', limit = 1 })[1]
-        if lst ~= nil then
-            return lst
+        local pkey = msgpackffi.encode_tuple(key)
+        local tuple = builtin.boxffi_index_min(index.space_id, index.id, pkey)
+        if tuple == ffi.cast('void *', -1) then
+            box.error() -- error
+        elseif tuple ~= nil then
+            return box.tuple.bless(tuple)
         else
             return
         end
     end
     index_mt.max = function(index, key)
-        if index.type ~= 'TREE' then
-            box.error(box.error.UNSUPPORTED, index.type, 'max()')
-        end
-        local lst = index:select(key, { iterator = 'LE', limit = 1 })[1]
-        if lst ~= nil then
-            return lst
+        local pkey = msgpackffi.encode_tuple(key)
+        local tuple = builtin.boxffi_index_max(index.space_id, index.id, pkey)
+        if tuple == ffi.cast('void *', -1) then
+            box.error() -- error
+        elseif tuple ~= nil then
+            return box.tuple.bless(tuple)
         else
             return
         end
@@ -639,21 +664,7 @@ function box.schema.space.bless(space)
     -- iteration
     index_mt.pairs = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
-        -- Use ALL for {} and nil keys and EQ for other keys
-        local itype = pkey + 1 < pkey_end and box.index.EQ or box.index.ALL
-
-        if opts and opts.iterator then
-            if type(opts.iterator) == "number" then
-                itype = opts.iterator
-            elseif type(opts.iterator) == "string" then
-                itype = box.index[string.upper(opts.iterator)]
-                if itype == nil then
-                    box.error(box.error.ITERATOR_TYPE, opts.iterator)
-                end
-            else
-                box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
-            end
-        end
+        local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
         local keybuf = ffi.string(pkey, pkey_end - pkey)
         local cdata = builtin.boxffi_index_iterator(index.space_id, index.id,
@@ -668,24 +679,14 @@ function box.schema.space.bless(space)
     index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
     -- index subtree size
     index_mt.count = function(index, key, opts)
-        local count = 0
-        local iterator
-
-        if opts and opts.iterator ~= nil then
-            iterator = opts.iterator
-        else
-            iterator = 'EQ'
+        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+        local count = builtin.boxffi_index_count(index.space_id, index.id,
+            itype, pkey);
+        if count == -1 then
+            box.error()
         end
-
-        if key == nil or type(key) == "table" and #key == 0 then
-            return index:len()
-        end
-
-        local state, tuple
-        for state, tuple in index:pairs(key, { iterator = iterator }) do
-            count = count + 1
-        end
-        return count
+        return tonumber(count)
     end
 
     local function check_index(space, index_id)

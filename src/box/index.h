@@ -161,7 +161,7 @@ protected:
 	 * Pre-allocated iterator to speed up the main case of
 	 * box_process(). Should not be used elsewhere.
 	 */
-	struct iterator *m_position;
+	mutable struct iterator *m_position;
 public:
 	virtual ~Index();
 
@@ -178,13 +178,18 @@ public:
 	virtual void buildNext(struct tuple *tuple);
 	virtual void endBuild();
 	virtual size_t size() const;
+	virtual struct tuple *min(const char *key, uint32_t part_count) const;
+	virtual struct tuple *max(const char *key, uint32_t part_count) const;
 	virtual struct tuple *random(uint32_t rnd) const;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) = 0;
 	virtual size_t bsize() const;
+
 	/**
 	 * Create a structure to represent an iterator. Must be
 	 * initialized separately.
@@ -194,11 +199,23 @@ public:
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const = 0;
 
-	inline struct iterator *position()
+	inline struct iterator *position() const
 	{
 		if (m_position == NULL)
 			m_position = allocIterator();
 		return m_position;
+	}
+};
+
+struct IteratorGuard: public Object {
+	struct iterator *it;
+	IteratorGuard(struct iterator *it)
+		: it(it)
+	{}
+
+	~IteratorGuard()
+	{
+		iterator_close(it);
 	}
 };
 

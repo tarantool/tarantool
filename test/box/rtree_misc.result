@@ -187,11 +187,11 @@ s.index.spatial:count()
 ...
 s.index.spatial:min()
 ---
-- error: RTREE does not support min()
+- error: Invalid key part count (expected [0..4], got 0)
 ...
 s.index.spatial:max()
 ---
-- error: RTREE does not support max()
+- error: Invalid key part count (expected [0..4], got 0)
 ...
 -- seems that drop can't fail
 s.index.spatial:drop()

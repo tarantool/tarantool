@@ -161,6 +161,24 @@ Index::size() const
 }
 
 struct tuple *
+Index::min(const char *key, uint32_t part_count) const
+{
+	struct iterator *it = position();
+	initIterator(it, ITER_GE, key, part_count);
+	IteratorGuard guard(it);
+	return it->next(it);
+}
+
+struct tuple *
+Index::max(const char *key, uint32_t part_count) const
+{
+	struct iterator *it = position();
+	initIterator(it, ITER_LE, key, part_count);
+	IteratorGuard guard(it);
+	return it->next(it);
+}
+
+struct tuple *
 Index::random(uint32_t rnd) const
 {
 	(void) rnd;
@@ -168,6 +186,21 @@ Index::random(uint32_t rnd) const
 		  index_type_strs[key_def->type],
 		  "random()");
 	return NULL;
+}
+
+size_t
+Index::count(enum iterator_type type, const char *key, uint32_t part_count) const
+{
+	if (type == ITER_ALL && key == NULL)
+		return size(); /* optimization */
+	struct iterator *it = position();
+	initIterator(it, type, key, part_count);
+	IteratorGuard guard(it);
+	size_t count = 0;
+	struct tuple *tuple = NULL;
+	while ((tuple = it->next(it)) != NULL)
+		++count;
+	return count;
 }
 
 struct tuple *
@@ -203,6 +236,7 @@ index_build(Index *index, Index *pk)
 
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
+	IteratorGuard it_guard(it);
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)))

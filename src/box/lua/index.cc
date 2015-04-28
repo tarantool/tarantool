@@ -101,6 +101,54 @@ boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key)
 	}
 }
 
+struct tuple *
+boxffi_index_min(uint32_t space_id, uint32_t index_id, const char *key)
+{
+	try {
+		Index *index = check_index(space_id, index_id);
+		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		key_validate(index->key_def, ITER_GE, key, part_count);
+		struct tuple *tuple = index->min(key, part_count);
+		if (tuple == NULL)
+			return NULL;
+		tuple_ref(tuple); /* must not throw in this case */
+		return tuple;
+	}  catch (Exception *) {
+		return (struct tuple *) -1; /* handled by box.error() in Lua */
+	}
+}
+
+struct tuple *
+boxffi_index_max(uint32_t space_id, uint32_t index_id, const char *key)
+{
+	try {
+		Index *index = check_index(space_id, index_id);
+		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		key_validate(index->key_def, ITER_LE, key, part_count);
+		struct tuple *tuple = index->max(key, part_count);
+		if (tuple == NULL)
+			return NULL;
+		tuple_ref(tuple); /* must not throw in this case */
+		return tuple;
+	}  catch (Exception *) {
+		return (struct tuple *) -1; /* handled by box.error() in Lua */
+	}
+}
+
+ssize_t
+boxffi_index_count(uint32_t space_id, uint32_t index_id, int type, const char *key)
+{
+	enum iterator_type itype = (enum iterator_type) type;
+	try {
+		Index *index = check_index(space_id, index_id);
+		uint32_t part_count = key ? mp_decode_array(&key) : 0;
+		key_validate(index->key_def, itype, key, part_count);
+		return index->count(itype, key, part_count);
+	} catch (Exception *) {
+		return -1; /* handled by box.error() in Lua */
+	}
+}
+
 static void
 box_index_init_iterator_types(struct lua_State *L, int idx)
 {
