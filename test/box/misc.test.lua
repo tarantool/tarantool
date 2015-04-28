@@ -15,10 +15,15 @@ t = nil
 
 --# stop server default
 --# start server default
+box.error.last()
 box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
-box.error()
+box.error.raise()
+box.error.last()
+box.error.clear()
+box.error.last()
+box.error.raise()
 
 space = box.space.tweedledum
 

@@ -79,20 +79,11 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	obuf_dup(out, &empty_map, sizeof(empty_map));
 }
 
-static inline uint32_t
-get_errcode(const Exception *e)
-{
-	const ClientError *error = dynamic_cast<const ClientError *>(e);
-	if (error)
-		return error->errcode();
-	return ClientError::get_code_for_foreign_exception(e);
-}
-
 void
 iproto_reply_error(struct obuf *out, const Exception *e, uint64_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg());
-	uint32_t errcode = get_errcode(e);
+	uint32_t errcode = ClientError::get_errcode(e);
 
 	struct iproto_header_bin header = iproto_header_bin;
 	struct iproto_body_bin body = iproto_error_bin;

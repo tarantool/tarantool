@@ -41,6 +41,10 @@ t = nil
 ----------------
 --# stop server default
 --# start server default
+box.error.last()
+---
+- null
+...
 box.error({code = 123, reason = 'test'})
 ---
 - error: test
@@ -53,9 +57,25 @@ box.error()
 ---
 - error: Illegal parameters, bla bla
 ...
-box.error()
+box.error.raise()
 ---
 - error: Illegal parameters, bla bla
+...
+box.error.last()
+---
+- type: ClientError
+  message: Illegal parameters, bla bla
+  code: 1
+...
+box.error.clear()
+---
+...
+box.error.last()
+---
+- null
+...
+box.error.raise()
+---
 ...
 space = box.space.tweedledum
 ---

@@ -404,7 +404,7 @@ fiber_loop(void *data __attribute__((unused)))
 			 * Make sure a leftover exception does not
 			 * propagate up to the joiner.
 			 */
-			Exception::cleanup(&fiber->exception);
+			Exception::clear(&fiber->exception);
 		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
 				 fiber_name(fiber));
@@ -519,7 +519,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	rlist_del(&f->state);
 	region_destroy(&f->gc);
 	tarantool_coro_destroy(&f->coro, &cord->slabc);
-	Exception::cleanup(&f->exception);
+	Exception::clear(&f->exception);
 }
 
 void
@@ -573,7 +573,7 @@ cord_destroy(struct cord *cord)
 		mh_i32ptr_delete(cord->fiber_registry);
 	}
 	region_destroy(&cord->sched.gc);
-	Exception::cleanup(&cord->sched.exception);
+	Exception::clear(&cord->sched.exception);
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
 }
@@ -611,7 +611,7 @@ void *cord_thread_func(void *p)
 		 * Clear a possible leftover exception object
 		 * to not confuse the invoker of the thread.
 		 */
-		Exception::cleanup(&cord->fiber->exception);
+		Exception::clear(&cord->fiber->exception);
 	} catch (Exception *) {
 		/*
 		 * The exception is now available to the caller

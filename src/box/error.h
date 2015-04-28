@@ -51,7 +51,7 @@ public:
 	ClientError(const char *file, unsigned line, const char *msg,
 		    uint32_t errcode);
 
-	static uint32_t get_code_for_foreign_exception(const Exception *e);
+	static uint32_t get_errcode(const Exception *e);
 private:
 	/* client errno code */
 	int m_errcode;

@@ -47,6 +47,8 @@ public:
 		throw this;
 	}
 
+	const char *type() const;
+
 	const char *
 	errmsg() const
 	{
@@ -60,8 +62,8 @@ public:
 	{
 		*what = NULL;
 	}
-	/** Clear the last error saved in the current thread's TLS */
-	static inline void cleanup(Exception **what)
+	/** Clear the last error saved in the current fiber's TLS */
+	static inline void clear(Exception **what)
 	{
 		if (*what != NULL && (*what)->size > 0) {
 			(*what)->~Exception();
@@ -72,7 +74,7 @@ public:
 	/** Move an exception from one thread to another. */
 	static void move(Exception **from, Exception **to)
 	{
-		Exception::cleanup(to);
+		Exception::clear(to);
 		*to = *from;
 		Exception::init(from);
 	}

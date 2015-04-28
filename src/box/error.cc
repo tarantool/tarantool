@@ -59,8 +59,11 @@ ClientError::log() const
 
 
 uint32_t
-ClientError::get_code_for_foreign_exception(const Exception *e)
+ClientError::get_errcode(const Exception *e)
 {
+	const ClientError *error = dynamic_cast<const ClientError *>(e);
+	if (error)
+		return error->errcode();
 	if (typeid(*e) == typeid(OutOfMemory))
 		return ER_MEMORY_ISSUE;
 	return ER_PROC_LUA;

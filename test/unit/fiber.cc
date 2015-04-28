@@ -89,7 +89,7 @@ fiber_join_test()
 	fiber_yield();
 	note("by this time the fiber should be dead already");
 	fiber_cancel(fiber);
-	Exception::cleanup(&fiber->exception);
+	Exception::clear(&fiber->exception);
 	fiber_join(fiber);
 
 	footer();

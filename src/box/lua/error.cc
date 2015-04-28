@@ -41,7 +41,7 @@ extern "C" {
 #include "box/error.h"
 
 static int
-lbox_raise(lua_State *L)
+lbox_error_raise(lua_State *L)
 {
 	uint32_t code = 0;
 	const char *reason = NULL;
@@ -106,6 +106,50 @@ raise:
 }
 
 static int
+lbox_error_last(lua_State *L)
+{
+	if (lua_gettop(L) >= 1)
+		luaL_error(L, "box.error.last(): bad arguments");
+
+	Exception *e = fiber()->exception;
+
+	if (e == NULL) {
+		lua_pushnil(L);
+	} else {
+		lua_newtable(L);
+
+		lua_pushstring(L, "message");
+		lua_pushstring(L, e->errmsg());
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "type");
+		lua_pushstring(L, e->type());
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "code");
+		lua_pushinteger(L, ClientError::get_errcode(e));
+		lua_settable(L, -3);
+
+		if (SystemError *se = dynamic_cast<SystemError *>(e)) {
+			lua_pushstring(L, "errno");
+			lua_pushinteger(L, se->errnum());
+			lua_settable(L, -3);
+		}
+       }
+       return 1;
+}
+
+static int
+lbox_error_clear(lua_State *L)
+{
+	if (lua_gettop(L) >= 1)
+		luaL_error(L, "box.error.clear(): bad arguments");
+
+	Exception::clear(&fiber()->exception);
+	return 0;
+}
+
+static int
 lbox_errinj_set(struct lua_State *L)
 {
 	char *name = (char*)luaL_checkstring(L, 1);
@@ -155,9 +199,27 @@ box_lua_error_init(struct lua_State *L) {
 		lua_setfield(L, -2, name + 3);
 	}
 	lua_newtable(L);
-	lua_pushcfunction(L, lbox_raise);
-	lua_setfield(L, -2, "__call");
+	{
+		lua_pushcfunction(L, lbox_error_raise);
+		lua_setfield(L, -2, "__call");
+
+		lua_newtable(L);
+		{
+			lua_pushcfunction(L, lbox_error_last);
+			lua_setfield(L, -2, "last");
+		}
+		{
+			lua_pushcfunction(L, lbox_error_clear);
+			lua_setfield(L, -2, "clear");
+		}
+		{
+			lua_pushcfunction(L, lbox_error_raise);
+			lua_setfield(L, -2, "raise");
+		}
+		lua_setfield(L, -2, "__index");
+	}
 	lua_setmetatable(L, -2);
+
 	lua_pop(L, 1);
 
 	static const struct luaL_reg errinjlib[] = {
