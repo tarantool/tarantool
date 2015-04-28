@@ -231,11 +231,11 @@ chkconfig --del tarantool
 
 %files common
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/"
 "%{_bindir}/tarantoolctl"
 "%{_mandir}/man1/tarantoolctl.1.gz"
 "%{_sysconfdir}/sysconfig/tarantool"
 %if %{with systemd}
+%dir "%{_libdir}/tarantool/"
 "%{_unitdir}/tarantool.service"
 "%{_libdir}/tarantool/tarantool.init"
 %else
