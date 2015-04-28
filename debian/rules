@@ -7,10 +7,7 @@ VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
 DEB_CMAKE_EXTRA_FLAGS := \
-	-DCMAKE_BUILD_TYPE=RelWithDebugInfo \
-	-DWITH_MYSQL=ON \
-	-DWITH_POSTGRESQL=ON
-#         -DENABLE_CLIENT=true \
+	-DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
 DEB_DH_INSTALLINIT_ARGS := --name=tarantool
 
