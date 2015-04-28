@@ -5,7 +5,7 @@ box.begin() box.commit();
 box.begin() box.begin();
 -- no active transaction since exception rolled it back
 box.commit();
--- double commit - implicit start of transaction 
+-- double commit - implicit start of transaction
 box.begin() box.commit() box.commit();
 -- commit if not started - implicit start of transaction
 box.commit();
@@ -15,7 +15,7 @@ box.rollback()
 box.begin() box.rollback() box.rollback();
 -- rollback of an empty trans - ends transaction
 box.begin() box.rollback();
--- no current transaction - implicit begin 
+-- no current transaction - implicit begin
 box.commit();
 fiber = require('fiber');
 function sloppy()
@@ -121,12 +121,12 @@ t;
 s:select{};
 s:drop();
 --# setopt delimiter ''
-tester = box.schema.space.create('tester')
-tindex = tester:create_index('primary')
-box.begin() tester:insert{1} box.rollback()
-tester:select{1}
-box.begin() tester:insert{1} box.commit()
-tester:select{1}
+test = box.schema.space.create('test')
+tindex = test:create_index('primary')
+box.begin() test:insert{1} box.rollback()
+test:select{1}
+box.begin() test:insert{1} box.commit()
+test:select{1}
 --
 -- gh-793 box.rollback() is not invoked after CALL
 --
@@ -138,3 +138,28 @@ cn:call('test') -- first CALL starts transaction
 cn:call('test') -- iproto reuses fiber on the second call
 cn = nil
 box.schema.func.drop('test')
+
+--
+-- Test statement-level rollback
+--
+box.space.test:truncate()
+function insert(a) box.space.test:insert(a) end
+--# setopt delimiter ';'
+function dup_key()
+    box.begin()
+    box.space.test:insert{1}
+    status, _ = pcall(insert, {1})
+    if not status then
+        if box.error.last().code ~= box.error.TUPLE_FOUND then
+            box.error.raise()
+        end
+        box.space.test:insert{2}
+    end
+    box.commit()
+end;
+--# setopt delimiter ''
+dup_key()
+box.space.test:select{}
+-- cleanup
+--
+box.space.test:drop()

@@ -43,6 +43,35 @@ t
 space:truncate()
 space:insert{0, 'test'}
 space.index['primary']:get{0}
+collectgarbage('collect')
+--
+-- Check that statement-level rollback does not leak tuples
+--
+space:truncate()
+function insert(a) space:insert(a) end
+--# setopt delimiter ';'
+function dup_key()
+    box.begin()
+    space:insert{1}
+    local i = 1
+    while i < 2000 do
+        status, _ = pcall(insert, {1, string.rep('test', i)})
+        if status then
+            error('Unexpected success when inserting a duplicate')
+        end
+        if box.error.last().code ~= box.error.TUPLE_FOUND then
+            box.error.raise()
+        end
+        i = i + 1
+    end
+    box.commit()
+    return i
+end;
+--# setopt delimiter ''
+dup_key()
+space:select{}
+--
+-- Cleanup
+--
 space:drop()
 t = nil
-collectgarbage('collect')
