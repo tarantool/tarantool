@@ -95,7 +95,7 @@ local template_cfg = {
     wal_dir_rescan_delay= 'number',
     panic_on_snap_error = 'boolean',
     panic_on_wal_error  = 'boolean',
-    replication_source  = 'string',
+    replication_source  = 'string, number',
     custom_proc_title   = 'string',
     pid_file            = 'string',
     background          = 'boolean',
@@ -106,8 +106,8 @@ local template_cfg = {
 }
 
 local function normalize_uri(port)
-    if port == nil then
-        return nil
+    if port == nil or type(port) == 'table' then
+        return port
     end
     return tostring(port);
 end
@@ -115,6 +115,7 @@ end
 -- options that require special handling
 local modify_cfg = {
     listen             = normalize_uri,
+    replication_source = normalize_uri,
 }
 
 -- dynamically settable options

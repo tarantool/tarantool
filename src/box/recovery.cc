@@ -120,6 +120,7 @@ static void
 fill_lsn(struct recovery_state *r, struct xrow_header *row)
 {
 	if (row->server_id == 0) {
+		/* Local request. */
 		row->server_id = r->server_id;
 		row->lsn = vclock_inc(&r->vclock, r->server_id);
 	} else {
