@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "unit.h"
 
@@ -473,6 +474,7 @@ itr_freeze_check()
 int
 main(void)
 {
+	srand(time(0));
 	itr_check();
 	itr_invalidate_check();
 	itr_freeze_check();
