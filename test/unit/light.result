@@ -2,4 +2,8 @@
 	*** simple_test: done ***
  	*** collision_test ***
 	*** collision_test: done ***
+ 	*** itr_test ***
+	*** itr_test: done ***
+ 	*** itr_freeze_check ***
+	*** itr_freeze_check: done ***
  

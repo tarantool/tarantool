@@ -189,8 +189,8 @@ matras_vers_test()
 					add_ver = rand() % 2 == 0;
 				if (add_ver) {
 					cur_num_or_ver++;
-					int new_ver = matras_create_read_view(&local);
-					assert(new_ver > 0);
+					matras_id_t new_ver = matras_create_read_view(&local);
+					check(new_ver > 0, "create read view failed");
 					use_mask |= (1 << new_ver);
 					comps[new_ver] = comps[0];
 				} else {

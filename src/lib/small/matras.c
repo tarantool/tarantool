@@ -314,7 +314,7 @@ matras_extent_count(const struct matras *m)
 
 /*
  * Create new version of matras memory.
- * Return -1 if all version IDs are occupied.
+ * Return 0 if all version IDs are occupied.
  */
 matras_id_t
 matras_create_read_view(struct matras *m)
@@ -331,7 +331,7 @@ matras_create_read_view(struct matras *m)
 #endif
 	assert(ver_id > 0);
 	if (ver_id >= MATRAS_VERSION_COUNT)
-		return -1;
+		return 0;
 	m->ver_occ_mask |= ((matras_version_tag_t)1) << ver_id;
 	m->roots[ver_id] = m->roots[0];
 	m->block_counts[ver_id] = m->block_counts[0];

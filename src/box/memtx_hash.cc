@@ -156,7 +156,7 @@ typedef uint32_t hash_t;
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct light_index_core *hash_table;
-	uint32_t h_pos;
+	struct light_index_iterator hitr;
 };
 
 void
@@ -171,13 +171,8 @@ hash_iterator_ge(struct iterator *ptr)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-
-	while (it->h_pos < it->hash_table->table_size) {
-		if (light_index_pos_valid(it->hash_table, it->h_pos))
-			return light_index_get(it->hash_table, it->h_pos++);
-		it->h_pos++;
-	}
-	return NULL;
+	struct tuple **res = light_index_itr_get_and_next(it->hash_table, &it->hitr);
+	return res ? *res : 0;
 }
 
 static struct tuple *
@@ -307,9 +302,8 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 	if (old_tuple) {
 		uint32_t h = tuple_hash(old_tuple, key_def);
-		hash_t slot = light_index_find(hash_table, h, old_tuple);
-		assert(slot != light_index_end);
-		light_index_delete(hash_table, slot);
+		int res = light_index_delete_value(hash_table, h, old_tuple);
+		assert(res == 0);
 	}
 	return old_tuple;
 }
@@ -327,6 +321,8 @@ MemtxHash::allocIterator() const
 
 	it->base.next = hash_iterator_ge;
 	it->base.free = hash_iterator_free;
+	it->hash_table = hash_table;
+	light_index_itr_begin(it->hash_table, &it->hitr);
 	return (struct iterator *) it;
 }
 
@@ -339,19 +335,15 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	assert(ptr->free == hash_iterator_free);
 
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
-	it->hash_table = hash_table;
 
 	switch (type) {
 	case ITER_ALL:
-		it->h_pos = 0;
-		while (it->h_pos < it->hash_table->table_size
-		       && !light_index_pos_valid(it->hash_table, it->h_pos))
-			it->h_pos++;
+		light_index_itr_begin(it->hash_table, &it->hitr);
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
 		assert(part_count > 0);
-		it->h_pos = light_index_find_key(hash_table, key_hash(key, key_def), key);
+		light_index_itr_key(it->hash_table, &it->hitr, key_hash(key, key_def), key);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:

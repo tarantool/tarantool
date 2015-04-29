@@ -284,7 +284,7 @@ matras_extent_count(const struct matras *m);
 
 /*
  * Create new version of matras memory.
- * Return -1 if all version IDs are occupied.
+ * Return 0 if all version IDs are occupied.
  */
 matras_id_t
 matras_create_read_view(struct matras *m);

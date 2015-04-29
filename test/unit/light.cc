@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <vector>
+#include <time.h>
 
 #include "unit.h"
 
@@ -183,11 +184,145 @@ collision_test()
 	footer();
 }
 
+static void
+itr_test()
+{
+	header();
+
+	struct light_core ht;
+	light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+	const size_t rounds = 1000;
+	const size_t start_limits = 20;
+
+	const size_t iterator_count = 16;
+	struct light_iterator itrs[iterator_count];
+	for (size_t i = 0; i < iterator_count; i++)
+		light_itr_begin(&ht, itrs + i);
+	size_t cur_iterator = 0;
+	hash_value_t strage_thing = 0;
+
+	for(size_t limits = start_limits; limits <= 2 * rounds; limits *= 10) {
+		for (size_t i = 0; i < rounds; i++) {
+			hash_value_t val = rand() % limits;
+			hash_t h = hash(val);
+			hash_t fnd = light_find(&ht, h, val);
+
+			if (fnd == light_end) {
+				light_insert(&ht, h, val);
+			} else {
+				light_delete(&ht, fnd);
+			}
+
+			hash_value_t *pval = light_itr_get_and_next(&ht, itrs + cur_iterator);
+			if (pval)
+				strage_thing ^= *pval;
+			if (!pval || (rand() % iterator_count) == 0) {
+				if (rand() % iterator_count) {
+					hash_value_t val = rand() % limits;
+					hash_t h = hash(val);
+					light_itr_key(&ht, itrs + cur_iterator, h, val);
+				} else {
+					light_itr_begin(&ht, itrs + cur_iterator);
+				}
+			}
+
+			cur_iterator++;
+			if (cur_iterator >= iterator_count)
+				cur_iterator = 0;
+		}
+	}
+	light_destroy(&ht);
+
+	if (strage_thing >> 20) {
+		printf("impossible!\n"); // prevent strage_thing to be optimized out
+	}
+
+	footer();
+}
+
+static void
+itr_freeze_check()
+{
+	header();
+
+	const int test_rounds_size = 10;
+	const int test_data_size = 1000;
+	hash_value_t comp_buf1[test_data_size];
+	hash_value_t comp_buf2[test_data_size];
+	const int test_data_mod = 2000;
+	srand(0);
+	struct light_core ht;
+
+	for (int i = 0; i < 10; i++) {
+		light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
+		int comp_buf_size1 = 0;
+		int comp_buf_size2 = 0;
+		for (int j = 0; j < test_data_size; j++) {
+			hash_value_t val = rand() % test_data_mod;
+			hash_t h = hash(val);
+			light_insert(&ht, h, val);
+		}
+		struct light_iterator itr;
+		light_itr_begin(&ht, &itr);
+		hash_value_t *e;
+		while ((e = light_itr_get_and_next(&ht, &itr))) {
+			comp_buf1[comp_buf_size1++] = *e;
+		}
+		struct light_iterator itr1;
+		light_itr_begin(&ht, &itr1);
+		light_itr_freeze(&ht, &itr1);
+		struct light_iterator itr2;
+		light_itr_begin(&ht, &itr2);
+		light_itr_freeze(&ht, &itr2);
+		for (int j = 0; j < test_data_size; j++) {
+			hash_value_t val = rand() % test_data_mod;
+			hash_t h = hash(val);
+			light_insert(&ht, h, val);
+		}
+		int tested_count = 0;
+		while ((e = light_itr_get_and_next(&ht, &itr1))) {
+			if (*e != comp_buf1[tested_count]) {
+				fail("version restore failed (1)", "true");
+			}
+			tested_count++;
+			if (tested_count > comp_buf_size1) {
+				fail("version restore failed (2)", "true");
+			}
+		}
+		light_itr_destroy(&ht, &itr1);
+		for (int j = 0; j < test_data_size; j++) {
+			hash_value_t val = rand() % test_data_mod;
+			hash_t h = hash(val);
+			hash_t pos = light_find(&ht, h, val);
+			if (pos != light_end)
+				light_delete(&ht, pos);
+		}
+
+		tested_count = 0;
+		while ((e = light_itr_get_and_next(&ht, &itr2))) {
+			if (*e != comp_buf1[tested_count]) {
+				fail("version restore failed (1)", "true");
+			}
+			tested_count++;
+			if (tested_count > comp_buf_size1) {
+				fail("version restore failed (2)", "true");
+			}
+		}
+
+		light_destroy(&ht);
+	}
+
+	footer();
+}
+
 int
 main(int, const char**)
 {
+	srand(time(0));
 	simple_test();
 	collision_test();
+	itr_test();
+	itr_freeze_check();
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 }
