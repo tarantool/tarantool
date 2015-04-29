@@ -44,6 +44,15 @@ digest.crc32_update(4294967295, 'abc')
 digest.crc32('abccde')
 digest.crc32_update(digest.crc32('abc'), 'cde')
 
+crc = digest.crc32.new()
+crc:update('abc')
+crc2 = crc:copy()
+crc:update('cde')
+crc:result() == digest.crc32('abccde')
+crc2:update('def')
+crc2:result() == digest.crc32('abcdef')
+crc, crc2 = nil, nil
+
 digest.base64_encode('12345')
 digest.base64_decode('MTIzNDU=')
 digest.base64_encode('asdfl asdf adfa zxc vzxcvz llll')
@@ -69,5 +78,20 @@ digest.urandom()
 #digest.urandom(0)
 #digest.urandom(1)
 #digest.urandom(16)
+
+digest.murmur('1234')
+mur = digest.murmur.new{seed=13}
+nulldigest = mur:result()
+mur:update('1234')
+mur:result()
+mur_new = mur:copy()
+mur_new:update('1234')
+mur_new:result() ~= mur:result()
+mur:clear()
+nulldigest == mur:result()
+mur = digest.murmur.new{seed=14}
+mur:update('1234')
+mur:result()
+mur, mur_new, nulldigest = nil, nil, nil
 
 digest = nil
