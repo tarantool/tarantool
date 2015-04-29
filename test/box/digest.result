@@ -146,6 +146,32 @@ lua box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
 ---
  - 3628146660
 ...
+lua crc = box.digest.crc32.new()
+---
+...
+lua crc:update('abc')
+---
+...
+lua crc2 = crc:copy()
+---
+...
+lua crc:update('cde')
+---
+...
+lua crc:result() == box.digest.crc32('abccde')
+---
+ - true
+...
+lua crc2:update('def')
+---
+...
+lua crc2:result() == box.digest.crc32('abcdef')
+---
+ - true
+...
+lua crc, crc2 = nil, nil
+---
+...
 lua box.digest.guava('hello', 0)
 ---
 error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''int64_t'')'
