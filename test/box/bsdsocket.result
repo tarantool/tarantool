@@ -358,7 +358,7 @@ sc:writable(10)
 ...
 sc:write('Hello, world')
 ---
-- true
+- 12
 ...
 sa, addr = s:accept()
 ---
@@ -392,7 +392,7 @@ sc:writable()
 ...
 sc:write(', again')
 ---
-- true
+- 7
 ...
 sa:read(8)
 ---
@@ -420,7 +420,7 @@ sc:writable()
 ...
 sc:send('abc')
 ---
-- true
+- 3
 ...
 sa:read(3)
 ---
@@ -428,7 +428,7 @@ sa:read(3)
 ...
 sc:send('Hello')
 ---
-- true
+- 5
 ...
 sa:readable()
 ---
@@ -444,15 +444,15 @@ sa:recv()
 ...
 sc:send('Hello')
 ---
-- true
+- 5
 ...
 sc:send(', world')
 ---
-- true
+- 7
 ...
 sc:send("\\nnew line")
 ---
-- true
+- 10
 ...
 sa:read('\\n', 1)
 ---
@@ -472,7 +472,7 @@ sa:read('ine', 0.1)
 ...
 sc:send('Hello, world')
 ---
-- true
+- 12
 ...
 sa:read(',', 1)
 ---
@@ -567,7 +567,7 @@ sa:nonblock(true)
 ...
 sa:send('Hello, world')
 ---
-- true
+- 12
 ...
 sc:recv()
 ---
@@ -704,7 +704,7 @@ sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ...
 sc:sendto('127.0.0.1', 3548, 'Hello, world')
 ---
-- true
+- 12
 ...
 s:readable(10)
 ---
@@ -716,7 +716,7 @@ s:recv()
 ...
 sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
 ---
-- true
+- 15
 ...
 s:readable(10)
 ---
@@ -772,7 +772,7 @@ sc:sendto('127.0.0.1', s:name().port)
 ...
 sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
 ---
-- true
+- 13
 ...
 s:readable(1)
 ---
@@ -787,7 +787,7 @@ data
 ...
 s:sendto(from.host, from.port, 'Hello, hello!')
 ---
-- true
+- 13
 ...
 sc:readable(1)
 ---
@@ -830,7 +830,7 @@ string.match(tostring(s), ', peer') ~= nil
 ...
 s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
 ---
-- true
+- 40
 ...
 header = s:read({chunk = 4000, delimiter = {"\n\n", "\r\n\r\n" }}, 1)
 ---
@@ -1322,7 +1322,7 @@ cnt
 ...
 client:write('hi')
 ---
-- true
+- 2
 ...
 client:read(123)
 ---

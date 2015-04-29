@@ -706,18 +706,19 @@ socket_methods.write = function(self, octets, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
+    local total_len = #octets
     local started = fiber.time()
     while true do
         local written = self:syswrite(octets)
         if written == nil then
             if not errno_is_transient[self:errno()] then
-                return false
+                return nil
             end
             written = 0
         end
 
         if written == string.len(octets) then
-            return true
+            return total_len
         end
         if written > 0 then
             octets = string.sub(octets, written + 1)
@@ -735,11 +736,11 @@ socket_methods.send = function(self, octets, flags)
 
     self._errno = nil
     local res = ffi.C.send(fd, octets, string.len(octets), iflags)
-    if res == -1 then
+    if res < 0 then
         self._errno = boxerrno()
-        return false
+        return nil
     end
-    return true
+    return tonumber(res)
 end
 
 socket_methods.recv = function(self, size, flags)
@@ -807,9 +808,9 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     end
     if res < 0 then
         self._errno = boxerrno()
-        return false
+        return nil
     end
-    return true
+    return tonumber(res)
 end
 
 local function create_socket(domain, stype, proto)
