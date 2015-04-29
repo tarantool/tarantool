@@ -72,8 +72,8 @@ local function tohex(r, size)
     return ffi.string(hexres, size * 2)
 end
 
-local PMurHash = {
-    default_seed = 13,
+local PMurHash
+local PMurHash_methods = {
 
     update = function(self, str)
         str = tostring(str or '')
@@ -81,7 +81,7 @@ local PMurHash = {
         self.total_length = self.total_length + string.len(str)
     end,
 
-    digest = function(self)
+    result = function(self)
         return ffi.C.PMurHash32_Result(self.seed[0], self.value[0], self.total_length)
     end,
 
@@ -90,69 +90,78 @@ local PMurHash = {
         self.total_length = 0
         self.value[0] = 0
     end,
+
+    copy = function(self)
+        local new_self = PMurHash.new()
+        new_self.seed[0] = self.seed[0]
+        new_self.value[0] = self.value[0]
+        new_self.total_length = self.total_length
+        return new_self
+    end
 }
 
-PMurHash.__call = function(self, str)
-    str = tostring(str or '')
-    return ffi.C.PMurHash32(PMurHash.default_seed, str, string.len(str))
-end
+PMurHash = {
+    default_seed = 13,
 
-PMurHash.copy = function(self)
-    new_self = PMurHash.new{seed=self.default_seed}
-    new_self.seed[0] = self.seed[0]
-    new_self.value[0] = self.value[0]
-    new_self.total_length = self.total_length
-    return new_self
-end
+    new = function(opts)
+        opts = opts or {}
+        local self = setmetatable({}, { __index = PMurHash_methods })
+        self.default_seed = (opts.seed or PMurHash.default_seed)
+        self.seed = ffi.new("int[1]", self.default_seed)
+        self.value = ffi.new("int[1]", 0)
+        self.total_length = 0
+        return self
+    end
+}
 
-PMurHash.new = function(opts)
-    opts = opts or {}
-    local self = setmetatable({}, { __index = PMurHash })
-    self.default_seed = (opts.seed or PMurHash.default_seed)
-    self.seed = ffi.new("int[1]", self.default_seed)
-    self.value = ffi.new("int[1]", 0)
-    self.total_length = 0
-    return self
-end
+setmetatable(PMurHash, {
+    __call = function(self, str)
+        str = tostring(str or '')
+        return ffi.C.PMurHash32(PMurHash.default_seed, str, string.len(str))
+    end
+})
 
-local CRC32 = {
-    crc_begin = 4294967295,
-
+local CRC32
+local CRC32_methods = {
     update = function(self, str)
         str = tostring(str or '')
         self.value = ffi.C.crc32_calc(self.value, str, string.len(str))
     end,
 
-    digest = function(self)
+    result = function(self)
         return self.value
     end,
 
     clear = function(self)
         self.value = CRC32.crc_begin
     end,
+
+    copy = function(self)
+        local new_self = CRC32.new()
+        new_self.value = self.value
+        return new_self
+    end
 }
 
-CRC32.__call = function(self, str)
-    str = tostring(str or '')
-    return ffi.C.crc32_calc(CRC32.crc_begin, str, string.len(str))
-end
+CRC32 = {
+    crc_begin = 4294967295,
 
-CRC32.copy = function(self)
-    new_self = CRC32.new()
-    new_self.value = self.value
-    return new_self
-end
+    new = function()
+        local self = setmetatable({}, { __index = CRC32_methods })
+        self.value = CRC32.crc_begin
+        return self
+    end
+}
 
-CRC32.new = function()
-    local self = setmetatable({}, { __index == CRC32 })
-    self.value = CRC32.crc_begin
-    return self
-end
+setmetatable(CRC32, {
+    __call = function(self, str)
+        str = tostring(str or '')
+        return ffi.C.crc32_calc(CRC32.crc_begin, str, string.len(str))
+    end
+})
 
 local m = {
-    crc32 = {
-        new = CRC32.new,
-    },
+    crc32 = CRC32,
 
     crc32_update = function(crc, str)
         str = tostring(str or '')
@@ -163,13 +172,8 @@ local m = {
        return ffi.C.guava(state, buckets)
     end,
 
-    murmur = {
-       new = PMurHash.new,
-    },
+    murmur = PMurHash
 }
-
-setmetatable(m.murmur, { __call = PMurHash.__call })
-setmetatable(m.crc32, { __call = CRC32.__call })
 
 if ssl ~= nil then
 

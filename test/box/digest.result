@@ -173,13 +173,13 @@ lua box.digest.murmur('1234')
 lua mur = box.digest.murmur.new{seed=13}
 ---
 ...
-lua nulldigest = mur:digest()
+lua nulldigest = mur:result()
 ---
 ...
 lua mur:update('1234')
 ---
 ...
-lua mur:digest()
+lua mur:result()
 ---
  - 1859914009
 ...
@@ -189,14 +189,14 @@ lua mur_new = mur:copy()
 lua mur_new:update('1234')
 ---
 ...
-lua mur_new:digest() ~= mur:digest()
+lua mur_new:result() ~= mur:result()
 ---
  - true
 ...
 lua mur:clear()
 ---
 ...
-lua nulldigest == mur:digest()
+lua nulldigest == mur:result()
 ---
  - true
 ...
@@ -206,7 +206,7 @@ lua mur = box.digest.murmur.new{seed=14}
 lua mur:update('1234')
 ---
 ...
-lua mur:digest()
+lua mur:result()
 ---
  - 1689834281
 ...
