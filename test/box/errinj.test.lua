@@ -1,4 +1,4 @@
-errinj = require('box.error.injection')
+errinj = box.error.injection
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })

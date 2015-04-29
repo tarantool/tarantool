@@ -113,7 +113,7 @@ box_lua_stat_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register(L, "box.stat", statlib);
+	luaL_register_module(L, "box.stat", statlib);
 
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_meta);

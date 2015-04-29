@@ -344,7 +344,7 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_setglobal(L, "cfuncs");
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
-	luaL_register(L, tuplelib_name, lbox_tuplelib);
+	luaL_register_module(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);

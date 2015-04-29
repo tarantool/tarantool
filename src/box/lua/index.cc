@@ -178,7 +178,7 @@ box_lua_index_init(struct lua_State *L)
 	};
 
 	/* box.index */
-	luaL_register(L, "box.index", indexlib);
+	luaL_register_module(L, "box.index", indexlib);
 	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
 }

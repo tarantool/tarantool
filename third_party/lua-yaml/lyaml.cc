@@ -735,16 +735,15 @@ const luaL_reg yamllib[] = {
 static int
 l_new(lua_State *L)
 {
-   struct luaL_serializer *s = luaL_newserializer(L, yamllib);
+   struct luaL_serializer *s = luaL_newserializer(L, NULL, yamllib);
    s->has_compact = 1;
    return 1;
 }
 
 int
 luaopen_yaml(lua_State *L) {
-   struct luaL_serializer *s = luaL_newserializer(L, yamllib);
+   struct luaL_serializer *s = luaL_newserializer(L, "yaml", yamllib);
    s->has_compact = 1;
-   luaL_register_module(L, "yaml", NULL);
    return 1;
 }
 

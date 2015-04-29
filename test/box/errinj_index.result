@@ -1,4 +1,4 @@
-errinj = require('box.error.injection')
+errinj = box.error.injection
 ---
 ...
 -- Check a failed realloc in tree index.

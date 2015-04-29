@@ -272,6 +272,6 @@ box_lua_session_init(struct lua_State *L)
 		{"on_disconnect", lbox_session_on_disconnect},
 		{NULL, NULL}
 	};
-	luaL_register(L, sessionlib_name, sessionlib);
+	luaL_register_module(L, sessionlib_name, sessionlib);
 	lua_pop(L, 1);
 }

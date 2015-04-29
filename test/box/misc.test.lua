@@ -1,3 +1,14 @@
+--# push filter 'table: .*' to 'table: <address>'
+
+-- gh-266: box.info() crash on uncofigured box
+package.loaded['box.space'] == nil
+package.loaded['box.index'] == nil
+package.loaded['box.tuple'] == nil
+package.loaded['box.error'] == nil
+package.loaded['box.info'] == nil
+package.loaded['box.stat'] == nil
+package.loaded['box.session'] == nil
+
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
@@ -166,3 +177,4 @@ fifo_top(space, 1)
 space:delete{1}
 
 space:drop()
+--# clear filter

@@ -229,7 +229,7 @@ box_lua_info_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register(L, "box.info", infolib);
+	luaL_register_module(L, "box.info", infolib);
 
 	lua_newtable(L);		/* metatable for info */
 

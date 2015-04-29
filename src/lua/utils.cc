@@ -209,7 +209,7 @@ luaL_serializer_cfg(lua_State *L)
  * @return new serializer
  */
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const luaL_Reg *reg)
+luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg)
 {
 	luaL_checkstack(L, 1, "too many upvalues");
 
@@ -264,6 +264,15 @@ luaL_newserializer(struct lua_State *L, const luaL_Reg *reg)
 	lua_setfield(L, -2, "array_mt");
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_map_metatable_ref);
 	lua_setfield(L, -2, "map_mt");
+
+	if (modname != NULL) {
+		/* Register module */
+		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+		lua_pushstring(L, modname); /* add alias */
+		lua_pushvalue(L, -3);
+		lua_settable(L, -3);
+		lua_pop(L, 1); /* _LOADED */
+	}
 
 	return serializer;
 }
@@ -619,22 +628,21 @@ void
 luaL_register_module(struct lua_State *L, const char *modname,
 		     const struct luaL_Reg *methods)
 {
-	if (methods == NULL) {
-		/* Register module */
-		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_pushstring(L, modname); /* add alias */
-		lua_pushvalue(L, -3);
-		lua_settable(L, -3);
-		lua_pop(L, 1);
-		return;
-	}
+	assert(methods != NULL && modname != NULL); /* use luaL_register instead */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	lua_getfield(L, -1, modname); /* get package.loaded */
-	if (!lua_istable(L, -1)) {  /* module is not found */
-		lua_pop(L, 1);  /* remove previous result */
-		lua_newtable(L);
-		lua_pushvalue(L, -1);
-		lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
+	if (strchr(modname, '.') == NULL) {
+		/* root level, e.g. box */
+		lua_getfield(L, -1, modname); /* get package.loaded.modname */
+		if (!lua_istable(L, -1)) {  /* module is not found */
+			lua_pop(L, 1);  /* remove previous result */
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
+		}
+	} else {
+		/* 1+ level, e.g. box.space */
+		if (luaL_findtable(L, -1, modname, 0) != NULL)
+			luaL_error(L, "Failed to register library");
 	}
 	lua_remove(L, -2);  /* remove _LOADED table */
 	luaL_register(L, NULL, methods);

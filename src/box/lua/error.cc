@@ -188,7 +188,7 @@ box_lua_error_init(struct lua_State *L) {
 	static const struct luaL_reg errorlib[] = {
 		{NULL, NULL}
 	};
-	luaL_register(L, "box.error", errorlib);
+	luaL_register_module(L, "box.error", errorlib);
 	for (int i = 0; i < tnt_error_codes_enum_MAX; i++) {
 		const char *name = tnt_error_codes[i].errstr;
 		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))

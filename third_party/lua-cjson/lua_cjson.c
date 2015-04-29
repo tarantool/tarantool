@@ -1027,7 +1027,7 @@ const luaL_reg jsonlib[] = {
 static int
 json_new(lua_State *L)
 {
-    luaL_newserializer(L, jsonlib);
+    luaL_newserializer(L, NULL, jsonlib);
     return 1;
 }
 
@@ -1035,8 +1035,7 @@ int
 luaopen_json(lua_State *L)
 {
     json_create_tokens();
-    luaL_json_default = luaL_newserializer(L, jsonlib);
-    luaL_register_module(L, "json", NULL);
+    luaL_json_default = luaL_newserializer(L, "json", jsonlib);
     luaL_pushnull(L);
     lua_setfield(L, -2, "null"); /* compatibility with cjson */
     return 1;

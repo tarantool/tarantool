@@ -210,7 +210,7 @@ extern int luaL_array_metatable_ref;
 #define LUAL_SERIALIZE "__serialize"
 
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const luaL_Reg *reg);
+luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg);
 
 static inline struct luaL_serializer *
 luaL_checkserializer(struct lua_State *L) {

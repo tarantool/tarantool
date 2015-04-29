@@ -1,3 +1,33 @@
+--# push filter 'table: .*' to 'table: <address>'
+-- gh-266: box.info() crash on uncofigured box
+package.loaded['box.space'] == nil
+---
+- true
+...
+package.loaded['box.index'] == nil
+---
+- true
+...
+package.loaded['box.tuple'] == nil
+---
+- true
+...
+package.loaded['box.error'] == nil
+---
+- true
+...
+package.loaded['box.info'] == nil
+---
+- true
+...
+package.loaded['box.stat'] == nil
+---
+- true
+...
+package.loaded['box.session'] == nil
+---
+- true
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -222,6 +252,7 @@ t;
   - 'box.error.DROP_USER : 44'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.MODIFY_INDEX : 14'
+  - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.PASSWORD_MISMATCH : 47'
   - 'box.error.TRANSACTION_CONFLICT : 97'
   - 'box.error.NO_SUCH_ENGINE : 57'
@@ -246,7 +277,7 @@ t;
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.NO_ACTIVE_TRANSACTION : 80'
-  - 'box.error.TUPLE_FOUND : 3'
+  - 'box.error.injection : table: <address>
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
   - 'box.error.UNSUPPORTED : 5'
   - 'box.error.INVALID_MSGPACK : 20'
@@ -563,3 +594,4 @@ space:delete{1}
 space:drop()
 ---
 ...
+--# clear filter
