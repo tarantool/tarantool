@@ -167,10 +167,9 @@ s.index[0]:select('key2', { limit = 100, iterator = 'GE' })
 - - ['key2', 'part1', 'part2_a']
   - ['key3', 'part1', 'part2_b']
 ...
-s.index[1]:select({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })
+s.index[1]:select({ 'part1', 'part2_a' }, { limit = 1, iterator = 'GE' })
 ---
 - - ['key2', 'part1', 'part2_a']
-  - ['key3', 'part1', 'part2_b']
 ...
 select * from t0 where k0='key1'
 ---
@@ -273,8 +272,8 @@ select * from t0 where k1='part_none'
 ...
 box.space[0].index[1]:select({'part1', 'part2'})
 ---
-- - [11234567, 'part1', 'part2']
-  - [1234567, 'part1', 'part2']
+- - [1234567, 'part1', 'part2']
+  - [11234567, 'part1', 'part2']
 ...
 select * from t0 where k1='part1'
 ---
