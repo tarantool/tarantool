@@ -1,5 +1,5 @@
 TAP version 13
-1..25
+1..29
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
@@ -15,6 +15,10 @@ ok - wal_mode change
 ok - wal_mode default value
 ok - wal_mode change
 ok - wal_mode default value
+ok - panic_on_wal_mode default value
+ok - panic_on_wal_mode new value
+ok - wal_dir_rescan_delay default value
+ok - wal_dir_rescan_delay new value
 ok - wal_mode fsync
 ok - wal_mode fsync -> fsync
 ok - wal_mode fsync -> write is not supported

@@ -243,6 +243,14 @@ box_set_readahead(int readahead)
 	iobuf_set_readahead(readahead);
 }
 
+extern "C" void
+box_set_panic_on_wal_error(int /* yesno */)
+{
+	recovery_setup_panic(recovery,
+			     cfg_geti("panic_on_snap_error"),
+			     cfg_geti("panic_on_wal_error"));
+}
+
 /* }}} configuration bindings */
 
 /**

@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(25)
+test:plan(29)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -67,6 +67,14 @@ box.cfg{wal_mode = "none"}
 test:is(box.cfg.wal_mode, "none", "wal_mode change")
 box.cfg{wal_mode = require('msgpack').NULL}
 test:is(box.cfg.wal_mode, "write", "wal_mode default value")
+
+test:is(box.cfg.panic_on_wal_error, true, "panic_on_wal_mode default value")
+box.cfg{panic_on_wal_error=false}
+test:is(box.cfg.panic_on_wal_error, false, "panic_on_wal_mode new value")
+
+test:is(box.cfg.wal_dir_rescan_delay, 0.1, "wal_dir_rescan_delay default value")
+box.cfg{wal_dir_rescan_delay=0.2}
+test:is(box.cfg.wal_dir_rescan_delay, 0.2, "wal_dir_rescan_delay new value")
 
 local tarantool_bin = arg[-1]
 local PANIC = 256

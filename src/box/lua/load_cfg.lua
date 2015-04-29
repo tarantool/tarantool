@@ -12,6 +12,7 @@ void box_set_readahead(int readahead);
 void box_set_io_collect_interval(double interval);
 void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
+void box_set_panic_on_wal_error(int);
 ]])
 
 local log = require('log')
@@ -128,7 +129,7 @@ local dynamic_cfg = {
     readahead               = ffi.C.box_set_readahead,
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
-
+    panic_on_wal_error      = ffi.C.box_set_panic_on_wal_error,
     -- snapshot_daemon
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
@@ -140,8 +141,9 @@ local dynamic_cfg_skip_at_load = {
     wal_mode                = true,
     listen                  = true,
     replication_source      = true,
+    wal_dir_rescan_delay    = true,
+    panic_on_wal_error      = true,
 }
-
 
 local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     if cfg == nil then

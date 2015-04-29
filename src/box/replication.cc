@@ -52,6 +52,9 @@ Relay::Relay(int fd_arg, uint64_t sync_arg)
 {
 	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
 			 replication_send_row, this);
+	recovery_setup_panic(r, cfg_geti("panic_if_snap_error"),
+			     cfg_geti("panic_if_wal_error"));
+
 	coio_init(&io);
 	io.fd = fd_arg;
 	sync = sync_arg;
