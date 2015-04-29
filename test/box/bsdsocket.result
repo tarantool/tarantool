@@ -304,7 +304,7 @@ lua sc:writable(10)
 ...
 lua sc:write('Hello, world')
 ---
- - true
+ - 12
 ...
 lua sa, addr = s:accept()
 ---
@@ -338,7 +338,7 @@ lua sc:writable()
 ...
 lua sc:write(', again')
 ---
- - true
+ - 7
 ...
 lua sa:read(8)
 ---
@@ -366,7 +366,7 @@ lua sc:writable()
 ...
 lua sc:send('abc')
 ---
- - true
+ - 3
 ...
 lua sa:read(3)
 ---
@@ -374,7 +374,7 @@ lua sa:read(3)
 ...
 lua sc:send('Hello')
 ---
- - true
+ - 5
 ...
 lua sa:readable()
 ---
@@ -390,15 +390,15 @@ lua sa:recv()
 ...
 lua sc:send('Hello')
 ---
- - true
+ - 5
 ...
 lua sc:send(', world')
 ---
- - true
+ - 7
 ...
 lua sc:send("\nnew line")
 ---
- - true
+ - 9
 ...
 lua sa:read('\n', 1)
 ---
@@ -419,7 +419,7 @@ lua sa:read('ine', 0.1)
 ...
 lua sc:send('Hello, world')
 ---
- - true
+ - 12
 ...
 lua sa:read(',', 1)
 ---
@@ -508,7 +508,7 @@ lua sa:nonblock(true)
 ...
 lua sa:send('Hello, world')
 ---
- - true
+ - 12
 ...
 lua sc:recv()
 ---
@@ -614,7 +614,7 @@ lua sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ...
 lua sc:sendto('127.0.0.1', 3548, 'Hello, world')
 ---
- - true
+ - 12
 ...
 lua s:readable(10)
 ---
@@ -626,7 +626,7 @@ lua s:recv(4096)
 ...
 lua sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
 ---
- - true
+ - 15
 ...
 lua s:readable(10)
 ---
@@ -673,7 +673,7 @@ lua sc:sendto('127.0.0.1', s:name().port)
 ...
 lua sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
 ---
- - true
+ - 13
 ...
 lua s:readable(1)
 ---
@@ -688,7 +688,7 @@ lua data
 ...
 lua s:sendto(from.host, from.port, 'Hello, hello!')
 ---
- - true
+ - 13
 ...
 lua sc:readable(1)
 ---
@@ -731,7 +731,7 @@ lua string.match(tostring(s), ', peer') ~= nil
 ...
 lua s:write('HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n')
 ---
- - true
+ - 40
 ...
 lua header = s:read({chunk = 4000, line = { '\n\n', '\r\n\r\n' }}, 1)
 ---
@@ -1106,7 +1106,7 @@ lua cnt
 ...
 lua client:write('hi')
 ---
- - true
+ - 2
 ...
 lua client:read(123)
 ---
