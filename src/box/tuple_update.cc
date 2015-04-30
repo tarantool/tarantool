@@ -116,8 +116,7 @@ enum arith_type {
 };
 
 /**
- * Argument (left and right) and result of ADD, AND, XOR, OR,
- * SUBTRACT, MULTIPLY.
+ * Argument (left and right) and result of ADD, SUBTRACT.
  *
  * To perform an arithmetic operation, update first loads
  * left and right arguments into corresponding value objects,
