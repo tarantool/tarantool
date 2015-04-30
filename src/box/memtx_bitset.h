@@ -44,6 +44,8 @@ public:
 	MemtxBitset(struct key_def *key_def);
 	virtual ~MemtxBitset();
 	virtual size_t size() const;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,

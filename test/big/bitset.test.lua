@@ -14,15 +14,25 @@ test_insert_delete(128)
 clear()
 fill(1, 128)
 dump(box.index.BITS_ALL)
+box.space.tweedledum.index.bitset:count()
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (single bit)
 ------------------------------------------------------------------------------
 dump(box.index.BITS_ALL_SET, 0)
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ALL_SET})
 dump(box.index.BITS_ALL_SET, 1)
+box.space.tweedledum.index.bitset:count(1, { iterator = box.index.BITS_ALL_SET})
 dump(box.index.BITS_ALL_SET, 2)
+box.space.tweedledum.index.bitset:count(2, { iterator = box.index.BITS_ALL_SET})
 dump(box.index.BITS_ALL_SET, 8)
+box.space.tweedledum.index.bitset:count(8, { iterator = box.index.BITS_ALL_SET})
+dump(box.index.BITS_ALL_SET, 128)
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ALL_SET})
 dump(box.index.BITS_ALL_SET, 1073741824)
+box.space.tweedledum.index.bitset:count(1073741824, { iterator = box.index.BITS_ALL_SET})
 dump(box.index.BITS_ALL_SET, 2147483648)
+box.space.tweedledum.index.bitset:count(2147483648, { iterator = box.index.BITS_ALL_SET})
+
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (multiple bit)
 ------------------------------------------------------------------------------
@@ -39,23 +49,44 @@ dump(box.index.BITS_ALL_SET, 4294967295)
 -- BitsetIndex: BITS_ALL_NOT_SET (single bit)
 ------------------------------------------------------------------------------
 dump(box.index.BITS_ALL_NOT_SET, 0)
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 2)
+box.space.tweedledum.index.bitset:count(2, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 8)
+box.space.tweedledum.index.bitset:count(8, { iterator = box.index.BITS_ALL_NOT_SET})
+dump(box.index.BITS_ALL_NOT_SET, 128)
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ALL_NOT_SET})
+dump(box.index.BITS_ALL_NOT_SET, 1073741824)
+box.space.tweedledum.index.bitset:count(1073741824, { iterator = box.index.BITS_ALL_NOT_SET})
+dump(box.index.BITS_ALL_NOT_SET, 2147483648)
+box.space.tweedledum.index.bitset:count(2147483648, { iterator = box.index.BITS_ALL_NOT_SET})
+
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_NOT_SET (multiple bit)
 ------------------------------------------------------------------------------
 dump(box.index.BITS_ALL_NOT_SET, 3)
+box.space.tweedledum.index.bitset:count(3, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 7)
+box.space.tweedledum.index.bitset:count(7, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 10)
+box.space.tweedledum.index.bitset:count(10, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 27)
+box.space.tweedledum.index.bitset:count(27, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 85)
+box.space.tweedledum.index.bitset:count(85, { iterator = box.index.BITS_ALL_NOT_SET})
 dump(box.index.BITS_ALL_NOT_SET, 4294967295)
+box.space.tweedledum.index.bitset:count(4294967295, { iterator = box.index.BITS_ALL_NOT_SET})
+
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (single bit)
 ------------------------------------------------------------------------------
 dump(box.index.BITS_ANY_SET, 0)
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ANY_SET})
 dump(box.index.BITS_ANY_SET, 16)
+box.space.tweedledum.index.bitset:count(16, { iterator = box.index.BITS_ANY_SET})
 dump(box.index.BITS_ANY_SET, 128)
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ANY_SET})
+
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (multiple bit)
 ------------------------------------------------------------------------------

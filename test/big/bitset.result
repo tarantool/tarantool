@@ -154,12 +154,20 @@ dump(box.index.BITS_ALL)
   - $     127$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count()
+---
+- 128
+...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (single bit)
 ------------------------------------------------------------------------------
 dump(box.index.BITS_ALL_SET, 0)
 ---
 - []
+...
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ALL_SET})
+---
+- 128
 ...
 dump(box.index.BITS_ALL_SET, 1)
 ---
@@ -228,6 +236,10 @@ dump(box.index.BITS_ALL_SET, 1)
   - $     125$
   - $     127$
 ...
+box.space.tweedledum.index.bitset:count(1, { iterator = box.index.BITS_ALL_SET})
+---
+- 64
+...
 dump(box.index.BITS_ALL_SET, 2)
 ---
 - - $       2$
@@ -294,6 +306,10 @@ dump(box.index.BITS_ALL_SET, 2)
   - $     123$
   - $     126$
   - $     127$
+...
+box.space.tweedledum.index.bitset:count(2, { iterator = box.index.BITS_ALL_SET})
+---
+- 64
 ...
 dump(box.index.BITS_ALL_SET, 8)
 ---
@@ -362,13 +378,33 @@ dump(box.index.BITS_ALL_SET, 8)
   - $     126$
   - $     127$
 ...
+box.space.tweedledum.index.bitset:count(8, { iterator = box.index.BITS_ALL_SET})
+---
+- 64
+...
+dump(box.index.BITS_ALL_SET, 128)
+---
+- - $     128$
+...
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ALL_SET})
+---
+- 1
+...
 dump(box.index.BITS_ALL_SET, 1073741824)
 ---
 - []
 ...
+box.space.tweedledum.index.bitset:count(1073741824, { iterator = box.index.BITS_ALL_SET})
+---
+- 0
+...
 dump(box.index.BITS_ALL_SET, 2147483648)
 ---
 - []
+...
+box.space.tweedledum.index.bitset:count(2147483648, { iterator = box.index.BITS_ALL_SET})
+---
+- 0
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (multiple bit)
@@ -661,6 +697,10 @@ dump(box.index.BITS_ALL_NOT_SET, 0)
   - $     127$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 128
+...
 dump(box.index.BITS_ALL_NOT_SET, 2)
 ---
 - - $       1$
@@ -727,6 +767,10 @@ dump(box.index.BITS_ALL_NOT_SET, 2)
   - $     124$
   - $     125$
   - $     128$
+...
+box.space.tweedledum.index.bitset:count(2, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 64
 ...
 dump(box.index.BITS_ALL_NOT_SET, 8)
 ---
@@ -795,6 +839,414 @@ dump(box.index.BITS_ALL_NOT_SET, 8)
   - $     119$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count(8, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 64
+...
+dump(box.index.BITS_ALL_NOT_SET, 128)
+---
+- - $       1$
+  - $       2$
+  - $       3$
+  - $       4$
+  - $       5$
+  - $       6$
+  - $       7$
+  - $       8$
+  - $       9$
+  - $      10$
+  - $      11$
+  - $      12$
+  - $      13$
+  - $      14$
+  - $      15$
+  - $      16$
+  - $      17$
+  - $      18$
+  - $      19$
+  - $      20$
+  - $      21$
+  - $      22$
+  - $      23$
+  - $      24$
+  - $      25$
+  - $      26$
+  - $      27$
+  - $      28$
+  - $      29$
+  - $      30$
+  - $      31$
+  - $      32$
+  - $      33$
+  - $      34$
+  - $      35$
+  - $      36$
+  - $      37$
+  - $      38$
+  - $      39$
+  - $      40$
+  - $      41$
+  - $      42$
+  - $      43$
+  - $      44$
+  - $      45$
+  - $      46$
+  - $      47$
+  - $      48$
+  - $      49$
+  - $      50$
+  - $      51$
+  - $      52$
+  - $      53$
+  - $      54$
+  - $      55$
+  - $      56$
+  - $      57$
+  - $      58$
+  - $      59$
+  - $      60$
+  - $      61$
+  - $      62$
+  - $      63$
+  - $      64$
+  - $      65$
+  - $      66$
+  - $      67$
+  - $      68$
+  - $      69$
+  - $      70$
+  - $      71$
+  - $      72$
+  - $      73$
+  - $      74$
+  - $      75$
+  - $      76$
+  - $      77$
+  - $      78$
+  - $      79$
+  - $      80$
+  - $      81$
+  - $      82$
+  - $      83$
+  - $      84$
+  - $      85$
+  - $      86$
+  - $      87$
+  - $      88$
+  - $      89$
+  - $      90$
+  - $      91$
+  - $      92$
+  - $      93$
+  - $      94$
+  - $      95$
+  - $      96$
+  - $      97$
+  - $      98$
+  - $      99$
+  - $     100$
+  - $     101$
+  - $     102$
+  - $     103$
+  - $     104$
+  - $     105$
+  - $     106$
+  - $     107$
+  - $     108$
+  - $     109$
+  - $     110$
+  - $     111$
+  - $     112$
+  - $     113$
+  - $     114$
+  - $     115$
+  - $     116$
+  - $     117$
+  - $     118$
+  - $     119$
+  - $     120$
+  - $     121$
+  - $     122$
+  - $     123$
+  - $     124$
+  - $     125$
+  - $     126$
+  - $     127$
+...
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 127
+...
+dump(box.index.BITS_ALL_NOT_SET, 1073741824)
+---
+- - $       1$
+  - $       2$
+  - $       3$
+  - $       4$
+  - $       5$
+  - $       6$
+  - $       7$
+  - $       8$
+  - $       9$
+  - $      10$
+  - $      11$
+  - $      12$
+  - $      13$
+  - $      14$
+  - $      15$
+  - $      16$
+  - $      17$
+  - $      18$
+  - $      19$
+  - $      20$
+  - $      21$
+  - $      22$
+  - $      23$
+  - $      24$
+  - $      25$
+  - $      26$
+  - $      27$
+  - $      28$
+  - $      29$
+  - $      30$
+  - $      31$
+  - $      32$
+  - $      33$
+  - $      34$
+  - $      35$
+  - $      36$
+  - $      37$
+  - $      38$
+  - $      39$
+  - $      40$
+  - $      41$
+  - $      42$
+  - $      43$
+  - $      44$
+  - $      45$
+  - $      46$
+  - $      47$
+  - $      48$
+  - $      49$
+  - $      50$
+  - $      51$
+  - $      52$
+  - $      53$
+  - $      54$
+  - $      55$
+  - $      56$
+  - $      57$
+  - $      58$
+  - $      59$
+  - $      60$
+  - $      61$
+  - $      62$
+  - $      63$
+  - $      64$
+  - $      65$
+  - $      66$
+  - $      67$
+  - $      68$
+  - $      69$
+  - $      70$
+  - $      71$
+  - $      72$
+  - $      73$
+  - $      74$
+  - $      75$
+  - $      76$
+  - $      77$
+  - $      78$
+  - $      79$
+  - $      80$
+  - $      81$
+  - $      82$
+  - $      83$
+  - $      84$
+  - $      85$
+  - $      86$
+  - $      87$
+  - $      88$
+  - $      89$
+  - $      90$
+  - $      91$
+  - $      92$
+  - $      93$
+  - $      94$
+  - $      95$
+  - $      96$
+  - $      97$
+  - $      98$
+  - $      99$
+  - $     100$
+  - $     101$
+  - $     102$
+  - $     103$
+  - $     104$
+  - $     105$
+  - $     106$
+  - $     107$
+  - $     108$
+  - $     109$
+  - $     110$
+  - $     111$
+  - $     112$
+  - $     113$
+  - $     114$
+  - $     115$
+  - $     116$
+  - $     117$
+  - $     118$
+  - $     119$
+  - $     120$
+  - $     121$
+  - $     122$
+  - $     123$
+  - $     124$
+  - $     125$
+  - $     126$
+  - $     127$
+  - $     128$
+...
+box.space.tweedledum.index.bitset:count(1073741824, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 128
+...
+dump(box.index.BITS_ALL_NOT_SET, 2147483648)
+---
+- - $       1$
+  - $       2$
+  - $       3$
+  - $       4$
+  - $       5$
+  - $       6$
+  - $       7$
+  - $       8$
+  - $       9$
+  - $      10$
+  - $      11$
+  - $      12$
+  - $      13$
+  - $      14$
+  - $      15$
+  - $      16$
+  - $      17$
+  - $      18$
+  - $      19$
+  - $      20$
+  - $      21$
+  - $      22$
+  - $      23$
+  - $      24$
+  - $      25$
+  - $      26$
+  - $      27$
+  - $      28$
+  - $      29$
+  - $      30$
+  - $      31$
+  - $      32$
+  - $      33$
+  - $      34$
+  - $      35$
+  - $      36$
+  - $      37$
+  - $      38$
+  - $      39$
+  - $      40$
+  - $      41$
+  - $      42$
+  - $      43$
+  - $      44$
+  - $      45$
+  - $      46$
+  - $      47$
+  - $      48$
+  - $      49$
+  - $      50$
+  - $      51$
+  - $      52$
+  - $      53$
+  - $      54$
+  - $      55$
+  - $      56$
+  - $      57$
+  - $      58$
+  - $      59$
+  - $      60$
+  - $      61$
+  - $      62$
+  - $      63$
+  - $      64$
+  - $      65$
+  - $      66$
+  - $      67$
+  - $      68$
+  - $      69$
+  - $      70$
+  - $      71$
+  - $      72$
+  - $      73$
+  - $      74$
+  - $      75$
+  - $      76$
+  - $      77$
+  - $      78$
+  - $      79$
+  - $      80$
+  - $      81$
+  - $      82$
+  - $      83$
+  - $      84$
+  - $      85$
+  - $      86$
+  - $      87$
+  - $      88$
+  - $      89$
+  - $      90$
+  - $      91$
+  - $      92$
+  - $      93$
+  - $      94$
+  - $      95$
+  - $      96$
+  - $      97$
+  - $      98$
+  - $      99$
+  - $     100$
+  - $     101$
+  - $     102$
+  - $     103$
+  - $     104$
+  - $     105$
+  - $     106$
+  - $     107$
+  - $     108$
+  - $     109$
+  - $     110$
+  - $     111$
+  - $     112$
+  - $     113$
+  - $     114$
+  - $     115$
+  - $     116$
+  - $     117$
+  - $     118$
+  - $     119$
+  - $     120$
+  - $     121$
+  - $     122$
+  - $     123$
+  - $     124$
+  - $     125$
+  - $     126$
+  - $     127$
+  - $     128$
+...
+box.space.tweedledum.index.bitset:count(2147483648, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 128
+...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_NOT_SET (multiple bit)
 ------------------------------------------------------------------------------
@@ -833,6 +1285,10 @@ dump(box.index.BITS_ALL_NOT_SET, 3)
   - $     124$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count(3, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 32
+...
 dump(box.index.BITS_ALL_NOT_SET, 7)
 ---
 - - $       8$
@@ -851,6 +1307,10 @@ dump(box.index.BITS_ALL_NOT_SET, 7)
   - $     112$
   - $     120$
   - $     128$
+...
+box.space.tweedledum.index.bitset:count(7, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 16
 ...
 dump(box.index.BITS_ALL_NOT_SET, 10)
 ---
@@ -887,6 +1347,10 @@ dump(box.index.BITS_ALL_NOT_SET, 10)
   - $     117$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count(10, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 32
+...
 dump(box.index.BITS_ALL_NOT_SET, 27)
 ---
 - - $       4$
@@ -897,6 +1361,10 @@ dump(box.index.BITS_ALL_NOT_SET, 27)
   - $      96$
   - $     100$
   - $     128$
+...
+box.space.tweedledum.index.bitset:count(27, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 8
 ...
 dump(box.index.BITS_ALL_NOT_SET, 85)
 ---
@@ -909,9 +1377,17 @@ dump(box.index.BITS_ALL_NOT_SET, 85)
   - $      42$
   - $     128$
 ...
+box.space.tweedledum.index.bitset:count(85, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 8
+...
 dump(box.index.BITS_ALL_NOT_SET, 4294967295)
 ---
 - []
+...
+box.space.tweedledum.index.bitset:count(4294967295, { iterator = box.index.BITS_ALL_NOT_SET})
+---
+- 0
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (single bit)
@@ -919,6 +1395,10 @@ dump(box.index.BITS_ALL_NOT_SET, 4294967295)
 dump(box.index.BITS_ANY_SET, 0)
 ---
 - []
+...
+box.space.tweedledum.index.bitset:count(0, { iterator = box.index.BITS_ANY_SET})
+---
+- 0
 ...
 dump(box.index.BITS_ANY_SET, 16)
 ---
@@ -987,9 +1467,17 @@ dump(box.index.BITS_ANY_SET, 16)
   - $     126$
   - $     127$
 ...
+box.space.tweedledum.index.bitset:count(16, { iterator = box.index.BITS_ANY_SET})
+---
+- 64
+...
 dump(box.index.BITS_ANY_SET, 128)
 ---
 - - $     128$
+...
+box.space.tweedledum.index.bitset:count(128, { iterator = box.index.BITS_ANY_SET})
+---
+- 1
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (multiple bit)
