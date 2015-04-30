@@ -32,14 +32,24 @@ equal_key(hash_value_t v1, hash_value_t v2)
 	return v1 == v2;
 }
 
+#define LIGHT_NAME
+#define LIGHT_DATA_TYPE uint64_t
+#define LIGHT_KEY_TYPE uint64_t
+#define LIGHT_CMP_ARG_TYPE int
+#define LIGHT_EQUAL(a, b, arg) equal(a, b)
+#define LIGHT_EQUAL_KEY(a, b, arg) equal_key(a, b)
+#include "salad/light.h"
+
 inline void *
 my_light_alloc()
 {
 	extents_count++;
-	char *draft = (char *)malloc(light_extent_size + 64 + 8);
-	void *result = draft + 8 + (63 - ((uint64_t)(draft + 8) % 64));
-	((void **)result)[-1] = draft;
-	return result;
+	char *p = (char *)malloc(light_extent_size + (1 << MATRAS_VERSION_COUNT) + sizeof(void*));
+	uintptr_t u = (uintptr_t)(p + sizeof(void *) + (1 << MATRAS_VERSION_COUNT));
+	u &= ~(((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
+	char *t = (char *)u;
+	((void **)t)[-1] = p;
+	return t;
 }
 
 inline void
@@ -48,14 +58,6 @@ my_light_free(void *p)
 	extents_count--;
 	free(((void **)p)[-1]);
 }
-
-#define LIGHT_NAME
-#define LIGHT_DATA_TYPE uint64_t
-#define LIGHT_KEY_TYPE uint64_t
-#define LIGHT_CMP_ARG_TYPE int
-#define LIGHT_EQUAL(a, b, arg) equal(a, b)
-#define LIGHT_EQUAL_KEY(a, b, arg) equal_key(a, b)
-#include "salad/light.h"
 
 
 static void

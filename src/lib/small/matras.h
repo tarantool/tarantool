@@ -75,7 +75,7 @@
  * To sum up, with a given N and M matras instance:
  *
  * 1) can provide not more than
- *    pow(M / sizeof(void*) / 2, 2) * (M / N)   blocks
+ *    pow(M / sizeof(void*), 2) * (M / N)   blocks
  *
  * 2) costs 2 random memory accesses to provide a new block
  *    or restore a block pointer from block id
@@ -139,24 +139,12 @@ extern "C" {
 typedef void *(*matras_alloc_func)();
 typedef void (*matras_free_func)(void *);
 
-typedef uint32_t matras_version_tag_t;
-
-struct matras_record {
-	/* pointer to next level of a tree */
-	union {
-		struct matras_record *ptr;
-		matras_version_tag_t ptr_padded;
-	};
-	/* version tag - bitmask of all version referencing ptr above */
-	union {
-		matras_version_tag_t tag;
-		void *tag_padded;
-	};
-};
-
 enum {
-	MATRAS_VERSION_COUNT = 8
+	MATRAS_VERSION_COUNT = 3
 };
+
+static const uintptr_t matras_ver_mask = (((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
+static const uintptr_t matras_ptr_mask = ~(((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
 
 /**
  * matras - memory allocator of blocks of equal
@@ -164,11 +152,11 @@ enum {
  */
 struct matras {
 	/* Pointer to the root extent of matras */
-	struct matras_record roots[MATRAS_VERSION_COUNT];
+	uintptr_t roots[MATRAS_VERSION_COUNT];
 	/* A number of already allocated blocks */
 	matras_id_t block_counts[MATRAS_VERSION_COUNT];
 	/* Bit mask of used versions */
-	matras_version_tag_t ver_occ_mask;
+	uintptr_t ver_occ_mask;
 	/* Block size (N) */
 	matras_id_t block_size;
 	/* Extent size (M) */
@@ -307,25 +295,8 @@ matras_touch(struct matras *m, matras_id_t id);
  * Debug check that ensures internal consistency.
  * Must return 0. If it returns not 0, smth is terribly wrong.
  */
-matras_version_tag_t
+uintptr_t
 matras_debug_selfcheck(const struct matras *m);
-
-/**
- * matras_get implementation
- */
-static inline void *
-matras_get(const struct matras *m, matras_id_t id)
-{
-	assert(id < m->block_counts[0]);
-
-	/* see "Shifts and masks explanation" for details */
-	matras_id_t n1 = id >> m->shift1;
-	matras_id_t n2 = (id & m->mask1) >> m->shift2;
-	matras_id_t n3 = (id & m->mask2);
-
-	char *extent = (char *)m->roots[0].ptr[n1].ptr[n2].ptr;
-	return &extent[n3 * m->block_size];
-}
 
 /**
  * matras_getv implementation
@@ -340,8 +311,19 @@ matras_getv(const struct matras *m, matras_id_t id, matras_id_t version)
 	matras_id_t n2 = (id & m->mask1) >> m->shift2;
 	matras_id_t n3 = (id & m->mask2);
 
-	char *extent = (char *)m->roots[version].ptr[n1].ptr[n2].ptr;
-	return &extent[n3 * m->block_size];
+	uintptr_t *p1 = (uintptr_t *)(m->roots[version] & matras_ptr_mask);
+	uintptr_t *p2 = (uintptr_t *)(p1[n1] & matras_ptr_mask);
+	char *p3 = (char *)(p2[n2] & matras_ptr_mask);
+	return &p3[n3 * m->block_size];
+}
+
+/**
+ * matras_get implementation
+ */
+static inline void *
+matras_get(const struct matras *m, matras_id_t id)
+{
+	return matras_getv(m, id, 0);
 }
 
 #if defined(__cplusplus)

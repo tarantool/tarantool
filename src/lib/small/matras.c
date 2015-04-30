@@ -47,7 +47,9 @@ matras_create(struct matras *m, matras_id_t extent_size, matras_id_t block_size,
 	/*block must be not greater than the extent*/
 	assert(block_size <= extent_size);
 	/*extent must be able to store at least two records*/
-	assert(extent_size > sizeof(struct matras_record));
+	assert(extent_size > sizeof(void *));
+	/*stupid check*/
+	assert(sizeof(void *) == sizeof(uintptr_t));
 
 	m->block_counts[0] = 0;
 	m->extent_size = extent_size;
@@ -57,9 +59,7 @@ matras_create(struct matras *m, matras_id_t extent_size, matras_id_t block_size,
 
 	matras_id_t log1 = matras_log2(extent_size);
 	matras_id_t log2 = matras_log2(block_size);
-	assert((sizeof(struct matras_record) &
-	       (sizeof(struct matras_record) - 1)) == 0);
-	matras_id_t log3 = matras_log2(sizeof(struct matras_record));
+	matras_id_t log3 = matras_log2(sizeof(void *));
 	m->log2_capacity = log1 * 3 - log2 - log3 * 2;
 	m->shift1 = log1 * 2 - log2 - log3;
 	m->shift2 = log1 - log2;
@@ -69,6 +69,18 @@ matras_create(struct matras *m, matras_id_t extent_size, matras_id_t block_size,
 
 	m->alloc_func = alloc_func;
 	m->free_func = free_func;
+}
+
+static inline uintptr_t *
+matras_ptr(uintptr_t ptrver)
+{
+	return (uintptr_t *)(ptrver & matras_ptr_mask);
+}
+
+static inline uintptr_t
+matras_ver(uintptr_t ptrver)
+{
+	return ptrver & matras_ver_mask;
 }
 
 /**
@@ -82,7 +94,7 @@ matras_destroy(struct matras *m)
 		matras_destroy_read_view(m, ver);
 	}
 	if (m->block_counts[0]) {
-		struct matras_record *extent1 = m->roots[0].ptr;
+		uintptr_t *extent1 = matras_ptr(m->roots[0]);
 		matras_id_t id = m->block_counts[0];
 		matras_id_t i, j;
 
@@ -96,20 +108,20 @@ matras_destroy(struct matras *m)
 			if (id)
 				n2++;
 
-			struct matras_record *extent2 = extent1[n1].ptr;
+			uintptr_t *extent2 = matras_ptr(extent1[n1]);
 			for (j = 0; j < n2; j++) {
-				struct matras_record *extent3 = extent2[j].ptr;
+				uintptr_t *extent3 = matras_ptr(extent2[j]);
 				m->free_func(extent3);
 			}
 			m->free_func(extent2);
 		}
 
 		/* free fully loaded extents */
-		matras_id_t n2 = m->extent_size / sizeof(struct matras_record);
+		matras_id_t n2 = m->extent_size / sizeof(void *);
 		for ( i = 0; i < n1; i++) {
-			struct matras_record *extent2 = extent1[i].ptr;
+			uintptr_t *extent2 = matras_ptr(extent1[i]);
 			for (j = 0; j < n2; j++) {
-				struct matras_record *extent3 = extent2[j].ptr;
+				uintptr_t *extent3 = matras_ptr(extent2[j]);
 				m->free_func(extent3);
 			}
 			m->free_func(extent2);
@@ -118,9 +130,6 @@ matras_destroy(struct matras *m)
 		m->free_func(extent1);
 		m->block_counts[0] = 0;
 	}
-#ifndef __OPTIMIZE__
-	m->roots[0].ptr = (struct matras_record *)(void *)(long long)0xDEADBEEF;
-#endif
 }
 
 /**
@@ -133,6 +142,7 @@ matras_reset(struct matras *m)
 {
 	matras_destroy(m);
 	m->block_counts[0] = 0;
+	m->ver_occ_mask = 1;
 }
 
 
@@ -169,35 +179,37 @@ matras_alloc(struct matras *m, matras_id_t *result_id)
 	matras_id_t extent3_not_empty = id;
 	matras_id_t n3 = id;
 
-	struct matras_record *extent1, *extent2, *extent3;
+	uintptr_t *extent1, *extent2, *extent3;
+	uintptr_t new_tag = (~(m->ver_occ_mask ^ 1)) & matras_ver_mask;
 
 	if (extent1_not_empty) {
-		extent1 = m->roots[0].ptr;
+		extent1 = matras_ptr(m->roots[0]);
 	} else {
-		extent1 = (struct matras_record *)m->alloc_func();
+		extent1 = (uintptr_t *)m->alloc_func();
+		assert(((uintptr_t)extent1 & matras_ver_mask) == 0);
 		if (!extent1)
 			return 0;
-		m->roots[0].ptr = extent1;
-		m->roots[0].tag = ~(m->ver_occ_mask ^ 1);
+		m->roots[0] = (uintptr_t)extent1 | new_tag;
 	}
 
 	if (extent2_not_empty) {
-		extent2 = extent1[n1].ptr;
+		extent2 = matras_ptr(extent1[n1]);
 	} else {
-		extent2 = (struct matras_record *)m->alloc_func();
+		extent2 = (uintptr_t *)m->alloc_func();
+		assert(((uintptr_t)extent2 & matras_ver_mask) == 0);
 		if (!extent2) {
 			if (!extent1_not_empty) /* means - was empty */
 				m->free_func(extent1);
 			return 0;
 		}
-		extent1[n1].ptr = extent2;
-		extent1[n1].tag = ~(m->ver_occ_mask ^ 1);
+		extent1[n1] = (uintptr_t)extent2 | new_tag;
 	}
 
 	if (extent3_not_empty) {
-		extent3 = extent2[n2].ptr;
+		extent3 = matras_ptr(extent2[n2]);
 	} else {
-		extent3 = (struct matras_record *)m->alloc_func();
+		extent3 = (uintptr_t *)m->alloc_func();
+		assert(((uintptr_t)extent3 & matras_ver_mask) == 0);
 		if (!extent3) {
 			if (!extent1_not_empty) /* means - was empty */
 				m->free_func(extent1);
@@ -205,8 +217,7 @@ matras_alloc(struct matras *m, matras_id_t *result_id)
 				m->free_func(extent2);
 			return 0;
 		}
-		extent2[n2].ptr = extent3;
-		extent2[n2].tag = ~(m->ver_occ_mask ^ 1);
+		extent2[n2] = (uintptr_t)extent3 | new_tag;
 	}
 
 	*result_id = m->block_counts[0]++;
@@ -238,10 +249,10 @@ matras_dealloc(struct matras *m)
 	matras_id_t extent3_free = !id;
 
 	if (extent1_free || extent2_free || extent3_free) {
-		struct matras_record *extent1, *extent2, *extent3;
-		extent1 = m->roots[0].ptr;
-		extent2 = extent1[n1].ptr;
-		extent3 = extent2[n2].ptr;
+		uintptr_t *extent1, *extent2, *extent3;
+		extent1 = matras_ptr(m->roots[0]);
+		extent2 = matras_ptr(extent1[n1]);
+		extent3 = matras_ptr(extent2[n2]);
 		if (extent3_free)
 			m->free_func(extent3);
 		if (extent2_free)
@@ -304,8 +315,8 @@ matras_extent_count(const struct matras *m)
 	 * so we can calculate number of extents by lower level extent count:*/
 	matras_id_t i;
 	for (i = 0; i < 2; i++) {
-		c = (c + (m->extent_size / sizeof(struct matras_record) - 1))
-			/ (m->extent_size / sizeof(struct matras_record));
+		c = (c + (m->extent_size / sizeof(void *) - 1))
+			/ (m->extent_size / sizeof(void *));
 		res += c;
 	}
 
@@ -332,7 +343,7 @@ matras_create_read_view(struct matras *m)
 	assert(ver_id > 0);
 	if (ver_id >= MATRAS_VERSION_COUNT)
 		return 0;
-	m->ver_occ_mask |= ((matras_version_tag_t)1) << ver_id;
+	m->ver_occ_mask |= ((uintptr_t)1) << ver_id;
 	m->roots[ver_id] = m->roots[0];
 	m->block_counts[ver_id] = m->block_counts[0];
 	return ver_id;
@@ -344,88 +355,78 @@ matras_create_read_view(struct matras *m)
 void
 matras_destroy_read_view(struct matras *m, matras_id_t ver_id)
 {
-	matras_version_tag_t me = ((matras_version_tag_t)1) << ver_id;
+	assert(ver_id);
+	uintptr_t me = ((uintptr_t)1) << ver_id;
+	assert(m->ver_occ_mask & me);
 	if (m->block_counts[ver_id]) {
 		matras_id_t step = m->mask2 + 1, j;
 		for (j = 0; j < m->block_counts[ver_id]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
 			matras_id_t n2 = (j & m->mask1) >> m->shift2;
-			matras_version_tag_t owners =
-				m->roots[ver_id].ptr[n1].ptr[n2].tag &
-				m->ver_occ_mask;
+			uintptr_t *extent1, *extent2;
+			uintptr_t owners;
+			extent1 = matras_ptr(m->roots[ver_id]);
+			extent2 = matras_ptr(extent1[n1]);
+			owners = matras_ver(extent2[n2]) & m->ver_occ_mask;
 			assert(owners & me);
 			if (owners == me) {
-				m->free_func(m->roots[ver_id].ptr[n1].ptr[n2].ptr);
-				m->roots[ver_id].ptr[n1].ptr[n2].tag ^= me;
-#ifndef __OPTIMIZE__
-				m->roots[ver_id].ptr[n1].ptr[n2].ptr =
-					(struct matras_record *)(void *)
-					(long long)0xDEADBEEF;
-#endif
+				m->free_func(matras_ptr(extent2[n2]));
 			} else {
-				matras_version_tag_t run = owners;
+				uintptr_t run = owners;
 				do {
 					uint32_t oth_ver = __builtin_ctzl(run);
-					run ^= ((matras_version_tag_t)1) << oth_ver;
-					assert((m->roots[oth_ver].ptr[n1].ptr[n2].tag &
-						m->ver_occ_mask & ~me) ==
-					       (owners & ~me));
-					assert(m->roots[oth_ver].ptr[n1].ptr[n2].ptr ==
-					       m->roots[ver_id].ptr[n1].ptr[n2].ptr);
-					m->roots[oth_ver].ptr[n1].ptr[n2].tag &= ~me;
+					run ^= ((uintptr_t)1) << oth_ver;
+					uintptr_t *ver_extent1, *ver_extent2;
+					ver_extent1 = matras_ptr(m->roots[oth_ver]);
+					ver_extent2 = matras_ptr(ver_extent1[n1]);
+					assert((matras_ver(ver_extent2[n2]) &
+						m->ver_occ_mask & ~me) == (owners & ~me));
+					assert(matras_ptr(ver_extent2[n2]) ==
+						matras_ptr(extent2[n2]));
+					ver_extent2[n2] &= ~me;
 				} while (run);
 			}
 		}
 		step = m->mask1 + 1;
 		for (j = 0; j < m->block_counts[ver_id]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
-			matras_version_tag_t owners =
-				m->roots[ver_id].ptr[n1].tag & m->ver_occ_mask;
+			uintptr_t *extent1;
+			extent1 = matras_ptr(m->roots[ver_id]);
+			uintptr_t owners;
+			owners = matras_ver(extent1[n1]) & m->ver_occ_mask;
 			assert(owners & me);
 			if (owners == me) {
-				m->free_func(m->roots[ver_id].ptr[n1].ptr);
-				m->roots[ver_id].ptr[n1].tag ^= me;
-#ifndef __OPTIMIZE__
-				m->roots[ver_id].ptr[n1].ptr =
-					(struct matras_record *)(void *)
-					(long long)0xDEADBEEF;
-#endif
+				m->free_func(matras_ptr(extent1[n1]));
 			} else {
-				matras_version_tag_t run = owners;
+				uintptr_t run = owners;
 				do {
 					uint32_t oth_ver = __builtin_ctzl(run);
-					run ^= ((matras_version_tag_t)1) << oth_ver;
-					assert((m->roots[oth_ver].ptr[n1].tag &
-						m->ver_occ_mask & ~me) ==
-					       (owners & ~me));
-					assert(m->roots[oth_ver].ptr[n1].ptr ==
-					       m->roots[ver_id].ptr[n1].ptr);
-					m->roots[oth_ver].ptr[n1].tag &= ~me;
+					run ^= ((uintptr_t)1) << oth_ver;
+					uintptr_t *ver_extent1;
+					ver_extent1 = matras_ptr(m->roots[oth_ver]);
+					assert((matras_ver(ver_extent1[n1]) &
+						m->ver_occ_mask & ~me) == (owners & ~me));
+					assert(matras_ptr(ver_extent1[n1]) ==
+						matras_ptr(extent1[n1]));
+					ver_extent1[n1] &= ~me;
 				} while (run);
 			}
 		}
-		matras_version_tag_t owners
-			= m->roots[ver_id].tag & m->ver_occ_mask;
+		uintptr_t owners;
+		owners = matras_ver(m->roots[ver_id]) & m->ver_occ_mask;
 		assert(owners & me);
 		if (owners == me) {
-			m->free_func(m->roots[ver_id].ptr);
-			m->roots[ver_id].tag ^= me;
-#ifndef __OPTIMIZE__
-			m->roots[ver_id].ptr =
-				(struct matras_record *)(void *)
-				(long long)0xDEADBEEF;
-#endif
+			m->free_func(matras_ptr(m->roots[ver_id]));
 		} else {
-			matras_version_tag_t run = owners;
+			uintptr_t run = owners;
 			do {
 				uint32_t oth_ver = __builtin_ctzl(run);
-				run ^= ((matras_version_tag_t)1) << oth_ver;
-				assert((m->roots[oth_ver].tag &
-					m->ver_occ_mask & ~me) ==
-				       (owners & ~me));
-				assert(m->roots[oth_ver].ptr ==
-				       m->roots[ver_id].ptr);
-				m->roots[oth_ver].tag &= ~me;
+				run ^= ((uintptr_t)1) << oth_ver;
+				assert((matras_ver(m->roots[oth_ver]) &
+					m->ver_occ_mask & ~me) == (owners & ~me));
+				assert(matras_ptr(m->roots[oth_ver]) ==
+					matras_ptr(m->roots[ver_id]));
+				m->roots[oth_ver] &= ~me;
 			} while (run);
 		}
 		m->block_counts[ver_id] = 0;
@@ -435,32 +436,42 @@ matras_destroy_read_view(struct matras *m, matras_id_t ver_id)
 		for (j = 0; j < m->block_counts[0]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
 			matras_id_t n2 = (j & m->mask1) >> m->shift2;
-			matras_version_tag_t run =
-				m->roots[0].ptr[n1].ptr[n2].tag &
+			uintptr_t *extent1, *extent2;
+			extent1 = matras_ptr(m->roots[0]);
+			extent2 = matras_ptr(extent1[n1]);
+			uintptr_t run =
+				matras_ver(extent2[n2]) &
 				m->ver_occ_mask;
 			do {
 				uint32_t oth_ver = __builtin_ctzl(run);
-				run ^= ((matras_version_tag_t)1) << oth_ver;
-				m->roots[oth_ver].ptr[n1].ptr[n2].tag |= me;
+				run ^= ((uintptr_t)1) << oth_ver;
+				uintptr_t *ver_extent1, *ver_extent2;
+				ver_extent1 = matras_ptr(m->roots[oth_ver]);
+				ver_extent2 = matras_ptr(ver_extent1[n1]);
+				ver_extent2[n2] |= me;
 			} while (run);
 		}
 		step = m->mask1 + 1;
 		for (j = 0; j < m->block_counts[0]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
-			matras_version_tag_t run =
-				m->roots[0].ptr[n1].tag & m->ver_occ_mask;
+			uintptr_t *extent1;
+			extent1 = matras_ptr(m->roots[0]);
+			uintptr_t run =
+				matras_ver(extent1[n1]) & m->ver_occ_mask;
 			do {
 				uint32_t oth_ver = __builtin_ctzl(run);
-				run ^= ((matras_version_tag_t)1) << oth_ver;
-				m->roots[oth_ver].ptr[n1].tag |= me;
+				run ^= ((uintptr_t)1) << oth_ver;
+				uintptr_t *ver_extent1;
+				ver_extent1 = matras_ptr(m->roots[oth_ver]);
+				ver_extent1[n1] |= me;
 			} while (run);
 		}
-		matras_version_tag_t run =
-			m->roots[0].tag & m->ver_occ_mask;
+		uintptr_t run =
+			m->roots[0] & m->ver_occ_mask;
 		do {
 			uint32_t oth_ver = __builtin_ctzl(run);
-			run ^= ((matras_version_tag_t)1) << oth_ver;
-			m->roots[oth_ver].tag |= me;
+			run ^= ((uintptr_t)1) << oth_ver;
+			m->roots[oth_ver] |= me;
 		} while (run);
 	}
 	m->ver_occ_mask ^= me;
@@ -480,33 +491,36 @@ matras_touch(struct matras *m, matras_id_t id)
 	matras_id_t n2 = (id & m->mask1) >> m->shift2;
 	matras_id_t n3 = id & m->mask2;
 
-	struct matras_record *l1 = &m->roots[0];
-	struct matras_record *l2 = &l1->ptr[n1];
-	struct matras_record *l3 = &l2->ptr[n2];
-	matras_version_tag_t owner_mask3 = l3->tag & m->ver_occ_mask;
+	uintptr_t *l1 = &m->roots[0];
+	uintptr_t *l2 = &matras_ptr(*l1)[n1];
+	uintptr_t *l3 = &matras_ptr(*l2)[n2];
+	uintptr_t owner_mask3 = matras_ver(*l3) & m->ver_occ_mask;
 	assert(owner_mask3 & 1);
 	if (owner_mask3 == 1)
-		return &((char *)(l3->ptr))[n3 * m->block_size]; /* private page */
+		return &((char *)matras_ptr(*l3))[n3 * m->block_size]; /* private page */
 
-	struct matras_record *new_extent3 =
-		(struct matras_record *)m->alloc_func();
+	uintptr_t *new_extent3 =
+		(uintptr_t *)m->alloc_func();
+	assert(((uintptr_t)new_extent3 & matras_ver_mask) == 0);
 	if (!new_extent3)
 		return 0;
 
-	matras_version_tag_t owner_mask1 = l1->tag & m->ver_occ_mask;
+	uintptr_t owner_mask1 = matras_ver(*l1) & m->ver_occ_mask;
 	assert(owner_mask1 & 1);
-	matras_version_tag_t owner_mask2 = l2->tag & m->ver_occ_mask;
+	uintptr_t owner_mask2 = matras_ver(*l2) & m->ver_occ_mask;
 	assert(owner_mask2 & 1);
-	struct matras_record *new_extent1 = 0, *new_extent2 = 0;
+	uintptr_t *new_extent1 = 0, *new_extent2 = 0;
 	if (owner_mask1 != 1) {
-		new_extent1 = (struct matras_record *)m->alloc_func();
+		new_extent1 = (uintptr_t *)m->alloc_func();
+		assert(((uintptr_t)new_extent1 & matras_ver_mask) == 0);
 		if (!new_extent1) {
 			m->free_func(new_extent3);
 			return 0;
 		}
 	}
 	if (owner_mask2 != 1) {
-		new_extent2 = (struct matras_record *)m->alloc_func();
+		new_extent2 = (uintptr_t *)m->alloc_func();
+		assert(((uintptr_t)new_extent2 & matras_ver_mask) == 0);
 		if (!new_extent2) {
 			m->free_func(new_extent3);
 			if (owner_mask1 != 1)
@@ -514,108 +528,105 @@ matras_touch(struct matras *m, matras_id_t id)
 			return 0;
 		}
 	}
-	matras_version_tag_t new_tag = ~(m->ver_occ_mask ^ 1);
+	uintptr_t new_tag = (~(m->ver_occ_mask ^ 1)) & matras_ver_mask;
 
 	if (owner_mask1 != 1) {
-		memcpy(new_extent1, l1->ptr, m->extent_size);
-		l1->tag = new_tag;
-		l1->ptr = new_extent1;
-		matras_version_tag_t run = owner_mask1 ^ 1;
-		matras_version_tag_t oth_tag = run & m->ver_occ_mask;
+		memcpy(new_extent1, matras_ptr(*l1), m->extent_size);
+		*l1 = (uintptr_t)new_extent1 | new_tag;
+		uintptr_t run = owner_mask1 ^ 1;
+		uintptr_t oth_tag = run & m->ver_occ_mask;
 		do {
 			uint32_t ver = __builtin_ctzl(run);
-			run ^= ((matras_version_tag_t)1) << ver;
-			m->roots[ver].tag = oth_tag;
+			run ^= ((uintptr_t)1) << ver;
+			m->roots[ver] = (m->roots[ver] & matras_ptr_mask) | oth_tag;
 		} while (run);
-		l2 = &l1->ptr[n1];
+		l2 = &matras_ptr(*l1)[n1];
 	}
 
 	if (owner_mask2 != 1) {
-		memcpy(new_extent2, l2->ptr, m->extent_size);
-		l2->tag = new_tag;
-		l2->ptr = new_extent2;
-		matras_version_tag_t run = owner_mask2 ^ 1;
-		matras_version_tag_t oth_tag = run & m->ver_occ_mask;
+		memcpy(new_extent2, matras_ptr(*l2), m->extent_size);
+		*l2 = (uintptr_t)new_extent2 | new_tag;
+		uintptr_t run = owner_mask2 ^ 1;
+		uintptr_t oth_tag = run & m->ver_occ_mask;
 		do {
 			uint32_t ver = __builtin_ctzl(run);
-			run ^= ((matras_version_tag_t)1) << ver;
-			m->roots[ver].ptr[n1].tag = oth_tag;
+			run ^= ((uintptr_t)1) << ver;
+			uintptr_t *ptr = &matras_ptr(m->roots[ver])[n1];
+			*ptr = (*ptr & matras_ptr_mask) | oth_tag;
 		} while (run);
-		l3 = &l2->ptr[n2];
+		l3 = &matras_ptr(*l2)[n2];
 	}
 
-	memcpy(new_extent3, l3->ptr, m->extent_size);
-	l3->tag = new_tag;
-	l3->ptr = new_extent3;
-	matras_version_tag_t run = owner_mask3 ^ 1;
-	matras_version_tag_t oth_tag = run & m->ver_occ_mask;
+	memcpy(new_extent3, matras_ptr(*l3), m->extent_size);
+	*l3 = (uintptr_t)new_extent3 | new_tag;
+	uintptr_t run = owner_mask3 ^ 1;
+	uintptr_t oth_tag = run & m->ver_occ_mask;
 	do {
 		uint32_t ver = __builtin_ctzl(run);
-		run ^= ((matras_version_tag_t)1) << ver;
-		m->roots[ver].ptr[n1].ptr[n2].tag = oth_tag;
+		run ^= ((uintptr_t)1) << ver;
+		uintptr_t *ptr = &matras_ptr(matras_ptr(m->roots[ver])[n1])[n2];
+		*ptr = (*ptr & matras_ptr_mask) | oth_tag;
 	} while (run);
 
-	return &((char *)new_extent3)[n3 * m->block_size]; ;
+	return &((char *)new_extent3)[n3 * m->block_size];
 }
 
 /*
  * Debug check that ensures internal consistency.
  * Must return 0. If it returns not 0, smth is terribly wrong.
  */
-matras_version_tag_t
+uintptr_t
 matras_debug_selfcheck(const struct matras *m)
 {
-	matras_version_tag_t res = 0, i;
+	uintptr_t res = 0, i;
 	for (i = 0; i < MATRAS_VERSION_COUNT; i++) {
-		matras_version_tag_t me = ((matras_version_tag_t) 1) << i;
+		uintptr_t me = ((uintptr_t) 1) << i;
 		if (!(m->ver_occ_mask & me))
 			continue;
 		matras_id_t step = m->mask2 + 1, j;
 		for (j = 0; j < m->block_counts[i]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
 			matras_id_t n2 = (j & m->mask1) >> m->shift2;
-			if (!(m->roots[i].tag & me))
+			if (!(matras_ver(m->roots[i]) & me))
 				res |= (1 | (me << 12));
-			if ((m->roots[i].tag & m->ver_occ_mask) != me) {
-				matras_version_tag_t run = m->roots[i].tag
+			if ((matras_ver(m->roots[i]) & m->ver_occ_mask) != me) {
+				uintptr_t run = matras_ver(m->roots[i])
 					& m->ver_occ_mask;
 				do {
 					uint32_t oth_ver = __builtin_ctzl(run);
-					run ^= ((matras_version_tag_t) 1)
-						<< oth_ver;
-					if (m->roots[i].tag
-						!= m->roots[oth_ver].tag)
+					run ^= ((uintptr_t) 1) << oth_ver;
+					if (matras_ver(m->roots[oth_ver])
+						!= matras_ver(m->roots[i]))
 						res |= (8 | (me << 12));
 				} while (run);
 			}
-			if (!(m->roots[i].ptr[n1].tag & me))
+			if (!(matras_ver(matras_ptr(m->roots[i])[n1]) & me))
 				res |= (2 | (me << 12));
-			if ((m->roots[i].ptr[n1].tag & m->ver_occ_mask) != me) {
-				matras_version_tag_t run =
-					m->roots[i].ptr[n1].tag
+			if ((matras_ver(matras_ptr(m->roots[i])[n1]) & m->ver_occ_mask) != me) {
+				uintptr_t run =
+					matras_ver(matras_ptr(m->roots[i])[n1])
 						& m->ver_occ_mask;
 				do {
 					uint32_t oth_ver = __builtin_ctzl(run);
-					run ^= ((matras_version_tag_t) 1)
-						<< oth_ver;
-					if (m->roots[i].ptr[n1].tag
-						!= m->roots[oth_ver].ptr[n1].tag)
+					run ^= ((uintptr_t) 1) << oth_ver;
+					if (matras_ver(matras_ptr(m->roots[oth_ver])[n1])
+						!= matras_ver(matras_ptr(m->roots[i])[n1]))
 						res |= (0x80 | (me << 12));
 				} while (run);
 			}
-			if (!(m->roots[i].ptr[n1].ptr[n2].tag & me))
+			if (!(matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2])& me))
 				res |= (4 | (me << 12));
-			if ((m->roots[i].ptr[n1].ptr[n2].tag & m->ver_occ_mask)
+			if ((matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2]) & m->ver_occ_mask)
 				!= me) {
-				matras_version_tag_t run =
-					m->roots[i].ptr[n1].ptr[n2].tag
+				uintptr_t run =
+					matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2])
 						& m->ver_occ_mask;
 				do {
 					uint32_t oth_ver = __builtin_ctzl(run);
-					run ^= ((matras_version_tag_t) 1)
-						<< oth_ver;
-					if (m->roots[i].ptr[n1].ptr[n2].tag
-						!= m->roots[oth_ver].ptr[n1].ptr[n2].tag)
+					run ^= ((uintptr_t) 1) << oth_ver;
+
+					if (matras_ver(matras_ptr(matras_ptr(m->roots[oth_ver])[n1])[n2])
+						!= matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2]))
 						res |= (0x800 | (me << 12));
 				} while (run);
 			}
@@ -623,39 +634,39 @@ matras_debug_selfcheck(const struct matras *m)
 	}
 	{
 		i = 0;
-		matras_version_tag_t me = ((matras_version_tag_t) 1) << i;
+		uintptr_t me = ((uintptr_t) 1) << i;
 		matras_id_t step = m->mask2 + 1, j;
 		for (j = 0; j < m->block_counts[i]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
 			matras_id_t n2 = (j & m->mask1) >> m->shift2;
-			if ((m->roots[i].tag & ~m->ver_occ_mask)
-				!= ~m->ver_occ_mask)
+			if ((matras_ver(m->roots[i]) & ~m->ver_occ_mask)
+				!= (matras_ver_mask & ~m->ver_occ_mask))
 				res |= (0x10 | (me << 12));
-			if ((m->roots[i].ptr[n1].tag & ~m->ver_occ_mask)
-				!= ~m->ver_occ_mask)
+			if ((matras_ver(matras_ptr(m->roots[i])[n1]) & ~m->ver_occ_mask)
+				!= (matras_ver_mask & ~m->ver_occ_mask))
 				res |= (0x20 | (me << 12));
-			if ((m->roots[i].ptr[n1].ptr[n2].tag & ~m->ver_occ_mask)
-				!= ~m->ver_occ_mask)
+			if ((matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2]) & ~m->ver_occ_mask)
+				!= (matras_ver_mask & ~m->ver_occ_mask))
 				res |= (0x40 | (me << 12));
 		}
 	}
 	for (i = 1; i < MATRAS_VERSION_COUNT; i++) {
-		matras_version_tag_t me = ((matras_version_tag_t) 1) << i;
+		uintptr_t me = ((uintptr_t) 1) << i;
 		if (!(m->ver_occ_mask & me))
 			continue;
 		matras_id_t step = m->mask2 + 1, j;
 		for (j = 0; j < m->block_counts[i]; j += step) {
 			matras_id_t n1 = j >> m->shift1;
 			matras_id_t n2 = (j & m->mask1) >> m->shift2;
-			if (!(m->roots[i].tag & 1))
-				if ((m->roots[i].tag & ~m->ver_occ_mask) != 0)
+			if (!(matras_ver(m->roots[i]) & 1))
+				if ((matras_ver(m->roots[i]) & ~m->ver_occ_mask) != 0)
 					res |= (0x100 | (me << 12));
-			if (!(m->roots[i].ptr[n1].tag & 1))
-				if ((m->roots[i].ptr[n1].tag & ~m->ver_occ_mask)
+			if (!(matras_ver(matras_ptr(m->roots[i])[n1]) & 1))
+				if ((matras_ver(matras_ptr(m->roots[i])[n1]) & ~m->ver_occ_mask)
 					!= 0)
 					res |= (0x200 | (me << 12));
-			if (!(m->roots[i].ptr[n1].ptr[n2].tag & 1))
-				if ((m->roots[i].ptr[n1].ptr[n2].tag
+			if (!(matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2]) & 1))
+				if ((matras_ver(matras_ptr(matras_ptr(m->roots[i])[n1])[n2])
 					& ~m->ver_occ_mask) != 0)
 					res |= (0x400 | (me << 12));
 		}
