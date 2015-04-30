@@ -374,7 +374,6 @@ schema_find_grants(const char *type, uint32_t id)
 	struct iterator *it = index->position();
 	char key[10 + BOX_NAME_MAX];
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
-			make_scoped_guard([=] { iterator_close(it); });
 	index->initIterator(it, ITER_EQ, key, 2);
 	IteratorGuard it_guard(it);
 	return it->next(it);

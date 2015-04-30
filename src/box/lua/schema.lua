@@ -588,8 +588,7 @@ local function space_object_check(space)
 end
 
 local function check_iterator_type(opts, key_is_nil)
-    -- Use ALL for {} and nil keys and EQ for other keys
-    local itype = key_is_nil and box.index.ALL or box.index.EQ
+    local itype
     if opts and opts.iterator then
         if type(opts.iterator) == "number" then
             itype = opts.iterator
@@ -601,6 +600,9 @@ local function check_iterator_type(opts, key_is_nil)
         else
             box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
         end
+    else
+        -- Use ALL for {} and nil keys and EQ for other keys
+        itype = key_is_nil and box.index.ALL or box.index.EQ
     end
     return itype
 end

@@ -106,6 +106,12 @@ boxffi_index_min(uint32_t space_id, uint32_t index_id, const char *key)
 {
 	try {
 		Index *index = check_index(space_id, index_id);
+		if (index->key_def->type != TREE) {
+			/* Show nice error messages in Lua */
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  index_type_strs[index->key_def->type],
+				  "min()");
+		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_GE, key, part_count);
 		struct tuple *tuple = index->min(key, part_count);
@@ -123,6 +129,12 @@ boxffi_index_max(uint32_t space_id, uint32_t index_id, const char *key)
 {
 	try {
 		Index *index = check_index(space_id, index_id);
+		if (index->key_def->type != TREE) {
+			/* Show nice error messages in Lua */
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  index_type_strs[index->key_def->type],
+				  "max()");
+		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_LE, key, part_count);
 		struct tuple *tuple = index->max(key, part_count);
