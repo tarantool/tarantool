@@ -800,6 +800,8 @@ AddIndex::alter(struct alter_space *alter)
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
+	IteratorGuard it_guard(it);
+
 	/*
 	 * The index has to be built tuple by tuple, since
 	 * there is no guarantee that all tuples satisfy
@@ -1092,6 +1094,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	mp_encode_uint(key, uid);
 
 	index->initIterator(it, ITER_EQ, key, 1);
+	IteratorGuard it_guard(it);
 	if (it->next(it))
 		return true;
 	return false;

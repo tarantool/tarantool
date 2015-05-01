@@ -40,20 +40,25 @@ void test_resize(void)
 }
 
 static
-void test_get_size(void)
+void test_size_and_count(void)
 {
 	header();
 
 	struct bitset_index index;
 	fail_unless(bitset_index_create(&index, realloc) == 0);
 
-	const size_t SET_SIZE = 1 << 10;
-	size_t key = 656906;
-	for(size_t i = 0; i < SET_SIZE; i++) {
-		bitset_index_insert(&index, &key, sizeof(key), i);
+	enum { P = 10, SIZE = (1 << P) + 1 };
+	for(size_t i = 0; i < SIZE; i++) {
+		bitset_index_insert(&index, &i, sizeof(i), i);
 	}
 
-	fail_unless(bitset_index_size(&index) == SET_SIZE);
+	fail_unless(bitset_index_size(&index) == SIZE);
+	fail_unless(bitset_index_count(&index, 0) == SIZE / 2);
+	fail_unless(bitset_index_count(&index, 1) == SIZE / 2);
+	fail_unless(bitset_index_count(&index, 4) == SIZE / 2);
+	fail_unless(bitset_index_count(&index, P) == 1);
+	fail_unless(bitset_index_count(&index, P + 1) == 0);
+	fail_unless(bitset_index_count(&index, 2147483648) == 0);
 
 	bitset_index_destroy(&index);
 
@@ -110,10 +115,14 @@ void test_insert_remove(void)
 	size_t *keys = malloc(NUMS_SIZE * sizeof(size_t));
 	size_t *values = malloc(NUMS_SIZE * sizeof(size_t));
 
+	size_t count0 = 0;
+	size_t count1 = 0;
 	printf("Generating test set... ");
 	for(size_t i = 0; i < NUMS_SIZE; i++) {
 		keys[i] = rand();
 		values[i] = rand();
+		count0 += (keys[i] & 1) != 0 ? 1 : 0;
+		count1 += (keys[i] & 2) != 0 ? 1 : 0;
 	}
 	printf("ok\n");
 
@@ -126,6 +135,9 @@ void test_insert_remove(void)
 	printf("ok\n");
 
 	check_keys(&index, keys, values, NUMS_SIZE);
+
+	fail_unless(bitset_index_count(&index, 0) == count0);
+	fail_unless(bitset_index_count(&index, 1) == count1);
 
 	printf("Removing random pairs... ");
 	for(size_t i = 0; i < NUMS_SIZE; i++) {
@@ -275,7 +287,7 @@ int main(void)
 {
 	setbuf(stdout, NULL);
 
-	test_get_size();
+	test_size_and_count();
 	test_resize();
 	test_insert_remove();
 	test_empty_simple();

@@ -281,8 +281,7 @@ user_reload_privs(struct user *user)
 
 		struct iterator *it = index->position();
 		index->initIterator(it, ITER_EQ, key, 1);
-		auto iterator_guard =
-			make_scoped_guard([=] { iterator_close(it); });
+		IteratorGuard it_guard(it);
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {

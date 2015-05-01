@@ -297,6 +297,20 @@ bitset_index_size(const struct bitset_index *index)
 	return bitset_cardinality(index->bitsets[0]);
 }
 
+/**
+ * @brief Returns the number of (key, value ) pairs where @a bit is set in key
+ * @param index bitset index
+ * @param bit bit
+ * @retval the number of (key, value ) pairs where (@a bit & key) != 0
+ */
+inline size_t
+bitset_index_count(const struct bitset_index *index, size_t bit)
+{
+	if (bit + 1 >= index->capacity)
+		return 0;
+	return bitset_cardinality(index->bitsets[bit + 1]);
+}
+
 #if defined(DEBUG)
 void
 bitset_index_dump(struct bitset_index *index, int verbose, FILE *stream);

@@ -262,3 +262,60 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 	}
 }
 
+size_t
+MemtxBitset::count(enum iterator_type type, const char *key,
+		   uint32_t part_count) const
+{
+	if (type == ITER_ALL)
+		return bitset_index_size(&index);
+
+	assert(part_count == 1); /* checked by key_validate() */
+	uint32_t bitset_key_size = 0;
+	const void *bitset_key = make_key(key, &bitset_key_size);
+	struct bit_iterator bit_it;
+	size_t bit;
+	if (type == ITER_BITS_ANY_SET) {
+		/*
+		 * Optimization: get the number of items for each requested bit
+		 * and then found the maximum.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		size_t result = 0;
+		while ((bit = bit_iterator_next(&bit_it)) != SIZE_MAX)
+			result = MAX(result, bitset_index_count(&index, bit));
+		return result;
+	} else if (type == ITER_BITS_ALL_SET) {
+		/**
+		 * Optimization: for an empty key return the number of items
+		 * in the index.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return bitset_index_size(&index);
+		/**
+		 * Optimiation: for a single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return bitset_index_count(&index, bit);
+	} else if (type == ITER_BITS_ALL_NOT_SET) {
+		/**
+		 * Optimization: for an empty key return the number of items
+		 * in the index.
+		 */
+		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
+		bit = bit_iterator_next(&bit_it);
+		if (bit == SIZE_MAX)
+			return bitset_index_size(&index);
+		/**
+		 * Optimiation: for the single bit key use
+		 * bitset_index_count().
+		 */
+		if (bit_iterator_next(&bit_it) == SIZE_MAX)
+			return bitset_index_size(&index) - bitset_index_count(&index, bit);
+	}
+
+	/* Call generic method */
+	return Index::count(type, key, part_count);
+}
