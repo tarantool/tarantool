@@ -281,8 +281,10 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 		 */
 		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
 		size_t result = 0;
-		while ((bit = bit_iterator_next(&bit_it)) != SIZE_MAX)
-			result = MAX(result, bitset_index_count(&index, bit));
+		while ((bit = bit_iterator_next(&bit_it)) != SIZE_MAX) {
+			size_t count = bitset_index_count(&index, bit);
+			result = MAX(result, count);
+		}
 		return result;
 	} else if (type == ITER_BITS_ALL_SET) {
 		/**
