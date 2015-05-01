@@ -14,7 +14,7 @@
 
     Type: boolean |br|
     Default: true |br|
-    Dynamic: no |br|
+    Dynamic: yes |br|
 
 .. confval:: rows_per_wal
 
