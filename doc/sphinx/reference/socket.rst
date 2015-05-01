@@ -182,8 +182,9 @@ the function invocations will look like ``sock:function_name(...)``.
         Send data over a connected socket.
 
         :param string data:
-        :return: true if success, false if error.
-        :rtype:  boolean
+        :return: the number of bytes sent.
+        :rtype:  number
+        :exception: nil on error.
 
     .. method:: syswrite(size)
 
