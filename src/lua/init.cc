@@ -79,10 +79,12 @@ struct lua_State *tarantool_L;
 extern char uuid_lua[];
 extern char session_lua[];
 extern char digest_lua[];
+extern char log_lua[];
 static const char *lua_sources[] = {
 	uuid_lua,
 	session_lua,
 	digest_lua,
+        log_lua,
 	NULL
 };
 
@@ -1493,14 +1495,14 @@ load_init_script(va_list ap)
 }
 
 /**
- * Unset functions in the Lua state which can be used to
- * execute external programs or otherwise introduce a breach
- * in security.
+ * Prepares a function, that unsets functions in the Lua state
+ * which can be used to execute external programs or otherwise
+ * otherwise introduce a breach in security.
  *
  * @param L is a Lua State.
  */
 static void
-tarantool_lua_sandbox(struct lua_State *L)
+tarantool_lua_prepare_sandbox(struct lua_State *L)
 {
 	/*
 	 * Unset some functions for security reasons:
@@ -1511,14 +1513,45 @@ tarantool_lua_sandbox(struct lua_State *L)
 	 * any builtin module using package.loaded
 	 */
 	int result = tarantool_lua_dostring(L,
-					    "os.execute = nil\n"
-					    "os.exit = nil\n"
-					    "os.rename = nil\n"
-					    "os.tmpname = nil\n"
-					    "os.remove = nil\n"
-					    "io = nil\n"
-					    "require = nil\n"
-					    "package = nil\n");
+					    "box.sandbox = function()\n"
+					    "    os.execute = nil\n"
+					    "    os.exit = nil\n"
+					    "    os.rename = nil\n"
+					    "    os.tmpname = nil\n"
+					    "    os.remove = nil\n"
+					    "    io = nil\n"
+					    "    require = nil\n"
+					    "    package = nil\n"
+					    "end\n");
+
+	if (result)
+		panic("%s", lua_tostring(L, -1));
+}
+
+/**
+ * Calls a function (if present), that unsets functions
+ * in the Lua state which can be used to execute
+ * external programs or otherwise
+ * otherwise introduce a breach in security.
+ *
+ * @param L is a Lua State.
+ */
+static void
+tarantool_lua_call_sandbox(struct lua_State *L)
+{
+	/*
+	 * Unset some functions for security reasons:
+	 * 1. Some os.* functions (like os.execute, os.exit, etc..)
+	 * 2. require(), since it can be used to provide access to ffi
+	 * or anything else we unset in 1.
+	 * 3. package, because it can be used to invoke require or to get
+	 * any builtin module using package.loaded
+	 */
+	int result = tarantool_lua_dostring(L,
+					    "if type(box.sandbox) == 'function' then\n"
+					    "    box.sandbox()\n"
+					    "    box.sandbox = nil\n"
+					    "end\n");
 
 	if (result)
 		panic("%s", lua_tostring(L, -1));
@@ -1527,6 +1560,13 @@ tarantool_lua_sandbox(struct lua_State *L)
 void
 tarantool_lua_load_init_script(struct lua_State *L)
 {
+	/*
+	 * Before loading init script, let's prepare sandbox function
+	 * By default, it will be called after init script.
+	 * User can unset if he prefers usability instead of security
+	 */
+	tarantool_lua_prepare_sandbox(tarantool_L);
+
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
 	 * box.insert, box.update, etc...), but box.fiber.yield() today,
@@ -1544,10 +1584,10 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 */
 	ev_run(0);
 
-	/* Outside the startup file require() or ffi are not
-	 * allowed.
-	*/
-	tarantool_lua_sandbox(tarantool_L);
+	/*
+	 * Call sandbox function, if it's still present
+	 */
+	tarantool_lua_call_sandbox(tarantool_L);
 }
 
 void *

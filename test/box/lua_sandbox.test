@@ -1,4 +1,6 @@
 # encoding: tarantool
+import os
+import shutil
 
 #
 # Test that some built-in functions were disabled by sandbox
@@ -13,3 +15,26 @@ exec admin "lua require"
 exec admin "lua package"
 # FFI can be mistakenly saved to the global variable by the one of our modules
 exec admin "lua ffi"
+
+# Check that user can disable sandbox
+server.stop()
+script_dir_path = os.path.join(vardir, "script_dir")
+os.mkdir(script_dir_path)
+shutil.copy("box/sandbox_off_init.lua", os.path.join(script_dir_path, "init.lua"))
+server.deploy("box/tarantool_scriptdir.cfg")
+
+exec admin "lua type(os.execute)"
+exec admin "lua type(os.exit)"
+exec admin "lua type(os.rename)"
+exec admin "lua type(os.tmpname)"
+exec admin "lua type(os.remove)"
+exec admin "lua type(io)"
+exec admin "lua type(require)"
+exec admin "lua type(package)"
+exec admin "lua ffi"
+
+# Restore server
+server.stop()
+shutil.rmtree(script_dir_path, True)
+server.deploy(self.suite_ini["config"])
+

@@ -146,6 +146,32 @@ lua box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
 ---
  - 3628146660
 ...
+lua crc = box.digest.crc32.new()
+---
+...
+lua crc:update('abc')
+---
+...
+lua crc2 = crc:copy()
+---
+...
+lua crc:update('cde')
+---
+...
+lua crc:result() == box.digest.crc32('abccde')
+---
+ - true
+...
+lua crc2:update('def')
+---
+...
+lua crc2:result() == box.digest.crc32('abcdef')
+---
+ - true
+...
+lua crc, crc2 = nil, nil
+---
+...
 lua box.digest.guava('hello', 0)
 ---
 error: 'bad argument #1 to ''?'' (cannot convert ''string'' to ''int64_t'')'
@@ -165,4 +191,51 @@ lua box.digest.guava(2016238256797177309, 11)
 lua box.digest.guava(1673758223894951030, 11)
 ---
  - 7
+...
+lua box.digest.murmur('1234')
+---
+ - 1859914009
+...
+lua mur = box.digest.murmur.new{seed=13}
+---
+...
+lua nulldigest = mur:result()
+---
+...
+lua mur:update('1234')
+---
+...
+lua mur:result()
+---
+ - 1859914009
+...
+lua mur_new = mur:copy()
+---
+...
+lua mur_new:update('1234')
+---
+...
+lua mur_new:result() ~= mur:result()
+---
+ - true
+...
+lua mur:clear()
+---
+...
+lua nulldigest == mur:result()
+---
+ - true
+...
+lua mur = box.digest.murmur.new{seed=14}
+---
+...
+lua mur:update('1234')
+---
+...
+lua mur:result()
+---
+ - 1689834281
+...
+lua mur, mur_new, nulldigest = nil, nil, nil
+---
 ...
