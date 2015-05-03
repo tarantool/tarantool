@@ -58,11 +58,12 @@ lbox_ipc_channel(struct lua_State *L)
 		if (size < 0)
 			luaL_error(L, "fiber.channel(size): negative size");
 	}
-	struct ipc_channel *ch = ipc_channel_new(size);
+	struct ipc_channel *ch = (struct ipc_channel *)
+		lua_newuserdata(L, ipc_channel_memsize(size));
 	if (!ch)
 		luaL_error(L, "fiber.channel: Not enough memory");
+	ipc_channel_create(ch, size);
 
-	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
 	luaL_getmetatable(L, channel_lib);
 
 	lua_pushstring(L, "rid");	/* first object id */
@@ -70,14 +71,13 @@ lbox_ipc_channel(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_setmetatable(L, -2);
-	*ptr = ch;
 	return 1;
 }
 
 static inline struct ipc_channel *
 lbox_check_channel(struct lua_State *L, int narg)
 {
-	return *(struct ipc_channel **) luaL_checkudata(L, narg, channel_lib);
+	return (struct ipc_channel *) luaL_checkudata(L, narg, channel_lib);
 }
 
 static int
@@ -86,7 +86,7 @@ lbox_ipc_channel_gc(struct lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		return 0;
 	struct ipc_channel *ch = lbox_check_channel(L, -1);
-	ipc_channel_delete(ch);
+	ipc_channel_destroy(ch);
 	return 0;
 }
 

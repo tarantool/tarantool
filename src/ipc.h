@@ -49,6 +49,26 @@ struct ipc_channel {
 	void *item[0];
 };
 
+static inline size_t
+ipc_channel_memsize(unsigned size)
+{
+	return sizeof(struct ipc_channel) + sizeof(void *) * size;
+}
+
+/**
+ * Initialize a channel (the memory should have
+ * been correctly allocated for the channel.
+ */
+void
+ipc_channel_create(struct ipc_channel *ch, unsigned size);
+
+
+/**
+ * Destroy a channel. Does not free allocated memory.
+ */
+void
+ipc_channel_destroy(struct ipc_channel *ch);
+
 /**
  * @brief Allocate and construct new IPC channel
  * @param size of channel
