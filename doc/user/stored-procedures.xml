@@ -3687,23 +3687,22 @@ Select OK, 1 rows affected
 <section xml:id="sp-box-digest">
     <title>Package <code>box.digest</code></title>
     <para>
-    A "digest" is a value which is returned by a
-
-    <link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash_function">Cryptographic hash function</link>
+    A "digest" is a value which is returned by a function
+    (usually a
+    <link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash_function">Cryptographic hash function</link>),
     applied against a string.
     Tarantool supports five types of cryptographic hash functions
-    (<link xlink:href="https://en.wikipedia.org/wiki/Md4">MD4</link>,
-    <link xlink:href="https://en.wikipedia.org/wiki/Md5">MD5</link>,
-    <link xlink:href="https://en.wikipedia.org/wiki/Sha-0">SHA-0</link>,
+    (<link xlink:href="https://en.wikipedia.org/wiki/Sha-0">SHA-0</link>,
     
     <link xlink:href="https://en.wikipedia.org/wiki/Sha-1">SHA-1</link>,
-    <link xlink:href="https://en.wikipedia.org/wiki/Sha-2">SHA-2</link>)
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-2">SHA-2</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Md4">MD4</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Md5">MD5</link>)
 
     as well as a checksum function
     (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
-    The functions in <code>box.digest</code> are:<programlisting><code>    box.digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
-    box.digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with CRC32.
-    box.digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
+    The functions in <code>box.digest</code> are:
+    <programlisting><code>    box.digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
     box.digest.sha0_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha0.
     box.digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
     box.digest.sha1_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha1.
@@ -3718,9 +3717,12 @@ Select OK, 1 rows affected
     box.digest.md4(<replaceable>string</replaceable>)                    Returns 128-bit digest made with MD4.
     box.digest.md4_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md4.
     box.digest.md5(<replaceable>string</replaceable>)                    Returns 256-bit digest made with MD5.
-    box.digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.</code></programlisting>
-   </para>
-   <note><simpara>
+    box.digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.
+    box.digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
+    box.digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with CRC32.
+    box.digest.crc32_new([<replaceable>seed</replaceable>])              Initiates incremental crc32.</code></programlisting>
+    </para>
+    <para><emphasis>NOTE re polynomial for crc32</emphasis>:
    <code>box.digest.crc32(<replaceable>string</replaceable>)</code> uses the
    <link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use">
    CRC-32C (Castagnoli)</link> polynomial value: hexadecimal 11EDC6F41 / decimal 4812730177.
@@ -3728,7 +3730,18 @@ Select OK, 1 rows affected
    ensure that the other functions use the same polynomial value.
    For example, in Python, install the crcmod package and say:
    <code>import crcmod ... fun = crcmod.mkCrcFun('4812730177') ... fun('string')</code>.
-   </simpara></note>
+   </para>
+   
+   <para><emphasis>NOTE re incremental crc32</emphasis>: Suppose that a digest is done for a string 'A',
+   then a new part 'B' is appended to the string,
+   then a new digest is required.
+   The new digest could be recomputed for the whole string 'AB',
+   but it is faster to take what was computed
+   before for 'A' and apply changes based on the new part 'B'.
+   This is called multi-step or "incremental" digesting,
+   which Tarantool supports with crc32 ...<programlisting>-- print crc32 of 'AB', with one step, then incrementally
+lua print(box.digest.crc32('AB'))
+lua c=box.digest.crc32.new() c:update('A') c:update('B') print(c:result())</programlisting></para>
 
 <bridgehead renderas="sect4">Example</bridgehead>
     <para>
