@@ -49,11 +49,18 @@ extern "C" {
 static int
 lbox_fio_open(struct lua_State *L)
 {
-	const char *path = lua_tostring(L, 1);
+	const char *pathname;
+	if (lua_gettop(L) < 1) {
+usage:
+		luaL_error(L, "Usage: fio.open(path, flags, mode)");
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	int flags = lua_tointeger(L, 2);
 	int mode = lua_tointeger(L, 3);
 
-	int fh = coeio_open(path, flags, mode);
+	int fh = coeio_open(pathname, flags, mode);
 	lua_pushinteger(L, fh);
 	return 1;
 }
@@ -63,6 +70,8 @@ lbox_fio_pwrite(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
+	if (buf == NULL)
+		luaL_error(L, "fio.pwrite(): buffer is not a string");
 	size_t len = lua_tonumber(L, 3);
 	size_t offset = lua_tonumber(L, 4);
 
@@ -108,13 +117,18 @@ lbox_fio_pread(struct lua_State *L)
 static int
 lbox_fio_rename(struct lua_State *L)
 {
-	const char *oldpath, *newpath;
-	int top = lua_gettop(L);
-	if (top < 2 || !(oldpath = lua_tostring(L, 1)) ||
-	    !(newpath = lua_tostring(L, 2))) {
+	const char *oldpath;
+	const char *newpath;
+	if (lua_gettop(L) < 2) {
+usage:
 		luaL_error(L, "Usage: fio.rename(oldpath, newpath)");
-		return 0;
 	}
+	oldpath = lua_tostring(L, 1);
+	newpath = lua_tostring(L, 2);
+
+	if (oldpath == NULL || newpath == NULL)
+		goto usage;
+
 	int res = coeio_rename(oldpath, newpath);
 	lua_pushboolean(L, res == 0);
 	return 1;
@@ -123,14 +137,14 @@ lbox_fio_rename(struct lua_State *L)
 static int
 lbox_fio_unlink(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
+	const char *pathname;
+	if (lua_gettop(L) < 1) {
+usage:
 		luaL_error(L, "Usage: fio.unlink(pathname)");
-	const char *pathname = lua_tostring(L, 1);
-	if (!pathname) {
-		errno = EINVAL;
-		lua_pushboolean(L, 0);
-		return 1;
 	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	int res = coeio_unlink(pathname);
 	lua_pushboolean(L, res == 0);
 	return 1;
@@ -149,16 +163,21 @@ lbox_fio_ftruncate(struct lua_State *L)
 static int
 lbox_fio_truncate(struct lua_State *L)
 {
+	const char *pathname;
 	int top = lua_gettop(L);
-	if (top < 1)
+	if (top < 1) {
+usage:
 		luaL_error(L, "Usage: fio.truncate(pathname[, newlen])");
-	const char *path = lua_tostring(L, 1);
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	off_t length;
 	if (top >= 2)
 		length = lua_tonumber(L, 2);
 	else
 		length = 0;
-	int res = coeio_truncate(path, length);
+	int res = coeio_truncate(pathname, length);
 
 	lua_pushboolean(L, res == 0);
 	return 1;
@@ -169,6 +188,9 @@ lbox_fio_write(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
+	if (buf == NULL)
+		luaL_error(L, "fio.write(): buffer is not a string");
+
 	size_t len = lua_tonumber(L, 3);
 	int res = coeio_write(fh, buf, len);
 	lua_pushinteger(L, res);
@@ -178,14 +200,22 @@ lbox_fio_write(struct lua_State *L)
 static int
 lbox_fio_chown(struct lua_State *L)
 {
-	if (lua_gettop(L) < 3)
+	const char *pathname;
+	if (lua_gettop(L) < 3) {
+usage:
 		luaL_error(L, "Usage: fio.chown(pathname, owner, group)");
-	const char *path = lua_tostring(L, 1);
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
+
 	uid_t owner;
 	if (lua_isnumber(L, 2)) {
 		owner = lua_tointeger(L, 2);
 	} else {
 		const char *username = lua_tostring(L, 2);
+		if (username == NULL)
+			username = "";
 		struct passwd *entry = getpwnam(username);
 		if (!entry) {
 			errno = EINVAL;
@@ -200,6 +230,8 @@ lbox_fio_chown(struct lua_State *L)
 		group = lua_tointeger(L, 3);
 	} else {
 		const char *groupname = lua_tostring(L, 3);
+		if (groupname == NULL)
+			groupname = "";
 		struct group *entry = getgrnam(groupname);
 		if (!entry) {
 			errno = EINVAL;
@@ -208,7 +240,7 @@ lbox_fio_chown(struct lua_State *L)
 		}
 		group = entry->gr_gid;
 	}
-	int res = coeio_chown(path, owner, group);
+	int res = coeio_chown(pathname, owner, group);
 	lua_pushboolean(L, res == 0);
 	return 1;
 }
@@ -216,11 +248,17 @@ lbox_fio_chown(struct lua_State *L)
 static int
 lbox_fio_chmod(struct lua_State *L)
 {
-	if (lua_gettop(L) < 2)
+	const char *pathname;
+	if (lua_gettop(L) < 2) {
+usage:
 		luaL_error(L, "Usage: fio.chmod(pathname, mode)");
-	const char *path = lua_tostring(L, 1);
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
+
 	mode_t mode = lua_tointeger(L, 2);
-	lua_pushboolean(L, coeio_chmod(path, mode) == 0);
+	lua_pushboolean(L, coeio_chmod(pathname, mode) == 0);
 	return 1;
 }
 
@@ -375,9 +413,14 @@ lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
 static int
 lbox_fio_lstat(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
+	const char *pathname;
+	if (lua_gettop(L) < 1) {
+usage:
 		luaL_error(L, "pathname is absent");
-	const char *pathname = lua_tostring(L, 1);
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	struct stat stat;
 
 	int res = coeio_lstat(pathname, &stat);
@@ -391,9 +434,14 @@ lbox_fio_lstat(struct lua_State *L)
 static int
 lbox_fio_stat(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
-		luaL_error(L, "pathname is absent");
-	const char *pathname = lua_tostring(L, 1);
+	const char *pathname;
+	if (lua_gettop(L) < 1) {
+usage:
+		luaL_error(L, "Usage: fio.stat(pathname)");
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	struct stat stat;
 
 	int res = coeio_stat(pathname, &stat);
@@ -424,10 +472,13 @@ lbox_fio_mkdir(struct lua_State *L)
 	const char *pathname;
 	int top = lua_gettop(L);
 
-	if (top < 1 || !(pathname = lua_tostring(L, 1))) {
+	if (top < 1) {
+usage:
 		luaL_error(L, "Usage fio.mkdir(pathname[, mode])");
-		return 0;
 	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 
 	mode_t mode;
 
@@ -443,10 +494,13 @@ static int
 lbox_fio_rmdir(struct lua_State *L)
 {
 	const char *pathname;
-	if (lua_gettop(L) < 1 || !(pathname = lua_tostring(L, 1))) {
+	if (lua_gettop(L) < 1) {
+usage:
 		luaL_error(L, "Usage: fio.rmdir(pathname)");
-		return 0;
 	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 
 	lua_pushboolean(L, coeio_rmdir(pathname) == 0);
 	return 1;
@@ -455,10 +509,15 @@ lbox_fio_rmdir(struct lua_State *L)
 static int
 lbox_fio_glob(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
+	const char *pattern;
+	if (lua_gettop(L) < 1) {
+usage:
 		luaL_error(L, "Usage: fio.glob(pattern)");
+	}
 
-	const char *pattern = lua_tostring(L, 1);
+	pattern = lua_tostring(L, 1);
+	if (pattern == NULL)
+		goto usage;
 
 	glob_t globbuf;
 	switch (glob(pattern, GLOB_NOESCAPE, NULL, &globbuf)) {
@@ -490,10 +549,16 @@ lbox_fio_glob(struct lua_State *L)
 static int
 lbox_fio_link(struct lua_State *L)
 {
-	if (lua_gettop(L) < 2)
+	const char *target;
+	const char *linkpath;
+	if (lua_gettop(L) < 2) {
+usage:
 		luaL_error(L, "Usage: fio.link(target, linkpath)");
-	const char *target = lua_tostring(L, 1);
-	const char *linkpath = lua_tostring(L, 2);
+	}
+	target = lua_tostring(L, 1);
+	linkpath = lua_tostring(L, 2);
+	if (target == NULL || linkpath == NULL)
+		goto usage;
 	lua_pushboolean(L, coeio_link(target, linkpath) == 0);
 	return 1;
 }
@@ -501,10 +566,16 @@ lbox_fio_link(struct lua_State *L)
 static int
 lbox_fio_symlink(struct lua_State *L)
 {
-	if (lua_gettop(L) < 2)
+	const char *target;
+	const char *linkpath;
+	if (lua_gettop(L) < 2) {
+usage:
 		luaL_error(L, "Usage: fio.symlink(target, linkpath)");
-	const char *target = lua_tostring(L, 1);
-	const char *linkpath = lua_tostring(L, 2);
+	}
+	target = lua_tostring(L, 1);
+	linkpath = lua_tostring(L, 2);
+	if (target == NULL || linkpath == NULL)
+		goto usage;
 	lua_pushboolean(L, coeio_symlink(target, linkpath) == 0);
 	return 1;
 }
@@ -512,11 +583,15 @@ lbox_fio_symlink(struct lua_State *L)
 static int
 lbox_fio_readlink(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
+	const char *pathname;
+	if (lua_gettop(L) < 1) {
+usage:
 		luaL_error(L, "Usage: fio.readlink(pathname)");
-
+	}
+	pathname = lua_tostring(L, 1);
+	if (pathname == NULL)
+		goto usage;
 	char *path = (char *)lua_newuserdata(L, PATH_MAX);
-	const char *pathname = lua_tostring(L, 1);
 	int res = coeio_readlink(pathname, path, PATH_MAX);
 	if (res < 0) {
 		lua_pushnil(L);

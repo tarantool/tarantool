@@ -14,6 +14,10 @@ fio.umask()
 - 0
 ...
 -- pathjoin
+fio.basename(nil, nil)
+---
+- null
+...
 fio.pathjoin('abc', 'cde')
 ---
 - abc/cde
@@ -31,6 +35,10 @@ fio.pathjoin('/', '/cde')
 - /cde
 ...
 -- basename
+fio.basename(nil)
+---
+- null
+...
 fio.basename('/')
 ---
 - 
@@ -66,6 +74,10 @@ file3 = fio.pathjoin(tmpdir, 'file.3')
 ...
 file4 = fio.pathjoin(tmpdir, 'file.4')
 ---
+...
+fio.open(nil)
+---
+- null
 ...
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 ---
@@ -121,13 +133,17 @@ fh1:stat().size
 ---
 - 0
 ...
+fh1:write(nil)
+---
+- true
+...
 fh1:write("Hello, world")
 ---
 - true
 ...
 fh1:stat().size
 ---
-- 133
+- 136
 ...
 fh1:fsync()
 ---
@@ -143,11 +159,11 @@ fio.sync()
 ...
 fh1:pread(512, 121)
 ---
-- Hello, world
+- nilHello, world
 ...
 fh1:pread(5, 121)
 ---
-- Hello
+- nilHe
 ...
 fh1:write("; Ehllo, again")
 ---
@@ -159,15 +175,15 @@ fh1:seek(121)
 ...
 fh1:read(13)
 ---
-- Hello, world;
+- nilHello, wor
 ...
 fh1:read(512)
 ---
-- ' Ehllo, again'
+- ld; Ehllo, again
 ...
 fh1:pread(512, 14 + 121)
 ---
-- Ehllo, again
+- d; Ehllo, again
 ...
 fh1:pwrite("He", 14 + 121)
 ---
@@ -175,12 +191,12 @@ fh1:pwrite("He", 14 + 121)
 ...
 fh1:pread(512, 14 + 121)
 ---
-- Hello, again
+- He Ehllo, again
 ...
 { fh1:stat().size, fio.stat(file1).size }
 ---
-- - 147
-  - 147
+- - 150
+  - 150
 ...
 fh1:seek(121)
 ---
@@ -188,11 +204,19 @@ fh1:seek(121)
 ...
 fh1:read(512)
 ---
-- Hello, world; Hello, again
+- nilHello, worlHe Ehllo, again
+...
+fio.link(nil, nil)
+---
+- error: 'Usage: fio.link(target, linkpath)'
 ...
 fio.link(file1, file2)
 ---
 - true
+...
+fio.glob(nil)
+---
+- error: 'Usage: fio.glob(pattern)'
 ...
 glob = fio.glob(fio.pathjoin(tmpdir, '*'))
 ---
@@ -229,13 +253,25 @@ fh3:write("abc")
 ---
 - true
 ...
+fio.rename(nil, nil)
+---
+- error: 'Usage: fio.rename(oldpath, newpath)'
+...
 fio.rename(file3, file4)
 ---
 - true
 ...
+fio.symlink(nil, nil)
+---
+- error: 'Usage: fio.symlink(target, linkpath)'
+...
 fio.symlink(file4, file3)
 ---
 - true
+...
+fio.stat(nil)
+---
+- error: 'Usage: fio.stat(pathname)'
 ...
 fio.stat(file3).size
 ---
@@ -257,6 +293,10 @@ bit.band(fio.stat(file4).mode, 0x1FF) == 0x1FD
 ---
 - true
 ...
+fio.chmod(nil, 0x1F8)
+---
+- error: 'Usage: fio.chmod(pathname, mode)'
+...
 fio.chmod(file4, 0x1F8) -- 0x770
 ---
 - true
@@ -268,6 +308,10 @@ bit.band(fh3:stat().mode, 0x1FF) == 0x1F8
 bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
 ---
 - true
+...
+fio.mkdir(nil)
+---
+- error: Usage fio.mkdir(pathname[, mode])
 ...
 fio.mkdir(fio.pathjoin(tmpdir, "dir"))
 ---
@@ -285,6 +329,10 @@ fio.mkdir(fio.pathjoin(tmpdir, "dir"))
   - Bad file descriptor
   - false
   - Bad file descriptor
+...
+fio.rmdir(nil)
+---
+- error: 'Usage: fio.rmdir(pathname)'
 ...
 fio.rmdir(fio.pathjoin(tmpdir, "dir"))
 ---
@@ -319,9 +367,13 @@ fio.unlink()
 ...
 fio.unlink(nil)
 ---
-- false
+- error: 'Usage: fio.unlink(pathname)'
 ...
 -- dirname
+fio.dirname(nil)
+---
+- null
+...
 fio.dirname('abc')
 ---
 - .

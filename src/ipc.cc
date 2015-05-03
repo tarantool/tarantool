@@ -30,23 +30,15 @@
 #include "fiber.h"
 #include <stdlib.h>
 
-static void
-ipc_channel_create(struct ipc_channel *ch);
-
-static void
-ipc_channel_destroy(struct ipc_channel *ch);
-
 struct ipc_channel *
 ipc_channel_new(unsigned size)
 {
-	if (!size)
+	if (size == 0)
 		size = 1;
 	struct ipc_channel *res = (struct ipc_channel *)
-		malloc(sizeof(struct ipc_channel) + sizeof(void *) * size);
-	if (res == NULL)
-		return NULL;
-	res->size = size;
-	ipc_channel_create(res);
+		malloc(ipc_channel_memsize(size));
+	if (res != NULL)
+		ipc_channel_create(res, size);
 	return res;
 }
 
@@ -57,9 +49,10 @@ ipc_channel_delete(struct ipc_channel *ch)
 	free(ch);
 }
 
-static void
-ipc_channel_create(struct ipc_channel *ch)
+void
+ipc_channel_create(struct ipc_channel *ch, unsigned size)
 {
+	ch->size = size;
 	ch->beg = ch->count = 0;
 	ch->readonly = ch->closed = false;
 	ch->close = NULL;
@@ -68,17 +61,45 @@ ipc_channel_create(struct ipc_channel *ch)
 	rlist_create(&ch->writers);
 }
 
-static void
+void
 ipc_channel_destroy(struct ipc_channel *ch)
 {
+	/**
+	 * XXX: this code is buggy, since the deleted fibers are
+	 * not woken up, but luckily it never gets called.
+	 * As long as channels are only used in Lua, the situation
+	 * that ipc_channel_destroy() is called on a channel which
+	 * has waiters is impossible:
+	 *
+	 * if there is a Lua fiber waiting on a channel, neither
+	 * the channel nor the fiber will ever get collected. The
+	 * fiber Lua stack will keep a reference to the channel
+	 * userdata, and the stack itself is referenced while the
+	 * fiber is waiting.  So, as long as channels are used
+	 * from Lua, only a channel which has no waiters can get
+	 * collected.
+	 *
+	 * The other part of the problem, however, is that such
+	 * orphaned waiters create a garbage collection loop and
+	 * leak memory.
+	 * The only solution, it seems, is to implement some sort
+	 * of shutdown() on a channel, which wakes up all waiters,
+	 * and use it explicitly in Lua.  Waking up waiters in
+	 * __gc/destroy is not a solution, since __gc will simply
+	 * never get called.
+         */
 	while (!rlist_empty(&ch->writers)) {
 		struct fiber *f =
 			rlist_first_entry(&ch->writers, struct fiber, state);
+		say_error("closing a channel which has a write waiter %d %s",
+			  f->fid, fiber_name(f));
 		rlist_del_entry(f, state);
 	}
 	while (!rlist_empty(&ch->readers)) {
 		struct fiber *f =
 			rlist_first_entry(&ch->readers, struct fiber, state);
+		say_error("closing a channel which has a read waiter %d %s",
+			  f->fid, fiber_name(f));
 		rlist_del_entry(f, state);
 	}
 }
