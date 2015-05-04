@@ -37,7 +37,7 @@ via the PHP API. Before trying to run, check that the server is listening and th
 example.php and say ``php example.php``. The program will open a socket connection with
 the tarantool server at localhost:3301, then send an INSERT request, then — if all is
 well — print "Insert succeeded". If the tuple already exists, the program will print
-“Duplicate key exists in unique index 0”.
+“Duplicate key exists in unique index 'primary' in space 'examples'”.
 
 .. code-block:: php
 

@@ -181,8 +181,6 @@ API is a direct binding to corresponding methods of index objects of type
             | or 'EQ'                    | values    | matching the field values. If there are     |
             |                            |           | multiple field values, they need to be      |
             |                            |           | separated by commas.                        |
-            |                            |           |                                             |
-            |                            |           | BITSET indexes are always unique.           |
             +----------------------------+-----------+---------------------------------------------+
             | box.index.BITS_ALL_SET     | field     | Keys match if all of the bits specified in  |
             |                            | values    | 'bit mask' are set.                         |
@@ -241,6 +239,8 @@ API is a direct binding to corresponding methods of index objects of type
             +--------------------+-----------+---------------------------------------------+
 
         .. code-block:: lua
+
+            EXAMPLE WITH DEFAULT 'TREE' INDEX AND PAIRS() FUNCTION
 
             tarantool> s = box.schema.space.create('space17')
             ---
@@ -356,6 +356,30 @@ API is a direct binding to corresponding methods of index objects of type
             tuple in the tuple set that would be returned by select. However,
             if there is more than one tuple in the tuple set, then get returns
             an error.
+
+        .. code-block:: lua
+
+            EXAMPLE WITH 'BITSET' INDEX
+
+            The following script shows creation and search with a BITSET index.
+             Notice: BITSET cannot be unique, so first a primary-key index is created.
+             Notice: bit values are entered as hexadecimal literals for easier reading.
+            s = box.schema.space.create('space_with_bitset')
+            s:create_index('primary_index',{parts={1,'STR'},unique=true,type='TREE'})
+            s:create_index('bitset_index',{parts={2, 'NUM'},unique=false,type='BITSET'})
+            s:insert{'Tuple with bit value = 01', 0x01}
+            s:insert{'Tuple with bit value = 10', 0x02}
+            s:insert{'Tuple with bit value = 11', 0x03}
+            s.index.bitset_index:select(0x02,{iterator=box.index.EQ})
+            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ANY_SET})
+            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_SET})
+            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_NOT_SET})
+            ...
+            The above script will return:
+             For EQ: Tuple with bit value = 10
+             For BITS_ANY_SET: Tuple with bit value = 10 + Tuple with bit value = 11
+             For BITS_ALL_SET: Tuple with bit value = 10 + Tuple with bit value = 11
+             For BIT_ALL_NOT_SET: Tuple with bit value = 01
 
     .. function:: min([key-value])
 

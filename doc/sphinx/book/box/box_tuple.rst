@@ -176,9 +176,11 @@ and conversion to a Lua table.
             - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
             ...
 
-    .. method:: unpack()
+    .. method:: unpack([start-field-number [, end-field-number]])
 
-        If ``t`` is a tuple instance, ``t:unpack(n)`` will return all fields.
+        If ``t`` is a tuple instance, ``t:unpack()`` will return all fields,
+        ``t:unpack(1)`` will return all fields starting with field number 1,
+        ``t:unpack(1,5)`` will return all fields between field number 1 and field number 5.
 
         :return: field(s) from the tuple.
         :rtype:  lua-value(s)

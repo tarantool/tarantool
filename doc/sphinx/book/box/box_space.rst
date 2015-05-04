@@ -253,14 +253,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible operators are:
 
-            * '+' for addition
-            * '-' for substraction
-            * '&' for bitwise AND
-            * '|' for bitwise OR
-            * '^' for butwise :abbr:`XOR(exclusive OR)`
+            * '+' for addition (values must be numeric)
+            * '-' for subtraction (values must be numeric)
+            * '&' for bitwise AND (values must be unsigned numeric)
+            * '|' for bitwise OR (values must be unsigned numeric)
+            * '^' for bitwise :abbr:`XOR(exclusive OR)` (values must be unsigned numeric)
             * ':' for string splice
-            * '!' for insert
-            * '#' for delete
+            * '!' for insertion
+            * '#' for deletion
+            * '=' for assignment
 
         :param space_object space-object:
         :param lua-value key: primary-key field values, must be passed as a Lua
@@ -268,8 +269,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :param table {operator, field_no, value}: a group of arguments for each
                 operation, indicating what the operation is, what field the
                 operation will apply to, and what value will be applied. For
-                some operations the field number can be -1, meaning the last
-                field in the tuple. Thus in the instruction
+                "!" and "=" operations the field number can be -1, meaning the last
+                field in the tuple.
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -279,10 +280,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type, number of indexes accessed, WAL
         settings.
 
-        .. code-block:: lua
-
-            s:update(44, {{'+',1,55},{'=',3,'x'}})
-
+        Thus in the instruction s:update(44, {{'+',1,55},{'=',3,'x'}})
         the primary-key value is 44, the operators are '+' and '=' meaning
         "add a value to a field and then assign a value to a field", the first
         affected field is field 1 and the value which will be added to it is
@@ -290,6 +288,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         assigned to it is 'x'.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             -- Assume that the initial state of the database is ...
             --   tester has one tuple set and one primary key whose type is 'NUM'.
