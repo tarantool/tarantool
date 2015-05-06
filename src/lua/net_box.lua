@@ -49,6 +49,7 @@ local sequence_mt = { __serialize = 'sequence' }
 local mapping_mt = { __serialize = 'mapping' }
 
 local CONSOLE_FAKESYNC  = 15121974
+local CONSOLE_DELIMITER = "$EOF$"
 
 local function request(header, body)
     -- hint msgpack to always encode header and body as a map
@@ -461,6 +462,12 @@ local remote_methods = {
         return false
     end,
 
+    _console = function(self, line)
+        local res = self:_request_raw('eval', CONSOLE_FAKESYNC,
+            line..CONSOLE_DELIMITER.."\n", true)
+        return res.body[DATA]
+    end,
+
     call    = function(self, proc_name, ...)
         if type(self) ~= 'table' then
             box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
@@ -468,33 +475,9 @@ local remote_methods = {
 
         proc_name = tostring(proc_name)
 
-        if not self.console then
-            local res = self:_request('call', true, proc_name, {...})
-            return res.body[DATA]
-        end
-
-        local eval_str = proc_name .. '('
-        for i = 1, select('#', ...) do
-            if i > 1 then
-                eval_str = eval_str .. ', '
-            end
-            local arg = select(i, ...)
-
-            if arg == nil then
-                eval_str = eval_str .. 'nil'
-            elseif type(arg) == 'number' then
-                eval_str = eval_str .. tostring(arg)
-            else
-                arg = tostring(arg)
-                arg = string.gsub(arg, ']]', ']].."]]"..[[')
-                arg = string.gsub(arg, "\n", ']].."\\n"..[[')
-                eval_str = eval_str .. '[[' .. arg .. ']]'
-            end
-        end
-        eval_str = eval_str .. ")\n"
-
-        local res = self:_console_request(eval_str, true)
+        local res = self:_request('call', true, proc_name, {...})
         return res.body[DATA]
+
     end,
 
     eval    = function(self, expr, ...)
@@ -503,12 +486,7 @@ local remote_methods = {
         end
 
         expr = tostring(expr)
-        local data
-        if self.console then
-            data = self:call('dostring', expr, ...)[1]
-        else
-            data = self:_request('eval', true, expr, {...}).body[DATA]
-        end
+        local data = self:_request('eval', true, expr, {...}).body[DATA]
         local data_len = #data
         if data_len == 1 then
             return data[1]
@@ -616,7 +594,6 @@ local remote_methods = {
         end
     end,
 
-
     _check_console_response = function(self)
         while true do
             local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n',
@@ -628,25 +605,8 @@ local remote_methods = {
             self.rpos = self.rpos + len
             self.rlen = self.rlen - len
 
-            local result = yaml.decode(resp)
-            if result ~= nil then
-                result = result[1]
-            end
-
             local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
-            local body = {}
-
-            if type(result) ~= 'table' then
-                result = { result }
-            end
-
-
-            if result.error ~= nil then
-                hdr[TYPE] = bit.bor(ERROR_TYPE, box.error.PROC_LUA)
-                body[ERROR] = result.error
-            else
-                body[DATA] = { result }
-            end
+            local body = { [DATA] = resp }
 
             if self.ch.sync[CONSOLE_FAKESYNC] ~= nil then
                 self.ch.sync[CONSOLE_FAKESYNC]:put({hdr = hdr, body = body })
@@ -657,11 +617,7 @@ local remote_methods = {
         end
     end,
 
-    _check_response = function(self)
-        if self.console then
-            return self:_check_console_response(self)
-        end
-
+    _check_binary_response = function(self)
         while true do
             if self.rlen < 5 then
                 break
@@ -769,10 +725,21 @@ local remote_methods = {
                     self:_fatal("Can't read handshake")
                 else
                     if string.match(self.handshake, '^Tarantool .*console') then
-                        self.console = true
+                        -- enable self:console() method
+                        self.console = self._console
+                        self._check_response = self._check_console_response
+                        -- set delimiter
+                        self:_switch_state('schema')
+                        local res = self:_request_raw('eval', CONSOLE_FAKESYNC,
+                            "require('console').delimiter('"..CONSOLE_DELIMITER.."')\n\n",
+                            true)
+                        if res.hdr[TYPE] ~= OK then
+                            self:_fatal(res.body[ERROR])
+                        end
                         self:_switch_state('active')
                     else
-                        self.console = false
+                        self.console = nil
+                        self._check_response = self._check_binary_response
                         local s, e = pcall(function()
                             self:_auth()
                         end)
@@ -971,7 +938,9 @@ local remote_methods = {
     end,
 
     _request = function(self, name, raise, ...)
-
+        if self.console then
+            box.error(box.error.UNSUPPORTED, "console", name)
+        end
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
             self.timeouts[fid] = TIMEOUT_INFINITY
@@ -1002,13 +971,6 @@ local remote_methods = {
         end
 
         return self:_request_internal(name, raise, ...)
-    end,
-
-    _console_request = function(self, request_body, raise)
-        if raise == nil then
-            raise = true
-        end
-        return self:_request_raw('call', CONSOLE_FAKESYNC, request_body, raise)
     end,
 
     _request_raw = function(self, name, sync, request, raise)
@@ -1049,8 +1011,8 @@ local remote_methods = {
             })
         end
 
-        if response.body[DATA] ~= nil then
-            if rawget(box, 'tuple') ~= nil and name ~= 'eval' then
+        if response.body[DATA] ~= nil and name ~= 'eval' then
+            if rawget(box, 'tuple') ~= nil then
                 for i, v in pairs(response.body[DATA]) do
                     response.body[DATA][i] =
                         box.tuple.new(response.body[DATA][i])
@@ -1137,10 +1099,8 @@ remote.self = {
             box.error(box.error.PROC_LUA, errmsg)
         end
         return proc(...)
-    end,
-    console = false
+    end
 }
-
 
 setmetatable(remote.self, {
     __index = function(self, key)

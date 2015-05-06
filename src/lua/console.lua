@@ -90,7 +90,13 @@ local function remote_eval(self, line)
         return ""
     end
     --
-    -- call remote 'console.eval' function
+    -- console connection: execute line as is
+    --
+    if self.remote.console then
+        return self.remote:console(line)
+    end
+    --
+    -- binary connection: call remote 'console.eval' function
     --
     local status, res = pcall(self.remote.eval, self.remote,
         "return require('console').eval(...)", line)
@@ -277,8 +283,12 @@ local function connect(uri)
         end
     end
 
-    -- check permissions
-    remote:eval('return true')
+    -- check connection && permissions
+    if remote.console then
+        remote:console('return true')
+    else
+        remote:eval('return true')
+    end
     -- override methods
     self.remote = remote
     self.eval = remote_eval
