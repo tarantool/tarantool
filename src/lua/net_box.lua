@@ -1091,6 +1091,9 @@ remote.self = {
         return result
     end,
     eval = function(_box, expr, ...)
+        if type(_box) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:eval(expr, ...)")
+        end
         local proc, errmsg = loadstring(expr)
         if not proc then
             proc, errmsg = loadstring("return "..expr)
