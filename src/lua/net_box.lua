@@ -596,11 +596,12 @@ local remote_methods = {
 
     _check_console_response = function(self)
         while true do
-            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n',
-                                      self.rpos)
-            if resp == nil then
+            local docend = "\n...\n"
+            if self.rlen < #docend or
+                string.sub(self.rbuf, #self.rbuf + 1 - #docend) ~= docend then
                 break
             end
+            local resp = string.sub(self.rbuf, self.rpos)
             local len = #resp
             self.rpos = self.rpos + len
             self.rlen = self.rlen - len

@@ -158,7 +158,7 @@ local function client_read(self)
         return nil
     end
     -- remove trailing delimiter
-    return buf:match("^(.*)"..delim)
+    return buf:sub(1, -#delim-1)
 end
 
 --

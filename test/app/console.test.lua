@@ -20,7 +20,7 @@ local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(30)
+test:plan(31)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -33,6 +33,10 @@ test:ok(client ~= nil, "connect to console")
 -- Execute some command
 client:write("1\n")
 test:is(yaml.decode(client:read(EOL))[1], 1, "eval")
+
+-- doesn't crash and doesn't hang
+client:write("_G\n")
+test:is(#client:read(EOL) > 0, true, "_G")
 
 -- Check internal state of `console` module
 client:write("require('fiber').id()\n")
