@@ -84,4 +84,51 @@ test:drop()
 s_disabled:drop()
 s_withindex:drop()
 
+-- Check transaction rollback when out of memory
+
+s = box.schema.space.create('s')
+_ = s:create_index('pk')
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+s:auto_increment{}
+s:select{}
+s:auto_increment{}
+s:select{}
+s:auto_increment{}
+s:select{}
+--# setopt delimiter ';'
+box.begin()
+    s:insert{1}
+box.commit();
+s:select{};
+box.begin()
+    s:insert{1}
+    s:insert{2}
+box.commit();
+s:select{};
+box.begin()
+    pcall(s.insert, s, {1})
+    s:insert{2}
+box.commit();
+s:select{};
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+box.begin()
+    s:insert{1}
+    errinj.set("ERRINJ_TUPLE_ALLOC", true)
+    s:insert{2}
+box.commit();
+s:select{};
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+box.begin()
+    s:insert{1}
+    errinj.set("ERRINJ_TUPLE_ALLOC", true)
+    pcall(s.insert, s, {2})
+box.commit();
+s:select{};
+
+--# setopt delimiter ''
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+
+s:drop()
+
+
 errinj = nil

@@ -28,12 +28,14 @@
  */
 #include "tuple.h"
 
+#include <stdio.h>
+
 #include "small/small.h"
 #include "small/quota.h"
 
 #include "key_def.h"
 #include "tuple_update.h"
-#include <stdio.h>
+#include "errinj.h"
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
@@ -261,6 +263,7 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple, uint32_t 
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
+	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
 	char *ptr = (char *) smalloc(&memtx_alloc, total, "tuple");
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
