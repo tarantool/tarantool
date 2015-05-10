@@ -134,7 +134,7 @@ selects a tuple in the ``_user`` space, and then drops the user.
     The maximum number of users is 32.
 
 ===========================================================
-               Priveleges and _priv space
+               Privileges and _priv space
 ===========================================================
 
 The fields in the ``_priv`` space are: the numeric id of the user who gave the

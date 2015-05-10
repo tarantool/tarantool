@@ -33,7 +33,7 @@ and a running tarantool server which also serves as a client.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We'll be making functions which go over one line. We don't want the client to
-send to the server after every line. So we :ref:`declare a delimter <setting delimiter>`.
+send to the server after every line. So we :ref:`declare a delimiter <setting delimiter>`.
 This means “Do not send to the server until you see an exclamation mark.”
 
 .. code-block:: lua

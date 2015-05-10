@@ -127,7 +127,7 @@ and conversion to a Lua table.
         number of the first field in ``t`` which matches 'a' is returned, then
         the numbers of all the fields in ``t`` which match 'a' are returned,
         then the numbers of all the fields in t which match 'a' and are at or
-        fter the second field are returned.
+        after the second field are returned.
 
         .. code-block:: lua
 

@@ -35,7 +35,7 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
 
 .. function:: fromstr(uuid_str)
 
-    :param uuid_str: UUID in 36-byte hexademical string
+    :param uuid_str: UUID in 36-byte hexadecimal string
     :return: converted UUID
     :rtype: cdata
 

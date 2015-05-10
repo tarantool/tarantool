@@ -55,7 +55,7 @@ IPROTO is a binary request/response protocol.
 
 .. code-block:: bash
 
-    TARANTOOL'S GRETTING:
+    TARANTOOL'S GREETING:
 
     0                                     63
     +--------------------------------------+
@@ -71,7 +71,7 @@ IPROTO is a binary request/response protocol.
 
 The server begins the dialogue by sending a fixed-size (128 bytes) text greeting
 to the client. The first 64 bytes of the greeting contain server version. The
-second 44 bytes contain a base64-encoded random string, to use in authentification
+second 44 bytes contain a base64-encoded random string, to use in authentication
 packet. And it ends with 20 bytes of spaces.
 
 ================================================================================
@@ -459,7 +459,7 @@ can be found in `src/box/errcode.h
                    MP_MAP                                   MP_MAP
 
     Then server, which we connect to, will send last SNAP file by, simply,
-    creating a number of INSERT's (with additional LSN and ServerID)
+    creating a number of INSERTs (with additional LSN and ServerID)
     (don't reply). Then it'll send a vclock's MP_MAP and close a socket.
 
     +================+================++============================+
@@ -528,7 +528,7 @@ So, **Header** of an SNAP/XLOG consists of:
     \n
 
 
-There're two markers: tuple beggining - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with the following schema:
+There are two markers: tuple beginning - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with the following schema:
 
 .. code-block:: bash
 
