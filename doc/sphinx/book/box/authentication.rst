@@ -1,7 +1,7 @@
 .. _box-authentication:
 
 -------------------------------------------------------------------------------
-                    Authentication and authorization
+                    Authentication and access control
 -------------------------------------------------------------------------------
 
 Understanding the details of security is primarily an issue for administrators,
@@ -134,7 +134,7 @@ selects a tuple in the ``_user`` space, and then drops the user.
     The maximum number of users is 32.
 
 ===========================================================
-               Privileges and _priv space
+               Privileges and the _priv space
 ===========================================================
 
 The fields in the ``_priv`` space are: the numeric id of the user who gave the
@@ -334,9 +334,9 @@ The second predefined role, named 'replication', can be assigned
 by the 'admin' user to users who need to use
 replication features.
 
-===========================================================
-                         Example
-===========================================================
+================================================================
+                         Example showing a role within a role
+================================================================
 
 In this example, a new user named U1 will insert a new tuple into a new space
 named T, and will succeed even though user U1 has no direct privilege to do

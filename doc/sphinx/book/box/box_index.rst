@@ -513,7 +513,7 @@ API is a direct binding to corresponding methods of index objects of type
 
 
 ===========================================================
-                         Example
+                         Example showing use of the box functions
 ===========================================================
 
 This example will work with the sandbox configuration described in the preface.
@@ -532,7 +532,10 @@ function will:
 
 The function uses Tarantool box functions box.space...select,
 box.space...replace, fiber.time, uuid.str(). The function uses
-Lua functions os.date() and string.sub().
+Lua functions `os.date()`_ and `string.sub()`_.
+
+.. _os.date(): http://www.lua.org/pil/22.1.html
+.. _string.sub(): http://www.lua.org/pil/20.html
 
 .. code-block:: lua
 
@@ -580,7 +583,7 @@ Lua functions os.date() and string.sub().
 .. _RTREE:
 
 ===========================================================
-             Package `box.index` for RTREE
+             Package `box.index` with index type = RTREE for spatial searches
 ===========================================================
 
 The :mod:`box.index` package may be used for spatial searches if the index type

@@ -17,10 +17,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. function:: create_index(index-name [, {options} ])
 
-        Create an index. It is **mandatory** to create an index for a tuple set
+        Create an index. It is mandatory to create an index for a tuple set
         before trying to insert tuples into it, or select tuples from it. The
         first created index, which will be used as the primary-key index, must be
-        **unique**.
+        unique.
 
         :param string index-name: name of index, which should not be a number and
                                 should not contain special characters;
@@ -31,7 +31,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. container:: table
 
-            **Options table**
+            **Options for box.space...create_index**
 
             +---------------+--------------------+-----------------------------+---------------------+
             | Name          | Effect             | Type                        | Default             |
@@ -54,7 +54,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             |               | types              |                             |                     |
             +---------------+--------------------+-----------------------------+---------------------+
 
-        Possible errors: too many parts. A type options other than TREE, or a
+        Possible errors: too many parts. A type option other than TREE, or a
         unique option other than unique, or a parts option with more than one
         field component, is only applicable for the memtx storage engine.
 
@@ -103,6 +103,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> s = box.schema.space.create('tmp', {temporary=true})
             ---
@@ -169,6 +171,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.tester:get{1}
 
     .. function:: drop()
@@ -186,6 +190,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.space_that_does_not_exist:drop()
 
     .. function:: rename(space-name)
@@ -200,6 +206,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Possible errors: ``space-name`` does not exist.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> box.space.space55:rename('space56')
             ---
@@ -232,6 +240,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Number of indexes accessed, WAL settings.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> box.space.tester:replace{5000, 'New value'}
 
@@ -375,6 +385,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.tester:delete(0)
             ---
             - [0, 'My first tuple']
@@ -388,7 +400,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
               expected NUM'
             ...
 
-    .. data:: id
+.. _space_object_id:
+
+    space-object.id
 
         Ordinal space number. Spaces can be referenced by either name or
         number. Thus, if space 'tester' has id = 800, then
@@ -397,14 +411,18 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
-    .. data:: enabled
+.. _space_object_enabled:
+
+    space-object.enabled
 
         Whether or not this space is enabled.
         The value is false if there is no index.
 
         :rtype: boolean
 
-    .. data:: field_count
+.. _space_object_field_count:
+
+    space-object.field_count
 
         The required field count for all tuples in this space. The field_count
         can be set initially with
@@ -413,7 +431,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
-    .. data:: index
+.. _space_object_index:
+
+    space-object.index[]
 
         A container for all defined indexes. An index is a Lua object of type
         :mod:`box.index` with methods to search tuples and iterate over them in
@@ -422,6 +442,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :rtype: table
 
         .. code-block: lua
+
+            EXAMPLE
 
             tarantool> box.space.tester.id
             ---
@@ -436,7 +458,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - TREE
             ...
 
-    .. function:: len()
+.. _space_object_len:
+
+    space-object:len()
 
         .. NOTE::
 
@@ -446,12 +470,16 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.tester:len()
             ---
             - 2
             ...
 
-    .. function:: truncate()
+.. _space_object_truncate:
+
+    space-object:truncate()
 
         Deletes all tuples.
 
@@ -461,6 +489,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.tester:truncate()
             ---
             ...
@@ -469,23 +499,28 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 0
             ...
 
-    .. function:: inc(key)
+
+.. _space_object_inc:
+
+    space-object:inc{field-value [, field-value ...]}
 
         Increments a counter in a tuple whose primary key matches the
-        ``key``. The field following the primary-key fields
+        field-value(s). The field following the primary-key fields
         will be the counter. If there is no tuple matching the
         ``field-value(s)``, a new one is inserted with initial counter
         value set to 1.
 
         :param space_object space-object:
-        :param lua-table,scalar key: key to be matched against the index
-                                        key, which may be multi-part.
+        :param lua-table,scalar field-value(s): values which must match the primary key
+
         :return: the new counter value
         :rtype:  number
 
         Complexity Factors: Index size, Index type, WAL settings.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> s = box.schema.space.create('forty_second_space')
             ---
@@ -502,7 +537,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 2
             ...
 
-    .. function:: dec(key)
+.. _space_object_dec:
+
+    space-object:dec{field-value [, field-value ...]}
 
         Decrements a counter in a tuple whose primary key matches the
         ``field-value(s)``. The field following the primary-key fields
@@ -519,6 +556,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type, WAL settings.
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> s = box.schema.space.create('space19')
             ---
@@ -539,7 +578,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 998
             ...
 
-    .. function:: auto_increment(tuple)
+.. _space_object_auto_increment:
+
+    space-object:auto_increment{field-value [, field-value ...]}
 
         Insert a new tuple using an auto-increment primary key. The space specified
         by space-name must have a NUM primary key index of type TREE. The
@@ -558,6 +599,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: lua
 
+            EXAMPLE
+
             tarantool> box.space.tester:auto_increment{'Fld#1', 'Fld#2'}
             ---
             - [1, 'Fld#1', 'Fld#2']
@@ -567,6 +610,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - [2, 'Fld#3']
             ...
 
+.. _space_object_pairs:
+
+    space-object:pairs()
+
     .. function:: pairs()
 
         A helper function to prepare for iterating over all tuples in a space.
@@ -575,6 +622,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :rtype:  function, tuple
 
         .. code-block:: lua
+
+            EXAMPLE
 
             tarantool> s = box.schema.space.create('space33')
             ---
@@ -599,7 +648,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_schema`` is a system tuple set. Its single tuple contains these fields:
     ``'version', major-version-number, minor-version-number``.
 
-    The following function will display all fields in all tuples of ``_schema``.
+    EXAMPLE: The following function will display all fields in all tuples of ``_schema``.
 
     .. code-block:: lua
 
@@ -633,7 +682,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_space`` is a system tuple set. Its tuples contain these fields:
     ``id, uid, space-name, engine, field_count, temporary``.
 
-    The following function will display all simple fields
+    EXAMPLE. The following function will display all simple fields
     in all tuples of ``_space``.
 
     .. code-block:: lua
@@ -741,7 +790,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     for support of the :ref:`replication feature <box-replication>`.
 
 =================================================
-                     Example
+                     Example showing use of the box.space functions
 =================================================
 
 This function will illustrate how to look at all the spaces, and for each

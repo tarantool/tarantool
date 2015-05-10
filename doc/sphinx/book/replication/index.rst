@@ -94,9 +94,9 @@ the old master went down, they would have to be re-applied manually.
 
 
 
-=====================================================================
-        Quick startup of a new two-server simple cluster
-=====================================================================
+=============================================================================
+        Instructions for quick startup of a new two-server simple cluster
+=============================================================================
 
 Step 1. Start the first server thus:
 
