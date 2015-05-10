@@ -48,6 +48,13 @@ local function format(status, ...)
     return formatter.encode({{error = err }})
 end
 
+function local_format(status, ...)
+    if not status and type(box.cfg) == 'table' then
+        box.rollback()
+    end
+    return format(status, ...)
+end
+
 --
 -- Evaluate command on local server
 --
@@ -68,7 +75,7 @@ local function local_eval(self, line)
     if not fun then
         return format(false, errmsg)
     end
-    return format(pcall(fun))
+    return local_format(pcall(fun))
 end
 
 local function eval(line)
@@ -90,7 +97,13 @@ local function remote_eval(self, line)
         return ""
     end
     --
-    -- call remote 'console.eval' function
+    -- console connection: execute line as is
+    --
+    if self.remote.console then
+        return self.remote:console(line)
+    end
+    --
+    -- binary connection: call remote 'console.eval' function
     --
     local status, res = pcall(self.remote.eval, self.remote,
         "return require('console').eval(...)", line)
@@ -152,7 +165,7 @@ local function client_read(self)
         return nil
     end
     -- remove trailing delimiter
-    return buf:match("^(.*)"..delim)
+    return buf:sub(1, -#delim-1)
 end
 
 --
@@ -277,8 +290,12 @@ local function connect(uri)
         end
     end
 
-    -- check permissions
-    remote:eval('return true')
+    -- check connection && permissions
+    if remote.console then
+        remote:console('return true')
+    else
+        remote:eval('return true')
+    end
     -- override methods
     self.remote = remote
     self.eval = remote_eval

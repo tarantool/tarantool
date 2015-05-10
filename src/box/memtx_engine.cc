@@ -111,23 +111,6 @@ memtx_txn_add_undo(struct txn *txn, struct space *space,
 	stmt->space = space;
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
-	/* Register a trigger to rollback transaction on yield. */
-	if (txn->autocommit == false && txn->n_stmts == 1) {
-
-		txn->fiber_on_yield = {
-			rlist_nil, txn_on_yield_or_stop, NULL, NULL
-		};
-		txn->fiber_on_stop = {
-			rlist_nil, txn_on_yield_or_stop, NULL, NULL
-		};
-		/*
-		 * Memtx doesn't allow yields between statements of
-		 * a transaction. Set a trigger which would roll
-		 * back the transaction if there is a yield.
-		 */
-		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
-		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
-	}
 }
 
 /**
@@ -490,6 +473,34 @@ MemtxEngine::prepare(struct txn *txn)
 	 */
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
+}
+
+
+void
+MemtxEngine::beginStatement(struct txn *txn)
+{
+	/*
+	 * Register a trigger to rollback transaction on yield.
+	 * This must be done in beginStatement, since it's
+	 * the first thing txn invokes after txn->n_stmts++,
+	 * to match with trigger_clear() in rollbackStatement().
+	 */
+	if (txn->autocommit == false && txn->n_stmts == 1) {
+
+		txn->fiber_on_yield = {
+			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+		};
+		txn->fiber_on_stop = {
+			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+		};
+		/*
+		 * Memtx doesn't allow yields between statements of
+		 * a transaction. Set a trigger which would roll
+		 * back the transaction if there is a yield.
+		 */
+		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+	}
 }
 
 void

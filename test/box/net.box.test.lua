@@ -225,52 +225,28 @@ space:drop()
 
 
 -- admin console tests
-function console_test(...) return { ... } end
-function console_test_error(...) error(string.format(...)) end
-function console_unpack_test(...) return ... end
-
-
-ADMIN = require('uri').parse(os.getenv('ADMIN'))
-
-cn = remote:new(LISTEN.host, LISTEN.service)
-cnc = remote:new(ADMIN.host, ADMIN.service)
-cnc.console
-
-cn:call('console_test', 1, 2, 3, 'string', nil)
-cnc:call('console_test', 1, 2, 3, 'string', nil)
-
-cn:call('console_test_error', 'error %d', 123)
-cnc:call('console_test_error', 'error %d', 123)
-
-
-cn:call('console_unpack_test', 1)
-cnc:call('console_unpack_test', 1)
-
-
-
-
-cn:call('123')
-cnc:call('123')
-
--- gh-649: String escaping doesn't work in remote console
-function echo(...) return ... end
-#cn:call('echo', [[a \[\[ \091\091 b \093\093 c \n d \t e \]\] f ]])[1][1]
-#cnc:call('echo', [[a \[\[ \091\091 b \093\093 c \n d \t e \]\] f ]])[1][1]
-#cn:call('echo', "a [[ \091\091 b \093\093 c \n d \t e ]] f ")[1][1]
-#cnc:call('echo', "a [[ \091\091 b \093\093 c \n d \t e ]] f ")[1][1]
+cnc = remote:new(os.getenv('ADMIN'))
+cnc.console ~= nil
+cnc:console('return 1, 2, 3, "string", nil')
+cnc:console('error("test")')
+cnc:console('a = {1, 2, 3, 4}; return a[3]')
 
 -- #545 user or password is not defined
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
 remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
 
 -- #544 usage for remote[point]method
-cn:call('console_test')
-cn.call('console_test')
+cn = remote:new(LISTEN.host, LISTEN.service)
+
+cn:eval('return true')
+cn.eval('return true')
 
 cn.ping()
 
-remote.self:call('console_test')
-remote.self.call('console_test')
+cn:close()
+
+remote.self:eval('return true')
+remote.self.eval('return true')
 
 
 -- uri as the first argument

@@ -46,6 +46,7 @@ struct MemtxEngine: public Engine {
 	virtual void dropPrimaryKey(struct space *space);
 	virtual bool needToBuildSecondaryKey(struct space *space);
 	virtual void keydefCheck(struct space *space, struct key_def *key_def);
+	virtual void beginStatement(struct txn *txn);
 	virtual void rollbackStatement(struct txn_stmt *stmt);
 	virtual void rollback(struct txn *txn);
 	virtual void prepare(struct txn *txn);

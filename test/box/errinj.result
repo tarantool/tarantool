@@ -9,13 +9,15 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_INDEX_ALLOC:
-    state: false
-  ERRINJ_WAL_IO:
-    state: false
-  ERRINJ_WAL_ROTATE:
+- ERRINJ_WAL_IO:
     state: false
   ERRINJ_TESTING:
+    state: false
+  ERRINJ_INDEX_ALLOC:
+    state: false
+  ERRINJ_TUPLE_ALLOC:
+    state: false
+  ERRINJ_WAL_ROTATE:
     state: false
 ...
 errinj.set("some-injection", true)
@@ -285,6 +287,113 @@ s_disabled:drop()
 ---
 ...
 s_withindex:drop()
+---
+...
+-- Check transaction rollback when out of memory
+s = box.schema.space.create('s')
+---
+...
+_ = s:create_index('pk')
+---
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+---
+- ok
+...
+s:auto_increment{}
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{}
+---
+- []
+...
+s:auto_increment{}
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{}
+---
+- []
+...
+s:auto_increment{}
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{}
+---
+- []
+...
+--# setopt delimiter ';'
+box.begin()
+    s:insert{1}
+box.commit();
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{};
+---
+- []
+...
+box.begin()
+    s:insert{1}
+    s:insert{2}
+box.commit();
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{};
+---
+- []
+...
+box.begin()
+    pcall(s.insert, s, {1})
+    s:insert{2}
+box.commit();
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{};
+---
+- []
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+---
+- ok
+...
+box.begin()
+    s:insert{1}
+    errinj.set("ERRINJ_TUPLE_ALLOC", true)
+    s:insert{2}
+box.commit();
+---
+- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+...
+s:select{};
+---
+- []
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+---
+- ok
+...
+box.begin()
+    s:insert{1}
+    errinj.set("ERRINJ_TUPLE_ALLOC", true)
+    pcall(s.insert, s, {2})
+box.commit();
+---
+...
+s:select{};
+---
+- - [1]
+...
+--# setopt delimiter ''
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+---
+- ok
+...
+s:drop()
 ---
 ...
 errinj = nil
