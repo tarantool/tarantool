@@ -248,7 +248,8 @@ error:
 			request->index_id = mp_decode_uint(&value);
 			break;
 		case IPROTO_OFFSET:
-			request->offset = mp_decode_uint(&value);
+			request->field_base = request->offset =
+				mp_decode_uint(&value);
 			break;
 		case IPROTO_LIMIT:
 			request->limit = mp_decode_uint(&value);
@@ -304,6 +305,11 @@ request_encode(struct request *request, struct iovec *iov)
 		pos = mp_encode_uint(pos, IPROTO_KEY);
 		memcpy(pos, request->key, key_len);
 		pos += key_len;
+		map_size++;
+	}
+	if (request->field_base) { /* only for UPDATE */
+		pos = mp_encode_uint(pos, IPROTO_OFFSET);
+		pos = mp_encode_uint(pos, request->field_base);
 		map_size++;
 	}
 	if (request->tuple) {

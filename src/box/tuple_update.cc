@@ -557,8 +557,13 @@ do_op_splice(struct tuple_update *update, struct update_op *op,
 				  op->field_no, "offset is out of bound");
 		}
 		arg->offset = arg->offset + str_len + 1;
-	} else if (arg->offset > str_len) {
-		arg->offset = str_len;
+	} else if (arg->offset - update->index_base >= 0) {
+		arg->offset -= update->index_base;
+		if (arg->offset > str_len)
+			arg->offset = str_len;
+	} else /* (offset <= 0) */ {
+		tnt_raise(ClientError, ER_SPLICE, update->index_base +
+				op->field_no, "offset is out of bound");
 	}
 
 	assert(arg->offset >= 0 && arg->offset <= str_len);
@@ -844,7 +849,14 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		}
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
-		op->field_no = mp_read_int(update, op, &expr);
+		int64_t field_no = mp_read_int(update, op, &expr);
+		if (field_no - update->index_base >= 0) {
+			op->field_no = field_no - update->index_base;
+		} else if (field_no < 0) {
+			op->field_no = field_no;
+		} else {
+			tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
+		}
 		op->meta->do_op(update, op, &expr);
 	}
 

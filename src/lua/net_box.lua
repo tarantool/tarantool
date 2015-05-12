@@ -165,10 +165,10 @@ local proto = {
 
     -- update
     update = function(sync, spaceno, key, oplist)
-        oplist = require('box.internal').normalize_update_ops(oplist)
         return request(
             { [SYNC] = sync, [TYPE] = UPDATE },
-            { [KEY] = keyfy(key),   [TUPLE]  = oplist, [SPACE_ID] = spaceno }
+            { [KEY] = keyfy(key), [OFFSET] = 1 , [TUPLE]  = oplist,
+              [SPACE_ID] = spaceno }
         )
     end,
 
