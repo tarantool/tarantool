@@ -226,6 +226,10 @@ class LuaObject(ObjectDescription):
         signode += addnodes.desc_annotation(prefix, prefix)
 
         if self.clsname and self.needs_class():
+            sprtr = '.' if str(self.typename) == "data" else ':'
+            clsname = '%s%s' % (self.clsname, sprtr)
+            signode += addnodes.desc_addname(clsname, clsname)
+        elif str(self.typename) == "data":
             clsname = '%s:' % (self.clsname)
             signode += addnodes.desc_addname(clsname, clsname)
         elif self.module and self.needs_module():

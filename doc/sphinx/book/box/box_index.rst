@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------
 
 The ``box.index`` package provides read-only access for index definitions and
-index keys. Indexes are contained in ``box.space.space-name.index`` array within
+index keys. Indexes are contained in :samp:`box.space.{space-name}.index` array within
 each space object. They provide an API for ordered iteration over tuples. This
 API is a direct binding to corresponding methods of index objects of type
 ``box.index`` in the storage engine.
@@ -291,10 +291,11 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. function:: select(key, options)
 
-        This is is an alternative to box.space...select() which goes via a
-        particular index and can make use of additional parameters that specify the
-        iterator type, and the limit (that is, the maximum number of tuples to
-        return) and the offset (that is, which tuple to start with in the list).
+        This is is an alternative to :func:`box.space...select() <space_object.select>`
+        which goes via a particular index and can make use of additional
+        parameters that specify the iterator type, and the limit (that is, the
+        maximum number of tuples to return) and the offset (that is, which
+        tuple to start with in the list).
 
         :param lua-table or scalar key: values to be matched against the index key.
         :param lua-table options: table with any or all of iterator=iterator-type
@@ -506,15 +507,18 @@ function will:
 * Format the value from field[3] as yyyy-mm-dd hh:mm:ss.ffff;
 * Return the formatted value.
 
-The function uses Tarantool box functions box.space...select,
-box.space...replace, fiber.time, uuid.str(). The function uses
+The function uses Tarantool box functions
+:func:`box.space...select <space_object.select>`,
+:func:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
+:func:`uuid.str`. The function uses
 Lua functions os.date() and string.sub().
 
 .. code-block:: lua
 
-    console = require('console'); console.delimiter('!')
+    console = require('console'); console.delimiter('st_end')
     function example()
-      local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
+      local a, b, c, table_of_selected_tuples
+      local replaced_tuple, time_field
       local formatted_time_field
       local fiber = require('fiber')
       table_of_selected_tuples = box.space.tester:select{1000}
@@ -533,8 +537,8 @@ Lua functions os.date() and string.sub().
       d = string.sub(c, 3, 6)
       formatted_time_field = formatted_time_field .. '.' .. d
       return formatted_time_field
-    end!
-    console.delimiter('')!
+    end st_end
+    console.delimiter('') st_end
 
 ... And here is what happens when one invokes the function:
 

@@ -1,4 +1,4 @@
-.. code-block:: bash
+.. code-block:: console
 
     $ # Terminal 1
     $ mkdir -p ~/tarantool_test_node_1

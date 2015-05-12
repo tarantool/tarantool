@@ -13,7 +13,7 @@
     tarantool> box.space.tester:select({0},{iterator='GE'})
     ---
     - - [1, 'Tuple inserted on Terminal #1']
-    - [2, 'Tuple inserted on Terminal #2']
+      - [2, 'Tuple inserted on Terminal #2']
     ...
     tarantool> box.space.tester:insert{3,'Another'}
     ---

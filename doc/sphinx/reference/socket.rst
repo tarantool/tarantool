@@ -534,6 +534,7 @@ On the first shell, start Tarantool and say:
                       end
                     end)
     console.delimiter('')!
+
 The above code means: use tcp_server() to wait for a
 connection from any host on port 3302. When it happens,
 enter a loop that reads on the socket and prints what it
