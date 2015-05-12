@@ -117,6 +117,16 @@
 #cmakedefine HAVE_GNU_READLINE 1
 
 /*
+ * Defined if `st_mtim' is a member of `struct stat'.
+ */
+#cmakedefine HAVE_STRUCT_STAT_ST_MTIM 1
+
+/*
+ * Defined if `st_mtimensec' is a member of `struct stat'.
+ */
+#cmakedefine HAVE_STRUCT_STAT_ST_MTIMENSEC 1
+
+/*
  * Set if compiler has __builtin_XXX methods.
  */
 #cmakedefine HAVE_BUILTIN_CTZ 1

@@ -88,6 +88,13 @@ check_function_exists(funopen HAVE_FUNOPEN)
 check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
 
+# Checks for libev
+include(CheckStructHasMember)
+check_struct_has_member("struct stat" "st_mtim" "sys/stat.h"
+    HAVE_STRUCT_STAT_ST_MTIM)
+check_struct_has_member("struct stat" "st_mtimensec" "sys/stat.h"
+    HAVE_STRUCT_STAT_ST_MTIMENSEC)
+
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
 # which we use to determine the end (or beginning, actually) of
