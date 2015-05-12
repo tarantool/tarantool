@@ -182,8 +182,9 @@ the function invocations will look like ``sock:function_name(...)``.
         Send data over a connected socket.
 
         :param string data:
-        :return: true if success, false if error.
-        :rtype:  boolean
+        :return: the number of bytes sent.
+        :rtype:  number
+        :exception: nil on error.
 
     .. method:: syswrite(size)
 
@@ -262,7 +263,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Accept a new client connection and create a new connected socket.
         It is good practice to set the socket's blocking mode explicitly
-        fter accepting.
+        after accepting.
 
         :return: new socket if success.
         :rtype: userdata
@@ -387,7 +388,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
     .. method:: readable([timeout])
                 writeable([timeout])
-                wait([timout])
+                wait([timeout])
 
         ``sock:readable()`` waits until something is readable, or until a timeout value expires. |br|
         ``sock:writable()`` waits until something is writable, or until a timeout value expires. |br|

@@ -176,6 +176,10 @@ with an existing space named T, associate the function a second time with the
 same space (so it will be called twice), disable all triggers of T, and destroy
 each trigger by replacing with ``nil``.
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Another Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. code-block:: lua
 
     box.space.T:on_replace(F)

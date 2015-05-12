@@ -57,3 +57,44 @@ be presented to the client as ``ER_PROC_LUA``.
         ---
         - error: A access denied for user 'B' to function 'C'
         ...
+
+.. function:: box.error.last()
+
+    Returns a description of the last error, as a Lua table
+    with three members: "type" (string) error's C++ class,
+    "message" (string) error's message, "code" (numeric) error's number.
+    Additionally, if the error is a system error (for example due to a
+    failure in socket or file io), there is a fourth member:
+    "errno" (number) C standard error number.
+
+    rtype: table
+
+.. function:: box.error.clear()
+
+    Clears the record of errors, so functions like `box.error()`
+    or `box.error.last()` will have no effect.
+
+    .. code-block:: lua
+
+        EXAMPLE
+
+        tarantool> box.error({code=555, reason='Arbitrary message'})
+        ---
+        - error: Arbitrary message
+        ...
+
+        tarantool> box.error.last()
+        ---
+        - type: ClientError
+          message: Arbitrary message
+          code: 555
+        ...
+
+        tarantool> box.error.clear()
+        ---
+        ...
+
+        tarantool> box.error.last()
+        ---
+        - null
+        ...

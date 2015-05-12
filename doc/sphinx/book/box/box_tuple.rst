@@ -42,7 +42,7 @@ and conversion to a Lua table.
 
 .. class:: tuple
 
-    .. method:: __len()
+    #tuple-value
 
         The ``#`` operator in Lua means "return count of components". So,
         if ``t`` is a tuple instance, ``#t`` will return the number of fields.
@@ -62,7 +62,7 @@ and conversion to a Lua table.
             - 4
             ...
 
-    .. method:: bsize()
+    tuple-value:bsize()
 
         If ``t`` is a tuple instance, ``t:bsize()`` will return the number of
         bytes in the tuple. It is useful to check this number when making
@@ -89,7 +89,7 @@ and conversion to a Lua table.
             - 13
             ...
 
-    .. method:: __index(key)
+    tuple-value [field-number]
 
         If ``t`` is a tuple instance, ``t[field-number]`` will return the field
         numbered field-number in the tuple. The first field is ``t[1]``.
@@ -110,13 +110,12 @@ and conversion to a Lua table.
             - Fld#2
             ...
 
-    .. method:: find([field-number,] field-value)
-                findall([field-number,] field-value)
+    tuple-value:find([field-number,] search-value) or tuple-value:findall([field-number,] search-value)
 
-        If ``t`` is a tuple instance, ``t:find(field-value)`` will return the
-        number of the first field in ``t`` that matches the field value),
-        and ``t:findall(field-value [, field-value ...])`` will return numbers
-        of all fields in ``t`` that match the field value. Optionally one can
+        If ``t`` is a tuple instance, ``t:find(search-value)`` will return the
+        number of the first field in ``t`` that matches the search value),
+        and ``t:findall(search-value [, search-value ...])`` will return numbers
+        of all fields in ``t`` that match the search value. Optionally one can
         put a numeric argument ``field-number`` before the search-value to
         indicate “start searching at field number ``field-number``.”
 
@@ -127,7 +126,7 @@ and conversion to a Lua table.
         number of the first field in ``t`` which matches 'a' is returned, then
         the numbers of all the fields in ``t`` which match 'a' are returned,
         then the numbers of all the fields in t which match 'a' and are at or
-        fter the second field are returned.
+        after the second field are returned.
 
         .. code-block:: lua
 
@@ -148,7 +147,7 @@ and conversion to a Lua table.
             - 4
             ...
 
-    .. method:: transform(start-field-number, fields-to-remove [, field-value ...])
+    tuple-value:transform(start-field-number, fields-to-remove [, field-value ...])
 
         If ``t`` is a tuple instance, ``t:transform(start-field-number,fields-to-remove)``
         will return a tuple where, starting from field ``start-field-number``,
@@ -176,9 +175,11 @@ and conversion to a Lua table.
             - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
             ...
 
-    .. method:: unpack()
+    tuple-value:unpack([start-field-number [, end-field-number]])
 
-        If ``t`` is a tuple instance, ``t:unpack(n)`` will return all fields.
+        If ``t`` is a tuple instance, ``t:unpack()`` will return all fields,
+        ``t:unpack(1)`` will return all fields starting with field number 1,
+        ``t:unpack(1,5)`` will return all fields between field number 1 and field number 5.
 
         :return: field(s) from the tuple.
         :rtype:  lua-value(s)
@@ -200,7 +201,7 @@ and conversion to a Lua table.
             - Fld#5
             ...
 
-    .. method:: pairs()
+    tuple-value:pairs()
 
         In Lua, ``lua-table-value:pairs()`` is a method which returns:
         ``function``, ``lua-table-value``, ``nil``. Tarantool has extended
@@ -227,7 +228,7 @@ and conversion to a Lua table.
             - Fld#1Fld#2Fld#3Fld#4Fld#5
             ...
 
-    .. method:: update({{format, field_number, value}...})
+    tuple-value:update({{format, field_number, value}...})
 
         Update a tuple.
 

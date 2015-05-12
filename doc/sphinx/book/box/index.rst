@@ -496,24 +496,7 @@ the Tarantool server's storage functionality with the ``box`` Lua library.
 
 The contents of the box library can be inspected at runtime with ``box``, with
 no arguments. The packages inside the box library are:
-
-.. toctree::
-    :maxdepth: 1
-
-    box_schema
-    box_tuple
-    box_space
-    box_index
-    box_session
-    box_error
-    box_introspection
-    net_box
-    admin
-    atomic
-    authentication
-    limitations
-    triggers
-
+box.schema, box.tuple, box.space, box.index, net.box, box.cfg, box.info, box.slab, box.stat.
 Every package contains one or more Lua functions. A few packages contain
 members as well as functions. The functions allow data definition (create
 alter drop), data manipulation (insert delete update select replace), and
@@ -570,6 +553,25 @@ The manual concentrates on memtx because it is the default and has been around
 longer. But sophia is a working key-value engine and will especially appeal to
 users who like to see data go directly to disk, so that recovery time might be
 shorter and database size might be larger. For architectural explanations and
-benchmarks, see sphia.org. On the other hand, sophia lacks some functions and
+benchmarks, see `sphia.org`_. On the other hand, sophia lacks some functions and
 options that are available with memtx. Where that is the case, the relevant
 description will contain the words "only applicable for the memtx storage engine".
+
+.. _sphia.org: http://sphia.org
+
+.. toctree::
+    :maxdepth: 1
+
+    box_schema
+    box_space
+    box_index
+    box_session
+    box_error
+    box_tuple
+    box_introspection
+    net_box
+    admin
+    atomic
+    authentication
+    limitations
+    triggers

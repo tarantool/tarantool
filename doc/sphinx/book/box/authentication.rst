@@ -1,7 +1,7 @@
 .. _box-authentication:
 
 -------------------------------------------------------------------------------
-                    Authentication and authorization
+                    Authentication and access control
 -------------------------------------------------------------------------------
 
 Understanding the details of security is primarily an issue for administrators,
@@ -56,22 +56,26 @@ determined long-term attacks, so passwords should be guarded and changed occasio
 The fields in the ``_user`` space are: the numeric id of the tuple, the numeric
 id of the tuple's creator, the user name, the type, and the optional password.
 
-There are three special tuples in the _user space: 'guest', 'admin', and 'public'.
+There are four special tuples in the _user space: 'guest', 'admin', 'public', and 'replication'.
 
 .. container:: table
 
-    +--------+----+------+--------------------------------------------------------+
-    | Name   | ID | Type | Description                                            |
-    +========+====+======+========================================================+
-    | guest  | 0  | user | Default when connecting remotely. Usually an untrusted |
-    |        |    |      | user with few privileges.                              |
-    +--------+----+------+--------------------------------------------------------+
-    | admin  | 1  | user | Default when using ``tarantool`` as a console. Usually |
-    |        |    |      | an administrative user with all privileges.            |
-    +--------+----+------+--------------------------------------------------------+
-    | public | 2  | role | Not a user in the usual sense. Described later in      |
-    |        |    |      | section `Roles`_.                                      |
-    +--------+----+------+--------------------------------------------------------+
+    +-------------+----+------+--------------------------------------------------------+
+    | Name        | ID | Type | Description                                            |
+    +=============+====+======+========================================================+
+    | guest       | 0  | user | Default when connecting remotely. Usually an untrusted |
+    |             |    |      | user with few privileges.                              |
+    +-------------+----+------+--------------------------------------------------------+
+    | admin       | 1  | user | Default when using ``tarantool`` as a console. Usually |
+    |             |    |      | an administrative user with all privileges.            |
+    +-------------+----+------+--------------------------------------------------------+
+    | public      | 2  | role | Not a user in the usual sense. Described later in      |
+    |             |    |      | section `Roles`_.                                      |
+    +-------------+----+------+--------------------------------------------------------+
+    | replication | 3  | role | Not a user in the usual sense. Described later in      |
+    |             |    |      | section `Roles`_.                                      |
+    +-------------+----+------+--------------------------------------------------------+
+
 
 To select a row from the ``_user`` space, use ``box.space._user:select``. For
 example, here is what happens with a select for user id = 0, which is the
@@ -105,6 +109,8 @@ To drop a user, say ``box.schema.user.drop(user-name)``.
 To check whether a user exists, say ``box.schema.user.exists(user-name)``,
 which returns true or false.
 
+To find what privileges a user has, say ``box.schema.user.info(user-name)``.
+
 For example, here is a session which creates a new user with a strong password,
 selects a tuple in the ``_user`` space, and then drops the user.
 
@@ -128,7 +134,7 @@ selects a tuple in the ``_user`` space, and then drops the user.
     The maximum number of users is 32.
 
 ===========================================================
-               Priveleges and _priv space
+               Privileges and the _priv space
 ===========================================================
 
 The fields in the ``_priv`` space are: the numeric id of the user who gave the
@@ -171,7 +177,7 @@ privilege to read from a space named space55, and then took the privilege away:
 ===========================================================
 
 The fields in the ``_func`` space are: the numeric function id, a number,
-and the function name.
+the function name, and a flag.
 
 The ``_func`` space does not include the function's body. One continues to
 create Lua functions in the usual way, by saying
@@ -181,6 +187,14 @@ that their names can be used within grant/revoke functions.
 
 The function for creating a ``_func`` tuple is:
 ``box.schema.func.create(function-name [, {if_not_exists=true} ])``.
+
+The variant function for creating a ``_func`` tuple is:
+``box.schema.func.create(function-name , {setuid=true} )``.
+This causes the flag (the fourth field in the _func tuple) to have
+a value meaning "true", and the effect of that is that the
+function's caller is treated as the function's creator,
+with full privileges. The setuid behavior does not apply for
+users who connect via console.connect.
 
 The function for dropping a ``_func`` tuple is:
 ``box.schema.func.drop(function-name)``.
@@ -286,7 +300,7 @@ or indirectly.
 
 .. function:: info()
 
-    Get information about a role.
+    Get information about a role, including what privileges have been granted to the role.
 
 .. function:: grant(role-name, 'execute', 'role', role-name)
 
@@ -312,18 +326,17 @@ or indirectly.
 
     Revoke a role from a user.
 
-There is one predefined role, named 'public', which is automatically assigned
-to new users when they are created with ``box.schema.user.create(user-name)``.
+There are two predefined roles. The first predefined role, named 'public', is automatically assigned
+to new users when they are created with ``box.schema.user.create(user-name)`` --
 Therefore a convenient way to grant 'read' on space '``t``' to every user that
-will ever exist is:
+will ever exist is: box.schema.role.grant('public','read','space','t').
+The second predefined role, named 'replication', can be assigned
+by the 'admin' user to users who need to use
+replication features.
 
-.. code-block:: lua
-
-    box.schema.role.grant('public','read','space','t').
-
-===========================================================
-                         Example
-===========================================================
+================================================================
+                         Example showing a role within a role
+================================================================
 
 In this example, a new user named U1 will insert a new tuple into a new space
 named T, and will succeed even though user U1 has no direct privilege to do

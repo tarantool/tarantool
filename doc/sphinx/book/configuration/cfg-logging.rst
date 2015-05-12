@@ -40,10 +40,10 @@
         }
 
     the program specified in the option is executed at server start and all
-    log messages are send to the standart input.
+    log messages are sent to the standard input.
 
     When logging to a file, tarantool reopens the log on SIGHUP. When log is
-    a program, it’s pid is saved in :func:`log.logger_pid` variable. You need
+    a program, its pid is saved in :func:`log.logger_pid` variable. You need
     to send it a signal to rotate logs.
 
     Type: string |br|

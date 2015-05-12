@@ -274,4 +274,4 @@ or
     $ cd doc/user
     $ make
 
-The html version of the user guide will be genreated in doc/www/content/doc
+The html version of the user guide will be generated in doc/www/content/doc

@@ -1,6 +1,6 @@
--------------------------------------------------------------------------------
-                            Package `net.box`
--------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+                            Package `net.box` -- working with networked Tarantool peers
+-----------------------------------------------------------------------------------------
 
 The ``net.box`` package contains connectors to remote database systems. One
 variant, ``box.net.sql``, is for connecting to MySQL or MariaDB or PostgreSQL —
@@ -25,7 +25,9 @@ necessary to prioritize requests or to use different authentication ids.
 
 .. module:: net_box
 
-.. function:: new(host, port [, {params}])
+.. class:: conn
+
+  conn = net_box:new(host, port [, {other parameter[s]}])
 
     Create a new connection. The connection is established on demand, at the
     time of the first request. It is re-established automatically after a
@@ -51,6 +53,8 @@ necessary to prioritize requests or to use different authentication ids.
 
     .. code-block:: lua
 
+        EXAMPLE
+
         conn = net_box:new('localhost', 3301)
         conn = net_box:new('127.0.0.1', box.cfg.listen, {
             wait_connect = false,
@@ -58,7 +62,6 @@ necessary to prioritize requests or to use different authentication ids.
             password = ''
         })
 
-.. class:: connection
 
     .. method:: ping()
 
@@ -96,7 +99,7 @@ necessary to prioritize requests or to use different authentication ids.
 
             conn:close()
 
-    .. method:: connection.space.<space-name>:select{field-value, ...}
+    .. method:: conn.space.<space-name>:select{field-value, ...}
 
         ``conn.space.space-name:select{...}`` is the remote-call equivalent
         of the local call ``box.space.space-name:select{...}``. Please note
@@ -105,22 +108,22 @@ necessary to prioritize requests or to use different authentication ids.
         does yield, so local data may change while a remote
         ``conn.space.space-name:select{...}`` is running.
 
-    .. method:: connection.space.<space-name>:insert{field-value, ...}
+    .. method:: conn.space.<space-name>:insert{field-value, ...}
 
         ``conn.space.space-name:insert(...)`` is the remote-call equivalent
         of the local call ``box.space.space-name:insert(...)``.
 
-    .. method:: connection.space.<space-name>:replace{field-value, ...}
+    .. method:: conn.space.<space-name>:replace{field-value, ...}
 
         ``conn.space.space-name:replace(...)`` is the remote-call equivalent
         of the local call ``box.space.space-name:replace(...)``.
 
-    .. method:: connection.space.<space-name>:update{field-value, ...}
+    .. method:: conn.space.<space-name>:update{field-value, ...}
 
         ``conn.space.space-name:update(...)`` is the remote-call equivalent
         of the local call ``box.space.space-name:update(...)``.
 
-    .. method:: connection.space.<space-name>:delete{field-value, ...}
+    .. method:: conn.space.<space-name>:delete{field-value, ...}
 
         ``conn.space.space-name:delete(...)`` is the remote-call equivalent
         of the local call ``box.space.space-name:delete(...)``.
@@ -151,9 +154,9 @@ necessary to prioritize requests or to use different authentication ids.
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.
 
-===========================================================
-                        Example
-===========================================================
+============================================================================
+                        Example showing use of most of the net.box methods
+============================================================================
 
 This example will work with the sandbox configuration described in the preface.
 That is, there is a space named tester with a numeric primary key. Assume that
