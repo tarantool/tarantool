@@ -850,13 +850,9 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		int64_t field_no = mp_read_int(update, op, &expr);
-		if (field_no - update->index_base >= 0) {
-			op->field_no = field_no - update->index_base;
-		} else if (field_no < 0) {
-			op->field_no = field_no;
-		} else {
-			tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
-		}
+		if (field_no - update->index_base < 0)
+			tnt_raise(ClientError, ER_NO_SUCH_FIELD, (int) field_no);
+		op->field_no = field_no - update->index_base;
 		op->meta->do_op(update, op, &expr);
 	}
 

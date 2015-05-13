@@ -328,7 +328,7 @@ lbox_update(lua_State *L)
 	struct request request;
 	struct port_lua port;
 	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4);
-	request.field_base = 1; /* field ids are one-indexed */
+	request.index_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
 	box_process(&request, (struct port *) &port);

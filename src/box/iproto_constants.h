@@ -58,6 +58,7 @@ enum iproto_key {
 	IPROTO_LIMIT = 0x12,
 	IPROTO_OFFSET = 0x13,
 	IPROTO_ITERATOR = 0x14,
+	IPROTO_INDEX_BASE = 0x15,
 	/* Leave a gap between integer values and other keys */
 	IPROTO_KEY = 0x20,
 	IPROTO_TUPLE = 0x21,
@@ -79,9 +80,9 @@ enum iproto_key {
 #define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(SERVER_ID) |\
 			  bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
-			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
-			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME) | \
-			  bit(EXPR))
+			  bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
+			  bit(KEY) | bit(TUPLE) | bit(FUNCTION_NAME) | \
+			  bit(USER_NAME) | bit(EXPR))
 
 static inline bool
 xrow_header_has_key(const char *pos, const char *end)

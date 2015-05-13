@@ -254,7 +254,7 @@ t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
 t:update()
 t:update(10)
 t:update({})
-t:update({{ '!', -1, 'f'}})
+t:update({{ '!', 4294967296, 'f'}})
 t:update({{ '#', 4, 1}})
 
 t

@@ -31,6 +31,7 @@ local INDEX_ID          = 0x11
 local LIMIT             = 0x12
 local OFFSET            = 0x13
 local ITERATOR          = 0x14
+local INDEX_BASE        = 0x15
 local KEY               = 0x20
 local TUPLE             = 0x21
 local FUNCTION_NAME     = 0x22
@@ -167,7 +168,7 @@ local proto = {
     update = function(sync, spaceno, key, oplist)
         return request(
             { [SYNC] = sync, [TYPE] = UPDATE },
-            { [KEY] = keyfy(key), [OFFSET] = 1 , [TUPLE]  = oplist,
+            { [KEY] = keyfy(key), [INDEX_BASE] = 1 , [TUPLE]  = oplist,
               [SPACE_ID] = spaceno }
         )
     end,
