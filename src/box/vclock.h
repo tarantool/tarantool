@@ -160,12 +160,22 @@ vclock_compare(const struct vclock *a, const struct vclock *b)
 {
 	bool le = true, ge = true;
 	for (uint32_t server_id = 0; server_id < VCLOCK_MAX; server_id++) {
-		int64_t lsn_a = vclock_get(a, server_id);
-		int64_t lsn_b = vclock_get(b, server_id);
-		le = le && lsn_a <= lsn_b;
-		ge = ge && lsn_a >= lsn_b;
-		if (!ge && !le)
-			return VCLOCK_ORDER_UNDEFINED;
+		int64_t lsn_a = a->lsn[server_id];
+		int64_t lsn_b = b->lsn[server_id];
+		if (lsn_a > 0 || lsn_b > 0) {
+			/*
+			 * At least one of the clocks must have
+			 * events for this server id. The case
+			 * when one of the clocks lists the server
+			 * as "present" and another doesn't yet
+			 * know about is possible when reading
+			 * and relaying rows to a replica.
+			 */
+			le = le && lsn_a <= lsn_b;
+			ge = ge && lsn_a >= lsn_b;
+			if (!ge && !le)
+				return VCLOCK_ORDER_UNDEFINED;
+		}
 	}
 	if (ge && !le)
 		return 1;
