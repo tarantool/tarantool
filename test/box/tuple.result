@@ -815,7 +815,7 @@ t:update({})
 ---
 - error: Illegal parameters, no operations for update
 ...
-t:update({{ '!', 4294967296, 'f'}})
+t:update({{ '!', -1, 'f'}})
 ---
 - ['a', 'b', 'c', 'd', 'e', 'f']
 ...
