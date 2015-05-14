@@ -79,7 +79,7 @@ session.su('guest')
 box.session.su('admin')
 ---
 ...
-box.schema.role.revoke('guest', 'public')
+box.schema.user.revoke('guest', 'public')
 ---
 ...
 box.session.su('guest')
@@ -108,7 +108,7 @@ box.session.su('guest')
 box.session.su('admin')
 ---
 ...
-box.schema.role.grant('guest', 'public')
+box.schema.user.grant('guest', 'public')
 ---
 ...
 box.session.su('guest')

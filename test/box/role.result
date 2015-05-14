@@ -74,15 +74,15 @@ box.schema.user.grant('tester', 'read', 'role', 'iddqd')
 - error: User 'tester' already has role 'iddqd'
 ...
 -- test granting role to a role
-box.schema.user.grant('iddqd', 'execute', 'role', 'iddqd')
+box.schema.role.grant('iddqd', 'execute', 'role', 'iddqd')
 ---
 - error: Granting role 'iddqd' to role 'iddqd' would create a loop
 ...
-box.schema.user.grant('iddqd', 'iddqd')
+box.schema.role.grant('iddqd', 'iddqd')
 ---
 - error: Granting role 'iddqd' to role 'iddqd' would create a loop
 ...
-box.schema.user.revoke('iddqd', 'iddqd')
+box.schema.role.revoke('iddqd', 'iddqd')
 ---
 - error: User 'iddqd' does not have role 'iddqd'
 ...
@@ -120,19 +120,32 @@ box.schema.role.create('c')
 box.schema.role.create('d')
 ---
 ...
-box.schema.user.grant('b', 'a')
+box.schema.role.grant('b', 'a')
 ---
 ...
-box.schema.user.grant('c', 'a')
+box.schema.role.grant('c', 'a')
 ---
 ...
-box.schema.user.grant('d', 'b')
+box.schema.role.grant('d', 'b')
 ---
 ...
-box.schema.user.grant('d', 'c')
+box.schema.role.grant('d', 'c')
 ---
 ...
+--check user restrictions
 box.schema.user.grant('a', 'd')
+---
+- error: User 'a' is not found
+...
+box.schema.user.revoke('a', 'd')
+---
+- error: User 'a' is not found
+...
+box.schema.user.drop('a')
+---
+- error: User 'a' is not found
+...
+box.schema.role.grant('a', 'd')
 ---
 - error: Granting role 'd' to role 'a' would create a loop
 ...
@@ -156,13 +169,13 @@ box.schema.role.create('a')
 box.schema.role.create('b')
 ---
 ...
-box.schema.user.grant('b', 'a')
+box.schema.role.grant('b', 'a')
 ---
 ...
 box.schema.role.drop('a')
 ---
 ...
-box.schema.user.info('b')
+box.schema.role.info('b')
 ---
 - []
 ...
@@ -178,6 +191,19 @@ box.schema.user.create('grantee')
 ...
 box.schema.role.create('liaison')
 ---
+...
+--check role restrictions
+box.schema.role.grant('test', 'liaison')
+---
+- error: Role 'test' is not found
+...
+box.schema.role.revoke('test', 'liaison')
+---
+- error: Role 'test' is not found
+...
+box.schema.role.drop('test')
+---
+- error: Role 'test' is not found
 ...
 box.schema.user.grant('grantee', 'liaison')
 ---
@@ -211,7 +237,7 @@ box.space.test:select{1}
 box.session.su('test')
 ---
 ...
-box.schema.user.revoke('liaison', 'read,write', 'space', 'test')
+box.schema.role.revoke('liaison', 'read,write', 'space', 'test')
 ---
 ...
 box.session.su('grantee')
@@ -234,7 +260,7 @@ box.schema.user.drop('test')
 box.schema.user.drop('grantee')
 ---
 ...
-box.schema.user.drop('liaison')
+box.schema.role.drop('liaison')
 ---
 ...
 --
@@ -304,7 +330,7 @@ box.schema.role.grant("role6", "role5")
 box.schema.role.grant("role7", "role5")
 ---
 ...
-box.schema.role.grant("user1", "role6")
+box.schema.user.grant("user1", "role6")
 ---
 ...
 box.schema.role.grant("role9", "role6")
@@ -615,10 +641,10 @@ box.schema.role.create('role')
 box.session.su('admin')
 ---
 ...
-box.schema.role.grant('grantee', 'role')
+box.schema.user.grant('grantee', 'role')
 ---
 ...
-box.schema.role.revoke('grantee', 'role')
+box.schema.user.revoke('grantee', 'role')
 ---
 ...
 box.schema.user.create('john')
@@ -628,7 +654,7 @@ box.session.su('john')
 ---
 ...
 -- error
-box.schema.role.grant('grantee', 'role')
+box.schema.user.grant('grantee', 'role')
 ---
 - error: Read access denied for user 'john' to space '_user'
 ...
@@ -645,11 +671,11 @@ box.schema.user.grant('john', 'read,write,execute', 'universe')
 box.session.su('john')
 ---
 ...
-box.schema.role.grant('grantee', 'role')
+box.schema.user.grant('grantee', 'role')
 ---
 - error: role access denied for user 'john'
 ...
-box.schema.role.grant('grantee', 'read', 'space', 'test')
+box.schema.user.grant('grantee', 'read', 'space', 'test')
 ---
 - error: Read access denied for user 'john'
 ...
@@ -658,7 +684,7 @@ box.schema.role.grant('grantee', 'read', 'space', 'test')
 -- can grant 'public' role, it's implicitly granted with
 -- a grant option.
 --
-box.schema.role.grant('grantee', 'public')
+box.schema.user.grant('grantee', 'public')
 ---
 - error: User 'grantee' already has role 'public'
 ...
@@ -667,7 +693,7 @@ box.schema.role.grant('grantee', 'public')
 -- superuser can do that, and even that would be useless,
 -- since one can still re-grant it back to oneself.
 --
-box.schema.role.revoke('grantee', 'public')
+box.schema.user.revoke('grantee', 'public')
 ---
 - error: Create or drop access denied for user 'john'
 ...

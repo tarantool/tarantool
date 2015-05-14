@@ -32,7 +32,7 @@ session.su('guest')
 #box.space._vindex:select(box.space._vpriv.id) > 0
 
 box.session.su('admin')
-box.schema.role.revoke('guest', 'public')
+box.schema.user.revoke('guest', 'public')
 box.session.su('guest')
 
 #box.space._vspace:select{}
@@ -42,7 +42,7 @@ box.session.su('guest')
 #box.space._vfunc:select{}
 
 box.session.su('admin')
-box.schema.role.grant('guest', 'public')
+box.schema.user.grant('guest', 'public')
 box.session.su('guest')
 
 #box.space._vspace:select{}
