@@ -276,7 +276,9 @@ xrow_encode_subscribe(struct xrow_header *row,
 	data = xrow_encode_uuid(data, server_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(vclock, server) {
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, server) {
 		data = mp_encode_uint(data, server.id);
 		data = mp_encode_uint(data, server.lsn);
 	}
@@ -289,7 +291,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 
 void
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
-			struct tt_uuid *server_uuid, struct vclock *vclock)
+		      struct tt_uuid *server_uuid, struct vclock *vclock)
 {
 	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -351,7 +353,9 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
 		if (mp_typeof(*d) != MP_UINT)
 			goto map_error;
 		int64_t lsn = (int64_t) mp_decode_uint(&d);
-		vclock_follow(vclock, id, lsn);
+		vclock_add_server(vclock, id);
+		if (lsn > 0)
+			vclock_follow(vclock, id, lsn);
 	}
 }
 
@@ -389,7 +393,9 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(vclock, server) {
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, server) {
 		data = mp_encode_uint(data, server.id);
 		data = mp_encode_uint(data, server.lsn);
 	}

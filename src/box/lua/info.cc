@@ -100,9 +100,11 @@ lbox_info_vclock(struct lua_State *L)
 	lua_createtable(L, 0, vclock_size(&recovery->vclock));
 	/* Request compact output flow */
 	luaL_setmaphint(L, -1);
-	vclock_foreach(&recovery->vclock, it) {
-		lua_pushinteger(L, it.id);
-		luaL_pushuint64(L, it.lsn);
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, &recovery->vclock);
+	vclock_foreach(&it, server) {
+		lua_pushinteger(L, server.id);
+		luaL_pushuint64(L, server.lsn);
 		lua_settable(L, -3);
 	}
 

@@ -966,7 +966,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	 */
 	fill_lsn(r, row);
 	if (r->wal_mode == WAL_NONE)
-		return vclock_sum(&r->vclock);
+		return vclock_signature(&r->vclock);
 
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
@@ -1002,7 +1002,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	fiber_set_cancellable(cancellable);
 	if (req->res == -1)
 		return -1;
-	return vclock_sum(&r->vclock);
+	return vclock_signature(&r->vclock);
 }
 
 /* }}} */
