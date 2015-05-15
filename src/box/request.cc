@@ -99,7 +99,7 @@ execute_update(struct request *request, struct port *port)
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
-					       request->field_base);
+					       request->index_base);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	if (! engine_auto_check_update(space->handler->engine->flags))
@@ -250,6 +250,9 @@ error:
 		case IPROTO_OFFSET:
 			request->offset = mp_decode_uint(&value);
 			break;
+		case IPROTO_INDEX_BASE:
+			request->index_base = mp_decode_uint(&value);
+			break;
 		case IPROTO_LIMIT:
 			request->limit = mp_decode_uint(&value);
 			break;
@@ -304,6 +307,11 @@ request_encode(struct request *request, struct iovec *iov)
 		pos = mp_encode_uint(pos, IPROTO_KEY);
 		memcpy(pos, request->key, key_len);
 		pos += key_len;
+		map_size++;
+	}
+	if (request->index_base) { /* only for UPDATE */
+		pos = mp_encode_uint(pos, IPROTO_INDEX_BASE);
+		pos = mp_encode_uint(pos, request->index_base);
 		map_size++;
 	}
 	if (request->tuple) {

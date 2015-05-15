@@ -190,7 +190,7 @@ struct update_op {
 	const struct update_op_meta *meta;
 	union update_op_arg arg;
 	/* Subject field no. */
-	uint32_t field_no;
+	int32_t field_no;
 	uint32_t new_field_len;
 	uint8_t opcode;
 };
@@ -331,22 +331,21 @@ mp_read_str(struct tuple_update *update, struct update_op *op,
 }
 
 static inline void
-op_check_field_no(struct tuple_update *update, uint32_t field_no,
-		  uint32_t field_max)
-{
-	if (field_no > field_max)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, update->index_base +
-			  field_no);
-}
-
-static inline void
 op_adjust_field_no(struct tuple_update *update, struct update_op *op,
-		   uint32_t field_max)
+		   int32_t field_max)
 {
-	if (op->field_no == UINT32_MAX)
-		op->field_no = field_max;
-	else
-		op_check_field_no(update, op->field_no, field_max);
+	if (op->field_no >= 0) {
+		if (op->field_no < field_max)
+			return;
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, update->index_base +
+			op->field_no);
+	} else {
+		if (op->field_no + field_max >= 0) {
+			op->field_no += field_max;
+			return;
+		}
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, op->field_no);
+	}
 }
 
 static inline void
@@ -363,7 +362,7 @@ static void
 do_op_insert(struct tuple_update *update, struct update_op *op,
 	     const char **expr)
 {
-	op_adjust_field_no(update, op, rope_size(update->rope));
+	op_adjust_field_no(update, op, rope_size(update->rope) + 1);
 	op_set_read(op, expr);
 	struct update_field *field = (struct update_field *)
 		update->alloc(update->alloc_ctx, sizeof(*field));
@@ -375,23 +374,23 @@ static void
 do_op_set(struct tuple_update *update, struct update_op *op,
 	  const char **expr)
 {
-	if (op->field_no < rope_size(update->rope)) {
-		struct update_field *field = (struct update_field *)
-				rope_extract(update->rope, op->field_no);
-		/* Ignore the previous op, if any. */
-		field->op = op;
-		op_set_read(op, expr);
-		op->new_field_len = op->arg.set.length;
-	} else {
-		do_op_insert(update, op, expr);
-	}
+	/* intepret '=' for n +1 field as insert */
+	if (op->field_no == rope_size(update->rope))
+		return do_op_insert(update, op, expr);
+	op_adjust_field_no(update, op, rope_size(update->rope));
+	struct update_field *field = (struct update_field *)
+			rope_extract(update->rope, op->field_no);
+	/* Ignore the previous op, if any. */
+	field->op = op;
+	op_set_read(op, expr);
+	op->new_field_len = op->arg.set.length;
 }
 
 static void
 do_op_delete(struct tuple_update *update, struct update_op *op,
 	     const char **expr)
 {
-	op_adjust_field_no(update, op, rope_size(update->rope) - 1);
+	op_adjust_field_no(update, op, rope_size(update->rope));
 	uint32_t delete_count = mp_read_int(update, op, expr);
 
 	if ((uint64_t) op->field_no + delete_count > rope_size(update->rope))
@@ -468,7 +467,7 @@ static void
 prepare_op_arith(struct tuple_update *update, struct update_op *op,
 		 const char **expr, struct op_arith_arg *left)
 {
-	op_check_field_no(update, op->field_no, rope_size(update->rope) - 1);
+	op_adjust_field_no(update, op, rope_size(update->rope));
 
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
@@ -497,7 +496,7 @@ static void
 do_op_bit(struct tuple_update *update, struct update_op *op,
 	  const char **expr)
 {
-	op_check_field_no(update, op->field_no, rope_size(update->rope) - 1);
+	op_adjust_field_no(update, op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 
@@ -531,7 +530,7 @@ static void
 do_op_splice(struct tuple_update *update, struct update_op *op,
 	     const char **expr)
 {
-	op_check_field_no(update, op->field_no, rope_size(update->rope) - 1);
+	op_adjust_field_no(update, op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 	if (field->op) {
@@ -557,8 +556,13 @@ do_op_splice(struct tuple_update *update, struct update_op *op,
 				  op->field_no, "offset is out of bound");
 		}
 		arg->offset = arg->offset + str_len + 1;
-	} else if (arg->offset > str_len) {
-		arg->offset = str_len;
+	} else if (arg->offset - update->index_base >= 0) {
+		arg->offset -= update->index_base;
+		if (arg->offset > str_len)
+			arg->offset = str_len;
+	} else /* (offset <= 0) */ {
+		tnt_raise(ClientError, ER_SPLICE, update->index_base +
+				op->field_no, "offset is out of bound");
 	}
 
 	assert(arg->offset >= 0 && arg->offset <= str_len);
@@ -844,7 +848,14 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		}
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
-		op->field_no = mp_read_int(update, op, &expr);
+		int32_t field_no = mp_read_int(update, op, &expr);
+		if (field_no - update->index_base >= 0) {
+			op->field_no = field_no - update->index_base;
+		} else if (field_no < 0) {
+			op->field_no = field_no;
+		} else {
+			tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
+		}
 		op->meta->do_op(update, op, &expr);
 	}
 

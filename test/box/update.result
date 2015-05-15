@@ -258,41 +258,168 @@ s:update({1684234849}, {{'#', 2, 1}})
 ---
 - error: Field 2 was not found in the tuple
 ...
-s:update({1684234849}, {{'=', -1, 'push1'}})
+s:update({1684234849}, {{'!', -1, 'push1'}})
 ---
 - [1684234849, 'push1']
 ...
-s:update({1684234849}, {{'=', -1, 'push2'}})
+s:update({1684234849}, {{'!', -1, 'push2'}})
 ---
 - [1684234849, 'push1', 'push2']
 ...
-s:update({1684234849}, {{'=', -1, 'push3'}})
+s:update({1684234849}, {{'!', -1, 'push3'}})
 ---
 - [1684234849, 'push1', 'push2', 'push3']
 ...
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap1'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap1'}})
 ---
 - [1684234849, 'push2', 'push3', 'swap1']
 ...
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap2'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap2'}})
 ---
 - [1684234849, 'push3', 'swap1', 'swap2']
 ...
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap3'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap3'}})
 ---
 - [1684234849, 'swap1', 'swap2', 'swap3']
 ...
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop1'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop1'}})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop1']
 ...
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop2'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop2'}})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop2']
 ...
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop3'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop3'}})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop3']
+...
+--
+-- negative indexes
+--
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', 0, 'Test'}})
+---
+- error: Field 0 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -1, 'Test'}})
+---
+- [1, 2, 3, 4, 5, 'Test']
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -3, 'Test'}})
+---
+- [1, 2, 3, 'Test', 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -5, 'Test'}})
+---
+- [1, 'Test', 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -6, 'Test'}})
+---
+- ['Test', 1, 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -7, 'Test'}})
+---
+- error: Field -7 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -100500, 'Test'}})
+---
+- error: Field -100500 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', 0, 'Test'}})
+---
+- error: Field 0 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -1, 'Test'}})
+---
+- [1, 2, 3, 4, 'Test']
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -3, 'Test'}})
+---
+- [1, 2, 'Test', 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -5, 'Test'}})
+---
+- ['Test', 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -6, 'Test'}})
+---
+- error: Field -6 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -100500, 'Test'}})
+---
+- error: Field -100500 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', 0, 100}})
+---
+- error: Field 0 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -1, 100}})
+---
+- [1, 2, 3, 4, 105]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -3, 100}})
+---
+- [1, 2, 103, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -5, 100}})
+---
+- [101, 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -6, 100}})
+---
+- error: Field -6 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -100500, 100}})
+---
+- error: Field -100500 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', 0, 100}})
+---
+- error: Field 0 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -1, 100}})
+---
+- [1, 2, 3, 4, 101]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -3, 100}})
+---
+- [1, 2, 103, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -5, 100}})
+---
+- [101, 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -6, 100}})
+---
+- error: Field -6 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -100500, 100}})
+---
+- error: Field -100500 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', 0, 1}})
+---
+- error: Field 0 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -1, 1}})
+---
+- [1, 2, 3, 4]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -3, 1}})
+---
+- [1, 2, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -5, 1}})
+---
+- [2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -6, 1}})
+---
+- error: Field -6 was not found in the tuple
+...
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -100500, 1}})
+---
+- error: Field -100500 was not found in the tuple
 ...
 --
 -- #416: UPDATEs from Lua can't be properly restored due to one based indexing

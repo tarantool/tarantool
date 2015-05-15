@@ -278,9 +278,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
                               table if key is multi-part
         :param table {operator, field_no, value}: a group of arguments for each
                 operation, indicating what the operation is, what field the
-                operation will apply to, and what value will be applied. For
-                "!" and "=" operations the field number can be -1, meaning the last
-                field in the tuple.
+                operation will apply to, and what value will be applied. The
+                field number can be negative, meaning the position from the
+                end of tuple (#tuple + negative field number + 1).
 
         :return: the updated tuple.
         :rtype:  tuple

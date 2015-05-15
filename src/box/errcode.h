@@ -88,7 +88,7 @@ struct errcode_record {
 	/* 34 */_(ER_NO_SUCH_TRIGGER,		2, "Trigger is not found") \
 	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space '%s' does not exist") \
-	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
+	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %d was not found in the tuple") \
 	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space '%s' field count %u") \
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \

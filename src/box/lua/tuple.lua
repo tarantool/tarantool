@@ -159,7 +159,6 @@ local function tuple_update(tuple, expr)
     if type(expr) ~= 'table' then
         error("Usage: tuple:update({ { op, field, arg}+ })")
     end
-    expr = internal.normalize_update_ops(expr)
     local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
     local tuple = builtin.boxffi_tuple_update(tuple, pexpr, pexpr_end)
     if tuple == NULL then

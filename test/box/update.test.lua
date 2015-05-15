@@ -86,15 +86,55 @@ s:update(48, {{'=', 0, 'hello'}})
 -- s:update: push/pop fields
 s:insert{1684234849}
 s:update({1684234849}, {{'#', 2, 1}})
-s:update({1684234849}, {{'=', -1, 'push1'}})
-s:update({1684234849}, {{'=', -1, 'push2'}})
-s:update({1684234849}, {{'=', -1, 'push3'}})
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap1'}})
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap2'}})
-s:update({1684234849}, {{'#', 2, 1}, {'=', -1, 'swap3'}})
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop1'}})
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop2'}})
-s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop3'}})
+s:update({1684234849}, {{'!', -1, 'push1'}})
+s:update({1684234849}, {{'!', -1, 'push2'}})
+s:update({1684234849}, {{'!', -1, 'push3'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap1'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap2'}})
+s:update({1684234849}, {{'#', 2, 1}, {'!', -1, 'swap3'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop1'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop2'}})
+s:update({1684234849}, {{'#', -1, 1}, {'!', -1, 'noop3'}})
+
+--
+-- negative indexes
+--
+
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', 0, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -1, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -3, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -5, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -6, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -7, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'!', -100500, 'Test'}})
+
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', 0, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -1, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -3, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -5, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -6, 'Test'}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'=', -100500, 'Test'}})
+
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', 0, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -1, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -3, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -5, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -6, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'+', -100500, 100}})
+
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', 0, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -1, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -3, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -5, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -6, 100}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'|', -100500, 100}})
+
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', 0, 1}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -1, 1}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -3, 1}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -5, 1}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -6, 1}})
+box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -100500, 1}})
 
 --
 -- #416: UPDATEs from Lua can't be properly restored due to one based indexing
