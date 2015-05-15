@@ -3957,6 +3957,15 @@ stat_timer_cb (EV_P_ ev_timer *w_, int revents)
     || prev.st_atime != w->attr.st_atime
     || prev.st_mtime != w->attr.st_mtime
     || prev.st_ctime != w->attr.st_ctime
+# if HAVE_STRUCT_STAT_ST_MTIM
+    || prev.st_atim.tv_nsec != w->attr.st_atim.tv_nsec
+    || prev.st_mtim.tv_nsec != w->attr.st_mtim.tv_nsec
+    || prev.st_ctim.tv_nsec != w->attr.st_ctim.tv_nsec
+# elif HAVE_STRUCT_STAT_ST_MTIMENSEC
+    || prev.st_atimensec != w->attr.st_atimensec
+    || prev.st_mtimensec != w->attr.st_mtimensec
+    || prev.st_ctimensec != w->attr.st_ctimensec
+# endif
   ) {
       /* we only update w->prev on actual differences */
       /* in case we test more often than invoke the callback, */
