@@ -28,7 +28,6 @@
  */
 extern "C" {
 #include "unit.h"
-#include "unit.h"
 } /* extern "C" */
 
 #include <stdarg.h>
@@ -248,12 +247,17 @@ test_tostring_one(uint32_t count, const int64_t *lsns, const char *res)
 	struct vclock vclock;
 	vclock_create(&vclock);
 	for (uint32_t node_id = 0; node_id < count; node_id++) {
-		vclock.lsn[node_id] = lsns[node_id];
+		if (lsns[node_id] >= 0)
+			vclock_add_server(&vclock, node_id);
+		if (lsns[node_id] > 0)
+			vclock_follow(&vclock, node_id, lsns[node_id]);
 	}
 	char *str = vclock_to_string(&vclock);
-	int result = strcmp(str, res) == 0;
+	int result = strcmp(str, res);
+	if (result)
+		diag("\n!!!new result!!! %s\n", str);
 	free(str);
-	return result;
+	return !result;
 }
 
 #define test(xa, res) ({\

@@ -38,6 +38,8 @@
 #define RB_COMPACT 1
 #include <third_party/rb.h>
 
+#include "bit/bit.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -46,6 +48,9 @@ enum { VCLOCK_MAX = 16 };
 
 /** Cluster vector clock */
 struct vclock {
+	/** Map of used components in lsn array */
+	unsigned int map;
+	/** Sum of all components of vclock. */
 	int64_t signature;
 	int64_t lsn[VCLOCK_MAX];
 	/** To order binary logs by vector clock. */
@@ -58,22 +63,45 @@ struct vclock_c {
 	int64_t lsn;
 };
 
-#define vclock_foreach(vclock, var) \
-	for (struct vclock_c (var) = {0, 0}; \
-	     (var).id < VCLOCK_MAX; (var).id++) \
-		if (((var).lsn = (vclock)->lsn[(var).id]) >= 0)
+struct vclock_iterator
+{
+	struct bit_iterator it;
+	const struct vclock *vclock;
+};
+
+static inline void
+vclock_iterator_init(struct vclock_iterator *it, const struct vclock *vclock)
+{
+	it->vclock = vclock;
+	bit_iterator_init(&it->it, &vclock->map, sizeof(vclock->map), true);
+}
+
+static inline struct vclock_c
+vclock_iterator_next(struct vclock_iterator *it)
+{
+	struct vclock_c c;
+	size_t id = bit_iterator_next(&it->it);
+	c.id = id == SIZE_MAX ? (int) VCLOCK_MAX : id;
+	if (c.id < VCLOCK_MAX)
+		c.lsn = it->vclock->lsn[c.id];
+	return c;
+}
+
+
+#define vclock_foreach(it, var) \
+	for (struct vclock_c (var) = vclock_iterator_next(it); \
+	     (var).id < VCLOCK_MAX; (var) = vclock_iterator_next(it))
 
 static inline void
 vclock_create(struct vclock *vclock)
 {
-	memset(vclock, 0xff, sizeof(*vclock));
-	vclock->signature = 0;
+	memset(vclock, 0, sizeof(*vclock));
 }
 
 static inline bool
 vclock_has(const struct vclock *vclock, uint32_t server_id)
 {
-	return server_id < VCLOCK_MAX && vclock->lsn[server_id] >= 0;
+	return server_id < VCLOCK_MAX && (vclock->map & (1 << server_id));
 }
 
 static inline int64_t
@@ -99,17 +127,16 @@ vclock_copy(struct vclock *dst, const struct vclock *src)
 static inline uint32_t
 vclock_size(const struct vclock *vclock)
 {
-	int32_t size = 0;
-	vclock_foreach(vclock, pair)
-		++size;
-	return size;
+	return __builtin_popcount(vclock->map);
 }
 
 static inline int64_t
 vclock_sum(const struct vclock *vclock)
 {
 	int64_t sum = 0;
-	vclock_foreach(vclock, server)
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, server)
 		sum += server.lsn;
 	return sum;
 }
@@ -118,6 +145,12 @@ static inline int64_t
 vclock_signature(const struct vclock *vclock)
 {
 	return vclock->signature;
+}
+
+static inline void
+vclock_add_server_nothrow(struct vclock *vclock, uint32_t server_id)
+{
+	vclock->map |= 1 << server_id;
 }
 
 int64_t
@@ -159,23 +192,19 @@ static inline int
 vclock_compare(const struct vclock *a, const struct vclock *b)
 {
 	bool le = true, ge = true;
-	for (uint32_t server_id = 0; server_id < VCLOCK_MAX; server_id++) {
+	unsigned int map = a->map | b->map;
+	struct bit_iterator it;
+	bit_iterator_init(&it, &map, sizeof(map), true);
+
+	for (size_t server_id = bit_iterator_next(&it); server_id < VCLOCK_MAX;
+	     server_id = bit_iterator_next(&it)) {
+
 		int64_t lsn_a = a->lsn[server_id];
 		int64_t lsn_b = b->lsn[server_id];
-		if (lsn_a > 0 || lsn_b > 0) {
-			/*
-			 * At least one of the clocks must have
-			 * events for this server id. The case
-			 * when one of the clocks lists the server
-			 * as "present" and another doesn't yet
-			 * know about is possible when reading
-			 * and relaying rows to a replica.
-			 */
-			le = le && lsn_a <= lsn_b;
-			ge = ge && lsn_a >= lsn_b;
-			if (!ge && !le)
-				return VCLOCK_ORDER_UNDEFINED;
-		}
+		le = le && lsn_a <= lsn_b;
+		ge = ge && lsn_a >= lsn_b;
+		if (!ge && !le)
+			return VCLOCK_ORDER_UNDEFINED;
 	}
 	if (ge && !le)
 		return 1;
@@ -255,14 +284,15 @@ vclock_add_server(struct vclock *vclock, uint32_t server_id)
 	if (server_id >= VCLOCK_MAX)
 		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
 	assert(! vclock_has(vclock, server_id));
-	vclock->lsn[server_id] = 0;
+	vclock_add_server_nothrow(vclock, server_id);
 }
 
 static inline void
 vclock_del_server(struct vclock *vclock, uint32_t server_id)
 {
 	assert(vclock_has(vclock, server_id));
-	vclock->lsn[server_id] = -1;
+	vclock->lsn[server_id] = 0;
+	vclock->map &= ~(1 << server_id);
 	vclock->signature = vclock_sum(vclock);
 }
 

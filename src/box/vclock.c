@@ -45,8 +45,10 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 		      (unsigned) server_id,
 		      (long long) prev_lsn, (long long) lsn);
 	}
-	vclock->signature += lsn - ((prev_lsn >= 0) ? prev_lsn : 0);
+	/* Easier add each time than check. */
+	vclock_add_server_nothrow(vclock, server_id);
 	vclock->lsn[server_id] = lsn;
+	vclock->signature += lsn - prev_lsn;
 	return prev_lsn;
 }
 
@@ -95,9 +97,11 @@ vclock_to_string(const struct vclock *vclock)
 		return NULL;
 
 	const char *sep = "";
-	vclock_foreach(vclock, it) {
-		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep, it.id,
-		    (long long) it.lsn) != 0)
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, server) {
+		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep,
+			      server.id, (long long) server.lsn) != 0)
 			return NULL;
 		sep = ", ";
 	}
@@ -156,8 +160,9 @@ vclock_from_string(struct vclock *vclock, const char *str)
 			errno = 0;
 			lsn = strtoll(p, (char **)  &p, 10);
 			if (errno != 0 || lsn < 0 || lsn > INT64_MAX ||
-			    vclock->lsn[server_id] != -1)
+			    vclock_has(vclock, server_id))
 				goto error;
+			vclock_add_server_nothrow(vclock, server_id);
 			vclock->lsn[server_id] = lsn;
 			goto comma;
 		}
@@ -192,8 +197,8 @@ vclockset_node_compare(const struct vclock *a, const struct vclock *b)
 {
 	int res = vclock_compare(a, b);
 	/*
-	 * In a vclock set, we do not allow vclock objects which
-	 * are note strictly ordered.
+	 * In a vclock set, we do not allow clocks which are not
+	 * strictly ordered.
 	 * See also xdir_scan(), in which we check & skip
 	 * duplicate vclocks.
 	 */
