@@ -36,3 +36,6 @@ box.space.test:select{}
 ---
 - []
 ...
+box.space.test:drop()
+---
+...

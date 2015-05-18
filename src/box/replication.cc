@@ -130,10 +130,6 @@ replication_subscribe_f(va_list ap)
 	recovery_follow_local(r, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
 
-	auto guard = make_scoped_guard([=]{
-		recovery_stop_local(r);
-		say_crit("exiting the relay loop");
-	});
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
@@ -176,6 +172,8 @@ replication_subscribe_f(va_list ap)
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 	}
+	recovery_stop_local(r);
+	say_crit("exiting the relay loop");
 }
 
 /** Replication acceptor fiber handler. */

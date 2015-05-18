@@ -41,3 +41,4 @@ print
 
 # missing tuples from removed xlog
 server.admin("box.space.test:select{}")
+server.admin("box.space.test:drop()")
