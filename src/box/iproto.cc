@@ -691,19 +691,26 @@ iproto_process(struct iproto_request *ireq)
 			iproto_reply_ok(&ireq->iobuf->out, ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
+			/*
+			 * As soon as box_process_subscribe() returns the
+			 * lambda in the beginning of the block
+			 * will re-activate the watchers for us.
+			 */
 			ev_io_stop(con->loop, &con->input);
 			ev_io_stop(con->loop, &con->output);
 			box_process_join(con->input.fd, &ireq->header);
-			/* TODO: check requests in `con' queue */
-			iproto_connection_shutdown(con);
-			return;
+			break;
 		case IPROTO_SUBSCRIBE:
 			ev_io_stop(con->loop, &con->input);
 			ev_io_stop(con->loop, &con->output);
+			/*
+			 * Subscribe never returns - unless there
+			 * is an error/exception. In that case
+			 * the write watcher will be re-activated
+			 * the same way as for JOIN.
+			 */
 			box_process_subscribe(con->input.fd, &ireq->header);
-			/* TODO: check requests in `con' queue */
-			iproto_connection_shutdown(con);
-			return;
+			break;
 		default:
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				   (uint32_t) ireq->header.type);

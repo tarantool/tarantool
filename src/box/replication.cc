@@ -109,6 +109,12 @@ replication_join(int fd, struct xrow_header *packet)
 	cord_cojoin(&cord);
 }
 
+static void
+feed_event_f(struct trigger *trigger, void * /* event */)
+{
+	ev_feed_event(loop(), (struct ev_io *) trigger->data, EV_CUSTOM);
+}
+
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -123,6 +129,11 @@ replication_subscribe_f(va_list ap)
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, fiber_name(fiber()),
 			      relay->wal_dir_rescan_delay);
+
+	auto guard = make_scoped_guard([=]{
+		recovery_stop_local(r);
+		say_crit("exiting the relay loop");
+	});
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
@@ -132,8 +143,24 @@ replication_subscribe_f(va_list ap)
 	read_ev.data = fiber();
 	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule_cb,
 		   relay->io.fd, EV_READ);
-
-	while (true) {
+	/**
+	 * If there is an exception in the follower fiber, it's
+	 * sufficient to break the main fiber's wait on the read
+	 * event.
+	 * recovery_stop_local() will follow and raise the
+	 * original exception in the joined fiber.  This original
+	 * exception will reach cord_join() and will be raised
+	 * further up, eventually reaching iproto_process(), where
+	 * it'll get converted to an iproto message and sent to
+	 * the client.
+	 * It's safe to allocate the trigger on stack, the life of
+	 * the follower fiber is enclosed into life of this fiber.
+	 */
+	struct trigger on_follow_error = {
+		rlist_nil, feed_event_f, &read_ev, NULL
+	};
+	trigger_add(&r->watcher->on_stop, &on_follow_error);
+	while (! fiber_is_dead(r->watcher)) {
 		ev_io_start(loop(), &read_ev);
 		fiber_yield();
 		ev_io_stop(loop(), &read_ev);
@@ -143,15 +170,12 @@ replication_subscribe_f(va_list ap)
 
 		if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
 			say_info("the replica has closed its socket, exiting");
-			goto end;
+			break;
 		}
 		if (rc < 0 && errno != EINTR && errno != EAGAIN &&
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 	}
-end:
-	recovery_stop_local(r);
-	say_crit("exiting the relay loop");
 }
 
 /** Replication acceptor fiber handler. */

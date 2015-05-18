@@ -145,7 +145,7 @@ fiber_cancel(struct fiber *f)
 	 * Don't wait for self and for fibers which are already
 	 * dead.
 	 */
-	if (f != self && !(f->flags & FIBER_IS_DEAD)) {
+	if (f != self && !fiber_is_dead(f)) {
 		rlist_add_tail_entry(&f->wake, self, state);
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
@@ -212,11 +212,11 @@ fiber_join(struct fiber *fiber)
 {
 	assert(fiber->flags & FIBER_IS_JOINABLE);
 
-	if (! (fiber->flags & FIBER_IS_DEAD)) {
+	if (! fiber_is_dead(fiber)) {
 		rlist_add_tail_entry(&fiber->wake, fiber(), state);
 		fiber_yield();
 	}
-	assert(fiber->flags & FIBER_IS_DEAD);
+	assert(fiber_is_dead(fiber));
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
 

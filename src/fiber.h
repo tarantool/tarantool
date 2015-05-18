@@ -369,6 +369,12 @@ fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
 bool
 fiber_is_cancelled();
 
+static inline bool
+fiber_is_dead(struct fiber *f)
+{
+	return f->flags & FIBER_IS_DEAD;
+}
+
 /**
  * \brief Retrieve value by \a key from fiber local storage
  * \param fiber fiber
