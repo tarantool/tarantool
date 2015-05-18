@@ -88,9 +88,6 @@
  *    consumes the amount of memory used to index the now
  *    deleted elements.
  *
- *    The tree iterator structure occupies only 6 bytes of memory
- *    (with probable padding by the compiler up to 8 bytes).
- *
  * 2) It has a low cache-miss rate. A look up in the tree boils
  *    down to to search in H blocks, where H is the height of the
  *    tree, and can be bound by log(N) / log(K), where N is the
@@ -156,7 +153,7 @@
  * bps_tree_elem_t *bps_tree_itr_get_elem(tree, itr);
  * bool bps_tree_itr_next(tree, itr);
  * bool bps_tree_itr_prev(tree, itr);
- * int bps_tree_itr_freeze(tree, itr);
+ * void bps_tree_itr_freeze(tree, itr);
  * void bps_tree_itr_destroy(tree, itr);
  */
 /* }}} */
@@ -524,8 +521,8 @@ struct bps_tree_iterator {
 	bps_tree_block_id_t block_id;
 	/* Position of an element in the block. Could be -1 for last in block*/
 	bps_tree_pos_t pos;
-	/* Version of matras memory. 0 for main version, nonzero for MVCC */
-	bps_tree_pos_t matras_version;
+	/* Version of matras memory for MVCC */
+	struct matras_view view;
 };
 
 /**
@@ -747,9 +744,8 @@ bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
  * with a bps_tree_itr_destroy call after usage.
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
- * @return - 0 on success, -1 if no more version is available in matras
  */
-int
+void
 bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
@@ -1001,7 +997,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 	assert(tree->size == 0);
 	assert(tree->root_id == (bps_tree_block_id_t)(-1));
 	assert(tree->garbage_head_id == (bps_tree_block_id_t)(-1));
-	assert(tree->matras.block_counts[0] == 0);
+	assert(tree->matras.head.block_count == 0);
 	if (array_size == 0)
 		return 0;
 	bps_tree_block_id_t leaf_count = (array_size +
@@ -1172,13 +1168,13 @@ bps_tree_restore_block(const struct bps_tree *tree, bps_tree_block_id_t id)
 }
 
 /**
- * @brief Get a pointer to block by it's ID and matras version.
+ * @brief Get a pointer to block by it's ID and provided read view.
  */
 static inline struct bps_block *
 bps_tree_restore_block_ver(const struct bps_tree *tree, bps_tree_block_id_t id,
-			   bps_tree_pos_t ver)
+			   struct matras_view *view)
 {
-	return (struct bps_block *)matras_getv(&tree->matras, id, ver);
+	return (struct bps_block *)matras_view_get(&tree->matras, view, id);
 }
 
 /**
@@ -1370,7 +1366,7 @@ bps_tree_invalid_iterator()
 	struct bps_tree_iterator res;
 	res.block_id = (bps_tree_block_id_t)(-1);
 	res.pos = 0;
-	res.matras_version = 0;
+	matras_head_read_view(&res.view);
 	return res;
 }
 
@@ -1400,8 +1396,7 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
 		return 0;
 
 	struct bps_block *block =
-		bps_tree_restore_block_ver(tree, itr->block_id,
-					   itr->matras_version);
+		bps_tree_restore_block_ver(tree, itr->block_id, &itr->view);
 	if (block->type != BPS_TREE_BT_LEAF) {
 		itr->block_id = (bps_tree_block_id_t)(-1);
 		return 0;
@@ -1467,7 +1462,7 @@ bps_tree_itr_first(const struct bps_tree *tree)
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->first_id;
 	itr.pos = 0;
-	itr.matras_version = 0;
+	matras_head_read_view(&itr.view);
 	return itr;
 }
 
@@ -1482,7 +1477,7 @@ bps_tree_itr_last(const struct bps_tree *tree)
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->last_id;
 	itr.pos = (bps_tree_pos_t)(-1);
-	itr.matras_version = 0;
+	matras_head_read_view(&itr.view);
 	return itr;
 }
 
@@ -1501,7 +1496,7 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
 	struct bps_tree_iterator res;
-	res.matras_version = 0;
+	matras_head_read_view(&res.view);
 	bool local_result;
 	if (!exact)
 		exact = &local_result;
@@ -1552,7 +1547,7 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact)
 {
 	struct bps_tree_iterator res;
-	res.matras_version = 0;
+	matras_head_read_view(&res.view);
 	bool local_result;
 	if (!exact)
 		exact = &local_result;
@@ -1624,7 +1619,7 @@ inline bool
 bps_tree_itr_next(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
-		if (itr->matras_version)
+		if (matras_is_read_view_created(&itr->view))
 			return false;
 		itr->block_id = tree->first_id;
 		itr->pos = 0;
@@ -1655,7 +1650,7 @@ inline bool
 bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
 	if (itr->block_id == (bps_tree_block_id_t)(-1)) {
-		if (itr->matras_version)
+		if (matras_is_read_view_created(&itr->view))
 			return false;
 		itr->block_id = tree->last_id;
 		itr->pos = (bps_tree_pos_t)(-1);
@@ -1680,14 +1675,12 @@ bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
  * with a bps_tree_itr_destroy call after usage.
  * @param tree - pointer to a tree
  * @param itr - pointer to tree iterator
- * @return - 0 on success, -1 if no more version is available in matras
  */
-inline int
+inline void
 bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
-	assert(itr->matras_version == 0);
-	itr->matras_version = matras_create_read_view(&tree->matras);
-	return itr->matras_version > 0 ? 0 : -1;
+	assert(!matras_is_read_view_created(&itr->view));
+	matras_create_read_view(&tree->matras, &itr->view);
 }
 
 /**
@@ -1699,10 +1692,7 @@ bps_tree_itr_freeze(struct bps_tree *tree, struct bps_tree_iterator *itr)
 inline void
 bps_tree_itr_destroy(struct bps_tree *tree, struct bps_tree_iterator *itr)
 {
-	if (itr->matras_version) {
-		matras_destroy_read_view(&tree->matras, itr->matras_version);
-		itr->matras_version = 0;
-	}
+	matras_destroy_read_view(&tree->matras, &itr->view);
 }
 
 /**

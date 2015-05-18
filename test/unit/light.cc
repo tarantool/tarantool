@@ -44,19 +44,14 @@ inline void *
 my_light_alloc()
 {
 	extents_count++;
-	char *p = (char *)malloc(light_extent_size + (1 << MATRAS_VERSION_COUNT) + sizeof(void*));
-	uintptr_t u = (uintptr_t)(p + sizeof(void *) + (1 << MATRAS_VERSION_COUNT));
-	u &= ~(((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
-	char *t = (char *)u;
-	((void **)t)[-1] = p;
-	return t;
+	return malloc(light_extent_size);
 }
 
 inline void
 my_light_free(void *p)
 {
 	extents_count--;
-	free(((void **)p)[-1]);
+	free(p);
 }
 
 
@@ -247,17 +242,15 @@ itr_freeze_check()
 {
 	header();
 
-	const int test_rounds_size = 10;
 	const int test_data_size = 1000;
-	hash_value_t comp_buf1[test_data_size];
-	hash_value_t comp_buf2[test_data_size];
+	hash_value_t comp_buf[test_data_size];
 	const int test_data_mod = 2000;
 	srand(0);
 	struct light_core ht;
 
 	for (int i = 0; i < 10; i++) {
 		light_create(&ht, light_extent_size, my_light_alloc, my_light_free, 0);
-		int comp_buf_size1 = 0;
+		int comp_buf_size = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {
 			hash_value_t val = rand() % test_data_mod;
@@ -268,7 +261,7 @@ itr_freeze_check()
 		light_itr_begin(&ht, &itr);
 		hash_value_t *e;
 		while ((e = light_itr_get_and_next(&ht, &itr))) {
-			comp_buf1[comp_buf_size1++] = *e;
+			comp_buf[comp_buf_size++] = *e;
 		}
 		struct light_iterator itr1;
 		light_itr_begin(&ht, &itr1);
@@ -283,11 +276,11 @@ itr_freeze_check()
 		}
 		int tested_count = 0;
 		while ((e = light_itr_get_and_next(&ht, &itr1))) {
-			if (*e != comp_buf1[tested_count]) {
+			if (*e != comp_buf[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
 			tested_count++;
-			if (tested_count > comp_buf_size1) {
+			if (tested_count > comp_buf_size) {
 				fail("version restore failed (2)", "true");
 			}
 		}
@@ -302,12 +295,12 @@ itr_freeze_check()
 
 		tested_count = 0;
 		while ((e = light_itr_get_and_next(&ht, &itr2))) {
-			if (*e != comp_buf1[tested_count]) {
-				fail("version restore failed (1)", "true");
+			if (*e != comp_buf[tested_count]) {
+				fail("version restore failed (3)", "true");
 			}
 			tested_count++;
-			if (tested_count > comp_buf_size1) {
-				fail("version restore failed (2)", "true");
+			if (tested_count > comp_buf_size) {
+				fail("version restore failed (4)", "true");
 			}
 		}
 

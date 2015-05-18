@@ -75,7 +75,7 @@
  * To sum up, with a given N and M matras instance:
  *
  * 1) can provide not more than
- *    pow(M / sizeof(void*), 2) * (M / N)   blocks
+ *    pow(M / sizeof(void*), 2) * (M / N) blocks
  *
  * 2) costs 2 random memory accesses to provide a new block
  *    or restore a block pointer from block id
@@ -113,15 +113,8 @@
  */
 /* }}} */
 
-#ifdef WIN32
-typedef unsigned __int32 matras_id_t;
-#else
-#include <stdint.h>
-typedef uint32_t matras_id_t;
-#endif
-
 #include <assert.h>
-#include <stdbool.h>
+#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -130,6 +123,11 @@ extern "C" {
 /**
  * Type of a block ID.
  */
+#ifdef WIN32
+typedef unsigned __int32 matras_id_t;
+#else
+typedef uint32_t matras_id_t;
+#endif
 
 /**
  * Type of the extent allocator (the allocator for regions
@@ -139,28 +137,34 @@ extern "C" {
 typedef void *(*matras_alloc_func)();
 typedef void (*matras_free_func)(void *);
 
-enum {
-	MATRAS_VERSION_COUNT = 3
+/**
+ * sruct matras_view represents appropriate mapping between
+ * block ID and it's pointer.
+ * matras structure has one main read/write view, and a number
+ * of user created read-only views.
+ */
+struct matras_view {
+	/* root extent of the view */
+	void *root;
+	/* block count in the view */
+	matras_id_t block_count;
+	/* all views are linked into doubly linked list */
+	struct matras_view *prev_view, *next_view;
 };
-
-static const uintptr_t matras_ver_mask = (((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
-static const uintptr_t matras_ptr_mask = ~(((uintptr_t)1 << MATRAS_VERSION_COUNT) - 1);
 
 /**
  * matras - memory allocator of blocks of equal
  * size with support of address translation.
  */
 struct matras {
-	/* Pointer to the root extent of matras */
-	uintptr_t roots[MATRAS_VERSION_COUNT];
-	/* A number of already allocated blocks */
-	matras_id_t block_counts[MATRAS_VERSION_COUNT];
-	/* Bit mask of used versions */
-	uintptr_t ver_occ_mask;
+	/* Main read/write view of the matras */
+	struct matras_view head;
 	/* Block size (N) */
 	matras_id_t block_size;
 	/* Extent size (M) */
 	matras_id_t extent_size;
+	/* Numberof allocated extents */
+	matras_id_t extent_count;
 	/* binary logarithm  of maximum possible created blocks count */
 	matras_id_t log2_capacity;
 	/* See "Shifts and masks explanation" below  */
@@ -262,7 +266,8 @@ matras_get(const struct matras *m, matras_id_t id);
  * Convert block id of a specified version into block address.
  */
 static void *
-matras_getv(const struct matras *m, matras_id_t id, matras_id_t version);
+matras_view_get(const struct matras *m, const struct matras_view *v,
+		matras_id_t id);
 
 /*
  * Getting number of allocated extents (of size extent_size each)
@@ -271,62 +276,98 @@ matras_id_t
 matras_extent_count(const struct matras *m);
 
 /*
- * Create new version of matras memory.
- * Return 0 if all version IDs are occupied.
+ * Connect read view to the matras so that it is always connected with main,
+ *  "head" read view. Such a read view does not consume any resources and
+ *  should not be destroyed.
  */
-matras_id_t
-matras_create_read_view(struct matras *m);
+static void
+matras_head_read_view(struct matras_view *v);
 
 /*
- * Delete memory version by specified ID.
+ * Create new read view.
  */
 void
-matras_destroy_read_view(struct matras *m, matras_id_t ver_id);
+matras_create_read_view(struct matras *m, struct matras_view *v);
+
+/*
+ * Delete a read view.
+ */
+void
+matras_destroy_read_view(struct matras *m, struct matras_view *v);
+
+/*
+ * Determine if the read view is created.
+ * @return 1 if the read view was created with matras_create_read_view
+ * @return 0 if the read view was initialized with matras_head_read_view
+ */
+static int
+matras_is_read_view_created(struct matras_view *v);
 
 /*
  * Notify matras that memory at given ID will be changed.
- * Returns true if ok, and false if failed to allocate memory.
+ * Returns (perhaps new) address of memory associated with that block.
+ * Returns NULL on memory error
  * Only needed (and does any work) if some versions are used.
  */
 void *
 matras_touch(struct matras *m, matras_id_t id);
 
 /*
- * Debug check that ensures internal consistency.
- * Must return 0. If it returns not 0, smth is terribly wrong.
+ * matras_head_read_view implementation.
  */
-uintptr_t
-matras_debug_selfcheck(const struct matras *m);
+static inline void
+matras_head_read_view(struct matras_view *v)
+{
+	v->next_view = 0;
+}
+
+/*
+ * matras_is_read_view_created implementation.
+ */
+static inline int
+matras_is_read_view_created(struct matras_view *v)
+{
+	return v->next_view ? 1 : 0;
+}
 
 /**
- * matras_getv implementation
+ * Common part of matras_view_get and matras_get
  */
 static inline void *
-matras_getv(const struct matras *m, matras_id_t id, matras_id_t version)
+matras_view_get_no_check(const struct matras *m, const struct matras_view *v,
+			 matras_id_t id)
 {
-	assert(id < m->block_counts[version]);
+	assert(id < v->block_count);
 
 	/* see "Shifts and masks explanation" for details */
 	matras_id_t n1 = id >> m->shift1;
 	matras_id_t n2 = (id & m->mask1) >> m->shift2;
 	matras_id_t n3 = (id & m->mask2);
 
-	uintptr_t *p1 = (uintptr_t *)(m->roots[version] & matras_ptr_mask);
-	uintptr_t *p2 = (uintptr_t *)(p1[n1] & matras_ptr_mask);
-	char *p3 = (char *)(p2[n2] & matras_ptr_mask);
-	return &p3[n3 * m->block_size];
+	char ***extent = (char ***)v->root;
+	return &extent[n1][n2][n3 * m->block_size];
 }
 
 /**
- * matras_get implementation
+ * matras_view_get definition
+ */
+static inline void *
+matras_view_get(const struct matras *m, const struct matras_view *v,
+		matras_id_t id)
+{
+	return matras_view_get_no_check(m, v->next_view ? v : &m->head, id);
+}
+
+/**
+ * matras_get definition
  */
 static inline void *
 matras_get(const struct matras *m, matras_id_t id)
 {
-	return matras_getv(m, id, 0);
+	return matras_view_get_no_check(m, &m->head, id);
 }
 
 #if defined(__cplusplus)
-} /* extern "C" */
+}; /* extern "C" */
 #endif /* defined(__cplusplus) */
 #endif /* INCLUDES_TARANTOOL_SMALL_MATRAS_H */

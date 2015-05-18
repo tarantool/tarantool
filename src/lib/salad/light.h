@@ -154,8 +154,8 @@ struct LIGHT(core) {
 struct LIGHT(iterator) {
 	/* Current position on table (ID of a current record) */
 	uint32_t slotpos;
-	/* Version of matras memory. 0 for main version, nonzero for MVCC */
-	uint32_t matras_version;
+	/* Version of matras memory for MVCC */
+	struct matras_view view;
 };
 
 /**
@@ -308,9 +308,8 @@ LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
  * with a light_itr_destroy call after usage.
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
- * @return - 0 on success, -1 if no more version is available in matras
  */
-int
+void
 LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /**
@@ -543,7 +542,7 @@ LIGHT(enqueue_empty)(struct LIGHT(core) *ht, uint32_t slot,
 /*
  * Empty records (that do not store value) are linked into doubly linked list.
  * Remove from list first record of that list and return that record
- * Touches matras of result and all chaning records
+ * Touches matras of result and all changing records
  */
 inline struct LIGHT(record) *
 LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
@@ -553,6 +552,8 @@ LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
 		matras_touch(&ht->mtable, ht->empty_slot);
 	if (!empty_record)
 		return 0;
+	assert(empty_record == (struct LIGHT(record) *)
+		       matras_get(&ht->mtable, ht->empty_slot));
 	assert(empty_record->next == ht->empty_slot);
 	uint32_t new_empty_slot = LIGHT(get_empty_next)(empty_record);
 	if (new_empty_slot != LIGHT(end)) {
@@ -569,7 +570,7 @@ LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
 /*
  * Empty records (that do not store value) are linked into doubly linked list.
  * Remove from list the record by given slot and return that record
- * Touches matras of result and all chaning records
+ * Touches matras of result and all changing records
  */
 inline struct LIGHT(record) *
 LIGHT(detach_empty)(struct LIGHT(core) *ht, uint32_t slot)
@@ -613,7 +614,7 @@ LIGHT(prepare_first_insert)(struct LIGHT(core) *ht)
 {
 	assert(ht->count == 0);
 	assert(ht->table_size == 0);
-	assert(ht->mtable.block_counts[0] == 0);
+	assert(ht->mtable.head.block_count == 0);
 
 	uint32_t slot;
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
@@ -652,7 +653,6 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 		matras_dealloc_range(&ht->mtable, ht->GROW_INCREMENT);
 		return -1;
 	}
-
 	uint32_t save_cover_mask = ht->cover_mask;
 	ht->table_size += ht->GROW_INCREMENT;
 	if (ht->cover_mask < ht->table_size - 1)
@@ -664,6 +664,7 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 	uint32_t susp_slot = new_slot & split_comm_mask;
 	struct LIGHT(record) *susp_record = (struct LIGHT(record) *)
 		matras_touch(&ht->mtable, susp_slot);
+
 	if (!susp_record) {
 		matras_dealloc_range(&ht->mtable, ht->GROW_INCREMENT);
 		ht->cover_mask = save_cover_mask;
@@ -750,7 +751,7 @@ LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 	if (ht->empty_slot == LIGHT(end))
 		if (LIGHT(grow)(ht))
 			return LIGHT(end);
-	assert(ht->table_size == ht->mtable.block_counts[0]);
+	assert(ht->table_size == ht->mtable.head.block_count);
 
 	ht->count++;
 	uint32_t slot = LIGHT(slot)(ht, hash);
@@ -973,7 +974,7 @@ LIGHT(itr_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	(void)ht;
 	itr->slotpos = 0;
-	itr->matras_version = 0;
+	matras_head_read_view(&itr->view);
 }
 
 /**
@@ -988,7 +989,7 @@ LIGHT(itr_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
 	       uint32_t hash, LIGHT_KEY_TYPE data)
 {
 	itr->slotpos = LIGHT(find_key)(ht, hash, data);
-	itr->matras_version = 0;
+	matras_head_read_view(&itr->view);
 }
 
 /**
@@ -1001,11 +1002,13 @@ inline LIGHT_DATA_TYPE *
 LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
 			struct LIGHT(iterator) *itr)
 {
-	while (itr->slotpos < ht->mtable.block_counts[itr->matras_version]) {
+	const struct matras_view *view;
+	view = matras_is_read_view_created(&itr->view) ?
+	       &itr->view : &ht->mtable.head;
+	while (itr->slotpos < view->block_count) {
 		uint32_t slotpos = itr->slotpos;
 		struct LIGHT(record) *record = (struct LIGHT(record) *)
-			matras_getv(&ht->mtable, slotpos,
-				    itr->matras_version);
+			matras_view_get(&ht->mtable, view, slotpos);
 		itr->slotpos++;
 		if (record->next != slotpos)
 			return &record->value;
@@ -1019,13 +1022,12 @@ LIGHT(itr_get_and_next)(const struct LIGHT(core) *ht,
  * with a light_itr_destroy call after usage.
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
- * @return - 0 on success, -1 if no more version is available in matras
  */
-inline int
+inline void
 LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
-	itr->matras_version = matras_create_read_view(&ht->mtable);
-	return itr->matras_version > 0 ? 0 : -1;
+	assert(!matras_is_read_view_created(&itr->view));
+	matras_create_read_view(&ht->mtable, &itr->view);
 }
 
 /**
@@ -1037,10 +1039,7 @@ LIGHT(itr_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 inline void
 LIGHT(itr_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
-	if (itr->matras_version) {
-		matras_destroy_read_view(&ht->mtable, itr->matras_version);
-		itr->matras_version = 0;
-	}
+	matras_destroy_read_view(&ht->mtable, &itr->view);
 }
 
 /*
@@ -1052,7 +1051,7 @@ inline int
 LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 {
 	int res = 0;
-	if (ht->table_size != ht->mtable.block_counts[0])
+	if (ht->table_size != ht->mtable.head.block_count)
 		res |= 64;
 	uint32_t empty_slot = ht->empty_slot;
 	uint32_t prev_empty_slot = LIGHT(end);

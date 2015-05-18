@@ -38,6 +38,8 @@ check_file_line(bool expr, const char *err_message, const char *file, int line)
 bool alloc_err_inj_enabled = false;
 unsigned int alloc_err_inj_countdown = 0;
 
+#define MATRAS_VERSION_COUNT 8
+
 static void *
 pta_alloc()
 {
@@ -67,20 +69,20 @@ void matras_alloc_test()
 	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
 	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
 
-	struct matras pta;
+	struct matras mat;
 
 	alloc_err_inj_enabled = false;
 	for (unsigned int i = 0; i <= maxCapacity; i++) {
-		matras_create(&pta, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
-		check(1u << pta.log2_capacity == maxCapacity, "Wrong capacity!");
+		matras_create(&mat, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
+		check(1u << mat.log2_capacity == maxCapacity, "Wrong capacity!");
 		AllocatedItems.clear();
 		for (unsigned int j = 0; j < i; j++) {
 			unsigned int res = 0;
-			void *data = matras_alloc(&pta, &res);
+			void *data = matras_alloc(&mat, &res);
 			check(data, "Alloc returned NULL");
-			void *test_data = matras_get(&pta, res);
+			void *test_data = matras_get(&mat, res);
 			check(data == test_data, "Alloc and Get mismatch");
-			size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
+			size_t provConsumedMemory = (size_t)matras_extent_count(&mat) * PROV_EXTENT_SIZE;
 			check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (1)");
 			check(res == j, "Index mismatch");
 			{
@@ -107,43 +109,43 @@ void matras_alloc_test()
 			}
 			AllocatedItems.insert(data);
 		}
-		size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
+		size_t provConsumedMemory = (size_t)matras_extent_count(&mat) * PROV_EXTENT_SIZE;
 		check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (2)");
-		matras_destroy(&pta);
+		matras_destroy(&mat);
 		check(AllocatedCount == 0, "Not all memory freed (1)");
 	}
 
 	for (unsigned int i = 0; i <= maxCapacity; i++) {
-		matras_create(&pta, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
+		matras_create(&mat, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
 		for (unsigned int j = 0; j < i; j++) {
 			unsigned int res = 0;
-			void *data = matras_alloc(&pta, &res);
+			void *data = matras_alloc(&mat, &res);
 		}
 		for (unsigned int j = 0; j < i; j++) {
-			matras_dealloc(&pta);
-			size_t provConsumedMemory = (size_t)matras_extent_count(&pta) * PROV_EXTENT_SIZE;
+			matras_dealloc(&mat);
+			size_t provConsumedMemory = (size_t)matras_extent_count(&mat) * PROV_EXTENT_SIZE;
 			check(provConsumedMemory == AllocatedCount * PROV_EXTENT_SIZE, "ConsumedMemory counter failed (3)");
 		}
 		check(AllocatedCount == 0, "Not all memory freed (2)");
-		matras_destroy(&pta);
+		matras_destroy(&mat);
 	}
 
 	alloc_err_inj_enabled = true;
 	for (unsigned int i = 0; i <= maxCapacity; i++) {
-		matras_create(&pta, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
+		matras_create(&mat, PROV_EXTENT_SIZE, PROV_BLOCK_SIZE, pta_alloc, pta_free);
 
 		alloc_err_inj_countdown = i;
 
 		for (unsigned int j = 0; j < maxCapacity; j++) {
 			unsigned int res = 0;
-			unsigned int prev_block_count = pta.block_counts[0];
-			void *data = matras_alloc(&pta, &res);
+			unsigned int prev_block_count = mat.head.block_count;
+			void *data = matras_alloc(&mat, &res);
 			if (!data) {
-				check(prev_block_count == pta.block_counts[0], "Created count changed during memory fail!");
+				check(prev_block_count == mat.head.block_count, "Created count changed during memory fail!");
 				break;
 			}
 		}
-		matras_destroy(&pta);
+		matras_destroy(&mat);
 		check(AllocatedCount == 0, "Not all memory freed after memory fail!");
 	}
 
@@ -165,6 +167,22 @@ void dea(void *p)
 	extents_in_use--;
 	free(p);
 }
+
+struct matras_view views[MATRAS_VERSION_COUNT];
+int vermask = 1;
+
+int reg_view_id()
+{
+	int id = __builtin_ctz(~vermask);
+	vermask |= 1 << id;
+	return id;
+}
+
+void unreg_view_id(int id)
+{
+	vermask &=~ (1 << id);
+}
+
 void
 matras_vers_test()
 {
@@ -189,7 +207,8 @@ matras_vers_test()
 					add_ver = rand() % 2 == 0;
 				if (add_ver) {
 					cur_num_or_ver++;
-					matras_id_t new_ver = matras_create_read_view(&local);
+					matras_id_t new_ver = reg_view_id();
+					matras_create_read_view(&local, views + new_ver);
 					check(new_ver > 0, "create read view failed");
 					use_mask |= (1 << new_ver);
 					comps[new_ver] = comps[0];
@@ -199,7 +218,8 @@ matras_vers_test()
 					do {
 						del_ver = 1 + rand() % (MATRAS_VERSION_COUNT - 1);
 					} while ((use_mask & (1 << del_ver)) == 0);
-					matras_destroy_read_view(&local, del_ver);
+					matras_destroy_read_view(&local, views + del_ver);
+					unreg_view_id(del_ver);
 					comps[del_ver].clear();
 					use_mask &= ~(1 << del_ver);
 				}
@@ -224,15 +244,15 @@ matras_vers_test()
 				matras_touch(&local, p);
 				*(type_t *)matras_get(&local, p) = val;
 			}
-			int checkres = matras_debug_selfcheck(&local);
-			check(checkres == 0, "internal check failed");
+			views[0] = local.head;
+
 			for (int i = 0; i < MATRAS_VERSION_COUNT; i++) {
 				if ((use_mask & (1 << i)) == 0)
 					continue;
-				check(comps[i].size() == local.block_counts[i], "size mismatch");
+				check(comps[i].size() == views[i].block_count, "size mismatch");
 				for (int j = 0; j < comps[i].size(); j++) {
 					type_t val1 = comps[i][j];
-					type_t val2 = *(type_t *)matras_getv(&local, j, i);
+					type_t val2 = *(type_t *)matras_view_get(&local, views + i, j);
 					check(val1 == val2, "data mismatch");
 				}
 			}
