@@ -17,7 +17,7 @@ server.admin("box.session.on_connect(f1)")
 
 unpacker = msgpack.Unpacker(use_list = False)
 
-conn = TarantoolConnection(server.sql.host, server.sql.port)
+conn = TarantoolConnection(server.iproto.host, server.iproto.port)
 conn.connect()
 s = conn.socket
 

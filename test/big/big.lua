@@ -8,3 +8,13 @@ box.cfg{
 }
 
 require('console').listen(os.getenv('ADMIN'))
+
+function compare(a,b) 
+    return a[1] < b[1] 
+end
+
+function sorted(data)
+    table.sort(data, compare)
+    return data
+end
+
