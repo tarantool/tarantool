@@ -37,7 +37,7 @@
     distribution of item sizes.
 
     Type: float |br|
-    Default: 2.0 |br|
+    Default: 1.1 |br|
     Dynamic: no |br|
 
 .. confval:: sophia
