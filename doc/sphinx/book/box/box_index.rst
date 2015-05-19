@@ -512,6 +512,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type, Number of tuples accessed.
 
+    .. function:: bsize()
+
+        Return the total number of bytes taken by the index.
+
+        :return: number of bytes
+        :rtype: number
 
 ===========================================================
                          Example showing use of the box functions

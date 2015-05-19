@@ -20,7 +20,7 @@ access to those parameters.
         tarantool> box.cfg
         ---
         - too_long_threshold: 0.5
-          slab_alloc_factor: 2
+          slab_alloc_factor: 1.1
           slab_alloc_minimal: 64
           background: false
           slab_alloc_arena: 1
