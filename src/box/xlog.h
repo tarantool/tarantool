@@ -54,6 +54,12 @@ struct XlogError: public Exception
  */
 enum xdir_type { SNAP, XLOG };
 
+/**
+ * Newly created snapshot files get .inprogress filename suffix.
+ * The suffix is removed  when the file is finished
+ * and closed.
+ */
+enum log_suffix { NONE, INPROGRESS };
 
 /**
  * A handle for a data directory with write ahead logs or snapshots.
@@ -71,19 +77,14 @@ struct xdir {
 	bool panic_if_error;
 
 	/**
-	 * When reading files in this directory, skip
-	 * files which have .inprogress suffix: these
-	 * files are temporary.
-	 */
-	bool skip_filename_with_suffix;
-
-	/**
 	 * true if a log file in this directory can by fsync()ed
 	 * at close in a separate thread (we use this technique to
 	 * speed up sync of write ahead logs, but not snapshots).
 	 */
 	bool sync_is_async;
 
+	/* Default filename suffix for a new file. */
+	enum log_suffix suffix;
 	/**
 	 * Additional flags to apply at fopen(2) to write.
 	 * A write ahead log opened with write mode can use
@@ -119,6 +120,7 @@ struct xdir {
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX+1];
+	/** Snapshots or xlogs */
 	enum xdir_type type;
 };
 
@@ -156,13 +158,6 @@ xdir_check(struct xdir *dir);
  * Basic open mode for a log file: read or write.
  */
 enum log_mode { LOG_READ, LOG_WRITE };
-
-/**
- * Newly created logs/snapshot files get .inprogress filename suffix.
- * The suffix is removed: for snapshots, when a file is finished
- * and closed, for xlogs, when the file has at least one record.
- */
-enum log_suffix { NONE, INPROGRESS };
 
 /**
  * A single log file - a snapshot or a write ahead log.
@@ -208,18 +203,16 @@ struct xlog {
  *
  * @param  dir           the log directory to look for a file
  * @param  signature     file name
- * @param  suffix        if IN_PROGRESS, look also for
- *                       .inprogress  files
  *
  * The caller must free the returned structure with
  * xlog_close().
  * Raises an exception in case of error.
  */
 struct xlog *
-xlog_open(struct xdir *dir, int64_t signature, enum log_suffix suffix);
+xlog_open(struct xdir *dir, int64_t signature);
 
 /**
- * Open an xlog from a pre-created stdio stream. The log
+ * Open an xlog from a pre-created stdio stream.
  * The log is open for reading.
  * The file is closed on error, even if open fails.
  *
@@ -231,7 +224,7 @@ xlog_open(struct xdir *dir, int64_t signature, enum log_suffix suffix);
 
 struct xlog *
 xlog_open_stream(struct xdir *dir, int64_t signature,
-		 enum log_suffix suffix, FILE *file, const char *filename);
+		 FILE *file, const char *filename);
 
 /**
  * Create a new file and open it in write (append) mode.
@@ -258,19 +251,7 @@ int
 xlog_sync(struct xlog *l);
 
 /**
- * Rename an xlog file to its final name (remove .inprogress
- * suffix).
- *
- * @retval 0 success
- * @retval -1 error
- */
-int
-xlog_rename(struct xlog *l);
-
-/**
  * Close the log file and free xlog object.
- * Renames the file to a name without .inprogress suffix if
- * necessary.
  *
  * @retval 0 success
  * @retval -1 error (fclose() failed).
@@ -314,12 +295,6 @@ xlog_cursor_next(struct xlog_cursor *i, struct xrow_header *packet);
  */
 char *
 format_filename(struct xdir *dir, int64_t signature, enum log_suffix suffix);
-
-/**
- * Remove a file with .inprogress extension.
- */
-int
-inprogress_log_unlink(char *filename);
 
 /**
  * Construct a row to write to the log file.

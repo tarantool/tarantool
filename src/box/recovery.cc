@@ -323,8 +323,7 @@ recovery_bootstrap(struct recovery_state *r)
 	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream(&r->snap_dir, 0, NONE, f,
-					     filename);
+	struct xlog *snap = xlog_open_stream(&r->snap_dir, 0, f, filename);
 	auto guard = make_scoped_guard([=]{
 		xlog_close(snap);
 	});
@@ -344,7 +343,6 @@ recover_remaining_wals(struct recovery_state *r)
 	struct xlog *next_wal;
 	int64_t current_signature, last_signature;
 	struct vclock *current_vclock;
-	enum log_suffix suffix;
 
 	xdir_scan(&r->wal_dir);
 
@@ -385,16 +383,8 @@ recover_remaining_wals(struct recovery_state *r)
 			assert(current_vclock != NULL);
 			current_signature = vclock_signature(current_vclock);
 		}
-
-		/*
-		 * For the last WAL, first try to open .inprogress
-		 * file: if it doesn't exist, we can safely try an
-		 * .xlog, with no risk of a concurrent
-		 * xlog_rename().
-		 */
-		suffix = current_signature == last_signature ? INPROGRESS : NONE;
 		try {
-			next_wal = xlog_open(&r->wal_dir, current_signature, suffix);
+			next_wal = xlog_open(&r->wal_dir, current_signature);
 		} catch (XlogError *e) {
 			e->log();
 			break;
@@ -411,7 +401,8 @@ recover_current_wal:
 		if (r->current_wal->rows == 0) {
 			say_error("read zero records from `%s`",
 				  r->current_wal->filename);
-			break;
+			if (r->current_wal->dir->panic_if_error)
+				break;
 		}
 		if (result == LOG_EOF) {
 			say_info("done `%s'", r->current_wal->filename);
@@ -419,11 +410,6 @@ recover_current_wal:
 			/* goto find_next_wal; */
 		} else if (r->signature == last_signature) {
 			/* last file is not finished */
-			break;
-		} else if (r->finalize && r->current_wal->is_inprogress) {
-			say_warn("failed to find EOF in `%s`",
-				 r->current_wal->filename);
-			/* Let recovery_finalize deal with last file */
 			break;
 		} else {
 			say_warn("WAL `%s` wasn't correctly closed",
@@ -456,29 +442,15 @@ recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 
 	if (r->current_wal != NULL) {
 		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
-
-		if (!r->current_wal->is_inprogress) {
-			if (r->current_wal->rows == 0)
-				/* Regular WAL (not inprogress) must contain at least one row */
-				panic("zero rows was successfully read from last WAL '%s'",
-				      r->current_wal->filename);
-		} else if (r->current_wal->rows == 0) {
-			/* Unlink empty inprogress WAL */
-			say_warn("deleting broken WAL '%s'", r->current_wal->filename);
-			if (inprogress_log_unlink(r->current_wal->filename) != 0)
-				panic("can't unlink 'inprogress' WAL");
-		} else if (r->current_wal->rows <= 1 /* one row */) {
-			/* Rename inprogress wal with one row */
-			say_warn("renaming unfinished WAL '%s'",
-				 r->current_wal->filename);
-			if (xlog_rename(r->current_wal) != 0)
-				panic("can't rename 'inprogress' WAL '%s'",
-				      r->current_wal->filename);
-		} else {
-			panic("too many rows in 'inprogress' WAL '%s'",
-			      r->current_wal->filename);
+		if (r->current_wal->rows == 0) {
+			/**
+			 * The last log file had zero rows -> bump
+			 * LSN so that we don't stumble over this
+			 * file when trying to open a new xlog for
+			 * writing.
+			 */
+			vclock_inc(&r->vclock, r->server_id);
 		}
-
 		recovery_close_log(r);
 	}
 
@@ -795,10 +767,6 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
  * previous WAL. We close the previous WAL only after opening
  * a new one to smoothly move local hot standby and replication
  * over to the next WAL.
- * If the current WAL has only 1 record, it means we need to
- * rename it from '.inprogress' to '.xlog'. We maintain
- * '.inprogress' WALs to ensure that, at any point in time,
- * an .xlog file contains at least 1 valid record.
  * In case of error, we try to close any open WALs.
  *
  * @post r->current_wal is in a good shape for writes or is NULL.
@@ -813,10 +781,6 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 	ERROR_INJECT_RETURN(ERRINJ_WAL_ROTATE);
 
 	if (l != NULL && l->rows >= r->writer->rows_per_wal) {
-		/*
-		 * if l->rows == 1, xlog_close() does
-		 * xlog_rename() for us.
-		 */
 		wal_to_close = l;
 		l = NULL;
 	}
@@ -839,15 +803,6 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 		}
 		/* Open WAL with '.inprogress' suffix. */
 		l = xlog_create(&r->wal_dir, vclock);
-	} else if (l->rows == 1) {
-		/*
-		 * Rename WAL after the first successful write
-		 * to a name  without .inprogress suffix.
-		 */
-		if (xlog_rename(l)) {
-			xlog_close(l);       /* error. */
-			l = NULL;
-		}
 	}
 	assert(wal_to_close == NULL);
 	*wal = l;
@@ -858,7 +813,7 @@ static struct wal_write_request *
 wal_fill_batch(struct xlog *wal, struct fio_batch *batch, int rows_per_wal,
 	       struct wal_write_request *req)
 {
-	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
+	int max_rows = rows_per_wal - wal->rows;
 	/* Post-condition of successful wal_opt_rotate(). */
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);

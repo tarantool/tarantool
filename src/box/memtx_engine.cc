@@ -269,7 +269,7 @@ recover_snap(struct recovery_state *r)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_signature(res);
 
-	struct xlog *snap = xlog_open(&r->snap_dir, signature, NONE);
+	struct xlog *snap = xlog_open(&r->snap_dir, signature);
 	auto guard = make_scoped_guard([=]{
 		xlog_close(snap);
 	});
@@ -690,8 +690,6 @@ snapshot_save(struct recovery_state *r)
 
 	space_foreach(snapshot_space, snap);
 
-	/** suppress rename */
-	snap->is_inprogress = false;
 	xlog_close(snap);
 
 	say_info("done");

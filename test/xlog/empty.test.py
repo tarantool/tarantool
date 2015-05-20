@@ -13,13 +13,13 @@ from os.path import abspath
 server.stop()
 server.deploy()
 lsn = str(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
-filename = os.path.join(server.vardir, lsn.zfill(20) + ".xlog.inprogress")
+filename = os.path.join(server.vardir, lsn.zfill(20) + ".xlog")
 f = open(filename, "w+")
 f.close()
 server.start()
 server.stop()
 if os.access(filename, os.F_OK):
-    print ".xlog.inprogress exists"
+    print ".xlog exists"
 # the server has started but is crippled since it
 # can't override an existing file
 server.start()

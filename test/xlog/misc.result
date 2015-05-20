@@ -1,25 +1,24 @@
 
-# Inprogress xlog must be renamed before second insert.
+# xlog file must exist after inserts.
 
 space = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
-.xlog.inprogress exists
+.xlog exists
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
-.xlog.inprogress has been successfully renamed
 
-# Inprogress xlog must be renamed during regular termination.
+# a new xlog must be opened after regular termination.
 
 box.space[0]:insert{3, 'third tuple'}
 ---
 - [3, 'third tuple']
 ...
-.xlog.inprogress exists
-.xlog.inprogress has been successfully renamed
+a new .xlog exists
+.xlog stays around after sutdown
 
-# An inprogress xlog file with one record must be renamed during recovery.
+# An xlog file with one record during recovery.
 
 box.space[0]:insert{4, 'fourth tuple'}
 ---
@@ -29,8 +28,8 @@ box.space[0]:insert{5, 'Unfinished record'}
 ---
 - [5, 'Unfinished record']
 ...
-.xlog exists
-.xlog.inprogress hash been successfully renamed
+.xlog exists after kill -9
+corrupt .xlog exists after start
 box.snapshot()
 ---
 - ok
