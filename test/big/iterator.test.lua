@@ -229,3 +229,17 @@ space:select({}, {iterator = 'mistake'})
 
 space:drop()
 
+
+-------------------------------------------------------------------------------
+--  Restore GE iterator for HASH https://github.com/tarantool/tarantool/issues/836
+-------------------------------------------------------------------------------
+space = box.schema.space.create('test', {temporary=true})
+idx1 = space:create_index('primary', {type='hash',unique=true})
+
+for i = 0,4 do space:insert{i} end
+
+space:select(2)
+space:select(2, {iterator="GE"})
+space:select(2, {iterator="GT"})
+
+space:drop()
