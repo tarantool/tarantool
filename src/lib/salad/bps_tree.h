@@ -894,6 +894,13 @@ struct bps_garbage {
 	struct bps_block header;
 	/* Next garbaged block id in single-linked list */
 	bps_tree_block_id_t next_id;
+	/* If a leaf is pushed to garbage, next and previous blocks' IDs are
+	 * saved in the garbage node in order to fix iterators pointing to
+	 * that node. */
+	/* Next leaf block ID in ordered linked list */
+	bps_tree_block_id_t next_leaf_id;
+	/* Previous leaf block ID in ordered linked list */
+	bps_tree_block_id_t prev_leaf_id;
 };
 
 /**
@@ -1397,6 +1404,22 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
 
 	struct bps_block *block =
 		bps_tree_restore_block_ver(tree, itr->block_id, &itr->view);
+	if (block->type == BPS_TREE_BT_GARBAGE) {
+		struct bps_garbage *garbage = (struct bps_garbage *)block;
+		while (garbage->next_leaf_id != (bps_tree_block_id_t)(-1)
+		       && garbage->next_leaf_id != itr->block_id) {
+			block = bps_tree_restore_block_ver(tree,
+				garbage->next_leaf_id, &itr->view);
+			if (block->type == BPS_TREE_BT_LEAF) {
+				itr->block_id = garbage->next_leaf_id;
+				itr->pos = 0;
+				break;
+			} else if (block->type != BPS_TREE_BT_GARBAGE) {
+				break;
+			}
+			garbage = (struct bps_garbage *)block;
+		}
+	}
 	if (block->type != BPS_TREE_BT_LEAF) {
 		itr->block_id = (bps_tree_block_id_t)(-1);
 		return 0;
@@ -1404,8 +1427,15 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
 	if (itr->pos == (bps_tree_pos_t)(-1)) {
 		itr->pos = block->size - 1;
 	} else if (itr->pos >= block->size) {
-		itr->block_id = (bps_tree_block_id_t)(-1);
-		return 0;
+		struct bps_leaf *leaf = (struct bps_leaf *)block;
+		if (leaf->next_id == (bps_tree_block_id_t)(-1)) {
+			itr->block_id = (bps_tree_block_id_t)(-1);
+			return 0;
+		}
+		itr->block_id = leaf->next_id;
+		itr->pos = 0;
+		block = bps_tree_restore_block_ver(tree, itr->block_id,
+						   &itr->view);
 	}
 	return (struct bps_leaf *)block;
 }
@@ -1735,11 +1765,20 @@ bps_tree_garbage_push(struct bps_tree *tree, struct bps_block *block,
 		      bps_tree_block_id_t id)
 {
 	assert(block); (void) block;
+	bps_tree_block_id_t next_leaf_id = (bps_tree_block_id_t)(-1);
+	bps_tree_block_id_t prev_leaf_id = (bps_tree_block_id_t)(-1);
+	if (block->type == BPS_TREE_BT_LEAF) {
+		struct bps_leaf *leaf = (struct bps_leaf *)block;
+		next_leaf_id = leaf->next_id;
+		prev_leaf_id = leaf->prev_id;
+	}
 
 	struct bps_garbage *garbage = (struct bps_garbage *)
 		bps_tree_touch_block(tree, id);
 	garbage->header.type = BPS_TREE_BT_GARBAGE;
 	garbage->next_id = tree->garbage_head_id;
+	garbage->next_leaf_id = next_leaf_id;
+	garbage->prev_leaf_id = prev_leaf_id;
 	tree->garbage_head_id = id;
 	tree->garbage_count++;
 }
