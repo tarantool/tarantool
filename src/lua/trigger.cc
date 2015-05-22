@@ -66,8 +66,12 @@ lbox_list_all_triggers(struct lua_State *L, struct rlist *list)
 	lua_newtable(L);
 	rlist_foreach_entry_reverse(trigger, list, link) {
 		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
-		lua_rawseti(L, -2, count);
-		count++;
+		if (! lua_isnil(L, -1)) {
+			lua_rawseti(L, -2, count);
+			count++;
+		} else {
+			lua_pop(L, 1);
+		}
 	}
 	return 1;
 }
@@ -105,7 +109,7 @@ lbox_trigger_reset(struct lua_State *L, int top,
 	 */
 	lbox_trigger_check_input(L, top);
 	/* If no args - return triggers table */
-	if (lua_isnil(L, top) && lua_isnil(L, top - 1)
+	if (lua_isnil(L, top) && lua_isnil(L, top - 1))
 		return lbox_list_all_triggers(L, list);
 
 	struct trigger *trg = lbox_trigger_find(L, top, list, run);
