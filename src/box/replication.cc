@@ -153,7 +153,7 @@ replication_subscribe_f(va_list ap)
 	 * the follower fiber is enclosed into life of this fiber.
 	 */
 	struct trigger on_follow_error = {
-		rlist_nil, feed_event_f, &read_ev, NULL
+		RLIST_LINK_INITIALIZER, feed_event_f, &read_ev, NULL
 	};
 	trigger_add(&r->watcher->on_stop, &on_follow_error);
 	while (! fiber_is_dead(r->watcher)) {

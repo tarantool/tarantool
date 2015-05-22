@@ -685,7 +685,7 @@ cord_costart_thread_func(void *arg)
 	struct fiber *f = fiber_new("main", ctx.run);
 
 	struct trigger break_ev_loop = {
-		rlist_nil, break_ev_loop_f, NULL, NULL
+		RLIST_LINK_INITIALIZER, break_ev_loop_f, NULL, NULL
 	};
 	/*
 	 * Got to be in a trigger, to break the loop even

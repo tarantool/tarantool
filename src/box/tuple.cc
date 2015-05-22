@@ -534,7 +534,8 @@ void
 tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	   uint32_t objsize_max, float alloc_factor)
 {
-	tuple_format_ber = tuple_format_new(&rlist_nil);
+	RLIST_HEAD(empty_list);
+	tuple_format_ber = tuple_format_new(&empty_list);
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_ber, 1);
 
