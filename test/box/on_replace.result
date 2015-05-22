@@ -14,7 +14,7 @@ ts.on_replace()
 ...
 ts:on_replace()
 ---
-- error: 'trigger reset: incorrect arguments'
+- 0
 ...
 ts:on_replace(123)
 ---
@@ -25,6 +25,7 @@ function fail(old_tuple, new_tuple) error('test') end
 ...
 ts:on_replace(fail)
 ---
+- 1
 ...
 ts:insert{1, 'b', 'c'}
 ---
@@ -35,6 +36,7 @@ ts:get{1}
 ...
 ts:on_replace(nil, fail)
 ---
+- 0
 ...
 ts:insert{1, 'b', 'c'}
 ---
@@ -49,6 +51,7 @@ function fail(old_tuple, new_tuple) error('abc') end
 ...
 ts:on_replace(fail)
 ---
+- 1
 ...
 ts:insert{2, 'b', 'c'}
 ---
@@ -62,6 +65,7 @@ function save_out(told, tnew) o = told n = tnew end
 ...
 ts:on_replace(save_out, fail)
 ---
+- 1
 ...
 ts:insert{2, 'a', 'b', 'c'}
 ---
