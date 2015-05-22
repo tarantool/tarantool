@@ -353,15 +353,6 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
 	switch (type) {
-	case ITER_GE:
-		if (part_count != 0) {
-			light_index_itr_key(it->hash_table, &it->hitr,
-					    key_hash(key, key_def), key);
-		} else {
-			light_index_itr_begin(it->hash_table, &it->hitr);
-		}
-		it->base.next = hash_iterator_ge;
-		break;
 	case ITER_GT:
 		if (part_count != 0) {
 			light_index_itr_key(it->hash_table, &it->hitr,

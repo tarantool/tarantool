@@ -236,10 +236,18 @@ space:drop()
 space = box.schema.space.create('test', {temporary=true})
 idx1 = space:create_index('primary', {type='hash',unique=true})
 
-for i = 0,4 do space:insert{i} end
+for i = 0,5 do space:insert{i} end
 
 space:select(2)
-space:select(2, {iterator="GE"})
-space:select(2, {iterator="GT"})
-
+space:select(5, {iterator="GE"})
+space:select(nil, {iterator="GE"})
+space:select(5, {iterator="GT"})
+l = space:select(nil, {limit=2, iterator="GT"})
+l
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
+l
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
+l
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
+l
 space:drop()

@@ -1063,23 +1063,55 @@ space = box.schema.space.create('test', {temporary=true})
 idx1 = space:create_index('primary', {type='hash',unique=true})
 ---
 ...
-for i = 0,4 do space:insert{i} end
+for i = 0,5 do space:insert{i} end
 ---
 ...
 space:select(2)
 ---
 - - [2]
 ...
-space:select(2, {iterator="GE"})
+space:select(5, {iterator="GE"})
+---
+- error: Hash index does not support requested iterator type
+...
+space:select(nil, {iterator="GE"})
+---
+- error: Invalid key part count in an exact match (expected 1, got 0)
+...
+space:select(5, {iterator="GT"})
+---
+- []
+...
+l = space:select(nil, {limit=2, iterator="GT"})
+---
+...
+l
+---
+- - [0]
+  - [1]
+...
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
+---
+...
+l
 ---
 - - [2]
   - [3]
-  - [4]
 ...
-space:select(2, {iterator="GT"})
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
 ---
-- - [3]
-  - [4]
+...
+l
+---
+- - [4]
+  - [5]
+...
+l = space:select(l[#l][1], {limit=2, iterator="GT"})
+---
+...
+l
+---
+- []
 ...
 space:drop()
 ---
