@@ -39,7 +39,7 @@ RLIST_HEAD(engines);
 
 Engine::Engine(const char *engine_name)
 	:name(engine_name),
-	 link(RLIST_INITIALIZER(link))
+	 link(RLIST_HEAD_INITIALIZER(link))
 {}
 
 void Engine::init()

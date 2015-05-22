@@ -32,10 +32,11 @@ main(void)
 		items[i].no = i;
 		rlist_add_tail(&head, &(items[i].list));
 	}
-	ok(rlist_empty(&rlist_nil), "rlist_nil is empty");
+	RLIST_HEAD(empty_list);
+	ok(rlist_empty(&empty_list), "rlist_nil is empty");
 	ok(rlist_empty(&head2), "head2 is empty");
-	rlist_swap(&head2, &rlist_nil);
-	ok(rlist_empty(&rlist_nil), "rlist_nil is empty after swap");
+	rlist_swap(&head2, &empty_list);
+	ok(rlist_empty(&empty_list), "rlist_nil is empty after swap");
 	ok(rlist_empty(&head2), "head2 is empty after swap");
 	rlist_swap(&head, &head2);
 	ok(rlist_empty(&head), "head is empty after swap");

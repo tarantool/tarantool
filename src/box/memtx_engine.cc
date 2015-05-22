@@ -488,10 +488,10 @@ MemtxEngine::beginStatement(struct txn *txn)
 	if (txn->autocommit == false && txn->n_stmts == 1) {
 
 		txn->fiber_on_yield = {
-			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+			RLIST_LINK_INITIALIZER, txn_on_yield_or_stop, NULL, NULL
 		};
 		txn->fiber_on_stop = {
-			rlist_nil, txn_on_yield_or_stop, NULL, NULL
+			RLIST_LINK_INITIALIZER, txn_on_yield_or_stop, NULL, NULL
 		};
 		/*
 		 * Memtx doesn't allow yields between statements of

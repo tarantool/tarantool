@@ -47,9 +47,6 @@ struct rlist {
 	struct rlist *next;
 };
 
-/* Used for static initialization of an empty list. */
-extern struct rlist rlist_nil;
-
 /**
  * init list head (or list entry as ins't included in list)
  */
@@ -201,15 +198,20 @@ rlist_swap(struct rlist *rhs, struct rlist *lhs)
 }
 
 /**
- * list initializer
+ * list head initializer
  */
-#define RLIST_INITIALIZER(name) { &(name), &(name) }
+#define RLIST_HEAD_INITIALIZER(name) { &(name), &(name) }
+
+/**
+ * list link node
+ */
+#define RLIST_LINK_INITIALIZER { 0, 0 }
 
 /**
  * allocate and init head of list
  */
 #define RLIST_HEAD(name)	\
-	struct rlist name = RLIST_INITIALIZER(name)
+	struct rlist name = RLIST_HEAD_INITIALIZER(name)
 
 /**
  * return entry by list item

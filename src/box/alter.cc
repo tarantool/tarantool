@@ -948,7 +948,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		struct space_def def;
 		space_def_create_from_tuple(&def, new_tuple, ER_CREATE_SPACE);
-		struct space *space = space_new(&def, &rlist_nil);
+		RLIST_HEAD(empty_list);
+		struct space *space = space_new(&def, &empty_list);
 		(void) space_cache_replace(space);
 		/*
 		 * So may happen that until the DDL change record
@@ -1697,31 +1698,31 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 /* }}} cluster configuration */
 
 struct trigger alter_space_on_replace_space = {
-	rlist_nil, on_replace_dd_space, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
 };
 
 struct trigger alter_space_on_replace_index = {
-	rlist_nil, on_replace_dd_index, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_index, NULL, NULL
 };
 
 struct trigger on_replace_schema = {
-	rlist_nil, on_replace_dd_schema, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_schema, NULL, NULL
 };
 
 struct trigger on_replace_user = {
-	rlist_nil, on_replace_dd_user, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_user, NULL, NULL
 };
 
 struct trigger on_replace_func = {
-	rlist_nil, on_replace_dd_func, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_func, NULL, NULL
 };
 
 struct trigger on_replace_priv = {
-	rlist_nil, on_replace_dd_priv, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_priv, NULL, NULL
 };
 
 struct trigger on_replace_cluster = {
-	rlist_nil, on_replace_dd_cluster, NULL, NULL
+	RLIST_LINK_INITIALIZER, on_replace_dd_cluster, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */
