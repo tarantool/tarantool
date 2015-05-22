@@ -129,7 +129,7 @@ space:select{1}
 -- this is illegal
 space:update(1, {{'=', 2, 'Huh'}, {'=', 1001, 'invalid field'}})
 ---
-- error: Field 1000 was not found in the tuple
+- error: Field 1001 was not found in the tuple
 ...
 space:select{1}
 ---
