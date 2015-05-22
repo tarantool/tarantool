@@ -13,7 +13,7 @@ print """
  """
 
 server.admin("function f1() nosuchfunction() end")
-server.admin("box.session.on_connect(f1)")
+server.admin("type(box.session.on_connect(f1))")
 
 unpacker = msgpack.Unpacker(use_list = False)
 

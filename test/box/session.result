@@ -53,30 +53,34 @@ session.peer() == session.peer(session.id())
 function noop() end
 ---
 ...
-session.on_connect(noop)
+type(session.on_connect(noop))
 ---
+- function
 ...
-session.on_disconnect(noop)
+type(session.on_disconnect(noop))
 ---
+- function
 ...
 -- check it's possible to reset these triggers
 function fail() error('hear') end
 ---
 ...
-session.on_connect(fail, noop)
+type(session.on_connect(fail, noop))
 ---
+- function
 ...
-session.on_disconnect(fail, noop)
+type(session.on_disconnect(fail, noop))
 ---
+- function
 ...
 -- check on_connect/on_disconnect argument count and type
-session.on_connect()
+type(session.on_connect())
 ---
-- error: 'trigger reset: incorrect arguments'
+- table
 ...
-session.on_disconnect()
+type(session.on_disconnect())
 ---
-- error: 'trigger reset: incorrect arguments'
+- table
 ...
 session.on_connect(function() end, function() end)
 ---
@@ -119,11 +123,13 @@ function dec() active_connections = active_connections - 1 end
 net = { box = require('net.box') }
 ---
 ...
-session.on_connect(inc)
+type(session.on_connect(inc))
 ---
+- function
 ...
-session.on_disconnect(dec)
+type(session.on_disconnect(dec))
 ---
+- function
 ...
 active_connections = 0
 ---
@@ -177,11 +183,13 @@ function audit_connect() box.space['tweedledum']:insert{session.id()} end
 function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
 ---
 ...
-session.on_connect(audit_connect)
+type(session.on_connect(audit_connect))
 ---
+- function
 ...
-session.on_disconnect(audit_disconnect)
+type(session.on_disconnect(audit_disconnect))
 ---
+- function
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---

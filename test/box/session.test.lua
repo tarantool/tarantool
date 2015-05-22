@@ -19,17 +19,17 @@ session.peer() == session.peer(session.id())
 
 -- check on_connect/on_disconnect triggers
 function noop() end
-session.on_connect(noop)
-session.on_disconnect(noop)
+type(session.on_connect(noop))
+type(session.on_disconnect(noop))
 
 -- check it's possible to reset these triggers
 function fail() error('hear') end
-session.on_connect(fail, noop)
-session.on_disconnect(fail, noop)
+type(session.on_connect(fail, noop))
+type(session.on_disconnect(fail, noop))
 
 -- check on_connect/on_disconnect argument count and type
-session.on_connect()
-session.on_disconnect()
+type(session.on_connect())
+type(session.on_disconnect())
 
 session.on_connect(function() end, function() end)
 session.on_disconnect(function() end, function() end)
@@ -48,8 +48,8 @@ session.on_disconnect(nil, fail)
 function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
 net = { box = require('net.box') }
-session.on_connect(inc)
-session.on_disconnect(dec)
+type(session.on_connect(inc))
+type(session.on_disconnect(dec))
 active_connections = 0
 LISTEN = require('uri').parse(box.cfg.listen)
 c = net.box:new(LISTEN.host, LISTEN.service)
@@ -69,8 +69,8 @@ session.on_disconnect(nil, dec)
 -- write audit trail of connect/disconnect into a space
 function audit_connect() box.space['tweedledum']:insert{session.id()} end
 function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
-session.on_connect(audit_connect)
-session.on_disconnect(audit_disconnect)
+type(session.on_connect(audit_connect))
+type(session.on_disconnect(audit_disconnect))
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 a = net.box:new(LISTEN.host, LISTEN.service)
