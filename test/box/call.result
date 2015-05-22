@@ -20,40 +20,30 @@ f1()
 - true
 - null
 ...
-call f1()
----
-- ['testing']
+call  f1 ()
+- [testing]
 - [1]
-- [False]
+- [false]
 - [-1]
 - [1.123]
-- [True]
-- [None]
-...
+- [true]
+- [null]
+
 f1=nil
 ---
 ...
-call f1()
----
-- error:
-    errcode: ER_NO_SUCH_PROC
-    errmsg: Procedure 'f1' is not defined
-...
+call  f1 ()
+error: {code: ER_NO_SUCH_PROC, reason: Procedure 'f1' is not defined}
+
 function f1() return f1 end
 ---
 ...
-call f1()
----
-- error:
-    errcode: ER_PROC_LUA
-    errmsg: unsupported Lua type 'function'
-...
-call dostring('box.error(33333, "Hey!")')
----
-- error:
-    errcode: ER_UNKNOWN (565)
-    errmsg: Unknown error
-...
+call  f1 ()
+error: {code: ER_PROC_LUA, reason: unsupported Lua type 'function'}
+
+call  box.error (33333, 'Hey!')
+error: {code: U, reason: Unknown error}
+
 
 # A test case for Bug#103491
 # server CALL processing bug with name path longer than two
@@ -74,18 +64,15 @@ test.test = {}
 test.test.f = f
 ---
 ...
-call f()
----
-- ['OK']
-...
-call test.f()
----
-- ['OK']
-...
-call test.test.f()
----
-- ['OK']
-...
+call  f ()
+- [OK]
+
+call  test.f ()
+- [OK]
+
+call  test.test.f ()
+- [OK]
+
 
 # Test for Bug #955226
 # Lua Numbers are passed back wrongly as strings
@@ -94,98 +81,87 @@ call test.test.f()
 function foo() return 1, 2, '1', '2' end
 ---
 ...
-call foo()
----
+call  foo ()
 - [1]
 - [2]
 - ['1']
 - ['2']
-...
+
 function f1(...) return {...} end
 ---
 ...
 function f2(...) return f1({...}) end
 ---
 ...
-call f1('test_', 'test_')
----
-- ['test_', 'test_']
-...
-call f2('test_', 'test_')
----
-- ['test_', 'test_']
-...
-call f1()
----
+call  f1 ('test_', 'test_')
+- [test_, test_]
+
+call  f2 ('test_', 'test_')
+- [test_, test_]
+
+call  f1 ()
 - []
-...
-call f2()
----
+
+call  f2 ()
 - []
-...
+
 function f3() return {{'hello'}, {'world'}} end
 ---
 ...
-call f3()
----
-- ['hello']
-- ['world']
-...
+call  f3 ()
+- [hello]
+- [world]
+
 function f3() return {'hello', {'world'}} end
 ---
 ...
-call f3()
----
-- ['hello', ['world']]
-...
+call  f3 ()
+- - hello
+  - [world]
+
 function f3() return 'hello', {{'world'}, {'canada'}} end
 ---
 ...
-call f3()
----
-- ['hello']
-- [['world'], ['canada']]
-...
+call  f3 ()
+- [hello]
+- - [world]
+  - [canada]
+
 function f3() return {}, '123', {{}, {}} end
 ---
 ...
-call f3()
----
+call  f3 ()
 - []
 - ['123']
-- [[], []]
-...
+- - []
+  - []
+
 function f3() return { {{'hello'}} } end
 ---
 ...
-call f3()
----
-- [['hello']]
-...
+call  f3 ()
+- - [hello]
+
 function f3() return { box.tuple.new('hello'), {'world'} } end
 ---
 ...
-call f3()
----
-- ['hello']
-- ['world']
-...
+call  f3 ()
+- [hello]
+- [world]
+
 function f3() return { {'world'}, box.tuple.new('hello') } end
 ---
 ...
-call f3()
----
-- ['world']
-- ['hello']
-...
-call f1('jason')
----
-- ['jason']
-...
-call f1('jason', 1, 'test', 2, 'stewart')
----
-- ['jason', 1, 'test', 2, 'stewart']
-...
+call  f3 ()
+- [world]
+- [hello]
+
+call  f1 ('jason',)
+- [jason]
+
+call  f1 ('jason', 1, 'test', 2, 'stewart')
+- [jason, 1, test, 2, stewart]
+
 space = box.schema.space.create('tweedledum', { id = 0 })
 ---
 ...
@@ -198,69 +174,58 @@ function myreplace(...) return space:replace{...} end
 function myinsert(...) return space:insert{...} end
 ---
 ...
-insert into t0 values (1, 'test box delete')
----
-- [1, 'test box delete']
-...
-call space:delete(1)
----
-- [1, 'test box delete']
-...
-insert into t0 values (1, 'test box delete')
----
-- [1, 'test box delete']
-...
-call space:delete(1)
----
-- [1, 'test box delete']
-...
-call space:delete(1)
----
-...
-insert into t0 values (2, 'test box delete')
----
-- [2, 'test box delete']
-...
-call space:delete(1)
----
-...
-call space:delete(2)
----
-- [2, 'test box delete']
-...
-call space:delete(2)
----
-...
+call  myinsert (1, 'test box delete')
+- [1, test box delete]
+
+call  space:delete (1,)
+- [1, test box delete]
+
+call  myinsert (1, 'test box delete')
+- [1, test box delete]
+
+call  space:delete (1,)
+- [1, test box delete]
+
+call  space:delete (1,)
+[]
+
+call  myinsert (2, 'test box delete')
+- [2, test box delete]
+
+call  space:delete (1,)
+[]
+
+call  space:delete (2,)
+- [2, test box delete]
+
+call  space:delete (2,)
+[]
+
 space:delete{2}
 ---
 ...
-insert into t0 values (2, 'test box delete')
----
-- [2, 'test box delete']
-...
-call space:get(2)
----
-- [2, 'test box delete']
-...
+call  myinsert (2, 'test box delete')
+- [2, test box delete]
+
+call  space:get (2,)
+- [2, test box delete]
+
 space:delete{2}
 ---
 - [2, 'test box delete']
 ...
-call space:get(2)
----
-...
-insert into t0 values (2, 'test box.select()')
----
-- [2, 'test box.select()']
-...
-call space:get(2)
----
-- [2, 'test box.select()']
-...
-call space:select(2)
----
-- [2, 'test box.select()']
-...
+call  space:get (2,)
+[]
+
+call  myinsert (2, 'test box.select()')
+- [2, test box.select()]
+
+call  space:get (2,)
+- [2, test box.select()]
+
+call  space:select (2,)
+- [2, test box.select()]
+
 space:get{2}
 ---
 - [2, 'test box.select()']
@@ -276,22 +241,18 @@ space:select{1}
 ---
 - []
 ...
-call myreplace(2, 'hello', 'world')
----
-- [2, 'hello', 'world']
-...
-call myreplace(2, 'goodbye', 'universe')
----
-- [2, 'goodbye', 'universe']
-...
-call space:get(2)
----
-- [2, 'goodbye', 'universe']
-...
-call space:select(2)
----
-- [2, 'goodbye', 'universe']
-...
+call  myreplace (2, 'hello', 'world')
+- [2, hello, world]
+
+call  myreplace (2, 'goodbye', 'universe')
+- [2, goodbye, universe]
+
+call  space:get (2,)
+- [2, goodbye, universe]
+
+call  space:select (2,)
+- [2, goodbye, universe]
+
 space:get{2}
 ---
 - [2, 'goodbye', 'universe']
@@ -300,35 +261,28 @@ space:select{2}
 ---
 - - [2, 'goodbye', 'universe']
 ...
-call myreplace(2)
----
+call  myreplace (2,)
 - [2]
-...
-call space:get(2)
----
+
+call  space:get (2,)
 - [2]
-...
-call space:select(2)
----
+
+call  space:select (2,)
 - [2]
-...
-call space:delete(2)
----
+
+call  space:delete (2,)
 - [2]
-...
-call space:delete(2)
----
-...
-call myinsert(3, 'old', 2)
----
-- [3, 'old', 2]
-...
-call myinsert(3, 'old', 2)
----
-- error:
-    errcode: ER_TUPLE_FOUND
-    errmsg: Duplicate key exists in unique index 'primary' in space 'tweedledum'
-...
+
+call  space:delete (2,)
+[]
+
+call  myinsert (3, 'old', 2)
+- [3, old, 2]
+
+call  myinsert (3, 'old', 2)
+error: {code: ER_TUPLE_FOUND, reason: Duplicate key exists in unique index 'primary'
+    in space 'tweedledum'}
+
 space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})
 ---
 - error: Attempt to modify a tuple field which is part of index 'primary' in space
@@ -337,14 +291,12 @@ space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})
 space:insert(space:get{3}:update{{'=', 1, 4}, {'=', 2, 'new'}}) space:delete{3}
 ---
 ...
-call space:get(4)
----
-- [4, 'new', 2]
-...
-call space:select(4)
----
-- [4, 'new', 2]
-...
+call  space:get (4,)
+- [4, new, 2]
+
+call  space:select (4,)
+- [4, new, 2]
+
 space:update({4}, {{'+', 3, 1}})
 ---
 - [4, 'new', 3]
@@ -353,29 +305,24 @@ space:update({4}, {{'-', 3, 1}})
 ---
 - [4, 'new', 2]
 ...
-call space:get(4)
----
-- [4, 'new', 2]
-...
-call space:select(4)
----
-- [4, 'new', 2]
-...
+call  space:get (4,)
+- [4, new, 2]
+
+call  space:select (4,)
+- [4, new, 2]
+
 function field_x(key, field_index) return space:get(key)[field_index] end
 ---
 ...
-call field_x(4, 1)
----
+call  field_x (4, 1)
 - [4]
-...
-call field_x(4, 2)
----
-- ['new']
-...
-call space:delete(4)
----
-- [4, 'new', 2]
-...
+
+call  field_x (4, 2)
+- [new]
+
+call  space:delete (4,)
+- [4, new, 2]
+
 space:drop()
 ---
 ...

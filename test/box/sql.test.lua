@@ -1,214 +1,91 @@
 net_box = require('net.box')
----
-...
+
 s = box.schema.space.create('test', { id = 0 })
----
-...
 box.schema.user.create('test', { password = 'test' })
----
-...
 box.schema.user.grant('test', 'execute,read,write', 'universe')
----
-...
+
 conn = net_box:new('test:test@' .. box.cfg.listen)
----
-...
 space = conn.space.test
----
-...
+
 index = box.space.test:create_index('primary', { type = 'hash' })
----
-...
 conn:ping()
----
-- true
-...
+
 -- xxx: bug  currently selects no rows
 space:select{}
----
-- error: Invalid key part count in an exact match (expected 1, got 0)
-...
 space:insert{1, 'I am a tuple'}
----
-- [1, 'I am a tuple']
-...
 space:select{1}
----
-- - [1, 'I am a tuple']
-...
+
 -- currently there is no way to find out how many records
 -- a space contains 
 space:select{0}
----
-- []
-...
 space:select{2}
----
-- []
-...
+
 --# stop server default
 --# start server default
 net_box = require('net.box')
----
-...
 conn = net_box:new('test:test@' .. box.cfg.listen)
----
-...
 space = conn.space.test
----
-...
+
 space:select{1}
----
-- - [1, 'I am a tuple']
-...
 box.snapshot()
----
-- ok
-...
 space:select{1}
----
-- - [1, 'I am a tuple']
-...
+
 --# stop server default
 --# start server default
 net_box = require('net.box')
----
-...
 conn = net_box:new('test:test@' .. box.cfg.listen)
----
-...
 space = conn.space.test
----
-...
+
 space:select{1}
----
-- - [1, 'I am a tuple']
-...
 space:delete{1}
----
-- [1, 'I am a tuple']
-...
 space:select{1}
----
-- []
-...
 -- xxx: update comes through, returns 0 rows affected 
 space:update(1, {{'=', 2, 'I am a new tuple'}})
----
-...
 -- nothing is selected, since nothing was there
 space:select{1}
----
-- []
-...
 space:insert{1, 'I am a new tuple'}
----
-- [1, 'I am a new tuple']
-...
 space:select{1}
----
-- - [1, 'I am a new tuple']
-...
 space:update(1, {{'=', 2, 'I am the newest tuple'}})
----
-- [1, 'I am the newest tuple']
-...
 space:select{1}
----
-- - [1, 'I am the newest tuple']
-...
 -- this is correct, can append field to tuple
 space:update(1, {{'=', 2, 'Huh'}, {'=', 3, 'I am a new field! I was added via append'}})
----
-- [1, 'Huh', 'I am a new field! I was added via append']
-...
 space:select{1}
----
-- - [1, 'Huh', 'I am a new field! I was added via append']
-...
+
 -- this is illegal
 space:update(1, {{'=', 2, 'Huh'}, {'=', 1001, 'invalid field'}})
----
-- error: Field 1000 was not found in the tuple
-...
 space:select{1}
----
-- - [1, 'Huh', 'I am a new field! I was added via append']
-...
 space:replace{1, 'I am a new tuple', 'stub'}
----
-- [1, 'I am a new tuple', 'stub']
-...
 space:update(1, {{'=', 2, 'Huh'}, {'=', 3, 'Oh-ho-ho'}})
----
-- [1, 'Huh', 'Oh-ho-ho']
-...
 space:select{1}
----
-- - [1, 'Huh', 'Oh-ho-ho']
-...
+
+
 -- check empty strings
 space:update(1, {{'=', 2, ''}, {'=', 3, ''}})
----
-- [1, '', '']
-...
 space:select{1}
----
-- - [1, '', '']
-...
+
 -- check type change 
 space:update(1, {{'=', 2, 2}, {'=', 3, 3}})
----
-- [1, 2, 3]
-...
 space:select{1}
----
-- - [1, 2, 3]
-...
+
 -- check limits
 space:insert{0}
----
-- [0]
-...
 space:select{0}
----
-- - [0]
-...
 space:select{4294967295}
----
-- []
-...
+
 -- cleanup 
 space:delete(0)
----
-- [0]
-...
 space:delete(4294967295)
----
-...
+
 -- A test case for: http://bugs.launchpad.net/bugs/712456
 -- Verify that when trying to access a non-existing or
 -- very large space id, no crash occurs.
 conn.space[1]:select{}
----
-- error: '[string "return conn.space[1]:select{} "]:1: attempt to index a nil value'
-...
 conn.space[65537]:select{}
----
-- error: '[string "return conn.space[65537]:select{} "]:1: attempt to index a nil
-    value'
-...
 conn.space[4294967295]:select{}
----
-- error: '[string "return conn.space[4294967295]:select{} "]:1: attempt to index a
-    nil value'
-...
+
 box.space[0]:drop()
----
-...
 box.schema.user.drop('test')
----
-...
+
 -- A test case for: http://bugs.launchpad.net/bugs/716683
 -- Admin console should not stall on unknown command.
 --admin("show status", simple=True)

@@ -18,7 +18,7 @@ print """
 """
 
 # opeing new connection to tarantool/box
-conn = TarantoolConnection(server.sql.host, server.sql.port)
+conn = TarantoolConnection(server.iproto.host, server.iproto.port)
 conn.connect()
 s = conn.socket
 
@@ -29,7 +29,7 @@ print "# send the package with invalid length"
 invalid_request = struct.pack('<LLL', 1, 4294967290, 1)
 print s.send(invalid_request)
 print "# check that is server alive"
-sql("ping")
+print iproto.py_con.ping() > 0
 
 # closing connection
 s.close()
@@ -48,7 +48,7 @@ def repr_dict(todump):
 
 def test(header, body):
     # Connect and authenticate
-    c = Connection('localhost', server.sql.port)
+    c = Connection('localhost', server.iproto.port)
     c.connect()
     print 'query', repr_dict(header), repr_dict(body)
     header = msgpack.dumps(header)
@@ -61,7 +61,7 @@ def test(header, body):
     except OSError as e:
         print '   => ', 'Failed to send request'
     c.close()
-    sql("ping")
+    print iproto.py_con.ping() > 0
 
 print """
 #  Test gh-206 "Segfault if sending IPROTO package without `KEY` field"
@@ -96,7 +96,7 @@ admin("space = box.schema.space.create('test', { id = 567 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
 
-c = Connection('localhost', server.sql.port)
+c = Connection('localhost', server.iproto.port)
 c.connect()
 request1 = RequestInsert(c, 567, [1, "baobab"])
 request2 = RequestInsert(c, 567, [2, "obbaba"])
@@ -173,7 +173,7 @@ class RawSelect(Request):
             msgpack.dumps(IPROTO_LIMIT) + msgpack.dumps(100);
         self._bytes = self.header(len(request_body)) + request_body
 
-c = sql.py_con
+c = iproto.py_con
 space = c.space('test')
 space_id = space.space_no
 
