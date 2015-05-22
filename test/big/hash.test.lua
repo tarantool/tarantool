@@ -299,3 +299,11 @@ hash:insert{0}
 hash:insert{16}
 for _, tuple in hi:pairs(nil, {iterator = box.index.ALL}) do hash:delete{tuple[1]} end
 hash:drop()
+
+-- 
+-- gh-616 "1-based indexing and 0-based error message
+--
+_ = box.schema.create_space('test')
+_ = box.space.test:create_index('i',{parts={1,'STR'}})
+box.space.test:insert{1}
+box.space.test:drop()

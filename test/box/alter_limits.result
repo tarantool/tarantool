@@ -508,7 +508,7 @@ index = s:create_index('t1', { type = 'hash' })
 -- field type contradicts field type of another index
 index = s:create_index('t2', { type = 'hash', parts = { 1, 'str' }})
 ---
-- error: Ambiguous field type in index 't2', key part 0. Requested type is STR but
+- error: Ambiguous field type in index 't2', key part 1. Requested type is STR but
     the field has previously been defined as NUM
 ...
 -- ok
@@ -785,7 +785,7 @@ _ = box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
 -- ambiguous field type
 index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 ---
-- error: Ambiguous field type in index 'str', key part 0. Requested type is STR but
+- error: Ambiguous field type in index 'str', key part 1. Requested type is STR but
     the field has previously been defined as NUM
 ...
 -- create index on a non-existing field
@@ -803,7 +803,7 @@ s:insert{'Der Baader Meinhof Komplex', '2009 '}
 -- create an index on a field with a wrong type
 index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'num'}})
 ---
-- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 2 type does not match one required by operation: expected NUM'
 ...
 -- a field is missing
 s:replace{'Der Baader Meinhof Komplex'}

@@ -40,7 +40,7 @@ tmp:bsize() > bsize
 -- Insert invalid fields
 hash:insert{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash replace fields tests
@@ -61,7 +61,7 @@ hash:replace{2, 'value1 v1.43', 'value2 1.92'}
 -- Replace invalid fields
 hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash select fields test
@@ -178,7 +178,7 @@ hash:insert{103, 'value1 v1.0', 'value2 v1.0'}
 ...
 hash:insert{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash replace fields tests
@@ -211,7 +211,7 @@ hash:replace{2, 'value1 v1.43', 'value2 1.92'}
 ...
 hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash select fields test
@@ -699,5 +699,21 @@ for _, tuple in hi:pairs(nil, {iterator = box.index.ALL}) do hash:delete{tuple[1
 ---
 ...
 hash:drop()
+---
+...
+-- 
+-- gh-616 "1-based indexing and 0-based error message
+--
+_ = box.schema.create_space('test')
+---
+...
+_ = box.space.test:create_index('i',{parts={1,'STR'}})
+---
+...
+box.space.test:insert{1}
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected STR'
+...
+box.space.test:drop()
 ---
 ...

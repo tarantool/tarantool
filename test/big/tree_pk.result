@@ -64,15 +64,15 @@ s0:delete{3}
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
 s0:insert{'xxxxxxx'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 s0:insert{''}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 s0:insert{'12'}
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 s1 = box.schema.space.create('tweedledee')
 ---
