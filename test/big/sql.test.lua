@@ -37,7 +37,7 @@ s:truncate()
 -- get away with it.
 
 space:insert{'Britney'}
-soretd(space.index.secondary:select('Anything'))
+sorted(space.index.secondary:select('Anything'))
 space:insert{'Stephanie'}
 sorted(space.index.secondary:select('Anything'))
 space:insert{'Spears', 'Britney'}
@@ -124,7 +124,7 @@ space:insert{3, 'new'}
 space:insert{4, 'world'}
 
 
--- Check how build_idnexes() works
+-- Check how build_indexes() works
 --# stop server default
 --# start server default
 net_box = require('net.box')

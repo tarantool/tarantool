@@ -11,7 +11,7 @@ index = box.space.test:create_index('primary', { type = 'hash' })
 conn:ping()
 
 -- xxx: bug  currently selects no rows
-space:select()
+space:select{}
 space:insert{1, 'I am a tuple'}
 space:select{1}
 

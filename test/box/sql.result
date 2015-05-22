@@ -24,7 +24,7 @@ conn:ping()
 - true
 ...
 -- xxx: bug  currently selects no rows
-space:select()
+space:select{}
 ---
 - error: Invalid key part count in an exact match (expected 1, got 0)
 ...

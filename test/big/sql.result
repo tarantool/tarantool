@@ -75,10 +75,9 @@ space:insert{'Britney'}
 ---
 - error: Tuple field count 1 is less than required by a defined index (expected 2)
 ...
-soretd(space.index.secondary:select('Anything'))
+sorted(space.index.secondary:select('Anything'))
 ---
-- error: '[string "return soretd(space.index.secondary:select(''A..."]:1: attempt
-    to call global ''soretd'' (a nil value)'
+- []
 ...
 space:insert{'Stephanie'}
 ---
@@ -347,7 +346,7 @@ space:insert{4, 'world'}
 ---
 - [4, 'world']
 ...
--- Check how build_idnexes() works
+-- Check how build_indexes() works
 --# stop server default
 --# start server default
 net_box = require('net.box')
