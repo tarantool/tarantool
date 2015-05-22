@@ -53,34 +53,34 @@ session.peer() == session.peer(session.id())
 function noop() end
 ---
 ...
-session.on_connect(noop)
+type(session.on_connect(noop))
 ---
-- 1
+- function
 ...
-session.on_disconnect(noop)
+type(session.on_disconnect(noop))
 ---
-- 1
+- function
 ...
 -- check it's possible to reset these triggers
 function fail() error('hear') end
 ---
 ...
-session.on_connect(fail, noop)
+type(session.on_connect(fail, noop))
 ---
-- 1
+- function
 ...
-session.on_disconnect(fail, noop)
+type(session.on_disconnect(fail, noop))
 ---
-- 1
+- function
 ...
 -- check on_connect/on_disconnect argument count and type
-session.on_connect()
+type(session.on_connect())
 ---
-- 1
+- table
 ...
-session.on_disconnect()
+type(session.on_disconnect())
 ---
-- 1
+- table
 ...
 session.on_connect(function() end, function() end)
 ---
@@ -109,11 +109,9 @@ session.on_disconnect(1)
 -- use of nil to clear the trigger
 session.on_connect(nil, fail)
 ---
-- 0
 ...
 session.on_disconnect(nil, fail)
 ---
-- 0
 ...
 -- check how connect/disconnect triggers work
 function inc() active_connections = active_connections + 1 end
@@ -125,13 +123,13 @@ function dec() active_connections = active_connections - 1 end
 net = { box = require('net.box') }
 ---
 ...
-session.on_connect(inc)
+type(session.on_connect(inc))
 ---
-- 1
+- function
 ...
-session.on_disconnect(dec)
+type(session.on_disconnect(dec))
 ---
-- 1
+- function
 ...
 active_connections = 0
 ---
@@ -174,11 +172,9 @@ active_connections
 ...
 session.on_connect(nil, inc)
 ---
-- 0
 ...
 session.on_disconnect(nil, dec)
 ---
-- 0
 ...
 -- write audit trail of connect/disconnect into a space
 function audit_connect() box.space['tweedledum']:insert{session.id()} end
@@ -187,13 +183,13 @@ function audit_connect() box.space['tweedledum']:insert{session.id()} end
 function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
 ---
 ...
-session.on_connect(audit_connect)
+type(session.on_connect(audit_connect))
 ---
-- 1
+- function
 ...
-session.on_disconnect(audit_disconnect)
+type(session.on_disconnect(audit_disconnect))
 ---
-- 1
+- function
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
@@ -215,11 +211,9 @@ a:close()
 -- cleanup
 session.on_connect(nil, audit_connect)
 ---
-- 0
 ...
 session.on_disconnect(nil, audit_disconnect)
 ---
-- 0
 ...
 active_connections
 ---

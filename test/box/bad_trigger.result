@@ -6,9 +6,9 @@
 function f1() nosuchfunction() end
 ---
 ...
-box.session.on_connect(f1)
+type(box.session.on_connect(f1))
 ---
-- 1
+- function
 ...
 greeting:  True
 fixheader:  True
@@ -17,5 +17,4 @@ error message:  [string "function f1() nosuchfunction() end"]:1: attempt to call
 eof: True
 box.session.on_connect(nil, f1)
 ---
-- 0
 ...
