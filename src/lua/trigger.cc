@@ -58,15 +58,17 @@ lbox_trigger_find(struct lua_State *L, int index,
 	return NULL;
 }
 
-uint32_t
-lbox_trigger_count(struct rlist *list)
+void
+lbox_trigger_table(struct lua_State *L, struct rlist *list)
 {
 	struct trigger *trigger;
-	uint32_t count = 0;
-	rlist_foreach_entry(trigger, list, link) {
+	uint32_t count = 1;
+	lua_newtable(L);
+	rlist_foreach_entry_reverse(trigger, list, link) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
+		lua_rawseti(L, -2, count);
 		count++;
 	}
-	return count;
 }
 
 void
@@ -96,9 +98,9 @@ lbox_trigger_reset(struct lua_State *L, int top,
 		   struct rlist *list, trigger_f run)
 {
 	lbox_trigger_check_input(L, top);
-	// if no args - return triggers count
+	// if no args - return triggers table
 	if(lua_isnil(L, top) && lua_isnil(L, top - 1)){
-		lua_pushnumber(L, lbox_trigger_count(list));
+		lbox_trigger_table(L, list);
 		return 1;
 	}
 
@@ -131,11 +133,12 @@ lbox_trigger_reset(struct lua_State *L, int top,
 		/* Reference. */
 		trg->data = (void *) (intptr_t)
 			luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trg->data);
+		return 1;
 
 	} else {
 		trigger_clear(trg);
 		free(trg);
 	}
-	lua_pushnumber(L, lbox_trigger_count(list));
-	return 1;
+	return 0;
 }
