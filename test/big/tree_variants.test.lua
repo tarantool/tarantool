@@ -18,15 +18,20 @@ space:insert{7, 7, 400, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007}
 space:insert{8, 8, 400, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 space:insert{9, 9, 400, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 
+-- In non-unique indexes select output order is undefined,
+-- so it's better to additionally sort output to receive same order every time.
+function sort_cmp(a, b) return a[1] < b[1] and true or false end
+function sort(t) table.sort(t, sort_cmp) return t end
+
 space.index['primary']:get{1}
-space.index['i1']:select{2}
-space.index[2]:select({300})
+sort(space.index['i1']:select{2})
+sort(space.index[2]:select({300}))
 #space.index['i3']:select({'Joe', 'Sixpack'})
 #space.index['i3']:select('John')
 #space.index['i4']:select('A Pipe')
-{space.index['i4']:select{'Miller Genuine Draft', 'Drinks'}}
-space.index['i5']:select{2007}
-space.index[6]:select{'Miller Genuine Draft', 'Drinks'}
+{sort(space.index['i4']:select{'Miller Genuine Draft', 'Drinks'})}
+sort(space.index['i5']:select{2007})
+sort(space.index[6]:select{'Miller Genuine Draft', 'Drinks'})
 
 space:delete{6}
 space:delete{7}
@@ -38,12 +43,12 @@ space:insert{7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007}
 space:insert{8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 space:insert{9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 
-space.index['i1']:select{6ULL}
-space.index['i1']:select{6}
-space.index['i2']:select(400ULL)
-space.index['i2']:select(400)
+sort(space.index['i1']:select{6ULL})
+sort(space.index['i1']:select{6})
+sort(space.index['i2']:select(400ULL))
+sort(space.index['i2']:select(400))
 
-space:select{}
+sort(space:select{})
 
 -- Test incorrect keys - supplied key field type does not match index type
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
@@ -53,3 +58,5 @@ space:insert{1, '', 2, '', '', '', '', '', 0}
 space:insert{1, 'xxxxxxxxxxx', 2, '', '', '', '', '', 0}
 
 space:drop()
+sort = nil
+sort_cmp = nul
