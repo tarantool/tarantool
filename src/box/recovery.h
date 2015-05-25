@@ -105,8 +105,6 @@ struct recovery_state {
 	enum wal_mode wal_mode;
 	struct tt_uuid server_uuid;
 	uint32_t server_id;
-
-	bool finalize;
 };
 
 struct recovery_state *

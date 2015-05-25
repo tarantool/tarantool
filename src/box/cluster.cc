@@ -72,7 +72,7 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 		 * Otherwise, read only is switched
 		 * off after recovery_finalize().
 		 */
-		if (r->finalize)
+		if (r->writer)
 			box_set_ro(false);
 	}
 }

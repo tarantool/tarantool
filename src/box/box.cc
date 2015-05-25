@@ -165,7 +165,7 @@ box_set_replication_source(const char *source)
 	    (old_is_replica &&
 	     (strcmp(source, recovery->remote.source) != 0))) {
 
-		if (recovery->finalize) {
+		if (recovery->writer) {
 			if (old_is_replica)
 				recovery_stop_remote(recovery);
 			recovery_set_remote(recovery, source);
@@ -208,7 +208,7 @@ box_set_wal_mode(const char *mode_name)
 	 * Really update WAL mode only after we left local hot standby,
 	 * since local hot standby expects it to be NONE.
 	 */
-	if (recovery->finalize)
+	if (recovery->writer)
 		recovery_update_mode(recovery, mode);
 }
 

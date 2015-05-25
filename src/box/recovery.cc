@@ -340,37 +340,30 @@ recovery_bootstrap(struct recovery_state *r)
 static void
 recover_remaining_wals(struct recovery_state *r)
 {
-	struct xlog *next_wal;
-	int64_t current_signature, last_signature;
-	struct vclock *current_vclock;
-
 	xdir_scan(&r->wal_dir);
 
-	current_vclock = vclockset_last(&r->wal_dir.index);
-	last_signature = current_vclock != NULL ?
-		vclock_signature(current_vclock) : -1;
+	struct vclock *last_vclock = vclockset_last(&r->wal_dir.index);
+	int64_t last_signature = last_vclock != NULL ?
+		vclock_signature(last_vclock) : -1;
 	/* If the caller already opened WAL for us, recover from it first */
+	struct vclock *current_vclock;
 	if (r->current_wal != NULL) {
-		if (r->signature == -1) {
-			r->signature
-				= vclock_signature(&r->current_wal->vclock);
-		}
+		current_vclock = &r->current_wal->vclock;
 		goto recover_current_wal;
 	}
 
 	while (1) {
-		current_vclock = vclockset_match(&r->wal_dir.index,
-						 &r->vclock,
-						 r->wal_dir.panic_if_error);
+		current_vclock =
+			vclockset_match(&r->wal_dir.index, &r->vclock,
+					r->wal_dir.panic_if_error);
 		if (current_vclock == NULL)
 			break; /* No more WALs */
 
-		current_signature = vclock_signature(current_vclock);
-		if (current_signature <= r->signature) {
+		if (vclock_signature(current_vclock) <= r->signature) {
 			if (r->signature == last_signature)
 				break;
 			say_error("missing xlog between %020lld and %020lld",
-				  (long long) current_signature,
+				  (long long) vclock_signature(current_vclock),
 				  (long long) last_signature);
 			if (r->wal_dir.panic_if_error)
 				break;
@@ -379,31 +372,22 @@ recover_remaining_wals(struct recovery_state *r)
 			say_warn("ignoring missing WALs");
 			current_vclock = vclockset_next(&r->wal_dir.index,
 							current_vclock);
-			/* current_signature != last_signature */
 			assert(current_vclock != NULL);
-			current_signature = vclock_signature(current_vclock);
 		}
+		assert(r->current_wal == NULL);
 		try {
-			next_wal = xlog_open(&r->wal_dir, current_signature);
+			r->current_wal = xlog_open(&r->wal_dir,
+					   vclock_signature(current_vclock));
 		} catch (XlogError *e) {
 			e->log();
 			break;
 		}
-		assert(r->current_wal == NULL);
-		r->signature = current_signature;
-		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
 
 recover_current_wal:
+		r->signature = vclock_signature(current_vclock);
 		int result = recover_xlog(r, r->current_wal);
 
-		/* rows == 0 could indicate an empty WAL */
-		if (r->current_wal->rows == 0) {
-			say_error("read zero records from `%s`",
-				  r->current_wal->filename);
-			if (r->current_wal->dir->panic_if_error)
-				break;
-		}
 		if (result == LOG_EOF) {
 			say_info("done `%s'", r->current_wal->filename);
 			recovery_close_log(r);
@@ -436,24 +420,25 @@ recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 {
 	recovery_stop_local(r);
 
-	r->finalize = true;
-
 	recover_remaining_wals(r);
 
 	if (r->current_wal != NULL) {
-		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
-		if (r->current_wal->rows == 0) {
-			/**
-			 * The last log file had zero rows -> bump
-			 * LSN so that we don't stumble over this
-			 * file when trying to open a new xlog for
-			 * writing.
-			 */
-			vclock_inc(&r->vclock, r->server_id);
-		}
+		say_warn("WAL `%s' wasn't correctly closed",
+			 r->current_wal->filename);
 		recovery_close_log(r);
 	}
 
+	if (vclockset_last(&r->wal_dir.index) != NULL &&
+	    vclock_signature(&r->vclock) ==
+	    vclock_signature(vclockset_last(&r->wal_dir.index))) {
+		/**
+		 * The last log file had zero rows -> bump
+		 * LSN so that we don't stumble over this
+		 * file when trying to open a new xlog
+		 * for writing.
+		 */
+		vclock_inc(&r->vclock, r->server_id);
+	}
 	r->wal_mode = wal_mode;
 	if (r->wal_mode == WAL_FSYNC)
 		(void) strcat(r->wal_dir.open_wflags, "s");
@@ -827,12 +812,23 @@ wal_fill_batch(struct xlog *wal, struct fio_batch *batch, int rows_per_wal,
 	return req;
 }
 
+/**
+ * fio_batch_write() version with recovery specific
+ * error injection.
+ */
+static inline int
+wal_fio_batch_write(struct fio_batch *batch, int fd)
+{
+	ERROR_INJECT(ERRINJ_WAL_WRITE, return 0);
+	return fio_batch_write(batch, fd);
+}
+
 static struct wal_write_request *
 wal_write_batch(struct xlog *wal, struct fio_batch *batch,
 		struct wal_write_request *req, struct wal_write_request *end,
 		struct vclock *vclock)
 {
-	int rows_written = fio_batch_write(batch, fileno(wal->f));
+	int rows_written = wal_fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
 		vclock_follow(vclock, req->row->server_id, req->row->lsn);

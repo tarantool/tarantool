@@ -43,6 +43,7 @@ struct errinj {
 	_(ERRINJ_TESTING, false) \
 	_(ERRINJ_WAL_IO, false) \
 	_(ERRINJ_WAL_ROTATE, false) \
+	_(ERRINJ_WAL_WRITE, false) \
 	_(ERRINJ_INDEX_ALLOC, false) \
 	_(ERRINJ_TUPLE_ALLOC, false)
 
