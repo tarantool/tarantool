@@ -10,22 +10,30 @@ ID_STEP = 5
 LOGIN = 'test'
 PASSWORD = 'pass123456'
 
+engines = ['memtx', 'sophia']
+
 def insert_tuples(_server, begin, end, msg = "tuple"):
-    for i in range(begin, end):
-        print 'box.space.tweedledum:insert{%d, "%s %d"}' % (i, msg, i)
-        print '-'
-        space = _server.iproto.py_con.space(0)
-        print space.insert((i, '%s %d' % (msg, i)))
+    for engine in engines:
+        for i in range(begin, end):
+            print 'box.space.%s:insert{%d, "%s %d"}' % (engine, i, msg, i)
+            print '-'
+            space = _server.iproto.py_con.space(engine)
+            print space.insert((i, '%s %d' % (msg, i)))
 
 def select_tuples(_server, begin, end):
-    for i in range(begin, end):
-        print 'box.space.tweedledum:select{%d}' % i
-        print '-'
-        space = _server.iproto.py_con.space(0)
-        print space.select(i)
+    for engine in engines:
+        for i in range(begin, end):
+            print 'box.space.%s:select{%d}' % (engine, i)
+            print '-'
+            space = _server.iproto.py_con.space(engine)
+            print space.select(i)
 
 # master server
 master = server
+# Re-deploy server to cleanup Sophia data
+master.stop()
+master.cleanup()
+master.deploy()
 master.admin("box.schema.user.create('%s', { password = '%s'})" % (LOGIN, PASSWORD))
 master.admin("box.schema.user.grant('%s', 'read,write,execute', 'universe')" % LOGIN)
 master.iproto.py_con.authenticate(LOGIN, PASSWORD)
@@ -42,8 +50,9 @@ replica.uri = '%s:%s@%s' % (LOGIN, PASSWORD, replica.iproto.uri)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.iproto.py_con.authenticate(LOGIN, PASSWORD)
 
-master.admin("s = box.schema.space.create('tweedledum', {id = 0})")
-master.admin("index = s:create_index('primary', {type = 'hash'})")
+for engine in engines:
+    master.admin("s = box.schema.space.create('%s', { engine = '%s'})" % (engine, engine))
+    master.admin("index = s:create_index('primary', {type = 'tree'})")
 
 ### gh-343: replica.cc must not add login and password to proc title
 #status = replica.get_param("status")
