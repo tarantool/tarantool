@@ -368,6 +368,6 @@ matras_get(const struct matras *m, matras_id_t id)
 }
 
 #if defined(__cplusplus)
-}; /* extern "C" */
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 #endif /* INCLUDES_TARANTOOL_SMALL_MATRAS_H */

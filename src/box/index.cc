@@ -220,6 +220,32 @@ Index::bsize() const
 	return 0;
 }
 
+/**
+ * Create a read view for iterator so further index modifications
+ * will not affect the iterator iteration.
+ */
+void
+Index::createReadViewForIterator(struct iterator *iterator)
+{
+	(void) iterator;
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		 index_type_strs[key_def->type],
+		 "freezeIterator()");
+}
+
+/**
+ * Destroy a read view of an iterator. Must be called for iterators,
+ * for which createReadViewForIterator was called.
+ */
+void
+Index::destroyReadViewForIterator(struct iterator *iterator)
+{
+	(void) iterator;
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		 index_type_strs[key_def->type],
+		 "destroyIterator()");
+}
+
 void
 index_build(Index *index, Index *pk)
 {

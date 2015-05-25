@@ -139,7 +139,7 @@ static void
 sig_snapshot(ev_loop * /* loop */, struct ev_signal * /* w */,
 	     int /* revents */)
 {
-	if (snapshot_pid) {
+	if (snapshot_in_progress) {
 		say_warn("Snapshot process is already running,"
 			" the signal is ignored");
 		return;

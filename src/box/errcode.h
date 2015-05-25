@@ -150,6 +150,7 @@ struct errcode_record {
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      2, "Transaction has been aborted by conflict") \
 
+
 /*
  * !IMPORTANT! Please follow instructions at start of the file
  * when adding new errors.
