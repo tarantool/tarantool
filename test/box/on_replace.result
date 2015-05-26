@@ -1,3 +1,19 @@
+-- test c and lua triggers: must return only lua triggers
+#box.space._space:on_replace()
+---
+- 0
+...
+function f() print('test') end
+---
+...
+type(box.space._space:on_replace(f))
+---
+- function
+...
+#box.space._space:on_replace()
+---
+- 1
+...
 ts = box.schema.space.create('test_space')
 ---
 ...
@@ -100,4 +116,20 @@ type(ts:on_replace(function() test = 1 end))
 ...
 ts:drop()
 ---
+...
+-- test garbage in lua stack
+#box.space._space:on_replace()
+---
+- 1
+...
+function f2() print('test2') end
+---
+...
+type(box.space._space:on_replace(f2))
+---
+- function
+...
+#box.space._space:on_replace()
+---
+- 2
 ...
