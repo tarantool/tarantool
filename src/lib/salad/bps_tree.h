@@ -3368,7 +3368,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 
 	new_inner->header.size = 0;
 	bps_inner_path_elem new_path_elem;
-	bps_tree_elem_t new_max_elem;
+	bps_tree_elem_t new_max_elem = tree->max_elem;;
 	bps_tree_prepare_new_ext_inner(inner_path_elem, &new_path_elem,
 				       new_inner, new_block_id, &new_max_elem);
 	if (has_left_ext && has_right_ext) {
