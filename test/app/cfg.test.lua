@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(29)
+test:plan(33)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -76,6 +76,10 @@ test:is(box.cfg.wal_dir_rescan_delay, 0.1, "wal_dir_rescan_delay default value")
 box.cfg{wal_dir_rescan_delay=0.2}
 test:is(box.cfg.wal_dir_rescan_delay, 0.2, "wal_dir_rescan_delay new value")
 
+test:is(box.cfg.too_long_threshold, 0.5, "too_long_threshold default value")
+box.cfg{too_long_threshold=0.1}
+test:is(box.cfg.too_long_threshold , 0.1, "too_long_threshold new value")
+
 local tarantool_bin = arg[-1]
 local PANIC = 256
 function run_script(code)
@@ -118,6 +122,13 @@ test:is(run_script(code), PANIC, 'snap_dir is invalid')
 
 code = [[ box.cfg{ wal_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'wal_dir is invalid')
+
+test:is(box.cfg.logger_nonblock, true, "logger_nonblock default value")
+code = [[
+box.cfg{logger_nonblock = false }
+os.exit(box.cfg.logger_nonblock == false and 0 or 1)
+]]
+test:is(run_script(code), 0, "logger_nonblock new value")
 
 -- box.cfg { listen = xx }
 local path = './tarantool.sock'
