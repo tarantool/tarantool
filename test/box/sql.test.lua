@@ -75,17 +75,3 @@ space:select{4294967295}
 -- cleanup 
 space:delete(0)
 space:delete(4294967295)
-
--- A test case for: http://bugs.launchpad.net/bugs/712456
--- Verify that when trying to access a non-existing or
--- very large space id, no crash occurs.
-conn.space[1]:select{}
-conn.space[65537]:select{}
-conn.space[4294967295]:select{}
-
-box.space[0]:drop()
-box.schema.user.drop('test')
-
--- A test case for: http://bugs.launchpad.net/bugs/716683
--- Admin console should not stall on unknown command.
---admin("show status", simple=True)

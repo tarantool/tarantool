@@ -1,0 +1,29 @@
+#
+# A test case for: http://bugs.launchpad.net/bugs/712456
+# Verify that when trying to access a non-existing or
+# very large space id, no crash occurs.
+#
+
+---
+- error:
+    errcode: (36)
+    errmsg: Space '1' does not exist
+...
+---
+- error:
+    errcode: (36)
+    errmsg: Space '65537' does not exist
+...
+---
+- error:
+    errcode: (36)
+    errmsg: Space '4294967295' does not exist
+...
+#
+# A test case for: http://bugs.launchpad.net/bugs/716683
+# Admin console should not stall on unknown command.
+
+show status
+---
+- error: '[string "show status"]:1: ''='' expected near ''status'''
+...
