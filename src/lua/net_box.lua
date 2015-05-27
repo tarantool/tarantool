@@ -186,10 +186,12 @@ local proto = {
             box.error(box.error.NO_SUCH_INDEX, indexno, '#'..tostring(spaceno))
         end
 
+        key = keyfy(key)
+
         local body = {
             [SPACE_ID] = spaceno,
             [INDEX_ID] = indexno,
-            [KEY] = keyfy(key)
+            [KEY] = key
         }
 
         if opts.limit ~= nil then
@@ -203,17 +205,7 @@ local proto = {
             body[OFFSET] = 0
         end
 
-        if opts.iterator ~= nil then
-            if type(opts.iterator) == 'string' then
-                local iterator = box.index[ opts.iterator ]
-                if iterator == nil then
-                    box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
-                end
-                body[ITERATOR] = iterator
-            else
-                body[ITERATOR] = tonumber(opts.iterator)
-            end
-        end
+        body[ITERATOR] = require('box.internal').check_iterator_type(opts, #key == 0)
 
         return request( { [SYNC] = sync, [TYPE] = SELECT }, body )
     end,
