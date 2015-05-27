@@ -75,3 +75,6 @@ space:select{4294967295}
 -- cleanup 
 space:delete(0)
 space:delete(4294967295)
+
+box.space[0]:drop()
+box.schema.user.drop('test')
