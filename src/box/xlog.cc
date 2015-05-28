@@ -812,6 +812,30 @@ xlog_open(struct xdir *dir, int64_t signature)
 	return xlog_open_stream(dir, signature, f, filename);
 }
 
+int
+xlog_rename(struct xlog *l)
+{
+       char *filename = l->filename;
+       char new_filename[PATH_MAX];
+       char *suffix = strrchr(filename, '.');
+
+       assert(l->is_inprogress);
+       assert(suffix);
+       assert(strcmp(suffix, inprogress_suffix) == 0);
+
+       /* Create a new filename without '.inprogress' suffix. */
+       memcpy(new_filename, filename, suffix - filename);
+       new_filename[suffix - filename] = '\0';
+
+       if (rename(filename, new_filename) != 0) {
+               say_syserror("can't rename %s to %s", filename, new_filename);
+
+               return -1;
+       }
+       l->is_inprogress = false;
+       return 0;
+}
+
 /**
  * In case of error, writes a message to the server log
  * and sets errno.
@@ -838,10 +862,16 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	}
 
 	/*
-	 * For snapshots, open the <lsn>.<suffix>.inprogress file.
-	 * If it exists, open will fail.
+	 * Open the <lsn>.<suffix>.inprogress file.
+	 * If it exists, open will fail. Always open/create
+	 * a file with .inprogress suffix: for snapshots,
+	 * the rename is done when the snapshot is complete.
+	 * Fox xlogs, we can rename only when we have written
+	 * the log file header, otherwise replication relay
+	 * may think that this is a corrupt file and stop
+	 * replication.
 	 */
-	filename = format_filename(dir, signature, dir->suffix);
+	filename = format_filename(dir, signature, INPROGRESS);
 	f = fiob_open(filename, dir->open_wflags);
 	if (!f)
 		goto error;
@@ -853,10 +883,12 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	snprintf(l->filename, PATH_MAX, "%s", filename);
 	l->mode = LOG_WRITE;
 	l->dir = dir;
-	l->is_inprogress = dir->suffix == INPROGRESS;
+	l->is_inprogress = true;
 	vclock_copy(&l->vclock, vclock);
 	setvbuf(l->f, NULL, _IONBF, 0);
 	if (xlog_write_meta(l) != 0)
+		goto error;
+	if (dir->suffix != INPROGRESS && xlog_rename(l))
 		goto error;
 
 	return l;
