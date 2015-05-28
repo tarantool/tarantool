@@ -45,7 +45,7 @@ box.cfg
   pid_file: tarantool.pid
   rows_per_wal: 50
   snapshot_period: 0
-  wal_dir_rescan_delay: 0.1
+  wal_dir_rescan_delay: 2
 ...
 space:insert{1, 'tuple'}
 ---

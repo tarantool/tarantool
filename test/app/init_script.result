@@ -25,7 +25,7 @@ box.cfg
 20	readahead:16320
 21	too_long_threshold:0.5
 22	snapshot_period:0
-23	wal_dir_rescan_delay:0.1
+23	wal_dir_rescan_delay:2
 --
 -- Test insert from detached fiber
 --

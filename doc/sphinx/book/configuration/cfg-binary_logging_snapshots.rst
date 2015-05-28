@@ -60,5 +60,5 @@
     files for the sake of replication or local hot standby.
 
     Type: float |br|
-    Default: 0.1 |br|
+    Default: 2 |br|
     Dynamic: **yes** |br|

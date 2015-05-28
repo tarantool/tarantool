@@ -31,7 +31,7 @@ t
   - 'pid_file: tarantool.pid'
   - 'rows_per_wal: 50'
   - 'snapshot_period: 0'
-  - 'wal_dir_rescan_delay: 0.1'
+  - 'wal_dir_rescan_delay: 2'
 ...
 -- must be read-only
 box.cfg()
@@ -65,7 +65,7 @@ t
   - 'pid_file: tarantool.pid'
   - 'rows_per_wal: 50'
   - 'snapshot_period: 0'
-  - 'wal_dir_rescan_delay: 0.1'
+  - 'wal_dir_rescan_delay: 2'
 ...
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}

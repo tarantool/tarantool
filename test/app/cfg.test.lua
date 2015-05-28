@@ -72,7 +72,7 @@ test:is(box.cfg.panic_on_wal_error, true, "panic_on_wal_mode default value")
 box.cfg{panic_on_wal_error=false}
 test:is(box.cfg.panic_on_wal_error, false, "panic_on_wal_mode new value")
 
-test:is(box.cfg.wal_dir_rescan_delay, 0.1, "wal_dir_rescan_delay default value")
+test:is(box.cfg.wal_dir_rescan_delay, 2, "wal_dir_rescan_delay default value")
 box.cfg{wal_dir_rescan_delay=0.2}
 test:is(box.cfg.wal_dir_rescan_delay, 0.2, "wal_dir_rescan_delay new value")
 
