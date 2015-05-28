@@ -1142,6 +1142,8 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     if object_name == nil and object_type == nil then
         object_type = 'role'
         object_name = privilege
+    end
+    if object_type == 'role' then
         -- revoke everything possible from role,
         -- to prevent stupid mistakes with privilege name
         privilege = 'read,write,execute'
