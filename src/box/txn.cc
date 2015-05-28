@@ -83,16 +83,16 @@ txn_replace(struct txn *txn, struct space *space,
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
+	assert(txn->stmt == 0);
 	assert(txn->n_stmts == 0 || !txn->autocommit);
-	struct txn_stmt *stmt;
 	if (txn->n_stmts++ == 1) {
-		stmt = &txn->stmt;
+		txn->stmt = &txn->first_stmt;
 	} else {
-		stmt = (struct txn_stmt *)
+		txn->stmt = (struct txn_stmt *)
 			region_alloc0(&fiber()->gc, sizeof(struct txn_stmt));
 	}
-	rlist_add_tail_entry(&txn->stmts, stmt, next);
-	return stmt;
+	rlist_add_tail_entry(&txn->stmts, txn->stmt, next);
+	return txn->stmt;
 }
 
 struct txn *
@@ -188,9 +188,11 @@ txn_rollback_stmt()
 		return;
 	if (txn->autocommit)
 		return txn_rollback();
-	struct txn_stmt *stmt = txn_stmt(txn);
-	txn->engine->rollbackStatement(stmt);
-	stmt->row = NULL;
+	if (txn->stmt == NULL)
+		return;
+	txn->engine->rollbackStatement(txn->stmt);
+	txn->stmt->row = NULL;
+	txn->stmt = NULL;
 }
 
 void

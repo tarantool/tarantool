@@ -53,7 +53,9 @@ struct txn_stmt {
 
 struct txn {
 	/** Pre-allocated first statement. */
-	struct txn_stmt stmt;
+	struct txn_stmt first_stmt;
+	/** Pointer to the current statement, if any */
+	struct txn_stmt *stmt;
 	/** List of statements in a transaction. */
 	struct rlist stmts;
 	 /** Commit and rollback triggers */
@@ -119,6 +121,8 @@ txn_commit_stmt(struct txn *txn)
 {
 	if (txn->autocommit)
 		txn_commit(txn);
+	else
+		txn->stmt = NULL;
 }
 
 /**
@@ -145,7 +149,7 @@ txn_replace(struct txn *txn, struct space *space,
 static inline struct txn_stmt *
 txn_stmt(struct txn *txn)
 {
-	return rlist_last_entry(&txn->stmts, struct txn_stmt, next);
+	return txn->stmt;
 }
 
 /**

@@ -57,3 +57,4 @@ s.temporary
 s:delete{1}
 _ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 s:drop()
+s = nil

@@ -160,6 +160,13 @@ end;
 --# setopt delimiter ''
 dup_key()
 box.space.test:select{}
--- cleanup
 --
+-- transaction which uses a non-existing space (used to crash in
+-- rollbackStatement)
+--
+test = box.space.test
 box.space.test:drop()
+status, message = pcall(function() box.begin() test:put{1} test:put{2} box.commit() end)
+status
+message:match('does not exist')
+test = nil
