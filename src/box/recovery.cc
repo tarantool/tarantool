@@ -451,6 +451,23 @@ recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 
 /* {{{ Local recovery: support of hot standby and replication relay */
 
+struct recovery_stat_data {
+	struct fiber *f;
+	bool signaled;
+};
+
+static void
+recovery_stat_cb(ev_loop *loop, ev_stat *stat, int revents)
+{
+	(void) loop;
+	(void) revents;
+	struct recovery_stat_data *data =
+		(struct recovery_stat_data *) stat->data;
+	data->signaled = true;
+	if (data->f->flags & FIBER_IS_CANCELLABLE)
+		fiber_wakeup(data->f);
+}
+
 static void
 recovery_follow_f(va_list ap)
 {
@@ -458,20 +475,40 @@ recovery_follow_f(va_list ap)
 	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
 	fiber_set_user(fiber(), &admin_credentials);
 
+	char path[PATH_MAX] = { '\0' };
+	struct recovery_stat_data data = { fiber(), false };
+	struct ev_stat stat;
+	ev_stat_init(&stat, recovery_stat_cb, path, 0.0);
+	stat.data = &data;
+
+	auto evstat_guard = make_scoped_guard([&] {
+		ev_stat_stop(loop(), &stat);
+	});
+
 	while (! fiber_is_cancelled()) {
+		data.signaled = false;
 		recover_remaining_wals(r);
+
+		if (ev_is_active(&stat) && ((r->current_wal == NULL) ||
+		     (strcmp(r->current_wal->filename, stat.path) != 0)))
+			ev_stat_stop(loop(), &stat);
+
+		if (r->current_wal != NULL && !ev_is_active(&stat)) {
+			snprintf(path, sizeof(path), "%s",
+				 r->current_wal->filename);
+			ev_stat_init(&stat, recovery_stat_cb, path, 0.0);
+			ev_stat_start(loop(), &stat);
+		}
+
+		if (data.signaled)
+			continue;
+
 		/**
 		 * Allow an immediate wakeup/break loop
 		 * from recovery_stop_local().
 		 */
 		fiber_set_cancellable(true);
-		if (r->current_wal != NULL) {
-			ev_stat stat;
-			coio_stat_init(&stat, r->current_wal->filename);
-			coio_stat_stat_timeout(&stat, wal_dir_rescan_delay);
-		} else {
-			fiber_yield_timeout(wal_dir_rescan_delay);
-		}
+		fiber_yield_timeout(wal_dir_rescan_delay);
 		fiber_set_cancellable(false);
 	}
 }
