@@ -232,7 +232,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:244: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:236: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -346,6 +346,12 @@ cn.space.net_box_test_space:delete{10}
 - [10, '(({abcde}))']
 ...
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+-- gh-841: net.box uses incorrect iterator type for select with no arguments
+cn.space.net_box_test_space:select()
 ---
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]

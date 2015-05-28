@@ -579,6 +579,8 @@ local function check_iterator_type(opts, key_is_nil)
     return itype
 end
 
+internal.check_iterator_type = check_iterator_type -- export for net.box
+
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
@@ -684,26 +686,13 @@ function box.schema.space.bless(space)
     index_mt.select = function(index, key, opts)
         local offset = 0
         local limit = 4294967295
-        local iterator = box.index.EQ
 
         local key, key_end = msgpackffi.encode_tuple(key)
-        if key_end == key + 1 then -- empty array
-            iterator = box.index.ALL
-        end
+        local iterator = check_iterator_type(opts, key + 1 >= key_end)
 
         if opts ~= nil then
             if opts.offset ~= nil then
                 offset = opts.offset
-            end
-            if type(opts.iterator) == "string" then
-                local resolved_iter = box.index[string.upper(opts.iterator)]
-                if resolved_iter == nil then
-                    box.error(box.error.ITERATOR_TYPE, opts.iterator);
-                end
-                opts.iterator = resolved_iter
-            end
-            if opts.iterator ~= nil then
-                iterator = opts.iterator
             end
             if opts.limit ~= nil then
                 limit = opts.limit

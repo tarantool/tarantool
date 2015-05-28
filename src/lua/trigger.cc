@@ -66,7 +66,7 @@ lbox_list_all_triggers(struct lua_State *L, struct rlist *list)
 	lua_newtable(L);
 	rlist_foreach_entry_reverse(trigger, list, link) {
 		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
-		if (! lua_isnil(L, -1)) {
+		if (lua_isfunction(L, -1) && !lua_iscfunction(L, -1)) {
 			lua_rawseti(L, -2, count);
 			count++;
 		} else {

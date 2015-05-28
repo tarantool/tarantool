@@ -169,6 +169,27 @@ box.info.vclock[11]
 ---
 - null
 ...
+-------------------------------------------------------------
+gh-806: cant prune old replicas by deleting their server ids
+-------------------------------------------------------------
+box.space._schema:insert{'test', 1}
+---
+- ['test', 1]
+...
+cluster_len = box.space._cluster:len()
+---
+...
+for id, lsn in pairs(box.info.vclock) do if id ~= box.info.server.id then box.space._cluster:delete{id} end end
+---
+...
+box.space._cluster:len() < cluster_len
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
