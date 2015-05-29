@@ -37,7 +37,6 @@
 
 RLIST_HEAD(engines);
 
-extern int snapshot_pid;
 extern bool snapshot_in_progress;
 extern struct latch schema_lock;
 

@@ -113,6 +113,7 @@ vclockset_reset(vclockset_t *set)
 void
 xdir_destroy(struct xdir *dir)
 {
+	/** Free vclock objects allocated in xdir_scan(). */
 	vclockset_reset(&dir->index);
 }
 

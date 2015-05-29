@@ -69,7 +69,6 @@ you can use **date -d@** 1306964594.980.
             id: 1
           pid: 32561
           version: 1.6.4-411-gcff798b
-          snapshot_pid: 0
           status: running
           vclock: {1: 158}
           replication:
@@ -111,10 +110,6 @@ you can use **date -d@** 1306964594.980.
         tarantool> box.info.recovery_last_update
         ---
         - 1306964594.980
-        ...
-        tarantool> box.info.snapshot_pid
-        ---
-        - 0
         ...
 
 =====================================================================

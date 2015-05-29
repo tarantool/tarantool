@@ -78,7 +78,6 @@ public:
 		*to = *from;
 		Exception::init(from);
 	}
-	virtual int errNo() const { return -1; }
 protected:
 	Exception(const char *file, unsigned line);
 	/* The copy constructor is needed for C++ throw */
@@ -111,7 +110,6 @@ public:
 
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
-	virtual int errNo() const override { return m_errno; }
 protected:
 	SystemError(const char *file, unsigned line);
 

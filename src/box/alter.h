@@ -40,7 +40,7 @@ extern struct trigger on_replace_priv;
 extern struct trigger on_replace_cluster;
 
 /**
- * Lock of scheme modification
+ * Lock of schema modification
  */
 extern struct latch schema_lock;
 

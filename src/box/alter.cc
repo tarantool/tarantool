@@ -72,8 +72,6 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 /** _func columns */
 #define FUNC_SETUID      3
 
-
-
 /* {{{ Auxiliary functions and methods. */
 
 void

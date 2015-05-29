@@ -201,12 +201,12 @@ public:
 
 	/**
 	 * Create a read view for iterator so further index modifications
-	 * will not affect the iterator iteration.
+	 * will not affect the iteration results.
 	 */
 	virtual void createReadViewForIterator(struct iterator *iterator);
 	/**
 	 * Destroy a read view of an iterator. Must be called for iterators,
-	 * for which createReadViewForIterator was called.
+	 * for which createReadViewForIterator() was called.
 	 */
 	virtual void destroyReadViewForIterator(struct iterator *iterator);
 

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
-#include "fiber.h"
 
 enum memtx_recovery_state {
 	MEMTX_INITIALIZED,
@@ -62,9 +61,7 @@ struct MemtxEngine: public Engine {
 	virtual void abortCheckpoint();
 	virtual void initSystemSpace(struct space *space);
 private:
-	/**
-	 * LSN of the snapshot which is in progress.
-	 */
+	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
 	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
 };

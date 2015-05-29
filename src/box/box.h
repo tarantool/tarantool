@@ -68,12 +68,6 @@ box_set_ro(bool ro);
 bool
 box_is_ro(void);
 
-/**
- * Actually 1 if snapshot is running, 0 - if not.
- * Left for compatibility;
- * TODO: remove it, just delete all lines of code containing it.
- */
-extern int snapshot_pid;
 /** True if snapshot is in progress. */
 extern bool snapshot_in_progress;
 /** Incremented with each next snapshot. */

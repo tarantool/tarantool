@@ -60,7 +60,6 @@ struct recovery_state *recovery;
 
 static struct evio_service binary; /* iproto binary listener */
 
-int snapshot_pid = 0; /* 1 during snapshoting */
 bool snapshot_in_progress = false;
 
 static void

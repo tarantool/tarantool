@@ -148,7 +148,7 @@ memtx_replace_primary_key(struct txn *txn, struct space *space,
 			  struct tuple *old_tuple, struct tuple *new_tuple,
 			  enum dup_replace_mode mode)
 {
-	(void) space->index[0]->replace(old_tuple, new_tuple, mode);
+	old_tuple = space->index[0]->replace(old_tuple, new_tuple, mode);
 	if (new_tuple)
 		tuple_ref(new_tuple);
 	memtx_txn_add_undo(txn, space, old_tuple, new_tuple);
@@ -557,8 +557,8 @@ MemtxEngine::beginJoin()
 }
 
 static void
-snapshot_write_row(struct recovery_state *r, struct xlog *l,
-		   struct xrow_header *row)
+checkpoint_write_row(struct xlog *l, struct xrow_header *row,
+		     uint64_t snap_io_rate_limit)
 {
 	static uint64_t bytes;
 	ev_tstamp elapsed;
@@ -583,9 +583,9 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 	/* TODO: use writev here */
 	for (int i = 0; i < iovcnt; i++) {
 		if (fwrite(iov[i].iov_base, iov[i].iov_len, 1, l->f) != 1) {
-			say_error("Can't write row (%zu bytes)",
-				  iov[i].iov_len);
-			panic_syserror("snapshot_write_row");
+			say_syserror("Can't write row (%zu bytes)",
+				     iov[i].iov_len);
+			tnt_raise(SystemError, "fwrite");
 		}
 		bytes += iov[i].iov_len;
 	}
@@ -595,7 +595,7 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 
 	fiber_gc();
 
-	if (r->snap_io_rate_limit != UINT64_MAX) {
+	if (snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {
 			/*
 			 * Remember the time of first
@@ -609,10 +609,10 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		 * filesystem cache, otherwise the limit is
 		 * not really enforced.
 		 */
-		if (bytes > r->snap_io_rate_limit)
+		if (bytes > snap_io_rate_limit)
 			fdatasync(fileno(l->f));
 	}
-	while (bytes > r->snap_io_rate_limit) {
+	while (bytes > snap_io_rate_limit) {
 		ev_now_update(loop);
 		/*
 		 * How much time have passed since
@@ -629,13 +629,13 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 
 		ev_now_update(loop);
 		last = ev_now(loop);
-		bytes -= r->snap_io_rate_limit;
+		bytes -= snap_io_rate_limit;
 	}
 }
 
 static void
-snapshot_write_tuple(struct xlog *l,
-		     uint32_t n, struct tuple *tuple)
+checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple,
+		       uint64_t snap_io_rate_limit)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
@@ -653,7 +653,7 @@ snapshot_write_tuple(struct xlog *l,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = tuple->data;
 	row.body[1].iov_len = tuple->bsize;
-	snapshot_write_row(recovery, l, &row);
+	checkpoint_write_row(l, &row, snap_io_rate_limit);
 }
 
 struct checkpoint_entry {
@@ -663,32 +663,44 @@ struct checkpoint_entry {
 };
 
 struct checkpoint {
-	struct xlog *snap;
+	/**
+	 * List of MemTX spaces to snapshot, with consistent
+	 * read view iterators.
+	 */
 	struct rlist entries;
-	int64_t checkpoint_id;
-	struct cord snapshot_cord;
+	/** The signature of the snapshot file (lsn sum) */
+	int64_t lsn;
+	uint64_t snap_io_rate_limit;
+	struct cord cord;
 	bool waiting_for_snap_thread;
+	struct vclock vclock;
+	struct xdir dir;
 };
 
 static void
-checkpoint_init(struct checkpoint *cp)
+checkpoint_init(struct checkpoint *ckpt, struct recovery_state *recovery,
+		int64_t lsn_arg)
 {
-	cp->entries = RLIST_HEAD_INITIALIZER(cp->entries);
-	cp->snap = 0;
-	cp->waiting_for_snap_thread = false;
-	cp->checkpoint_id = -1;
+	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	ckpt->waiting_for_snap_thread = false;
+	ckpt->lsn = lsn_arg;
+	vclock_copy(&ckpt->vclock, &recovery->vclock);
+	xdir_create(&ckpt->dir, recovery->snap_dir.dirname, SNAP,
+		    &recovery->server_uuid);
+	ckpt->snap_io_rate_limit = recovery->snap_io_rate_limit;
 }
 
 static void
-checkpoint_destroy(struct checkpoint *cp)
+checkpoint_destroy(struct checkpoint *ckpt)
 {
 	struct checkpoint_entry *entry;
-	rlist_foreach_entry(entry, &cp->entries, link) {
+	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		Index *pk = space_index(entry->space, 0);
 		pk->destroyReadViewForIterator(entry->iterator);
 		entry->iterator->free(entry->iterator);
 	}
-	cp->entries = RLIST_HEAD_INITIALIZER(cp->entries);
+	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	xdir_destroy(&ckpt->dir);
 }
 
 
@@ -702,11 +714,11 @@ checkpoint_add_space(struct space *sp, void *data)
 	Index *pk = space_index(sp, 0);
 	if (!pk)
 		return;
-	struct checkpoint *cp = (struct checkpoint *)data;
+	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
 	entry = (struct checkpoint_entry *)
 		region_alloc(&fiber()->gc, sizeof(*entry));
-	rlist_add_tail_entry(&cp->entries, entry, link);
+	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
 	entry->iterator = pk->allocIterator();
@@ -715,58 +727,46 @@ checkpoint_add_space(struct space *sp, void *data)
 	pk->createReadViewForIterator(entry->iterator);
 };
 
-static void *
-snapshot_cord_func(void *p)
+void
+checkpoint_f(va_list ap)
 {
-	struct checkpoint *cp = (struct checkpoint *) p;
-	say_info("saving snapshot `%s'", cp->snap->filename);
+	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
+
+	struct xlog *snap = xlog_create(&ckpt->dir, &ckpt->vclock);
+
+	if (snap == NULL)
+		tnt_raise(SystemError, "xlog_open");
+
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
+
+	say_info("saving snapshot `%s'", snap->filename);
 	struct checkpoint_entry *entry;
-	rlist_foreach_entry(entry, &cp->entries, link) {
+	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		struct tuple *tuple;
-		while (true) {
-			tuple = entry->iterator->next(entry->iterator);
-			if (!tuple)
-				break;
-			snapshot_write_tuple(cp->snap,
-					     space_id(entry->space), tuple);
+		struct iterator *it = entry->iterator;
+		for (tuple = it->next(it); tuple; tuple = it->next(it)) {
+			checkpoint_write_tuple(snap, space_id(entry->space),
+					       tuple, ckpt->snap_io_rate_limit);
 		}
 	}
-
-	xlog_close(cp->snap);
-
 	say_info("done");
-	return 0;
 }
-
 
 int
 MemtxEngine::beginCheckpoint(int64_t lsn)
 {
-	assert(snapshot_in_progress);
 	assert(m_checkpoint == 0);
 
 	m_checkpoint = (struct checkpoint *)
 		region_alloc(&fiber()->gc, sizeof(*m_checkpoint));
-	checkpoint_init(m_checkpoint);
+
+	checkpoint_init(m_checkpoint, ::recovery, lsn);
 	space_foreach(checkpoint_add_space, m_checkpoint);
 
-	m_checkpoint->snap = xlog_create(&recovery->snap_dir,
-					     &recovery->vclock);
-	if (m_checkpoint->snap == NULL) {
-		say_syserror("failed to save snapshot: failed to open file in write mode");
+	if (cord_costart(&m_checkpoint->cord, "snapshot",
+			 checkpoint_f, m_checkpoint)) {
 		return -1;
 	}
-
-	m_checkpoint->checkpoint_id = lsn;
-
-	int cord_start_res = cord_start(&m_checkpoint->snapshot_cord,
-					"snapshot", snapshot_cord_func,
-					m_checkpoint);
-	if (cord_start_res) {
-		say_syserror("cord_start");
-		return -1;
-	}
-	snapshot_pid = 1;
 	m_checkpoint->waiting_for_snap_thread = true;
 
 	/* increment snapshot version */
@@ -777,24 +777,21 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 int
 MemtxEngine::waitCheckpoint()
 {
-	assert(snapshot_in_progress);
 	assert(m_checkpoint);
 	assert(m_checkpoint->waiting_for_snap_thread);
 
-	int result = 0;
+	int result;
 	try {
 		/* wait for memtx-part snapshot completion */
-		if (cord_join(&m_checkpoint->snapshot_cord)) {
-			say_syserror("cord_join");
-			result = -1;
-		}
+		result = cord_join(&m_checkpoint->cord);
 	} catch (Exception *e) {
-		errno = e->errNo();
 		e->log();
 		result = -1;
+		SystemError *se = dynamic_cast<SystemError *>(e);
+		if (se)
+			errno = se->errnum();
 	}
 
-	snapshot_pid = 0;
 	m_checkpoint->waiting_for_snap_thread = false;
 	return result;
 }
@@ -802,59 +799,52 @@ MemtxEngine::waitCheckpoint()
 void
 MemtxEngine::commitCheckpoint()
 {
-	assert(snapshot_in_progress);
 	/* beginCheckpoint() must have been done */
 	assert(m_checkpoint);
 	/* waitCheckpoint() must have been done. */
 	assert(!m_checkpoint->waiting_for_snap_thread);
 
-	checkpoint_destroy(m_checkpoint);
 	tuple_end_snapshot();
 
-	struct xdir *dir = &::recovery->snap_dir;
+	struct xdir *dir = &m_checkpoint->dir;
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
 	snprintf(to, sizeof(to), "%s",
-		 format_filename(dir, m_checkpoint->checkpoint_id, NONE));
-	char *from = format_filename(dir, m_checkpoint->checkpoint_id,
-				     INPROGRESS);
+		 format_filename(dir, m_checkpoint->lsn, NONE));
+	char *from = format_filename(dir, m_checkpoint->lsn, INPROGRESS);
 	int rc = coeio_rename(from, to);
 	if (rc != 0)
-		tnt_raise(SystemError, "can't rename .snap.inprogress");
+		panic("can't rename .snap.inprogress");
 
+	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
 
 void
 MemtxEngine::abortCheckpoint()
 {
-	assert(snapshot_in_progress);
 	/**
 	 * An error in the other engine's first phase.
 	 */
 	if (m_checkpoint->waiting_for_snap_thread) {
 		try {
 			/* wait for memtx-part snapshot completion */
-			if (cord_join(&m_checkpoint->snapshot_cord)) {
-				say_syserror("cord_join");
-			}
+			cord_join(&m_checkpoint->cord);
 		} catch (Exception *e) {
 			e->log();
 		}
-		snapshot_pid = 0;
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 
-	checkpoint_destroy(m_checkpoint);
 	tuple_end_snapshot();
 
-	if (m_checkpoint->checkpoint_id > 0) {
-		/** Remove garbage .inprogress file. */
-		char *filename = format_filename(&::recovery->snap_dir,
-						 m_checkpoint->checkpoint_id,
-						 INPROGRESS);
-		(void) coeio_unlink(filename);
-	}
+	/** Remove garbage .inprogress file. */
+	char *filename = format_filename(&m_checkpoint->dir,
+					 m_checkpoint->lsn,
+					 INPROGRESS);
+	(void) coeio_unlink(filename);
+
+	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
 

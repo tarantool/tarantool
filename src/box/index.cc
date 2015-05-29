@@ -229,8 +229,8 @@ Index::createReadViewForIterator(struct iterator *iterator)
 {
 	(void) iterator;
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		 index_type_strs[key_def->type],
-		 "freezeIterator()");
+		  index_type_strs[key_def->type],
+		  "consistent read view");
 }
 
 /**
@@ -242,8 +242,8 @@ Index::destroyReadViewForIterator(struct iterator *iterator)
 {
 	(void) iterator;
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		 index_type_strs[key_def->type],
-		 "destroyIterator()");
+		  index_type_strs[key_def->type],
+		  "consistent read view");
 }
 
 void
