@@ -197,11 +197,15 @@ ok - double
     # boolean: end
 ok - boolean
     # string
-    1..4
+    1..8
     ok - encode/decode for 
     ok - encode/decode for abcde
     ok - encode/decode for Кудыкины горы
     ok - encode/decode for xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ok - encode/decode for $a	 $
+    ok - encode/decode for $a	 $
+    ok - encode/decode for $a\t $
+    ok - encode/decode for $a\\t $
     # string: end
 ok - string
     # nil

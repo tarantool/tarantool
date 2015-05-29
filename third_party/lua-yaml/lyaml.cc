@@ -356,76 +356,6 @@ static int l_load(lua_State *L) {
 
 static int dump_node(struct lua_yaml_dumper *dumper);
 
-/*
-  Copyright (c) 2013 Palard Julien. All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions
-  are met:
-  1. Redistributions of source code must retain the above copyright
-  notice, this list of conditions and the following disclaimer.
-  2. Redistributions in binary form must reproduce the above copyright
-  notice, this list of conditions and the following disclaimer in the
-  documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-  ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-  SUCH DAMAGE.
-
-  Check if the given unsigned char * is a valid utf-8 sequence.
-
-  Return value :
-  If the string is valid utf-8, 1 is returned.
-  Else, 0 is returned.
-
-  Valid utf-8 sequences look like this :
-  0xxxxxxx
-  110xxxxx 10xxxxxx
-  1110xxxx 10xxxxxx 10xxxxxx
-  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
-  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
-*/
-static int is_utf8(const char *data, size_t len)
-{
-    const unsigned char *str = (const unsigned char *) data;
-    size_t i = 0;
-    size_t continuation_bytes = 0;
-
-    while (i < len)
-    {
-        if (str[i] <= 0x7F)
-            continuation_bytes = 0;
-        else if (str[i] >= 0xC0 /*11000000*/ && str[i] <= 0xDF /*11011111*/)
-            continuation_bytes = 1;
-        else if (str[i] >= 0xE0 /*11100000*/ && str[i] <= 0xEF /*11101111*/)
-            continuation_bytes = 2;
-        else if (str[i] >= 0xF0 /*11110000*/ && str[i] <= 0xF4 /* Cause of RFC 3629 */)
-            continuation_bytes = 3;
-        else
-            return 0;
-        i += 1;
-        while (i < len && continuation_bytes > 0
-               && str[i] >= 0x80
-               && str[i] <= 0xBF)
-        {
-            i += 1;
-            continuation_bytes -= 1;
-        }
-        if (continuation_bytes != 0)
-            return 0;
-    }
-    return 1;
-}
-
 static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    const char *s = "";
    lua_pushvalue(dumper->L, -1);
@@ -514,6 +444,237 @@ static int dump_null(struct lua_yaml_dumper *dumper) {
    return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
+static yaml_scalar_style_t analyze_string(struct lua_yaml_dumper *dumper,
+      const char *str, size_t len, int *is_binary)
+{
+   *is_binary = 0;
+
+   /**
+    * This function ported from PyYAML implementation.
+    * PyYAML has same authors and licence as LibYAML. See License.LibYaml
+    * https://bitbucket.org/xi/pyyaml/src/ddf211a41bb231c365fece5599b7e484e6dc33fc/lib/yaml/emitter.py?at=default#cl-629
+    */
+
+   /*
+    * Fast checks
+    */
+   /* Display empty scalar as plain */
+   if (len == 0)
+      return YAML_PLAIN_SCALAR_STYLE;
+
+   /* Special string values */
+   if (len <= 5 && (!strcmp(str, "true")
+            || !strcmp(str, "false")
+            || !strcmp(str, "~")
+            || !strcmp(str, "null"))) {
+      return YAML_SINGLE_QUOTED_SCALAR_STYLE;
+   }
+
+   /* Check document indicators. */
+   if (len >= 3 && (memcmp(str, "---", 3) == 0 || memcmp(str, "...", 3) == 0))
+      return YAML_LITERAL_SCALAR_STYLE;
+
+   /* Allowed styles */
+   bool allowPlain = true;
+   bool allowSingleQuoted = true;
+
+   /* Indicators and special characters. */
+   bool blockIndicators = false;
+   bool flowIndicators = false;
+   bool lineBreaks = false;
+   bool specialCharacters = false;
+
+   /* Important whitespace combinations. */
+   bool leadingSpace = false;
+   bool leadingBreak = false;
+   bool trailingSpace = false;
+   bool trailingBreak = false;
+   bool breakSpace = false;
+   bool spaceBreak = false;
+   bool emptyLines = false;
+   bool previousSpace = false;
+   bool previousBreak = false;
+
+   const unsigned char *s = (const unsigned char *) str;
+   const unsigned char *p = s;
+   const unsigned char *e = s + len;
+   while (p < e) {
+      if (*p > 0x7F) {
+         /* UTF-8 */
+
+         int continuation_bytes = 0;
+         if (*p >= 0xC0 && *p <= 0xDF) {
+            continuation_bytes = 1;
+         } else if (*p >= 0xE0 && *p <= 0xEF /*11101111*/) {
+            continuation_bytes = 2;
+         } else if (*p >= 0xF0 && *p <= 0xF4) {
+            continuation_bytes = 3;
+         } else {
+            /* Invalid UTF-8 */
+            *is_binary = 1;
+            return YAML_PLAIN_SCALAR_STYLE;
+         }
+
+         ++p;
+         while (p < e  && continuation_bytes > 0 && *p >= 0x80 && *p <= 0xBF) {
+            ++p;
+            continuation_bytes -= 1;
+         }
+         if (continuation_bytes != 0) {
+            /* Invalid UTF-8 */
+            *is_binary = 1;
+            return YAML_PLAIN_SCALAR_STYLE;
+         } else {
+            continue;
+         }
+      }
+
+      /* ASCII */
+
+      bool preceededByWhitespace = (p > s) &&
+            strchr(" \t\r\n\x85", *(p - 1)) != NULL;
+      bool followedByWhitespace = (p + 1 >= s + len) ||
+            strchr(" \t\r\n\x85", *(p + 1)) != NULL;
+
+      /* Check for line breaks and special characters */
+      bool isLineBreak = false;
+      if (*p == '\n' || *p == 0x85) {
+         lineBreaks = isLineBreak = true;
+      } else if (*p < 0x20) {
+         specialCharacters = true;
+      }
+
+      /* Check for indicators. */
+      if (p == s) {
+         /* Leading indicators are special characters. */
+         if (strchr("#,[]{}&*!|>\'\"%@`", *p) != NULL) {
+            flowIndicators = true;
+            blockIndicators = true;
+         }
+         if (*p == '?' || *p == ':') {
+            flowIndicators = true;
+            if (followedByWhitespace)
+               blockIndicators = true;
+         }
+         if (*p == '-' && followedByWhitespace) {
+            flowIndicators = true;
+            blockIndicators = true;
+         }
+      } else {
+         if (isLineBreak && *(p - 1) == '\n')
+            emptyLines = true;
+         /* Some indicators cannot appear within a scalar as well. */
+          if (strchr(",?[]{}", *p) != NULL) {
+              flowIndicators = true;
+          }
+          if (*p == ':') {
+              flowIndicators = true;
+              if (followedByWhitespace) {
+                  blockIndicators = true;
+              }
+          }
+          if (*p == '#' && preceededByWhitespace) {
+              flowIndicators = true;
+              blockIndicators = true;
+          }
+      }
+
+      /* Detect important whitespace combinations. */
+      if (*p == ' ') {
+          if (p == s)
+              leadingSpace = true;
+          if (p == s + len - 1)
+              trailingSpace = true;
+          if (previousBreak)
+              breakSpace = true;
+          previousSpace = true;
+          previousBreak = false;
+      } else if (isLineBreak) {
+          if (p == s)
+              leadingBreak = true;
+          if (p == s + len - 1)
+              trailingBreak = true;
+          if (previousSpace)
+              spaceBreak = true;
+          previousSpace = false;
+          previousBreak = true;
+      } else {
+          previousSpace = false;
+          previousBreak = false;
+      }
+
+      ++p;
+   }
+
+   /*
+    * Tarantool-specific: use literal style for string with empty lines.
+    * Useful for tutorial().
+    */
+   if (emptyLines)
+      return YAML_LITERAL_SCALAR_STYLE;
+
+   bool flowMode = false;
+   if (dumper->emitter.flow_level > 0) {
+      flowMode = true;
+   } else {
+      yaml_event_t *evp;
+      for (evp = dumper->emitter.events.head;
+            evp != dumper->emitter.events.tail; evp++) {
+         if ((evp->type == YAML_SEQUENCE_START_EVENT &&
+                  evp->data.sequence_start.style == YAML_FLOW_SEQUENCE_STYLE) ||
+               (evp->type == YAML_MAPPING_START_EVENT &&
+                evp->data.mapping_start.style == YAML_FLOW_MAPPING_STYLE)) {
+            flowMode = true;
+            break;
+         }
+      }
+   }
+
+   /*  Let's decide what styles are allowed. */
+
+   /*
+    * Spaces followed by breaks, as well as special character are only
+    * allowed for double quoted scalars.
+    */
+   if (spaceBreak || specialCharacters)
+      return YAML_DOUBLE_QUOTED_SCALAR_STYLE;
+
+   /*
+    * Spaces at the beginning of a new line are only acceptable for block
+    * scalars
+    */
+   if (breakSpace)
+      allowPlain = allowSingleQuoted = false;
+
+   /* Leading and trailing whitespaces are bad for plain scalars. */
+   if (leadingSpace || leadingBreak || trailingSpace || trailingBreak)
+      allowPlain = false;
+
+   if (flowMode) {
+      //if (flowMode && flowIndicators)
+      //   allowPlain = false;
+      /*
+       * Tarantool-specific: always quote strings in FLOW SEQUENCE
+       * Flow: [1, 'a', 'testing']
+       * Block:
+       * - 1
+       * - a
+       * - testing
+       */
+      allowPlain = false;
+   } else /* blockMode */ {
+       /* Block indicators are forbidden for block plain scalars. */
+      if (blockIndicators)
+         allowPlain = false;
+   }
+
+   if (allowPlain)
+      return YAML_PLAIN_SCALAR_STYLE;
+   else if (allowSingleQuoted)
+      return YAML_SINGLE_QUOTED_SCALAR_STYLE;
+   return YAML_DOUBLE_QUOTED_SCALAR_STYLE;
+}
+
 static int dump_node(struct lua_yaml_dumper *dumper)
 {
    size_t len;
@@ -555,49 +716,22 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       return dump_array(dumper, &field);
    case MP_MAP:
       return dump_table(dumper, &field);
-   case MP_BIN:
    case MP_STR:
       str = lua_tolstring(dumper->L, -1, &len);
-      if (field.type == MP_BIN || !is_utf8(str, len)) {
-         is_binary = 1;
-         tobase64(dumper->L, -1);
-         str = lua_tolstring(dumper->L, -1, &len);
-         tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
-         break;
-      }
-
-      /*
-       * Always quote strings in FLOW SEQUENCE
-       * Flow: [1, 'a', 'testing']
-       * Block:
-       * - 1
-       * - a
-       * - testing
-       */
-      if (dumper->emitter.flow_level > 0) {
-         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-         break;
-      }
-
-      for (evp = dumper->emitter.events.head;
-         evp != dumper->emitter.events.tail; evp++) {
-         if (evp->type == YAML_SEQUENCE_START_EVENT &&
-             evp->data.sequence_start.style == YAML_FLOW_SEQUENCE_STYLE) {
-            style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-            goto strbreak;
-         }
-      }
-
-      if (len <= 5 && (!strcmp(str, "true")
-          || !strcmp(str, "false")
-          || !strcmp(str, "~")
-          || !strcmp(str, "null"))) {
-          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-      } else if (lua_isnumber(dumper->L, -1)) {
+      if (lua_isnumber(dumper->L, -1)) {
          /* string is convertible to number, quote it to preserve type */
          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+         break;
       }
-      strbreak:
+      style = analyze_string(dumper, str, len, &is_binary);
+      if (!is_binary)
+            break;
+      /* Fall through */
+   case MP_BIN:
+      is_binary = 1;
+      tobase64(dumper->L, -1);
+      str = lua_tolstring(dumper->L, -1, &len);
+      tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
       break;
    case MP_BOOL:
       if (field.bval) {

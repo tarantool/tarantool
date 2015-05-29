@@ -34,7 +34,7 @@ local function test_compact(test, s)
     test:is(ss.encode(setmetatable({k = 'v'}, { __serialize="mapping"})),
         "---\nk: v\n...\n", "block map")
     test:is(ss.encode({setmetatable({k = 'v'}, { __serialize="map"})}),
-        "---\n- {k: v}\n...\n", "flow map")
+        "---\n- {'k': 'v'}\n...\n", "flow map")
     test:is(getmetatable(ss.decode(ss.encode({k = 'v'}))).__serialize, "map",
         "decoded __serialize is map")
 
@@ -42,13 +42,17 @@ local function test_compact(test, s)
 end
 
 local function test_output(test, s)
-    test:plan(6)
+    test:plan(8)
     test:is(s.encode({true}), '---\n- true\n...\n', "encode for true")
     test:is(s.decode("---\nyes\n..."), true, "decode for 'yes'")
     test:is(s.encode({false}), '---\n- false\n...\n', "encode for false")
     test:is(s.decode("---\nno\n..."), false, "decode for 'no'")
     test:is(s.encode({s.NULL}), '---\n- null\n...\n', "encode for nil")
     test:is(s.decode("---\n~\n..."), s.NULL, "decode for ~")
+    test:is(s.encode("\x80\x92\xe8s\x16"), '--- !!binary gJLocxY=\n...\n',
+        "encode for binary")
+    test:is(s.encode("Tutorial -- Header\n====\n\nText"),
+        "--- |-\n  Tutorial -- Header\n  ====\n\n  Text\n...\n", "tutorial string");
 end
 
 tap.test("yaml", function(test)
