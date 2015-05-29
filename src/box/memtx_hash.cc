@@ -319,7 +319,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	if (old_tuple) {
 		uint32_t h = tuple_hash(old_tuple, key_def);
 		int res = light_index_delete_value(hash_table, h, old_tuple);
-		assert(res == 0); (void)res;
+		assert(res == 0); (void) res;
 	}
 	return old_tuple;
 }
@@ -378,4 +378,27 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 			  "Hash index", "requested iterator type");
 	}
 }
+
+/**
+ * Create a read view for iterator so further index modifications
+ * will not affect the iterator iteration.
+ */
+void
+MemtxHash::createReadViewForIterator(struct iterator *iterator)
+{
+	struct hash_iterator *it = (struct hash_iterator *) iterator;
+	light_index_itr_freeze(it->hash_table, &it->hitr);
+}
+
+/**
+ * Destroy a read view of an iterator. Must be called for iterators,
+ * for which createReadViewForIterator was called.
+ */
+void
+MemtxHash::destroyReadViewForIterator(struct iterator *iterator)
+{
+	struct hash_iterator *it = (struct hash_iterator *) iterator;
+	light_index_itr_destroy(it->hash_table, &it->hitr);
+}
+
 /* }}} */

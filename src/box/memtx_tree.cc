@@ -399,3 +399,27 @@ MemtxTree::endBuild()
 	build_array_alloc_size = 0;
 }
 
+/**
+ * Create a read view for iterator so further index modifications
+ * will not affect the iterator iteration.
+ */
+void
+MemtxTree::createReadViewForIterator(struct iterator *iterator)
+{
+	struct tree_iterator *it = tree_iterator(iterator);
+	struct bps_tree_index *tree = (struct bps_tree_index *)it->tree;
+	bps_tree_index_itr_freeze(tree, &it->bps_tree_iter);
+}
+
+/**
+ * Destroy a read view of an iterator. Must be called for iterators,
+ * for which createReadViewForIterator was called.
+ */
+void
+MemtxTree::destroyReadViewForIterator(struct iterator *iterator)
+{
+	struct tree_iterator *it = tree_iterator(iterator);
+	struct bps_tree_index *tree = (struct bps_tree_index *)it->tree;
+	bps_tree_index_itr_destroy(tree, &it->bps_tree_iter);
+}
+

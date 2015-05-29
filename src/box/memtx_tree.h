@@ -74,6 +74,17 @@ public:
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
 
+	/**
+	 * Create a read view for iterator so further index modifications
+	 * will not affect the iterator iteration.
+	 */
+	virtual void createReadViewForIterator(struct iterator *iterator);
+	/**
+	 * Destroy a read view of an iterator. Must be called for iterators,
+	 * for which createReadViewForIterator was called.
+	 */
+	virtual void destroyReadViewForIterator(struct iterator *iterator);
+
 // protected:
 	struct bps_tree_index tree;
 	struct tuple **build_array;

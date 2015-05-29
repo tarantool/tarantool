@@ -128,7 +128,7 @@ lbox_info_uptime(struct lua_State *L)
 static int
 lbox_info_snapshot_pid(struct lua_State *L)
 {
-	lua_pushnumber(L, snapshot_pid);
+	lua_pushnumber(L, (int)snapshot_pid);
 	return 1;
 }
 

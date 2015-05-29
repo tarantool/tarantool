@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
+#include "fiber.h"
 
 enum memtx_recovery_state {
 	MEMTX_INITIALIZED,
@@ -64,8 +65,7 @@ private:
 	/**
 	 * LSN of the snapshot which is in progress.
 	 */
-	int64_t m_checkpoint_id;
-	pid_t m_snapshot_pid;
+	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
 };
 
