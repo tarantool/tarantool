@@ -891,6 +891,14 @@ local function privilege_resolve(privilege)
     return numeric
 end
 
+local function checked_privilege(privilege, object_type)
+    local priv_hex = privilege_resolve(privilege)
+    if object_type == 'role' and priv_hex ~= 4 then
+        box.error(box.error.UNSUPPORTED_ROLE_PRIV, privilege)
+    end
+    return priv_hex
+end
+
 local function privilege_name(privilege)
     local names = {}
     if bit.band(privilege, 1) ~= 0 then
@@ -1092,13 +1100,10 @@ local function grant(uid, name, privilege, object_type,
         -- named 'execute'
         object_type = 'role'
         object_name = privilege
-    end
-    -- sanitize privilege type for role object type
-    if object_type == 'role' then
         privilege = 'execute'
     end
+    local privilege_hex = checked_privilege(privilege, object_type)
 
-    privilege_hex = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
     if options == nil then
         options = {}
@@ -1142,12 +1147,10 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     if object_name == nil and object_type == nil then
         object_type = 'role'
         object_name = privilege
+        privilege = 'execute'
     end
-    if object_type == 'role' then
-        -- revoke everything possible from role,
-        -- to prevent stupid mistakes with privilege name
-        privilege = 'read,write,execute'
-    end
+    local privilege_hex = checked_privilege(privilege, object_type)
+
     if options == nil then
         options = {}
     end
@@ -1168,16 +1171,15 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
                       object_type, object_name)
         end
     end
-    privilege = privilege_resolve(privilege)
     local old_privilege = tuple[5]
     local grantor = tuple[1]
     -- sic:
     -- a user may revoke more than he/she granted
     -- (erroneous user input)
     --
-    privilege = bit.band(old_privilege, bit.bnot(privilege))
-    if privilege ~= 0 then
-        _priv:replace{grantor, uid, object_type, oid, privilege}
+    privilege_hex = bit.band(old_privilege, bit.bnot(privilege_hex))
+    if privilege_hex ~= 0 then
+        _priv:replace{grantor, uid, object_type, oid, privilege_hex}
     else
         _priv:delete{uid, object_type, oid}
     end
