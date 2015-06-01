@@ -73,6 +73,7 @@ static inline void
 latch_destroy(struct latch *l)
 {
 	assert(rlist_empty(&l->queue));
+	(void) l;
 }
 
 /**
