@@ -106,9 +106,9 @@ cn:eval('return ...', 1, 2, 3)
 ...
 cn:eval('return { k = "v1" }, true, {  xx = 10, yy = 15 }, nil')
 ---
-- {k: v1}
+- {'k': 'v1'}
 - true
-- {yy: 15, xx: 10}
+- {'yy': 15, 'xx': 10}
 - null
 ...
 cn:eval('return nil')
@@ -632,41 +632,28 @@ cnc.console ~= nil
 ...
 cnc:console('return 1, 2, 3, "string", nil')
 ---
-- '---
-
+- |
+  ---
   - 1
-
   - 2
-
   - 3
-
   - string
-
   - null
-
   ...
-
-'
 ...
 cnc:console('error("test")')
 ---
-- '---
-
+- |
+  ---
   - error: test
-
   ...
-
-'
 ...
 cnc:console('a = {1, 2, 3, 4}; return a[3]')
 ---
-- '---
-
+- |
+  ---
   - 3
-
   ...
-
-'
 ...
 -- #545 user or password is not defined
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })

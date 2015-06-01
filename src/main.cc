@@ -211,22 +211,6 @@ end:
 	abort();
 }
 
-/**
- * This SIGTERM handler is only used before the main event loop started to
- * cleanup server pid file. The handler is replaced by ev_signal after the boot.
- * @sa signal_start
- */
-static void
-sig_term_cb(int signo)
-{
-	psignal(signo, "");
-	/* unlink pidfile. */
-	if (pid_file != NULL)
-		unlink(pid_file);
-
-	_exit(EXIT_SUCCESS);
-}
-
 static void
 signal_free(void)
 {
@@ -239,6 +223,9 @@ signal_free(void)
 static void
 signal_reset()
 {
+	for (int i = 0; i < ev_sig_count; i++)
+		ev_signal_stop(loop(), &ev_sigs[i]);
+
 	struct sigaction sa;
 
 	/* Reset all signals to their defaults. */
@@ -253,9 +240,6 @@ signal_reset()
 	    sigaction(SIGSEGV, &sa, NULL) == -1 ||
 	    sigaction(SIGFPE, &sa, NULL) == -1)
 		say_syserror("sigaction");
-
-	for (int i = 0; i < ev_sig_count; i++)
-		ev_signal_stop(loop(), &ev_sigs[i]);
 
 	/* Unblock any signals blocked by libev. */
 	sigset_t sigset;
@@ -286,18 +270,16 @@ signal_init(void)
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		panic_syserror("sigaction");
 
+	/*
+	 * SA_RESETHAND resets handler action to the default
+	 * one when entering handler.
+	 * SA_NODEFER allows receiving the same signal during handler.
+	 */
+	sa.sa_flags = SA_RESETHAND | SA_NODEFER;
 	sa.sa_handler = sig_fatal_cb;
 
 	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
 	    sigaction(SIGFPE, &sa, 0) == -1) {
-		panic_syserror("sigaction");
-	}
-
-	sa.sa_handler = sig_term_cb;
-	if (sigaction(SIGUSR1, &sa, 0) == -1 ||
-	    sigaction(SIGINT, &sa, 0) == -1  ||
-	    sigaction(SIGTERM, &sa, 0) == -1 ||
-	    sigaction(SIGHUP, &sa, 0) == -1) {
 		panic_syserror("sigaction");
 	}
 
@@ -544,8 +526,8 @@ main(int argc, char **argv)
 	start_time = ev_time();
 #ifndef __APPLE__
 	/* set locale to make iswXXXX function work */
-	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL ||
-	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL ||
+	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL &&
+	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL &&
 	    setlocale(LC_CTYPE, "en_US.utf8") == NULL)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 #endif

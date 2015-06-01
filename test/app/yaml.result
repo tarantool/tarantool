@@ -203,11 +203,15 @@ ok - double
     # boolean: end
 ok - boolean
     # string
-    1..4
+    1..8
     ok - encode/decode for 
     ok - encode/decode for abcde
     ok - encode/decode for Кудыкины горы
     ok - encode/decode for xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ok - encode/decode for $a	 $
+    ok - encode/decode for $a	 $
+    ok - encode/decode for $a\t $
+    ok - encode/decode for $a\\t $
     # string: end
 ok - string
     # nil
@@ -278,13 +282,15 @@ ok - ucdata
     # compact: end
 ok - compact
     # output
-    1..6
+    1..8
     ok - encode for true
     ok - decode for 'yes'
     ok - encode for false
     ok - decode for 'no'
     ok - encode for nil
     ok - decode for ~
+    ok - encode for binary
+    ok - tutorial string
     # output: end
 ok - output
 # yaml: end

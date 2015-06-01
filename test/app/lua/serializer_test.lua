@@ -202,11 +202,15 @@ local function test_boolean(test, s)
 end
 
 local function test_string(test, s)
-    test:plan(4)
+    test:plan(8)
     rt(test, s, "")
     rt(test, s, "abcde")
     rt(test, s, "Кудыкины горы") -- utf-8
     rt(test, s, string.rep("x", 33))
+    rt(test, s, '$a\t $')
+    rt(test, s, '$a\t $')
+    rt(test, s, [[$a\t $]])
+    rt(test, s, [[$a\\t $]])
 end
 
 local function test_nil(test, s)

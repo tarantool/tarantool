@@ -268,7 +268,19 @@ tuple_alloc(struct tuple_format *format, size_t size)
 {
 	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	char *ptr = (char *) smalloc(&memtx_alloc, total, "tuple");
+	char *ptr = (char *) smalloc_nothrow(&memtx_alloc, total);
+	/**
+	 * Use a nothrow version and throw an exception here,
+	 * to throw an instance of ClientError. Apart from being
+	 * more nice to the user, ClientErrors are ignored in
+	 * panic_on_wal_error=false mode, allowing us to start
+	 * with lower arena than necessary in the circumstances
+	 * of disaster recovery.
+	 */
+	if (ptr == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  total, "slab allocator", "tuple");
+	}
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
