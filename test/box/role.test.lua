@@ -343,3 +343,12 @@ box.schema.user.drop('test', { if_not_exists = true})
 box.schema.role.create('role', 'role')
 box.schema.role.drop('role', 'role')
 box.schema.user.drop('test', { if_exists = true})
+
+-- gh-663: inconsistent roles grant/revoke
+box.schema.role.create('X1')
+box.schema.role.create('X2')
+box.schema.role.info('X1')
+box.schema.role.grant('X1','read','role','X2')
+box.schema.role.info('X1')
+box.schema.role.revoke('X1','read','role','X2')
+box.schema.role.info('X1')

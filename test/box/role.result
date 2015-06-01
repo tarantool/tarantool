@@ -67,11 +67,11 @@ box.schema.user.grant('tester', 'execute', 'role', 'tester')
 -- test granting a non-execute grant on a role - error
 box.schema.user.grant('tester', 'write', 'role', 'iddqd')
 ---
-- error: User 'tester' already has role 'iddqd'
+- error: Unsupported role privilege 'write'
 ...
 box.schema.user.grant('tester', 'read', 'role', 'iddqd')
 ---
-- error: User 'tester' already has role 'iddqd'
+- error: Unsupported role privilege 'read'
 ...
 -- test granting role to a role
 box.schema.role.grant('iddqd', 'execute', 'role', 'iddqd')
@@ -868,4 +868,31 @@ box.schema.role.drop('role', 'role')
 ...
 box.schema.user.drop('test', { if_exists = true})
 ---
+...
+-- gh-663: inconsistent roles grant/revoke
+box.schema.role.create('X1')
+---
+...
+box.schema.role.create('X2')
+---
+...
+box.schema.role.info('X1')
+---
+- []
+...
+box.schema.role.grant('X1','read','role','X2')
+---
+- error: Unsupported role privilege 'read'
+...
+box.schema.role.info('X1')
+---
+- []
+...
+box.schema.role.revoke('X1','read','role','X2')
+---
+- error: Unsupported role privilege 'read'
+...
+box.schema.role.info('X1')
+---
+- []
 ...
