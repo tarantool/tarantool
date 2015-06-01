@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <sys/types.h> /* pid_t */
 
 #if defined(__cplusplus)
 extern "C" {
