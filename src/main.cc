@@ -544,8 +544,8 @@ main(int argc, char **argv)
 	start_time = ev_time();
 #ifndef __APPLE__
 	/* set locale to make iswXXXX function work */
-	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL ||
-	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL ||
+	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL &&
+	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL &&
 	    setlocale(LC_CTYPE, "en_US.utf8") == NULL)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 #endif
