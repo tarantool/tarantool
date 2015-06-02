@@ -34,6 +34,7 @@ box.space._schema:delete{"key"}
 ---
 - ['key']
 ...
+-- list all the logs
 require('fio').glob("*.xlog")
 ---
 - - 00000000000000000000.xlog

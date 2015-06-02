@@ -456,14 +456,14 @@ box_init(void)
 		/* Initialize a new replica */
 		engine_begin_join();
 		replica_bootstrap(recovery);
-		int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
 	} else {
 		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
-		int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
 	}
 	fiber_gc();
@@ -518,7 +518,7 @@ int
 box_snapshot()
 {
 	/* create snapshot file */
-	int64_t checkpoint_id = vclock_signature(&recovery->vclock);
+	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 	return engine_checkpoint(checkpoint_id);
 }
 

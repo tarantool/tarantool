@@ -165,7 +165,7 @@ SophiaEngine::join(Relay *relay)
 	struct vclock *res = vclockset_last(&relay->r->snap_dir.index);
 	if (res == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signt = vclock_signature(res);
+	int64_t signt = vclock_sum(res);
 
 	/* get snapshot object */
 	char id[128];
