@@ -181,7 +181,7 @@ vclock_from_string(struct vclock *vclock, const char *str)
 		goto error;
 	end:
 		if (*p == '\0') {
-			vclock->signature = vclock_sum(vclock);
+			vclock->signature = vclock_calc_sum(vclock);
 			return 0;
 		} else if (isblank(*p)) {
 			++p;

@@ -156,9 +156,9 @@ test_isearch()
 
 	int64_t queries[][NODE_N + 1] = {
 		/* not found (lsns are too old) */
-		{  0,  0, 0, 0, /* => */ INT64_MAX},
-		{  1,  0, 0, 0, /* => */ INT64_MAX},
-		{  5,  0, 0, 0, /* => */ INT64_MAX},
+		{  0,  0, 0, 0, /* => */ 10},
+		{  1,  0, 0, 0, /* => */ 10},
+		{  5,  0, 0, 0, /* => */ 10},
 
 		/* =10.xlog (left bound) */
 		{  10, 0, 0, 0, /* => */ 10},
@@ -230,8 +230,8 @@ test_isearch()
 		}
 
 		int64_t check = *(query + NODE_N);
-		struct vclock *res = vclockset_match(&set, &vclock, true);
-		int64_t value = res != NULL ? vclock_signature(res) : INT64_MAX;
+		struct vclock *res = vclockset_match(&set, &vclock);
+		int64_t value = res != NULL ? vclock_sum(res) : INT64_MAX;
 		is(value, check, "query #%d", q + 1);
 	}
 

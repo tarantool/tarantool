@@ -28,9 +28,9 @@ box.space.test:delete{3}
 ---
 - [3, 'third tuple']
 ...
-check log line for 'ignoring missing WAL'
+check log line for 'ignoring a gap in LSN'
 
-'ignoring missing WAL' exists in server log
+'ignoring a gap in LSN' exists in server log
 
 box.space.test:select{}
 ---

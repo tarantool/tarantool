@@ -5,7 +5,7 @@ box.cfg{
     listen              = os.getenv("LISTEN"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
-    panic_on_wal_error  = false,
+    panic_on_wal_error  = true,
     rows_per_wal        = 10
 }
 

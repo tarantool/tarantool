@@ -19,6 +19,7 @@ box.space._schema:insert{"key"}
 --# start server dont_panic 
 box.space._schema:get{"key"}
 box.space._schema:delete{"key"}
+-- list all the logs
 require('fio').glob("*.xlog")
 --# stop server dont_panic 
 --# cleanup server dont_panic

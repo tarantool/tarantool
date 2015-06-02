@@ -410,7 +410,12 @@ fiber_loop(void *data __attribute__((unused)))
 				 fiber_name(fiber));
 			say_info("fiber `%s': exiting", fiber_name(fiber));
 		} catch (Exception *e) {
-			e->log();
+			/*
+			 * For joinable fibers, it's the business
+			 * of the caller to deal with the error.
+			 */
+			if (! (fiber->flags & FIBER_IS_JOINABLE))
+				e->log();
 		} catch (...) {
 			/* This can only happen in case of a server bug. */
 			say_error("fiber `%s': unknown exception",

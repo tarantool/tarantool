@@ -103,6 +103,8 @@ local socket = require 'socket'
 local ffi = require 'ffi'
 local os = require 'os'
 local fiber = require 'fiber'
+local digest = require 'digest'
+local urilib = require 'uri'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
@@ -289,6 +291,21 @@ local function mkdir(dirname)
         log.error("Can't chown(%s, %s, %s): %s",
             default_cfg.username, default_cfg.username, dirname, errno.strerror())
     end
+end
+
+local function read_file(filename)
+    local file = fio.open(filename, {'O_RDONLY'})
+    local buf = {}
+    local i = 1
+
+    while true do
+        buf[i] = file:read(1024)
+        if buf[i] == '' then
+            break
+        end
+        i = i + 1
+    end
+    return table.concat(buf)
 end
 
 function mk_default_dirs(cfg)
@@ -495,17 +512,35 @@ elseif cmd == 'status' then
     print(instance_name .. ' is running (pid:' .. default_cfg.pid_file .. ')')
     os.exit(0)
 elseif cmd == 'reload' then
-    if arg[1] == nil then
+    local filename = arg[1]
+    if filename == nil then
         log.error("Usage: tarantoolctl reload instance_name file.lua")
         os.exit(1)
     end
-    if fio.stat(arg[1]) == nil then
+    if fio.stat(filename) == nil then
         if errno() == errno.ENOENT then
-            print(arg[1] .. ': file not found')
+            print(filename .. ': file not found')
             os.exit(1)
         end
     end
-    dofile(arg[1])
+    content = digest.base64_encode(read_file(filename))
+
+    if fio.stat(console_sock) == nil then
+        log.warn("pid file exists, but the control socket (%s) doesn't",
+                console_sock)
+        os.exit(2)
+    end
+
+    local u = urilib.parse(console_sock)
+    local remote = require('net.box'):new(u.host, u.service,
+        { user = u.login, password = u.password })
+    local code = string.format(
+        'loadstring(require("digest").base64_decode([[%s]]))()',
+        content
+    )
+    remote:console(code)
+
+    os.exit(0)
 else
     log.error("Unknown command '%s'", cmd)
     os.exit(-1)

@@ -169,7 +169,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
-	r->signature = -1;
 	r->snap_io_rate_limit = UINT64_MAX;
 
 	xdir_create(&r->snap_dir, snap_dirname, SNAP, &r->server_uuid);
@@ -221,6 +220,14 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error,
 static inline void
 recovery_close_log(struct recovery_state *r)
 {
+	if (r->current_wal == NULL)
+		return;
+	if (r->current_wal->eof_read) {
+		say_info("done `%s'", r->current_wal->filename);
+	} else {
+		say_warn("file `%s` wasn't correctly closed",
+			 r->current_wal->filename);
+	}
 	xlog_close(r->current_wal);
 	r->current_wal = NULL;
 }
@@ -263,13 +270,12 @@ recovery_apply_row(struct recovery_state *r, struct xrow_header *row)
 		r->apply_row(r, r->apply_row_param, row);
 }
 
-#define LOG_EOF 0
-
 /**
- * @retval 0 OK, read full xlog.
- * @retval 1 OK, read some but not all rows, or no EOF marker
+ * Read all rows in a file starting from the last position.
+ * Advance the position. If end of file is reached,
+ * set l.eof_read.
  */
-int
+void
 recover_xlog(struct recovery_state *r, struct xlog *l)
 {
 	struct xlog_cursor i;
@@ -281,6 +287,12 @@ recover_xlog(struct recovery_state *r, struct xlog *l)
 	});
 
 	struct xrow_header row;
+	/*
+	 * xlog_cursor_next() returns 1 when
+	 * it can not read more rows. This doesn't mean
+	 * the file is fully read: it's fully read only
+	 * when EOF marker has been read, see i.eof_read
+	 */
 	while (xlog_cursor_next(&i, &row) == 0) {
 		try {
 			recovery_apply_row(r, &row);
@@ -301,15 +313,6 @@ recover_xlog(struct recovery_state *r, struct xlog *l)
 		panic("snapshot `%s' has no EOF marker", l->filename);
 	}
 
-	/*
-	 * xlog_cursor_next() returns 1 when
-	 * it can not read more rows. This doesn't mean
-	 * the file is fully read: it's fully read only
-	 * when EOF marker has been read. This is
-	 * why eof_read is used here to indicate the
-	 * end of log.
-	 */
-	return !i.eof_read;
 }
 
 void
@@ -331,7 +334,8 @@ recovery_bootstrap(struct recovery_state *r)
 	recover_xlog(r, snap);
 }
 
-/** Find out if there are new .xlog files since the current
+/**
+ * Find out if there are new .xlog files since the current
  * LSN, and read them all up.
  *
  * This function will not close r->current_wal if
@@ -342,75 +346,65 @@ recover_remaining_wals(struct recovery_state *r)
 {
 	xdir_scan(&r->wal_dir);
 
-	struct vclock *last_vclock = vclockset_last(&r->wal_dir.index);
-	int64_t last_signature = last_vclock != NULL ?
-		vclock_signature(last_vclock) : -1;
+	struct vclock *last = vclockset_last(&r->wal_dir.index);
+	if (last == NULL) {
+		assert(r->current_wal == NULL);
+		/** Nothing to do. */
+		return;
+	}
+	assert(vclockset_next(&r->wal_dir.index, last) == NULL);
+
 	/* If the caller already opened WAL for us, recover from it first */
-	struct vclock *current_vclock;
+	struct vclock *clock;
 	if (r->current_wal != NULL) {
-		current_vclock = &r->current_wal->vclock;
-		goto recover_current_wal;
+		clock = vclockset_match(&r->wal_dir.index,
+					&r->current_wal->vclock);
+		if (clock != NULL &&
+		    vclock_compare(clock, &r->current_wal->vclock) == 0)
+			goto recover_current_wal;
+		/*
+		 * The current WAL has disappeared under our feet -
+		 * assume anything can happen in production and go
+		 * on.
+		 */
+		assert(false);
 	}
 
-	while (1) {
-		current_vclock =
-			vclockset_match(&r->wal_dir.index, &r->vclock,
-					r->wal_dir.panic_if_error);
-		if (current_vclock == NULL)
-			break; /* No more WALs */
+	for (clock = vclockset_match(&r->wal_dir.index, &r->vclock);
+	     clock != NULL;
+	     clock = vclockset_next(&r->wal_dir.index, clock)) {
 
-		if (vclock_signature(current_vclock) <= r->signature) {
-			if (r->signature == last_signature)
-				break;
-			say_error("missing xlog between %020lld and %020lld",
-				  (long long) vclock_signature(current_vclock),
-				  (long long) last_signature);
+		if (vclock_compare(clock, &r->vclock) > 0) {
+			/**
+			 * The best clock we could find is
+			 * greater or is incomparable with the
+			 * current state of recovery.
+			 */
+			XlogGapError *e =
+				tnt_error(XlogGapError, &r->vclock, clock);
+
 			if (r->wal_dir.panic_if_error)
-				break;
-
-			/* Ignore missing WALs */
-			say_warn("ignoring missing WALs");
-			current_vclock = vclockset_next(&r->wal_dir.index,
-							current_vclock);
-			assert(current_vclock != NULL);
-		}
-		assert(r->current_wal == NULL);
-		try {
-			r->current_wal = xlog_open(&r->wal_dir,
-					   vclock_signature(current_vclock));
-		} catch (XlogError *e) {
+				throw e;
 			e->log();
-			break;
+			/* Ignore missing WALs */
+			say_warn("ignoring a gap in LSN");
 		}
+		recovery_close_log(r);
+
+		r->current_wal = xlog_open(&r->wal_dir, vclock_sum(clock));
+
 		say_info("recover from `%s'", r->current_wal->filename);
 
 recover_current_wal:
-		r->signature = vclock_signature(current_vclock);
-		int result = recover_xlog(r, r->current_wal);
-
-		if (result == LOG_EOF) {
-			say_info("done `%s'", r->current_wal->filename);
-			recovery_close_log(r);
-			/* goto find_next_wal; */
-		} else if (r->signature == last_signature) {
-			/* last file is not finished */
-			break;
-		} else {
-			say_warn("WAL `%s` wasn't correctly closed",
-				 r->current_wal->filename);
-			recovery_close_log(r);
-		}
+		if (r->current_wal->eof_read == false)
+			recover_xlog(r, r->current_wal);
+		/**
+		 * Keep the last log open to remember recovery
+		 * position. This speeds up recovery in local hot
+		 * standby mode, since we don't have to re-open
+		 * and re-scan the last log in recovery_finalize().
+		 */
 	}
-
-	/*
-	 * It's not a fatal error when last WAL is empty, but if
-	 * we lose some logs it is a fatal error.
-	 */
-	if (last_signature > r->signature) {
-		tnt_raise(XlogError,
-			  "not all WALs have been successfully read");
-	}
-
 	region_free(&fiber()->gc);
 }
 
@@ -422,15 +416,11 @@ recovery_finalize(struct recovery_state *r, enum wal_mode wal_mode,
 
 	recover_remaining_wals(r);
 
-	if (r->current_wal != NULL) {
-		say_warn("WAL `%s' wasn't correctly closed",
-			 r->current_wal->filename);
-		recovery_close_log(r);
-	}
+	recovery_close_log(r);
 
 	if (vclockset_last(&r->wal_dir.index) != NULL &&
-	    vclock_signature(&r->vclock) ==
-	    vclock_signature(vclockset_last(&r->wal_dir.index))) {
+	    vclock_sum(&r->vclock) ==
+	    vclock_sum(vclockset_last(&r->wal_dir.index))) {
 		/**
 		 * The last log file had zero rows -> bump
 		 * LSN so that we don't stumble over this
@@ -957,8 +947,10 @@ wal_writer_thread(void *worker_args)
 		ev_async_send(writer->txn_loop, &writer->write_event);
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-	if (r->current_wal != NULL)
-		recovery_close_log(r);
+	if (r->current_wal != NULL) {
+		xlog_close(r->current_wal);
+		r->current_wal = NULL;
+	}
 	return NULL;
 }
 
@@ -975,7 +967,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	 */
 	fill_lsn(r, row);
 	if (r->wal_mode == WAL_NONE)
-		return vclock_signature(&r->vclock);
+		return vclock_sum(&r->vclock);
 
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
@@ -1011,7 +1003,7 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	fiber_set_cancellable(cancellable);
 	if (req->res == -1)
 		return -1;
-	return vclock_signature(&r->vclock);
+	return vclock_sum(&r->vclock);
 }
 
 /* }}} */
@@ -1023,7 +1015,7 @@ recovery_last_checkpoint(struct recovery_state *r)
 {
 	/* recover last snapshot lsn */
 	struct vclock *vclock = vclockset_last(&r->snap_dir.index);
-	return vclock ? vclock_signature(vclock) : -1;
+	return vclock ? vclock_sum(vclock) : -1;
 }
 
 /* }}} */

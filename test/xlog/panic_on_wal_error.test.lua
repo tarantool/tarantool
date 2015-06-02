@@ -1,4 +1,11 @@
 -- preparatory stuff
+fio = require('fio')
+glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
+for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
+glob = fio.pathjoin(box.cfg.wal_dir, '*.snap')
+for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
+--# stop server default
+--# start server default
 box.schema.user.grant('guest', 'replication')
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('pk')
@@ -67,6 +74,7 @@ box.space.test:select{}
 --
 --# set connection default 
 --# stop server replica
+--# cleanup server replica
 --
 -- cleanup
 box.space.test:drop()

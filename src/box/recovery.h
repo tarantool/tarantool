@@ -85,8 +85,6 @@ struct recovery_state {
 	struct xlog *current_wal;
 	struct xdir snap_dir;
 	struct xdir wal_dir;
-	/** Used to find missing xlog files */
-	int64_t signature;
 	struct wal_writer *writer;
 	/**
 	 * This is used in local hot standby or replication
@@ -132,7 +130,7 @@ recovery_has_data(struct recovery_state *r)
 	       vclockset_first(&r->wal_dir.index) != NULL;
 }
 void recovery_bootstrap(struct recovery_state *r);
-int
+void
 recover_xlog(struct recovery_state *r, struct xlog *l);
 void recovery_follow_local(struct recovery_state *r,
 			   const char *name,
