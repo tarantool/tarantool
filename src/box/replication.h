@@ -46,7 +46,8 @@ public:
 };
 
 void
-replication_join(int fd, struct xrow_header *packet);
+replication_join(int fd, struct xrow_header *packet,
+		 void (*on_join)(const struct tt_uuid *));
 
 /**
  * Subscribe a replica to updates.

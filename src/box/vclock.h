@@ -281,7 +281,7 @@ static inline void
 vclock_add_server(struct vclock *vclock, uint32_t server_id)
 {
 	if (server_id >= VCLOCK_MAX)
-		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
+		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 	assert(! vclock_has(vclock, server_id));
 	vclock_add_server_nothrow(vclock, server_id);
 }
