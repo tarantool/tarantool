@@ -131,7 +131,7 @@ vclock_size(const struct vclock *vclock)
 }
 
 static inline int64_t
-vclock_sum(const struct vclock *vclock)
+vclock_calc_sum(const struct vclock *vclock)
 {
 	int64_t sum = 0;
 	struct vclock_iterator it;
@@ -142,7 +142,7 @@ vclock_sum(const struct vclock *vclock)
 }
 
 static inline int64_t
-vclock_signature(const struct vclock *vclock)
+vclock_sum(const struct vclock *vclock)
 {
 	return vclock->signature;
 }
@@ -229,17 +229,16 @@ rb_proto(, vclockset_, vclockset_t, struct vclock);
  * @return a vclock that <= than \a key
  */
 static inline struct vclock *
-vclockset_match(vclockset_t *set, struct vclock *key,
-		bool panic_if_error)
+vclockset_match(vclockset_t *set, struct vclock *key)
 {
 	struct vclock *match = vclockset_psearch(set, key);
 	/**
 	 * vclockset comparator returns 0 for
-	 * incomparable keys. So the match doesn't have to be
+	 * incomparable keys, rendering them equal.
+	 * So the match, even when found, is not necessarily
 	 * strictly preceding the search key, it may be
-	 * incomparable. If this is the case, unwind until
-	 * we get to a key which is strictly below the search
-	 * pattern.
+	 * incomparable. If this is the case, unwind until we get
+	 * to a key which is strictly below the search pattern.
 	 */
 	while (match != NULL) {
 		if (vclock_compare(match, key) <= 0)
@@ -249,10 +248,10 @@ vclockset_match(vclockset_t *set, struct vclock *key,
 	}
 	/*
 	 * There is no xlog which is strictly less than the search
-	 * pattern. Return the fist successor log - it is either
+	 * pattern. Return the first log - it is either
 	 * strictly greater, or incomparable with the key.
 	 */
-	return panic_if_error ? NULL: vclockset_first(set);
+	return vclockset_first(set);
 }
 
 #if defined(__cplusplus)
@@ -282,7 +281,7 @@ static inline void
 vclock_add_server(struct vclock *vclock, uint32_t server_id)
 {
 	if (server_id >= VCLOCK_MAX)
-		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
+		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 	assert(! vclock_has(vclock, server_id));
 	vclock_add_server_nothrow(vclock, server_id);
 }
@@ -293,7 +292,7 @@ vclock_del_server(struct vclock *vclock, uint32_t server_id)
 	assert(vclock_has(vclock, server_id));
 	vclock->lsn[server_id] = 0;
 	vclock->map &= ~(1 << server_id);
-	vclock->signature = vclock_sum(vclock);
+	vclock->signature = vclock_calc_sum(vclock);
 }
 
 #endif /* defined(__cplusplus) */

@@ -1305,3 +1305,19 @@ box.schema.role.revoke = function(user_name, ...)
     return revoke(uid, user_name, ...)
 end
 box.schema.role.info = box.schema.user.info
+
+-- 
+-- once
+--
+box.once = function(key, func, ...)
+    if type(key) ~= 'string' or type(func) ~= 'function' then
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: box.once(key, func, ...)")
+    end
+    
+    local key = "once"..key
+    if box.space._schema:get{key} ~= nil then
+        return
+    end
+    box.space._schema:put{key}
+    return func(...)
+end

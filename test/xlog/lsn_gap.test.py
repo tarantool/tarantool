@@ -26,7 +26,7 @@ server.stop()
 os.unlink(wal)
 
 server.start()
-line="ignoring missing WAL"
+line="ignoring a gap in LSN"
 print "check log line for '%s'" % line
 print
 if server.logfile_pos.seek_once(line) >= 0:

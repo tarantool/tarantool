@@ -53,6 +53,7 @@ t
   - index
   - info
   - internal
+  - once
   - rollback
   - runtime
   - schema

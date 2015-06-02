@@ -45,6 +45,13 @@ struct XlogError: public Exception
 		  const char *format, ...);
 };
 
+struct XlogGapError: public XlogError
+{
+	XlogGapError(const char *file, unsigned line,
+		  const struct vclock *from,
+		  const struct vclock *to);
+};
+
 /* {{{ log dir */
 
 /**
@@ -182,6 +189,8 @@ struct xlog {
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */
 	bool is_inprogress;
+	/** True if eof has been read when reading the log. */
+	bool eof_read;
 	/**
 	 * Text file header: server uuid. We read
 	 * only logs with our own uuid, to avoid situations

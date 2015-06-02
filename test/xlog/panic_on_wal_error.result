@@ -1,4 +1,21 @@
 -- preparatory stuff
+fio = require('fio')
+---
+...
+glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
+---
+...
+for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
+---
+...
+glob = fio.pathjoin(box.cfg.wal_dir, '*.snap')
+---
+...
+for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
+---
+...
+--# stop server default
+--# start server default
 box.schema.user.grant('guest', 'replication')
 ---
 ...
@@ -116,7 +133,7 @@ box.info.replication.status
 ...
 box.info.replication.message
 ---
-- not all WALs have been successfully read
+- 'Missing .xlog file between LSN 6 {1: 6, 2: 0} and 8 {1: 8, 2: 0}'
 ...
 box.space.test:select{}
 ---
@@ -126,6 +143,7 @@ box.space.test:select{}
 --
 --# set connection default 
 --# stop server replica
+--# cleanup server replica
 --
 -- cleanup
 box.space.test:drop()

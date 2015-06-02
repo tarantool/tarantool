@@ -267,7 +267,7 @@ recover_snap(struct recovery_state *r)
 	 */
 	if (res == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signature = vclock_signature(res);
+	int64_t signature = vclock_sum(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature);
 	auto guard = make_scoped_guard([=]{
