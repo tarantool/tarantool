@@ -58,8 +58,6 @@ box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
 
-static struct evio_service binary; /* iproto binary listener */
-
 bool snapshot_in_progress = false;
 
 static void
@@ -189,11 +187,7 @@ extern "C" void
 box_set_listen(const char *uri)
 {
 	box_check_uri(uri, "listen");
-	if (evio_service_is_active(&binary))
-		evio_service_stop(&binary);
-
-	if (uri != NULL)
-		coio_service_start(&binary, uri);
+	iproto_set_listen(uri);
 }
 
 extern "C" void
@@ -470,7 +464,7 @@ box_init(void)
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
-	iproto_init(&binary);
+	iproto_init();
 	box_set_listen(cfg_gets("listen"));
 
 	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));

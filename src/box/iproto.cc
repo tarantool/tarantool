@@ -74,7 +74,9 @@ struct iproto_request
 	size_t total_len;
 };
 
-struct mempool iproto_request_pool;
+static struct evio_service binary; /* iproto binary listener */
+
+static struct mempool iproto_request_pool;
 
 static struct iproto_request *
 iproto_request_new(struct iproto_connection *con,
@@ -823,7 +825,7 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 /** Initialize a read-write port. */
 void
-iproto_init(struct evio_service *service)
+iproto_init()
 {
 	mempool_create(&iproto_request_pool, &cord()->slabc,
 		       sizeof(struct iproto_request));
@@ -831,8 +833,18 @@ iproto_init(struct evio_service *service)
 	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
 
-	evio_service_init(loop(), service, "binary",
+	evio_service_init(loop(), &binary, "binary",
 			  iproto_on_accept, NULL);
+}
+
+void
+iproto_set_listen(const char *uri)
+{
+	if (evio_service_is_active(&binary))
+		evio_service_stop(&binary);
+
+	if (uri != NULL)
+		coio_service_start(&binary, uri);
 }
 
 /* vim: set foldmethod=marker */

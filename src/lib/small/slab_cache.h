@@ -192,9 +192,21 @@ slab_sizeof()
 
 /** Useful size of a slab. */
 static inline uint32_t
-slab_size(struct slab *slab)
+slab_capacity(struct slab *slab)
 {
 	return slab->size - slab_sizeof();
+}
+
+static inline void *
+slab_data(struct slab *slab)
+{
+	return (char *) slab + slab_sizeof();
+}
+
+static inline struct slab *
+slab_from_data(void *data)
+{
+	return (struct slab *) ((char *) data - slab_sizeof());
 }
 
 void

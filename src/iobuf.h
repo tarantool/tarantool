@@ -34,8 +34,6 @@
 #include "third_party/queue.h"
 #include "small/region.h"
 
-struct ev_io;
-
 /** {{{ Input buffer.
  *
  * Continuous piece of memory to store input.
@@ -53,7 +51,7 @@ struct ev_io;
  */
 struct ibuf
 {
-	struct region *pool;
+	struct slab_cache *slabc;
 	char *buf;
 	/** Start of input. */
 	char *pos;
@@ -82,6 +80,13 @@ ibuf_unused(struct ibuf *ibuf)
 	return ibuf->buf + ibuf->capacity - ibuf->end;
 }
 
+/** How much memory is allocated */
+static inline size_t
+ibuf_capacity(struct ibuf *ibuf)
+{
+	return ibuf->capacity;
+}
+
 /* Integer value of the position in the buffer - stable
  * in case of realloc.
  */
@@ -98,9 +103,9 @@ ibuf_pos(struct ibuf *ibuf)
 enum { IOBUF_IOV_MAX = 32 };
 
 /**
- * An output buffer is an array of struct iovec vectors
+ * An output buffer is a vector of struct iovec
  * for writev().
- * Each buffer is allocated on region allocator.
+ * Each iovec buffer is allocated on region allocator.
  * Buffer size grows by a factor of 2. With this growth factor,
  * the number of used buffers is unlikely to ever exceed the
  * hard limit of IOBUF_IOV_MAX. If it does, an exception is
@@ -112,7 +117,7 @@ struct obuf
 	/* How many bytes are in the buffer. */
 	size_t size;
 	/** Position of the "current" iovec. */
-	size_t pos;
+	int pos;
 	/** Allocation factor (allocations are a multiple of this number) */
 	size_t alloc_factor;
 	/** How many bytes are actually allocated for each iovec. */
@@ -128,6 +133,9 @@ struct obuf
 
 void
 obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor);
+
+void
+obuf_destroy(struct obuf *buf);
 
 /** How many bytes are in the output buffer. */
 static inline size_t
@@ -147,17 +155,21 @@ obuf_iovcnt(struct obuf *buf)
  * Output buffer savepoint. It's possible to
  * save the current buffer state in a savepoint
  * and roll back to the saved state at any time
- * before iobuf_flush()
+ * before iobuf_reset()
  */
 struct obuf_svp
 {
-	size_t pos;
+	int pos;
 	size_t iov_len;
 	size_t size;
 };
 
+/**
+ * Slow path of obuf_reserve(), which actually reallocates
+ * memory and moves data if necessary.
+ */
 void
-obuf_ensure_resize(struct obuf *buf, size_t size);
+obuf_reserve_slow(struct obuf *buf, size_t size);
 
 /**
  * \brief Ensure \a buf to have at least \a size bytes of contiguous memory
@@ -169,19 +181,19 @@ obuf_ensure_resize(struct obuf *buf, size_t size);
  * \return a pointer to contiguous chunk of memory
  */
 static inline char *
-obuf_ensure(struct obuf *buf, size_t size)
+obuf_reserve(struct obuf *buf, size_t size)
 {
 	if (buf->iov[buf->pos].iov_len + size > buf->capacity[buf->pos])
-		obuf_ensure_resize(buf, size);
+		obuf_reserve_slow(buf, size);
 	struct iovec *iov = &buf->iov[buf->pos];
 	return (char *) iov->iov_base + iov->iov_len;
 }
 
 /**
- * \brief Advance write position after using obuf_ensure()
+ * \brief Advance write position after using obuf_reserve()
  * \param buf
  * \param size
- * \sa obuf_ensure
+ * \sa obuf_reserve
  */
 static inline void
 obuf_advance(struct obuf *buf, size_t size)
@@ -202,7 +214,6 @@ obuf_advance(struct obuf *buf, size_t size)
  *	obuf_dup(buf, ...);
  * uint32_t total = obuf_size(buf);
  * memcpy(obuf_svp_to_ptr(&svp), &total, sizeof(total);
- * iobuf_flush();
  */
 struct obuf_svp
 obuf_book(struct obuf *obuf, size_t size);
@@ -241,7 +252,7 @@ obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp);
 static inline char *
 obuf_join(struct obuf *obuf)
 {
-	size_t iovcnt = obuf_iovcnt(obuf);
+	int iovcnt = obuf_iovcnt(obuf);
 	if (iovcnt == 1)
 		return (char *) obuf->iov[0].iov_base;
 
@@ -266,6 +277,11 @@ struct iobuf
 	/** Output buffer. */
 	struct obuf out;
 	struct region pool;
+	/*
+	 * A "pinned" buffer is not destroyed even if it's idle.
+	 * The last one to unpin an idle buffer has to destroy it.
+	 */
+	int pins;
 };
 
 /** Create an instance of input/output buffer. */
@@ -276,12 +292,6 @@ iobuf_new(const char *name);
 void
 iobuf_delete(struct iobuf *iobuf);
 
-/** Flush output using cooperative I/O and garbage collect.
- * @return number of bytes written
- */
-ssize_t
-iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
-
 /**
  * Must be called when we are done sending all output,
  * and there is likely no cached input.
@@ -290,13 +300,33 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
 void
 iobuf_reset(struct iobuf *iobuf);
 
-/** Return true if there is no input and no output. */
+static inline void
+iobuf_pin(struct iobuf *iobuf)
+{
+	iobuf->pins++;
+}
+
+static inline void
+iobuf_unpin(struct iobuf *iobuf)
+{
+	iobuf->pins--;
+}
+
+/** Return true if there is no input and no output and
+ * no one has pinned the buffer - i.e. it's safe to
+ * destroy it.
+ */
 static inline bool
 iobuf_is_idle(struct iobuf *iobuf)
 {
-	return ibuf_size(&iobuf->in) == 0 && obuf_size(&iobuf->out) == 0;
+	return ibuf_size(&iobuf->in) == 0 && obuf_size(&iobuf->out) == 0 &&
+		iobuf->pins == 0;
 }
 
+/**
+ * Got to be called in each thread iobuf subsystem is
+ * used in.
+ */
 void
 iobuf_init();
 

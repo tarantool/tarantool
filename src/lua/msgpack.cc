@@ -61,7 +61,7 @@ luamp_encode_array(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size)
 {
 	(void) cfg;
 	assert(mp_sizeof_array(size) <= 5);
-	char *data = obuf_ensure(buf, 5);
+	char *data = obuf_reserve(buf, 5);
 	char *pos = mp_encode_array(data, size);
 	obuf_advance(buf, pos - data);
 }
@@ -71,7 +71,7 @@ luamp_encode_map(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size)
 {
 	(void) cfg;
 	assert(mp_sizeof_map(size) <= 5);
-	char *data = obuf_ensure(buf, 5);
+	char *data = obuf_reserve(buf, 5);
 	char *pos = mp_encode_map(data, size);
 	obuf_advance(buf, pos - data);
 }
@@ -81,7 +81,7 @@ luamp_encode_uint(struct luaL_serializer *cfg, struct obuf *buf, uint64_t num)
 {
 	(void) cfg;
 	assert(mp_sizeof_uint(num) <= 9);
-	char *data = obuf_ensure(buf, 9);
+	char *data = obuf_reserve(buf, 9);
 	char *pos = mp_encode_uint(data, num);
 	obuf_advance(buf, pos - data);
 }
@@ -91,7 +91,7 @@ luamp_encode_int(struct luaL_serializer *cfg, struct obuf *buf, int64_t num)
 {
 	(void) cfg;
 	assert(mp_sizeof_int(num) <= 9);
-	char *data = obuf_ensure(buf, 9);
+	char *data = obuf_reserve(buf, 9);
 	char *pos = mp_encode_int(data, num);
 	obuf_advance(buf, pos - data);
 }
@@ -101,7 +101,7 @@ luamp_encode_float(struct luaL_serializer *cfg, struct obuf *buf, float num)
 {
 	(void) cfg;
 	assert(mp_sizeof_float(num) <= 5);
-	char *data = obuf_ensure(buf, 5);
+	char *data = obuf_reserve(buf, 5);
 	char *pos = mp_encode_float(data, num);
 	obuf_advance(buf, pos - data);
 }
@@ -111,7 +111,7 @@ luamp_encode_double(struct luaL_serializer *cfg, struct obuf *buf, double num)
 {
 	(void) cfg;
 	assert(mp_sizeof_double(num) <= 9);
-	char *data = obuf_ensure(buf, 9);
+	char *data = obuf_reserve(buf, 9);
 	char *pos = mp_encode_double(data, num);
 	obuf_advance(buf, pos - data);
 }
@@ -122,7 +122,7 @@ luamp_encode_str(struct luaL_serializer *cfg, struct obuf *buf,
 {
 	(void) cfg;
 	assert(mp_sizeof_str(len) <= 5 + len);
-	char *data = obuf_ensure(buf, 5 + len);
+	char *data = obuf_reserve(buf, 5 + len);
 	char *pos = mp_encode_str(data, str, len);
 	obuf_advance(buf, pos - data);
 }
@@ -132,7 +132,7 @@ luamp_encode_nil(struct luaL_serializer *cfg, struct obuf *buf)
 {
 	(void) cfg;
 	assert(mp_sizeof_nil() <= 1);
-	char *data = obuf_ensure(buf, 1);
+	char *data = obuf_reserve(buf, 1);
 	char *pos = mp_encode_nil(data);
 	obuf_advance(buf, pos - data);
 }
@@ -142,7 +142,7 @@ luamp_encode_bool(struct luaL_serializer *cfg, struct obuf *buf, bool val)
 {
 	(void) cfg;
 	assert(mp_sizeof_bool(val) <= 1);
-	char *data = obuf_ensure(buf, 1);
+	char *data = obuf_reserve(buf, 1);
 	char *pos = mp_encode_bool(data, val);
 	obuf_advance(buf, pos - data);
 }
