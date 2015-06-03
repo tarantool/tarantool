@@ -153,6 +153,15 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	(void) w;
 	(void) revents;
 
+	/**
+	 * If running in daemon mode, complain about possibly
+	 * sudden and unexpected death.
+	 * Real case: an ops A kills the server and ops B files
+	 * a bug that the server suddenly died. Make such case
+	 * explicit in the log.
+	 */
+	if (pid_file)
+		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
 	start_loop = false;
 	/* Terminate the main event loop */
 	ev_break(loop, EVBREAK_ALL);
