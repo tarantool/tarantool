@@ -316,7 +316,7 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
 	if (server_id >= VCLOCK_MAX)
-		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
+		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 
 	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
@@ -330,13 +330,9 @@ box_process_join(int fd, struct xrow_header *header)
 	access_check_space(space_cache_find(SC_CLUSTER_ID), PRIV_W);
 
 	assert(header->type == IPROTO_JOIN);
-	struct tt_uuid server_uuid = uuid_nil;
-	xrow_decode_join(header, &server_uuid);
 
 	/* Process JOIN request via replication relay */
-	replication_join(fd, header);
-	/** Register the server with the cluster. */
-	box_on_cluster_join(&server_uuid);
+	replication_join(fd, header, box_on_cluster_join);
 }
 
 void

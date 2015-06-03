@@ -1,0 +1,36 @@
+box.once()
+---
+- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+...
+box.once("key")
+---
+- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+...
+box.once("key", "key")
+---
+- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+...
+box.once("key", nil)
+---
+- error: 'Illegal parameters, Usage: box.once(key, func, ...)'
+...
+box.once("key", function() end)
+---
+...
+function f(arg) if i ~= nil then i = i + arg else i = arg end end
+---
+...
+box.once("test", f, 1)
+---
+...
+i
+---
+- 1
+...
+box.once("test", f, 1)
+---
+...
+i
+---
+- 1
+...

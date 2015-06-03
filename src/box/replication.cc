@@ -82,31 +82,40 @@ void
 replication_join_f(va_list ap)
 {
 	Relay *relay = va_arg(ap, Relay *);
-	struct recovery_state *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send snapshot */
 	engine_join(relay);
 
-	/* Send response to JOIN command = end of stream */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
-	row.sync = relay->sync;
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(&row, iov);
-	coio_writev(&relay->io, iov, iovcnt, 0);
-	say_info("snapshot sent");
 }
 
 void
-replication_join(int fd, struct xrow_header *packet)
+replication_join(int fd, struct xrow_header *packet,
+		 void (*on_join)(const struct tt_uuid *))
 {
 	Relay relay(fd, packet->sync);
+	struct recovery_state *r = relay.r;
+
+	struct tt_uuid server_uuid = uuid_nil;
+	xrow_decode_join(packet, &server_uuid);
 
 	struct cord cord;
 	cord_costart(&cord, "join", replication_join_f, &relay);
 	cord_cojoin(&cord);
+	/**
+	 * Call the server-side hook which stores the replica uuid
+	 * in _cluster hook after sending the last row but before
+	 * sending OK - if the hook fails, the error reaches the
+	 * client.
+	 */
+	on_join(&server_uuid);
+
+	/* Send response to JOIN command = end of stream */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
+	relay_send(&relay, &row);
+	say_info("snapshot sent");
 }
 
 static void
