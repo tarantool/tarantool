@@ -413,6 +413,11 @@ engine_init()
 	engine_register(sophia);
 }
 
+const char*box_type_strs = {iproto_type_strs[0], iproto_type_strs[1],
+	iproto_type_strs[2], iproto_type_strs[3], iproto_type_strs[4],
+	iproto_type_strs[5], iproto_type_strs[6], iproto_type_strs[7],
+	iproto_type_strs[8], "EXCEPTION"};
+
 static inline void
 box_init(void)
 {
@@ -422,7 +427,7 @@ box_init(void)
 		   cfg_getd("slab_alloc_factor"));
 
 	stat_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	stat_base = stat_register(box_type_strs, BOX_STAT_MAX);
 
 	engine_init();
 
@@ -482,7 +487,7 @@ box_init(void)
 
 	engine_end_recovery();
 
-	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
+	stat_cleanup(stat_base, BOX_STAT_MAX);
 
 	if (recovery_has_remote(recovery))
 		recovery_follow_remote(recovery);
