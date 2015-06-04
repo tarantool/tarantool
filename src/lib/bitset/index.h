@@ -311,6 +311,15 @@ bitset_index_count(const struct bitset_index *index, size_t bit)
 	return bitset_cardinality(index->bitsets[bit + 1]);
 }
 
+/**
+ * @brief Return the number of bytes used by index. Only dynamically allocated
+ * data are counted (i.e. sizeof(struct bitset_index) is not counted)
+ * @param index bitset index
+ * @return number of bytes used by index.
+ */
+size_t
+bitset_index_bsize(const struct bitset_index *index);
+
 #if defined(DEBUG)
 void
 bitset_index_dump(struct bitset_index *index, int verbose, FILE *stream);

@@ -36,8 +36,10 @@
 #include "index.h"
 #include "bitset/index.h"
 
-struct bitset_index;
-struct bitset_expr;
+#ifndef OLD_GOOD_BITSET
+struct matras;
+struct mh_bitset_index_t;
+#endif /*#ifndef OLD_GOOD_BITSET*/
 
 class MemtxBitset: public Index {
 public:
@@ -56,8 +58,19 @@ public:
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
+#ifndef OLD_GOOD_BITSET
+	void registerTuple(struct tuple *tuple);
+	void unregisterTuple(struct tuple *tuple);
+	uint32_t tupleToValue(struct tuple *tuple) const;
+	struct tuple *valueToTuple(uint32_t value) const;
+#endif /*#ifndef OLD_GOOD_BITSET*/
 private:
-	struct bitset_index index;
+	struct bitset_index m_index;
+#ifndef OLD_GOOD_BITSET
+	struct matras *m_id_to_tuple;
+	struct mh_bitset_index_t *m_tuple_to_id;
+	uint32_t m_spare_id;
+#endif /*#ifndef OLD_GOOD_BITSET*/
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED */
