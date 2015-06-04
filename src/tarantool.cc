@@ -366,7 +366,7 @@ snapshot(void)
 	salloc_protect();
 
 	title("dumper", "%" PRIu32, getppid());
-	fiber_set_name(fiber, status);
+	fiber_set_name(fiber_ptr, status);
 
 	/*
 	 * Safety: make sure we don't double-write
@@ -933,7 +933,7 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(tarantool_L);
-		prelease(fiber->gc_pool);
+		prelease(fiber_ptr->gc_pool);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering event loop");
 		if (cfg.io_collect_interval > 0)

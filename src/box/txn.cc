@@ -67,7 +67,7 @@ txn_replace(struct txn *txn, struct space *space,
 struct txn *
 txn_begin()
 {
-	struct txn *txn = (struct txn *) p0alloc(fiber->gc_pool, sizeof(*txn));
+	struct txn *txn = (struct txn *) p0alloc(fiber_ptr->gc_pool, sizeof(*txn));
 	return txn;
 }
 
@@ -78,7 +78,7 @@ txn_commit(struct txn *txn)
 		int64_t lsn = next_lsn(recovery_state);
 
 		ev_tstamp start = ev_now(), stop;
-		int res = wal_write(recovery_state, lsn, fiber->cookie,
+		int res = wal_write(recovery_state, lsn, fiber_ptr->cookie,
 				    txn->op, txn->data, txn->len);
 		stop = ev_now();
 

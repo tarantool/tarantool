@@ -122,14 +122,14 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 	while (ch->count == 0) {
 		/* try to be in FIFO order */
 		if (first_try) {
-			rlist_add_tail_entry(&ch->readers, fiber, state);
+			rlist_add_tail_entry(&ch->readers, fiber_ptr, state);
 			first_try = false;
 		} else {
-			rlist_add_entry(&ch->readers, fiber, state);
+			rlist_add_entry(&ch->readers, fiber_ptr, state);
 		}
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield_timeout(timeout);
-		rlist_del_entry(fiber, state);
+		rlist_del_entry(fiber_ptr, state);
 
 		/* broadcast messsage wakes us up */
 		if (ch->bcast) {
@@ -184,14 +184,14 @@ ipc_channel_get(struct ipc_channel *ch)
 static void
 ipc_channel_close_waiter(struct ipc_channel *ch, struct fiber *f)
 {
-	ch->close = fiber;
+	ch->close = fiber_ptr;
 
 	while(ch->close) {
 		bool cancellable = fiber_setcancellable(true);
 		fiber_wakeup(f);
 		fiber_yield();
 		ch->close = NULL;
-		rlist_del_entry(fiber, state);
+		rlist_del_entry(fiber_ptr, state);
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 	}
@@ -241,15 +241,15 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 
 		/* try to be in FIFO order */
 		if (first_try) {
-			rlist_add_tail_entry(&ch->writers, fiber, state);
+			rlist_add_tail_entry(&ch->writers, fiber_ptr, state);
 			first_try = false;
 		} else {
-			rlist_add_entry(&ch->writers, fiber, state);
+			rlist_add_entry(&ch->writers, fiber_ptr, state);
 		}
 
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield_timeout(timeout);
-		rlist_del_entry(fiber, state);
+		rlist_del_entry(fiber_ptr, state);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
@@ -340,12 +340,12 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 		f = rlist_first_entry(&ch->readers, struct fiber, state);
 
 		ch->bcast_msg = data;
-		ch->bcast = fiber;
+		ch->bcast = fiber_ptr;
 		fiber_wakeup(f);
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
 		ch->bcast = NULL;
-		rlist_del_entry(fiber, state);
+		rlist_del_entry(fiber_ptr, state);
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 		/* if any other reader was added don't wake it up */

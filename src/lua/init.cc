@@ -374,7 +374,7 @@ lbox_isfiber(struct lua_State *L, int narg)
 static int
 lbox_fiber_id(struct lua_State *L)
 {
-	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
+	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber_ptr;
 	lua_pushinteger(L, f->fid);
 	return 1;
 }
@@ -418,7 +418,7 @@ box_lua_fiber_push_caller(struct lua_State *child_L)
 		lbox_create_weak_table(child_L, "callers");
 	}
 	lua_pushthread(child_L);
-	lua_pushinteger(child_L, fiber->fid);
+	lua_pushinteger(child_L, fiber_ptr->fid);
 	lua_settable(child_L, -3);
 	/* Pop the fiberlib metatable and callers table. */
 	lua_pop(child_L, 2);
@@ -466,7 +466,7 @@ lbox_fiber_gc(struct lua_State *L)
 	 * to resume an attached fiber.
 	 */
 	if (child_L) {
-		assert(f != fiber && child_L != L);
+		assert(f != fiber_ptr && child_L != L);
 		/*
 		 * Garbage collect the associated coro.
 		 * Do it first, since the cancelled fiber
@@ -488,14 +488,14 @@ lbox_fiber_gc(struct lua_State *L)
 static int
 lbox_fiber_detach(struct lua_State *L)
 {
-	if (box_lua_fiber_get_coro(L, fiber) == NULL)
+	if (box_lua_fiber_get_coro(L, fiber_ptr) == NULL)
 		luaL_error(L, "fiber.detach(): not attached");
 	struct fiber *caller = box_lua_fiber_get_caller(L);
 	/* Clear the caller, to avoid a reference leak. */
 	/* Request a detach. */
 	lua_pushinteger(L, DETACH);
 	/* A detached fiber has no associated session. */
-	fiber_set_sid(fiber, 0, 0);
+	fiber_set_sid(fiber_ptr, 0, 0);
 	fiber_yield_to(caller);
 	return 0;
 }
@@ -506,7 +506,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 	fiber_testcancel();
 	fiber_setcancellable(false);
 
-	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber);
+	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber_ptr);
 	/*
 	 * Reference the coroutine to make sure it's not garbage
 	 * collected when detached.
@@ -535,11 +535,11 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 
 		cleanup();
 	} catch (const FiberCancelException &e) {
-		if (box_lua_fiber_get_coro(L, fiber)) {
+		if (box_lua_fiber_get_coro(L, fiber_ptr)) {
 			struct fiber *caller = box_lua_fiber_get_caller(L);
 			fiber_wakeup(caller);
 		}
-		box_lua_fiber_clear_coro(tarantool_L, fiber);
+		box_lua_fiber_clear_coro(tarantool_L, fiber_ptr);
 		/*
 		 * Note: FiberCancelException leaves garbage on
 		 * coroutine stack. This is OK since it is only
@@ -578,7 +578,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 	 * If we're still attached, synchronously pass
 	 * them to the caller, and then terminate.
 	 */
-	if (box_lua_fiber_get_coro(L, fiber)) {
+	if (box_lua_fiber_get_coro(L, fiber_ptr)) {
 		struct fiber *caller = box_lua_fiber_get_caller(L);
 		lua_pushinteger(L, DONE);
 		fiber_yield_to(caller);
@@ -590,7 +590,7 @@ static bool
 lbox_fiber_checkstack(struct lua_State *L)
 {
 	fiber_checkstack();
-	struct fiber *f = fiber;
+	struct fiber *f = fiber_ptr;
 	const int MAX_STACK_DEPTH = 16;
 	int depth = 1;
 	while ((L = box_lua_fiber_get_coro(L, f)) != NULL) {
@@ -613,7 +613,7 @@ lbox_fiber_create(struct lua_State *L)
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Preserve the session in a child fiber. */
-	fiber_set_sid(f, fiber->sid, fiber->cookie);
+	fiber_set_sid(f, fiber_ptr->sid, fiber_ptr->cookie);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -767,12 +767,12 @@ lbox_fiber_yield(struct lua_State *L)
 	fiber_setcancellable(true);
 	struct lua_State *coro_L;
 	struct fiber *caller;
-	if ((coro_L = box_lua_fiber_get_coro(L, fiber)) &&
+	if ((coro_L = box_lua_fiber_get_coro(L, fiber_ptr)) &&
 	     (caller = box_lua_fiber_get_caller(coro_L))) {
 		lua_pushinteger(L, YIELD);
 		fiber_yield_to(caller);
 	} else {
-		fiber_wakeup(fiber);
+		fiber_wakeup(fiber_ptr);
 		fiber_yield();
 		fiber_testcancel();
 	}
@@ -789,7 +789,7 @@ lbox_fiber_yield(struct lua_State *L)
 static bool
 fiber_is_caller(struct lua_State *L, struct fiber *f)
 {
-	struct fiber *child = fiber;
+	struct fiber *child = fiber_ptr;
 	while ((L = box_lua_fiber_get_coro(L, child)) != NULL) {
 		struct fiber *caller = box_lua_fiber_get_caller(L);
 		if (caller == f)
@@ -820,13 +820,13 @@ lbox_fiber_status(struct lua_State *L)
 			luaL_checkudata(L, 1, fiberlib_name);
 		f = fiber_find(fid);
 	} else {
-		f = fiber;
+		f = fiber_ptr;
 	}
 	const char *status;
 	if (f == NULL || f->fid == 0) {
 		/* This fiber is dead. */
 		status = "dead";
-	} else if (f == fiber) {
+	} else if (f == fiber_ptr) {
 		/* The fiber is the current running fiber. */
 		status = "running";
 	} else if (fiber_is_caller(L, f)) {
@@ -848,7 +848,7 @@ lbox_fiber_status(struct lua_State *L)
 static int
 lbox_fiber_name(struct lua_State *L)
 {
-	struct fiber *f = fiber;
+	struct fiber *f = fiber_ptr;
 	int name_index = 1;
 	if (lua_gettop(L) >= 1 && lbox_isfiber(L, 1)) {
 		f = lbox_checkfiber(L, 1);
@@ -886,7 +886,7 @@ lbox_fiber_sleep(struct lua_State *L)
 static int
 lbox_fiber_self(struct lua_State *L)
 {
-	lbox_pushfiber(L, fiber);
+	lbox_pushfiber(L, fiber_ptr);
 	return 1;
 }
 
@@ -1081,13 +1081,13 @@ lbox_print(struct lua_State *L)
 		if (out->size < 2 || tbuf_str(out)[out->size-1] != '\n')
 			tbuf_printf(out, CRLF);
 	} else {
-		size_t allocated = palloc_allocated(fiber->gc_pool);
+		size_t allocated = palloc_allocated(fiber_ptr->gc_pool);
 		auto scoped_guard = make_scoped_guard([=] {
-			ptruncate(fiber->gc_pool, allocated);
+			ptruncate(fiber_ptr->gc_pool, allocated);
 		});
 
 		/* Add a message to the server log */
-		out = tbuf_new(fiber->gc_pool);
+		out = tbuf_new(fiber_ptr->gc_pool);
 		tarantool_lua_printstack(L, out);
 		say_info("%s", tbuf_str(out));
 	}
@@ -1317,11 +1317,11 @@ tarantool_lua_close(struct lua_State *L)
 static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
-	struct tbuf *buf = tbuf_new(fiber->gc_pool);
-	size_t allocated = palloc_allocated(fiber->gc_pool);
+	struct tbuf *buf = tbuf_new(fiber_ptr->gc_pool);
+	size_t allocated = palloc_allocated(fiber_ptr->gc_pool);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));
-	ptruncate(fiber->gc_pool, allocated);
+	ptruncate(fiber_ptr->gc_pool, allocated);
 	if (r) {
 		/* pop the error message */
 		lua_pop(L, 1);

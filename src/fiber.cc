@@ -47,7 +47,7 @@ extern "C" {
 enum { FIBER_CALL_STACK = 16 };
 
 static struct fiber sched;
-__thread struct fiber *fiber = &sched;
+__thread struct fiber *fiber_ptr = &sched;
 static __thread struct fiber *call_stack[FIBER_CALL_STACK];
 static __thread struct fiber **sp;
 static __thread uint32_t last_used_fid;
@@ -56,35 +56,35 @@ static __thread struct rlist fibers, zombie_fibers, ready_fibers;
 static __thread ev_async ready_async;
 
 static void
-update_last_stack_frame(struct fiber *fiber)
+update_last_stack_frame(struct fiber *f)
 {
 #ifdef ENABLE_BACKTRACE
-	fiber->last_stack_frame = __builtin_frame_address(0);
+	f->last_stack_frame = __builtin_frame_address(0);
 #else
-	(void)fiber;
+	(void)f;
 #endif /* ENABLE_BACKTRACE */
 }
 
 void
 fiber_call(struct fiber *callee, ...)
 {
-	struct fiber *caller = fiber;
+	struct fiber *caller = fiber_ptr;
 
 	assert(sp + 1 - call_stack < FIBER_CALL_STACK);
 	assert(caller);
 
-	fiber = callee;
+	fiber_ptr = callee;
 	*sp++ = caller;
 
 	update_last_stack_frame(caller);
 
 	callee->csw++;
 
-	fiber->flags &= ~FIBER_READY;
+	fiber_ptr->flags &= ~FIBER_READY;
 
-	va_start(fiber->f_data, callee);
+	va_start(fiber_ptr->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
-	va_end(fiber->f_data);
+	va_end(fiber_ptr->f_data);
 }
 
 void
@@ -136,7 +136,7 @@ fiber_cancel(struct fiber *f)
 
 	f->flags |= FIBER_CANCEL;
 
-	if (f == fiber) {
+	if (f == fiber_ptr) {
 		fiber_testcancel();
 		return;
 	}
@@ -154,7 +154,7 @@ fiber_cancel(struct fiber *f)
 		 * it has been cancelled, and die.
 		 */
 		assert(f->waiter == NULL);
-		f->waiter = fiber;
+		f->waiter = fiber_ptr;
 		fiber_yield();
 	}
 	/*
@@ -169,7 +169,7 @@ fiber_cancel(struct fiber *f)
 bool
 fiber_is_cancelled()
 {
-	return fiber->flags & FIBER_CANCEL;
+	return fiber_ptr->flags & FIBER_CANCEL;
 }
 
 /** Test if this fiber is in a cancellable state and was indeed
@@ -197,11 +197,11 @@ fiber_testcancel(void)
 bool
 fiber_setcancellable(bool enable)
 {
-	bool prev = fiber->flags & FIBER_CANCELLABLE;
+	bool prev = fiber_ptr->flags & FIBER_CANCELLABLE;
 	if (enable == true)
-		fiber->flags |= FIBER_CANCELLABLE;
+		fiber_ptr->flags |= FIBER_CANCELLABLE;
 	else
-		fiber->flags &= ~FIBER_CANCELLABLE;
+		fiber_ptr->flags &= ~FIBER_CANCELLABLE;
 	return prev;
 }
 
@@ -214,9 +214,9 @@ void
 fiber_yield(void)
 {
 	struct fiber *callee = *(--sp);
-	struct fiber *caller = fiber;
+	struct fiber *caller = fiber_ptr;
 
-	fiber = callee;
+	fiber_ptr = callee;
 	update_last_stack_frame(caller);
 
 	callee->csw++;
@@ -234,7 +234,7 @@ fiber_schedule_timeout(ev_timer *watcher, int revents)
 {
 	(void) revents;
 
-	assert(fiber == &sched);
+	assert(fiber_ptr == &sched);
 	struct fiber_watcher_data *state =
 			(struct fiber_watcher_data *) watcher->data;
 	state->timed_out = true;
@@ -250,7 +250,7 @@ fiber_yield_timeout(ev_tstamp delay)
 {
 	struct ev_timer timer;
 	ev_timer_init(&timer, fiber_schedule_timeout, delay, 0);
-	struct fiber_watcher_data state = { fiber, false };
+	struct fiber_watcher_data state = { fiber_ptr, false };
 	timer.data = &state;
 	ev_timer_start(&timer);
 	fiber_yield();
@@ -293,7 +293,7 @@ wait_for_child(pid_t pid)
 	ev_child cw;
 	ev_init(&cw, fiber_schedule_child);
 	ev_child_set(&cw, pid, 0);
-	cw.data = fiber;
+	cw.data = fiber_ptr;
 	ev_child_start(&cw);
 	fiber_yield();
 	ev_child_stop(&cw);
@@ -305,7 +305,7 @@ wait_for_child(pid_t pid)
 void
 fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 {
-	assert(fiber == &sched);
+	assert(fiber_ptr == &sched);
 	fiber_call((struct fiber *) watcher->data);
 }
 
@@ -335,28 +335,28 @@ fiber_find(uint32_t fid)
 }
 
 static void
-register_fid(struct fiber *fiber)
+register_fid(struct fiber *f)
 {
-	struct mh_i32ptr_node_t node = { fiber->fid, fiber };
+	struct mh_i32ptr_node_t node = { f->fid, f };
 	mh_i32ptr_put(fiber_registry, &node, NULL, NULL);
 }
 
 static void
-unregister_fid(struct fiber *fiber)
+unregister_fid(struct fiber *f)
 {
-	struct mh_i32ptr_node_t node = { fiber->fid, NULL };
+	struct mh_i32ptr_node_t node = { f->fid, NULL };
 	mh_i32ptr_remove(fiber_registry, &node, NULL);
 }
 
 void
 fiber_gc(void)
 {
-	if (palloc_allocated(fiber->gc_pool) < 128 * 1024) {
-		palloc_reset(fiber->gc_pool);
+	if (palloc_allocated(fiber_ptr->gc_pool) < 128 * 1024) {
+		palloc_reset(fiber_ptr->gc_pool);
 		return;
 	}
 
-	prelease(fiber->gc_pool);
+	prelease(fiber_ptr->gc_pool);
 }
 
 
@@ -366,30 +366,30 @@ fiber_gc(void)
 static void
 fiber_zombificate()
 {
-	if (fiber->waiter)
-		fiber_wakeup(fiber->waiter);
-	rlist_del(&fiber->state);
-	fiber->waiter = NULL;
-	fiber_set_name(fiber, "zombie");
-	fiber->f = NULL;
-	unregister_fid(fiber);
-	fiber->fid = 0;
-	fiber->flags = 0;
-	prelease(fiber->gc_pool);
-	rlist_move_entry(&zombie_fibers, fiber, link);
+	if (fiber_ptr->waiter)
+		fiber_wakeup(fiber_ptr->waiter);
+	rlist_del(&fiber_ptr->state);
+	fiber_ptr->waiter = NULL;
+	fiber_set_name(fiber_ptr, "zombie");
+	fiber_ptr->f = NULL;
+	unregister_fid(fiber_ptr);
+	fiber_ptr->fid = 0;
+	fiber_ptr->flags = 0;
+	prelease(fiber_ptr->gc_pool);
+	rlist_move_entry(&zombie_fibers, fiber_ptr, link);
 }
 
 static void
 fiber_loop(void *data __attribute__((unused)))
 {
 	for (;;) {
-		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
+		assert(fiber_ptr != NULL && fiber_ptr->f != NULL && fiber_ptr->fid != 0);
 		try {
-			fiber->f(fiber->f_data);
+			fiber_ptr->f(fiber_ptr->f_data);
 		} catch (const FiberCancelException& e) {
 			say_info("fiber `%s' has been cancelled",
-				 fiber_name(fiber));
-			say_info("fiber `%s': exiting", fiber_name(fiber));
+				 fiber_name(fiber_ptr));
+			say_info("fiber `%s': exiting", fiber_name(fiber_ptr));
 		} catch (const Exception& e) {
 			e.log();
 		} catch (...) {
@@ -398,8 +398,8 @@ fiber_loop(void *data __attribute__((unused)))
 			 * server bug.
 			 */
 			say_error("fiber `%s': unknown exception",
-				fiber_name(fiber));
-			panic("fiber `%s': exiting", fiber_name(fiber));
+				fiber_name(fiber_ptr));
+			panic("fiber `%s': exiting", fiber_name(fiber_ptr));
 		}
 		fiber_zombificate();
 		fiber_yield();	/* give control back to scheduler */
@@ -413,10 +413,10 @@ fiber_loop(void *data __attribute__((unused)))
 */
 
 void
-fiber_set_name(struct fiber *fiber, const char *name)
+fiber_set_name(struct fiber *f, const char *name)
 {
 	assert(name != NULL);
-	palloc_set_name(fiber->gc_pool, name);
+	palloc_set_name(f->gc_pool, name);
 }
 
 /**
@@ -431,39 +431,39 @@ fiber_set_name(struct fiber *fiber, const char *name)
  * completes.
  */
 struct fiber *
-fiber_new(const char *name, void (*f) (va_list))
+fiber_new(const char *name, void (*func) (va_list))
 {
-	struct fiber *fiber = NULL;
+	struct fiber *f = NULL;
 
 	if (!rlist_empty(&zombie_fibers)) {
-		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
-		rlist_move_entry(&fibers, fiber, link);
+		f = rlist_first_entry(&zombie_fibers, struct fiber, link);
+		rlist_move_entry(&fibers, f, link);
 	} else {
-		fiber = (struct fiber *) palloc(eter_pool, sizeof(*fiber));
+		f = (struct fiber *) palloc(eter_pool, sizeof(*fiber_ptr));
 
-		memset(fiber, 0, sizeof(*fiber));
-		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
+		memset(f, 0, sizeof(*fiber_ptr));
+		tarantool_coro_create(&f->coro, fiber_loop, NULL);
 
-		fiber->gc_pool = palloc_create_pool("");
+		f->gc_pool = palloc_create_pool("");
 
-		rlist_add_entry(&fibers, fiber, link);
-		rlist_create(&fiber->state);
+		rlist_add_entry(&fibers, f, link);
+		rlist_create(&f->state);
 	}
 
 
-	fiber->f = f;
+	f->f = func;
 
 	/* fids from 0 to 100 are reserved */
 	if (++last_used_fid < 100)
 		last_used_fid = 100;
-	fiber->fid = last_used_fid;
-	fiber->sid = 0;
-	fiber->flags = 0;
-	fiber->waiter = NULL;
-	fiber_set_name(fiber, name);
-	register_fid(fiber);
+	f->fid = last_used_fid;
+	f->sid = 0;
+	f->flags = 0;
+	f->waiter = NULL;
+	fiber_set_name(f, name);
+	register_fid(f);
 
-	return fiber;
+	return f;
 }
 
 /**
@@ -475,7 +475,7 @@ fiber_new(const char *name, void (*f) (va_list))
 void
 fiber_destroy(struct fiber *f)
 {
-	if (f == fiber) /* do not destroy running fiber */
+	if (f == fiber_ptr) /* do not destroy running fiber */
 		return;
 	if (strcmp(fiber_name(f), "sched") == 0)
 		return;
@@ -497,32 +497,32 @@ fiber_destroy_all()
 
 
 static void
-fiber_info_print(struct tbuf *out, struct fiber *fiber)
+fiber_info_print(struct tbuf *out, struct fiber *f)
 {
-	void *stack_top = (char *) fiber->coro.stack + fiber->coro.stack_size;
+	void *stack_top = (char *) f->coro.stack + f->coro.stack_size;
 
-	tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
-	tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
-	tbuf_printf(out, "    name: %s" CRLF, fiber_name(fiber));
+	tbuf_printf(out, "  - fid: %4i" CRLF, f->fid);
+	tbuf_printf(out, "    csw: %i" CRLF, f->csw);
+	tbuf_printf(out, "    name: %s" CRLF, fiber_name(f));
 	tbuf_printf(out, "    stack: %p" CRLF, stack_top);
 #ifdef ENABLE_BACKTRACE
 	tbuf_printf(out, "    backtrace:" CRLF "%s",
-		    backtrace(fiber->last_stack_frame,
-			      fiber->coro.stack, fiber->coro.stack_size));
+		    backtrace(f->last_stack_frame,
+			      f->coro.stack, f->coro.stack_size));
 #endif /* ENABLE_BACKTRACE */
 }
 
 void
 fiber_info(struct tbuf *out)
 {
-	struct fiber *fiber;
+	struct fiber *f;
 
 	tbuf_printf(out, "fibers:" CRLF);
 
-	rlist_foreach_entry(fiber, &fibers, link)
-		fiber_info_print(out, fiber);
-	rlist_foreach_entry(fiber, &zombie_fibers, link)
-		fiber_info_print(out, fiber);
+	rlist_foreach_entry(f, &fibers, link)
+		fiber_info_print(out, f);
+	rlist_foreach_entry(f, &zombie_fibers, link)
+		fiber_info_print(out, f);
 }
 
 void
@@ -539,7 +539,7 @@ fiber_init(void)
 	fiber_set_name(&sched, "sched");
 
 	sp = call_stack;
-	fiber = &sched;
+	fiber_ptr = &sched;
 	last_used_fid = 100;
 
 	iobuf_init_readahead(cfg.readahead);

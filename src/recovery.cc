@@ -110,7 +110,7 @@ void
 wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 {
 	assert(wait_lsn->waiter == NULL);
-	wait_lsn->waiter = fiber;
+	wait_lsn->waiter = fiber_ptr;
 	wait_lsn->lsn = lsn;
 }
 
@@ -512,7 +512,7 @@ recover_current_wal:
 		result = -1;
 	}
 
-	prelease(fiber->gc_pool);
+	prelease(fiber_ptr->gc_pool);
 	return result;
 }
 
@@ -536,7 +536,7 @@ recover_existing_wals(struct recovery_state *r)
 		panic("recover failed");
 	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
 out:
-	prelease(fiber->gc_pool);
+	prelease(fiber_ptr->gc_pool);
 }
 
 void
@@ -1131,10 +1131,10 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req = (struct wal_write_request *)
-		palloc(fiber->gc_pool, sizeof(struct wal_write_request) +
+		palloc(fiber_ptr->gc_pool, sizeof(struct wal_write_request) +
 		       sizeof(op) + row_len);
 
-	req->fiber = fiber;
+	req->fiber = fiber_ptr;
 	req->res = -1;
 	row_v11_fill(&req->row, lsn, XLOG, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
@@ -1167,7 +1167,7 @@ snapshot_write_row(struct log_io *l,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct row_v11 *row = (struct row_v11 *) palloc(fiber->gc_pool,
+	struct row_v11 *row = (struct row_v11 *) palloc(fiber_ptr->gc_pool,
 				     sizeof(struct row_v11) +
 				     data_len + metadata_len);
 
@@ -1186,7 +1186,7 @@ snapshot_write_row(struct log_io *l,
 	bytes += written;
 
 
-	prelease_after(fiber->gc_pool, 128 * 1024);
+	prelease_after(fiber_ptr->gc_pool, 128 * 1024);
 
 	if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {

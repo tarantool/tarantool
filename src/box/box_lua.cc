@@ -339,12 +339,12 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
-	PallocGuard palloc_guard(fiber->gc_pool);
+	PallocGuard palloc_guard(fiber_ptr->gc_pool);
 
 	/*
 	 * Prepare UPDATE expression
 	 */
-	struct tbuf *b = tbuf_new(fiber->gc_pool);
+	struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 	tbuf_append(b, (char *) &op_cnt, sizeof(op_cnt));
 	if (field_count > 0) {
 		tbuf_ensure(b, 2 * sizeof(uint32_t) + 1 + 5);
@@ -384,7 +384,7 @@ lbox_tuple_transform(struct lua_State *L)
 	/* Execute tuple_update */
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       palloc_region_alloc,
-					       fiber->gc_pool,
+					       fiber_ptr->gc_pool,
 					       tuple, tbuf_str(b), tbuf_end(b));
 	lbox_pushtuple(L, new_tuple);
 	return 1;
@@ -527,11 +527,11 @@ lbox_tuple_tostring(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
-	size_t allocated = palloc_allocated(fiber->gc_pool);
-	struct tbuf *tbuf = tbuf_new(fiber->gc_pool);
+	size_t allocated = palloc_allocated(fiber_ptr->gc_pool);
+	struct tbuf *tbuf = tbuf_new(fiber_ptr->gc_pool);
 	tuple_print(tbuf, tuple);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
-	ptruncate(fiber->gc_pool, allocated);
+	ptruncate(fiber_ptr->gc_pool, allocated);
 	return 1;
 }
 
@@ -802,7 +802,7 @@ lbox_create_iterator(struct lua_State *L)
 	int argc = lua_gettop(L);
 
 	/* Create a new iterator. */
-	PallocGuard palloc_guard(fiber->gc_pool);
+	PallocGuard palloc_guard(fiber_ptr->gc_pool);
 	enum iterator_type type = ITER_ALL;
 	uint32_t key_part_count = 0;
 	const char *key = NULL;
@@ -822,7 +822,7 @@ lbox_create_iterator(struct lua_State *L)
 			/* Nothing */
 		} else if (argc == 3 && lua_type(L, 3) == LUA_TUSERDATA) {
 			/* Tuple. */
-			struct tbuf *b = tbuf_new(fiber->gc_pool);
+			struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 			struct tuple *tuple = lua_checktuple(L, 2);
 			key_part_count = tuple->field_count;
 			tuple_to_tbuf(tuple, b);
@@ -830,7 +830,7 @@ lbox_create_iterator(struct lua_State *L)
 			key_size = b->size;
 		} else {
 			/* Single or multi- part key. */
-			struct tbuf *b = tbuf_new(fiber->gc_pool);
+			struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 			key_part_count = argc - 2;
 			struct lua_field field;
 			for (uint32_t i = 0; i < key_part_count; i++) {
@@ -937,19 +937,19 @@ lbox_index_count(struct lua_State *L)
 		luaL_error(L, "index.count(): one or more arguments expected");
 
 	/* preparing single or multi-part key */
-	PallocGuard palloc_guard(fiber->gc_pool);
+	PallocGuard palloc_guard(fiber_ptr->gc_pool);
 	uint32_t key_part_count = 0;
 	const char *key = NULL;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
 		struct tuple *tuple = lua_checktuple(L, 2);
-		struct tbuf *b = tbuf_new(fiber->gc_pool);
+		struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 		tuple_to_tbuf(tuple, b);
 		key_part_count = tuple->field_count;
 		key = b->data;
 	} else {
 		/* Single or multi- part key. */
-		struct tbuf *b = tbuf_new(fiber->gc_pool);
+		struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 		key_part_count = argc;
 		struct lua_field field;
 		for (uint32_t i = 0; i < key_part_count; i++) {
@@ -1045,7 +1045,7 @@ static struct port *
 port_lua_create(struct lua_State *L)
 {
 	struct port_lua *port = (struct port_lua *)
-			palloc(fiber->gc_pool, sizeof(struct port_lua));
+			palloc(fiber_ptr->gc_pool, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
 	return (struct port *) port;
@@ -1219,18 +1219,18 @@ lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
+	size_t allocated_size = palloc_allocated(fiber_ptr->gc_pool);
 	struct port *port_lua = port_lua_create(L);
 	try {
 		box_process(port_lua, op, req, sz);
 
 		/*
 		 * This only works as long as port_lua doesn't
-		 * use fiber->cleanup and fiber->gc_pool.
+		 * use fiber->cleanup and fiber_ptr->gc_pool.
 		 */
-		ptruncate(fiber->gc_pool, allocated_size);
+		ptruncate(fiber_ptr->gc_pool, allocated_size);
 	} catch (const Exception& e) {
-		ptruncate(fiber->gc_pool, allocated_size);
+		ptruncate(fiber_ptr->gc_pool, allocated_size);
 		throw;
 	}
 	return lua_gettop(L) - top;
@@ -1571,8 +1571,8 @@ lbox_pack(struct lua_State *L)
 	size_t size;
 	const char *str;
 
-	PallocGuard palloc_guard(fiber->gc_pool);
-	struct tbuf *b = tbuf_new(fiber->gc_pool);
+	PallocGuard palloc_guard(fiber_ptr->gc_pool);
+	struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 
 	struct lua_field field;
 	double dbl;

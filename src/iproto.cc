@@ -175,7 +175,7 @@ static inline void
 iproto_cache_fiber(struct iproto_queue *i_queue)
 {
 	fiber_gc();
-	rlist_add_entry(&i_queue->fiber_cache, fiber, state);
+	rlist_add_entry(&i_queue->fiber_cache, fiber_ptr, state);
 	fiber_yield();
 }
 
@@ -230,7 +230,7 @@ iproto_queue_handler(va_list ap)
 restart:
 	while (iproto_dequeue_request(i_queue, &request)) {
 
-		fiber_set_sid(fiber, iproto_session_id(request.session), iproto_session_cookie(request.session));
+		fiber_set_sid(fiber_ptr, iproto_session_id(request.session), iproto_session_cookie(request.session));
 		request.process(&request);
 	}
 	iproto_cache_fiber(&request_queue);
@@ -734,7 +734,7 @@ iproto_process_connect(struct iproto_request *request)
 static void
 iproto_process_disconnect(struct iproto_request *request)
 {
-	fiber_set_sid(fiber, request->session->sid, request->session->cookie);
+	fiber_set_sid(fiber_ptr, request->session->sid, request->session->cookie);
 	/* Runs the trigger, which may yield. */
 	iproto_session_destroy(request->session);
 }
