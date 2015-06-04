@@ -53,6 +53,8 @@ add_executable(light.test light.cc)
 target_link_libraries(light.test small)
 add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
+    ${CMAKE_SOURCE_DIR}/src/box/box_stat.c
+    ${CMAKE_SOURCE_DIR}/src/stat.cc
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc)
 target_link_libraries(vclock.test core small)

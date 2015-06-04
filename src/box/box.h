@@ -112,26 +112,6 @@ void box_set_readahead(int readahead);
 
 extern struct recovery_state *recovery;
 
-/**
- * Statistics stuff
- */
-enum box_call_type {
-	/* Synonyms for iproto commands */
-	BOX_OK = IPROTO_OK,
-	BOX_SELECT = IPROTO_SELECT,
-	BOX_INSERT = IPROTO_INSERT,
-	BOX_REPLACE = IPROTO_REPLACE,
-	BOX_UPDATE = IPROTO_UPDATE,
-	BOX_DELETE = IPROTO_DELETE,
-	BOX_CALL = IPROTO_CALL,
-	BOX_AUTH = IPROTO_AUTH,
-	BOX_EVAL = IPROTO_EVAL,
-	/* Non-iproto stuff */
-	BOX_EXCEPTION = BOX_GET + 1,
-	BOX_STAT_MAX = BOX_EXCEPTION + 1
-};
-extern const char*box_type_strs[];
-
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

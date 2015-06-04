@@ -35,6 +35,7 @@
 #include "replication.h"
 #include "replica.h"
 #include <stat.h>
+#include "box_stat.h"
 #include "main.h"
 #include "tuple.h"
 #include "lua/call.h"
@@ -413,7 +414,7 @@ engine_init()
 	engine_register(sophia);
 }
 
-const char*box_type_strs = {iproto_type_strs[0], iproto_type_strs[1],
+const char*box_type_strs[] = {iproto_type_strs[0], iproto_type_strs[1],
 	iproto_type_strs[2], iproto_type_strs[3], iproto_type_strs[4],
 	iproto_type_strs[5], iproto_type_strs[6], iproto_type_strs[7],
 	iproto_type_strs[8], "EXCEPTION"};

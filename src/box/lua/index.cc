@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stat.h>
+#include "box/box_stat.h"
 #include "box/lua/index.h"
 #include "lua/utils.h"
 #include "box/index.h"

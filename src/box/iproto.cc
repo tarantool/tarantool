@@ -48,6 +48,7 @@
 #include "user_def.h"
 #include "authentication.h"
 #include "stat.h"
+#include "box_stat.h"
 #include "lua/call.h"
 
 /* {{{ iproto_request - declaration */

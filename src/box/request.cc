@@ -40,9 +40,8 @@
 #include <scoped_guard.h>
 #include "user_def.h"
 #include "iproto_constants.h"
-#include "stat.h"
-
-int stat_base;
+#include <stat.h>
+#include "box_stat.h"
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)

@@ -26,58 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "error.h"
-#include <stdio.h>
-#include <typeinfo>
-#include "stat.h"
-#include "box_stat.h"
 
-ClientError::ClientError(const char *file, unsigned line,
-			 uint32_t errcode, ...)
-	: Exception(file, line)
-{
-	m_errcode = errcode;
-	va_list ap;
-	va_start(ap, errcode);
-	vsnprintf(m_errmsg, sizeof(m_errmsg),
-		  tnt_errcode_desc(m_errcode), ap);
-	va_end(ap);
-	if (stat_base != INT_MIN)
-		stat_collect(stat_base, BOX_EXCEPTION, 1);
-}
+#include <limits.h>
 
-ClientError::ClientError(const char *file, unsigned line, const char *msg,
-			 uint32_t errcode)
-	: Exception(file, line)
-{
-	m_errcode = errcode;
-	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
-	m_errmsg[sizeof(m_errmsg) - 1] = 0;
-	if (stat_base != INT_MIN)
-		stat_collect(stat_base, BOX_EXCEPTION, 1);
-}
-
-void
-ClientError::log() const
-{
-	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", tnt_errcode_str(m_errcode));
-}
-
-
-uint32_t
-ClientError::get_errcode(const Exception *e)
-{
-	const ClientError *error = dynamic_cast<const ClientError *>(e);
-	if (error)
-		return error->errcode();
-	if (typeid(*e) == typeid(OutOfMemory))
-		return ER_MEMORY_ISSUE;
-	return ER_PROC_LUA;
-}
-
-ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
-	: LoggedError(file, line, ER_INJECTION, msg)
-{
-	/* nothing */
-}
-
+int stat_base = INT_MIN;

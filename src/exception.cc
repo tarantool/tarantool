@@ -75,14 +75,12 @@ Exception::operator delete(void * /* ptr */)
 Exception::Exception(const char *file, unsigned line)
 	: m_file(file), m_line(line)
 {
-	stat_collect(stat_base, BOX_EXCEPTION, 1);
 	m_errmsg[0] = 0;
 }
 
 Exception::Exception(const Exception& e)
 	: Object(), m_file(e.m_file), m_line(e.m_line)
 {
-	stat_collect(stat_base, BOX_EXCEPTION, 1);
 	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
 }
 
