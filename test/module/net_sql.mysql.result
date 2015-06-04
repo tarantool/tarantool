@@ -63,6 +63,14 @@ lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc'
 ---
  - [[{"one":1},{"one":2},{"two":"abc"}],3]
 ...
+lua dump({c:execute('SELECT ? AS val', '1')})
+---
+ - [[{"val":"1"}],1]
+...
+lua dump({c:execute('SELECT ? AS val', 1)})
+---
+ - [[{"val":1}],1]
+...
 lua c:quote('test "abc" test')
 ---
  - test \"abc\" test

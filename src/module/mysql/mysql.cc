@@ -286,22 +286,19 @@ lua_mysql_execute(struct lua_State *L)
 				"Can't find value for %d placeholder", idx);
 		}
 
-		if (lua_isboolean(L, idx)) {
-			int v = lua_toboolean(L, idx++);
-			luaL_addstring(&b, v ? "TRUE" : "FALSE");
-			continue;
-		}
-
-		if (lua_isnil(L, idx)) {
-			idx++;
-			luaL_addstring(&b, "NULL");
-			continue;
-		}
-
-		if (lua_isnumber(L, idx)) {
-			const char *s = lua_tostring(L, idx++);
-			luaL_addstring(&b, s);
-			continue;
+		int v;
+		switch(lua_type(L, idx)) {
+			case LUA_TBOOLEAN:
+				v = lua_toboolean(L, idx++);
+				luaL_addstring(&b, v ? "TRUE" : "FALSE");
+				continue;
+			case LUA_TNIL:
+				idx++;
+				luaL_addstring(&b, "NULL");
+				continue;
+			case LUA_TNUMBER:
+				luaL_addstring(&b, lua_tostring(L, idx++));
+				continue;
 		}
 
 		size_t l;
