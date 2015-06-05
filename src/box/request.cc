@@ -116,7 +116,7 @@ execute_update(struct request *request, struct txn *txn)
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
 					       palloc_region_alloc,
-					       fiber->gc_pool,
+					       fiber_ptr->gc_pool,
 					       old_tuple, *reqpos, reqend);
 	try {
 		space_validate_tuple(space, new_tuple);
@@ -234,7 +234,7 @@ request_create(uint32_t type, const char *data, uint32_t len)
 	}
 	request_check_type(type);
 	struct request *request = (struct request *)
-			palloc(fiber->gc_pool, sizeof(struct request));
+			palloc(fiber_ptr->gc_pool, sizeof(struct request));
 	request->type = type;
 	request->data = data;
 	request->len = len;

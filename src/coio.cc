@@ -53,7 +53,7 @@ void
 coio_init(struct ev_io *coio)
 {
 	/* Prepare for ev events. */
-	coio->data = fiber;
+	coio->data = fiber_ptr;
 	ev_init(coio, fiber_schedule_coio);
 	coio->fd = -1;
 }
@@ -61,7 +61,7 @@ coio_init(struct ev_io *coio)
 static inline void
 coio_fiber_yield(struct ev_io *coio)
 {
-	coio->data = fiber;
+	coio->data = fiber_ptr;
 	fiber_yield();
 #ifdef DEBUG
 	coio->data = NULL;
@@ -71,7 +71,7 @@ coio_fiber_yield(struct ev_io *coio)
 static inline bool
 coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
 {
-	coio->data = fiber;
+	coio->data = fiber_ptr;
 	bool is_timedout = fiber_yield_timeout(delay);
 #ifdef DEBUG
 	coio->data = NULL;

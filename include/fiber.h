@@ -111,12 +111,12 @@ struct fiber {
 	uint64_t cookie;
 };
 
-extern __thread struct fiber *fiber;
+extern __thread struct fiber *fiber_ptr;
 
 void fiber_init(void);
 void fiber_free(void);
 typedef void(*fiber_func)(va_list);
-struct fiber *fiber_new(const char *name, fiber_func f);
+struct fiber *fiber_new(const char *name, fiber_func func);
 void fiber_set_name(struct fiber *fiber, const char *name);
 int wait_for_child(pid_t pid);
 

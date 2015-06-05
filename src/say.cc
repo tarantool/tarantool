@@ -192,7 +192,7 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 		      ev_now() - now + tm.tm_sec);
 
 	p += snprintf(buf + p, len - p, " [%i] %i/%s", getpid(),
-		      fiber->fid, fiber_name(fiber));
+		      fiber_ptr->fid, fiber_name(fiber_ptr));
 
 	if (level == S_WARN || level == S_ERROR)
 		p += snprintf(buf + p, len - p, " %s:%i", filename, line);

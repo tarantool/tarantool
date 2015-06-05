@@ -271,13 +271,13 @@ print_backtrace()
 	void *stack_top;
 	size_t stack_size;
 
-	if (fiber == NULL || fiber_name(fiber) == NULL ||
-	    strcmp(fiber_name(fiber), "sched") == 0) {
+	if (fiber_ptr == NULL || fiber_name(fiber_ptr) == NULL ||
+	    strcmp(fiber_name(fiber_ptr), "sched") == 0) {
 		stack_top = frame; /* we don't know where the system stack top is */
 		stack_size = (const char *) __libc_stack_end - (const char *) frame;
 	} else {
-		stack_top = fiber->coro.stack;
-		stack_size = fiber->coro.stack_size;
+		stack_top = fiber_ptr->coro.stack;
+		stack_size = fiber_ptr->coro.stack_size;
 	}
 
 	fdprintf(STDERR_FILENO, "%s", backtrace(frame, stack_top, stack_size));

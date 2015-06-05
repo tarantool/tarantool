@@ -38,7 +38,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	int cs;
 	char *p, *pe;
 	char *fstart;
-	struct tbuf *keys = tbuf_new(fiber->gc_pool);
+	struct tbuf *keys = tbuf_new(fiber_ptr->gc_pool);
 	const char *key;
 	bool append, show_cas;
 	int incr_sign;
@@ -105,7 +105,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			} else {
 				field = tuple_field(tuple, 3, &field_len);
-				b = tbuf_new(fiber->gc_pool);
+				b = tbuf_new(fiber_ptr->gc_pool);
 				if (append) {
 					tbuf_append(b, field, field_len);
 					tbuf_append(b, data, bytes);
@@ -151,7 +151,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_new(fiber->gc_pool);
+					b = tbuf_new(fiber_ptr->gc_pool);
 					tbuf_printf(b, "%" PRIu64, value);
 					data = b->data;
 					bytes = b->size;

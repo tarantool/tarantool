@@ -62,13 +62,13 @@ session_create(int fd, uint64_t cookie)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_sid(fiber, sid, cookie);
+	fiber_set_sid(fiber_ptr, sid, cookie);
 	if (session_on_connect.trigger) {
 		void *param = session_on_connect.param;
 		try {
 			session_on_connect.trigger(param);
 		} catch (const Exception& e) {
-			fiber_set_sid(fiber, 0, 0);
+			fiber_set_sid(fiber_ptr, 0, 0);
 			mh_i32ptr_remove(session_registry, &node, NULL);
 			throw;
 		}

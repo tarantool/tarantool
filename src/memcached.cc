@@ -127,7 +127,7 @@ memcached_store(const char *key, uint32_t exptime, uint32_t flags, uint32_t byte
 	static uint64_t cas = 42;
 	struct meta m;
 
-	struct tbuf *req = tbuf_new(fiber->gc_pool);
+	struct tbuf *req = tbuf_new(fiber_ptr->gc_pool);
 
 	tbuf_append(req, &cfg.memcached_space, sizeof(uint32_t));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
@@ -161,7 +161,7 @@ memcached_delete(const char *key)
 {
 	uint32_t key_len = 1;
 	uint32_t box_flags = 0;
-	struct tbuf *req = tbuf_new(fiber->gc_pool);
+	struct tbuf *req = tbuf_new(fiber_ptr->gc_pool);
 
 	tbuf_append(req, &cfg.memcached_space, sizeof(uint32_t));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
@@ -233,7 +233,7 @@ salloc_stat_memcached_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 static void
 memcached_print_stats(struct obuf *out)
 {
-	struct tbuf *buf = tbuf_new(fiber->gc_pool);
+	struct tbuf *buf = tbuf_new(fiber_ptr->gc_pool);
 
 	struct salloc_stat_memcached_cb_ctx memstats;
 	memstats.bytes_used = memstats.items = 0;
@@ -315,7 +315,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
 		if (show_cas) {
-			struct tbuf *b = tbuf_new(fiber->gc_pool);
+			struct tbuf *b = tbuf_new(fiber_ptr->gc_pool);
 			tbuf_printf(b, "VALUE %.*s %" PRIu32 " %" PRIu32 " %" PRIu64 "\r\n", key_len, (char*) key, m->flags, value_len, m->cas);
 			obuf_dup(out, b->data, b->size);
 			stats.bytes_written += b->size;
@@ -562,7 +562,7 @@ restart:
 		if (tuple == NULL)
 			memcached_index->initIterator(memcached_it, ITER_ALL, NULL, 0);
 
-		struct tbuf *keys_to_delete = tbuf_new(fiber->gc_pool);
+		struct tbuf *keys_to_delete = tbuf_new(fiber_ptr->gc_pool);
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++) {
 

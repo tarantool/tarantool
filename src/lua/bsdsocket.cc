@@ -422,7 +422,7 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 
 	struct ev_io io;
 	ev_io_init(&io, bsdsocket_io, fh, events);
-	struct bsdsocket_io_wdata wdata = { fiber, 0 };
+	struct bsdsocket_io_wdata wdata = { fiber_ptr, 0 };
 	io.data = &wdata;
 	ev_set_priority(&io, EV_MAXPRI);
 	ev_io_start(&io);
