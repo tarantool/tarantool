@@ -1,12 +1,15 @@
-os.execute("rm -f *.snap")
+name = string.match(arg[0], "([^,]+)%.lua")
+---
+...
+os.execute("rm -f " .. name .."/*.snap")
 ---
 - 0
 ...
-os.execute("rm -f *.xlog")
+os.execute("rm -f " .. name .."/*.xlog")
 ---
 - 0
 ...
-os.execute("touch mt")
+os.execute("touch " .. name .."/mt")
 ---
 - 0
 ...
@@ -90,19 +93,22 @@ sophia_dir()[1] -- 1
 ---
 - 1
 ...
-os.execute("rm -f *.snap")
+name = string.match(arg[0], "([^,]+)%.lua")
+---
+...
+os.execute("rm -f " .. name .."/*.snap")
 ---
 - 0
 ...
-os.execute("rm -f *.xlog")
+os.execute("rm -f " .. name .."/*.xlog")
 ---
 - 0
 ...
-os.execute("rm -f mt")
+os.execute("rm -f " .. name .."/mt")
 ---
 - 0
 ...
-os.execute("rm -f lock")
+os.execute("rm -f " .. name .."/lock")
 ---
 - 0
 ...

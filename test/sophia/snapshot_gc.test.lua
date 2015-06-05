@@ -1,7 +1,7 @@
-
-os.execute("rm -f *.snap")
-os.execute("rm -f *.xlog")
-os.execute("touch mt")
+name = string.match(arg[0], "([^,]+)%.lua")
+os.execute("rm -f " .. name .."/*.snap")
+os.execute("rm -f " .. name .."/*.xlog")
+os.execute("touch " .. name .."/mt")
 
 --# stop server default
 --# start server default
@@ -34,10 +34,11 @@ space:drop()
 sophia_schedule()
 sophia_dir()[1] -- 1
 
-os.execute("rm -f *.snap")
-os.execute("rm -f *.xlog")
-os.execute("rm -f mt")
-os.execute("rm -f lock")
+name = string.match(arg[0], "([^,]+)%.lua")
+os.execute("rm -f " .. name .."/*.snap")
+os.execute("rm -f " .. name .."/*.xlog")
+os.execute("rm -f " .. name .."/mt")
+os.execute("rm -f " .. name .."/lock")
 
 --# stop server default
 --# start server default
