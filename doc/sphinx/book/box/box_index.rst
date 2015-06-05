@@ -519,9 +519,9 @@ API is a direct binding to corresponding methods of index objects of type
         :return: number of bytes
         :rtype: number
 
-===========================================================
+=================================================================
                          Example showing use of the box functions
-===========================================================
+=================================================================
 
 This example will work with the sandbox configuration described in the preface.
 That is, there is a space named tester with a numeric primary key. The example
@@ -592,9 +592,9 @@ Lua functions `os.date()`_ and `string.sub()`_.
 
 .. _RTREE:
 
-===========================================================
+=============================================================================
              Package `box.index` with index type = RTREE for spatial searches
-===========================================================
+=============================================================================
 
 The :mod:`box.index` package may be used for spatial searches if the index type
 is RTREE. There are operations for searching ``rectangles``. Rectangles are
