@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -35,8 +36,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-typedef unsigned int rsize_t;
-typedef int rssize_t;
+typedef uint32_t rope_size_t;
+typedef int32_t rope_ssize_t;
 typedef void *(*rope_split_func)(void *, void *, size_t, size_t);
 typedef void *(*rope_alloc_func)(void *, size_t);
 typedef void (*rope_free_func)(void *, void *);
@@ -48,9 +49,9 @@ struct rope_node {
 	/** Node height, see rope_node_height(), used for AVL balance. */
 	int height;
 	/** Subtree size. */
-	rsize_t tree_size;
+	rope_size_t tree_size;
 	/* Substring size. */
-	rsize_t leaf_size;
+	rope_size_t leaf_size;
 	/* Substring. */
 	void *data;
 	/* Left (0) and right (1) links */
@@ -81,13 +82,13 @@ struct rope_iter {
 	struct rope_node *path[ROPE_HEIGHT_MAX];
 };
 
-static inline rsize_t
+static inline rope_size_t
 rope_node_size(struct rope_node *node)
 {
 	return node ? node->tree_size : 0;
 }
 
-static inline rsize_t
+static inline rope_size_t
 rope_leaf_size(struct rope_node *node)
 {
 	return node->leaf_size;
@@ -99,7 +100,7 @@ rope_leaf_data(struct rope_node *node)
 	return node->data;
 }
 
-static inline rsize_t
+static inline rope_size_t
 rope_size(struct rope *rope)
 {
 	return rope_node_size(rope->root);
@@ -171,8 +172,8 @@ rope_delete(struct rope *rope)
  *             tree node
  */
 int
-rope_insert(struct rope *rope, rsize_t offset, void *data,
-	    rsize_t size);
+rope_insert(struct rope *rope, rope_size_t offset, void *data,
+	    rope_size_t size);
 
 /** Append a substring at rope tail. */
 static inline int
@@ -189,10 +190,10 @@ rope_append(struct rope *rope, void *data, size_t size)
  *              tree node
  */
 struct rope_node *
-rope_extract_node(struct rope *rope, rsize_t offset);
+rope_extract_node(struct rope *rope, rope_size_t offset);
 
 static inline void *
-rope_extract(struct rope *rope, rsize_t offset)
+rope_extract(struct rope *rope, rope_size_t offset)
 {
 	return rope_leaf_data(rope_extract_node(rope, offset));
 }
@@ -204,7 +205,7 @@ rope_extract(struct rope *rope, rsize_t offset)
  * @pre offset < rope_size(rope)
  */
 int
-rope_erase(struct rope *rope, rsize_t offset);
+rope_erase(struct rope *rope, rope_size_t offset);
 
 /** Initialize an iterator. */
 static inline void

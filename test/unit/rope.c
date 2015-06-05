@@ -3,7 +3,7 @@
 #include "rope_common.h"
 
 static void
-test_rope_extract(struct rope *rope, rsize_t pos)
+test_rope_extract(struct rope *rope, rope_size_t pos)
 {
 	printf("extract pos = %zu: ", (size_t) pos);
 	struct rope_node *node = rope_extract_node(rope, pos);
@@ -13,7 +13,7 @@ test_rope_extract(struct rope *rope, rsize_t pos)
 }
 
 static inline void
-test_rope_cut(struct rope *rope, rsize_t offset, rsize_t size)
+test_rope_cut(struct rope *rope, rope_size_t offset, rope_size_t size)
 {
 	printf("erase offset = %zu, size = %zu \n", (size_t) offset, (size_t) size);
 	while (size-- > 0)
