@@ -1,0 +1,15 @@
+-- Options for test-run tarantoolctl
+
+local pwd = os.getenv('PWD')
+default_cfg = {
+    pid_file   = pwd .. "/var",
+    wal_dir    = pwd .. "/var",
+    snap_dir   = pwd .. "/var",
+    sophia_dir = pwd .. "/var",
+    logger     = pwd .. "/var",
+    background = false,
+}
+
+instance_dir = pwd .. "/var"
+
+-- vim: set ft=lua :
