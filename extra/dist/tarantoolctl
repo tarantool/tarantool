@@ -178,10 +178,13 @@ end
 
 local function check_user_level()
     -- local dir configuration
-    local local_dir = '.tarantoolctl'
-    if fio.stat(local_dir) then
-        usermode = true
-        return local_dir
+    local pwd = os.getenv('PWD')
+    if pwd ~= nil then
+        local local_dir = pwd .. '/.tarantoolctl'
+        if fio.stat(local_dir) then
+            usermode = true
+            return local_dir
+        end
     end
 
     -- home dir configuration
