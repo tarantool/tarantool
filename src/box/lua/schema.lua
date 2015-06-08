@@ -683,13 +683,10 @@ function box.schema.space.bless(space)
         end
     end
 
-    index_mt.select = function(index, key, opts)
+    local function check_select_opts(opts, key_is_nil)
         local offset = 0
         local limit = 4294967295
-
-        local key, key_end = msgpackffi.encode_tuple(key)
-        local iterator = check_iterator_type(opts, key + 1 >= key_end)
-
+        local iterator = check_iterator_type(opts, key_is_nil)
         if opts ~= nil then
             if opts.offset ~= nil then
                 offset = opts.offset
@@ -698,6 +695,12 @@ function box.schema.space.bless(space)
                 limit = opts.limit
             end
         end
+        return iterator, offset, limit
+    end
+
+    index_mt.select_ffi = function(index, key, opts)
+        local key, key_end = msgpackffi.encode_tuple(key)
+        local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
         if builtin.boxffi_select(port, index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
@@ -711,6 +714,14 @@ function box.schema.space.bless(space)
         end
         return ret
     end
+
+    index_mt.select_luac = function(index, key, opts)
+        local key = keify(key)
+        local iterator, offset, limit = check_select_opts(opts, #key == 0)
+        return internal.select(index.space_id, index.id, iterator,
+            offset, limit, key)
+    end
+
     index_mt.update = function(index, key, ops)
         return internal.update(index.space_id, index.id, keify(key), ops);
     end
@@ -728,6 +739,16 @@ function box.schema.space.bless(space)
             box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
         end
         return box.schema.index.alter(index.space_id, index.id, options)
+    end
+
+    -- true if reading operations may yield
+    local read_yields = space.engine == 'sophia'
+    if read_yields then
+        -- use Lua/C implmenetation
+        index_mt.select = index_mt.select_luac
+    else
+        -- use FFI implementation
+        index_mt.select = index_mt.select_ffi
     end
     --
     local space_mt = {}

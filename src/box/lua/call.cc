@@ -83,6 +83,7 @@ struct port_lua
 {
 	struct port_vtab *vtab;
 	struct lua_State *L;
+	size_t size; /* for port_lua_add_tuple */
 };
 
 static inline struct port_lua *
@@ -122,30 +123,26 @@ port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
 	try {
-		int idx = luaL_getn(L, -1);	/* TODO: can be optimized */
 		lbox_pushtuple(L, tuple);
-		lua_rawseti(L, -2, idx + 1);
-
+		lua_rawseti(L, -2, ++port_lua(port)->size);
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 
 /** Add all tuples to a Lua table. */
-static struct port *
-port_lua_table_create(struct lua_State *L)
+void
+port_lua_table_create(struct port_lua *port, struct lua_State *L)
 {
 	static struct port_vtab port_lua_vtab = {
 		port_lua_table_add_tuple,
 		null_port_eof,
 	};
-	struct port_lua *port = (struct port_lua *)
-			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
+	port->size = 0;
 	/* The destination table to append tuples to. */
 	lua_newtable(L);
-	return (struct port *) port;
 }
 
 /* }}} */
@@ -179,12 +176,12 @@ lbox_process(lua_State *L)
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
 	/* Capture all output into a Lua table. */
-	struct port *port_lua = port_lua_table_create(L);
+	struct port_lua port_lua;
 	struct request request;
 	request_create(&request, op);
 	request_decode(&request, req, sz);
-	box_process(&request, port_lua);
-
+	port_lua_table_create(&port_lua, L);
+	box_process(&request, (struct port *) &port_lua);
 	return 1;
 }
 
@@ -289,6 +286,27 @@ boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
+}
+
+static int
+lbox_select(lua_State *L)
+{
+	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+		!lua_isnumber(L, 3) || !lua_isnumber(L, 4) || !lua_isnumber(L, 5)) {
+		return luaL_error(L, "Usage index:select(space_id, index_id,"
+			"iterator, offset, limit, key)");
+	}
+
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_SELECT, 6, -1);
+	request.index_id = lua_tointeger(L, 2);
+	request.iterator = lua_tointeger(L, 3);
+	request.offset = lua_tointeger(L, 4);
+	request.limit = lua_tointeger(L, 5);
+	port_lua_table_create(&port, L);
+	box_process(&request, (struct port *) &port);
+	return 1;
 }
 
 static int
@@ -731,6 +749,7 @@ static const struct luaL_reg boxlib[] = {
 static const struct luaL_reg boxlib_internal[] = {
 	{"process", lbox_process},
 	{"call_loadproc",  lbox_call_loadproc},
+	{"select", lbox_select},
 	{"insert", lbox_insert},
 	{"replace", lbox_replace},
 	{"update", lbox_update},
@@ -747,6 +766,14 @@ box_lua_init(struct lua_State *L)
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 
+#if 0
+	/* Get CTypeID for `struct port *' */
+	int rc = luaL_cdef(L, "struct port;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_PORT_PTR = luaL_ctypeid(L, "struct port *");
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+#endif
 	box_lua_error_init(L);
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);
