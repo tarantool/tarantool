@@ -10,7 +10,7 @@ string.match(arg[-1], '^/') ~= nil
 ---
 - true
 ...
-string.match(arg[0], '^/') ~= nil
+string.match(arg[0], '^/') == nil
 ---
 - true
 ...
@@ -18,7 +18,7 @@ string.match(arg[-1], '/tarantool$') ~= nil
 ---
 - true
 ...
-string.match(arg[0], '/box%.lua$') ~= nil
+string.match(arg[2], 'box%.lua$') ~= nil
 ---
 - true
 ...

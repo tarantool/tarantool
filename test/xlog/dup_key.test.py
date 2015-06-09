@@ -10,8 +10,9 @@ server.stop()
 server.deploy()
 lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
 filename = str(lsn).zfill(20) + ".xlog"
-wal_old = os.path.join(server.vardir, "old_" + filename)
-wal = os.path.join(server.vardir, filename)
+vardir = os.path.join(server.vardir, server.name)
+wal_old = os.path.join(vardir, "old_" + filename)
+wal = os.path.join(vardir, filename)
 
 # Create wal#1
 server.admin("space = box.schema.space.create('test')")

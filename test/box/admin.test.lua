@@ -6,7 +6,7 @@ index = space:create_index('primary')
 
 --# push filter 'listen: .*' to 'listen: <uri>'
 help()
-box.cfg
+cfg_filter(box.cfg)
 space:insert{1, 'tuple'}
 box.snapshot()
 space:delete{1}

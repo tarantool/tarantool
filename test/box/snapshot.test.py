@@ -28,11 +28,12 @@ admin("space:insert{2, 'second tuple'}")
 #
 # Check for other errors, e.g. "Permission denied".
 print "# Make 'var' directory read-only."
-os.chmod(server.vardir, 0555)
+data_dir = os.path.join(server.vardir, server.name)
+os.chmod(data_dir, 0555)
 admin("box.snapshot()")
 
 # cleanup
-os.chmod(server.vardir, 0755)
+os.chmod(data_dir, 0755)
 
 admin("space:delete{1}")
 admin("space:delete{2}")
@@ -52,7 +53,7 @@ pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
 lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
 
 snapshot = str(lsn).zfill(20) + ".snap"
-snapshot = os.path.join(server.vardir, snapshot)
+snapshot = os.path.join(os.path.join(server.vardir, server.name), snapshot)
 
 iteration = 0
 

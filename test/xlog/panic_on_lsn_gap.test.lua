@@ -35,8 +35,9 @@ t
 -- Before restart: oops, our LSN is 11,
 -- even though we didn't insert anything.
 --
+name = string.match(arg[0], "([^,]+)%.lua")
 box.info.vclock
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 --# stop server panic
 --# start server panic
 --
@@ -79,7 +80,8 @@ box.info.vclock
 box.info.vclock
 box.space._schema:select{'key'}
 -- list all the logs
-require('fio').glob("*.xlog")
+name = string.match(arg[0], "([^,]+)%.lua")
+require('fio').glob(name .. "/*.xlog")
 -- now insert 10 rows - so that the next
 -- row will need to switch the WAL
 --# setopt delimiter ';'
@@ -89,20 +91,20 @@ end;
 --# setopt delimiter ''
 -- the next insert should switch xlog, but aha - it fails
 -- a new xlog file is created but has 0 rows
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 box.space._schema:replace{"key", 'test 3'}
 box.info.vclock
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 -- and the next one (just to be sure
 box.space._schema:replace{"key", 'test 3'}
 box.info.vclock
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
 -- then a success
 box.space._schema:replace{"key", 'test 4'}
 box.info.vclock
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 -- restart is ok
 --# stop server panic
 --# start server panic
