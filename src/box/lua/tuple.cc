@@ -301,19 +301,14 @@ lbox_tuple_transform(struct lua_State *L)
 }
 
 void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
+lbox_pushtuple_noref(struct lua_State *L, struct tuple *tuple)
 {
-	if (tuple) {
-		assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
-		struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
-			CTID_CONST_STRUCT_TUPLE_REF, sizeof(struct tuple *));
-		*ptr = tuple;
-		lua_pushcfunction(L, lbox_tuple_gc);
-		luaL_setcdatagc(L, -2);
-		tuple_ref(tuple);
-	} else {
-		return lua_pushnil(L);
-	}
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
+		CTID_CONST_STRUCT_TUPLE_REF, sizeof(struct tuple *));
+	*ptr = tuple;
+	lua_pushcfunction(L, lbox_tuple_gc);
+	luaL_setcdatagc(L, -2);
 }
 
 static const struct luaL_reg lbox_tuple_meta[] = {
