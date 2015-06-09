@@ -21,13 +21,6 @@ fio = require('fio')
 
 tarantool_bin_path = arg[-1]
 work_dir = fio.cwd()
-snap_dir_as_expected = false
-snap_dir_as_expected = snap_dir_as_expected or box.cfg.snap_dir == nil
-snap_dir_as_expected = snap_dir_as_expected or box.cfg.snap_dir == ''
-snap_dir_as_expected = snap_dir_as_expected or box.cfg.snap_dir == '.'
-snap_dir_as_expected = snap_dir_as_expected or box.cfg.snap_dir == work_dir
-snap_dir_as_expected
-box.cfg.snap_dir
 script_path = fio.pathjoin(work_dir, 'snap_script.lua')
 cmd_template = [[/bin/sh -c 'cd "%s" && "%s" ./snap_script.lua 2> /dev/null']]
 cmd = string.format(cmd_template, work_dir, tarantool_bin_path)
@@ -167,7 +160,7 @@ s1:drop();
 s2:drop();
 
 script_code = [[
-box.cfg{ slab_alloc_arena = 0.5, snap_dir = ".", wal_mode = "none" }
+box.cfg{ slab_alloc_arena = 0.5, snap_dir = "]] .. box.cfg.snap_dir .. [[", wal_mode = "none" }
 
 s1 = box.space.accounts
 s2 = box.space.operations
