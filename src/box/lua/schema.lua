@@ -1,6 +1,7 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
+local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local session = box.session
@@ -524,7 +525,7 @@ local iterator_gen = function(param, state)
         information.
     --]]
     if not ffi.istype(iterator_t, state) then
-        error('usage gen(param, state)')
+        error('usage: next(param, state)')
     end
     -- next() modifies state in-place
     local tuple = builtin.boxffi_iterator_next(state)
@@ -532,6 +533,15 @@ local iterator_gen = function(param, state)
         return box.error() -- error
     elseif tuple ~= nil then
         return state, box.tuple.bless(tuple) -- new state, value
+    else
+        return nil
+    end
+end
+
+local iterator_gen_luac = function(param, state)
+    local tuple = internal.iterator_next(state)
+    if tuple ~= nil then
+        return state, tuple -- new state, value
     else
         return nil
     end
@@ -650,7 +660,7 @@ function box.schema.space.bless(space)
         return internal.random(index.space_id, index.id, rnd);
     end
     -- iteration
-    index_mt.pairs = function(index, key, opts)
+    index_mt.pairs_ffi = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
@@ -660,11 +670,18 @@ function box.schema.space.bless(space)
         if cdata == nil then
             box.error()
         end
-
         return fun.wrap(iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc))
     end
-    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
-    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.pairs_luac = function(index, key, opts)
+        key = keify(key)
+        local itype = check_iterator_type(opts, #key == 0);
+        local keymp = msgpack.encode(key)
+        local keybuf = ffi.string(keymp, #keymp)
+        local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
+        return fun.wrap(iterator_gen_luac, keybuf,
+            ffi.gc(cdata, iterator_cdata_gc))
+    end
+
     -- index subtree size
     index_mt.count_ffi = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
@@ -764,7 +781,7 @@ function box.schema.space.bless(space)
 
     -- true if reading operations may yield
     local read_yields = space.engine == 'sophia'
-    local read_ops = {'select', 'get', 'min', 'max', 'count', 'random'}
+    local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
     for _, op in ipairs(read_ops) do
         if read_yields then
             -- use Lua/C implmenetation
@@ -774,6 +791,8 @@ function box.schema.space.bless(space)
             index_mt[op] = index_mt[op .. "_ffi"]
         end
     end
+    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
     --
     local space_mt = {}
     space_mt.len = function(space)

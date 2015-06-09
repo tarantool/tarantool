@@ -42,6 +42,8 @@
 /** {{{ box.index Lua library: access to spaces and indexes
  */
 
+static int CTID_STRUCT_ITERATOR_REF = 0;
+
 static inline Index *
 check_index(uint32_t space_id, uint32_t index_id)
 {
@@ -307,6 +309,30 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	}
 }
 
+static int
+lbox_index_iterator(lua_State *L)
+{
+	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 3))
+		return luaL_error(L, "usage index.iterator(space_id, index_id, type, key)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t iterator = lua_tointeger(L, 3);
+	/* const char *key = lbox_tokey(L, 4); */
+	const char *mpkey = lua_tolstring(L, 4, NULL); /* Key encoded by Lua */
+	struct iterator *it = boxffi_index_iterator(space_id, index_id,
+		iterator, mpkey);
+	if (it == NULL)
+		return lbox_error(L);
+
+	assert(CTID_STRUCT_ITERATOR_REF != 0);
+	struct iterator **ptr = (struct iterator **) luaL_pushcdata(L,
+		CTID_STRUCT_ITERATOR_REF, sizeof(struct iterator *));
+	*ptr = it; /* NULL handled by Lua, gc also set by Lua */
+	return 1;
+}
+
 struct tuple*
 boxffi_iterator_next(struct iterator *itr)
 {
@@ -333,11 +359,36 @@ boxffi_iterator_next(struct iterator *itr)
 	}
 }
 
+static int
+lbox_iterator_next(lua_State *L)
+{
+	/* first argument is key buffer */
+	if (lua_gettop(L) < 1 || lua_type(L, 1) != LUA_TCDATA)
+		return luaL_error(L, "usage: next(state)");
+
+	assert(CTID_STRUCT_ITERATOR_REF != 0);
+	uint32_t ctypeid;
+	void *data = luaL_checkcdata(L, 1, &ctypeid);
+	if (ctypeid != CTID_STRUCT_ITERATOR_REF)
+		return luaL_error(L, "usage: next(state)");
+
+	struct iterator *itr = *(struct iterator **) data;
+	struct tuple *tuple = boxffi_iterator_next(itr);
+	return lbox_returntuple(L, tuple);
+}
+
 /* }}} */
 
 void
 box_lua_index_init(struct lua_State *L)
 {
+	/* Get CTypeIDs */
+	int rc = luaL_cdef(L, "struct iterator;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_ITERATOR_REF = luaL_ctypeid(L, "struct iterator&");
+	assert(CTID_STRUCT_ITERATOR_REF != 0);
+
 	static const struct luaL_reg indexlib [] = {
 		{NULL, NULL}
 	};
@@ -353,6 +404,8 @@ box_lua_index_init(struct lua_State *L)
 		{"min", lbox_index_min},
 		{"max", lbox_index_max},
 		{"count", lbox_index_count},
+		{"iterator", lbox_index_iterator},
+		{"iterator_next", lbox_iterator_next},
 		{NULL, NULL}
 	};
 
