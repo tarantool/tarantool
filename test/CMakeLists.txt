@@ -15,5 +15,14 @@ add_custom_target(test-force
 
 add_subdirectory(app)
 add_subdirectory(unit)
+
+# Move tarantoolctl config
+if (NOT ${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
+    configure_file(
+        "${PROJECT_SOURCE_DIR}/test/.tarantoolctl"
+        "${PROJECT_BINARY_DIR}/test/.tarantoolctl"
+        )
+endif()
+
 # Disable connector_c for 1.6
 #add_subdirectory(connector_c)
