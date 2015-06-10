@@ -140,36 +140,37 @@ rslab_unused(struct rslab *slab)
 	return slab->slab.size - rslab_sizeof() - slab->used;
 }
 
-/**
- * Allocate 'size' bytes from a block.
- * @pre block must have enough unused space
- */
-static inline void *
-rslab_alloc(struct rslab *slab, size_t size)
-{
-	assert(size <= rslab_unused(slab));
-	char *ptr = (char*)rslab_data(slab) + slab->used;
-	slab->used += size;
-	return ptr;
-}
-
 void *
-region_alloc_slow(struct region *region, size_t size);
+region_reserve_slow(struct region *region, size_t size);
 
-/** Allocate size bytes from a region. */
 static inline void *
-region_alloc_nothrow(struct region *region, size_t size)
+region_reserve_nothrow(struct region *region, size_t size)
 {
 	if (! rlist_empty(&region->slabs.slabs)) {
 		struct rslab *slab = rlist_first_entry(&region->slabs.slabs,
 						       struct rslab,
 						       slab.next_in_list);
-		if (size <= rslab_unused(slab)) {
-			region->slabs.stats.used += size;
-			return rslab_alloc(slab, size);
-		}
+		if (size <= rslab_unused(slab))
+			return (char *) rslab_data(slab) + slab->used;
 	}
-	return region_alloc_slow(region, size);
+	return region_reserve_slow(region, size);
+}
+
+/** Allocate size bytes from a region. */
+static inline void *
+region_alloc_nothrow(struct region *region, size_t size)
+{
+	void *ptr = region_reserve_nothrow(region, size);
+	if (ptr != NULL) {
+		struct rslab *slab = rlist_first_entry(&region->slabs.slabs,
+						       struct rslab,
+						       slab.next_in_list);
+		assert(size <= rslab_unused(slab));
+
+		region->slabs.stats.used += size;
+		slab->used += size;
+	}
+	return ptr;
 }
 
 /**
@@ -194,6 +195,9 @@ region_used(struct region *region)
 	return region->slabs.stats.used;
 }
 
+/** Return size bytes allocated last as a single chunk. */
+void *
+region_join_nothrow(struct region *region, size_t size);
 
 /** How much memory is held by this region. */
 static inline size_t
@@ -209,8 +213,9 @@ region_free_after(struct region *region, size_t after)
 		region_free(region);
 }
 
+/** Truncate the region to the given size */
 void
-region_truncate(struct region *pool, size_t sz);
+region_truncate(struct region *pool, size_t size);
 
 static inline void
 region_set_name(struct region *region, const char *name)
@@ -238,9 +243,33 @@ region_alloc(struct region *region, size_t size)
 }
 
 static inline void *
+region_reserve(struct region *region, size_t size)
+{
+	void *ptr = region_reserve_nothrow(region, size);
+	if (ptr == NULL)
+		tnt_raise(OutOfMemory, size, "region", "new slab");
+	return ptr;
+}
+
+static inline void *
+region_join(struct region *region, size_t size)
+{
+	void *ptr = region_join_nothrow(region, size);
+	if (ptr == NULL)
+		tnt_raise(OutOfMemory, size, "region", "join");
+	return ptr;
+}
+
+static inline void *
 region_alloc0(struct region *region, size_t size)
 {
 	return memset(region_alloc(region, size), 0, size);
+}
+
+static inline void
+region_dup(struct region *region, const void *ptr, size_t size)
+{
+	(void) memcpy(region_alloc(region, size), ptr, size);
 }
 
 extern "C" {
@@ -249,15 +278,29 @@ region_alloc_cb(void *ctx, size_t size)
 {
 	return region_alloc((struct region *) ctx, size);
 }
+
+static inline void *
+region_reserve_cb(void *ctx, size_t *size)
+{
+	struct region *region = (struct region *) ctx;
+	void *ptr = region_reserve(region, *size);
+	struct rslab *slab = rlist_first_entry(&region->slabs.slabs,
+					       struct rslab,
+					       slab.next_in_list);
+	*size = rslab_unused(slab);
+	return ptr;
+}
+
 } /* extern "C" */
 
 struct RegionGuard {
 	struct region *region;
 	size_t used;
 
-	RegionGuard(struct region *_region)
-		: region(_region),
-		  used(region_used(_region)) {
+	RegionGuard(struct region *region_arg)
+		: region(region_arg),
+		  used(region_used(region_arg))
+        {
 		/* nothing */
 	}
 

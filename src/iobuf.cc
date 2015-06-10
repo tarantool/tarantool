@@ -102,9 +102,10 @@ ibuf_reserve(struct ibuf *ibuf, size_t size)
 			new_capacity *= 2;
 
 		struct slab *slab = slab_get(ibuf->slabc, new_capacity);
-		if (slab == NULL)
-			tnt_raise(OutOfMemory, new_capacity, "ibuf_reserve", "slab cache");
-
+		if (slab == NULL) {
+			tnt_raise(OutOfMemory, new_capacity,
+				  "ibuf_reserve", "slab cache");
+		}
 		char *ptr = (char *) slab_data(slab);
 		memcpy(ptr, ibuf->pos, current_size);
 		ibuf->capacity = slab_capacity(slab);
@@ -242,7 +243,7 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
 }
 
-void
+void *
 obuf_reserve_slow(struct obuf *buf, size_t size)
 {
 	struct iovec *iov = &buf->iov[buf->pos];
@@ -263,6 +264,8 @@ obuf_reserve_slow(struct obuf *buf, size_t size)
 		/* Simply realloc. */
 		obuf_alloc_pos(buf, buf->pos, size);
 	}
+	assert(buf->iov[buf->pos].iov_len + size <= buf->capacity[buf->pos]);
+	return (char *) buf->iov[buf->pos].iov_base + buf->iov[buf->pos].iov_len;
 }
 
 /** Book a few bytes in the output buffer. */
@@ -276,7 +279,7 @@ obuf_book(struct obuf *buf, size_t size)
 	svp.iov_len = buf->iov[buf->pos].iov_len;
 	svp.size = buf->size;
 
-	obuf_advance(buf, size);
+	obuf_alloc(buf, size);
 	return svp;
 }
 

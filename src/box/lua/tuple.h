@@ -42,7 +42,7 @@ struct tuple *lua_istuple(struct lua_State *L, int narg);
 
 void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		  struct obuf *b, int index);
+		  struct mpstream *stream, int index);
 
 void
 box_lua_tuple_init(struct lua_State *L);

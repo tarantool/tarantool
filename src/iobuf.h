@@ -168,7 +168,7 @@ struct obuf_svp
  * Slow path of obuf_reserve(), which actually reallocates
  * memory and moves data if necessary.
  */
-void
+void *
 obuf_reserve_slow(struct obuf *buf, size_t size);
 
 /**
@@ -180,11 +180,11 @@ obuf_reserve_slow(struct obuf *buf, size_t size);
  * \param size
  * \return a pointer to contiguous chunk of memory
  */
-static inline char *
+static inline void *
 obuf_reserve(struct obuf *buf, size_t size)
 {
 	if (buf->iov[buf->pos].iov_len + size > buf->capacity[buf->pos])
-		obuf_reserve_slow(buf, size);
+		return obuf_reserve_slow(buf, size);
 	struct iovec *iov = &buf->iov[buf->pos];
 	return (char *) iov->iov_base + iov->iov_len;
 }
@@ -195,12 +195,36 @@ obuf_reserve(struct obuf *buf, size_t size)
  * \param size
  * \sa obuf_reserve
  */
-static inline void
-obuf_advance(struct obuf *buf, size_t size)
+static inline void *
+obuf_alloc(struct obuf *buf, size_t size)
 {
-	buf->iov[buf->pos].iov_len += size;
+	if (buf->iov[buf->pos].iov_len + size > buf->capacity[buf->pos])
+		(void) obuf_reserve_slow(buf, size);
+	struct iovec *iov = &buf->iov[buf->pos];
+	void *ptr = (char *) iov->iov_base + iov->iov_len;
+	iov->iov_len += size;
 	buf->size += size;
-	assert(buf->iov[buf->pos].iov_len <= buf->capacity[buf->pos]);
+	assert(iov->iov_len < buf->capacity[buf->pos]);
+	return ptr;
+}
+
+extern "C" {
+
+static inline void *
+obuf_reserve_cb(void *ctx, size_t *size)
+{
+	struct obuf *buf = (struct obuf *) ctx;
+	void *ptr = obuf_reserve(buf, *size);
+	*size = buf->capacity[buf->pos] - buf->iov[buf->pos].iov_len;
+	return ptr;
+}
+
+static inline void *
+obuf_alloc_cb(void *ctx, size_t size)
+{
+	return obuf_alloc((struct obuf *) ctx, size);
+}
+
 }
 
 /**
@@ -242,28 +266,6 @@ obuf_svp_to_ptr(struct obuf *buf, struct obuf_svp *svp)
 /** Forget anything added to output buffer after the savepoint. */
 void
 obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp);
-
-/**
- * \brief Conventional function to join iovec into a solid memory chunk.
- * For iovec of size 1 returns iov->iov_base without allocation extra memory.
- * \param[out] size calculated length of \a iov
- * \return solid memory chunk
- */
-static inline char *
-obuf_join(struct obuf *obuf)
-{
-	int iovcnt = obuf_iovcnt(obuf);
-	if (iovcnt == 1)
-		return (char *) obuf->iov[0].iov_base;
-
-	char *data = (char *) region_alloc(obuf->pool, obuf_size(obuf));
-	char *pos = data;
-	for (int i = 0; i < iovcnt; i++) {
-		memcpy(pos, obuf->iov[i].iov_base, obuf->iov[i].iov_len);
-		pos += obuf->iov[i].iov_len;
-	}
-	return data;
-}
 
 /* }}} */
 

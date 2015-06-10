@@ -30,7 +30,7 @@
 #include <sys/types.h> /* ssize_t */
 
 void *
-region_alloc_slow(struct region *region, size_t size)
+region_reserve_slow(struct region *region, size_t size)
 {
 	/* The new slab must have at least this many bytes available. */
 	size_t slab_min_size = size + rslab_sizeof() - slab_sizeof();
@@ -39,14 +39,13 @@ region_alloc_slow(struct region *region, size_t size)
 	slab = (struct rslab *) slab_get(region->cache, slab_min_size);
 	if (slab == NULL)
 		return NULL;
-	slab->used = size;
+	slab->used = 0;
 	/*
 	 * Sic: add the new slab to the beginning of the
 	 * region, even if it is full, otherwise,
 	 * region_truncate() won't work.
 	 */
 	slab_list_add(&region->slabs, &slab->slab, next_in_list);
-	region->slabs.stats.used += size;
 	return rslab_data(slab);
 }
 
@@ -66,11 +65,11 @@ region_free(struct region *region)
  * obtained by calling region_used().
  */
 void
-region_truncate(struct region *region, size_t new_size)
+region_truncate(struct region *region, size_t used)
 {
-	assert(new_size <= region_used(region));
+	ssize_t cut_size = region_used(region) - used;
+	assert(cut_size >= 0);
 
-	ssize_t cut_size = region_used(region) - new_size;
 	while (! rlist_empty(&region->slabs.slabs)) {
 		struct rslab *slab = rlist_first_entry(&region->slabs.slabs,
 						       struct rslab,
@@ -87,6 +86,43 @@ region_truncate(struct region *region, size_t new_size)
 		slab_put(region->cache, &slab->slab);
 	}
 	assert(cut_size == 0);
-	region->slabs.stats.used = new_size;
+	region->slabs.stats.used = used;
 }
 
+void *
+region_join_nothrow(struct region *region, size_t size)
+{
+	if (rlist_empty(&region->slabs.slabs)) {
+		assert(size == 0);
+		return region_alloc_nothrow(region, 0);
+	}
+	struct rslab *slab = rlist_first_entry(&region->slabs.slabs,
+					       struct rslab,
+					       slab.next_in_list);
+
+	if (slab->used >= size) {
+		/* Don't move stuff if it's in a single chunk. */
+		return (char *) rslab_data(slab) + slab->used - size;
+	}
+	/**
+	 * Use region_reserve() to ensure slab->size is not
+	 * changed when the joined region is in the same slab
+	 * as the final chunk.
+	 */
+	char *ptr = region_reserve_nothrow(region, size);
+	size_t offset = size;
+	if (ptr == NULL)
+		return NULL;
+	/*
+	 * Copy data from last chunk to first, i.e. in the reverse order.
+	 */
+	while (offset > 0 && slab->used <= offset) {
+		memcpy(ptr + offset - slab->used, rslab_data(slab), slab->used);
+		offset -= slab->used;
+		slab = rlist_next_entry(slab, slab.next_in_list);
+	}
+	if (offset > 0)
+		memcpy(ptr, rslab_data(slab) + slab->used - offset, offset);
+	region_alloc_nothrow(region, size);
+	return ptr;
+}

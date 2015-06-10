@@ -195,19 +195,25 @@ lbox_request_create(struct request *request,
 {
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
+	struct region *gc = &fiber()->gc;
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb);
+
 	if (key > 0) {
-		struct obuf key_buf;
-		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode_tuple(L, luaL_msgpack_default, &key_buf, key);
-		request->key = obuf_join(&key_buf);
-		request->key_end = request->key + obuf_size(&key_buf);
+		size_t used = region_used(gc);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, key);
+		mpstream_flush(&stream);
+		size_t key_len = region_used(gc) - used;
+		request->key = (char *) region_join(gc, key_len);
+		request->key_end = request->key + key_len;
 	}
 	if (tuple > 0) {
-		struct obuf tuple_buf;
-		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf, tuple);
-		request->tuple = obuf_join(&tuple_buf);
-		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
+		size_t used = region_used(gc);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, tuple);
+		mpstream_flush(&stream);
+		size_t  tuple_len = region_used(gc) - used;
+		request->tuple = (char *) region_join(gc, tuple_len);
+		request->tuple_end = request->tuple + tuple_len;
 	}
 }
 
@@ -588,8 +594,9 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	 * then each return value as a tuple.
 	 *
 	 * If a Lua stack contains at least one scalar, each
-	 * value on the stack is converted to a tuple. A Lua
-	 * is converted to a tuple with multiple fields.
+	 * value on the stack is converted to a tuple. A single
+	 * Lua with scalars is converted to a tuple with multiple
+	 * fields.
 	 *
 	 * If the stack is a Lua table, each member of which is
 	 * not scalar, each member of the table is converted to
@@ -600,6 +607,8 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 
 	uint32_t count = 0;
 	struct obuf_svp svp = iproto_prepare_select(out);
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
 
 	/** Check if we deal with a table of tables. */
 	int nrets = lua_gettop(L);
@@ -614,7 +623,7 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
 			do {
 				luamp_encode_tuple(L, luaL_msgpack_default,
-						   out, -1);
+						   &stream, -1);
 				++count;
 				lua_pop(L, 1);
 			} while (lua_next(L, 1));
@@ -625,15 +634,16 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	}
 	for (int i = 1; i <= nrets; ++i) {
 		if (lua_isarray(L, i) || lua_istuple(L, i)) {
-			luamp_encode_tuple(L, luaL_msgpack_default, out, i);
+			luamp_encode_tuple(L, luaL_msgpack_default, &stream, i);
 		} else {
-			luamp_encode_array(luaL_msgpack_default, out, 1);
-			luamp_encode(L, luaL_msgpack_default, out, i);
+			luamp_encode_array(luaL_msgpack_default, &stream, 1);
+			luamp_encode(L, luaL_msgpack_default, &stream, i);
 		}
 		++count;
 	}
 
 done:
+	mpstream_flush(&stream);
 	iproto_reply_select(out, &svp, request->header->sync, count);
 }
 
@@ -685,10 +695,13 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 
 	/* Send results of the called procedure to the client. */
 	struct obuf_svp svp = iproto_prepare_select(out);
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
 	int nrets = lua_gettop(L);
 	for (int k = 1; k <= nrets; ++k) {
-		luamp_encode(L, luaL_msgpack_default, out, k);
+		luamp_encode(L, luaL_msgpack_default, &stream, k);
 	}
+	mpstream_flush(&stream);
 	iproto_reply_select(out, &svp, request->header->sync, nrets);
 }
 

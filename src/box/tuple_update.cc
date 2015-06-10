@@ -91,7 +91,7 @@
 /** Update internal state */
 struct tuple_update
 {
-	region_alloc_func alloc;
+	tuple_update_alloc_func alloc;
 	void *alloc_ctx;
 	struct rope *rope;
 	struct update_op *ops;
@@ -865,7 +865,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 }
 
 const char *
-tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
+tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base)
