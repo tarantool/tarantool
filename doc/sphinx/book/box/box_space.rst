@@ -789,9 +789,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_cluster`` is a new system tuple set
     for support of the :ref:`replication feature <box-replication>`.
 
-=================================================
+===================================================================
                      Example showing use of the box.space functions
-=================================================
+===================================================================
 
 This function will illustrate how to look at all the spaces, and for each
 display: approximately how many tuples it contains, and the first field of

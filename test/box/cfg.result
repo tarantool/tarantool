@@ -5,33 +5,31 @@ box.cfg.nosuchoption = 1
 - error: '[string "-- load_cfg.lua - internal file..."]:265: Attempt to modify a read-only
     table'
 ...
-t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
+cfg_filter(box.cfg)
 ---
-...
-t
----
-- - 'snapshot_count: 6'
-  - 'too_long_threshold: 0.5'
-  - 'slab_alloc_factor: 1.1'
-  - 'slab_alloc_maximal: 1048576'
-  - 'background: false'
-  - 'slab_alloc_arena: 0.1'
-  - 'primary: <uri>
-  - 'logger_nonblock: true'
-  - 'snap_dir: .'
-  - 'coredump: false'
-  - 'slab_alloc_minimal: 16'
-  - 'sophia_dir: .'
-  - 'wal_mode: write'
-  - 'wal_dir: .'
-  - 'panic_on_snap_error: true'
-  - 'panic_on_wal_error: true'
-  - 'log_level: 5'
-  - 'readahead: 16320'
-  - 'pid_file: tarantool.pid'
-  - 'rows_per_wal: 50'
-  - 'snapshot_period: 0'
-  - 'wal_dir_rescan_delay: 2'
+- snapshot_count: 6
+  too_long_threshold: 0.5
+  slab_alloc_factor: 1.1
+  rows_per_wal: 50
+  background: false
+  snapshot_period: 0
+  sophia:
+    page_size: 131072
+    memory_limit: 0
+    threads: 5
+    node_size: 134217728
+    compression: none
+  primary: <uri>
+  logger_nonblock: true
+  coredump: false
+  wal_mode: write
+  panic_on_snap_error: true
+  panic_on_wal_error: true
+  slab_alloc_arena: 0.1
+  custom_proc_title: box
+  log_level: 5
+  readahead: 16320
+  wal_dir_rescan_delay: 2
 ...
 -- must be read-only
 box.cfg()
@@ -39,33 +37,31 @@ box.cfg()
 - error: '[string "-- load_cfg.lua - internal file..."]:211: bad argument #1 to ''pairs''
     (table expected, got nil)'
 ...
-t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
+cfg_filter(box.cfg)
 ---
-...
-t
----
-- - 'snapshot_count: 6'
-  - 'too_long_threshold: 0.5'
-  - 'slab_alloc_factor: 1.1'
-  - 'slab_alloc_maximal: 1048576'
-  - 'background: false'
-  - 'slab_alloc_arena: 0.1'
-  - 'primary: <uri>
-  - 'logger_nonblock: true'
-  - 'snap_dir: .'
-  - 'coredump: false'
-  - 'slab_alloc_minimal: 16'
-  - 'sophia_dir: .'
-  - 'wal_mode: write'
-  - 'wal_dir: .'
-  - 'panic_on_snap_error: true'
-  - 'panic_on_wal_error: true'
-  - 'log_level: 5'
-  - 'readahead: 16320'
-  - 'pid_file: tarantool.pid'
-  - 'rows_per_wal: 50'
-  - 'snapshot_period: 0'
-  - 'wal_dir_rescan_delay: 2'
+- snapshot_count: 6
+  too_long_threshold: 0.5
+  slab_alloc_factor: 1.1
+  rows_per_wal: 50
+  background: false
+  snapshot_period: 0
+  sophia:
+    page_size: 131072
+    memory_limit: 0
+    threads: 5
+    node_size: 134217728
+    compression: none
+  primary: <uri>
+  logger_nonblock: true
+  coredump: false
+  wal_mode: write
+  panic_on_snap_error: true
+  panic_on_wal_error: true
+  slab_alloc_arena: 0.1
+  custom_proc_title: box
+  log_level: 5
+  readahead: 16320
+  wal_dir_rescan_delay: 2
 ...
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}

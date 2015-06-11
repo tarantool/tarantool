@@ -119,7 +119,7 @@ Step 3. Start the second server thus:
 
 .. code-block:: lua
 
-    box.cfg{listen=uri#2, replication_source=uri#1}
+    box.cfg{replication_source=uri#1}
 
 ... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
 
@@ -159,10 +159,11 @@ servers will end up with different contents.
                 All the "What If?" Questions
 =====================================================================
 
-:Q: What if there are more than two servers with master-master?
-:A: On each server, specify the :confval:`replication_source` for all the others. For
-    example, server #3 would have a request:
-    ``box.cfg{replication_source=uri#1, replication_source=uri#2}``.
+..
+    :Q: What if there are more than two servers with master-master?
+    :A: On each server, specify the :confval:`replication_source` for all the others. For
+        example, server #3 would have a request:
+        ``box.cfg{replication_source=uri#1, replication_source=uri#2}``.
 
 :Q: What if a a server should be taken out of the cluster?
 :A: Run ``box.cfg{}`` again specifying a blank replication source:

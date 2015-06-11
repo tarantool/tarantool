@@ -10,7 +10,7 @@ master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
 replica.wait_lsn(master_id, master.get_lsn(master_id))
@@ -26,7 +26,7 @@ print '-------------------------------------------------------------'
 
 # Remove xlog retrived by SUBSCRIBE
 filename = str(0).zfill(20) + ".xlog"
-wal = os.path.join(replica.vardir, filename)
+wal = os.path.join(os.path.join(replica.vardir, replica.name), filename)
 os.remove(wal)
 
 # Start replica without master

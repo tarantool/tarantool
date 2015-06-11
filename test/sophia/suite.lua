@@ -14,7 +14,7 @@ end
 function sophia_dir()
 	local i = 0
 	local list = {}
-	for file in io.popen("ls -1 sophia_test"):lines() do
+	for file in io.popen("ls -1 ./box/sophia_test"):lines() do
 		i = i + 1
 		list[i] = file
 	end
@@ -22,11 +22,11 @@ function sophia_dir()
 end
 
 function sophia_mkdir(dir)
-	os.execute("mkdir sophia_test")
+	os.execute("mkdir ./box/sophia_test")
 end
 
 function sophia_rmdir(dir)
-	os.execute("rm -rf sophia_test")
+	os.execute("rm -rf ./box/sophia_test")
 end
 
 function file_exists(name)

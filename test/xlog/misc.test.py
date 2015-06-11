@@ -9,11 +9,13 @@ server.deploy()
 lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
 server.stop()
 
+data_path = os.path.join(server.vardir, server.name)
+
 print """
 # xlog file must exist after inserts.
 """
 filename = str(lsn).zfill(20) + ".xlog"
-wal = os.path.join(server.vardir, filename)
+wal = os.path.join(data_path, filename)
 
 server.start()
 
@@ -32,7 +34,7 @@ print """
 filename = str(lsn).zfill(20) + ".xlog"
 server.start()
 
-wal = os.path.join(server.vardir, filename)
+wal = os.path.join(data_path, filename)
 
 server.admin("box.space[0]:insert{3, 'third tuple'}")
 
@@ -51,7 +53,7 @@ print """
 
 server.start()
 filename = str(lsn).zfill(20) + ".xlog"
-wal = os.path.join(server.vardir, filename)
+wal = os.path.join(data_path, filename)
 server.admin("box.space[0]:insert{4, 'fourth tuple'}")
 server.admin("box.space[0]:insert{5, 'Unfinished record'}")
 pid = int(yaml.load(server.admin("require('tarantool').pid()", silent=True))[0])
@@ -84,13 +86,13 @@ admin("box.space._schema:insert({'test', 'test'})")
 admin("box.snapshot()")
 lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
 snapshot = str(lsn).zfill(20) + ".snap"
-snapshot = os.path.join(server.vardir, snapshot)
+snapshot = os.path.join(data_path, snapshot)
 server.stop()
 os.rename(snapshot, snapshot + ".inprogress")
 # remove .xlogs
-for f in os.listdir(server.vardir):
+for f in os.listdir(data_path):
     if f.endswith(".xlog"):
-        os.remove(os.path.join(server.vardir, f))
+        os.remove(os.path.join(data_path, f))
 
 # check that .snap.inprogress is ignored during scan
 server.start()

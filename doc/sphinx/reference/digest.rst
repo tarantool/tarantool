@@ -11,59 +11,60 @@ The functions in digest are:
 
 .. module:: digest
 
-.. _sha
+.. _sha:
+.. _sha_hex:
+.. _sha1:
+.. _sha1_hex:
+.. _sha224:
+.. _sha224_hex:
+.. _sha256:
+.. _sha256_hex:
+.. _sha384:
+.. _sha384_hex:
+.. _sha512:
+.. _sha512_hex:
+.. _md4_in_digest:
+.. _md4_hex:
+.. _md5_in_digest:
+.. _md5_hex:
+.. _crc32_in_digest:
+.. _crc32_update:
+.. _crc32_new:
+.. _base64_encode:
+.. _base64_decode:
+.. _urandom:
+.. _guava_in_digest:
+.. _murmur_in_digest:
+.. _murmur_new:
+
 | :samp:`sha({string})` Returns 160-bit digest made with SHA-0. Not recommended.
-.. _sha_hex
 | :samp:`sha_hex({string})`     Returns hexadecimal of a digest calculated with sha.
-.. _sha1
 | :samp:`sha1({string})`     Returns 160-bit digest made with SHA-1.
-.. _sha1_hex
 | :samp:`sha1_hex({string})`         Returns hexadecimal of a digest calculated with sha1.
-.. _sha224
 | :samp:`sha224({string})`         Returns 224-bit digest made with SHA-2.
-.. _sha224_hex
 | :samp:`sha224_hex({string})`         Returns hexadecimal of a digest calculated with sha224.
-.. _sha256
 | :samp:`sha256({string})`         Returns 256-bit digest made with SHA-2.
-.. _sha256_hex
 | :samp:`sha256_hex({string})`         Returns hexadecimal of a digest calculated with sha256.
-.. _sha384
 | :samp:`sha384({string})`         Returns 384-bit digest made with SHA-2.
-.. _sha384_hex
 | :samp:`sha384_hex({string})`         Returns hexadecimal of a digest calculated with sha384.
-.. _sha512
 | :samp:`sha512({string})`         Returns 512-bit digest made with SHA-2.
-.. _sha512_hex
 | :samp:`sha512_hex({string})`         Returns hexadecimal of a digest calculated with sha512.
-.. _md4
 | :samp:`md4({string})`         Returns 128-bit digest made with MD4.
-.. _md4_hex
 | :samp:`md4_hex({string})`         Returns hexadecimal of a digest calculated with md4.
-.. _md5
 | :samp:`md5({string})`         Returns 256-bit digest made with MD5.
-.. _md5_hex
 | :samp:`md5_hex({string})`         Returns hexadecimal of a digest calculated with md5.
-.. _crc32
-| :samp:`crc32({string})` Returns 32-bit checksum made with CRC32. See `crc32 notes <crc32 notes>`_.
-.. _crc32_update
-| :samp:`crc32_update({number, string})` Returns update of a checksum calculated with CRC32. See `crc32 notes <crc32 notes>`_.
-.. _crc32_new
-| :samp:`crc32.new()`  Initiates incremental crc32. See `incremental digest <incremental digest>`_.
-.. _base64_encode
+| :samp:`crc32({string})` Returns 32-bit checksum made with CRC32. See :ref:`crc32 notes <crc32notes>`.
+| :samp:`crc32_update({number, string})` Returns update of a checksum calculated with CRC32. See :ref:`crc32 notes <crc32notes>`.
+| :samp:`crc32.new()`  Initiates incremental crc32. See :ref:`incremental digests <incremental digests>`.
 | :samp:`base64_encode({string})`         Returns base64 encoding from a regular string.
-.. _base64_decode
 | :samp:`base64_decode({string})`         Returns a regular string from a base64 encoding.
-.. _urandom
 | :samp:`urandom({integer})`       Returns array of random bytes with length = integer.  
-.. _guava
-| :samp:`guava({integer}, {integer})`       Returns a number made with consistent hash. See `guava notes <guava notes>`_.
-.. _murmur
+| :samp:`guava({integer}, {integer})`       Returns a number made with consistent hash. See :ref:`guava notes <guavanotes>`.
 | :samp:`murmur({string})`       Returns 32-bit digest made with MurmurHash.
-.. _murmur_new
-| :samp:`murmur.new([{seed}])`  Initiates incremental MurmurHash. See `incremental digest <incremental digest>`_.
+| :samp:`murmur.new([{seed}])`  Initiates incremental MurmurHash. See :ref:`incremental digests <incremental digests>`.
 
+.. _crc32notes:
 
-.. _crc32 notes:
 **crc32 notes**
       The crc32 and crc32_update function use the `CRC-32C (Castagnoli)`_ polynomial
       value: 0x11EDC6F41 / 4812730177. If it is necessary to be
@@ -81,7 +82,8 @@ The functions in digest are:
 
 .. _CRC-32C (Castagnoli): https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use
 
-.. _guava notes:
+.. _guavanotes:
+
 **guava notes**
 
         The guava function uses the `Consistent Hashing`_ algorithm of
@@ -96,6 +98,7 @@ The functions in digest are:
           8
 
 .. _incremental digests:
+
 **incremental digests**
 
         Suppose that a digest is done for a string 'A',

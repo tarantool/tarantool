@@ -176,13 +176,18 @@ local function check_cmd(cmd)
     usage()
 end
 
---
--- Find if we're running under a user, and this
--- user has a default file in his home directory.
--- If present, use it. Otherwise assume a system-
--- wide default. If it's missing, it's OK as well.
---
-local function find_default_file()
+local function check_user_level()
+    -- local dir configuration
+    local pwd = os.getenv('PWD')
+    if pwd ~= nil then
+        local local_dir = pwd .. '/.tarantoolctl'
+        if fio.stat(local_dir) then
+            usermode = true
+            return local_dir
+        end
+    end
+
+    -- home dir configuration
     if os.getenv('HOME') then
         local c = os.getenv('HOME') .. '/.config/tarantool/tarantool'
         if fio.stat(c) then
@@ -190,6 +195,24 @@ local function find_default_file()
             return c
         end
     end
+    return nil
+end
+
+--
+-- Find if we're running under a user, and this
+-- user has a default file in his home directory.
+-- If present, use it. Otherwise assume a system-
+-- wide default. If it's missing, it's OK as well.
+--
+local function find_default_file()
+    --
+    -- try to find local dir or user config
+    --
+    user_level = check_user_level()
+    if user_level ~= nil then
+        return user_level
+    end
+
     --
     -- no user-level defaults, use a system-wide one
     --
@@ -346,7 +369,9 @@ local function wrapper_cfg(cfg)
     --
     cfg.pid_file = default_cfg.pid_file
     cfg.username = default_cfg.username
-    cfg.background = true
+    if cfg.background == nil then
+        cfg.background = true
+    end
     cfg.custom_proc_title = instance_name
 
     mk_default_dirs(cfg)

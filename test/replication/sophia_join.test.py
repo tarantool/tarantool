@@ -20,7 +20,7 @@ print '-------------------------------------------------------------'
 # replica server
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir #os.path.join(server.vardir,'replica')
 replica.rpl_master = master
 replica.deploy()
 replica.wait_lsn(master_id, lsn)

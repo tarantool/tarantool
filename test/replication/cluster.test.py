@@ -75,7 +75,8 @@ print 'gh-707: Master crashes on JOIN if it does not have snapshot files'
 print 'gh-480: If socket is closed while JOIN, replica wont reconnect'
 print '-------------------------------------------------------------'
 
-for k in glob.glob(os.path.join(server.vardir, '*.snap')):
+data_dir = os.path.join(server.vardir, server.name)
+for k in glob.glob(os.path.join(data_dir, '*.snap')):
     os.unlink(k)
 
 # remember the number of servers in _cluster table
@@ -140,7 +141,7 @@ master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
 replica.wait_lsn(master_id, master.get_lsn(master_id))

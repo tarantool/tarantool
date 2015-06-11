@@ -323,7 +323,7 @@ with two fields. The first field will be 1. The second field will be a random
 10-letter string. Once again the ``string_function(``) can be invoked from
 ``main_function()`` which can be invoked with ``main_function()!``. But
 ``main_function()`` won't tell the whole story, because it does not return t, it
-nly puts t into the database. To confirm that something got inserted, we'll use
+only puts t into the database. To confirm that something got inserted, we'll use
 a SELECT request.
 
 .. code-block:: lua

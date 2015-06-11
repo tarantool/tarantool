@@ -37,7 +37,7 @@ test_rope_new()
 }
 
 static inline void
-test_rope_insert(struct rope *rope, rsize_t offset, char *str)
+test_rope_insert(struct rope *rope, rope_size_t offset, char *str)
 {
 	printf("insert offset = %zu, str = '%s'\n", (size_t) offset, str);
 	rope_insert(rope, offset, str, strlen(str));
@@ -46,7 +46,7 @@ test_rope_insert(struct rope *rope, rsize_t offset, char *str)
 }
 
 static inline void
-test_rope_erase(struct rope *rope, rsize_t offset)
+test_rope_erase(struct rope *rope, rope_size_t offset)
 {
 	printf("erase offset = %zu\n", (size_t) offset);
 	rope_erase(rope, offset);

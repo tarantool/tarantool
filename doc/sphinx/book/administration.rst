@@ -262,32 +262,32 @@ The settings in the above script are:
             commands for tarantoolctl
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The command format is ``tarantoolctl operation application-name``, where
+The command format is :samp:`tarantoolctl operation {application_name}`, where
 operation is one of: start, stop, enter, logrotate, status, reload. Thus ...
 
-.. option:: start <app_name>
+.. option:: start <application_name>
 
-    starts application <app_name>
+    starts application <application_name>
 
-.. option:: stop <app_name>
+.. option:: stop <application_name>
 
-    stops <app_name>
+    stops <application_name>
 
-.. option:: enter <app_name>
+.. option:: enter <application_name>
 
-    shows <app_name>'s admin console, if it has one
+    shows <application_name>'s admin console, if it has one
 
-.. option:: logrotate <app_name>
+.. option:: logrotate <application_name>
 
-    rotates <app_name>'s log files (make new, remove old)
+    rotates <application_name>'s log files (make new, remove old)
 
-.. option:: status <app_name>
+.. option:: status <application_name>
 
-    checks <app_name>'s status
+    checks <application_name>'s status
 
-.. option:: reload <file_name>
+.. option:: reload <application_name> <file_name>
 
-   reloads <file_name>.
+   load and execute the code from <file_name> as an instance of <application_name>
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl

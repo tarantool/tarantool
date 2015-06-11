@@ -6,10 +6,10 @@
 -- Check how well we handle a failed log write
 -- in panic_on_wal_error=false mode
 --
---# create server dont_panic with script='xlog/xlog.lua'
---# start server dont_panic
---# set connection dont_panic
---
+--# stop server default
+--# cleanup server default
+--# deploy server default
+--# start server default
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 ---
 - ok
@@ -18,14 +18,14 @@ box.space._schema:insert{"key"}
 ---
 - error: Failed to write to disk
 ...
---# stop server dont_panic 
---# start server dont_panic 
+--# stop server default
+--# start server default
 box.space._schema:insert{"key"}
 ---
 - ['key']
 ...
---# stop server dont_panic 
---# start server dont_panic 
+--# stop server default
+--# start server default
 box.space._schema:get{"key"}
 ---
 - ['key']
@@ -35,11 +35,16 @@ box.space._schema:delete{"key"}
 - ['key']
 ...
 -- list all the logs
-require('fio').glob("*.xlog")
+name = string.match(arg[0], "([^,]+)%.lua")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
-  - 00000000000000000002.xlog
 ...
---# stop server dont_panic 
---# cleanup server dont_panic
+require('fio').glob(name .. "/*.xlog")
+---
+- - xlog/00000000000000000000.xlog
+  - xlog/00000000000000000001.xlog
+  - xlog/00000000000000000002.xlog
+...
+--# stop server default
+--# cleanup server default
+--# deploy server default
+--# start server default
