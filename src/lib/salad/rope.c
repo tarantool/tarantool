@@ -71,7 +71,7 @@ rope_relink(struct rope_node *node)
 }
 
 static inline struct rope_node *
-rope_node_new(struct rope *rope, void *data, rsize_t size)
+rope_node_new(struct rope *rope, void *data, rope_size_t size)
 {
 	struct rope_node *node =
 		(struct rope_node *) rope->alloc(rope->alloc_ctx,
@@ -112,9 +112,9 @@ rope_clear(struct rope *rope)
 }
 
 static struct rope_node *
-rope_node_split(struct rope *rope, struct rope_node *node, rsize_t offset)
+rope_node_split(struct rope *rope, struct rope_node *node, rope_size_t offset)
 {
-	rsize_t old_size = node->leaf_size;
+	rope_size_t old_size = node->leaf_size;
 	node->leaf_size = offset;
 
 	void *data = rope->split(rope->split_ctx, node->data, old_size, offset);
@@ -260,16 +260,16 @@ avl_rebalance_after_delete(struct rope_node ***path,
  * @return the end of the route.
  */
 static inline struct rope_node ***
-avl_route_to_offset(struct rope_node ***path, rsize_t *p_offset,
+avl_route_to_offset(struct rope_node ***path, rope_size_t *p_offset,
 		    ssize_t adjust_size)
 {
-	rsize_t offset = *p_offset;
+	rope_size_t offset = *p_offset;
 	while (**path) {
 		struct rope_node *node = **path;
 
 		node->tree_size += adjust_size;
 
-		rsize_t left_size = rope_node_size(node->link[0]);
+		rope_size_t left_size = rope_node_size(node->link[0]);
 
 		if (offset < left_size) {
 			/* The offset lays in  the left subtree. */
@@ -301,7 +301,7 @@ avl_route_to_offset(struct rope_node ***path, rsize_t *p_offset,
  * (previous node) or leftmost leaf of the right child.
  */
 static inline struct rope_node ***
-avl_route_to_next(struct rope_node ***path, int dir, rssize_t adjust_size)
+avl_route_to_next(struct rope_node ***path, int dir, rope_ssize_t adjust_size)
 {
 	struct rope_node *node = **path;
 	*++path = &node->link[dir];
@@ -334,7 +334,7 @@ avl_route_to_next(struct rope_node ***path, int dir, rssize_t adjust_size)
  * heights and sizes of all modified nodes.
  */
 int
-rope_insert(struct rope *rope, rsize_t offset, void *data, rsize_t size)
+rope_insert(struct rope *rope, rope_size_t offset, void *data, rope_size_t size)
 {
 	if (offset > rope_size(rope))
 		offset = rope_size(rope);
@@ -380,7 +380,7 @@ rope_insert(struct rope *rope, rsize_t offset, void *data, rsize_t size)
 
 /** Make sure there is a rope node at the given offset. */
 struct rope_node *
-rope_extract_node(struct rope *rope, rsize_t offset)
+rope_extract_node(struct rope *rope, rope_size_t offset)
 {
 	assert(offset < rope_size(rope));
 
@@ -419,7 +419,7 @@ rope_extract_node(struct rope *rope, rsize_t offset)
  * from rope_insert().
  */
 int
-rope_erase(struct rope *rope, rsize_t offset)
+rope_erase(struct rope *rope, rope_size_t offset)
 {
 	assert(offset < rope_size(rope));
 
@@ -439,7 +439,7 @@ rope_erase(struct rope *rope, rsize_t offset)
 			node->leaf_size -= 1;
 			return 0;
 		}
-		rsize_t size = node->leaf_size;
+		rope_size_t size = node->leaf_size;
 		/* Cut the tail */
 		void *next = rope->split(rope->split_ctx, node->data,
 					 node->leaf_size, offset);
@@ -622,7 +622,7 @@ rope_node_print(struct rope_node *node,
 
 	const char *padding[] = { "│   ", "   " };
 
-	rsize_t child_prefix_len = strlen(prefix) + strlen(padding[0]) + 1;
+	rope_size_t child_prefix_len = strlen(prefix) + strlen(padding[0]) + 1;
 	char *child_prefix = malloc(child_prefix_len);
 
 	if (node && (node->link[0] || node->link[1])) {
