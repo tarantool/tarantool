@@ -5,9 +5,9 @@
 This chapter describes how Tarantool stores values
 and what operations with data it supports. 
 
-==================
+===================
 Document data model
-==================
+===================
 
 If you tried out the
 :ref:`Starting Tarantool and making your first database <first database>`
@@ -81,7 +81,7 @@ of a field is the field's number, base 1. For example
 When Tarantool returns a tuple value, it surrounds
 strings with single quotes, separates fields with commas,
 and encloses the tuple inside square brackets.
-For example: [ 3, 'length', 93 ]. 
+For example: :codenormal:`[ 3, 'length', 93 ]`. 
 
 .. _box.index:
 
@@ -174,7 +174,7 @@ requires only one byte but the largest number requires nine bytes.
 A "string" is a variable-length sequence of bytes,
 usually represented with alphanumeric characters inside single quotes.
 
-A "boolean" is either true or false.
+A "boolean" is either :codenormal:`true` or :codenormal:`false`.
 
 A "nil" type has only one possible value, also called "nil",
 but often displayed as "null".
@@ -184,7 +184,7 @@ Nils may not be used in Lua tables; the workaround
 is to use :ref:`yaml.NULL <yaml-null>` or
 :ref:`json.NULL <json-null>` or :ref:`msgpack.NULL <msgpack-null>`.
 
-A tuple is returned in YAML format like - [120, 'a', 'b', 'c'].
+A tuple is returned in YAML format like :codenormal:`- [120, 'a', 'b', 'c']`.
 A few functions may return tables with multiple tuples.
 A scalar may be converted to a tuple with only one field.
 A Lua table may contain all of a tuple's fields, but not nil.
@@ -238,9 +238,9 @@ Five examples of basic operations:
    box.space.tester:delete{999}
 
 How does Tarantool do a basic operation? Let's take this example:
-   box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
+   :codenormal:`box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})`
 which, for those who know SQL, is equivalent to a statement like
-   UPDATE tester SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
+   :codenormal:`UPDATE tester SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3`
 
 STEP #1: if this is happening on a remote client,
 then the client parses the statement and changes
@@ -269,7 +269,7 @@ no such thing ever happens. Only the transaction processor
 thread can access the database, and there is only one
 transaction processor thread for each instance of the server.
 
-FACT #2: the transaction processor thread can handle many fibers.
+FACT #2: the transaction processor thread can handle many *fibers*.
 A fiber is a set of computer instructions that may contain
 “yield” signals. The transaction processor thread will execute
 all computer instructions until a yield, then switch to execute
@@ -283,15 +283,15 @@ or network-access causes an implicit yield, and every
 statement that goes through the tarantool client causes
 an implicit yield. And there are explicit yields:
 in a Lua function one can and should add “yield” statements
-to prevent hogging. This is called cooperative multitasking.
+to prevent hogging. This is called *cooperative multitasking*.
 
 Since all data-change operations end with an implicit yield
 and an implicit commit, and since no data-change operation
 can change more than one tuple, there is no need for any locking.
 Consider, for example, a Lua function that does three Tarantool operations:|br|
-s:select{999}                -- this does not yield and does not commit |br|
-s:update({...},{{...}})      -- this yields and commits |br|
-s:select{999}                -- this does not yield and does not commit |br|
+:codenormal:`s:select{999}                -- this does not yield and does not commit` |br|
+:codenormal:`s:update({...},{{...}})      -- this yields and commits` |br|
+:codenormal:`s:select{999}                -- this does not yield and does not commit` |br|
 The combination “SELECT plus UPDATE” is an atomic transaction:
 the function holds a consistent view of the database until the UPDATE ends.
 For the combination “UPDATE plus SELECT” the view is not consistent,
@@ -329,19 +329,17 @@ A new WAL file is created for every :confval:`rows_per_wal <rows_per_wal>` recor
 Each data change request gets assigned a continuously growing
 64-bit log sequence number. The name of the WAL file is based
 on the log sequence number of the first record in the file,
-plus an extension .xlog.
+plus an extension :codenormal:`.xlog`.
 
 Apart from a log sequence number and the data change request
 (its format is the same as in the binary protocol and is described
 in `doc/box-protocol.html`_), each WAL record contains a header,
-some metadata, and then the data formatted according to msgpack rules.
+some metadata, and then the data formatted according to `msgpack`_ rules.
 For example this is what the WAL file looks like after the first INSERT
 request ("s:insert({1})") for the introductory sandbox exercise
 ":ref:`Starting Tarantool and making your first database <first database>`“.
-On the left are the hexadecimal bytes that one would see with
-
-$ hexdump 00000000000000000001.xlog
-
+On the left are the hexadecimal bytes that one would see with |br|
+:codebold:`$ hexdump 00000000000000000001.xlog` |br|
 and on the right are comments.
 
 .. code-block:: none
@@ -419,12 +417,13 @@ Data manipulation
 -----------------
 
 The basic "data-manipulation" requests are:
-insert, replace, update, delete, select.
-They all are part of the box library.
+:codenormal:`insert`, :codenormal:`replace`, :codenormal:`update`,
+:codenormal:`delete`, :codenormal:`select`.
+They all are part of the :codenormal:`box` library.
 They all may return data. Usually both inputs and outputs may be Lua tables.
 
 The Lua syntax for data-manipulation functions can vary.
-Here are examples of the variations with select examples;
+Here are examples of the variations with :codenormal:`select` examples;
 the same rules exist for the other data-manipulation functions.
 Every one of the examples does the same thing:
 select a tuple set from a space named tester where
@@ -432,13 +431,13 @@ the primary-key field value equals 1.
 
 First there are "naming variations":
 
-    1. box.space.tester:select{1}
+    1. :codenormal:`box.space.tester:select{1}`
 
-    2. box.space['tester']:select{1}
+    2. :codenormal:`box.space['tester']:select{1}`
 
-    3. box.space[512]:select{1}
+    3. :codenormal:`box.space[512]:select{1}`
 
-    4. variable = 'tester'; box.space[variable]:select{1}
+    4. :codenormal:`variable = 'tester'; box.space[variable]:select{1}`
 
 ... There is an assumption that the numeric id of
 'tester' is 512, which happens to be the case in our
@@ -450,17 +449,17 @@ the variants exist in the wild.
 
 Then there are "parameter variations":
 
-    1. box.space.tester:select{1}
+    1. :codenormal:`box.space.tester:select{1}`
 
-    2. box.space.tester:select({1})
+    2. :codenormal:`box.space.tester:select({1})`
 
-    3. box.space.tester:select(1)
+    3. :codenormal:`box.space.tester:select(1)`
 
-    4. box.space.tester:select({1},{iterator='EQ'})
+    4. :codenormal:`box.space.tester:select({1},{iterator='EQ'})`
 
-    5. variable = 1; box.space.tester:select{variable}
+    5. :codenormal:`variable = 1; box.space.tester:select{variable}`
 
-    6. variable = {1}; box.space.tester:select(variable)
+    6. :codenormal:`variable = {1}; box.space.tester:select(variable)`
 
 ... The primary-key value is enclosed in braces, and if
 it was a multi-part primary key then the value would be
@@ -478,7 +477,7 @@ user preference and all the variants exist in the wild.
 
 All the data-manipulation functions operate on tuple sets but,
 since primary keys are unique, the number of tuples in the
-tuple set is always 1. The only exception is box.space...select,
+tuple set is always 1. The only exception is :codenormal:`box.space...select`,
 which may accept either a primary-key value or a secondary-key value. 
 
 .. _box-library:
@@ -488,13 +487,14 @@ The box library
 ---------------
 
 As well as executing Lua chunks or defining their own functions, users can exploit
-the Tarantool server's storage functionality with the ``box`` Lua library.
+the Tarantool server's storage functionality with the :codenormal:`Lua library`.
 
 =====================================================================
                      Packages of the box library
 =====================================================================
 
-The contents of the box library can be inspected at runtime with ``box``, with
+The contents of the :codenormal:`box` library can be inspected at runtime
+with :codenormal:`box`, with
 no arguments. The packages inside the box library are:
 box.schema, box.tuple, box.space, box.index, net.box, box.cfg, box.info, box.slab, box.stat.
 Every package contains one or more Lua functions. A few packages contain
@@ -533,7 +533,7 @@ introspection (inspecting contents of spaces, accessing server configuration).
     |                   | :ref:`wal_mode <wal_mode>`. If the setting causes   |
     |                   | no writing or                                       |
     |                   | delayed writing, this factor is unimportant. If the |
-    |                   | settings causes every data-change request to wait   |
+    |                   | setting causes every data-change request to wait    |
     |                   | for writing to finish on a slow device, this factor |
     |                   | is more important than all the others.              |
     +-------------------+-----------------------------------------------------+

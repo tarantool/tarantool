@@ -289,6 +289,8 @@ API is a direct binding to corresponding methods of index objects of type
             ---
             ...
 
+.. _index_select:
+
     .. function:: select(key, options)
 
         This is is an alternative to :func:`box.space...select() <space_object.select>`

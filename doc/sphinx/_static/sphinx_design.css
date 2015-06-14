@@ -450,9 +450,14 @@ div.b-cols_content_left .b-search-text {
     height: 100%;
 }
 
+/*
+  Classes whose names start with "ccode" are a Tarantool extension,
+  see comment in conf.py file: Tarantool custom roles
+*/
+
 .ccode, .ccodeb, .ccodei, .ccodebi {
     white-space: pre;
-    font-size: 13px;
+    font-size: 14px;
     font-family: monospace;
 }
 
