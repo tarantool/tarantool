@@ -30,6 +30,7 @@
  */
 #include "object.h"
 #include <stdarg.h>
+#include <assert.h>
 #include "say.h"
 
 enum { TNT_ERRMSG_MAX = 512 };
@@ -56,33 +57,24 @@ public:
 	}
 
 	virtual void log() const;
-	virtual ~Exception() {}
+	virtual ~Exception();
 
-	static void init(Exception **what)
-	{
-		*what = NULL;
+	void ref() {
+		++m_ref;
 	}
-	/** Clear the last error saved in the current fiber's TLS */
-	static inline void clear(Exception **what)
-	{
-		if (*what != NULL && (*what)->size > 0) {
-			(*what)->~Exception();
-			free(*what);
-		}
-		Exception::init(what);
+
+	void unref() {
+		assert(m_ref > 0);
+		--m_ref;
+		if (m_ref == 0)
+			delete this;
 	}
-	/** Move an exception from one thread to another. */
-	static void move(Exception **from, Exception **to)
-	{
-		Exception::clear(to);
-		*to = *from;
-		Exception::init(from);
-	}
+
 protected:
 	Exception(const char *file, unsigned line);
-	/* The copy constructor is needed for C++ throw */
-	Exception(const Exception&);
 
+	/* Ref counter */
+	size_t m_ref;
 	/* file name */
 	const char *m_file;
 	/* line number */
@@ -131,9 +123,112 @@ public:
 		    const char *object);
 };
 
+/**
+ * Diagnostics Area - a container for errors and warnings
+ */
+struct diag {
+	/* \cond private */
+	class Exception *last;
+	/* \endcond private */
+};
+
+/**
+ * Remove all errors from the diagnostics area
+ * \param diag diagnostics area
+ */
+static inline void
+diag_clear(struct diag *diag)
+{
+	if (diag->last == NULL)
+		return;
+	diag->last->unref();
+	diag->last = NULL;
+}
+
+/**
+ * Add a new error to the diagnostics area
+ * \param diag diagnostics area
+ * \param e error to add
+ */
+static inline void
+diag_add_error(struct diag *diag, Exception *e)
+{
+	assert(e != NULL);
+	e->ref();
+	diag_clear(diag);
+	diag->last = e;
+}
+
+/**
+ * Return last error
+ * \return last error
+ * \param diag diagnostics area
+ */
+static inline Exception *
+diag_last_error(struct diag *diag)
+{
+	return diag->last;
+}
+
+/**
+ * Move all errors from \a from to \a to.
+ * \param from source
+ * \param to destination
+ * \post diag_is_empty(from)
+ */
+static inline void
+diag_move(struct diag *from, struct diag *to)
+{
+	diag_clear(to);
+	if (from->last == NULL)
+		return;
+	to->last = from->last;
+	from->last = NULL;
+}
+
+/**
+ * Return true if diagnostics area is empty
+ * \param diag diagnostics area to initialize
+ */
+static inline bool
+diag_is_empty(struct diag *diag)
+{
+	return diag->last == NULL;
+}
+
+/**
+ * Create a new diagnostics area
+ * \param diag diagnostics area to initialize
+ */
+static inline void
+diag_create(struct diag *diag)
+{
+	diag->last = NULL;
+}
+
+/**
+ * Destroy diagnostics area
+ * \param diag diagnostics area to clean
+ */
+static inline void
+diag_destroy(struct diag *diag)
+{
+	diag_clear(diag);
+}
+
+/**
+ * A helper for tnt_error to avoid cyclic includes (fiber.h and exception.h)
+ * \cond false
+ * */
+struct diag *
+diag_get();
+/** \endcond */
+
 #define tnt_error(class, ...) ({					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	new class(__FILE__, __LINE__, ##__VA_ARGS__);			\
+	class *e = new class(__FILE__, __LINE__, ##__VA_ARGS__);	\
+	diag_add_error(diag_get(), e);					\
+	e;								\
 })
 
 #define tnt_raise(...) do {						\

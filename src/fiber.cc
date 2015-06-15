@@ -220,11 +220,11 @@ fiber_join(struct fiber *fiber)
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
 
-	Exception::move(&fiber->exception, &fiber()->exception);
-	if (fiber()->exception &&
-	    typeid(*fiber()->exception) != typeid(FiberCancelException)) {
-		fiber()->exception->raise();
-	}
+	/* Move exception to the caller */
+	diag_move(&fiber->diag, &fiber()->diag);
+	Exception *e = diag_last_error(&fiber()->diag);
+	if (e != NULL && typeid(*e) != typeid(FiberCancelException))
+		e->raise();
 	fiber_testcancel();
 }
 /**
@@ -404,7 +404,7 @@ fiber_loop(void *data __attribute__((unused)))
 			 * Make sure a leftover exception does not
 			 * propagate up to the joiner.
 			 */
-			Exception::clear(&fiber->exception);
+			diag_clear(&fiber->diag);
 		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
 				 fiber_name(fiber));
@@ -497,6 +497,7 @@ fiber_new(const char *name, void (*f) (va_list))
 	if (++cord->max_fid < 100)
 		cord->max_fid = 101;
 	fiber->fid = cord->max_fid;
+	diag_create(&fiber->diag);
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 
@@ -524,7 +525,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	rlist_del(&f->state);
 	region_destroy(&f->gc);
 	tarantool_coro_destroy(&f->coro, &cord->slabc);
-	Exception::clear(&f->exception);
+	diag_destroy(&f->diag);
 }
 
 void
@@ -555,7 +556,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->call_stack_depth = 0;
 	cord->sched.fid = 1;
 	fiber_reset(&cord->sched);
-	Exception::init(&cord->sched.exception);
+	diag_create(&cord->sched.diag);
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
@@ -578,7 +579,7 @@ cord_destroy(struct cord *cord)
 		mh_i32ptr_delete(cord->fiber_registry);
 	}
 	region_destroy(&cord->sched.gc);
-	Exception::clear(&cord->sched.exception);
+	diag_destroy(&cord->sched.diag);
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
 }
@@ -616,11 +617,11 @@ void *cord_thread_func(void *p)
 		 * Clear a possible leftover exception object
 		 * to not confuse the invoker of the thread.
 		 */
-		Exception::clear(&cord->fiber->exception);
+		diag_clear(&cord->fiber->diag);
 	} catch (Exception *) {
 		/*
 		 * The exception is now available to the caller
-		 * via cord->exception.
+		 * via cord->diag.
 		 */
 		res = NULL;
 	}
@@ -653,16 +654,18 @@ cord_join(struct cord *cord)
 	assert(cord() != cord); /* Can't join self. */
 	void *retval = NULL;
 	int res = tt_pthread_join(cord->id, &retval);
-	if (res == 0 && cord->fiber->exception) {
+	if (res == 0 && !diag_is_empty(&cord->fiber->diag)) {
 		/*
 		 * cord_thread_func guarantees that
 		 * cord->exception is only set if the subject cord
 		 * has terminated with an uncaught exception,
 		 * transfer it to the caller.
 		 */
-		Exception::move(&cord->fiber->exception, &fiber()->exception);
+		diag_move(&cord->fiber->diag, &fiber()->diag);
 		cord_destroy(cord);
-		fiber()->exception->raise();
+		Exception *e = diag_last_error(&fiber()->diag);
+		if (e != NULL)
+			e->raise();
 	}
 	cord_destroy(cord);
 	return res;
@@ -702,10 +705,10 @@ cord_costart_thread_func(void *arg)
 		/* The fiber hasn't died right away at start. */
 		ev_run(loop(), 0);
 	}
-	if (f->exception &&
-	    typeid(f->exception) != typeid(FiberCancelException)) {
-		Exception::move(&f->exception, &fiber()->exception);
-		fiber()->exception->raise();
+	diag_move(&f->diag, &fiber()->diag);
+	Exception *e = diag_last_error(&fiber()->diag);
+	if (e != NULL && typeid(*e) != typeid(FiberCancelException)) {
+		e->raise();
 	}
 
 	return NULL;

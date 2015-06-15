@@ -392,8 +392,9 @@ extern "C" const char *
 tarantool_error_message(void)
 {
 	/* called only from error handler */
-	assert(fiber()->exception != NULL);
-	return fiber()->exception->errmsg();
+	Exception *e = diag_last_error(&fiber()->diag);
+	assert(e != NULL);
+	return e->errmsg();
 }
 
 /**

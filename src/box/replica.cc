@@ -325,7 +325,7 @@ recovery_stop_remote(struct recovery_state *r)
 	 * If the remote died from an exception, don't throw it
 	 * up.
 	 */
-	Exception::clear(&f->exception);
+	diag_clear(&f->diag);
 	fiber_join(f);
 	r->remote.status = "off";
 }

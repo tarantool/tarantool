@@ -39,51 +39,44 @@
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
 
+struct diag *
+diag_get()
+{
+	return &fiber()->diag;
+}
+
 void *
 Exception::operator new(size_t size)
 {
-	struct fiber *fiber = fiber();
-
-	if (fiber->exception && fiber->exception->size == 0)
-		fiber->exception = NULL;
-
-	if (fiber->exception) {
-		/* Explicitly call destructor for previous exception */
-		fiber->exception->~Exception();
-		if (fiber->exception->size >= size) {
-			/* Reuse memory allocated for exception */
-			return fiber->exception;
-		}
-		free(fiber->exception);
-	}
-	fiber->exception = (Exception *) malloc(size);
-	if (fiber->exception) {
-		fiber->exception->size = size;
-		return fiber->exception;
-	}
-	fiber->exception = &out_of_memory;
-	throw fiber->exception;
+	void *buf = malloc(size);
+	if (buf != NULL)
+		return buf;
+	diag_add_error(&fiber()->diag, &out_of_memory);
+	throw &out_of_memory;
 }
 
 void
-Exception::operator delete(void * /* ptr */)
+Exception::operator delete(void *ptr)
 {
-	/* Unsupported */
-	assert(false);
+	free(ptr);
+}
+
+Exception::~Exception()
+{
+	if (this != &out_of_memory) {
+		assert(m_ref == 0);
+	}
 }
 
 Exception::Exception(const char *file, unsigned line)
-	: m_file(file), m_line(line)
-{
+	: m_ref(0), m_file(file), m_line(line){
 	m_errmsg[0] = 0;
+	if (this == &out_of_memory) {
+		/* A special workaround for out_of_memory static init */
+		out_of_memory.m_ref = 1;
+		return;
+	}
 }
-
-Exception::Exception(const Exception& e)
-	: Object(), m_file(e.m_file), m_line(e.m_line)
-{
-	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
-}
-
 
 const char *
 Exception::type() const
