@@ -55,10 +55,11 @@ static inline void
 iproto_port_add_tuple(struct port *ptr, struct tuple *tuple, uint32_t flags)
 {
 	struct iproto_port *port = iproto_port(ptr);
-	if (++port->reply.found == 1) {
+	if (port->reply.found == 0) {
 		/* Found the first tuple, add header. */
 		port->svp = obuf_book(port->buf, sizeof(port->reply));
 	}
+	port->reply.found++;
 	if (flags & BOX_RETURN_TUPLE)
 		tuple_to_obuf(tuple, port->buf);
 }
