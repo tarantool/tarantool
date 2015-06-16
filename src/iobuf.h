@@ -113,15 +113,11 @@ enum { IOBUF_IOV_MAX = 32 };
  */
 struct obuf
 {
-	struct region *pool;
+	struct slab_cache *slabc;
 	/* How many bytes are in the buffer. */
 	size_t size;
 	/** Position of the "current" iovec. */
-	int pos;
-	/** Allocation factor (allocations are a multiple of this number) */
-	size_t alloc_factor;
-	/** How many bytes are actually allocated for each iovec. */
-	size_t capacity[IOBUF_IOV_MAX];
+	size_t pos;
 	/**
 	 * List of iovec vectors, each vector is at least twice
 	 * as big as the previous one. The vector following the
@@ -129,10 +125,18 @@ struct obuf
 	 * (iov_base = NULL, iov_len = 0).
 	 */
 	struct iovec iov[IOBUF_IOV_MAX];
+	/** How many bytes are actually allocated for each iovec. */
+	size_t capacity[IOBUF_IOV_MAX];
+	/**
+	 * iov[0] size (allocations are normally a multiple of this number),
+	 * but can be larger if a large chunk is requested by
+	 * obuf_reserve().
+	 */
+	size_t start_size;
 };
 
 void
-obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor);
+obuf_create(struct obuf *buf, struct slab_cache *slabc, size_t start_size);
 
 void
 obuf_destroy(struct obuf *buf);
@@ -159,7 +163,7 @@ obuf_iovcnt(struct obuf *buf)
  */
 struct obuf_svp
 {
-	int pos;
+	size_t pos;
 	size_t iov_len;
 	size_t size;
 };
@@ -278,7 +282,6 @@ struct iobuf
 	struct ibuf in;
 	/** Output buffer. */
 	struct obuf out;
-	struct region pool;
 	/*
 	 * A "pinned" buffer is not destroyed even if it's idle.
 	 * The last one to unpin an idle buffer has to destroy it.

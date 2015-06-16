@@ -141,34 +141,32 @@ static inline void
 obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
 {
 	assert(buf->capacity[pos] == 0);
-	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 : buf->alloc_factor;
-	while (capacity < size) {
-		capacity *=2;
-	}
+	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 :
+		buf->start_size;
+	while (capacity < size)
+		capacity *= 2;
 
-	buf->iov[pos].iov_base = region_alloc(buf->pool, capacity);
-	buf->capacity[buf->pos] = capacity;
+	struct slab *slab = slab_get(buf->slabc, capacity);
+	if (slab == NULL)
+		tnt_raise(OutOfMemory, capacity, "obuf_alloc_pos", "slab_get");
+	buf->iov[pos].iov_base = slab_data(slab);
+	buf->capacity[buf->pos] = slab_capacity(slab);
 	assert(buf->iov[pos].iov_len == 0);
 }
 
-/** Initialize an output buffer instance. Don't allocate memory
+/**
+ * Initialize an output buffer instance. Don't allocate memory
  * yet -- it may never be needed.
  */
 void
-obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor)
+obuf_create(struct obuf *buf, struct slab_cache *slabc, size_t start_size)
 {
-	buf->pool = pool;
+	buf->slabc = slabc;
 	buf->pos = 0;
 	buf->size = 0;
-	buf->alloc_factor = alloc_factor;
+	buf->start_size = start_size;
 	obuf_init_pos(buf, buf->pos);
 }
-
-void
-obuf_destroy(struct obuf *obuf)
-{
-	(void) obuf;
-};
 
 /** Mark an output buffer as empty. */
 static void
@@ -179,6 +177,16 @@ obuf_reset(struct obuf *buf)
 		buf->iov[i].iov_len = 0;
 	buf->pos = 0;
 	buf->size = 0;
+}
+
+void
+obuf_destroy(struct obuf *buf)
+{
+	int iovcnt = obuf_iovcnt(buf);
+	for (int i = 0; i < iovcnt; i++) {
+		struct slab *slab = slab_from_data(buf->iov[i].iov_base);
+		slab_put(buf->slabc, slab);
+	}
 }
 
 /** Add data to the output buffer. Copies the data. */
@@ -257,11 +265,17 @@ obuf_reserve_slow(struct obuf *buf, size_t size)
 	}
 	/* Make sure the next buffer can store size. */
 	assert(iov->iov_len == 0);
-	if (capacity == 0) {
-		obuf_init_pos(buf, buf->pos + 1);
-		obuf_alloc_pos(buf, buf->pos, size);
-	} else if (size > capacity) {
-		/* Simply realloc. */
+	if (size > capacity) {
+		if (capacity > 0) {
+			/* Simply realloc. */
+			struct slab *slab =
+				slab_from_data(buf->iov[buf->pos].iov_base);
+			slab_put(buf->slabc, slab);
+			obuf_init_pos(buf, buf->pos);
+		} else {
+			/* Initialize the next pos, the end marker. */
+			obuf_init_pos(buf, buf->pos + 1);
+		}
 		obuf_alloc_pos(buf, buf->pos, size);
 	}
 	assert(buf->iov[buf->pos].iov_len + size <= buf->capacity[buf->pos]);
@@ -296,6 +310,13 @@ obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp)
 		buf->iov[i].iov_len = 0;
 }
 
+static inline size_t
+obuf_capacity(struct obuf *buf)
+{
+	/** This is an approximation, see obuf_alloc_pos() */
+	return buf->capacity[buf->pos] * 2;
+}
+
 /* struct obuf }}} */
 
 /* {{{ struct iobuf */
@@ -304,7 +325,7 @@ obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp)
  * How big is a buffer which needs to be shrunk before it is put
  * back into buffer cache.
  */
-static int iobuf_max_pool_size()
+static int iobuf_max_size()
 {
 	return 18 * iobuf_readahead;
 }
@@ -313,22 +334,21 @@ static int iobuf_max_pool_size()
 struct iobuf *
 iobuf_new(const char *name)
 {
+	(void) name;
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
 		iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);
-		region_create(&iobuf->pool, &cord()->slabc);
 		iobuf->pins = 0;
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, &cord()->slabc);
-		obuf_create(&iobuf->out, &iobuf->pool, iobuf_readahead);
+		obuf_create(&iobuf->out, &cord()->slabc, iobuf_readahead);
 	} else {
 		iobuf = SLIST_FIRST(&iobuf_cache);
 		SLIST_REMOVE_HEAD(&iobuf_cache, next);
 	}
-	/* When releasing the buffer, we trim it to iobuf_max_pool_size. */
-	assert(region_used(&iobuf->pool) <= iobuf_max_pool_size());
-	assert(ibuf_capacity(&iobuf->in) <= iobuf_max_pool_size());
-	region_set_name(&iobuf->pool, name);
+	/* When releasing the buffer, we trim it to iobuf_max_size(). */
+	assert(ibuf_capacity(&iobuf->in) <= iobuf_max_size());
+	assert(obuf_capacity(&iobuf->out) <= iobuf_max_size());
 	return iobuf;
 }
 
@@ -337,20 +357,18 @@ void
 iobuf_delete(struct iobuf *iobuf)
 {
 	assert(iobuf->pins == 0);
-	if (ibuf_capacity(&iobuf->in) < iobuf_max_pool_size()) {
+	if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
 		ibuf_reset(&iobuf->in);
 	} else {
 		ibuf_destroy(&iobuf->in);
 		ibuf_create(&iobuf->in, &cord()->slabc);
 	}
-	struct region *pool = &iobuf->pool;
-	if (region_used(pool) < iobuf_max_pool_size()) {
+	if (obuf_capacity(&iobuf->out) < iobuf_max_size()) {
 		obuf_reset(&iobuf->out);
 	} else {
-		region_free(pool);
-		obuf_create(&iobuf->out, pool, iobuf_readahead);
+		obuf_destroy(&iobuf->out);
+		obuf_create(&iobuf->out, &cord()->slabc, iobuf_readahead);
 	}
-	region_set_name(pool, "iobuf_cache");
 	SLIST_INSERT_HEAD(&iobuf_cache, iobuf, next);
 }
 
