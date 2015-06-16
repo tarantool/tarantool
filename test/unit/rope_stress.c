@@ -14,15 +14,15 @@ test_rope_stress_small()
 	const int iterations = 500;
 	int i = 0;
 	for (i = 0; i < iterations; ++i) {
-		char *d = data[((rsize_t) rand())%5];
+		char *d = data[((rope_size_t) rand())%5];
 		int len = strlen(d);
-		rsize_t size = rope_size(rope);
-		rsize_t offset = ((rsize_t) rand()) % (size + 1);
+		rope_size_t size = rope_size(rope);
+		rope_size_t offset = ((rope_size_t) rand()) % (size + 1);
 		rope_insert(rope, offset, d, len);
 		fail_unless(size + len == rope_size(rope));
 		rope_check(rope);
 		size = rope_size(rope);
-		offset = ((rsize_t) rand()) % size;
+		offset = ((rope_size_t) rand()) % size;
 		if (offset == size)
 			offset--;
 		rope_erase(rope, offset);
@@ -43,14 +43,14 @@ test_rope_stress_large()
 	const int iterations = 50000;
 	int i = 0;
 	for (i = 0; i < iterations; ++i) {
-		char *d = data[((rsize_t) rand())%5];
+		char *d = data[((rope_size_t) rand())%5];
 		int len = strlen(d);
-		rsize_t size = rope_size(rope);
-		rsize_t offset = ((rsize_t) rand()) % (size + 1);
+		rope_size_t size = rope_size(rope);
+		rope_size_t offset = ((rope_size_t) rand()) % (size + 1);
 		rope_insert(rope, offset, d, len);
 		fail_unless(size + len == rope_size(rope));
 		size = rope_size(rope);
-		offset = ((rsize_t) rand()) % size;
+		offset = ((rope_size_t) rand()) % size;
 		if (offset == size)
 			offset--;
 		rope_erase(rope, offset);

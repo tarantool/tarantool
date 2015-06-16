@@ -65,13 +65,16 @@ t
 -- Before restart: oops, our LSN is 11,
 -- even though we didn't insert anything.
 --
+name = string.match(arg[0], "([^,]+)%.lua")
+---
+...
 box.info.vclock
 ---
 - - 11
 ...
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 ---
-- - 00000000000000000000.xlog
+- - panic/00000000000000000000.xlog
 ...
 --# stop server panic
 --# start server panic
@@ -160,10 +163,13 @@ box.space._schema:select{'key'}
 - - ['key', 'test 2']
 ...
 -- list all the logs
-require('fio').glob("*.xlog")
+name = string.match(arg[0], "([^,]+)%.lua")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
+...
+require('fio').glob(name .. "/*.xlog")
+---
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
 ...
 -- now insert 10 rows - so that the next
 -- row will need to switch the WAL
@@ -176,11 +182,11 @@ end;
 --# setopt delimiter ''
 -- the next insert should switch xlog, but aha - it fails
 -- a new xlog file is created but has 0 rows
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
-  - 00000000000000000012.xlog
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 ---
@@ -194,12 +200,12 @@ box.info.vclock
 ---
 - - 23
 ...
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
-  - 00000000000000000012.xlog
-  - 00000000000000000022.xlog
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
+  - panic/00000000000000000022.xlog
 ...
 -- and the next one (just to be sure
 box.space._schema:replace{"key", 'test 3'}
@@ -210,12 +216,12 @@ box.info.vclock
 ---
 - - 24
 ...
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
-  - 00000000000000000012.xlog
-  - 00000000000000000022.xlog
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
+  - panic/00000000000000000022.xlog
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
 ---
@@ -230,12 +236,12 @@ box.info.vclock
 ---
 - - 25
 ...
-require('fio').glob("*.xlog")
+require('fio').glob(name .. "/*.xlog")
 ---
-- - 00000000000000000000.xlog
-  - 00000000000000000001.xlog
-  - 00000000000000000012.xlog
-  - 00000000000000000022.xlog
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
+  - panic/00000000000000000022.xlog
 ...
 -- restart is ok
 --# stop server panic

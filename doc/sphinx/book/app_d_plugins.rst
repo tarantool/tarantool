@@ -76,7 +76,7 @@ mysqld server is already running on the local host 127.0.0.1.
     Query OK, 0 rows affected (0.13 sec)
     mysql> INSERT INTO test.test VALUES (1,'MySQL row');
     Query OK, 1 row affected (0.02 sec)
-    mysql> **QUIT**
+    mysql> QUIT
     Bye
 
     # Build the Tarantool server. Make certain that "cmake" gets the right

@@ -297,7 +297,8 @@ box.space.test:drop()
 box.space.test_old:drop()
 con:close()
 
-file_log = require('fio').open('tarantool.log', {'O_RDONLY', 'O_NONBLOCK'})
+name = string.match(arg[0], "([^,]+)%.lua")
+file_log = require('fio').open(name .. '.log', {'O_RDONLY', 'O_NONBLOCK'})
 file_log:seek(0, 'SEEK_END') ~= 0
 
 --# setopt delimiter ';'

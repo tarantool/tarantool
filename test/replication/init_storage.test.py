@@ -11,8 +11,8 @@ master.admin("space = box.schema.space.create('test', {id =  42})")
 master.admin("index = space:create_index('primary', { type = 'tree'})")
 
 master.admin('for k = 1, 9 do space:insert{k, k*k} end')
-
-for k in glob.glob(os.path.join(master.vardir, '*.xlog')):
+data_dir = os.path.join(master.vardir, master.name)
+for k in glob.glob(os.path.join(data_dir, '*.xlog')):
     os.unlink(k)
 
 print '-------------------------------------------------------------'
@@ -21,7 +21,7 @@ print '-------------------------------------------------------------'
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
 
@@ -61,7 +61,7 @@ lsn = master.get_lsn(master_id)
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
 
@@ -80,7 +80,7 @@ print '-------------------------------------------------------------'
 server.stop()
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
-replica.vardir = os.path.join(server.vardir, 'replica')
+replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy(wait=False)
 
