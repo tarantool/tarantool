@@ -158,7 +158,7 @@ struct fiber {
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
 	/** Exception which caused this fiber's death. */
-	class Exception *exception;
+	struct diag diag;
 };
 
 enum { FIBER_CALL_STACK = 16 };

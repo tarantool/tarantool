@@ -53,8 +53,9 @@ lbox_error_raise(lua_State *L)
 	int top = lua_gettop(L);
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
-		if (fiber()->exception)
-			fiber()->exception->raise();
+		Exception *e = diag_last_error(&fiber()->diag);
+		if (e != NULL)
+			e->raise();
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
 		code = lua_tointeger(L, 2);
@@ -101,7 +102,9 @@ raise:
 
 	/* see tnt_raise() */
 	say_debug("ClientError at %s:%i", file, line);
-	throw new ClientError(file, line, reason, code);
+	ClientError *e = new ClientError(file, line, reason, code);
+	diag_add_error(&fiber()->diag, e);
+	throw e;
 	return 0;
 }
 
@@ -111,7 +114,7 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	Exception *e = fiber()->exception;
+	Exception *e = diag_last_error(&fiber()->diag);
 
 	if (e == NULL) {
 		lua_pushnil(L);
@@ -145,7 +148,7 @@ lbox_error_clear(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.clear(): bad arguments");
 
-	Exception::clear(&fiber()->exception);
+	diag_clear(&fiber()->diag);
 	return 0;
 }
 

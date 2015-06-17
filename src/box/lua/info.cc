@@ -63,10 +63,10 @@ lbox_info_replication(struct lua_State *L)
 		lua_pushnumber(L, ev_now(loop()) - r->remote.last_row_time);
 		lua_settable(L, -3);
 
-		if (r->remote.reader->exception) {
+		Exception *e = diag_last_error(&r->remote.reader->diag);
+		if (e != NULL) {
 			lua_pushstring(L, "message");
-			lua_pushstring(L,
-				       r->remote.reader->exception->errmsg());
+			lua_pushstring(L, e->errmsg());
 			lua_settable(L, -3);
 		}
 	}

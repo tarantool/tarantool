@@ -363,11 +363,12 @@ cord_cojoin(struct cord *cord)
 {
 	assert(cord() != cord); /* Can't join self. */
 	int rc = coio_call(cord_cojoin_cb, cord);
-	if (rc == 0 && cord->fiber->exception) {
-		Exception::move(&cord->fiber->exception, &fiber()->exception);
+	diag_move(&cord->fiber->diag, &fiber()->diag);
+	Exception *e = diag_last_error(&fiber()->diag);
+	if (rc == 0 && e != NULL) {
 		cord_destroy(cord);
 		 /* re-throw exception in this fiber */
-		fiber()->exception->raise();
+		e->raise();
 	}
 	cord_destroy(cord);
 	return rc;
