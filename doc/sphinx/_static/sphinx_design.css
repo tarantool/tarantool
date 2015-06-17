@@ -449,3 +449,17 @@ div.b-cols_content_left .b-search-text {
 .b-documentation-tab div {
     height: 100%;
 }
+
+.ccode, .ccodeb, .ccodei, .ccodebi {
+    white-space: pre;
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.ccodeb, .ccodebi {
+    font-weight: bold;
+}
+
+.ccodei, .ccodebi {
+    font-style: italic;
+}

@@ -148,10 +148,11 @@ static inline void
 iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
 {
 	struct iproto_port *port = iproto_port(ptr);
-	if (++port->found == 1) {
+	if (port->found == 0) {
 		/* Found the first tuple, add header. */
 		port->svp = iproto_prepare_select(port->buf);
 	}
+	port->found++;
 	tuple_to_obuf(tuple, port->buf);
 }
 
