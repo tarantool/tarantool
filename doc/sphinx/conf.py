@@ -74,6 +74,9 @@ rst_prolog = """
 
 .. role:: codebolditalic
    :class: ccodebi
+   
+.. |nbsp| unicode:: 0xA0 
+
 """
 
 

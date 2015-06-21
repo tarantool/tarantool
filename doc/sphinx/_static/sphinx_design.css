@@ -468,3 +468,9 @@ div.b-cols_content_left .b-search-text {
 .ccodei, .ccodebi {
     font-style: italic;
 }
+
+
+.leftaligned {
+    text-align: left
+}
+
