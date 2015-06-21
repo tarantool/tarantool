@@ -51,6 +51,46 @@ remote.self:eval('error("exception")')
 remote.self:eval('box.error(0)')
 remote.self:eval('!invalid expression')
 
+--
+-- gh-822: net.box.call should roll back local transaction on error
+--
+
+_ = box.schema.space.create('gh822')
+_ = box.space.gh822:create_index('primary')
+
+--# setopt delimiter ';'
+
+-- rollback on invalid function
+function rollback_on_invalid_function()
+    box.begin()
+    box.space.gh822:insert{1, "netbox_test"}
+    pcall(remote.self.call, remote.self, 'invalid_function')
+    return box.space.gh822:get(1) == nil
+end;
+rollback_on_invalid_function();
+
+-- rollback on call error
+function test_error() error('Some error') end;
+function rollback_on_call_error()
+    box.begin()
+    box.space.gh822:insert{1, "netbox_test"}
+    pcall(remote.self.call, remote.self, 'test_error')
+    return box.space.gh822:get(1) == nil
+end;
+rollback_on_call_error();
+
+-- rollback on eval
+function rollback_on_eval_error()
+    box.begin()
+    box.space.gh822:insert{1, "netbox_test"}
+    pcall(remote.self.eval, remote.self, "error('Some error')")
+    return box.space.gh822:get(1) == nil
+end;
+rollback_on_eval_error();
+
+--# setopt delimiter ''
+box.space.gh822:drop()
+
 box.schema.user.revoke('guest','execute','universe')
 box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()

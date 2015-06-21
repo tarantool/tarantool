@@ -1054,6 +1054,41 @@ local remote_methods = {
 
 setmetatable(remote, { __index = remote_methods })
 
+local function rollback()
+    if rawget(box, 'rollback') ~= nil then
+        -- roll back local transaction on error
+        box.rollback()
+    end
+end
+
+local function handle_call_result(status, ...)
+    if not status then
+        rollback()
+        return box.error(box.error.PROC_LUA, (...))
+    end
+    if select('#', ...) == 1 and type((...)) == 'table' then
+        local result = (...)
+        for i, v in pairs(result) do
+            result[i] = box.tuple.new(v)
+        end
+        return result
+    else
+        local result = {}
+        for i=1,select('#', ...), 1 do
+            result[i] = box.tuple.new((select(i, ...)))
+        end
+        return result
+    end
+end
+
+local function handle_eval_result(status, ...)
+    if not status then
+        rollback()
+        return box.error(box.error.PROC_LUA, (...))
+    end
+    return ...
+end
+
 remote.self = {
     ping = function() return true end,
     reload_schema = function() end,
@@ -1066,23 +1101,18 @@ remote.self = {
             box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
         end
         proc_name = tostring(proc_name)
-        local proc = { package.loaded['box.internal']
-            .call_loadproc(proc_name) }
+        local status, proc, obj = pcall(package.loaded['box.internal'].
+            call_loadproc, proc_name)
+        if not status then
+            rollback()
+            return box.error() -- re-throw
+        end
         local result
-        if #proc == 2 then
-            result = { proc[1](proc[2], ...) }
+        if obj ~= nil then
+            return handle_call_result(pcall(proc, obj, ...))
         else
-            result = { proc[1](...) }
+            return handle_call_result(pcall(proc, ...))
         end
-
-        if #result == 1 and type(result[1]) == 'table' then
-            result = result[1]
-        end
-
-        for i, v in pairs(result) do
-            result[i] = box.tuple.new(v)
-        end
-        return result
     end,
     eval = function(_box, expr, ...)
         if type(_box) ~= 'table' then
@@ -1093,9 +1123,10 @@ remote.self = {
             proc, errmsg = loadstring("return "..expr)
         end
         if not proc then
-            box.error(box.error.PROC_LUA, errmsg)
+            rollback()
+            return box.error(box.error.PROC_LUA, errmsg)
         end
-        return proc(...)
+        return handle_eval_result(pcall(proc, ...))
     end
 }
 
