@@ -30,20 +30,20 @@ API is a direct binding to corresponding methods of index objects of type
 
         :rtype: table
 
-        .. code-block:: lua
-
-            tarantool> box.space.tester.index.primary
-            ---
-            unique: true
-            parts:
-            0:
-                type: NUM
-                fieldno: 1
-            id: 0
-            space_id: 513
-            name: primary
-            type: TREE
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary`
+        | :codenormal:`---`
+        | - :codenormal:`unique: true`
+        | |nbsp| :codenormal:`parts:`
+        | |nbsp| :codenormal:`0:`
+        | |nbsp| - :codenormal:`type: NUM`
+        | |nbsp| |nbsp| |nbsp| :codenormal:`fieldno: 1`
+        | |nbsp| |nbsp| |nbsp| :codenormal:`id: 0`
+        | |nbsp| |nbsp| |nbsp| :codenormal:`space_id: 513`
+        | |nbsp| :codenormal:`name: primary`
+        | |nbsp| :codenormal:`type: TREE`
+        | :codenormal:`...` |br|
 
     .. _index-iterator:
 
@@ -85,7 +85,7 @@ API is a direct binding to corresponding methods of index objects of type
             | Type          | Arguments | Description                                 |
             +===============+===========+=============================================+
             | box.index.ALL | none      | Iterate over all tuples in an index. Tuples |
-            | or 'ALL'      |           | are returned in ascending order of the key. |
+            | or 'ALL'      |           | are returned  in ascending order by key.    |
             +---------------+-----------+---------------------------------------------+
             | box.index.EQ  | field     | Equality iterator: iterate over all tuples  |
             | or 'EQ'       | values    | where field values = key values. Parts of a |
@@ -238,72 +238,77 @@ API is a direct binding to corresponding methods of index objects of type
             |                    |           | values.                                     |
             +--------------------+-----------+---------------------------------------------+
 
-        .. code-block:: lua
+|br|
 
-            EXAMPLE WITH DEFAULT 'TREE' INDEX AND PAIRS() FUNCTION
+        | :codebold:`Example With Default 'TREE' Index and pairs() function`
+        |
+        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space17')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{'C', 'C'}`
+        | :codenormal:`---`
+        | :codenormal:`- ['C', 'C']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{'B', 'A'}`
+        | :codenormal:`---`
+        | :codenormal:`- ['B', 'A']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{'C', '!'}`
+        | :codenormal:`---`
+        | :codenormal:`- ['C', '!']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{'A', 'C'}`
+        | :codenormal:`---`
+        | :codenormal:`- ['A', 'C']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`function example()`
+        | :codenormal:`>` :codebold:`for _, tuple in`
+        | :codenormal:`>` :codebold:`s.index.primary:pairs(nil, {iterator = box.index.ALL}) do`
+        | :codenormal:`>` :codebold:`print(tuple)`
+        | :codenormal:`>` :codebold:`end`
+        | :codenormal:`>` :codebold:`end!`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`example()`
+        | :codenormal:`['A', 'C']`
+        | :codenormal:`['B', 'A']`
+        | :codenormal:`['C', '!']`
+        | :codenormal:`['C', 'C']`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:drop()`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
-            tarantool> s = box.schema.space.create('space17')
-            ---
-            ...
-            tarantool> s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})
-            ---
-            ...
-            tarantool> s:insert{'C', 'C'}
-            ---
-            - ['C', 'C']
-            ...
-            tarantool> s:insert{'B', 'A'}
-            ---
-            - ['B', 'A']
-            ...
-            tarantool> s:insert{'C', '!'}
-            ---
-            - ['C', '!']
-            ...
-            tarantool> s:insert{'A', 'C'}
-            ---
-            - ['A', 'C']
-            ...
-            tarantool> console = require('console'); console.delimiter('!')
-            ---
-            ...
-            tarantool> function example()
-                     >   for _, tuple in
-                     >   s.index.primary:pairs(nil, {iterator = box.index.ALL}) do
-                     >     print(tuple)
-                     >   end
-                     > end!
-            ---
-            ...
-            tarantool> console.delimiter('')!
-            ---
-            ...
-            tarantool> example()
-            ['A', 'C']
-            ['B', 'A']
-            ['C', '!']
-            ['C', 'C']
-            ---
-            ...
-            tarantool> s:drop()
-            ---
-            ...
+.. _index_select:
 
     .. function:: select(key, options)
 
-        This is is an alternative to :func:`box.space...select() <space_object.select>`
+        This is an alternative to :func:`box.space...select() <space_object.select>`
         which goes via a particular index and can make use of additional
         parameters that specify the iterator type, and the limit (that is, the
         maximum number of tuples to return) and the offset (that is, which
         tuple to start with in the list).
 
-        :param lua-table or scalar key: values to be matched against the index key.
-        :param lua-table options: table with any or all of iterator=iterator-type
-                                    limit=maximum-number-of-tuples,
-                                    offset=start-tuple-number.
+        Parameters: :codenormal:`field-value(s)` = values to be matched against the index key.
+        :codenormal:`option(s)` any or all of
+        :codenormal:`iterator =` :codeitalic:`iterator-type`,
+        :codenormal:`limit =` :codeitalic:`maximum-number-of-tuples`,
+        :codenormal:`offset =` :codeitalic:`start-tuple-number`. 
 
         :return: the tuple or tuples that match the field values.
         :rtype:  tuple set as a Lua table
+
+        EXAMPLE
 
         .. code-block:: lua
 
@@ -331,19 +336,19 @@ API is a direct binding to corresponding methods of index objects of type
 
         .. NOTE::
 
-            [.index.index-name] is optional. If it is omitted, then the assumed
+            :samp:`index.{index-name}` is optional. If it is omitted, then the assumed
             index is the first (primary-key) index. Therefore, for the example
             above, ``box.space.tester:select({1}, {iterator = 'GT'})`` would have
             returned the same two rows, via the 'primary' index.
 
         .. NOTE::
 
-            ``iterator = iterator type`` is optional. If it is omitted, then
+            :samp:`iterator = {iterator-type}` is optional. If it is omitted, then
             ``iterator = 'EQ'`` is assumed.
 
         .. NOTE::
 
-            ``field-value [, field-value ...]`` is optional. If it is omitted,
+            :samp:`{field-value} [, {field-value ...}]` is optional. If it is omitted,
             then every key in the index is considered to be a match, regardless of
             iterator type. Therefore, for the example above,
             ``box.space.tester:select{}`` will select every tuple in the tester
@@ -351,11 +356,11 @@ API is a direct binding to corresponding methods of index objects of type
 
         .. NOTE::
 
-            ``box.space.space-name.index.index-name:select(...)[1]``. can be
-            replaced by ``box.space.space-name.index.index-name:get(...)``.
-            That is, get can be used as a convenient shorthand to get the first
-            tuple in the tuple set that would be returned by select. However,
-            if there is more than one tuple in the tuple set, then get returns
+            :samp:`box.space.{space-name}.index.{index-name}:select(...)[1]``. can be
+            replaced by :samp:`box.space.{space-name}.index.{index-name}:get(...)`.
+            That is, :codenormal:`get` can be used as a convenient shorthand to get the first
+            tuple in the tuple set that would be returned by :codenormal:`select`. However,
+            if there is more than one tuple in the tuple set, then :codenormal:`get` returns
             an error.
 
         .. code-block:: lua
@@ -394,12 +399,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.tester.index.primary:min()
-            ---
-            - ['Alpha!', 55, 'This is the first tuple!']
-            ...
+        | :codenormal:`tarantool>`  :codebold:`box.space.tester.index.primary:min()`
+        | :codenormal:`---`
+        | :codenormal:`- ['Alpha!', 55, 'This is the first tuple!']`
+        | :codenormal:`...`
 
     .. function:: max([key-value])
 
@@ -413,12 +418,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.tester.index.primary:max()
-            ---
-            - ['Gamma!', 55, 'This is the third tuple!']
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary:max()`
+        | :codenormal:`---`
+        | :codenormal:`- ['Gamma!', 55, 'This is the third tuple!']`
+        | :codenormal:`...`
 
 
     .. function:: random(random-value)
@@ -433,12 +438,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.tester.index.secondary:random(1)
-            ---
-            - ['Beta!', 66, 'This is the second tuple!']
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.secondary:random(1)`
+        | :codenormal:`---`
+        | :codenormal:`- ['Beta!', 66, 'This is the second tuple!']`
+        | :codenormal:`...`
 
     .. function:: count(key-value, options)
 
@@ -454,16 +459,16 @@ API is a direct binding to corresponding methods of index objects of type
                 is only applicable for the memtx storage engine.
         :rtype:  number
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.tester.index.primary:count(999)
-            ---
-            - 0
-            ...
-            tarantool> box.space.tester.index.primary:count('Alpha!', { iterator = 'LE' })
-            ---
-            - 1
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary:count(999)`
+        | :codenormal:`---`
+        | :codenormal:`- 0`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary:count('Alpha!', { iterator = 'LE' })`
+        | :codenormal:`---`
+        | :codenormal:`- 1`
+        | :codenormal:`...`
 
     .. function:: alter({options})
 
@@ -476,11 +481,11 @@ API is a direct binding to corresponding methods of index objects of type
         :except: The first index cannot be changed to {unique = false}.
         :except: The alter function is only applicable for the memtx storage engine.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.space55.index.primary:alter({type = 'HASH'})
-            ---
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.space55.index.primary:alter({type = 'HASH'})`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
     .. function:: drop()
 
@@ -490,11 +495,11 @@ API is a direct binding to corresponding methods of index objects of type
         :return: nil.
         :except: If index-name doesn't exist.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.space55.index.primary:drop()
-            ---
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.space55.index.primary:drop()`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
     .. function:: rename(index-name)
 
@@ -504,11 +509,11 @@ API is a direct binding to corresponding methods of index objects of type
         :return: nil
         :except: If index-name doesn't exist.
 
-        .. code-block:: lua
+        EXAMPLE
 
-            tarantool> box.space.space55.index.primary:rename('secondary')
-            ---
-            ...
+        | :codenormal:`tarantool>` :codebold:`box.space.space55.index.primary:rename('secondary')`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
         Complexity Factors: Index size, Index type, Number of tuples accessed.
 
@@ -575,20 +580,18 @@ Lua functions `os.date()`_ and `string.sub()`_.
 
 ... And here is what happens when one invokes the function:
 
-.. code-block:: lua
-
-    tarantool> box.space.tester:delete(1000)
-    ---
-    - 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}
-    ...
-    tarantool> example(1000)
-    ---
-    - 2014-01-29 16:11:51.1582
-    ...
-    tarantool> example(1000)
-    ---
-    - error: 'This tuple already has 3 fields'
-    ...
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:delete(1000)`
+    | :codenormal:`---`
+    | :codenormal:`- 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`example(1000)`
+    | :codenormal:`---`
+    | :codenormal:`- 2014-01-29 16:11:51.1582`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`example(1000)`
+    | :codenormal:`---`
+    | :codenormal:`- error: 'This tuple already has 3 fields'`
+    | :codenormal:`...`
 
 .. _RTREE:
 
@@ -597,7 +600,7 @@ Lua functions `os.date()`_ and `string.sub()`_.
 =============================================================================
 
 The :mod:`box.index` package may be used for spatial searches if the index type
-is RTREE. There are operations for searching ``rectangles``. Rectangles are
+is RTREE. There are operations for searching *rectangles*. Rectangles are
 described according to their X-axis (horizontal axis) and Y-axis (vertical axis)
 coordinates in a grid of arbitrary size. Here is a picture of four rectangles on
 a grid with 11 horizontal points and 11 vertical points:
@@ -633,11 +636,9 @@ is Rectangle#2", and "Rectangle#3 is entirely inside Rectangle#2".
 
 Now let us create a space and add an RTREE index.
 
-.. code-block:: lua
-
-    s = box.schema.create_space('rectangles')
-    i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})
-    r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})
+    :codebold:`s = box.schema.create_space`
+    :codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
+    :codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
 
 Field#1 doesn't matter, we just make it because we need a primary-key index.
 (RTREE indexes cannot be unique and therefore cannot be primary-key indexes.)
@@ -645,21 +646,17 @@ The second field must be an "array", which means its values must represent
 {x,y} points or {x1,y1,x2,y2} rectangles. Now let us populate the table by
 inserting two tuples, containing the coordinates of Rectangle#2 and Rectangle#4.
 
-.. code-block:: lua
-
-    s:insert{1, {3,5,9,10}}
-    s:insert{2, {10,11}}
+    :codebold:`s:insert{1, {3,5,9,10}}`
+    :codebold:`s:insert{2, {10,11}}`
 
 And now, following the description of `RTREE iterator types`_, we can search the
 rectangles with these requests:
 
 .. _RTREE iterator types: rtree-iterator_
 
-.. code-block:: lua
-
-    r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)
-    r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)
-    r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)
+    :codebold:`r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)`
+    :codebold:`r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)`
+    :codebold:`r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)`
 
 Request#1 returns 1 tuple because the point {10,11} is the same as the rectangle
 {10,11,10,11} ("Rectangle#4" in the picture). Request#2 returns 1 tuple because

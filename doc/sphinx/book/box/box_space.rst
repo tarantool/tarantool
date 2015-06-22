@@ -58,14 +58,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
         unique option other than unique, or a parts option with more than one
         field component, is only applicable for the memtx storage engine.
 
-        .. code-block:: lua
-
-            tarantool> s = box.space.space55
-            ---
-            ...
-            tarantool> s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
-            ---
-            ...
+        | :codenormal:`tarantool>` :codebold:`s = box.space.space55`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
     .. function:: insert(tuple)
 
@@ -79,9 +77,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Possible errors: If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
 
-        .. code-block:: lua
-
-            box.space.tester:insert{5000,'tuple number five thousand'}
+        Example: :codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
 
     .. function:: select(key)
 
@@ -102,57 +98,55 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Complexity Factors: Index size, Index type.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> s = box.schema.space.create('tmp', {temporary=true})
-            ---
-            ...
-            tarantool> s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})
-            ---
-            ...
-            tarantool> s:insert{1,'A'}
-            ---
-            - [1, 'A']
-            ...
-            tarantool> s:insert{1,'B'}
-            ---
-            - [1, 'B']
-            ...
-            tarantool> s:insert{1,'C'}
-            ---
-            - [1, 'C']
-            ...
-            tarantool> s:insert{2,'D'}
-            ---
-            - [2, 'D']
-            ...
-            tarantool> -- must equal both primary-key fields
-            tarantool> s:select{1,'B'}
-            ---
-            - - [1, 'B']
-            ...
-            tarantool> -- must equal only one primary-key field
-            tarantool> s:select{1}
-            ---
-            - - [1, 'A']
-              - [1, 'B']
-              - [1, 'C']
-            ...
-            tarantool> -- must equal 0 fields, so returns all tuples
-            tarantool> s:select{}
-            ---
-            - - [1, 'A']
-              - [1, 'B']
-              - [1, 'C']
-              - [2, 'D']
-            ...
+        | :codebold:`EXAMPLE`
+        |
+        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tmp', {temporary=true})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{1,'A'}`
+        | :codenormal:`---`
+        | :codenormal:`- [1, 'A']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{1,'B'}`
+        | :codenormal:`---`
+        | :codenormal:`- [1, 'B']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{1,'C'}`
+        | :codenormal:`---`
+        | :codenormal:`- [1, 'C']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{2,'D'}`
+        | :codenormal:`---`
+        | :codenormal:`- [2, 'D']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`-- must equal both primary-key fields`
+        | :codenormal:`tarantool>` :codebold:`s:select{1,'B'}`
+        | :codenormal:`---`
+        | :codenormal:`- - [1, 'B']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`-- must equal only one primary-key field`
+        | :codenormal:`tarantool>` :codebold:`s:select{1}`
+        | :codenormal:`---`
+        | :codenormal:`- - [1, 'A']`
+        | :codenormal:`- [1, 'B']`
+        | :codenormal:`- [1, 'C']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`-- must equal 0 fields, so returns all tuples`
+        | :codenormal:`tarantool>` :codebold:`s:select{}`
+        | :codenormal:`---`
+        | :codenormal:`- - [1, 'A']`
+        | :codenormal:`- [1, 'B']`
+        | :codenormal:`- [1, 'C']`
+        | :codenormal:`- [2, 'D']`
+        | :codenormal:`...`
 
         For examples of complex ``select`` requests, where one can specify which index to
         search and what condition to use (for example "greater than" instead of
         "equal to") and how many tuples to return, see the later section
-        ``box.space.space-name[.index.index-name]:select``.
+        :ref:`box.space.space-name[.index.index-name]:select <index_select>`.
 
     .. function:: get(key)
 
@@ -169,11 +163,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        .. code-block:: lua
+        The :codenormal:`box.space...select` function returns a set
+        of tuples as a Lua table; the :codenormal:`box.space...get`
+        function returns a single tuple. And it is possible to get
+        the first tuple in a tuple set by appending "[1]".
+        Therefore :codenormal:`box.space.tester:get{1}` has the same
+        effect as :codenormal:`box.space.tester:select{1}[1]`, and
+        may serve as a convenient shorthand. 
 
-            EXAMPLE
-
-            tarantool> box.space.tester:get{1}
+        Example: :codenormal:`tarantool>` :codebold:`box.space.tester:get{1}`
 
     .. function:: drop()
 
@@ -188,11 +186,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.space_that_does_not_exist:drop()
+        Example: :codenormal:`tarantool>` :codebold:`box.space.space_that_does_not_exist:drop()`
 
     .. function:: rename(space-name)
 
@@ -205,16 +199,14 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: ``space-name`` does not exist.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.space55:rename('space56')
-            ---
-            ...
-            tarantool> box.space.space56:rename('space55')
-            ---
-            ...
+        | :codebold:`EXAMPLE`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.space55:rename('space56')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.space56:rename('space55')`
+        | :codenormal:`---`
+        | :codenormal:`...`
 
     .. function:: replace(tuple)
                   put(tuple)
@@ -239,11 +231,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester:replace{5000, 'New value'}
+        Example: :codenormal:`tarantool>` :codebold:`box.space.tester:replace{5000, 'New value'}`
 
     .. function:: update(key, {{operator, field_no, value}, ...})
 
@@ -258,7 +246,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         are present, the field number for each operation is assumed to be
         relative to the most recent state of the tuple, that is, as if all
         previous operations in a multi-operation update have already been
-        applied. In other words, it is always safe to merge multiple update
+        applied. In other words, it is always safe to merge multiple :codenormal:`update`
         invocations into a single invocation, with no change in semantics.
 
         Possible operators are:
@@ -272,6 +260,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             * '!' for insertion
             * '#' for deletion
             * '=' for assignment
+
+        For “!” and “=” operations the field number can be -1, meaning the last field in the tuple.
 
         :param space_object space-object:
         :param lua-value key: primary-key field values, must be passed as a Lua
@@ -290,85 +280,84 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Complexity Factors: Index size, Index type, number of indexes accessed, WAL
         settings.
 
-        Thus in the instruction s:update(44, {{'+',1,55},{'=',3,'x'}})
+        Thus in the instruction :codenormal:`s:update(44, {{'+',1,55},{'=',3,'x'}})`
         the primary-key value is 44, the operators are '+' and '=' meaning
         "add a value to a field and then assign a value to a field", the first
         affected field is field 1 and the value which will be added to it is
         55, the second affected field is field 3 and the value which will be
         assigned to it is 'x'.
 
-        .. code-block:: lua
+        | :codebold:`EXAMPLE`
+        |
+        | :codenormal:`-- Assume that the initial state of the database is ...`
+        | :codenormal:`--   tester has one tuple set and one primary key whose type is 'NUM'.`
+        | :codenormal:`--   There is one tuple, with field[1] = 999 and field[2] = 'A'.`
+        |
+        | :codenormal:`-- In the following update ...`
+        | :codenormal:`--   The first argument is tester, that is, the affected space is tester`
+        | :codenormal:`--   The second argument is 999, that is, the affected tuple is identified by`
+        | :codenormal:`--     primary key value = 999`
+        | :codenormal:`--   The third argument is '=', that is, there is one operation, assignment`
+        | :codenormal:`--     to a field`
+        | :codenormal:`--   The fourth argument is 2, that is, the affected field is field[2]`
+        | :codenormal:`--   The fifth argument is 'B', that is, field[2] contents change to 'B'`
+        | :codenormal:`--   Therefore, after the following update, field[1] = 999 and field[2] = 'B'.`
+        | :codenormal:`box.space.tester:update(999, {{'=', 2, 'B'}})`
+        |
+        | :codenormal:`-- In the following update, the arguments are the same, except that ...`
+        | :codenormal:`--   the key is passed as a Lua table (inside braces). This is unnecessary`
+        | :codenormal:`--   when the primary key has only one field, but would be necessary if the`
+        | :codenormal:`--   primary key had more than one field.`
+        | :codenormal:`--   Therefore, after the following update, field[1] = 999 and field[2] = 'B'`
+        | :codenormal:`--     (no change).`
+        | :codenormal:`box.space.tester:update({999}, {{'=', 2, 'B'}})`
+        |
+        | :codenormal:`-- In the following update, the arguments are the same, except that ...`
+        | :codenormal:`--    The fourth argument is 3, that is, the affected field is field[3].`
+        | :codenormal:`--    It is okay that, until now, field[3] has not existed. It gets added.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'B',`
+        | :codenormal:`--      field[3] = 1.`
+        | :codenormal:`box.space.tester:update({999}, {{'=', 3, 1}})`
+        |
+        | :codenormal:`-- In the following update, the arguments are the same, except that ...`
+        | :codenormal:`--    The third argument is '+', that is, the operation is addition rather`
+        | :codenormal:`--      than assignment.`
+        | :codenormal:`--    Since field[3] previously contained 1, this means we're adding 1 to 1.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'B',`
+        | :codenormal:`--      field[3] = 2.`
+        | :codenormal:`box.space.tester:update({999}, {{'+', 3, 1}})`
+        |
+        | :codenormal:`-- In the following update ...`
+        | :codenormal:`--    The idea is to modify two fields at once.`
+        | :codenormal:`--    The formats are '|' and '=', that is, there are two operations, OR and`
+        | :codenormal:`--      assignment.`
+        | :codenormal:`--    The fourth and fifth arguments mean that field[3] gets ORed with 1.`
+        | :codenormal:`--    The seventh and eighth arguments mean that field[2] gets assigned 'C'.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'C',`
+        | :codenormal:`--      field[3] = 3.`
+        | :codenormal:`box.space.tester:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})`
+        |
+        | :codenormal:`-- In the following update ...`
+        | :codenormal:`--    The idea is to delete field[2], then subtract 3 from field[3], but ...`
+        | :codenormal:`--    after the delete, there is a renumbering -- so field[3] becomes field[2]`
+        | :codenormal:`--    before we subtract 3 from it, and that's why the seventh argument is 2 not 3.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 0.`
+        | :codenormal:`box.space.tester:update({999}, {{'-- ', 2, 1}, {'-', 2, 3}})`
+        |
+        | :codenormal:`-- In the following update ...`
+        | :codenormal:`--    We're making a long string so that splice will work in the next example.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'XYZ'.`
+        | :codenormal:`box.space.tester:update({999}, {{'=', 2, 'XYZ'}})`
+        |
+        | :codenormal:`-- In the following update ...`
+        | :codenormal:`--    The third argument is ':', that is, this is the example of splice.`
+        | :codenormal:`--    The fourth argument is 2 because the change will occur in field[2].`
+        | :codenormal:`--    The fifth argument is 2 because deletion will begin with the second byte.`
+        | :codenormal:`--    The sixth argument is 1 because the number of bytes to delete is 1.`
+        | :codenormal:`--    The seventh argument is '!!' because '!!' is to be added at this position.`
+        | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.`
+        | :codenormal:`box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})`
 
-            EXAMPLE
-
-            -- Assume that the initial state of the database is ...
-            --   tester has one tuple set and one primary key whose type is 'NUM'.
-            --   There is one tuple, with field[1] = 999 and field[2] = 'A'.
-
-            -- In the following update ...
-            --   The first argument is tester, that is, the affected space is tester
-            --   The second argument is 999, that is, the affected tuple is identified by
-            --     primary key value = 999
-            --   The third argument is '=', that is, there is one operation, assignment
-            --     to a field
-            --   The fourth argument is 2, that is, the affected field is field[2]
-            --   The fifth argument is 'B', that is, field[2] contents change to 'B'
-            --   Therefore, after the following update, field[1] = 999 and field[2] = 'B'.
-            box.space.tester:update(999, {{'=', 2, 'B'}})
-
-            -- In the following update, the arguments are the same, except that ...
-            --   the key is passed as a Lua table (inside braces). This is unnecessary
-            --   when the primary key has only one field, but would be necessary if the
-            --   primary key had more than one field.
-            --   Therefore, after the following update, field[1] = 999 and field[2] = 'B'
-            --     (no change).
-            box.space.tester:update({999}, {{'=', 2, 'B'}})
-
-            -- In the following update, the arguments are the same, except that ...
-            --    The fourth argument is 3, that is, the affected field is field[3].
-            --    It is okay that, until now, field[3] has not existed. It gets added.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 'B',
-            --      field[3] = 1.
-            box.space.tester:update({999}, {{'=', 3, 1}})
-
-            -- In the following update, the arguments are the same, except that ...
-            --    The third argument is '+', that is, the operation is addition rather
-            --      than assignment.
-            --    Since field[3] previously contained 1, this means we're adding 1 to 1.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 'B',
-            --      field[3] = 2.
-            box.space.tester:update({999}, {{'+', 3, 1}})
-
-            -- In the following update ...
-            --    The idea is to modify two fields at once.
-            --    The formats are '|' and '=', that is, there are two operations, OR and
-            --      assignment.
-            --    The fourth and fifth arguments mean that field[3] gets ORed with 1.
-            --    The seventh and eighth arguments mean that field[2] gets assigned 'C'.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 'C',
-            --      field[3] = 3.
-            box.space.tester:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
-
-            -- In the following update ...
-            --    The idea is to delete field[2], then subtract 3 from field[3], but ...
-            --    after the delete, there is a renumbering -- so field[3] becomes field[2]
-            --    before we subtract 3 from it, and that's why the seventh argument is 2 not 3.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 0.
-            box.space.tester:update({999}, {{'-- ', 2, 1}, {'-', 2, 3}})
-
-            -- In the following update ...
-            --    We're making a long string so that splice will work in the next example.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 'XYZ'.
-            box.space.tester:update({999}, {{'=', 2, 'XYZ'}})
-
-            -- In the following update ...
-            --    The third argument is ':', that is, this is the example of splice.
-            --    The fourth argument is 2 because the change will occur in field[2].
-            --    The fifth argument is 2 because deletion will begin with the second byte.
-            --    The sixth argument is 1 because the number of bytes to delete is 1.
-            --    The seventh argument is '!!' because '!!' is to be added at this position.
-            --    Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.
-            box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})
 
     .. function:: delete(key)
 
@@ -383,22 +372,20 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Complexity Factors: Index size, Index type
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester:delete(0)
-            ---
-            - [0, 'My first tuple']
-            ...
-            tarantool> box.space.tester:delete(0)
-            ---
-            ...
-            tarantool> box.space.tester:delete('a')
-            ---
-            - error: 'Supplied key type of part 0 does not match index part type:
-              expected NUM'
-            ...
+        | :codebold:`Example:`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:delete(0)`
+        | :codenormal:`---`
+        | :codenormal:`- [0, 'My first tuple']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:delete(0)`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:delete('a')`
+        | :codenormal:`---`
+        | :codenormal:`- error: 'Supplied key type of part 0 does not match index part type:`
+        |   :codenormal:`expected NUM'`
+        | :codenormal:`...`
 
 .. _space_object_id:
 
@@ -416,7 +403,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     space-object.enabled
 
         Whether or not this space is enabled.
-        The value is false if there is no index.
+        The value is :codenormal:`false` if there is no index.
 
         :rtype: boolean
 
@@ -441,22 +428,20 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: table
 
-        .. code-block: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester.id
-            ---
-            - 512
-            ...
-            tarantool> box.space.tester.field_count
-            ---
-            - 0
-            ...
-            tarantool> box.space.tester.index.primary.type
-            ---
-            - TREE
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.id`
+        | :codenormal:`---`
+        | :codenormal:`- 512`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.field_count`
+        | :codenormal:`---`
+        | :codenormal:`- 0`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary.type`
+        | :codenormal:`---`
+        | :codenormal:`- TREE`
+        | :codenormal:`...`
 
 .. _space_object_len:
 
@@ -468,14 +453,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: Number of tuples in the space.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester:len()
-            ---
-            - 2
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:len()`
+        | :codenormal:`---`
+        | :codenormal:`- 2`
+        | :codenormal:`...`
 
 .. _space_object_truncate:
 
@@ -487,17 +470,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester:truncate()
-            ---
-            ...
-            tarantool> box.space.tester:len()
-            ---
-            - 0
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:truncate()`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:len()`
+        | :codenormal:`---`
+        | :codenormal:`- 0`
+        | :codenormal:`...`
 
 
 .. _space_object_inc:
@@ -518,24 +499,23 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Complexity Factors: Index size, Index type, WAL settings.
 
-        .. code-block:: lua
 
-            EXAMPLE
-
-            tarantool> s = box.schema.space.create('forty_second_space')
-            ---
-            ...
-            tarantool> s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
-            ---
-            ...
-            tarantool> box.space.forty_second_space:inc{1,'a'}
-            ---
-            - 1
-            ...
-            tarantool> box.space.forty_second_space:inc{1,'a'}
-            ---
-            - 2
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('forty_second_space')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.forty_second_space:inc{1,'a'}`
+        | :codenormal:`---`
+        | :codenormal:`- 1`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.forty_second_space:inc{1,'a'}`
+        | :codenormal:`---`
+        | :codenormal:`- 2`
+        | :codenormal:`...`
 
 .. _space_object_dec:
 
@@ -555,28 +535,26 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Complexity Factors: Index size, Index type, WAL settings.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> s = box.schema.space.create('space19')
-            ---
-            ...
-            tarantool> s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
-            ---
-            ...
-            tarantool> box.space.space19:insert{1,'a',1000}
-            ---
-            - [1, 'a', 1000]
-            ...
-            tarantool> box.space.space19:dec{1,'a'}
-            ---
-            - 999
-            ...
-            tarantool> box.space.space19:dec{1,'a'}
-            ---
-            - 998
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space19')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.space19:insert{1,'a',1000}`
+        | :codenormal:`---`
+        | :codenormal:`- [1, 'a', 1000]`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.space19:dec{1,'a'}`
+        | :codenormal:`---`
+        | :codenormal:`- 999`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.space19:dec{1,'a'}`
+        | :codenormal:`---`
+        | :codenormal:`- 998`
+        | :codenormal:`...`
 
 .. _space_object_auto_increment:
 
@@ -597,18 +575,16 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: index has wrong type or primary-key indexed field is not a number.
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> box.space.tester:auto_increment{'Fld#1', 'Fld#2'}
-            ---
-            - [1, 'Fld#1', 'Fld#2']
-            ...
-            tarantool> box.space.tester:auto_increment{'Fld#3'}
-            ---
-            - [2, 'Fld#3']
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:auto_increment{'Fld#1', 'Fld#2'}`
+        | :codenormal:`---`
+        | :codenormal:`- [1, 'Fld#1', 'Fld#2']`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:auto_increment{'Fld#3'}`
+        | :codenormal:`---`
+        | :codenormal:`- [2, 'Fld#3']`
+        | :codenormal:`...`
 
 .. _space_object_pairs:
 
@@ -621,27 +597,25 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: function which can be used in a for/end loop. Within the loop, a value is returned for each iteration.
         :rtype:  function, tuple
 
-        .. code-block:: lua
-
-            EXAMPLE
-
-            tarantool> s = box.schema.space.create('space33')
-            ---
-            ...
-            tarantool> -- index 'X' has default parts {1,'NUM'}
-            tarantool> s:create_index('X', {})
-            ---
-            ...
-            tarantool> s:insert{0,'Hello my '}; s:insert{1,'Lua world'}
-            ---
-            ...
-            tarantool> tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end
-            ---
-            ...
-            tarantool> tmp
-            ---
-            - Hello my Lua world
-            ...
+        | :codebold:`Example`
+        |
+        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space33')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`-- index 'X' has default parts {1,'NUM'}`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('X', {})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`s:insert{0,'Hello my '}; s:insert{1,'Lua world'}`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`tmp`
+        | :codenormal:`---`
+        | :codenormal:`- Hello my Lua world`
+        | :codenormal:`...`
 
 .. data::     _schema
 
@@ -650,32 +624,27 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     EXAMPLE: The following function will display all fields in all tuples of ``_schema``.
 
-    .. code-block:: lua
-
-        console = require('console'); console.delimiter('!')
-        function example()
-            local ta = {}, i, line
-            for k, v in box.space._schema:pairs() do
-                i = 1
-                line = ''
-                while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end
-                table.insert(ta, line)
-            end
-            return ta
-        end!
-        console.delimiter('')!
-
+    | :codenormal:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`function example()`
+    |     :codenormal:`local ta = {}, i, line`
+    |     :codenormal:`for k, v in box.space._schema:pairs() do`
+    |         :codenormal:`i = 1`
+    |         :codenormal:`line = ''`
+    |         :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
+    |         :codenormal:`table.insert(ta, line)`
+    |     :codenormal:`end`
+    |     :codenormal:`return ta`
+    | :codenormal:`end!`
+    | :codenormal:`console.delimiter('')!`
 
     Here is what ``example()`` returns in a typical installation:
 
-    .. code-block:: lua
-
-        tarantool> example()
-        ---
-        - - 'cluster 1ec4e1f8-8f1b-4304-bb22-6c47ce0cf9c6 '
-          - 'max_id 520 '
-          - 'version 1 6 '
-        ...
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`- - 'cluster 1ec4e1f8-8f1b-4304-bb22-6c47ce0cf9c6 '`
+    | :codenormal:`- 'max_id 520 '`
+    | :codenormal:`- 'version 1 6 '`
+    | :codenormal:`...`
 
 .. data::     _space
 
@@ -685,43 +654,39 @@ A list of all ``box.space`` functions follows, then comes a list of all
     EXAMPLE. The following function will display all simple fields
     in all tuples of ``_space``.
 
-    .. code-block:: lua
-
-        console = require('console'); console.delimiter('!')
-        function example()
-            local ta = {}, i, line
-            for k, v in box.space._space:pairs() do
-                i = 1
-                line = ''
-                while i <= #v do
-                    if type(v[i]) ~= 'table' then
-                        line = line .. v[i] .. ' '
-                    end
-                    i = i + 1
-                end
-                table.insert(ta, line)
-            end
-            return ta
-        end!
-        console.delimiter('')!
+    | :codenormal:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`function example()`
+        | :codenormal:`local ta = {}, i, line`
+        | :codenormal:`for k, v in box.space._space:pairs() do`
+            | :codenormal:`i = 1`
+            | :codenormal:`line = ''`
+            | :codenormal:`while i <= #v do`
+                | :codenormal:`if type(v[i]) ~= 'table' then`
+                    | :codenormal:`line = line .. v[i] .. ' '`
+                | :codenormal:`end`
+                | :codenormal:`i = i + 1`
+            | :codenormal:`end`
+            | :codenormal:`table.insert(ta, line)`
+        | :codenormal:`end`
+        | :codenormal:`return ta`
+    | :codenormal:`end!`
+    | :codenormal:`console.delimiter('')!`
 
     Here is what ``example()`` returns in a typical installation:
 
-    .. code-block:: lua
-
-        tarantool> example()
-        ---
-        - - '272 1 _schema memtx 0  '
-          - '280 1 _space memtx 0  '
-          - '288 1 _index memtx 0  '
-          - '296 1 _func memtx 0  '
-          - '304 1 _user memtx 0  '
-          - '312 1 _priv memtx 0  '
-          - '320 1 _cluster memtx 0  '
-          - '512 1 tester memtx 0  '
-          - '513 1 origin sophia 0  '
-          - '514 1 archive memtx 0  '
-        ...
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`- - '272 1 _schema memtx 0  '`
+    | :codenormal:`- '280 1 _space memtx 0  '`
+    | :codenormal:`- '288 1 _index memtx 0  '`
+    | :codenormal:`- '296 1 _func memtx 0  '`
+    | :codenormal:`- '304 1 _user memtx 0  '`
+    | :codenormal:`- '312 1 _priv memtx 0  '`
+    | :codenormal:`- '320 1 _cluster memtx 0  '`
+    | :codenormal:`- '512 1 tester memtx 0  '`
+    | :codenormal:`- '513 1 origin sophia 0  '`
+    | :codenormal:`- '514 1 archive memtx 0  '`
+    | :codenormal:`...`
 
 .. data::     _index
 
@@ -731,48 +696,45 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     The following function will display all fields in all tuples of _index.
 
-    .. code-block:: lua
-
-        console = require('console'); console.delimiter('!')
-        function example()
-            local ta = {}, i, line
-            for k, v in box.space._index:pairs() do
-                i = 1
-                line = ''
-                    while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end
-                table.insert(ta, line)
-            end
-            return ta
-        end!
-        console.delimiter('')!
+    | :codenormal:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`function example()`
+    |     :codenormal:`local ta = {}, i, line`
+    |     :codenormal:`for k, v in box.space._index:pairs() do`
+    |         :codenormal:`i = 1`
+    |         :codenormal:`line = ''`
+    |             :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
+    |         :codenormal:`table.insert(ta, line)`
+    |     :codenormal:`end`
+    |     :codenormal:`return ta`
+    | :codenormal:`end!`
+    | :codenormal:`console.delimiter('')!`
 
     Here is what ``example()`` returns in a typical installation:
 
-    .. code-block:: lua
 
-        tarantool> example()
-        ---
-        - - '272 0 primary tree 1 1 0 str '
-          - '280 0 primary tree 1 1 0 num '
-          - '280 1 owner tree 0 1 1 num '
-          - '280 2 name tree 1 1 2 str '
-          - '288 0 primary tree 1 2 0 num 1 num '
-          - '288 2 name tree 1 2 0 num 2 str '
-          - '296 0 primary tree 1 1 0 num '
-          - '296 1 owner tree 0 1 1 num '
-          - '296 2 name tree 1 1 2 str '
-          - '304 0 primary tree 1 1 0 num '
-          - '304 1 owner tree 0 1 1 num '
-          - '304 2 name tree 1 1 2 str '
-          - '312 0 primary tree 1 3 1 num 2 str 3 num '
-          - '312 1 owner tree 0 1 0 num '
-          - '312 2 object tree 0 2 2 str 3 num '
-          - '320 0 primary tree 1 1 0 num '
-          - '320 1 uuid tree 1 1 1 str '
-          - '512 0 primary tree 1 1 0 num '
-          - '513 0 first tree 1 1 0 NUM '
-          - '514 0 first tree 1 1 0 STR '
-        ...
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`- - '272 0 primary tree 1 1 0 str '`
+    | :codenormal:`- '280 0 primary tree 1 1 0 num '`
+    | :codenormal:`- '280 1 owner tree 0 1 1 num '`
+    | :codenormal:`- '280 2 name tree 1 1 2 str '`
+    | :codenormal:`- '288 0 primary tree 1 2 0 num 1 num '`
+    | :codenormal:`- '288 2 name tree 1 2 0 num 2 str '`
+    | :codenormal:`- '296 0 primary tree 1 1 0 num '`
+    | :codenormal:`- '296 1 owner tree 0 1 1 num '`
+    | :codenormal:`- '296 2 name tree 1 1 2 str '`
+    | :codenormal:`- '304 0 primary tree 1 1 0 num '`
+    | :codenormal:`- '304 1 owner tree 0 1 1 num '`
+    | :codenormal:`- '304 2 name tree 1 1 2 str '`
+    | :codenormal:`- '312 0 primary tree 1 3 1 num 2 str 3 num '`
+    | :codenormal:`- '312 1 owner tree 0 1 0 num '`
+    | :codenormal:`- '312 2 object tree 0 2 2 str 3 num '`
+    | :codenormal:`- '320 0 primary tree 1 1 0 num '`
+    | :codenormal:`- '320 1 uuid tree 1 1 1 str '`
+    | :codenormal:`- '512 0 primary tree 1 1 0 num '`
+    | :codenormal:`- '513 0 first tree 1 1 0 NUM '`
+    | :codenormal:`- '514 0 first tree 1 1 0 STR '`
+    | :codenormal:`...`
 
 .. data::     _user
 
@@ -831,21 +793,19 @@ returns a table.
 
 ... And here is what happens when one invokes the function:
 
-.. code-block:: lua
-
-    tarantool> example()
-    ---
-    - - _schema tuple_count =3. first field in first tuple = cluster
-      - _space tuple_count =15. first field in first tuple = 272
-      - _index tuple_count =25. first field in first tuple = 272
-      - _func tuple_count =1. first field in first tuple = 1
-      - _user tuple_count =4. first field in first tuple = 0
-      - _priv tuple_count =6. first field in first tuple = 1
-      - _cluster tuple_count =1. first field in first tuple = 1
-      - tester tuple_count =2. first field in first tuple = 1
-      - origin tuple_count =0
-      - archive tuple_count =13. first field in first tuple = test_0@tarantool.org
-      - space55 tuple_count =0
-      - tmp tuple_count =0
-      - forty_second_space tuple_count =1. first field in first tuple = 1
-    ...
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`- - _schema tuple_count =3. first field in first tuple = cluster`
+    | :codenormal:`- _space tuple_count =15. first field in first tuple = 272`
+    | :codenormal:`- _index tuple_count =25. first field in first tuple = 272`
+    | :codenormal:`- _func tuple_count =1. first field in first tuple = 1`
+    | :codenormal:`- _user tuple_count =4. first field in first tuple = 0`
+    | :codenormal:`- _priv tuple_count =6. first field in first tuple = 1`
+    | :codenormal:`- _cluster tuple_count =1. first field in first tuple = 1`
+    | :codenormal:`- tester tuple_count =2. first field in first tuple = 1`
+    | :codenormal:`- origin tuple_count =0`
+    | :codenormal:`- archive tuple_count =13. first field in first tuple = test_0@tarantool.org`
+    | :codenormal:`- space55 tuple_count =0`
+    | :codenormal:`- tmp tuple_count =0`
+    | :codenormal:`- forty_second_space tuple_count =1. first field in first tuple = 1`
+    | :codenormal:`...`

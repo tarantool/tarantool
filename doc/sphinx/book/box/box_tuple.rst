@@ -27,18 +27,18 @@ and conversion to a Lua table.
     tuple and ``t`` will be a new tuple object. Saying ``t`` returns the
     entire tuple ``t``.
 
-    .. code-block:: lua
+    EXAMPLE
 
-        tarantool> x = box.space.tester:insert{33,tonumber('1'),tonumber64('2')}:totable()
-        ---
-        ...
-        tarantool> t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})
-        ---
-        ...
-        tarantool> t
-        ---
-        - ['abc', 'def', 'ghi', 'abc']
-        ...
+    | :codenormal:`tarantool>` :codebold:`x = box.space.tester:insert{33,tonumber('1'),tonumber64('2')}:totable()`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`t`
+    | :codenormal:`---`
+    | :codenormal:`- ['abc', 'def', 'ghi', 'abc']`
+    | :codenormal:`...`
 
 .. class:: tuple
 
@@ -52,15 +52,15 @@ and conversion to a Lua table.
         In the following example, a tuple named ``t`` is created and then the
         number of fields in ``t`` is returned.
 
-        .. code-block:: lua
 
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})
-            ---
-            ...
-            tarantool> #t
-            ---
-            - 4
-            ...
+
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`#t`
+ | :codenormal:`---`
+ | :codenormal:`- 4`
+ | :codenormal:`...`
 
     tuple-value:bsize()
 
@@ -79,15 +79,13 @@ and conversion to a Lua table.
         and three bytes to store the contents, and a bit for overhead, so
         ``bsize()`` returns ``3*(1+3)+1``.
 
-        .. code-block:: lua
-
-            tarantool> t = box.tuple.new({'aaa','bbb','ccc'})
-            ---
-            ...
-            tarantool> t:bsize()
-            ---
-            - 13
-            ...
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'aaa','bbb','ccc'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:bsize()`
+ | :codenormal:`---`
+ | :codenormal:`- 13`
+ | :codenormal:`...`
 
     tuple-value [field-number]
 
@@ -100,15 +98,13 @@ and conversion to a Lua table.
         In the following example, a tuple named ``t`` is created and then the
         second field in ``t`` is returned.
 
-        .. code-block:: lua
-
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})
-            ---
-            ...
-            tarantool> t[2]
-            ---
-            - Fld#2
-            ...
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t[2]`
+ | :codenormal:`---`
+ | :codenormal:`- Fld#2`
+ | :codenormal:`...`
 
     tuple-value:find([field-number,] search-value) or tuple-value:findall([field-number,] search-value)
 
@@ -128,28 +124,26 @@ and conversion to a Lua table.
         then the numbers of all the fields in t which match 'a' and are at or
         after the second field are returned.
 
-        .. code-block:: lua
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'a','b','c','a'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:find('a')`
+ | :codenormal:`---`
+ | :codenormal:`- 1`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:findall('a')`
+ | :codenormal:`---`
+ | :codenormal:`- 1`
+ | :codenormal:`- 4`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:findall(2, 'a')`
+ | :codenormal:`---`
+ | :codenormal:`- 4`
+ | :codenormal:`...`
 
-            tarantool> t = box.tuple.new({'a','b','c','a'})
-            ---
-            ...
-            tarantool> t:find('a')
-            ---
-            - 1
-            ...
-            tarantool> t:findall('a')
-            ---
-            - 1
-            - 4
-            ...
-            tarantool> t:findall(2, 'a')
-            ---
-            - 4
-            ...
+    :samp:`{tuple-value}:transform({start-field-number}, {fields-to-remove} [, {field-value} ...])`
 
-    tuple-value:transform(start-field-number, fields-to-remove [, field-value ...])
-
-        If ``t`` is a tuple instance, ``t:transform(start-field-number,fields-to-remove)``
+        If ``t`` is a tuple instance, :samp:`t:transform({start-field-number},{fields-to-remove})`
         will return a tuple where, starting from field ``start-field-number``,
         a number of fields (``fields-to-remove``) are removed. Optionally one
         can add more arguments after ``fields-to-remove`` to indicate new
@@ -165,17 +159,15 @@ and conversion to a Lua table.
         starting from the second field, two fields are removed but one new
         one is added, then the result is returned.
 
-        .. code-block:: lua
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:transform(2,2,'x')`
+ | :codenormal:`---`
+ | :codenormal:`- ['Fld#1', 'x', 'Fld#4', 'Fld#5']`
+ | :codenormal:`...`
 
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
-            ---
-            ...
-            tarantool> t:transform(2,2,'x')
-            ---
-            - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
-            ...
-
-    tuple-value:unpack([start-field-number [, end-field-number]])
+    :samp:`{tuple-value}:unpack([{start-field-number} [, {end-field-number}]])`
 
         If ``t`` is a tuple instance, ``t:unpack()`` will return all fields,
         ``t:unpack(1)`` will return all fields starting with field number 1,
@@ -187,21 +179,19 @@ and conversion to a Lua table.
         In the following example, a tuple named ``t`` is created and then all
         its fields are selected, then the result is returned.
 
-        .. code-block:: lua
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`t:unpack()`
+ | :codenormal:`---`
+ | :codenormal:`- Fld#1`
+ | :codenormal:`- Fld#2`
+ | :codenormal:`- Fld#3`
+ | :codenormal:`- Fld#4`
+ | :codenormal:`- Fld#5`
+ | :codenormal:`...`
 
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
-            ---
-            ...
-            tarantool> t:unpack()
-            ---
-            - Fld#1
-            - Fld#2
-            - Fld#3
-            - Fld#4
-            - Fld#5
-            ...
-
-    tuple-value:pairs()
+    :samp:`{tuple-value}:pairs()`
 
         In Lua, ``lua-table-value:pairs()`` is a method which returns:
         ``function``, ``lua-table-value``, ``nil``. Tarantool has extended
@@ -215,30 +205,30 @@ and conversion to a Lua table.
         In the following example, a tuple named ``t`` is created and then all
         its fields are selected using a Lua for-end loop.
 
-        .. code-block:: lua
 
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
-            ---
-            ...
-            tarantool> tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end
-            ---
-            ...
-            tarantool> tmp
-            ---
-            - Fld#1Fld#2Fld#3Fld#4Fld#5
-            ...
 
-    tuple-value:update({{format, field_number, value}...})
+ | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`tmp`
+ | :codenormal:`---`
+ | :codenormal:`- Fld#1Fld#2Fld#3Fld#4Fld#5`
+ | :codenormal:`...`
+
+    :samp:`{tuple-value}`:code:`:update({{`:samp:`{format}, {field_number}, {value}`:code:`}...})`
 
         Update a tuple.
 
         This function updates a tuple which is not in a space. Compare the function
-        ``box.space.space-name:update{key, format, {field_number, value}...)``,
+        :code:`box.space.`:samp:`{space-name}`:code:`:update{`:samp:`{key}, {format},` :code:`{`:samp:`{field_number}, {value}`:code:`}...)`,
         which updates a tuple in a space.
 
-        Parameters: briefly: format indicates the type of update operation such as '``=``'
-        for 'assign new value', ``field_number`` indicates the field number to change such
-        as 2 for field number 2, value indicates the string which operates on the field such
+        Parameters: briefly: :codenormal:`format` indicates the type of update operation such as '``=``'
+        for 'assign new value', :codenormal:`field_number` indicates the field number to change such
+        as 2 for field number 2, :codenormal:`value` indicates the string which operates on the field such
         as 'B' for a new assignable value = 'B'.
 
         For details: see the description for ``format``, ``field_number``, and ``value`` in
@@ -250,15 +240,13 @@ and conversion to a Lua table.
         In the following example, a tuple named ``t`` is created and then its second field is
         updated to equal 'B'.
 
-        .. code-block:: lua
-
-            tarantool> t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
-            ---
-            ...
-            tarantool> t:update({{'=',2,'B'}})
-            ---
-            - ['Fld#1', 'B', 'Fld#3', 'Fld#4', 'Fld#5']
-            ...
+        | :codenormal:`tarantool>` :codebold:`t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`t:update({{'=',2,'B'}})`
+        | :codenormal:`---`
+        | :codenormal:`- ['Fld#1', 'B', 'Fld#3', 'Fld#4', 'Fld#5']`
+        | :codenormal:`...`
 
 ===========================================================
                         Example
@@ -296,12 +284,10 @@ and display how many bytes remain in the tuple. The function uses Tarantool
 
 ... And here is what happens when one invokes the function:
 
-.. code-block:: yaml
-
-    tarantool> example()
-    ---
-    - 'tuple2 = '
-    - ['a', 'c']
-    - ' # of bytes = '
-    - 5
-    ...
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`- 'tuple2 = '`
+    | :codenormal:`- ['a', 'c']`
+    | :codenormal:`- ' # of bytes = '`
+    | :codenormal:`- 5`
+    | :codenormal:`...`
