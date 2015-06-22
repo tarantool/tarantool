@@ -10,7 +10,7 @@ connecting to tarantool servers via a network.
 
 Call ``require('net.box')`` to get a ``net.box`` object, which will be called
 ``net_box`` for examples in this section. Call ``net_box.new()`` to connect and
-get a connection object, which will be called conn for examples in this section.
+get a connection object, which will be called ``conn`` for examples in this section.
 Call the other ``net.box()`` routines, passing ``conn:``, to execute requests on
 the remote box. Call :func:`conn:close <socket_object.close>` to disconnect.
 
@@ -31,13 +31,13 @@ necessary to prioritize requests or to use different authentication ids.
 
     Create a new connection. The connection is established on demand, at the
     time of the first request. It is re-established automatically after a
-    disconnect. The returned conn object supports methods for making remote
+    disconnect. The returned ``conn`` object supports methods for making remote
     requests, such as select, update or delete.
 
     For the local tarantool server there is a pre-created always-established
-    connection object named net_box.self. Its purpose is to make polymorphic
-    use of the ``net_box`` API easier. Therefore ``conn = net_box:new('localhost', 3301)``
-    can be replaced by ``conn = net_box.self``. However, there is an important
+    connection object named :samp:`{net_box}.self`. Its purpose is to make polymorphic
+    use of the ``net_box`` API easier. Therefore :samp:`conn = {net_box}:new('localhost', 3301)`
+    can be replaced by :samp:`conn = {net_box}.self`. However, there is an important
     difference between the embedded connection and a remote one. With the
     embedded connection, requests which do not modify data do not yield.
     When using a remote connection, any request can yield, and local database
@@ -51,16 +51,16 @@ necessary to prioritize requests or to use different authentication ids.
     :return: conn object
     :rtype:  userdata
 
-    .. code-block:: lua
+ 
 
-        EXAMPLE
+        EXAMPLES
 
-        conn = net_box:new('localhost', 3301)
-        conn = net_box:new('127.0.0.1', box.cfg.listen, {
-            wait_connect = false,
-            user = 'guest',
-            password = ''
-        })
+        | :codebold:`conn = net_box:new('localhost', 3301)`
+        | :codebold:`conn = net_box:new('127.0.0.1', box.cfg.listen, {`
+        | :codebold:`wait_connect = false,`
+        | :codebold:`user = 'guest',`
+        | :codebold:`password = ''`
+        | :codebold:`})`
 
 
     .. method:: ping()
@@ -70,9 +70,7 @@ necessary to prioritize requests or to use different authentication ids.
         :return: true on success, false on error
         :rtype:  boolean
 
-        .. code-block:: lua
-
-            net_box.self:ping()
+        Example: :codebold:`net_box.self:ping()`
 
     .. method:: wait_connected([timeout])
 
@@ -82,9 +80,8 @@ necessary to prioritize requests or to use different authentication ids.
         :return: true when connected, false on failure.
         :rtype:  boolean
 
-        .. code-block:: lua
-
-            net_box.self:wait_connected().
+        Example: :codebold:`net_box.self:wait_connected()`
+ 
 
     .. method:: close()
 
@@ -95,61 +92,55 @@ necessary to prioritize requests or to use different authentication ids.
         call, it is good programming practice to close a connection explicitly when it
         is no longer needed, to avoid lengthy stalls of the garbage collector.
 
-        .. code-block:: lua
-
-            conn:close()
+        Example: :codebold:`conn:close()`
 
     .. method:: conn.space.<space-name>:select{field-value, ...}
 
-        ``conn.space.space-name:select{...}`` is the remote-call equivalent
-        of the local call ``box.space.space-name:select{...}``. Please note
-        this difference: a local ``box.space.space-name:select{...}`` does
-        not yield, but a remote ``conn.space.space-name:select{...}`` call
+        :samp:`conn.space.{space-name}:select`:code:`{...}` is the remote-call equivalent
+        of the local call :samp:`box.space.{space-name}:select`:code:`{...}`. Please note
+        this difference: a local :samp:`box.space.{space-name}:select`:code:`{...}` does
+        not yield, but a remote :samp:`conn.space.{space-name}:select`:code:`{...}` call
         does yield, so local data may change while a remote
-        ``conn.space.space-name:select{...}`` is running.
+        :samp:`conn.space.{space-name}:select`:code:`{...}` is running.
 
     .. method:: conn.space.<space-name>:insert{field-value, ...}
 
-        ``conn.space.space-name:insert(...)`` is the remote-call equivalent
-        of the local call ``box.space.space-name:insert(...)``.
+        :samp:`conn.space.{space-name}:insert(...)` is the remote-call equivalent
+        of the local call :samp:`box.space.{space-name}:insert(...)`.
 
     .. method:: conn.space.<space-name>:replace{field-value, ...}
 
-        ``conn.space.space-name:replace(...)`` is the remote-call equivalent
-        of the local call ``box.space.space-name:replace(...)``.
+        :samp:`conn.space.{space-name}:replace(...)` is the remote-call equivalent
+        of the local call :samp:`box.space.space-name:replace(...)`.
 
     .. method:: conn.space.<space-name>:update{field-value, ...}
 
-        ``conn.space.space-name:update(...)`` is the remote-call equivalent
-        of the local call ``box.space.space-name:update(...)``.
+        :samp:`conn.space.{space-name}:update(...)` is the remote-call equivalent
+        of the local call :samp:`box.space.space-name:update(...)`.
 
     .. method:: conn.space.<space-name>:delete{field-value, ...}
 
-        ``conn.space.space-name:delete(...)`` is the remote-call equivalent
-        of the local call ``box.space.space-name:delete(...)``.
+        :samp:`conn.space.{space-name}:delete(...)` is the remote-call equivalent
+        of the local call :samp:`box.space.space-name:delete(...)`.
 
     .. method:: call(function-name [, arguments])
 
-        ``conn:call('func', '1', '2', '3')`` is the remote-call equivalent of
-        ``func('1', '2', '3')``. That is, ``conn:call`` is a remote
+        :samp:`conn:call('func', '1', '2', '3')` is the remote-call equivalent of
+        :samp:`func('1', '2', '3')`. That is, ``conn:call`` is a remote
         stored-procedure call.
 
-        .. code-block:: lua
-
-            conn:call('function5').
+        Example: :codebold:`conn:call('function5')`
 
     .. method:: timeout(timeout)
 
         ``timeout(...)`` is a wrapper which sets a timeout for the request that
         follows it.
 
-        .. code-block:: lua
-
-            conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}}).
+        Example: :codebold:`conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})`
 
         All remote calls support execution timeouts. Using a wrapper object makes
         the remote connection API compatible with the local one, removing the need
-        for a separate timeout argument, which the local version would ignore. Once
+        for a separate :codenormal:`timeout` argument, which the local version would ignore. Once
         a request is sent, it cannot be revoked from the remote server even if a
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.
@@ -163,75 +154,73 @@ That is, there is a space named tester with a numeric primary key. Assume that
 the database is nearly empty. Assume that the tarantool server is running on
 ``localhost 127.0.0.1:3301``.
 
-.. code-block:: lua
-
-    tarantool> box.schema.user.grant('guest', 'read,write,execute', 'universe')
-    ---
-    ...
-    tarantool> console = require('console'); console.delimiter('!')
-    ---
-    ...
-    tarantool> net_box = require('net.box')!
-    ---
-    ...
-    tarantool> function example()
-             > if net_box.self:ping() then
-             >   table.insert(ta, 'self:ping() succeeded')
-             >   table.insert(ta, '  (no surprise -- self connection is pre-established)')
-             > end
-             > if box.cfg.listen == '3301' then
-             >   table.insert(ta,'The local server listen address = 3301')
-             > else
-             >   table.insert(ta, 'The local server listen address is not 3301')
-             >   table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')
-             >   table.insert(ta, '(  (so connect will fail)')
-             > end
-             > conn = net_box:new('127.0.0.1', 3301)
-             > conn.space.tester:delete{800}
-             > table.insert(ta, 'conn delete done on tester.')
-             > conn.space.tester:insert{800, 'data'}
-             > table.insert(ta, 'conn insert done on tester, index 0')
-             > table.insert(ta, '  primary key value = 800.')
-             > wtuple = conn.space.tester:select{800}
-             > table.insert(ta, 'conn select done on tester, index 0')
-             > table.insert(ta, '  number of fields = ' .. #wtuple)
-             > conn.space.tester:delete{800}
-             > table.insert(ta, 'conn delete done on tester')
-             > conn.space.tester:replace{800, 'New data', 'Extra data'}
-             > table.insert(ta, 'conn:replace done on tester')
-             > conn:timeout(0.5).space.tester:update({800}, {{'=', 2, 'Fld#1'}})
-             > table.insert(ta, 'conn update done on tester')
-             > conn:close()
-             > table.insert(ta, 'conn close done')
-             > end!
-    ---
-    ...
-    tarantool> console.delimiter('')!
-    ---
-    ...
-    tarantool> ta = {}
-    ---
-    ...
-    tarantool> example()
-    ---
-    ...
-    tarantool> ta
-    ---
-    - - self:ping() succeeded
-      - '  (no surprise -- self connection is pre-established)'
-      - The local server listen address = 3301
-      - conn delete done on tester.
-      - conn insert done on tester, index 0
-      - '  primary key value = 800.'
-      - conn select done on tester, index 0
-      - '  number of fields = 1'
-      - conn delete done on tester
-      - conn:replace done on tester
-      - conn update done on tester
-      - conn close done
-    ...
-    tarantool> box.space.tester:select{800} -- Prove that the update succeeded.
-    ---
-    - [800, 'Fld#1', 'Extra data']
-    ...
+    | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'read,write,execute', 'universe')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`net_box = require('net.box')!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`function example()`
+    | :codenormal:`>` :codebold:`if net_box.self:ping() then`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'self:ping() succeeded')`
+    | :codenormal:`>` :codebold:`table.insert(ta, '  (no surprise -- self connection is pre-established)')`
+    | :codenormal:`>` :codebold:`end`
+    | :codenormal:`>` :codebold:`if box.cfg.listen == '3301' then`
+    | :codenormal:`>` :codebold:`table.insert(ta,'The local server listen address = 3301')`
+    | :codenormal:`>` :codebold:`else`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'The local server listen address is not 3301')`
+    | :codenormal:`>` :codebold:`table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')`
+    | :codenormal:`>` :codebold:`table.insert(ta, '(  (so connect will fail)')`
+    | :codenormal:`>` :codebold:`end`
+    | :codenormal:`>` :codebold:`conn = net_box:new('127.0.0.1', 3301)`
+    | :codenormal:`>` :codebold:`conn.space.tester:delete{800}`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn delete done on tester.')`
+    | :codenormal:`>` :codebold:`conn.space.tester:insert{800, 'data'}`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn insert done on tester, index 0')`
+    | :codenormal:`>` :codebold:`table.insert(ta, '  primary key value = 800.')`
+    | :codenormal:`>` :codebold:`wtuple = conn.space.tester:select{800}`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn select done on tester, index 0')`
+    | :codenormal:`>` :codebold:`table.insert(ta, '  number of fields = ' .. #wtuple)`
+    | :codenormal:`>` :codebold:`conn.space.tester:delete{800}`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn delete done on tester')`
+    | :codenormal:`>` :codebold:`conn.space.tester:replace{800, 'New data', 'Extra data'}`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn:replace done on tester')`
+    | :codenormal:`>` :codebold:`conn:timeout(0.5).space.tester:update({800}, {{'=', 2, 'Fld#1'}})`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn update done on tester')`
+    | :codenormal:`>` :codebold:`conn:close()`
+    | :codenormal:`>` :codebold:`table.insert(ta, 'conn close done')`
+    | :codenormal:`>` :codebold:`end!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`ta = {}`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`example()`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`ta`
+    | :codenormal:`---`
+    | :codenormal:`- - self:ping() succeeded`
+    | :codenormal:`- '  (no surprise -- self connection is pre-established)'`
+    | :codenormal:`- The local server listen address = 3301`
+    | :codenormal:`- conn delete done on tester.`
+    | :codenormal:`- conn insert done on tester, index 0`
+    | :codenormal:`- '  primary key value = 800.'`
+    | :codenormal:`- conn select done on tester, index 0`
+    | :codenormal:`- '  number of fields = 1'`
+    | :codenormal:`- conn delete done on tester`
+    | :codenormal:`- conn:replace done on tester`
+    | :codenormal:`- conn update done on tester`
+    | :codenormal:`- conn close done`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:select{800} -- Prove that the update succeeded.`
+    | :codenormal:`---`
+    | :codenormal:`- [800, 'Fld#1', 'Extra data']`
+    | :codenormal:`...`
 

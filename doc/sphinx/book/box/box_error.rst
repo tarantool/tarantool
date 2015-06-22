@@ -43,20 +43,21 @@ be presented to the client as ``ER_PROC_LUA``.
 
     :except: whatever is specified in errcode-number.
 
-    .. code-block:: lua
+    EXAMPLE
 
-        tarantool> box.error({code=555, reason='Arbitrary message'})
-        ---
-        - error: Arbitrary message
-        ...
-        tarantool> box.error()
-        ---
-        - error: Arbitrary message
-        ...
-        tarantool> box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')
-        ---
-        - error: A access denied for user 'B' to function 'C'
-        ...
+
+    | :codenormal:`tarantool>` :codebold:`box.error({code=555, reason='Arbitrary message'})`
+    | :codenormal:`---`
+    | :codenormal:`- error: Arbitrary message`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.error()`
+    | :codenormal:`---`
+    | :codenormal:`- error: Arbitrary message`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')`
+    | :codenormal:`---`
+    | :codenormal:`- error: A access denied for user 'B' to function 'C'`
+    | :codenormal:`...`
 
 .. function:: box.error.last()
 
@@ -74,27 +75,25 @@ be presented to the client as ``ER_PROC_LUA``.
     Clears the record of errors, so functions like `box.error()`
     or `box.error.last()` will have no effect.
 
-    .. code-block:: lua
+    EXAMPLE
 
-        EXAMPLE
-
-        tarantool> box.error({code=555, reason='Arbitrary message'})
-        ---
-        - error: Arbitrary message
-        ...
-
-        tarantool> box.error.last()
-        ---
-        - type: ClientError
-          message: Arbitrary message
-          code: 555
-        ...
-
-        tarantool> box.error.clear()
-        ---
-        ...
-
-        tarantool> box.error.last()
-        ---
-        - null
-        ...
+    | :codenormal:`tarantool>` :codebold:`box.error({code=555, reason='Arbitrary message'})`
+    | :codenormal:`---`
+    | :codenormal:`- error: Arbitrary message`
+    | :codenormal:`..`
+    |
+    | :codenormal:`tarantool>` :codebold:`box.error.last()`
+    | :codenormal:`---`
+    | :codenormal:`- type: ClientError`
+    | :codenormal:`message: Arbitrary message`
+    | :codenormal:`code: 555`
+    | :codenormal:`...`
+    |
+    | :codenormal:`tarantool>` :codebold:`box.error.clear()`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    |
+    | :codenormal:`tarantool>` :codebold:`box.error.last()`
+    | :codenormal:`---`
+    | :codenormal:`- null`
+    | :codenormal:`...`

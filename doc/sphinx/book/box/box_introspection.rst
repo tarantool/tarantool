@@ -15,18 +15,18 @@ access to those parameters.
 
 .. data:: box.cfg
 
-    .. code-block:: lua
+    EXAMPLE
 
-        tarantool> box.cfg
-        ---
-        - too_long_threshold: 0.5
-          slab_alloc_factor: 1.1
-          slab_alloc_minimal: 64
-          background: false
-          slab_alloc_arena: 1
-          log_level: 5
-          ...
-        ...
+    | :codenormal:`tarantool>` :codebold:`box.cfg`
+    | :codenormal:`---`
+    | :codenormal:`- too_long_threshold: 0.5`
+    | :codenormal:`slab_alloc_factor: 1.1`
+    | :codenormal:`slab_alloc_minimal: 64`
+    | :codenormal:`background: false`
+    | :codenormal:`slab_alloc_arena: 1`
+    | :codenormal:`log_level: 5`
+    | :codenormal:`...`
+    | :codenormal:`...`
 
 =====================================================================
                          Package `box.info`
@@ -58,23 +58,22 @@ you can use **date -d@** 1306964594.980.
     :return: keys and values in the package.
     :rtype:  table
 
-    .. code-block:: yaml
-
-        tarantool> box.info()
-        ---
-        - server:
-            lsn: 158
-            ro: false
-            uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64
-            id: 1
-          pid: 32561
-          version: 1.6.4-411-gcff798b
-          status: running
-          vclock: {1: 158}
-          replication:
-            status: off
-          uptime: 2778
-        ...
+    EXAMPLE
+    | :codenormal:`tarantool>` :codebold:`box.info()`
+    | :codenormal:`---`
+    | :codenormal:`- server:`
+    | :codenormal:`lsn: 158`
+    | :codenormal:`ro: false`
+    | :codenormal:`uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64`
+    | :codenormal:`id: 1`
+    | :codenormal:`pid: 32561`
+    | :codenormal:`version: 1.6.4-411-gcff798b`
+    | :codenormal:`status: running`
+    | :codenormal:`vclock: {1: 158}`
+    | :codenormal:`replication:`
+    | :codenormal:`status: off`
+    | :codenormal:`uptime: 2778`
+    | :codenormal:`...`
 
 .. data:: status
           pid
@@ -83,34 +82,34 @@ you can use **date -d@** 1306964594.980.
 
     .. code-block:: lua
 
-        tarantool> box.info.pid
-        ---
-        - 1747
-        ...
-        tarantool> box.info.logger_pid
-        ---
-        - 1748
-        ...
-        tarantool> box.info.version
-        ---
-        - 1.6.4-411-gcff798b
-        ...
-        tarantool> box.info.uptime
-        ---
-        - 3672
-        ...
-        tarantool> box.info.status
-        ---
-        - running
-        ...
-        tarantool> box.info.recovery_lag
-        ---
-        - 0.000
-        ...
-        tarantool> box.info.recovery_last_update
-        ---
-        - 1306964594.980
-        ...
+    | :codenormal:`tarantool>` :codebold:`box.info.pid`
+    | :codenormal:`---`
+    | :codenormal:`- 1747`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.logger_pid`
+    | :codenormal:`---`
+    | :codenormal:`- 1748`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.version`
+    | :codenormal:`---`
+    | :codenormal:`- 1.6.4-411-gcff798b`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.uptime`
+    | :codenormal:`---`
+    | :codenormal:`- 3672`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.status`
+    | :codenormal:`---`
+    | :codenormal:`- running`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.recovery_lag`
+    | :codenormal:`---`
+    | :codenormal:`- 0.000`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.info.recovery_last_update`
+    | :codenormal:`---`
+    | :codenormal:`- 1306964594.980`
+    | :codenormal:`...`
 
 =====================================================================
                          Package `box.slab`
@@ -136,27 +135,27 @@ The arena_size and arena_used values are the amount of the % of
 
     .. code-block:: lua
 
-        tarantool> box.slab.info().arena_used
-        ---
-        - 4194304
-        ...
-        tarantool> box.slab.info().arena_size
-        ---
-        - 104857600
-        ...
-        tarantool> box.slab.info().slabs
-        ---
-        - - {mem_free: 9320, mem_used: 6976, 'item_count': 109,
-            'item_size': 64, 'slab_count': 1, 'slab_size': 16384}
-          - {mem_free: 16224, mem_used: 72, 'item_count': 1,
-            'item_size': 72, 'slab_count': 1,'slab_size': 16384}
-        etc.
-        ...
-        tarantool> box.slab.info().slabs[1]
-        ---
-        - {mem_free: 9320, mem_used: 6976, 'item_count': 109,
-          'item_size': 64, 'slab_count': 1, 'slab_size': 16384}
-        ...
+    | :codenormal:`tarantool>` :codebold:`box.slab.info().arena_used`
+    | :codenormal:`---`
+    | :codenormal:`- 4194304`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.slab.info().arena_size`
+    | :codenormal:`---`
+    | :codenormal:`- 104857600`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.slab.info().slabs`
+    | :codenormal:`---`
+    | :codenormal:`- - {mem_free: 9320, mem_used: 6976, 'item_count': 109,`
+    | :codenormal:`'item_size': 64, 'slab_count': 1, 'slab_size': 16384}`
+    | :codenormal:`- {mem_free: 16224, mem_used: 72, 'item_count': 1,`
+    | :codenormal:`'item_size': 72, 'slab_count': 1,'slab_size': 16384}`
+    | :codenormal:`etc.`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.slab.info().slabs[1]`
+    | :codenormal:`---`
+    | :codenormal:`- {mem_free: 9320, mem_used: 6976, 'item_count': 109,`
+    | :codenormal:`'item_size': 64, 'slab_count': 1, 'slab_size': 16384}`
+    | :codenormal:`...`
 
 =====================================================================
                          Package `box.stat`
@@ -170,43 +169,41 @@ since startup, broken down by request type.
 
 .. data:: box.stat
 
-    .. code-block:: lua
-
-        tarantool> box.stat, type(box.stat) -- a virtual table
-        ---
-        - []
-        - table
-        ...
-        tarantool> box.stat() -- the full contents of the table
-        ---
-        - DELETE:
-            total: 48902544
-            rps: 147
-          EVAL:
-            total: 0
-            rps: 0
-          SELECT:
-            total: 388322317
-            rps: 1246
-          REPLACE:
-            total: 4
-            rps: 0
-          INSERT:
-            total: 48207694
-            rps: 139
-          AUTH:
-            total: 0
-            rps: 0
-          CALL:
-            total: 8
-            rps: 0
-          UPDATE:
-            total: 743350520
-            rps: 1874
-        ...
-        tarantool> box.stat().DELETE -- a selected item of the table
-        ---
-        - total: 48902544
-          rps: 0
-        ...
+        | :codenormal:`tarantool>` :codebold:`box.stat, type(box.stat) -- a virtual table`
+        | :codenormal:`---`
+        | :codenormal:`- []`
+        | :codenormal:`- table`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.stat() -- the full contents of the table`
+        | :codenormal:`---`
+        | :codenormal:`- DELETE:`
+        | :codenormal:`total: 48902544`
+        | :codenormal:`rps: 147`
+        | :codenormal:`EVAL:`
+        | :codenormal:`total: 0`
+        | :codenormal:`rps: 0`
+        | :codenormal:`SELECT:`
+        | :codenormal:`total: 388322317`
+        | :codenormal:`rps: 1246`
+        | :codenormal:`REPLACE:`
+        | :codenormal:`total: 4`
+        | :codenormal:`rps: 0`
+        | :codenormal:`INSERT:`
+        | :codenormal:`total: 48207694`
+        | :codenormal:`rps: 139`
+        | :codenormal:`AUTH:`
+        | :codenormal:`total: 0`
+        | :codenormal:`rps: 0`
+        | :codenormal:`CALL:`
+        | :codenormal:`total: 8`
+        | :codenormal:`rps: 0`
+        | :codenormal:`UPDATE:`
+        | :codenormal:`total: 743350520`
+        | :codenormal:`rps: 1874`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`box.stat().DELETE -- a selected item of the table`
+        | :codenormal:`---`
+        | :codenormal:`- total: 48902544`
+        | :codenormal:`rps: 0`
+        | :codenormal:`...`
 

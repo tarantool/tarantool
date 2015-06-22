@@ -41,18 +41,16 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
                     Example
 =================================================
 
-.. code-block:: lua
-
-    tarantool> s = box.schema.space.create('space55')
-    ---
-    ...
-    tarantool> s = box.schema.space.create('space55', {id = 555, temporary = false})
-    ---
-    - error: Space 'space55' already exists
-    ...
-    tarantool> s = box.schema.space.create('space55', {if_not_exists = true})
-    ---
-    ...
+ | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space55')`
+ | :codenormal:`---`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space55', {id = 555, temporary = false})`
+ | :codenormal:`---`
+ | :codenormal:`- error: Space 'space55' already exists`
+ | :codenormal:`...`
+ | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space55', {if_not_exists = true})`
+ | :codenormal:`---`
+ | :codenormal:`...`
 
 After a space is created, usually the next step is to
 :func:`create an index <space_object.create_index>` for it,
