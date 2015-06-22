@@ -208,7 +208,7 @@ obuf_alloc(struct obuf *buf, size_t size)
 	void *ptr = (char *) iov->iov_base + iov->iov_len;
 	iov->iov_len += size;
 	buf->size += size;
-	assert(iov->iov_len < buf->capacity[buf->pos]);
+	assert(iov->iov_len <= buf->capacity[buf->pos]);
 	return ptr;
 }
 
