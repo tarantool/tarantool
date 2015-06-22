@@ -382,6 +382,20 @@ bitset_index_init_iterator(struct bitset_index *index,
 	return bitset_iterator_init(it, expr, index->bitsets, index->capacity);
 }
 
+size_t
+bitset_index_bsize(const struct bitset_index *index)
+{
+	size_t result = 0;
+	for (size_t b = 0; b < index->capacity; b++) {
+		if (index->bitsets[b] == NULL)
+			continue;
+		struct bitset_info info;
+		bitset_info(index->bitsets[b], &info);
+		result += info.page_total_size * info.pages;
+	}
+	return result;
+}
+
 extern inline size_t
 bitset_index_size(const struct bitset_index *index);
 
