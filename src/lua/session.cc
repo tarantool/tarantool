@@ -101,6 +101,8 @@ static struct lbox_session_trigger on_connect =
 	{ &session_on_connect, LUA_NOREF};
 static struct lbox_session_trigger on_disconnect =
 	{ &session_on_disconnect, LUA_NOREF};
+static struct lbox_session_trigger on_auth =
+	{ &session_on_auth, LUA_NOREF};
 
 static void
 lbox_session_run_trigger(void *param)
@@ -176,6 +178,12 @@ lbox_session_on_disconnect(struct lua_State *L)
 	return lbox_session_set_trigger(L, &on_disconnect);
 }
 
+static int
+lbox_session_on_auth(struct lua_State *L)
+{
+	return lbox_session_set_trigger(L, &on_auth);
+}
+
 void
 session_storage_cleanup(int sid)
 {
@@ -203,6 +211,7 @@ static const struct luaL_reg sessionlib[] = {
 	{"peer", lbox_session_peer},
 	{"on_connect", lbox_session_on_connect},
 	{"on_disconnect", lbox_session_on_disconnect},
+	{"on_auth", lbox_session_on_auth},
 	{NULL, NULL}
 };
 

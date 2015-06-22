@@ -211,6 +211,17 @@ lbox_session_run_trigger(struct trigger *trigger, void * /* event */)
 	lbox_call(L, 0, 0);
 }
 
+static void
+lbox_session_run_auth_trigger(struct trigger *trigger, void *event)
+{
+	lua_State *L = lua_newthread(tarantool_L);
+	LuarefGuard coro_guard(tarantool_L);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
+	/* now only the user name comes in as an on_auth argument */
+	lua_pushstring(L, (const char *)event);
+	lbox_call(L, 1, 0);
+}
+
 static int
 lbox_session_on_connect(struct lua_State *L)
 {
@@ -223,6 +234,13 @@ lbox_session_on_disconnect(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &session_on_disconnect,
 				  lbox_session_run_trigger);
+}
+
+static int
+lbox_session_on_auth(struct lua_State *L)
+{
+	return lbox_trigger_reset(L, 2, &session_on_auth,
+				  lbox_session_run_auth_trigger);
 }
 
 void
@@ -270,6 +288,7 @@ box_lua_session_init(struct lua_State *L)
 		{"peer", lbox_session_peer},
 		{"on_connect", lbox_session_on_connect},
 		{"on_disconnect", lbox_session_on_disconnect},
+		{"on_auth", lbox_session_on_auth},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, sessionlib_name, sessionlib);

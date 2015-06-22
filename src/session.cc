@@ -39,6 +39,7 @@ static struct mh_i32ptr_t *session_registry;
 
 struct session_trigger session_on_connect;
 struct session_trigger session_on_disconnect;
+struct session_trigger session_on_auth;
 
 uint32_t
 session_create(int fd, uint64_t cookie)
