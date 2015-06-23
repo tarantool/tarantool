@@ -980,7 +980,6 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 	req->res = -1;
 	req->row = row;
 	row->tm = ev_now(loop());
-	row->sync = 0;
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 

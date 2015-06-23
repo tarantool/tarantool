@@ -118,13 +118,14 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out)
 		d = mp_encode_uint(d, header->type);
 		map_size++;
 	}
-
+/* https://github.com/tarantool/tarantool/issues/881 */
+#if 0
 	if (header->sync) {
 		d = mp_encode_uint(d, IPROTO_SYNC);
 		d = mp_encode_uint(d, header->sync);
 		map_size++;
 	}
-
+#endif
 	if (header->server_id) {
 		d = mp_encode_uint(d, IPROTO_SERVER_ID);
 		d = mp_encode_uint(d, header->server_id);
