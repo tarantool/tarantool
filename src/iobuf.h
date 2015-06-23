@@ -276,8 +276,6 @@ obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp);
 /** {{{  Input/output pair. */
 struct iobuf
 {
-	/** Used for iobuf cache. */
-	SLIST_ENTRY(iobuf) next;
 	/** Input buffer. */
 	struct ibuf in;
 	/** Output buffer. */
@@ -289,13 +287,34 @@ struct iobuf
 	int pins;
 };
 
-/** Create an instance of input/output buffer. */
+/**
+ * Create an instance of input/output buffer.
+ * @warning not safe to use in case of multi-threaded
+ * access to in and out.
+ */
 struct iobuf *
-iobuf_new(const char *name);
+iobuf_new();
 
-/** Destroy an input/output buffer. */
+/**
+ * Destroy an input/output buffer.
+ * @warning a counterpart of iobuf_new(), only for single threaded
+ * access.
+ */
 void
 iobuf_delete(struct iobuf *iobuf);
+
+/**
+ * Multi-threaded constructor of iobuf - 'out'
+ * may use slab caches of another (consumer) cord.
+ */
+struct iobuf *
+iobuf_new_mt(struct slab_cache *slabc_out);
+
+/**
+ * @pre 'out' must be freed if necessary by the consumer cord
+ */
+void
+iobuf_delete_mt(struct iobuf *iobuf);
 
 /**
  * Must be called when we are done sending all output,

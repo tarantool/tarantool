@@ -30,7 +30,6 @@
 #include "fiber.h"
 
 __thread struct mempool iobuf_pool;
-__thread SLIST_HEAD(iobuf_cache, iobuf) iobuf_cache;
 
 /**
  * Network readahead. A signed integer to avoid
@@ -187,6 +186,9 @@ obuf_destroy(struct obuf *buf)
 		struct slab *slab = slab_from_data(buf->iov[i].iov_base);
 		slab_put(buf->slabc, slab);
 	}
+#ifndef NDEBUG
+	obuf_create(buf, buf->slabc, buf->start_size);
+#endif
 }
 
 /** Add data to the output buffer. Copies the data. */
@@ -332,44 +334,41 @@ static int iobuf_max_size()
 
 /** Create an instance of input/output buffer or take one from cache. */
 struct iobuf *
-iobuf_new(const char *name)
+iobuf_new()
 {
-	(void) name;
+	return iobuf_new_mt(&cord()->slabc);
+}
+
+struct iobuf *
+iobuf_new_mt(struct slab_cache *slabc_out)
+{
 	struct iobuf *iobuf;
-	if (SLIST_EMPTY(&iobuf_cache)) {
-		iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);
-		iobuf->pins = 0;
-		/* Note: do not allocate memory upfront. */
-		ibuf_create(&iobuf->in, &cord()->slabc);
-		obuf_create(&iobuf->out, &cord()->slabc, iobuf_readahead);
-	} else {
-		iobuf = SLIST_FIRST(&iobuf_cache);
-		SLIST_REMOVE_HEAD(&iobuf_cache, next);
-	}
-	/* When releasing the buffer, we trim it to iobuf_max_size(). */
-	assert(ibuf_capacity(&iobuf->in) <= iobuf_max_size());
-	assert(obuf_capacity(&iobuf->out) <= iobuf_max_size());
+	iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);
+	iobuf->pins = 0;
+	/* Note: do not allocate memory upfront. */
+	ibuf_create(&iobuf->in, &cord()->slabc);
+	obuf_create(&iobuf->out, slabc_out, iobuf_readahead);
 	return iobuf;
 }
 
-/** Put an instance back to the iobuf_cache. */
+/** Destroy an instance and delete it. */
 void
 iobuf_delete(struct iobuf *iobuf)
 {
+	ibuf_destroy(&iobuf->in);
+	obuf_destroy(&iobuf->out);
+	mempool_free(&iobuf_pool, iobuf);
+}
+
+/** Second part of multi-threaded destroy. */
+void
+iobuf_delete_mt(struct iobuf *iobuf)
+{
 	assert(iobuf->pins == 0);
-	if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
-		ibuf_reset(&iobuf->in);
-	} else {
-		ibuf_destroy(&iobuf->in);
-		ibuf_create(&iobuf->in, &cord()->slabc);
-	}
-	if (obuf_capacity(&iobuf->out) < iobuf_max_size()) {
-		obuf_reset(&iobuf->out);
-	} else {
-		obuf_destroy(&iobuf->out);
-		obuf_create(&iobuf->out, &cord()->slabc, iobuf_readahead);
-	}
-	SLIST_INSERT_HEAD(&iobuf_cache, iobuf, next);
+	ibuf_destroy(&iobuf->in);
+	/* Destroyed by the caller. */
+	assert(&iobuf->out.pos == 0 && iobuf->out.iov[0].iov_base == NULL);
+	mempool_free(&iobuf_pool, iobuf);
 }
 
 void
@@ -379,10 +378,23 @@ iobuf_reset(struct iobuf *iobuf)
 	 * If we happen to have fully processed the input,
 	 * move the pos to the start of the input buffer.
 	 */
-	if (ibuf_size(&iobuf->in) == 0)
-		ibuf_reset(&iobuf->in);
-	/* Cheap to do even if already done. */
-	obuf_reset(&iobuf->out);
+	if (ibuf_size(&iobuf->in) == 0) {
+		if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
+			ibuf_reset(&iobuf->in);
+		} else {
+			struct slab_cache *slabc = iobuf->in.slabc;
+			ibuf_destroy(&iobuf->in);
+			ibuf_create(&iobuf->in, slabc);
+		}
+	}
+	if (obuf_capacity(&iobuf->out) < iobuf_max_size()) {
+		/* Cheap to do even if already done. */
+		obuf_reset(&iobuf->out);
+	} else {
+		struct slab_cache *slabc = iobuf->out.slabc;
+		obuf_destroy(&iobuf->out);
+		obuf_create(&iobuf->out, slabc, iobuf_readahead);
+	}
 }
 
 void

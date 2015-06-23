@@ -134,7 +134,7 @@ replica_bootstrap(struct recovery_state *r)
 
 	struct ev_io coio;
 	coio_init(&coio);
-	struct iobuf *iobuf = iobuf_new(fiber_name(fiber()));
+	struct iobuf *iobuf = iobuf_new();
 	auto coio_guard = make_scoped_guard([&] {
 		iobuf_delete(iobuf);
 		evio_close(loop(), &coio);
@@ -207,7 +207,7 @@ pull_from_remote(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct ev_io coio;
-	struct iobuf *iobuf = iobuf_new(fiber_name(fiber()));
+	struct iobuf *iobuf = iobuf_new();
 	ev_loop *loop = loop();
 
 	coio_init(&coio);

@@ -54,6 +54,9 @@
 
 struct iproto_connection;
 
+static inline size_t
+iproto_connection_count();
+
 typedef void (*iproto_request_f)(struct iproto_request *);
 
 /**
@@ -71,8 +74,15 @@ struct iproto_request
 	struct xrow_header header;
 	/* Box request, if this is a DML */
 	struct request request;
-	size_t total_len;
+	/**
+	 * How much space the request takes in the
+	 * input buffer (len, header and body - all of it)
+	 */
+	size_t len;
+	STAILQ_ENTRY(iproto_request) fifo;
 };
+
+STAILQ_HEAD(iproto_fifo, iproto_request);
 
 static struct evio_service binary; /* iproto binary listener */
 
@@ -104,9 +114,10 @@ struct IprotoRequestGuard {
 
 /* {{{ iproto_queue */
 
-struct iproto_request;
-
-enum { IPROTO_REQUEST_QUEUE_SIZE = 2048, };
+enum {
+       IPROTO_FIBER_CACHE_SIZE = 128,
+       IPROTO_FIBER_POOL_SIZE = 1024,
+};
 
 /**
  * Implementation of an input queue of the box request processor.
@@ -122,27 +133,34 @@ enum { IPROTO_REQUEST_QUEUE_SIZE = 2048, };
 struct iproto_queue
 {
 	/** Ring buffer of fixed size */
-	struct iproto_request *queue[IPROTO_REQUEST_QUEUE_SIZE];
+	struct iproto_fifo queue;
 	/**
 	 * Cache of fibers which work on requests
 	 * in this queue.
 	 */
 	struct rlist fiber_cache;
+	/** The number of fibers in the cache */
+	int cache_size;
+	/** The number of fibers working on tasks. */
+	int pool_size;
 	/**
 	 * Used to trigger request processing when
 	 * the queue becomes non-empty.
 	 */
 	struct ev_async watcher;
-	/* Ring buffer position. */
-	int begin, end;
-	/* Ring buffer size. */
-	int size;
 };
 
 static inline bool
 iproto_queue_is_empty(struct iproto_queue *i_queue)
 {
-	return i_queue->begin == i_queue->end;
+	return STAILQ_EMPTY(&i_queue->queue);
+}
+
+static inline bool
+iproto_queue_needs_throttling(struct iproto_queue *i_queue)
+{
+	return i_queue->pool_size > IPROTO_FIBER_POOL_SIZE &&
+		i_queue->pool_size > iproto_connection_count();
 }
 
 /**
@@ -162,28 +180,23 @@ static void
 iproto_queue_push(struct iproto_queue *i_queue,
 		  struct iproto_request *request)
 {
-	/* If the queue is full, invoke the handler to work it off. */
-	if (i_queue->end == i_queue->size)
-		ev_invoke(loop(), &i_queue->watcher, EV_CUSTOM);
-	assert(i_queue->end < i_queue->size);
 	/*
 	 * There were some queued requests, ensure they are
 	 * handled.
 	 */
 	if (iproto_queue_is_empty(i_queue))
 		ev_feed_event(loop(), &request_queue.watcher, EV_CUSTOM);
-	i_queue->queue[i_queue->end++] = request;
+	STAILQ_INSERT_TAIL(&i_queue->queue, request, fifo);
 }
 
 static struct iproto_request *
 iproto_queue_pop(struct iproto_queue *i_queue)
 {
-	if (i_queue->begin == i_queue->end)
+	if (iproto_queue_is_empty(i_queue))
 		return NULL;
-	struct iproto_request *request = i_queue->queue[i_queue->begin++];
-	if (i_queue->begin == i_queue->end)
-		i_queue->begin = i_queue->end = 0;
-	return request;
+	struct iproto_request *ireq = STAILQ_FIRST(&i_queue->queue);
+	STAILQ_REMOVE_HEAD(&i_queue->queue, fifo);
+	return ireq;
 }
 
 /**
@@ -195,6 +208,8 @@ iproto_queue_handler(va_list ap)
 {
 	struct iproto_queue *i_queue = va_arg(ap, struct iproto_queue *);
 	struct iproto_request *request;
+	i_queue->pool_size++;
+	auto size_guard = make_scoped_guard([=]{ i_queue->pool_size--; });
 restart:
 	while ((request = iproto_queue_pop(i_queue))) {
 		IprotoRequestGuard guard(request);
@@ -202,10 +217,16 @@ restart:
 		fiber_set_user(fiber(), &request->session->credentials);
 		request->process(request);
 	}
-	/** Put the current fiber into a queue fiber cache. */
-	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
-	fiber_yield();
-	goto restart;
+	if (i_queue->cache_size < IPROTO_FIBER_CACHE_SIZE) {
+		/** Put the current fiber into a queue fiber cache. */
+		rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
+		i_queue->pool_size--;
+		i_queue->cache_size++;
+		fiber_yield();
+		i_queue->cache_size--;
+		i_queue->pool_size++;
+		goto restart;
+	}
 }
 
 /** Create fibers to handle all outstanding tasks. */
@@ -215,13 +236,20 @@ iproto_queue_schedule(ev_loop * /* loop */, struct ev_async *watcher,
 {
 	struct iproto_queue *i_queue = (struct iproto_queue *) watcher->data;
 	while (! iproto_queue_is_empty(i_queue)) {
-
 		struct fiber *f;
-		if (! rlist_empty(&i_queue->fiber_cache))
+		if (! rlist_empty(&i_queue->fiber_cache)) {
 			f = rlist_shift_entry(&i_queue->fiber_cache,
 					      struct fiber, state);
-		else
+		} else if (! iproto_queue_needs_throttling(i_queue)) {
 			f = fiber_new("iproto", iproto_queue_handler);
+		} else {
+			/**
+			 * No worries that this watcher may not
+			 * get scheduled again - there are enough
+			 * worker fibers already, so just leave.
+			 */
+			break;
+		}
 		fiber_start(f, i_queue);
 	}
 }
@@ -229,8 +257,7 @@ iproto_queue_schedule(ev_loop * /* loop */, struct ev_async *watcher,
 static inline void
 iproto_queue_init(struct iproto_queue *i_queue)
 {
-	i_queue->size = IPROTO_REQUEST_QUEUE_SIZE;
-	i_queue->begin = i_queue->end = 0;
+	STAILQ_INIT(&i_queue->queue);
 	/**
 	 * Initialize an ev_async event which would start
 	 * workers for all outstanding tasks.
@@ -238,6 +265,8 @@ iproto_queue_init(struct iproto_queue *i_queue)
 	ev_async_init(&i_queue->watcher, iproto_queue_schedule);
 	i_queue->watcher.data = i_queue;
 	rlist_create(&i_queue->fiber_cache);
+	i_queue->cache_size = 0;
+	i_queue->pool_size = 0;
 }
 
 /* }}} */
@@ -285,6 +314,12 @@ struct iproto_connection
 
 static struct mempool iproto_connection_pool;
 
+static inline size_t
+iproto_connection_count()
+{
+	return mempool_count(&iproto_connection_pool);
+}
+
 /**
  * A connection is idle when the client is gone
  * and there are no outstanding requests in the request queue.
@@ -312,14 +347,15 @@ iproto_connection_on_output(ev_loop * /* loop */, struct ev_io *watcher,
 static struct iproto_connection *
 iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 {
+	(void) name;
 	struct iproto_connection *con = (struct iproto_connection *)
 		mempool_alloc(&iproto_connection_pool);
 	con->input.data = con->output.data = con;
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
-	con->iobuf[0] = iobuf_new(name);
-	con->iobuf[1] = iobuf_new(name);
+	con->iobuf[0] = iobuf_new();
+	con->iobuf[1] = iobuf_new();
 	con->parse_size = 0;
 	con->write_pos = obuf_create_svp(&con->iobuf[0]->out);
 	con->session = NULL;
@@ -348,8 +384,9 @@ iproto_connection_delete(struct iproto_connection *con)
 }
 
 static inline void
-iproto_connection_shutdown(struct iproto_connection *con)
+iproto_connection_close(struct iproto_connection *con)
 {
+	int fd = con->input.fd;
 	ev_io_stop(con->loop, &con->input);
 	ev_io_stop(con->loop, &con->output);
 	con->input.fd = con->output.fd = -1;
@@ -371,13 +408,6 @@ iproto_connection_shutdown(struct iproto_connection *con)
 		con->disconnect = NULL;
 		iproto_queue_push(&request_queue, ireq);
 	}
-}
-
-static inline void
-iproto_connection_close(struct iproto_connection *con)
-{
-	int fd = con->input.fd;
-	iproto_connection_shutdown(con);
 	close(fd);
 }
 
@@ -458,7 +488,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
-	while (true) {
+	while (! iproto_queue_needs_throttling(&request_queue)) {
 		const char *reqstart = in->end - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
@@ -477,7 +507,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		IprotoRequestGuard guard(ireq);
 
 		xrow_header_decode(&ireq->header, &pos, reqend);
-		ireq->total_len = pos - reqstart; /* total request length */
+		assert(pos == reqend);
+		ireq->len = reqend - reqstart; /* total request length */
 
 		/*
 		 * sic: in case of exception con->parse_size
@@ -640,7 +671,7 @@ iproto_process(struct iproto_request *ireq)
 
 	auto scope_guard = make_scoped_guard([=]{
 		/* Discard request (see iproto_enqueue_batch()) */
-		iobuf->in.pos += ireq->total_len;
+		iobuf->in.pos += ireq->len;
 
 		if (evio_is_active(&con->output)) {
 			if (! ev_is_active(&con->output))

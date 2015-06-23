@@ -626,7 +626,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	struct fiber *f;
 
 	try {
-		iobuf = iobuf_new(iobuf_name);
+		iobuf = iobuf_new();
 		f = fiber_new(fiber_name, service->handler);
 	} catch (Exception *e) {
 		e->log();

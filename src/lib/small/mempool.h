@@ -180,6 +180,15 @@ struct mempool_stats
 void
 mempool_stats(struct mempool *mempool, struct mempool_stats *stats);
 
+/**
+ * Number of objects in the pool.
+ */
+static inline size_t
+mempool_count(struct mempool *pool)
+{
+	return pool->slabs.stats.used/pool->objsize;
+}
+
 /** @todo: struct mempool_iterator */
 
 void
