@@ -36,11 +36,7 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
-#include "salad/rlist.h"
 #include "request.h"
-#include <stdlib.h>
-#include <string.h>
-#include <sys/wait.h>
 #include "box.h"
 #include "iproto_constants.h"
 #include "xrow.h"
@@ -48,10 +44,9 @@
 #include "schema.h"
 #include "main.h"
 #include "coeio_file.h"
-#include "coio.h"
+#include "coeio.h"
 #include "errinj.h"
 #include "scoped_guard.h"
-#include "salad/rlist.h"
 
 /** For all memory used by all indexes. */
 extern struct quota memtx_quota;
@@ -783,7 +778,7 @@ MemtxEngine::waitCheckpoint()
 	int result;
 	try {
 		/* wait for memtx-part snapshot completion */
-		result = cord_join(&m_checkpoint->cord);
+		result = cord_cojoin(&m_checkpoint->cord);
 	} catch (Exception *e) {
 		e->log();
 		result = -1;
@@ -829,7 +824,7 @@ MemtxEngine::abortCheckpoint()
 	if (m_checkpoint->waiting_for_snap_thread) {
 		try {
 			/* wait for memtx-part snapshot completion */
-			cord_join(&m_checkpoint->cord);
+			cord_cojoin(&m_checkpoint->cord);
 		} catch (Exception *e) {
 			e->log();
 		}
