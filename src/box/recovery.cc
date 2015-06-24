@@ -265,7 +265,6 @@ recovery_apply_row(struct recovery_state *r, struct xrow_header *row)
 {
 	/* Check lsn */
 	int64_t current_lsn = vclock_get(&r->vclock, row->server_id);
-	assert(current_lsn >= 0);
 	if (row->lsn > current_lsn)
 		r->apply_row(r, r->apply_row_param, row);
 }
