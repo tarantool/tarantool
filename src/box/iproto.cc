@@ -488,7 +488,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
-	while (! iproto_queue_needs_throttling(&request_queue)) {
+	while (true) {
 		const char *reqstart = in->end - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
