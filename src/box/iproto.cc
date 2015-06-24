@@ -115,8 +115,8 @@ struct IprotoRequestGuard {
 /* {{{ iproto_queue */
 
 enum {
-       IPROTO_FIBER_CACHE_SIZE = 128,
        IPROTO_FIBER_POOL_SIZE = 1024,
+       IPROTO_FIBER_CACHE_SIZE = IPROTO_FIBER_POOL_SIZE * 2
 };
 
 /**
