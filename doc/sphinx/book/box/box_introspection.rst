@@ -15,17 +15,16 @@ access to those parameters.
 
 .. data:: box.cfg
 
-    EXAMPLE
-
+    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`box.cfg`
     | :codenormal:`---`
-    | :codenormal:`- too_long_threshold: 0.5`
-    | :codenormal:`slab_alloc_factor: 1.1`
-    | :codenormal:`slab_alloc_minimal: 64`
-    | :codenormal:`background: false`
-    | :codenormal:`slab_alloc_arena: 1`
-    | :codenormal:`log_level: 5`
-    | :codenormal:`...`
+    | |nbsp| :codenormal:`- too_long_threshold: 0.5`
+    | |nbsp| :codenormal:`slab_alloc_factor: 1.1`
+    | |nbsp| :codenormal:`slab_alloc_minimal: 64`
+    | |nbsp| :codenormal:`background: false`
+    | |nbsp| :codenormal:`slab_alloc_arena: 1`
+    | |nbsp| :codenormal:`log_level: 5`
+    | |nbsp| :codenormal:`...`
     | :codenormal:`...`
 
 =====================================================================
@@ -58,22 +57,22 @@ you can use **date -d@** 1306964594.980.
     :return: keys and values in the package.
     :rtype:  table
 
-    EXAMPLE
+    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`box.info()`
     | :codenormal:`---`
     | :codenormal:`- server:`
-    | :codenormal:`lsn: 158`
-    | :codenormal:`ro: false`
-    | :codenormal:`uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64`
-    | :codenormal:`id: 1`
-    | :codenormal:`pid: 32561`
-    | :codenormal:`version: 1.6.4-411-gcff798b`
-    | :codenormal:`snapshot_pid: 0`
-    | :codenormal:`status: running`
-    | :codenormal:`vclock: {1: 158}`
-    | :codenormal:`replication:`
-    | :codenormal:`status: off`
-    | :codenormal:`uptime: 2778`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`lsn: 158`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`ro: false`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64`
+    | |nbsp| :codenormal:`id: 1`
+    | |nbsp| :codenormal:`pid: 32561`
+    | |nbsp| :codenormal:`version: 1.6.4-411-gcff798b`
+    | |nbsp| :codenormal:`snapshot_pid: 0`
+    | |nbsp| :codenormal:`status: running`
+    | |nbsp| :codenormal:`vclock: {1: 158}`
+    | |nbsp| :codenormal:`replication:`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`status: off`
+    | |nbsp| :codenormal:`uptime: 2778`
     | :codenormal:`...`
 
 .. data:: status
