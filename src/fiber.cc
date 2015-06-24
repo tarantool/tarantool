@@ -663,9 +663,7 @@ cord_join(struct cord *cord)
 		 */
 		diag_move(&cord->fiber->diag, &fiber()->diag);
 		cord_destroy(cord);
-		Exception *e = diag_last_error(&fiber()->diag);
-		if (e != NULL)
-			e->raise();
+		diag_last_error(&fiber()->diag)->raise();
 	}
 	cord_destroy(cord);
 	return res;
