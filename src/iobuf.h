@@ -34,6 +34,10 @@
 #include "third_party/queue.h"
 #include "small/region.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** {{{ Input buffer.
  *
  * Continuous piece of memory to store input.
@@ -54,37 +58,40 @@ struct ibuf
 	struct slab_cache *slabc;
 	char *buf;
 	/** Start of input. */
-	char *pos;
+	char *rpos;
 	/** End of useful input */
+	char *wpos;
+	/** End of buffer. */
 	char *end;
-	/** Buffer size. */
-	size_t capacity;
 };
 
-/** Reserve space for sz bytes in the input buffer. */
 void
-ibuf_reserve(struct ibuf *ibuf, size_t sz);
+ibuf_create(struct ibuf *ibuf, struct slab_cache *slabc);
+
+void
+ibuf_destroy(struct ibuf *ibuf);
 
 /** How much data is read and is not parsed yet. */
 static inline size_t
 ibuf_size(struct ibuf *ibuf)
 {
-	assert(ibuf->end >= ibuf->pos);
-	return ibuf->end - ibuf->pos;
+	assert(ibuf->wpos >= ibuf->rpos);
+	return ibuf->wpos - ibuf->rpos;
 }
 
 /** How much data can we fit beyond buf->end */
 static inline size_t
 ibuf_unused(struct ibuf *ibuf)
 {
-	return ibuf->buf + ibuf->capacity - ibuf->end;
+	assert(ibuf->wpos <= ibuf->end);
+	return ibuf->end - ibuf->wpos;
 }
 
 /** How much memory is allocated */
 static inline size_t
 ibuf_capacity(struct ibuf *ibuf)
 {
-	return ibuf->capacity;
+	return ibuf->end - ibuf->buf;
 }
 
 /* Integer value of the position in the buffer - stable
@@ -93,8 +100,40 @@ ibuf_capacity(struct ibuf *ibuf)
 static inline size_t
 ibuf_pos(struct ibuf *ibuf)
 {
-	return ibuf->pos - ibuf->buf;
+	assert(ibuf->buf <= ibuf->rpos);
+	return ibuf->rpos - ibuf->buf;
 }
+
+/** Forget all cached input. */
+static inline void
+ibuf_reset(struct ibuf *ibuf)
+{
+	ibuf->rpos = ibuf->wpos = ibuf->buf;
+}
+
+int
+ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size);
+
+static inline int
+ibuf_reserve_nothrow(struct ibuf *ibuf, size_t size)
+{
+	if (ibuf->wpos + size <= ibuf->end)
+		return 0;
+	return ibuf_reserve_nothrow_slow(ibuf, size);
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+/** Reserve space for sz bytes in the input buffer. */
+static inline void
+ibuf_reserve(struct ibuf *ibuf, size_t size)
+{
+	if (ibuf_reserve_nothrow(ibuf, size) != 0)
+		tnt_raise(OutOfMemory, size, "ibuf", "reserve");
+}
+
+#endif /* defined(__cplusplus) */
 
 /* }}} */
 

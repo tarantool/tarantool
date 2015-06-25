@@ -51,16 +51,15 @@ static int iobuf_readahead = 16320;
 /* {{{ struct ibuf */
 
 /** Initialize an input buffer. */
-static void
+void
 ibuf_create(struct ibuf *ibuf, struct slab_cache *slabc)
 {
 	ibuf->slabc = slabc;
-	ibuf->capacity = 0;
-	ibuf->buf = ibuf->pos = ibuf->end = NULL;
+	ibuf->buf = ibuf->rpos = ibuf->wpos = ibuf->end = NULL;
 	/* Don't allocate the buffer yet. */
 }
 
-static void
+void
 ibuf_destroy(struct ibuf *ibuf)
 {
 	if (ibuf->buf) {
@@ -69,51 +68,43 @@ ibuf_destroy(struct ibuf *ibuf)
 	 }
 }
 
-/** Forget all cached input. */
-static void
-ibuf_reset(struct ibuf *ibuf)
-{
-	ibuf->pos = ibuf->end = ibuf->buf;
-}
-
 /**
  * Ensure the buffer has sufficient capacity
  * to store size bytes.
  */
-void
-ibuf_reserve(struct ibuf *ibuf, size_t size)
+int
+ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size)
 {
-	if (size <= ibuf_unused(ibuf))
-		return;
+	assert(ibuf->wpos + size > ibuf->end);
 	size_t current_size = ibuf_size(ibuf);
+	size_t capacity = ibuf_capacity(ibuf);
 	/*
 	 * Check if we have enough space in the
 	 * current buffer. In this case de-fragment it
 	 * by moving existing data to the beginning.
 	 * Otherwise, get a bigger buffer.
 	 */
-	if (size + current_size <= ibuf->capacity) {
-		memmove(ibuf->buf, ibuf->pos, current_size);
+	if (size + current_size <= capacity) {
+		memmove(ibuf->buf, ibuf->rpos, current_size);
 	} else {
 		/* Use iobuf_readahead as allocation factor. */
-		size_t new_capacity = MAX(ibuf->capacity * 2, iobuf_readahead);
+		size_t new_capacity = MAX(capacity * 2, iobuf_readahead);
 		while (new_capacity < current_size + size)
 			new_capacity *= 2;
 
 		struct slab *slab = slab_get(ibuf->slabc, new_capacity);
-		if (slab == NULL) {
-			tnt_raise(OutOfMemory, new_capacity,
-				  "ibuf_reserve", "slab cache");
-		}
+		if (slab == NULL)
+			return -1;
 		char *ptr = (char *) slab_data(slab);
-		memcpy(ptr, ibuf->pos, current_size);
-		ibuf->capacity = slab_capacity(slab);
+		memcpy(ptr, ibuf->rpos, current_size);
 		if (ibuf->buf)
 			slab_put(ibuf->slabc, slab_from_data(ibuf->buf));
 		ibuf->buf = ptr;
+		ibuf->end = ibuf->buf + slab_capacity(slab);
 	}
-	ibuf->pos = ibuf->buf;
-	ibuf->end = ibuf->pos + current_size;
+	ibuf->rpos = ibuf->buf;
+	ibuf->wpos = ibuf->rpos + current_size;
+	return 0;
 }
 
 /* }}} */

@@ -53,22 +53,22 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 		coio_breadn(coio, in, 1);
 
 	/* Read length */
-	if (mp_typeof(*in->pos) != MP_UINT) {
+	if (mp_typeof(*in->rpos) != MP_UINT) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			  "packet length");
 	}
-	ssize_t to_read = mp_check_uint(in->pos, in->end);
+	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	uint32_t len = mp_decode_uint((const char **) &in->pos);
+	uint32_t len = mp_decode_uint((const char **) &in->rpos);
 
 	/* Read header and body */
 	to_read = len - ibuf_size(in);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	xrow_header_decode(row, (const char **) &in->pos, in->pos + len);
+	xrow_header_decode(row, (const char **) &in->rpos, in->rpos + len);
 }
 
 static void
