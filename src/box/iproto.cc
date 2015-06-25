@@ -287,11 +287,11 @@ struct iproto_connection
 	/*
 	 * Size of readahead which is not parsed yet, i.e.
 	 * size of a piece of request which is not fully read.
-	 * Is always relative to iobuf[0]->in.end. In other words,
-	 * iobuf[0]->in.end - parse_size gives the start of the
+	 * Is always relative to iobuf[0]->in.wpos. In other words,
+	 * iobuf[0]->in.wpos - parse_size gives the start of the
 	 * unparsed request. A size rather than a pointer is used
 	 * to be safe in case in->buf is reallocated. Being
-	 * relative to in->end, rather than to in->pos is helpful to
+	 * relative to in->wpos, rather than to in->rpos is helpful to
 	 * make sure ibuf_reserve() or iobuf rotation don't make
 	 * the value meaningless.
 	 */
@@ -394,7 +394,7 @@ iproto_connection_close(struct iproto_connection *con)
 	 * Discard unparsed data, to recycle the con
 	 * as soon as all parsed data is processed.
 	 */
-	con->iobuf[0]->in.end -= con->parse_size;
+	con->iobuf[0]->in.wpos -= con->parse_size;
 	/*
 	 * If the con is not idle, it is destroyed
 	 * after the last request is handled. Otherwise,
@@ -443,8 +443,8 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 
 	/* The type code is checked in iproto_enqueue_batch() */
 	if (con->parse_size) {
-		const char *pos = oldbuf->in.end - con->parse_size;
-		if (mp_check_uint(pos, oldbuf->in.end) <= 0)
+		const char *pos = oldbuf->in.wpos - con->parse_size;
+		if (mp_check_uint(pos, oldbuf->in.wpos) <= 0)
 			to_read = mp_decode_uint(&pos);
 	}
 
@@ -471,10 +471,10 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	 * Discard unparsed data in the old buffer, otherwise it
 	 * won't be recycled when all parsed requests are processed.
 	 */
-	oldbuf->in.end -= con->parse_size;
+	oldbuf->in.wpos -= con->parse_size;
 	/* Move the cached request prefix to the new buffer. */
-	memcpy(newbuf->in.pos, oldbuf->in.end, con->parse_size);
-	newbuf->in.end += con->parse_size;
+	memcpy(newbuf->in.rpos, oldbuf->in.wpos, con->parse_size);
+	newbuf->in.wpos += con->parse_size;
 	/*
 	 * Rotate buffers. Not strictly necessary, but
 	 * helps preserve response order.
@@ -489,18 +489,18 @@ static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
 	while (true) {
-		const char *reqstart = in->end - con->parse_size;
+		const char *reqstart = in->wpos - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "packet length");
 		}
-		if (mp_check_uint(pos, in->end) >= 0)
+		if (mp_check_uint(pos, in->wpos) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
 		const char *reqend = pos + len;
-		if (reqend > in->end)
+		if (reqend > in->wpos)
 			break;
 		struct iproto_request *ireq =
 			iproto_request_new(con, iproto_process);
@@ -512,7 +512,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 
 		/*
 		 * sic: in case of exception con->parse_size
-		 * as well as in->pos must not be advanced, to
+		 * as well as in->rpos must not be advanced, to
 		 * stay in sync.
 		 */
 		if (ireq->header.type >= IPROTO_SELECT &&
@@ -557,7 +557,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 
 		struct ibuf *in = &iobuf->in;
 		/* Read input. */
-		int nrd = sio_read(fd, in->end, ibuf_unused(in));
+		int nrd = sio_read(fd, in->wpos, ibuf_unused(in));
 		if (nrd < 0) {                  /* Socket is not ready. */
 			ev_io_start(loop, &con->input);
 			return;
@@ -567,7 +567,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			return;
 		}
 		/* Update the read position and connection state. */
-		in->end += nrd;
+		in->wpos += nrd;
 		con->parse_size += nrd;
 		/* Enqueue all requests which are fully read up. */
 		iproto_enqueue_batch(con, in);
@@ -671,7 +671,7 @@ iproto_process(struct iproto_request *ireq)
 
 	auto scope_guard = make_scoped_guard([=]{
 		/* Discard request (see iproto_enqueue_batch()) */
-		iobuf->in.pos += ireq->len;
+		iobuf->in.rpos += ireq->len;
 
 		if (evio_is_active(&con->output)) {
 			if (! ev_is_active(&con->output))
