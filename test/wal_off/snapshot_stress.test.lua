@@ -18,6 +18,7 @@ snapshot_interval = 0.005
 
 fiber = require('fiber')
 fio = require('fio')
+log = require('log')
 
 tarantool_bin_path = arg[-1]
 work_dir = fio.cwd()
@@ -78,8 +79,12 @@ function get_rnd_str()
     return garbage[math.floor(math.random() * string_max_size)]
 end;
 
+additional_spaces = { };
+
 function add_space()
-    box.schema.create_space(get_new_space_name()):create_index('test')
+    local tmp_space = box.schema.create_space(get_new_space_name())
+    table.insert(additional_spaces, tmp_space)
+    tmp_space:create_index('test')
     n_spaces = n_spaces + 1
 end;
 
@@ -125,42 +130,53 @@ end;
 
 function work()
     for i = 1,iteration_count do
-        work_itr()
+        if not pcall(work_itr) then
+            log.info("work_itr failed")
+            break
+        end
     end
     workers_done = workers_done + 1
 end;
 
+snaps_done = false;
 function snaps()
     while (workers_done ~= workers_count) do
         pcall(box.snapshot)
         fiber.sleep(snapshot_interval)
-    end snaps_done = true
+    end
+    snaps_done = true
 end;
 
 function wait()
     while (not snaps_done) do
-        fiber.sleep(1)
+        fiber.sleep(0.1)
     end
 end;
 
 init();
 
-print('creating snapshot start');
+log.info('Part I: creating snapshot start');
+
 for i = 1,workers_count do
     fiber.create(work)
 end;
 local tmp_fib = fiber.create(snaps);
 wait();
-print('creating snapshot done');
+
+log.info('Part I: creating snapshot done');
 
 #s1:select{};
 #s2:select{};
 
 s1:drop();
 s2:drop();
+for k,v in pairs(additional_spaces) do v:drop() end;
+s1 = nil s2 = nil additional_spaces = nil;
 
 script_code = [[
 box.cfg{ slab_alloc_arena = 0.5, snap_dir = "]] .. box.cfg.snap_dir .. [[", wal_mode = "none" }
+
+log = require('log')
 
 s1 = box.space.accounts
 s2 = box.space.operations
@@ -168,7 +184,7 @@ s2 = box.space.operations
 total_sum = 0
 t1 = {}
 for k,v in s1:pairs() do t1[ v[1] ] = v[2] total_sum = total_sum + v[2] end
-if total_sum ~= 0 then print('error: total sum mismatch') os.exit(-1) end
+if total_sum ~= 0 then log.info('error: total sum mismatch') os.exit(-1) end
 
 t2 = {}
 function acc_inc(n1, v) t2[n1] = (t2[n1] and t2[n1] or 0) + v end
@@ -177,16 +193,16 @@ for k,v in s2:pairs() do acc_inc(v[2], v[4]) acc_inc(v[3], -v[4]) end
 bad = false
 for k,v in pairs(t1) do if (t2[k] and t2[k] or 0) ~= v then bad = true end end
 for k,v in pairs(t2) do if (t1[k] and t1[k] or 0) ~= v then bad = true end end
-if bad then print('error: operation apply mismatch') os.exit(-1) end
+if bad then log.info('error: operation apply mismatch') os.exit(-1) end
 
-print('success: snapshot is ok')
+log.info('success: snapshot is ok')
 os.exit(0)
 ]];
 script = fio.open(script_path, open_flags, tonumber('0777', 8))
 script:write(script_code)
 script:close()
 
-print('checking snapshot start');
+log.info('Part II: checking snapshot start');
 
 snaps = fio.glob(snap_search_wildcard);
 snaps_find_status = #snaps <= initial_snap_count and 'where are my snapshots?' or 'snaps found';
@@ -195,7 +211,7 @@ snapshot_check_status = "snap check ok";
 while #snaps > initial_snap_count do
     if os.execute(cmd) ~= 0 then
         snapshot_check_status = "snap check failed!"
-	break
+        break
     end
     max_snap = nil
     for k,v in pairs(snaps) do
@@ -204,11 +220,29 @@ while #snaps > initial_snap_count do
             max_snap_k = k
         end
     end
-    fio.unlink(fio.pathjoin(box.cfg.snap_dir, max_snap))
+    if max_snap:sub(1, 1) ~= "/" then
+        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
+    end
+    fio.unlink(max_snap)
+    snaps[max_snap_k] = nil
+end;
+while #snaps > initial_snap_count do
+    max_snap = nil
+    for k,v in pairs(snaps) do
+        if max_snap == nil or v > max_snap then
+            max_snap = v
+            max_snap_k = k
+        end
+    end
+    if max_snap:sub(1, 1) ~= "/" then
+        max_snap = fio.pathjoin(box.cfg.snap_dir, max_snap)
+    end
+    fio.unlink(max_snap)
     snaps[max_snap_k] = nil
 end;
 snapshot_check_status;
-print('checking snapshot done');
+
+log.info('Part II: checking snapshot done');
 
 --# setopt delimiter ''
 

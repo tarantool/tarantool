@@ -69,6 +69,8 @@ admin("function f3() return { box.tuple.new('hello'), {'world'} } end")
 call("f3")
 admin("function f3() return { {'world'}, box.tuple.new('hello') } end")
 call("f3")
+admin("function f3() return { { test={1,2,3} }, { test2={1,2,3} } } end")
+call("f3")
 
 call("f1", 'jason')
 call("f1", 'jason', 1, 'test', 2, 'stewart')
