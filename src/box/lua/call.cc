@@ -611,7 +611,7 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		 */
 		lua_pushnil(L);
 		int has_keys = lua_next(L, 1);
-		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
+		if (has_keys  && (lua_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
 			do {
 				luamp_encode_tuple(L, luaL_msgpack_default,
 						   out, -1);
