@@ -666,7 +666,6 @@ iproto_process(struct iproto_task *task)
 		return;
 
 	task->connection->session->sync = task->header.sync;
-	struct obuf_svp svp = obuf_create_svp(out);
 	try {
 		switch (task->header.type) {
 		case IPROTO_SELECT:
@@ -677,7 +676,20 @@ iproto_process(struct iproto_task *task)
 			assert(task->request.type == task->header.type);
 			struct iproto_port port;
 			iproto_port_init(&port, out, task->header.sync);
-			box_process(&task->request, (struct port *) &port);
+			try {
+				box_process(&task->request, (struct port *) &port);
+			} catch (Exception *e) {
+				/*
+				 * This only works if there are no
+				 * yields between the moment the
+				 * port is first used for
+				 * output and is flushed/an error
+				 * occurs.
+				 */
+				if (port.found)
+					obuf_rollback_to_svp(out, &port.svp);
+				throw;
+			}
 			break;
 		case IPROTO_CALL:
 			assert(task->request.type == task->header.type);
@@ -728,7 +740,6 @@ iproto_process(struct iproto_task *task)
 				   (uint32_t) task->header.type);
 		}
 	} catch (Exception *e) {
-		obuf_rollback_to_svp(out, &svp);
 		iproto_reply_error(out, e, task->header.sync);
 	}
 }
