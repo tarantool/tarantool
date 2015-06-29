@@ -65,20 +65,27 @@ struct iproto_task
 {
 	struct iproto_connection *connection;
 	struct iobuf *iobuf;
-	struct session *session;
 	iproto_task_f process;
 	/* Request message code and sync. */
 	struct xrow_header header;
 	/* Box request, if this is a DML */
 	struct request request;
-	size_t total_len;
+	size_t len;
 };
 
 struct mempool iproto_task_pool;
 
 static struct iproto_task *
 iproto_task_new(struct iproto_connection *con,
-		   iproto_task_f process);
+		iproto_task_f process)
+{
+	struct iproto_task *task =
+		(struct iproto_task *) mempool_alloc(&iproto_task_pool);
+	task->connection = con;
+	task->process = process;
+	return task;
+}
+
 
 static void
 iproto_process_connect(struct iproto_task *task);
@@ -90,12 +97,12 @@ static void
 iproto_process(struct iproto_task *task);
 
 struct IprotoRequestGuard {
-	struct iproto_task *ireq;
-	IprotoRequestGuard(struct iproto_task *ireq_arg):ireq(ireq_arg) {}
+	struct iproto_task *task;
+	IprotoRequestGuard(struct iproto_task *task_arg):task(task_arg) {}
 	~IprotoRequestGuard()
-	{ if (ireq) mempool_free(&iproto_task_pool, ireq); }
+	{ if (task) mempool_free(&iproto_task_pool, task); }
 	struct iproto_task *release()
-	{ struct iproto_task *tmp = ireq; ireq = NULL; return tmp; }
+	{ struct iproto_task *tmp = task; task = NULL; return tmp; }
 };
 
 /* }}} */
@@ -184,48 +191,8 @@ iproto_queue_pop(struct iproto_queue *i_queue)
 	return task;
 }
 
-/**
- * Main function of the fiber invoked to handle all outstanding
- * tasks in a queue.
- */
-static void
-iproto_queue_handler(va_list ap)
-{
-	struct iproto_queue *i_queue = va_arg(ap, struct iproto_queue *);
-	struct iproto_task *task;
-restart:
-	while ((task = iproto_queue_pop(i_queue))) {
-		IprotoRequestGuard guard(task);
-		fiber_set_session(fiber(), task->session);
-		fiber_set_user(fiber(), &task->session->credentials);
-		task->process(task);
-	}
-	/** Put the current fiber into a queue fiber cache. */
-	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
-	fiber_yield();
-	goto restart;
-}
-
-/** Create fibers to handle all outstanding tasks. */
-static void
-iproto_queue_schedule(ev_loop * /* loop */, struct ev_async *watcher,
-		      int /* events */)
-{
-	struct iproto_queue *i_queue = (struct iproto_queue *) watcher->data;
-	while (! iproto_queue_is_empty(i_queue)) {
-
-		struct fiber *f;
-		if (! rlist_empty(&i_queue->fiber_cache))
-			f = rlist_shift_entry(&i_queue->fiber_cache,
-					      struct fiber, state);
-		else
-			f = fiber_new("iproto", iproto_queue_handler);
-		fiber_start(f, i_queue);
-	}
-}
-
 static inline void
-iproto_queue_init(struct iproto_queue *i_queue)
+iproto_queue_init(struct iproto_queue *i_queue, ev_async_cb cb)
 {
 	i_queue->size = IPROTO_REQUEST_QUEUE_SIZE;
 	i_queue->begin = i_queue->end = 0;
@@ -233,7 +200,7 @@ iproto_queue_init(struct iproto_queue *i_queue)
 	 * Initialize an ev_async event which would start
 	 * workers for all outstanding tasks.
 	 */
-	ev_async_init(&i_queue->watcher, iproto_queue_schedule);
+	ev_async_init(&i_queue->watcher, cb);
 	i_queue->watcher.data = i_queue;
 	rlist_create(&i_queue->fiber_cache);
 }
@@ -365,9 +332,9 @@ iproto_connection_shutdown(struct iproto_connection *con)
 	 * twice.
 	 */
 	if (iproto_connection_is_idle(con)) {
-		struct iproto_task *ireq = con->disconnect;
+		struct iproto_task *task = con->disconnect;
 		con->disconnect = NULL;
-		iproto_queue_push(&tx_queue, ireq);
+		iproto_queue_push(&tx_queue, task);
 	}
 }
 
@@ -470,31 +437,32 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
-		struct iproto_task *ireq =
+		struct iproto_task *task =
 			iproto_task_new(con, iproto_process);
-		IprotoRequestGuard guard(ireq);
+		task->iobuf = con->iobuf[0];
+		IprotoRequestGuard guard(task);
 
-		xrow_header_decode(&ireq->header, &pos, reqend);
-		ireq->total_len = pos - reqstart; /* total request length */
+		xrow_header_decode(&task->header, &pos, reqend);
+		task->len = pos - reqstart; /* total request length */
 
 		/*
 		 * sic: in case of exception con->parse_size
 		 * as well as in->pos must not be advanced, to
 		 * stay in sync.
 		 */
-		if (ireq->header.type >= IPROTO_SELECT &&
-		    ireq->header.type <= IPROTO_EVAL) {
+		if (task->header.type >= IPROTO_SELECT &&
+		    task->header.type <= IPROTO_EVAL) {
 			/* Pre-parse request before putting it into the queue */
-			if (ireq->header.bodycnt == 0) {
+			if (task->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "request type");
 			}
-			request_create(&ireq->request, ireq->header.type);
-			pos = (const char *) ireq->header.body[0].iov_base;
-			request_decode(&ireq->request, pos,
-				       ireq->header.body[0].iov_len);
+			request_create(&task->request, task->header.type);
+			pos = (const char *) task->header.body[0].iov_base;
+			request_decode(&task->request, pos,
+				       task->header.body[0].iov_len);
 		}
-		ireq->request.header = &ireq->header;
+		task->request.header = &task->header;
 		iproto_queue_push(&tx_queue, guard.release());
 		/* Request will be discarded in iproto_process_XXX */
 
@@ -627,18 +595,62 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 
 /* }}} */
 
+/** {{{ tx_queue handlers */
+/**
+ * Main function of the fiber invoked to handle all outstanding
+ * tasks in a queue.
+ */
+static void
+iproto_tx_queue_fiber(va_list ap)
+{
+	struct iproto_queue *i_queue = va_arg(ap, struct iproto_queue *);
+	struct iproto_task *task;
+restart:
+	while ((task = iproto_queue_pop(i_queue))) {
+		IprotoRequestGuard guard(task);
+		struct session *session = task->connection->session;
+		fiber_set_session(fiber(), session);
+		fiber_set_user(fiber(), &session->credentials);
+		task->process(task);
+	}
+	/** Put the current fiber into a queue fiber cache. */
+	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
+	fiber_yield();
+	goto restart;
+}
+
+/** Create fibers to handle all outstanding tasks. */
+static void
+iproto_tx_queue_cb(ev_loop * /* loop */, struct ev_async *watcher,
+		   int /* events */)
+{
+	struct iproto_queue *i_queue = (struct iproto_queue *) watcher->data;
+	while (! iproto_queue_is_empty(i_queue)) {
+
+		struct fiber *f;
+		if (! rlist_empty(&i_queue->fiber_cache))
+			f = rlist_shift_entry(&i_queue->fiber_cache,
+					      struct fiber, state);
+		else
+			f = fiber_new("iproto", iproto_tx_queue_fiber);
+		fiber_start(f, i_queue);
+	}
+}
+
+/* }}} */
+
 /* {{{ iproto_process_* functions */
 
 static void
-iproto_process(struct iproto_task *ireq)
+iproto_process(struct iproto_task *task)
 {
-	struct iobuf *iobuf = ireq->iobuf;
+	struct iobuf *iobuf = task->iobuf;
 	struct obuf *out = &iobuf->out;
-	struct iproto_connection *con = ireq->connection;
+	struct iproto_connection *con = task->connection;
 
 	auto scope_guard = make_scoped_guard([=]{
 		/* Discard request (see iproto_enqueue_batch()) */
-		iobuf->in.pos += ireq->total_len;
+		iobuf->in.pos += task->len;
 
 		if (evio_is_active(&con->output)) {
 			if (! ev_is_active(&con->output))
@@ -653,42 +665,42 @@ iproto_process(struct iproto_task *ireq)
 	if (unlikely(! evio_is_active(&con->output)))
 		return;
 
-	ireq->session->sync = ireq->header.sync;
+	task->connection->session->sync = task->header.sync;
 	struct obuf_svp svp = obuf_create_svp(out);
 	try {
-		switch (ireq->header.type) {
+		switch (task->header.type) {
 		case IPROTO_SELECT:
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
 		case IPROTO_UPDATE:
 		case IPROTO_DELETE:
-			assert(ireq->request.type == ireq->header.type);
+			assert(task->request.type == task->header.type);
 			struct iproto_port port;
-			iproto_port_init(&port, out, ireq->header.sync);
-			box_process(&ireq->request, (struct port *) &port);
+			iproto_port_init(&port, out, task->header.sync);
+			box_process(&task->request, (struct port *) &port);
 			break;
 		case IPROTO_CALL:
-			assert(ireq->request.type == ireq->header.type);
-			stat_collect(stat_base, ireq->request.type, 1);
-			box_lua_call(&ireq->request, &iobuf->out);
+			assert(task->request.type == task->header.type);
+			stat_collect(stat_base, task->request.type, 1);
+			box_lua_call(&task->request, out);
 			break;
 		case IPROTO_EVAL:
-			assert(ireq->request.type == ireq->header.type);
-			stat_collect(stat_base, ireq->request.type, 1);
-			box_lua_eval(&ireq->request, &iobuf->out);
+			assert(task->request.type == task->header.type);
+			stat_collect(stat_base, task->request.type, 1);
+			box_lua_eval(&task->request, out);
 			break;
 		case IPROTO_AUTH:
 		{
-			assert(ireq->request.type == ireq->header.type);
-			const char *user = ireq->request.key;
+			assert(task->request.type == task->header.type);
+			const char *user = task->request.key;
 			uint32_t len = mp_decode_strl(&user);
-			authenticate(user, len, ireq->request.tuple,
-				     ireq->request.tuple_end);
-			iproto_reply_ok(&ireq->iobuf->out, ireq->header.sync);
+			authenticate(user, len, task->request.tuple,
+				     task->request.tuple_end);
+			iproto_reply_ok(out, task->header.sync);
 			break;
 		}
 		case IPROTO_PING:
-			iproto_reply_ok(&ireq->iobuf->out, ireq->header.sync);
+			iproto_reply_ok(out, task->header.sync);
 			break;
 		case IPROTO_JOIN:
 			/*
@@ -698,7 +710,7 @@ iproto_process(struct iproto_task *ireq)
 			 */
 			ev_io_stop(con->loop, &con->input);
 			ev_io_stop(con->loop, &con->output);
-			box_process_join(con->input.fd, &ireq->header);
+			box_process_join(con->input.fd, &task->header);
 			break;
 		case IPROTO_SUBSCRIBE:
 			ev_io_stop(con->loop, &con->input);
@@ -709,29 +721,16 @@ iproto_process(struct iproto_task *ireq)
 			 * the write watcher will be re-activated
 			 * the same way as for JOIN.
 			 */
-			box_process_subscribe(con->input.fd, &ireq->header);
+			box_process_subscribe(con->input.fd, &task->header);
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				   (uint32_t) ireq->header.type);
+				   (uint32_t) task->header.type);
 		}
 	} catch (Exception *e) {
-		obuf_rollback_to_svp(&iobuf->out, &svp);
-		iproto_reply_error(&iobuf->out, e, ireq->header.sync);
+		obuf_rollback_to_svp(out, &svp);
+		iproto_reply_error(out, e, task->header.sync);
 	}
-}
-
-static struct iproto_task *
-iproto_task_new(struct iproto_connection *con,
-		   iproto_task_f process)
-{
-	struct iproto_task *ireq =
-		(struct iproto_task *) mempool_alloc(&iproto_task_pool);
-	ireq->connection = con;
-	ireq->iobuf = con->iobuf[0];
-	ireq->session = con->session;
-	ireq->process = process;
-	return ireq;
 }
 
 const char *
@@ -816,9 +815,10 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	 * fixed so there is a limited number of tasks in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
-	struct iproto_task *ireq =
+	struct iproto_task *task =
 		iproto_task_new(con, iproto_process_connect);
-	iproto_queue_push(&tx_queue, ireq);
+	task->iobuf = con->iobuf[0];
+	iproto_queue_push(&tx_queue, task);
 }
 
 /** Initialize a read-write port. */
@@ -827,7 +827,7 @@ iproto_init(struct evio_service *service)
 {
 	mempool_create(&iproto_task_pool, &cord()->slabc,
 		       sizeof(struct iproto_task));
-	iproto_queue_init(&tx_queue);
+	iproto_queue_init(&tx_queue, iproto_tx_queue_cb);
 	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
 
