@@ -52,11 +52,6 @@
 
 /* {{{ iproto_task - declaration */
 
-struct iproto_connection;
-
-static inline size_t
-iproto_connection_count();
-
 typedef void (*iproto_task_f)(struct iproto_task *);
 
 /**
@@ -66,19 +61,28 @@ typedef void (*iproto_task_f)(struct iproto_task *);
  */
 struct iproto_task
 {
-	struct iproto_connection *connection;
-	struct iobuf *iobuf;
+	STAILQ_ENTRY(iproto_task) fifo;
+	/** Function to handle a single task. */
 	iproto_task_f process;
+	/** --- Members common to all tasks --- */
+	struct iproto_connection *connection;
+
+	/* --- Box tasks - actual requests for the transaction processor --- */
 	/* Request message code and sync. */
 	struct xrow_header header;
 	/* Box request, if this is a DML */
 	struct request request;
+	/*
+	 * Remember the active iobuf of the connection,
+	 * in which the request is stored. The response
+	 * must be put into the out buffer of this iobuf.
+	 */
+	struct iobuf *iobuf;
 	/**
 	 * How much space the request takes in the
 	 * input buffer (len, header and body - all of it)
 	 */
 	size_t len;
-	STAILQ_ENTRY(iproto_task) fifo;
 };
 
 STAILQ_HEAD(iproto_fifo, iproto_task);
@@ -95,17 +99,6 @@ iproto_task_new(struct iproto_connection *con,
 	task->process = process;
 	return task;
 }
-
-static struct evio_service binary; /* iproto binary listener */
-
-static void
-iproto_process_connect(struct iproto_task *task);
-
-static void
-iproto_process_disconnect(struct iproto_task *task);
-
-static void
-iproto_process(struct iproto_task *task);
 
 struct IprotoTaskGuard {
 	struct iproto_task *task;
@@ -140,10 +133,7 @@ struct iproto_queue
 {
 	/** Ring buffer of fixed size */
 	struct iproto_fifo queue;
-	/**
-	 * Cache of fibers which work on tasks
-	 * in this queue.
-	 */
+	/** Cache of fibers which work on tasks  in this queue. */
 	struct rlist fiber_cache;
 	/** The number of fibers in the cache */
 	int cache_size;
@@ -165,31 +155,13 @@ iproto_queue_is_empty(struct iproto_queue *i_queue)
 static inline bool
 iproto_queue_needs_throttling(struct iproto_queue *i_queue)
 {
-	return i_queue->pool_size > IPROTO_FIBER_POOL_SIZE &&
-		i_queue->pool_size > iproto_connection_count();
+	return i_queue->pool_size > IPROTO_FIBER_POOL_SIZE;
 }
 
-/**
- * A single global queue for all tasks in all connections. All
- * tasks are processed concurrently.
- * Is also used as a queue for just established connections and to
- * execute disconnect triggers. A few notes about these triggers:
- * - they need to be run in a fiber
- * - unlike an ordinary request failure, on_connect trigger
- *   failure must lead to connection close.
- * - on_connect trigger must be processed before any other
- *   request on this connection.
- */
-static struct iproto_queue tx_queue;
-
 static void
-iproto_queue_push(struct iproto_queue *i_queue,
-		  struct iproto_task *task)
+iproto_queue_push(struct iproto_queue *i_queue, struct iproto_task *task)
 {
-	/*
-	 * There were some queued tasks, ensure they are
-	 * handled.
-	 */
+	/* Trigger task processing when the queue becomes non-empty. */
 	if (iproto_queue_is_empty(i_queue))
 		ev_feed_event(loop(), &i_queue->watcher, EV_CUSTOM);
 	STAILQ_INSERT_TAIL(&i_queue->queue, task, fifo);
@@ -222,7 +194,21 @@ iproto_queue_init(struct iproto_queue *i_queue, ev_async_cb cb)
 
 /* }}} */
 
+
 /* {{{ iproto_connection */
+
+/**
+ * A single global queue for all requests in all connections. All
+ * requests from all connections are processed concurrently.
+ * Is also used as a queue for just established connections and to
+ * execute disconnect triggers. A few notes about these triggers:
+ * - they need to be run in a fiber
+ * - unlike an ordinary request failure, on_connect trigger
+ *   failure must lead to connection close.
+ * - on_connect trigger must be processed before any other
+ *   request on this connection.
+ */
+static struct iproto_queue tx_queue;
 
 /** Context of a single client connection. */
 struct iproto_connection
@@ -249,10 +235,6 @@ struct iproto_connection
 	ssize_t parse_size;
 	/** Current write position in the output buffer */
 	struct obuf_svp write_pos;
-	/**
-	 * Function of the task processor to handle
-	 * a single task.
-	 */
 	struct ev_io input;
 	struct ev_io output;
 	/** Logical session. */
@@ -264,12 +246,6 @@ struct iproto_connection
 };
 
 static struct mempool iproto_connection_pool;
-
-static inline size_t
-iproto_connection_count()
-{
-	return mempool_count(&iproto_connection_pool);
-}
 
 /**
  * A connection is idle when the client is gone
@@ -295,6 +271,34 @@ static void
 iproto_connection_on_output(ev_loop * /* loop */, struct ev_io *watcher,
 			    int /* revents */);
 
+/** Recycle a connection. Never throws. */
+static inline void
+iproto_connection_delete(struct iproto_connection *con)
+{
+	assert(iproto_connection_is_idle(con));
+	assert(!evio_is_active(&con->output));
+	if (con->session) {
+		if (! rlist_empty(&session_on_disconnect))
+			session_run_on_disconnect_triggers(con->session);
+		session_destroy(con->session);
+	}
+	iobuf_delete(con->iobuf[0]);
+	iobuf_delete(con->iobuf[1]);
+	if (con->disconnect)
+		mempool_free(&iproto_task_pool, con->disconnect);
+	mempool_free(&iproto_connection_pool, con);
+}
+
+static void
+iproto_process(struct iproto_task *task);
+
+static void
+iproto_process_disconnect(struct iproto_task *task)
+{
+	/* Runs the trigger, which may yield. */
+	iproto_connection_delete(task->connection);
+}
+
 static struct iproto_connection *
 iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 {
@@ -316,24 +320,6 @@ iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 	return con;
 }
 
-/** Recycle a connection. Never throws. */
-static inline void
-iproto_connection_delete(struct iproto_connection *con)
-{
-	assert(iproto_connection_is_idle(con));
-	assert(!evio_is_active(&con->output));
-	if (con->session) {
-		if (! rlist_empty(&session_on_disconnect))
-			session_run_on_disconnect_triggers(con->session);
-		session_destroy(con->session);
-	}
-	iobuf_delete(con->iobuf[0]);
-	iobuf_delete(con->iobuf[1]);
-	if (con->disconnect)
-		mempool_free(&iproto_task_pool, con->disconnect);
-	mempool_free(&iproto_connection_pool, con);
-}
-
 static inline void
 iproto_connection_close(struct iproto_connection *con)
 {
@@ -348,7 +334,7 @@ iproto_connection_close(struct iproto_connection *con)
 	con->iobuf[0]->in.wpos -= con->parse_size;
 	/*
 	 * If the con is not idle, it is destroyed
-	 * after the last task is handled. Otherwise,
+	 * after the last request is handled. Otherwise,
 	 * queue a separate task to run on_disconnect()
 	 * trigger and destroy the connection.
 	 * Sic: the check is mandatory to not destroy a connection
@@ -697,7 +683,7 @@ iproto_process(struct iproto_task *task)
 	if (unlikely(! evio_is_active(&con->output)))
 		return;
 
-	task->connection->session->sync = task->header.sync;
+	con->session->sync = task->header.sync;
 	try {
 		switch (task->header.type) {
 		case IPROTO_SELECT:
@@ -830,13 +816,6 @@ iproto_process_connect(struct iproto_task *task)
 	ev_feed_event(con->loop, &con->input, EV_READ);
 }
 
-static void
-iproto_process_disconnect(struct iproto_task *task)
-{
-	/* Runs the trigger, which may yield. */
-	iproto_connection_delete(task->connection);
-}
-
 /** }}} */
 
 /**
@@ -863,6 +842,8 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	task->iobuf = con->iobuf[0];
 	iproto_queue_push(&tx_queue, task);
 }
+
+static struct evio_service binary; /* iproto binary listener */
 
 /** Initialize a read-write port. */
 void
