@@ -610,41 +610,46 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
 
-	/** Check if we deal with a table of tables. */
-	int nrets = lua_gettop(L);
-	if (nrets == 1 && lua_isarray(L, 1)) {
-		/*
-		 * The table is not empty and consists of tables
-		 * or tuples. Treat each table element as a tuple,
-		 * and push it.
+	try {
+		/** Check if we deal with a table of tables. */
+		int nrets = lua_gettop(L);
+		if (nrets == 1 && lua_isarray(L, 1)) {
+			/*
+			 * The table is not empty and consists of tables
+			 * or tuples. Treat each table element as a tuple,
+			 * and push it.
 		 */
-		lua_pushnil(L);
-		int has_keys = lua_next(L, 1);
-		if (has_keys  && (lua_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
-			do {
-				luamp_encode_tuple(L, luaL_msgpack_default,
-						   &stream, -1);
-				++count;
+			lua_pushnil(L);
+			int has_keys = lua_next(L, 1);
+			if (has_keys  && (lua_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
+				do {
+					luamp_encode_tuple(L, luaL_msgpack_default,
+							   &stream, -1);
+					++count;
+					lua_pop(L, 1);
+				} while (lua_next(L, 1));
+				goto done;
+			} else if (has_keys) {
 				lua_pop(L, 1);
-			} while (lua_next(L, 1));
-			goto done;
-		} else if (has_keys) {
-			lua_pop(L, 1);
+			}
 		}
-	}
-	for (int i = 1; i <= nrets; ++i) {
-		if (lua_isarray(L, i) || lua_istuple(L, i)) {
-			luamp_encode_tuple(L, luaL_msgpack_default, &stream, i);
-		} else {
-			luamp_encode_array(luaL_msgpack_default, &stream, 1);
-			luamp_encode(L, luaL_msgpack_default, &stream, i);
+		for (int i = 1; i <= nrets; ++i) {
+			if (lua_isarray(L, i) || lua_istuple(L, i)) {
+				luamp_encode_tuple(L, luaL_msgpack_default, &stream, i);
+			} else {
+				luamp_encode_array(luaL_msgpack_default, &stream, 1);
+				luamp_encode(L, luaL_msgpack_default, &stream, i);
+			}
+			++count;
 		}
-		++count;
-	}
 
 done:
-	mpstream_flush(&stream);
-	iproto_reply_select(out, &svp, request->header->sync, count);
+		mpstream_flush(&stream);
+		iproto_reply_select(out, &svp, request->header->sync, count);
+	} catch (...) {
+		obuf_rollback_to_svp(out, &svp);
+		throw;
+	}
 }
 
 void
@@ -698,11 +703,16 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
 	int nrets = lua_gettop(L);
-	for (int k = 1; k <= nrets; ++k) {
-		luamp_encode(L, luaL_msgpack_default, &stream, k);
+	try {
+		for (int k = 1; k <= nrets; ++k) {
+			luamp_encode(L, luaL_msgpack_default, &stream, k);
+		}
+		mpstream_flush(&stream);
+		iproto_reply_select(out, &svp, request->header->sync, nrets);
+	} catch (...) {
+		obuf_rollback_to_svp(out, &svp);
+		throw;
 	}
-	mpstream_flush(&stream);
-	iproto_reply_select(out, &svp, request->header->sync, nrets);
 }
 
 void

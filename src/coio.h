@@ -44,8 +44,6 @@ struct coio_service
 	void *handler_param;
 };
 
-typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
-
 int
 coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		     socklen_t *addr_len, ev_tstamp timeout);
