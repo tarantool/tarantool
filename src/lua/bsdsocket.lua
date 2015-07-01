@@ -963,7 +963,7 @@ end
 
 local function tcp_connect(host, port, timeout)
     if host == 'unix/' then
-        return tcp_connect_remote({ host = host, port = port, protocol = 'ip',
+        return tcp_connect_remote({ host = host, port = port, protocol = 0,
             family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
