@@ -15,6 +15,7 @@
 #include "fiber.h"
 #include "base64.h"
 #include "random.h"
+#include "iobuf.h"
 #include <lib/salad/guava.h>
 
 /*
@@ -66,5 +67,9 @@ void *ffi_symbols[] = {
 	(void *) random_bytes,
 	(void *) fiber_time,
 	(void *) fiber_time64,
-	(void *) sophia_schedule
+	(void *) sophia_schedule,
+	(void *) tarantool_lua_slab_cache,
+	(void *) ibuf_create,
+	(void *) ibuf_destroy,
+	(void *) ibuf_reserve_nothrow_slow
 };

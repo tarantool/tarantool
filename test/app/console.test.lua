@@ -16,7 +16,7 @@ os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
 --
-local EOL = "\n%.%.%.\n"
+local EOL = "\n...\n"
 
 test = tap.test("console")
 

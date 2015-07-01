@@ -1,6 +1,7 @@
 -- msgpackffi.lua (internal file)
 
 local ffi = require('ffi')
+local buffer = require('buffer')
 local builtin = ffi.C
 local msgpack = require('msgpack') -- .NULL, .array_mt, .map_mt, .cfg
 local MAXNESTING = 16
@@ -28,37 +29,6 @@ local bswap_u64 = bit.bswap
 --]]
 
 --------------------------------------------------------------------------------
---- Buffer
---------------------------------------------------------------------------------
-
-local DEFAULT_CAPACITY = 4096;
-
-local tmpbuf = {}
-tmpbuf.s = ffi.new("char[?]", DEFAULT_CAPACITY)
-tmpbuf.e = tmpbuf.s + DEFAULT_CAPACITY
-tmpbuf.p = tmpbuf.s
-tmpbuf.reserve = function(buf, needed)
-    if buf.p + needed <= buf.e then
-        return
-    end
-
-    local size = buf.p - buf.s
-    local capacity = buf.e - buf.s
-    while capacity - size < needed do
-        capacity = 2 * capacity
-    end
-
-    local s = ffi.new("char[?]", capacity)
-    ffi.copy(s, buf.s, size)
-    buf.s = s
-    buf.e = s + capacity
-    buf.p = s + size
-end
-tmpbuf.reset = function(buf)
-    buf.p = buf.s
-end
-
---------------------------------------------------------------------------------
 -- Encoder
 --------------------------------------------------------------------------------
 
@@ -76,54 +46,46 @@ local function on_encode(ctype_or_udataname, callback)
 end
 
 local function encode_fix(buf, code, num)
-    buf:reserve(1)
-    buf.p[0] = bit.bor(code, tonumber(num))
-    -- buf.p[0] = bit.bor(code, num) -- LuaJIT 2.1
-    buf.p = buf.p + 1
+    local p = buf:alloc(1)
+    p[0] = bit.bor(code, tonumber(num))
 end
 
 local function encode_u8(buf, code, num)
-    buf:reserve(2)
-    buf.p[0] = code
-    ffi.cast(uint16_ptr_t, buf.p + 1)[0] = num
-    buf.p = buf.p + 2
+    local p = buf:alloc(2)
+    p[0] = code
+    ffi.cast(uint8_ptr_t, p + 1)[0] = num
 end
 
 local function encode_u16(buf, code, num)
-    buf:reserve(3)
-    buf.p[0] = code
-    ffi.cast(uint16_ptr_t, buf.p + 1)[0] = bswap_u16(num)
-    buf.p = buf.p + 3
+    local p = buf:alloc(3)
+    p[0] = code
+    ffi.cast(uint16_ptr_t, p + 1)[0] = bswap_u16(num)
 end
 
 local function encode_u32(buf, code, num)
-    buf:reserve(5)
-    buf.p[0] = code
-    ffi.cast(uint32_ptr_t, buf.p + 1)[0] = bswap_u32(num)
-    buf.p = buf.p + 5
+    local p = buf:alloc(5)
+    p[0] = code
+    ffi.cast(uint32_ptr_t, p + 1)[0] = bswap_u32(num)
 end
 
 local function encode_u64(buf, code, num)
-    buf:reserve(9)
-    buf.p[0] = code
-    ffi.cast(uint64_ptr_t, buf.p + 1)[0] = bswap_u64(ffi.cast('uint64_t', num))
-    buf.p = buf.p + 9
+    local p = buf:alloc(9)
+    p[0] = code
+    ffi.cast(uint64_ptr_t, p + 1)[0] = bswap_u64(ffi.cast('uint64_t', num))
 end
 
 local function encode_float(buf, num)
-    buf:reserve(5)
-    buf.p[0] = 0xca;
-    ffi.cast(float_ptr_t, buf.p + 1)[0] = num
-    ffi.cast(uint32_ptr_t, buf.p + 1)[0] = bswap_u32(ffi.cast(uint32_ptr_t, buf.p + 1)[0])
-    buf.p = buf.p + 5
+    local p = buf:alloc(5)
+    p[0] = 0xca;
+    ffi.cast(float_ptr_t, p + 1)[0] = num
+    ffi.cast(uint32_ptr_t, p + 1)[0] = bswap_u32(ffi.cast(uint32_ptr_t, p + 1)[0])
 end
 
 local function encode_double(buf, num)
-    buf:reserve(9)
-    buf.p[0] = 0xcb;
-    ffi.cast(double_ptr_t, buf.p + 1)[0] = num
-    ffi.cast(uint64_ptr_t, buf.p + 1)[0] = bswap_u64(ffi.cast(uint64_ptr_t, buf.p + 1)[0])
-    buf.p = buf.p + 9
+    local p = buf:alloc(9)
+    p[0] = 0xcb;
+    ffi.cast(double_ptr_t, p + 1)[0] = num
+    ffi.cast(uint64_ptr_t, p + 1)[0] = bswap_u64(ffi.cast(uint64_ptr_t, p + 1)[0])
 end
 
 local function encode_int(buf, num)
@@ -166,8 +128,8 @@ local function encode_str(buf, str)
     else
         encode_u32(buf, 0xdb, len)
     end
-    ffi.copy(buf.p, str, len)
-    buf.p = buf.p + len
+    local p = buf:alloc(len)
+    ffi.copy(p, str, len)
 end
 
 local function encode_array(buf, size)
@@ -199,9 +161,8 @@ local function encode_bool_cdata(buf, val)
 end
 
 local function encode_nil(buf)
-    buf:reserve(1)
-    buf.p[0] = 0xc0
-    buf.p = buf.p + 1
+    local p = buf:alloc(1)
+    p[0] = 0xc0
 end
 
 local function encode_r(buf, obj, level)
@@ -263,9 +224,12 @@ local function encode_r(buf, obj, level)
 end
 
 local function encode(obj)
+    local tmpbuf = buffer.IBUF_SHARED
     tmpbuf:reset()
     encode_r(tmpbuf, obj, 0)
-    return ffi.string(tmpbuf.s, tmpbuf.p - tmpbuf.s)
+    local r = ffi.string(tmpbuf.rpos, tmpbuf.size)
+    tmpbuf:recycle()
+    return r
 end
 
 on_encode(ffi.typeof('uint8_t'), encode_int)
@@ -503,6 +467,7 @@ end
 --------------------------------------------------------------------------------
 
 local function encode_tuple(obj)
+    local tmpbuf = buffer.IBUF_SHARED
     tmpbuf:reset()
     if obj == nil then
         encode_fix(tmpbuf, 0x90, 0)  -- empty array
@@ -516,7 +481,7 @@ local function encode_tuple(obj)
         encode_fix(tmpbuf, 0x90, 1)  -- array of one element
         encode_r(tmpbuf, obj, 1)
     end
-    return tmpbuf.s, tmpbuf.p
+    return tmpbuf.rpos, tmpbuf.wpos
 end
 
 --------------------------------------------------------------------------------

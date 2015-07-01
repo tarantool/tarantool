@@ -169,9 +169,8 @@ end
 
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
-    buf:reserve(tuple._bsize)
-    builtin.tuple_to_buf(tuple, buf.p)
-    buf.p = buf.p + tuple._bsize
+    local data = buf:alloc(tuple._bsize)
+    builtin.tuple_to_buf(tuple, data)
 end
 
 msgpackffi.on_encode(ffi.typeof('const struct tuple &'), tuple_to_msgpack)

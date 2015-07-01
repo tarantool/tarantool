@@ -25,6 +25,9 @@ errno = require 'errno'
 fio = require 'fio'
 ---
 ...
+ffi = require('ffi')
+---
+...
 type(socket)
 ---
 - table
@@ -70,7 +73,7 @@ s:close()
 s:close()
 
 ---
-- error: 'builtin/socket.lua:83: attempt to use closed socket'
+- error: 'builtin/socket.lua:87: attempt to use closed socket'
 ...
 LISTEN = require('uri').parse(box.cfg.listen)
 ---
@@ -134,14 +137,15 @@ s:wait(.01)
 ---
 - RW
 ...
-handshake = s:sysread(128)
+handshake = ffi.new('char[128]')
 ---
 ...
-string.len(handshake)
+-- test sysread with char *
+s:sysread(handshake, 128)
 ---
 - 128
 ...
-string.sub(handshake, 1, 9)
+ffi.string(handshake, 9)
 ---
 - Tarantool
 ...
@@ -151,7 +155,8 @@ ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
 ping = msgpack.encode(string.len(ping)) .. ping
 ---
 ...
-s:syswrite(ping)
+-- test syswrite with char *
+s:syswrite(ffi.cast('const char *', ping), #ping)
 ---
 - 7
 ...
@@ -279,7 +284,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:357: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:393: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -481,14 +486,6 @@ sa:read(',', 1)
 sc:shutdown('W')
 ---
 - true
-...
-sa:read(100, 1)
----
-- ' world'
-...
-sa:read(100, 1)
----
-- 
 ...
 sa:close()
 ---
@@ -1028,7 +1025,7 @@ ch:get(1)
 ...
 s:error()
 ---
-- error: 'builtin/socket.lua:83: attempt to use closed socket'
+- error: 'builtin/socket.lua:87: attempt to use closed socket'
 ...
 -- random port
 port = 33123
@@ -1395,7 +1392,7 @@ end);
 client = socket.tcp_connect('unix/', path)
 ---
 ...
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 ---
 ...
 buf == "a 10\n"
@@ -1405,7 +1402,7 @@ buf == "a 10\n"
 remaining = remaining - #buf
 ---
 ...
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 ---
 ...
 buf == "b 15\n"
@@ -1415,7 +1412,7 @@ buf == "b 15\n"
 remaining = remaining - #buf
 ---
 ...
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 ---
 ...
 buf == "abc"
@@ -1429,14 +1426,14 @@ remaining == 0
 ---
 - true
 ...
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 ---
 ...
 buf == ""
 ---
 - true
 ...
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 ---
 ...
 buf == ""
