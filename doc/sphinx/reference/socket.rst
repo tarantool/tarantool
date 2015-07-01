@@ -387,7 +387,7 @@ the function invocations will look like ``sock:function_name(...)``.
         otherwise block indefinitely.
 
     .. method:: readable([timeout])
-                writeable([timeout])
+                writable([timeout])
                 wait([timeout])
 
         ``sock:readable()`` waits until something is readable, or until a timeout value expires. |br|

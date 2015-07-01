@@ -493,7 +493,7 @@ client:close()
 server:close()
 
 -- Test that socket is closed on GC
-s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 s:bind('unix/', path)
 s:listen()
 s = nil
@@ -503,7 +503,7 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 
 -- Test serializers with sockets
-s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 x = s:wait()
 -- waiters is map
 s.waiters
