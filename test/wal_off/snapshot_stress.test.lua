@@ -45,10 +45,16 @@ snap_search_wildcard = fio.pathjoin(box.cfg.snap_dir, '*.snap');
 snaps = fio.glob(snap_search_wildcard);
 initial_snap_count = #snaps
 
+if box.space.accounts then box.space.accounts:drop() end
+if box.space.operations then box.space.operations:drop() end
+if box.space.deleting then box.space.deleting:drop() end
+
 s1 = box.schema.create_space("accounts")
 i1 = s1:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
 s2 = box.schema.create_space("operations")
 i2 = s2:create_index('primary', { type = 'HASH', parts = {1, 'num'} })
+s3 = box.schema.create_space("deleting")
+i3 = s3:create_index('primary', { type = 'TREE', parts = {1, 'num'} })
 
 n_accs = 0
 n_ops = 0
@@ -66,6 +72,11 @@ function get_new_space_name()
     n_spaces = n_spaces + 1
     return "test" .. tostring(n_spaces - 1)
 end;
+
+tmp = get_new_space_name()
+if box.space[tmp] then box.space[tmp]:drop() tmp = get_new_space_name() end
+tmp = nil
+n_spaces = 0
 
 function get_rnd_acc()
     return math.floor(math.random() * n_accs)
@@ -113,9 +124,16 @@ function do_rand_op()
     do_op(get_rnd_acc(), get_rnd_acc(), get_rnd_val())
 end;
 
+function remove_smth()
+    s3:delete{i3:min()[1]}
+end;
+
 function init()
     for i = 1,accounts_start do
         add_acc()
+    end
+    for i = 1,workers_count*iteration_count do
+        s3:auto_increment{"I hate dentists!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"}
     end
 end;
 
@@ -125,6 +143,7 @@ function work_itr()
         fiber.sleep(0)
     end
     add_acc()
+    remove_smth()
     add_space()
 end;
 
