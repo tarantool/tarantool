@@ -71,7 +71,7 @@ This chapter has examples that show how to connect to the Tarantool server via
 the Perl, PHP, and Python connectors. The examples contain hard code that will
 work if and only if the server (tarantool) is running on localhost (127.0.0.1)
 and is listening on port 3301 (``box.cfg.listen='3301'``) and space 'examples'
-has id = 999 (``box.space.tester.id = 999``), and space 'examples' has a
+has id = 999 (``box.space.examples.id = 999``), and space 'examples' has a
 primary-key index for a numeric field (``box.space[999].index[0].parts[1].type
 = "NUM"``) and user 'guest' has privileges for reading and writing.
 
