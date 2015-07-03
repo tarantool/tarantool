@@ -11,9 +11,9 @@ for database events,
 
 All triggers have the following characteristics.
 
-* They associate a function with an `event`. The request to "define a trigger"
+* They associate a `function` with an `event`. The request to "define a trigger"
   consists of passing the name of the trigger's function to one of the
-  "on_event-name..." functions: ``on_connect()``, ``on_disconnect()``,
+  "on_`event-name` ..." functions: ``on_connect()``, ``on_disconnect()``,
   or ``on_replace()``.
 * They are `defined by any user`. There are no privilege requirements for defining
   triggers.
@@ -35,7 +35,7 @@ All triggers have the following characteristics.
   outside the event context.
 * They are `replaceable`. The request to "redefine a trigger" consists of passing
   the names of a new trigger function and an old trigger function to one of the
-  "on_event-name..." functions.
+  "on `event-name` ..." functions.
 
 ===========================================================
                     Connection triggers
@@ -54,12 +54,7 @@ All triggers have the following characteristics.
 
     If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
 
-    .. code-block:: lua
-
-        function f ()
-            x = x + 1
-        end
-        box.session.on_connect(f)
+    Example: :codenormal:`function f () x = x + 1 end; box.session.on_connect(f)`
 
     .. WARNING::
 
@@ -77,12 +72,9 @@ All triggers have the following characteristics.
     :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
     :return: nil
 
-    .. code-block:: lua
+    If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
 
-        function f ()
-            x = x + 1
-        end
-        box.session.on_disconnect(f)
+    Example: :codenormal:`function f () x = x + 1 end; box.session.on_disconnect(f)`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Example
@@ -93,16 +85,18 @@ All triggers have the following characteristics.
 
 .. code-block:: lua
 
+    console = require('console'); console.delimiter('!') --this means ignore line feeds until next '!'
     function log_connect ()
       local log = require('log')
       local m = 'Connection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end
+    end!
     function log_disconnect ()
       local log = require('log')
       local m = 'Disconnection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end
+    end!
+    console.delimiter('')!
     box.session.on_connect(log_connect)
     box.session.on_disconnect(log_disconnect)
 
@@ -130,25 +124,20 @@ Here is what might appear in the log file in a typical installation:
     :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
     :return: nil
 
-    .. code-block:: lua
+    If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted. 
 
-        function f ()
-            x = x + 1
-        end
-        box.space.X:on_replace(f)
+    Example: :codenormal:`function f () x = x + 1 end; box.space.X:on_replace(f)`
 
 .. function:: box.space.<space-name>:run_triggers(true|false)
 
     At the time that a trigger is defined, it is automatically enabled - that
     is, it will be executed. Replace triggers can be disabled with
-    ``box.space.space-name:run_triggers(false)`` and re-enabled with
-    ``box.space.space-name:run_triggers(true)``.
+    :samp:`box.space.{space-name}:run_triggers(false)` and re-enabled with
+    :samp:`box.space.{space-name}:run_triggers(true)`.
 
     :return: nil
 
-    .. code-block:: lua
-
-        box.space.X:run_triggers(false)
+    Example: :codenormal:`box.space.X:run_triggers(false)`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Example
@@ -171,14 +160,14 @@ is executed once after each insert.
     s:drop()
     replace_counter
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Another Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The following series of requests will associate an existing function named F
 with an existing space named T, associate the function a second time with the
 same space (so it will be called twice), disable all triggers of T, and destroy
 each trigger by replacing with ``nil``.
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            Another Example
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: lua
 
