@@ -176,10 +176,8 @@ struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size);
 
 /**
- * Create a new tuple from a sequence of BER-len encoded fields.
+ * Create a new tuple from a sequence of MsgPack encoded fields.
  * tuple->refs is 0.
- *
- * @post *data is advanced to the length of tuple data
  *
  * Throws an exception if tuple format is incorrect.
  */

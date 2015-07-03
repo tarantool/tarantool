@@ -10,7 +10,7 @@ box.cfg
 5	background:false
 6	logger:tarantool.log
 7	slab_alloc_arena:0.1
-8	listen:3314
+8	listen:port
 9	logger_nonblock:true
 10	snap_dir:.
 11	coredump:false

@@ -3,7 +3,7 @@
 -- Testing init script
 --
 box.cfg{
-    listen = 3314,
+    listen = os.getenv("LISTEN"),
     pid_file = "box.pid",
     slab_alloc_arena=0.1,
     logger="tarantool.log"
@@ -26,7 +26,14 @@ print[[
 ]]
 t = {}
 
-for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t,k..':'..tostring(v)) end end
+for k,v in pairs(box.cfg) do
+    if k == 'listen' then
+        v = 'port'
+    end
+    if type(v) ~= 'table' and type(v) ~= 'function' then
+        table.insert(t,k..':'..tostring(v))
+    end
+end
 
 print('box.cfg')
 for k,v in pairs(t) do print(k, v) end

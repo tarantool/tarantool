@@ -48,8 +48,7 @@ src/box/lua/*.lua.c
 src/tarantool
 src/trivia/tarantool.h
 tarantool-*.tar.gz
-test/lib/*.pyc
-test/lib/*/*.pyc
+test/lib/
 test/unit/*.test
 test/unit/fiob
 test/var

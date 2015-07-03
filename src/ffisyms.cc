@@ -1,4 +1,3 @@
-
 #include <bit/bit.h>
 #include <lib/msgpuck/msgpuck.h>
 #include "scramble.h"
@@ -66,5 +65,5 @@ void *ffi_symbols[] = {
 	(void *) random_bytes,
 	(void *) fiber_time,
 	(void *) fiber_time64,
-	(void *) sophia_schedule
+	(void *) sophia_schedule,
 };
