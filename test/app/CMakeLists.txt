@@ -1,7 +1,14 @@
 include_directories(${CMAKE_BINARY_DIR}/src/trivia)
-add_library(module_api SHARED module_api.c)
-set_target_properties(module_api PROPERTIES PREFIX "")
-if(TARGET_OS_DARWIN)
-    set_target_properties(module_api PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
-endif(TARGET_OS_DARWIN)
-add_dependencies(module_api generate_module_api)
+
+function(build_module module files)
+    add_library(${module} SHARED ${files})
+    set_target_properties(${module} PROPERTIES PREFIX "")
+    add_dependencies(${module} rebuild_module_api)
+    if(TARGET_OS_DARWIN)
+        set_target_properties(${module} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+    endif(TARGET_OS_DARWIN)
+endfunction()
+
+
+build_module(module_api module_api.c)
+build_module(function1 function1.c)

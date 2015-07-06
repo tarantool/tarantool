@@ -31,6 +31,7 @@
 #include "user_def.h"
 #include "user.h"
 #include "space.h"
+#include "func.h"
 #include "txn.h"
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
@@ -71,6 +72,8 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 
 /** _func columns */
 #define FUNC_SETUID      3
+/** _func columns */
+#define FUNC_LANGUAGE    4
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -1306,34 +1309,32 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 
 /** Create a function definition from tuple. */
 static void
-func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
+func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 {
-	func->fid = tuple_field_u32(tuple, ID);
-	func->uid = tuple_field_u32(tuple, UID);
-	func->setuid = false;
-	/*
-	 * Do not initialize the privilege cache right away since
-	 * when loading up a function definition during recovery,
-	 * user cache may not be filled up yet (space _user is
-	 * recovered after space _func), so no user cache entry
-	 * may exist yet for such user.  The cache will be filled
-	 * up on demand upon first access.
-	 *
-	 * Later on consistency of the cache is ensured by DDL
-	 * checks (see user_has_data()).
-	 */
-	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
+	def->fid = tuple_field_u32(tuple, ID);
+	def->uid = tuple_field_u32(tuple, UID);
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);
-	if (len >= sizeof(func->name)) {
+	if (len >= sizeof(def->name)) {
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
 			  name, "function name is too long");
 	}
-	snprintf(func->name, sizeof(func->name), "%s", name);
-	/** Nobody has access to the function but the owner. */
-	memset(func->access, 0, sizeof(func->access));
+	snprintf(def->name, sizeof(def->name), "%s", name);
 	if (tuple_field_count(tuple) > FUNC_SETUID)
-		func->setuid = tuple_field_u32(tuple, FUNC_SETUID);
+		def->setuid = tuple_field_u32(tuple, FUNC_SETUID);
+	else
+		def->setuid = false;
+	if (tuple_field_count(tuple) > FUNC_LANGUAGE) {
+		const char *language = tuple_field_cstr(tuple, FUNC_LANGUAGE);
+		def->language = STR2ENUM(func_language, language);
+		if (def->language == func_language_MAX) {
+			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
+				  name, language);
+		}
+	} else {
+		/* Lua is the default. */
+		def->language = FUNC_LANGUAGE_LUA;
+	}
 }
 
 /** Remove a function from function cache */
@@ -1352,9 +1353,9 @@ static void
 func_cache_replace_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn_stmt *stmt = txn_stmt((struct txn*) event);
-	struct func_def func;
-	func_def_create_from_tuple(&func, stmt->new_tuple);
-	func_cache_replace(&func);
+	struct func_def def;
+	func_def_create_from_tuple(&def, stmt->new_tuple);
+	func_cache_replace(&def);
 }
 
 /**
@@ -1369,36 +1370,36 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	struct func_def func;
+	struct func_def def;
 
 	uint32_t fid = tuple_field_u32(old_tuple ?
 				       old_tuple : new_tuple, ID);
-	struct func_def *old_func = func_by_id(fid);
+	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
-		func_def_create_from_tuple(&func, new_tuple);
-		func_cache_replace(&func);
+		func_def_create_from_tuple(&def, new_tuple);
+		func_cache_replace(&def);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
 		trigger_add(&txn->on_rollback, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
-		func_def_create_from_tuple(&func, old_tuple);
+		func_def_create_from_tuple(&def, old_tuple);
 		/*
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
 		 */
-		access_check_ddl(func.uid);
+		access_check_ddl(def.uid);
 		/* Can only delete func if it has no grants. */
-		if (schema_find_grants("function", old_func->fid)) {
+		if (schema_find_grants("function", old_func->def.fid)) {
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
-				  (unsigned) func.uid,
+				  (unsigned) old_func->def.uid,
 				  "function has grants");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
 		trigger_add(&txn->on_commit, on_commit);
 	} else {                                /* UPDATE, REPLACE */
-		func_def_create_from_tuple(&func, new_tuple);
-		access_check_ddl(func.uid);
+		func_def_create_from_tuple(&def, new_tuple);
+		access_check_ddl(def.uid);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_replace_func, NULL);
 		trigger_add(&txn->on_commit, on_commit);
@@ -1462,8 +1463,8 @@ priv_def_check(struct priv_def *priv)
 	}
 	case SC_FUNCTION:
 	{
-		struct func_def *func = func_cache_find(priv->object_id);
-		if (func->uid != grantor->uid && grantor->uid != ADMIN) {
+		struct func *func = func_cache_find(priv->object_id);
+		if (func->def.uid != grantor->uid && grantor->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  priv_name(priv->access), grantor->name);
 		}

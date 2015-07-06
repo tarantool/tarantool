@@ -108,7 +108,7 @@ iproto_port(struct port *port)
 
 enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };
 
-static inline void
+extern "C" void
 iproto_port_eof(struct port *ptr)
 {
 	struct iproto_port *port = iproto_port(ptr);
@@ -144,7 +144,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos + sizeof(header), &body, sizeof(body));
 }
 
-static inline void
+extern "C" void
 iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
 {
 	struct iproto_port *port = iproto_port(ptr);

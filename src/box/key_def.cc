@@ -35,6 +35,8 @@
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
 
+const char *func_language_strs[] = {"LUA", "C"};
+
 const uint32_t key_mp_type[] = {
 	/* [UNKNOWN] = */ UINT32_MAX,
 	/* [NUM]     = */  1U << MP_UINT,

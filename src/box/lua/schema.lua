@@ -976,7 +976,9 @@ end
 box.schema.func = {}
 box.schema.func.create = function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { setuid = 'boolean', if_not_exists = 'boolean' })
+    check_param_table(opts, { setuid = 'boolean',
+                              if_not_exists = 'boolean',
+                              language = 'string'})
     local _func = box.space[box.schema.FUNC_ID]
     local func = _func.index.name:get{name}
     if func then
@@ -985,9 +987,9 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    opts = update_param_table(opts, { setuid = false })
+    opts = update_param_table(opts, { setuid = false, type = 'lua'})
     opts.setuid = opts.setuid and 1 or 0
-    _func:auto_increment{session.uid(), name, opts.setuid}
+    _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
 end
 
 box.schema.func.drop = function(name, opts)

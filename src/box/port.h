@@ -30,6 +30,10 @@
  */
 #include "trivia/util.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct tuple;
 struct port;
 
@@ -77,14 +81,18 @@ port_add_tuple(struct port *port, struct tuple *tuple)
 	(port->vtab->add_tuple)(port, tuple);
 }
 
-/** Reused in port_lua */
-void
-null_port_eof(struct port *port __attribute__((unused)));
-
 /**
  * This one does not have state currently, thus a single
  * instance is sufficient.
  */
 extern struct port null_port;
+
+/** Reused in port_lua */
+void
+null_port_eof(struct port *port __attribute__((unused)));
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

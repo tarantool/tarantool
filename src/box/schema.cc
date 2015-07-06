@@ -30,6 +30,7 @@
 #include "user_def.h"
 #include "engine.h"
 #include "space.h"
+#include "func.h"
 #include "tuple.h"
 #include "assoc.h"
 #include "lua/utils.h"
@@ -313,35 +314,35 @@ schema_free(void)
 	while (mh_size(funcs) > 0) {
 		mh_int_t i = mh_first(funcs);
 
-		struct func_def *func = (struct func_def *)
-				mh_i32ptr_node(funcs, i)->val;
-		func_cache_delete(func->fid);
+		struct func *func = ((struct func *)
+				     mh_i32ptr_node(funcs, i)->val);
+		func_cache_delete(func->def.fid);
 	}
 	mh_i32ptr_delete(funcs);
 }
 
 void
-func_cache_replace(struct func_def *func)
+func_cache_replace(struct func_def *def)
 {
-	struct func_def *old = func_by_id(func->fid);
+	struct func *old = func_by_id(def->fid);
 	if (old) {
-		*old = *func;
+		func_update(old, def);
 		return;
 	}
 	if (mh_size(funcs) >= BOX_FUNCTION_MAX)
 		tnt_raise(ClientError, ER_FUNCTION_MAX, BOX_FUNCTION_MAX);
-	void *ptr = malloc(sizeof(*func));
-	if (ptr == NULL) {
+	struct func *func = func_new(def);
+	if (func == NULL) {
 error:
 		panic_syserror("Out of memory for the data "
-			       "dictionary cache.");
+			       "dictionary cache (stored function).");
 	}
-	memcpy(ptr, func, sizeof(*func));
-	func = (struct func_def *) ptr;
-	const struct mh_i32ptr_node_t node = { func->fid, func };
+	const struct mh_i32ptr_node_t node = { def->fid, func };
 	mh_int_t k = mh_i32ptr_put(funcs, &node, NULL, NULL);
-	if (k == mh_end(funcs))
+	if (k == mh_end(funcs)) {
+		func_delete(func);
 		goto error;
+	}
 }
 
 void
@@ -350,19 +351,19 @@ func_cache_delete(uint32_t fid)
 	mh_int_t k = mh_i32ptr_find(funcs, fid, NULL);
 	if (k == mh_end(funcs))
 		return;
-	struct func_def *func = (struct func_def *)
+	struct func *func = (struct func *)
 		mh_i32ptr_node(funcs, k)->val;
 	mh_i32ptr_del(funcs, k, NULL);
-	free(func);
+	func_delete(func);
 }
 
-struct func_def *
+struct func *
 func_by_id(uint32_t fid)
 {
 	mh_int_t func = mh_i32ptr_find(funcs, fid, NULL);
 	if (func == mh_end(funcs))
 		return NULL;
-	return (struct func_def *) mh_i32ptr_node(funcs, func)->val;
+	return (struct func *) mh_i32ptr_node(funcs, func)->val;
 }
 
 bool

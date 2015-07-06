@@ -53,6 +53,7 @@ include(cmake/profile.cmake)
 include(cmake/FindReadline.cmake)
 include(cmake/FindSphinx.cmake)
 include(cmake/systemd.cmake)
+include(cmake/module.cmake)
 
 if (NOT READLINE_FOUND)
     message(FATAL_ERROR "readline library not found.")
