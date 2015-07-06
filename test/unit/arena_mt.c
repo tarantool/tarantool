@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include "unit.h"
+#include <trivia/util.h>
 #include <pthread.h>
+#include <pthread_np.h>
 
 struct slab_arena arena;
 struct quota quota;
@@ -18,7 +20,11 @@ int FILL = SLAB_MIN_SIZE/sizeof(pthread_t);
 void *
 run(void *p __attribute__((unused)))
 {
+#ifdef TARGET_OS_FREEBSD
+	unsigned int seed = pthread_getthreadid_np();
+#else
 	unsigned int seed = (unsigned int) pthread_self();
+#endif
 	int iterations = rand_r(&seed) % ITERATIONS;
 	pthread_t **slabs = slab_map(&arena);
 	for (int i = 0; i < iterations; i++) {
