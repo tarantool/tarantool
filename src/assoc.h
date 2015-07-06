@@ -49,8 +49,8 @@ struct mh_i32ptr_node_t {
 #define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
 #define mh_hash_key(a, arg) (a)
-#define mh_eq(a, b, arg) ((a->key) == (b->key))
-#define mh_eq_key(a, b, arg) ((a) == (b->key))
+#define mh_cmp(a, b, arg) ((a->key) != (b->key))
+#define mh_cmp_key(a, b, arg) ((a) != (b->key))
 #include "salad/mhash.h"
 
 #if defined(__cplusplus)
