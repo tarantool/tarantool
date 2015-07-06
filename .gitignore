@@ -62,6 +62,7 @@ third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 VERSION
+!FreeBSD/databases/tarantool/Makefile
 src/00000000000000000001.snap
 
 doc/sphinx/_build/*

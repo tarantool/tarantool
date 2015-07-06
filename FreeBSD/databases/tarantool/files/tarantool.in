@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $FreeBSD: databases/tarantool/files/tarantool.in 308708 2012-12-11 20:00:36Z rm $
+# $FreeBSD$
 
 # PROVIDE: tarantool
 # REQUIRE: LOGIN
@@ -8,6 +8,7 @@
 #
 # tarantool_enable="YES"
 # tarantool_config=""
+# tarantool_data="/var/db/tarantool"
 #
 
 . /etc/rc.subr
@@ -19,9 +20,34 @@ load_rc_config "$name"
 
 tarantool_enable=${tarantool_enable:-"NO"}
 tarantool_config=${tarantool_config:-"%%ETCDIR%%/$name.cfg"}
+tarantool_data=${tarantool_data:-"/var/db/tarantool"}
 
 command="%%PREFIX%%/bin/tarantool_box"
-command_args="--daemonize --config ${tarantool_config}"
+command_args="--config=${tarantool_config} --background"
 pidfile="/var/run/$name.pid"
+
+start_precmd="${name}_prestart"
+
+tarantool_prestart()
+{
+	if ! [ -d ${tarantool_data} ]
+	then
+		eval mkdir -p ${tarantool_data}
+	fi
+
+	if ! [ -f "${tarantool_data}/00000000000000000001.snap" ]
+	then
+		if ! [ -f ${tarantool_config} ]
+		then
+			echo "===> Install default config file."
+			eval cp "%%ETCDIR%%/tarantool.cfg.sample" ${tarantool_config}
+			echo "===> Install default snapshot."
+			eval cp "%%DATADIR%%/00000000000000000001.snap" ${tarantool_data}
+		else
+			echo "===> Init tarantool storage by ${tarantool_config}"
+			eval ${command} --config=${tarantool_config} --init-storage
+		fi
+	fi
+}
 
 run_rc_command "$1"
