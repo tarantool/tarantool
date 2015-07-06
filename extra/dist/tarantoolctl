@@ -220,7 +220,7 @@ local function find_default_file()
     local config_list = {
         '/etc/sysconfig/tarantool',
         '/etc/default/tarantool',
-        '/usr/local/etc/tarantool/tarantool',
+        '/usr/local/etc/tarantool/default/tarantool',
     }
     for _, c in pairs(config_list) do
         if fio.stat(c) then
