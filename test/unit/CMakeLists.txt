@@ -103,3 +103,6 @@ target_link_libraries(guava.test salad)
 add_executable(find_path.test find_path.c
     ${CMAKE_SOURCE_DIR}/src/find_path.c
 )
+add_executable(csv.test csv.c
+    ${CMAKE_SOURCE_DIR}/src/lib/csv/csv.c
+)
