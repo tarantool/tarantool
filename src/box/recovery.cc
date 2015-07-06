@@ -116,7 +116,7 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 /* {{{ LSN API */
 
-static void
+void
 fill_lsn(struct recovery_state *r, struct xrow_header *row)
 {
 	if (row->server_id == 0) {
@@ -551,16 +551,8 @@ recovery_stop_local(struct recovery_state *r)
  * in the data state.
  */
 
-struct wal_write_request {
-	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
-	/* Auxiliary. */
-	int64_t res;
-	struct fiber *fiber;
-	struct xrow_header *row;
-};
-
 /* Context of the WAL writer thread. */
-STAILQ_HEAD(wal_fifo, wal_write_request);
+STAILQ_HEAD(wal_fifo, wal_request);
 
 struct wal_writer
 {
@@ -626,7 +618,7 @@ wal_schedule_queue(struct wal_fifo *queue)
 	 * Can't use STAILQ_FOREACH since fiber_call()
 	 * destroys the list entry.
 	 */
-	struct wal_write_request *req, *tmp;
+	struct wal_request *req, *tmp;
 	STAILQ_FOREACH_SAFE(req, queue, wal_fifo_entry, tmp)
 		fiber_call(req->fiber);
 }
@@ -654,7 +646,7 @@ wal_schedule(ev_loop * /* loop */, ev_async *watcher, int /* event */)
 	 * in reverse order, performing a playback of the
 	 * in-memory database state.
 	 */
-	STAILQ_REVERSE(&rollback, wal_write_request, wal_fifo_entry);
+	STAILQ_REVERSE(&rollback, wal_request, wal_fifo_entry);
 	wal_schedule_queue(&rollback);
 }
 
@@ -841,19 +833,33 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 	return l ? 0 : -1;
 }
 
-static struct wal_write_request *
+static struct wal_request *
 wal_fill_batch(struct xlog *wal, struct fio_batch *batch, int rows_per_wal,
-	       struct wal_write_request *req)
+	       struct wal_request *req)
 {
 	int max_rows = rows_per_wal - wal->rows;
 	/* Post-condition of successful wal_opt_rotate(). */
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
 
-	struct iovec iov[XROW_IOVMAX];
-	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
-		int iovcnt = xlog_encode_row(req->row, iov);
-		fio_batch_add(batch, iov, iovcnt);
+	while (req != NULL && batch->rows < batch->max_rows) {
+		int iovcnt = 0;
+		struct iovec *iov;
+		struct xrow_header **row = req->rows;
+		for (; row < req->rows + req->n_rows; row++) {
+			iov = fio_batch_book(batch, iovcnt, XROW_IOVMAX);
+			if (iov == NULL) {
+				/*
+				 * No space in the batch for
+				 * this transaction, open a new
+				 * batch for it and hope that it
+				 * is sufficient to hold it.
+				 */
+				return req;
+			}
+			iovcnt += xlog_encode_row(*row, iov);
+		}
+		fio_batch_add(batch, iovcnt);
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -870,15 +876,17 @@ wal_fio_batch_write(struct fio_batch *batch, int fd)
 	return fio_batch_write(batch, fd);
 }
 
-static struct wal_write_request *
+static struct wal_request *
 wal_write_batch(struct xlog *wal, struct fio_batch *batch,
-		struct wal_write_request *req, struct wal_write_request *end,
+		struct wal_request *req, struct wal_request *end,
 		struct vclock *vclock)
 {
 	int rows_written = wal_fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
-		vclock_follow(vclock, req->row->server_id, req->row->lsn);
+		vclock_follow(vclock,
+			      req->rows[req->n_rows - 1]->server_id,
+			      req->rows[req->n_rows - 1]->lsn);
 		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
@@ -893,15 +901,17 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	struct xlog **wal = &r->current_wal;
 	struct fio_batch *batch = writer->batch;
 
-	struct wal_write_request *req = STAILQ_FIRST(input);
-	struct wal_write_request *write_end = req;
+	struct wal_request *req = STAILQ_FIRST(input);
+	struct wal_request *write_end = req;
 
 	while (req) {
 		if (wal_opt_rotate(wal, r, &writer->vclock) != 0)
 			break;
-		struct wal_write_request *batch_end;
+		struct wal_request *batch_end;
 		batch_end = wal_fill_batch(*wal, batch, writer->rows_per_wal,
 					   req);
+		if (batch_end == req)
+			break;
 		write_end = wal_write_batch(*wal, batch, req, batch_end,
 					    &writer->vclock);
 		if (batch_end != write_end)
@@ -958,13 +968,8 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct recovery_state *r, struct xrow_header *row)
+wal_write(struct recovery_state *r, struct wal_request *req)
 {
-	/*
-	 * Bump current LSN even if wal_mode = NONE, so that
-	 * snapshots still works with WAL turned off.
-	 */
-	fill_lsn(r, row);
 	if (r->wal_mode == WAL_NONE)
 		return vclock_sum(&r->vclock);
 
@@ -972,14 +977,8 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 
 	struct wal_writer *writer = r->writer;
 
-	struct wal_write_request *req = (struct wal_write_request *)
-		region_alloc(&fiber()->gc, sizeof(struct wal_write_request));
-
 	req->fiber = fiber();
 	req->res = -1;
-	req->row = row;
-	row->tm = ev_now(loop());
-	row->sync = 0;
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 

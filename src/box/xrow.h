@@ -39,7 +39,7 @@ extern "C" {
 enum {
 	XROW_HEADER_IOVMAX = 1,
 	XROW_BODY_IOVMAX = 2,
-	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX + 1
+	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX
 };
 
 struct xrow_header {
@@ -66,7 +66,7 @@ xrow_encode_uuid(char *pos, const struct tt_uuid *in);
 
 int
 xrow_header_encode(const struct xrow_header *header,
-		   struct iovec *out);
+		   struct iovec *out, size_t fixheader_len);
 
 int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out);

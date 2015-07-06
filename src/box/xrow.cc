@@ -105,10 +105,13 @@ error:
 }
 
 int
-xrow_header_encode(const struct xrow_header *header, struct iovec *out)
+xrow_header_encode(const struct xrow_header *header, struct iovec *out,
+		   size_t fixheader_len)
 {
 	/* allocate memory for sign + header */
-	char *data = (char *) region_alloc(&fiber()->gc, HEADER_LEN_MAX);
+	out->iov_base = region_alloc(&fiber()->gc, HEADER_LEN_MAX +
+				     fixheader_len);
+	char *data = (char *) out->iov_base + fixheader_len;
 
 	/* Header */
 	char *d = data + 1; /* Skip 1 byte for MP_MAP */
@@ -118,12 +121,13 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out)
 		d = mp_encode_uint(d, header->type);
 		map_size++;
 	}
-
+#if 0
 	if (header->sync) {
 		d = mp_encode_uint(d, IPROTO_SYNC);
 		d = mp_encode_uint(d, header->sync);
 		map_size++;
 	}
+#endif
 
 	if (header->server_id) {
 		d = mp_encode_uint(d, IPROTO_SERVER_ID);
@@ -145,8 +149,7 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out)
 
 	assert(d <= data + HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
-	out->iov_base = data;
-	out->iov_len = (d - data);
+	out->iov_len = d - (char *) out->iov_base;
 	out++;
 
 	memcpy(out, header->body, sizeof(*out) * header->bodycnt);
@@ -164,18 +167,15 @@ int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
 	static const int iov0_len = mp_sizeof_uint(UINT32_MAX);
-	int iovcnt = xrow_header_encode(row, out + 1) + 1;
-	char *fixheader = (char *) region_alloc(&fiber()->gc, iov0_len);
-	uint32_t len = 0;
-	for (int i = 1; i < iovcnt; i++)
+	int iovcnt = xrow_header_encode(row, out, iov0_len);
+	ssize_t len = -iov0_len;
+	for (int i = 0; i < iovcnt; i++)
 		len += out[i].iov_len;
 
 	/* Encode length */
-	char *data = fixheader;
+	char *data = (char *) out[0].iov_base;
 	*(data++) = 0xce; /* MP_UINT32 */
 	*(uint32_t *) data = mp_bswap_u32(len);
-	out[0].iov_base = fixheader;
-	out[0].iov_len = iov0_len;
 
 	assert(iovcnt <= XROW_IOVMAX);
 	return iovcnt;

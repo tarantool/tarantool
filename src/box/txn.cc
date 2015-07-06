@@ -54,6 +54,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	stmt->row = request->header;
 	if (request->header != NULL)
 		return;
+
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row= (struct xrow_header *)
 		region_alloc0(&fiber()->gc, sizeof(struct xrow_header));
@@ -144,17 +145,28 @@ txn_commit(struct txn *txn)
 	if (txn->engine)
 		txn->engine->prepare(txn);
 
+	struct wal_request *req = (struct wal_request *)
+		region_alloc(&fiber()->gc, sizeof(struct wal_request) +
+			     sizeof(struct xrow_header) * txn->n_stmts);
+	req->n_rows = 0;
+
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue;
+		/*
+		 * Bump current LSN even if wal_mode = NONE, so that
+		 * snapshots still works with WAL turned off.
+		 */
+		fill_lsn(recovery, stmt->row);
+		stmt->row->tm = ev_now(loop());
+		req->rows[req->n_rows++] = stmt->row;
+	}
+	if (req->n_rows) {
 		ev_tstamp start = ev_now(loop()), stop;
-		int64_t res = wal_write(recovery, stmt->row);
+		int64_t res = wal_write(recovery, req);
 		stop = ev_now(loop());
-		if (stop - start > too_long_threshold && stmt->row != NULL) {
-			say_warn("too long %s: %.3f sec",
-				 iproto_type_name(stmt->row->type),
-				 stop - start);
-		}
+		if (stop - start > too_long_threshold)
+			say_warn("too long WAL write: %.3f sec", stop - start);
 		if (res < 0)
 			tnt_raise(LoggedError, ER_WAL_IO);
 		txn->signature = res;

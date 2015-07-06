@@ -435,12 +435,11 @@ error:
 int
 xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 {
-	int iovcnt = xrow_header_encode(row, iov + 1) + 1;
-	char *fixheader = (char *) region_alloc(&fiber()->gc,
-						XLOG_FIXHEADER_SIZE);
-	uint32_t len = 0;
+	int iovcnt = xrow_header_encode(row, iov, XLOG_FIXHEADER_SIZE);
+	char *fixheader = (char *) iov[0].iov_base;
+	uint32_t len = iov[0].iov_len - XLOG_FIXHEADER_SIZE;
 	uint32_t crc32p = 0;
-	uint32_t crc32c = 0;
+	uint32_t crc32c = crc32_calc(0, fixheader + XLOG_FIXHEADER_SIZE, len);
 	for (int i = 1; i < iovcnt; i++) {
 		crc32c = crc32_calc(crc32c, (const char *) iov[i].iov_base,
 				    iov[i].iov_len);
@@ -460,8 +459,6 @@ xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 	assert(data == fixheader + XLOG_FIXHEADER_SIZE);
-	iov[0].iov_base = fixheader;
-	iov[0].iov_len = XLOG_FIXHEADER_SIZE;
 
 	assert(iovcnt <= XROW_IOVMAX);
 	return iovcnt;

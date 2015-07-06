@@ -34,6 +34,7 @@
 
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
+#include "third_party/queue.h"
 #include "xlog.h"
 #include "vclock.h"
 #include "tt_uuid.h"
@@ -140,7 +141,20 @@ void recovery_stop_local(struct recovery_state *r);
 void recovery_finalize(struct recovery_state *r, enum wal_mode mode,
 		       int rows_per_wal);
 
-int64_t wal_write(struct recovery_state *r, struct xrow_header *packet);
+void
+fill_lsn(struct recovery_state *r, struct xrow_header *row);
+
+struct wal_request {
+	STAILQ_ENTRY(wal_request) wal_fifo_entry;
+	/* Auxiliary. */
+	int64_t res;
+	struct fiber *fiber;
+	int n_rows;
+	struct xrow_header *rows[];
+};
+
+int64_t
+wal_write(struct recovery_state *r, struct wal_request *req);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
