@@ -1,0 +1,108 @@
+	*** test1 ***
+|1|	
+||	
+|1|	|2|	|3|	
+|123|	
+	*** test1: done ***
+ 	*** test2 ***
+|123|	|456|	|abcac|	|'multiword field 4'|	
+|none|	|none|	|0|	
+||	||	||	
+||	||	||	
+	*** test2: done ***
+ 	*** test3 ***
+|1|	||	|2|	
+	*** test3: done ***
+ 	*** test4 ***
+|123|	|5|	|92|	|0|	|0|	
+|1|	|12  34|	|56|	|quote , |	|66|	
+|ok|	
+	*** test4: done ***
+ 	*** test_chunk ***
+tail: ok
+	*** test_chunk: done ***
+ 	*** big_chunk_separated_test ***
+line_cnt=10000, fieldsizes_cnt=66600000, 66600000
+	*** big_chunk_separated_test: done ***
+ 	*** random_generated_test ***
+||	
+| ba|	
+|a|	
+|a|	||	
+||	
+|a|	
+|b"|	
+|aa|	
+|b|	||	
+||	||	
+|,|	
+||	
+||	|a|	||	|a|	
+||	
+||	
+|ba|	
+||	|b  a|	||	
+||	|"a|	
+|b|	
+||	|,a|	
+||	|a|	||	
+||	
+| a,b|	
+||	|b|	
+|aa|	
+|b|	
+||	
+||	
+||	||	
+|b|	
+|c|	||	
+||	
+|aa|	
+||	
+|ab|	
+|ab|	||	
+| b|	
+|,   ,,|	
+||	
+|bab|	
+|b|	
+|a|	
+|a|	
+|a|	|"|	||	
+|a|	
+||	
+||	
+||	
+|a|	
+|a|	
+||	
+| ,baab ,a|	
+|bb|	||	
+||	
+||	||	
+|b|	||	|b|	
+||	
+|b|	
+||	
+|b|	
+||	|ab|	
+|aa|	
+||	
+|ba,b, caa|	
+|b|	
+||	|"|	||	
+|ba|	
+| |	
+||	
+|a|	
+|b|	
+|bbba,|	
+||	
+||	
+||	|a|	|b|	|a|	|b|	||	
+||	
+||	
+||	
+|b|	
+	*** random_generated_test: done ***
+ 
