@@ -1,6 +1,9 @@
 net_box = require('net.box')
 ---
 ...
+errinj = box.error.injection
+---
+...
 box.schema.user.grant('guest', 'replication')
 ---
 ...
@@ -11,18 +14,12 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
 --# set connection default
---# stop server replica
 s = box.schema.space.create('test');
 ---
 ...
 index = s:create_index('primary', {type = 'hash'})
 ---
 ...
--- insert values
-for i=1,100000 do s:insert{i, 'this is test message12345'} end
----
-...
---# start server replica
 --# set connection replica
 fiber = require('fiber')
 ---
@@ -30,21 +27,30 @@ fiber = require('fiber')
 while box.space.test == nil do fiber.sleep(0.01) end
 ---
 ...
--- try to delete localy
-box.space.test:len() > 0
+--# set connection default
+--# stop server replica
+-- insert values
+for i=1,100 do s:insert{i, 'this is test message12345'} end
 ---
-- true
 ...
-box.space.test:len() < 100000
+-- sleep after every tuple
+errinj.set("ERRINJ_RELAY", true)
 ---
-- true
+- ok
+...
+--# start server replica
+--# set connection replica
+-- try to delete
+box.space.test:len()
+---
+- 1
 ...
 d = box.space.test:delete{1}
 ---
 ...
 box.space.test:get(1) ~= nil
 ---
-- true
+- false
 ...
 -- try to delete by net.box
 --# set connection default
@@ -57,13 +63,12 @@ d = c.space.test:delete{1}
 ...
 c.space.test:get(1) ~= nil
 ---
-- true
+- false
 ...
 -- check sync
---# set connection replica
-box.space.test:len() < 100000
+errinj.set("ERRINJ_RELAY", false)
 ---
-- true
+- ok
 ...
 -- cleanup
 --# stop server replica

@@ -43,6 +43,7 @@
 #include "coio.h"
 #include "cfg.h"
 #include "trigger.h"
+#include "errinj.h"
 
 void
 replication_send_row(struct recovery_state *r, void *param,
@@ -227,6 +228,10 @@ relay_send(Relay *relay, struct xrow_header *packet)
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(packet, iov);
 	coio_writev(&relay->io, iov, iovcnt, 0);
+	ERROR_INJECT(ERRINJ_RELAY,
+	{
+		sleep(1000);
+	});
 }
 
 /** Send a single row to the client. */
