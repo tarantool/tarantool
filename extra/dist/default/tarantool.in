@@ -8,6 +8,6 @@ default_cfg = {
     username   = "tarantool",
 }
 
-instance_dir = "/etc/tarantool/instances.enabled"
+instance_dir = "@CMAKE_INSTALL_SYSCONFDIR@/tarantool/instances.enabled"
 
 -- vim: set ft=lua :
