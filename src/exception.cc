@@ -33,7 +33,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <typeinfo>
 
 /** out_of_memory::size is zero-initialized by the linker. */
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
@@ -44,6 +43,16 @@ diag_get()
 {
 	return &fiber()->diag;
 }
+
+static const struct method exception_methods[] = {
+	make_method(&type_Exception, "message", &Exception::errmsg),
+	make_method(&type_Exception, "file", &Exception::file),
+	make_method(&type_Exception, "line", &Exception::line),
+	make_method(&type_Exception, "log", &Exception::log),
+	METHODS_SENTINEL
+};
+const struct type type_Exception = make_type("Exception", NULL,
+	exception_methods);
 
 void *
 Exception::operator new(size_t size)
@@ -68,8 +77,16 @@ Exception::~Exception()
 	}
 }
 
-Exception::Exception(const char *file, unsigned line)
-	: m_ref(0), m_file(file), m_line(line){
+Exception::Exception(const struct type *type_arg, const char *file,
+	unsigned line)
+	: Object(), type(type_arg), m_ref(0) {
+	if (m_file != NULL) {
+		snprintf(m_file, sizeof(m_file), "%s", file);
+		m_line = line;
+	} else {
+		m_file[0] = 0;
+		m_line = 0;
+	}
 	m_errmsg[0] = 0;
 	if (this == &out_of_memory) {
 		/* A special workaround for out_of_memory static init */
@@ -78,25 +95,21 @@ Exception::Exception(const char *file, unsigned line)
 	}
 }
 
-const char *
-Exception::type() const
-{
-	const char *name = typeid(*this).name();
-	/** A quick & dirty version of name demangle for class names */
-	char *res = NULL;
-	(void) strtol(name, &res, 10);
-	return res && strlen(res) ? res : name;
-}
-
 void
 Exception::log() const
 {
-	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", type());
+	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", type->name);
 }
 
+static const struct method systemerror_methods[] = {
+	make_method(&type_SystemError, "errnum", &SystemError::errnum),
+	METHODS_SENTINEL
+};
 
-SystemError::SystemError(const char *file, unsigned line)
-	: Exception(file, line),
+const struct type type_SystemError = make_type("SystemError", &type_Exception,
+	systemerror_methods);
+SystemError::SystemError(const struct type *type, const char *file, unsigned line)
+	:Exception(type, file, line),
 	  m_errno(errno)
 {
 	/* nothing */
@@ -104,7 +117,7 @@ SystemError::SystemError(const char *file, unsigned line)
 
 SystemError::SystemError(const char *file, unsigned line,
 			 const char *format, ...)
-	:Exception(file, line),
+	: Exception(&type_SystemError, file, line),
 	m_errno(errno)
 {
 	va_list ap;
@@ -135,10 +148,12 @@ SystemError::log() const
 	     m_errmsg);
 }
 
+const struct type type_OutOfMemory =
+	make_type("OutOfMemory", &type_Exception);
 OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 size_t amount, const char *allocator,
 			 const char *object)
-	:SystemError(file, line)
+	: SystemError(&type_OutOfMemory, file, line)
 {
 	m_errno = ENOMEM;
 	snprintf(m_errmsg, sizeof(m_errmsg),

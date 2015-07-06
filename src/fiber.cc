@@ -36,11 +36,13 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
-#include <typeinfo>
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
 pthread_t main_thread_id;
+
+const struct type type_FiberCancelException =
+	make_type("FiberCancelException", &type_Exception);
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -223,7 +225,7 @@ fiber_join(struct fiber *fiber)
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
 	Exception *e = diag_last_error(&fiber()->diag);
-	if (e != NULL && typeid(*e) != typeid(FiberCancelException))
+	if (e != NULL && type_cast(FiberCancelException, e))
 		e->raise();
 	fiber_testcancel();
 }
@@ -705,9 +707,8 @@ cord_costart_thread_func(void *arg)
 	}
 	diag_move(&f->diag, &fiber()->diag);
 	Exception *e = diag_last_error(&fiber()->diag);
-	if (e != NULL && typeid(*e) != typeid(FiberCancelException)) {
+	if (e != NULL && type_cast(FiberCancelException, e))
 		e->raise();
-	}
 
 	return NULL;
 }

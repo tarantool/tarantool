@@ -54,9 +54,10 @@ static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte ord
 static const char inprogress_suffix[] = ".inprogress";
 static const char v12[] = "0.12\n";
 
+const struct type type_XlogError = make_type("XlogError", &type_Exception);
 XlogError::XlogError(const char *file, unsigned line,
 		     const char *format, ...)
-	:Exception(file, line)
+	:Exception(&type_XlogError, file, line)
 {
 	va_list ap;
 	va_start(ap, format);
@@ -64,10 +65,21 @@ XlogError::XlogError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+XlogError::XlogError(const struct type *type, const char *file, unsigned line,
+		     const char *format, ...)
+	:Exception(type, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
+	va_end(ap);
+}
+
+const struct type type_XlogGapError = make_type("XlogGapError", &type_Exception);
 XlogGapError::XlogGapError(const char *file, unsigned line,
 			   const struct vclock *from,
 			   const struct vclock *to)
-	:XlogError(file, line, "")
+	:XlogError(&type_XlogGapError, file, line, "")
 {
 	char *s_from = vclock_to_string(from);
 	char *s_to = vclock_to_string(to);

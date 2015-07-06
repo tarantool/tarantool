@@ -434,6 +434,7 @@ tarantool_lua_utils_init(struct lua_State *L);
 } /* extern "C" */
 
 #include "exception.h"
+extern const struct type type_LuajitError;
 class LuajitError: public Exception {
 public:
 	LuajitError(const char *file, unsigned line,

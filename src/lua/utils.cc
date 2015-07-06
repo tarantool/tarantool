@@ -708,9 +708,10 @@ tarantool_lua_utils_init(struct lua_State *L)
 	return 0;
 }
 
+const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
 LuajitError::LuajitError(const char *file, unsigned line,
 			 struct lua_State *L)
-	:Exception(file, line)
+	: Exception(&type_LuajitError, file, line)
 {
 	const char *msg = lua_tostring(L, -1);
 	snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");

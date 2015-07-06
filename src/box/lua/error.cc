@@ -121,22 +121,22 @@ lbox_error_last(lua_State *L)
 	} else {
 		lua_newtable(L);
 
-		lua_pushstring(L, "message");
-		lua_pushstring(L, e->errmsg());
-		lua_settable(L, -3);
-
 		lua_pushstring(L, "type");
-		lua_pushstring(L, e->type());
+		lua_pushstring(L, e->type->name);
 		lua_settable(L, -3);
 
-		lua_pushstring(L, "code");
-		lua_pushinteger(L, ClientError::get_errcode(e));
-		lua_settable(L, -3);
-
-		if (SystemError *se = dynamic_cast<SystemError *>(e)) {
-			lua_pushstring(L, "errno");
-			lua_pushinteger(L, se->errnum());
-			lua_settable(L, -3);
+		type_foreach_method(e->type, method) {
+			if (method_invokable<const char *>(method, e)) {
+				const char *s = method_invoke<const char *>(method, e);
+				lua_pushstring(L, method->name);
+				lua_pushstring(L, s);
+				lua_settable(L, -3);
+			} else if (method_invokable<int>(method, e)) {
+				int code = method_invoke<int>(method, e);
+				lua_pushstring(L, method->name);
+				lua_pushinteger(L, code);
+				lua_settable(L, -3);
+			}
 		}
        }
        return 1;

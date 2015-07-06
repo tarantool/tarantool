@@ -46,6 +46,7 @@ set (core_sources
      exception.cc
      coro.cc
      object.cc
+     reflection.c
      assoc.c
  )
 

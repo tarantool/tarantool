@@ -46,9 +46,11 @@
 #include "say.h"
 #include "trivia/util.h"
 
+const struct type type_SocketError = make_type("SocketError",
+	&type_SystemError);
 SocketError::SocketError(const char *file, unsigned line, int fd,
 			 const char *format, ...)
-	: SystemError(file, line)
+	: SystemError(&type_SocketError, file, line)
 {
 	int save_errno = errno;
 

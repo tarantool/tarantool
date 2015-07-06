@@ -103,3 +103,8 @@ target_link_libraries(guava.test salad)
 add_executable(find_path.test find_path.c
     ${CMAKE_SOURCE_DIR}/src/find_path.c
 )
+
+add_executable(reflection_c.test reflection_c.c unit.c
+    ${CMAKE_SOURCE_DIR}/src/reflection.c)
+add_executable(reflection_cxx.test reflection_cxx.cc unit.c
+    ${CMAKE_SOURCE_DIR}/src/reflection.c)

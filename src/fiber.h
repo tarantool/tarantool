@@ -85,10 +85,11 @@ enum {
  * cancelled.
  */
 #if defined(__cplusplus)
+extern const struct type type_FiberCancelException;
 class FiberCancelException: public Exception {
 public:
 	FiberCancelException(const char *file, unsigned line)
-		: Exception(file, line) {
+		: Exception(&type_FiberCancelException, file, line) {
 		/* Nothing */
 	}
 

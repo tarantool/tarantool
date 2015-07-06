@@ -43,6 +43,7 @@
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
+extern const struct type type_SocketError;
 class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, int fd,
