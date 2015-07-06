@@ -7,7 +7,9 @@
 #include "unit.h"
 #include <trivia/util.h>
 #include <pthread.h>
+#ifdef TARGET_OS_FREEBSD
 #include <pthread_np.h>
+#endif
 
 struct slab_arena arena;
 struct quota quota;
