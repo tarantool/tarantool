@@ -64,7 +64,7 @@ third_party/luajit/src/lj_vm.s
 VERSION
 !FreeBSD/databases/tarantool/Makefile
 src/00000000000000000001.snap
-
 doc/sphinx/_build/*
 !doc/sphinx/_build/.gitignore
 doc/www/content/doc
+extra/dist/default/tarantool
