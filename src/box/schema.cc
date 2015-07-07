@@ -199,14 +199,22 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 {
 	struct space *space = space_cache_find(system_space_id);
 	Index *index = index_find(space, index_id);
+	char buf[BOX_NAME_MAX * 2];
+	/**
+	 * This is an internal-only method, we should know the
+	 * max length in advance.
+	 */
+	if (len + 5 > sizeof(buf))
+		return SC_ID_NIL;
+
+	mp_encode_str(buf, name, len);
+
 	struct iterator *it = index->position();
-	char key[5 /* str len */ + BOX_NAME_MAX];
-	mp_encode_str(key, name, len);
-	index->initIterator(it, ITER_EQ, key, 1);
+	index->initIterator(it, ITER_EQ, buf, 1);
 	IteratorGuard it_guard(it);
 
-	struct tuple *tuple;
-	while ((tuple = it->next(it))) {
+	struct tuple *tuple = it->next(it);
+	if (tuple) {
 		/* id is always field #1 */
 		return tuple_field_u32(tuple, 0);
 	}
