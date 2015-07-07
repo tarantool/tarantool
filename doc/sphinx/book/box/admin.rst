@@ -23,27 +23,25 @@ A reference description also follows below:
     this command. 10% of :confval:`slab_alloc_arena` is, on average,
     sufficient. This statement waits until a snapshot is taken and returns operation result.
 
-    .. code-block:: lua
-
-        tarantool> box.info.version
-        ---
-        - 1.6.3-439-g7e1011b
-        ...
-        tarantool> box.snapshot()
-        ---
-        - ok
-        ...
-        tarantool> box.snapshot()
-        ---
-        error: can't save snapshot, errno 17 (File exists)
-        ...
-
+    | EXAMPLE
+    | :codenormal:`tarantool>` :codebold:`box.info.version`
+    | :codenormal:`---`
+    | :codenormal:`- 1.6.3-439-g7e1011b`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.snapshot()`
+    | :codenormal:`---`
+    | :codenormal:`- ok`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.snapshot()`
+    | :codenormal:`---`
+    | :codenormal:`error: can't save snapshot, errno 17 (File exists)`
+    | :codenormal:`...`
 
     Taking a snapshot does not cause the server to start a new write-ahead log.
     Once a snapshot is taken, old WALs can be deleted as long as all replicas
-    are up to date. But the WAL which was current at the time **box.snapshot()**
+    are up to date. But the WAL which was current at the time :codenormal:`box.snapshot()`
     started must be kept for recovery, since it still contains log records
-    written after the start of **box.snapshot()**.
+    written after the start of :codenormal:`box.snapshot()`.
 
     An alternative way to save a snapshot is to send the server SIGUSR1 UNIX
     signal. While this approach could be handy, it is not recommended for use

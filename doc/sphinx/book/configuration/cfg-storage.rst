@@ -8,7 +8,7 @@
     Tarantool can consume up to 20% more than the limit set here.
 
     Type: float |br|
-    Default: null |br|
+    Default: 1.0 |br|
     Dynamic: no |br|
 
 .. confval:: slab_alloc_minimal
@@ -22,7 +22,7 @@
 
 .. confval:: slab_alloc_maximal
 
-    Size of the largest allocation unit. It can be tuned down up if it
+    Size of the largest allocation unit. It can be tuned up if it
     is necessary to store large tuples.
 
     Type: integer |br|
@@ -44,17 +44,15 @@
 
     The default sophia configuration can be changed with
 
-    .. code-block:: lua
-
-        sophia = {
-            page_size = number,
-            threads = number,
-            node_size = number,
-            memory_limit = number
-        }
+        | :code:`sophia = {`
+        | |nbsp| :samp:`page_size = {number},`
+        | |nbsp| :samp:`threads = {number},`
+        | |nbsp| :samp:`node_size = {number},`
+        | |nbsp| :samp:`memory_limit = {number}`
+        | :code:`}`
 
     This method may change in the future.
 
     Type: table |br|
-    Default: (see the note) |br|
+    Default: (see above) |br|
     Dynamic: no |br|

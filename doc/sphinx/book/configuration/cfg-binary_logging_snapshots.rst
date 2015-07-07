@@ -20,7 +20,7 @@
 
     How many log records to store in a single write-ahead log file.
     When this limit is reached, Tarantool creates another WAL file
-    named :samp:`{<first-lsn-in-wal>}.xlog` This can be useful for
+    named :samp:`{<first-lsn-in-wal>}.xlog`. This can be useful for
     simple rsync-based backups.
 
     Type: integer |br|
@@ -61,4 +61,4 @@
 
     Type: float |br|
     Default: 2 |br|
-    Dynamic: **yes** |br|
+    Dynamic: no |br|

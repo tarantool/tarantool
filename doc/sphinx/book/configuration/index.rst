@@ -9,15 +9,11 @@ line or in an initialization file.
 
 Tarantool is started by entering the command:
 
-.. program:: tarantool
-
-.. code-block:: bash
-
-    $ tarantool
-    OR
-    $ tarantool <options>
-    OR
-    $ tarantool <lua-initialization-file> [arguments]
+    | :codenormal:`$` :codebold:`tarantool`
+    | OR
+    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
+    | OR
+    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
 =====================================================================
                         Command options
@@ -31,14 +27,13 @@ Tarantool is started by entering the command:
 
     Print product name and version, for example:
 
-    .. code-block:: bash
-
-        $  ./tarantool --version
-        Tarantool 1.6.3-439-g7e1011b
-        Target: Linux-x86_64-Debug
-        ...
+        | :codenormal:`$`  :codebold:`./tarantool --version`
+        | :codenormal:`Tarantool 1.6.3-439-g7e1011b`
+        | :codenormal:`Target: Linux-x86_64-Debug`
+        | :codenormal:`...`
 
     In this example:
+
     “Tarantool” is the name of the reusable asynchronous networking
     programming framework.
 
@@ -75,7 +70,7 @@ Some configuration parameters and some functions depend on a URI, or
 for login, a password, a host name or host IP address, and a port number. Only
 the port number is always mandatory. The password is mandatory if the user
 name is specified, unless the user name is 'guest'. So, formally, the URI
-syntax is ``[host:]port`` or ``[username:password@]host:port``
+syntax is ``[host:]port`` or ``[username:password@]host:port``.
 If host is omitted, then 'localhost' is assumed.
 If username:password is omitted, then 'guest' is assumed. Some examples:
 
@@ -99,7 +94,7 @@ In certain circumstances a Unix socket may be used where a URI is required.
                        Initialization file
 =====================================================================
 
-If the command to start Tarantool includes ``<lua-initialization-file>``, then
+If the command to start Tarantool includes :codeitalic:`lua-initialization-file`, then
 Tarantool begins by invoking the Lua program in the file, which by convention
 may have the name "``script.lua``". The Lua program may get further arguments
 from the command line or may use operating-system functions, such as ``getenv()``.
@@ -122,19 +117,17 @@ and suppose the environment variable LISTEN_URI contains 3301,
 and suppose the command line is ``~/tarantool/src/tarantool script.lua ARG``.
 Then the screen might look like this:
 
-.. code-block:: lua
-
-    $ export LISTEN_URI=3301
-    $ ~/tarantool/src/tarantool script.lua ARG
-    ... main/101/script.lua C> version 1.6.3-439-g7e1011b
-    ... main/101/script.lua C> log level 5
-    ... main/101/script.lua I> mapping 107374184 bytes for a shared arena...
-    ... main/101/script.lua I> recovery start
-    ... main/101/script.lua I> recovering from `./00000000000000000000.snap'
-    ... main/101/script.lua I> primary: bound to 0.0.0.0:3301
-    ... main/102/leave_local_hot_standby I> ready to accept requests
-    Starting  ARG
-    ... main C> entering the event loop
+    | :codenormal:`$` :codebold:`export LISTEN_URI=3301`
+    | :codenormal:`$` :codebold:`~/tarantool/src/tarantool script.lua ARG`
+    | :codenormal:`... main/101/script.lua C> version 1.6.3-439-g7e1011b`
+    | :codenormal:`... main/101/script.lua C> log level 5`
+    | :codenormal:`... main/101/script.lua I> mapping 107374184 bytes for a shared arena...`
+    | :codenormal:`... main/101/script.lua I> recovery start`
+    | :codenormal:`... main/101/script.lua I> recovering from `./00000000000000000000.snap'`
+    | :codenormal:`... main/101/script.lua I> primary: bound to 0.0.0.0:3301`
+    | :codenormal:`... main/102/leave_local_hot_standby I> ready to accept requests`
+    | :codenormal:`Starting  ARG`
+    | :codenormal:`... main C> entering the event loop`
 
 .. _local_hot_standby:
 .. _replication_port:
@@ -151,7 +144,7 @@ Then the screen might look like this:
                 Configuration parameters
 =====================================================================
 
-Configuration parameters have the form ``box.cfg{ key = value [, key = value ...]}``.
+Configuration parameters have the form :codenormal:`box.cfg{` :codeitalic:`key = value` :codenormal:`[,` :codeitalic:`key = value` :codenormal:`...]}`.
 Since ``box.cfg`` may contain many configuration parameters and since some of the
 parameters (such as directory addresses) are semi-permanent, it's best to keep
 ``box.cfg`` in a Lua file. Typically this Lua file is the initialization file
@@ -165,7 +158,7 @@ a second time.
 To see all the non-null parameters, say ``box.cfg`` (no parentheses). To see a
 particular parameter, for example the listen address, say ``box.cfg.listen``.
 
-The following tables describe all parameters for basic operation, for storage,
+The following sections describe all parameters for basic operation, for storage,
 for binary logging and snapshots, for replication, for networking, and for logging.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,5 +236,5 @@ reason, the port will become free so the standby instance will succeed in
 connecting, and will become the primary instance. Thus there is no noticeable
 downtime if the primary instance goes down.
 
-If this ``local_hot_standby`` feature is being used, then ``wal_mode`` should
+If this local_hot_standby feature is being used, then wal_mode should
 not be equal to "none".
