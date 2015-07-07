@@ -7,11 +7,8 @@
 #
 #   * Enable tarantool on startup:
 #      tarantool_enable="YES"
-#   * Change config (Default %%ETCDIR%%/default/tarantool):
-#      tarantool_config="%%ETCDIR%%/default/tarantool"
-#   * Path to storage, depended by option work_dir at:
-#     %%ETCDIR%%/default/tarantool
-#      tarantool_data="/var/db/tarantool"
+#   * Path to storage instances:
+#      tarantool_instances="%%ETCDIR%%/instances.enabled"
 #
 #
 #########################################################

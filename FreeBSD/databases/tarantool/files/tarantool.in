@@ -7,8 +7,7 @@
 # KEYWORD: shutdown
 #
 # tarantool_enable="YES"
-# tarantool_config=""
-# tarantool_data="/var/db/tarantool"
+# tarantool_instances=""
 #
 
 . /etc/rc.subr
@@ -19,35 +18,38 @@ rcvar=tarantool_enable
 load_rc_config "$name"
 
 tarantool_enable=${tarantool_enable:-"NO"}
-tarantool_config=${tarantool_config:-"%%ETCDIR%%/$name.cfg"}
-tarantool_data=${tarantool_data:-"/var/db/tarantool"}
+tarantool_instances=${tarantool_instances:-"%%ETCDIR%%/instances.enabled"}
 
-command="%%PREFIX%%/bin/tarantool_box"
-command_args="--config=${tarantool_config} --background"
-pidfile="/var/run/$name.pid"
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+restart_cmd="${name}_restart"
 
-start_precmd="${name}_prestart"
+INSTANCES=$(find ${tarantool_instances} -type f -name '*.lua')
+TDAEMON=%%PREFIX%%/bin/tarantool
+TCTL=%%PREFIX%%/bin/tarantoolctl
 
-tarantool_prestart()
+tarantool_start()
 {
-	if ! [ -d ${tarantool_data} ]
-	then
-		eval mkdir -p ${tarantool_data}
-	fi
+	echo "tarantool: Starting instances"
+	for inst in ${INSTANCES}
+	do
+		${TDAEMON} ${TCTL} start $(basename ${inst} .lua)
+	done
+}
 
-	if ! [ -f "${tarantool_data}/00000000000000000001.snap" ]
-	then
-		if ! [ -f ${tarantool_config} ]
-		then
-			echo "===> Install default config file."
-			eval cp "%%ETCDIR%%/tarantool.cfg.sample" ${tarantool_config}
-			echo "===> Install default snapshot."
-			eval cp "%%DATADIR%%/00000000000000000001.snap" ${tarantool_data}
-		else
-			echo "===> Init tarantool storage by ${tarantool_config}"
-			eval ${command} --config=${tarantool_config} --init-storage
-		fi
-	fi
+tarantool_stop()
+{
+	echo "tarantool: Stopping instances"
+	for inst in ${INSTANCES}
+	do
+		${TDAEMON} ${TCTL} stop $(basename ${inst} .lua)
+	done
+}
+
+tarantool_restart()
+{
+	tarantool_stop
+	tarantool_start
 }
 
 run_rc_command "$1"

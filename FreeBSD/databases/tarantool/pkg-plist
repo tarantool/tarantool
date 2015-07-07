@@ -12,3 +12,7 @@ man/man1/tarantool.1.gz
 man/man1/tarantoolctl.1.gz
 %%PORTDOCS%%%%DOCSDIR%%/LICENSE
 %%PORTDOCS%%%%DOCSDIR%%/README.md
+@dir %%ETCDIR%%/instances.enabled
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_DATADIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_LOGDIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_RUNDIR%%
