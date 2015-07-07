@@ -207,6 +207,12 @@ lbox_request_create(struct request *request,
 	}
 	if (tuple > 0) {
 		size_t used = region_used(gc);
+		/*
+		 * region_join() above could have allocated memory and
+		 * invalidated stream write position. Reset the
+		 * stream to avoid overwriting the key.
+		 */
+		mpstream_reset(&stream);
 		luamp_encode_tuple(L, luaL_msgpack_default, &stream, tuple);
 		mpstream_flush(&stream);
 		size_t  tuple_len = region_used(gc) - used;
