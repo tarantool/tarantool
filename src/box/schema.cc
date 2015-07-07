@@ -199,16 +199,18 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 {
 	struct space *space = space_cache_find(system_space_id);
 	Index *index = index_find(space, index_id);
+	char buf[BOX_NAME_MAX * 2];
+	/**
+	 * This is an internal-only method, we should know the
+	 * max length in advance.
+	 */
+	if (len + 5 > sizeof(buf))
+		return SC_ID_NIL;
 
-	const uint32_t local_len = BOX_NAME_MAX * 2;
-	char buf[5 + local_len];
-	char *key = len <= local_len ? buf : (char *)malloc(5 + len);
-	auto key_guard =
-		make_scoped_guard([key, &buf]{ if (key != buf) free(key); });
-	mp_encode_str(key, name, len);
+	mp_encode_str(buf, name, len);
 
 	struct iterator *it = index->position();
-	index->initIterator(it, ITER_EQ, key, 1);
+	index->initIterator(it, ITER_EQ, buf, 1);
 	IteratorGuard it_guard(it);
 
 	struct tuple *tuple = it->next(it);
