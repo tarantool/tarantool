@@ -18,6 +18,11 @@
 |1|	|12  34|	|56|	|quote , |	|66|	
 |ok|	
 	*** test4: done ***
+ 	*** test5 ***
+|abc|	|longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong|	|0|	
+|123|	|456|	||	
+|0|	||	||	
+	*** test5: done ***
  	*** test_chunk ***
 tail: ok
 	*** test_chunk: done ***

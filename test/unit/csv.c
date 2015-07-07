@@ -58,6 +58,18 @@ void test4() {
                       "1, 12  34, 56, \"quote , \", 66\nok");
     footer();
 }
+void test5() {
+    header();
+    const char * const s = "abc\tlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong\t0\n"
+        "123\t456\t\n" "0\t\t\n";
+    struct csv csv;
+    csv_create(&csv);
+    csv.emit_field = print_field;
+    csv.emit_row = print_endl;
+    csv.csv_delim = '\t';
+    csv_parse(&csv, s, s + strlen(s));
+    footer();
+}
 
 void test_chunk(const char* const s)
 {
@@ -148,6 +160,7 @@ int main()
     test2();
     test3();
     test4();
+    test5();
     test_chunk("123 , 5  ,       92    , 0, "
                " 0\n1, 12  34, 56, \"quote , \", 66\nok");
     big_chunk_separated_test();

@@ -69,7 +69,7 @@ csv_parse(struct csv *csv, const char *s, const char *end)
         // in some cases buffer is not used
         switch(state) {
         case 0: //leading spaces
-            if(p == end || !(*p == ' ' || *p == '\t')) {
+            if(p == end || *p != ' ') {
                 state = 1;
                 field_begin = p;
             }
@@ -77,7 +77,7 @@ csv_parse(struct csv *csv, const char *s, const char *end)
         case 1: //common case without buffer
             if(isendl || *p == csv->csv_delim) {
                 state = 0;
-                for(field_end = p - 1; field_end > field_begin && isspace(*field_end); field_end--);
+                for(field_end = p - 1; field_end > field_begin && *field_end == ' '; field_end--);
                 field_end++;
                 csv->emit_field(csv->emit_ctx, field_begin, field_end);
             } else if(*p == csv->csv_quote) {
@@ -106,7 +106,7 @@ csv_parse(struct csv *csv, const char *s, const char *end)
                     state = 4;
                 } else {
                    field_end = p;
-                   for(p++;p < end && isspace(*p) && *p != '\n' && *p !='\r'; p++);
+                   for(p++;p < end && *p == ' '; p++);
                    if(*p == csv->csv_delim || *p == '\n' || *p == '\r') {
                        state = 0;
                        isendl = (*p == '\n' || *p == '\r');
@@ -126,7 +126,7 @@ csv_parse(struct csv *csv, const char *s, const char *end)
             }
             if(isendl || *p == csv->csv_delim) {
                 state = 0;
-                for(bufp--; bufp > csv->buf && isspace(*bufp); bufp--);
+                for(bufp--; bufp > csv->buf && *bufp == ' '; bufp--);
                 bufp++;
                 csv->emit_field(csv->emit_ctx, csv->buf, bufp);
             } else if(*p == csv->csv_quote) {
@@ -164,22 +164,6 @@ csv_parse(struct csv *csv, const char *s, const char *end)
             }
             break;
         }
-        /*if(isendl) {
-            bufp = csv->buf;
-            if(p == end)
-                csv->emit_row(csv->emit_ctx);
-            while(p != end && (*p == '\n' || *p == '\r')) {
-                if(p != end && *p != *(p + 1) && (*(p + 1) == '\n' || *(p + 1) == '\r')) {
-                    p++; //\r\n - is only 1 endl
-                    csv->emit_row(csv->emit_ctx);
-                } else {
-                    csv->emit_row(csv->emit_ctx);
-                }
-                p++;
-            }
-            if(p != end)
-                p--;
-        }*/
         if(isendl) {
             assert(state == 0);
             bufp = csv->buf;
@@ -189,6 +173,11 @@ csv_parse(struct csv *csv, const char *s, const char *end)
         }
         p++;
     } while(p != end + 1);
+
+    if(csv->buf) {
+        free(csv->buf);
+        csv->buf = 0;
+    }
 }
 
 
