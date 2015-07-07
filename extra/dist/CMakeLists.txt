@@ -1,5 +1,11 @@
 # Scripts for a tarantoolctl packaging
 set(SYSV_INITD_PATH ${CMAKE_INSTALL_LIBDIR}/tarantool/tarantool.init)
+# Default path to data in default/tarantool
+if (NOT TARANTOOL_DATADIR)
+    set(TARANTOOL_DATADIR "/var/lib/tarantool")
+endif()
+message (STATUS "TARANTOOL_DATADIR: ${TARANTOOL_DATADIR}")
+
 configure_file("tarantool.service.in" "tarantool.service")
 configure_file(default/tarantool.in default/tarantool)
 
