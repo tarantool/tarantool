@@ -1,0 +1,13 @@
+-- Options for Tarantool
+default_cfg = {
+    pid_file   = "/var/run/tarantool", -- will become pid_file .. instance .. '.pid'
+    wal_dir    = "@TARANTOOL_DATADIR@", -- will become wal_dir/instance/
+    snap_dir   = "@TARANTOOL_DATADIR@", -- snap_dir/instance/
+    sophia_dir = "@TARANTOOL_DATADIR@", -- will become sophia_dir/sophia/instance/
+    logger     = "/var/log/tarantool", -- logger/instance .. '.log'
+    username   = "tarantool",
+}
+
+instance_dir = "@CMAKE_INSTALL_SYSCONFDIR@/tarantool/instances.enabled"
+
+-- vim: set ft=lua :
