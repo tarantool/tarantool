@@ -13,7 +13,7 @@ if (ENABLE_RPM)
     # chmod +x 655
     if (WITH_SYSTEMD)
     message (STATUS "Building RPM with SYSTEMD")
-        install (FILES tarantool.service DESTINATION ${SYSTEMD_SERVICES_INSTALL_DIR}
+        install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool.service DESTINATION ${SYSTEMD_SERVICES_INSTALL_DIR}
             PERMISSIONS
             OWNER_READ OWNER_WRITE
             GROUP_READ GROUP_EXECUTE
@@ -32,14 +32,14 @@ if (ENABLE_RPM)
             GROUP_READ GROUP_EXECUTE
             WORLD_READ WORLD_EXECUTE)
     endif(WITH_SYSTEMD)
-    install (FILES default/tarantool DESTINATION
+    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/default/tarantool DESTINATION
         ${CMAKE_INSTALL_SYSCONFDIR}/sysconfig/
     PERMISSIONS
     OWNER_READ OWNER_WRITE
     GROUP_READ
     WORLD_READ)
 else (ENABLE_RPM)
-    install (FILES default/tarantool DESTINATION
+    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/default/tarantool DESTINATION
         ${CMAKE_INSTALL_SYSCONFDIR}/default/
     PERMISSIONS
     OWNER_READ OWNER_WRITE
