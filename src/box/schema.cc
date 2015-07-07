@@ -199,14 +199,20 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 {
 	struct space *space = space_cache_find(system_space_id);
 	Index *index = index_find(space, index_id);
-	struct iterator *it = index->position();
-	char key[5 /* str len */ + BOX_NAME_MAX];
+
+	const uint32_t local_len = BOX_NAME_MAX * 2;
+	char buf[5 + local_len];
+	char *key = len <= local_len ? buf : (char *)malloc(5 + len);
+	auto key_guard =
+		make_scoped_guard([key, &buf]{ if (key != buf) free(key); });
 	mp_encode_str(key, name, len);
+
+	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, 1);
 	IteratorGuard it_guard(it);
 
-	struct tuple *tuple;
-	while ((tuple = it->next(it))) {
+	struct tuple *tuple = it->next(it);
+	if (tuple) {
 		/* id is always field #1 */
 		return tuple_field_u32(tuple, 0);
 	}
