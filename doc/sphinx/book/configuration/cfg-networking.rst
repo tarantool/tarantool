@@ -1,6 +1,6 @@
 .. confval:: io_collect_interval
 
-    The server will sleep for ``io_collect_interval`` seconds between iterations
+    The server will sleep for io_collect_interval seconds between iterations
     of the event loop. Can be used to reduce CPU load in deployments in which
     the number of client connections is large, but requests are not so frequent
     (for example, each connection issues just a handful of requests per second).

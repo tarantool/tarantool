@@ -1,5 +1,6 @@
-.. code-block:: lua
+.. raw:: html
 
+    <pre>
     ... ...
     tarantool> s:insert{2,'Tuple inserted on Terminal #2'}
     ---
@@ -23,4 +24,5 @@
     2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
     2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 I> authenticated
     2014-10-13 12:10:21.488 [25581] main/101/spawner I> created a replication relay: pid = 29632
-    2014-10-13 12:10:21.592 [29632] main/101/relay/127.0.0.1:45908 I> recover from `./00000000000000000000.xlog'
+    2014-10-13 12:10:21.592 [29632] main/101/relay/127.0.0.1:45908 I> recover from ./00000000000000000000.xlog'
+    </pre>

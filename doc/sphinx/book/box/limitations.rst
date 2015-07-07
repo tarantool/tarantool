@@ -12,7 +12,8 @@ Number of indexes in a space
 
 Number of fields in a tuple
     The theoretical maximum is 2147483647 (``box.schema.FIELD_MAX``). The
-    practical maximum is whatever is specified by the space's field_count
+    practical maximum is whatever is specified by the space's
+    :ref:`field_count <space_object_field_count>`
     member, or the maximum tuple length.
 
 Number of spaces
@@ -32,7 +33,7 @@ Update operations count
     is 4000 (``BOX_UPDATE_OP_CNT_MAX``).
 
 Number of users and roles
-    32 ().
+    32.
 
 Length of an index name or space name or user name
     32 (``box.schema.NAME_MAX``).
