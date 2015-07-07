@@ -1,6 +1,7 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
+local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local session = box.session
@@ -524,7 +525,7 @@ local iterator_gen = function(param, state)
         information.
     --]]
     if not ffi.istype(iterator_t, state) then
-        error('usage gen(param, state)')
+        error('usage: next(param, state)')
     end
     -- next() modifies state in-place
     local tuple = builtin.boxffi_iterator_next(state)
@@ -532,6 +533,15 @@ local iterator_gen = function(param, state)
         return box.error() -- error
     elseif tuple ~= nil then
         return state, box.tuple.bless(tuple) -- new state, value
+    else
+        return nil
+    end
+end
+
+local iterator_gen_luac = function(param, state)
+    local tuple = internal.iterator_next(state)
+    if tuple ~= nil then
+        return state, tuple -- new state, value
     else
         return nil
     end
@@ -604,7 +614,7 @@ function box.schema.space.bless(space)
         return error('Attempt to modify a read-only table') end
     index_mt.__index = index_mt
     -- min and max
-    index_mt.min = function(index, key)
+    index_mt.min_ffi = function(index, key)
         local pkey = msgpackffi.encode_tuple(key)
         local tuple = builtin.boxffi_index_min(index.space_id, index.id, pkey)
         if tuple == ffi.cast('void *', -1) then
@@ -615,7 +625,11 @@ function box.schema.space.bless(space)
             return
         end
     end
-    index_mt.max = function(index, key)
+    index_mt.min_luac = function(index, key)
+        key = keify(key)
+        return internal.min(index.space_id, index.id, key);
+    end
+    index_mt.max_ffi = function(index, key)
         local pkey = msgpackffi.encode_tuple(key)
         local tuple = builtin.boxffi_index_max(index.space_id, index.id, pkey)
         if tuple == ffi.cast('void *', -1) then
@@ -626,7 +640,11 @@ function box.schema.space.bless(space)
             return
         end
     end
-    index_mt.random = function(index, rnd)
+    index_mt.max_luac = function(index, key)
+        key = keify(key)
+        return internal.max(index.space_id, index.id, key);
+    end
+    index_mt.random_ffi = function(index, rnd)
         rnd = rnd or math.random()
         local tuple = builtin.boxffi_index_random(index.space_id, index.id, rnd)
         if tuple == ffi.cast('void *', -1) then
@@ -637,8 +655,12 @@ function box.schema.space.bless(space)
             return
         end
     end
+    index_mt.random_luac = function(index, rnd)
+        rnd = rnd or math.random()
+        return internal.random(index.space_id, index.id, rnd);
+    end
     -- iteration
-    index_mt.pairs = function(index, key, opts)
+    index_mt.pairs_ffi = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
@@ -648,13 +670,20 @@ function box.schema.space.bless(space)
         if cdata == nil then
             box.error()
         end
-
         return fun.wrap(iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc))
     end
-    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
-    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.pairs_luac = function(index, key, opts)
+        key = keify(key)
+        local itype = check_iterator_type(opts, #key == 0);
+        local keymp = msgpack.encode(key)
+        local keybuf = ffi.string(keymp, #keymp)
+        local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
+        return fun.wrap(iterator_gen_luac, keybuf,
+            ffi.gc(cdata, iterator_cdata_gc))
+    end
+
     -- index subtree size
-    index_mt.count = function(index, key, opts)
+    index_mt.count_ffi = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
         local count = builtin.boxffi_index_count(index.space_id, index.id,
@@ -664,6 +693,11 @@ function box.schema.space.bless(space)
         end
         return tonumber(count)
     end
+    index_mt.count_luac = function(index, key, opts)
+        key = keify(key)
+        local itype = check_iterator_type(opts, #key == 0);
+        return internal.count(index.space_id, index.id, itype, key);
+    end
 
     local function check_index(space, index_id)
         if space.index[index_id] == nil then
@@ -671,7 +705,7 @@ function box.schema.space.bless(space)
         end
     end
 
-    index_mt.get = function(index, key)
+    index_mt.get_ffi = function(index, key)
         local key, key_end = msgpackffi.encode_tuple(key)
         local tuple = builtin.boxffi_index_get(index.space_id, index.id, key)
         if tuple == ffi.cast('void *', -1) then
@@ -682,14 +716,15 @@ function box.schema.space.bless(space)
             return
         end
     end
+    index_mt.get_luac = function(index, key)
+        key = keify(key)
+        return internal.get(index.space_id, index.id, key)
+    end
 
-    index_mt.select = function(index, key, opts)
+    local function check_select_opts(opts, key_is_nil)
         local offset = 0
         local limit = 4294967295
-
-        local key, key_end = msgpackffi.encode_tuple(key)
-        local iterator = check_iterator_type(opts, key + 1 >= key_end)
-
+        local iterator = check_iterator_type(opts, key_is_nil)
         if opts ~= nil then
             if opts.offset ~= nil then
                 offset = opts.offset
@@ -698,6 +733,12 @@ function box.schema.space.bless(space)
                 limit = opts.limit
             end
         end
+        return iterator, offset, limit
+    end
+
+    index_mt.select_ffi = function(index, key, opts)
+        local key, key_end = msgpackffi.encode_tuple(key)
+        local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
         if builtin.boxffi_select(port, index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
@@ -711,6 +752,14 @@ function box.schema.space.bless(space)
         end
         return ret
     end
+
+    index_mt.select_luac = function(index, key, opts)
+        local key = keify(key)
+        local iterator, offset, limit = check_select_opts(opts, #key == 0)
+        return internal.select(index.space_id, index.id, iterator,
+            offset, limit, key)
+    end
+
     index_mt.update = function(index, key, ops)
         return internal.update(index.space_id, index.id, keify(key), ops);
     end
@@ -729,6 +778,21 @@ function box.schema.space.bless(space)
         end
         return box.schema.index.alter(index.space_id, index.id, options)
     end
+
+    -- true if reading operations may yield
+    local read_yields = space.engine == 'sophia'
+    local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
+    for _, op in ipairs(read_ops) do
+        if read_yields then
+            -- use Lua/C implmenetation
+            index_mt[op] = index_mt[op .. "_luac"]
+        else
+            -- use FFI implementation
+            index_mt[op] = index_mt[op .. "_ffi"]
+        end
+    end
+    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
     --
     local space_mt = {}
     space_mt.len = function(space)

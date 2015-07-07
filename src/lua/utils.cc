@@ -97,6 +97,23 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename)
 }
 
 int
+luaL_cdef(struct lua_State *L, const char *what)
+{
+	int idx = lua_gettop(L);
+	/* This function calls ffi.cdef  */
+
+	/* Get ffi.typeof function */
+	luaL_loadstring(L, "return require('ffi').cdef");
+	lua_call(L, 0, 1);
+	/* FFI must exist */
+	assert(lua_gettop(L) == idx + 1 && lua_isfunction(L, idx + 1));
+	/* Push the argument to ffi.cdef */
+	lua_pushstring(L, what);
+	/* Call ffi.cdef() */
+	return lua_pcall(L, 1, 0, 0);
+}
+
+int
 luaL_setcdatagc(struct lua_State *L, int idx)
 {
 	if (idx < 0)

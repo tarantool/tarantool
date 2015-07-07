@@ -40,6 +40,14 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
+int
+lbox_error(lua_State *L)
+{
+	(void) L;
+	diag_last_error(&fiber()->diag)->raise();
+	return 0;
+}
+
 static int
 lbox_error_raise(lua_State *L)
 {
@@ -53,9 +61,8 @@ lbox_error_raise(lua_State *L)
 	int top = lua_gettop(L);
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
-		Exception *e = diag_last_error(&fiber()->diag);
-		if (e != NULL)
-			e->raise();
+		if (diag_last_error(&fiber()->diag))
+			lbox_error(L);
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
 		code = lua_tointeger(L, 2);

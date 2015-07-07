@@ -28,6 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <box/tuple.h>
+
 struct lua_State;
 struct txn;
 struct tuple;
@@ -36,7 +39,15 @@ struct tuple;
  * Push tuple on lua stack
  */
 void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
+lbox_pushtuple_noref(struct lua_State *L, struct tuple *tuple);
+
+static inline void
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	lbox_pushtuple_noref(L, tuple);
+	tuple_ref(tuple);
+}
 
 struct tuple *lua_istuple(struct lua_State *L, int narg);
 
