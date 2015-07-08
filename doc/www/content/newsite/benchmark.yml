@@ -80,5 +80,5 @@ blocks  :
       averaged over 8 consecutive test runs.
 
       Configuration files for the tested systems can be found
-      `on it's Github page <https://github.com/bigbes92/ycsb-expand-db/tree/master/confs>`_.
+      `on its Github page <https://github.com/bigbes92/ycsb-expand-db/tree/master/confs>`_.
 ...
