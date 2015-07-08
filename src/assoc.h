@@ -35,6 +35,8 @@ extern "C" {
 #define MH_UNDEF
 #endif
 
+#include "third_party/PMurHash.h"
+
 /*
  * Map: (i32) => (void *)
  */
@@ -52,6 +54,55 @@ struct mh_i32ptr_node_t {
 #define mh_cmp(a, b, arg) ((a->key) != (b->key))
 #define mh_cmp_key(a, b, arg) ((a) != (b->key))
 #include "salad/mhash.h"
+
+/*
+ * Map: (char * with length) => (void *)
+ */
+enum {
+	MH_STRN_HASH_SEED = 13U
+};
+
+static inline uint32_t
+mh_strn_hash(const char *str, size_t len)
+{
+	uint32_t h = MH_STRN_HASH_SEED;
+	uint32_t carry = 0;
+	PMurHash32_Process(&h, &carry, str, len);
+	return PMurHash32_Result(h, carry, len);
+}
+
+#define mh_name _strnptr
+struct mh_strnptr_key_t {
+	const char *str;
+	size_t len;
+	uint32_t hash;
+};
+#define mh_key_t struct mh_strnptr_key_t *
+
+struct mh_strnptr_node_t {
+	const char *str;
+	size_t len;
+	uint32_t hash;
+	void *val;
+};
+#define mh_node_t struct mh_strnptr_node_t
+
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) ((a)->len != (b)->len || \
+			    strncmp((a)->str, (b)->str, (a)->len))
+#define mh_cmp_key(a, b, arg) mh_cmp(a, b, arg)
+#include "salad/mhash.h"
+
+static inline mh_int_t
+mh_strnptr_find_inp(struct mh_strnptr_t *h, const char *str, size_t len)
+{
+	uint32_t hash = mh_strn_hash(str, len);
+	struct mh_strnptr_key_t key = {str, len, hash};
+	return mh_strnptr_find(h, &key, NULL);
+};
+
 
 #if defined(__cplusplus)
 } /* extern "C" */

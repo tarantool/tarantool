@@ -139,12 +139,8 @@ func_cache_find(uint32_t fid)
 	return func;
 }
 
-static inline struct func *
-func_by_name(const char *name, uint32_t name_len)
-{
-	uint32_t fid = schema_find_id(SC_FUNC_ID, 2, name, name_len);
-	return func_by_id(fid);
-}
+struct func *
+func_by_name(const char *name, uint32_t name_len);
 
 
 /**
