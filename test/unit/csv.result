@@ -3,58 +3,71 @@
 ||	
 |1|	|2|	|3|	
 |123|	
+valid: yes
 	*** test1: done ***
  	*** test2 ***
 |123|	|456|	|abcac|	|'multiword field 4'|	
 |none|	|none|	|0|	
 ||	||	||	
 ||	||	||	
+valid: yes
 	*** test2: done ***
  	*** test3 ***
 |1|	||	|2|	
+valid: yes
 	*** test3: done ***
  	*** test4 ***
 |123|	|5|	|92|	|0|	|0|	
 |1|	|12  34|	|56|	|quote , |	|66|	
 |ok|	
+valid: yes
 	*** test4: done ***
  	*** test5 ***
 |abc|	|longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong|	|0|	
 |123|	|456|	||	
 |0|	||	||	
+valid: yes
 	*** test5: done ***
+ 	*** test6 ***
+||	
+||	
+|abc|	
+|c"|	|d|	|de|	
+||	
+|k|	
+|e|	
+||	
+||	
+| |	
+
+valid: NO
+	*** test6: done ***
  	*** test_chunk ***
 tail: ok
 	*** test_chunk: done ***
  	*** big_chunk_separated_test ***
-line_cnt=10000, fieldsizes_cnt=66600000, 66600000
+line_cnt=10000, fieldsizes_cnt=1920000, 1920000
 	*** big_chunk_separated_test: done ***
  	*** random_generated_test ***
 ||	
-| ba|	
-|a|	
-|a|	||	
-||	
-|a|	
-|b"|	
+| ba aa, 
+|	
+|a
+b|	
 |aa|	
 |b|	||	
 ||	||	
-|,|	
-||	
-||	|a|	||	|a|	
-||	
-||	
+|,
+|	
+||	|a|	||	|a
+
+ |	
 |ba|	
 ||	|b  a|	||	
 ||	|"a|	
 |b|	
-||	|,a|	
-||	|a|	||	
-||	
-| a,b|	
-||	|b|	
-|aa|	
+||	|,a,a ,c a|	|b|	
+||	|baa|	
 |b|	
 ||	
 ||	
@@ -63,51 +76,79 @@ line_cnt=10000, fieldsizes_cnt=66600000, 66600000
 |c|	||	
 ||	
 |aa|	
-||	
-|ab|	
-|ab|	||	
-| b|	
-|,   ,,|	
-||	
-|bab|	
-|b|	
-|a|	
-|a|	
+|
+ abab, b|	
+|,   ,,babb
+a
+a|	
 |a|	|"|	||	
+|a
+
+ |	
+||	
+|a|	
 |a|	
 ||	
-||	
-||	
-|a|	
-|a|	
-||	
-| ,baab ,a|	
-|bb|	||	
-||	
-||	||	
-|b|	||	|b|	
-||	
+|aa a" ,baab ,a bb   , ,b,,  b
+|	
 |b|	
 ||	
 |b|	
 ||	|ab|	
 |aa|	
-||	
-|ba,b, caa|	
-|b|	
-||	|"|	||	
+|
+b aba|	|b|	|
+b abaaa 
+b|	
+||	|b"|	||	
 |ba|	
-| |	
-||	
-|a|	
-|b|	
-|bbba,|	
-||	
-||	
-||	|a|	|b|	|a|	|b|	||	
-||	
-||	
-||	
-|b|	
+| 
+
+a 
+bbbbba|	valid: yes
 	*** random_generated_test: done ***
+ 	*** common_test ***
+|first|	|last|	|address|	|city|	|zip|	
+|John|	|Doe|	|120 any st.|	|Anytown, WW|	|08123|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|a|	|b|	|c|	
+|1|	|"|	|""|	
+|2|	|3|	|4|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|a|	|b|	
+|1|	|ha "ha" ha|	
+|3|	|4|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|key|	|val|	
+|1|	|{"type": "Point", "coordinates": [102.0, 0.5]}|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|a|	|b|	|c|	
+|1|	|2|	|3|	
+|Once upon 
+a time|	|5|	|6|	
+|7|	|8|	|9|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|a|	|b|	
+|1|	|ha
+"ha"
+ha|	
+|3|	|4|	
+valid: yes
+	*** common_test: done ***
+ 	*** common_test ***
+|a|	|b|	|c|	
+|1|	|2|	|3|	
+|4|	|5|	|а нет ли ошибок?|	
+valid: yes
+	*** common_test: done ***
  

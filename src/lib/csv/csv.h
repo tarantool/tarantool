@@ -13,16 +13,24 @@ typedef void (*csv_emit_field_t)(void *ctx, const char *field, const char *end);
 struct csv
 {
 	void *emit_ctx;
-    csv_emit_row_t emit_row;
-    csv_emit_field_t emit_field;
-    int csv_delim, csv_quote;
+	csv_emit_row_t emit_row;
+	csv_emit_field_t emit_field;
+	char csv_delim;
+	char csv_quote;
+	int csv_invalid;
 
-    char *buf;
-    size_t buf_len;
-    void *(*csv_realloc)(void*, size_t);
-    void (*csv_free)(void*);
+	void *(*csv_realloc)(void*, size_t);
 };
 
+//parser options
+enum {
+	CSV_OPT_DELIMITER,
+	CSV_OPT_QUOTE,
+	CSV_OPT_REALLOC,
+	CSV_OPT_EMIT_FIELD,
+	CSV_OPT_EMIT_ROW,
+	CSV_OPT_CTX
+};
 void
 csv_create(struct csv *csv);
 
@@ -33,11 +41,10 @@ csv_destroy(struct csv *csv);
  * Set a parser option.
  */
 void
-csv_setopt(struct csv *csv, const char *optname, void *optval);
+csv_setopt(struct csv *csv, int opt, ...);
 
 /**
  * Parse input and call emit_row/emit_line.
- *
  * @return the pointer to the unprocessed tail
  */
 const char *
@@ -57,6 +64,12 @@ csv_parse(struct csv *csv, const char *s, const char *end);
  */
 int
 csv_snprintf(struct csv *csv, FILE *f, const char *format, ...);
+
+/**
+ * if quote not closed returns 0
+ */
+int
+csv_isvalid(struct csv *csv);
 
 #if defined(__cplusplus)
 }
