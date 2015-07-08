@@ -20,7 +20,7 @@ To call another DBMS from Tarantool, the essential requirements are: another
 DBMS, and Tarantool.
 
 It will be necessary to build Tarantool from source, as described in
-“ :ref:`building-from-source` ”
+“:ref:`building-from-source`”.
 
 .. _Tarantool Plugin API wiki page: https://github.com/tarantool/tarantool/wiki/Plugin-API
 
@@ -34,8 +34,9 @@ which work best when the application can work on both SQL and Tarantool inside
 the same Lua routine.
 
 The connection method is
-``box.net.sql.connect('mysql'|'pg', host, port, user, password, database)``.
-The methods for select/insert/etc. are the same as the ones in the net.box package.
+:samp:`box.net.sql.connect('mysql'|'pg', {host}, {port}, {user}, {password}, {database})`.
+The methods for select/insert/etc. are the same as the ones in the
+:ref:`net.box <package_net_box>` package.
 
 
 ===========================================================
@@ -49,123 +50,121 @@ The example was run on a Linux machine where the base directory had a copy of
 the Tarantool source on ~/tarantool, and a copy of MySQL on ~/mysql-5.5. The
 mysqld server is already running on the local host 127.0.0.1.
 
-::
-
-    # Check that the include subdirectory exists by looking for .../include/mysql.h.
-    # (If this fails, there's a chance that it's in .../include/mysql/mysql.h instead.)
-    $ [ -f ~/mysql-5.5/include/mysql.h ] && echo "OK" || echo "Error"
-    OK
-
-    # Check that the library subdirectory exists and has the necessary .so file.
-    $ [ -f ~/mysql-5.5/lib/libmysqlclient.so ] && echo "OK" || echo "Error"
-    OK
-
-    # Check that the mysql client can connect using some factory defaults:
-    # port = 3306, user = 'root', user password = '', database = 'test'.
-    # These can be changed, provided one uses the changed values in
-    # all places.
-    $ ~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --password= --database=test
-    Welcome to the MySQL monitor.  Commands end with ; or \g.
-    Your MySQL connection id is 25
-    Server version: 5.5.35 MySQL Community Server (GPL)
-    ...
-    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
-
-    # Insert a row in database test, and quit.
-    mysql> CREATE TABLE IF NOT EXISTS test (s1 INT, s2 VARCHAR(50));
-    Query OK, 0 rows affected (0.13 sec)
-    mysql> INSERT INTO test.test VALUES (1,'MySQL row');
-    Query OK, 1 row affected (0.02 sec)
-    mysql> QUIT
-    Bye
-
-    # Build the Tarantool server. Make certain that "cmake" gets the right
-    # paths for the MySQL include directory and the MySQL libmysqlclient
-    # library which were checked earlier.
-    $ cd ~/tarantool
-    $ make clean
-    $ rm CMakeCache.txt
-    $ cmake . -DWITH_MYSQL=on -DMYSQL_INCLUDE_DIR=~/mysql-5.5/include\
-    >  -DMYSQL_LIBRARIES=~/mysql-5.5/lib/libmysqlclient.so
-    ...
-    -- Found MySQL includes: ~/mysql-5.5/include/mysql.h
-    -- Found MySQL library: ~/mysql-5.5/lib/libmysqlclient.so
-    ...
-    -- Configuring done
-    -- Generating done
-    -- Build files have been written to: ~/tarantool
-    $ make
-    ...
-    Scanning dependencies of target mysql
-    [ 79%] Building CXX object src/module/mysql/CMakeFiles/mysql.dir/mysql.cc.o
-    Linking CXX shared library libmysql.so
-    [ 79%] Built target mysql
-    ...
-    [100%] Built target man
-    $
-
-    # The MySQL module should now be in ./src/module/mysql/mysql.so.
-    # If a "make install" had been done, then mysql.so would be in a
-    # different place, for example
-    # /usr/local/lib/x86_64-linux-gnu/tarantool/box/net/mysql.so.
-    # In that case there should be additional cmake options such as
-    # -DCMAKE_INSTALL_LIBDIR and -DCMAKE_INSTALL_PREFIX.
-    # For this example we assume that "make install" is not done.
-
-    # Change directory to a directory which can be used for temporary tests.
-    # For this example we assume that the name of this directory is
-    # /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever
-    # is the actual base directory for the machine that's used for this test.)
-    # Now, to help tarantool find the essential mysql.so file, execute these lines:
-    cd /home/pgulutzan/tarantool_sandbox
-    mkdir box
-    mkdir box/net
-    cp ~/tarantool/src/module/mysql/mysql.so ./box/net/mysql.so
-
-    # Start the Tarantool server. Do not use a Lua initialization file.
-
-    $ ~/tarantool/src/tarantool
-    ~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b
-    type 'help' for interactive help
-    tarantool>  box.cfg{}
-    ...
-    # Enter the following lines on the prompt (again, change "/home/pgulutzan"
-    # to whatever the real directory is that contains tarantool):
-    package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
-    require("sql")
-    if type(box.net.sql) ~= "table" then error("net.sql load failed") end
-    require("box.net.mysql")
-    # ... Make sure that tarantool replies "true" for both calls to "require()".
-
-    # Create a Lua function that will connect to the MySQL server,
-    # (using some factory default values for the port and user and password),
-    # retrieve one row, and display the row.
-    # For explanations of the statement types used here, read the
-    # Lua tutorial earlier in the Tarantool user manual.
-    tarantool> console = require('console'); console.delimiter('!')
-    tarantool> function mysql_select ()
-            ->   local dbh = box.net.sql.connect(
-            ->       'mysql', '127.0.0.1', 3306, 'root', '', 'test')
-            ->   local test = dbh:select('SELECT * FROM test WHERE s1 = 1')
-            ->    local row = ''
-            ->   for i, card in pairs(test) do
-            ->     row = row .. card.s2 .. ' '
-            ->     end
-            ->   return row
-            ->   end!
-    ---
-    ...
-    tarantool> console.delimiter('')!
-    tarantool>
-
-    # Execute the Lua function.
-    tarantool> mysql_select()
-    ---
-    - 'MySQL row '
-    ...
-    # Observe the result. It contains "MySQL row".
-    # So this is the row that was inserted into the MySQL database.
-    # And now it's been selected with the Tarantool client.
+    | :codenormal:`# Check that the include subdirectory exists by looking for .../include/mysql.h.`
+    | :codenormal:`# (If this fails, there's a chance that it's in .../include/mysql/mysql.h instead.)`
+    | :codenormal:`$` :codebold:`[ -f ~/mysql-5.5/include/mysql.h ] && echo "OK" || echo "Error"`
+    | :codenormal:`OK`
+    |
+    | :codenormal:`# Check that the library subdirectory exists and has the necessary .so file.`
+    | :codenormal:`$` :codebold:`[ -f ~/mysql-5.5/lib/libmysqlclient.so ] && echo "OK" || echo "Error"`
+    | :codenormal:`OK`
+    |
+    | :codenormal:`# Check that the mysql client can connect using some factory defaults:`
+    | :codenormal:`# port = 3306, user = 'root', user password = '', database = 'test'.`
+    | :codenormal:`# These can be changed, provided one uses the changed values in`
+    | :codenormal:`# all places.`
+    | :codenormal:`$` :codebold:`~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --password= --database=test`
+    | :codenormal:`Welcome to the MySQL monitor.  Commands end with ; or \\g.`
+    | :codenormal:`Your MySQL connection id is 25`
+    | :codenormal:`Server version: 5.5.35 MySQL Community Server (GPL)`
+    | :codenormal:`...`
+    | :codenormal:`Type 'help;' or '\\h' for help. Type '\\c' to clear the current input statement.`
+    |
+    | :codenormal:`# Insert a row in database test, and quit.`
+    | :codenormal:`mysql>` :codebold:`CREATE TABLE IF NOT EXISTS test (s1 INT, s2 VARCHAR(50));`
+    | :codenormal:`Query OK, 0 rows affected (0.13 sec)`
+    | :codenormal:`mysql>` :codebold:`INSERT INTO test.test VALUES (1,'MySQL row');`
+    | :codenormal:`Query OK, 1 row affected (0.02 sec)`
+    | :codenormal:`mysql>` :codebold:`QUIT`
+    | :codenormal:`Bye`
+    |
+    | :codenormal:`# Build the Tarantool server. Make certain that "cmake" gets the right`
+    | :codenormal:`# paths for the MySQL include directory and the MySQL libmysqlclient`
+    | :codenormal:`# library which were checked earlier.`
+    | :codenormal:`$` :codebold:`cd ~/tarantool`
+    | :codenormal:`$` :codebold:`make clean`
+    | :codenormal:`$` :codebold:`rm CMakeCache.txt`
+    | :codenormal:`$` :codebold:`cmake . -DWITH_MYSQL=on -DMYSQL_INCLUDE_DIR=~/mysql-5.5/include\\`
+    | :codenormal:`>` |nbsp| |nbsp| :codebold:`-DMYSQL_LIBRARIES=~/mysql-5.5/lib/libmysqlclient.so`
+    | :codenormal:`...`
+    | :codenormal:`-- Found MySQL includes: ~/mysql-5.5/include/mysql.h`
+    | :codenormal:`-- Found MySQL library: ~/mysql-5.5/lib/libmysqlclient.so`
+    | :codenormal:`...`
+    | :codenormal:`-- Configuring done`
+    | :codenormal:`-- Generating done`
+    | :codenormal:`-- Build files have been written to: ~/tarantool`
+    | :codenormal:`$` :codebold:`make`
+    | :codenormal:`...`
+    | :codenormal:`Scanning dependencies of target mysql`
+    | :codenormal:`[ 79%] Building CXX object src/module/mysql/CMakeFiles/mysql.dir/mysql.cc.o`
+    | :codenormal:`Linking CXX shared library libmysql.so`
+    | :codenormal:`[ 79%] Built target mysql`
+    | :codenormal:`...`
+    | :codenormal:`[100%] Built target man`
+    | :codenormal:`$`
+    |
+    | :codenormal:`# The MySQL module should now be in ./src/module/mysql/mysql.so.`
+    | :codenormal:`# If a "make install" had been done, then mysql.so would be in a`
+    | :codenormal:`# different place, for example`
+    | :codenormal:`# /usr/local/lib/x86_64-linux-gnu/tarantool/box/net/mysql.so.`
+    | :codenormal:`# In that case there should be additional cmake options such as`
+    | :codenormal:`# -DCMAKE_INSTALL_LIBDIR and -DCMAKE_INSTALL_PREFIX.`
+    | :codenormal:`# For this example we assume that "make install" is not done.`
+    |
+    | :codenormal:`# Change directory to a directory which can be used for temporary tests.`
+    | :codenormal:`# For this example we assume that the name of this directory is`
+    | :codenormal:`# /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever`
+    | :codenormal:`# is the actual base directory for the machine that's used for this test.)`
+    | :codenormal:`# Now, to help tarantool find the essential mysql.so file, execute these lines:`
+    | :codebold:`cd /home/pgulutzan/tarantool_sandbox`
+    | :codebold:`mkdir box`
+    | :codebold:`mkdir box/net`
+    | :codebold:`cp ~/tarantool/src/module/mysql/mysql.so ./box/net/mysql.so`
+    |
+    | :codenormal:`# Start the Tarantool server. Do not use a Lua initialization file.`
+    |
+    | :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+    | :codenormal:`~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b`
+    | :codenormal:`type 'help' for interactive help`
+    | :codenormal:`tarantool>` :codebold:`box.cfg{}`
+    | :codenormal:`...`
+    | :codenormal:`# Enter the following lines on the prompt (again, change "/home/pgulutzan"`
+    | :codenormal:`# to whatever the real directory is that contains tarantool):`
+    | :codenormal:`package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path`
+    | :codenormal:`require("sql")`
+    | :codenormal:`if type(box.net.sql) ~= "table" then error("net.sql load failed") end`
+    | :codenormal:`require("box.net.mysql")`
+    | :codenormal:`# ... Make sure that tarantool replies "true" for both calls to "require()".`
+    |
+    | :codenormal:`# Create a Lua function that will connect to the MySQL server,`
+    | :codenormal:`# (using some factory default values for the port and user and password),`
+    | :codenormal:`# retrieve one row, and display the row.`
+    | :codenormal:`# For explanations of the statement types used here, read the`
+    | :codenormal:`# Lua tutorial earlier in the Tarantool user manual.`
+    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`tarantool>` :codebold:`function mysql_select ()`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`local dbh = box.net.sql.connect(`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`'mysql', '127.0.0.1', 3306, 'root', '', 'test')`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`local test = dbh:select('SELECT * FROM test WHERE s1 = 1')`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`local row = ''`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`for i, card in pairs(test) do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`row = row .. card.s2 .. ' '`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`return row`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`end!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | :codenormal:`tarantool>`
+    |
+    | :codenormal:`# Execute the Lua function.`
+    | :codenormal:`tarantool>` :codebold:`mysql_select()`
+    | :codenormal:`---`
+    | :codenormal:`- 'MySQL row '`
+    | :codenormal:`...`
+    | :codenormal:`# Observe the result. It contains "MySQL row".`
+    | :codenormal:`# So this is the row that was inserted into the MySQL database.`
+    | :codenormal:`# And now it's been selected with the Tarantool client.`
 
 ===========================================================
                   PostgreSQL Example
@@ -175,9 +174,7 @@ This example assumes that a recent version of PostgreSQL has been installed.
 The PostgreSQL library and include files are also necessary. On Ubuntu they
 can be installed with
 
-.. code-block:: bash
-
-    $ sudo apt-get install libpq-dev
+    | :codebold:`$ sudo apt-get install libpq-dev`
 
 If that works, then cmake will find the necessary files without requiring any
 special user input. However, because not all platforms are alike, for this
@@ -189,108 +186,106 @@ The example was run on a Linux machine where the base directory had a copy of
 the Tarantool source on ~/tarantool, and a copy of PostgreSQL on /usr. The
 postgres server is already running on the local host 127.0.0.1.
 
-::
-
-    # Check that the include subdirectory exists
-    # by looking for /usr/include/postgresql/libpq-fe-h.
-    $ [ -f /usr/include/postgresql/libpq-fe.h ] && echo "OK" || echo "Error"
-    OK
-
-    # Check that the library subdirectory exists and has the necessary .so file.
-    $ [ -f /usr/lib/libpq.so ] && echo "OK" || echo "Error"
-    OK
-
-    # Check that the psql client can connect using some factory defaults:
-    # port = 5432, user = 'postgres', user password = 'postgres', database = 'postgres'.
-    # These can be changed, provided one changes them in all places.
-    # Insert a row in database postgres, and quit.
-    $ psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
-    Password for user postgres:
-    psql (9.3.0, server 9.3.2)
-    SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
-    Type "help" for help.
-
-    postgres=# CREATE TABLE test (s1 INT, s2 VARCHAR(50));
-    CREATE TABLE
-    postgres=# INSERT INTO test VALUES (1,'PostgreSQL row');
-    INSERT 0 1
-    postgres=# \q
-    $
-
-    # Build the Tarantool server. Make certain that "cmake" gets the right
-    # paths for the PostgreSQL include directory and the PostgreSQL libpq
-    # library which were checked earlier.
-    $ cd ~/tarantool
-    $ make clean
-    $ rm CMakeCache.txt
-    $ cmake . -DWITH_POSTGRESQL=on -DPostgreSQL_LIBRARY=/usr/lib/libpq.so\
-    >  -DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql
-    ...
-    -- Found PostgreSQL: /usr/lib/libpq.so (found version "9.3.2")
-    ...
-    -- Configuring done
-    -- Generating done
-    -- Build files have been written to: ~/tarantool
-    $ make
-    ...
-    [ 79%] Building CXX object src/plugin/pg/CMakeFiles/pg.dir/pg.cc.o
-    Linking CXX shared library libpg.so
-    [ 79%] Built target pg
-    ...
-    [100%] Built target man
-    $
-
-    # Change directory to a directory which can be used for temporary tests.
-    # For this example we assume that the name of this directory is
-    # /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever
-    # is the actual base directory for the machine that's used for this test.)
-    # Now, to help tarantool find the essential mysql.so file, execute these lines:
-    cd /home/pgulutzan/tarantool_sandbox
-    mkdir box
-    mkdir box/net
-    cp ~/tarantool/src/module/pg/pg.so ./box/net/pg.so
-
-    # Start the Tarantool server. Do not use a Lua initialization file.
-
-    $ ~/tarantool/src/tarantool
-    ~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b
-    type 'help' for interactive help
-    tarantool>   box.cfg{}
-
-    # Enter the following lines on the prompt (again, change "/home/pgulutzan"
-    # to whatever the real directory is that contains tarantool):
-    package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
-    require("sql")
-    if type(box.net.sql) ~= "table" then error("net.sql load failed") end
-    require("box.net.pg")
-    # ... Make sure that tarantool replies "true" for the calls to "require()".
-
-    # Create a Lua function that will connect to the PostgreSQL server,
-    # retrieve one row, and display the row.
-    # For explanations of the statement types used here, read the
-    # Lua tutorial in the Tarantool user manual.
-    tarantool> console = require('console'); console.delimiter('!')
-    tarantool> function postgresql_select ()
-            ->   local dbh = box.net.sql.connect(
-            ->       'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')
-            ->   local test = dbh:select('SELECT * FROM test WHERE s1 = 1')
-            ->   local row = ''
-            ->   for i, card in pairs(test) do
-            ->     row = row .. card.s2 .. ' '
-            ->     end
-             >   return row
-            ->   end!
-    ---
-    ...
-    tarantool> console.delimiter('')!
-    tarantool>
-
-    # Execute the Lua function.
-    tarantool> postgresql_select()
-    ---
-    - 'PostgreSQL row '
-    ...
-
-    # Observe the result. It contains "PostgreSQL row".
-    # So this is the row that was inserted into the PostgreSQL database.
-    # And now it's been selected with the Tarantool client.
+    | :codenormal:`# Check that the include subdirectory exists`
+    | :codenormal:`# by looking for /usr/include/postgresql/libpq-fe-h.`
+    | :codenormal:`$` :codebold:`[ -f /usr/include/postgresql/libpq-fe.h ] && echo "OK" || echo "Error"`
+    | :codenormal:`OK`
+    |
+    | :codenormal:`# Check that the library subdirectory exists and has the necessary .so file.`
+    | :codenormal:`$` :codebold:`[ -f /usr/lib/libpq.so ] && echo "OK" || echo "Error"`
+    | :codenormal:`OK`
+    |
+    | :codenormal:`# Check that the psql client can connect using some factory defaults:`
+    | :codenormal:`# port = 5432, user = 'postgres', user password = 'postgres', database = 'postgres'.`
+    | :codenormal:`# These can be changed, provided one changes them in all places.`
+    | :codenormal:`# Insert a row in database postgres, and quit.`
+    | :codenormal:`$` :codebold:`psql -h 127.0.0.1 -p 5432 -U postgres -d postgres`
+    | :codenormal:`Password for user postgres:`
+    | :codenormal:`psql (9.3.0, server 9.3.2)`
+    | :codenormal:`SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)`
+    | :codenormal:`Type "help" for help.`
+    |
+    | :codenormal:`postgres=#` :codebold:`CREATE TABLE test (s1 INT, s2 VARCHAR(50));`
+    | :codenormal:`CREATE TABLE`
+    | :codenormal:`postgres=#` :codebold:`INSERT INTO test VALUES (1,'PostgreSQL row');`
+    | :codenormal:`INSERT 0 1`
+    | :codenormal:`postgres=#` :codebold:`\\q`
+    | :codenormal:`$`
+    |
+    | :codenormal:`# Build the Tarantool server. Make certain that "cmake" gets the right`
+    | :codenormal:`# paths for the PostgreSQL include directory and the PostgreSQL libpq`
+    | :codenormal:`# library which were checked earlier.`
+    | :codenormal:`$` :codebold:`cd ~/tarantool`
+    | :codenormal:`$` :codebold:`make clean`
+    | :codenormal:`$` :codebold:`rm CMakeCache.txt`
+    | :codenormal:`$` :codebold:`cmake . -DWITH_POSTGRESQL=on -DPostgreSQL_LIBRARY=/usr/lib/libpq.so\\`
+    | :codenormal:`>` |nbsp| :codebold:`-DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql`
+    | :codenormal:`...`
+    | :codenormal:`-- Found PostgreSQL: /usr/lib/libpq.so (found version "9.3.2")`
+    | :codenormal:`...`
+    | :codenormal:`-- Configuring done`
+    | :codenormal:`-- Generating done`
+    | :codenormal:`-- Build files have been written to: ~/tarantool`
+    | :codenormal:`$` :codebold:`make`
+    | :codenormal:`...`
+    | :codenormal:`[ 79%] Building CXX object src/plugin/pg/CMakeFiles/pg.dir/pg.cc.o`
+    | :codenormal:`Linking CXX shared library libpg.so`
+    | :codenormal:`[ 79%] Built target pg`
+    | :codenormal:`...`
+    | :codenormal:`[100%] Built target man`
+    | :codenormal:`$`
+    |
+    | :codenormal:`# Change directory to a directory which can be used for temporary tests.`
+    | :codenormal:`# For this example we assume that the name of this directory is`
+    | :codenormal:`# /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever`
+    | :codenormal:`# is the actual base directory for the machine that's used for this test.)`
+    | :codenormal:`# Now, to help tarantool find the essential mysql.so file, execute these lines:`
+    | :codebold:`cd /home/pgulutzan/tarantool_sandbox`
+    | :codebold:`mkdir box`
+    | :codebold:`mkdir box/net`
+    | :codebold:`cp ~/tarantool/src/module/pg/pg.so ./box/net/pg.so`
+    |
+    | :codenormal:`# Start the Tarantool server. Do not use a Lua initialization file.`
+    |
+    | :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+    | :codenormal:`~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b`
+    | :codenormal:`type 'help' for interactive help`
+    | :codenormal:`tarantool>` :codebold:`box.cfg{}`
+    |
+    | :codenormal:`# Enter the following lines on the prompt (again, change "/home/pgulutzan"`
+    | :codenormal:`# to whatever the real directory is that contains tarantool):`
+    | :codenormal:`package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path`
+    | :codenormal:`require("sql")`
+    | :codenormal:`if type(box.net.sql) ~= "table" then error("net.sql load failed") end`
+    | :codenormal:`require("box.net.pg")`
+    | :codenormal:`# ... Make sure that tarantool replies "true" for the calls to "require()".`
+    |
+    | :codenormal:`# Create a Lua function that will connect to the PostgreSQL server,`
+    | :codenormal:`# retrieve one row, and display the row.`
+    | :codenormal:`# For explanations of the statement types used here, read the`
+    | :codenormal:`# Lua tutorial in the Tarantool user manual.`
+    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`tarantool>` :codebold:`function postgresql_select ()`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local dbh = box.net.sql.connect(`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local test = dbh:select('SELECT * FROM test WHERE s1 = 1')`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local row = ''`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for i, card in pairs(test) do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`row = row .. card.s2 .. ' '`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return row`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | :codenormal:`tarantool>`
+    |
+    | :codenormal:`# Execute the Lua function.`
+    | :codenormal:`tarantool>` :codebold:`postgresql_select()`
+    | :codenormal:`---`
+    | :codenormal:`- 'PostgreSQL row '`
+    | :codenormal:`...`
+    |
+    | :codenormal:`# Observe the result. It contains "PostgreSQL row".`
+    | :codenormal:`# So this is the row that was inserted into the PostgreSQL database.`
+    | :codenormal:`# And now it's been selected with the Tarantool client.`

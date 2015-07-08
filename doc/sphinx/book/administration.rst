@@ -87,7 +87,7 @@ sensitive so ``insert`` and ``Insert`` are not the same thing.
 String literals are: Any sequence of zero or more characters enclosed in
 single quotes. Double quotes are legal but single quotes are preferred.
 Enclosing in double square brackets is good for multi-line strings as
-described in `Lua documentation`_. Examples: 'Hello, world', 'A', [[A\B!]].
+described in `Lua documentation`_. Examples: 'Hello, world', 'A', [[A\\B!]].
 
 .. _Lua documentation: http://www.lua.org/pil/2.4.html
 
