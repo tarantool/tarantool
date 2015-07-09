@@ -225,7 +225,8 @@ fiber_join(struct fiber *fiber)
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
 	Exception *e = diag_last_error(&fiber()->diag);
-	if (e != NULL && type_cast(FiberCancelException, e))
+	/** Raise exception again, unless it's FiberCancelException */
+	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
 		e->raise();
 	fiber_testcancel();
 }
@@ -707,7 +708,7 @@ cord_costart_thread_func(void *arg)
 	}
 	diag_move(&f->diag, &fiber()->diag);
 	Exception *e = diag_last_error(&fiber()->diag);
-	if (e != NULL && type_cast(FiberCancelException, e))
+	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
 		e->raise();
 
 	return NULL;

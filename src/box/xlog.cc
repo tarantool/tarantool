@@ -75,7 +75,9 @@ XlogError::XlogError(const struct type *type, const char *file, unsigned line,
 	va_end(ap);
 }
 
-const struct type type_XlogGapError = make_type("XlogGapError", &type_Exception);
+const struct type type_XlogGapError =
+	make_type("XlogGapError", &type_XlogError);
+
 XlogGapError::XlogGapError(const char *file, unsigned line,
 			   const struct vclock *from,
 			   const struct vclock *to)

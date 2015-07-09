@@ -79,15 +79,15 @@ Exception::~Exception()
 
 Exception::Exception(const struct type *type_arg, const char *file,
 	unsigned line)
-	: Object(), type(type_arg), m_ref(0) {
+	:type(type_arg), m_ref(0) {
 	if (m_file != NULL) {
 		snprintf(m_file, sizeof(m_file), "%s", file);
 		m_line = line;
 	} else {
-		m_file[0] = 0;
+		m_file[0] = '\0';
 		m_line = 0;
 	}
-	m_errmsg[0] = 0;
+	m_errmsg[0] = '\0';
 	if (this == &out_of_memory) {
 		/* A special workaround for out_of_memory static init */
 		out_of_memory.m_ref = 1;
@@ -108,9 +108,11 @@ static const struct method systemerror_methods[] = {
 
 const struct type type_SystemError = make_type("SystemError", &type_Exception,
 	systemerror_methods);
-SystemError::SystemError(const struct type *type, const char *file, unsigned line)
+
+SystemError::SystemError(const struct type *type,
+			 const char *file, unsigned line)
 	:Exception(type, file, line),
-	  m_errno(errno)
+	m_errno(errno)
 {
 	/* nothing */
 }
@@ -149,7 +151,8 @@ SystemError::log() const
 }
 
 const struct type type_OutOfMemory =
-	make_type("OutOfMemory", &type_Exception);
+	make_type("OutOfMemory", &type_SystemError);
+
 OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 size_t amount, const char *allocator,
 			 const char *object)

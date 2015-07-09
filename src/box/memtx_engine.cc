@@ -782,7 +782,7 @@ MemtxEngine::waitCheckpoint()
 	} catch (Exception *e) {
 		e->log();
 		result = -1;
-		SystemError *se = dynamic_cast<SystemError *>(e);
+		SystemError *se = type_cast(SystemError, e);
 		if (se)
 			errno = se->errnum();
 	}
