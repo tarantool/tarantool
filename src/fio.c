@@ -183,15 +183,14 @@ fio_batch_start(struct fio_batch *batch, long max_rows)
 }
 
 void
-fio_batch_add(struct fio_batch *batch, const struct iovec *iov, int iovcnt)
+fio_batch_add(struct fio_batch *batch, int iovcnt)
 {
-	assert(!fio_batch_has_space(batch, iovcnt));
 	assert(iovcnt > 0);
 	assert(batch->max_rows > 0);
-	for (int i = 0; i < iovcnt; i++) {
-		batch->iov[batch->iovcnt++] = iov[i];
-		batch->bytes += iov[i].iov_len;
-	}
+	int i = batch->iovcnt;
+	batch->iovcnt += iovcnt;
+	for (; i < batch->iovcnt; i++)
+		batch->bytes += batch->iov[i].iov_len;
 	bit_set(batch->rowflag, batch->iovcnt);
 	batch->rows++;
 }

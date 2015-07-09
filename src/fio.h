@@ -178,19 +178,27 @@ fio_batch_alloc(int max_iov);
 void
 fio_batch_start(struct fio_batch *batch, long max_rows);
 
-static inline bool
-fio_batch_has_space(struct fio_batch *batch, int iovcnt)
-{
-	return batch->iovcnt + iovcnt > batch->max_iov ||
-		batch->rows >= batch->max_rows;
-}
-
 /**
  * Add a row to a batch.
+ * @pre iovcnt is the number of iov elements previously 
+ *      booked with fio_batch_book() and filled with data
  * @pre fio_batch_is_full() == false
  */
 void
-fio_batch_add(struct fio_batch *batch, const struct iovec *iov, int iovcnt);
+fio_batch_add(struct fio_batch *batch, int iovcnt);
+
+/**
+ * Get a pointer to struct iov * in the batch
+ * beyond batch->iovcnt + offset. Ensure
+ * the iov has at least 'count' elements.
+ */
+static inline struct iovec *
+fio_batch_book(struct fio_batch *batch, int offset, int count)
+{
+	if (batch->iovcnt + offset + count <= batch->max_iov)
+		return batch->iov + batch->iovcnt + offset;
+	return 0;
+}
 
 /**
  * Write all rows stacked into the batch.

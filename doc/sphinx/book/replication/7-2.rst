@@ -1,5 +1,6 @@
-.. code-block:: lua
+.. raw:: html
 
+    <pre>
     ... ...
     tarantool> s:insert{2,'Tuple inserted on Terminal #2'}
     ---
@@ -22,4 +23,6 @@
     tarantool>
     2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
     2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 I> authenticated
+    </pre>
+
 

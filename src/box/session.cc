@@ -42,6 +42,7 @@ struct mempool session_pool;
 
 RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
+RLIST_HEAD(session_on_auth);
 
 static inline  uint32_t
 sid_max()
@@ -137,11 +138,18 @@ session_run_on_disconnect_triggers(struct session *session)
 void
 session_run_on_connect_triggers(struct session *session)
 {
+	/* Run on_connect with admin credentals */
 	struct fiber *fiber = fiber();
 	fiber_set_session(fiber, session);
 	fiber_set_user(fiber, &admin_credentials);
 	trigger_run(&session_on_connect, NULL);
 	/* Set session user to guest, until it is authenticated. */
+}
+
+void
+session_run_on_auth_triggers(const char *user_name)
+{
+	trigger_run(&session_on_auth, (void *)user_name);
 }
 
 void

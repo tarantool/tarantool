@@ -17,12 +17,11 @@ A Tarantool server process title follows the following naming scheme:
 * **running** -- ordinary node "ready to accept requests",
 * **loading** -- ordinary node recovering from old snap and wal files,
 * **orphan** -- not in a cluster,
-* **hot_standby** -- see section :confval:`local_hot_standby`,
+* **hot_standby** -- see section :ref:`local hot standby <book-cfg-local_hot_standy>`,
 * **dumper + process-id** -- saving a snapshot,
 
 For example:
 
-.. code-block:: bash
+    | :codenormal:`$` :codebold:`ps -A -f | grep tarantool`
+    | :codenormal:`1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running`
 
-    $ ps -A -f | grep tarantool
-    1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running

@@ -254,6 +254,8 @@ t;
   - 'box.error.TUPLE_NOT_FOUND : 4'
   - 'box.error.DROP_USER : 44'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
+  - 'box.error.injection : table: <address>
+  - 'box.error.FUNCTION_LANGUAGE : 100'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.FIELD_TYPE : 23'
@@ -281,7 +283,7 @@ t;
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.NO_ACTIVE_TRANSACTION : 80'
-  - 'box.error.injection : table: <address>
+  - 'box.error.LOAD_FUNCTION : 99'
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
   - 'box.error.UNSUPPORTED : 5'
   - 'box.error.INVALID_MSGPACK : 20'

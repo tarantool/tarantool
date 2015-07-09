@@ -10,7 +10,7 @@ reloading configuration, taking snapshots, log rotation.
 =====================================================================
 
 The server is configured to shut down gracefully on SIGTERM and SIGINT
-(keyboard interrupt) or SIGHUP. SIGUSR1 can be used to save a snapshot. All
+(keyboard interrupt). SIGUSR1 can be used to save a snapshot. All
 other signals are blocked or ignored. The signals are processed in the main
 thread event loop. Thus, if the control flow never reaches the event loop
 (thanks to a runaway stored procedure), the server stops responding to any
@@ -47,15 +47,13 @@ the preceding and following tokens are mutually exclusive alternatives.
 
 General form:
 
-.. code-block:: bash
+    | :codenormal:`$` :codebold:`tarantool`
+    | OR
+    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
+    | OR
+    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
-    $ tarantool
-    OR
-    $ tarantool <options>
-    OR
-    $ tarantool <lua-initialization-file> [arguments]
-
-<lua-initialization-file> can be any script containing code for initializing.
+:codebolditalic:`Lua-initialization-file` can be any script containing code for initializing.
 Effect: The code in the file is executed during startup. Example: ``init.lua``.
 Notes: If a script is used, there will be no prompt. The script should contain
 configuration information including "``box.cfg{...listen=...}``" or
@@ -68,21 +66,14 @@ option):
 .. option:: -?, -h, --help
 
     Client displays a help message including a list of options.
-
-    .. code-block:: bash
-
-        tarantool --help
-
+    Example: :codenormal:`tarantool --help`.
     The program stops after displaying the help.
 
 .. option:: -V, --version
 
-    .. code-block:: bash
-
-        tarantool --version
-
+    Client displays version information.
+    Example: :codenormal:`tarantool --version`.
     The program stops after displaying the version.
-
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       Tokens, requests, and special key combinations
@@ -91,20 +82,14 @@ option):
 Procedure identifiers are: Any sequence of letters, digits, or underscores
 which is legal according to the rules for Lua identifiers. Procedure
 identifiers are also called function names. Notes: function names are case
-insensitive so ``insert`` and ``Insert`` are not the same thing.
+sensitive so ``insert`` and ``Insert`` are not the same thing.
 
 String literals are: Any sequence of zero or more characters enclosed in
 single quotes. Double quotes are legal but single quotes are preferred.
 Enclosing in double square brackets is good for multi-line strings as
-described in `Lua documentation`_.
+described in `Lua documentation`_. Examples: 'Hello, world', 'A', [[A\B!]].
 
 .. _Lua documentation: http://www.lua.org/pil/2.4.html
-
-Example:
-
-.. code-block:: lua
-
-    'Hello, world', 'A', [[A\B!]].
 
 Numeric literals are: Character sequences containing only digits, optionally
 preceded by + or -. Examples: 55, -. Notes: Tarantool NUM data type is
@@ -127,10 +112,10 @@ greater-than sign, for example ``tarantool>``). The end-of-request marker is by
 default a newline (line feed).
 
 For multi-line requests, it is possible to change the end-of-request marker.
-Syntax: ``console = require('console'); console.delimiter(string-literal)``.
+Syntax: :samp:`console = require('console'); console.delimiter({string-literal})`.
 The string-literal must be a value in single quotes. Effect: string becomes
 end-of-request delimiter, so newline alone is not treated as end of request.
-To go back to normal mode: ``console.delimiter('')string-literal``. Example:
+To go back to normal mode: :samp:`console.delimiter(''){string-literal}`. Example:
 
 .. code-block:: lua
 
@@ -141,39 +126,40 @@ To go back to normal mode: ``console.delimiter('')string-literal``. Example:
     end!
     console.delimiter('')!
 
+For a condensed Backus-Naur Form [BNF] description of the suggested form
+of client requests, see http://tarantool.org/doc/box-protocol.html.
+
 In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of
 an interactive-mode tarantool client session:
 
-.. code-block:: bash
-
-    $ tarantool
-                    [ tarantool will display an introductory message
-                      including version number here ]
-    tarantool> box.cfg{listen=3301}
-                    [ tarantool will display configuration information
-                      here ]
-    tarantool> s = box.schema.space.create('tester')
-                    [ tarantool may display an in-progress message here ]
-    ---
-    ...
-    tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
-    ---
-    ...
-    tarantool> box.space.tester:insert{1,'My first tuple'}
-    ---
-    - [1, 'My first tuple']
-    ...
-    tarantool> box.space.tester:select(1)
-    ---
-    - - [1, 'My first tuple']
-    ...
-    tarantool> box.space.tester:drop()
-    ---
-    ...
-    tarantool> os.exit()
-    2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown
-    $
+    | :codenormal:`$` :codebold:`tarantool`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display an introductory message`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`including version number here ]`
+    | :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display configuration information`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`here ]`
+    | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool may display an in-progress message here ]`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:insert{1,'My first tuple'}`
+    | :codenormal:`---`
+    | :codenormal:`- [1, 'My first tuple']`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
+    | :codenormal:`---`
+    | :codenormal:`- - [1, 'My first tuple']`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:drop()`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`os.exit()`
+    | :codenormal:`2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown`
+    | :codenormal:`$`
 
 Explanatory notes about what tarantool displayed in the above example:
 
@@ -228,23 +214,23 @@ The settings in the above script are:
 
 ``pid_file``
     The directory for the pid file and control-socket file. The
-    script will add ":file:`/instance-name`" to the directory name.
+    script will add ":samp:`/{instance-name}`" to the directory name.
 
 ``wal_dir``
     The directory for the write-ahead :file:`*.xlog` files. The
-    script will add ":file:`/instance-name`" to the directory-name.
+    script will add ":samp:`/{instance-name}`" to the directory-name.
 
 ``snap_dir``
     The directory for the snapshot :file:`*.snap` files. The script
-    will add ":file:`/instance-name`" to the directory-name.
+    will add ":samp:`/{instance-name}`" to the directory-name.
 
 ``sophia_dir``
     The directory for the sophia-storage-engine files. The script
-    will add ":file:`/sophia/instance-name`" to the directory-name.
+    will add ":samp:`/sophia/{instance-name}`" to the directory-name.
 
 ``logger``
     The place where the application log will go. The script will
-    add ":file:`/instance-name.log`" to the name.
+    add ":samp:`/{instance-name}.log`" to the name.
 
 ``username``
     the user that runs the tarantool server. This is the operating-system
@@ -255,39 +241,22 @@ The settings in the above script are:
     who writes an application for :program:`tarantoolctl` must put the
     application's source code in this directory, or a symbolic link. For
     examples in this section the application name my_app will be used, and
-    its source will have to be in :file:`instance_dir/my_app.lua`.
+    its source will have to be in :samp:`{instance_dir}/my_app.lua`.
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             commands for tarantoolctl
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The command format is :samp:`tarantoolctl operation {application_name}`, where
+The command format is :samp:`tarantoolctl {operation} {application_name}`, where
 operation is one of: start, stop, enter, logrotate, status, reload. Thus ...
 
-.. option:: start <application_name>
-
-    starts application <application_name>
-
-.. option:: stop <application_name>
-
-    stops <application_name>
-
-.. option:: enter <application_name>
-
-    shows <application_name>'s admin console, if it has one
-
-.. option:: logrotate <application_name>
-
-    rotates <application_name>'s log files (make new, remove old)
-
-.. option:: status <application_name>
-
-    checks <application_name>'s status
-
-.. option:: reload <application_name> <file_name>
-
-   load and execute the code from <file_name> as an instance of <application_name>
+| :codenormal:`tarantoolctl start my_app            -- starts application my_app`
+| :codenormal:`tarantoolctl stop my_app             -- stops my_app`
+| :codenormal:`tarantoolctl enter my_app            -- show my_app's admin console, if it has one`
+| :codenormal:`tarantoolctl logrotate my_app        -- rotate my_app's log files (make new, remove old)`
+| :codenormal:`tarantoolctl status my_app           -- check my_app's status`
+| :codenormal:`tarantoolctl reload my_app file_name -- execute code from file_name as an instance of my_app`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl

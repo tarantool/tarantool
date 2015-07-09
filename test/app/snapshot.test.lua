@@ -27,6 +27,8 @@ function purge()
     end
 end
 
+continue_snapshoting = true
+
 function snapshot(lsn)
     fiber.name('snapshot')
     while true do
@@ -35,8 +37,12 @@ function snapshot(lsn)
             lsn = new_lsn;
             box.snapshot()
         end
+        if not continue_snapshoting then
+            break
+        end
         fiber.sleep(0.001)
     end
+    snap_chan:put("!")
 end
 box.cfg{logger="tarantool.log", slab_alloc_arena=0.1, rows_per_wal=5000}
 
@@ -55,8 +61,11 @@ fiber.create(noise)
 fiber.create(purge)
 fiber.create(noise)
 fiber.create(purge)
-fiber.create(snapshot, box.info.server.lsn)
+snap_chan = fiber.channel()
+snap_fib = fiber.create(snapshot, box.info.server.lsn)
 
 fiber.sleep(0.3)
+continue_snapshoting = false
+snap_chan:get()
 print('ok')
 os.exit(0)

@@ -84,16 +84,22 @@ mpstream_flush(struct mpstream *stream)
 }
 
 static inline void
+mpstream_reset(struct mpstream *stream)
+{
+	size_t size = 0;
+	stream->buf = (char *) stream->reserve(stream->ctx, &size);
+	stream->pos = stream->buf;
+	stream->end = stream->pos + size;
+}
+
+static inline void
 mpstream_init(struct mpstream *stream, void *ctx,
 	      luamp_reserve_f reserve, luamp_alloc_f alloc)
 {
 	stream->ctx = ctx;
 	stream->reserve = reserve;
 	stream->alloc = alloc;
-	size_t size = 0;
-	stream->buf = (char *) stream->reserve(stream->ctx, &size);
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
+	mpstream_reset(stream);
 }
 
 static inline char *

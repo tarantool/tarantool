@@ -40,10 +40,11 @@ add_library(box
     sophia_engine.cc
     sophia_index.cc
     space.cc
+    func.cc
     alter.cc
     schema.cc
     session.cc
-    port.cc
+    port.c
     request.cc
     txn.cc
     box.cc

@@ -50,6 +50,7 @@
 #include "box/txn.h"
 #include "box/user_def.h"
 #include "box/user.h"
+#include "box/func.h"
 #include "box/schema.h"
 #include "box/session.h"
 #include "box/iproto_constants.h"
@@ -83,6 +84,7 @@ struct port_lua
 {
 	struct port_vtab *vtab;
 	struct lua_State *L;
+	size_t size; /* for port_lua_add_tuple */
 };
 
 static inline struct port_lua *
@@ -95,7 +97,7 @@ port_lua(struct port *port) { return (struct port_lua *) port; }
  * @sa port_add_lua_multret
  */
 
-static void
+extern "C" void
 port_lua_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
@@ -122,30 +124,26 @@ port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
 	try {
-		int idx = luaL_getn(L, -1);	/* TODO: can be optimized */
 		lbox_pushtuple(L, tuple);
-		lua_rawseti(L, -2, idx + 1);
-
+		lua_rawseti(L, -2, ++port_lua(port)->size);
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 
 /** Add all tuples to a Lua table. */
-static struct port *
-port_lua_table_create(struct lua_State *L)
+void
+port_lua_table_create(struct port_lua *port, struct lua_State *L)
 {
 	static struct port_vtab port_lua_vtab = {
 		port_lua_table_add_tuple,
 		null_port_eof,
 	};
-	struct port_lua *port = (struct port_lua *)
-			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
+	port->size = 0;
 	/* The destination table to append tuples to. */
 	lua_newtable(L);
-	return (struct port *) port;
 }
 
 /* }}} */
@@ -179,12 +177,12 @@ lbox_process(lua_State *L)
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
 	/* Capture all output into a Lua table. */
-	struct port *port_lua = port_lua_table_create(L);
+	struct port_lua port_lua;
 	struct request request;
 	request_create(&request, op);
 	request_decode(&request, req, sz);
-	box_process(&request, port_lua);
-
+	port_lua_table_create(&port_lua, L);
+	box_process(&request, (struct port *) &port_lua);
 	return 1;
 }
 
@@ -209,6 +207,12 @@ lbox_request_create(struct request *request,
 	}
 	if (tuple > 0) {
 		size_t used = region_used(gc);
+		/*
+		 * region_join() above could have allocated memory and
+		 * invalidated stream write position. Reset the
+		 * stream to avoid overwriting the key.
+		 */
+		mpstream_reset(&stream);
 		luamp_encode_tuple(L, luaL_msgpack_default, &stream, tuple);
 		mpstream_flush(&stream);
 		size_t  tuple_len = region_used(gc) - used;
@@ -295,6 +299,27 @@ boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
+}
+
+static int
+lbox_select(lua_State *L)
+{
+	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+		!lua_isnumber(L, 3) || !lua_isnumber(L, 4) || !lua_isnumber(L, 5)) {
+		return luaL_error(L, "Usage index:select(space_id, index_id,"
+			"iterator, offset, limit, key)");
+	}
+
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_SELECT, 6, -1);
+	request.index_id = lua_tointeger(L, 2);
+	request.iterator = lua_tointeger(L, 3);
+	request.offset = lua_tointeger(L, 4);
+	request.limit = lua_tointeger(L, 5);
+	port_lua_table_create(&port, L);
+	box_process(&request, (struct port *) &port);
+	return 1;
 }
 
 static int
@@ -439,7 +464,6 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	return 1 + objstack;
 }
 
-
 /**
  * A helper to find lua stored procedures for box.call.
  * box.call iteslf is pure Lua, to avoid issues
@@ -468,12 +492,12 @@ struct SetuidGuard
 	struct credentials *orig_credentials;
 
 	inline SetuidGuard(const char *name, uint32_t name_len,
-			   uint8_t access);
+			   uint8_t access, struct func *func);
 	inline ~SetuidGuard();
 };
 
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
-			 uint8_t access)
+			 uint8_t access, struct func *func)
 	:setuid(false)
 	,orig_credentials(current_user())
 {
@@ -486,22 +510,14 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	if ((orig_credentials->universal_access & PRIV_ALL) == PRIV_ALL)
 		return;
 	access &= ~orig_credentials->universal_access;
-	/*
-	 * We need to look up the function by name even if
-	 * the user has access to it, since it could require
-	 * a set of other user id.
-	 */
-	struct func_def *func = func_by_name(name, name_len);
 	if (func == NULL && access == 0) {
 		/**
 		 * Well, the function is not explicitly defined,
-		 * so it's obviously not a setuid one. Wasted
-		 * cycles on look up while the user had universal
-		 * access :(
+		 * so it's obviously not a setuid one.
 		 */
 		return;
 	}
-	if (func == NULL || (func->uid != orig_credentials->uid &&
+	if (func == NULL || (func->def.uid != orig_credentials->uid &&
 	     access & ~func->access[orig_credentials->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
@@ -511,16 +527,16 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
 			  priv_name(access), user->name, name_buf);
 	}
-	if (func->setuid) {
+	if (func->def.setuid) {
 		/** Remember and change the current user id. */
 		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
 			/*
 			 * Fill the cache upon first access, since
-			 * when func_def is created, no user may
+			 * when func is created, no user may
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user *owner = user_cache_find(func->uid);
+			struct user *owner = user_cache_find(func->def.uid);
 			credentials_init(&func->owner_credentials, owner);
 		}
 		setuid = true;
@@ -564,9 +580,19 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 {
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
+	int oc = 0; /* how many objects are on stack after box_lua_find */
 
-	/* Try to find a function by name */
-	int oc = box_lua_find(L, name, name + name_len);
+	struct func *func = func_by_name(name, name_len);
+	/*
+	 * func == NULL means that perhaps the user has a global
+	 * "EXECUTE" privilege, so no specific grant to a function.
+	 */
+	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
+		/* Try to find a function by name in Lua */
+		oc = box_lua_find(L, name, name + name_len);
+	} else if (func->func == NULL) {
+		func_load(func);
+	}
 	/**
 	 * Check access to the function and optionally change
 	 * execution time user id (set user id). Sic: the order
@@ -574,17 +600,24 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	 * https://github.com/tarantool/tarantool/issues/300
 	 * - if a function does not exist, say it first.
 	 */
-	SetuidGuard setuid(name, name_len, PRIV_X);
+	SetuidGuard setuid(name, name_len, PRIV_X, func);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
-	uint32_t arg_count = mp_decode_array(&args);
-	luaL_checkstack(L, arg_count, "call: out of stack");
 
-	for (uint32_t i = 0; i < arg_count; i++) {
-		luamp_decode(L, luaL_msgpack_default, &args);
+	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
+		uint32_t arg_count = mp_decode_array(&args);
+		luaL_checkstack(L, arg_count, "call: out of stack");
+
+		for (uint32_t i = 0; i < arg_count; i++) {
+			luamp_decode(L, luaL_msgpack_default, &args);
+		}
+		lua_call(L, arg_count + oc - 1, LUA_MULTRET);
+	} else {
+		struct port_lua port;
+		port_lua_create(&port, L);
+
+		func->func(request, (struct port *) &port);
 	}
-	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-
 	/**
 	 * Add all elements from Lua stack to iproto.
 	 *
@@ -754,6 +787,7 @@ static const struct luaL_reg boxlib[] = {
 static const struct luaL_reg boxlib_internal[] = {
 	{"process", lbox_process},
 	{"call_loadproc",  lbox_call_loadproc},
+	{"select", lbox_select},
 	{"insert", lbox_insert},
 	{"replace", lbox_replace},
 	{"update", lbox_update},
@@ -770,6 +804,14 @@ box_lua_init(struct lua_State *L)
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 
+#if 0
+	/* Get CTypeID for `struct port *' */
+	int rc = luaL_cdef(L, "struct port;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_PORT_PTR = luaL_ctypeid(L, "struct port *");
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+#endif
 	box_lua_error_init(L);
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);

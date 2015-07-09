@@ -45,7 +45,8 @@ struct errinj {
 	_(ERRINJ_WAL_ROTATE, false) \
 	_(ERRINJ_WAL_WRITE, false) \
 	_(ERRINJ_INDEX_ALLOC, false) \
-	_(ERRINJ_TUPLE_ALLOC, false)
+	_(ERRINJ_TUPLE_ALLOC, false) \
+	_(ERRINJ_RELAY, false)
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];

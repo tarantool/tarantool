@@ -31,7 +31,7 @@
 .. confval:: snap_dir
 
     A directory where snapshot (.snap) files will be stored. Can be relative to
-    work_dir. If not specified, defaults to work_dir. See also :confval:`snap_dir`.
+    work_dir. If not specified, defaults to work_dir. See also :confval:`wal_dir`.
 
     Type: string |br|
     Default: "." |br|
@@ -51,18 +51,18 @@
     Deprecated. Do not use.
 
     Type: boolean |br|
-    Default: "false" |br|
+    Default: false |br|
     Dynamic: no |br|
 
 .. confval:: listen
 
     The read/write data port number or :ref:`URI` (Universal Resource Identifier)
-    string. Has no default value, so must be specified if connections will
+    string. Has no default value, so **must be specified** if connections will
     occur from remote clients that do not use “admin address” (the
     administrative host and port).
 
     A typical value is 3301. The listen parameter may also be set for
-    :ref:`book-cfg-local_hot_standy`.
+    :ref:`local hot standby <book-cfg-local_hot_standy>`.
 
     .. NOTE::
 
@@ -70,7 +70,7 @@
         connections can only serve reads until the replica becomes a master.
 
     Type: integer or string |br|
-    Default: "null" |br|
+    Default: null |br|
     Dynamic: yes |br|
 
 .. confval:: pid_file
@@ -79,37 +79,33 @@
     A typical value is “:file:`tarantool.pid`”.
 
     Type: string |br|
-    Default: "null" |br|
+    Default: null |br|
     Dynamic: no |br|
 
 .. confval:: custom_proc_title
 
-    Inject the given string into :ref:`process title <book-proctitle>`
+    Inject the given string into :ref:`server process title <book-proctitle>`
     (what’s shown in the COMMAND column for :samp:`ps` and :samp:`top` commands).
 
     .. NOTE::
 
         For example, ordinarily ps shows the Tarantool server process thus:
 
-        .. code-block:: lua
-
-            $ ps -ef | grep tarantool
-            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running
-            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner
-            tarantool: primary pri: 3301 adm: 3313
+            | :codenormal:`$` :codebold:`ps -ef | grep tarantool`
+            | :codenormal:`1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running`
+            | :codenormal:`1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner`
+            | :codenormal:`tarantool: primary pri: 3301 adm: 3313`
 
         But if the configuration parameters include
         ``custom_proc_title='sessions'`` then the output looks like:
 
-        .. code-block:: lua
-
-            $ ps -ef | grep tarantool
-            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions
-            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions
-            tarantool: primary pri: 3301 adm: 3313
+            | :codenormal:`$` :codebold:`ps -ef | grep tarantool`
+            | :codenormal:`1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions`
+            | :codenormal:`1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions`
+            | :codenormal:`tarantool: primary pri: 3301 adm: 3313`
 
     Type: string |br|
-    Default: "null" |br|
+    Default: null |br|
     Dynamic: no |br|
 
 .. confval:: background

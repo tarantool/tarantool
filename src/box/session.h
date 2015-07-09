@@ -120,6 +120,11 @@ extern struct rlist session_on_disconnect;
 void
 session_run_on_disconnect_triggers(struct session *session);
 
+extern struct rlist session_on_auth;
+
+void
+session_run_on_auth_triggers(const char *user_name);
+
 void
 session_init();
 

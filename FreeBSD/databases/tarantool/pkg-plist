@@ -1,54 +1,18 @@
-bin/tarantool_box
-bin/tarancheck
-%%CLIENT%%bin/tarantool
-etc/tarantool.cfg.sample
-include/tarantool/tnt.h
-include/tarantool/tnt_buf.h
-include/tarantool/tnt_call.h
-include/tarantool/tnt_delete.h
-include/tarantool/tnt_dir.h
-include/tarantool/tnt_enc.h
-include/tarantool/tnt_insert.h
-include/tarantool/tnt_io.h
-include/tarantool/tnt_iob.h
-include/tarantool/tnt_iter.h
-include/tarantool/tnt_lex.h
-include/tarantool/tnt_log.h
-include/tarantool/tnt_mem.h
-include/tarantool/tnt_net.h
-include/tarantool/tnt_opt.h
-include/tarantool/tnt_ping.h
-include/tarantool/tnt_proto.h
-include/tarantool/tnt_queue.h
-include/tarantool/tnt_reply.h
-include/tarantool/tnt_request.h
-include/tarantool/tnt_rpl.h
-include/tarantool/tnt_select.h
-include/tarantool/tnt_snapshot.h
-include/tarantool/tnt_sql.h
-include/tarantool/tnt_stream.h
-include/tarantool/tnt_tuple.h
-include/tarantool/tnt_update.h
-include/tarantool/tnt_utf8.h
-include/tarantool/tnt_xlog.h
-lib/libtarantoolnet.so.1.1
-lib/libtarantoolrpl.so.1
-lib/libtarantoolnet.a
-lib/libtarantoolnet.so
-lib/libtarantool.a
-lib/libtarantoolnet.so.1
-lib/libtarantoolrpl.so
-lib/libtarantoolsql.so.1.1
-lib/libtarantoolsql.a
-lib/libtarantoolsql.so.1
-lib/libtarantoolrpl.so.1.1
-lib/libtarantool.so.1
-lib/libtarantoolsql.so
-lib/libtarantool.so.1.1
-lib/libtarantoolrpl.a
-lib/libtarantool.so
-%%DOCSDIR%%/README.md
-%%DOCSDIR%%/box-protocol.txt
-%%DOCSDIR%%/LICENSE
-@dirrm %%DOCSDIR%%
-@dirrm include/tarantool
+bin/tarantool
+bin/tarantoolctl
+%%ETCDIR%%/default/tarantool
+include/tarantool/lauxlib.h
+include/tarantool/lua.h
+include/tarantool/lua.hpp
+include/tarantool/luaconf.h
+include/tarantool/luajit.h
+include/tarantool/lualib.h
+include/tarantool/tarantool.h
+man/man1/tarantool.1.gz
+man/man1/tarantoolctl.1.gz
+%%PORTDOCS%%%%DOCSDIR%%/LICENSE
+%%PORTDOCS%%%%DOCSDIR%%/README.md
+@dir %%ETCDIR%%/instances.enabled
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_DATADIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_LOGDIR%%
+@dir(%%TT_USER%%,%%TT_GROUP%%,) %%TT_RUNDIR%%

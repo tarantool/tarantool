@@ -29,6 +29,7 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
+#include "func.h"
 #include "tuple.h"
 #include "session.h"
 
@@ -224,10 +225,10 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 
 	const char *name = tuple_field_cstr(tuple, 2);
 	uint32_t name_len = strlen(name);
-	struct func_def *func = func_by_name(name, name_len);
+	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);
 	uint8_t effective = func->access[cr->auth_token].effective;
-	if (func->uid == cr->uid || (PRIV_X & effective))
+	if (func->def.uid == cr->uid || (PRIV_X & effective))
 		return true;
 	return false;
 }

@@ -507,6 +507,11 @@ lbox_bsdsocket_push_family(struct lua_State *L, int family)
 static int
 lbox_bsdsocket_push_protocol(struct lua_State *L, int protonumber)
 {
+	if (protonumber == 0) {
+		lua_pushinteger(L, 0);
+		return 1;
+	}
+
 	struct protoent *p = getprotobynumber(protonumber);
 	if (p) {
 		lua_pushstring(L, p->p_name);

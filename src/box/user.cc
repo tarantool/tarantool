@@ -31,6 +31,7 @@
 #include "assoc.h"
 #include "schema.h"
 #include "space.h"
+#include "func.h"
 #include "index.h"
 #include "bit/bit.h"
 #include "fiber.h"
@@ -213,7 +214,7 @@ access_find(struct priv_def *priv)
 	}
 	case SC_FUNCTION:
 	{
-		struct func_def *func = func_by_id(priv->object_id);
+		struct func *func = func_by_id(priv->object_id);
 		if (func)
 			access = func->access;
 		break;

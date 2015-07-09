@@ -48,8 +48,7 @@ src/box/lua/*.lua.c
 src/tarantool
 src/trivia/tarantool.h
 tarantool-*.tar.gz
-test/lib/*.pyc
-test/lib/*/*.pyc
+test/lib/
 test/unit/*.test
 test/unit/fiob
 test/var
@@ -63,8 +62,9 @@ third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 VERSION
+!FreeBSD/databases/tarantool/Makefile
 src/00000000000000000001.snap
-
 doc/sphinx/_build/*
 !doc/sphinx/_build/.gitignore
 doc/www/content/doc
+extra/dist/default/tarantool

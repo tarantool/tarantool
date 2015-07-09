@@ -764,7 +764,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 	}
 	m_checkpoint->waiting_for_snap_thread = true;
 
-	/* increment snapshot version */
+	/* increment snapshot version; set tuple deletion to delayed mode */
 	tuple_begin_snapshot();
 	return 0;
 }

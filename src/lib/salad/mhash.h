@@ -196,7 +196,7 @@ _mh(next_slot)(mh_int_t slot, mh_int_t inc, mh_int_t size)
 	return slot >= size ? slot - size : slot;
 }
 
-#if defined(mh_hash_key) && defined(mh_eq_key)
+#if defined(mh_hash_key) && defined(mh_cmp_key)
 /**
  * If it is necessary to search by something different
  * than a hash node, define mh_hash_key and mh_eq_key
@@ -212,7 +212,8 @@ _mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
 	mh_int_t i = k % h->n_buckets;
 	mh_int_t inc = 1 + k % (h->n_buckets - 1);
 	for (;;) {
-		if ((mh_mayeq(h, i, hk) && mh_eq_key(key, mh_node(h, i), arg)))
+		if ((mh_mayeq(h, i, hk) &&
+		    !mh_cmp_key(key, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
@@ -234,7 +235,7 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 	mh_int_t i = k % h->n_buckets;
 	mh_int_t inc = 1 + k % (h->n_buckets - 1);
 	for (;;) {
-		if ((mh_mayeq(h, i, hk) && mh_eq(node, mh_node(h, i), arg)))
+		if ((mh_mayeq(h, i, hk) && !mh_cmp(node, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
@@ -270,7 +271,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 	*exist = 1;
 	/* Skip through all collisions. */
 	while (mh_exist(h, i)) {
-		if (mh_mayeq(h, i, hk) && mh_eq(node, mh_node(h, i), arg))
+		if (mh_mayeq(h, i, hk) && !mh_cmp(node, mh_node(h, i), arg))
 			return i;               /* Found a duplicate. */
 		/*
 		 * Mark this link as part of a collision chain. The
@@ -293,7 +294,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 	while (mh_dirty(h, i)) {
 		i = _mh(next_slot)(i, inc, h->n_buckets);
 
-		if (mh_mayeq(h, i, hk) && mh_eq(mh_node(h, i), node, arg))
+		if (mh_mayeq(h, i, hk) && !mh_cmp(mh_node(h, i), node, arg))
 			return i;               /* Found a duplicate. */
 	}
 	/* Reached the end of the collision chain: no duplicates. */
@@ -610,8 +611,8 @@ _mh(dump)(struct _mh(t) *h)
 #undef mh_name
 #undef mh_hash
 #undef mh_hash_key
-#undef mh_eq
-#undef mh_eq_key
+#undef mh_cmp
+#undef mh_cmp_key
 #undef mh_node
 #undef mh_dirty
 #undef mh_place

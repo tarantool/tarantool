@@ -22,32 +22,20 @@
 
     By default, the log is sent to the standard error stream (``stderr``). If
     ``logger`` is specified, the log is sent to the file named in the string.
-    Example setting:
-
-    .. code-block:: lua
-
-        box.cfg{
-            logger = 'tarantool.log'
-        }
-
+    Example setting: |br|
+    box.cfg{logger = 'tarantool.log' } |br|
     This will open :file:`tarantool.log` for output on the server’s default
-    directory. If ``logger`` string begins with a pipe, for example
-
-    .. code-block:: lua
-
-        box.cfg{
-            logger = '| cronolog tarantool.log'
-        }
-
-    the program specified in the option is executed at server start and all
-    log messages are sent to the standard input.
+    directory. If ``logger`` string begins with a pipe, for example |br|
+    box.cfg{logger = '| cronolog tarantool.log' } |br|
+    the program specified in the option (in this case, cronolog) is executed at server start and all
+    log messages are sent to the standard input (``stdin``) of cronolog.
 
     When logging to a file, tarantool reopens the log on SIGHUP. When log is
     a program, its pid is saved in :func:`log.logger_pid` variable. You need
     to send it a signal to rotate logs.
 
     Type: string |br|
-    Default: "null" |br|
+    Default: null |br|
     Dynamic: no |br|
 
 .. confval:: logger_nonblock

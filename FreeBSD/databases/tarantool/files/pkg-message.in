@@ -3,11 +3,12 @@
 #
 #        After install you'll need:
 #
-#    Edit example config:
-#    %%ETCDIR%%/tarantool.cfg.sample
-#    Init storage:
-#    %%PREFIX%%/bin/tarantool_box --init-storage \
-#      -c %%ETCDIR%%/tarantool.cfg
+#    Configuration at /etc/rc.conf:
+#
+#   * Enable tarantool on startup:
+#      tarantool_enable="YES"
+#   * Path to storage instances:
+#      tarantool_instances="%%ETCDIR%%/instances.enabled"
 #
 #
 #########################################################

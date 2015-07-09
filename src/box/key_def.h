@@ -312,6 +312,16 @@ struct credentials {
 };
 
 /**
+ * The supported language of the stored function.
+ */
+enum func_language {
+	FUNC_LANGUAGE_LUA,
+	FUNC_LANGUAGE_C,
+	func_language_MAX,
+};
+extern const char *func_language_strs[];
+
+/**
  * Definition of a function. Function body is not stored
  * or replicated (yet).
  */
@@ -326,18 +336,11 @@ struct func_def {
 	 */
 	bool setuid;
 	/**
-	 * Authentication id of the owner of the function,
-	 * used for set-user-id functions.
+	 * The language of the stored function.
 	 */
-	struct credentials owner_credentials;
+	enum func_language language;
 	/** Function name. */
 	char name[BOX_NAME_MAX + 1];
-	/**
-	 * Strictly speaking, this doesn't belong
-	 * to func def but belongs to func cache entry.
-	 * Kept here for simplicity.
-	 */
-	struct access access[BOX_USER_MAX];
 };
 
 /**
