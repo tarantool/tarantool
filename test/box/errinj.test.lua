@@ -1,4 +1,5 @@
 errinj = box.error.injection
+net_box = require('net.box')
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
@@ -128,7 +129,21 @@ s:select{};
 --# setopt delimiter ''
 errinj.set("ERRINJ_TUPLE_ALLOC", false)
 
+-- gh-881 iproto request with wal IO error
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+test = box.schema.create_space('test')
+_ = test:create_index('primary')
+
+for i=1, box.cfg.rows_per_wal do test:insert{i, 'test'} end
+c = net_box:new(box.cfg.listen)
+
+-- try to write xlog without permission to write to disk
+errinj.set('ERRINJ_WAL_WRITE', true)
+c.space.test:insert({box.cfg.rows_per_wal + 1,1,2,3})
+errinj.set('ERRINJ_WAL_WRITE', false)
+
+-- Cleanup
 s:drop()
-
-
+test:drop()
 errinj = nil
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
