@@ -70,7 +70,7 @@ ibuf_destroy(struct ibuf *ibuf)
 
 /** Free memory allocated by this buffer */
 void
-ibuf_gc(struct ibuf *ibuf)
+ibuf_reinit(struct ibuf *ibuf)
 {
 	struct slab_cache *slabc = ibuf->slabc;
 	ibuf_destroy(ibuf);

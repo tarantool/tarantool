@@ -72,7 +72,7 @@ void
 ibuf_destroy(struct ibuf *ibuf);
 
 void
-ibuf_gc(struct ibuf *ibuf);
+ibuf_reinit(struct ibuf *ibuf);
 
 /** How much data is read and is not parsed yet. */
 static inline size_t

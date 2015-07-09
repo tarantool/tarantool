@@ -26,7 +26,7 @@ void
 ibuf_destroy(struct ibuf *ibuf);
 
 void
-ibuf_gc(struct ibuf *ibuf);
+ibuf_reinit(struct ibuf *ibuf);
 
 int
 ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size);
@@ -67,7 +67,7 @@ end
 
 local function ibuf_recycle(buf)
     checkibuf(buf, 'recycle')
-    builtin.ibuf_gc(buf)
+    builtin.ibuf_reinit(buf)
 end
 
 local function ibuf_reset(buf)
