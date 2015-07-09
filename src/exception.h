@@ -31,12 +31,14 @@
 #include "object.h"
 #include <stdarg.h>
 #include <assert.h>
-#include <limits.h> /* _POSIX_PATH_MAX */
 
 #include "reflection.h"
 #include "say.h"
 
-enum { TNT_ERRMSG_MAX = 512 };
+enum {
+	EXCEPTION_ERRMSG_MAX = 512,
+	EXCEPTION_FILE_MAX = 256
+};
 
 extern const struct type type_Exception;
 class Exception: public Object {
@@ -87,10 +89,10 @@ protected:
 	/* line number */
 	unsigned m_line;
 	/* file name */
-	char m_file[_POSIX_PATH_MAX];
+	char m_file[EXCEPTION_FILE_MAX];
 
 	/* error description */
-	char m_errmsg[TNT_ERRMSG_MAX];
+	char m_errmsg[EXCEPTION_ERRMSG_MAX];
 };
 
 extern const struct type type_SystemError;

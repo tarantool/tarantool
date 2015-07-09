@@ -221,7 +221,7 @@ xrow_decode_error(struct xrow_header *row)
 {
 	uint32_t code = row->type & (IPROTO_TYPE_ERROR - 1);
 
-	char error[TNT_ERRMSG_MAX] = { 0 };
+	char error[EXCEPTION_ERRMSG_MAX] = { 0 };
 	const char *pos;
 	uint32_t map_size;
 
