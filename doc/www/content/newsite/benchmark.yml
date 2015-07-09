@@ -35,10 +35,8 @@ blocks  :
 
       However, to compare with the rest of the world,
       a standardized benchmarking kit is more appropriate.
-      This is why Yahoo! Cloud Serving Benchmark |copy| was
-      used to produce the charts below. A fork of YCSB with
-      Tarantool support is available
-      `here <https://github.com/bigbes92/YCSB>`_. Since YCSB
+      This is why `Yahoo! Cloud Serving Benchmark |copy| <http://github.com/brianfrankcooper/YCSB>`_
+      was used to produce the charts below. Since YCSB
       was developed to compare cloud key/value servers, it
       provides a very narrow view at performance of a tested
       server. For example, performance of secondary keys or
@@ -80,5 +78,5 @@ blocks  :
       averaged over 8 consecutive test runs.
 
       Configuration files for the tested systems can be found
-      `on it's Github page <https://github.com/bigbes92/ycsb-expand-db/tree/master/confs>`_.
+      `on its Github page <https://github.com/bigbes/ycsb-expand-db/tree/master/confs>`_.
 ...

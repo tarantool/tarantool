@@ -135,7 +135,8 @@ blocks :
     - - "Connectors"
       - format : rst
         content: |
-          - PHP driver,        `<https://github.com/tarantool/tarantool-php>`_
+          - PHP PECL driver,   `<https://github.com/tarantool/tarantool-php>`_
+          - PHP PEAR driver,   `<https://github.com/tarantool-php/client>`_
           - Java driver,       `Maven repository`_
           - Python driver,     `<http://pypi.python.org/pypi/tarantool>`_
           - Ruby driver,       `<https://github.com/funny-falcon/tarantool16-ruby>`_
