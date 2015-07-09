@@ -28,11 +28,17 @@
  */
 #include "error.h"
 #include <stdio.h>
-#include <typeinfo>
+
+static struct method clienterror_methods[] = {
+	make_method(&type_ClientError, "code", &ClientError::errcode),
+	METHODS_SENTINEL
+};
+const struct type type_ClientError = make_type("ClientError", &type_Exception,
+	clienterror_methods);
 
 ClientError::ClientError(const char *file, unsigned line,
 			 uint32_t errcode, ...)
-	: Exception(file, line)
+	: Exception(&type_ClientError, file, line)
 {
 	m_errcode = errcode;
 	va_list ap;
@@ -44,7 +50,7 @@ ClientError::ClientError(const char *file, unsigned line,
 
 ClientError::ClientError(const char *file, unsigned line, const char *msg,
 			 uint32_t errcode)
-	: Exception(file, line)
+	: Exception(&type_ClientError, file, line)
 {
 	m_errcode = errcode;
 	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
@@ -61,10 +67,10 @@ ClientError::log() const
 uint32_t
 ClientError::get_errcode(const Exception *e)
 {
-	const ClientError *error = dynamic_cast<const ClientError *>(e);
-	if (error)
-		return error->errcode();
-	if (typeid(*e) == typeid(OutOfMemory))
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error)
+		return client_error->errcode();
+	if (type_cast(OutOfMemory, e))
 		return ER_MEMORY_ISSUE;
 	return ER_PROC_LUA;
 }

@@ -46,13 +46,15 @@
 #include "say.h"
 #include "trivia/util.h"
 
+const struct type type_SocketError = make_type("SocketError",
+	&type_SystemError);
 SocketError::SocketError(const char *file, unsigned line, int fd,
 			 const char *format, ...)
-	: SystemError(file, line)
+	: SystemError(&type_SocketError, file, line)
 {
 	int save_errno = errno;
 
-	char buf[TNT_ERRMSG_MAX];
+	char buf[EXCEPTION_ERRMSG_MAX];
 
 	va_list ap;
 	va_start(ap, format);

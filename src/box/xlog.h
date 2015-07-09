@@ -43,6 +43,9 @@ struct XlogError: public Exception
 {
 	XlogError(const char *file, unsigned line,
 		  const char *format, ...);
+protected:
+	XlogError(const struct type *type, const char *file, unsigned line,
+		  const char *format, ...);
 };
 
 struct XlogGapError: public XlogError

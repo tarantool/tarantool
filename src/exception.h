@@ -31,15 +31,20 @@
 #include "object.h"
 #include <stdarg.h>
 #include <assert.h>
+
+#include "reflection.h"
 #include "say.h"
 
-enum { TNT_ERRMSG_MAX = 512 };
+enum {
+	EXCEPTION_ERRMSG_MAX = 512,
+	EXCEPTION_FILE_MAX = 256
+};
 
+extern const struct type type_Exception;
 class Exception: public Object {
-protected:
-	/** Allocated size. */
-	size_t size;
 public:
+	const struct type *type; /* reflection */
+
 	void *operator new(size_t size);
 	void operator delete(void*);
 	virtual void raise()
@@ -48,12 +53,18 @@ public:
 		throw this;
 	}
 
-	const char *type() const;
-
 	const char *
 	errmsg() const
 	{
 		return m_errmsg;
+	}
+
+	const char *file() const {
+		return m_file;
+	}
+
+	int line() const {
+		return m_line;
 	}
 
 	virtual void log() const;
@@ -71,19 +82,20 @@ public:
 	}
 
 protected:
-	Exception(const char *file, unsigned line);
+	Exception(const struct type *type, const char *file, unsigned line);
 
 	/* Ref counter */
 	size_t m_ref;
-	/* file name */
-	const char *m_file;
 	/* line number */
 	unsigned m_line;
+	/* file name */
+	char m_file[EXCEPTION_FILE_MAX];
 
 	/* error description */
-	char m_errmsg[TNT_ERRMSG_MAX];
+	char m_errmsg[EXCEPTION_ERRMSG_MAX];
 };
 
+extern const struct type type_SystemError;
 class SystemError: public Exception {
 public:
 
@@ -103,7 +115,7 @@ public:
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
 protected:
-	SystemError(const char *file, unsigned line);
+	SystemError(const struct type *type, const char *file, unsigned line);
 
 	void
 	init(const char *format, ...);
@@ -116,6 +128,7 @@ protected:
 	int m_errno;
 };
 
+extern const struct type type_OutOfMemory;
 class OutOfMemory: public SystemError {
 public:
 	OutOfMemory(const char *file, unsigned line,
