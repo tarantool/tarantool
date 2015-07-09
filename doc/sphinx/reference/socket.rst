@@ -88,7 +88,7 @@ the function invocations will look like ``sock:function_name(...)``.
 .. function:: __call(domain, type, protocol)
 
     Create a new TCP or UDP socket. The argument values
-    are the same as in the `Linux man page <http://man7.org/linux/man-pages/man2/socket.2.html>`_.
+    are the same as in the `Linux socket(2) man page <http://man7.org/linux/man-pages/man2/socket.2.html>`_.
 
     :param domain:
     :param type:
@@ -151,7 +151,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: sysconnect(host, port)
 
         Connect a socket to a remote host. The argument values are the same as
-        in the Linux man page [1]_.
+        in the `Linux connect(2) man page <http://man7.org/linux/man-pages/man2/connect.2.html>`_.
         The host must be an IP address.
 
         Parameters:
@@ -333,7 +333,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: setsockopt(level, name, value)
 
         Set socket flags. The argument values are the same as in the
-        Linux man page [2]_.
+        `Linux getsockopt(2) man page <http://man7.org/linux/man-pages/man2/setsockopt.2.html>`_.
         The ones that Tarantool accepts are:
 
             * SO_ACCEPTCONN
@@ -372,7 +372,7 @@ the function invocations will look like ``sock:function_name(...)``.
     .. method:: linger([active])
 
         Set or clear the SO_LINGER flag. For a description of the flag, see
-        Linux man page [3]_.
+        the `Linux man page <http://man7.org/linux/man-pages/man1/loginctl.1.html>`_.
 
         :param boolean active:
 
@@ -561,7 +561,4 @@ The strings "A", "B", "C" are printed.
 
 .. _luasocket: https://github.com/diegonehab/luasocket
 
-.. [1] http://man7.org/linux/man-pages/man2/connect.2.html
-.. [2] http://man7.org/linux/man-pages/man2/setsockopt.2.html
-.. [3] http://man7.org/linux/man-pages/man1/loginctl.1.html
 
