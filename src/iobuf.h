@@ -71,6 +71,9 @@ ibuf_create(struct ibuf *ibuf, struct slab_cache *slabc);
 void
 ibuf_destroy(struct ibuf *ibuf);
 
+void
+ibuf_gc(struct ibuf *ibuf);
+
 /** How much data is read and is not parsed yet. */
 static inline size_t
 ibuf_size(struct ibuf *ibuf)

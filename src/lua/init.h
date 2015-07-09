@@ -83,6 +83,9 @@ tarantool_lua(struct lua_State *L,
 
 extern char *history;
 
+extern "C" struct slab_cache *
+tarantool_lua_slab_cache();
+
 /**
  * Return last exception text
  */

@@ -68,6 +68,15 @@ ibuf_destroy(struct ibuf *ibuf)
 	 }
 }
 
+/** Free memory allocated by this buffer */
+void
+ibuf_gc(struct ibuf *ibuf)
+{
+	struct slab_cache *slabc = ibuf->slabc;
+	ibuf_destroy(ibuf);
+	ibuf_create(ibuf, slabc);
+}
+
 /**
  * Ensure the buffer has sufficient capacity
  * to store size bytes.
