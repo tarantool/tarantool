@@ -29,6 +29,7 @@ void small_string_test(const char* const s)
 	csv.emit_row = print_endl;
 	csv_parse(&csv, s, s + strlen(s));
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	csv_destroy(&csv);
 }
 
 void
@@ -79,23 +80,23 @@ void test5() {
 	csv_setopt(&csv, CSV_OPT_DELIMITER, '\t');
 	csv_parse(&csv, s, s + strlen(s));
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	csv_destroy(&csv);
 	footer();
 }
 
 void test6() {
 	header();
 	const char * const s1 = "\n \nabc\nc\"\",\"d\",de\n\nk";
-	const char * const s2 = "k\ne\n\n \n\" \"\n\"quote isn't closed, sorry\n \noh";
+	const char * const s2 = "\ne\n\n \n\" \"\n\"quote isn't closed, sorry\n \noh";
 	struct csv csv;
 	csv_create(&csv);
 	csv.emit_field = print_field;
 	csv.emit_row = print_endl;
 	const char* t = csv_parse_chunk(&csv, s1, s1 + strlen(s1));
-	assert(t == s1 + strlen(s1) - 1);
 	t = csv_parse_chunk(&csv, s2, s2 + 2);
-	assert(t == s2 + 2);
 	csv_parse(&csv, s2 + 2, s2 + strlen(s2));
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	csv_destroy(&csv);
 	footer();
 }
 void test_chunk(const char* const s)
@@ -106,22 +107,26 @@ void test_chunk(const char* const s)
 	csv.emit_field = NULL;
 	csv.emit_row = NULL;
 	printf("tail: %s\n", csv_parse_chunk(&csv, s, s + strlen(s)));
+	csv_destroy(&csv);
 	footer();
 }
 
 struct counter {
 	size_t line_cnt, fieldsizes_cnt;
 };
+
 void
 line_counter(void *ctx)
 {
 	((struct counter*)ctx)->line_cnt++;
 }
+
 void
 fieldsizes_counter(void *ctx, const char *s, const char *end)
 {
 	((struct counter*)ctx)->fieldsizes_cnt += end - s;
 }
+
 void big_chunk_separated_test() {
 	header();
 	struct csv csv;
@@ -152,8 +157,10 @@ void big_chunk_separated_test() {
 	}
 
 	const char *bufp = buf;
-	while(bufp < buf + bufn - chunk_size)
-		bufp = csv_parse_chunk(&csv, bufp, bufp + chunk_size);
+	while(bufp < buf + bufn - chunk_size) {
+		csv_parse_chunk(&csv, bufp, bufp + chunk_size);
+		bufp += chunk_size;
+	}
 	csv_parse(&csv, bufp, buf + bufn);
 
 	//without fieldsizes counts without commas and spaces
@@ -161,6 +168,8 @@ void big_chunk_separated_test() {
 	       (int) (lines * (strlen(s) - 6) * (linelen / strlen(s))));
 	assert(lines == cnt.line_cnt);
 	assert(lines * (strlen(s) - 6) * (linelen / strlen(s))  == cnt.fieldsizes_cnt);
+	csv_destroy(&csv);
+	free(buf);
 	footer();
 }
 

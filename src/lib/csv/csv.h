@@ -17,9 +17,15 @@ struct csv
 	csv_emit_field_t emit_field;
 	char csv_delim;
 	char csv_quote;
+
 	int csv_invalid;
 
 	void *(*csv_realloc)(void*, size_t);
+
+	int state;
+	char *buf;
+	char *bufp;
+	size_t buf_len;
 };
 
 //parser options
@@ -45,6 +51,8 @@ csv_setopt(struct csv *csv, int opt, ...);
 
 /**
  * Parse input and call emit_row/emit_line.
+ * Save tail to inside buffer,
+ * next call will concatenate tail and string from args
  * @return the pointer to the unprocessed tail
  */
 const char *

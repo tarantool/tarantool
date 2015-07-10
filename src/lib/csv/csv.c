@@ -13,6 +13,8 @@ enum {  CSV_LEADING_SPACES = 0,
 	CSV_BUF_IN_QUOTES = 4
 };
 
+static const double csv_buf_expand_factor = 2.0;
+
 void csv_emit_row_empty(void *ctx)
 {
 	(void)ctx;
@@ -37,7 +39,10 @@ csv_create(struct csv *csv)
 void
 csv_destroy(struct csv *csv)
 {
-	(void)csv;
+	if(csv->buf) {
+		csv->csv_realloc(csv->buf, 0);
+		csv->buf = 0;
+	}
 }
 
 void
@@ -76,114 +81,66 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 	if (csv->emit_row == NULL)
 		csv->emit_row = csv_emit_row_empty;
 	const char *p = s;
-	int state = 0;
-	const char *field_begin;
-	const char *field_end;
-	char *buf = 0;
-	size_t buf_len = 0;
-	char *bufp = 0;
 	const char *tail = s;
+
+
 	do {
 		int isendl = (*p == '\n' || *p == '\r');
 
-		// in some cases buffer is not used
-		if ((state == 3 || state == 4) && !bufp) {
-			if (buf_len < end - p) {
-				buf = csv->csv_realloc(buf, (end - p) * sizeof(char));
-				buf_len = end - p;
-			}
-			memcpy(buf, field_begin, p - field_begin);
-			bufp = buf + (p - field_begin);
+		if (csv->buf_len < csv->bufp - csv->buf + 1) {
+			csv->buf_len = (int)((csv->bufp - csv->buf + 1) * csv_buf_expand_factor + 1);
+			char *new_buf = csv->csv_realloc(csv->buf, csv->buf_len);
+			csv->bufp = csv->bufp - csv->buf + new_buf;
+			csv->buf = new_buf;
 		}
-		switch(state) {
+
+		switch(csv->state) {
 		case CSV_LEADING_SPACES: //leading spaces
 			if (p == end || *p != ' ') {
-				state = CSV_OUT_OF_QUOTES;
-				field_begin = p;
+				csv->state = CSV_BUF_OUT_OF_QUOTES;
 			}
 			else break;
-		case CSV_OUT_OF_QUOTES: //common case without buffer
+		case CSV_BUF_OUT_OF_QUOTES:
 			if (isendl || *p == csv->csv_delim) {
-				state = CSV_LEADING_SPACES;
-				field_end = p - 1;
-				while(field_end > field_begin && *field_end == ' ')
-					field_end--;
-				field_end++;
-				csv->emit_field(csv->emit_ctx, field_begin, field_end);
+				csv->state = CSV_LEADING_SPACES;
+				size_t space_end = 1;
+				while (csv->bufp - space_end > csv->buf && p - space_end > s &&
+						*(p - space_end) == ' ')
+					space_end++;
+				space_end--;
+				csv->bufp -= space_end;
+				csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
 				tail = p + 1;
+				csv->bufp = csv->buf;
 			} else if (*p == csv->csv_quote) {
 				if (p + 1 != end && *(p + 1) == csv->csv_quote) {
-					p--;
-					state = CSV_BUF_OUT_OF_QUOTES;
-				} else {
-					state = CSV_BUF_IN_QUOTES;
-					if (field_begin == p) {
-						field_begin = p + 1;
-						state = CSV_IN_QUOTES;
-					}
-				}
-			}
-			break;
-		case CSV_IN_QUOTES: //quote case without buffer
-			if (*p == csv->csv_quote) {
-				if (p + 1 != end && *(p + 1) == csv->csv_quote) {
-					p--;
-					state = CSV_BUF_IN_QUOTES;
-				} else {
-					field_end = p;
-					p = p + 1;
-					while (p < end && *p == ' ')
-						p++;
-					if (*p == csv->csv_delim || *p == '\n' || *p == '\r') {
-						state = CSV_LEADING_SPACES;
-						isendl = (*p == '\n' || *p == '\r');
-						csv->emit_field(csv->emit_ctx, field_begin, field_end);
-						tail = p + 1;
-					} else {
-						p = field_end - 1;
-						state = CSV_BUF_IN_QUOTES;
-					}
-				}
-			}
-			break;
-		case CSV_BUF_OUT_OF_QUOTES: //common case with buffer
-			if (isendl || *p == csv->csv_delim) {
-				state = CSV_LEADING_SPACES;
-				bufp--;
-				while (bufp > buf && *bufp == ' ')
-					bufp--;
-				bufp++;
-				csv->emit_field(csv->emit_ctx, buf, bufp);
-				tail = p + 1;
-			} else if (*p == csv->csv_quote) {
-				if (p + 1 != end && *(p + 1) == csv->csv_quote) {
-					*bufp++ = csv->csv_quote;
+					*csv->bufp++ = csv->csv_quote;
 					p++;
 				} else {
-					state = CSV_BUF_IN_QUOTES;
+					csv->state = CSV_BUF_IN_QUOTES;
 				}
 			}  else {
-				*bufp++ = *p;
+				*csv->bufp++ = *p;
 			}
 			break;
-		case CSV_BUF_IN_QUOTES: //quote case with buffer
+		case CSV_BUF_IN_QUOTES:
 			if (*p == csv->csv_quote) {
 				if (p + 1 != end && *(p + 1) == csv->csv_quote) {
-					*bufp++ = csv->csv_quote;
+					*csv->bufp++ = csv->csv_quote;
 					p++;
 				} else {
-					state = CSV_BUF_OUT_OF_QUOTES;
+					csv->state = CSV_BUF_OUT_OF_QUOTES;
 				}
 			} else {
-				*bufp++ = *p;
+				*csv->bufp++ = *p;
 			}
 			break;
 		}
-		if (isendl && state != CSV_IN_QUOTES && state != CSV_BUF_IN_QUOTES) {
-			assert(state == CSV_LEADING_SPACES);
-			bufp = 0;
+		if (isendl && csv->state != CSV_IN_QUOTES && csv->state != CSV_BUF_IN_QUOTES) {
+			assert(csv->state == CSV_LEADING_SPACES);
+			csv->bufp = csv->buf;
 			csv->emit_row(csv->emit_ctx);
-			if (p != end && *p != *(p + 1) && (*(p + 1) == '\n' || *(p + 1) == '\r'))
+			if (p != end - 1 && *p != *(p + 1) && (*(p + 1) == '\n' || *(p + 1) == '\r'))
 				p++; //\r\n - is only 1 endl
 			tail = p + 1;
 		}
@@ -191,27 +148,22 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 	} while(p != end);
 
 	if (endfile && *(end - 1) != '\n' && *(end - 1) != '\r') {
-		if (state == 2 || state == 4) {
+		if (csv->state == 2 || csv->state == 4) {
 			csv->csv_invalid = 1;
-		} else if (bufp) {
-			bufp--;
-			while(bufp > buf && *bufp == ' ')
-				bufp--;
-			bufp++;
-			csv->emit_field(csv->emit_ctx, buf, bufp);
 		} else {
-			field_begin = tail;
-			field_end = end - 1;
-			while(field_end > field_begin && *field_end == ' ')
-				field_end--;
-			field_end++;
-			csv->emit_field(csv->emit_ctx, field_begin, field_end);
+			size_t space_end = 1;
+			while (p - space_end > s && *(p - space_end) == ' ')
+				space_end++;
+			space_end--;
+			csv->bufp -= space_end;
+			csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
+			csv->bufp = 0;
+			csv->csv_realloc(csv->buf, 0);
+			csv->buf = 0;
+			csv->buf_len = 0;
 		}
 		csv->emit_row(csv->emit_ctx);
-	}
-	if (buf) {
-		csv->csv_realloc(buf, 0);
-		buf = 0;
+		return 0;
 	}
 	return tail;
 }

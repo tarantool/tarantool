@@ -89,7 +89,7 @@ a|
 |a|	
 |a|	
 ||	
-|aa a" ,baab ,a bb   , ,b,,  b
+|aa a ,baab ,a bb   , ,b,,  b
 |	
 |b|	
 ||	
@@ -97,8 +97,7 @@ a|
 ||	|ab|	
 |aa|	
 |
-b aba|	|b|	|
-b abaaa 
+b aba|	|b|	|caa 
 b|	
 ||	|b"|	||	
 |ba|	
@@ -114,7 +113,7 @@ valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|	|c|	
-|1|	|"|	|""|	
+|1|	|"|	|"|	
 |2|	|3|	|4|	
 valid: yes
 	*** common_test: done ***
