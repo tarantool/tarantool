@@ -84,7 +84,7 @@ const struct type type_Tarantool = make_type("Tarantool", &type_Database,
 int
 main()
 {
-	plan(29);
+	plan(30);
 
 	Object obj;
 	Tarantool tntobj;
@@ -169,6 +169,10 @@ main()
 	method_invoke<void>(inc, &tntobj);
 	iret = method_invoke<int>(get_int, &tntobj);
 	is(iret, 49, "invoke (void)");
+
+	const Tarantool *tntconstptr = &tntobj;
+	ok((!method_invokable<void, const char *>(put_string, tntconstptr)),
+		"!invokable<>() on const method with non-const object");
 
 	return check_plan();
 }

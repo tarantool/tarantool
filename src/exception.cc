@@ -80,7 +80,7 @@ Exception::~Exception()
 Exception::Exception(const struct type *type_arg, const char *file,
 	unsigned line)
 	:type(type_arg), m_ref(0) {
-	if (m_file != NULL) {
+	if (file != NULL) {
 		snprintf(m_file, sizeof(m_file), "%s", file);
 		m_line = line;
 	} else {

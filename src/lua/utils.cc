@@ -100,6 +100,7 @@ int
 luaL_cdef(struct lua_State *L, const char *what)
 {
 	int idx = lua_gettop(L);
+	(void) idx;
 	/* This function calls ffi.cdef  */
 
 	/* Get ffi.typeof function */

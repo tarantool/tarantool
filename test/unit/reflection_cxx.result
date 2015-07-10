@@ -1,4 +1,4 @@
-1..29
+1..30
 ok 1 - type.name
 ok 2 - type.parent
 ok 3 - type.parent
@@ -28,3 +28,4 @@ ok 26 - invokable<void, const char *>
 ok 27 - invoke (int)
 ok 28 - invoke (const char *)
 ok 29 - invoke (void)
+ok 30 - !invokable<>() on const method with non-const object

@@ -100,8 +100,6 @@ struct method {
 		void *_spacer[2];
 #if defined(__cplusplus)
 		method_thiscall_f thiscall;
-		static_assert(sizeof(thiscall) <= sizeof(_spacer),
-			"sizeof(thiscall)");
 #endif /* defined(__cplusplus) */
 	};
 };
@@ -125,6 +123,9 @@ extern const struct method METHODS_SENTINEL;
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+static_assert(sizeof(((struct method *) 0)->thiscall) <=
+	      sizeof(((struct method *) 0)->_spacer), "sizeof(thiscall)");
 
 /*
  * Begin of C++ syntax sugar
@@ -250,6 +251,14 @@ method_invokable(const struct method *method, T *object)
 	return method_helper<0, Args...>::invokable(method);
 }
 
+template<typename R, typename... Args, typename T> inline bool
+method_invokable(const struct method *method, const T *object)
+{
+	if (!method->isconst)
+		return false;
+	return method_invokable<R, Args...>(method, const_cast<T*>(object));
+}
+
 /**
  * Invoke method with object and provided arguments.
  */
@@ -259,13 +268,6 @@ method_invoke(const struct method *method, T *object, Args... args)
 	assert((method_invokable<R, Args...>(method, object)));
 	typedef R (T::*MemberFunction)(Args...);
 	return (object->*(MemberFunction) method->thiscall)(args...);
-}
-
-template<typename R, typename... Args, typename T > inline R
-method_invoke(const struct method *method, const T *object, Args... args)
-{
-	assert(method->isconst);
-	return method_invoke<R, Args...>(object, args...);
 }
 
 #endif /* defined(__cplusplus) */
