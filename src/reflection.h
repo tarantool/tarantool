@@ -167,9 +167,12 @@ template<> inline enum ctype ctypeof<const char *>() { return CTYPE_CONST_CHAR_P
  * \cond false
  */
 
+template <int N, typename... Args>
+struct method_helper;
+
 /** A helper for recursive templates */
 template <int N, typename A, typename... Args>
-struct method_helper {
+struct method_helper<N, A, Args... >  {
 	static bool
 	invokable(const method *method)
 	{
@@ -186,22 +189,17 @@ struct method_helper {
 	}
 };
 
-template <int N, typename R>
-struct method_helper<N, R> {
+template <int N>
+struct method_helper<N> {
 	static bool
-	invokable(const method *method)
+	invokable(const method *)
 	{
-		if (method->nargs != N)
-			return false;
-		if (method->rtype != ctypeof<R>())
-			return false;
 		return true;
 	}
 
 	static void
 	init(struct method *method)
 	{
-		method->rtype = ctypeof<R>();
 		method->nargs = N;
 	}
 };
@@ -222,7 +220,8 @@ make_method(const struct type *owner, const char *name,
 	m.name = name;
 	m.thiscall = (method_thiscall_f) method_arg;
 	m.isconst = false;
-	method_helper<0, Args..., R>::init(&m);
+	m.rtype = ctypeof<R>();
+	method_helper<0, Args...>::init(&m);
 	return m;
 }
 
@@ -241,9 +240,14 @@ make_method(const struct type *owner, const char *name,
 template<typename R, typename... Args, typename T> inline bool
 method_invokable(const struct method *method, T *object)
 {
+	static_assert(sizeof...(Args) <= METHOD_ARG_MAX, "too many arguments");
 	if (!type_assignable(method->owner, object->type))
 		return false;
-	return method_helper<0, Args..., R>::invokable(method);
+	if (method->rtype != ctypeof<R>())
+		return false;
+	if (method->nargs != sizeof...(Args))
+		return false;
+	return method_helper<0, Args...>::invokable(method);
 }
 
 /**
