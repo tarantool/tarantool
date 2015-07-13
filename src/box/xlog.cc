@@ -646,8 +646,6 @@ xlog_atfork(struct xlog **lptr)
 		 * fclose().
 		 */
 		close(fileno(l->f));
-		fclose(l->f);
-		free(l);
 		*lptr = NULL;
 	}
 }
