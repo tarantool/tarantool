@@ -15,6 +15,7 @@
 #include "base64.h"
 #include "random.h"
 #include <lib/salad/guava.h>
+#include <lib/csv/csv.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -66,4 +67,10 @@ void *ffi_symbols[] = {
 	(void *) fiber_time,
 	(void *) fiber_time64,
 	(void *) sophia_schedule,
+	(void *) csv_create,
+	(void *) csv_destroy,
+	(void *) csv_setopt,
+	(void *) csv_iter_create,
+	(void *) csv_next,
+	(void *) csv_feed,
 };

@@ -29,6 +29,7 @@ lua_source(lua_sources lua/help_en_US.lua)
 lua_source(lua_sources lua/tap.lua)
 lua_source(lua_sources lua/fio.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
+lua_source(lua_sources lua/csv.lua)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -103,7 +104,7 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 target_link_libraries(server core)
 
-set (common_libraries server core misc bitset msgpuck)
+set (common_libraries server core misc bitset msgpuck csv)
 
 list(APPEND common_libraries
     ${LIBEIO_LIBRARIES}

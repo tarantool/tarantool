@@ -27,7 +27,8 @@ void small_string_test(const char* const s)
 	csv_create(&csv);
 	csv.emit_field = print_field;
 	csv.emit_row = print_endl;
-	csv_parse(&csv, s, s + strlen(s));
+	csv_parse_chunk(&csv, s, s + strlen(s));
+	csv_finish_parsing(&csv);
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
 	csv_destroy(&csv);
 }
@@ -78,7 +79,8 @@ void test5() {
 	csv.emit_field = print_field;
 	csv.emit_row = print_endl;
 	csv_setopt(&csv, CSV_OPT_DELIMITER, '\t');
-	csv_parse(&csv, s, s + strlen(s));
+	csv_parse_chunk(&csv, s, s + strlen(s));
+	csv_finish_parsing(&csv);
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
 	csv_destroy(&csv);
 	footer();
@@ -92,21 +94,11 @@ void test6() {
 	csv_create(&csv);
 	csv.emit_field = print_field;
 	csv.emit_row = print_endl;
-	const char* t = csv_parse_chunk(&csv, s1, s1 + strlen(s1));
-	t = csv_parse_chunk(&csv, s2, s2 + 2);
-	csv_parse(&csv, s2 + 2, s2 + strlen(s2));
+	csv_parse_chunk(&csv, s1, s1 + strlen(s1));
+	csv_parse_chunk(&csv, s2, s2 + 2);
+	csv_parse_chunk(&csv, s2 + 2, s2 + strlen(s2));
+	csv_finish_parsing(&csv);
 	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
-	csv_destroy(&csv);
-	footer();
-}
-void test_chunk(const char* const s)
-{
-	header();
-	struct csv csv;
-	csv_create(&csv);
-	csv.emit_field = NULL;
-	csv.emit_row = NULL;
-	printf("tail: %s\n", csv_parse_chunk(&csv, s, s + strlen(s)));
 	csv_destroy(&csv);
 	footer();
 }
@@ -161,7 +153,8 @@ void big_chunk_separated_test() {
 		csv_parse_chunk(&csv, bufp, bufp + chunk_size);
 		bufp += chunk_size;
 	}
-	csv_parse(&csv, bufp, buf + bufn);
+	csv_parse_chunk(&csv, bufp, buf + bufn);
+	csv_finish_parsing(&csv);
 
 	//without fieldsizes counts without commas and spaces
 	printf("line_cnt=%d, fieldsizes_cnt=%d, %d\n", (int)cnt.line_cnt, (int)cnt.fieldsizes_cnt,
@@ -185,21 +178,48 @@ void random_generated_test() {
 				"a\r\raa a\" ,baab ,a \rbb   ,\r \r,\rb,,  b"
 				"\n\r\"\nb\n\nb \n,ab \raa\r\"\nb a\"ba,b, c"
 				"\"a\"a \"\r\n\"b \n,b\"\",\nba\n\" \n\na \r"
-				"\nb\rb\"bbba,\" \n\n\n,a,b,a,b,\n\n\n\nb \r"
+				"\nb\rb\"bbba,\" \n\n\n,a,b,a,b,\n\n\n\nb\"\r"
 				);
 
 	footer();
 }
-int main()
-{
+
+void iter_test1() {
+	header();
+	struct csv_iterator it;
+	struct csv csv;
+	csv_create(&csv);
+	csv_iter_create(&it, &csv);
+	int st = 0;
+	const char *buf = ",d ,e\r\n12,42,3\no";
+	while((st = csv_next(&it)) != CSV_IT_EOF) {
+		switch(st) {
+		case CSV_IT_NEEDMORE:
+			csv_feed(&it, buf);
+			buf += strlen(buf);
+			break;
+		case CSV_IT_EOL:
+			printf("\n");
+			break;
+		case CSV_IT_OK:
+			print_field(0, it.field, it.field + it.field_len);
+			break;
+		case CSV_IT_ERROR:
+			printf("\nerror");
+			break;
+		}
+	}
+	csv_destroy(&csv);
+	footer();
+}
+
+int main() {
 	test1();
 	test2();
 	test3();
 	test4();
 	test5();
 	test6(); // blank lines, invalid csv
-	test_chunk("123 , 5  ,       92    , 0, "
-		   " 0\n1, 12  34, 56, \"quote , \", 66\nok");
 	big_chunk_separated_test();
 	random_generated_test();
 	/* comma in quotes */
@@ -252,7 +272,12 @@ int main()
 				"1,2,3\n"
 				"4,5,а нет ли ошибок?\n"
 				);
+	/* ending spaces */
+	common_test("  www  , \"aa\"a , \"tt  \" \n");
 
+
+	//iterator tests
+	iter_test1();
 
 	return 0;
 }

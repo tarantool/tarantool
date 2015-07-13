@@ -5,13 +5,6 @@
 #include <string.h>
 #include <assert.h>
 #include <stdarg.h>
-//parser states
-enum {  CSV_LEADING_SPACES = 0,
-	CSV_OUT_OF_QUOTES = 1,
-	CSV_IN_QUOTES = 2,
-	CSV_BUF_OUT_OF_QUOTES = 3,
-	CSV_BUF_IN_QUOTES = 4
-};
 
 static const double csv_buf_expand_factor = 2.0;
 
@@ -71,23 +64,21 @@ csv_setopt(struct csv *csv, int opt, ...)
 }
 
 const char *
-csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
+csv_parse_common(struct csv *csv, const char *s, const char *end, int onlyfirst)
 {
 	if (end - s == 0)
-		return s;
+		return 0;
 	assert(end - s > 0);
 	if (csv->emit_field == NULL)
 		csv->emit_field = csv_emit_field_empty;
 	if (csv->emit_row == NULL)
 		csv->emit_row = csv_emit_row_empty;
 	const char *p = s;
-	const char *tail = s;
 
-
-	do {
+	 while(p != end) {
 		int isendl = (*p == '\n' || *p == '\r');
 
-		if (csv->buf_len < csv->bufp - csv->buf + 1) {
+		if (csv->buf == 0 || (csv->bufp && csv->buf_len < csv->bufp - csv->buf + 1)) {
 			csv->buf_len = (int)((csv->bufp - csv->buf + 1) * csv_buf_expand_factor + 1);
 			char *new_buf = csv->csv_realloc(csv->buf, csv->buf_len);
 			csv->bufp = csv->bufp - csv->buf + new_buf;
@@ -96,6 +87,7 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 
 		switch(csv->state) {
 		case CSV_LEADING_SPACES: //leading spaces
+			csv->bufp = csv->buf;
 			if (p == end || *p != ' ') {
 				csv->state = CSV_BUF_OUT_OF_QUOTES;
 			}
@@ -109,8 +101,13 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 					space_end++;
 				space_end--;
 				csv->bufp -= space_end;
-				csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
-				tail = p + 1;
+				if(onlyfirst) {
+					csv->state = CSV_NEWLINE;
+					return p;
+				} else {
+					csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
+				}
+
 				csv->bufp = csv->buf;
 			} else if (*p == csv->csv_quote) {
 				if (p + 1 != end && *(p + 1) == csv->csv_quote) {
@@ -119,8 +116,15 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 				} else {
 					csv->state = CSV_BUF_IN_QUOTES;
 				}
-			}  else {
+			} else{
+
 				*csv->bufp++ = *p;
+			}
+
+			if (*p == ' ') {
+				csv->csv_ending_spaces++;
+			} else {
+				csv->csv_ending_spaces = 0;
 			}
 			break;
 		case CSV_BUF_IN_QUOTES:
@@ -135,47 +139,101 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int endfile)
 				*csv->bufp++ = *p;
 			}
 			break;
+		case CSV_NEWLINE:
+			csv->state = CSV_LEADING_SPACES;
+			break;
 		}
-		if (isendl && csv->state != CSV_IN_QUOTES && csv->state != CSV_BUF_IN_QUOTES) {
+		if (isendl && csv->state != CSV_BUF_IN_QUOTES) {
 			assert(csv->state == CSV_LEADING_SPACES);
-			csv->bufp = csv->buf;
-			csv->emit_row(csv->emit_ctx);
+			csv->bufp = 0;
 			if (p != end - 1 && *p != *(p + 1) && (*(p + 1) == '\n' || *(p + 1) == '\r'))
 				p++; //\r\n - is only 1 endl
-			tail = p + 1;
+			if(onlyfirst)
+				return p + 1;
+			else
+				csv->emit_row(csv->emit_ctx);
 		}
 		p++;
-	} while(p != end);
-
-	if (endfile && *(end - 1) != '\n' && *(end - 1) != '\r') {
-		if (csv->state == 2 || csv->state == 4) {
-			csv->csv_invalid = 1;
-		} else {
-			size_t space_end = 1;
-			while (p - space_end > s && *(p - space_end) == ' ')
-				space_end++;
-			space_end--;
-			csv->bufp -= space_end;
-			csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
-			csv->bufp = 0;
-			csv->csv_realloc(csv->buf, 0);
-			csv->buf = 0;
-			csv->buf_len = 0;
-		}
-		csv->emit_row(csv->emit_ctx);
-		return 0;
 	}
-	return tail;
+	return end;
 }
 
 
-const char *
-csv_parse_chunk(struct csv *csv, const char *s, const char *end) {
-	return csv_parse_common(csv, s, end, 0);
-}
 void
-csv_parse(struct csv *csv, const char *s, const char *end)
+csv_parse_chunk(struct csv *csv, const char *s, const char *end) {
+	csv_parse_common(csv, s, end, 0);
+}
+
+void
+csv_finish_parsing(struct csv *csv)
 {
-	csv_parse_common(csv, s, end, 1);
-	return;
+	if (csv->state == CSV_BUF_IN_QUOTES) {
+		csv->csv_invalid = 1;
+	} else {
+		if (csv->bufp) {
+				csv->bufp -= csv->csv_ending_spaces;
+				csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
+				csv->emit_row(csv->emit_ctx);
+		}
+		if (csv->buf)
+			csv->csv_realloc(csv->buf, 0);
+		csv->bufp = 0;
+		csv->buf = 0;
+		csv->buf_len = 0;
+	}
+}
+
+
+void
+csv_iter_create(struct csv_iterator *it, struct csv *csv)
+{
+	memset(it, 0, sizeof(struct csv_iterator));
+	it->csv = csv;
+}
+
+int
+csv_next(struct csv_iterator *it) {
+	it->field = 0;
+	it->field_len = 0;
+	if(it->buf_begin == 0)
+		return CSV_IT_NEEDMORE;
+	if(it->buf_begin == it->buf_end) {
+		if (!it->csv->csv_invalid && it->csv->state == CSV_BUF_IN_QUOTES) {
+			it->csv->csv_invalid = 1;
+			it->csv->csv_realloc(it->csv->buf, 0);
+			it->csv->buf = 0;
+			it->csv->buf_len = 0;
+			return CSV_IT_ERROR;
+		}
+		if(!it->csv->buf) {
+			return CSV_IT_EOF;
+		}
+		if(it->csv->bufp) {
+			it->csv->bufp -= it->csv->csv_ending_spaces;
+			it->field = it->csv->buf;
+			it->field_len = it->csv->bufp - it->csv->buf;
+			it->csv->bufp = 0;
+			return CSV_IT_OK;
+		} else {
+			it->csv->csv_realloc(it->csv->buf, 0);
+			it->csv->buf = 0;
+			it->csv->buf_len = 0;
+			return CSV_IT_EOL;
+		}
+	}
+	const char *tail = csv_parse_common(it->csv, it->buf_begin, it->buf_end, 1);
+	if(tail == it->buf_end)
+		return CSV_IT_NEEDMORE;
+	it->buf_begin = tail;
+	if(it->csv->bufp == 0)
+		return CSV_IT_EOL;
+	it->field = it->csv->buf;
+	it->field_len = it->csv->bufp - it->csv->buf;
+	return CSV_IT_OK;
+}
+
+void
+csv_feed(struct csv_iterator *it, const char *str) {
+	it->buf_begin = str;
+	it->buf_end = str + strlen(str);
 }

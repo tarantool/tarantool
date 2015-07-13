@@ -19,6 +19,7 @@ struct csv
 	char csv_quote;
 
 	int csv_invalid;
+	int csv_ending_spaces;
 
 	void *(*csv_realloc)(void*, size_t);
 
@@ -37,6 +38,23 @@ enum {
 	CSV_OPT_EMIT_ROW,
 	CSV_OPT_CTX
 };
+
+//iteraion states
+enum {
+	CSV_IT_OK,
+	CSV_IT_EOL,
+	CSV_IT_NEEDMORE,
+	CSV_IT_EOF,
+	CSV_IT_ERROR
+};
+
+//parser states
+enum {  CSV_LEADING_SPACES,
+	CSV_BUF_OUT_OF_QUOTES,
+	CSV_BUF_IN_QUOTES,
+	CSV_NEWLINE
+};
+
 void
 csv_create(struct csv *csv);
 
@@ -53,18 +71,13 @@ csv_setopt(struct csv *csv, int opt, ...);
  * Parse input and call emit_row/emit_line.
  * Save tail to inside buffer,
  * next call will concatenate tail and string from args
- * @return the pointer to the unprocessed tail
- */
-const char *
-csv_parse_chunk(struct csv *csv, const char *s, const char *end);
-
-/**
- * Parses the entire buffer, assuming there is no next
- * chunk. Emits the tail of the buffer as a field even
- * if there is no newline at end of input.
  */
 void
-csv_parse(struct csv *csv, const char *s, const char *end);
+csv_parse_chunk(struct csv *csv, const char *s, const char *end);
+
+
+void
+csv_finish_parsing(struct csv *csv);
 
 /**
  * Format variadic arguments and print them into
@@ -79,7 +92,39 @@ csv_snprintf(struct csv *csv, FILE *f, const char *format, ...);
 int
 csv_isvalid(struct csv *csv);
 
+
+struct csv_iterator {
+	struct csv *csv;
+
+	const char *buf_begin;
+	const char *buf_end;
+
+	const char *field;
+	size_t field_len;
+};
+
+void
+csv_iter_create(struct csv_iterator *it, struct csv *csv);
+/**
+ * @brief csv_next recieves next element from csv
+ * element is field or end of line
+ * @return iteration state
+ */
+int
+csv_next(struct csv_iterator *);
+
+/**
+ * @brief csv_feed delivers buffer to iterator
+ * empty buffer means end of iteration
+ */
+void
+csv_feed(struct csv_iterator *, const char *);
+
+#define CSV_ITERATOR_GET_FIELD(it) it->field
+#define CSV_ITERATOR_GET_FLEN(it)  it->field_len
+
 #if defined(__cplusplus)
 }
 #endif /* extern "C" */
 #endif
+

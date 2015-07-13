@@ -39,12 +39,8 @@ valid: yes
 ||	
 ||	
 | |	
-
 valid: NO
 	*** test6: done ***
- 	*** test_chunk ***
-tail: ok
-	*** test_chunk: done ***
  	*** big_chunk_separated_test ***
 line_cnt=10000, fieldsizes_cnt=1920000, 1920000
 	*** big_chunk_separated_test: done ***
@@ -104,7 +100,15 @@ b|
 | 
 
 a 
-bbbbba|	valid: yes
+bbbbba|	| 
+
+
+,a,b,a,b,
+
+
+
+b|	
+valid: yes
 	*** random_generated_test: done ***
  	*** common_test ***
 |first|	|last|	|address|	|city|	|zip|	
@@ -150,4 +154,13 @@ valid: yes
 |4|	|5|	|а нет ли ошибок?|	
 valid: yes
 	*** common_test: done ***
+ 	*** common_test ***
+|www|	|aaa|	|tt  |	
+valid: yes
+	*** common_test: done ***
+ 	*** iter_test1 ***
+||	|d|	|e|	
+|12|	|42|	|3|	
+|o|	
+	*** iter_test1: done ***
  
