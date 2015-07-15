@@ -515,28 +515,60 @@ lua_isarray(struct lua_State *L, int i)
 	return index_starts_at_1;
 }
 
+static inline void
+execute_c_call(struct func *func, struct request *request, struct obuf *out)
+{
+	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	if (func->func == NULL)
+		func_load(func);
+
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+	SetuidGuard setuid(name, name_len, PRIV_X, func);
+
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	auto guard = make_scoped_guard([&]{
+		port_buf_destroy(&port_buf);
+	});
+
+	func->func(request, &port_buf.base);
+
+	if (in_txn()) {
+		say_warn("a transaction is active at CALL return");
+		txn_rollback();
+	}
+
+	struct obuf_svp svp = iproto_prepare_select(out);
+	try {
+		for (struct port_buf_entry *entry = port_buf.first;
+		     entry != NULL; entry = entry->next) {
+			tuple_to_obuf(entry->tuple, out);
+		}
+		iproto_reply_select(out, &svp, request->header->sync,
+				    port_buf.size);
+	} catch (Exception *e) {
+		obuf_rollback_to_svp(out, &svp);
+		txn_rollback();
+		/* Let all well-behaved exceptions pass through. */
+		throw;
+	}
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
 static inline void
-execute_call(lua_State *L, struct request *request, struct obuf *out)
+execute_lua_call(lua_State *L, struct func *func, struct request *request,
+		 struct obuf *out)
 {
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
-	int oc = 0; /* how many objects are on stack after box_lua_find */
 
-	struct func *func = func_by_name(name, name_len);
-	/*
-	 * func == NULL means that perhaps the user has a global
-	 * "EXECUTE" privilege, so no specific grant to a function.
-	 */
-	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
-		/* Try to find a function by name in Lua */
-		oc = box_lua_find(L, name, name + name_len);
-	} else if (func->func == NULL) {
-		func_load(func);
-	}
+	int oc = 0; /* how many objects are on stack after box_lua_find */
+	/* Try to find a function by name in Lua */
+	oc = box_lua_find(L, name, name + name_len);
 	/**
 	 * Check access to the function and optionally change
 	 * execution time user id (set user id). Sic: the order
@@ -548,20 +580,18 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 
-	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
-		uint32_t arg_count = mp_decode_array(&args);
-		luaL_checkstack(L, arg_count, "call: out of stack");
+	uint32_t arg_count = mp_decode_array(&args);
+	luaL_checkstack(L, arg_count, "call: out of stack");
 
-		for (uint32_t i = 0; i < arg_count; i++) {
-			luamp_decode(L, luaL_msgpack_default, &args);
-		}
-		lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-	} else {
-		struct port_lua port;
-		port_lua_create(&port, L);
+	for (uint32_t i = 0; i < arg_count; i++)
+		luamp_decode(L, luaL_msgpack_default, &args);
+	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
 
-		func->func(request, (struct port *) &port);
+	if (in_txn()) {
+		say_warn("a transaction is active at CALL return");
+		txn_rollback();
 	}
+
 	/**
 	 * Add all elements from Lua stack to iproto.
 	 *
@@ -632,15 +662,23 @@ done:
 void
 box_lua_call(struct request *request, struct obuf *out)
 {
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+
+	struct func *func = func_by_name(name, name_len);
+	if (func != NULL && func->def.language == FUNC_LANGUAGE_C)
+		return execute_c_call(func, request, out);
+
+	/*
+	 * func == NULL means that perhaps the user has a global
+	 * "EXECUTE" privilege, so no specific grant to a function.
+	 */
+	assert(func == NULL || func->def.language == FUNC_LANGUAGE_LUA);
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);
 		LuarefGuard coro_ref(tarantool_L);
-		execute_call(L, request, out);
-		if (in_txn()) {
-			say_warn("a transaction is active at CALL return");
-			txn_rollback();
-		}
+		execute_lua_call(L, func, request, out);
 	} catch (Exception *e) {
 		txn_rollback();
 		/* Let all well-behaved exceptions pass through. */
