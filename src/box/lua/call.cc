@@ -221,53 +221,8 @@ lbox_request_create(struct request *request,
 	}
 }
 
-static void
-port_ffi_add_tuple(struct port *port, struct tuple *tuple)
-{
-	struct port_ffi *port_ffi = (struct port_ffi *) port;
-	if (port_ffi->size >= port_ffi->capacity) {
-		uint32_t capacity = (port_ffi->capacity > 0) ?
-				2 * port_ffi->capacity : 1024;
-		struct tuple **ret = (struct tuple **)
-			realloc(port_ffi->ret, sizeof(*ret) * capacity);
-		assert(ret != NULL);
-		port_ffi->ret = ret;
-		port_ffi->capacity = capacity;
-	}
-	tuple_ref(tuple);
-	port_ffi->ret[port_ffi->size++] = tuple;
-}
-
-struct port_vtab port_ffi_vtab = {
-	port_ffi_add_tuple,
-	null_port_eof,
-};
-
-void
-port_ffi_create(struct port_ffi *port)
-{
-	memset(port, 0, sizeof(*port));
-	port->vtab = &port_ffi_vtab;
-}
-
-static inline void
-port_ffi_clear(struct port_ffi *port)
-{
-	for (uint32_t i = 0; i < port->size; i++) {
-		tuple_unref(port->ret[i]);
-		port->ret[i] = NULL;
-	}
-	port->size = 0;
-}
-
-void
-port_ffi_destroy(struct port_ffi *port)
-{
-	free(port->ret);
-}
-
 int
-boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
+boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	      int iterator, uint32_t offset, uint32_t limit,
 	      const char *key, const char *key_end)
 {
@@ -281,21 +236,10 @@ boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 	request.key = key;
 	request.key_end = key_end;
 
-	/*
-	 * A single instance of port_ffi object is used
-	 * for all selects, reset it.
-	 */
-	port->size = 0;
 	try {
-		box_process(&request, (struct port *) port);
+		box_process(&request, port);
 		return 0;
 	} catch (Exception *e) {
-		/*
-		 * The tuples will be not blessed and garbage
-		 * collected, unreference them here, to avoid
-		 * a leak.
-		 */
-		port_ffi_clear(port);
 		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
