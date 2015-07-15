@@ -38,6 +38,15 @@ csv_destroy(struct csv *csv)
 	}
 }
 
+int csv_isvalid(struct csv *csv)
+{
+	if (csv->prevsymb == csv->csv_quote) {
+		csv->state = csv->state == CSV_BUF_IN_QUOTES ? CSV_BUF_OUT_OF_QUOTES : CSV_BUF_IN_QUOTES;
+		csv->prevsymb = ' ';
+	}
+	csv->csv_invalid = csv->state  == CSV_BUF_IN_QUOTES;
+	return !csv->csv_invalid;
+}
 void
 csv_setopt(struct csv *csv, int opt, ...)
 {
@@ -166,9 +175,7 @@ csv_parse_chunk(struct csv *csv, const char *s, const char *end) {
 void
 csv_finish_parsing(struct csv *csv)
 {
-	if (csv->state == CSV_BUF_IN_QUOTES) {
-		csv->csv_invalid = 1;
-	} else {
+	if (csv_isvalid(csv)){
 		if (csv->bufp) {
 				csv->bufp -= csv->csv_ending_spaces;
 				csv->emit_field(csv->emit_ctx, csv->buf, csv->bufp);
@@ -197,7 +204,7 @@ csv_next(struct csv_iterator *it) {
 	if(it->buf_begin == 0)
 		return CSV_IT_NEEDMORE;
 	if(it->buf_begin == it->buf_end) {
-		if (!it->csv->csv_invalid && it->csv->state == CSV_BUF_IN_QUOTES) {
+		if (!it->csv->csv_invalid && !csv_isvalid(it->csv)) {
 			it->csv->csv_invalid = 1;
 			it->csv->csv_realloc(it->csv->buf, 0);
 			it->csv->buf = 0;
