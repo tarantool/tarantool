@@ -46,7 +46,9 @@ line_cnt=10000, fieldsizes_cnt=1920000, 1920000
 	*** big_chunk_separated_test: done ***
  	*** random_generated_test ***
 ||	
-| ba aa, 
+| ba
+ a
+a, 
 |	
 |a
 b|	
@@ -57,13 +59,17 @@ b|
 |	
 ||	|a|	||	|a
 
- |	
+
+ |	
 |ba|	
 ||	|b  a|	||	
 ||	|"a|	
 |b|	
-||	|,a,a ,c a|	|b|	
-||	|baa|	
+||	|,a
+,a ,
+c a|	|b|	
+||	|b
+aa|	
 |b|	
 ||	
 ||	
@@ -73,8 +79,12 @@ b|
 ||	
 |aa|	
 |
- abab, b|	
-|,   ,,babb
+ ab
+ab,
+ b|	
+|,   ,,
+bab
+b
 a
 a|	
 |a|	|"|	||	
@@ -85,8 +95,13 @@ a|
 |a|	
 |a|	
 ||	
-|aa a ,baab ,a bb   , ,b,,  b
-|	
+|aa a ,baab ,a 
+bb   ,
+ 
+,
+b,,  b
+
+|	
 |b|	
 ||	
 |b|	
@@ -100,7 +115,8 @@ b|
 | 
 
 a 
-bbbbba|	| 
+b
+bbbba|	| 
 
 
 ,a,b,a,b,
@@ -163,4 +179,8 @@ valid: yes
 |12|	|42|	|3|	
 |o|	
 	*** iter_test1: done ***
+ 	*** iter_test2 ***
+|1|	
+|23|	
+	*** iter_test2: done ***
  

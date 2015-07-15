@@ -51,11 +51,11 @@ ffi.cdef[[
 ]]
 
 csv = {
-loadcsv = function(readable)
+loadcsv = function(readable, csv_chunk_size)
+    csv_chunk_size = csv_chunk_size or 4096
     if type(readable.read) ~= "function" then
        error("Usage: loadcsv(object with read method)")
     end
-    csv_chunk_size = 4096
     local log = require('log')
 
     local it = ffi.new('csv_iterator_t[1]')

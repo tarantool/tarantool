@@ -18,6 +18,7 @@ struct csv
 	char csv_delim;
 	char csv_quote;
 
+	char prevsymb;
 	int csv_invalid;
 	int csv_ending_spaces;
 
@@ -52,7 +53,8 @@ enum {
 enum {  CSV_LEADING_SPACES,
 	CSV_BUF_OUT_OF_QUOTES,
 	CSV_BUF_IN_QUOTES,
-	CSV_NEWLINE
+	CSV_NEWLINE,
+	CSV_END_OF_INPUT
 };
 
 void

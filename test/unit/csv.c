@@ -14,8 +14,12 @@ void
 print_field(void *ctx, const char *s, const char *end)
 {
 	putchar('|');
-	for(const char *p = s; p != end && *p; p++)
-		putchar(*p);
+	for(const char *p = s; p != end && *p; p++) {
+		if((*p == '\r' || *p == '\n') && (p + 1 == end || (*(p + 1) != '\r' && *(p + 1) != '\n')))
+			putchar('\n');
+		else
+			putchar(*p);
+	}
 	putchar('|');
 	putchar('\t');
 	fflush(stdout);
@@ -191,12 +195,42 @@ void iter_test1() {
 	csv_create(&csv);
 	csv_iter_create(&it, &csv);
 	int st = 0;
-	const char *buf = ",d ,e\r\n12,42,3\no";
+	const char *buf = ",d ,e\r\n12,42,3\no\n";
 	while((st = csv_next(&it)) != CSV_IT_EOF) {
 		switch(st) {
 		case CSV_IT_NEEDMORE:
 			csv_feed(&it, buf);
 			buf += strlen(buf);
+			break;
+		case CSV_IT_EOL:
+			printf("\n");
+			break;
+		case CSV_IT_OK:
+			print_field(0, it.field, it.field + it.field_len);
+			break;
+		case CSV_IT_ERROR:
+			printf("\nerror");
+			break;
+		}
+	}
+	csv_destroy(&csv);
+	footer();
+}
+
+void iter_test2() {
+	header();
+	struct csv_iterator it;
+	struct csv csv;
+	csv_create(&csv);
+	csv_iter_create(&it, &csv);
+	int st = 0;
+	const char ar[] = {'1', '\n', 0, '2', '3', 0, 0};
+	const char *buf = ar;
+	while((st = csv_next(&it)) != CSV_IT_EOF) {
+		switch(st) {
+		case CSV_IT_NEEDMORE:
+			csv_feed(&it, buf);
+			buf += 3;
 			break;
 		case CSV_IT_EOL:
 			printf("\n");
@@ -278,6 +312,7 @@ int main() {
 
 	//iterator tests
 	iter_test1();
+	iter_test2();
 
 	return 0;
 }
