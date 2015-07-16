@@ -378,6 +378,7 @@ box_free(void)
 	user_cache_free();
 	schema_free();
 	tuple_free();
+	port_free();
 	recovery_exit(recovery);
 	recovery = NULL;
 	engine_shutdown();
@@ -464,6 +465,7 @@ box_init(void)
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
+	port_init();
 	iproto_init();
 	box_set_listen(cfg_gets("listen"));
 

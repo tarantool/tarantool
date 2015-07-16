@@ -90,16 +90,16 @@ func_load(struct func *func)
 	 * Extract package name from function name.
 	 * E.g. name = foo.bar.baz, function = baz, package = foo.bar
 	 */
+	const char *sym;
 	const char *package = func->def.name;
-	const char *package_end = NULL;
-	const char *sym = package;
-	while ((sym = strchr(sym, '.')))
-		package_end = sym;
-	if (package_end == NULL) {
+	const char *package_end = strrchr(package, '.');
+	if (package_end != NULL) {
+		/* module.submodule.function => module.submodule, function */
+		sym = package_end + 1;
+	} else {
+		/* package == function => function, function */
 		sym = package;
 		package_end = package + strlen(package);
-	} else {
-		sym = package_end + 1;
 	}
 
 	/* First argument of searchpath: name */
