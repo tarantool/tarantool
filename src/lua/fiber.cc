@@ -239,6 +239,17 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 	lua_pushnumber(L, f->csw);
 	lua_settable(L, -3);
 
+	lua_pushliteral(L, "memory");
+	lua_newtable(L);
+	lua_pushstring(L, "used");
+	lua_pushnumber(L, region_used(&f->gc));
+	lua_settable(L, -3);
+	lua_pushstring(L, "total");
+	lua_pushnumber(L, region_total(&f->gc) + f->coro.stack_size +
+		       sizeof(struct fiber));
+	lua_settable(L, -3);
+	lua_settable(L, -3);
+
 #ifdef ENABLE_BACKTRACE
 	lua_pushstring(L, "backtrace");
 	lua_newtable(L);
