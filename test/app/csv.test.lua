@@ -93,6 +93,14 @@ f:close()
 print("test roundtrip: ")
 print(table2str(t) == table2str(t2))
 
+print("test iterate, only first field:")
+f = fio.open(file2, {'O_RDONLY'}) 
+for tup in csv.iterate(f) do
+    print(tup[1])
+end
+f:close()
+
+
 fio.unlink(file1)
 fio.unlink(file2)
 fio.unlink(file3)

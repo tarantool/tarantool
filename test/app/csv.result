@@ -42,3 +42,12 @@ fio test4:
 
 test roundtrip: 
 true
+test iterate, only first field:
+1
+23
+none
+
+aba
+local res = internal.pwrite(self.fh
+iflag = bit.bor(iflag
+
