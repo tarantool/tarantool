@@ -77,7 +77,9 @@ csv_setopt(struct csv *csv, int opt, ...);
 void
 csv_parse_chunk(struct csv *csv, const char *s, const char *end);
 
-
+/**
+ * emits all remaining symbols from buffer
+ */
 void
 csv_finish_parsing(struct csv *csv);
 
@@ -87,7 +89,9 @@ csv_finish_parsing(struct csv *csv);
 int
 csv_isvalid(struct csv *csv);
 
-
+/**
+ * @brief The csv_iterator struct allows iterate field by field through csv
+ */
 struct csv_iterator {
 	struct csv *csv;
 
@@ -101,7 +105,7 @@ struct csv_iterator {
 void
 csv_iter_create(struct csv_iterator *it, struct csv *csv);
 /**
- * @brief csv_next recieves next element from csv
+ * Recieves next element from csv
  * element is field or end of line
  * @return iteration state
  */
@@ -117,9 +121,8 @@ csv_feed(struct csv_iterator *, const char *);
 
 /**
  * @brief csv_escape_field adds pair quote and
- * if there is comma in field, adds surrounding quotes
+ * if there is comma or linebreak in field, adds surrounding quotes
  */
-
 int
 csv_escape_field(struct csv *csv, const char *field, char *dst);
 
