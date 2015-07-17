@@ -7,6 +7,7 @@
 #include <box/lua/tuple.h>
 #include <box/lua/call.h>
 #include <box/sophia_engine.h>
+#include <box/port.h>
 #include <lua/init.h>
 #include "main.h"
 #include "lua/bsdsocket.h"
@@ -43,8 +44,6 @@ void *ffi_symbols[] = {
 	(void *) boxffi_index_iterator,
 	(void *) boxffi_tuple_update,
 	(void *) boxffi_iterator_next,
-	(void *) port_ffi_create,
-	(void *) port_ffi_destroy,
 	(void *) boxffi_select,
 	(void *) password_prepare,
 	(void *) tarantool_error_message,
@@ -71,4 +70,7 @@ void *ffi_symbols[] = {
 	(void *) ibuf_create,
 	(void *) ibuf_destroy,
 	(void *) ibuf_reserve_nothrow_slow,
+	(void *) port_buf_create,
+	(void *) port_buf_destroy,
+	(void *) port_buf_transfer
 };

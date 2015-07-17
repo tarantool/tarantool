@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "lib/salad/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -90,6 +91,40 @@ extern struct port null_port;
 /** Reused in port_lua */
 void
 null_port_eof(struct port *port __attribute__((unused)));
+
+struct port_buf_entry {
+	struct port_buf_entry *next;
+	struct tuple *tuple;
+};
+
+struct port_buf {
+	struct port base;
+	size_t size;
+	struct port_buf_entry *first;
+	struct port_buf_entry *last;
+	struct port_buf_entry first_entry;
+};
+
+void
+port_buf_create(struct port_buf *port_buf);
+
+/**
+ * Unref all tuples and free allocated memory
+ */
+void
+port_buf_destroy(struct port_buf *port_buf);
+
+/**
+ * Like port_buf_destroy() but doesn't do tuple_unref()
+ */
+void
+port_buf_transfer(struct port_buf *port_buf);
+
+void
+port_init(void);
+
+void
+port_free(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

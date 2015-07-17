@@ -44,7 +44,7 @@ add_library(box
     alter.cc
     schema.cc
     session.cc
-    port.c
+    port.cc
     request.cc
     txn.cc
     box.cc
