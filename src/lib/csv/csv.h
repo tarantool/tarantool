@@ -82,13 +82,6 @@ void
 csv_finish_parsing(struct csv *csv);
 
 /**
- * Format variadic arguments and print them into
- * a stream, adding CSV markup.
- */
-int
-csv_snprintf(struct csv *csv, FILE *f, const char *format, ...);
-
-/**
  * if quote not closed returns 0
  */
 int
@@ -121,6 +114,14 @@ csv_next(struct csv_iterator *);
  */
 void
 csv_feed(struct csv_iterator *, const char *);
+
+/**
+ * @brief csv_escape_field adds pair quote and
+ * if there is comma in field, adds surrounding quotes
+ */
+
+int
+csv_escape_field(struct csv *csv, const char *field, char *dst);
 
 #define CSV_ITERATOR_GET_FIELD(it) it->field
 #define CSV_ITERATOR_GET_FLEN(it)  it->field_len

@@ -183,4 +183,7 @@ valid: yes
 |1|	
 |23|	
 	*** iter_test2: done ***
+ 	*** csv_out ***
+abc<len=3>,"with,comma"<len=12>,""in quotes""<len=13>,1 "" quote<len=10>
+	*** csv_out: done ***
  

@@ -247,6 +247,22 @@ void iter_test2() {
 	footer();
 }
 
+void csv_out() {
+	header();
+
+	const char fields[4][36] = { "abc", "with,comma", "\"in quotes\"", "1 \" quote"};
+	char buf[18];
+	int i;
+	struct csv csv;
+	csv_create(&csv);
+	for(i = 0; i < 4; i++) {
+		int len = csv_escape_field(&csv, fields[i], buf);
+		printf("%s<len=%d>%c", buf, len, i == 3 ? '\n' : ',');
+	}
+
+	footer();
+}
+
 int main() {
 	test1();
 	test2();
@@ -314,5 +330,7 @@ int main() {
 	iter_test1();
 	iter_test2();
 
+	//output test
+	csv_out();
 	return 0;
 }

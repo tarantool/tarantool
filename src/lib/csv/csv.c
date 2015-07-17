@@ -242,7 +242,28 @@ csv_next(struct csv_iterator *it) {
 }
 
 void
-csv_feed(struct csv_iterator *it, const char *str) {
+csv_feed(struct csv_iterator *it, const char *str)
+{
 	it->buf_begin = str;
 	it->buf_end = str + strlen(str);
+}
+
+int
+csv_escape_field(struct csv *csv, const char *field, char *dst)
+{
+	char *p = dst;
+	int inquotes = 0;
+	if(strchr(field, csv->csv_delim) || strchr(field, '\n') || strchr(field, '\r')) {
+		inquotes = 1;
+		*p++ = csv->csv_quote;
+	}
+	while(*field) {
+		if(*field == csv->csv_quote)
+			*p++ = csv->csv_quote;
+		*p++ = *field++;
+	}
+	if(inquotes)
+		*p++ = csv->csv_quote;
+	*p = 0;
+	return p - dst;
 }
