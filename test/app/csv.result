@@ -1,0 +1,44 @@
+obj test1:
+|a|	|b|	
+|1|	|ha
+"ha"
+ha|	
+|3|	|4|	
+
+obj test2:
+||	||	||	
+||	||	
+||	
+
+obj test3:
+||	||	
+|kp"v|	
+
+fio test1:
+|123|	|5|	|92|	|0|	|0|	
+|1|	|12  34|	|56|	|quote , |	|66|	
+|ok|	
+
+fio test2:
+fio test3:
+|1|	
+|23|	|456|	|abcac|	|'multiword field 4'|	
+|none|	|none|	|0|	
+||	||	||	
+|aba|	|adda|	|f3|	|0|	
+|local res = internal.pwrite(self.fh|	|data|	|len|	|offset)|	
+|iflag = bit.bor(iflag|	|fio.c.flag[ flag ])|	
+||	||	||	
+
+fio test4:
+|1|	
+|23|	|456|	|abcac|	|'multiword field 4'|	
+|none|	|none|	|0|	
+||	||	||	
+|aba|	|adda|	|f3|	|0|	
+|local res = internal.pwrite(self.fh|	|data|	|len|	|offset)|	
+|iflag = bit.bor(iflag|	|fio.c.flag[ flag ])|	
+||	||	||	
+
+test roundtrip: 
+true
