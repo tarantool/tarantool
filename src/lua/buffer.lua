@@ -17,10 +17,11 @@ struct ibuf
     char *wpos;
     /** End of ibuf. */
     char *epos;
+    size_t start_capacity;
 };
 
 void
-ibuf_create(struct ibuf *ibuf, struct slab_cache *slabc);
+ibuf_create(struct ibuf *ibuf, struct slab_cache *slabc, size_t start_capacity);
 
 void
 ibuf_destroy(struct ibuf *ibuf);
@@ -28,7 +29,7 @@ ibuf_destroy(struct ibuf *ibuf);
 void
 ibuf_reinit(struct ibuf *ibuf);
 
-int
+void *
 ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size);
 ]]
 
@@ -55,7 +56,7 @@ local function ibuf_pos(buf)
     return tonumber(buf.rpos - buf.buf)
 end
 
-local function ibuf_size(buf)
+local function ibuf_used(buf)
     checkibuf(buf, 'size')
     return tonumber(buf.wpos - buf.rpos)
 end
@@ -77,9 +78,11 @@ local function ibuf_reset(buf)
 end
 
 local function ibuf_reserve_slow(buf, size)
-    if builtin.ibuf_reserve_nothrow_slow(buf, size) ~= 0 then
+    local ptr = builtin.ibuf_reserve_nothrow_slow(buf, size)
+    if ptr == nil then
         errorf("Failed to allocate %d bytes in ibuf", size)
     end
+    return ffi.cast('char *', ptr)
 end
 
 local function ibuf_reserve(buf, size)
@@ -87,24 +90,25 @@ local function ibuf_reserve(buf, size)
     if buf.wpos + size <= buf.epos then
         return buf.wpos
     end
-    ibuf_reserve_slow(buf, size)
-    return buf.wpos
+    return ibuf_reserve_slow(buf, size)
 end
 
 local function ibuf_alloc(buf, size)
     checkibuf(buf, 'alloc')
-    if buf.wpos + size > buf.epos then
-        ibuf_reserve_slow(buf, size)
+    local wpos
+    if buf.wpos + size <= buf.epos then
+        wpos = buf.wpos
+    else
+        wpos = ibuf_reserve_slow(buf, size)
     end
-    local wpos = buf.wpos
-    buf.wpos = wpos + size
+    buf.wpos = buf.wpos + size
     return wpos
 end
 
 local function checksize(buf, size)
     if ibuf.rpos + size > ibuf.wpos then
         errorf("Attempt to read out of range bytes: needed=%d size=%d",
-            tonumber(size), ibuf_size(buf))
+            tonumber(size), ibuf_used(buf))
     end
 end
 
@@ -123,7 +127,7 @@ local function ibuf_read(buf, size)
 end
 
 local ibuf_properties = {
-    size = ibuf_size;
+    size = ibuf_used;
     capacity = ibuf_capacity;
     pos = ibuf_pos;
     unused = ibuf_unused;
@@ -175,7 +179,7 @@ ffi.metatype(ibuf_t, ibuf_mt);
 local function ibuf_new(arg, arg2)
     local buf = ffi.new(ibuf_t)
     local slabc = builtin.tarantool_lua_slab_cache()
-    builtin.ibuf_create(buf, slabc)
+    builtin.ibuf_create(buf, slabc, 16320)
     if arg == nil then
         return buf
     elseif type(arg) == 'number' then

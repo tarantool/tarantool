@@ -49,7 +49,7 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	struct ibuf *in = &iobuf->in;
 
 	/* Read fixed header */
-	if (ibuf_size(in) < 1)
+	if (ibuf_used(in) < 1)
 		coio_breadn(coio, in, 1);
 
 	/* Read length */
@@ -64,7 +64,7 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	uint32_t len = mp_decode_uint((const char **) &in->rpos);
 
 	/* Read header and body */
-	to_read = len - ibuf_size(in);
+	to_read = len - ibuf_used(in);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 

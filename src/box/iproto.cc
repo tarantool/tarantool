@@ -260,8 +260,8 @@ static inline bool
 iproto_connection_is_idle(struct iproto_connection *con)
 {
 	return !evio_is_active(&con->input) &&
-		ibuf_size(&con->iobuf[0]->in) == 0 &&
-		ibuf_size(&con->iobuf[1]->in) == 0;
+		ibuf_used(&con->iobuf[0]->in) == 0 &&
+		ibuf_used(&con->iobuf[1]->in) == 0;
 }
 
 static void
@@ -389,7 +389,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 		return oldbuf;
 
 	/** All requests are processed, reuse the buffer. */
-	if (ibuf_size(&oldbuf->in) == con->parse_size) {
+	if (ibuf_used(&oldbuf->in) == con->parse_size) {
 		ibuf_reserve(&oldbuf->in, to_read);
 		return oldbuf;
 	}
@@ -525,7 +525,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 static inline struct iobuf *
 iproto_connection_output_iobuf(struct iproto_connection *con)
 {
-	if (obuf_size(&con->iobuf[1]->out))
+	if (obuf_used(&con->iobuf[1]->out))
 		return con->iobuf[1];
 	/*
 	 * Don't try to write from a newer buffer if an older one
@@ -533,8 +533,8 @@ iproto_connection_output_iobuf(struct iproto_connection *con)
 	 * the client may end up getting a salad of different
 	 * pieces of replies from both buffers.
 	 */
-	if (ibuf_size(&con->iobuf[1]->in) == 0 &&
-	    obuf_size(&con->iobuf[0]->out))
+	if (ibuf_used(&con->iobuf[1]->in) == 0 &&
+	    obuf_used(&con->iobuf[0]->out))
 		return con->iobuf[0];
 	return NULL;
 }
@@ -559,12 +559,12 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 	}
 
 	if (nwr > 0) {
-		if (svp->size + nwr == obuf_size(&iobuf->out)) {
+		if (svp->used + nwr == obuf_used(&iobuf->out)) {
 			iobuf_reset(iobuf);
 			*svp = obuf_create_svp(&iobuf->out);
 			return 0;
 		}
-		svp->size += nwr;
+		svp->used += nwr;
 		svp->pos += sio_move_iov(iov, nwr, &svp->iov_len);
 	}
 	return -1;
