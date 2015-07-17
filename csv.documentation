@@ -1,0 +1,40 @@
+Tarantool supports CSV file input/output.
+CSV is comma separated values, like this:
+example.txt:
+package,method,return value
+fio,pathjoin,string
+csv,load,table
+none,",comma in field", and ""quote""
+
+Commas in fields must be in quotes
+If there are quotes in a field, it must be double-quotes.
+You can set delimiter and quote character:
+    csv.delimiter = ','
+    csv.quote = '"'
+
+csv.iterate = function(readable[, csv_chunk_size])
+--@brief parse csv string by string
+--@param readable must be string or object with method read(num) returns string
+--@param csv_chunk_size (default 4096). Parser will read by csv_chunk_size symbols
+--@return iter function, iterator state
+
+Example:
+    f = require("fio").open("example.txt", { "O_RDONLY"})
+    for tup in csv.iterate(f) do
+        print(tup[1], tup[2], tup[3])
+    end
+Output:
+    package method  return value
+    fio     pathjoin        string
+    csv     load    table
+    none    ,comma in field and "quote"
+
+csv.load = function(readable, csv_chunk_size)
+--@brief parse csv and make table
+--@return table
+
+
+csv.dump = function(t, writable)
+--@brief dumps tuple or table as csv
+--@param writable must be object with method write(string) like file or socket
+--@return there is no writable it returns csv as string

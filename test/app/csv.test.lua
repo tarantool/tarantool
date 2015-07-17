@@ -84,7 +84,7 @@ t = {
 }
 
 f = require("fio").open(file3, { "O_WRONLY", "O_TRUNC" , "O_CREAT"}, 0x1FF)
-csv.dump(f, t)
+csv.dump(t, f)
 f:close()
 f = fio.open(file3, {'O_RDONLY'}) 
 t2 = csv.load(f, 5)
@@ -100,6 +100,9 @@ for tup in csv.iterate(f) do
 end
 f:close()
 
+print("test str dump:")
+print(csv.dump(t))
+print("test load(dump(t)): " .. tostring(table2str(t) == table2str(csv.load(csv.dump(t)))))
 
 fio.unlink(file1)
 fio.unlink(file2)

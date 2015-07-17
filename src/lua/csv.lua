@@ -75,64 +75,112 @@ local iter = function(csvstate)
     end
 end
 
-local csv = {
-    iterate = function(readable, csv_chunk_size)
-        csv_chunk_size = csv_chunk_size or 4096
-        if type(readable.read) ~= "function" then
-            error("Usage: load(object with read method)")
-        end
-
-        local it = ffi.new('csv_iterator_t[1]')
-        local csv = ffi.new('csv_t[1]')
-        ffi.C.csv_create(csv)
-        ffi.C.csv_iter_create(it, csv)
-
-        return iter, {readable, csv_chunk_size, csv, it}
-    end,
-    load = function(readable, csv_chunk_size)
-        csv_chunk_size = csv_chunk_size or 4096
-        if type(readable.read) ~= "function" then
-            error("Usage: load(object with read method)")
-        end
-
-        result = {}
-        for tup in csv.iterate(readable, csv_chunk_size) do
-            table.insert(result, tup)
-        end
-
-        return result
-    end,
-    dump = function(writable, t)
-        if type(writable.write) ~= "function" or type(t) ~= "table" then
-            error("Usage: dump(writable, table)")
-        end
-        local csv = ffi.new('csv_t[1]')
-        ffi.C.csv_create(csv)
-        local bufsz = 256
-        --local buf = ffi.new('char[?]', bufsz)
-        local buf = csv[0].csv_realloc(ffi.cast(ffi.typeof('void *'), 0), bufsz)
-        if type(t[1]) ~= 'table' then
-            t = {t}
-        end
-        for k, line in pairs(t) do
-            local first = true
-            for k2, field in pairs(line) do
-                strf = tostring(field)
-                if (strf:len() + 1) * 2 > bufsz then
-                    bufsz = (strf:len() + 1) * 2
-                    buf = csv[0].csv_realloc(buf, bufsz)
-                end
-                local len = ffi.C.csv_escape_field(csv, strf, buf)
-                if first then
-                    first = false
-                else
-                    writable:write(',')
-                end
-                writable:write(ffi.string(buf, len))
-            end
-            writable:write('\n')
-        end
-        csv[0].csv_realloc(buf, 0)
+local make_readable = function(s)
+    rd = {}
+    rd.val = s
+    rd.read = function(self, cnt)
+        local res = self.val;
+        self.val = ""
+        return res
     end
-}
-return csv
+    return rd
+end
+
+local make_writable = function()
+    wr = {}
+    wr.returnstring = ""
+    wr.write = function(self, s)
+        wr.returnstring = wr.returnstring .. s
+    end
+    return wr
+end
+
+local module = {}
+
+module.delimiter = ','
+module.quote = '"'
+
+--@brief parse csv string by string
+--@param readable must be string or object with method read(num) returns string
+--@param csv_chunk_size (default 4096). Parser will read by csv_chunk_size symbols
+--@return iter function, iterator state
+module.iterate = function(readable, csv_chunk_size)
+    csv_chunk_size = csv_chunk_size or 4096
+    if type(readable) == "string" then
+        readable = make_readable(readable)
+    end
+    if type(readable.read) ~= "function" then
+        error("Usage: load(object with method read(num) returns string)")
+    end
+
+    local str = readable:read(csv_chunk_size)
+    if not str then
+        error("Usage: load(object with method read(num) returns string)")
+    end
+    local it = ffi.new('csv_iterator_t[1]')
+    local csv = ffi.new('csv_t[1]')
+    ffi.C.csv_create(csv)
+    csv[0].csv_delim = string.byte(module.delimiter)
+    csv[0].csv_quote = string.byte(module.quote)
+    ffi.C.csv_iter_create(it, csv)
+    ffi.C.csv_feed(it, str)
+
+    return iter, {readable, csv_chunk_size, csv, it}
+end
+
+--@brief parse csv and make table
+--@return table
+module.load = function(readable, csv_chunk_size)
+    csv_chunk_size = csv_chunk_size or 4096
+    result = {}
+    for tup in module.iterate(readable, csv_chunk_size) do
+        table.insert(result, tup)
+    end
+
+    return result
+end
+
+--@brief dumps tuple or table as csv
+--@param writable must be object with method write(string) like file or socket
+--@return there is no writable it returns csv as string
+module.dump = function(t, writable)
+    if type(writable) == "nil" then
+        writable = make_writable()
+    end
+    if type(writable.write) ~= "function" or type(t) ~= "table" then
+        error("Usage: dump(writable, table)")
+    end
+    local csv = ffi.new('csv_t[1]')
+    ffi.C.csv_create(csv)
+    csv[0].csv_delim = string.byte(module.delimiter)
+    csv[0].csv_quote = string.byte(module.quote)
+    local bufsz = 256
+    local buf = csv[0].csv_realloc(ffi.cast(ffi.typeof('void *'), 0), bufsz)
+    if type(t[1]) ~= 'table' then
+        t = {t}
+    end
+    for k, line in pairs(t) do
+        local first = true
+        for k2, field in pairs(line) do
+            strf = tostring(field)
+            if (strf:len() + 1) * 2 > bufsz then
+                bufsz = (strf:len() + 1) * 2
+                buf = csv[0].csv_realloc(buf, bufsz)
+            end
+            local len = ffi.C.csv_escape_field(csv, strf, buf)
+            if first then
+                first = false
+            else
+                writable:write(module.delimiter)
+            end
+            writable:write(ffi.string(buf, len))
+        end
+        writable:write('\n')
+    end
+    csv[0].csv_realloc(buf, 0)
+    if writable.returnstring then
+        return writable.returnstring
+    end
+end
+
+return module

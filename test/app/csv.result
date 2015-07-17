@@ -51,3 +51,18 @@ aba
 local res = internal.pwrite(self.fh
 iflag = bit.bor(iflag
 
+test str dump:
+quote"" d,",and, comma","both "" of "" t,h,e,m"
+"""""",","","""
+"mul
+ti
+li
+ne
+
+",field
+
+""
+"
+"
+
+test load(dump(t)): true
