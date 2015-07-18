@@ -525,7 +525,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 static inline struct iobuf *
 iproto_connection_output_iobuf(struct iproto_connection *con)
 {
-	if (obuf_used(&con->iobuf[1]->out))
+	if (obuf_used(&con->iobuf[1]->out) &&
+	    obuf_used(&con->iobuf[1]->out) > con->write_pos.used)
 		return con->iobuf[1];
 	/*
 	 * Don't try to write from a newer buffer if an older one
@@ -534,7 +535,8 @@ iproto_connection_output_iobuf(struct iproto_connection *con)
 	 * pieces of replies from both buffers.
 	 */
 	if (ibuf_used(&con->iobuf[1]->in) == 0 &&
-	    obuf_used(&con->iobuf[0]->out))
+	    obuf_used(&con->iobuf[0]->out) &&
+	    obuf_used(&con->iobuf[0]->out) > con->write_pos.used)
 		return con->iobuf[0];
 	return NULL;
 }
