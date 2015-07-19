@@ -45,4 +45,11 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_new_size, int index_base);
 
+const char *
+tuple_upsert_execute(region_alloc_func alloc, void *alloc_ctx,
+		     const char *expr,const char *expr_end,
+		     const char *old_data, const char *old_data_end,
+		     uint32_t *p_new_size, int index_base);
+
+
 #endif /* TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED */

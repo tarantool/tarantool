@@ -115,6 +115,55 @@ execute_update(struct request *request, struct port *port)
 }
 
 static void
+execute_upsert(struct request *request, struct port *port)
+{
+	struct space *space = space_cache_find(request->space_id);
+	struct txn *txn = txn_begin_stmt(request, space);
+
+	access_check_space(space, PRIV_W);
+	Index *pk = index_find(space, 0);
+	/* Try to find the tuple by primary key. */
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	TupleGuardSafe old_guard(old_tuple);
+
+	/* Update the tuple. */
+	struct tuple *new_tuple =
+		tuple_upsert(space->format, region_alloc_cb,
+			     &fiber()->gc, old_tuple,
+			     request->extra_tuple, request->extra_tuple_end,
+			     request->tuple, request->tuple_end,
+			     request->index_base);
+	TupleGuard guard(new_tuple);
+	try {
+		space_validate_tuple(space, new_tuple);
+		if (old_tuple &&
+		   !engine_auto_check_update(space->handler->engine->flags))
+			space_check_update(space, old_tuple, new_tuple);
+		txn_replace(txn, space, old_tuple, new_tuple,
+			    old_tuple ? DUP_REPLACE : DUP_INSERT);
+	} catch (ClientError *e) {
+		say_error("The following error occured during UPSERT "
+				  "operation:");
+		e->log();
+		txn_rollback_stmt();
+		if (old_tuple)
+			port_add_tuple(port, old_tuple);
+		return;
+	}
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, new_tuple);
+}
+
+static void
 execute_delete(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
@@ -202,7 +251,7 @@ process_rw(struct request *request, struct port *port)
 	assert(iproto_type_is_dml(request->type));
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
-		execute_update, execute_delete
+		execute_update, execute_delete, 0, 0, 0, execute_upsert
 	};
 	request_execute_f fun = execute_map[request->type];
 	assert(fun != NULL);
@@ -269,6 +318,9 @@ error:
 		case IPROTO_EXPR:
 			request->key = value;
 			request->key_end = data;
+		case IPROTO_DEF_TUPLE:
+			request->extra_tuple = value;
+			request->extra_tuple_end = data;
 		default:
 			break;
 		}

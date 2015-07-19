@@ -96,7 +96,8 @@ const char *iproto_type_strs[] =
 	"DELETE",
 	"CALL",
 	"AUTH",
-	"EVAL"
+	"EVAL",
+	"UPSERT"
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)

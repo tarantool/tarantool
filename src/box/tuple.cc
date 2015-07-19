@@ -425,6 +425,41 @@ tuple_update(struct tuple_format *format,
 }
 
 struct tuple *
+tuple_upsert(struct tuple_format *format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple,
+	     const char *plan_b_tuple_data, const char *plan_b_tuple_data_end,
+	     const char *expr, const char *expr_end, int field_base)
+{
+	uint32_t new_size = 0;
+	const char *old_data, *old_data_end;
+	if (old_tuple) {
+		old_data = old_tuple->data;
+		old_data_end = old_tuple->data + old_tuple->bsize;
+	} else {
+		old_data = plan_b_tuple_data;
+		old_data_end = plan_b_tuple_data_end;
+	}
+	const char *new_data =
+		tuple_upsert_execute(region_alloc, alloc_ctx, expr, expr_end,
+				     old_data, old_data_end,
+				     &new_size, field_base);
+
+	/* Allocate a new tuple. */
+	assert(mp_typeof(*new_data) == MP_ARRAY);
+	struct tuple *new_tuple = tuple_new(format, new_data,
+					    new_data + new_size);
+
+	try {
+		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
+	} catch (Exception *e) {
+		tuple_delete(new_tuple);
+		throw;
+	}
+	return new_tuple;
+}
+
+struct tuple *
 tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
 	size_t tuple_len = end - data;

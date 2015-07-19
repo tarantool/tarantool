@@ -58,6 +58,9 @@ struct request
 	/** Insert/replace tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
+	/** Additional tuple of request, currently used by UPSERT */
+	const char *extra_tuple;
+	const char *extra_tuple_end;
 	/** Base field offset for UPDATE, e.g. 0 for C and 1 for Lua. */
 	int index_base;
 };

@@ -69,6 +69,7 @@ enum iproto_key {
 	IPROTO_CLUSTER_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
 	IPROTO_EXPR = 0x27, /* EVAL */
+	IPROTO_DEF_TUPLE = 0x28,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -114,7 +115,7 @@ extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 enum iproto_type {
 	/* command is successful */
 	IPROTO_OK = 0,
-	/* dml command codes */
+	/* dml command codes (see extra dml command codes) */
 	IPROTO_SELECT = 1,
 	IPROTO_INSERT = 2,
 	IPROTO_REPLACE = 3,
@@ -124,7 +125,10 @@ enum iproto_type {
 	IPROTO_CALL = 6,
 	IPROTO_AUTH = 7,
 	IPROTO_EVAL = 8,
-	IPROTO_TYPE_STAT_MAX = IPROTO_EVAL + 1,
+	IPROTO_UPSERT = 9,
+	IPROTO_TYPE_EXT_DML_MAX = IPROTO_UPSERT + 1,
+	IPROTO_TYPE_STAT_MAX = IPROTO_UPSERT + 1,
+	/* new range of dml command codes */
 	/* admin command codes */
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
@@ -157,7 +161,8 @@ iproto_type_is_select(uint32_t type)
 static inline bool
 iproto_type_is_dml(uint32_t type)
 {
-	return type >= IPROTO_SELECT && type < IPROTO_TYPE_DML_MAX;
+	return (type >= IPROTO_SELECT && type < IPROTO_TYPE_DML_MAX) ||
+	       (type == IPROTO_UPSERT && type < IPROTO_TYPE_EXT_DML_MAX);
 }
 
 static inline bool

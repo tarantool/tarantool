@@ -136,12 +136,13 @@ end;
 t;
 ---
 - - DELETE
-  - EVAL
   - SELECT
-  - REPLACE
   - INSERT
-  - AUTH
+  - EVAL
   - CALL
+  - REPLACE
+  - UPSERT
+  - AUTH
   - UPDATE
   - total
   - rps

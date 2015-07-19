@@ -192,7 +192,7 @@ lbox_process(lua_State *L)
 void
 lbox_request_create(struct request *request,
 		    struct lua_State *L, enum iproto_type type,
-		    int key, int tuple)
+		    int key, int tuple, int def_tuple)
 {
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
@@ -209,6 +209,15 @@ lbox_request_create(struct request *request,
 		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf, tuple);
 		request->tuple = obuf_join(&tuple_buf);
 		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
+	}
+	if (def_tuple > 0) {
+		struct obuf tuple_buf;
+		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf,
+				   def_tuple);
+		request->extra_tuple = obuf_join(&tuple_buf);
+		request->extra_tuple_end =
+			request->extra_tuple + obuf_size(&tuple_buf);
 	}
 }
 
@@ -300,7 +309,7 @@ lbox_insert(lua_State *L)
 
 	struct request request;
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2);
+	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2, -1);
 	port_lua_create(&port, L);
 	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
@@ -314,7 +323,7 @@ lbox_replace(lua_State *L)
 
 	struct request request;
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2);
+	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2, -1);
 	port_lua_create(&port, L);
 	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 2;
@@ -323,17 +332,36 @@ lbox_replace(lua_State *L)
 static int
 lbox_update(lua_State *L)
 {
-	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
+	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
 		return luaL_error(L, "Usage space:update(key, ops)");
 
 	struct request request;
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4);
+	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4, -1);
 	request.index_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
 	box_process(&request, (struct port *) &port);
 	return lua_gettop(L) - 4;
+}
+
+static int
+lbox_upsert(lua_State *L)
+{
+	if (lua_gettop(L) != 5 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE ||
+	    lua_type(L, 5) != LUA_TTABLE)
+		return luaL_error(L, "Usage space:upsert(key, ops, def_tuple)");
+
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_UPSERT, 3, 4, 5);
+	request.index_base = 1; /* field ids are one-indexed */
+	port_lua_create(&port, L);
+	/* Ignore index_id for now */
+	box_process(&request, (struct port *) &port);
+	return lua_gettop(L) - 5;
 }
 
 static int
@@ -344,7 +372,7 @@ lbox_delete(lua_State *L)
 
 	struct request request;
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1);
+	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1, -1);
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
 	box_process(&request, (struct port *) &port);
@@ -754,6 +782,7 @@ static const struct luaL_reg boxlib_internal[] = {
 	{"replace", lbox_replace},
 	{"update", lbox_update},
 	{"delete", lbox_delete},
+	{"upsert", lbox_upsert},
 	{NULL, NULL}
 };
 
