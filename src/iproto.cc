@@ -548,8 +548,7 @@ iproto_session_on_input(struct ev_io *watcher,
 static inline struct iobuf *
 iproto_session_output_iobuf(struct iproto_session *session)
 {
-	if (obuf_size(&session->iobuf[1]->out) &&
-	    obuf_size(&session->iobuf[1]->out) > con->write_pos.size)
+	if (obuf_size(&session->iobuf[1]->out) > session->write_pos.size)
 		return session->iobuf[1];
 	/*
 	 * Don't try to write from a newer buffer if an older one
@@ -558,8 +557,7 @@ iproto_session_output_iobuf(struct iproto_session *session)
 	 * pieces of replies from both buffers.
 	 */
 	if (ibuf_size(&session->iobuf[1]->in) == 0 &&
-	    obuf_size(&session->iobuf[0]->out)
-	    obuf_size(&session->iobuf[0]->out) > con->write_pos.size)
+	    obuf_size(&session->iobuf[0]->out) > session->write_pos.size)
 		return session->iobuf[0];
 	return NULL;
 }
