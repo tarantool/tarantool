@@ -51,8 +51,8 @@ initializes, something like this:
  | :codenormal:`2014-08-07 09:41:41.128 ... ready to accept requests`
 
 Now that the server is up, you could start up a different shell
-and connect to its primary port with
-  :codebold:`telnet 0 3301`
+and connect to its primary port with |br|
+:codebold:`telnet 0 3301` |br|
 but for example purposes it is simpler to just leave the server
 running in "interactive mode". On production machines the
 interactive mode is just for administrators, but because it's
@@ -96,7 +96,7 @@ Your terminal screen should now look like this:
  | :codenormal:`---`
  | :codenormal:`- - [3, 'Length', 93]`
  | :codenormal:`...`
-  |
+ |
  | :codenormal:`tarantool>`
 
 Now, to prepare for the example in the next section, try this:
@@ -145,21 +145,21 @@ one of the tuples that was inserted earlier.
 Your terminal screen should now look like this:
 
  | :codenormal:`...`
-  |
+ |
  | :codenormal:`tarantool> console = require('console')`
  | :codenormal:`---`
  | :codenormal:`...`
-  |
+ |
  | :codenormal:`tarantool> console.connect('localhost:3301')`
  | :codenormal:`2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301`
  | :codenormal:`---`
  | :codenormal:`...`
-  |
+ |
  | :codenormal:`localhost:3301> box.space.tester:select{2}`
  | :codenormal:`---`
  | :codenormal:`- - [2, 'Music']`
  | :codenormal:`...`
-  |
+ |
  | :codenormal:`localhost:3301>`
 
 You can repeat box.space...:insert{} and box.space...:select{}
