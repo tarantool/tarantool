@@ -249,21 +249,29 @@ csv_feed(struct csv_iterator *it, const char *str)
 }
 
 int
-csv_escape_field(struct csv *csv, const char *field, char *dst)
+csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size)
 {
 	char *p = dst;
 	int inquotes = 0;
-	if(strchr(field, csv->csv_delim) || strchr(field, '\n') || strchr(field, '\r')) {
+	if(memchr(field, csv->csv_delim, field_len) || memchr(field, '\n', field_len) || memchr(field, '\r', field_len)) {
 		inquotes = 1;
 		*p++ = csv->csv_quote;
 	}
 	while(*field) {
-		if(*field == csv->csv_quote)
+		if(*field == csv->csv_quote) {
+			if(p - dst >= buf_size)
+				return -1;
 			*p++ = csv->csv_quote;
+		}
+		if(p - dst >= buf_size)
+			return -1;
 		*p++ = *field++;
 	}
-	if(inquotes)
+	if(inquotes) {
+		if(p - dst >= buf_size)
+			return -1;
 		*p++ = csv->csv_quote;
+	}
 	*p = 0;
 	return p - dst;
 }

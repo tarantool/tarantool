@@ -41,7 +41,7 @@ ffi.cdef[[
     void csv_iter_create(struct csv_iterator *it, struct csv *csv);
     int csv_next(struct csv_iterator *);
     void csv_feed(struct csv_iterator *, const char *);
-    int csv_escape_field(struct csv *, const char *, char *);
+    int csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
     enum {
         CSV_IT_OK,
         CSV_IT_EOL,
@@ -50,31 +50,6 @@ ffi.cdef[[
         CSV_IT_ERROR
     };
 ]]
-
-local iter = function(csvstate)
-    local readable = csvstate[1]
-    local csv_chunk_size = csvstate[2]
-    local csv = csvstate[3]
-    local it = csvstate[4]
-    local tup = {}
-    local st = ffi.C.csv_next(it)
-    while st ~= ffi.C.CSV_IT_EOF do
-        if st == ffi.C.CSV_IT_NEEDMORE then
-            ffi.C.csv_feed(it, readable:read(csv_chunk_size))
-        elseif st == ffi.C.CSV_IT_EOL then
-            return tup
-        elseif st == ffi.C.CSV_IT_OK then
-            table.insert(tup, ffi.string(it[0].field, it[0].field_len))
-        elseif st == ffi.C.CSV_IT_ERROR then
-            log.warn("CSV file has errors")
-            break
-        elseif st == ffi.C.CSV_IT_EOF then
-            ffi.C.csv_destroy(csv)
-            break
-        end
-        st = ffi.C.csv_next(it)
-    end
-end
 
 local make_readable = function(s)
     rd = {}
@@ -94,6 +69,33 @@ local make_writable = function()
         wr.returnstring = wr.returnstring .. s
     end
     return wr
+end
+
+
+local iter = function(csvstate, i)
+    local readable = csvstate[1]
+    local csv_chunk_size = csvstate[2]
+    local csv = csvstate[3]
+    local it = csvstate[4]
+    local tup = {}
+    local st = ffi.C.csv_next(it)
+    while st ~= ffi.C.CSV_IT_EOF do
+        if st == ffi.C.CSV_IT_NEEDMORE then
+            ffi.C.csv_feed(it, readable:read(csv_chunk_size))
+        elseif st == ffi.C.CSV_IT_EOL then
+            i = i + 1
+            return i, tup
+        elseif st == ffi.C.CSV_IT_OK then
+            table.insert(tup, ffi.string(it[0].field, it[0].field_len))
+        elseif st == ffi.C.CSV_IT_ERROR then
+            log.warn("CSV file has errors")
+            break
+        elseif st == ffi.C.CSV_IT_EOF then
+            ffi.C.csv_destroy(csv)
+            break
+        end
+        st = ffi.C.csv_next(it)
+    end
 end
 
 local module = {}
@@ -126,7 +128,7 @@ module.iterate = function(readable, csv_chunk_size)
     ffi.C.csv_iter_create(it, csv)
     ffi.C.csv_feed(it, str)
 
-    return iter, {readable, csv_chunk_size, csv, it}
+    return iter, {readable, csv_chunk_size, csv, it}, 0
 end
 
 --@brief parse csv and make table
@@ -136,12 +138,9 @@ module.load = function(readable, skip_lines, csv_chunk_size)
     skip_lines = skip_lines or 0
     csv_chunk_size = csv_chunk_size or 4096
     result = {}
-    i = 0
-    for tup in module.iterate(readable, csv_chunk_size) do
-        if i < skip_lines then 
-            i = i + 1
-        else
-            table.insert(result, tup)
+    for i, tup in module.iterate(readable, csv_chunk_size) do
+        if i > skip_lines then             
+            result[i - skip_lines] = tup
         end
     end
 
@@ -175,7 +174,7 @@ module.dump = function(t, writable)
                 bufsz = (strf:len() + 1) * 2
                 buf = csv[0].csv_realloc(buf, bufsz)
             end
-            local len = ffi.C.csv_escape_field(csv, strf, buf)
+            local len = ffi.C.csv_escape_field(csv, strf, string.len(strf), buf, bufsz)
             if first then
                 first = false
             else

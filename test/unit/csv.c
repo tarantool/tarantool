@@ -4,15 +4,20 @@
 #include <string.h>
 #include <assert.h>
 
+int isendl = 1;
 void
 print_endl(void *ctx)
 {
 	fflush(stdout);
 	puts("");
+	isendl = 1;
 }
 void
 print_field(void *ctx, const char *s, const char *end)
 {
+	if(!isendl)
+		putchar('\t');
+	isendl = 0;
 	putchar('|');
 	for(const char *p = s; p != end && *p; p++) {
 		if((*p == '\r' || *p == '\n') && (p + 1 == end || (*(p + 1) != '\r' && *(p + 1) != '\n')))
@@ -21,8 +26,25 @@ print_field(void *ctx, const char *s, const char *end)
 			putchar(*p);
 	}
 	putchar('|');
-	putchar('\t');
 	fflush(stdout);
+}
+void
+buf_endl(void *ctx)
+{
+	*(*((char**)ctx))++ = '\n';
+}
+void
+buf_field(void *ctx, const char *s, const char *end)
+{
+	*(*((char**)ctx))++ = '|';
+	for(const char *p = s; p != end && *p; p++) {
+		if((*p == '\r' || *p == '\n') && (p + 1 == end || (*(p + 1) != '\r' && *(p + 1) != '\n')))
+			*(*((char**)ctx))++ = '\n';
+		else
+			*(*((char**)ctx))++ = *p;
+	}
+	*(*((char**)ctx))++ = '|';
+	*(*((char**)ctx))++ = '\t';
 }
 
 void small_string_test(const char* const s)
@@ -33,7 +55,6 @@ void small_string_test(const char* const s)
 	csv.emit_row = print_endl;
 	csv_parse_chunk(&csv, s, s + strlen(s));
 	csv_finish_parsing(&csv);
-	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
 	csv_destroy(&csv);
 }
 
@@ -172,18 +193,33 @@ void big_chunk_separated_test() {
 
 void random_generated_test() {
 	header();
-	small_string_test(
-				"\n\r\" ba\r a\ra, \n\"\n\"a\nb\" \raa\rb,\n"
-				"\r, \n\",\r\n\"\n,a, ,\"a\n\n\r \"\r ba\r,b"
-				"  a,\n,\"\"a\n\r \"b\"   \n,\",a\r,a ,\r\rc"
-				"\" a,b\r\n,\"b\r\"aa  \nb \n\r\r\n\n,\rb\nc"
-				",\n\n aa\n \"\n ab\rab,\r\" b\n\",   ,,\r\r"
-				"bab\rb\na\n\"a\ra,\"\",\n\"a\n\n \"\r \ra\n"
-				"a\r\raa a\" ,baab ,a \rbb   ,\r \r,\rb,,  b"
-				"\n\r\"\nb\n\nb \n,ab \raa\r\"\nb a\"ba,b, c"
-				"\"a\"a \"\r\n\"b \n,b\"\",\nba\n\" \n\na \r"
-				"\nb\rb\"bbba,\" \n\n\n,a,b,a,b,\n\n\n\nb\"\r"
-				);
+	const char *rand_test =
+			"\n\r\" ba\r a\ra, \n\"\n\"a\nb\" \raa\rb,\n"
+			"\r, \n\",\r\n\"\n,a, ,\"a\n\n\r \"\r ba\r,b"
+			"  a,\n,\"\"a\n\r \"b\"   \n,\",a\r,a ,\r\rc"
+			"\" a,b\r\n,\"b\r\"aa  \nb \n\r\r\n\n,\rb\nc"
+			",\n\n aa\n \"\n ab\rab,\r\" b\n\",   ,,\r\r"
+			"bab\rb\na\n\"a\ra,\"\",\n\"a\n\n \"\r \ra\n"
+			"a\r\raa a\" ,baab ,a \rbb   ,\r \r,\rb,,  b"
+			"\n\r\"\nb\n\nb \n,ab \raa\r\"\nb a\"ba,b, c"
+			"\"a\"a \"\r\n\"b \n,b\"\",\nba\n\" \n\na \r"
+			"\nb\rb\"bbba,\" \n\n\n,a,b,a,b,\n\n\n\nb\"\r";
+
+	struct csv csv;
+	csv_create(&csv);
+	csv_setopt(&csv, CSV_OPT_EMIT_FIELD, fieldsizes_counter);
+	csv_setopt(&csv, CSV_OPT_EMIT_ROW, line_counter);
+
+	struct counter cnt;
+	cnt.line_cnt = 0;
+	cnt.fieldsizes_cnt = 0;
+	csv_setopt(&csv, CSV_OPT_CTX, &cnt);
+
+	csv_parse_chunk(&csv, rand_test, rand_test + strlen(rand_test));
+	csv_finish_parsing(&csv);
+	printf("line_cnt=%d, fieldsizes_cnt=%d\n", (int)cnt.line_cnt, (int)cnt.fieldsizes_cnt);
+	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	csv_destroy(&csv);
 
 	footer();
 }
@@ -203,7 +239,7 @@ void iter_test1() {
 			buf += strlen(buf);
 			break;
 		case CSV_IT_EOL:
-			printf("\n");
+			print_endl(0);
 			break;
 		case CSV_IT_OK:
 			print_field(0, it.field, it.field + it.field_len);
@@ -233,7 +269,7 @@ void iter_test2() {
 			buf += 3;
 			break;
 		case CSV_IT_EOL:
-			printf("\n");
+			print_endl(0);
 			break;
 		case CSV_IT_OK:
 			print_field(0, it.field, it.field + it.field_len);
@@ -250,14 +286,18 @@ void iter_test2() {
 void csv_out() {
 	header();
 
-	const char fields[4][36] = { "abc", "with,comma", "\"in quotes\"", "1 \" quote"};
-	char buf[18];
+	const char fields[5][24] = { "abc", "with,comma", "\"in quotes\"", "1 \" quote",
+				     "long field, return \"-1\"" };
+	char buf[24];
 	int i;
 	struct csv csv;
 	csv_create(&csv);
-	for(i = 0; i < 4; i++) {
-		int len = csv_escape_field(&csv, fields[i], buf);
-		printf("%s<len=%d>%c", buf, len, i == 3 ? '\n' : ',');
+	for(i = 0; i < 5; i++) {
+		int len = csv_escape_field(&csv, fields[i], strlen(fields[i]), buf, sizeof(buf));
+		if(len != -1)
+			printf("%s<len=%d>%c", buf, len, i == 4 ? '\n' : ',');
+		else
+			printf("<len=%d>%c", len, i == 4 ? '\n' : ',');
 	}
 
 	footer();

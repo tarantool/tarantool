@@ -120,15 +120,24 @@ void
 csv_feed(struct csv_iterator *, const char *);
 
 /**
- * @brief csv_escape_field adds pair quote and
- * if there is comma or linebreak in field, adds surrounding quotes
+ * @brief csv_escape_field prepares field to out in file.
+ * Adds pair quote and if there is comma or linebreak in field, adds surrounding quotes.
+ * At worst escaped field will 2 times more symbols than input field.
+ * @return length of escaped field or -1 if not enough space in buffer.
  */
 int
-csv_escape_field(struct csv *csv, const char *field, char *dst);
+csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
 
-#define CSV_ITERATOR_GET_FIELD(it) it->field
-#define CSV_ITERATOR_GET_FLEN(it)  it->field_len
 
+static inline const char* csv_iterator_get_field(struct csv_iterator *it)
+{
+	return it->field;
+}
+
+static inline size_t csv_iterator_get_field_len(struct csv_iterator *it)
+{
+	return it->field_len;
+}
 #if defined(__cplusplus)
 }
 #endif /* extern "C" */
