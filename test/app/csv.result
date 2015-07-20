@@ -20,7 +20,6 @@ fio test1:
 |ok|	
 
 fio test2:
-fio test3:
 |1|	
 |23|	|456|	|abcac|	|'multiword field 4'|	
 |none|	|none|	|0|	
@@ -30,8 +29,7 @@ fio test3:
 |iflag = bit.bor(iflag|	|fio.c.flag[ flag ])|	
 ||	||	||	
 
-fio test4:
-|1|	
+fio test3:
 |23|	|456|	|abcac|	|'multiword field 4'|	
 |none|	|none|	|0|	
 ||	||	||	

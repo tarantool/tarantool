@@ -69,6 +69,7 @@ local iter = function(csvstate)
             log.warn("CSV file has errors")
             break
         elseif st == ffi.C.CSV_IT_EOF then
+            ffi.C.csv_destroy(csv)
             break
         end
         st = ffi.C.csv_next(it)
@@ -129,12 +130,19 @@ module.iterate = function(readable, csv_chunk_size)
 end
 
 --@brief parse csv and make table
+--@param skip_lines is number of lines to skip.
 --@return table
-module.load = function(readable, csv_chunk_size)
+module.load = function(readable, skip_lines, csv_chunk_size)
+    skip_lines = skip_lines or 0
     csv_chunk_size = csv_chunk_size or 4096
     result = {}
+    i = 0
     for tup in module.iterate(readable, csv_chunk_size) do
-        table.insert(result, tup)
+        if i < skip_lines then 
+            i = i + 1
+        else
+            table.insert(result, tup)
+        end
     end
 
     return result
@@ -177,6 +185,7 @@ module.dump = function(t, writable)
         end
         writable:write('\n')
     end
+    ffi.C.csv_destroy(csv)
     csv[0].csv_realloc(buf, 0)
     if writable.returnstring then
         return writable.returnstring

@@ -29,12 +29,12 @@ print(table2str(csv.load(readable)))
 print("obj test2:")
 readable.v = ", ,\n , \n\n"
 readable.i = 0
-print(table2str(csv.load(readable, 1)))
+print(table2str(csv.load(readable, 0, 1)))
 
 print("obj test3:")
 readable.v = ", \r\nkp\"\"v"
 readable.i = 0
-print(table2str(csv.load(readable, 3)))
+print(table2str(csv.load(readable, 0, 3)))
 
 tmpdir = fio.tempdir()
 file1 = fio.pathjoin(tmpdir, 'file.1')
@@ -47,7 +47,7 @@ f:write("123 , 5  ,       92    , 0, 0\n" ..
         "1, 12  34, 56, \"quote , \", 66\nok")
 f:close()
 f = fio.open(file1, {'O_RDONLY'}) 
-print(table2str(csv.load(f,10)))
+print(table2str(csv.load(f,0,10)))
 f:close()
 
 
@@ -62,15 +62,13 @@ f:write("1\n23,456,abcac,\'multiword field 4\'\n" ..
         ",,"
 )
 f:close()
+f = fio.open(file2, {'O_RDONLY'}) 
+print(table2str(csv.load(f, 0, 1))) --symbol by symbol reading
+f:close()
 
 print("fio test3:")
 f = fio.open(file2, {'O_RDONLY'}) 
-print(table2str(csv.load(f, 1))) --symbol by symbol reading
-f:close()
-
-print("fio test4:")
-f = fio.open(file2, {'O_RDONLY'}) 
-print(table2str(csv.load(f, 7))) --7 symbols per chunk
+print(table2str(csv.load(f, 1, 7))) --7 symbols per chunk
 f:close()
 
 
@@ -87,7 +85,7 @@ f = require("fio").open(file3, { "O_WRONLY", "O_TRUNC" , "O_CREAT"}, 0x1FF)
 csv.dump(t, f)
 f:close()
 f = fio.open(file3, {'O_RDONLY'}) 
-t2 = csv.load(f, 5)
+t2 = csv.load(f, 0, 5)
 f:close()
 
 print("test roundtrip: ")
