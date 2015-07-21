@@ -114,7 +114,7 @@ box.info.vclock[2]
 ...
 box.space._schema:replace{"test", 48}
 ---
-- error: Can't modify data because this server in read-only mode.
+- error: Can't modify data because this server is in read-only mode.
 ...
 box.space._cluster:insert{10, "<replica uuid>"}
 ---

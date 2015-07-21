@@ -202,12 +202,12 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
 	    if (rc != 0) {
-		ai = NULL;
+		    if (errno == ETIMEDOUT)
+			    return -1; /* timeout */
+		    tnt_raise(SocketError, -1, "getaddrinfo");
 	    }
-	}
-	if (ai == NULL)
-		return -1; /* timeout */
 
+	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (!uri->host_hint) freeaddrinfo(ai);
 		else free(ai_local.ai_addr);
@@ -215,7 +215,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	evio_timeout_update(loop(), start, &delay);
 
 	coio_timeout_init(&start, &delay, timeout);
-	assert(! evio_is_active(coio));
+	assert(! evio_has_fd(coio));
 	while (ai) {
 		try {
 			if (coio_connect_addr(coio, ai->ai_addr,

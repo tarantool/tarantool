@@ -33,7 +33,7 @@ box.info.server.lsn
 ...
 space = box.schema.space.create("ro")
 ---
-- error: Can't modify data because this server in read-only mode.
+- error: Can't modify data because this server is in read-only mode.
 ...
 box.info.vclock[2]
 ---

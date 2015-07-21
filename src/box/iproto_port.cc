@@ -130,7 +130,7 @@ void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 			uint32_t count)
 {
-	uint32_t len = obuf_used(buf) - svp->used - 5;
+	uint32_t len = obuf_size(buf) - svp->used - 5;
 
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);

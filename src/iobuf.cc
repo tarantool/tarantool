@@ -90,7 +90,7 @@ iobuf_delete_mt(struct iobuf *iobuf)
 {
 	ibuf_destroy(&iobuf->in);
 	/* Destroyed by the caller. */
-	assert(&iobuf->out.pos == 0 && iobuf->out.iov[0].iov_base == NULL);
+	assert(iobuf->out.pos == 0 && iobuf->out.iov[0].iov_base == NULL);
 	mempool_free(&iobuf_pool, iobuf);
 }
 

@@ -221,7 +221,7 @@ pull_from_remote(va_list ap)
 		const char *err = NULL;
 		try {
 			struct xrow_header row;
-			if (! evio_is_active(&coio)) {
+			if (! evio_has_fd(&coio)) {
 				remote_set_status(&r->remote, "connecting");
 				err = "can't connect to master";
 				remote_connect(r, &coio, iobuf);
@@ -285,7 +285,7 @@ pull_from_remote(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-		if (! evio_is_active(&coio))
+		if (! evio_has_fd(&coio))
 			fiber_sleep(RECONNECT_DELAY);
 	}
 }

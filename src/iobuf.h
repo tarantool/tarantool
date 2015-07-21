@@ -33,7 +33,6 @@
 #include "small/ibuf.h"
 #include "small/obuf.h"
 
-/** {{{  Input/output pair. */
 struct iobuf
 {
 	/** Input buffer. */
@@ -86,7 +85,7 @@ iobuf_reset(struct iobuf *iobuf);
 static inline bool
 iobuf_is_idle(struct iobuf *iobuf)
 {
-	return ibuf_used(&iobuf->in) == 0 && obuf_used(&iobuf->out) == 0;
+	return ibuf_used(&iobuf->in) == 0 && obuf_size(&iobuf->out) == 0;
 }
 
 /**
@@ -98,7 +97,5 @@ iobuf_init();
 
 void
 iobuf_set_readahead(int readahead);
-
-/* }}} */
 
 #endif /* TARANTOOL_IOBUF_H_INCLUDED */

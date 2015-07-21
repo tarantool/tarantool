@@ -70,6 +70,7 @@ obuf_create(struct obuf *buf, struct slab_cache *slabc, size_t start_capacity)
 	buf->iov[0].iov_base = NULL;
 	buf->iov[0].iov_len = 0;
 	buf->capacity[0] = 0;
+	buf->wend = buf->wpos = obuf_create_svp(buf);
 }
 
 
@@ -82,6 +83,7 @@ obuf_reset(struct obuf *buf)
 		buf->iov[i].iov_len = 0;
 	buf->pos = 0;
 	buf->used = 0;
+	buf->wend = buf->wpos = obuf_create_svp(buf);
 }
 
 void

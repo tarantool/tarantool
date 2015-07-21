@@ -44,6 +44,7 @@ set (core_sources
      say.cc
      memory.cc
      fiber.cc
+     cbus.cc
      exception.cc
      coro.cc
      object.cc

@@ -78,15 +78,28 @@ struct obuf
 	 * obuf_reserve().
 	 */
 	size_t start_capacity;
+	/** How many bytes are actually allocated for each iovec. */
+	size_t capacity[SMALL_OBUF_IOV_MAX + 1];
 	/**
 	 * List of iovec vectors, each vector is at least twice
 	 * as big as the previous one. The vector following the
 	 * last allocated one is always zero-initialized
 	 * (iov_base = NULL, iov_len = 0).
+	 * Make it the last member to reduce friction around
+	 * wpos/wend in iproto thread - last elements
+	 * of iov are unlikely to be updated often.
 	 */
 	struct iovec iov[SMALL_OBUF_IOV_MAX + 1];
-	/** How many bytes are actually allocated for each iovec. */
-	size_t capacity[SMALL_OBUF_IOV_MAX + 1];
+	/**
+	 * The below two members are used by iproto thread,
+	 * avoid false sharing by cache aligning them.
+	 */
+	struct {
+		/** Current write position in the output buffer */
+		struct obuf_svp wpos;
+		/** End of write position in the output buffer */
+		struct obuf_svp wend;
+	} __attribute__((aligned(64)));
 };
 
 void
@@ -100,9 +113,15 @@ obuf_reset(struct obuf *buf);
 
 /** How many bytes are in the output buffer. */
 static inline size_t
-obuf_used(struct obuf *obuf)
+obuf_size(struct obuf *obuf)
 {
 	return obuf->used;
+}
+
+static inline size_t
+obuf_used(struct obuf *obuf)
+{
+	return obuf->wend.used - obuf->wpos.used;
 }
 
 /** The size of iov vector in the buffer. */
