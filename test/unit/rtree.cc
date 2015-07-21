@@ -9,15 +9,17 @@
 
 static int page_count = 0;
 
+const uint32_t extent_size = RTREE_PAGE_SIZE * 8;
+
 static void *
-page_alloc()
+extent_alloc()
 {
 	page_count++;
-	return malloc(RTREE_PAGE_SIZE);
+	return malloc(extent_size);
 }
 
 static void
-page_free(void *page)
+extent_free(void *page)
 {
 	page_count--;
 	free(page);
@@ -34,7 +36,7 @@ simple_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, page_alloc, page_free);
+	rtree_init(&tree, extent_size, extent_alloc, extent_free);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (size_t i = 1; i <= rounds; i++) {
@@ -241,8 +243,6 @@ neighbor_test()
 	header();
 
 	const int test_count = 1000;
-	struct rtree_iterator iterator;
-	rtree_iterator_init(&iterator);
 	struct rtree_rect arr[test_count];
 	static struct rtree_rect basis;
 
@@ -255,10 +255,12 @@ neighbor_test()
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, page_alloc, page_free);
+		rtree_init(&tree, extent_size, extent_alloc, extent_free);
 
 		rtree_test_build(&tree, arr, i);
 
+		struct rtree_iterator iterator;
+		rtree_iterator_init(&iterator);
 		if (!rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator) && i != 0) {
 			fail("search is successful", "true");
 		}
@@ -269,10 +271,10 @@ neighbor_test()
 				fail("wrong search result", "true");
 			}
 		}
+		rtree_iterator_destroy(&iterator);
 		rtree_destroy(&tree);
 	}
 
-	rtree_iterator_destroy(&iterator);
 
 	footer();
 }
