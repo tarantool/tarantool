@@ -69,6 +69,13 @@ static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
 enum {
+	/**
+	 * This number is calculated based on the
+	 * max (realistic) number of insertions
+	 * a deletion from a B-tree or an R-tree
+	 * can lead to, and, as a result, the max
+	 * number of new block allocations.
+	 */
 	RESERVE_EXTENTS_BEFORE_REPLACE = 16
 };
 
