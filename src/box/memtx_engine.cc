@@ -58,6 +58,13 @@ static bool memtx_index_arena_initialized = false;
 static struct slab_arena memtx_index_arena;
 static struct slab_cache memtx_index_arena_slab_cache;
 static struct mempool memtx_index_extent_pool;
+/**
+ * To ensure proper statement-level rollback in case
+ * of out of memory conditions, we maintain a number
+ * of slack memory extents reserved before a statement
+ * is begun. If there isn't enough slack memory,
+ * we don't begin the statement.
+ */
 static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
@@ -164,6 +171,10 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 		       struct tuple *old_tuple, struct tuple *new_tuple,
 		       enum dup_replace_mode mode)
 {
+	/*
+	 * Ensure we have enough slack memory to guarantee
+	 * successful statement-level rollback.
+	 */
 	memtx_index_extent_reserve(RESERVE_EXTENTS_BEFORE_REPLACE);
 	uint32_t i = 0;
 	try {
