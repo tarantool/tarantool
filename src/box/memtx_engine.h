@@ -95,4 +95,11 @@ memtx_index_extent_alloc();
 void
 memtx_index_extent_free(void *extent);
 
+/**
+ * Reserve num extents in pool.
+ * Ensure that next num extent_alloc will succeed w/o an error
+ */
+void
+memtx_index_extent_reserve(int num);
+
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */
