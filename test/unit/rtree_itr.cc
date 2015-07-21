@@ -6,19 +6,21 @@
 #include "unit.h"
 #include "salad/rtree.h"
 
-static int page_count = 0;
+static int extent_count = 0;
+
+const uint32_t extent_size = RTREE_PAGE_SIZE * 8;
 
 static void *
-page_alloc()
+extent_alloc()
 {
-	page_count++;
-	return malloc(RTREE_PAGE_SIZE);
+	extent_count++;
+	return malloc(extent_size);
 }
 
 static void
-page_free(void *page)
+extent_free(void *page)
 {
-	page_count--;
+	extent_count--;
 	free(page);
 }
 
@@ -28,7 +30,7 @@ itr_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, page_alloc, page_free);
+	rtree_init(&tree, extent_size, extent_alloc, extent_free);
 
 	/* Filling tree */
 	const size_t count1 = 10000;
@@ -182,8 +184,8 @@ itr_check()
 	}
 
 	rtree_purge(&tree);
-	rtree_destroy(&tree);
 	rtree_iterator_destroy(&iterator);
+	rtree_destroy(&tree);
 
 	footer();
 }
@@ -197,9 +199,6 @@ itr_invalidate_check()
 	const size_t max_delete_count = 100;
 	const size_t max_insert_count = 200;
 	const size_t attempt_count = 100;
-	struct rtree_iterator iterators[test_size];
-	for (size_t i = 0; i < test_size; i++)
-		rtree_iterator_init(iterators + i);
 
 	struct rtree_rect rect;
 
@@ -212,7 +211,10 @@ itr_invalidate_check()
 			del_cnt = test_size - del_pos;
 		}
 		struct rtree tree;
-		rtree_init(&tree, page_alloc, page_free);
+		rtree_init(&tree, extent_size, extent_alloc, extent_free);
+		struct rtree_iterator iterators[test_size];
+		for (size_t i = 0; i < test_size; i++)
+			rtree_iterator_init(iterators + i);
 
 		for (size_t i = 0; i < test_size; i++) {
 			rtree_set2d(&rect, i, i, i, i);
@@ -240,6 +242,9 @@ itr_invalidate_check()
 				fail("Iterator was not invalidated (18)", "true");
 			}
 		}
+
+		for (size_t i = 0; i < test_size; i++)
+			rtree_iterator_destroy(iterators + i);
 		rtree_destroy(&tree);
 	}
 
@@ -250,7 +255,10 @@ itr_invalidate_check()
 		size_t ins_cnt = rand() % max_insert_count + 1;
 
 		struct rtree tree;
-		rtree_init(&tree, page_alloc, page_free);
+		rtree_init(&tree, extent_size, extent_alloc, extent_free);
+		struct rtree_iterator iterators[test_size];
+		for (size_t i = 0; i < test_size; i++)
+			rtree_iterator_init(iterators + i);
 
 		for (size_t i = 0; i < test_size; i++) {
 			rtree_set2d(&rect, i, i, i, i);
@@ -276,11 +284,11 @@ itr_invalidate_check()
 				fail("Iterator was not invalidated (22)", "true");
 			}
 		}
+
+		for (size_t i = 0; i < test_size; i++)
+			rtree_iterator_destroy(iterators + i);
 		rtree_destroy(&tree);
 	}
-
-	for (size_t i = 0; i < test_size; i++)
-		rtree_iterator_destroy(iterators + i);
 
 	footer();
 }
@@ -290,7 +298,7 @@ main(void)
 {
 	itr_check();
 	itr_invalidate_check();
-	if (page_count != 0) {
+	if (extent_count != 0) {
 		fail("memory leak!", "false");
 	}
 }

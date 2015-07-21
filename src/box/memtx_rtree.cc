@@ -34,11 +34,6 @@
 #include "fiber.h"
 #include "small/small.h"
 
-/**
- * Single-linked list of free rtree pages
- */
-static void *rtree_free_pages = 0;
-
 /* {{{ Utilities. *************************************************/
 
 inline void extract_rectangle(struct rtree_rect *rect,
@@ -122,41 +117,6 @@ index_rtree_iterator_next(struct iterator *i)
 
 /* {{{ MemtxRTree  **********************************************************/
 
-static void *
-rtree_page_alloc()
-{
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
-	if (!rtree_free_pages) {
-		/**
-		 * No free pages in list - let's allocate new extent, split it
-		 * into pages and add them to the list.
-		 */
-		char *extent = (char *)memtx_index_extent_alloc();
-		if (!extent) {
-			panic("%s", "Memory allocation failed in rtree");
-			return 0;
-		}
-		assert(MEMTX_EXTENT_SIZE % RTREE_PAGE_SIZE == 0);
-		assert(RTREE_PAGE_SIZE >= sizeof(void *));
-		for (size_t i = 0; i < MEMTX_EXTENT_SIZE; i += RTREE_PAGE_SIZE) {
-			*(void **)(extent + i) = rtree_free_pages;
-			rtree_free_pages = (void *)(extent + i);
-		}
-	}
-	/* Now we surely have a free page in free list */
-	void *res = rtree_free_pages;
-	rtree_free_pages = *(void **)rtree_free_pages;
-	return res;
-}
-
-static void
-rtree_page_free(void *page)
-{
-	/* Just add to free list. */
-	*(void **)page = rtree_free_pages;
-	rtree_free_pages = page;
-}
-
 MemtxRTree::~MemtxRTree()
 {
 	// Iterator has to be destroyed prior to tree
@@ -175,7 +135,8 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	assert(key_def->is_unique == false);
 
 	memtx_index_arena_init();
-	rtree_init(&tree, rtree_page_alloc, rtree_page_free);
+	rtree_init(&tree, MEMTX_EXTENT_SIZE,
+		   memtx_index_extent_alloc, memtx_index_extent_free);
 }
 
 size_t

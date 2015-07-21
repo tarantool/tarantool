@@ -93,11 +93,11 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{1}
 ---
-- [1, 1, 'test1']
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 res = {}
 ---
@@ -107,7 +107,8 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [2, 2, 'test2']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
   - [3, 3, 'test3']
   - [4, 4, 'test4']
   - [5, 5, 'test5']
@@ -125,29 +126,10 @@ for i = 501,510 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [501, 501]
-  - [502, 502]
-  - [503, 503]
-  - [504, 504]
-  - [505, 505]
-  - [506, 506]
-  - [507, 507]
-  - [508, 508]
-  - [509, 509]
-  - [510, 510]
-...
-res = {}
----
-...
-for i = 2001,2010 do table.insert(res, (s:get{i})) end
----
-...
-res
----
 - []
 ...
---count must be greater that 1000 but less than 2000
-function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 1000 and "fail 1" or count >= 2000 and "fail 2" or "ok" end
+--count must be exactly 10
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count == 10 and "ok" or "fail" end
 ---
 ...
 check_iter_and_size()
@@ -156,11 +138,11 @@ check_iter_and_size()
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{2}
 ---
-- [2, 2, 'test2']
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 check_iter_and_size()
 ---
@@ -174,7 +156,9 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [3, 3, 'test3']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
   - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
@@ -182,18 +166,6 @@ res
   - [8, 8, 'test8']
   - [9, 9, 'test9']
   - [10, 10, 'test10']
-...
-for i = 3501,4500 do s:insert{i, i} end
----
-- error: Failed to allocate 16384 bytes in MemtxTree for replace
-...
-s:delete{3}
----
-- [3, 3, 'test3']
-...
-check_iter_and_size()
----
-- ok
 ...
 errinj.set("ERRINJ_INDEX_ALLOC", false)
 ---
@@ -210,7 +182,10 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [4, 4, 'test4']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
   - [7, 7, 'test7']
@@ -230,7 +205,10 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [4, 4, 'test4']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
   - [7, 7, 'test7']
@@ -352,11 +330,11 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 10 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{1}
 ---
-- [1, 1, 'test1']
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 res = {}
 ---
@@ -366,7 +344,8 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [2, 2, 'test2']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
   - [3, 3, 'test3']
   - [4, 4, 'test4']
   - [5, 5, 'test5']
@@ -396,23 +375,19 @@ res
 ---
 - []
 ...
---since every insertion is rejected, count must be (10 - number of deletions)
-function check_iter_and_size(size_must_be) local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end print (count) return count ~= size_must_be and "fail 1" or "ok" end
----
-...
-check_iter_and_size(9)
+check_iter_and_size()
 ---
 - ok
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 9 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{2}
 ---
-- [2, 2, 'test2']
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
-check_iter_and_size(8)
+check_iter_and_size()
 ---
 - ok
 ...
@@ -424,7 +399,9 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [3, 3, 'test3']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
   - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
@@ -435,13 +412,13 @@ res
 ...
 for i = 3501,4500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 8 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{3}
 ---
-- [3, 3, 'test3']
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
-check_iter_and_size(7)
+check_iter_and_size()
 ---
 - ok
 ...
@@ -460,7 +437,10 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [4, 4, 'test4']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
   - [7, 7, 'test7']
@@ -480,7 +460,10 @@ for i = 1,10 do table.insert(res, (s:get{i})) end
 ...
 res
 ---
-- - [4, 4, 'test4']
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
   - [5, 5, 'test5']
   - [6, 6, 'test6']
   - [7, 7, 'test7']

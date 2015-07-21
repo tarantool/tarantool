@@ -54,6 +54,26 @@ static bool memtx_index_arena_initialized = false;
 static struct slab_arena memtx_index_arena;
 static struct slab_cache memtx_index_arena_slab_cache;
 static struct mempool memtx_index_extent_pool;
+/**
+ * To ensure proper statement-level rollback in case
+ * of out of memory conditions, we maintain a number
+ * of slack memory extents reserved before a statement
+ * is begun. If there isn't enough slack memory,
+ * we don't begin the statement.
+ */
+static int memtx_index_num_reserved_extents;
+static void *memtx_index_reserved_extents;
+
+enum {
+	/**
+	 * This number is calculated based on the
+	 * max (realistic) number of insertions
+	 * a deletion from a B-tree or an R-tree
+	 * can lead to, and, as a result, the max
+	 * number of new block allocations.
+	 */
+	RESERVE_EXTENTS_BEFORE_REPLACE = 16
+};
 
 /**
  * A version of space_replace for a space which has
@@ -154,6 +174,11 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 		       struct tuple *old_tuple, struct tuple *new_tuple,
 		       enum dup_replace_mode mode)
 {
+	/*
+	 * Ensure we have enough slack memory to guarantee
+	 * successful statement-level rollback.
+	 */
+	memtx_index_extent_reserve(RESERVE_EXTENTS_BEFORE_REPLACE);
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
@@ -873,6 +898,9 @@ memtx_index_arena_init()
 	mempool_create(&memtx_index_extent_pool,
 		       &memtx_index_arena_slab_cache,
 		       MEMTX_EXTENT_SIZE);
+	/* Empty reserved list */
+	memtx_index_num_reserved_extents = 0;
+	memtx_index_reserved_extents = 0;
 	/* Done */
 	memtx_index_arena_initialized = true;
 }
@@ -883,7 +911,19 @@ memtx_index_arena_init()
 void *
 memtx_index_extent_alloc()
 {
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
+	if (memtx_index_reserved_extents) {
+		assert(memtx_index_num_reserved_extents > 0);
+		memtx_index_num_reserved_extents--;
+		void *result = memtx_index_reserved_extents;
+		memtx_index_reserved_extents = *(void **)
+			memtx_index_reserved_extents;
+		return result;
+	}
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
+		     /* same error as in mempool_alloc */
+		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
+			       "mempool", "new slab")
+	);
 	return mempool_alloc(&memtx_index_extent_pool);
 }
 
@@ -894,4 +934,24 @@ void
 memtx_index_extent_free(void *extent)
 {
 	return mempool_free(&memtx_index_extent_pool, extent);
+}
+
+/**
+ * Reserve num extents in pool.
+ * Ensure that next num extent_alloc will succeed w/o an error
+ */
+void
+memtx_index_extent_reserve(int num)
+{
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
+	/* same error as in mempool_alloc */
+		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
+			       "mempool", "new slab")
+	);
+	while (memtx_index_num_reserved_extents < num) {
+		void *ext = mempool_alloc(&memtx_index_extent_pool);
+		*(void **)ext = memtx_index_reserved_extents;
+		memtx_index_reserved_extents = ext;
+		memtx_index_num_reserved_extents++;
+	}
 }

@@ -249,13 +249,23 @@ rtree_always_true(const struct rtree_rect *rt1,
 static struct rtree_page *
 rtree_alloc_page(struct rtree *tree)
 {
-	return (struct rtree_page *)tree->page_alloc();
+	if (tree->free_pages) {
+		struct rtree_page *result =
+			(struct rtree_page *)tree->free_pages;
+		tree->free_pages = *(void **)tree->free_pages;
+		return result;
+	} else {
+		uint32_t unused_id;
+		return (struct rtree_page *)
+			matras_alloc(&tree->mtab, &unused_id);
+	}
 }
 
 static void
 rtree_free_page(struct rtree *tree, struct rtree_page *page)
 {
-	tree->page_free(page);
+	*(void **)page = tree->free_pages;
+	tree->free_pages = (void *)page;
 }
 
 static void
@@ -558,7 +568,7 @@ rtree_page_purge(struct rtree *tree, struct rtree_page *page, int level)
 		for (int i = 0; i < page->n; i++)
 			rtree_page_purge(tree, page->b[i].data.page, level);
 	}
-	tree->page_free(page);
+	rtree_free_page(tree, page);
 }
 
 /*------------------------------------------------------------------------- */
@@ -624,7 +634,8 @@ rtree_iterator_destroy(struct rtree_iterator *itr)
 	struct rtree_neighbor_page *curr, *next;
 	for (curr = itr->page_list; curr != NULL; curr = next) {
 		next = curr->next;
-		itr->tree->page_free(curr);
+		rtree_free_page((struct rtree *) itr->tree,
+				(struct rtree_page *) curr);
 	}
 	itr->page_list = NULL;
 	itr->page_pos = RTREE_NEIGHBORS_IN_PAGE;
@@ -648,7 +659,8 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 {
 	if (itr->page_pos >= RTREE_NEIGHBORS_IN_PAGE) {
 		struct rtree_neighbor_page *new_page =
-			(struct rtree_neighbor_page *)itr->tree->page_alloc();
+			(struct rtree_neighbor_page *)
+			rtree_alloc_page((struct rtree*)itr->tree);
 		new_page->next = itr->page_list;
 		itr->page_list = new_page;
 		itr->page_pos = 0;
@@ -683,6 +695,7 @@ rtree_iterator_free_neighbor(struct rtree_iterator *itr,
 void
 rtree_iterator_init(struct rtree_iterator *itr)
 {
+	itr->tree = 0;
 	itr->neigh_list = NULL;
 	itr->neigh_free_list = NULL;
 	itr->page_list = NULL;
@@ -764,22 +777,24 @@ rtree_iterator_next(struct rtree_iterator *itr)
 /*------------------------------------------------------------------------- */
 
 void
-rtree_init(struct rtree *tree,
-	   rtree_page_alloc_t page_alloc, rtree_page_free_t page_free)
+rtree_init(struct rtree *tree, uint32_t extent_size,
+	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free)
 {
 	tree->n_records = 0;
 	tree->height = 0;
 	tree->root = NULL;
 	tree->version = 0;
 	tree->n_pages = 0;
-	tree->page_alloc = page_alloc;
-	tree->page_free = page_free;
+	matras_create(&tree->mtab, extent_size, RTREE_PAGE_SIZE,
+		      extent_alloc, extent_free);
+	tree->free_pages = 0;
 }
 
 void
 rtree_destroy(struct rtree *tree)
 {
 	rtree_purge(tree);
+	matras_destroy(&tree->mtab);
 }
 
 void
@@ -859,6 +874,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 	     enum spatial_search_op op, struct rtree_iterator *itr)
 {
 	rtree_iterator_reset(itr);
+	assert(itr->tree == 0 || itr->tree == tree);
 	itr->tree = tree;
 	itr->version = tree->version;
 	itr->rect = *rect;
