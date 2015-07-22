@@ -3,24 +3,20 @@
 ||
 |1|	|2|	|3|
 |123|
-valid: yes
 	*** test1: done ***
  	*** test2 ***
 |123|	|456|	|abcac|	|'multiword field 4'|
 |none|	|none|	|0|
 ||	||	||
 ||	||	||
-valid: yes
 	*** test2: done ***
  	*** test3 ***
 |1|	||	|2|
-valid: yes
 	*** test3: done ***
  	*** test4 ***
 |123|	|5|	|92|	|0|	|0|
 |1|	|12  34|	|56|	|quote , |	|66|
 |ok|
-valid: yes
 	*** test4: done ***
  	*** test5 ***
 |abc|	|longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong|	|0|
@@ -51,24 +47,20 @@ valid: yes
  	*** common_test ***
 |first|	|last|	|address|	|city|	|zip|
 |John|	|Doe|	|120 any st.|	|Anytown, WW|	|08123|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|	|c|
 |1|	|"|	|"|
 |2|	|3|	|4|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|
 |1|	|ha "ha" ha|
 |3|	|4|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |key|	|val|
 |1|	|{"type": "Point", "coordinates": [102.0, 0.5]}|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|	|c|
@@ -76,7 +68,6 @@ valid: yes
 |Once upon 
 a time|	|5|	|6|
 |7|	|8|	|9|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|
@@ -84,17 +75,14 @@ valid: yes
 "ha"
 ha|
 |3|	|4|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |a|	|b|	|c|
 |1|	|2|	|3|
 |4|	|5|	|а нет ли ошибок?|
-valid: yes
 	*** common_test: done ***
  	*** common_test ***
 |www|	|aaa|	|tt  |
-valid: yes
 	*** common_test: done ***
  	*** iter_test1 ***
 ||	|d|	|e|
@@ -106,6 +94,6 @@ valid: yes
 |23|
 	*** iter_test2: done ***
  	*** csv_out ***
-abc<len=3>,"with,comma"<len=12>,""in quotes""<len=13>,1 "" quote<len=10>,<len=-1>
+abc<len=3>,"with,comma"<len=12>,""in quotes""<len=13>,1 "" quote<len=10>
 	*** csv_out: done ***
  

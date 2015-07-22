@@ -70,7 +70,7 @@ void *ffi_symbols[] = {
 	(void *) csv_create,
 	(void *) csv_destroy,
 	(void *) csv_setopt,
-	(void *) csv_iter_create,
+	(void *) csv_iterator_create,
 	(void *) csv_next,
 	(void *) csv_feed,
 };

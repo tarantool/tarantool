@@ -36,12 +36,10 @@ ffi.cdef[[
         const char *field;
         size_t field_len;
     };
-    typedef struct csv csv_t;
-    typedef struct csv_iterator csv_iterator_t;
-    void csv_iter_create(struct csv_iterator *it, struct csv *csv);
+    void csv_iterator_create(struct csv_iterator *it, struct csv *csv);
     int csv_next(struct csv_iterator *);
-    void csv_feed(struct csv_iterator *, const char *);
-    int csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
+    void csv_feed(struct csv_iterator *, const char *, size_t);
+    size_t csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
     enum {
         CSV_IT_OK,
         CSV_IT_EOL,
@@ -50,17 +48,6 @@ ffi.cdef[[
         CSV_IT_ERROR
     };
 ]]
-
-local make_readable = function(s)
-    rd = {}
-    rd.val = s
-    rd.read = function(self, cnt)
-        local res = self.val;
-        self.val = ""
-        return res
-    end
-    return rd
-end
 
 local make_writable = function()
     wr = {}
@@ -81,12 +68,21 @@ local iter = function(csvstate, i)
     local st = ffi.C.csv_next(it)
     while st ~= ffi.C.CSV_IT_EOF do
         if st == ffi.C.CSV_IT_NEEDMORE then
-            ffi.C.csv_feed(it, readable:read(csv_chunk_size))
+            if readable then
+                local buf = readable:read(csv_chunk_size)
+                ffi.C.csv_feed(it, buf, string.len(buf))
+            else
+                ffi.C.csv_feed(it, "", 0)
+            end
         elseif st == ffi.C.CSV_IT_EOL then
             i = i + 1
-            return i, tup
+            if i > 0 then
+                return i, tup
+            end
         elseif st == ffi.C.CSV_IT_OK then
-            table.insert(tup, ffi.string(it[0].field, it[0].field_len))
+            if i >= 0 then
+                tup[#tup + 1] = ffi.string(it.field, it.field_len)
+            end
         elseif st == ffi.C.CSV_IT_ERROR then
             log.warn("CSV file has errors")
             break
@@ -100,69 +96,94 @@ end
 
 local module = {}
 
-module.delimiter = ','
-module.quote = '"'
-
 --@brief parse csv string by string
 --@param readable must be string or object with method read(num) returns string
---@param csv_chunk_size (default 4096). Parser will read by csv_chunk_size symbols
+--@param opts.chunk_size (default 4096). Parser will read by chunk_size symbols
+--@param opts.delimiter (default ',').
+--@param opts.quote (default '"'). 
+--@param opts.skip_head_lines (default 0). Skip header. 
 --@return iter function, iterator state
-module.iterate = function(readable, csv_chunk_size)
-    csv_chunk_size = csv_chunk_size or 4096
+module.iterate = function(readable, opts)
+    opts = opts or {}
+    if not opts.chunk_size then
+        opts.chunk_size = 4096
+    end
+    if not opts.delimiter then
+        opts.delimiter = ','
+    end
+    if not opts.quote then
+        opts.quote = '"'
+    end
+    if not opts.skip_head_lines then
+        opts.skip_head_lines = 0
+    end
+    if type(readable) ~= "string" and type(readable.read) ~= "function" then
+        error("Usage: load(string or object with method read(num) returns string)")
+    end
+    local str
     if type(readable) == "string" then
-        readable = make_readable(readable)
+        str = readable
+        readable = null
+    else
+        str = readable:read(opts.chunk_size)
     end
-    if type(readable.read) ~= "function" then
-        error("Usage: load(object with method read(num) returns string)")
-    end
-
-    local str = readable:read(csv_chunk_size)
     if not str then
-        error("Usage: load(object with method read(num) returns string)")
+        error("Usage: load(string or object with method read(num) returns string)")
     end
-    local it = ffi.new('csv_iterator_t[1]')
-    local csv = ffi.new('csv_t[1]')
+    local it = ffi.new('struct csv_iterator')
+    local csv = ffi.new('struct csv')
     ffi.C.csv_create(csv)
-    csv[0].csv_delim = string.byte(module.delimiter)
-    csv[0].csv_quote = string.byte(module.quote)
-    ffi.C.csv_iter_create(it, csv)
-    ffi.C.csv_feed(it, str)
+    ffi.gc(csv, ffi.C.csv_destroy)
+    
+    csv.csv_delim = string.byte(opts.delimiter)
+    csv.csv_quote = string.byte(opts.quote)
+    ffi.C.csv_iterator_create(it, csv)
+    ffi.C.csv_feed(it, str, string.len(str))
 
-    return iter, {readable, csv_chunk_size, csv, it}, 0
+    return iter, {readable, opts.chunk_size, csv, it}, -opts.skip_head_lines
 end
 
 --@brief parse csv and make table
---@param skip_lines is number of lines to skip.
 --@return table
-module.load = function(readable, skip_lines, csv_chunk_size)
-    skip_lines = skip_lines or 0
-    csv_chunk_size = csv_chunk_size or 4096
+module.load = function(readable, opts)
+    opts = opts or {}
     result = {}
-    for i, tup in module.iterate(readable, csv_chunk_size) do
-        if i > skip_lines then             
-            result[i - skip_lines] = tup
-        end
+    for i, tup in module.iterate(readable, opts) do
+        result[i] = tup
     end
-
     return result
 end
 
 --@brief dumps tuple or table as csv
+--@param t is tuple or table
 --@param writable must be object with method write(string) like file or socket
+--@param opts.delimiter (default ',').
+--@param opts.quote (default '"'). 
 --@return there is no writable it returns csv as string
-module.dump = function(t, writable)
+module.dump = function(t, opts, writable)
+    opts = opts or {}
+    writable = writable or null
+    if not opts.delimiter then
+        opts.delimiter = ','
+    end
+    if not opts.quote then
+        opts.quote = '"'
+    end
+    
     if type(writable) == "nil" then
         writable = make_writable()
     end
     if type(writable.write) ~= "function" or type(t) ~= "table" then
-        error("Usage: dump(writable, table)")
+        error("Usage: dump(table[, opts, writable])")
     end
-    local csv = ffi.new('csv_t[1]')
+    local csv = ffi.new('struct csv')
     ffi.C.csv_create(csv)
-    csv[0].csv_delim = string.byte(module.delimiter)
-    csv[0].csv_quote = string.byte(module.quote)
+    ffi.gc(csv, ffi.C.csv_destroy)
+    csv.csv_delim = string.byte(opts.delimiter)
+    csv.csv_quote = string.byte(opts.quote)
+    
     local bufsz = 256
-    local buf = csv[0].csv_realloc(ffi.cast(ffi.typeof('void *'), 0), bufsz)
+    local buf = csv.csv_realloc(ffi.cast(ffi.typeof('void *'), 0), bufsz)
     if type(t[1]) ~= 'table' then
         t = {t}
     end
@@ -172,20 +193,20 @@ module.dump = function(t, writable)
             strf = tostring(field)
             if (strf:len() + 1) * 2 > bufsz then
                 bufsz = (strf:len() + 1) * 2
-                buf = csv[0].csv_realloc(buf, bufsz)
+                buf = csv.csv_realloc(buf, bufsz)
             end
             local len = ffi.C.csv_escape_field(csv, strf, string.len(strf), buf, bufsz)
             if first then
                 first = false
             else
-                writable:write(module.delimiter)
+                writable:write(opts.delimiter)
             end
             writable:write(ffi.string(buf, len))
         end
         writable:write('\n')
     end
     ffi.C.csv_destroy(csv)
-    csv[0].csv_realloc(buf, 0)
+    csv.csv_realloc(buf, 0)
     if writable.returnstring then
         return writable.returnstring
     end

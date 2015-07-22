@@ -27,6 +27,8 @@ csv_create(struct csv *csv)
 	csv->csv_delim= ',';
 	csv->csv_quote = '\"';
 	csv->csv_realloc = realloc;
+	csv->emit_field = csv_emit_field_empty;
+	csv->emit_row = csv_emit_row_empty;
 }
 
 void
@@ -34,19 +36,28 @@ csv_destroy(struct csv *csv)
 {
 	if(csv->buf) {
 		csv->csv_realloc(csv->buf, 0);
-		csv->buf = 0;
+		csv->buf = NULL;
 	}
 }
 
-int csv_isvalid(struct csv *csv)
+int
+csv_isvalid(struct csv *csv)
 {
 	if (csv->prevsymb == csv->csv_quote) {
 		csv->state = csv->state == CSV_BUF_IN_QUOTES ? CSV_BUF_OUT_OF_QUOTES : CSV_BUF_IN_QUOTES;
 		csv->prevsymb = ' ';
 	}
-	csv->csv_invalid = csv->state  == CSV_BUF_IN_QUOTES;
-	return !csv->csv_invalid;
+	if (csv->csv_error_status == CSV_ER_OK && csv->state  == CSV_BUF_IN_QUOTES)
+		csv->csv_error_status = CSV_ER_INVALID;
+	return !csv->csv_error_status;
 }
+
+int
+csv_get_error_status(struct csv *csv)
+{
+	return csv->csv_error_status;
+}
+
 void
 csv_setopt(struct csv *csv, int opt, ...)
 {
@@ -60,12 +71,12 @@ csv_setopt(struct csv *csv, int opt, ...)
 		csv->csv_quote = va_arg(args, int);
 		break;
 	case CSV_OPT_REALLOC:
-		csv->csv_realloc = va_arg(args, void*);
+		csv->csv_realloc = va_arg(args, void* (*)(void*, long unsigned int));
 		break;
 	case CSV_OPT_EMIT_FIELD:
-		csv->emit_field = va_arg(args, void*);
+		csv->emit_field = va_arg(args, void (*)(void*, const char *, const char *));
 	case CSV_OPT_EMIT_ROW:
-		csv->emit_row = va_arg(args, void*);
+		csv->emit_row = va_arg(args, void (*)(void*));
 	case CSV_OPT_CTX:
 		csv->emit_ctx = va_arg(args, void*);
 	}
@@ -76,12 +87,10 @@ const char *
 csv_parse_common(struct csv *csv, const char *s, const char *end, int onlyfirst)
 {
 	if (end - s == 0)
-		return 0;
+		return NULL;
 	assert(end - s > 0);
-	if (csv->emit_field == NULL)
-		csv->emit_field = csv_emit_field_empty;
-	if (csv->emit_row == NULL)
-		csv->emit_row = csv_emit_row_empty;
+	assert(csv->emit_field);
+	assert(csv->emit_row);
 	const char *p = s;
 
 	 while(p != end) {
@@ -89,7 +98,11 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int onlyfirst)
 
 		if (csv->buf == 0 || (csv->bufp && csv->buf_len < csv->bufp - csv->buf + 1)) {
 			csv->buf_len = (int)((csv->bufp - csv->buf + 1) * csv_buf_expand_factor + 1);
-			char *new_buf = csv->csv_realloc(csv->buf, csv->buf_len);
+			char *new_buf = (char *) csv->csv_realloc(csv->buf, csv->buf_len);
+			if(new_buf == NULL) {
+				csv->csv_error_status = CSV_ER_MEMORY_ERROR;
+				return NULL;
+			}
 			csv->bufp = csv->bufp - csv->buf + new_buf;
 			csv->buf = new_buf;
 		}
@@ -111,12 +124,12 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int onlyfirst)
 		}
 		csv->prevsymb = *p;
 		switch(csv->state) {
-		case CSV_LEADING_SPACES: //leading spaces
+		case CSV_LEADING_SPACES:
 			csv->bufp = csv->buf;
 			if (*p != ' ') {
 				csv->state = CSV_BUF_OUT_OF_QUOTES;
 			}
-			else break;
+			else break; //spaces passed, perform field at once
 		case CSV_BUF_OUT_OF_QUOTES:
 			if (isendl || *p == csv->csv_delim) {
 				csv->state = CSV_LEADING_SPACES;
@@ -153,7 +166,7 @@ csv_parse_common(struct csv *csv, const char *s, const char *end, int onlyfirst)
 			csv->bufp = 0;
 			if(onlyfirst) {
 				if(p + 1 == end)
-					return 0;
+					return NULL;
 				else
 					return p + 1;
 			}
@@ -183,15 +196,15 @@ csv_finish_parsing(struct csv *csv)
 		}
 		if (csv->buf)
 			csv->csv_realloc(csv->buf, 0);
-		csv->bufp = 0;
-		csv->buf = 0;
+		csv->bufp = NULL;
+		csv->buf = NULL;
 		csv->buf_len = 0;
 	}
 }
 
 
 void
-csv_iter_create(struct csv_iterator *it, struct csv *csv)
+csv_iterator_create(struct csv_iterator *it, struct csv *csv)
 {
 	memset(it, 0, sizeof(struct csv_iterator));
 	it->csv = csv;
@@ -199,20 +212,19 @@ csv_iter_create(struct csv_iterator *it, struct csv *csv)
 
 int
 csv_next(struct csv_iterator *it) {
-	it->field = 0;
+	it->field = NULL;
 	it->field_len = 0;
-	if(it->buf_begin == 0)
+	if(it->buf_begin == NULL)
 		return CSV_IT_NEEDMORE;
 	if(it->buf_begin == it->buf_end) {
-		if (!it->csv->csv_invalid && !csv_isvalid(it->csv)) {
-			it->csv->csv_invalid = 1;
+		if (!it->csv->csv_error_status && !csv_isvalid(it->csv)) {
 			it->csv->csv_realloc(it->csv->buf, 0);
-			it->csv->buf = 0;
-			it->csv->bufp = 0;
+			it->csv->buf = NULL;
+			it->csv->bufp = NULL;
 			it->csv->buf_len = 0;
 			return CSV_IT_ERROR;
 		}
-		if(it->csv->bufp == 0) {
+		if(it->csv->bufp == NULL) {
 			return CSV_IT_EOF;
 		}
 		if(it->csv->state != CSV_END_OF_INPUT) {
@@ -224,15 +236,17 @@ csv_next(struct csv_iterator *it) {
 			return CSV_IT_OK;
 		} else {
 			it->csv->csv_realloc(it->csv->buf, 0);
-			it->csv->buf = 0;
-			it->csv->bufp = 0;
+			it->csv->buf = NULL;
+			it->csv->bufp = NULL;
 			it->csv->buf_len = 0;
 			return CSV_IT_EOL;
 		}
 	}
 	const char *tail = csv_parse_common(it->csv, it->buf_begin, it->buf_end, 1);
+	if(csv_get_error_status(it->csv) == CSV_ER_MEMORY_ERROR)
+		return CSV_IT_ERROR;
 	it->buf_begin = tail;
-	if(it->csv->bufp == 0 && it->csv->prevsymb)
+	if(it->csv->bufp == NULL && it->csv->prevsymb)
 		return CSV_IT_EOL;
 	if(tail == it->buf_end)
 		return CSV_IT_NEEDMORE;
@@ -242,13 +256,13 @@ csv_next(struct csv_iterator *it) {
 }
 
 void
-csv_feed(struct csv_iterator *it, const char *str)
+csv_feed(struct csv_iterator *it, const char *buf, size_t buf_len)
 {
-	it->buf_begin = str;
-	it->buf_end = str + strlen(str);
+	it->buf_begin = buf;
+	it->buf_end = buf + buf_len;
 }
 
-int
+size_t
 csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size)
 {
 	char *p = dst;
@@ -259,17 +273,14 @@ csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst
 	}
 	while(*field) {
 		if(*field == csv->csv_quote) {
-			if(p - dst >= buf_size)
-				return -1;
+			assert(p - dst < buf_size);
 			*p++ = csv->csv_quote;
 		}
-		if(p - dst >= buf_size)
-			return -1;
+		assert(p - dst < buf_size);
 		*p++ = *field++;
 	}
 	if(inquotes) {
-		if(p - dst >= buf_size)
-			return -1;
+		assert(p - dst < buf_size);
 		*p++ = csv->csv_quote;
 	}
 	*p = 0;

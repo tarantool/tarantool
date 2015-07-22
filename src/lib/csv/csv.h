@@ -19,7 +19,7 @@ struct csv
 	char csv_quote;
 
 	char prevsymb;
-	int csv_invalid;
+	int csv_error_status;
 	int csv_ending_spaces;
 
 	void *(*csv_realloc)(void*, size_t);
@@ -30,8 +30,7 @@ struct csv
 	size_t buf_len;
 };
 
-//parser options
-enum {
+enum parser_options {
 	CSV_OPT_DELIMITER,
 	CSV_OPT_QUOTE,
 	CSV_OPT_REALLOC,
@@ -40,8 +39,7 @@ enum {
 	CSV_OPT_CTX
 };
 
-//iteraion states
-enum {
+enum iteraion_states {
 	CSV_IT_OK,
 	CSV_IT_EOL,
 	CSV_IT_NEEDMORE,
@@ -49,12 +47,18 @@ enum {
 	CSV_IT_ERROR
 };
 
-//parser states
-enum {  CSV_LEADING_SPACES,
+enum parser_states {
+	CSV_LEADING_SPACES,
 	CSV_BUF_OUT_OF_QUOTES,
 	CSV_BUF_IN_QUOTES,
 	CSV_NEWLINE,
 	CSV_END_OF_INPUT
+};
+
+enum error_status {
+	CSV_ER_OK,
+	CSV_ER_INVALID,
+	CSV_ER_MEMORY_ERROR
 };
 
 void
@@ -84,10 +88,10 @@ void
 csv_finish_parsing(struct csv *csv);
 
 /**
- * if quote not closed returns 0
+ * @return 0 is ok
  */
 int
-csv_isvalid(struct csv *csv);
+csv_get_error_status(struct csv *csv);
 
 /**
  * @brief The csv_iterator struct allows iterate field by field through csv
@@ -103,7 +107,7 @@ struct csv_iterator {
 };
 
 void
-csv_iter_create(struct csv_iterator *it, struct csv *csv);
+csv_iterator_create(struct csv_iterator *it, struct csv *csv);
 /**
  * Recieves next element from csv
  * element is field or end of line
@@ -117,7 +121,7 @@ csv_next(struct csv_iterator *);
  * empty buffer means end of iteration
  */
 void
-csv_feed(struct csv_iterator *, const char *);
+csv_feed(struct csv_iterator *it, const char *buf, size_t buf_len);
 
 /**
  * @brief csv_escape_field prepares field to out in file.
@@ -125,7 +129,7 @@ csv_feed(struct csv_iterator *, const char *);
  * At worst escaped field will 2 times more symbols than input field.
  * @return length of escaped field or -1 if not enough space in buffer.
  */
-int
+size_t
 csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
 
 

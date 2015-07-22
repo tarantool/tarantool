@@ -106,7 +106,7 @@ void test5() {
 	csv_setopt(&csv, CSV_OPT_DELIMITER, '\t');
 	csv_parse_chunk(&csv, s, s + strlen(s));
 	csv_finish_parsing(&csv);
-	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	printf("valid: %s\n", csv.csv_error_status == CSV_ER_INVALID ? "NO" : "yes");
 	csv_destroy(&csv);
 	footer();
 }
@@ -123,7 +123,7 @@ void test6() {
 	csv_parse_chunk(&csv, s2, s2 + 2);
 	csv_parse_chunk(&csv, s2 + 2, s2 + strlen(s2));
 	csv_finish_parsing(&csv);
-	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	printf("valid: %s\n", csv_get_error_status(&csv) == CSV_ER_INVALID ? "NO" : "yes");
 	csv_destroy(&csv);
 	footer();
 }
@@ -218,7 +218,7 @@ void random_generated_test() {
 	csv_parse_chunk(&csv, rand_test, rand_test + strlen(rand_test));
 	csv_finish_parsing(&csv);
 	printf("line_cnt=%d, fieldsizes_cnt=%d\n", (int)cnt.line_cnt, (int)cnt.fieldsizes_cnt);
-	printf("valid: %s\n", csv.csv_invalid ? "NO" : "yes");
+	printf("valid: %s\n", csv_get_error_status(&csv) == CSV_ER_INVALID ? "NO" : "yes");
 	csv_destroy(&csv);
 
 	footer();
@@ -229,13 +229,13 @@ void iter_test1() {
 	struct csv_iterator it;
 	struct csv csv;
 	csv_create(&csv);
-	csv_iter_create(&it, &csv);
+	csv_iterator_create(&it, &csv);
 	int st = 0;
 	const char *buf = ",d ,e\r\n12,42,3\no\n";
 	while((st = csv_next(&it)) != CSV_IT_EOF) {
 		switch(st) {
 		case CSV_IT_NEEDMORE:
-			csv_feed(&it, buf);
+			csv_feed(&it, buf, strlen(buf));
 			buf += strlen(buf);
 			break;
 		case CSV_IT_EOL:
@@ -258,14 +258,14 @@ void iter_test2() {
 	struct csv_iterator it;
 	struct csv csv;
 	csv_create(&csv);
-	csv_iter_create(&it, &csv);
+	csv_iterator_create(&it, &csv);
 	int st = 0;
 	const char ar[] = {'1', '\n', 0, '2', '3', 0, 0};
 	const char *buf = ar;
 	while((st = csv_next(&it)) != CSV_IT_EOF) {
 		switch(st) {
 		case CSV_IT_NEEDMORE:
-			csv_feed(&it, buf);
+			csv_feed(&it, buf, strlen(buf));
 			buf += 3;
 			break;
 		case CSV_IT_EOL:
@@ -286,18 +286,14 @@ void iter_test2() {
 void csv_out() {
 	header();
 
-	const char fields[5][24] = { "abc", "with,comma", "\"in quotes\"", "1 \" quote",
-				     "long field, return \"-1\"" };
-	char buf[24];
+	const char fields[4][24] = { "abc", "with,comma", "\"in quotes\"", "1 \" quote"};
+	char buf[54];
 	int i;
 	struct csv csv;
 	csv_create(&csv);
-	for(i = 0; i < 5; i++) {
+	for(i = 0; i < 4; i++) {
 		int len = csv_escape_field(&csv, fields[i], strlen(fields[i]), buf, sizeof(buf));
-		if(len != -1)
-			printf("%s<len=%d>%c", buf, len, i == 4 ? '\n' : ',');
-		else
-			printf("<len=%d>%c", len, i == 4 ? '\n' : ',');
+		printf("%s<len=%d>%c", buf, len, i == 3 ? '\n' : ',');
 	}
 
 	footer();

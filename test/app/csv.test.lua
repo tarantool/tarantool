@@ -41,11 +41,11 @@ test:is(table2str(csv.load(readable)), test1, "obj test1")
 
 readable.v = ", ,\n , \n\n"
 readable.i = 0
-test:is(table2str(csv.load(readable, 0, 1)), test2, "obj test2")
+test:is(table2str(csv.load(readable, {chunk_size = 1} )), test2, "obj test2")
 
 readable.v = ", \r\nkp\"\"v"
 readable.i = 0
-test:is(table2str(csv.load(readable, 0, 3)), test3, "obj test3")
+test:is(table2str(csv.load(readable, {chunk_size = 3})), test3, "obj test3")
 
 tmpdir = fio.tempdir()
 file1 = fio.pathjoin(tmpdir, 'file.1')
@@ -57,7 +57,7 @@ f:write("123 , 5  ,       92    , 0, 0\n" ..
         "1, 12  34, 56, \"quote , \", 66\nok")
 f:close()
 f = fio.open(file1, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f,0,10)), test4, "fio test1")
+test:is(table2str(csv.load(f, {chunk_size = 10})), test4, "fio test1")
 f:close()
 
 
@@ -72,13 +72,12 @@ f:write("1\n23,456,abcac,\'multiword field 4\'\n" ..
 )
 f:close()
 f = fio.open(file2, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f, 0, 1)), test5, "fio test2") --symbol by symbol reading
+test:is(table2str(csv.load(f, {chunk_size = 1})), test5, "fio test2") --symbol by symbol reading
 f:close()
 
 f = fio.open(file2, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f, 1, 7)), test6, "fio test3") --7 symbols per chunk
+test:is(table2str(csv.load(f, {chunk_size = 7, skip_head_lines = 1})), test6, "fio test3") --7 symbols per chunk
 f:close()
-
 
 t = {
     {'quote" d', ',and, comma', 'both " of " t,h,e,m'}, 
@@ -90,10 +89,10 @@ t = {
 }
 
 f = require("fio").open(file3, { "O_WRONLY", "O_TRUNC" , "O_CREAT"}, 0x1FF)
-csv.dump(t, f)
+csv.dump(t, {}, f)
 f:close()
 f = fio.open(file3, {'O_RDONLY'}) 
-t2 = csv.load(f, 0, 5)
+t2 = csv.load(f, {chunk_size = 5})
 f:close()
 
 test:is(table2str(t), table2str(t2), "test roundtrip")
