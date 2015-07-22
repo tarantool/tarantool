@@ -7,9 +7,6 @@ blocks  :
   header:
     - "Tarantool"
     - "Get your data in RAM. Get compute close to data. Enjoy the performance"
-    - >
-      Tarantool combines the network programming power of Node.JS
-      with data persitence capabilities of Redis.
   features:
     - format: rst
       content: >
@@ -27,9 +24,9 @@ blocks  :
         MessagePack based client-server protocol
     - format: rst
       content: >
-        two data engines: 100% in-memory with optional persistence
-        and a `2-level disk-based B-tree <http://sphia.org>`_,
-        to use with large data sets
+        a built-in database with two data engines: 100% in-memory
+        with optional persistence and a `2-level disk-based B-tree
+        <http://sphia.org>`_, to use with large data sets
     - "secondary key and index iterators support"
     - "asynchronous master-master replication"
     - "authentication and access control"
