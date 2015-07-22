@@ -5,7 +5,7 @@
 -------------------------------------------------------------------------------
 
 Triggers, also known as callbacks, are functions which the server executes when
-certain events happen. Currently the two types of triggers are `connection triggers`_,
+certain events happen. Currently the main types of triggers are `connection triggers`_,
 which are executed when a session begins or ends, and `replace triggers`_ which are
 for database events,
 
@@ -13,12 +13,12 @@ All triggers have the following characteristics.
 
 * They associate a `function` with an `event`. The request to "define a trigger"
   consists of passing the name of the trigger's function to one of the
-  "on_`event-name` ..." functions: ``on_connect()``, ``on_disconnect()``,
-  or ``on_replace()``.
+  ":samp:`on_{event-name}()`" functions: :code:`on_connect()`, :code:`on_auth()`,
+  :code:`on_disconnect()`, or :code:`on_replace()`.
 * They are `defined by any user`. There are no privilege requirements for defining
   triggers.
 * They are called `after` the event. They are not called if the event ends
-  prematurely due to an error.
+  prematurely due to an error. (Exception: :code:`on_auth()` is called before the event.)
 * They are in `server memory`. They are not stored in the database. Triggers
   disappear when the server is shut down. If there is a requirement to make
   them permanent, then the function definitions and trigger settings should
@@ -108,6 +108,34 @@ Here is what might appear in the log file in a typical installation:
         Connection. user=guest id=3
     2014-12-15 13:22:19.289 [11360] main/103/iproto I>
         Disconnection. user=guest id=3
+
+===========================================================
+                    Authentication triggers
+===========================================================
+
+.. function:: box.session.on_auth(trigger-function [, old-trigger-function-name])
+
+    Define a trigger for execution during authentication.
+    The on_auth trigger function is invoked after the on_connect trigger function,
+    if and only if the connection has succeeded so far.
+    For this purpose, connection and authentication are considered to be separate steps.
+
+    Unlike other trigger types, on_auth trigger functions are invoked `before`
+    the event. Therefore a trigger function like ":code:`function auth_function () v = box.session.user(); end`"
+    will set :code:`v` to "guest", the user name before the authentication is done.
+    To get the user name after the authentication is done, use the special syntax:
+    ":code:`function auth_function (user_name) v = user_name; end`"
+
+    If the trigger fails by raising an
+    error, the error is sent to the client and the connection is closed.
+
+    :param function trigger-function: function which will become the trigger function
+    :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
+    :return: nil
+
+    If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
+
+    Example: :codenormal:`function f () x = x + 1 end; box.session.on_auth(f)`
 
 
 ===========================================================

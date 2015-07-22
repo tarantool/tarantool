@@ -83,7 +83,7 @@ can be reused when another fiber is created.
 
     Return information about all fibers.
 
-    :return: the name, id, and backtrace of all fibers.
+    :return: the name, id, available memory, used memory, and backtrace of all fibers.
     :rtype: table
 
 .. function:: kill(id)
