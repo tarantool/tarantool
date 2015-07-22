@@ -6,7 +6,7 @@ template: "index"
 blocks  :
   header:
     - "Tarantool"
-    - "A NoSQL database running in a Lua application server"
+    - "Get your data in RAM. Get compute close to data. Enjoy the performance"
     - >
       Tarantool combines the network programming power of Node.JS
       with data persitence capabilities of Redis.
