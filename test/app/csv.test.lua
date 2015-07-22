@@ -19,16 +19,21 @@ end
 local csv = require('csv')
 local fio = require('fio')
 local tap = require('tap')
-local test1 = '|a|\t|b|\t\n|1|\t|ha\n"ha"\nha|\t\n|3|\t|4|\t\n'
-local test2 = '||\t||\t||\t\n||\t||\t\n||\t\n'
-local test3 = '||\t||\t\n|kp"v|\t\n'
-local test4 = '|123|\t|5|\t|92|\t|0|\t|0|\t\n|1|\t|12  34|\t|56|\t|quote , |\t|66|\t\n|ok|\t\n'
-local test5 = "|1|\t\n|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|\t|none|\t|0|\t\n" .. 
-        "||\t||\t||\t\n|aba|\t|adda|\t|f3|\t|0|\t\n|local res = internal.pwrite(self.fh|\t|d" ..
-        "ata|\t|len|\t|offset)|\t\n|iflag = bit.bor(iflag|\t|fio.c.flag[ flag ])|\t\n||\t||\t||\t\n"
-local test6 = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|\t|none|\t|0|\t\n||\t||\t||\t\n" .. 
-        "|aba|\t|adda|\t|f3|\t|0|\t\n|local res = internal.pwrite(self.fh|\t|data|\t|len|\t|offset)" ..
-        "|\t\n|iflag = bit.bor(iflag|\t|fio.c.flag[ flag ])|\t\n||\t||\t||\t\n"
+local test1_ans = '|a|\t|b|\t\n|1|\t|ha\n"ha"\nha|\t\n|3|\t|4|\t\n'
+local test2_ans = '||\t||\t||\t\n||\t||\t\n||\t\n'
+local test3_ans = '||\t||\t\n|kp"v|\t\n'
+local test4_ans = '|123|\t|5|\t|92|\t|0|\t|0|\t\n|1|\t|12  34|\t|56|\t' ..
+                  '|quote , |\t|66|\t\n|ok|\t\n'
+local test5_ans = "|1|\t\n|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n" ..
+                  "|none|\t|none|\t|0|\t\n||\t||\t||\t\n|aba|\t|adda|\t|f" ..
+                  "3|\t|0|\t\n|local res = internal.pwrite(self.fh|\t|dat" ..
+                  "a|\t|len|\t|offset)|\t\n|iflag = bit.bor(iflag|\t|fio." .. 
+                  "c.flag[ flag ])|\t\n||\t||\t||\t\n"
+local test6_ans = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|" ..
+                  "\t|none|\t|0|\t\n||\t||\t||\t\n|aba|\t|adda|\t|f3|\t|" .. 
+                  "0|\t\n|local res = internal.pwrite(self.fh|\t|data|\t" ..
+                  "|len|\t|offset)|\t\n|iflag = bit.bor(iflag|\t|fio.c.f" ..
+                  "lag[ flag ])|\t\n||\t||\t||\t\n"
 
 test = tap.test("csv")
 test:plan(8)
@@ -37,15 +42,15 @@ readable = {}
 readable.read = myread
 readable.v = "a,b\n1,\"ha\n\"\"ha\"\"\nha\"\n3,4\n"
 readable.i = 0
-test:is(table2str(csv.load(readable)), test1, "obj test1")
+test:is(table2str(csv.load(readable)), test1_ans, "obj test1")
 
 readable.v = ", ,\n , \n\n"
 readable.i = 0
-test:is(table2str(csv.load(readable, {chunk_size = 1} )), test2, "obj test2")
+test:is(table2str(csv.load(readable, {chunk_size = 1} )), test2_ans, "obj test2")
 
 readable.v = ", \r\nkp\"\"v"
 readable.i = 0
-test:is(table2str(csv.load(readable, {chunk_size = 3})), test3, "obj test3")
+test:is(table2str(csv.load(readable, {chunk_size = 3})), test3_ans, "obj test3")
 
 tmpdir = fio.tempdir()
 file1 = fio.pathjoin(tmpdir, 'file.1')
@@ -57,7 +62,7 @@ f:write("123 , 5  ,       92    , 0, 0\n" ..
         "1, 12  34, 56, \"quote , \", 66\nok")
 f:close()
 f = fio.open(file1, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f, {chunk_size = 10})), test4, "fio test1")
+test:is(table2str(csv.load(f, {chunk_size = 10})), test4_ans, "fio test1")
 f:close()
 
 
@@ -72,11 +77,14 @@ f:write("1\n23,456,abcac,\'multiword field 4\'\n" ..
 )
 f:close()
 f = fio.open(file2, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f, {chunk_size = 1})), test5, "fio test2") --symbol by symbol reading
+--symbol by symbol reading
+test:is(table2str(csv.load(f, {chunk_size = 1})), test5_ans, "fio test2") 
 f:close()
 
 f = fio.open(file2, {'O_RDONLY'}) 
-test:is(table2str(csv.load(f, {chunk_size = 7, skip_head_lines = 1})), test6, "fio test3") --7 symbols per chunk
+opts = {chunk_size = 7, skip_head_lines = 1}
+--7 symbols per chunk
+test:is(table2str(csv.load(f, opts)), test6_ans, "fio test3") 
 f:close()
 
 t = {

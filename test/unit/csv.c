@@ -1,8 +1,35 @@
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #include "csv/csv.h"
 #include "unit.h"
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 
 int isendl = 1;
 void
@@ -106,7 +133,7 @@ void test5() {
 	csv_setopt(&csv, CSV_OPT_DELIMITER, '\t');
 	csv_parse_chunk(&csv, s, s + strlen(s));
 	csv_finish_parsing(&csv);
-	printf("valid: %s\n", csv.csv_error_status == CSV_ER_INVALID ? "NO" : "yes");
+	printf("valid: %s\n", csv.error_status == CSV_ER_INVALID ? "NO" : "yes");
 	csv_destroy(&csv);
 	footer();
 }
@@ -161,7 +188,7 @@ void big_chunk_separated_test() {
 	struct counter cnt;
 	cnt.line_cnt = 0;
 	cnt.fieldsizes_cnt = 0;
-	csv_setopt(&csv, CSV_OPT_CTX, &cnt);
+	csv_setopt(&csv, CSV_OPT_EMIT_CTX, &cnt);
 
 	const char *s = "abc, def, def, cba";
 	for(size_t i = 0; i < lines; i++) {
@@ -184,8 +211,8 @@ void big_chunk_separated_test() {
 	//without fieldsizes counts without commas and spaces
 	printf("line_cnt=%d, fieldsizes_cnt=%d, %d\n", (int)cnt.line_cnt, (int)cnt.fieldsizes_cnt,
 	       (int) (lines * (strlen(s) - 6) * (linelen / strlen(s))));
-	assert(lines == cnt.line_cnt);
-	assert(lines * (strlen(s) - 6) * (linelen / strlen(s))  == cnt.fieldsizes_cnt);
+	fail_unless(lines == cnt.line_cnt);
+	fail_unless(lines * (strlen(s) - 6) * (linelen / strlen(s))  == cnt.fieldsizes_cnt);
 	csv_destroy(&csv);
 	free(buf);
 	footer();
@@ -213,7 +240,7 @@ void random_generated_test() {
 	struct counter cnt;
 	cnt.line_cnt = 0;
 	cnt.fieldsizes_cnt = 0;
-	csv_setopt(&csv, CSV_OPT_CTX, &cnt);
+	csv_setopt(&csv, CSV_OPT_EMIT_CTX, &cnt);
 
 	csv_parse_chunk(&csv, rand_test, rand_test + strlen(rand_test));
 	csv_finish_parsing(&csv);

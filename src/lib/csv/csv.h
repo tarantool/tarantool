@@ -1,7 +1,34 @@
 #ifndef TARANTOOL_CSV_H_INCLUDED
 #define TARANTOOL_CSV_H_INCLUDED
-
-#include<stdio.h>
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+#include <stdio.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -15,14 +42,14 @@ struct csv
 	void *emit_ctx;
 	csv_emit_row_t emit_row;
 	csv_emit_field_t emit_field;
-	char csv_delim;
-	char csv_quote;
+	char delimiter;
+	char quote_char;
 
-	char prevsymb;
-	int csv_error_status;
-	int csv_ending_spaces;
+	char prev_symbol;
+	int error_status;
+	int ending_spaces;
 
-	void *(*csv_realloc)(void*, size_t);
+	void *(*realloc)(void*, size_t);
 
 	int state;
 	char *buf;
@@ -30,16 +57,16 @@ struct csv
 	size_t buf_len;
 };
 
-enum parser_options {
+enum csv_parser_option {
 	CSV_OPT_DELIMITER,
 	CSV_OPT_QUOTE,
 	CSV_OPT_REALLOC,
 	CSV_OPT_EMIT_FIELD,
 	CSV_OPT_EMIT_ROW,
-	CSV_OPT_CTX
+	CSV_OPT_EMIT_CTX
 };
 
-enum iteraion_states {
+enum csv_iteraion_state {
 	CSV_IT_OK,
 	CSV_IT_EOL,
 	CSV_IT_NEEDMORE,
@@ -47,15 +74,15 @@ enum iteraion_states {
 	CSV_IT_ERROR
 };
 
-enum parser_states {
+enum csv_parser_state {
 	CSV_LEADING_SPACES,
-	CSV_BUF_OUT_OF_QUOTES,
-	CSV_BUF_IN_QUOTES,
+	CSV_OUT_OF_QUOTES,
+	CSV_IN_QUOTES,
 	CSV_NEWLINE,
-	CSV_END_OF_INPUT
+	CSV_END_OF_LAST_LINE
 };
 
-enum error_status {
+enum csv_error_status {
 	CSV_ER_OK,
 	CSV_ER_INVALID,
 	CSV_ER_MEMORY_ERROR
@@ -99,10 +126,10 @@ csv_get_error_status(struct csv *csv);
 struct csv_iterator {
 	struct csv *csv;
 
-	const char *buf_begin;
+	const char *buf_begin; //input buffer
 	const char *buf_end;
 
-	const char *field;
+	const char *field;    //output buffer
 	size_t field_len;
 };
 
@@ -130,15 +157,17 @@ csv_feed(struct csv_iterator *it, const char *buf, size_t buf_len);
  * @return length of escaped field or -1 if not enough space in buffer.
  */
 size_t
-csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t buf_size);
+csv_escape_field(struct csv *csv, const char *field, size_t field_len, char *dst, size_t dst_size);
 
 
-static inline const char* csv_iterator_get_field(struct csv_iterator *it)
+static inline const char *
+csv_iterator_get_field(struct csv_iterator *it)
 {
 	return it->field;
 }
 
-static inline size_t csv_iterator_get_field_len(struct csv_iterator *it)
+static inline size_t
+csv_iterator_get_field_len(struct csv_iterator *it)
 {
 	return it->field_len;
 }
