@@ -310,6 +310,9 @@ struct cbus {
 void
 cbus_create(struct cbus *bus);
 
+void
+cbus_destroy(struct cbus *bus);
+
 /**
  * Connect the pipes: join cord1 input to the cord2 output,
  * and cord1 output to cord2 input.
@@ -332,6 +335,35 @@ cbus_create(struct cbus *bus);
  */
 struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe);
+
+/**
+ * Lock the bus. Ideally should never be used
+ * outside cbus code.
+ */
+static inline void
+cbus_lock(struct cbus *bus)
+{
+	tt_pthread_mutex_lock(&bus->mutex);
+}
+
+/** Unlock the bus. */
+static inline void
+cbus_unlock(struct cbus *bus)
+{
+	tt_pthread_mutex_unlock(&bus->mutex);
+}
+
+static inline void
+cbus_signal(struct cbus *bus)
+{
+	tt_pthread_cond_signal(&bus->cond);
+}
+
+static inline void
+cbus_wait_signal(struct cbus *bus)
+{
+	tt_pthread_cond_wait(&bus->cond, &bus->mutex);
+}
 
 /**
  * Dispatch the message to the next hop.

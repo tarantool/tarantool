@@ -28,24 +28,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
-#include "third_party/queue.h"
 #include "xlog.h"
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "uri.h"
+#include "wal.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct fiber;
-struct tbuf;
 struct recovery_state;
 
 typedef void (apply_row_f)(struct recovery_state *, void *,
@@ -55,13 +52,8 @@ typedef void (apply_row_f)(struct recovery_state *, void *,
  * LSN makes it to disk.
  */
 
-struct wal_writer;
 struct wal_watcher;
-
-enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
-
-/** String constants for the supported modes. */
-extern const char *wal_mode_STRS[];
+struct wal_writer;
 
 enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
@@ -120,9 +112,17 @@ recovery_exit(struct recovery_state *r);
 void
 recovery_atfork(struct recovery_state *r);
 
-void recovery_update_mode(struct recovery_state *r, enum wal_mode mode);
-void recovery_update_io_rate_limit(struct recovery_state *r,
-				   double new_limit);
+void
+recovery_update_mode(struct recovery_state *r,
+		     enum wal_mode mode);
+
+void
+recovery_update_io_rate_limit(struct recovery_state *r,
+			      double new_limit);
+
+void
+recovery_setup_panic(struct recovery_state *r, bool on_snap_error,
+		     bool on_wal_error);
 
 static inline bool
 recovery_has_data(struct recovery_state *r)
@@ -130,36 +130,29 @@ recovery_has_data(struct recovery_state *r)
 	return vclockset_first(&r->snap_dir.index) != NULL ||
 	       vclockset_first(&r->wal_dir.index) != NULL;
 }
-void recovery_bootstrap(struct recovery_state *r);
+
+void
+recovery_bootstrap(struct recovery_state *r);
+
 void
 recover_xlog(struct recovery_state *r, struct xlog *l);
-void recovery_follow_local(struct recovery_state *r,
-			   const char *name,
-			   ev_tstamp wal_dir_rescan_delay);
-void recovery_stop_local(struct recovery_state *r);
-
-void recovery_finalize(struct recovery_state *r, enum wal_mode mode,
-		       int rows_per_wal);
 
 void
-fill_lsn(struct recovery_state *r, struct xrow_header *row);
+recovery_follow_local(struct recovery_state *r, const char *name,
+		      ev_tstamp wal_dir_rescan_delay);
 
-struct wal_request {
-	STAILQ_ENTRY(wal_request) wal_fifo_entry;
-	/* Auxiliary. */
-	int64_t res;
-	struct fiber *fiber;
-	int n_rows;
-	struct xrow_header *rows[];
-};
+void
+recovery_stop_local(struct recovery_state *r);
 
-int64_t
-wal_write(struct recovery_state *r, struct wal_request *req);
+void
+recovery_finalize(struct recovery_state *r, enum wal_mode mode,
+		  int rows_per_wal);
 
-void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
-void recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
+void
+recovery_fill_lsn(struct recovery_state *r, struct xrow_header *row);
 
-struct fio_batch;
+void
+recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
 
 /**
  * Return LSN of the most recent snapshot or -1 if there is

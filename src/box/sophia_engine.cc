@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "replication.h"
 #include "sophia_engine.h"
 #include "cfg.h"
 #include "xrow.h"
@@ -36,10 +35,10 @@
 #include "index.h"
 #include "sophia_index.h"
 #include "recovery.h"
+#include "relay.h"
 #include "space.h"
 #include "request.h"
 #include "iproto_constants.h"
-#include "replication.h"
 #include "salad/rlist.h"
 #include <sophia.h>
 #include <stdlib.h>

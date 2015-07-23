@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 #include "memtx_engine.h"
-#include "replication.h"
 #include "tuple.h"
 #include "txn.h"
 #include "index.h"
@@ -41,6 +40,7 @@
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "recovery.h"
+#include "relay.h"
 #include "schema.h"
 #include "main.h"
 #include "coeio_file.h"

@@ -157,7 +157,7 @@ txn_commit(struct txn *txn)
 		 * Bump current LSN even if wal_mode = NONE, so that
 		 * snapshots still works with WAL turned off.
 		 */
-		fill_lsn(recovery, stmt->row);
+		recovery_fill_lsn(recovery, stmt->row);
 		stmt->row->tm = ev_now(loop());
 		req->rows[req->n_rows++] = stmt->row;
 	}

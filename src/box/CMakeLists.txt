@@ -55,7 +55,8 @@ add_library(box
     cluster.cc
     recovery.cc
     replica.cc
-    replication.cc
+    relay.cc
+    wal.cc
     ${lua_sources}
     lua/call.cc
     lua/tuple.cc

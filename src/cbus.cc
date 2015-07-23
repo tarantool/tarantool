@@ -62,6 +62,7 @@ cpipe_create(struct cpipe *pipe)
 	ev_async_init(&pipe->fetch_output, cpipe_fetch_output_cb);
 	pipe->fetch_output.data = pipe;
 	pipe->consumer = loop();
+	pipe->producer = NULL; /* set in join() under a mutex */
 	ev_async_start(pipe->consumer, &pipe->fetch_output);
 }
 
@@ -101,18 +102,6 @@ cbus_destroy(struct cbus *bus)
 	(void) tt_pthread_cond_destroy(&bus->cond);
 }
 
-static inline void
-cbus_lock(struct cbus *bus)
-{
-	tt_pthread_mutex_lock(&bus->mutex);
-}
-
-static inline void
-cbus_unlock(struct cbus *bus)
-{
-	tt_pthread_mutex_unlock(&bus->mutex);
-}
-
 /**
  * @pre both consumers initialized their pipes
  * @post each consumers gets the input end of the opposite pipe
@@ -133,15 +122,27 @@ cbus_join(struct cbus *bus, struct cpipe *pipe)
 	int peer_idx = !pipe_idx;
 	bus->pipe[pipe_idx] = pipe;
 	while (bus->pipe[peer_idx] == NULL)
-		tt_pthread_cond_wait(&bus->cond, &bus->mutex);
+		cbus_wait_signal(bus);
+
 	cpipe_join(pipe, bus, bus->pipe[peer_idx]);
+	cbus_signal(bus);
+	/*
+	 * At this point we've have both pipes initialized
+	 * in bus->pipe array, and our pipe joined.
+	 * But the other pipe may have not been joined
+	 * yet, ensure it's fully initialized before return.
+	 */
+	while (bus->pipe[peer_idx]->producer == NULL) {
+		/* Let the other side wakeup and perform the join. */
+		cbus_wait_signal(bus);
+	}
 	cbus_unlock(bus);
 	/*
-	 * POSIX: the and pthread_cond_signal() function shall
+	 * POSIX: pthread_cond_signal() function shall
 	 * have no effect if there are no threads currently
 	 * blocked on cond.
 	 */
-	pthread_cond_signal(&bus->cond);
+	cbus_signal(bus);
 	return bus->pipe[peer_idx];
 }
 

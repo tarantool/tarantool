@@ -32,7 +32,7 @@
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
-#include "replication.h"
+#include "relay.h"
 #include "replica.h"
 #include <stat.h>
 #include "main.h"
