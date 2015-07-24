@@ -110,9 +110,6 @@ void
 recovery_exit(struct recovery_state *r);
 
 void
-recovery_atfork(struct recovery_state *r);
-
-void
 recovery_update_mode(struct recovery_state *r,
 		     enum wal_mode mode);
 

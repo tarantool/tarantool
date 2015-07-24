@@ -64,29 +64,6 @@ struct wal_writer
 static struct wal_writer wal_writer;
 
 /**
- * A pthread_atfork() callback for a child process. Today we only
- * fork the master process to save a snapshot, and in the child
- * the WAL writer thread is not necessary and not present.
- */
-void
-recovery_atfork(struct recovery_state *r)
-{
-	xlog_atfork(&r->current_wal);
-	if (r->writer == NULL)
-		return;
-	if (r->writer->batch) {
-		free(r->writer->batch);
-		r->writer->batch = NULL;
-	}
-	/*
-	 * Make sure that atexit() handlers in the child do
-	 * not try to stop the non-existent thread.
-	 * The writer is not used in the child.
-	 */
-	r->writer = NULL;
-}
-
-/**
  * A commit watcher callback is invoked whenever there
  * are requests in wal_writer->commit. This callback is
  * associated with an internal WAL writer watcher and is

@@ -502,9 +502,7 @@ box_load_cfg()
 void
 box_atfork()
 {
-	if (recovery == NULL)
-		return;
-	recovery_atfork(recovery);
+	assert(recovery == NULL);
 }
 
 int
