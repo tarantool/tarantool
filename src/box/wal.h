@@ -40,8 +40,7 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
-struct wal_request {
-	STAILQ_ENTRY(wal_request) wal_fifo_entry;
+struct wal_request: public cmsg {
 	/* Auxiliary. */
 	int64_t res;
 	struct fiber *fiber;

@@ -148,6 +148,9 @@ struct cpipe {
 void
 cpipe_create(struct cpipe *pipe);
 
+void
+cpipe_destroy(struct cpipe *pipe);
+
 /**
  * Reset the default fetch output callback with a custom one.
  */
@@ -162,6 +165,22 @@ cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
 	 */
 	ev_set_cb(&pipe->fetch_output, fetch_output_cb);
 	pipe->fetch_output.data = data;
+}
+
+/**
+ * Reset the default fetch output callback with a custom one.
+ */
+static inline void
+cpipe_set_flush_cb(struct cpipe *pipe, ev_async_cb flush_input_cb,
+		   void *data)
+{
+	assert(loop() == pipe->producer);
+	/*
+	 * According to libev documentation, you can set cb at
+	 * virtually any time, modulo threads.
+	 */
+	ev_set_cb(&pipe->flush_input, flush_input_cb);
+	pipe->flush_input.data = data;
 }
 
 /**

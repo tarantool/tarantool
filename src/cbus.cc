@@ -66,6 +66,13 @@ cpipe_create(struct cpipe *pipe)
 	ev_async_start(pipe->consumer, &pipe->fetch_output);
 }
 
+void
+cpipe_destroy(struct cpipe *pipe)
+{
+	assert(loop() == pipe->consumer);
+	ev_async_stop(pipe->consumer, &pipe->fetch_output);
+}
+
 static void
 cpipe_join(struct cpipe *pipe, struct cbus *bus, struct cpipe *peer)
 {
