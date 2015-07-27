@@ -1,6 +1,7 @@
 net_box = require('net.box')
 
 s = box.schema.space.create('test', { id = 0 })
+_ = box.schema.space.create('test1', { id = 555 })
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 
@@ -8,6 +9,8 @@ conn = net_box:new('test:test@' .. box.cfg.listen)
 space = conn.space.test
 
 index = box.space.test:create_index('primary', { type = 'hash' })
+_ = box.space.test1:create_index('primary', { type = 'hash' })
+_ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'str'}})
 conn:ping()
 
 -- xxx: bug  currently selects no rows
@@ -72,9 +75,15 @@ space:insert{0}
 space:select{0}
 space:select{4294967295}
 
+-- check update delete be secondary index
+conn.space.test1:insert{0, "hello", 1}
+conn.space.test1.index.secondary:update("hello", {{'=', 3, 2}})
+conn.space.test1.index.secondary:delete("hello")
+
 -- cleanup 
 space:delete(0)
 space:delete(4294967295)
 box.space.test:drop()
+box.space.test1:drop()
 box.schema.user.drop('test')
 space = nil
