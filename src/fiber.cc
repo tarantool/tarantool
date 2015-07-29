@@ -64,6 +64,7 @@ fiber_call(struct fiber *callee)
 
 	assert(cord->call_stack_depth < FIBER_CALL_STACK);
 	assert(caller);
+	assert(caller != callee);
 
 	cord->call_stack_depth++;
 	cord->fiber = callee;
