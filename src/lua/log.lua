@@ -19,9 +19,14 @@ ffi.cdef[[
     };
 
     pid_t logger_pid;
+    extern int log_level;
 ]]
 
 local function say(level, fmt, ...)
+    if ffi.C.log_level < level then
+-- don't waste cycles on debug.getinfo()
+        return
+    end
     local debug = require('debug')
     local str = string.format(tostring(fmt), ...)
     local frame = debug.getinfo(3, "Sl")

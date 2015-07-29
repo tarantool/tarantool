@@ -52,6 +52,7 @@ enum say_level {
 /** \endcond public */
 
 extern int log_fd;
+extern int log_level;
 extern pid_t logger_pid;
 
 void
