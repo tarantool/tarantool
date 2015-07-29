@@ -150,8 +150,8 @@ struct errcode_record {
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      2, "Transaction has been aborted by conflict") \
 	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     2, "Unsupported role privilege '%s'") \
-	/* 98 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
-	/* 98 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
+	/* 99 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
+	/*100 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

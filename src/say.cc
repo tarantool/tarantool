@@ -48,8 +48,7 @@ pid_t logger_pid;
 static bool booting = true;
 static bool logger_background = true;
 static const char *binary_filename;
-static int log_level_default = S_INFO;
-static int *log_level = &log_level_default;
+int log_level = S_INFO;
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -89,7 +88,7 @@ say_init(const char *argv0)
 void
 say_set_log_level(int new_level)
 {
-	*log_level = new_level;
+	log_level = new_level;
 }
 
 /**
@@ -216,7 +215,7 @@ say_init_file()
 void
 say_logger_init(const char *path, int level, int nonblock, int background)
 {
-	*log_level = level;
+	log_level = level;
 	logger_nonblock = nonblock;
 	logger_background = background;
 	setvbuf(stderr, NULL, _IONBF, 0);
@@ -307,7 +306,7 @@ static void
 sayf(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
 	int errsv = errno; /* Preserve the errno. */
-	if (*log_level < level)
+	if (log_level < level)
 		return;
 	va_list ap;
 	va_start(ap, format);
