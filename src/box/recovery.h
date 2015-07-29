@@ -158,6 +158,12 @@ recovery_apply_row(struct recovery_state *r, struct xrow_header *packet);
 int64_t
 recovery_last_checkpoint(struct recovery_state *r);
 
+/**
+ * Ensure we don't corrupt the current WAL file in the child.
+ */
+void
+recovery_atfork(struct recovery_state *r);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

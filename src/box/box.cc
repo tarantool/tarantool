@@ -502,7 +502,8 @@ box_load_cfg()
 void
 box_atfork()
 {
-	assert(recovery == NULL);
+	/* box.coredump() forks to save a core. */
+	recovery_atfork(recovery);
 }
 
 int

@@ -243,6 +243,18 @@ recovery_exit(struct recovery_state *r)
 }
 
 void
+recovery_atfork(struct recovery_state *r)
+{
+       xlog_atfork(&r->current_wal);
+       /*
+        * Make sure that atexit() handlers in the child do
+        * not try to stop the non-existent thread.
+        * The writer is not used in the child.
+        */
+       r->writer = NULL;
+}
+
+void
 recovery_apply_row(struct recovery_state *r, struct xrow_header *row)
 {
 	/* Check lsn */
