@@ -112,7 +112,7 @@ all other indexes are called “secondary” indexes.
 
 An index definition may include identifiers of tuple fields
 and their expected types. The allowed types for indexed fields are NUM
-(64-bit unsigned integer between -9,223,372,036,854,775,807 and
+(unsigned integer between 0 and
 18,446,744,073,709,551,615), or STR (string, any sequence of octets), or ARRAY
 (a series of numbers for use with :ref:`RTREE indexes <RTREE>`.
 Take our example, which has the request:
@@ -120,7 +120,7 @@ Take our example, which has the request:
   i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 
 The effect is that, for all tuples in tester,
-field number 1 must exist and must be a 64-bit integer.
+field number 1 must exist and must contain an unsigned integer.
 
 Space definitions and index definitions are stored permanently
 in system spaces. It is possible to add, drop, or alter the
@@ -157,19 +157,24 @@ Tarantool can work with numbers, strings, booleans, tables, and userdata.
 .. _table: http://www.lua.org/pil/2.5.html
 .. _userdata: http://www.lua.org/pil/28.1.html
 
-In Lua a "number" is double-precision floating-point;
-however, for database storage Tarantool uses MsgPack rules,
-and MsgPack allows for both integer and floating-point values.
-So Tarantool will store a number as a float if the value
-contains a decimal point, and otherwise will store as an integer.
-Tarantool can store signed numbers, but not in indexed fields
--- when a field has a 'NUM' index, the values must be unsigned
-64-bit integers. Large numbers can be entered with exponential
-notation, for example 9e99. Large integers greater than
-100,000,000,000,000 (1e14) should be entered with the
-:func:`tonumber64 <tonumber64>`
-function. Storage is variable-length, so the smallest number
+In Lua a "number" is double-precision floating-point,
+but Tarantool allows both integer and floating-point values.
+Tarantool will try to store a number as floating-point if
+the value contains a decimal point or is very large (greater than 100 quadrillion = 1e14),
+otherwise Tarantool will store it as an integer.
+To ensure that even very large numbers will be treated as
+integers, use the :func:`tonumber64 <tonumber64>`
+function, or the LL (Long Long) suffix, or the ULL
+(Unsigned Long Long) suffix. Here are examples of numbers
+using regular notation, exponential notation, the ULL suffix,
+and the tonumber64 function:
+-55,  -2.7e+20, 100000000000000ULL, tonumber64('18446744073709551615').
+
+For database storage Tarantool uses MsgPack rules.
+Storage is variable-length, so the smallest number
 requires only one byte but the largest number requires nine bytes.
+When a field has a 'NUM' index, all values must be unsigned
+integers between 0 and 18,446,744,073,709,551,615.
 
 A "string" is a variable-length sequence of bytes,
 usually represented with alphanumeric characters inside single quotes.
