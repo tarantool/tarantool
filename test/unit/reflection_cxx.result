@@ -1,0 +1,31 @@
+1..30
+ok 1 - type.name
+ok 2 - type.parent
+ok 3 - type.parent
+ok 4 - is_instance
+ok 5 - is_instance
+ok 6 - is_instance
+ok 7 - is_instance
+ok 8 - methods order
+ok 9 - methods order
+ok 10 - methods order
+ok 11 - methods order
+ok 12 - methods order
+ok 13 - method.owner
+ok 14 - method.name
+ok 15 - method.rtype (non void)
+ok 16 - method.rtype (void)
+ok 17 - method.nargs (zero)
+ok 18 - method.nargs (non-zero)
+ok 19 - method.atype
+ok 20 - method.isconst
+ok 21 - !method.isconst
+ok 22 - !invokable<invalid args>
+ok 23 - !invokable<extra args>
+ok 24 - !invokable<>(invalid object)
+ok 25 - invokable<const char *>
+ok 26 - invokable<void, const char *>
+ok 27 - invoke (int)
+ok 28 - invoke (const char *)
+ok 29 - invoke (void)
+ok 30 - !invokable<>() on const method with non-const object

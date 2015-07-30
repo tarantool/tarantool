@@ -91,7 +91,7 @@
 /** Update internal state */
 struct tuple_update
 {
-	region_alloc_func alloc;
+	tuple_update_alloc_func alloc;
 	void *alloc_ctx;
 	struct rope *rope;
 	struct update_op *ops;
@@ -938,7 +938,7 @@ upsert_do_ops(struct tuple_update *update)
 
 static void
 update_init(struct tuple_update *update,
-	    region_alloc_func alloc, void *alloc_ctx,
+	    tuple_update_alloc_func alloc, void *alloc_ctx,
 	    const char *old_data, const char *old_data_end,
 	    int index_base)
 {
@@ -964,7 +964,7 @@ update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
 }
 
 const char *
-tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
+tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base)
@@ -980,7 +980,7 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 }
 
 const char *
-tuple_upsert_execute(region_alloc_func alloc, void *alloc_ctx,
+tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base)

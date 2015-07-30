@@ -68,8 +68,8 @@ box_set_ro(bool ro);
 bool
 box_is_ro(void);
 
-/** Non zero if snapshot is in progress. */
-extern int snapshot_pid;
+/** True if snapshot is in progress. */
+extern bool snapshot_in_progress;
 /** Incremented with each next snapshot. */
 extern uint32_t snapshot_version;
 

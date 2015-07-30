@@ -49,26 +49,26 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	struct ibuf *in = &iobuf->in;
 
 	/* Read fixed header */
-	if (ibuf_size(in) < 1)
+	if (ibuf_used(in) < 1)
 		coio_breadn(coio, in, 1);
 
 	/* Read length */
-	if (mp_typeof(*in->pos) != MP_UINT) {
+	if (mp_typeof(*in->rpos) != MP_UINT) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			  "packet length");
 	}
-	ssize_t to_read = mp_check_uint(in->pos, in->end);
+	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	uint32_t len = mp_decode_uint((const char **) &in->pos);
+	uint32_t len = mp_decode_uint((const char **) &in->rpos);
 
 	/* Read header and body */
-	to_read = len - ibuf_size(in);
+	to_read = len - ibuf_used(in);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	xrow_header_decode(row, (const char **) &in->pos, in->pos + len);
+	xrow_header_decode(row, (const char **) &in->rpos, in->rpos + len);
 }
 
 static void
@@ -134,7 +134,7 @@ replica_bootstrap(struct recovery_state *r)
 
 	struct ev_io coio;
 	coio_init(&coio);
-	struct iobuf *iobuf = iobuf_new(fiber_name(fiber()));
+	struct iobuf *iobuf = iobuf_new();
 	auto coio_guard = make_scoped_guard([&] {
 		iobuf_delete(iobuf);
 		evio_close(loop(), &coio);
@@ -207,7 +207,7 @@ pull_from_remote(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct ev_io coio;
-	struct iobuf *iobuf = iobuf_new(fiber_name(fiber()));
+	struct iobuf *iobuf = iobuf_new();
 	ev_loop *loop = loop();
 
 	coio_init(&coio);
@@ -221,7 +221,7 @@ pull_from_remote(va_list ap)
 		const char *err = NULL;
 		try {
 			struct xrow_header row;
-			if (! evio_is_active(&coio)) {
+			if (! evio_has_fd(&coio)) {
 				remote_set_status(&r->remote, "connecting");
 				err = "can't connect to master";
 				remote_connect(r, &coio, iobuf);
@@ -285,7 +285,7 @@ pull_from_remote(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-		if (! evio_is_active(&coio))
+		if (! evio_has_fd(&coio))
 			fiber_sleep(RECONNECT_DELAY);
 	}
 }
@@ -325,7 +325,7 @@ recovery_stop_remote(struct recovery_state *r)
 	 * If the remote died from an exception, don't throw it
 	 * up.
 	 */
-	Exception::clear(&f->exception);
+	diag_clear(&f->diag);
 	fiber_join(f);
 	r->remote.status = "off";
 }

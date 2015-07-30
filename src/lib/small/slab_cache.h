@@ -180,6 +180,12 @@ slab_get_with_order(struct slab_cache *cache, uint8_t order);
 void
 slab_put(struct slab_cache *cache, struct slab *slab);
 
+static inline size_t
+slab_cache_used(struct slab_cache *slabc)
+{
+	return slabc->allocated.stats.used;
+}
+
 struct slab *
 slab_from_ptr(struct slab_cache *cache, void *ptr, uint8_t order);
 
@@ -192,9 +198,21 @@ slab_sizeof()
 
 /** Useful size of a slab. */
 static inline uint32_t
-slab_size(struct slab *slab)
+slab_capacity(struct slab *slab)
 {
 	return slab->size - slab_sizeof();
+}
+
+static inline void *
+slab_data(struct slab *slab)
+{
+	return (char *) slab + slab_sizeof();
+}
+
+static inline struct slab *
+slab_from_data(void *data)
+{
+	return (struct slab *) ((char *) data - slab_sizeof());
 }
 
 void

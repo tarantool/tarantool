@@ -134,7 +134,7 @@ execute_upsert(struct request *request, struct port *port)
 	struct tuple *new_tuple =
 		tuple_upsert(space->format, region_alloc_cb,
 			     &fiber()->gc, old_tuple,
-			     request->extra_tuple, request->extra_tuple_end,
+			     request->default_tuple, request->default_tuple_end,
 			     request->tuple, request->tuple_end,
 			     request->index_base);
 	TupleGuard guard(new_tuple);
@@ -319,8 +319,8 @@ error:
 			request->key = value;
 			request->key_end = data;
 		case IPROTO_DEF_TUPLE:
-			request->extra_tuple = value;
-			request->extra_tuple_end = data;
+			request->default_tuple = value;
+			request->default_tuple_end = data;
 		default:
 			break;
 		}

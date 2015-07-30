@@ -58,7 +58,7 @@ struct errcode_record {
 	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index '%s' in space '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
-	/*  7 */_(ER_READONLY,			2, "Can't modify data because this server in read-only mode.") \
+	/*  7 */_(ER_READONLY,			2, "Can't modify data because this server is in read-only mode.") \
 	/*  8 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/*  9 */_(ER_CREATE_SPACE,		2, "Failed to create space '%s': %s") \
 	/* 10 */_(ER_SPACE_EXISTS,		2, "Space '%s' already exists") \
@@ -150,8 +150,8 @@ struct errcode_record {
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       2, "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      2, "Transaction has been aborted by conflict") \
 	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     2, "Unsupported role privilege '%s'") \
-	/* 98 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
-	/* 98 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
+	/* 99 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
+	/*100 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

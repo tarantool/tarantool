@@ -30,6 +30,7 @@
  */
 #include "trivia/util.h"
 #include "key_def.h" /* for enum field_type */
+#include "tuple_update.h"
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
@@ -474,7 +475,7 @@ tuple_init_field_map(struct tuple_format *format,
 
 struct tuple *
 tuple_update(struct tuple_format *new_format,
-	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     tuple_update_alloc_func f, void *alloc_ctx,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base);
 

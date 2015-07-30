@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
+#ifndef TARANTOOL_REPLICATION_RELAY_H_INCLUDED
+#define TARANTOOL_REPLICATION_RELAY_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -60,5 +60,5 @@ replication_subscribe(int fd, struct xrow_header *packet);
 void
 relay_send(Relay *relay, struct xrow_header *packet);
 
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
+#endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */
 

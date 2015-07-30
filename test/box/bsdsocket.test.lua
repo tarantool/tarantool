@@ -7,6 +7,7 @@ msgpack = require 'msgpack'
 log = require 'log'
 errno = require 'errno'
 fio = require 'fio'
+ffi = require('ffi')
 type(socket)
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
@@ -45,14 +46,16 @@ s:writable(.00000000000001)
 s:writable(0)
 s:wait(.01)
 
-handshake = s:sysread(128)
-string.len(handshake)
-string.sub(handshake, 1, 9)
+handshake = ffi.new('char[128]')
+-- test sysread with char *
+s:sysread(handshake, 128)
+ffi.string(handshake, 9)
 
 ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
 ping = msgpack.encode(string.len(ping)) .. ping
 
-s:syswrite(ping)
+-- test syswrite with char *
+s:syswrite(ffi.cast('const char *', ping), #ping)
 s:readable(1)
 s:wait(.01)
 
@@ -114,7 +117,6 @@ sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
 sc:writable(10)
 sc:write('Hello, world')
 
-
 sa, addr = s:accept()
 addr2 = sa:name()
 addr2.host == addr.host
@@ -150,8 +152,6 @@ sa:read('ine', 0.1)
 sc:send('Hello, world')
 sa:read(',', 1)
 sc:shutdown('W')
-sa:read(100, 1)
-sa:read(100, 1)
 sa:close()
 sc:close()
 
@@ -410,7 +410,6 @@ s:close()
 
 os.remove(path)
 
-
 server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 type(addr)
 server ~= nil
@@ -475,19 +474,19 @@ server = socket.tcp_server('unix/', path, function(s)
 end);
 --# setopt delimiter ''
 client = socket.tcp_connect('unix/', path)
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 buf == "a 10\n"
 remaining = remaining - #buf
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 buf == "b 15\n"
 remaining = remaining - #buf
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 buf == "abc"
 remaining = remaining - #buf
 remaining == 0
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 buf == ""
-buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf = client:read({ size = remaining, delimiter = "\n"})
 buf == ""
 client:close()
 server:close()

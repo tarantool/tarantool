@@ -54,13 +54,8 @@ t
 - - pid
   - replication
   - server
-  - snapshot_pid
   - status
   - uptime
   - vclock
   - version
-...
-box.info.snapshot_pid
----
-- 0
 ...

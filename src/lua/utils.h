@@ -101,6 +101,17 @@ luaL_setcdatagc(struct lua_State *L, int idx);
 LUA_API uint32_t
 luaL_ctypeid(struct lua_State *L, const char *ctypename);
 
+/**
+* @brief Declare symbols for FFI
+* @param L Lua State
+* @param what C definitions
+* @sa ffi.cdef(def)
+* @retval 0 on success
+* @retval LUA_ERRRUN, LUA_ERRMEM, LUA_ERRERR otherwise
+*/
+LUA_API int
+luaL_cdef(struct lua_State *L, const char *ctypename);
+
 /** \endcond public */
 
 static inline lua_Integer
@@ -434,6 +445,7 @@ tarantool_lua_utils_init(struct lua_State *L);
 } /* extern "C" */
 
 #include "exception.h"
+extern const struct type type_LuajitError;
 class LuajitError: public Exception {
 public:
 	LuajitError(const char *file, unsigned line,

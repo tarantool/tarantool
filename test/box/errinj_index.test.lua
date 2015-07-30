@@ -31,12 +31,9 @@ res
 res = {}
 for i = 501,510 do table.insert(res, (s:get{i})) end
 res
-res = {}
-for i = 2001,2010 do table.insert(res, (s:get{i})) end
-res
 
---count must be greater that 1000 but less than 2000
-function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 1000 and "fail 1" or count >= 2000 and "fail 2" or "ok" end
+--count must be exactly 10
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count == 10 and "ok" or "fail" end
 check_iter_and_size()
 
 for i = 2501,3500 do s:insert{i, i} end
@@ -45,10 +42,6 @@ check_iter_and_size()
 res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
-
-for i = 3501,4500 do s:insert{i, i} end
-s:delete{3}
-check_iter_and_size()
 
 errinj.set("ERRINJ_INDEX_ALLOC", false)
 
@@ -102,20 +95,18 @@ res = {}
 for i = 2001,2010 do table.insert(res, (s:get{i})) end
 res
 
---since every insertion is rejected, count must be (10 - number of deletions)
-function check_iter_and_size(size_must_be) local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end print (count) return count ~= size_must_be and "fail 1" or "ok" end
-check_iter_and_size(9)
+check_iter_and_size()
 
 for i = 2501,3500 do s:insert{i, i} end
 s:delete{2}
-check_iter_and_size(8)
+check_iter_and_size()
 res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
 
 for i = 3501,4500 do s:insert{i, i} end
 s:delete{3}
-check_iter_and_size(7)
+check_iter_and_size()
 
 errinj.set("ERRINJ_INDEX_ALLOC", false)
 

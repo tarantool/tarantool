@@ -67,7 +67,6 @@ you can use **date -d@** 1306964594.980.
     | |nbsp| :codenormal:`id: 1`
     | |nbsp| :codenormal:`pid: 32561`
     | |nbsp| :codenormal:`version: 1.6.4-411-gcff798b`
-    | |nbsp| :codenormal:`snapshot_pid: 0`
     | |nbsp| :codenormal:`status: running`
     | |nbsp| :codenormal:`vclock: {1: 158}`
     | |nbsp| :codenormal:`replication:`
@@ -109,10 +108,6 @@ you can use **date -d@** 1306964594.980.
     | :codenormal:`tarantool>` :codebold:`box.info.recovery_last_update`
     | :codenormal:`---`
     | :codenormal:`- 1306964594.980`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.snapshot_pid`
-    | :codenormal:`---`
-    | :codenormal:`- 0`
     | :codenormal:`...`
 
 =====================================================================

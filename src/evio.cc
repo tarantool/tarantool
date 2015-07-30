@@ -51,7 +51,7 @@ evio_close(ev_loop *loop, struct ev_io *evio)
 	ev_io_stop(loop, evio);
 	/* Close the socket. */
 	close(evio->fd);
-	/* Make sure evio_is_active() returns a proper value. */
+	/* Make sure evio_has_fd() returns a proper value. */
 	evio->fd = -1;
 }
 

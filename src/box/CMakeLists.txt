@@ -44,7 +44,7 @@ add_library(box
     alter.cc
     schema.cc
     session.cc
-    port.c
+    port.cc
     request.cc
     txn.cc
     box.cc
@@ -55,7 +55,8 @@ add_library(box
     cluster.cc
     recovery.cc
     replica.cc
-    replication.cc
+    relay.cc
+    wal.cc
     ${lua_sources}
     lua/call.cc
     lua/tuple.cc

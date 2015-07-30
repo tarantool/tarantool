@@ -14,6 +14,8 @@ errinj.info()
 ---
 - ERRINJ_WAL_WRITE:
     state: false
+  ERRINJ_RELAY:
+    state: false
   ERRINJ_TESTING:
     state: false
   ERRINJ_WAL_ROTATE:

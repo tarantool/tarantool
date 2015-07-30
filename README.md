@@ -4,10 +4,9 @@
 
 http://tarantool.org
 
-Tarantool is an efficient NoSQL database and a
-Lua application server.
+Tarantool is an in-memory database and application server.
 
-Key features of the Lua application server:
+Key features of the application server:
  * 100% compatible drop-in replacement for Lua 5.1,
    based on LuaJIT 2.0.
    Simply use #!/usr/bin/tarantool instead of

@@ -31,6 +31,7 @@
 #include "errcode.h"
 #include "exception.h"
 
+extern const struct type type_ClientError;
 class ClientError: public Exception {
 public:
 	virtual void raise()

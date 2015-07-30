@@ -33,9 +33,12 @@
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>
+#include <latch.h>
 
 RLIST_HEAD(engines);
 
+extern bool snapshot_in_progress;
+extern struct latch schema_lock;
 
 Engine::Engine(const char *engine_name)
 	:name(engine_name),
@@ -149,11 +152,11 @@ engine_end_recovery()
 int
 engine_checkpoint(int64_t checkpoint_id)
 {
-	static bool snapshot_is_in_progress = false;
-	if (snapshot_is_in_progress)
+	if (snapshot_in_progress)
 		return EINPROGRESS;
 
-	snapshot_is_in_progress = true;
+	snapshot_in_progress = true;
+	latch_lock(&schema_lock);
 
 	/* create engine snapshot */
 	Engine *engine;
@@ -172,14 +175,16 @@ engine_checkpoint(int64_t checkpoint_id)
 	engine_foreach(engine) {
 		engine->commitCheckpoint();
 	}
-	snapshot_is_in_progress = false;
+	latch_unlock(&schema_lock);
+	snapshot_in_progress = false;
 	return 0;
 error:
 	int save_errno = errno;
 	/* rollback snapshot creation */
 	engine_foreach(engine)
 		engine->abortCheckpoint();
-	snapshot_is_in_progress = false;
+	latch_unlock(&schema_lock);
+	snapshot_in_progress = false;
 	return save_errno;
 }
 

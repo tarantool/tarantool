@@ -181,7 +181,7 @@ mempool_stats(struct mempool *pool, struct mempool_stats *stats)
 	/* Object size. */
 	stats->objsize = pool->objsize;
 	/* Number of objects. */
-	stats->objcount = pool->slabs.stats.used/pool->objsize;
+	stats->objcount = mempool_count(pool);
 	/* Size of the slab. */
 	stats->slabsize = slab_order_size(pool->cache, pool->slab_order);
 	/* The number of slabs. */

@@ -197,7 +197,7 @@ and make install.
 
 .. _tarantool.org/dist/master/tarantool.rb: http://tarantool.org/dist/master/tarantool.rb
 
-.. _first database:
+.. _dup first database:
 
 =====================================================================
         Starting Tarantool and making your first database

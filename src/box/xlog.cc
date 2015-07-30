@@ -54,9 +54,10 @@ static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte ord
 static const char inprogress_suffix[] = ".inprogress";
 static const char v12[] = "0.12\n";
 
+const struct type type_XlogError = make_type("XlogError", &type_Exception);
 XlogError::XlogError(const char *file, unsigned line,
 		     const char *format, ...)
-	:Exception(file, line)
+	:Exception(&type_XlogError, file, line)
 {
 	va_list ap;
 	va_start(ap, format);
@@ -64,10 +65,23 @@ XlogError::XlogError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+XlogError::XlogError(const struct type *type, const char *file, unsigned line,
+		     const char *format, ...)
+	:Exception(type, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
+	va_end(ap);
+}
+
+const struct type type_XlogGapError =
+	make_type("XlogGapError", &type_XlogError);
+
 XlogGapError::XlogGapError(const char *file, unsigned line,
 			   const struct vclock *from,
 			   const struct vclock *to)
-	:XlogError(file, line, "")
+	:XlogError(&type_XlogGapError, file, line, "")
 {
 	char *s_from = vclock_to_string(from);
 	char *s_to = vclock_to_string(to);
@@ -128,6 +142,7 @@ vclockset_reset(vclockset_t *set)
 void
 xdir_destroy(struct xdir *dir)
 {
+	/** Free vclock objects allocated in xdir_scan(). */
 	vclockset_reset(&dir->index);
 }
 
@@ -434,12 +449,11 @@ error:
 int
 xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 {
-	int iovcnt = xrow_header_encode(row, iov + 1) + 1;
-	char *fixheader = (char *) region_alloc(&fiber()->gc,
-						XLOG_FIXHEADER_SIZE);
-	uint32_t len = 0;
+	int iovcnt = xrow_header_encode(row, iov, XLOG_FIXHEADER_SIZE);
+	char *fixheader = (char *) iov[0].iov_base;
+	uint32_t len = iov[0].iov_len - XLOG_FIXHEADER_SIZE;
 	uint32_t crc32p = 0;
-	uint32_t crc32c = 0;
+	uint32_t crc32c = crc32_calc(0, fixheader + XLOG_FIXHEADER_SIZE, len);
 	for (int i = 1; i < iovcnt; i++) {
 		crc32c = crc32_calc(crc32c, (const char *) iov[i].iov_base,
 				    iov[i].iov_len);
@@ -459,8 +473,6 @@ xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 	if (padding > 0)
 		data = mp_encode_strl(data, padding - 1) + padding - 1;
 	assert(data == fixheader + XLOG_FIXHEADER_SIZE);
-	iov[0].iov_base = fixheader;
-	iov[0].iov_len = XLOG_FIXHEADER_SIZE;
 
 	assert(iovcnt <= XROW_IOVMAX);
 	return iovcnt;

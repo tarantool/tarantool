@@ -26,32 +26,33 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "replication.h"
+#include "relay.h"
 #include <say.h>
 #include <fiber.h>
+#include "scoped_guard.h"
 
 #include "recovery.h"
 #include "xlog.h"
 #include "iproto_constants.h"
-#include "box/engine.h"
-#include "box/cluster.h"
-#include "box/schema.h"
-#include "box/vclock.h"
-#include "scoped_guard.h"
+#include "engine.h"
+#include "cluster.h"
+#include "schema.h"
+#include "vclock.h"
 #include "xrow.h"
 #include "coeio.h"
 #include "coio.h"
 #include "cfg.h"
 #include "trigger.h"
+#include "errinj.h"
 
 void
-replication_send_row(struct recovery_state *r, void *param,
-                     struct xrow_header *packet);
+relay_send_row(struct recovery_state *r, void *param,
+	       struct xrow_header *packet);
 
 Relay::Relay(int fd_arg, uint64_t sync_arg)
 {
 	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-			 replication_send_row, this);
+			 relay_send_row, this);
 	recovery_setup_panic(r, cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
@@ -227,12 +228,16 @@ relay_send(Relay *relay, struct xrow_header *packet)
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(packet, iov);
 	coio_writev(&relay->io, iov, iovcnt, 0);
+	ERROR_INJECT(ERRINJ_RELAY,
+	{
+		sleep(1000);
+	});
 }
 
 /** Send a single row to the client. */
 void
-replication_send_row(struct recovery_state *r, void *param,
-                     struct xrow_header *packet)
+relay_send_row(struct recovery_state *r, void *param,
+	       struct xrow_header *packet)
 {
 	Relay *relay = (Relay *) param;
 	assert(iproto_type_is_dml(packet->type));

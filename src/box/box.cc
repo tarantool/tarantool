@@ -32,7 +32,7 @@
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
-#include "replication.h"
+#include "relay.h"
 #include "replica.h"
 #include <stat.h>
 #include "main.h"
@@ -58,9 +58,8 @@ box_process_func box_process = process_ro;
 
 struct recovery_state *recovery;
 
-static struct evio_service binary; /* iproto binary listener */
+bool snapshot_in_progress = false;
 
-int snapshot_pid = 0; /* snapshot processes pid */
 static void
 process_ro(struct request *request, struct port *port)
 {
@@ -188,11 +187,7 @@ extern "C" void
 box_set_listen(const char *uri)
 {
 	box_check_uri(uri, "listen");
-	if (evio_service_is_active(&binary))
-		evio_service_stop(&binary);
-
-	if (uri != NULL)
-		coio_service_start(&binary, uri);
+	iproto_set_listen(uri);
 }
 
 extern "C" void
@@ -383,6 +378,7 @@ box_free(void)
 	user_cache_free();
 	schema_free();
 	tuple_free();
+	port_free();
 	recovery_exit(recovery);
 	recovery = NULL;
 	engine_shutdown();
@@ -469,7 +465,8 @@ box_init(void)
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
-	iproto_init(&binary);
+	port_init();
+	iproto_init();
 	box_set_listen(cfg_gets("listen"));
 
 	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
@@ -505,8 +502,7 @@ box_load_cfg()
 void
 box_atfork()
 {
-	if (recovery == NULL)
-		return;
+	/* box.coredump() forks to save a core. */
 	recovery_atfork(recovery);
 }
 

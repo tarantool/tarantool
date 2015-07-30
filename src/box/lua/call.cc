@@ -84,6 +84,7 @@ struct port_lua
 {
 	struct port_vtab *vtab;
 	struct lua_State *L;
+	size_t size; /* for port_lua_add_tuple */
 };
 
 static inline struct port_lua *
@@ -123,30 +124,26 @@ port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
 	try {
-		int idx = luaL_getn(L, -1);	/* TODO: can be optimized */
 		lbox_pushtuple(L, tuple);
-		lua_rawseti(L, -2, idx + 1);
-
+		lua_rawseti(L, -2, ++port_lua(port)->size);
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 
 /** Add all tuples to a Lua table. */
-static struct port *
-port_lua_table_create(struct lua_State *L)
+void
+port_lua_table_create(struct port_lua *port, struct lua_State *L)
 {
 	static struct port_vtab port_lua_vtab = {
 		port_lua_table_add_tuple,
 		null_port_eof,
 	};
-	struct port_lua *port = (struct port_lua *)
-			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
+	port->size = 0;
 	/* The destination table to append tuples to. */
 	lua_newtable(L);
-	return (struct port *) port;
 }
 
 /* }}} */
@@ -180,94 +177,62 @@ lbox_process(lua_State *L)
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
 	/* Capture all output into a Lua table. */
-	struct port *port_lua = port_lua_table_create(L);
+	struct port_lua port_lua;
 	struct request request;
 	request_create(&request, op);
 	request_decode(&request, req, sz);
-	box_process(&request, port_lua);
-
+	port_lua_table_create(&port_lua, L);
+	box_process(&request, (struct port *) &port_lua);
 	return 1;
 }
 
 void
 lbox_request_create(struct request *request,
 		    struct lua_State *L, enum iproto_type type,
-		    int key, int tuple, int def_tuple)
+		    int key, int tuple, int default_tuple)
 {
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
+	struct region *gc = &fiber()->gc;
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb);
+
 	if (key > 0) {
-		struct obuf key_buf;
-		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode_tuple(L, luaL_msgpack_default, &key_buf, key);
-		request->key = obuf_join(&key_buf);
-		request->key_end = request->key + obuf_size(&key_buf);
+		size_t used = region_used(gc);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, key);
+		mpstream_flush(&stream);
+		size_t key_len = region_used(gc) - used;
+		request->key = (char *) region_join(gc, key_len);
+		request->key_end = request->key + key_len;
 	}
 	if (tuple > 0) {
-		struct obuf tuple_buf;
-		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf, tuple);
-		request->tuple = obuf_join(&tuple_buf);
-		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
+		size_t used = region_used(gc);
+		/*
+		 * region_join() above could have allocated memory and
+		 * invalidated stream write position. Reset the
+		 * stream to avoid overwriting the key.
+		 */
+		mpstream_reset(&stream);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, tuple);
+		mpstream_flush(&stream);
+		size_t tuple_len = region_used(gc) - used;
+		request->tuple = (char *) region_join(gc, tuple_len);
+		request->tuple_end = request->tuple + tuple_len;
 	}
-	if (def_tuple > 0) {
-		struct obuf tuple_buf;
-		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
-		luamp_encode_tuple(L, luaL_msgpack_default, &tuple_buf,
-				   def_tuple);
-		request->extra_tuple = obuf_join(&tuple_buf);
-		request->extra_tuple_end =
-			request->extra_tuple + obuf_size(&tuple_buf);
+	if (default_tuple > 0) {
+		size_t used = region_used(gc);
+		mpstream_reset(&stream);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream,
+				   default_tuple);
+		mpstream_flush(&stream);
+		size_t tuple_len = region_used(gc) - used;
+		request->default_tuple = (char *) region_join(gc, tuple_len);
+		request->default_tuple_end = request->default_tuple + tuple_len;
 	}
-}
-
-static void
-port_ffi_add_tuple(struct port *port, struct tuple *tuple)
-{
-	struct port_ffi *port_ffi = (struct port_ffi *) port;
-	if (port_ffi->size >= port_ffi->capacity) {
-		uint32_t capacity = (port_ffi->capacity > 0) ?
-				2 * port_ffi->capacity : 1024;
-		struct tuple **ret = (struct tuple **)
-			realloc(port_ffi->ret, sizeof(*ret) * capacity);
-		assert(ret != NULL);
-		port_ffi->ret = ret;
-		port_ffi->capacity = capacity;
-	}
-	tuple_ref(tuple);
-	port_ffi->ret[port_ffi->size++] = tuple;
-}
-
-struct port_vtab port_ffi_vtab = {
-	port_ffi_add_tuple,
-	null_port_eof,
-};
-
-void
-port_ffi_create(struct port_ffi *port)
-{
-	memset(port, 0, sizeof(*port));
-	port->vtab = &port_ffi_vtab;
-}
-
-static inline void
-port_ffi_clear(struct port_ffi *port)
-{
-	for (uint32_t i = 0; i < port->size; i++) {
-		tuple_unref(port->ret[i]);
-		port->ret[i] = NULL;
-	}
-	port->size = 0;
-}
-
-void
-port_ffi_destroy(struct port_ffi *port)
-{
-	free(port->ret);
 }
 
 int
-boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
+boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	      int iterator, uint32_t offset, uint32_t limit,
 	      const char *key, const char *key_end)
 {
@@ -281,24 +246,34 @@ boxffi_select(struct port_ffi *port, uint32_t space_id, uint32_t index_id,
 	request.key = key;
 	request.key_end = key_end;
 
-	/*
-	 * A single instance of port_ffi object is used
-	 * for all selects, reset it.
-	 */
-	port->size = 0;
 	try {
-		box_process(&request, (struct port *) port);
+		box_process(&request, port);
 		return 0;
 	} catch (Exception *e) {
-		/*
-		 * The tuples will be not blessed and garbage
-		 * collected, unreference them here, to avoid
-		 * a leak.
-		 */
-		port_ffi_clear(port);
 		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
+}
+
+static int
+lbox_select(lua_State *L)
+{
+	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+		!lua_isnumber(L, 3) || !lua_isnumber(L, 4) || !lua_isnumber(L, 5)) {
+		return luaL_error(L, "Usage index:select(space_id, index_id,"
+			"iterator, offset, limit, key)");
+	}
+
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_SELECT, 6, -1, -1);
+	request.index_id = lua_tointeger(L, 2);
+	request.iterator = lua_tointeger(L, 3);
+	request.offset = lua_tointeger(L, 4);
+	request.limit = lua_tointeger(L, 5);
+	port_lua_table_create(&port, L);
+	box_process(&request, (struct port *) &port);
+	return 1;
 }
 
 static int
@@ -569,28 +544,60 @@ lua_isarray(struct lua_State *L, int i)
 	return index_starts_at_1;
 }
 
+static inline void
+execute_c_call(struct func *func, struct request *request, struct obuf *out)
+{
+	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	if (func->func == NULL)
+		func_load(func);
+
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+	SetuidGuard setuid(name, name_len, PRIV_X, func);
+
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	auto guard = make_scoped_guard([&]{
+		port_buf_destroy(&port_buf);
+	});
+
+	func->func(request, &port_buf.base);
+
+	if (in_txn()) {
+		say_warn("a transaction is active at CALL return");
+		txn_rollback();
+	}
+
+	struct obuf_svp svp = iproto_prepare_select(out);
+	try {
+		for (struct port_buf_entry *entry = port_buf.first;
+		     entry != NULL; entry = entry->next) {
+			tuple_to_obuf(entry->tuple, out);
+		}
+		iproto_reply_select(out, &svp, request->header->sync,
+				    port_buf.size);
+	} catch (Exception *e) {
+		obuf_rollback_to_svp(out, &svp);
+		txn_rollback();
+		/* Let all well-behaved exceptions pass through. */
+		throw;
+	}
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
 static inline void
-execute_call(lua_State *L, struct request *request, struct obuf *out)
+execute_lua_call(lua_State *L, struct func *func, struct request *request,
+		 struct obuf *out)
 {
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
-	int oc = 0; /* how many objects are on stack after box_lua_find */
 
-	struct func *func = func_by_name(name, name_len);
-	/*
-	 * func == NULL means that perhaps the user has a global
-	 * "EXECUTE" privilege, so no specific grant to a function.
-	 */
-	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
-		/* Try to find a function by name in Lua */
-		oc = box_lua_find(L, name, name + name_len);
-	} else if (func->func == NULL) {
-		func_load(func);
-	}
+	int oc = 0; /* how many objects are on stack after box_lua_find */
+	/* Try to find a function by name in Lua */
+	oc = box_lua_find(L, name, name + name_len);
 	/**
 	 * Check access to the function and optionally change
 	 * execution time user id (set user id). Sic: the order
@@ -602,20 +609,18 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 
-	if (func == NULL || func->def.language == FUNC_LANGUAGE_LUA) {
-		uint32_t arg_count = mp_decode_array(&args);
-		luaL_checkstack(L, arg_count, "call: out of stack");
+	uint32_t arg_count = mp_decode_array(&args);
+	luaL_checkstack(L, arg_count, "call: out of stack");
 
-		for (uint32_t i = 0; i < arg_count; i++) {
-			luamp_decode(L, luaL_msgpack_default, &args);
-		}
-		lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-	} else {
-		struct port_lua port;
-		port_lua_create(&port, L);
+	for (uint32_t i = 0; i < arg_count; i++)
+		luamp_decode(L, luaL_msgpack_default, &args);
+	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
 
-		func->func(request, (struct port *) &port);
+	if (in_txn()) {
+		say_warn("a transaction is active at CALL return");
+		txn_rollback();
 	}
+
 	/**
 	 * Add all elements from Lua stack to iproto.
 	 *
@@ -625,8 +630,9 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 	 * then each return value as a tuple.
 	 *
 	 * If a Lua stack contains at least one scalar, each
-	 * value on the stack is converted to a tuple. A Lua
-	 * is converted to a tuple with multiple fields.
+	 * value on the stack is converted to a tuple. A single
+	 * Lua with scalars is converted to a tuple with multiple
+	 * fields.
 	 *
 	 * If the stack is a Lua table, each member of which is
 	 * not scalar, each member of the table is converted to
@@ -637,6 +643,8 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 
 	uint32_t count = 0;
 	struct obuf_svp svp = iproto_prepare_select(out);
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
 
 	try {
 		/** Check if we deal with a table of tables. */
@@ -646,13 +654,13 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 			 * The table is not empty and consists of tables
 			 * or tuples. Treat each table element as a tuple,
 			 * and push it.
-			 */
+		 */
 			lua_pushnil(L);
 			int has_keys = lua_next(L, 1);
 			if (has_keys  && (lua_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
 				do {
 					luamp_encode_tuple(L, luaL_msgpack_default,
-							   out, -1);
+							   &stream, -1);
 					++count;
 					lua_pop(L, 1);
 				} while (lua_next(L, 1));
@@ -663,15 +671,16 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 		}
 		for (int i = 1; i <= nrets; ++i) {
 			if (lua_isarray(L, i) || lua_istuple(L, i)) {
-				luamp_encode_tuple(L, luaL_msgpack_default, out, i);
+				luamp_encode_tuple(L, luaL_msgpack_default, &stream, i);
 			} else {
-				luamp_encode_array(luaL_msgpack_default, out, 1);
-				luamp_encode(L, luaL_msgpack_default, out, i);
+				luamp_encode_array(luaL_msgpack_default, &stream, 1);
+				luamp_encode(L, luaL_msgpack_default, &stream, i);
 			}
 			++count;
 		}
 
-	done:
+done:
+		mpstream_flush(&stream);
 		iproto_reply_select(out, &svp, request->header->sync, count);
 	} catch (...) {
 		obuf_rollback_to_svp(out, &svp);
@@ -682,15 +691,23 @@ execute_call(lua_State *L, struct request *request, struct obuf *out)
 void
 box_lua_call(struct request *request, struct obuf *out)
 {
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+
+	struct func *func = func_by_name(name, name_len);
+	if (func != NULL && func->def.language == FUNC_LANGUAGE_C)
+		return execute_c_call(func, request, out);
+
+	/*
+	 * func == NULL means that perhaps the user has a global
+	 * "EXECUTE" privilege, so no specific grant to a function.
+	 */
+	assert(func == NULL || func->def.language == FUNC_LANGUAGE_LUA);
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);
 		LuarefGuard coro_ref(tarantool_L);
-		execute_call(L, request, out);
-		if (in_txn()) {
-			say_warn("a transaction is active at CALL return");
-			txn_rollback();
-		}
+		execute_lua_call(L, func, request, out);
 	} catch (Exception *e) {
 		txn_rollback();
 		/* Let all well-behaved exceptions pass through. */
@@ -727,11 +744,14 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 
 	/* Send results of the called procedure to the client. */
 	struct obuf_svp svp = iproto_prepare_select(out);
+	struct mpstream stream;
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb);
+	int nrets = lua_gettop(L);
 	try {
-		int nrets = lua_gettop(L);
 		for (int k = 1; k <= nrets; ++k) {
-			luamp_encode(L, luaL_msgpack_default, out, k);
+			luamp_encode(L, luaL_msgpack_default, &stream, k);
 		}
+		mpstream_flush(&stream);
 		iproto_reply_select(out, &svp, request->header->sync, nrets);
 	} catch (...) {
 		obuf_rollback_to_svp(out, &svp);
@@ -778,6 +798,7 @@ static const struct luaL_reg boxlib[] = {
 static const struct luaL_reg boxlib_internal[] = {
 	{"process", lbox_process},
 	{"call_loadproc",  lbox_call_loadproc},
+	{"select", lbox_select},
 	{"insert", lbox_insert},
 	{"replace", lbox_replace},
 	{"update", lbox_update},
@@ -795,6 +816,14 @@ box_lua_init(struct lua_State *L)
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 
+#if 0
+	/* Get CTypeID for `struct port *' */
+	int rc = luaL_cdef(L, "struct port;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_PORT_PTR = luaL_ctypeid(L, "struct port *");
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+#endif
 	box_lua_error_init(L);
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);

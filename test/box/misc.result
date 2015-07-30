@@ -94,9 +94,11 @@ box.error.raise()
 ...
 box.error.last()
 ---
-- type: ClientError
-  message: Illegal parameters, bla bla
+- line: -1
   code: 1
+  type: ClientError
+  message: Illegal parameters, bla bla
+  file: '[C]'
 ...
 box.error.clear()
 ---

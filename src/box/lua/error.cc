@@ -40,6 +40,14 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
+int
+lbox_error(lua_State *L)
+{
+	(void) L;
+	diag_last_error(&fiber()->diag)->raise();
+	return 0;
+}
+
 static int
 lbox_error_raise(lua_State *L)
 {
@@ -53,8 +61,8 @@ lbox_error_raise(lua_State *L)
 	int top = lua_gettop(L);
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
-		if (fiber()->exception)
-			fiber()->exception->raise();
+		if (diag_last_error(&fiber()->diag))
+			lbox_error(L);
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
 		code = lua_tointeger(L, 2);
@@ -101,7 +109,9 @@ raise:
 
 	/* see tnt_raise() */
 	say_debug("ClientError at %s:%i", file, line);
-	throw new ClientError(file, line, reason, code);
+	ClientError *e = new ClientError(file, line, reason, code);
+	diag_add_error(&fiber()->diag, e);
+	throw e;
 	return 0;
 }
 
@@ -111,29 +121,29 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	Exception *e = fiber()->exception;
+	Exception *e = diag_last_error(&fiber()->diag);
 
 	if (e == NULL) {
 		lua_pushnil(L);
 	} else {
 		lua_newtable(L);
 
-		lua_pushstring(L, "message");
-		lua_pushstring(L, e->errmsg());
-		lua_settable(L, -3);
-
 		lua_pushstring(L, "type");
-		lua_pushstring(L, e->type());
+		lua_pushstring(L, e->type->name);
 		lua_settable(L, -3);
 
-		lua_pushstring(L, "code");
-		lua_pushinteger(L, ClientError::get_errcode(e));
-		lua_settable(L, -3);
-
-		if (SystemError *se = dynamic_cast<SystemError *>(e)) {
-			lua_pushstring(L, "errno");
-			lua_pushinteger(L, se->errnum());
-			lua_settable(L, -3);
+		type_foreach_method(e->type, method) {
+			if (method_invokable<const char *>(method, e)) {
+				const char *s = method_invoke<const char *>(method, e);
+				lua_pushstring(L, method->name);
+				lua_pushstring(L, s);
+				lua_settable(L, -3);
+			} else if (method_invokable<int>(method, e)) {
+				int code = method_invoke<int>(method, e);
+				lua_pushstring(L, method->name);
+				lua_pushinteger(L, code);
+				lua_settable(L, -3);
+			}
 		}
        }
        return 1;
@@ -145,7 +155,7 @@ lbox_error_clear(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.clear(): bad arguments");
 
-	Exception::clear(&fiber()->exception);
+	diag_clear(&fiber()->diag);
 	return 0;
 }
 

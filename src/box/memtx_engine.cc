@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 #include "memtx_engine.h"
-#include "replication.h"
 #include "tuple.h"
 #include "txn.h"
 #include "index.h"
@@ -36,19 +35,16 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
-#include "salad/rlist.h"
 #include "request.h"
-#include <stdlib.h>
-#include <string.h>
-#include <sys/wait.h>
 #include "box.h"
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "recovery.h"
+#include "relay.h"
 #include "schema.h"
 #include "main.h"
 #include "coeio_file.h"
-#include "coio.h"
+#include "coeio.h"
 #include "errinj.h"
 #include "scoped_guard.h"
 
@@ -58,6 +54,26 @@ static bool memtx_index_arena_initialized = false;
 static struct slab_arena memtx_index_arena;
 static struct slab_cache memtx_index_arena_slab_cache;
 static struct mempool memtx_index_extent_pool;
+/**
+ * To ensure proper statement-level rollback in case
+ * of out of memory conditions, we maintain a number
+ * of slack memory extents reserved before a statement
+ * is begun. If there isn't enough slack memory,
+ * we don't begin the statement.
+ */
+static int memtx_index_num_reserved_extents;
+static void *memtx_index_reserved_extents;
+
+enum {
+	/**
+	 * This number is calculated based on the
+	 * max (realistic) number of insertions
+	 * a deletion from a B-tree or an R-tree
+	 * can lead to, and, as a result, the max
+	 * number of new block allocations.
+	 */
+	RESERVE_EXTENTS_BEFORE_REPLACE = 16
+};
 
 /**
  * A version of space_replace for a space which has
@@ -158,6 +174,11 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 		       struct tuple *old_tuple, struct tuple *new_tuple,
 		       enum dup_replace_mode mode)
 {
+	/*
+	 * Ensure we have enough slack memory to guarantee
+	 * successful statement-level rollback.
+	 */
+	memtx_index_extent_reserve(RESERVE_EXTENTS_BEFORE_REPLACE);
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
@@ -234,8 +255,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 
 MemtxEngine::MemtxEngine()
 	:Engine("memtx"),
-	m_checkpoint_id(-1),
-	m_snapshot_pid(0),
+	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY |
@@ -557,8 +577,8 @@ MemtxEngine::beginJoin()
 }
 
 static void
-snapshot_write_row(struct recovery_state *r, struct xlog *l,
-		   struct xrow_header *row)
+checkpoint_write_row(struct xlog *l, struct xrow_header *row,
+		     uint64_t snap_io_rate_limit)
 {
 	static uint64_t bytes;
 	ev_tstamp elapsed;
@@ -583,9 +603,9 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 	/* TODO: use writev here */
 	for (int i = 0; i < iovcnt; i++) {
 		if (fwrite(iov[i].iov_base, iov[i].iov_len, 1, l->f) != 1) {
-			say_error("Can't write row (%zu bytes)",
-				  iov[i].iov_len);
-			panic_syserror("snapshot_write_row");
+			say_syserror("Can't write row (%zu bytes)",
+				     iov[i].iov_len);
+			tnt_raise(SystemError, "fwrite");
 		}
 		bytes += iov[i].iov_len;
 	}
@@ -595,7 +615,7 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 
 	fiber_gc();
 
-	if (r->snap_io_rate_limit != UINT64_MAX) {
+	if (snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {
 			/*
 			 * Remember the time of first
@@ -609,10 +629,10 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 		 * filesystem cache, otherwise the limit is
 		 * not really enforced.
 		 */
-		if (bytes > r->snap_io_rate_limit)
+		if (bytes > snap_io_rate_limit)
 			fdatasync(fileno(l->f));
 	}
-	while (bytes > r->snap_io_rate_limit) {
+	while (bytes > snap_io_rate_limit) {
 		ev_now_update(loop);
 		/*
 		 * How much time have passed since
@@ -629,13 +649,13 @@ snapshot_write_row(struct recovery_state *r, struct xlog *l,
 
 		ev_now_update(loop);
 		last = ev_now(loop);
-		bytes -= r->snap_io_rate_limit;
+		bytes -= snap_io_rate_limit;
 	}
 }
 
 static void
-snapshot_write_tuple(struct xlog *l,
-		     uint32_t n, struct tuple *tuple)
+checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple,
+		       uint64_t snap_io_rate_limit)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
@@ -653,88 +673,123 @@ snapshot_write_tuple(struct xlog *l,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = tuple->data;
 	row.body[1].iov_len = tuple->bsize;
-	snapshot_write_row(recovery, l, &row);
+	checkpoint_write_row(l, &row, snap_io_rate_limit);
+}
+
+struct checkpoint_entry {
+	struct space *space;
+	struct iterator *iterator;
+	struct rlist link;
+};
+
+struct checkpoint {
+	/**
+	 * List of MemTX spaces to snapshot, with consistent
+	 * read view iterators.
+	 */
+	struct rlist entries;
+	/** The signature of the snapshot file (lsn sum) */
+	int64_t lsn;
+	uint64_t snap_io_rate_limit;
+	struct cord cord;
+	bool waiting_for_snap_thread;
+	struct vclock vclock;
+	struct xdir dir;
+};
+
+static void
+checkpoint_init(struct checkpoint *ckpt, struct recovery_state *recovery,
+		int64_t lsn_arg)
+{
+	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	ckpt->waiting_for_snap_thread = false;
+	ckpt->lsn = lsn_arg;
+	vclock_copy(&ckpt->vclock, &recovery->vclock);
+	xdir_create(&ckpt->dir, recovery->snap_dir.dirname, SNAP,
+		    &recovery->server_uuid);
+	ckpt->snap_io_rate_limit = recovery->snap_io_rate_limit;
 }
 
 static void
-snapshot_space(struct space *sp, void *udata)
+checkpoint_destroy(struct checkpoint *ckpt)
+{
+	struct checkpoint_entry *entry;
+	rlist_foreach_entry(entry, &ckpt->entries, link) {
+		Index *pk = space_index(entry->space, 0);
+		pk->destroyReadViewForIterator(entry->iterator);
+		entry->iterator->free(entry->iterator);
+	}
+	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	xdir_destroy(&ckpt->dir);
+}
+
+
+static void
+checkpoint_add_space(struct space *sp, void *data)
 {
 	if (space_is_temporary(sp))
 		return;
 	if (!space_is_memtx(sp))
 		return;
-	struct tuple *tuple;
-	struct xlog *l = (struct xlog *)udata;
 	Index *pk = space_index(sp, 0);
-	if (pk == NULL)
+	if (!pk)
 		return;
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
+	struct checkpoint *ckpt = (struct checkpoint *)data;
+	struct checkpoint_entry *entry;
+	entry = (struct checkpoint_entry *)
+		region_alloc(&fiber()->gc, sizeof(*entry));
+	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
-	while ((tuple = it->next(it)))
-		snapshot_write_tuple(l, space_id(sp), tuple);
-}
+	entry->space = sp;
+	entry->iterator = pk->allocIterator();
 
-static void
-snapshot_save(struct recovery_state *r)
+	pk->initIterator(entry->iterator, ITER_ALL, NULL, 0);
+	pk->createReadViewForIterator(entry->iterator);
+};
+
+void
+checkpoint_f(va_list ap)
 {
-	struct xlog *snap = xlog_create(&r->snap_dir, &r->vclock);
+	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
+
+	struct xlog *snap = xlog_create(&ckpt->dir, &ckpt->vclock);
+
 	if (snap == NULL)
-		panic_status(errno, "failed to save snapshot: failed to open file in write mode.");
-	/*
-	 * While saving a snapshot, snapshot name is set to
-	 * <lsn>.snap.inprogress. When done, the snapshot is
-	 * renamed to <lsn>.snap.
-	 */
+		tnt_raise(SystemError, "xlog_open");
+
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
+
 	say_info("saving snapshot `%s'", snap->filename);
-
-	space_foreach(snapshot_space, snap);
-
-	xlog_close(snap);
-
+	struct checkpoint_entry *entry;
+	rlist_foreach_entry(entry, &ckpt->entries, link) {
+		struct tuple *tuple;
+		struct iterator *it = entry->iterator;
+		for (tuple = it->next(it); tuple; tuple = it->next(it)) {
+			checkpoint_write_tuple(snap, space_id(entry->space),
+					       tuple, ckpt->snap_io_rate_limit);
+		}
+	}
 	say_info("done");
 }
 
 int
 MemtxEngine::beginCheckpoint(int64_t lsn)
 {
-	assert(m_checkpoint_id == -1);
-	assert(m_snapshot_pid == 0);
-	/* flush buffers to avoid multiple output
-	 *
-	 * https://github.com/tarantool/tarantool/issues/366
-	*/
-	fflush(stdout);
-	fflush(stderr);
-	/*
-	 * Due to fork nature, no threads are recreated.
-	 * This is the only consistency guarantee here for a
-	 * multi-threaded engine.
-	 */
-	snapshot_pid = fork();
-	switch (snapshot_pid) {
-	case -1:
-		say_syserror("fork");
-		return -1;
-	case  0: /* dumper */
-		slab_arena_mprotect(&memtx_arena);
-		cord_set_name("snap");
-		title("dumper", "%" PRIu32, getppid());
-		fiber_set_name(fiber(), "dumper");
-		/* make sure we don't double-write parent stdio
-		 * buffers at exit() during panic */
-		close_all_xcpt(1, log_fd);
-		/* do not rename snapshot */
-		snapshot_save(::recovery);
-		exit(EXIT_SUCCESS);
-		return 0;
-	default: /* waiter */
-		break;
-	}
+	assert(m_checkpoint == 0);
 
-	m_checkpoint_id = lsn;
-	m_snapshot_pid = snapshot_pid;
-	/* increment snapshot version */
+	m_checkpoint = (struct checkpoint *)
+		region_alloc(&fiber()->gc, sizeof(*m_checkpoint));
+
+	checkpoint_init(m_checkpoint, ::recovery, lsn);
+	space_foreach(checkpoint_add_space, m_checkpoint);
+
+	if (cord_costart(&m_checkpoint->cord, "snapshot",
+			 checkpoint_f, m_checkpoint)) {
+		return -1;
+	}
+	m_checkpoint->waiting_for_snap_thread = true;
+
+	/* increment snapshot version; set tuple deletion to delayed mode */
 	tuple_begin_snapshot();
 	return 0;
 }
@@ -742,60 +797,75 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 int
 MemtxEngine::waitCheckpoint()
 {
-	assert(m_checkpoint_id >= 0);
-	assert(m_snapshot_pid > 0);
-	/* wait for memtx-part snapshot completion */
-	int rc = coio_waitpid(m_snapshot_pid);
-	if (WIFSIGNALED(rc))
-		rc = EINTR;
-	else
-		rc = WEXITSTATUS(rc);
-	/* complete snapshot */
-	tuple_end_snapshot();
-	m_snapshot_pid = snapshot_pid = 0;
-	errno = rc;
+	assert(m_checkpoint);
+	assert(m_checkpoint->waiting_for_snap_thread);
 
-	return rc;
+	int result;
+	try {
+		/* wait for memtx-part snapshot completion */
+		result = cord_cojoin(&m_checkpoint->cord);
+	} catch (Exception *e) {
+		e->log();
+		result = -1;
+		SystemError *se = type_cast(SystemError, e);
+		if (se)
+			errno = se->errnum();
+	}
+
+	m_checkpoint->waiting_for_snap_thread = false;
+	return result;
 }
 
 void
 MemtxEngine::commitCheckpoint()
 {
 	/* beginCheckpoint() must have been done */
-	assert(m_checkpoint_id >= 0);
+	assert(m_checkpoint);
 	/* waitCheckpoint() must have been done. */
-	assert(m_snapshot_pid == 0);
+	assert(!m_checkpoint->waiting_for_snap_thread);
 
-	struct xdir *dir = &::recovery->snap_dir;
+	tuple_end_snapshot();
+
+	struct xdir *dir = &m_checkpoint->dir;
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
 	snprintf(to, sizeof(to), "%s",
-		 format_filename(dir, m_checkpoint_id, NONE));
-	char *from = format_filename(dir, m_checkpoint_id, INPROGRESS);
+		 format_filename(dir, m_checkpoint->lsn, NONE));
+	char *from = format_filename(dir, m_checkpoint->lsn, INPROGRESS);
 	int rc = coeio_rename(from, to);
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
-	m_checkpoint_id = -1;
+	checkpoint_destroy(m_checkpoint);
+	m_checkpoint = 0;
 }
 
 void
 MemtxEngine::abortCheckpoint()
 {
-	if (m_snapshot_pid > 0) {
-		assert(m_checkpoint_id >= 0);
-		/**
-		 * An error in the other engine's first phase.
-		 */
-		waitCheckpoint();
+	/**
+	 * An error in the other engine's first phase.
+	 */
+	if (m_checkpoint->waiting_for_snap_thread) {
+		try {
+			/* wait for memtx-part snapshot completion */
+			cord_cojoin(&m_checkpoint->cord);
+		} catch (Exception *e) {
+			e->log();
+		}
+		m_checkpoint->waiting_for_snap_thread = false;
 	}
-	if (m_checkpoint_id > 0) {
-		/** Remove garbage .inprogress file. */
-		char *filename = format_filename(&::recovery->snap_dir,
-						m_checkpoint_id, INPROGRESS);
-		(void) coeio_unlink(filename);
-	}
-	m_checkpoint_id = -1;
+
+	tuple_end_snapshot();
+
+	/** Remove garbage .inprogress file. */
+	char *filename = format_filename(&m_checkpoint->dir,
+					 m_checkpoint->lsn,
+					 INPROGRESS);
+	(void) coeio_unlink(filename);
+
+	checkpoint_destroy(m_checkpoint);
+	m_checkpoint = 0;
 }
 
 void
@@ -828,6 +898,9 @@ memtx_index_arena_init()
 	mempool_create(&memtx_index_extent_pool,
 		       &memtx_index_arena_slab_cache,
 		       MEMTX_EXTENT_SIZE);
+	/* Empty reserved list */
+	memtx_index_num_reserved_extents = 0;
+	memtx_index_reserved_extents = 0;
 	/* Done */
 	memtx_index_arena_initialized = true;
 }
@@ -838,7 +911,19 @@ memtx_index_arena_init()
 void *
 memtx_index_extent_alloc()
 {
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
+	if (memtx_index_reserved_extents) {
+		assert(memtx_index_num_reserved_extents > 0);
+		memtx_index_num_reserved_extents--;
+		void *result = memtx_index_reserved_extents;
+		memtx_index_reserved_extents = *(void **)
+			memtx_index_reserved_extents;
+		return result;
+	}
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
+		     /* same error as in mempool_alloc */
+		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
+			       "mempool", "new slab")
+	);
 	return mempool_alloc(&memtx_index_extent_pool);
 }
 
@@ -849,4 +934,24 @@ void
 memtx_index_extent_free(void *extent)
 {
 	return mempool_free(&memtx_index_extent_pool, extent);
+}
+
+/**
+ * Reserve num extents in pool.
+ * Ensure that next num extent_alloc will succeed w/o an error
+ */
+void
+memtx_index_extent_reserve(int num)
+{
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
+	/* same error as in mempool_alloc */
+		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
+			       "mempool", "new slab")
+	);
+	while (memtx_index_num_reserved_extents < num) {
+		void *ext = mempool_alloc(&memtx_index_extent_pool);
+		*(void **)ext = memtx_index_reserved_extents;
+		memtx_index_reserved_extents = ext;
+		memtx_index_num_reserved_extents++;
+	}
 }

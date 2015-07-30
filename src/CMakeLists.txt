@@ -15,6 +15,7 @@ include_directories(${READLINE_INCLUDE_DIR})
 set(lua_sources)
 lua_source(lua_sources lua/init.lua)
 lua_source(lua_sources lua/fiber.lua)
+lua_source(lua_sources lua/buffer.lua)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
@@ -43,9 +44,11 @@ set (core_sources
      say.cc
      memory.cc
      fiber.cc
+     cbus.cc
      exception.cc
      coro.cc
      object.cc
+     reflection.c
      assoc.c
  )
 

@@ -63,10 +63,10 @@ lbox_info_replication(struct lua_State *L)
 		lua_pushnumber(L, ev_now(loop()) - r->remote.last_row_time);
 		lua_settable(L, -3);
 
-		if (r->remote.reader->exception) {
+		Exception *e = diag_last_error(&r->remote.reader->diag);
+		if (e != NULL) {
 			lua_pushstring(L, "message");
-			lua_pushstring(L,
-				       r->remote.reader->exception->errmsg());
+			lua_pushstring(L, e->errmsg());
 			lua_settable(L, -3);
 		}
 	}
@@ -126,13 +126,6 @@ lbox_info_uptime(struct lua_State *L)
 }
 
 static int
-lbox_info_snapshot_pid(struct lua_State *L)
-{
-	lua_pushnumber(L, snapshot_pid);
-	return 1;
-}
-
-static int
 lbox_info_pid(struct lua_State *L)
 {
 	lua_pushnumber(L, getpid());
@@ -171,7 +164,6 @@ lbox_info_dynamic_meta [] =
 	{"replication", lbox_info_replication},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
-	{"snapshot_pid", lbox_info_snapshot_pid},
 	{"pid", lbox_info_pid},
 #if 0
 	{"sophia", lbox_info_sophia},

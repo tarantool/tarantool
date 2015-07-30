@@ -30,6 +30,7 @@
  */
 #include <stddef.h>
 #include <stdbool.h>
+#include "small/matras.h"
 
 /**
  * In-memory Guttman's R-tree
@@ -56,6 +57,7 @@ enum {
 	/**
 	 * R-Tree uses linear search for elements on a page,
 	 * so a larger page size can hurt performance.
+	 * must be power of 2
 	 */
 	RTREE_PAGE_SIZE = 1024
 };
@@ -88,8 +90,8 @@ enum spatial_search_op
 };
 
 /* pointers to page allocation and deallocations functions */
-typedef void *(*rtree_page_alloc_t)();
-typedef void (*rtree_page_free_t)(void *);
+typedef void *(*rtree_extent_alloc_t)();
+typedef void (*rtree_extent_free_t)(void *);
 
 /* A point in RTREE_DIMENSION space */
 struct rtree_point
@@ -124,10 +126,10 @@ struct rtree
 	unsigned version;
 	/* Number of allocated (used) pages */
 	unsigned n_pages;
-	/* Function for allocation new pages */
-	rtree_page_alloc_t page_alloc;
-	/* Function for deallocation new pages */
-	rtree_page_free_t page_free;
+	/* Matras for allocating new page */
+	struct matras mtab;
+	/* List of free pages */
+	void *free_pages;
 };
 
 /* Struct for iteration and retrieving rtree values */
@@ -196,12 +198,13 @@ rtree_set2d(struct rtree_rect *rect,
 /**
  * @brief Initialize a tree
  * @param tree - pointer to a tree
- * @param page_alloc - page allocation function
- * @param page_free - page deallocation function
+ * @param extent_size - size of extents allocated by extent_alloc (see next)
+ * @param extent_alloc - extent allocation function
+ * @param extent_free - extent deallocation function
  */
 void
-rtree_init(struct rtree *tree,
-	   rtree_page_alloc_t page_alloc, rtree_page_free_t page_free);
+rtree_init(struct rtree *tree, uint32_t extent_size,
+	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free);
 
 /**
  * @brief Destroy a tree

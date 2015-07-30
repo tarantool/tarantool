@@ -61,11 +61,8 @@ struct MemtxEngine: public Engine {
 	virtual void abortCheckpoint();
 	virtual void initSystemSpace(struct space *space);
 private:
-	/**
-	 * LSN of the snapshot which is in progress.
-	 */
-	int64_t m_checkpoint_id;
-	pid_t m_snapshot_pid;
+	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
+	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
 };
 
@@ -94,5 +91,12 @@ memtx_index_extent_alloc();
  */
 void
 memtx_index_extent_free(void *extent);
+
+/**
+ * Reserve num extents in pool.
+ * Ensure that next num extent_alloc will succeed w/o an error
+ */
+void
+memtx_index_extent_reserve(int num);
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

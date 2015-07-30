@@ -61,14 +61,14 @@ region_test_truncate()
 
 	fail_unless(ptr);
 
-	size_t size = region_used(&region);
+	size_t used = region_used(&region);
 
 	region_alloc_nothrow(&region, 10000);
 	region_alloc_nothrow(&region, 10000000);
 
-	region_truncate(&region, size);
+	region_truncate(&region, used);
 
-	fail_unless(region_used(&region) == size);
+	fail_unless(region_used(&region) == used);
 
 	region_free(&region);
 

@@ -14,4 +14,3 @@ t = {}
 for k, _ in pairs(box.info()) do table.insert(t, k) end
 table.sort(t)
 t
-box.info.snapshot_pid

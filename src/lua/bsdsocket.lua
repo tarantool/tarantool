@@ -1,7 +1,7 @@
 -- bsdsocket.lua (internal file)
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
-local LIMIT_INFINITY = 4294967295
+local LIMIT_INFINITY = 2147483647
 local READAHEAD = 16380
 
 local ffi = require('ffi')
@@ -10,6 +10,7 @@ local internal = require('socket')
 local fiber = require('fiber')
 local fio = require('fio')
 local log = require('log')
+local buffer = require('buffer')
 
 ffi.cdef[[
     struct socket {
@@ -51,6 +52,9 @@ ffi.cdef[[
         int    p_proto;      /* protocol number */
     };
     struct protoent *getprotobyname(const char *name);
+
+    void *memmem(const void *haystack, size_t haystacklen,
+        const void *needle, size_t needlelen);
 ]]
 
 local function sprintf(fmt, ...)
@@ -166,31 +170,63 @@ socket_methods.sysconnect = function(self, host, port)
     return false
 end
 
-socket_methods.syswrite = function(self, octets)
+local function syswrite(self, charptr, size)
     local fd = check_socket(self)
     self._errno = nil
-    local done = ffi.C.write(fd, octets, string.len(octets))
+    local done = ffi.C.write(fd, charptr, size)
     if done < 0 then
         self._errno = boxerrno()
         return nil
     end
+
     return tonumber(done)
 end
 
-socket_methods.sysread = function(self, size)
-    local fd = check_socket(self)
-    size = size or READAHEAD
-    self._errno = nil
-    local buf = ffi.new('char[?]', size)
-    local res = ffi.C.read(fd, buf, size)
+socket_methods.syswrite = function(self, arg1, arg2)
+    -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
+    if type(arg1) == 'cdata' and arg2 ~= nil then
+        return syswrite(self, arg1, arg2)
+    elseif type(arg1) == 'string' then
+        return syswrite(self, arg1, #arg1)
+    else
+        error('Usage: socket:syswrite(data) or socket:syswrite(const char *, size)')
+    end
+end
 
+local function sysread(self, charptr, size)
+    local fd = check_socket(self)
+
+    self._errno = nil
+    local res = ffi.C.read(fd, charptr, size)
     if res < 0 then
         self._errno = boxerrno()
         return nil
     end
 
-    buf = ffi.string(buf, res)
-    return buf
+    return tonumber(res)
+end
+
+socket_methods.sysread = function(self, arg1, arg2)
+    -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
+    if type(arg1) == 'cdata' and arg2 ~= nil then
+        return sysread(self, arg1, arg2)
+    end
+
+    local size = arg1 or READAHEAD
+
+    local buf = buffer.IBUF_SHARED
+    buf:reset()
+    local p = buf:alloc(size)
+
+    local res = sysread(self, p, size)
+    if res then
+        local str = ffi.string(p, res)
+        buf:recycle()
+        return str
+    else
+        buf:recycle()
+        return res
+    end
 end
 
 socket_methods.nonblock = function(self, nb)
@@ -546,41 +582,80 @@ local errno_is_fatal = {
     [boxerrno.ENOTSOCK] = true;
 }
 
-local function readchunk(self, limit, timeout)
-    if self.rbuf == nil then
-        self.rbuf = ''
-        self.rpos = 1
-        self.rlen = 0
+local function check_limit(self, limit)
+    if self.rbuf.size >= limit then
+        return limit
+    end
+    return nil
+end
+
+local function check_delimiter(self, limit, eols)
+    if limit == 0 then
+        return 0
+    end
+    local rbuf = self.rbuf
+    if rbuf.size == 0 then
+        return nil
     end
 
-    if self.rlen >= limit then
+    local shortest
+    for i, eol in ipairs(eols) do
+        local data = ffi.C.memmem(rbuf.rpos, rbuf.size, eol, #eol)
+        if data ~= nil then
+            local len = ffi.cast('char *', data) - rbuf.rpos + #eol
+            if shortest == nil or shortest > len then
+                shortest = len
+            end
+        end
+    end
+    if shortest ~= nil and shortest <= limit then
+        return shortest
+    elseif limit <= rbuf.size then
+        return limit
+    end
+    return nil
+end
+
+local function read(self, limit, timeout, check, ...)
+    assert(limit >= 0)
+    limit = math.min(limit, LIMIT_INFINITY)
+    local rbuf = self.rbuf
+    if rbuf == nil then
+        rbuf = buffer.ibuf()
+        self.rbuf = rbuf
+    end
+
+    local len = check(self, limit, ...)
+    if len ~= nil then
         self._errno = nil
-        local data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
-        self.rlen = self.rlen - limit
-        self.rpos = self.rpos + limit
+        local data = ffi.string(rbuf.rpos, len)
+        rbuf.rpos = rbuf.rpos + len
         return data
     end
 
-    while true do
+    local started = fiber.time()
+    while timeout > 0 do
         local started = fiber.time()
 
-        local to_read
-        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
-            to_read = limit - self.rlen
-        end
-        local data = self:sysread(to_read)
-        if data ~= nil then
-            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
-            self.rpos = 1
-            self.rlen = string.len(self.rbuf)
-            if string.len(data) == 0 then   -- eof
-                limit = self.rlen
-            end
-            if self.rlen >= limit then
-               data = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
-               self.rlen = self.rlen - limit
-               self.rpos = self.rpos + limit
-               return data
+        assert(rbuf.size < limit)
+        local to_read = math.min(limit - rbuf.size, READAHEAD)
+        local data = rbuf:reserve(to_read)
+        assert(rbuf.unused >= to_read)
+        local res = sysread(self, data, rbuf.unused)
+        if res == 0 then -- eof
+            self._errno = nil
+            local len = rbuf.size
+            local data = ffi.string(rbuf.rpos, len)
+            rbuf.rpos = rbuf.rpos + len
+            return data
+        elseif res ~= nil then
+            rbuf.wpos = rbuf.wpos + res
+            local len = check(self, limit, ...)
+            if len ~= nil then
+                self._errno = nil
+                local data = ffi.string(rbuf.rpos, len)
+                rbuf.rpos = rbuf.rpos + len
+                return data
             end
         elseif not errno_is_transient[self:errno()] then
             self._errno = boxerrno()
@@ -599,102 +674,22 @@ local function readchunk(self, limit, timeout)
     return nil
 end
 
-local function readline_check(self, eols, limit)
-    if limit == 0 then
-        return ''
-    end
-    if self.rlen == 0 then
-        return nil
-    end
-
-    local shortest
-    for i, eol in ipairs(eols) do
-        local data = string.match(self.rbuf, "^(.-" .. eol .. ")", self.rpos)
-        if data ~= nil then
-            if string.len(data) > limit then
-                data = string.sub(data, 1, limit)
-            end
-            if shortest == nil or string.len(shortest) > string.len(data) then
-                shortest = data
-            end
-        end
-    end
-    if shortest == nil and self.rlen >= limit then
-        shortest = string.sub(self.rbuf, self.rpos, self.rpos - 1 + limit)
-    end
-    if shortest ~= nil then
-        local len = string.len(shortest)
-        self.rpos = self.rpos + len
-        self.rlen = self.rlen - len
-    end
-    return shortest
-end
-
-local function readline(self, limit, eol, timeout)
-    if self.rbuf == nil then
-        self.rbuf = ''
-        self.rpos = 1
-        self.rlen = 0
-    end
-
-    self._errno = nil
-    local data = readline_check(self, eol, limit)
-    if data ~= nil then
-        return data
-    end
-
-    local started = fiber.time()
-    while timeout > 0 do
-        local started = fiber.time()
-        
-        if not self:readable(timeout) then
-            self._errno = boxerrno()
-            return nil
-        end
-        
-        timeout = timeout - ( fiber.time() - started )
-
-        local to_read
-        if limit ~= LIMIT_INFINITY and limit > READAHEAD then
-            to_read = limit - self.rlen
-        end
-        local data = self:sysread(to_read)
-        if data ~= nil then
-            self.rbuf = string.sub(self.rbuf, self.rpos) .. data
-            self.rpos = 1
-            self.rlen = string.len(self.rbuf)
-            if string.len(data) == 0 then       -- eof
-                limit = self.rlen
-            end
-            data = readline_check(self, eol, limit)
-            if data ~= nil then
-                return data
-            end
-
-        elseif not errno_is_transient[self:errno()] then
-            self._errno = boxerrno()
-            return nil
-        end
-    end
-    return nil
-end
-
 socket_methods.read = function(self, opts, timeout)
     check_socket(self)
     timeout = timeout or TIMEOUT_INFINITY
     if type(opts) == 'number' then
-        return readchunk(self, opts, timeout)
+        return read(self, opts, timeout, check_limit)
     elseif type(opts) == 'string' then
-        return readline(self, LIMIT_INFINITY, { opts }, timeout)
+        return read(self, LIMIT_INFINITY, timeout, check_delimiter, { opts })
     elseif type(opts) == 'table' then
-        local chunk = opts.chunk or opts.size or 4294967295
+        local chunk = opts.chunk or opts.size or LIMIT_INFINITY
         local delimiter = opts.delimiter or opts.line
         if delimiter == nil then
-            return readchunk(self, chunk, timeout)
+            return read(self, chunk, timeout, check_limit)
         elseif type(delimiter) == 'string' then
-            return readline(self, chunk, { delimiter }, timeout)
+            return read(self, chunk, timeout, check_delimiter, { delimiter })
         elseif type(delimiter) == 'table' then
-            return readline(self, chunk, delimiter, timeout)
+            return read(self, chunk, timeout, check_delimiter, delimiter)
         end
     end
     error('Usage: s:read(delimiter|chunk|{delimiter = x, chunk = x}, timeout)')
@@ -706,23 +701,28 @@ socket_methods.write = function(self, octets, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
-    local total_len = #octets
+    local s = ffi.cast('const char *', octets)
+    local p = s
+    local e = s + #octets
+    if p == e then
+        return 0
+    end
+
     local started = fiber.time()
     while true do
-        local written = self:syswrite(octets)
-        if written == nil then
-            if not errno_is_transient[self:errno()] then
-                return nil
+        local written = syswrite(self, p, e - p)
+        if written == 0 then
+            return p - s -- eof
+        elseif written ~= nil then
+            p = p + written
+            assert(p <= e)
+            if p == e then
+                return e - s
             end
-            written = 0
+        elseif not errno_is_transient[self:errno()] then
+            return nil
         end
 
-        if written == string.len(octets) then
-            return total_len
-        end
-        if written > 0 then
-            octets = string.sub(octets, written + 1)
-        end
         timeout = timeout - (fiber.time() - started)
         if timeout <= 0 or not self:writable(timeout) then
             break

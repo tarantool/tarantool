@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_WAL_WRITER_H_INCLUDED
+#define TARANTOOL_WAL_WRITER_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,25 +28,33 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port.h"
+#include  <third_party/queue.h>
+#include <stdint.h>
+#include "cbus.h"
+
+struct fiber;
+struct recovery_state;
+
+enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
+
+/** String constants for the supported modes. */
+extern const char *wal_mode_STRS[];
+
+struct wal_request: public cmsg {
+	/* Auxiliary. */
+	int64_t res;
+	struct fiber *fiber;
+	int n_rows;
+	struct xrow_header *rows[];
+};
+
+int64_t
+wal_write(struct recovery_state *r, struct wal_request *req);
+
+int
+wal_writer_start(struct recovery_state *state, int rows_per_wal);
 
 void
-null_port_eof(struct port *port __attribute__((unused)))
-{
-}
+wal_writer_stop(struct recovery_state *r);
 
-static void
-null_port_add_tuple(struct port *port __attribute__((unused)),
-		    struct tuple *tuple __attribute__((unused)))
-{
-}
-
-static struct port_vtab null_port_vtab = {
-	null_port_add_tuple,
-	null_port_eof,
-};
-
-struct port null_port = {
-	/* .vtab = */ &null_port_vtab,
-};
-
+#endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */

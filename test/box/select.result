@@ -1,3 +1,6 @@
+msgpack = require('msgpack')
+---
+...
 s = box.schema.space.create('select', { temporary = true })
 ---
 ...
@@ -10,63 +13,102 @@ index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, '
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 ---
 ...
+--# setopt delimiter ';'
+local function test_op(op, idx, ...)
+    local t1 = idx[op .. '_ffi'](idx, ...)
+    local t2 = idx[op .. '_luac'](idx, ...)
+    if msgpack.encode(t1) ~= msgpack.encode(t2) then
+        return 'different result from '..op..'_ffi and '..op..'_luac', t1, t2
+    end
+    return t1
+end
+test = setmetatable({}, {
+    __index = function(_, op) return function(...) return test_op(op, ...) end end
+})
+---
+...
+--# setopt delimiter ''
+local function test_op(op, idx, ...)
+    local t1 = idx[op .. '_ffi'](idx, ...)
+    local t2 = idx[op .. '_luac'](idx, ...)
+    if msgpack.encode(t1) ~= msgpack.encode(t2) then
+        return 'different result from '..op..'_ffi and '..op..'_luac', t1, t2
+    end
+    return t1
+end
+test = setmetatable({}, {
+    __index = function(_, op) return function(...) return test_op(op, ...) end end
+})
+
+---
+...
 --------------------------------------------------------------------------------
 -- get tests
 --------------------------------------------------------------------------------
-s.index[0]:get()
+s.index[0].get == s.index[0].get_ffi or s.index[0].get == s.index[0].get_luac
+---
+- true
+...
+test.get(s.index[0])
 ---
 - error: Invalid key part count in an exact match (expected 1, got 0)
 ...
-s.index[0]:get({})
+test.get(s.index[0], {})
 ---
 - error: Invalid key part count in an exact match (expected 1, got 0)
 ...
-s.index[0]:get(nil)
+test.get(s.index[0], nil)
 ---
 - error: Invalid key part count in an exact match (expected 1, got 0)
 ...
-s.index[0]:get(1)
+test.get(s.index[0], 1)
 ---
 - [1, 1, 2, 3]
 ...
-s.index[0]:get({1})
+test.get(s.index[0], {1})
 ---
 - [1, 1, 2, 3]
 ...
-s.index[0]:get({1, 2})
+test.get(s.index[0], {1, 2})
 ---
 - error: Invalid key part count in an exact match (expected 1, got 2)
 ...
-s.index[0]:get(0)
+test.get(s.index[0], 0)
 ---
+- null
 ...
-s.index[0]:get({0})
+test.get(s.index[0], {0})
 ---
+- null
 ...
-s.index[0]:get("0")
----
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
-...
-s.index[0]:get({"0"})
+test.get(s.index[0], "0")
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-s.index[1]:get(1)
+test.get(s.index[0], {"0"})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+test.get(s.index[1], 1)
 ---
 - error: Invalid key part count in an exact match (expected 2, got 1)
 ...
-s.index[1]:get({1})
+test.get(s.index[1], {1})
 ---
 - error: Invalid key part count in an exact match (expected 2, got 1)
 ...
-s.index[1]:get({1, 2})
+test.get(s.index[1], {1, 2})
 ---
 - [2, 1, 2, 3]
 ...
 --------------------------------------------------------------------------------
 -- select tests
 --------------------------------------------------------------------------------
-s.index[0]:select()
+s.index[0].select == s.index[0].select_ffi or s.index[0].select == s.index[0].select_luac
+---
+- true
+...
+test.select(s.index[0])
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -89,7 +131,7 @@ s.index[0]:select()
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select({})
+test.select(s.index[0], {})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -112,7 +154,7 @@ s.index[0]:select({})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(nil)
+test.select(s.index[0], nil)
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -135,7 +177,7 @@ s.index[0]:select(nil)
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select({}, {iterator = 'ALL'})
+test.select(s.index[0], {}, {iterator = 'ALL'})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -158,7 +200,7 @@ s.index[0]:select({}, {iterator = 'ALL'})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = box.index.ALL })
+test.select(s.index[0], nil, {iterator = box.index.ALL })
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -181,7 +223,7 @@ s.index[0]:select(nil, {iterator = box.index.ALL })
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select({}, {iterator = box.index.ALL, limit = 10})
+test.select(s.index[0], {}, {iterator = box.index.ALL, limit = 10})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -194,15 +236,15 @@ s.index[0]:select({}, {iterator = box.index.ALL, limit = 10})
   - [9, 1, 2, 3]
   - [10, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = box.index.ALL, limit = 0})
+test.select(s.index[0], nil, {iterator = box.index.ALL, limit = 0})
 ---
 - []
 ...
-s.index[0]:select({}, {iterator = 'ALL', limit = 1, offset = 15})
+test.select(s.index[0], {}, {iterator = 'ALL', limit = 1, offset = 15})
 ---
 - - [16, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = 'ALL', limit = 20, offset = 15})
+test.select(s.index[0], nil, {iterator = 'ALL', limit = 20, offset = 15})
 ---
 - - [16, 1, 2, 3]
   - [17, 1, 2, 3]
@@ -210,7 +252,7 @@ s.index[0]:select(nil, {iterator = 'ALL', limit = 20, offset = 15})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = box.index.EQ})
+test.select(s.index[0], nil, {iterator = box.index.EQ})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -233,7 +275,7 @@ s.index[0]:select(nil, {iterator = box.index.EQ})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select({}, {iterator = 'EQ'})
+test.select(s.index[0], {}, {iterator = 'EQ'})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -256,7 +298,7 @@ s.index[0]:select({}, {iterator = 'EQ'})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = 'REQ'})
+test.select(s.index[0], nil, {iterator = 'REQ'})
 ---
 - - [20, 1, 2, 3]
   - [19, 1, 2, 3]
@@ -279,7 +321,7 @@ s.index[0]:select(nil, {iterator = 'REQ'})
   - [2, 1, 2, 3]
   - [1, 1, 2, 3]
 ...
-s.index[0]:select({}, {iterator = box.index.REQ})
+test.select(s.index[0], {}, {iterator = box.index.REQ})
 ---
 - - [20, 1, 2, 3]
   - [19, 1, 2, 3]
@@ -302,45 +344,45 @@ s.index[0]:select({}, {iterator = box.index.REQ})
   - [2, 1, 2, 3]
   - [1, 1, 2, 3]
 ...
-s.index[0]:select(nil, {iterator = 'EQ', limit = 2, offset = 1})
+test.select(s.index[0], nil, {iterator = 'EQ', limit = 2, offset = 1})
 ---
 - - [2, 1, 2, 3]
   - [3, 1, 2, 3]
 ...
-s.index[0]:select({}, {iterator = box.index.REQ, limit = 2, offset = 1})
+test.select(s.index[0], {}, {iterator = box.index.REQ, limit = 2, offset = 1})
 ---
 - - [19, 1, 2, 3]
   - [18, 1, 2, 3]
 ...
-s.index[0]:select(1)
+test.select(s.index[0], 1)
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select({1})
+test.select(s.index[0], {1})
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select({1, 2})
+test.select(s.index[0], {1, 2})
 ---
 - error: Invalid key part count (expected [0..1], got 2)
 ...
-s.index[0]:select(0)
+test.select(s.index[0], 0)
 ---
 - []
 ...
-s.index[0]:select({0})
+test.select(s.index[0], {0})
 ---
 - []
 ...
-s.index[0]:select("0")
+test.select(s.index[0], "0")
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-s.index[0]:select({"0"})
+test.select(s.index[0], {"0"})
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-s.index[1]:select(1)
+test.select(s.index[1], 1)
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -363,7 +405,7 @@ s.index[1]:select(1)
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[1]:select({1})
+test.select(s.index[1], {1})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -386,12 +428,12 @@ s.index[1]:select({1})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[1]:select({1}, {limit = 2})
+test.select(s.index[1], {1}, {limit = 2})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
 ...
-s.index[1]:select(1, {iterator = 'EQ'})
+test.select(s.index[1], 1, {iterator = 'EQ'})
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -414,29 +456,29 @@ s.index[1]:select(1, {iterator = 'EQ'})
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[1]:select({1}, {iterator = box.index.EQ, offset = 16, limit = 2})
+test.select(s.index[1], {1}, {iterator = box.index.EQ, offset = 16, limit = 2})
 ---
 - - [17, 1, 2, 3]
   - [18, 1, 2, 3]
 ...
-s.index[1]:select({1}, {iterator = box.index.REQ, offset = 16, limit = 2 })
+test.select(s.index[1], {1}, {iterator = box.index.REQ, offset = 16, limit = 2 })
 ---
 - - [4, 1, 2, 3]
   - [3, 1, 2, 3]
 ...
-s.index[1]:select({1, 2}, {iterator = 'EQ'})
+test.select(s.index[1], {1, 2}, {iterator = 'EQ'})
 ---
 - - [2, 1, 2, 3]
 ...
-s.index[1]:select({1, 2}, {iterator = box.index.REQ})
+test.select(s.index[1], {1, 2}, {iterator = box.index.REQ})
 ---
 - - [2, 1, 2, 3]
 ...
-s.index[1]:select({1, 2})
+test.select(s.index[1], {1, 2})
 ---
 - - [2, 1, 2, 3]
 ...
-s.index[0]:select(nil, { iterator = 'ALL', offset = 0, limit = 4294967295 })
+test.select(s.index[0], nil, { iterator = 'ALL', offset = 0, limit = 4294967295 })
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -459,7 +501,7 @@ s.index[0]:select(nil, { iterator = 'ALL', offset = 0, limit = 4294967295 })
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select({}, { iterator = 'ALL', offset = 0, limit = 4294967295 })
+test.select(s.index[0], {}, { iterator = 'ALL', offset = 0, limit = 4294967295 })
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -482,19 +524,19 @@ s.index[0]:select({}, { iterator = 'ALL', offset = 0, limit = 4294967295 })
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(1)
+test.select(s.index[0], 1)
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = box.index.EQ })
+test.select(s.index[0], 1, { iterator = box.index.EQ })
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = 'EQ' })
+test.select(s.index[0], 1, { iterator = 'EQ' })
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = 'GE' })
+test.select(s.index[0], 1, { iterator = 'GE' })
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
@@ -517,16 +559,16 @@ s.index[0]:select(1, { iterator = 'GE' })
   - [19, 1, 2, 3]
   - [20, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = 'GE', limit = 2 })
+test.select(s.index[0], 1, { iterator = 'GE', limit = 2 })
 ---
 - - [1, 1, 2, 3]
   - [2, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = 'LE', limit = 2 })
+test.select(s.index[0], 1, { iterator = 'LE', limit = 2 })
 ---
 - - [1, 1, 2, 3]
 ...
-s.index[0]:select(1, { iterator = 'GE', offset = 10, limit = 2 })
+test.select(s.index[0], 1, { iterator = 'GE', offset = 10, limit = 2 })
 ---
 - - [11, 1, 2, 3]
   - [12, 1, 2, 3]
@@ -534,6 +576,43 @@ s.index[0]:select(1, { iterator = 'GE', offset = 10, limit = 2 })
 s:select(2)
 ---
 - - [2, 1, 2, 3]
+...
+--------------------------------------------------------------------------------
+-- min/max tests
+--------------------------------------------------------------------------------
+test.min(s.index[1])
+---
+- [1, 1, 2, 3]
+...
+test.max(s.index[1])
+---
+- [20, 1, 2, 3]
+...
+--------------------------------------------------------------------------------
+-- count tests
+--------------------------------------------------------------------------------
+test.count(s.index[1])
+---
+- 20
+...
+test.count(s.index[0], nil)
+---
+- 20
+...
+test.count(s.index[0], {})
+---
+- 20
+...
+test.count(s.index[0], 10, { iterator = 'GT'})
+---
+- 10
+...
+--------------------------------------------------------------------------------
+-- random tests
+--------------------------------------------------------------------------------
+test.random(s.index[0], 48)
+---
+- [9, 1, 2, 3]
 ...
 s:drop()
 ---

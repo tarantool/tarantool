@@ -85,10 +85,11 @@ enum {
  * cancelled.
  */
 #if defined(__cplusplus)
+extern const struct type type_FiberCancelException;
 class FiberCancelException: public Exception {
 public:
 	FiberCancelException(const char *file, unsigned line)
-		: Exception(file, line) {
+		: Exception(&type_FiberCancelException, file, line) {
 		/* Nothing */
 	}
 
@@ -158,7 +159,7 @@ struct fiber {
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
 	/** Exception which caused this fiber's death. */
-	class Exception *exception;
+	struct diag diag;
 };
 
 enum { FIBER_CALL_STACK = 16 };

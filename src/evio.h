@@ -139,7 +139,7 @@ evio_service_is_active(struct evio_service *service)
 }
 
 static inline bool
-evio_is_active(struct ev_io *ev)
+evio_has_fd(struct ev_io *ev)
 {
 	return ev->fd >= 0;
 }

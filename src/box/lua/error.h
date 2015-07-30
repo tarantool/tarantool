@@ -34,4 +34,7 @@ struct lua_State;
 void
 box_lua_error_init(struct lua_State *L);
 
+int
+lbox_error(struct lua_State *L);
+
 #endif /* INCLUDES_TARANTOOL_LUA_ERROR_H */

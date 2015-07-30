@@ -97,6 +97,24 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename)
 }
 
 int
+luaL_cdef(struct lua_State *L, const char *what)
+{
+	int idx = lua_gettop(L);
+	(void) idx;
+	/* This function calls ffi.cdef  */
+
+	/* Get ffi.typeof function */
+	luaL_loadstring(L, "return require('ffi').cdef");
+	lua_call(L, 0, 1);
+	/* FFI must exist */
+	assert(lua_gettop(L) == idx + 1 && lua_isfunction(L, idx + 1));
+	/* Push the argument to ffi.cdef */
+	lua_pushstring(L, what);
+	/* Call ffi.cdef() */
+	return lua_pcall(L, 1, 0, 0);
+}
+
+int
 luaL_setcdatagc(struct lua_State *L, int idx)
 {
 	if (idx < 0)
@@ -708,9 +726,10 @@ tarantool_lua_utils_init(struct lua_State *L)
 	return 0;
 }
 
+const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
 LuajitError::LuajitError(const char *file, unsigned line,
 			 struct lua_State *L)
-	:Exception(file, line)
+	: Exception(&type_LuajitError, file, line)
 {
 	const char *msg = lua_tostring(L, -1);
 	snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");

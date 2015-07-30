@@ -29,5 +29,9 @@
  * SUCH DAMAGE.
  */
 void
-iproto_init(struct evio_service *service);
+iproto_init();
+
+void
+iproto_set_listen(const char *uri);
+
 #endif

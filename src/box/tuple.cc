@@ -400,15 +400,16 @@ tuple_field_cstr(struct tuple *tuple, uint32_t i)
 
 struct tuple *
 tuple_update(struct tuple_format *format,
-	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     tuple_update_alloc_func f, void *alloc_ctx,
 	     const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end, int field_base)
 {
 	uint32_t new_size = 0;
-	const char *new_data = tuple_update_execute(region_alloc, alloc_ctx,
-					expr, expr_end, old_tuple->data,
-					old_tuple->data + old_tuple->bsize,
-					&new_size, field_base);
+	const char *new_data =
+		tuple_update_execute(f, alloc_ctx,
+				     expr, expr_end, old_tuple->data,
+				     old_tuple->data + old_tuple->bsize,
+				     &new_size, field_base);
 
 	/* Allocate a new tuple. */
 	assert(mp_typeof(*new_data) == MP_ARRAY);
