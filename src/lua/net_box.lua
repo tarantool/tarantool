@@ -157,19 +157,19 @@ local proto = {
     end,
 
     -- delete
-    delete = function(sync, spaceno, key)
+    delete = function(sync, spaceno, key, index_id)
         return request(
             { [SYNC] = sync, [TYPE] = DELETE },
-            { [SPACE_ID] = spaceno, [KEY] = keyfy(key) }
+            { [SPACE_ID] = spaceno, [INDEX_ID] = index_id, [KEY] = keyfy(key) }
         )
     end,
 
     -- update
-    update = function(sync, spaceno, key, oplist)
+    update = function(sync, spaceno, key, oplist, index_id)
         return request(
             { [SYNC] = sync, [TYPE] = UPDATE },
             { [KEY] = keyfy(key), [INDEX_BASE] = 1 , [TUPLE]  = oplist,
-              [SPACE_ID] = spaceno }
+              [SPACE_ID] = spaceno, [INDEX_ID] = index_id }
         )
     end,
 
@@ -256,12 +256,12 @@ local function space_metatable(self)
 
             delete = function(space, key)
                 check_if_space(space)
-                return self:_delete(space.id, key)
+                return self:_delete(space.id, key, 0)
             end,
 
             update = function(space, key, oplist)
                 check_if_space(space)
-                return self:_update(space.id, key, oplist)
+                return self:_update(space.id, key, oplist, 0)
             end,
 
             get = function(space, key)
@@ -334,7 +334,18 @@ local function index_metatable(self)
                 if #res > 0 then
                     return res[1][1]
                 end
-            end
+            end,
+
+            delete = function(idx, key)
+                check_if_index(idx)
+                return self:_delete(idx.space.id, key, idx.id)
+            end,
+
+            update = function(idx, key, oplist)
+                check_if_index(idx)
+                return self:_update(idx.space.id, key, oplist, idx.id)
+            end,
+
         }
     }
 end
@@ -1041,13 +1052,13 @@ local remote_methods = {
         return one_tuple(res.body[DATA])
     end,
 
-    _delete  = function(self, spaceno, key)
-        local res = self:_request('delete', true, spaceno, key)
+    _delete  = function(self, spaceno, key, index_id)
+        local res = self:_request('delete', true, spaceno, key, index_id)
         return one_tuple(res.body[DATA])
     end,
 
-    _update = function(self, spaceno, key, oplist)
-        local res = self:_request('update', true, spaceno, key, oplist)
+    _update = function(self, spaceno, key, oplist, index_id)
+        local res = self:_request('update', true, spaceno, key, oplist, index_id)
         return one_tuple(res.body[DATA])
     end
 }
