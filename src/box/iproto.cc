@@ -111,7 +111,7 @@ struct IprotoRequestGuard {
 
 struct iproto_task;
 
-enum { IPROTO_REQUEST_QUEUE_SIZE = 2048, };
+enum { IPROTO_REQUEST_QUEUE_SIZE = 2048, IPROTO_FIBER_CACHE_IDLE_TIMEOUT = 3 };
 
 /**
  * Implementation of an input queue of the box request processor.
@@ -617,7 +617,11 @@ restart:
 	}
 	/** Put the current fiber into a queue fiber cache. */
 	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
-	fiber_yield();
+	bool timed_out = fiber_yield_timeout(IPROTO_FIBER_CACHE_IDLE_TIMEOUT);
+	if (timed_out) {
+		rlist_del_entry(fiber(), state);
+		return;
+	}
 	goto restart;
 }
 
