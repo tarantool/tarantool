@@ -60,35 +60,36 @@
 
     :except: unknown format specifier.
 
-    .. code-block:: lua
-
-        tarantool> pickle = require('pickle')
-        ---
-        ...
-        tarantool> box.space.tester:insert{0, 'hello world'}
-        ---
-        - [0, 'hello world']
-        ...
-        tarantool> box.space.tester:update({0}, {{'=', 2, 'bye world'}})
-        ---
-        - [0, 'bye world']
-        ...
-        tarantool> box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})
-        ---
-        - [0, "\0\0\0\0\x03\0\0\0hello"]
-        ...
-        tarantool> box.space.tester:update({0}, {{'=', 2, 4}})
-        ---
-        - [0, 4]
-        ...
-        tarantool> box.space.tester:update({0}, {{'+', 2, 4}})
-        ---
-        - [0, 8]
-        ...
-        tarantool> box.space.tester:update({0}, {{'^', 2, 4}})
-        ---
-        - [0, 12]
-        ...
+    | EXAMPLE
+    |
+    | 
+    | :codenormal:`tarantool>` :codebold:`pickle = require('pickle')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:insert{0, 'hello world'}`
+    | :codenormal:`---`
+    | :codenormal:`- [0, 'hello world']`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:update({0}, {{'=', 2, 'bye world'}})`
+    | :codenormal:`---`
+    | :codenormal:`- [0, 'bye world']`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})`
+    | :codenormal:`---`
+    | :codenormal:`- [0, "\0\0\0\0\x03\0\0\0hello"]`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:update({0}, {{'=', 2, 4}})`
+    | :codenormal:`---`
+    | :codenormal:`- [0, 4]`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:update({0}, {{'+', 2, 4}})`
+    | :codenormal:`---`
+    | :codenormal:`- [0, 8]`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:update({0}, {{'^', 2, 4}})`
+    | :codenormal:`---`
+    | :codenormal:`- [0, 12]`
+    | :codenormal:`...`
 
 .. function:: unpack(format, binary-string)
 
@@ -100,40 +101,39 @@
     :return: A list of strings or numbers.
     :rtype:  table
 
-    .. code-block:: lua
-
-        tarantool> pickle = require('pickle')
-        ---
-        ...
-        tarantool> -- this means following commands must end with '!'
-        tarantool> console = require('console'); console.delimiter('!')
-        tarantool> tuple = box.space.tester:replace{0}!
-        ---
-        ...
-        tarantool> string.len(tuple[1])!
-        ---
-        - 1
-        ...
-        tarantool> pickle.unpack('b', tuple[1])!
-        ---
-        - 48
-        ...
-        tarantool> pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!
-        ---
-        - 255
-        - 65535
-        - 4294967295
-        ...
-        tarantool> pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!
-        ---
-        - 18446744073709551615
-        - 65535
-        ...
-        tarantool> num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',
-                ->                   tonumber64('666666666666666')))!
-        ---
-        ...
-        tarantool> console.delimiter('') -- back to normal: commands end with line feed!
-
+    | EXAMPLE
+    |
+    | :codenormal:`tarantool>` :codebold:`pickle = require('pickle')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`-- this means following commands must end with '!'`
+    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+    | :codenormal:`tarantool>` :codebold:`tuple = box.space.tester:replace{0}!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`string.len(tuple[1])!`
+    | :codenormal:`---`
+    | :codenormal:`- 1`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('b', tuple[1])!`
+    | :codenormal:`---`
+    | :codenormal:`- 48`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!`
+    | :codenormal:`---`
+    | :codenormal:`- 255`
+    | :codenormal:`- 65535`
+    | :codenormal:`- 4294967295`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!`
+    | :codenormal:`---`
+    | :codenormal:`- 18446744073709551615`
+    | :codenormal:`- 65535`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`tonumber64('666666666666666')))!`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`console.delimiter('') -- back to normal: commands end with line feed!`
 
 .. _pack: http://perldoc.perl.org/functions/pack.html

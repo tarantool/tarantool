@@ -129,19 +129,27 @@ Notes: The maximum number of users is 32.
                Privileges and the _priv space
 ===========================================================
 
-The fields in the _priv space are: the numeric id of the user who gave the
-privilege ("grantor_id"), the numeric id of the user who received the
-privilege ("grantee_id"), the id of the object, the type of object - "space"
-or "function" or "universe", the type of operation - "read" or "write" or
-"execute" or a combination such as "read,write,execute".
+The fields in the _priv space are:
+the numeric id of the user who gave the privilege ("grantor_id"),
+the numeric id of the user who received the privilege ("grantee_id"),
+the type of object - "space" or "function" or "universe",
+the numeric id of the object,
+the type of operation - "read" = 1, or "write" = 2, or
+"execute" = 4, or a combination such as "read,write,execute".
 
-The function for granting a privilege is:
-:samp:`box.schema.user.grant({user-name-of-grantee}, {operation-type}, {object-type}, {object-name})` or
-:samp:`box.schema.user.grant({user-name-of-grantee}, {operation-type}, 'universe')`.
+The function for granting a privilege is: |br|
+:samp:`box.schema.user.grant({grantee-user-name-or-id}, {operation-type}, {object-type}, {object-name}[, {grant-option}])`
+or |br|
+:samp:`box.schema.user.grant({grantee-user-name-or-id}, {operation-type}, 'universe'[, {grant-option}])` |br|
+where 'universe' means 'all objects',
+and the optional grant-option can be :code:`{grantor=grantor_id}`,
+:code:`{if_not_exists=true|false}`, or both.
 
-The function for revoking a privilege is:
-:samp:`box.schema.user.revoke({user-name-of-grantee}, {operation-type}, {object-type}, {object-name})` or
-:samp:`box.schema.user.revoke({user-name-of-grantee}, {operation-type}, 'universe')`.
+The function for revoking a privilege is: |br|
+:samp:`box.schema.user.revoke({grantee-user-name-or-id}, {operation-type}, {object-type}, {object-name}[, {revoke-option}])`
+or |br|
+:samp:`box.schema.user.revoke({grantee-user-name-or-id}, {operation-type}, 'universe'[, {revoke-option}])` |br|
+where the optional revoke-option can be :code:`{if_exists=true|false}`.
 
 For example, here is a session where the admin user gave the guest user the
 privilege to read from a space named space55, and then took the privilege away:
@@ -156,8 +164,7 @@ privilege to read from a space named space55, and then took the privilege away:
 Notes: Generally privileges are granted or revoked by the owner of the object (the
 user who created it), or by the 'admin' user. Before dropping any objects
 or users, steps should be taken to ensure that all their associated
-privileges have been revoked. Only the 'admin' user can grant privileges
-for the 'universe'.
+privileges have been revoked. Only the 'admin' user can grant privileges for the 'universe'.
 
 
 ===========================================================
@@ -277,10 +284,6 @@ or indirectly.
 .. function:: drop(role-name)
 
     Drop a role.
-
-.. function:: info()
-
-    Get information about a role, including what privileges have been granted to the role.
 
 .. function:: grant(role-name, 'execute', 'role', role-name)
 

@@ -16,20 +16,18 @@ Standard ML, Haskell, or Erlang.
 
 The full documentation is `On the luafun section of github`_.
 However, the first chapter can be skipped because installation
-is already done, it's inside Tarantool. All that is needed is the usual require request.
+is already done, it's inside Tarantool. All that is needed is the usual :code:`require` request.
 After that, all the operations described in the
 Lua fun manual will work, provided they are preceded by the
-name returned by the require request.
+name returned by the :code:`require` request.
 For example:
 
-.. code-block:: lua
-
-    localhost> fun = require('fun')
-    localhost> for _k, a in fun.range(3) do print(a) end
-    1
-    2
-    3
-    ---
-    ...
+    | :codenormal:`tarantool>` :codebold:`fun = require('fun')`
+    | :codenormal:`tarantool>` :codebold:`for _k, a in fun.range(3) do print(a) end`
+    | :codenormal:`1`
+    | :codenormal:`2`
+    | :codenormal:`3`
+    | :codenormal:`---`
+    | :codenormal:`...`
 
 .. _On the luafun section of github: http://rtsisyk.github.io/luafun
