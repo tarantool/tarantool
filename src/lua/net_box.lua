@@ -854,21 +854,37 @@ local remote_methods = {
                 parts   = {},
             }
 
-            if index[5] == 0 then
-                idx.unique = false
+            if type(index[5]) == 'number' then
+                if index[5] == 0 then
+                    idx.unique = false
+                else
+                    idx.unique = true
+                end
+
+                for k = 0, index[6] - 1 do
+                    local pktype = index[7 + k * 2 + 1]
+                    local pkfield = index[7 + k * 2]
+
+                    local pk = {
+                        type = string.upper(pktype),
+                        fieldno = pkfield
+                    }
+                    idx.parts[k] = pk
+                end
             else
-                idx.unique = true
-            end
+                for k = 1, #index[5] do
+                    local pktype = index[5][k][2]
+                    local pkfield = index[5][k][1]
 
-            for k = 0, index[6] - 1 do
-                local pktype = index[7 + k * 2 + 1]
-                local pkfield = index[7 + k * 2]
-
-                local pk = {
-                    type = string.upper(pktype),
-                    fieldno = pkfield
-                }
-                idx.parts[k] = pk
+                    local pk = {
+                        type = string.upper(pktype),
+                        fieldno = pkfield
+                    }
+                    idx.parts[k - 1] = pk
+                end
+                if index[6] and index[6].is_unique then
+                    idx.unique = index[6].is_unique
+                end
             end
 
             if sl[idx.space] ~= nil then

@@ -372,10 +372,11 @@ box.schema.index.create = function(space_id, name, options)
         unique = 'boolean',
         id = 'number',
         if_not_exists = 'boolean',
+        dimension = 'number',
     }
     local options_defaults = {
         type = 'tree',
-        parts = { 1, "num" },
+        parts = { 1, 'num' },
         unique = true,
     }
     check_param_table(options, options_template)
@@ -392,24 +393,31 @@ box.schema.index.create = function(space_id, name, options)
         end
     end
 
-    local unique = options.unique and 1 or 0
-    local part_count = bit.rshift(#options.parts, 1)
-    local parts = options.parts
     local iid = 0
-    -- max
-    local tuple = _index.index[0]
-        :select(space_id, { limit = 1, iterator = 'LE' })[1]
-    if tuple then
-        local id = tuple[1]
-        if id == space_id then
-            iid = tuple[2] + 1
-        end
-    end
     if options.id then
         iid = options.id
+    else
+        -- max
+        local tuple = _index.index[0]
+            :select(space_id, { limit = 1, iterator = 'LE' })[1]
+        if tuple then
+            local id = tuple[1]
+            if id == space_id then
+                iid = tuple[2] + 1
+            end
+        end
     end
-    _index:insert{space_id, iid, name, options.type,
-                  unique, part_count, unpack(options.parts)}
+    parts = {}
+    for i = 1, #options.parts, 2 do
+        table.insert(parts, {options.parts[i], options.parts[i + 1]})
+    end
+    local additional_params = {}
+    local dimension = options.dimension
+    if dimension then
+        additional_params.dimension = dimension
+    end
+    additional_params.is_unique = options.unique
+    _index:insert{space_id, iid, name, options.type, parts, additional_params}
     return box.space[space_id].index[name]
 end
 
@@ -442,11 +450,12 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
 
     local options_template = {
-        type = 'string',
+        id = 'number',
         name = 'string',
+        type = 'string',
         parts = 'table',
         unique = 'boolean',
-        id = 'number',
+        dimension = 'number',
     }
     check_param_table(options, options_template)
 
@@ -457,13 +466,20 @@ box.schema.index.alter = function(space_id, index_id, options)
         index_id = box.space[space_id].index[index_id].id
     end
     local _index = box.space[box.schema.INDEX_ID]
-    if options.unique ~= nil then
-        options.unique = options.unique and 1 or 0
-    end
     if options.id ~= nil then
-        if options.parts ~= nil then
+        local can_update_field = {id = true, name = true, type = true }
+        local can_update = true
+        local cant_update_fields = ''
+        for k,v in pairs(options) do
+            if not can_update_field[k] then
+                can_update = false
+                cant_update_fields = cant_update_fields .. ' ' .. k
+            end
+        end
+        if not can_update then
             box.error(box.error.PROC_LUA,
-                      "Don't know how to update both id and parts")
+                      "Don't know how to update both id and" ..
+                       cant_update_fields)
         end
         ops = {}
         local function add_op(value, field_no)
@@ -474,28 +490,46 @@ box.schema.index.alter = function(space_id, index_id, options)
         add_op(options.id, 2)
         add_op(options.name, 3)
         add_op(options.type, 4)
-        add_op(options.unique, 5)
         _index:update({space_id, index_id}, ops)
         return
     end
-    local tuple = _index:get{space_id, index_id}
+    local tuple = _index:get{space_id, index_id }
+    local parts = {}
+    local additional_parameters = {}
+    if type(tuple[5]) == 'number' then
+        --old format
+        additional_parameters.is_unique = tuple[5] == 0 and false or true
+        local part_count = tuple[5]
+        for i = 1,part_count do
+            table.insert(parts, {tuple[2 * i + 4], tuple[2 * i + 5]});
+        end
+    else
+        --new format
+        parts = tuple[5]
+        additional_parameters = tuple[6]
+    end
     if options.name == nil then
         options.name = tuple[3]
     end
     if options.type == nil then
         options.type = tuple[4]
     end
-    if options.unique == nil then
-        options.unique = tuple[5]
+    if options.unique ~= nil then
+        additional_parameters.is_unique = options.unique and true or false
     end
-    if options.parts == nil then
-        options.parts = {tuple:slice(6)} -- not part count
-    else
+    if options.dimension ~= nil then
+        additional_parameters.dimension = options.dimension
+    end
+    if options.parts ~= nil then
         check_index_parts(options.parts)
         options.parts = update_index_parts(options.parts)
+        parts = {}
+        for i = 1, #options.parts, 2 do
+            table.insert(parts, {options.parts[i], options.parts[i + 1]})
+        end
     end
     _index:replace{space_id, index_id, options.name, options.type,
-                   options.unique, #options.parts/2, unpack(options.parts)}
+                   parts, additional_parameters}
 end
 
 local function keify(key)

@@ -254,7 +254,8 @@ schema_init()
 					      "primary", /* name */
 					      TREE /* index type */,
 					      true /* unique */,
-					      1 /* part count */);
+					      0 /* dimension */,
+					      1); /* part count */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
 	(void) sc_space_new(&def, key_def, &on_replace_schema);
 
@@ -298,7 +299,8 @@ schema_init()
 			      "primary",
 			      TREE /* index type */,
 			      true /* unique */,
-			      2 /* part count */);
+			      0 /* dimension */,
+			      2); /* part count */
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 	/* index no */

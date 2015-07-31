@@ -56,10 +56,17 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 #define FIELD_COUNT      4
 #define FLAGS            5
 /** _index columns */
+#define INDEX_SPACE_ID   0
 #define INDEX_ID         1
+#define INDEX_NAME       2
 #define INDEX_TYPE       3
-#define INDEX_IS_UNIQUE  4
-#define INDEX_PART_COUNT 5
+#define INDEX_PARTS      4
+#define INDEX_OPTIONS    5
+/** old _index columns */
+/** TODO: remove in future versions */
+#define INDEX_OLD_IS_UNIQUE 4
+#define INDEX_OLD_PART_COUNT 5
+
 
 /** _user columns */
 #define USER_TYPE        3
@@ -112,33 +119,85 @@ access_check_ddl(uint32_t owner_uid)
 struct key_def *
 key_def_new_from_tuple(struct tuple *tuple)
 {
-	uint32_t id = tuple_field_u32(tuple, ID);
+	struct key_def *key_def;
+	uint32_t id = tuple_field_u32(tuple, INDEX_SPACE_ID);
 	uint32_t index_id = tuple_field_u32(tuple, INDEX_ID);
 	const char *type_str = tuple_field_cstr(tuple, INDEX_TYPE);
 	enum index_type type = STR2ENUM(index_type, type_str);
-	uint32_t is_unique = tuple_field_u32(tuple, INDEX_IS_UNIQUE);
-	uint32_t part_count = tuple_field_u32(tuple, INDEX_PART_COUNT);
-	const char *name = tuple_field_cstr(tuple, NAME);
+	const char *name = tuple_field_cstr(tuple, INDEX_NAME);
+	const char *roadstone = tuple_field(tuple, INDEX_PARTS);
+	if (mp_typeof(*roadstone) == MP_ARRAY) {
+		/* new space structure */
+		const char *opts = tuple_field(tuple, INDEX_OPTIONS);
+		bool is_unique = true;
+		uint32_t dimension = 0;
+		if (opts) {
+			assert(mp_typeof(*opts) == MP_MAP);
+			uint32_t ops_size = mp_decode_array(&opts);
+			for (uint32_t i = 0; i < ops_size; i++) {
+				uint32_t opts_key_len;
+				const char *opts_key;
+				opts_key = mp_decode_str(&opts, &opts_key_len);
+				if (opts_key_len == 9 &&
+				    memcmp(opts_key, "is_unique", 9) == 0) {
+					is_unique = mp_decode_bool(&opts);
+				} else if (opts_key_len == 9 &&
+				    memcmp(opts_key, "dimension", 9) == 0) {
+					dimension = mp_decode_uint(&opts);
+				} else {
+					mp_next(&opts);
+				}
+			}
+		}
+		const char *parts = tuple_field(tuple, INDEX_PARTS);
+		uint32_t part_count = mp_decode_array(&parts);
+		key_def = key_def_new(id, index_id, name, type,
+				      is_unique > 0, dimension, part_count);
+		auto scoped_guard =
+			make_scoped_guard([=] { key_def_delete(key_def); });
+		for (uint32_t i = 0; i < part_count; i++) {
+			uint32_t c = mp_decode_array(&parts);
+			assert(c >= 2);
+			uint32_t fieldno = mp_decode_uint(&parts);
+			uint32_t len;
+			const char *field_type_str;
+			field_type_str = mp_decode_str(&parts, &len);
+			char buf[256];
+			snprintf(buf, 256, "%.*s", len, field_type_str);
+			enum field_type field_type;
+			field_type = STR2ENUM(field_type, buf);
+			key_def_set_part(key_def, i, fieldno, field_type);
+		}
+		key_def_check(key_def);
+		scoped_guard.is_active = false;
+	} else {
+		/* old space structure */
+		/* TODO: remove in future versions */
+		assert(mp_typeof(*roadstone) == MP_UINT);
+		uint32_t is_unique = tuple_field_u32(tuple,
+						     INDEX_OLD_IS_UNIQUE);
+		uint32_t part_count = tuple_field_u32(tuple,
+						      INDEX_OLD_PART_COUNT);
+		key_def = key_def_new(id, index_id, name, type,
+				      is_unique > 0, 0, part_count);
+		auto scoped_guard =
+			make_scoped_guard([=] { key_def_delete(key_def); });
 
-	struct key_def *key_def = key_def_new(id, index_id, name, type,
-					      is_unique > 0, part_count);
-	auto scoped_guard =
-		make_scoped_guard([=] { key_def_delete(key_def); });
+		struct tuple_iterator it;
+		tuple_rewind(&it, tuple);
+		/* Parts follow part count. */
+		(void) tuple_seek(&it, INDEX_OLD_PART_COUNT);
 
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	/* Parts follow part count. */
-	(void) tuple_seek(&it, INDEX_PART_COUNT);
-
-	for (uint32_t i = 0; i < part_count; i++) {
-		uint32_t fieldno = tuple_next_u32(&it);
-		const char *field_type_str = tuple_next_cstr(&it);
-		enum field_type field_type;
-		field_type = STR2ENUM(field_type, field_type_str);
-		key_def_set_part(key_def, i, fieldno, field_type);
+		for (uint32_t i = 0; i < part_count; i++) {
+			uint32_t fieldno = tuple_next_u32(&it);
+			const char *field_type_str = tuple_next_cstr(&it);
+			enum field_type field_type;
+			field_type = STR2ENUM(field_type, field_type_str);
+			key_def_set_part(key_def, i, fieldno, field_type);
+		}
+		key_def_check(key_def);
+		scoped_guard.is_active = false;
 	}
-	key_def_check(key_def);
-	scoped_guard.is_active = false;
 	return key_def;
 }
 

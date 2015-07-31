@@ -62,7 +62,8 @@ schema_object_type(const char *name)
 
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, bool is_unique, uint32_t part_count)
+	    enum index_type type, bool is_unique, uint32_t dimension,
+	    uint32_t part_count)
 {
 	uint32_t parts_size = sizeof(struct key_part) * part_count;
 	size_t sz = parts_size + sizeof(struct key_def);
@@ -87,6 +88,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->is_unique = is_unique;
+	def->dimension = dimension;
 	def->part_count = part_count;
 
 	memset(def->parts, 0, parts_size);

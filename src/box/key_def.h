@@ -119,6 +119,8 @@ struct key_def {
 	enum index_type type;
 	/** Is this key unique. */
 	bool is_unique;
+	/** Dimension of rtree index */
+	uint32_t dimension;
 	/** Description of parts of a multipart index. */
 	struct key_part parts[];
 };
@@ -126,14 +128,15 @@ struct key_def {
 /** Initialize a pre-allocated key_def. */
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, bool is_unique, uint32_t part_count);
+	    enum index_type type, bool is_unique, uint32_t dimension,
+	    uint32_t part_count);
 
 static inline struct key_def *
 key_def_dup(struct key_def *def)
 {
 	struct key_def *dup = key_def_new(def->space_id, def->iid, def->name,
 					  def->type, def->is_unique,
-					  def->part_count);
+					  def->dimension, def->part_count);
 	if (dup) {
 		memcpy(dup->parts, def->parts,
 		       def->part_count * sizeof(*def->parts));

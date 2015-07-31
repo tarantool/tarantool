@@ -158,10 +158,10 @@ _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [280, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [280, 1, 'owner', 'tree', [[1, 'num']], {'is_unique': false}]
   - [280, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [281, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [281, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [281, 1, 'owner', 'tree', [[1, 'num']], {'is_unique': true}]
   - [281, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
   - [288, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
