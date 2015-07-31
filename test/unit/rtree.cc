@@ -9,7 +9,7 @@
 
 static int page_count = 0;
 
-const uint32_t extent_size = RTREE_PAGE_SIZE * 8;
+const uint32_t extent_size = 1024 * 8;
 
 static void *
 extent_alloc()
@@ -36,16 +36,13 @@ simple_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, extent_size, extent_alloc, extent_free);
+	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
 			fail("element already in tree (1)", "true");
@@ -58,10 +55,7 @@ simple_check()
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (!rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
 			fail("element in tree (1)", "false");
@@ -87,10 +81,7 @@ simple_check()
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (rtree_search(&tree, &rect, SOP_EQUALS, &iterator)) {
 			fail("element already in tree (2)", "true");
@@ -103,10 +94,7 @@ simple_check()
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (!rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator)) {
 			fail("element in tree (2)", "false");
@@ -133,10 +121,7 @@ simple_check()
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
 			fail("element already in tree (3)", "true");
@@ -149,10 +134,7 @@ simple_check()
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (!rtree_search(&tree, &rect, SOP_BELONGS, &iterator)) {
 			fail("element in tree (3)", "false");
@@ -179,10 +161,7 @@ simple_check()
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
 			fail("element already in tree (4)", "true");
@@ -195,10 +174,7 @@ simple_check()
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
 
-		rect.lower_point.coords[0] = i;
-		rect.lower_point.coords[1] = i;
-		rect.upper_point.coords[0] = i + 0.5;
-		rect.upper_point.coords[1] = i + 0.5;
+		rtree_set2d(&rect, i, i, i + 0.5, i + 0.5);
 
 		if (!rtree_search(&tree, &rect, SOP_CONTAINS, &iterator)) {
 			fail("element in tree (4)", "false");
@@ -247,15 +223,12 @@ neighbor_test()
 	static struct rtree_rect basis;
 
 	for (size_t i = 0; i < test_count; i++) {
-		arr[i].lower_point.coords[0] = i;
-		arr[i].lower_point.coords[1] = i;
-		arr[i].upper_point.coords[0] = i + 1;
-		arr[i].upper_point.coords[1] = i + 1;
+		rtree_set2d(&arr[i], i, i, i + 1, i + 1);
 	}
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
 
 		rtree_test_build(&tree, arr, i);
 

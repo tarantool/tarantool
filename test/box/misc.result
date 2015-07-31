@@ -257,6 +257,7 @@ t;
   - 'box.error.DROP_USER : 44'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.injection : table: <address>
+  - 'box.error.RTREE_RECT_ERROR : 101'
   - 'box.error.FUNCTION_LANGUAGE : 100'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.TUPLE_FOUND : 3'

@@ -36,60 +36,51 @@
 
 /* {{{ Utilities. *************************************************/
 
-inline void extract_rectangle(struct rtree_rect *rect,
-			      const struct tuple *tuple, struct key_def *kd)
+inline int
+mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
+	       const char *mp, unsigned count)
 {
-        assert(kd->part_count == 1);
-	const char *elems = tuple_field(tuple, kd->parts[0].fieldno);
-	uint32_t size = mp_decode_array(&elems);
-	switch (size) {
-	case 1: // array
-	{
-		const char* elems = tuple_field(tuple, kd->parts[0].fieldno);
-		uint32_t size = mp_decode_array(&elems);
-		switch (size) {
-		case 2: // point
-			rect->lower_point.coords[0] =
-				rect->upper_point.coords[0] =
-				mp_decode_num(&elems, 0);
-			rect->lower_point.coords[1] =
-				rect->upper_point.coords[1] =
-				mp_decode_num(&elems, 1);
-			break;
-		case 4:
-			rect->lower_point.coords[0] = mp_decode_num(&elems, 0);
-			rect->lower_point.coords[1] = mp_decode_num(&elems, 1);
-			rect->upper_point.coords[0] = mp_decode_num(&elems, 2);
-			rect->upper_point.coords[1] = mp_decode_num(&elems, 3);
-			break;
-		default:
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree index", "Field should be array with "
-				  "size 2 (point) or 4 (rectangle)");
-
+	if (count == dimension) { /* point */
+		for (unsigned i = 0; i < dimension; i++) {
+			coord_t c = mp_decode_num(&mp, i);
+			rect->coords[i * 2] = c;
+			rect->coords[i * 2 + 1] = c;
 		}
-		break;
+	} else if (count == dimension * 2) { /* box */
+		for (unsigned i = 0; i < dimension; i++) {
+			coord_t c = mp_decode_num(&mp, i);
+			rect->coords[i * 2] = c;
+		}
+		for (unsigned i = 0; i < dimension; i++) {
+			coord_t c = mp_decode_num(&mp, i + dimension);
+			rect->coords[i * 2 + 1] = c;
+		}
+	} else {
+		return -1;
 	}
-	case 2: // point
-		rect->lower_point.coords[0] =
-			rect->upper_point.coords[0] =
-			mp_decode_num(&elems, 0);
-		rect->lower_point.coords[1] =
-			rect->upper_point.coords[1] =
-			mp_decode_num(&elems, 1);
-		break;
-	case 4:
-		rect->lower_point.coords[0] = mp_decode_num(&elems, 0);
-		rect->lower_point.coords[1] = mp_decode_num(&elems, 1);
-		rect->upper_point.coords[0] = mp_decode_num(&elems, 2);
-		rect->upper_point.coords[1] = mp_decode_num(&elems, 3);
-		break;
-	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "R-Tree index", "Key should contain 2 (point) or 4 (rectangle) coordinates");
+	rtree_rect_normalize(rect, dimension);
+	return 0;
+}
 
+inline int
+mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
+	       const char *mp)
+{
+	uint32_t size = mp_decode_array(&mp);
+	return mp_decode_rect(rect, dimension, mp, size);
+}
+
+inline void
+extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
+		  struct key_def *key_def)
+{
+	assert(key_def->part_count == 1);
+	const char *elems = tuple_field(tuple, key_def->parts[0].fieldno);
+	unsigned dimension = key_def->opts.dimension;
+	if (mp_decode_rect(rect, dimension, elems)) {
+		tnt_raise(ClientError, ER_RTREE_RECT_ERROR,
+			  "Field", dimension, dimension * 2);
 	}
-	rtree_rect_normalize(rect);
 }
 /* {{{ MemtxRTree Iterators ****************************************/
 
@@ -103,7 +94,7 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
-        delete itr;
+	delete itr;
 }
 
 static struct tuple *
@@ -124,102 +115,74 @@ MemtxRTree::~MemtxRTree()
 		index_rtree_iterator_free(m_position);
 		m_position = NULL;
 	}
-	rtree_destroy(&tree);
+	rtree_destroy(&m_tree);
 }
 
 MemtxRTree::MemtxRTree(struct key_def *key_def)
-  : Index(key_def)
+	: Index(key_def)
 {
 	assert(key_def->part_count == 1);
 	assert(key_def->parts[0].type = ARRAY);
 	assert(key_def->opts.is_unique == false);
 
+	m_dimension = key_def->opts.dimension;
+	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
+		char message[64];
+		snprintf(message, 64, "dimension (%u) must belong to range "
+			 "[%u, %u]", m_dimension, 1, RTREE_MAX_DIMENSION);
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "RTREE index", message);
+	}
+
 	memtx_index_arena_init();
-	rtree_init(&tree, MEMTX_EXTENT_SIZE,
+	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
 		   memtx_index_extent_alloc, memtx_index_extent_free);
 }
 
 size_t
 MemtxRTree::size() const
 {
-	return rtree_number_of_records(&tree);
+	return rtree_number_of_records(&m_tree);
 }
 
 size_t
 MemtxRTree::bsize() const
 {
-	return rtree_used_size(&tree);
+	return rtree_used_size(&m_tree);
 }
 
 struct tuple *
 MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 {
+	struct rtree_iterator iterator;
+	rtree_iterator_init(&iterator);
+
 	rtree_rect rect;
-        struct rtree_iterator iterator;
-        rtree_iterator_init(&iterator);
-        switch (part_count) {
-	case 1:
-	{
-		uint32_t size = mp_decode_array(&key);
-		switch (size) {
-		case 2:
-			rect.lower_point.coords[0] =
-				rect.upper_point.coords[0] =
-				mp_decode_num(&key, 0);
-			rect.lower_point.coords[1] =
-				rect.upper_point.coords[1] =
-				mp_decode_num(&key, 1);
-			break;
-		case 4:
-			rect.lower_point.coords[0] = mp_decode_num(&key, 0);
-			rect.lower_point.coords[1] = mp_decode_num(&key, 1);
-			rect.upper_point.coords[0] = mp_decode_num(&key, 2);
-			rect.upper_point.coords[1] = mp_decode_num(&key, 3);
-			break;
-		default:
-			assert(false);
-		}
-		break;
-	}
-	case 2:
-		rect.lower_point.coords[0] =
-			rect.upper_point.coords[0] =
-			mp_decode_num(&key, 0);
-		rect.lower_point.coords[1] =
-			rect.upper_point.coords[1] =
-			mp_decode_num(&key, 1);
-		break;
-	case 4:
-		rect.lower_point.coords[0] = mp_decode_num(&key, 0);
-		rect.lower_point.coords[1] = mp_decode_num(&key, 1);
-		rect.upper_point.coords[0] = mp_decode_num(&key, 2);
-		rect.upper_point.coords[1] = mp_decode_num(&key, 3);
-		break;
-	default:
+	if (mp_decode_rect(&rect, m_dimension, key, part_count))
 		assert(false);
-	}
-        struct tuple *result = NULL;
-        if (rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator))
+
+	struct tuple *result = NULL;
+	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &iterator))
 		result = (struct tuple *)rtree_iterator_next(&iterator);
-        rtree_iterator_destroy(&iterator);
-        return result;
+	rtree_iterator_destroy(&iterator);
+	return result;
 }
 
 struct tuple *
 MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-                    enum dup_replace_mode)
+		    enum dup_replace_mode)
 {
-        struct rtree_rect rect;
-        if (new_tuple) {
-                extract_rectangle(&rect, new_tuple, key_def);
-                rtree_insert(&tree, &rect, new_tuple);
-        }
+	struct rtree_rect rect;
+	if (new_tuple) {
+		extract_rectangle(&rect, new_tuple, key_def);
+		rtree_insert(&m_tree, &rect, new_tuple);
+	}
 	if (old_tuple) {
-                extract_rectangle(&rect, old_tuple, key_def);
-                if (!rtree_remove(&tree, &rect, old_tuple))
-                        old_tuple = NULL;
-        }
-        return old_tuple;
+		extract_rectangle(&rect, old_tuple, key_def);
+		if (!rtree_remove(&m_tree, &rect, old_tuple))
+			old_tuple = NULL;
+	}
+	return old_tuple;
 }
 
 struct iterator *
@@ -240,98 +203,59 @@ MemtxRTree::allocIterator() const
 
 void
 MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
-                         const char *key, uint32_t part_count) const
+			 const char *key, uint32_t part_count) const
 {
-        struct rtree_rect rect;
-        index_rtree_iterator *it = (index_rtree_iterator *)iterator;
-        switch (part_count) {
-        case 0:
-                if (type != ITER_ALL) {
-                        tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree index", "It is possible to omit key only for ITER_ALL");
-                }
-                break;
-	case 1:
-	{
-		uint32_t size = mp_decode_array(&key);
-		switch (size) {
-		case 2:
-			rect.lower_point.coords[0] =
-				rect.upper_point.coords[0] =
-				mp_decode_num(&key, 0);
-			rect.lower_point.coords[1] =
-				rect.upper_point.coords[1] =
-				mp_decode_num(&key, 1);
-			break;
-		case 4:
-			rect.lower_point.coords[0] = mp_decode_num(&key, 0);
-			rect.lower_point.coords[1] = mp_decode_num(&key, 1);
-			rect.upper_point.coords[0] = mp_decode_num(&key, 2);
-			rect.upper_point.coords[1] = mp_decode_num(&key, 3);
-			break;
-		default:
+	index_rtree_iterator *it = (index_rtree_iterator *)iterator;
+
+	struct rtree_rect rect;
+	if (part_count == 0) {
+		if (type != ITER_ALL) {
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree index", "Key should be array of 2 (point) "
-				  "or 4 (rectangle) numeric coordinates");
+				  "R-Tree index",
+				  "It is possible to omit "
+				  "key only for ITER_ALL");
 		}
-		break;
+	} else if (mp_decode_rect(&rect, m_dimension, key, part_count)) {
+		tnt_raise(ClientError, ER_RTREE_RECT_ERROR,
+			  "Key", m_dimension, m_dimension * 2);
 	}
-	case 2:
-		rect.lower_point.coords[0] =
-			rect.upper_point.coords[0] =
-			mp_decode_num(&key, 0);
-		rect.lower_point.coords[1] =
-			rect.upper_point.coords[1] =
-			mp_decode_num(&key, 1);
+
+	spatial_search_op op;
+	switch (type) {
+	case ITER_ALL:
+		op = SOP_ALL;
 		break;
-	case 4:
-		rect.lower_point.coords[0] = mp_decode_num(&key, 0);
-		rect.lower_point.coords[1] = mp_decode_num(&key, 1);
-		rect.upper_point.coords[0] = mp_decode_num(&key, 2);
-		rect.upper_point.coords[1] = mp_decode_num(&key, 3);
+	case ITER_EQ:
+		op = SOP_EQUALS;
+		break;
+	case ITER_GT:
+		op = SOP_STRICT_CONTAINS;
+		break;
+	case ITER_GE:
+		op = SOP_CONTAINS;
+		break;
+	case ITER_LT:
+		op = SOP_STRICT_BELONGS;
+		break;
+	case ITER_LE:
+		op = SOP_BELONGS;
+		break;
+	case ITER_OVERLAPS:
+		op = SOP_OVERLAPS;
+		break;
+	case ITER_NEIGHBOR:
+		op = SOP_NEIGHBOR;
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "R-Tree index", "Key contain 2 (point) "
-			  "or 4 (rectangle) numeric coordinates");
+			  "RTREE index", "Unsupported search operation for RTREE");
 	}
-        spatial_search_op op;
-        switch (type) {
-        case ITER_ALL:
-                op = SOP_ALL;
-                break;
-        case ITER_EQ:
-                op = SOP_EQUALS;
-                break;
-        case ITER_GT:
-                op = SOP_STRICT_CONTAINS;
-                break;
-        case ITER_GE:
-                op = SOP_CONTAINS;
-                break;
-        case ITER_LT:
-                op = SOP_STRICT_BELONGS;
-                break;
-        case ITER_LE:
-                op = SOP_BELONGS;
-                break;
-        case ITER_OVERLAPS:
-                op = SOP_OVERLAPS;
-                break;
-        case ITER_NEIGHBOR:
-                op = SOP_NEIGHBOR;
-                break;
-        default:
-                tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "R-Tree index", "Unsupported search operation for R-Tree");
-        }
-        rtree_search(&tree, &rect, op, &it->impl);
+	rtree_search(&m_tree, &rect, op, &it->impl);
 }
 
 void
 MemtxRTree::beginBuild()
 {
-	rtree_purge(&tree);
+	rtree_purge(&m_tree);
 }
-
 

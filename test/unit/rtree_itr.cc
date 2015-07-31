@@ -8,7 +8,7 @@
 
 static int extent_count = 0;
 
-const uint32_t extent_size = RTREE_PAGE_SIZE * 8;
+const uint32_t extent_size = 1024 * 8;
 
 static void *
 extent_alloc()
@@ -30,7 +30,7 @@ itr_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, extent_size, extent_alloc, extent_free);
+	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
 
 	/* Filling tree */
 	const size_t count1 = 10000;
@@ -161,7 +161,7 @@ itr_check()
 		for (size_t j = 0; j < count2; j++) {
 			coord_t coord = i * 2 * count2;
 			rtree_set2d(&rect, coord + 0.1, coord + 0.1, coord + j, coord + j);
-			rtree_rect_normalize(&rect);
+			rtree_rect_normalize(&rect, 2);
 			if (!rtree_search(&tree, &rect, SOP_STRICT_CONTAINS, &iterator) && j != 0 && j != count2 - 1) {
 				fail("Integrity check failed (11)", "false");
 			}
@@ -211,7 +211,7 @@ itr_invalidate_check()
 			del_cnt = test_size - del_pos;
 		}
 		struct rtree tree;
-		rtree_init(&tree, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);
@@ -255,7 +255,7 @@ itr_invalidate_check()
 		size_t ins_cnt = rand() % max_insert_count + 1;
 
 		struct rtree tree;
-		rtree_init(&tree, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);

@@ -219,6 +219,8 @@ key_def_new_from_tuple(struct tuple *tuple)
 			key_def_set_part(key_def, i, fieldno, field_type);
 		}
 	}
+	if (type == RTREE && key_def->opts.dimension == 0)
+		key_def->opts.dimension = 2;
 	key_def_check(key_def);
 	scoped_guard.is_active = false;
 	return key_def;

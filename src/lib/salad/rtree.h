@@ -32,6 +32,9 @@
 #include <stdbool.h>
 #include "small/matras.h"
 
+#define RB_COMPACT 1
+#include "third_party/rb.h"
+
 /**
  * In-memory Guttman's R-tree
  */
@@ -49,17 +52,21 @@ typedef double area_t;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct rtree_neighbor {
+	rb_node(struct rtree_neighbor) link;
+	struct rtree_neighbor *next;
+	void *child;
+	int level;
+	sq_coord_t distance;
+};
+
+typedef rb_tree(struct rtree_neighbor) rtnt_t;
+
 enum {
-	/** Number of dimensions of R-tree geometry */
-	RTREE_DIMENSION = 2,
 	/** Maximal possible R-tree height */
 	RTREE_MAX_HEIGHT = 16,
-	/**
-	 * R-Tree uses linear search for elements on a page,
-	 * so a larger page size can hurt performance.
-	 * must be power of 2
-	 */
-	RTREE_PAGE_SIZE = 1024
+	/** Maximal possible R-tree height */
+	RTREE_MAX_DIMENSION = 20
 };
 
 /**
@@ -93,31 +100,36 @@ enum spatial_search_op
 typedef void *(*rtree_extent_alloc_t)();
 typedef void (*rtree_extent_free_t)(void *);
 
-/* A point in RTREE_DIMENSION space */
-struct rtree_point
-{
-	/* coordinates of the point */
-	coord_t coords[RTREE_DIMENSION];
-};
-
 /* A box in RTREE_DIMENSION space */
 struct rtree_rect
 {
-	/* vertex with minimal coordinates */
-	struct rtree_point lower_point;
-	/* vertex with maximal coordinates (diagonal to lower_point) */
-	struct rtree_point upper_point;
+	/* coords: { low X, upper X, low Y, upper Y, etc } */
+	coord_t coords[RTREE_MAX_DIMENSION * 2];
 };
 
 /* Type of function, comparing two rectangles */
 typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
-				   const struct rtree_rect *rt2);
+				   const struct rtree_rect *rt2,
+				   unsigned dimension);
 
 /* Main rtree struct */
 struct rtree
 {
 	/* Root node (page) */
 	struct rtree_page *root;
+	/* R-tree dimension */
+	unsigned dimension;
+	/* Minimal number of branches in tree page */
+	unsigned page_min_fill;
+	/* Maximal number of branches in tree page */
+	unsigned page_max_fill;
+	/* Page size in bytes */
+	unsigned page_size;
+	/* Page branch size in bytes */
+	unsigned page_branch_size;
+	/* For iterator usage, pages are splitted into structs neighbours
+	 * Here is number of neighbours fit into one page */
+	unsigned neighbours_in_page;
 	/* Number of records in entire tree */
 	unsigned n_records;
 	/* Height of a tree */
@@ -146,13 +158,13 @@ struct rtree_iterator
 	/* A verion of a tree when the iterator was created */
 	int version;
 
-	/* Special single-linked list of closest neqighbors
+	/* Special rb tree of closest neqighbors
 	 * Used only for iteration with op = SOP_NEIGHBOR
 	 * For allocating list entries, page allocator of tree is used.
 	 * Allocated page is much bigger than list entry and thus
 	 * provides several list entries.
 	 */
-	struct rtree_neighbor *neigh_list;
+	rtnt_t neigh_tree;
 	/* List of unused (deleted) list entries */
 	struct rtree_neighbor *neigh_free_list;
 	/* List of tree pages, allocated for list entries */
@@ -184,7 +196,7 @@ struct rtree_iterator
  * @param rect - pointer to a rectangle
  */
 void
-rtree_rect_normalize(struct rtree_rect *rect);
+rtree_rect_normalize(struct rtree_rect *rect, unsigned dimension);
 
 /**
  * @brief Set up 2D rectangle by 4 coordinates
@@ -196,14 +208,23 @@ rtree_set2d(struct rtree_rect *rect,
 	    coord_t left, coord_t bottom, coord_t right, coord_t top);
 
 /**
+ * @brief Set up 2D rectangle by 2 coordinates (set to point)
+ * @param rect - pointer to a rectangle
+ * @params x, y - corresponding coordinates
+ */
+void
+rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y);
+
+/**
  * @brief Initialize a tree
  * @param tree - pointer to a tree
  * @param extent_size - size of extents allocated by extent_alloc (see next)
  * @param extent_alloc - extent allocation function
  * @param extent_free - extent deallocation function
+ * @return 0 on success, -1 on error
  */
-void
-rtree_init(struct rtree *tree, uint32_t extent_size,
+int
+rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
 	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free);
 
 /**

@@ -53,7 +53,8 @@ public:
                                   const char *key, uint32_t part_count) const;
 
 protected:
-	struct rtree tree;
+	unsigned m_dimension;
+	struct rtree m_tree;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED */

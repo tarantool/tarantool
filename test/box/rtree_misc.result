@@ -93,8 +93,8 @@ s:insert{1, 2, nil, 3}
 ...
 s:insert{1, 2, {}}
 ---
-- error: R-Tree index does not support Key should contain 2 (point) or 4 (rectangle)
-    coordinates
+- error: 'RTree: Field must be an array with 2 (point) or 4 (rectangle/box) numeric
+    coordinates'
 ...
 s:insert{1, 2, {"3", "4", "5", "6"}}
 ---
@@ -118,13 +118,13 @@ s:insert{1, 2, {3, 4, 5, "6"}}
 ...
 s:insert{1, 2, {3}}
 ---
-- error: R-Tree index does not support Field should be array with size 2 (point) or
-    4 (rectangle)
+- error: 'RTree: Field must be an array with 2 (point) or 4 (rectangle/box) numeric
+    coordinates'
 ...
 s:insert{1, 2, {3, 4, 5}}
 ---
-- error: R-Tree index does not support Key should contain 2 (point) or 4 (rectangle)
-    coordinates
+- error: 'RTree: Field must be an array with 2 (point) or 4 (rectangle/box) numeric
+    coordinates'
 ...
 -- inserting good value
 s:insert{1, 2, {3, 4, 5, 6}}

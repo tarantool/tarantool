@@ -152,6 +152,7 @@ struct errcode_record {
 	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     2, "Unsupported role privilege '%s'") \
 	/* 99 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
 	/*100 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
+	/*101 */_(ER_RTREE_RECT_ERROR,		2, "RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

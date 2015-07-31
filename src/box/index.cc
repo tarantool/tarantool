@@ -69,41 +69,42 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		/* Fall through. */
 	}
 
-        if (key_def->type == RTREE) {
-                if (part_count != 1 && part_count != 2 && part_count != 4)
-                        tnt_raise(ClientError, ER_KEY_PART_COUNT, 4, part_count);
-                if (part_count == 1) {
+	if (key_def->type == RTREE) {
+		unsigned d = key_def->opts.dimension;
+		if (part_count != 1 && part_count != d && part_count != d * 2)
+			tnt_raise(ClientError, ER_KEY_PART_COUNT,
+				  d  * 2, part_count);
+		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
 			key_mp_type_validate(ARRAY, mp_type, ER_KEY_PART_TYPE, 0);
-			uint32_t arr_size = mp_decode_array(&key);
-			if (arr_size != 2 && arr_size != 4)
-				tnt_raise(ClientError, ER_UNSUPPORTED,
-					  "R-Tree key", "Key should contain 2 (point) "
-					  "or 4 (rectangle) numeric coordinates");
-			for (uint32_t part = 0; part < arr_size; part++) {
+			uint32_t array_size = mp_decode_array(&key);
+			if (array_size != d && array_size != d * 2)
+				tnt_raise(ClientError, ER_RTREE_RECT_ERROR,
+					  "Key", d, d * 2);
+			for (uint32_t part = 0; part < array_size; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
 				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, 0);
 			}
-                } else {
+		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
 				enum mp_type mp_type = mp_typeof(*key);
 				mp_next(&key);
 				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, part);
 			}
-                }
-        } else {
-                if (part_count > key_def->part_count)
-                        tnt_raise(ClientError, ER_KEY_PART_COUNT,
-                                  key_def->part_count, part_count);
+		}
+	} else {
+		if (part_count > key_def->part_count)
+			tnt_raise(ClientError, ER_KEY_PART_COUNT,
+				  key_def->part_count, part_count);
 
-                /* Partial keys are allowed only for TREE index type. */
-                if (key_def->type != TREE && part_count < key_def->part_count) {
-                        tnt_raise(ClientError, ER_EXACT_MATCH,
-                                  key_def->part_count, part_count);
-                }
-                key_validate_parts(key_def, key, part_count);
-        }
+		/* Partial keys are allowed only for TREE index type. */
+		if (key_def->type != TREE && part_count < key_def->part_count) {
+			tnt_raise(ClientError, ER_EXACT_MATCH,
+				  key_def->part_count, part_count);
+		}
+		key_validate_parts(key_def, key, part_count);
+	}
 }
 
 void
