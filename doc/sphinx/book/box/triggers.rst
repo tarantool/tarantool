@@ -204,3 +204,34 @@ each trigger by replacing with ``nil``.
     box.space.T:run_triggers(false)
     box.space.T:on_replace(nil, F)
     box.space.T:on_replace(nil, F)
+
+===========================================================
+                    Getting a list of triggers
+===========================================================
+
+The code :code:`on_connect()` -- with no arguments --
+lists all connect-trigger functions;
+:code:`on_auth()` lists all authentication-trigger functions;
+:code:`on_disconnect()` lists all disconnect-trigger functions;
+:code:`on_replace()` lists all replace-trigger functions.
+In the following example a user finds that there are
+three functions associated with :code:`on_connect`
+triggers, and executes the third function, which happens to
+contain the line "print('function #3')".
+
+  | :codenormal:`tarantool>` :codebold:`box.session.on_connect()`
+  | :codenormal:`---`
+  | :codenormal:`- - 'function: 0x416ab6f8'`
+  | |nbsp| |nbsp| :codenormal:`- 'function: 0x416ab6f8'`
+  | |nbsp| |nbsp| :codenormal:`- 'function: 0x416ad800'`
+  | :codenormal:`...`
+  |
+  | :codenormal:`tarantool>` :codebold:`box.session.on_connect()[3]()`
+  | :codenormal:`function #3`
+  | :codenormal:`---`
+  | :codenormal:`...`
+
+
+
+
+
