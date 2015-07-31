@@ -257,9 +257,13 @@ restart:
 		rlist_add_entry(&pool->fiber_cache, fiber(), state);
 		pool->size--;
 		pool->cache_size++;
-		fiber_yield();
+		bool timed_out = fiber_yield_timeout(pool->idle_timeout);
 		pool->cache_size--;
 		pool->size++;
+		if (timed_out) {
+			/** Nothing to do for quite a while */
+			return;
+		}
 		goto restart;
 	}
 }
@@ -296,7 +300,7 @@ cpipe_fiber_pool_cb(ev_loop * /* loop */, struct ev_async *watcher,
 void
 cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
 			const char *name, struct cpipe *pipe,
-			int max_pool_size)
+			int max_pool_size, float idle_timeout)
 {
 	rlist_create(&pool->fiber_cache);
 	pool->name = name;
@@ -304,5 +308,6 @@ cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
 	pool->size = 0;
 	pool->cache_size = 0;
 	pool->max_size = max_pool_size;
+	pool->idle_timeout = idle_timeout;
 	cpipe_set_fetch_cb(pipe, cpipe_fiber_pool_cb, pool);
 }
