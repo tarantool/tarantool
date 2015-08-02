@@ -502,6 +502,9 @@ box_load_cfg()
 void
 box_atfork()
 {
+	/* NULL when forking for box.cfg{background = true} */
+	if (recovery == NULL)
+		return;
 	/* box.coredump() forks to save a core. */
 	recovery_atfork(recovery);
 }
