@@ -72,6 +72,7 @@ enum {
 	 * can lead to, and, as a result, the max
 	 * number of new block allocations.
 	 */
+	RESERVE_EXTENTS_BEFORE_DELETE = 8,
 	RESERVE_EXTENTS_BEFORE_REPLACE = 16
 };
 
@@ -178,7 +179,9 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
 	 */
-	memtx_index_extent_reserve(RESERVE_EXTENTS_BEFORE_REPLACE);
+	memtx_index_extent_reserve(new_tuple ?
+				   RESERVE_EXTENTS_BEFORE_REPLACE :
+				   RESERVE_EXTENTS_BEFORE_DELETE);
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
