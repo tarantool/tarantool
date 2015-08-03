@@ -367,4 +367,18 @@ boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end)
 	} catch (ClientError *e) {
 		return NULL;
 	}
+
+}
+struct tuple *
+boxffi_tuple_upsert(struct tuple *tuple, const char *expr, const char *expr_end)
+{
+	RegionGuard region_guard(&fiber()->gc);
+	try {
+		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
+			region_alloc_cb, &fiber()->gc, tuple, expr, expr_end, 1);
+		tuple_ref(new_tuple); /* must not throw in this case */
+		return new_tuple;
+	} catch (ClientError *e) {
+		return NULL;
+	}
 }

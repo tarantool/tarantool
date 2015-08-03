@@ -928,9 +928,8 @@ upsert_do_ops(struct tuple_update *update)
 	for (; op < ops_end; op++) {
 		try {
 			op->meta->do_op(update, op);
-		} catch(ClientError *e) {
-			say_error("The following error occured during UPSERT "
-				  "operation:");
+		} catch (ClientError *e) {
+			say_error("UPSERT operation failed:");
 			e->log();
 		}
 	}

@@ -232,27 +232,10 @@ tuple_unref(struct tuple *tuple)
 /** Make tuple references exception-friendly in absence of @finally. */
 struct TupleGuard {
 	struct tuple *tuple;
-	TupleGuard(struct tuple *arg) : tuple(arg) { tuple_ref(tuple); }
+	TupleGuard(struct tuple *arg) :tuple(arg) { tuple_ref(tuple); }
 	~TupleGuard() { tuple_unref(tuple); }
 	TupleGuard(const TupleGuard&) = delete;
 	void operator=(const TupleGuard&) = delete;
-};
-
-/** Same as TupleGuard, but accepts normally NULL pointers */
-struct TupleGuardSafe {
-	struct tuple *tuple;
-	TupleGuardSafe(struct tuple *arg) : tuple(arg)
-	{
-		if (tuple)
-			tuple_ref(tuple);
-	}
-	~TupleGuardSafe()
-	{
-		if (tuple)
-			tuple_unref(tuple);
-	}
-	TupleGuardSafe(const TupleGuardSafe&) = delete;
-	void operator=(const TupleGuardSafe&) = delete;
 };
 
 /**
@@ -483,7 +466,6 @@ struct tuple *
 tuple_upsert(struct tuple_format *new_format,
 	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 	     const struct tuple *old_tuple,
-	     const char *plan_b_tuple_data, const char *plan_b_tuple_data_end,
 	     const char *expr, const char *expr_end, int field_base);
 
 /**

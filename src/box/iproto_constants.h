@@ -69,7 +69,7 @@ enum iproto_key {
 	IPROTO_CLUSTER_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
 	IPROTO_EXPR = 0x27, /* EVAL */
-	IPROTO_DEF_TUPLE = 0x28,
+	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -83,7 +83,7 @@ enum iproto_key {
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
 			  bit(KEY) | bit(TUPLE) | bit(FUNCTION_NAME) | \
-			  bit(USER_NAME) | bit(EXPR))
+			  bit(USER_NAME) | bit(EXPR) | bit(OPS))
 
 static inline bool
 xrow_header_has_key(const char *pos, const char *end)
@@ -121,14 +121,11 @@ enum iproto_type {
 	IPROTO_REPLACE = 3,
 	IPROTO_UPDATE = 4,
 	IPROTO_DELETE = 5,
-	IPROTO_TYPE_DML_MAX = IPROTO_DELETE + 1,
 	IPROTO_CALL = 6,
 	IPROTO_AUTH = 7,
 	IPROTO_EVAL = 8,
 	IPROTO_UPSERT = 9,
-	IPROTO_TYPE_EXT_DML_MAX = IPROTO_UPSERT + 1,
 	IPROTO_TYPE_STAT_MAX = IPROTO_UPSERT + 1,
-	/* new range of dml command codes */
 	/* admin command codes */
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
@@ -161,8 +158,8 @@ iproto_type_is_select(uint32_t type)
 static inline bool
 iproto_type_is_dml(uint32_t type)
 {
-	return (type >= IPROTO_SELECT && type < IPROTO_TYPE_DML_MAX) ||
-	       (type == IPROTO_UPSERT && type < IPROTO_TYPE_EXT_DML_MAX);
+	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
+		type == IPROTO_UPSERT;
 }
 
 static inline bool

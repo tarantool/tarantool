@@ -93,7 +93,7 @@ execute_update(struct request *request, struct port *port)
 	}
 	TupleGuard old_guard(old_tuple);
 
-	/* Update the tuple. */
+	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
 					       region_alloc_cb,
 					       &fiber()->gc,
@@ -115,7 +115,7 @@ execute_update(struct request *request, struct port *port)
 }
 
 static void
-execute_upsert(struct request *request, struct port *port)
+execute_upsert(struct request *request, struct port * /* port */)
 {
 	struct space *space = space_cache_find(request->space_id);
 	struct txn *txn = txn_begin_stmt(request, space);
@@ -128,39 +128,33 @@ execute_upsert(struct request *request, struct port *port)
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
-	TupleGuardSafe old_guard(old_tuple);
-
-	/* Update the tuple. */
-	struct tuple *new_tuple =
-		tuple_upsert(space->format, region_alloc_cb,
-			     &fiber()->gc, old_tuple,
-			     request->default_tuple, request->default_tuple_end,
-			     request->tuple, request->tuple_end,
-			     request->index_base);
-	TupleGuard guard(new_tuple);
-	try {
+	if (old_tuple == NULL) {
+		struct tuple *new_tuple = tuple_new(space->format,
+						    request->tuple,
+						    request->tuple_end);
+		TupleGuard guard(new_tuple);
 		space_validate_tuple(space, new_tuple);
-		if (old_tuple &&
-		   !engine_auto_check_update(space->handler->engine->flags))
+
+		txn_replace(txn, space, NULL, new_tuple, DUP_INSERT);
+	} else {
+		TupleGuard old_guard(old_tuple);
+
+		/* Update the tuple. */
+		struct tuple *new_tuple =
+			tuple_upsert(space->format, region_alloc_cb,
+				     &fiber()->gc, old_tuple,
+				     request->ops, request->ops_end,
+				     request->index_base);
+		TupleGuard guard(new_tuple);
+
+		space_validate_tuple(space, new_tuple);
+		if (!engine_auto_check_update(space->handler->engine->flags))
 			space_check_update(space, old_tuple, new_tuple);
-		txn_replace(txn, space, old_tuple, new_tuple,
-			    old_tuple ? DUP_REPLACE : DUP_INSERT);
-	} catch (ClientError *e) {
-		say_error("The following error occured during UPSERT "
-				  "operation:");
-		e->log();
-		txn_rollback_stmt();
-		if (old_tuple)
-			port_add_tuple(port, old_tuple);
-		return;
+		txn_replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
 	}
+
 	txn_commit_stmt(txn);
-	/*
-	 * Adding result to port must be after possible WAL write.
-	 * The reason is that any yield between port_add_tuple and port_eof
-	 * calls could lead to sending not finished response to iproto socket.
-	 */
-	port_add_tuple(port, new_tuple);
+	/* Return nothing: upsert does not return data. */
 }
 
 static void
@@ -318,9 +312,11 @@ error:
 		case IPROTO_EXPR:
 			request->key = value;
 			request->key_end = data;
-		case IPROTO_DEF_TUPLE:
-			request->default_tuple = value;
-			request->default_tuple_end = data;
+			break;
+		case IPROTO_OPS:
+			request->ops = value;
+			request->ops_end = data;
+			break;
 		default:
 			break;
 		}
@@ -339,9 +335,10 @@ int
 request_encode(struct request *request, struct iovec *iov)
 {
 	int iovcnt = 1;
-	const int HEADER_LEN_MAX = 32;
+	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;
-	uint32_t len = HEADER_LEN_MAX + key_len;
+	uint32_t ops_len = request->ops_end - request->ops;
+	uint32_t len = MAP_LEN_MAX + key_len;
 	char *begin = (char *) region_alloc(&fiber()->gc, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -355,21 +352,27 @@ request_encode(struct request *request, struct iovec *iov)
 		pos = mp_encode_uint(pos, request->index_id);
 		map_size++;
 	}
+	if (request->index_base) { /* UPDATE/UPSERT */
+		pos = mp_encode_uint(pos, IPROTO_INDEX_BASE);
+		pos = mp_encode_uint(pos, request->index_base);
+		map_size++;
+	}
 	if (request->key) {
 		pos = mp_encode_uint(pos, IPROTO_KEY);
 		memcpy(pos, request->key, key_len);
 		pos += key_len;
 		map_size++;
 	}
-	if (request->index_base) { /* only for UPDATE */
-		pos = mp_encode_uint(pos, IPROTO_INDEX_BASE);
-		pos = mp_encode_uint(pos, request->index_base);
+	if (request->ops) {
+		pos = mp_encode_uint(pos, IPROTO_OPS);
+		memcpy(pos, request->ops, ops_len);
+		pos += ops_len;
 		map_size++;
 	}
 	if (request->tuple) {
 		pos = mp_encode_uint(pos, IPROTO_TUPLE);
-		iov[1].iov_base = (void *) request->tuple;
-		iov[1].iov_len = (request->tuple_end - request->tuple);
+		iov[iovcnt].iov_base = (void *) request->tuple;
+		iov[iovcnt].iov_len = (request->tuple_end - request->tuple);
 		iovcnt++;
 		map_size++;
 	}

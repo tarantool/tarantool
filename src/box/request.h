@@ -55,13 +55,13 @@ struct request
 	/** Search key or proc name. */
 	const char *key;
 	const char *key_end;
-	/** Insert/replace tuple or proc argument or update operations. */
+	/** Insert/replace/upsert tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
-	/** Additional tuple of request, currently used by UPSERT */
-	const char *default_tuple;
-	const char *default_tuple_end;
-	/** Base field offset for UPDATE, e.g. 0 for C and 1 for Lua. */
+	/** Upsert operations. */
+	const char *ops;
+	const char *ops_end;
+	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
 	int index_base;
 };
 

@@ -767,27 +767,40 @@ s:delete{0}
 ...
 s:upsert({0}, {{'+', 2, 2}}) -- wrong usage
 ---
-- error: Usage space:upsert(key, ops, def_tuple)
+- error: Usage space:upsert(key, ops, tuple)
+...
+s:select{0}
+---
+- []
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0, 0})
 ---
-- [0, 2]
+...
+s:select{0}
+---
+- - [0, 0]
 ...
 s:delete{0}
 ---
-- [0, 2]
+- [0, 0]
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0, 0, 0})
 ---
-- [0, 2, 0]
+...
+s:select{0}
+---
+- - [0, 0, 0]
 ...
 s:delete{0}
 ---
-- [0, 2, 0]
+- [0, 0, 0]
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0})
 ---
-- [0]
+...
+s:select{0}
+---
+- - [0]
 ...
 s:replace{0, 1, 2, 4}
 ---
@@ -795,7 +808,10 @@ s:replace{0, 1, 2, 4}
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0, 0, "you will not see it"})
 ---
-- [0, 3, 2, 4]
+...
+s:select{0}
+---
+- - [0, 3, 2, 4]
 ...
 s:replace{0, -0x4000000000000000ll}
 ---
@@ -803,7 +819,10 @@ s:replace{0, -0x4000000000000000ll}
 ...
 s:upsert({0}, {{'+', 2, -0x4000000000000001ll}}, {0})  -- overflow
 ---
-- [0, -4611686018427387904]
+...
+s:select{0}
+---
+- - [0, -4611686018427387904]
 ...
 s:replace{0, "thing"}
 ---
@@ -811,7 +830,10 @@ s:replace{0, "thing"}
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0, "nothing"})
 ---
-- [0, 'thing']
+...
+s:select{0}
+---
+- - [0, 'thing']
 ...
 s:delete{0}
 ---
@@ -819,7 +841,10 @@ s:delete{0}
 ...
 s:upsert({0}, {{'+', 2, 2}}, {0, "thing"})
 ---
-- [0, 'thing']
+...
+s:select{0}
+---
+- - [0, 'thing']
 ...
 s:replace{0, 1, 2}
 ---
@@ -827,15 +852,24 @@ s:replace{0, 1, 2}
 ...
 s:upsert({0}, {{'!', 42, 42}}, {0})
 ---
-- [0, 1, 2]
+...
+s:select{0}
+---
+- - [0, 1, 2]
 ...
 s:upsert({0}, {{'#', 42, 42}}, {0})
 ---
-- [0, 1, 2]
+...
+s:select{0}
+---
+- - [0, 1, 2]
 ...
 s:upsert({0}, {{'=', 42, 42}}, {0})
 ---
-- [0, 1, 2]
+...
+s:select{0}
+---
+- - [0, 1, 2]
 ...
 s:replace{0, 1.5}
 ---
@@ -843,7 +877,11 @@ s:replace{0, 1.5}
 ...
 s:upsert({0}, {{'|', 1, 255}}, {0})
 ---
-- [0, 1.5]
+- error: Attempt to modify a tuple field which is part of index 'pk' in space 'tweedledum'
+...
+s:select{0}
+---
+- - [0, 1.5]
 ...
 s:replace{0, 1.5}
 ---
@@ -855,15 +893,24 @@ s:replace{0, 'something to splice'}
 ...
 s:upsert({0}, {{':', 2, 1, 4, 'no'}}, {0})
 ---
-- [0, 'nothing to splice']
+...
+s:select{0}
+---
+- - [0, 'nothing to splice']
 ...
 s:upsert({0}, {{':', 2, 1, 2, 'every'}}, {0})
 ---
-- [0, 'everything to splice']
+...
+s:select{0}
+---
+- - [0, 'everything to splice']
 ...
 s:upsert({0}, {{':', 2, -100, 2, 'every'}}, {0})
 ---
-- [0, 'everything to splice']
+...
+s:select{0}
+---
+- - [0, 'everything to splice']
 ...
 s:drop()
 ---

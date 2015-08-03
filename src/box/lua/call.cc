@@ -189,7 +189,7 @@ lbox_process(lua_State *L)
 void
 lbox_request_create(struct request *request,
 		    struct lua_State *L, enum iproto_type type,
-		    int key, int tuple, int default_tuple)
+		    int key, int tuple, int ops)
 {
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
@@ -219,15 +219,14 @@ lbox_request_create(struct request *request,
 		request->tuple = (char *) region_join(gc, tuple_len);
 		request->tuple_end = request->tuple + tuple_len;
 	}
-	if (default_tuple > 0) {
+	if (ops > 0) {
 		size_t used = region_used(gc);
 		mpstream_reset(&stream);
-		luamp_encode_tuple(L, luaL_msgpack_default, &stream,
-				   default_tuple);
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, ops);
 		mpstream_flush(&stream);
-		size_t tuple_len = region_used(gc) - used;
-		request->default_tuple = (char *) region_join(gc, tuple_len);
-		request->default_tuple_end = request->default_tuple + tuple_len;
+		size_t ops_len = region_used(gc) - used;
+		request->ops = (char *) region_join(gc, ops_len);
+		request->ops_end = request->ops + ops_len;
 	}
 }
 
@@ -313,6 +312,7 @@ lbox_update(lua_State *L)
 
 	struct request request;
 	struct port_lua port;
+	/** Legacy: in case of update, ops are passed in in request tuple */
 	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4, -1);
 	request.index_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
@@ -327,11 +327,11 @@ lbox_upsert(lua_State *L)
 	if (lua_gettop(L) != 5 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE ||
 	    lua_type(L, 5) != LUA_TTABLE)
-		return luaL_error(L, "Usage space:upsert(key, ops, def_tuple)");
+		return luaL_error(L, "Usage space:upsert(key, ops, tuple)");
 
 	struct request request;
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_UPSERT, 3, 4, 5);
+	lbox_request_create(&request, L, IPROTO_UPSERT, 3, 5, 4);
 	request.index_base = 1; /* field ids are one-indexed */
 	port_lua_create(&port, L);
 	/* Ignore index_id for now */
