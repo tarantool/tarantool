@@ -24,3 +24,5 @@
     other
     expirationd
     shard
+    tarantool
+
