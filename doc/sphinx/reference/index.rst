@@ -23,3 +23,4 @@
     pickle
     other
     expirationd
+    shard
