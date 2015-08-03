@@ -122,9 +122,8 @@ space:drop()
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
 auto = box.schema.space.create('auto_original')
-auto2 = box.schema.space.create('auto', {id = auto.id})
+box.schema.space.create('auto', {id = auto.id})
 box.schema.space.drop('auto')
-auto2
 box.schema.space.create('auto_original', {id = auto.id})
 auto:drop()
 

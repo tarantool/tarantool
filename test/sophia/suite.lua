@@ -18,7 +18,7 @@ function sophia_dir()
 		i = i + 1
 		list[i] = file
 	end
-	return {i, t}
+	return {i}
 end
 
 function sophia_mkdir(dir)

@@ -12,7 +12,7 @@ too_longs = {}
 function test_run_itr(itr, key)
     for i=1,50 do
         local gen, param, state = s.index.primary:pairs({key}, {iterator = itr})
-        state, v =  gen(param, state)
+        local state, v =  gen(param, state)
         test_res[itr .. ' ' .. key] = v
     end
 end;

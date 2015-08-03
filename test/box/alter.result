@@ -337,17 +337,13 @@ space:drop()
 auto = box.schema.space.create('auto_original')
 ---
 ...
-auto2 = box.schema.space.create('auto', {id = auto.id})
+box.schema.space.create('auto', {id = auto.id})
 ---
 - error: Duplicate key exists in unique index 'primary' in space '_space'
 ...
 box.schema.space.drop('auto')
 ---
 - error: Illegal parameters, space_id should be a number
-...
-auto2
----
-- null
 ...
 box.schema.space.create('auto_original', {id = auto.id})
 ---

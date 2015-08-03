@@ -35,6 +35,9 @@ session.id() > 0
 ---
 - true
 ...
+failed = false
+---
+...
 f = fiber.create(function() failed = session.id() == 0 end)
 ---
 ...

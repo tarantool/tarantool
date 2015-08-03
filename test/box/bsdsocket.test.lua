@@ -286,7 +286,7 @@ sc ~= nil
 e == 0
 sc:close()
 s:close()
-socket.tcp_connect('127.0.0.1', porrt), errno() == errno.ECONNREFUSED
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 
 -- AF_UNIX
 path = '/tmp/tarantool-test-socket'

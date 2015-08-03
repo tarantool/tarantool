@@ -165,6 +165,7 @@ f==g
 -- arguments to fiber.create
 f = fiber.create(print('hello'))
 -- test passing arguments in and out created fiber
+res = {}
 function r(a, b) res = { a, b } end
 f=fiber.create(r)
 while f:status() == 'running' do fiber.sleep(0) end

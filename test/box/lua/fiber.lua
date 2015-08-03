@@ -55,7 +55,7 @@ end
 local function tester_task_routine()
     printer_task = fiber.create(printer_task_routine, 5)
 	table.insert(result, "tester: status(printer) = " .. printer_task:status())
-    count = 1
+    local count = 1
     while printer_task:status() ~= "dead" do
 		table.insert(result, "count: " .. tostring(count))
 		table.insert(result, "status: " .. printer_task:status())

@@ -1,7 +1,7 @@
 -- {name, top, bottom, fifo...}
 fifomax = 5
 function find_or_create_fifo(space, name)
-    fifo = space:get{name}
+    local fifo = space:get{name}
     if fifo == nil then
         fifo = {}
         for i = 1, fifomax do table.insert(fifo, 0) end
@@ -10,9 +10,9 @@ function find_or_create_fifo(space, name)
     return fifo
 end
 function fifo_push(space, name, val)
-    fifo = find_or_create_fifo(space, name)
-    top = fifo[2]
-    bottom = fifo[3]
+    local fifo = find_or_create_fifo(space, name)
+    local top = fifo[2]
+    local bottom = fifo[3]
     if top == fifomax+3 then -- % size
         top = 4
     elseif top ~= bottom then -- was not empty
@@ -26,7 +26,7 @@ function fifo_push(space, name, val)
     return space:update({name}, {{'=', 2, top}, {'=', 3, bottom }, {'=', top, val}})
 end
 function fifo_top(space, name)
-    fifo = find_or_create_fifo(space, name)
-    top = fifo[2]
+    local fifo = find_or_create_fifo(space, name)
+    local top = fifo[2]
     return fifo[top]
 end

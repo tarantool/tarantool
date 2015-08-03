@@ -422,6 +422,9 @@ f = fiber.create(print('hello'))
     ...): bad arguments'
 ...
 -- test passing arguments in and out created fiber
+res = {}
+---
+...
 function r(a, b) res = { a, b } end
 ---
 ...

@@ -199,6 +199,6 @@ space:drop()
 sort = nil
 ---
 ...
-sort_cmp = nul
+sort_cmp = nil
 ---
 ...
