@@ -296,32 +296,49 @@ iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 	return con;
 }
 
+/**
+ * Initiate a connection shutdown. This method may
+ * be invoked many times, and does the internal
+ * bookkeeping to only cleanup resources once.
+ */
 static inline void
 iproto_connection_close(struct iproto_connection *con)
 {
-	int fd = con->input.fd;
-	ev_io_stop(con->loop, &con->input);
-	ev_io_stop(con->loop, &con->output);
-	con->input.fd = con->output.fd = -1;
+	if (evio_has_fd(&con->input)) {
+		/* Clears all pending events. */
+		ev_io_stop(con->loop, &con->input);
+		ev_io_stop(con->loop, &con->output);
+
+		int fd = con->input.fd;
+		/* Make evio_has_fd() happy */
+		con->input.fd = con->output.fd = -1;
+		close(fd);
+		/*
+		 * Discard unparsed data, to recycle the
+		 * connection in net_send_msg() as soon as all
+		 * parsed data is processed.  It's important this
+		 * is done only once.
+		 */
+		con->iobuf[0]->in.wpos -= con->parse_size;
+	}
 	/*
-	 * Discard unparsed data, to recycle the con
-	 * as soon as all parsed data is processed.
-	 */
-	con->iobuf[0]->in.wpos -= con->parse_size;
-	/*
-	 * If the con is not idle, it is destroyed
-	 * after the last request is handled. Otherwise,
-	 * queue a separate msg to run on_disconnect()
-	 * trigger and destroy the connection.
-	 * Sic: the check is mandatory to not destroy a connection
+	 * If the connection has no outstanding requests in the
+	 * input buffer, then no one (e.g. tx thread) is referring
+	 * to it, so it must be destroyed at once. Queue a msg to
+	 * run on_disconnect() trigger and destroy the connection.
+	 *
+	 * Otherwise, it will be destroyed by the last request on
+	 * this connection that has finished processing.
+	 *
+	 * The check is mandatory to not destroy a connection
 	 * twice.
 	 */
 	if (iproto_connection_is_idle(con)) {
+		assert(con->disconnect != NULL);
 		struct iproto_msg *msg = con->disconnect;
 		con->disconnect = NULL;
 		cpipe_push(&tx_pipe, msg);
 	}
-	close(fd);
 }
 
 /**

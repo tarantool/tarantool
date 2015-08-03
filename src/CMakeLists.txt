@@ -29,6 +29,7 @@ lua_source(lua_sources lua/help.lua)
 lua_source(lua_sources lua/help_en_US.lua)
 lua_source(lua_sources lua/tap.lua)
 lua_source(lua_sources lua/fio.lua)
+lua_source(lua_sources lua/strict.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 
 add_custom_target(generate_lua_sources

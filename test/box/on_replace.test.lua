@@ -28,6 +28,8 @@ type(ts:on_replace(fail))
 ts:insert{2, 'b', 'c'}
 ts:get{2}
 
+o = nil
+n = nil
 function save_out(told, tnew) o = told n = tnew end
 type(ts:on_replace(save_out, fail))
 ts:insert{2, 'a', 'b', 'c'}

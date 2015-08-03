@@ -59,4 +59,4 @@ space:insert{1, 'xxxxxxxxxxx', 2, '', '', '', '', '', 0}
 
 space:drop()
 sort = nil
-sort_cmp = nul
+sort_cmp = nil

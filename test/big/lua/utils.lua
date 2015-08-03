@@ -14,7 +14,7 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 	local tkeys = {};
 	local values = {};
 	local types = space_field_types(space_no);
-	function get_field(tuple, field_no)
+	local function get_field(tuple, field_no)
 		local f = tuple[field_no]
 		if (types[field_no] == 'NUM') then
 			return string.format('%8d', f);
@@ -81,7 +81,7 @@ end
 
 -- sort all rows as strings(not for tables);
 function box.sort(tuples)
-    function compare_tables(t1, t2)
+    local function compare_tables(t1, t2)
         return (tostring(t1) < tostring(t2))
     end
     table.sort(tuples, compare_tables)

@@ -12,6 +12,8 @@ print """
  #
  """
 
+# silence possible error of strict mode
+server.admin("nosuchfunction = nil")
 server.admin("function f1() nosuchfunction() end")
 server.admin("type(box.session.on_connect(f1))")
 

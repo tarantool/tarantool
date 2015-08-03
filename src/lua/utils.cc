@@ -128,6 +128,7 @@ luaL_setcdatagc(struct lua_State *L, int idx)
 	GCtab *t = cts->finalizer;
 #if !defined(NDEBUG)
 	CType *ct = ctype_raw(cts, cd->ctypeid);
+	(void) ct;
 	assert(ctype_isptr(ct->info) || ctype_isstruct(ct->info) ||
 	       ctype_isrefarray(ct->info));
 #endif /* !defined(NDEBUG) */

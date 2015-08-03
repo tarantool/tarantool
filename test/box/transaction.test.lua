@@ -45,6 +45,7 @@ s = box.schema.space.create('test');
 box.begin() index = s:create_index('primary');
 box.rollback();
 index = s:create_index('primary');
+t = nil
 function multi()
     box.begin()
     s:auto_increment{'first row'}
@@ -148,7 +149,7 @@ function insert(a) box.space.test:insert(a) end
 function dup_key()
     box.begin()
     box.space.test:insert{1}
-    status, _ = pcall(insert, {1})
+    local status, _ = pcall(insert, {1})
     if not status then
         if box.error.last().code ~= box.error.TUPLE_FOUND then
             box.error.raise()

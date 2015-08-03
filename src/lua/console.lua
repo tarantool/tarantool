@@ -48,7 +48,7 @@ local function format(status, ...)
     return formatter.encode({{error = err }})
 end
 
-function local_format(status, ...)
+local function local_format(status, ...)
     if not status and type(box.cfg) == 'table' then
         box.rollback()
     end

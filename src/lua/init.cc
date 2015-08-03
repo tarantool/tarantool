@@ -70,7 +70,8 @@ struct fiber *script_fiber;
 bool start_loop = true;
 
 /* contents of src/lua/ files */
-extern char uuid_lua[],
+extern char strict_lua[],
+	uuid_lua[],
 	msgpackffi_lua[],
 	fun_lua[],
 	digest_lua[],
@@ -88,6 +89,8 @@ extern char uuid_lua[],
 	fio_lua[];
 
 static const char *lua_modules[] = {
+	/* Make it first to affect load of all other modules */
+	"strict", strict_lua,
 	"tarantool", init_lua,
 	"fiber", fiber_lua,
 	"buffer", buffer_lua,
@@ -382,6 +385,11 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 		lua_settable(L, -3);
 	}
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
+
+#ifdef NDEBUG
+	/* Unload strict after boot in release mode */
+	luaL_dostring(L, "require('strict').off()");
+#endif /* NDEBUG */
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

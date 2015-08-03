@@ -12,6 +12,7 @@ session.exists(1234567890)
 
 -- check session.id()
 session.id() > 0
+failed = false
 f = fiber.create(function() failed = session.id() == 0 end)
 while f:status() ~= 'dead' do fiber.sleep(0) end
 failed

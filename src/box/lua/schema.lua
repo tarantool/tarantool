@@ -1125,7 +1125,7 @@ end
 
 local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
-    auth_mech_list = {}
+    local auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
     _user:update({uid}, {{"=", 5, auth_mech_list}})
 end
@@ -1158,7 +1158,7 @@ box.schema.user.create = function(name, opts)
         end
         return
     end
-    auth_mech_list = {}
+    local auth_mech_list = {}
     if opts.password then
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
@@ -1286,7 +1286,7 @@ local function drop(uid, opts)
         box.schema.func.drop(tuple[1])
     end
     -- if this is a role, revoke this role from whoever it was granted to
-    grants = _priv.index.object:select{'role', uid}
+    local grants = _priv.index.object:select{'role', uid}
     for k, tuple in pairs(grants) do
         revoke(tuple[2], tuple[2], uid)
     end

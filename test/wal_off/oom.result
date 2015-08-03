@@ -171,7 +171,7 @@ function dup_key()
     space:insert{1}
     local i = 1
     while i < 2000 do
-        status, _ = pcall(insert, {1, string.rep('test', i)})
+        local status, _ = pcall(insert, {1, string.rep('test', i)})
         if status then
             error('Unexpected success when inserting a duplicate')
         end
