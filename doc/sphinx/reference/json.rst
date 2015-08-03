@@ -16,31 +16,31 @@ The json package provides JSON manipulation routines. It is based on the
     :return: the original value reformatted as a JSON string.
     :rtype: string
 
-    .. code-block:: lua
-
-        tarantool> json=require('json')
-        ---
-        ...
-        tarantool> json.encode(123)
-        ---
-        - '123'
-        ...
-        tarantool> json.encode({123})
-        ---
-        - '[123]'
-        ...
-        tarantool> json.encode({123, 234, 345})
-        ---
-        - '[123,234,345]'
-        ...
-        tarantool> json.encode({abc = 234, cde = 345})
-        ---
-        - '{"cde":345,"abc":234}'
-        ...
-        tarantool> json.encode({hello = {'world'}})
-        ---
-        - '{"hello":["world"]}'
-        ...
+    | EXAMPLE
+    |
+    | :codenormal:`tarantool>` :codebold:`json=require('json')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.encode(123)`
+    | :codenormal:`---`
+    | :codenormal:`- '123'`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.encode({123})`
+    | :codenormal:`---`
+    | :codenormal:`- '[123]'`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.encode({123, 234, 345})`
+    | :codenormal:`---`
+    | :codenormal:`- '[123,234,345]'`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.encode({abc = 234, cde = 345})`
+    | :codenormal:`---`
+    | :codenormal:`- '{"cde":345,"abc":234}'`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.encode({hello = {'world'}})`
+    | :codenormal:`---`
+    | :codenormal:`- '{"hello":["world"]}'`
+    | :codenormal:`...`
 
 .. function:: decode(string)
 
@@ -50,23 +50,23 @@ The json package provides JSON manipulation routines. It is based on the
     :return: the original contents formatted as a Lua table.
     :rtype: table
 
-    .. code-block:: lua
-
-        tarantool> json=require('json')
-        ---
-        ...
-        tarantool> json.decode('123')
-        ---
-        - 123
-        ...
-        tarantool> json.decode('[123, "hello"]')[2]
-        ---
-        - hello
-        ...
-        tarantool> json.decode('{"hello": "world"}').hello
-        ---
-        - world
-        ...
+    | EXAMPLE
+    |
+    | :codenormal:`tarantool>` :codebold:`json=require('json')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.decode('123')`
+    | :codenormal:`---`
+    | :codenormal:`- 123`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.decode('[123, "hello"]')[2]`
+    | :codenormal:`---`
+    | :codenormal:`- hello`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`json.decode('{"hello": "world"}').hello`
+    | :codenormal:`---`
+    | :codenormal:`- world`
+    | :codenormal:`...`
 
 .. _json-null:
 
@@ -74,26 +74,26 @@ The json package provides JSON manipulation routines. It is based on the
 
     A value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
 
-    .. code-block:: lua
-
-        tarantool> -- When nil is assigned to a Lua-table field, the field is null
-        tarantool> {nil, 'a', 'b'}
-        - - null
-        - a
-        - b
-        ...
-        tarantool>  -- When json.NULL is assigned to a Lua-table field, the field is json.NULL
-        tarantool> {json.NULL, 'a', 'b'}
-        ---
-        - - null
-        - a
-        - b
-        ...
-        tarantool> -- When json.NULL is assigned to a JSON field, the field is null
-        tarantool> json.encode({field2 = json.NULL, field1 = 'a',  field3 = 'c'})
-        ---
-        - '{"field2":null,"field1":"a","field3":"c"}'
-        ...
+    | EXAMPLE
+    |
+    | :codenormal:`tarantool>` :codebold:`-- When nil is assigned to a Lua-table field, the field is null`
+    | :codenormal:`tarantool>` :codebold:`{nil, 'a', 'b'}`
+    | :codenormal:`- - null`
+    | :codenormal:`- a`
+    | :codenormal:`- b`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`-- When json.NULL is assigned to a Lua-table field, the field is json.NULL`
+    | :codenormal:`tarantool>` :codebold:`{json.NULL, 'a', 'b'}`
+    | :codenormal:`---`
+    | :codenormal:`- - null`
+    | :codenormal:`- a`
+    | :codenormal:`- b`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`-- When json.NULL is assigned to a JSON field, the field is null`
+    | :codenormal:`tarantool>` :codebold:`json.encode({field2 = json.NULL, field1 = 'a',  field3 = 'c'})`
+    | :codenormal:`---`
+    | :codenormal:`- '{"field2":null,"field1":"a","field3":"c"}'`
+    | :codenormal:`...`
 
 .. _Lua-CJSON package by Mark Pulford: http://www.kyne.com.au/~mark/software/lua-cjson.php
 .. _the official documentation: http://www.kyne.com.au/~mark/software/lua-cjson-manual.html

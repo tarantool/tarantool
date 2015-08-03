@@ -8,7 +8,7 @@ function crossjoin(space0, space1, limit)
       if limit <= 0 then
         return result
       end
-      newtuple = v0:totable()
+      local newtuple = v0:totable()
       for _, v in v1:pairs() do table.insert(newtuple, v) end
       table.insert(result, newtuple)
       limit = limit - 1

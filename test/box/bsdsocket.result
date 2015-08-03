@@ -887,7 +887,7 @@ s:close()
 ---
 - true
 ...
-socket.tcp_connect('127.0.0.1', porrt), errno() == errno.ECONNREFUSED
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 ---
 - null
 - true

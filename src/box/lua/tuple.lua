@@ -166,7 +166,7 @@ local function tuple_update(tuple, expr)
     end
     local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
     local tuple = builtin.boxffi_tuple_update(tuple, pexpr, pexpr_end)
-    if tuple == NULL then
+    if tuple == nil then
         return box.error()
     end
     return tuple_bless(tuple)

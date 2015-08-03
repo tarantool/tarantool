@@ -208,7 +208,7 @@ local function find_default_file()
     --
     -- try to find local dir or user config
     --
-    user_level = check_user_level()
+    local user_level = check_user_level()
     if user_level ~= nil then
         return user_level
     end
@@ -333,7 +333,7 @@ end
 
 function mk_default_dirs(cfg)
     -- create pid_dir
-    pid_dir = fio.dirname(cfg.pid_file)
+    local pid_dir = fio.dirname(cfg.pid_file)
     if fio.stat(pid_dir) == nil then
         mkdir(pid_dir)
     end
@@ -350,7 +350,7 @@ function mk_default_dirs(cfg)
         mkdir(cfg.sophia_dir)
     end
     -- create log_dir
-    log_dir = fio.dirname(cfg.logger)
+    local log_dir = fio.dirname(cfg.logger)
     if log_dir:find('|') == nil and fio.stat(log_dir) == nil then
         mkdir(log_dir)
     end

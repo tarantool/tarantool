@@ -115,11 +115,8 @@ the function invocations will look like ``sock:function_name(...)``.
     :return: A table containing these fields: "host", "family", "type", "protocol", "port".
     :rtype:  table
 
-    .. code-block:: lua
-
-        tarantool> socket.getaddrinfo('tarantool.org', 'http')
-
-    will return variable information such as
+    | :codenormal:`tarantool>` :codebold:`socket.getaddrinfo('tarantool.org', 'http')`
+    | will return variable information such as
 
     .. code-block:: yaml
 
@@ -430,35 +427,32 @@ server and tarantool.org, then an HTTP "head" message is sent, and a response
 is received: "``HTTP/1.1 200 OK``". This is not a useful way to communicate
 with this particular site, but shows that the system works.
 
-
-.. code-block:: lua
-
-    tarantool> socket = require('socket')
-    ---
-    ...
-    tarantool> sock = socket.tcp_connect('tarantool.org', 80)
-    ---
-    ...
-    tarantool> type(sock)
-    ---
-    - table
-    ...
-    tarantool> sock:error()
-    ---
-    - null
-    ...
-    tarantool> sock:send("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
-    ---
-    - true
-    ...
-    tarantool> sock:read(17)
-    ---
-    - "HTTP/1.1 200 OK\r\n"
-    ...
-    tarantool> sock:close()
-    ---
-    - true
-    ...
+    | :codenormal:`tarantool>` :codebold:`socket = require('socket')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock = socket.tcp_connect('tarantool.org', 80)`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`type(sock)`
+    | :codenormal:`---`
+    | :codenormal:`- table`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock:error()`
+    | :codenormal:`---`
+    | :codenormal:`- null`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock:send("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock:read(17)`
+    | :codenormal:`---`
+    | :codenormal:`- "HTTP/1.1 200 OK\r\n"`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock:close()`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Use of a UDP socket on localhost
@@ -470,40 +464,38 @@ to ``sock_1``. Using ``sock_1``, receive a message. Display the received
 message. Close both connections. |br| This is not a useful way for a
 computer to communicate with itself, but shows that the system works.
 
-.. code-block:: lua
-
-    tarantool> socket = require('socket')
-    ---
-    ...
-    tarantool>  sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')
-    ---
-    ...
-    tarantool>  sock_1:bind('127.0.0.1')
-    ---
-    - true
-    ...
-    tarantool>  sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')
-    ---
-    ...
-    tarantool>  sock_2:sendto('127.0.0.1', sock_1:name().port,'X')
-    ---
-    - true
-    ...
-    tarantool>  message = sock_1:recvfrom()
-    ---
-    ...
-    tarantool>  message
-    ---
-    - X
-    ...
-    tarantool>  sock_1:close()
-    ---
-    - true
-    ...
-    tarantool>  sock_2:close()
-    ---
-    - true
-    ...
+    | :codenormal:`tarantool>` :codebold:`socket = require('socket')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_1:bind('127.0.0.1')`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_2:sendto('127.0.0.1', sock_1:name().port,'X')`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`message = sock_1:recvfrom()`
+    | :codenormal:`---`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`message`
+    | :codenormal:`---`
+    | :codenormal:`- X`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_1:close()`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`sock_2:close()`
+    | :codenormal:`---`
+    | :codenormal:`- true`
+    | :codenormal:`...`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Use tcp_server to accept file contents sent with socat

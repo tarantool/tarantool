@@ -1984,6 +1984,8 @@ bps_tree_debug_memmove(void *dst_arg, void *src_arg, size_t num,
 	char *src = (char *)src_arg;
 	struct bps_block *dst_block = (bps_block *)dst_block_arg;
 	struct bps_block *src_block = (bps_block *)src_block_arg;
+	(void) dst_block;
+	(void) src_block;
 
 	assert(dst_block->type == src_block->type);
 	assert(dst_block->type == BPS_TREE_BT_LEAF ||
@@ -1991,6 +1993,8 @@ bps_tree_debug_memmove(void *dst_arg, void *src_arg, size_t num,
 	if (dst_block->type == BPS_TREE_BT_LEAF) {
 		struct bps_leaf *dst_leaf = (struct bps_leaf *)dst_block_arg;
 		struct bps_leaf *src_leaf = (struct bps_leaf *)src_block_arg;
+		(void) dst_leaf;
+		(void) src_leaf;
 		if (num) {
 			assert(dst >= ((char *)dst_leaf->elems));
 			assert(dst < ((char *)dst_leaf->elems) +

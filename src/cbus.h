@@ -457,6 +457,11 @@ struct cpipe_fiber_pool {
 	int cache_size;
 	/** The limit on the number of fibers working on tasks. */
 	int max_size;
+	/**
+	 * Fibers in leave the pool if they have nothing to do
+	 * for longer than this.
+	 */
+	float idle_timeout;
 	struct cpipe *pipe;
 };
 
@@ -467,6 +472,6 @@ struct cpipe_fiber_pool {
 void
 cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
 			const char *name, struct cpipe *pipe,
-			int max_pool_size);
+			int max_pool_size, float idle_timeout);
 
 #endif /* TARANTOOL_CBUS_H_INCLUDED */

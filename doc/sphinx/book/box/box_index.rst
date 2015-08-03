@@ -470,6 +470,33 @@ API is a direct binding to corresponding methods of index objects of type
         | :codenormal:`- 1`
         | :codenormal:`...`
 
+    .. function:: update(key, {{operator, field_no, value}, ...})
+
+        Update a tuple.
+
+        Same as :func:`box.space...update() <space_object.update>`,
+        but key is searched in this index instead of primary key.
+        This index ought to be unique.
+
+        :param lua-value key: key to be matched against the index key
+        :param table {operator, field_no, value}: update opearations (see: func:`box.space...update() <space_object.update>`)
+
+        :return: the updated tuple.
+        :rtype:  tuple
+
+    .. function:: delete(key)
+
+        Delete a tuple identified by a key.
+
+        Same as :func:`box.space...delete() <space_object.delete>`,
+        but key is searched in this index instead of primary key.
+        This index ought to be unique.
+
+        :param lua-value key: key to be matched against the index key
+
+        :return: the deleted tuple.
+        :rtype:  tuple
+
     .. function:: alter({options})
 
         Alter an index.

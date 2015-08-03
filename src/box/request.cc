@@ -80,8 +80,10 @@ execute_update(struct request *request, struct port *port)
 	struct txn *txn = txn_begin_stmt(request, space);
 
 	access_check_space(space, PRIV_W);
-	Index *pk = index_find(space, 0);
-	/* Try to find the tuple by primary key. */
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find(space, request->index_id);
+	if (!pk->key_def->is_unique)
+		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
@@ -165,8 +167,10 @@ execute_delete(struct request *request, struct port *port)
 
 	access_check_space(space, PRIV_W);
 
-	/* Try to find tuple by primary key */
-	Index *pk = index_find(space, 0);
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find(space, request->index_id);
+	if (!pk->key_def->is_unique)
+		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
