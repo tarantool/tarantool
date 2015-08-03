@@ -176,6 +176,15 @@ index_find(struct space *space, uint32_t index_id)
 	return index;
 }
 
+static inline Index *
+index_find_unique(struct space *space, uint32_t index_id)
+{
+	Index *index = index_find(space, index_id);
+	if (!index->key_def->is_unique)
+		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
+	return index;
+}
+
 extern "C" void
 space_run_triggers(struct space *space, bool yesno);
 
