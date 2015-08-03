@@ -386,10 +386,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 	/* Unload strict after boot in release mode */
 	luaL_dostring(L, "require('strict').off()");
-#endif
+#endif /* NDEBUG */
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
