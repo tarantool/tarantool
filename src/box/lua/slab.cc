@@ -63,6 +63,8 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
+	/** Assign next slab size to the next member of an array. */
+	lua_pushnumber(L, lua_objlen(L, -1) + 1);
 	lua_newtable(L);
 	/**
 	 * This is in fact only to force YaML flow "compact" for this
@@ -94,6 +96,7 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	luaL_pushuint64(L, stats->objcount);
 	lua_settable(L, -3);
 
+	lua_settable(L, -3);
 	return 0;
 }
 
@@ -103,7 +106,7 @@ static int
 lbox_slab_stats(struct lua_State *L)
 {
 	struct small_stats totals;
-	int top = lua_gettop(L);
+	lua_newtable(L);
 	/*
 	 * List all slabs used for tuples and slabs used for
 	 * indexes, with their stats.
@@ -113,7 +116,7 @@ lbox_slab_stats(struct lua_State *L)
 	mempool_stats(&memtx_index_extent_pool, &index_stats);
 	small_stats_lua_cb(&index_stats, L);
 
-	return lua_gettop(L) - top;
+	return 1;
 }
 
 
