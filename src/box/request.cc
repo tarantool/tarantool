@@ -81,9 +81,7 @@ execute_update(struct request *request, struct port *port)
 
 	access_check_space(space, PRIV_W);
 	/* Try to find the tuple by unique key. */
-	Index *pk = index_find(space, request->index_id);
-	if (!pk->key_def->is_unique)
-		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
+	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
@@ -95,7 +93,7 @@ execute_update(struct request *request, struct port *port)
 	}
 	TupleGuard old_guard(old_tuple);
 
-	/* Update the tuple. */
+	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
 					       region_alloc_cb,
 					       &fiber()->gc,
@@ -117,6 +115,49 @@ execute_update(struct request *request, struct port *port)
 }
 
 static void
+execute_upsert(struct request *request, struct port * /* port */)
+{
+	struct space *space = space_cache_find(request->space_id);
+	struct txn *txn = txn_begin_stmt(request, space);
+
+	access_check_space(space, PRIV_W);
+	Index *pk = index_find_unique(space, request->index_id);
+	/* Try to find the tuple by primary key. */
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	if (old_tuple == NULL) {
+		struct tuple *new_tuple = tuple_new(space->format,
+						    request->tuple,
+						    request->tuple_end);
+		TupleGuard guard(new_tuple);
+		space_validate_tuple(space, new_tuple);
+
+		txn_replace(txn, space, NULL, new_tuple, DUP_INSERT);
+	} else {
+		TupleGuard old_guard(old_tuple);
+
+		/* Update the tuple. */
+		struct tuple *new_tuple =
+			tuple_upsert(space->format, region_alloc_cb,
+				     &fiber()->gc, old_tuple,
+				     request->ops, request->ops_end,
+				     request->index_base);
+		TupleGuard guard(new_tuple);
+
+		space_validate_tuple(space, new_tuple);
+		if (!engine_auto_check_update(space->handler->engine->flags))
+			space_check_update(space, old_tuple, new_tuple);
+		txn_replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	}
+
+	txn_commit_stmt(txn);
+	/* Return nothing: upsert does not return data. */
+}
+
+static void
 execute_delete(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
@@ -125,9 +166,7 @@ execute_delete(struct request *request, struct port *port)
 	access_check_space(space, PRIV_W);
 
 	/* Try to find the tuple by unique key. */
-	Index *pk = index_find(space, request->index_id);
-	if (!pk->key_def->is_unique)
-		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
+	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
@@ -206,7 +245,7 @@ process_rw(struct request *request, struct port *port)
 	assert(iproto_type_is_dml(request->type));
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
-		execute_update, execute_delete
+		execute_update, execute_delete, 0, 0, 0, execute_upsert
 	};
 	request_execute_f fun = execute_map[request->type];
 	assert(fun != NULL);
@@ -273,6 +312,11 @@ error:
 		case IPROTO_EXPR:
 			request->key = value;
 			request->key_end = data;
+			break;
+		case IPROTO_OPS:
+			request->ops = value;
+			request->ops_end = data;
+			break;
 		default:
 			break;
 		}
@@ -291,9 +335,10 @@ int
 request_encode(struct request *request, struct iovec *iov)
 {
 	int iovcnt = 1;
-	const int HEADER_LEN_MAX = 32;
+	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;
-	uint32_t len = HEADER_LEN_MAX + key_len;
+	uint32_t ops_len = request->ops_end - request->ops;
+	uint32_t len = MAP_LEN_MAX + key_len;
 	char *begin = (char *) region_alloc(&fiber()->gc, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -307,21 +352,27 @@ request_encode(struct request *request, struct iovec *iov)
 		pos = mp_encode_uint(pos, request->index_id);
 		map_size++;
 	}
+	if (request->index_base) { /* UPDATE/UPSERT */
+		pos = mp_encode_uint(pos, IPROTO_INDEX_BASE);
+		pos = mp_encode_uint(pos, request->index_base);
+		map_size++;
+	}
 	if (request->key) {
 		pos = mp_encode_uint(pos, IPROTO_KEY);
 		memcpy(pos, request->key, key_len);
 		pos += key_len;
 		map_size++;
 	}
-	if (request->index_base) { /* only for UPDATE */
-		pos = mp_encode_uint(pos, IPROTO_INDEX_BASE);
-		pos = mp_encode_uint(pos, request->index_base);
+	if (request->ops) {
+		pos = mp_encode_uint(pos, IPROTO_OPS);
+		memcpy(pos, request->ops, ops_len);
+		pos += ops_len;
 		map_size++;
 	}
 	if (request->tuple) {
 		pos = mp_encode_uint(pos, IPROTO_TUPLE);
-		iov[1].iov_base = (void *) request->tuple;
-		iov[1].iov_len = (request->tuple_end - request->tuple);
+		iov[iovcnt].iov_base = (void *) request->tuple;
+		iov[iovcnt].iov_len = (request->tuple_end - request->tuple);
 		iovcnt++;
 		map_size++;
 	}

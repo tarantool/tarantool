@@ -399,18 +399,9 @@ tuple_field_cstr(struct tuple *tuple, uint32_t i)
 }
 
 struct tuple *
-tuple_update(struct tuple_format *format,
-	     tuple_update_alloc_func f, void *alloc_ctx,
-	     const struct tuple *old_tuple, const char *expr,
-	     const char *expr_end, int field_base)
+tuple_bless(struct tuple_format *format,
+	    const char *new_data, size_t new_size)
 {
-	uint32_t new_size = 0;
-	const char *new_data =
-		tuple_update_execute(f, alloc_ctx,
-				     expr, expr_end, old_tuple->data,
-				     old_tuple->data + old_tuple->bsize,
-				     &new_size, field_base);
-
 	/* Allocate a new tuple. */
 	assert(mp_typeof(*new_data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_new(format, new_data,
@@ -423,6 +414,39 @@ tuple_update(struct tuple_format *format,
 		throw;
 	}
 	return new_tuple;
+}
+
+struct tuple *
+tuple_update(struct tuple_format *format,
+	     tuple_update_alloc_func f, void *alloc_ctx,
+	     const struct tuple *old_tuple, const char *expr,
+	     const char *expr_end, int field_base)
+{
+	uint32_t new_size = 0;
+	const char *new_data =
+		tuple_update_execute(f, alloc_ctx,
+				     expr, expr_end, old_tuple->data,
+				     old_tuple->data + old_tuple->bsize,
+				     &new_size, field_base);
+
+	return tuple_bless(format, new_data, new_size);
+}
+
+struct tuple *
+tuple_upsert(struct tuple_format *format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple,
+	     const char *expr, const char *expr_end, int field_base)
+{
+	uint32_t new_size = 0;
+
+	const char *new_data =
+		tuple_upsert_execute(region_alloc, alloc_ctx, expr, expr_end,
+				     old_tuple->data,
+				     old_tuple->data + old_tuple->bsize,
+				     &new_size, field_base);
+
+	return tuple_bless(format, new_data, new_size);
 }
 
 struct tuple *

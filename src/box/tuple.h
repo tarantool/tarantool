@@ -462,6 +462,12 @@ tuple_update(struct tuple_format *new_format,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end, int field_base);
 
+struct tuple *
+tuple_upsert(struct tuple_format *new_format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple,
+	     const char *expr, const char *expr_end, int field_base);
+
 /**
  * @brief Compare two tuple fields using using field type definition
  * @param field_a field

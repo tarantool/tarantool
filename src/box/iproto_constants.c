@@ -83,6 +83,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
+	/* 0x28 */	MP_ARRAY, /* IPROTO_OPS */
 	/* }}} */
 };
 
@@ -96,11 +97,12 @@ const char *iproto_type_strs[] =
 	"DELETE",
 	"CALL",
 	"AUTH",
-	"EVAL"
+	"EVAL",
+	"UPSERT",
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_EVAL + 1] = {
+const uint64_t iproto_body_key_map[IPROTO_UPSERT + 1] = {
 	0,                                                     /* unused */
 	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
@@ -108,8 +110,9 @@ const uint64_t iproto_body_key_map[IPROTO_EVAL + 1] = {
 	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
 	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
 	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
-	bit(USER_NAME) | bit(TUPLE),                           /* AUTH */
-	bit(EXPR)      | bit(TUPLE),                           /* EVAL */
+	bit(USER_NAME)| bit(TUPLE),                            /* AUTH */
+	bit(EXPR)     | bit(TUPLE),                            /* EVAL */
+	bit(SPACE_ID) | bit(KEY) | bit(OPS) | bit(TUPLE),      /* UPSERT */
 };
 #undef bit
 
@@ -154,5 +157,6 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"cluster UUID",     /* 0x25 */
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
+	"operations",       /* 0x28 */
 };
 

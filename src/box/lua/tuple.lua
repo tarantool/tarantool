@@ -42,7 +42,12 @@ void
 tuple_to_buf(struct tuple *tuple, char *buf);
 
 struct tuple *
-boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);
+boxffi_tuple_update(struct tuple *tuple, const char *expr,
+                    const char *expr_end);
+
+struct tuple *
+boxffi_tuple_upsert(struct tuple *tuple, const char *expr,
+                    const char *expr_end);
 ]])
 
 local builtin = ffi.C
@@ -167,6 +172,18 @@ local function tuple_update(tuple, expr)
     return tuple_bless(tuple)
 end
 
+local function tuple_upsert(tuple, expr)
+    if type(expr) ~= 'table' then
+        error("Usage: tuple:upsert({ { op, field, arg}+ })")
+    end
+    local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
+    local tuple = builtin.boxffi_tuple_upsert(tuple, pexpr, pexpr_end)
+    if tuple == nil then
+        return box.error()
+    end
+    return tuple_bless(tuple)
+end
+
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
     local data = buf:alloc(tuple._bsize)
@@ -189,6 +206,7 @@ local methods = {
     ["unpack"]      = tuple_unpack;
     ["totable"]     = tuple_totable;
     ["update"]      = tuple_update;
+    ["upsert"]      = tuple_upsert;
     ["bsize"]       = function(tuple)
         return tonumber(tuple._bsize)
     end;

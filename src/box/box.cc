@@ -59,6 +59,7 @@ box_process_func box_process = process_ro;
 struct recovery_state *recovery;
 
 bool snapshot_in_progress = false;
+static bool box_init_done = false;
 
 static void
 process_ro(struct request *request, struct port *port)
@@ -372,17 +373,23 @@ box_set_cluster_uuid()
 void
 box_free(void)
 {
-	if (recovery == NULL)
-		return;
-	session_free();
-	user_cache_free();
-	schema_free();
-	tuple_free();
-	port_free();
-	recovery_exit(recovery);
-	recovery = NULL;
-	engine_shutdown();
-	stat_free();
+	if (recovery) {
+		recovery_exit(recovery);
+		recovery = NULL;
+	}
+	/*
+	 * See gh-584 "box_free() is called even if box is not
+	 * initialized
+	 */
+	if (box_init_done) {
+		session_free();
+		user_cache_free();
+		schema_free();
+		tuple_free();
+		port_free();
+		engine_shutdown();
+		stat_free();
+	}
 }
 
 static void
@@ -486,6 +493,7 @@ box_init(void)
 	say_info("ready to accept requests");
 
 	fiber_gc();
+	box_init_done = true;
 }
 
 void

@@ -782,6 +782,10 @@ function box.schema.space.bless(space)
     index_mt.update = function(index, key, ops)
         return internal.update(index.space_id, index.id, keify(key), ops);
     end
+    index_mt.upsert = function(index, key, ops, def_tuple)
+        return internal.upsert(index.space_id, index.id, keify(key), ops,
+            def_tuple);
+    end
     index_mt.delete = function(index, key)
         return internal.delete(index.space_id, index.id, keify(key));
     end
@@ -840,6 +844,10 @@ function box.schema.space.bless(space)
     space_mt.update = function(space, key, ops)
         check_index(space, 0)
         return space.index[0]:update(key, ops)
+    end
+    space_mt.upsert = function(space, key, ops, def_tuple)
+        check_index(space, 0)
+        return space.index[0]:upsert(key, ops, def_tuple)
     end
     space_mt.delete = function(space, key)
         check_index(space, 0)
