@@ -36,12 +36,19 @@ extern "C" {
 } /* extern "C" */
 
 #include "box/tuple.h"
+#include "box/memtx_engine.h"
 #include "small/small.h"
 #include "small/quota.h"
 #include "memory.h"
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
 extern "C" {
+
+static int
+small_stats_noop_cb(const struct mempool_stats * /* stats */, void * /* cb_ctx */)
+{
+	return 0;
+}
 
 static int
 small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
@@ -56,8 +63,6 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
-	/** Assign next slab size to the next member of an array. */
-	lua_pushnumber(L, lua_objlen(L, -1) + 1);
 	lua_newtable(L);
 	/**
 	 * This is in fact only to force YaML flow "compact" for this
@@ -89,46 +94,101 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	luaL_pushuint64(L, stats->objcount);
 	lua_settable(L, -3);
 
-	lua_settable(L, -3);
 	return 0;
 }
 
 } /* extern "C" */
 
 static int
+lbox_slab_stats(struct lua_State *L)
+{
+	struct small_stats totals;
+	int top = lua_gettop(L);
+	/*
+	 * List all slabs used for tuples and slabs used for
+	 * indexes, with their stats.
+	 */
+	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx_index_extent_pool, &index_stats);
+	small_stats_lua_cb(&index_stats, L);
+
+	return lua_gettop(L) - top;
+}
+
+
+static int
 lbox_slab_info(struct lua_State *L)
 {
 	struct small_stats totals;
 
+	/*
+	 * List all slabs used for tuples and slabs used for
+	 * indexes, with their stats.
+	 */
 	lua_newtable(L);
-	lua_pushstring(L, "slabs");
-	lua_newtable(L);
-	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
-	lua_settable(L, -3);
+	small_stats(&memtx_alloc, &totals, small_stats_noop_cb, L);
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx_index_extent_pool, &index_stats);
 
-	lua_pushstring(L, "arena_used");
-	luaL_pushuint64(L, totals.used);
-	lua_settable(L, -3);
+	struct slab_arena *tuple_arena = memtx_alloc.cache->arena;
+	struct quota *memtx_quota = tuple_arena->quota;
+	double ratio;
+	char ratio_buf[32];
 
-	lua_pushstring(L, "arena_size");
-	luaL_pushuint64(L, totals.total);
-	lua_settable(L, -3);
+	ratio = 100 * ((double) totals.used
+		/ ((double) totals.total + 0.0001));
+	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
-	char value[32];
-	double items_used_ratio = 100
-		* ((double)totals.used)
-		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
-	snprintf(value, sizeof(value), "%0.1lf%%", items_used_ratio);
+	/*
+	 * Fragmentation factor for tuples. Don't account indexes,
+	 * even if they are fragmented, there is nothing people
+	 * can do about it.
+	 */
 	lua_pushstring(L, "items_used_ratio");
-	lua_pushstring(L, value);
+	lua_pushstring(L, ratio_buf);
 	lua_settable(L, -3);
 
-	double arena_used_ratio = 100
-		* ((double)memtx_alloc.cache->arena->used)
-		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
-	snprintf(value, sizeof(value), "%0.1lf%%", arena_used_ratio);
+	/** How much address space has been already touched */
+	lua_pushstring(L, "arena_size");
+	luaL_pushuint64(L, totals.total + index_stats.totals.total);
+	lua_settable(L, -3);
+	/**
+	 * How much of this formatted address space is used for
+	 * actual data.
+	 */
+	lua_pushstring(L, "arena_used");
+	luaL_pushuint64(L, totals.used + index_stats.totals.used);
+	lua_settable(L, -3);
+
+	/*
+	 * This is pretty much the same as
+	 * box.cfg.slab_alloc_arena, but in bytes
+	 */
+	lua_pushstring(L, "quota_size");
+	luaL_pushuint64(L, quota_total(memtx_quota));
+	lua_settable(L, -3);
+
+	/*
+	 * How much quota has been booked - reflects the total
+	 * size of slabs in various slab caches.
+	 */
+	lua_pushstring(L, "quota_used");
+	luaL_pushuint64(L, quota_used(memtx_quota));
+	lua_settable(L, -3);
+
+	/**
+	 * This should be the same as arena_size/arena_used, however,
+	 * don't trust totals in the most important monitoring
+	 * factor, it's the quota that give you OOM error in the
+	 * end of the day.
+	 */
+	ratio = 100 * ((double) quota_used(memtx_quota) /
+		 ((double) quota_total(memtx_quota) + 0.0001));
+	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
+
 	lua_pushstring(L, "arena_used_ratio");
-	lua_pushstring(L, value);
+	lua_pushstring(L, ratio_buf);
 	lua_settable(L, -3);
 
 	return 1;
@@ -144,7 +204,7 @@ lbox_runtime_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "maxalloc");
-	luaL_pushuint64(L, quota_get(runtime.quota));
+	luaL_pushuint64(L, quota_total(runtime.quota));
 	lua_settable(L, -3);
 
 	return 1;
@@ -167,6 +227,10 @@ box_lua_slab_init(struct lua_State *L)
 
 	lua_pushstring(L, "info");
 	lua_pushcfunction(L, lbox_slab_info);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "stats");
+	lua_pushcfunction(L, lbox_slab_stats);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "check");

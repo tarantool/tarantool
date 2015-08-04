@@ -71,7 +71,7 @@ t;
 string.match(tostring(box.slab.info()), '^table:') ~= nil;
 box.slab.info().arena_used >= 0;
 box.slab.info().arena_size > 0;
-string.match(tostring(box.slab.info().slabs), '^table:') ~= nil;
+string.match(tostring(box.slab.stats()), '^table:') ~= nil;
 t = {};
 for k, v in pairs(box.slab.info()) do
     table.insert(t, k)

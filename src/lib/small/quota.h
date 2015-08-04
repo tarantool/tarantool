@@ -77,7 +77,7 @@ quota_init(struct quota *quota, size_t total)
  * Get current quota limit
  */
 static inline size_t
-quota_get(const struct quota *quota)
+quota_total(const struct quota *quota)
 {
 	return (quota->value >> 32) * QUOTA_UNIT_SIZE;
 }

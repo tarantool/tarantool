@@ -118,24 +118,25 @@ end;
 ...
 function test_box_slab_info()
     local tmp = box.slab.info()
+    local tmp_slabs = box.slab.stats()
     local cdata = {'arena_size', 'arena_used'}
     local failed = {}
-    if type(tmp.slabs) == 'table' then
-        for name, tbl in ipairs(tmp.slabs) do
+    if type(tmp_slabs) == 'table' then
+        for name, tbl in ipairs(tmp_slabs) do
             local bl, fld = test_slab(tbl)
             if bl == true then
                 tmp[name] = nil
             else
                 for k, v in ipairs(fld) do
-                    table.append(failed, v)
+                    table.insert(failed, v)
                 end
             end
         end
     else
-        table.append(failed, 'box.slab.info().slabs is not ok')
+        table.insert(failed, 'box.slab.info().slabs is not ok')
     end
-    if #tmp.slabs == 0 then
-        tmp.slabs = nil
+    if #tmp_slabs == 0 then
+        tmp_slabs = nil
     end
     for k, v in ipairs(cdata) do
         if check_type(tmp[v], 'number') == false then
@@ -164,7 +165,7 @@ function test_fiber(tbl)
     if type(tbl.backtrace) == 'table' and #tbl.backtrace > 0 then
         tbl.backtrace = nil
     else
-        table.append(failed, 'backtrace')
+        table.insert(failed, 'backtrace')
     end
     if #tbl > 0 or #failed > 0 then
         return false, failed
@@ -183,7 +184,7 @@ function test_box_fiber_info()
             tmp[name] = nil
         else
             for k, v in ipairs(fld) do
-                table.append(failed, v)
+                table.insert(failed, v)
             end
         end
     end

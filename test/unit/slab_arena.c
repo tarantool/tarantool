@@ -11,7 +11,7 @@ slab_arena_print(struct slab_arena *arena)
 {
 	printf("arena->prealloc = %zu\narena->maxalloc = %zu\n"
 	       "arena->used = %zu\narena->slab_size = %u\n",
-	       arena->prealloc, quota_get(arena->quota),
+	       arena->prealloc, quota_total(arena->quota),
 	       arena->used, arena->slab_size);
 }
 
