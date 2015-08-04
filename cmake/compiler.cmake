@@ -17,6 +17,18 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
 endif()
 
 #
+# Hard coding the compiler version is ugly from cmake POV, but 
+# at least gives user a friendly error message. The most critical
+# demand for C++ compiler is support of C++11 lambdas, added
+# only in version 4.5 https://gcc.gnu.org/projects/cxx0x.html
+#
+if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.5)
+        message(FATAL_ERROR "
+        Your GCC version is ${CMAKE_CXX_COMPILER_VERSION}, please update to version 4.6 or later 
+                ")
+endif()
+
+#
 # Check supported standards
 #
 if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
