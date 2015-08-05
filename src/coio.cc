@@ -94,10 +94,8 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 	bool is_timedout = coio_fiber_yield_timeout(coio, timeout);
 	ev_io_stop(loop, coio);
 	fiber_testcancel();
-	if (is_timedout) {
-		errno = ETIMEDOUT;
-		return -1;
-	}
+	if (is_timedout)
+		tnt_raise(TimedOut);
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
 	sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
@@ -201,12 +199,8 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0) {
-		    if (errno == ETIMEDOUT)
-			    return -1; /* timeout */
+	    if (rc != 0)
 		    tnt_raise(SocketError, -1, "getaddrinfo");
-	    }
-
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (!uri->host_hint) freeaddrinfo(ai);
@@ -273,10 +267,8 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
 		 */
 		bool is_timedout = coio_fiber_yield_timeout(coio, delay);
 		fiber_testcancel();
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			tnt_raise(SocketError, coio->fd, "accept");
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 }
@@ -288,7 +280,7 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
  * and sets errno to 0.
  * Can read up to bufsiz bytes.
  *
- * @retval the number of bytes read, sets the errno to ETIMEDOUT or 0.
+ * @retval the number of bytes read.
  */
 ssize_t
 coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
@@ -333,10 +325,8 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 		bool is_timedout = coio_fiber_yield_timeout(coio,
 							    delay);
 		fiber_testcancel();
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			return sz - to_read;
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 }
@@ -428,10 +418,8 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 							    delay);
 		fiber_testcancel();
 
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			return sz - towrite;
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 }
@@ -500,10 +488,8 @@ coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
 		bool is_timedout = coio_fiber_yield_timeout(coio, delay);
 		fiber_testcancel();
 
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			return total;
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 	return total;
@@ -513,7 +499,6 @@ coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
  * Send up to sz bytes to a UDP socket.
  * Return the number of bytes sent.
  *
- * @retval  0, errno = ETIMEDOUT timeout
  * @retval  n  the number of bytes written
  */
 ssize_t
@@ -547,10 +532,8 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 		bool is_timedout = coio_fiber_yield_timeout(coio,
 							    delay);
 		fiber_testcancel();
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			return 0;
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 }
@@ -559,7 +542,6 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
  * Read a datagram up to sz bytes from a socket, with a timeout.
  *
  * @retval   0, errno = 0   eof
- * @retval   0, errno = ETIMEDOUT timeout
  * @retvl    n              number of bytes read
  */
 ssize_t
@@ -594,10 +576,8 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 		bool is_timedout = coio_fiber_yield_timeout(coio,
 							    delay);
 		fiber_testcancel();
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			return 0;
-		}
+		if (is_timedout)
+			tnt_raise(TimedOut);
 		coio_timeout_update(start, &delay);
 	}
 }

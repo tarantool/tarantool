@@ -163,3 +163,12 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 		 "Failed to allocate %u bytes in %s for %s",
 		 (unsigned) amount, allocator, object);
 }
+
+const struct type type_TimedOut =
+	make_type("TimedOut", &type_SystemError);
+
+TimedOut::TimedOut(const char *file, unsigned line)
+	: SystemError(&type_OutOfMemory, file, line)
+{
+	m_errno = ETIMEDOUT;
+}
