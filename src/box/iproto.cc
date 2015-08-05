@@ -564,12 +564,15 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 	ssize_t nwr = sio_writev(fd, iov, iovcnt);
 	if (nwr > 0) {
 		if (begin->used + nwr == end->used) {
-			/* Quickly recycle the buffer if it's idle. */
 			if (ibuf_used(&iobuf->in) == 0) {
+				/* Quickly recycle the buffer if it's idle. */
 				assert(end->used == obuf_size(&iobuf->out));
+				/* resets wpos and wpend to zero pos */
 				iobuf_reset(iobuf);
+			} else { /* Avoid assignment reordering. */
+				/* Advance write position. */
+				*begin = *end;
 			}
-			*begin = *end;          /* advance write position */
 			return 0;
 		}
 		begin->used += nwr;             /* advance write position */
