@@ -5,9 +5,11 @@ fiber = require('fiber')
 --
 -- Check that Tarantool creates ADMIN session for #! script
 --
+continue_snapshoting = true
+
 function noise()
     fiber.name('noise-'..fiber.id())
-    while true do
+    while continue_snapshoting do
         if box.space.test:len() < 300000 then
             local  value = string.rep('a', math.random(255)+1)
             box.space.test:auto_increment{fiber.time64(), value}
@@ -18,7 +20,7 @@ end
 
 function purge()
     fiber.name('purge-'..fiber.id())
-    while true do
+    while continue_snapshoting do
         local min = box.space.test.index.primary:min()
         if min ~= nil then
             box.space.test:delete{min[1]}
@@ -27,18 +29,13 @@ function purge()
     end
 end
 
-continue_snapshoting = true
-
 function snapshot(lsn)
     fiber.name('snapshot')
-    while true do
+    while continue_snapshoting do
         local new_lsn = box.info.server.lsn
         if new_lsn ~= lsn then
             lsn = new_lsn;
-            box.snapshot()
-        end
-        if not continue_snapshoting then
-            break
+            pcall(box.snapshot)
         end
         fiber.sleep(0.001)
     end

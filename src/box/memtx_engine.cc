@@ -52,12 +52,17 @@
 #include "errinj.h"
 #include "scoped_guard.h"
 
-/** For all memory used by all indexes. */
+/** For all memory used by all indexes.
+ * If you decide to use memtx_index_arena or
+ * memtx_index_slab_cache for anything other than
+ * memtx_index_extent_pool, make sure this is reflected in
+ * box.slab.info(), @sa lua/slab.cc
+ */
 extern struct quota memtx_quota;
 static bool memtx_index_arena_initialized = false;
 static struct slab_arena memtx_index_arena;
-static struct slab_cache memtx_index_arena_slab_cache;
-static struct mempool memtx_index_extent_pool;
+static struct slab_cache memtx_index_slab_cache;
+struct mempool memtx_index_extent_pool;
 /**
  * To ensure proper statement-level rollback in case
  * of out of memory conditions, we maintain a number
@@ -848,10 +853,10 @@ memtx_index_arena_init()
 		panic_syserror("failed to initialize index arena");
 	}
 	/* Creating slab cache */
-	slab_cache_create(&memtx_index_arena_slab_cache, &memtx_index_arena);
+	slab_cache_create(&memtx_index_slab_cache, &memtx_index_arena);
 	/* Creating mempool */
 	mempool_create(&memtx_index_extent_pool,
-		       &memtx_index_arena_slab_cache,
+		       &memtx_index_slab_cache,
 		       MEMTX_EXTENT_SIZE);
 	/* Empty reserved list */
 	memtx_index_num_reserved_extents = 0;

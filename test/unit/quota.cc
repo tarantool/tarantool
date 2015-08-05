@@ -83,7 +83,7 @@ main(int n, char **a)
 	long set_success_count = 0;
 	long use_success_count = 0;
 	for (size_t i = 0; i < THREAD_CNT; i++) {
-		if (datum[i].last_lim_set == quota_get(&quota))
+		if (datum[i].last_lim_set == quota_total(&quota))
 			one_set_successed = true;
 		total_alloc += datum[i].use_change;
 		use_success_count += datum[i].use_change_success;
