@@ -2,7 +2,6 @@
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local LIMIT_INFINITY = 2147483647
-local READAHEAD = 16380
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
@@ -212,7 +211,7 @@ socket_methods.sysread = function(self, arg1, arg2)
         return sysread(self, arg1, arg2)
     end
 
-    local size = arg1 or READAHEAD
+    local size = arg1 or buffer.READAHEAD
 
     local buf = buffer.IBUF_SHARED
     buf:reset()
@@ -638,7 +637,7 @@ local function read(self, limit, timeout, check, ...)
         local started = fiber.time()
 
         assert(rbuf.size < limit)
-        local to_read = math.min(limit - rbuf.size, READAHEAD)
+        local to_read = math.min(limit - rbuf.size, buffer.READAHEAD)
         local data = rbuf:reserve(to_read)
         assert(rbuf.unused >= to_read)
         local res = sysread(self, data, rbuf.unused)

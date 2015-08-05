@@ -420,11 +420,21 @@ lua_msgpack_decode(lua_State *L)
 }
 
 static int
+lua_ibuf_msgpack_decode(lua_State *L)
+{
+	const char **start = (const char **)lua_topointer(L, 1);
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+	luamp_decode(L, cfg, start);
+	return 2;
+}
+
+static int
 lua_msgpack_new(lua_State *L);
 
 const luaL_reg msgpacklib[] = {
 	{ "encode", lua_msgpack_encode },
 	{ "decode", lua_msgpack_decode },
+	{ "ibuf_decode", lua_ibuf_msgpack_decode },
 	{ "new",    lua_msgpack_new },
 	{ NULL, NULL}
 };

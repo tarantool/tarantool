@@ -1,6 +1,7 @@
 -- buffer.lua (internal file)
 
 local ffi = require('ffi')
+local READAHEAD = 16320
 
 ffi.cdef[[
 struct slab_cache;
@@ -36,7 +37,7 @@ ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size);
 local builtin = ffi.C
 local ibuf_t = ffi.typeof('struct ibuf')
 
-local function errorf(method, s, ...)
+local function errorf(s, ...)
     error(string.format(s, ...))
 end
 
@@ -106,7 +107,7 @@ local function ibuf_alloc(buf, size)
 end
 
 local function checksize(buf, size)
-    if ibuf.rpos + size > ibuf.wpos then
+    if buf.rpos + size > buf.wpos then
         errorf("Attempt to read out of range bytes: needed=%d size=%d",
             tonumber(size), ibuf_used(buf))
     end
@@ -179,7 +180,7 @@ ffi.metatype(ibuf_t, ibuf_mt);
 local function ibuf_new(arg, arg2)
     local buf = ffi.new(ibuf_t)
     local slabc = builtin.tarantool_lua_slab_cache()
-    builtin.ibuf_create(buf, slabc, 16320)
+    builtin.ibuf_create(buf, slabc, READAHEAD)
     if arg == nil then
         return buf
     elseif type(arg) == 'number' then
@@ -192,4 +193,5 @@ end
 return {
     ibuf = ibuf_new;
     IBUF_SHARED = ibuf_new();
+    READAHEAD = READAHEAD;
 }
