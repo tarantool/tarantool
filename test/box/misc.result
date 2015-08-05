@@ -190,7 +190,7 @@ box.slab.info().arena_size > 0;
 ---
 - true
 ...
-string.match(tostring(box.slab.info().slabs), '^table:') ~= nil;
+string.match(tostring(box.slab.stats()), '^table:') ~= nil;
 ---
 - true
 ...
@@ -204,11 +204,12 @@ end;
 ...
 t;
 ---
-- - arena_used_ratio
+- - quota_used
+  - arena_used_ratio
   - items_used_ratio
-  - arena_used
   - arena_size
-  - slabs
+  - quota_size
+  - arena_used
 ...
 box.runtime.info().used > 0;
 ---

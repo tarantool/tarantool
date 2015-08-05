@@ -37,6 +37,9 @@ enum memtx_recovery_state {
 	MEMTX_OK,
 };
 
+/** Memtx extents pool, available to statistics. */
+extern struct mempool memtx_index_extent_pool;
+
 struct MemtxEngine: public Engine {
 	MemtxEngine();
 	virtual Handler *open();
