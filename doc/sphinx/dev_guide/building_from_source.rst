@@ -38,12 +38,8 @@ explain what the steps are, then on the Internet you can look at some example sc
 2. Set up python modules for running the test suite or creating documentation.
    This step is optional. Python modules are not necessary for building Tarantool
    itself, unless one intends to use the ``-DENABLE_DOC`` option in step 5 or the
-   "Run the test suite" option in step 7. Say:
-
-   .. code-block:: bash
-
-     python --version
-
+   "Run the test suite" option in step 7. Say: |br|
+   :codenormal:`python --version` |br|
    You should see that the python version is greater than 2.6 --
    preferably 2.7 -- and less than 3.0
 
@@ -108,12 +104,9 @@ explain what the steps are, then on the Internet you can look at some example sc
      sudo pip install -U sphinx
 
 3. Use :code:`git` to download the latest source code from the
-   Tarantool 1.6 master branch on github.com.
-
-   .. code-block:: bash
-
-     cd ~
-     git clone https://github.com/tarantool/tarantool.git ~/tarantool
+   Tarantool 1.6 master branch on github.com. |br| |br|
+   :code:`cd ~` |br|
+   :code:`git clone https://github.com/tarantool/tarantool.git ~/tarantool`
 
 4. Use ``git`` again so that third-party contributions will be seen as well.
    This step is only necessary once, the first time you do a download. There
@@ -123,7 +116,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    .. code-block:: bash
 
      cd ~/tarantool
-     git submodule init --recursive
+     git submodule init
      git submodule update --recursive
      cd ../
 
@@ -132,7 +125,7 @@ explain what the steps are, then on the Internet you can look at some example sc
 
 5. Use CMake to initiate the build.
 
-   .. code-block: bash
+   .. code-block:: bash
 
      cd ~/tarantool
      make clean         # unnecessary, added for good luck
@@ -140,21 +133,18 @@ explain what the steps are, then on the Internet you can look at some example sc
      cmake .            # Start build with build type=Debug, no doc
 
    On some platforms it may be necessary to specify the C and C++ versions,
-   for example
-
-   .. code-block: bash
-
-     CC=gcc-4.8 CXX=g++-4.8 cmake .
-
+   for example |br|
+   :code:`CC=gcc-4.8 CXX=g++-4.8 cmake .` |br|
    The option for specifying build type is :samp:`-DCMAKE_BUILD_TYPE={type}` where
    :samp:`{type} = None | Debug | Release | RelWithDebInfo | MinSizeRel` and a
    reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebInfo``
    (``Debug`` is used only by project maintainers and ``Release`` is used only
    when the highest performance is required).
 
-   The option for asking to build documentation is ``-DENABLE_DOC=true|false`,
+   The option for asking to build documentation is :code:`-DENABLE_DOC=true|false`,
    which outputs HTML documentation (such as what you're reading now) to the
-   subdirectory doc/www/output/doc. Tarantool uses the Sphinx simplified markup system.
+   subdirectory doc/www/output/doc. Tarantool uses the `Sphinx <http://sphinx-doc.org/>`_
+   simplified markup system.
    Since most users do not need to rebuild the documentation,
    the reasonable option
    is ``-DENABLE_DOC=false`` or just don't use the ``-DENABLE_DOC`` clause at all.
@@ -183,7 +173,6 @@ explain what the steps are, then on the Internet you can look at some example sc
      # run tests using python
      PATH=~/tarantool/bin:$PATH ./test-run.py
 
-
    The output should contain reassuring reports, for example:
 
    .. code-block:: bash
@@ -209,24 +198,17 @@ explain what the steps are, then on the Internet you can look at some example sc
      rm ~/tarantool/bin/python
      rmdir ~/tarantool/bin
 
-
 8. Make an rpm. |br| This step is optional. It's only for people who want to
    redistribute Tarantool. Package maintainers who want to build with rpmbuild
    should consult the rpm-build instructions for the appropriate platform.
 
 This is the end of the list of steps to take for source downloads.
 
-For your added convenience, github.com has README files with example scripts:
-
-* `README.CentOS <https://github.com/tarantool/tarantool/blob/master/README.CentOS>`_
-  for CentOS 5.8,
-* `README.FreeBSD <https://github.com/tarantool/tarantool/blob/master/README.FreeBSD>`_
-  for FreeBSD 8.3,
-* `README.MacOSX <https://github.com/tarantool/tarantool/blob/master/README.MacOSX>`_
-  for Mac OS X `Lion`,
-* `README.md <https://github.com/tarantool/tarantool/blob/master/README.md>`_
-  for generic GNU/Linux.
-
+For your added convenience, github.com has README files with example scripts: |br|
+`README.CentOS <https://github.com/tarantool/tarantool/blob/master/README.CentOS>`_ for CentOS 5.8, |br|
+`README.FreeBSD <https://github.com/tarantool/tarantool/blob/master/README.FreeBSD>`_ for FreeBSD 10.1, |br|
+`README.MacOSX <https://github.com/tarantool/tarantool/blob/master/README.MacOSX>`_ for Mac OS X `Lion`, |br|
+`README.md <https://github.com/tarantool/tarantool/blob/master/README.md>`_ for generic GNU/Linux. |br|
 These example scripts assume that the intent is to download from the master
 branch, build the server (but not the documentation), and run tests after build.
 
