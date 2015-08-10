@@ -73,7 +73,7 @@ s:close()
 s:close()
 
 ---
-- error: 'builtin/socket.lua:87: attempt to use closed socket'
+- error: 'builtin/socket.lua:86: attempt to use closed socket'
 ...
 LISTEN = require('uri').parse(box.cfg.listen)
 ---
@@ -284,7 +284,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:393: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:392: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -1025,7 +1025,7 @@ ch:get(1)
 ...
 s:error()
 ---
-- error: 'builtin/socket.lua:87: attempt to use closed socket'
+- error: 'builtin/socket.lua:86: attempt to use closed socket'
 ...
 -- random port
 port = 33123

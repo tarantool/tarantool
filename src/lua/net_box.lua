@@ -9,6 +9,7 @@ local ffi = require 'ffi'
 local digest = require 'digest'
 local yaml = require 'yaml'
 local urilib = require 'uri'
+local buffer = require 'buffer'
 
 -- packet codes
 local OK                = 0
@@ -423,7 +424,6 @@ local remote_methods = {
         self.is_run = true
         self.state = 'init'
         self.wbuf = {}
-        self.rbuf = ''
         self.rpos = 1
         self.rlen = 0
 
@@ -575,7 +575,6 @@ local remote_methods = {
         self.space = {}
         self:_switch_state('error')
         self:_error_waiters(emsg)
-        self.rbuf = ''
         self.rpos = 1
         self.rlen = 0
         self.wbuf = {}
@@ -599,54 +598,47 @@ local remote_methods = {
     end,
 
     _check_console_response = function(self)
-        while true do
-            local docend = "\n...\n"
-            if self.rlen < #docend or
-                string.sub(self.rbuf, #self.rbuf + 1 - #docend) ~= docend then
-                break
-            end
-            local resp = string.sub(self.rbuf, self.rpos)
-            local len = #resp
-            self.rpos = self.rpos + len
-            self.rlen = self.rlen - len
+        local docend = "\n...\n"
+        local resp = ffi.string(self.rbuf.rpos, self.rbuf.size)
 
-            local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
-            local body = { [DATA] = resp }
-
-            if self.ch.sync[CONSOLE_FAKESYNC] ~= nil then
-                self.ch.sync[CONSOLE_FAKESYNC]:put({hdr = hdr, body = body })
-                self.ch.sync[CONSOLE_FAKESYNC] = nil
-            else
-                log.warn("Unexpected console response: %s", resp)
-            end
+        if #resp < #docend or
+                string.sub(resp, #resp + 1 - #docend) ~= docend then
+            return -1
         end
+
+        local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
+        local body = { [DATA] = resp }
+
+        if self.ch.sync[CONSOLE_FAKESYNC] ~= nil then
+            self.ch.sync[CONSOLE_FAKESYNC]:put({hdr = hdr, body = body })
+            self.ch.sync[CONSOLE_FAKESYNC] = nil
+        else
+            log.warn("Unexpected console response: %s", resp)
+        end
+        self.rbuf:read(#resp)
+        return 0
     end,
 
     _check_binary_response = function(self)
         while true do
-            if self.rlen < 5 then
-                break
+            if self.rbuf.size < 5 then
+                return 0
             end
 
-            local len, off = msgpack.decode(self.rbuf, self.rpos)
-            -- wait for correct package length
-            if off + len > #self.rbuf + 1 then
-                break
+            local rpos, len = msgpack.ibuf_decode(self.rbuf.rpos)
+            if rpos + len > self.rbuf.wpos then
+                return len - (self.rbuf.wpos - rpos)
             end
 
-            local hdr, body
-            hdr, off = msgpack.decode(self.rbuf, off)
-            if off <= #self.rbuf then
-                body, off = msgpack.decode(self.rbuf, off)
-                -- disable YAML flow output (useful for admin console)
-                setmetatable(body, mapping_mt)
-            else
-                body = {}
+            local rpos, hdr = msgpack.ibuf_decode(rpos)
+            local body = {}
+
+            if rpos < self.rbuf.wpos then
+                rpos, body= msgpack.ibuf_decode(rpos)
             end
+            setmetatable(body, mapping_mt)
 
-            self.rpos = off
-            self.rlen = #self.rbuf + 1 - self.rpos
-
+            self.rbuf.rpos = rpos
             local sync = hdr[SYNC]
 
             if self.ch.sync[sync] ~= nil then
@@ -654,6 +646,10 @@ local remote_methods = {
                 self.ch.sync[sync] = nil
             else
                 log.warn("Unexpected response %s", tostring(sync))
+            end
+
+           if self.rbuf.size == 0 then
+                return 0
             end
         end
     end,
@@ -888,19 +884,22 @@ local remote_methods = {
 
     _read_worker = function(self)
         fiber.name('net.box.read')
+        self.rbuf = buffer.ibuf(buffer.READAHEAD)
         while self:_wait_state(self._r_states) ~= 'closed' do
             if self.s:readable() then
-                local data = self.s:sysread()
-
-                if data ~= nil then
-                    if #data == 0 then
+                local len = self.s:sysread(self.rbuf.wpos, self.rbuf.unused)
+                if len ~= nil then
+                    if len == 0 then
                         self:_fatal('Remote host closed connection')
                     else
-                        self.rbuf = string.sub(self.rbuf, self.rpos) ..
-                                    data
-                        self.rpos = 1
-                        self.rlen = #self.rbuf
-                        self:_check_response()
+                        self.rbuf.wpos = self.rbuf.wpos + len
+
+                        local advance = self:_check_response()
+                        if advance < 0 then
+			    advance = buffer.READAHEAD
+                        end
+
+                        self.rbuf:reserve(advance)
                     end
                 elseif errno_is_transient[errno()] ~= true then
                     self:_fatal(errno.strerror(errno()))
