@@ -140,7 +140,7 @@ boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key)
 {
 	try {
 		Index *index = check_index(space_id, index_id);
-		if (!index->key_def->is_unique)
+		if (!index->key_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		primary_key_validate(index->key_def, key, part_count);

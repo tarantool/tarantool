@@ -62,7 +62,7 @@ schema_object_type(const char *name)
 
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, bool is_unique, uint32_t dimension,
+	    enum index_type type, struct key_opts *opts,
 	    uint32_t part_count)
 {
 	uint32_t parts_size = sizeof(struct key_part) * part_count;
@@ -87,8 +87,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
-	def->is_unique = is_unique;
-	def->dimension = dimension;
+	def->opts = *opts;
 	def->part_count = part_count;
 
 	memset(def->parts, 0, parts_size);
@@ -128,8 +127,8 @@ key_def_cmp(const struct key_def *key1, const struct key_def *key2)
 		return strcmp(key1->name, key2->name);
 	if (key1->type != key2->type)
 		return (int) key1->type < (int) key2->type ? -1 : 1;
-	if (key1->is_unique != key2->is_unique)
-		return (int) key1->is_unique < (int) key2->is_unique ? -1 : 1;
+	if (key_opts_cmp(&key1->opts, &key2->opts))
+		return key_opts_cmp(&key1->opts, &key2->opts);
 
 	return key_part_cmp(key1->parts, key1->part_count,
 			    key2->parts, key2->part_count);
@@ -159,7 +158,7 @@ key_def_check(struct key_def *key_def)
 			  space_name(space),
 			  "index id too big");
 	}
-	if (key_def->iid == 0 && key_def->is_unique == false) {
+	if (key_def->iid == 0 && key_def->opts.is_unique == false) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  key_def->name,
 			  space_name(space),

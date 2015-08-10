@@ -262,7 +262,7 @@ MemtxHash::random(uint32_t rnd) const
 struct tuple *
 MemtxHash::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->is_unique && part_count == key_def->part_count);
+	assert(key_def->opts.is_unique && part_count == key_def->part_count);
 	(void) part_count;
 
 	struct tuple *ret = NULL;

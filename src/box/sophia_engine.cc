@@ -263,7 +263,7 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case TREE:
-		if (! key_def->is_unique) {
+		if (! key_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),

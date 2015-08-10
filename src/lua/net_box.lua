@@ -853,15 +853,13 @@ local remote_methods = {
                 type    = string.upper(index[4]),
                 parts   = {},
             }
+            local OPTS = 5
+            local PARTS = 6
 
-            if type(index[5]) == 'number' then
-                if index[5] == 0 then
-                    idx.unique = false
-                else
-                    idx.unique = true
-                end
+            if type(index[OPTS]) == 'number' then
+                idx.unique = index[OPTS] == 1 and true or false
 
-                for k = 0, index[6] - 1 do
+                for k = 0, index[PARTS] - 1 do
                     local pktype = index[7 + k * 2 + 1]
                     local pkfield = index[7 + k * 2]
 
@@ -872,9 +870,9 @@ local remote_methods = {
                     idx.parts[k] = pk
                 end
             else
-                for k = 1, #index[5] do
-                    local pktype = index[5][k][2]
-                    local pkfield = index[5][k][1]
+                for k = 1, #index[PARTS] do
+                    local pktype = index[PARTS][k][2]
+                    local pkfield = index[PARTS][k][1]
 
                     local pk = {
                         type = string.upper(pktype),
@@ -882,9 +880,7 @@ local remote_methods = {
                     }
                     idx.parts[k - 1] = pk
                 end
-                if index[6] and index[6].is_unique then
-                    idx.unique = index[6].is_unique
-                end
+                idx.unique = index[OPTS].is_unique and true or false
             end
 
             if sl[idx.space] ~= nil then

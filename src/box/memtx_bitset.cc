@@ -181,7 +181,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 MemtxBitset::MemtxBitset(struct key_def *key_def)
 	: Index(key_def)
 {
-	assert(!this->key_def->is_unique);
+	assert(!this->key_def->opts.is_unique);
 
 #ifndef OLD_GOOD_BITSET
 	m_spare_id = SPARE_ID_END;
@@ -281,7 +281,7 @@ struct tuple *
 MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
 {
-	assert(!key_def->is_unique);
+	assert(!key_def->opts.is_unique);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 

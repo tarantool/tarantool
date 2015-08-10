@@ -167,8 +167,13 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_pushnumber(L, key_def->iid);
 		lua_newtable(L);		/* space.index[k] */
 
-		lua_pushboolean(L, key_def->is_unique);
-		lua_setfield(L, -2, "unique");
+		if (key_def->type == HASH || key_def->type == TREE) {
+			lua_pushboolean(L, key_def->opts.is_unique);
+			lua_setfield(L, -2, "unique");
+		} else if (key_def->type == RTREE) {
+			lua_pushnumber(L, key_def->opts.dimension);
+			lua_setfield(L, -2, "dimension");
+		}
 
 		lua_pushstring(L, index_type_strs[key_def->type]);
 		lua_setfield(L, -2, "type");

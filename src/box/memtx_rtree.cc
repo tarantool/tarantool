@@ -132,7 +132,7 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 {
 	assert(key_def->part_count == 1);
 	assert(key_def->parts[0].type = ARRAY);
-	assert(key_def->is_unique == false);
+	assert(key_def->opts.is_unique == false);
 
 	memtx_index_arena_init();
 	rtree_init(&tree, MEMTX_EXTENT_SIZE,

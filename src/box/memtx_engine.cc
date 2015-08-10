@@ -191,7 +191,7 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 	try {
 		/* Update the primary key */
 		Index *pk = index_find(space, 0);
-		assert(pk->key_def->is_unique);
+		assert(pk->key_def->opts.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
 		 * has to find and delete it, or raise an
@@ -419,7 +419,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
-		if (! key_def->is_unique) {
+		if (! key_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),
@@ -436,7 +436,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "RTREE index key can not be multipart");
 		}
-		if (key_def->is_unique) {
+		if (key_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),
@@ -450,7 +450,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "BITSET index key can not be multipart");
 		}
-		if (key_def->is_unique) {
+		if (key_def->opts.is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),

@@ -131,7 +131,7 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	struct space *source = space_cache_find(source_space_id);
 	class Index *pk = index_find(source, source_index_id);
-	if (!pk->key_def->is_unique)
+	if (!pk->key_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *tuple = pk->findByKey(key, part_count);
