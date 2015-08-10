@@ -103,6 +103,36 @@ struct key_part {
 	enum field_type type;
 };
 
+/** Index options */
+struct key_opts {
+	/**
+	 * Is this index unique or not - relevant to HASH/TREE
+	 * index
+	 */
+	bool is_unique;
+	/**
+	 * RTREE index dimension.
+	 */
+	uint32_t dimension;
+};
+
+static inline void
+key_opts_create(struct key_opts *opts)
+{
+	opts->is_unique = true;
+	opts->dimension = 0;
+}
+
+static inline int
+key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
+{
+	if (o1->is_unique != o2->is_unique)
+		return o1->is_unique < o2->is_unique ? -1 : 1;
+	if (o2->dimension != o1->dimension)
+		return o1->dimension < o2-> dimension ? -1 : 1;
+	return 0;
+}
+
 /* Descriptor of a multipart key. */
 struct key_def {
 	/* A link in key list. */
@@ -113,12 +143,11 @@ struct key_def {
 	uint32_t space_id;
 	/** Index name. */
 	char name[BOX_NAME_MAX + 1];
-	/** The size of the 'parts' array. */
-	uint32_t part_count;
 	/** Index type. */
 	enum index_type type;
-	/** Is this key unique. */
-	bool is_unique;
+	struct key_opts opts;
+	/** The size of the 'parts' array. */
+	uint32_t part_count;
 	/** Description of parts of a multipart index. */
 	struct key_part parts[];
 };
@@ -126,13 +155,14 @@ struct key_def {
 /** Initialize a pre-allocated key_def. */
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	    enum index_type type, bool is_unique, uint32_t part_count);
+	    enum index_type type, struct key_opts *opts,
+	    uint32_t part_count);
 
 static inline struct key_def *
 key_def_dup(struct key_def *def)
 {
 	struct key_def *dup = key_def_new(def->space_id, def->iid, def->name,
-					  def->type, def->is_unique,
+					  def->type, &def->opts,
 					  def->part_count);
 	if (dup) {
 		memcpy(dup->parts, def->parts,

@@ -399,7 +399,7 @@ session.su('testuser')
 ...
 box.space._index:select(272)
 ---
-- - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
+- - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'str']]]
 ...
 box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 ---
@@ -591,10 +591,10 @@ box.space._space:select()
         'name': 'format', 'type': '*'}]]
   - [288, 1, '_index', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
+      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
   - [289, 1, '_vindex', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'unique', 'type': 'num'}, {'name': 'part_count', 'type': 'num'}]]
+      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
   - [296, 1, '_func', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
   - [297, 1, '_vfunc', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',

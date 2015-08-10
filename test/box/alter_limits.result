@@ -779,9 +779,6 @@ s.index.primary:select{}
   - ['Homevideo', 2011]
   - ['No such movie', 999]
 ...
-_ = box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
----
-...
 -- ambiguous field type
 index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 ---

@@ -249,12 +249,13 @@ schema_init()
 	struct space_def def = {
 		SC_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
 	};
+	struct key_opts opts = { true /* is_unique */, 0 /* dimension */ };
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */
 					      TREE /* index type */,
-					      true /* unique */,
-					      1 /* part count */);
+					      &opts,
+					      1); /* part count */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
 	(void) sc_space_new(&def, key_def, &on_replace_schema);
 
@@ -297,8 +298,8 @@ schema_init()
 			      0 /* index id */,
 			      "primary",
 			      TREE /* index type */,
-			      true /* unique */,
-			      2 /* part count */);
+			      &opts,
+			      2); /* part count */
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 	/* index no */

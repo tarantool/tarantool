@@ -75,8 +75,8 @@ format[1] = {name = 'id', type = 'num'}
 format[2] = {name = 'iid', type = 'num'}
 format[3] = {name = 'name', type = 'str'}
 format[4] = {name = 'type', type = 'str'}
-format[5] = {name = 'unique', type = 'num'}
-format[6] = {name = 'part_count', type = 'num'}
+format[5] = {name = 'opts', type = 'array'}
+format[6] = {name = 'parts', type = 'array'}
 _index:format(format)
 format={}
 format[1] = {name='id', type='num'}
@@ -107,32 +107,32 @@ _cluster:format(format)
 -- index on owner id is index #1 (base-0)
 -- index on object name is index #2 (base-0)
 -- space name is unique
-_index:insert{_schema.id, 0, 'primary', 'tree', 1, 1, 0, 'str'}
-_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
-_index:insert{_space.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
-_index:insert{_space.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
+_index:insert{_schema.id, 0, 'primary', 'tree', { unique = true }, {{0, 'str'}}}
+_index:insert{_space.id, 0, 'primary', 'tree', { unique = true }, {{0, 'num'}}}
+_index:insert{_space.id, 1, 'owner', 'tree', {unique = false }, {{1, 'num'}}}
+_index:insert{_space.id, 2, 'name', 'tree', { unique = true }, {{2, 'str'}}}
 
 -- index name is unique within a space
-_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
-_index:insert{_index.id, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str'}
+_index:insert{_index.id, 0, 'primary', 'tree', {unique = true}, {{0, 'num'}, {1, 'num'}}}
+_index:insert{_index.id, 2, 'name', 'tree', {unique = true}, {{0, 'num'}, {2, 'str'}}}
 -- user name and id are unique
-_index:insert{_user.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
-_index:insert{_user.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
-_index:insert{_user.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
+_index:insert{_user.id, 0, 'primary', 'tree', {unique = true}, {{0, 'num'}}}
+_index:insert{_user.id, 1, 'owner', 'tree', {unique = false}, {{1, 'num'}}}
+_index:insert{_user.id, 2, 'name', 'tree', {unique = true}, {{2, 'str'}}}
 -- function name and id are unique
-_index:insert{_func.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
-_index:insert{_func.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
-_index:insert{_func.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
+_index:insert{_func.id, 0, 'primary', 'tree', {unique = true}, {{0, 'num'}}}
+_index:insert{_func.id, 1, 'owner', 'tree', {unique = false}, {{1, 'num'}}}
+_index:insert{_func.id, 2, 'name', 'tree', {unique = true}, {{2, 'str'}}}
 --
-_index:insert{_priv.id, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num'}
+_index:insert{_priv.id, 0, 'primary', 'tree', {unique = true}, {{1, 'num'}, {2, 'str'}, {3, 'num'}}}
 -- owner index  - to quickly find all privileges granted by a user
-_index:insert{_priv.id, 1, 'owner', 'tree', 0, 1, 0, 'num'}
+_index:insert{_priv.id, 1, 'owner', 'tree', {unique = false}, {{0, 'num'}}}
 -- object index - to quickly find all grants on a given object
-_index:insert{_priv.id, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num'}
+_index:insert{_priv.id, 2, 'object', 'tree', {unique = false}, {{2, 'str'}, {3, 'num'}}}
 -- primary key: node id
-_index:insert{_cluster.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{_cluster.id, 0, 'primary', 'tree', {unique = true}, {{0, 'num'}}}
 -- node uuid key: node uuid
-_index:insert{_cluster.id, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
+_index:insert{_cluster.id, 1, 'uuid', 'tree', {unique = true}, {{1, 'str'}}}
 
 --
 -- Pre-created users and grants
@@ -168,6 +168,11 @@ local views = {
     [box.schema.FUNC_ID] = box.schema.VFUNC_ID;
     [box.schema.PRIV_ID] = box.schema.VPRIV_ID;
 }
+
+--
+-- create definitions for system views, and grant
+-- privileges on system views to 'PUBLIC' role
+--
 
 for source_id, target_id in pairs(views) do
     local def = _space:get(source_id):totable()

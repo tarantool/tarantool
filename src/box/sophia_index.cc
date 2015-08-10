@@ -213,7 +213,7 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	(void) part_count;
 	assert(part_count == 1);
-	assert(key_def->is_unique && part_count == key_def->part_count);
+	assert(key_def->opts.is_unique && part_count == key_def->part_count);
 	const char *keyptr = key;
 	mp_next(&keyptr);
 	size_t keysize = keyptr - key;

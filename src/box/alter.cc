@@ -58,8 +58,13 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 /** _index columns */
 #define INDEX_ID         1
 #define INDEX_TYPE       3
-#define INDEX_IS_UNIQUE  4
-#define INDEX_PART_COUNT 5
+#define INDEX_OPTS       4
+#define INDEX_PARTS      5
+/** old _index columns */
+/** TODO: remove in future versions */
+#define INDEX_165_IS_UNIQUE 4
+#define INDEX_165_PART_COUNT 5
+
 
 /** _user columns */
 #define USER_TYPE        3
@@ -97,6 +102,55 @@ access_check_ddl(uint32_t owner_uid)
 	}
 }
 
+
+/** Fill key_opts structure from opts field in tuple of space _index */
+void
+key_opts_create_from_field(struct key_opts *opts, const char *field)
+{
+	key_opts_create(opts);
+	if (field == NULL)
+		return;
+	if (mp_typeof(*field) != MP_MAP) {
+		tnt_raise(ClientError, ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
+			  "map");
+	}
+	uint32_t map_size = mp_decode_map(&field);
+	for (uint32_t i = 0; i < map_size; i++) {
+		const char *key;
+		uint32_t len;
+		if (mp_typeof(*field) != MP_STR) {
+			tnt_raise(ClientError,
+				  ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
+				  "string");
+		}
+		key = mp_decode_str(&field, &len);
+		if (len == strlen("unique") &&
+		    memcmp(key, "unique", len) == 0) {
+
+
+			if (mp_typeof(*field) != MP_BOOL) {
+				tnt_raise(ClientError,
+					  ER_FIELD_TYPE,
+					  INDEX_OPTS + INDEX_OFFSET,
+					  "bool");
+			}
+			opts->is_unique = mp_decode_bool(&field);
+		} else if (len == strlen("dimension") &&
+			   memcmp(key, "dimension", len) == 0) {
+
+			if (mp_typeof(*field) != MP_UINT) {
+				tnt_raise(ClientError,
+					  ER_FIELD_TYPE,
+					  INDEX_OPTS + INDEX_OFFSET,
+					  "unsigned");
+			}
+			opts->dimension = mp_decode_uint(&field);
+		} else {
+			mp_next(&field);
+		}
+	}
+}
+
 /**
  * Create a key_def object from a record in _index
  * system space.
@@ -112,30 +166,58 @@ access_check_ddl(uint32_t owner_uid)
 struct key_def *
 key_def_new_from_tuple(struct tuple *tuple)
 {
+	struct key_def *key_def;
+	struct key_opts opts;
 	uint32_t id = tuple_field_u32(tuple, ID);
 	uint32_t index_id = tuple_field_u32(tuple, INDEX_ID);
 	const char *type_str = tuple_field_cstr(tuple, INDEX_TYPE);
 	enum index_type type = STR2ENUM(index_type, type_str);
-	uint32_t is_unique = tuple_field_u32(tuple, INDEX_IS_UNIQUE);
-	uint32_t part_count = tuple_field_u32(tuple, INDEX_PART_COUNT);
 	const char *name = tuple_field_cstr(tuple, NAME);
+	const char *opts_field = tuple_field(tuple, INDEX_OPTS);
+	const char *parts = tuple_field(tuple, INDEX_PARTS);
+	uint32_t part_count;
+	bool is_166plus = mp_typeof(*opts_field) == MP_MAP;
+	if (is_166plus) {
+		/* 1.6.6+ _index space structure */
+		key_opts_create_from_field(&opts, opts_field);
+		part_count = mp_decode_array(&parts);
+	} else {
+		/* 1.6.5 _index space structure */
+		key_opts_create(&opts);
+		opts.is_unique = tuple_field_u32(tuple, INDEX_165_IS_UNIQUE);
+		part_count = tuple_field_u32(tuple, INDEX_165_PART_COUNT);
+	}
+	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
+	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
 
-	struct key_def *key_def = key_def_new(id, index_id, name, type,
-					      is_unique > 0, part_count);
-	auto scoped_guard =
-		make_scoped_guard([=] { key_def_delete(key_def); });
-
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	/* Parts follow part count. */
-	(void) tuple_seek(&it, INDEX_PART_COUNT);
-
-	for (uint32_t i = 0; i < part_count; i++) {
-		uint32_t fieldno = tuple_next_u32(&it);
-		const char *field_type_str = tuple_next_cstr(&it);
-		enum field_type field_type;
-		field_type = STR2ENUM(field_type, field_type_str);
-		key_def_set_part(key_def, i, fieldno, field_type);
+	if (is_166plus) {
+		/* 1.6.6+ */
+		for (uint32_t i = 0; i < part_count; i++) {
+			uint32_t part_array_len = mp_decode_array(&parts);
+			assert(part_array_len >= 2);
+			uint32_t fieldno = mp_decode_uint(&parts);
+			uint32_t len;
+			const char *field_type_str;
+			field_type_str = mp_decode_str(&parts, &len);
+			char buf[BOX_NAME_MAX];
+			snprintf(buf, sizeof(buf), "%.*s", len, field_type_str);
+			enum field_type field_type;
+			field_type = STR2ENUM(field_type, buf);
+			key_def_set_part(key_def, i, fieldno, field_type);
+		}
+	} else {
+		/* 1.6.5 */
+		struct tuple_iterator it;
+		tuple_rewind(&it, tuple);
+		/* Parts follow part count. */
+		(void) tuple_seek(&it, INDEX_165_PART_COUNT);
+		for (uint32_t i = 0; i < part_count; i++) {
+			uint32_t fieldno = tuple_next_u32(&it);
+			const char *field_type_str = tuple_next_cstr(&it);
+			enum field_type field_type;
+			field_type = STR2ENUM(field_type, field_type_str);
+			key_def_set_part(key_def, i, fieldno, field_type);
+		}
 	}
 	key_def_check(key_def);
 	scoped_guard.is_active = false;
@@ -679,7 +761,7 @@ AddIndex::prepare(struct alter_space *alter)
 
 	if (drop == NULL ||
 	    drop->old_key_def->type != new_key_def->type ||
-	    drop->old_key_def->is_unique != new_key_def->is_unique ||
+	    drop->old_key_def->opts.is_unique != new_key_def->opts.is_unique ||
 	    key_part_cmp(drop->old_key_def->parts,
 			 drop->old_key_def->part_count,
 			 new_key_def->parts,

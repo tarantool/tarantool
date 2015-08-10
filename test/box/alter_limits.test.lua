@@ -269,7 +269,6 @@ index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'num
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select{}
-_ = box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
 -- ambiguous field type
 index = s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 -- create index on a non-existing field

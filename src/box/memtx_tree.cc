@@ -47,7 +47,7 @@ int
 tree_index_compare(const tuple *a, const tuple *b, struct key_def *key_def)
 {
 	int r = tuple_compare(a, b, key_def);
-	if (r == 0 && !key_def->is_unique)
+	if (r == 0 && !key_def->opts.is_unique)
 		r = a < b ? -1 : a > b;
 	return r;
 }
@@ -219,7 +219,7 @@ MemtxTree::random(uint32_t rnd) const
 struct tuple *
 MemtxTree::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->is_unique && part_count == key_def->part_count);
+	assert(key_def->opts.is_unique && part_count == key_def->part_count);
 
 	struct key_data key_data;
 	key_data.key = key;
