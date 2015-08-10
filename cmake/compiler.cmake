@@ -22,10 +22,17 @@ endif()
 # demand for C++ compiler is support of C++11 lambdas, added
 # only in version 4.5 https://gcc.gnu.org/projects/cxx0x.html
 #
-if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.5)
-        message(FATAL_ERROR "
-        Your GCC version is ${CMAKE_CXX_COMPILER_VERSION}, please update to version 4.6 or later 
-                ")
+if (CMAKE_COMPILER_IS_GNUCC)
+# cmake 2.8.9 and earlier doesn't support CMAKE_CXX_COMPILER_VERSION
+       if (NOT CMAKE_CXX_COMPILER_VERSION)
+               execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                               OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
+       endif()
+       if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.5)
+               message(FATAL_ERROR "
+               Your GCC version is ${CMAKE_CXX_COMPILER_VERSION}, please update
+                       ")
+       endif()
 endif()
 
 #
