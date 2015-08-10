@@ -895,8 +895,8 @@ local remote_methods = {
                         self.rbuf.wpos = self.rbuf.wpos + len
 
                         local advance = self:_check_response()
-                        if advance < 0 then
-			    advance = buffer.READAHEAD
+                        if advance <= 0 then
+                            advance = buffer.READAHEAD
                         end
 
                         self.rbuf:reserve(advance)
