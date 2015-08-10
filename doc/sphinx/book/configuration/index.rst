@@ -88,7 +88,10 @@ If username:password is omitted, then 'guest' is assumed. Some examples:
     | username:password@host:port | notguest:sesame@mail.ru:3301 |
     +-----------------------------+------------------------------+
 
-In certain circumstances a Unix socket may be used where a URI is required.
+In certain circumstances a Unix domain socket may be used
+where a URI is expected, for example "unix/:/tmp/unix_domain_socket.sock" or
+simply "/tmp/unix_domain_socket.sock".
+
 
 =====================================================================
                        Initialization file
