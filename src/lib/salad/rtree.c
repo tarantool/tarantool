@@ -305,9 +305,9 @@ rtree_always_true(const struct rtree_rect *rt1,
 		  const struct rtree_rect *rt2,
 		  unsigned dimension)
 {
-	(void)rt1;
-	(void)rt2;
-	(void)dimension;
+	(void) rt1;
+	(void) rt2;
+	(void) dimension;
 	return true;
 }
 
@@ -316,7 +316,7 @@ rtree_always_true(const struct rtree_rect *rt1,
 /*------------------------------------------------------------------------- */
 
 static struct rtree_page *
-rtree_alloc_page(struct rtree *tree)
+rtree_page_alloc(struct rtree *tree)
 {
 	if (tree->free_pages) {
 		struct rtree_page *result =
@@ -331,14 +331,14 @@ rtree_alloc_page(struct rtree *tree)
 }
 
 static void
-rtree_free_page(struct rtree *tree, struct rtree_page *page)
+rtree_page_free(struct rtree *tree, struct rtree_page *page)
 {
 	*(void **)page = tree->free_pages;
 	tree->free_pages = (void *)page;
 }
 
 static struct rtree_page_branch *
-rtree_get_branch(const struct rtree *tree, const struct rtree_page *page,
+rtree_branch_get(const struct rtree *tree, const struct rtree_page *page,
 		 unsigned ind)
 {
 	return (struct rtree_page_branch *)
@@ -359,7 +359,7 @@ set_next_reinsert_page(const struct rtree *tree, struct rtree_page *page,
 		       struct rtree_page *next_page)
 {
 	/* The page must be MIN_FILLed, so last branch is unused */
-	struct rtree_page_branch *b = rtree_get_branch(tree, page,
+	struct rtree_page_branch *b = rtree_branch_get(tree, page,
 						       tree->page_max_fill - 1);
 	b->data.page = next_page;
 }
@@ -367,7 +367,7 @@ set_next_reinsert_page(const struct rtree *tree, struct rtree_page *page,
 struct rtree_page *
 get_next_reinsert_page(const struct rtree *tree, const struct rtree_page *page)
 {
-	struct rtree_page_branch *b = rtree_get_branch(tree, page,
+	struct rtree_page_branch *b = rtree_branch_get(tree, page,
 						       tree->page_max_fill - 1);
 	return b->data.page;
 }
@@ -377,10 +377,10 @@ static void
 rtree_page_cover(const struct rtree *tree, const struct rtree_page *page,
 		 struct rtree_rect *res)
 {
-	rtree_rect_copy(res, &rtree_get_branch(tree, page, 0)->rect,
+	rtree_rect_copy(res, &rtree_branch_get(tree, page, 0)->rect,
 			tree->dimension);
 	for (int i = 1; i < page->n; i++) {
-		rtree_rect_add(res, &rtree_get_branch(tree, page, i)->rect,
+		rtree_rect_add(res, &rtree_branch_get(tree, page, i)->rect,
 			       tree->dimension);
 	}
 }
@@ -390,7 +390,7 @@ static void
 rtree_page_init_with_record(const struct rtree *tree, struct rtree_page *page,
 			    struct rtree_rect *rect, record_t obj)
 {
-	struct rtree_page_branch *b = rtree_get_branch(tree, page, 0);
+	struct rtree_page_branch *b = rtree_branch_get(tree, page, 0);
 	page->n = 1;
 	rtree_rect_copy(&b->rect, rect, tree->dimension);
 	b->data.record = obj;
@@ -402,10 +402,10 @@ rtree_page_init_with_pages(const struct rtree *tree, struct rtree_page *page,
 			   struct rtree_page *page1, struct rtree_page *page2)
 {
 	page->n = 2;
-	struct rtree_page_branch *b = rtree_get_branch(tree, page, 0);
+	struct rtree_page_branch *b = rtree_branch_get(tree, page, 0);
 	rtree_page_cover(tree, page1, &b->rect);
 	b->data.page = page1;
-	b = rtree_get_branch(tree, page, 1);
+	b = rtree_branch_get(tree, page, 1);
 	rtree_page_cover(tree, page2, &b->rect);
 	b->data.page = page2;
 }
@@ -414,13 +414,13 @@ static struct rtree_page *
 rtree_split_page(struct rtree *tree, struct rtree_page *page,
 		 const struct rtree_page_branch *br)
 {
-	assert(page->n == tree-> page_max_fill);
+	assert(page->n == tree->page_max_fill);
 	const struct rtree_rect *rects[RTREE_MAXIMUM_BRANCHES_IN_PAGE + 1];
 	unsigned ids[RTREE_MAXIMUM_BRANCHES_IN_PAGE + 1];
 	rects[0] = &br->rect;
 	ids[0] = 0;
 	for (unsigned i = 0; i < page->n; i++) {
-		struct rtree_page_branch *b = rtree_get_branch(tree, page, i);
+		struct rtree_page_branch *b = rtree_branch_get(tree, page, i);
 		rects[i + 1] = &b->rect;
 		ids[i + 1] = i + 1;
 	}
@@ -522,16 +522,16 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	unsigned k = min_k;
 	unsigned k1 = tree->page_min_fill + k;
 	unsigned k2 = n - k1;
-	struct rtree_page *new_page = rtree_alloc_page(tree);
+	struct rtree_page *new_page = rtree_page_alloc(tree);
 	tree->n_pages++;
 	char taken[RTREE_MAXIMUM_BRANCHES_IN_PAGE];
 	memset(taken, 0, sizeof(taken));
 	for (unsigned i = 0; i < k1; i++) {
 		struct rtree_page_branch *new_b =
-			rtree_get_branch(tree, new_page, i);
+			rtree_branch_get(tree, new_page, i);
 		const struct rtree_page_branch *from_b = br;
 		if (ids[i]) {
-			from_b = rtree_get_branch(tree, page, ids[i] - 1);
+			from_b = rtree_branch_get(tree, page, ids[i] - 1);
 			taken[ids[i] - 1] = 1;
 		}
 		rtree_branch_copy(new_b, from_b, d);
@@ -540,8 +540,8 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	for (unsigned i = 0, j = 0; j < page->n; j++) {
 		if (taken[j] == 0) {
 			struct rtree_page_branch *to, *from;
-			to = rtree_get_branch(tree, page, i++);
-			from = rtree_get_branch(tree, page, j);
+			to = rtree_branch_get(tree, page, i++);
+			from = rtree_branch_get(tree, page, j);
 			rtree_branch_copy(to, from, tree->dimension);
 			moved++;
 		}
@@ -549,7 +549,7 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	assert(moved == k2 || moved + 1 == k2);
 	if (moved + 1 == k2) {
 		struct rtree_page_branch *to;
-		to = rtree_get_branch(tree, page, moved);
+		to = rtree_branch_get(tree, page, moved);
 		rtree_branch_copy(to, br, tree->dimension);
 	}
 	new_page->n = k1;
@@ -563,7 +563,7 @@ rtree_page_add_branch(struct rtree *tree, struct rtree_page *page,
 {
 	if (page->n < tree->page_max_fill) {
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(tree, page, page->n++);
+		b = rtree_branch_get(tree, page, page->n++);
 		rtree_branch_copy(b, br, tree->dimension);
 		return NULL;
 	} else {
@@ -577,8 +577,8 @@ rtree_page_remove_branch(struct rtree *tree, struct rtree_page *page, int i)
 	page->n--;
 	for (int j = i; j < page->n; j++) {
 		struct rtree_page_branch *to, *from;
-		to = rtree_get_branch(tree, page, j);
-		from = rtree_get_branch(tree, page, j + 1);
+		to = rtree_branch_get(tree, page, j);
+		from = rtree_branch_get(tree, page, j + 1);
 		rtree_branch_copy(to, from, tree->dimension);
 	}
 }
@@ -594,7 +594,7 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 		area_t min_incr = 0, best_area = 0;
 		for (int i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, page, i);
+			b = rtree_branch_get(tree, page, i);
 			area_t r_area = rtree_rect_area(&b->rect,
 							tree->dimension);
 			struct rtree_rect cover;
@@ -620,7 +620,7 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 		}
 		assert(mini >= 0);
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(tree, page, mini);
+		b = rtree_branch_get(tree, page, mini);
 		struct rtree_page *p = b->data.page;
 		struct rtree_page *q = rtree_page_insert(tree, p,
 							 rect, obj, level);
@@ -651,7 +651,7 @@ rtree_page_remove(struct rtree *tree, struct rtree_page *page,
 	if (--level != 0) {
 		for (unsigned i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, page, i);
+			b = rtree_branch_get(tree, page, i);
 			if (!rtree_rect_intersects_rect(&b->rect, rect, d))
 				continue;
 			struct rtree_page *next_page = b->data.page;
@@ -673,7 +673,7 @@ rtree_page_remove(struct rtree *tree, struct rtree_page *page,
 	} else {
 		for (unsigned i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, page, i);
+			b = rtree_branch_get(tree, page, i);
 			if (b->data.page == obj) {
 				rtree_page_remove_branch(tree, page, i);
 				return true;
@@ -689,11 +689,11 @@ rtree_page_purge(struct rtree *tree, struct rtree_page *page, int level)
 	if (--level != 0) { /* this is an internal node in the tree */
 		for (int i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, page, i);
+			b = rtree_branch_get(tree, page, i);
 			rtree_page_purge(tree, b->data.page, level);
 		}
 	}
-	rtree_free_page(tree, page);
+	rtree_page_free(tree, page);
 }
 
 /*------------------------------------------------------------------------- */
@@ -708,7 +708,7 @@ rtree_iterator_goto_first(struct rtree_iterator *itr, int sp,
 	if (sp + 1 == itr->tree->height) {
 		for (int i = 0, n = pg->n; i < n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(itr->tree, pg, i);
+			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->leaf_cmp(&itr->rect, &b->rect, d)) {
 				itr->stack[sp].page = pg;
 				itr->stack[sp].pos = i;
@@ -718,7 +718,7 @@ rtree_iterator_goto_first(struct rtree_iterator *itr, int sp,
 	} else {
 		for (int i = 0, n = pg->n; i < n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(itr->tree, pg, i);
+			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->intr_cmp(&itr->rect, &b->rect, d)
 			    && rtree_iterator_goto_first(itr, sp + 1,
 							 b->data.page))
@@ -741,7 +741,7 @@ rtree_iterator_goto_next(struct rtree_iterator *itr, int sp)
 	if (sp + 1 == itr->tree->height) {
 		for (int i = itr->stack[sp].pos, n = pg->n; ++i < n;) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(itr->tree, pg, i);
+			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->leaf_cmp(&itr->rect, &b->rect, d)) {
 				itr->stack[sp].pos = i;
 				return true;
@@ -750,7 +750,7 @@ rtree_iterator_goto_next(struct rtree_iterator *itr, int sp)
 	} else {
 		for (int i = itr->stack[sp].pos, n = pg->n; ++i < n;) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(itr->tree, pg, i);
+			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->intr_cmp(&itr->rect, &b->rect, d)
 			    && rtree_iterator_goto_first(itr, sp + 1,
 							 b->data.page))
@@ -770,7 +770,7 @@ rtree_iterator_destroy(struct rtree_iterator *itr)
 	struct rtree_neighbor_page *curr, *next;
 	for (curr = itr->page_list; curr != NULL; curr = next) {
 		next = curr->next;
-		rtree_free_page((struct rtree *) itr->tree,
+		rtree_page_free((struct rtree *) itr->tree,
 				(struct rtree_page *) curr);
 	}
 	itr->page_list = NULL;
@@ -800,7 +800,7 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 	if (itr->page_pos >= itr->tree->neighbours_in_page) {
 		struct rtree_neighbor_page *new_page =
 			(struct rtree_neighbor_page *)
-			rtree_alloc_page((struct rtree*)itr->tree);
+			rtree_page_alloc((struct rtree*)itr->tree);
 		new_page->next = itr->page_list;
 		itr->page_list = new_page;
 		itr->page_pos = 0;
@@ -852,7 +852,7 @@ rtree_iterator_process_neigh(struct rtree_iterator *itr,
 	rtree_iterator_free_neighbor(itr, neighbor);
 	for (int i = 0, n = pg->n; i < n; i++) {
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(itr->tree, pg, i);
+		b = rtree_branch_get(itr->tree, pg, i);
 		coord_t distance =
 			rtree_rect_neigh_distance2(&b->rect, &itr->rect, d);
 		struct rtree_neighbor *neigh =
@@ -903,7 +903,7 @@ rtree_iterator_next(struct rtree_iterator *itr)
 	int sp = itr->tree->height - 1;
 	if (!itr->eof && rtree_iterator_goto_next(itr, sp)) {
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(itr->tree,
+		b = rtree_branch_get(itr->tree,
 				     itr->stack[sp].page, itr->stack[sp].pos);
 		return b->data.record;
 	}
@@ -958,7 +958,7 @@ void
 rtree_insert(struct rtree *tree, struct rtree_rect *rect, record_t obj)
 {
 	if (tree->root == NULL) {
-		tree->root = rtree_alloc_page(tree);
+		tree->root = rtree_page_alloc(tree);
 		rtree_page_init_with_record(tree, tree->root, rect, obj);
 		tree->height = 1;
 		tree->n_pages++;
@@ -967,7 +967,7 @@ rtree_insert(struct rtree *tree, struct rtree_rect *rect, record_t obj)
 			rtree_page_insert(tree, tree->root, rect, obj, tree->height);
 		if (p != NULL) {
 			/* root splitted */
-			struct rtree_page *new_root = rtree_alloc_page(tree);
+			struct rtree_page *new_root = rtree_page_alloc(tree);
 			rtree_page_init_with_pages(tree, new_root,
 						   tree->root, p);
 			tree->root = new_root;
@@ -993,7 +993,7 @@ rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj)
 	while (pg != NULL) {
 		for (int i = 0, n = pg->n; i < n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, pg, i);
+			b = rtree_branch_get(tree, pg, i);
 			struct rtree_page *p =
 				rtree_page_insert(tree, tree->root,
 						  &b->rect, b->data.record,
@@ -1001,7 +1001,7 @@ rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj)
 			if (p != NULL) {
 				/* root splitted */
 				struct rtree_page *new_root
-					= rtree_alloc_page(tree);
+					= rtree_page_alloc(tree);
 				rtree_page_init_with_pages(tree, new_root,
 							   tree->root, p);
 				tree->root = new_root;
@@ -1011,15 +1011,15 @@ rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj)
 		}
 		level--;
 		struct rtree_page *next = get_next_reinsert_page(tree, pg);
-		rtree_free_page(tree, pg);
+		rtree_page_free(tree, pg);
 		tree->n_pages--;
 		pg = next;
 	}
 	if (tree->root->n == 1 && tree->height > 1) {
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(tree, tree->root, 0);
+		b = rtree_branch_get(tree, tree->root, 0);
 		struct rtree_page *new_root = b->data.page;
-		rtree_free_page(tree, tree->root);
+		rtree_page_free(tree, tree->root);
 		tree->root = new_root;
 		tree->height--;
 		tree->n_pages--;
@@ -1126,7 +1126,7 @@ rtree_debug_print_page(const struct rtree *tree, const struct rtree_page *page,
 	unsigned d = tree->dimension;
 	for (int i = 0; i < page->n; i++) {
 		struct rtree_page_branch *b;
-		b = rtree_get_branch(tree, page, i);
+		b = rtree_branch_get(tree, page, i);
 		double v = 1;
 		for (unsigned j = 0; j < d; j++) {
 			double d1 = b->rect.coords[j * 2];
@@ -1139,7 +1139,7 @@ rtree_debug_print_page(const struct rtree *tree, const struct rtree_page *page,
 	if (--level > 1) {
 		for (int i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
-			b = rtree_get_branch(tree, page, i);
+			b = rtree_branch_get(tree, page, i);
 			rtree_debug_print_page(tree, b->data.page, level,
 					       path * 100 + i + 1);
 		}
