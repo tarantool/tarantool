@@ -120,7 +120,7 @@ static inline void
 key_opts_create(struct key_opts *opts)
 {
 	opts->is_unique = true;
-	opts->dimension = 0;
+	opts->dimension = 2;
 }
 
 static inline int
