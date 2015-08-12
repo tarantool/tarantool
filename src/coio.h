@@ -1,6 +1,8 @@
 #ifndef TARANTOOL_COIO_H_INCLUDED
 #define TARANTOOL_COIO_H_INCLUDED
 /*
+ * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:

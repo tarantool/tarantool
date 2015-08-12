@@ -1,6 +1,8 @@
 #ifndef INCLUDES_TARANTOOL_CFG_H
 #define INCLUDES_TARANTOOL_CFG_H
 /*
+ * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:
