@@ -327,22 +327,22 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 
 	/*
 	 * This code tries to write queued requests (=transactions) using as
-	 * less as possible I/O syscalls and memory copies. For this reason
+	 * few I/O syscalls and memory copies as possible. For this reason
 	 * writev(2) and `struct iovec[]` are used (see `struct fio_batch`).
 	 *
 	 * For each request (=transaction) each request row (=statement) is
 	 * added to iov `batch`. A row can contain up to XLOG_IOVMAX iovecs.
 	 * A request can have an **unlimited** number of rows. Since OS has
-	 * hardcoded limit up to `sysconf(_SC_IOV_MAX)` iovecs (usually 1024),
-	 * a single batch can't fit huge transactions. Therefore, it is not
-	 * possible to "atomically" write an entire transaction using the
-	 * single writev(2) call.
+	 * a hard coded limit up to `sysconf(_SC_IOV_MAX)` iovecs (usually
+	 * 1024), a huge transaction may not fit into a single batch.
+	 * Therefore, it is not possible to "atomically" write an entire
+	 * transaction using a single writev(2) call.
 	 *
 	 * Request boundaries and batch boundaries are not connected at all
 	 * in this code. Batches flushed to disk as soon as they are full.
 	 * In order to guarantee that a transaction is either fully written
 	 * to file or isn't written at all, ftruncate(2) is used to shrink
-	 * file to the last fuly written request. The absolute position
+	 * the file to the last fully written request. The absolute position
 	 * of request in xlog file is stored inside `struct wal_request`.
 	 */
 
@@ -400,7 +400,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	/* Flush remaining data in batch (if any) */
 	if (fio_batch_size(batch) > 0) {
 		ssize_t nwr = wal_fio_batch_write(batch, fileno(wal->f));
-		if (nwr >= 0) {
+		if (nwr > 0) {
 			/* Update cached file offset */
 			written_bytes += nwr;
 		}

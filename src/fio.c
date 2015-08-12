@@ -221,13 +221,16 @@ fio_batch_rotate(struct fio_batch *batch, size_t bytes_written)
 
 	struct iovec *iov = batch->iov;
 	struct iovec *iovend = iov + batch->iovcnt;
-	for (; bytes_written >= iov->iov_len; ++iov)
+	for (; iov < iovend; ++iov) {
+		if (iov->iov_len > bytes_written) {
+			iov->iov_base = (char *) iov->iov_base + bytes_written;
+			iov->iov_len -= bytes_written;
+			break;
+		}
 		bytes_written -= iov->iov_len;
-
+	}
 	assert(iov < iovend); /* Partial write  */
-	iov->iov_base = (char *) iov->iov_base + bytes_written;
-	iov->iov_len -= bytes_written;
-	memmove(batch->iov, iov, iovend - iov);
+	memmove(batch->iov, iov, (iovend - iov) * sizeof(struct iovec));
 	batch->iovcnt = iovend - iov;
 }
 
