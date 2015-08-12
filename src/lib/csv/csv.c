@@ -36,8 +36,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-static const double csv_buf_expand_factor = 2.0;
-
 void csv_emit_row_empty(void *ctx)
 {
 	(void)ctx;
@@ -73,15 +71,7 @@ csv_destroy(struct csv *csv)
 int
 csv_isvalid(struct csv *csv)
 {
-	if (csv->prev_symbol == csv->quote_char) {
-		if (csv->state == CSV_IN_QUOTES)
-			csv->state = CSV_OUT_OF_QUOTES;
-		else
-			csv->state = CSV_IN_QUOTES;
-		csv->prev_symbol = ' ';
-	}
-	if (csv->error_status == CSV_ER_OK &&
-			csv->state == CSV_IN_QUOTES)
+	if (csv->error_status == CSV_ER_OK && csv->state == CSV_IN_QUOTES)
 		csv->error_status = CSV_ER_INVALID;
 	return !csv->error_status;
 }
@@ -118,8 +108,9 @@ csv_setopt(struct csv *csv, int opt, ...)
 }
 
 /**
-  * both of methods (emitting and iterating) are implemening by one function
+  * both of methods (emitting and iterating) are implementing by one function
   * firstonly == true means iteration method.
+  * @return unprocessed tail
   **/
 const char *
 csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
@@ -129,65 +120,70 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 	assert(end - s > 0);
 	assert(csv->emit_field);
 	assert(csv->emit_row);
-	const char *p = s;
-
-	while (p != end) {
+	for (const char *p = s; p != end; p++) {
 		bool is_line_end = (*p == '\n' || *p == '\r');
-		//realloc buffer
-		if (csv->buf == 0 ||
-		    (csv->bufp && csv->buf_len < csv->bufp - csv->buf + 1)) {
-			csv->buf_len = (int)((csv->bufp - csv->buf + 1) *
-					     csv_buf_expand_factor + 1);
-			char *new_buf = (char *) csv->realloc(csv->buf, csv->buf_len);
+		/* realloc buffer */
+		if (csv->buf == NULL ||
+		   (csv->bufp && csv->buf_len < csv->bufp - csv->buf + 1)) {
+			size_t new_size = csv->buf_len * 2;
+			if (csv->buf_len == 0 || csv->buf == NULL)
+				new_size = 256;
+			char *new_buf = (char *)csv->realloc(csv->buf, new_size);
 			if (new_buf == NULL) {
 				csv->error_status = CSV_ER_MEMORY_ERROR;
 				return NULL;
 			}
+			csv->buf_len = new_size;
 			csv->bufp = csv->bufp - csv->buf + new_buf;
 			csv->buf = new_buf;
 		}
-		/** parser should keep previous symbol, because of "" and \r\n
-		 *  and to prevent additional states of FSM
-		 */
-		if (csv->prev_symbol == csv->quote_char) {
-			//double-quote ""
-			if (*p == csv->quote_char) {
-				*csv->bufp++ = csv->quote_char;
-				csv->prev_symbol = ' ';
-				p++;
-				continue;
-			}
-			//quote closing or opening
-			if (csv->state == CSV_IN_QUOTES)
-				csv->state = CSV_OUT_OF_QUOTES;
-			else
-				csv->state = CSV_IN_QUOTES;
-		}
-		//\r\n (or \n\r) linebreak, not in quotes
+		/* \r\n (or \n\r) linebreak, not in quotes */
 		if (is_line_end && csv->state != CSV_IN_QUOTES &&
-		    *p != csv->prev_symbol &&
-		    (csv->prev_symbol  == '\n' || csv->prev_symbol == '\r')
-		    ) {
-			csv->prev_symbol = 0;
-			p++;
+		   *p != csv->prev_symbol &&
+		   (csv->prev_symbol  == '\n' || csv->prev_symbol == '\r')) {
+			csv->prev_symbol = '\0';
 			continue;
 		}
 		csv->prev_symbol = *p;
-		switch(csv->state) {
+		/* 2 switches to avoid code dublicates */
+		switch (csv->state) {
 		case CSV_LEADING_SPACES:
 			csv->bufp = csv->buf;
-			if (*p != ' ') {
+			if (*p == ' ') /* skip spaces */
+				continue;
+			csv->state = CSV_OUT_OF_QUOTES;
+			/* symbol not performed, go to next switch */
+			break;
+		case CSV_QUOTE_OPENING:
+			if (*p == csv->quote_char) {
+				/* double-quote "" */
+				*csv->bufp++ = csv->quote_char;
 				csv->state = CSV_OUT_OF_QUOTES;
+				continue;
 			}
-			else
-				break; //spaces passed, perform field at once
+			csv->state = CSV_IN_QUOTES;
+			/* symbol not performed, go to next switch */
+			break;
+		case CSV_QUOTE_CLOSING:
+			if (*p == csv->quote_char) {
+				/* double-quote "" */
+				*csv->bufp++ = csv->quote_char;
+				csv->state = CSV_IN_QUOTES;
+				continue;
+			}
+			csv->state = CSV_OUT_OF_QUOTES;
+			/* symbol not performed, go to next switch */
+			break;
+		}
+
+		switch (csv->state) {
 		case CSV_OUT_OF_QUOTES:
-			//end of field
 			if (is_line_end || *p == csv->delimiter) {
+				/* end of field */
 				csv->state = CSV_LEADING_SPACES;
 				csv->bufp -= csv->ending_spaces;
 				if (firstonly) {
-					csv->state = CSV_NEWLINE;
+					csv->state = CSV_NEWFIELD;
 					return p;
 				} else {
 					csv->emit_field(csv->emit_ctx,
@@ -195,7 +191,10 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 				}
 
 				csv->bufp = csv->buf;
-			} else if (*p != csv->quote_char) {
+
+			} else if (*p == csv->quote_char) {
+				csv->state = CSV_QUOTE_OPENING;
+			} else {
 				*csv->bufp++ = *p;
 			}
 
@@ -204,34 +203,34 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 			} else {
 				csv->ending_spaces = 0;
 			}
+			if (is_line_end) {
+				/** bufp == buf means empty field,
+				  * but bufp == 0 means no field at the moment,
+				  * it may be end of line or end of file
+				  **/
+				csv->bufp = 0;
+				csv->emit_row(csv->emit_ctx);
+			}
 			break;
 		case CSV_IN_QUOTES:
-			if (*p != csv->quote_char) {
+			if (*p == csv->quote_char) {
+				csv->state = CSV_QUOTE_CLOSING;
+			} else {
 				*csv->bufp++ = *p;
 			}
 			break;
-		case CSV_NEWLINE:
+		case CSV_NEWFIELD:
 			csv->state = CSV_LEADING_SPACES;
-			break;
-		}
-		if (is_line_end && csv->state != CSV_IN_QUOTES) {
-			assert(csv->state == CSV_LEADING_SPACES);
-			/** bufp == buf means empty field,
-			  * but bufp == 0 means no field at the moment,
-			  * it may be end of line or end of file
-			  **/
-			csv->bufp = 0;
-			if (firstonly) {
+			if (is_line_end) {
+				csv->bufp = 0;
 				if (p + 1 == end)
 					return NULL;
 				else
 					return p + 1;
+
 			}
-			else {
-				csv->emit_row(csv->emit_ctx);
-			}
+			break;
 		}
-		p++;
 	}
 	return end;
 }
@@ -276,7 +275,7 @@ csv_next(struct csv_iterator *it)
 {
 	it->field = NULL;
 	it->field_len = 0;
-	if (it->buf_begin == NULL) //buffer isn't set
+	if (it->buf_begin == NULL) /* buffer isn't set */
 		return CSV_IT_NEEDMORE;
 	/**
 	  * length of buffer is zero
@@ -288,7 +287,7 @@ csv_next(struct csv_iterator *it)
 		  * but bufp == 0 means no field at the moment, it may be
 		  * end of line or end of file
 		  **/
-		if (it->csv->bufp == NULL) { //nothing to emit, end of file
+		if (it->csv->bufp == NULL) { /* nothing to emit, end of file */
 			return CSV_IT_EOF;
 		}
 		if (!it->csv->error_status && !csv_isvalid(it->csv)) {
@@ -299,7 +298,7 @@ csv_next(struct csv_iterator *it)
 			return CSV_IT_ERROR;
 		}
 
-		if (it->csv->state != CSV_END_OF_LAST_LINE) { //last field
+		if (it->csv->state != CSV_END_OF_LAST_LINE) { /* last field */
 			it->csv->state = CSV_END_OF_LAST_LINE;
 			it->csv->bufp -= it->csv->ending_spaces;
 			it->field = it->csv->buf;
@@ -307,7 +306,7 @@ csv_next(struct csv_iterator *it)
 			it->csv->bufp = it->csv->buf;
 			return CSV_IT_OK;
 		}
-		if (it->csv->state == CSV_END_OF_LAST_LINE) { //last line
+		if (it->csv->state == CSV_END_OF_LAST_LINE) { /* last line */
 			it->csv->realloc(it->csv->buf, 0);
 			it->csv->buf = NULL;
 			it->csv->bufp = NULL;
@@ -323,14 +322,14 @@ csv_next(struct csv_iterator *it)
 		return CSV_IT_ERROR;
 
 	it->buf_begin = tail;
-	//bufp == NULL means end of line
-	if (it->csv->bufp == NULL && it->csv->prev_symbol)
+	/* bufp == NULL means end of line */
+	if (it->csv->bufp == NULL)
 		return CSV_IT_EOL;
 
-	if (tail == it->buf_end) //buffer is empty
+	if (tail == it->buf_end) /* buffer is empty */
 		return CSV_IT_NEEDMORE;
 
-	//return field via iterator structure
+	/* return field via iterator structure */
 	it->field = it->csv->buf;
 	it->field_len = it->csv->bufp - it->csv->buf;
 	return CSV_IT_OK;
@@ -349,7 +348,7 @@ csv_escape_field(struct csv *csv, const char *field,
 {
 	char *p = dst;
 	int inquotes = 0;
-	//surround quotes, only if there is delimiter \n or \r
+	/* surround quotes, only if there is delimiter \n or \r */
 	if (memchr(field, csv->delimiter, field_len) ||
 	    memchr(field, '\n', field_len) ||
 	    memchr(field, '\r', field_len)) {
@@ -357,7 +356,7 @@ csv_escape_field(struct csv *csv, const char *field,
 		*p++ = csv->quote_char;
 	}
 	while (*field) {
-		// double-quote ""
+		/*  double-quote "" */
 		if (*field == csv->quote_char) {
 			assert(p - dst < buf_size);
 			*p++ = csv->quote_char;
@@ -365,7 +364,7 @@ csv_escape_field(struct csv *csv, const char *field,
 		assert(p - dst < buf_size);
 		*p++ = *field++;
 	}
-	//adds ending quote
+	/* adds ending quote */
 	if (inquotes) {
 		assert(p - dst < buf_size);
 		*p++ = csv->quote_char;
