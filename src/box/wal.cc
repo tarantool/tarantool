@@ -143,7 +143,7 @@ wal_writer_init(struct wal_writer *writer, struct vclock *vclock,
 
 	writer->rows_per_wal = rows_per_wal;
 
-	writer->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
+	writer->batch = fio_batch_new();
 
 	if (writer->batch == NULL)
 		panic_syserror("fio_batch_alloc");
@@ -159,7 +159,7 @@ wal_writer_destroy(struct wal_writer *writer)
 {
 	cpipe_destroy(&writer->tx_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
-	free(writer->batch);
+	fio_batch_delete(writer->batch);
 }
 
 /** WAL writer thread routine. */
@@ -274,64 +274,15 @@ wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
 	return l ? 0 : -1;
 }
 
-static struct wal_request *
-wal_fill_batch(struct xlog *wal, struct fio_batch *batch, int rows_per_wal,
-	       struct wal_request *req)
-{
-	int max_rows = rows_per_wal - wal->rows;
-	/* Post-condition of successful wal_opt_rotate(). */
-	assert(max_rows > 0);
-	fio_batch_start(batch, max_rows);
-
-	while (req != NULL && batch->rows < batch->max_rows) {
-		int iovcnt = 0;
-		struct iovec *iov;
-		struct xrow_header **row = req->rows;
-		for (; row < req->rows + req->n_rows; row++) {
-			iov = fio_batch_book(batch, iovcnt, XROW_IOVMAX);
-			if (iov == NULL) {
-				/*
-				 * No space in the batch for
-				 * this transaction, open a new
-				 * batch for it and hope that it
-				 * is sufficient to hold it.
-				 */
-				return req;
-			}
-			iovcnt += xlog_encode_row(*row, iov);
-		}
-		fio_batch_add(batch, iovcnt);
-		req = (struct wal_request *) STAILQ_NEXT(req, fifo);
-	}
-	return req;
-}
-
 /**
  * fio_batch_write() version with recovery specific
  * error injection.
  */
-static inline int
+static inline ssize_t
 wal_fio_batch_write(struct fio_batch *batch, int fd)
 {
 	ERROR_INJECT(ERRINJ_WAL_WRITE, return 0);
 	return fio_batch_write(batch, fd);
-}
-
-static struct wal_request *
-wal_write_batch(struct xlog *wal, struct fio_batch *batch,
-		struct wal_request *req, struct wal_request *end,
-		struct vclock *vclock)
-{
-	int rows_written = wal_fio_batch_write(batch, fileno(wal->f));
-	wal->rows += rows_written;
-	while (req != end && rows_written-- != 0)  {
-		vclock_follow(vclock,
-			      req->rows[req->n_rows - 1]->server_id,
-			      req->rows[req->n_rows - 1]->lsn);
-		req->res = 0;
-		req = (struct wal_request *) STAILQ_NEXT(req, fifo);
-	}
-	return req;
 }
 
 /**
@@ -354,35 +305,148 @@ wal_writer_pop(struct wal_writer *writer)
 	}
 }
 
-
 static void
 wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 		  struct cmsg_fifo *input, struct cmsg_fifo *commit,
 		  struct cmsg_fifo *rollback)
 {
-	struct xlog **wal = &r->current_wal;
-	struct fio_batch *batch = writer->batch;
+	/*
+	 * Input queue can only be empty on wal writer shutdown.
+	 * In this case wal_opt_rotate can create an extra empty xlog.
+	 */
+	if (unlikely(STAILQ_EMPTY(input)))
+		return;
 
-	struct wal_request *req = (struct wal_request *) STAILQ_FIRST(input);
-	struct wal_request *write_end = req;
-
-	while (req) {
-		if (wal_opt_rotate(wal, r, &writer->vclock) != 0)
-			break;
-		struct wal_request *batch_end;
-		batch_end = wal_fill_batch(*wal, batch, writer->rows_per_wal,
-					   req);
-		if (batch_end == req)
-			break;
-		write_end = wal_write_batch(*wal, batch, req, batch_end,
-					    &writer->vclock);
-		if (batch_end != write_end)
-			break;
-		req = write_end;
+	/* Xlog is only rotated between queue processing  */
+	if (wal_opt_rotate(&r->current_wal, r, &writer->vclock) != 0) {
+		STAILQ_SPLICE(input, STAILQ_FIRST(input), fifo, rollback);
+		return;
 	}
+
+	/*
+	 * This code tries to write queued requests (=transactions) using as
+	 * less as possible I/O syscalls and memory copies. For this reason
+	 * writev(2) and `struct iovec[]` are used (see `struct fio_batch`).
+	 *
+	 * For each request (=transaction) each request row (=statement) is
+	 * added to iov `batch`. A row can contain up to XLOG_IOVMAX iovecs.
+	 * A request can have an **unlimited** number of rows. Since OS has
+	 * hardcoded limit up to `sysconf(_SC_IOV_MAX)` iovecs (usually 1024),
+	 * a single batch can't fit huge transactions. Therefore, it is not
+	 * possible to "atomically" write an entire transaction using the
+	 * single writev(2) call. Moreover, writev has partial writes, so
+	 * this idea makes absolutely no sense.
+	 *
+	 * Request boundaries and batch boundaries are not connected at all
+	 * in this code. Batches flushed to disk as soon as they are full.
+	 * In order to guarantee that a transaction is either fully written
+	 * to file or isn't written at all, ftruncate(2) is used to shrink
+	 * file to the last fuly written request. The absolute position
+	 * of request in xlog file is stored inside `struct wal_request`.
+	 */
+
+	struct xlog *wal = r->current_wal;
+	/* Calculated wal offset for the next record */
+	off_t offset = wal->offset;
+	/* Start new iov batch */
+	struct fio_batch *batch = writer->batch;
+	fio_batch_reset(batch);
+
+	/*
+	 * Iterate over requests (transactions)
+	 */
+	struct wal_request *req;
+	for (req = (struct wal_request *) STAILQ_FIRST(input);
+	     req != NULL;
+	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
+		/* Save start of request */
+		req->start_offset = offset;
+		req->end_offset = -1;
+
+		/*
+		 * Iterate over request rows (tx statements)
+		 */
+		struct xrow_header **row = req->rows;
+		for (; row < req->rows + req->n_rows; row++) {
+			/* Check batch has enough space to fit statement */
+			if (unlikely(fio_batch_unused(batch) < XROW_IOVMAX)) {
+				/*
+				 * No space in the batch for this statement,
+				 * flush added statements and rotate batch.
+				 */
+				assert(fio_batch_size(batch) > 0);
+				ssize_t nwr = wal_fio_batch_write(batch,
+					fileno(wal->f));
+				if (nwr < 0)
+					goto done; /* to break outer loop */
+
+				/* Update cached file offset */
+				wal->offset += nwr;
+			}
+
+			/* Add the statement to iov batch */
+			struct iovec *iov = fio_batch_book(batch, XROW_IOVMAX);
+			assert(iov != NULL); /* checked above */
+			int iovcnt = xlog_encode_row(*row, iov);
+			offset += fio_batch_add(batch, iovcnt);
+		}
+
+		/* Save end of request */
+		req->end_offset = offset;
+	}
+	/* Flush remaining data in batch (if any) */
+	if (fio_batch_size(batch) > 0) {
+		ssize_t nwr = wal_fio_batch_write(batch, fileno(wal->f));
+		if (nwr >= 0) {
+			/* Update cached file offset */
+			wal->offset += nwr;
+		}
+	}
+
+done:
+	/*
+	 * Iterate over `input` queue and add all processed requests to
+	 * `commit` queue and all other to `rollback` queue.
+	 */
+	struct wal_request *reqend = req;
+	for (req = (struct wal_request *) STAILQ_FIRST(input);
+	     req != reqend;
+	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
+
+		/*
+		 * Check if request has been fully written to xlog.
+		 */
+		if (unlikely(req->end_offset == -1 ||
+			     req->end_offset > wal->offset)) {
+			/*
+			 * This and all subsequent requests have been failed
+			 * to write. Truncate xlog to the end of last
+			 * successfully written request.
+			 */
+			if (ftruncate(fileno(wal->f), req->start_offset) != 0)
+				panic_syserror("failed to rollback xlog");
+			wal->offset = req->start_offset;
+			/*
+			 * Move tail to `rollback` queue.
+			 */
+			STAILQ_SPLICE(input, req, fifo, rollback);
+			break;
+		}
+
+		/* Update internal vclock */
+		vclock_follow(&writer->vclock,
+			      req->rows[req->n_rows - 1]->server_id,
+			      req->rows[req->n_rows - 1]->lsn);
+		/* Update row counter for wal_opt_rotate() */
+		wal->rows += req->n_rows;
+		/* Mark request as successed for tx thread */
+		req->res = 0;
+	}
+
 	fiber_gc();
-	STAILQ_SPLICE(input, write_end, fifo, rollback);
+	/* Move all processed requests to `commit` queue */
 	STAILQ_CONCAT(commit, input);
+	return;
 }
 
 /** WAL writer thread main loop.  */

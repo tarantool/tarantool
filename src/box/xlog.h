@@ -188,6 +188,10 @@ struct xlog {
 	 * appended to the file.
 	 */
 	size_t rows;
+	/**
+	 * Cached current position to save extra syscalls to lseek
+	 */
+	off_t offset;
 	/** Log file name. */
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */

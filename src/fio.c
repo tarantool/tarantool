@@ -159,99 +159,80 @@ fio_truncate(int fd, off_t offset)
 	return rc;
 }
 
+
 struct fio_batch *
-fio_batch_alloc(int max_iov)
+fio_batch_new(void)
 {
+	int max_iov = sysconf(_SC_IOV_MAX);
+
 	struct fio_batch *batch = (struct fio_batch *)
 		malloc(sizeof(struct fio_batch) +
-		       sizeof(struct iovec) * max_iov +
-		       (max_iov / CHAR_BIT + 1));
+		       sizeof(struct iovec) * max_iov);
 	if (batch == NULL)
 		return NULL;
-	batch->bytes = batch->rows = batch->iovcnt = batch->max_rows = 0;
+
+	fio_batch_reset(batch);
 	batch->max_iov = max_iov;
-	batch->rowflag = (char *) (batch + 1) + sizeof(struct iovec) * max_iov;
 	return batch;
 }
 
 void
-fio_batch_start(struct fio_batch *batch, long max_rows)
+fio_batch_delete(struct fio_batch *batch)
 {
-	batch->bytes = batch->rows = batch->iovcnt = 0;
-	batch->max_rows = max_rows;
-	memset(batch->rowflag, 0, batch->max_iov / CHAR_BIT + 1);
+	free(batch);
 }
 
-void
-fio_batch_add(struct fio_batch *batch, int iovcnt)
+size_t
+fio_batch_add(struct fio_batch *batch, int count)
 {
-	assert(iovcnt > 0);
-	assert(batch->max_rows > 0);
-	int i = batch->iovcnt;
-	batch->iovcnt += iovcnt;
-	for (; i < batch->iovcnt; i++)
-		batch->bytes += batch->iov[i].iov_len;
-	bit_set(batch->rowflag, batch->iovcnt);
-	batch->rows++;
+	assert(batch->iovcnt + count <= batch->max_iov);
+
+	size_t total_bytes = 0;
+	struct iovec *iov = batch->iov + batch->iovcnt;
+	struct iovec *end = iov + count;
+	for (; iov != end; ++iov) {
+		assert(iov->iov_base != NULL && iov->iov_len > 0);
+		total_bytes += iov->iov_len;
+	}
+	batch->iovcnt += count;
+	batch->bytes += total_bytes;
+	return total_bytes;
 }
 
-int
+/**
+ * Rotate batch after partial write.
+ */
+static inline void
+fio_batch_rotate(struct fio_batch *batch, size_t bytes_written)
+{
+	if (likely(bytes_written == batch->bytes)) {
+		/* Full write */
+		fio_batch_reset(batch);
+		return;
+	}
+
+	assert(bytes_written < batch->bytes); /* Partial write */
+	batch->bytes -= bytes_written;
+
+	struct iovec *iov = batch->iov;
+	struct iovec *iovend = iov + batch->iovcnt;
+	for (; bytes_written >= iov->iov_len; ++iov)
+		bytes_written -= iov->iov_len;
+
+	assert(iov < iovend); /* Partial write  */
+	iov->iov_base = (char *) iov->iov_base + bytes_written;
+	iov->iov_len -= bytes_written;
+	memmove(batch->iov, iov, iovend - iov);
+	batch->iovcnt = (iovend - iov) / sizeof(*iov);
+}
+
+ssize_t
 fio_batch_write(struct fio_batch *batch, int fd)
 {
 	ssize_t bytes_written = fio_writev(fd, batch->iov, batch->iovcnt);
-	if (bytes_written <= 0)
-		return 0;
+	if (unlikely(bytes_written <= 0))
+		return -1; /* Error */
 
-	if (bytes_written == batch->bytes)
-		return batch->rows; /* returns the number of written rows */
-
-	say_warn("fio_batch_write, [%s]: partial write,"
-		 " wrote %jd out of %jd bytes",
-		 fio_filename(fd),
-		 (intmax_t) bytes_written, (intmax_t) batch->bytes);
-
-	/* Iterate over end of row flags */
-	struct bit_iterator bit_it;
-	bit_iterator_init(&bit_it, batch->rowflag,
-			  batch->max_iov / CHAR_BIT + 1, 1);
-	size_t row_last_iov = bit_iterator_next(&bit_it);
-
-	int good_rows = 0; /* the number of fully written rows */
-	ssize_t good_bytes = 0; /* the number of bytes in fully written rows */
-	ssize_t row_bytes = 0;  /* the number of bytes in the current row */
-	struct iovec *iov = batch->iov;
-	while (iov < batch->iov + batch->iovcnt) {
-		if (good_bytes + row_bytes + iov->iov_len > bytes_written)
-			break;
-		row_bytes += iov->iov_len;
-		if ((iov - batch->iov) == row_last_iov) {
-			/* the end of current row  */
-			good_bytes += row_bytes;
-			row_bytes = 0;
-			good_rows++;
-			row_last_iov = bit_iterator_next(&bit_it);
-		}
-		iov++;
-	}
-	/*
-	 * Unwind file position back to ensure we do not leave
-	 * partially written rows.
-	 */
-	off_t good_offset = fio_lseek(fd,
-				      good_bytes - bytes_written, SEEK_CUR);
-	/*
-	 * The caller may choose to close the file right after
-	 * a partial write. Don't take chances and make sure that
-	 * there is no garbage at the end of file if it happens.
-	 */
-	if (good_offset != -1)
-		(void) fio_truncate(fd, good_offset);
-	/*
-	 * writev() doesn't set errno in case of a partial write.
-	 * If nothing else from the above failed, set errno to
-	 * EAGAIN.
-	 */
-	if (! errno)
-		errno = EAGAIN;
-	return good_rows;  /* returns the number of written rows */
+	fio_batch_rotate(batch, bytes_written);
+	return bytes_written;
 }

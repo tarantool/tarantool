@@ -920,6 +920,9 @@ xlog_create(struct xdir *dir, const struct vclock *vclock)
 	if (dir->suffix != INPROGRESS && xlog_rename(l))
 		goto error;
 
+	/* Remember current write position in file */
+	l->offset = lseek(fileno(f), 0, SEEK_CUR);
+
 	return l;
 error:
 	int save_errno = errno;

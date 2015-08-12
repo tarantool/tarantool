@@ -170,4 +170,19 @@ box.space.test:drop()
 status, message = pcall(function() box.begin() test:put{1} test:put{2} box.commit() end)
 status
 message:match('does not exist')
+if not status then box.rollback() end
 test = nil
+
+--# setopt delimiter ';'
+function tx_limit(n)
+    box.begin()
+    for i=0,n do
+        box.space.test:insert{i}
+    end
+    box.commit()
+end;
+--# setopt delimiter ''
+_ = box.schema.space.create('test');
+_ = box.space.test:create_index('primary');
+tx_limit(10000)
+box.space.test:len()

@@ -33,9 +33,11 @@
  * the requested number of bytes), log errors nicely, provide batch
  * writes.
  */
+#include <stddef.h>
 #include <sys/types.h>
 #include <stdbool.h>
 #include <sys/uio.h>
+#include <assert.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -155,59 +157,63 @@ struct fio_batch
 	/** Total number of bytes in batched rows. */
 	ssize_t bytes;
 	/** Total number of batched rows.*/
-	int rows;
-	/** Total number of I/O vectors */
 	int iovcnt;
 	/** A cap on how many rows can be batched. Can be set to INT_MAX. */
-	int max_rows;
-	/** A system cap on how many rows can be batched. */
 	int max_iov;
-	/**
-	 * End of row flags for each iov (bitset). fio_write() tries to
-	 * write {iov, iov, iov with flag} blocks atomically.
-	 */
-	char *rowflag;
 	/* Batched rows. */
 	struct iovec iov[];
 };
 
 struct fio_batch *
-fio_batch_alloc(int max_iov);
+fio_batch_new(void);
 
-/** Begin a new batch write. Set a cap on the number of rows in the batch.  */
 void
-fio_batch_start(struct fio_batch *batch, long max_rows);
+fio_batch_delete(struct fio_batch *batch);
+
+static inline void
+fio_batch_reset(struct fio_batch *batch)
+{
+	batch->bytes = 0;
+	batch->iovcnt = 0;
+}
+
+static inline size_t
+fio_batch_size(struct fio_batch *batch)
+{
+	return batch->bytes;
+}
+
+static inline int
+fio_batch_unused(struct fio_batch *batch)
+{
+	return batch->max_iov - batch->iovcnt;
+}
 
 /**
  * Add a row to a batch.
  * @pre iovcnt is the number of iov elements previously 
  *      booked with fio_batch_book() and filled with data
- * @pre fio_batch_is_full() == false
  */
-void
-fio_batch_add(struct fio_batch *batch, int iovcnt);
+size_t
+fio_batch_add(struct fio_batch *batch, int count);
 
 /**
- * Get a pointer to struct iov * in the batch
- * beyond batch->iovcnt + offset. Ensure
- * the iov has at least 'count' elements.
+ * Ensure the iov has at least 'count' elements.
  */
 static inline struct iovec *
-fio_batch_book(struct fio_batch *batch, int offset, int count)
+fio_batch_book(struct fio_batch *batch, int count)
 {
-	if (batch->iovcnt + offset + count <= batch->max_iov)
-		return batch->iov + batch->iovcnt + offset;
-	return 0;
+	if (batch->iovcnt + count <= batch->max_iov)
+		return batch->iov + batch->iovcnt;
+	return NULL;
 }
 
 /**
- * Write all rows stacked into the batch.
- * In case of error, seeks back to the end of
- * the last fully written row.
- *
- * @return   The number of rows written.
+ * Write batch to fd using writev(2) and rotate batch.
+ * In case of partial write batch will contain remaining data.
+ * \sa fio_writev()
  */
-int
+ssize_t
 fio_batch_write(struct fio_batch *batch, int fd);
 
 #if defined(__cplusplus)
