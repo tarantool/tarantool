@@ -205,6 +205,9 @@ fio_batch_add(struct fio_batch *batch, int count)
 static inline void
 fio_batch_rotate(struct fio_batch *batch, size_t bytes_written)
 {
+	/*
+	 * writev(2) usually fully write all data on local filesystems.
+	 */
 	if (likely(bytes_written == batch->bytes)) {
 		/* Full write */
 		fio_batch_reset(batch);
@@ -223,7 +226,7 @@ fio_batch_rotate(struct fio_batch *batch, size_t bytes_written)
 	iov->iov_base = (char *) iov->iov_base + bytes_written;
 	iov->iov_len -= bytes_written;
 	memmove(batch->iov, iov, iovend - iov);
-	batch->iovcnt = (iovend - iov) / sizeof(*iov);
+	batch->iovcnt = iovend - iov;
 }
 
 ssize_t

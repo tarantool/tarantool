@@ -334,8 +334,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	 * hardcoded limit up to `sysconf(_SC_IOV_MAX)` iovecs (usually 1024),
 	 * a single batch can't fit huge transactions. Therefore, it is not
 	 * possible to "atomically" write an entire transaction using the
-	 * single writev(2) call. Moreover, writev has partial writes, so
-	 * this idea makes absolutely no sense.
+	 * single writev(2) call.
 	 *
 	 * Request boundaries and batch boundaries are not connected at all
 	 * in this code. Batches flushed to disk as soon as they are full.
@@ -346,8 +345,10 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	 */
 
 	struct xlog *wal = r->current_wal;
-	/* Calculated wal offset for the next record */
-	off_t offset = wal->offset;
+	/* The size of batched data */
+	off_t batched_bytes = 0;
+	/* The size of written data */
+	off_t written_bytes = 0;
 	/* Start new iov batch */
 	struct fio_batch *batch = writer->batch;
 	fio_batch_reset(batch);
@@ -359,8 +360,8 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	for (req = (struct wal_request *) STAILQ_FIRST(input);
 	     req != NULL;
 	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
-		/* Save start of request */
-		req->start_offset = offset;
+		/* Save relative offset of request start */
+		req->start_offset = batched_bytes;
 		req->end_offset = -1;
 
 		/*
@@ -381,25 +382,25 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 					goto done; /* to break outer loop */
 
 				/* Update cached file offset */
-				wal->offset += nwr;
+				written_bytes += nwr;
 			}
 
 			/* Add the statement to iov batch */
 			struct iovec *iov = fio_batch_book(batch, XROW_IOVMAX);
 			assert(iov != NULL); /* checked above */
 			int iovcnt = xlog_encode_row(*row, iov);
-			offset += fio_batch_add(batch, iovcnt);
+			batched_bytes += fio_batch_add(batch, iovcnt);
 		}
 
-		/* Save end of request */
-		req->end_offset = offset;
+		/* Save relative offset of request end */
+		req->end_offset = batched_bytes;
 	}
 	/* Flush remaining data in batch (if any) */
 	if (fio_batch_size(batch) > 0) {
 		ssize_t nwr = wal_fio_batch_write(batch, fileno(wal->f));
 		if (nwr >= 0) {
 			/* Update cached file offset */
-			wal->offset += nwr;
+			written_bytes += nwr;
 		}
 	}
 
@@ -412,23 +413,33 @@ done:
 	for (req = (struct wal_request *) STAILQ_FIRST(input);
 	     req != reqend;
 	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
-
 		/*
 		 * Check if request has been fully written to xlog.
 		 */
 		if (unlikely(req->end_offset == -1 ||
-			     req->end_offset > wal->offset)) {
+			     req->end_offset > written_bytes)) {
 			/*
 			 * This and all subsequent requests have been failed
 			 * to write. Truncate xlog to the end of last
 			 * successfully written request.
 			 */
-			if (ftruncate(fileno(wal->f), req->start_offset) != 0)
+
+			/* Calculate relative position of the good request */
+			off_t garbage_bytes = written_bytes - req->start_offset;
+			assert(garbage_bytes >= 0);
+
+			/* Get absolute position */
+			off_t good_offset = fio_lseek(fileno(wal->f),
+				-garbage_bytes, SEEK_CUR);
+			if (good_offset < 0)
+				panic_syserror("failed to get xlog position");
+
+			/* Truncate xlog */
+			if (ftruncate(fileno(wal->f), good_offset) != 0)
 				panic_syserror("failed to rollback xlog");
-			wal->offset = req->start_offset;
-			/*
-			 * Move tail to `rollback` queue.
-			 */
+			written_bytes = req->start_offset;
+
+			/* Move tail to `rollback` queue. */
 			STAILQ_SPLICE(input, req, fifo, rollback);
 			break;
 		}
