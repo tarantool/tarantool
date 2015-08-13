@@ -8,9 +8,10 @@ By saying :code:`require('tarantool')`, one can answer
 some questions about how the tarantool server was built,
 such as "what flags were used", or "what was the version
 of the compiler". Additionally one can see the uptime
-and the server version and the process id, but those
-information items are more commonly accessed with
-:func:`box.info`.
+and the server version and the process id. Those
+information items can also be accessed with
+:func:`box.info` but use of the tarantool package is
+recommended.
 
     | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`tarantool = require('tarantool')`

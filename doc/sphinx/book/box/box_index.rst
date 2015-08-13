@@ -636,9 +636,9 @@ is Rectangle#2", and "Rectangle#3 is entirely inside Rectangle#2".
 
 Now let us create a space and add an RTREE index.
 
-    :codebold:`s = box.schema.create_space`
-    :codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
-    :codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
+    | :codebold:`s = box.schema.create_space('rectangles')`
+    | :codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
+    | :codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
 
 Field#1 doesn't matter, we just make it because we need a primary-key index.
 (RTREE indexes cannot be unique and therefore cannot be primary-key indexes.)
@@ -646,17 +646,17 @@ The second field must be an "array", which means its values must represent
 {x,y} points or {x1,y1,x2,y2} rectangles. Now let us populate the table by
 inserting two tuples, containing the coordinates of Rectangle#2 and Rectangle#4.
 
-    :codebold:`s:insert{1, {3,5,9,10}}`
-    :codebold:`s:insert{2, {10,11}}`
+    | :codebold:`s:insert{1, {3,5,9,10}}`
+    | :codebold:`s:insert{2, {10,11}}`
 
 And now, following the description of `RTREE iterator types`_, we can search the
 rectangles with these requests:
 
 .. _RTREE iterator types: rtree-iterator_
 
-    :codebold:`r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)`
-    :codebold:`r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)`
-    :codebold:`r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)`
+    | :codebold:`r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)`
+    | :codebold:`r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)`
+    | :codebold:`r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)`
 
 Request#1 returns 1 tuple because the point {10,11} is the same as the rectangle
 {10,11,10,11} ("Rectangle#4" in the picture). Request#2 returns 1 tuple because
