@@ -19,7 +19,7 @@ The shard package distributes according to a hash algorithm,
 that is, it applies a hash function to a tuple's primary-key value
 in order to decide which shard the tuple belongs to.
 The hash function is `consistent`_
-so that changing the number of tuples will not affect results for many keys.
+so that changing the number of servers will not affect results for many keys.
 The specific hash function that the shard package uses is
 guava.digest in the :codeitalic:`digest` package. |br|
 **Queue** ...
