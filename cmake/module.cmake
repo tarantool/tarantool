@@ -15,10 +15,13 @@ function(rebuild_module_api)
     add_custom_command(OUTPUT ${dstfile}
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h > ${tmpfile}
         COMMAND cat ${headers} | ${CMAKE_SOURCE_DIR}/extra/apigen >> ${tmpfile}
+        COMMAND ${CMAKE_C_COMPILER} -I ${CMAKE_SOURCE_DIR}/src
+            -E ${CMAKE_SOURCE_DIR}/src/box/errcode.h |
+            grep "enum box_error_code" >> ${tmpfile}
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
-        DEPENDS ${srcfiles}
+        DEPENDS ${srcfiles} ${CMAKE_SOURCE_DIR}/src/box/errcode.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_header.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/tarantool_footer.h
         )

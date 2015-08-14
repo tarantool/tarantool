@@ -1,7 +1,4 @@
-#include "errcode.h"
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
- *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:
@@ -29,15 +26,46 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "errcode.h"
 
-#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
-	.errstr = #s,				\
-	.errflags = f,				\
-	.errdesc = d				\
-},
+#include "latch.h"
 
-struct errcode_record box_error_codes[box_error_code_MAX] = {
-	ERROR_CODES(ERRCODE_RECORD_MEMBER)
+struct box_latch
+{
+    struct latch l;
 };
 
+box_latch_t*
+box_latch_new(void)
+{
+	box_latch_t* bl = (box_latch_t*) malloc(sizeof(box_latch_t));
+	if (bl)
+		latch_create(&bl->l);
+	return bl;
+}
+
+void
+box_latch_delete(box_latch_t* bl)
+{
+	if (bl) {
+		latch_destroy(&bl->l);
+		free(bl);
+	}
+}
+
+void
+box_latch_lock(box_latch_t* bl)
+{
+	latch_lock(&bl->l);
+}
+
+int
+box_latch_trylock(box_latch_t* bl)
+{
+	return latch_trylock(&bl->l);
+}
+
+void
+box_latch_unlock(box_latch_t* bl)
+{
+	latch_unlock(&bl->l);
+}

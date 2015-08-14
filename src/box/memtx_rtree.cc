@@ -80,7 +80,7 @@ extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
 	const char *elems = tuple_field(tuple, key_def->parts[0].fieldno);
 	unsigned dimension = key_def->opts.dimension;
 	if (mp_decode_rect(rect, dimension, elems)) {
-		tnt_raise(ClientError, ER_RTREE_RECT_ERROR,
+		tnt_raise(ClientError, ER_RTREE_RECT,
 			  "Field", dimension, dimension * 2);
 	}
 }
@@ -218,7 +218,7 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 				  "key only for ITER_ALL");
 		}
 	} else if (mp_decode_rect(&rect, m_dimension, key, part_count)) {
-		tnt_raise(ClientError, ER_RTREE_RECT_ERROR,
+		tnt_raise(ClientError, ER_RTREE_RECT,
 			  "Key", m_dimension, m_dimension * 2);
 	}
 

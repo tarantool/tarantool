@@ -15,6 +15,12 @@
  */
 
 #if defined(__cplusplus)
+#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
+#else
+#define API_EXPORT extern __attribute__ ((visibility ("default")))
+#endif
+
+#if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 

@@ -236,7 +236,7 @@ txn_check_autocommit(struct txn *txn, const char *where)
 extern "C" {
 
 int
-boxffi_txn_begin()
+box_txn_begin()
 {
 	try {
 		if (in_txn())
@@ -248,10 +248,37 @@ boxffi_txn_begin()
 	return 0;
 }
 
+int
+box_txn_commit()
+{
+	struct txn *txn = in_txn();
+	/**
+	 * COMMIT is like BEGIN or ROLLBACK
+	 * a "transaction-initiating statement".
+	 * Do nothing if transaction is not started,
+	 * it's the same as BEGIN + COMMIT.
+	*/
+	if (! txn)
+		return 0;
+	try {
+		txn_commit(txn);
+	} catch (...) {
+		txn_rollback();
+		return -1;
+	}
+	return 0;
+}
+
 void
-boxffi_txn_rollback()
+box_txn_rollback()
 {
 	txn_rollback(); /* doesn't throw */
+}
+
+void *
+box_txn_alloc(size_t size)
+{
+	return region_alloc_nothrow(&fiber()->gc, size);
 }
 
 } /* extern "C" */

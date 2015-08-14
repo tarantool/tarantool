@@ -33,33 +33,34 @@
 #include "error.h"
 #include <stdio.h> /* snprintf */
 
-enum schema_id {
+/** \cond public */
+enum {
 	/** Start of the reserved range of system spaces. */
-	SC_SYSTEM_ID_MIN = 256,
+	BOX_SYSTEM_ID_MIN = 256,
 	/** Space id of _schema. */
-	SC_SCHEMA_ID = 272,
+	BOX_SCHEMA_ID = 272,
 	/** Space id of _space. */
-	SC_SPACE_ID = 280,
-	SC_VSPACE_ID = 281,
+	BOX_SPACE_ID = 280,
+	BOX_VSPACE_ID = 281,
 	/** Space id of _index. */
-	SC_INDEX_ID = 288,
-	SC_VINDEX_ID = 289,
+	BOX_INDEX_ID = 288,
+	BOX_VINDEX_ID = 289,
 	/** Space id of _func. */
-	SC_FUNC_ID = 296,
-	SC_VFUNC_ID = 297,
+	BOX_FUNC_ID = 296,
+	BOX_VFUNC_ID = 297,
 	/** Space id of _user. */
-	SC_USER_ID = 304,
-	SC_VUSER_ID = 305,
+	BOX_USER_ID = 304,
+	BOX_VUSER_ID = 305,
 	/** Space id of _priv. */
-	SC_PRIV_ID = 312,
-	SC_VPRIV_ID = 313,
+	BOX_PRIV_ID = 312,
+	BOX_VPRIV_ID = 313,
 	/** Space id of _cluster. */
-	SC_CLUSTER_ID = 320,
+	BOX_CLUSTER_ID = 320,
 	/** End of the reserved range of system spaces. */
-	SC_SYSTEM_ID_MAX = 511,
-	SC_ID_NIL = 2147483647
+	BOX_SYSTEM_ID_MAX = 511,
+	BOX_ID_NIL = 2147483647
 };
-
+/** \endcond public */
 
 extern int sc_version;
 

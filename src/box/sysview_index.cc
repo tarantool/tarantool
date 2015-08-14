@@ -169,12 +169,12 @@ vspace_filter(struct space *source, struct tuple *tuple)
 }
 
 SysviewVspaceIndex::SysviewVspaceIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_SPACE_ID, key_def->iid, vspace_filter)
+	: SysviewIndex(key_def, BOX_SPACE_ID, key_def->iid, vspace_filter)
 {
 }
 
 SysviewVindexIndex::SysviewVindexIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_INDEX_ID, key_def->iid, vspace_filter)
+	: SysviewIndex(key_def, BOX_INDEX_ID, key_def->iid, vspace_filter)
 {
 }
 
@@ -193,7 +193,7 @@ vuser_filter(struct space *source, struct tuple *tuple)
 }
 
 SysviewVuserIndex::SysviewVuserIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_USER_ID, key_def->iid, vuser_filter)
+	: SysviewIndex(key_def, BOX_USER_ID, key_def->iid, vuser_filter)
 {
 }
 
@@ -212,7 +212,7 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 }
 
 SysviewVprivIndex::SysviewVprivIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_PRIV_ID, key_def->iid, vpriv_filter)
+	: SysviewIndex(key_def, BOX_PRIV_ID, key_def->iid, vpriv_filter)
 {
 }
 
@@ -236,6 +236,6 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 }
 
 SysviewVfuncIndex::SysviewVfuncIndex(struct key_def *key_def)
-	: SysviewIndex(key_def, SC_FUNC_ID, key_def->iid, vfunc_filter)
+	: SysviewIndex(key_def, BOX_FUNC_ID, key_def->iid, vfunc_filter)
 {
 }

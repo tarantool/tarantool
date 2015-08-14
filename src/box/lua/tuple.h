@@ -41,14 +41,15 @@ struct tuple;
  * Push tuple on lua stack
  */
 void
-lbox_pushtuple_noref(struct lua_State *L, struct tuple *tuple);
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
-static inline void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
+static inline int
+lbox_pushtupleornil(lua_State *L, box_tuple_t *tuple)
 {
-	assert(tuple != NULL);
-	lbox_pushtuple_noref(L, tuple);
-	tuple_ref(tuple);
+	if (tuple == NULL)
+		return 0;
+	lbox_pushtuple(L, tuple);
+	return 1;
 }
 
 struct tuple *lua_istuple(struct lua_State *L, int narg);
@@ -56,6 +57,9 @@ struct tuple *lua_istuple(struct lua_State *L, int narg);
 void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index);
+
+char *
+lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len);
 
 void
 box_lua_tuple_init(struct lua_State *L);

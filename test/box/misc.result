@@ -257,7 +257,8 @@ t;
   - 'box.error.DROP_USER : 44'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.injection : table: <address>
-  - 'box.error.RTREE_RECT_ERROR : 101'
+  - 'box.error.REPLICA_MAX : 73'
+  - 'box.error.RTREE_RECT : 101'
   - 'box.error.FUNCTION_LANGUAGE : 100'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.TUPLE_FOUND : 3'
@@ -297,7 +298,7 @@ t;
   - 'box.error.GUEST_USER_PASSWORD : 96'
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
-  - 'box.error.REPLICA_MAX : 73'
+  - 'box.error.PROC_C : 102'
   - 'box.error.ITERATOR_TYPE : 72'
   - 'box.error.NONMASTER : 6'
   - 'box.error.SPACE_EXISTS : 10'

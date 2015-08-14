@@ -65,8 +65,8 @@ int sc_version;
 bool
 space_is_system(struct space *space)
 {
-	return space->def.id > SC_SYSTEM_ID_MIN &&
-		space->def.id < SC_SYSTEM_ID_MAX;
+	return space->def.id > BOX_SYSTEM_ID_MIN &&
+		space->def.id < BOX_SYSTEM_ID_MAX;
 }
 
 /** Return space by its number */
@@ -95,8 +95,8 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	mh_int_t i;
 	struct space *space;
 	char key[6];
-	assert(mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
-	mp_encode_uint(key, SC_SYSTEM_ID_MIN);
+	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
+	mp_encode_uint(key, BOX_SYSTEM_ID_MIN);
 
 	/*
 	 * Make sure we always visit system spaces first,
@@ -104,7 +104,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	 * This is essential for correctly recovery from the
 	 * snapshot, and harmless otherwise.
 	 */
-	space = space_by_id(SC_SPACE_ID);
+	space = space_by_id(BOX_SPACE_ID);
 	Index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
 		struct iterator *it = pk->allocIterator();
@@ -208,7 +208,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	 * max length in advance.
 	 */
 	if (len + 5 > sizeof(buf))
-		return SC_ID_NIL;
+		return BOX_ID_NIL;
 
 	mp_encode_str(buf, name, len);
 
@@ -221,7 +221,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 		/* id is always field #1 */
 		return tuple_field_u32(tuple, 0);
 	}
-	return SC_ID_NIL;
+	return BOX_ID_NIL;
 }
 
 /**
@@ -249,7 +249,7 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		SC_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
+		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
 	};
 	struct key_opts opts = { true /* is_unique */, 0 /* dimension */ };
 	struct key_def *key_def = key_def_new(def.id,
@@ -262,39 +262,39 @@ schema_init()
 	(void) sc_space_new(&def, key_def, &on_replace_schema);
 
 	/* _space - home for all spaces. */
-	key_def->space_id = def.id = SC_SPACE_ID;
+	key_def->space_id = def.id = BOX_SPACE_ID;
 	snprintf(def.name, sizeof(def.name), "_space");
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 
 	(void) sc_space_new(&def, key_def, &alter_space_on_replace_space);
 
 	/* _user - all existing users */
-	key_def->space_id = def.id = SC_USER_ID;
+	key_def->space_id = def.id = BOX_USER_ID;
 	snprintf(def.name, sizeof(def.name), "_user");
 	(void) sc_space_new(&def, key_def, &on_replace_user);
 
 	/* _func - all executable objects on which one can have grants */
-	key_def->space_id = def.id = SC_FUNC_ID;
+	key_def->space_id = def.id = BOX_FUNC_ID;
 	snprintf(def.name, sizeof(def.name), "_func");
 	(void) sc_space_new(&def, key_def, &on_replace_func);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	key_def->space_id = def.id = SC_PRIV_ID;
+	key_def->space_id = def.id = BOX_PRIV_ID;
 	snprintf(def.name, sizeof(def.name), "_priv");
 	(void) sc_space_new(&def, key_def, &on_replace_priv);
 	/*
 	 * _cluster - association server uuid <-> server id
 	 * The real index is defined in the snapshot.
 	 */
-	key_def->space_id = def.id = SC_CLUSTER_ID;
+	key_def->space_id = def.id = BOX_CLUSTER_ID;
 	snprintf(def.name, sizeof(def.name), "_cluster");
 	(void) sc_space_new(&def, key_def, &on_replace_cluster);
 	key_def_delete(key_def);
 
 	/* _index - definition of indexes in all spaces */
-	def.id = SC_INDEX_ID;
+	def.id = BOX_INDEX_ID;
 	snprintf(def.name, sizeof(def.name), "_index");
 	key_def = key_def_new(def.id,
 			      0 /* index id */,
@@ -406,7 +406,7 @@ func_by_name(const char *name, uint32_t name_len)
 bool
 schema_find_grants(const char *type, uint32_t id)
 {
-	struct space *priv = space_cache_find(SC_PRIV_ID);
+	struct space *priv = space_cache_find(BOX_PRIV_ID);
 	/** "object" index */
 	Index *index = index_find(priv, 2);
 	struct iterator *it = index->position();

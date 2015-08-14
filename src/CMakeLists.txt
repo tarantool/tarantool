@@ -72,6 +72,7 @@ set (server_sources
      pickle.cc
      stat.cc
      ipc.cc
+     latch.cc
      errinj.cc
      fio.c
      crc32.c

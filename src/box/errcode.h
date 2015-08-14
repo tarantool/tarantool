@@ -154,35 +154,36 @@ struct errcode_record {
 	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     2, "Unsupported role privilege '%s'") \
 	/* 99 */_(ER_LOAD_FUNCTION,		2, "Failed to dynamically load function '%s': %s") \
 	/*100 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
-	/*101 */_(ER_RTREE_RECT_ERROR,		2, "RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \
+	/*101 */_(ER_RTREE_RECT,		2, "RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \
+	/*102 */_(ER_PROC_C,			2, "%s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
  * when adding new errors.
  */
 
-ENUM0(tnt_error_codes_enum, ERROR_CODES);
-extern struct errcode_record tnt_error_codes[];
+ENUM0(box_error_code, ERROR_CODES);
+extern struct errcode_record box_error_codes[];
 
 /** Return a string representation of error name, e.g. "ER_OK".
  */
 
 static inline const char *tnt_errcode_str(uint32_t errcode)
 {
-	if (errcode >= tnt_error_codes_enum_MAX) {
+	if (errcode >= box_error_code_MAX) {
 		/* Unknown error code - can be triggered using box.error() */
 		return "ER_UNKNOWN";
 	}
-	return tnt_error_codes[errcode].errstr;
+	return box_error_codes[errcode].errstr;
 }
 
 /** Return a description of the error. */
 static inline const char *tnt_errcode_desc(uint32_t errcode)
 {
-	if (errcode >= tnt_error_codes_enum_MAX)
+	if (errcode >= box_error_code_MAX)
 		return "Unknown error";
 
-	return tnt_error_codes[errcode].errdesc;
+	return box_error_codes[errcode].errdesc;
 }
 
 #ifdef __cplusplus

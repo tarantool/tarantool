@@ -211,9 +211,9 @@ replication_subscribe(int fd, struct xrow_header *packet)
 	}
 
 	/* Check server uuid */
-	r->server_id = schema_find_id(SC_CLUSTER_ID, 1,
+	r->server_id = schema_find_id(BOX_CLUSTER_ID, 1,
 				   tt_uuid_str(&server_uuid), UUID_STR_LEN);
-	if (r->server_id == SC_ID_NIL) {
+	if (r->server_id == BOX_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&server_uuid));
 	}

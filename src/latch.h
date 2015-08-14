@@ -157,4 +157,28 @@ latch_unlock(struct latch *l)
 	}
 }
 
+/** \cond public */
+/**
+ * API of C stored function.
+ */
+
+typedef struct box_latch box_latch_t;
+
+API_EXPORT box_latch_t*
+box_latch_new(void);
+
+API_EXPORT void
+box_latch_delete(box_latch_t* bl);
+
+API_EXPORT void
+box_latch_lock(box_latch_t* bl);
+
+API_EXPORT int
+box_latch_trylock(box_latch_t* bl);
+
+API_EXPORT void
+box_latch_unlock(box_latch_t* bl);
+
+/** \endcond public */
+
 #endif /* TARANTOOL_LATCH_H_INCLUDED */

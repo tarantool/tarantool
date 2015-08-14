@@ -3,5 +3,14 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/coeio.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
-    ${CMAKE_SOURCE_DIR}/src/box/func.h)
+    ${CMAKE_SOURCE_DIR}/src/box/txn.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple.h
+    ${CMAKE_SOURCE_DIR}/src/box/schema.h
+    ${CMAKE_SOURCE_DIR}/src/box/box.h
+    ${CMAKE_SOURCE_DIR}/src/box/index.h
+    ${CMAKE_SOURCE_DIR}/src/box/func.h
+    ${CMAKE_SOURCE_DIR}/src/box/error.h
+    ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
+    ${CMAKE_SOURCE_DIR}/src/latch.h
+)
 rebuild_module_api(${api_headers})

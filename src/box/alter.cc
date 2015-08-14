@@ -1189,7 +1189,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 		return false;
 	struct iterator *it = index->position();
 	char key[6];
-	assert(mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
+	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
 
 	index->initIterator(it, ITER_EQ, key, 1);
@@ -1203,7 +1203,7 @@ bool
 user_has_data(struct user *user)
 {
 	uint32_t uid = user->uid;
-	uint32_t spaces[] = { SC_SPACE_ID, SC_FUNC_ID, SC_PRIV_ID, SC_PRIV_ID };
+	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
 	 * For _priv also check that the user has no grants.

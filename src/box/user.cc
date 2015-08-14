@@ -276,7 +276,7 @@ user_reload_privs(struct user *user)
 	privset_new(&user->privs);
 	/* Load granted privs from _priv space. */
 	{
-		struct space *space = space_cache_find(SC_PRIV_ID);
+		struct space *space = space_cache_find(BOX_PRIV_ID);
 		char key[6];
 		/** Primary key - by user id */
 		Index *index = index_find(space, 0);
@@ -436,7 +436,7 @@ user_cache_find(uint32_t uid)
 struct user *
 user_cache_find_by_name(const char *name, uint32_t len)
 {
-	uint32_t uid = schema_find_id(SC_USER_ID, 2, name, len);
+	uint32_t uid = schema_find_id(BOX_USER_ID, 2, name, len);
 	struct user *user = user_by_id(uid);
 	if (user == NULL || user->type != SC_USER) {
 		char name_buf[BOX_NAME_MAX + 1];
