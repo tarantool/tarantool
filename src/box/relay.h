@@ -31,12 +31,15 @@
  * SUCH DAMAGE.
  */
 #include "evio.h"
+#include "fiber.h"
 
 struct xrow_header;
 
 /** State of a replication relay. */
 class Relay {
 public:
+	/** The thread in which we relay data to the replica. */
+	struct cord cord;
 	/** Replica connection */
 	struct ev_io io;
 	/* Request sync */
