@@ -6,7 +6,7 @@ template: "index"
 blocks  :
   header:
     - "Tarantool"
-    - "Get your data in RAM. Get compute close to data. Enjoy the performance"
+    - "Get your data in RAM. Get compute close to data. Enjoy the performance."
   features:
     - format: rst
       content: >
