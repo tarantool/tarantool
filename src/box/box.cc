@@ -114,6 +114,12 @@ box_check_uri(const char *source, const char *option_name)
 	}
 }
 
+static void
+box_check_replication_source(void)
+{
+	box_check_uri(cfg_gets("replication_source"), "replication_source");
+}
+
 static enum wal_mode
 box_check_wal_mode(const char *mode_name)
 {
@@ -150,16 +156,16 @@ box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_uri(cfg_gets("listen"), "listen");
-	box_check_uri(cfg_gets("replication_source"), "replication_source");
+	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
 extern "C" void
-box_set_replication_source(const char *source)
+box_set_replication_source(void)
 {
-	box_check_uri(source, "replication_source");
+	const char *source = cfg_gets("replication_source");
 	bool old_is_replica = recovery->remote.reader;
 	bool new_is_replica = source != NULL;
 
@@ -187,15 +193,17 @@ box_set_replication_source(const char *source)
 }
 
 extern "C" void
-box_set_listen(const char *uri)
+box_set_listen(void)
 {
+	const char *uri = cfg_gets("listen");
 	box_check_uri(uri, "listen");
 	iproto_set_listen(uri);
 }
 
 extern "C" void
-box_set_wal_mode(const char *mode_name)
+box_set_wal_mode(void)
 {
+	const char *mode_name = cfg_gets("wal_mode");
 	enum wal_mode mode = box_check_wal_mode(mode_name);
 	if (mode != recovery->wal_mode &&
 	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
@@ -211,38 +219,39 @@ box_set_wal_mode(const char *mode_name)
 }
 
 extern "C" void
-box_set_log_level(int level)
+box_set_log_level(void)
 {
-	say_set_log_level(level);
+	say_set_log_level(cfg_geti("log_level"));
 }
 
 extern "C" void
-box_set_io_collect_interval(double interval)
+box_set_io_collect_interval(void)
 {
-	ev_set_io_collect_interval(loop(), interval);
+	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
 }
 
 extern "C" void
-box_set_snap_io_rate_limit(double limit)
+box_set_snap_io_rate_limit(void)
 {
-	recovery_update_io_rate_limit(recovery, limit);
+	recovery_update_io_rate_limit(recovery, cfg_getd("snap_io_rate_limit"));
 }
 
 extern "C" void
-box_set_too_long_threshold(double threshold)
+box_set_too_long_threshold(void)
 {
-	too_long_threshold = threshold;
+	too_long_threshold = cfg_getd("too_long_threshold");
 }
 
 extern "C" void
-box_set_readahead(int readahead)
+box_set_readahead(void)
 {
+	int readahead = cfg_geti("readahead");
 	box_check_readahead(readahead);
 	iobuf_set_readahead(readahead);
 }
 
 extern "C" void
-box_set_panic_on_wal_error(int /* yesno */)
+box_set_panic_on_wal_error(void)
 {
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
@@ -442,11 +451,11 @@ box_init(void)
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, NULL);
-	recovery_set_remote(recovery,
-			    cfg_gets("replication_source"));
+	box_set_replication_source();
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
+
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
@@ -476,7 +485,7 @@ box_init(void)
 
 	port_init();
 	iproto_init();
-	box_set_listen(cfg_gets("listen"));
+	box_set_listen();
 
 	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));

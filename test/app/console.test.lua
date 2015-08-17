@@ -6,9 +6,10 @@ local socket = require('socket')
 local yaml = require('yaml')
 local fiber = require('fiber')
 local ffi = require('ffi')
+local log = require('log')
 
 -- Supress console log messages
-ffi.C.box_set_log_level(4)
+log.level(4)
 
 local CONSOLE_SOCKET = '/tmp/tarantool-test-console.sock'
 local IPROTO_SOCKET = '/tmp/tarantool-test-iproto.sock'

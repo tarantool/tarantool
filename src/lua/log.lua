@@ -4,6 +4,8 @@ local ffi = require('ffi')
 ffi.cdef[[
     typedef void (*sayfunc_t)(int level, const char *filename, int line,
                const char *error, const char *format, ...);
+    void
+    say_set_log_level(int new_level);
 
     extern sayfunc_t _say;
     extern void say_logrotate(int);
@@ -70,5 +72,9 @@ return {
 
     logger_pid = function()
         return tonumber(ffi.C.logger_pid)
-    end
+    end,
+
+    level = function(level)
+        return ffi.C.say_set_log_level(level)
+    end,
 }
