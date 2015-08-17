@@ -117,3 +117,7 @@ add_executable(reflection_cxx.test reflection_cxx.cc unit.c
 add_executable(csv.test csv.c
     ${CMAKE_SOURCE_DIR}/src/lib/csv/csv.c
 )
+
+add_executable(rmean.test rmean.cc unit.c
+        ${CMAKE_SOURCE_DIR}/src/rmean.cc)
+target_link_libraries(rmean.test core)

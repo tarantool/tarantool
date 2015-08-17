@@ -36,7 +36,7 @@
 #include "recovery.h"
 #include "relay.h"
 #include "replica.h"
-#include <stat.h>
+#include <rmean.h>
 #include "main.h"
 #include "tuple.h"
 #include "lua/call.h"
@@ -583,7 +583,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 		engine_shutdown();
-		stat_free();
+		rmean_delete(rmean_box);
 	}
 }
 
@@ -615,8 +615,7 @@ box_init(void)
 		   cfg_geti("slab_alloc_maximal"),
 		   cfg_getd("slab_alloc_factor"));
 
-	stat_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 
 	engine_init();
 
@@ -678,7 +677,7 @@ box_init(void)
 
 	engine_end_recovery();
 
-	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
+	rmean_cleanup(rmean_box);
 
 	if (recovery_has_replica(recovery))
 		recovery_follow_replica(recovery);

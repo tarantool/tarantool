@@ -42,9 +42,9 @@
 #include <scoped_guard.h>
 #include "user_def.h"
 #include "iproto_constants.h"
-#include "stat.h"
+#include "rmean.h"
 
-int stat_base;
+struct rmean *rmean_box;
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
@@ -251,7 +251,7 @@ process_rw(struct request *request, struct port *port)
 	};
 	request_execute_f fun = execute_map[request->type];
 	assert(fun != NULL);
-	stat_collect(stat_base, request->type, 1);
+	rmean_collect(rmean_box, request->type, 1);
 	try {
 		fun(request, port);
 		port_eof(port);

@@ -53,7 +53,7 @@
 #include <crc32.h>
 #include "memory.h"
 #include <say.h>
-#include <stat.h>
+#include <rmean.h>
 #include <limits.h>
 #include "trivia/util.h"
 #include "tt_pthread.h"

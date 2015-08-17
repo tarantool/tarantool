@@ -35,7 +35,9 @@
 
 struct txn;
 struct port;
-extern int stat_base;
+
+/** box statistics */
+extern struct rmean *rmean_box;
 
 struct request
 {

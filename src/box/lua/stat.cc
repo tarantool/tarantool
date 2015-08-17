@@ -32,7 +32,8 @@
 #include "stat.h"
 
 #include <string.h>
-#include <stat.h>
+#include <rmean.h>
+#include <box/request.h>
 
 extern "C" {
 #include <lua.h>
@@ -90,14 +91,14 @@ static int
 lbox_stat_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
-	return stat_foreach(seek_stat_item, L);
+	return rmean_foreach(rmean_box, seek_stat_item, L);
 }
 
 static int
 lbox_stat_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	stat_foreach(set_stat_item, L);
+	rmean_foreach(rmean_box, set_stat_item, L);
 	return 1;
 }
 

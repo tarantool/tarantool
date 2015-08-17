@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_STAT_H_INCLUDED
-#define TARANTOOL_STAT_H_INCLUDED
+#ifndef TARANTOOL_RMEAN_H_INCLUDED
+#define TARANTOOL_RMEAN_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -34,16 +34,33 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void stat_init(void);
-void stat_free(void);
-void stat_cleanup(int base, size_t max_idx);
-int stat_register(const char **name, size_t count);
-extern int stat_max_name_len;
+#include "trivia/util.h"
+#include "fiber.h"
 
-void stat_collect(int base, int name, int64_t value);
+#define PERF_SECS 5
 
-typedef int (*stat_cb)(const char *name, int rps, int64_t total, void *cb_ctx);
+struct stats {
+	const char *name;
+	int64_t value[PERF_SECS + 1];
+	int64_t total;
+};
 
-int stat_foreach(stat_cb cb, void *cb_ctx);
+struct rmean {
+	ev_timer timer;
+	int stats_n;
+	struct stats stats[0];
+};
 
-#endif /* TARANTOOL_STAT_H_INCLUDED */
+struct rmean *rmean_new(const char **name, size_t n);
+void rmean_delete(struct rmean *rmean);
+void rmean_cleanup(struct rmean *rmean);
+
+void rmean_timer_tick(struct rmean *rmean);
+
+void rmean_collect(struct rmean *rmean, size_t name, int64_t value);
+
+typedef int (*rmean_cb)(const char *name, int rps, int64_t total, void *cb_ctx);
+
+int rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx);
+
+#endif /* TARANTOOL_RMEAN_H_INCLUDED */
