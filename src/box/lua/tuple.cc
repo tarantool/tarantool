@@ -172,6 +172,30 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 }
 
 void
+luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
+		    struct mpstream *stream, int index)
+{
+	if (luaL_isarray(L, index) || lua_istuple(L, index)) {
+		luamp_encode_tuple(L, cfg, stream, index);
+	} else {
+		luamp_encode_array(cfg, stream, 1);
+		luamp_encode(L, cfg, stream, index);
+	}
+}
+
+void
+luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
+		  struct mpstream *stream, int index)
+{
+	/* Performs keyfy() logic */
+	if (lua_isnil(L, index)) {
+		luamp_encode_array(cfg, stream, 0);
+	} else {
+		return luamp_convert_tuple(L, cfg, stream, index);
+	}
+}
+
+void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index)
 {

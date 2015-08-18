@@ -56,6 +56,7 @@ extern "C" {
 #include "third_party/lua-cjson/lua_cjson.h"
 #include "third_party/lua-yaml/lyaml.h"
 #include "lua/msgpack.h"
+#include "lua/net_box.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
 
@@ -367,6 +368,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_yaml(L);
 	lua_pop(L, 1);
 	luaopen_json(L);
+	lua_pop(L, 1);
+	luaopen_msgpack(L);
+	lua_pop(L, 1);
+	luaopen_net_box(L);
 	lua_pop(L, 1);
 
 #if defined(HAVE_GNU_READLINE)

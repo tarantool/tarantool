@@ -1,12 +1,12 @@
 -- net_box.lua (internal file)
 
+local internal = require 'net.box.lib'
 local msgpack = require 'msgpack'
 local fiber = require 'fiber'
 local socket = require 'socket'
 local log = require 'log'
 local errno = require 'errno'
 local ffi = require 'ffi'
-local digest = require 'digest'
 local yaml = require 'yaml'
 local urilib = require 'uri'
 local buffer = require 'buffer'
@@ -53,39 +53,24 @@ local mapping_mt = { __serialize = 'mapping' }
 local CONSOLE_FAKESYNC  = 15121974
 local CONSOLE_DELIMITER = "$EOF$"
 
-local function request(header, body)
-    -- hint msgpack to always encode header and body as a map
-    header = msgpack.encode(setmetatable(header, mapping_mt))
-    body = msgpack.encode(setmetatable(body, mapping_mt))
+local ch_buf = {}
+local ch_buf_size = 0
 
-    local len = msgpack.encode(string.len(header) + string.len(body))
+local function get_channel()
+    if ch_buf_size == 0 then
+        return fiber.channel()
+    end
 
-    return len .. header .. body
+    local ch = ch_buf[ch_buf_size]
+    ch_buf[ch_buf_size] = nil
+    ch_buf_size = ch_buf_size - 1
+    return ch
 end
 
-
-local function strxor(s1, s2)
-    local res = ''
-    for i = 1, string.len(s1) do
-        if i > string.len(s2) then
-            break
-        end
-
-        local b1 = string.byte(s1, i)
-        local b2 = string.byte(s2, i)
-        res = res .. string.char(bit.bxor(b1, b2))
-    end
-    return res
-end
-
-local function keyfy(v)
-    if type(v) == 'table' then
-        return v
-    end
-    if v == nil then
-        return {}
-    end
-    return { v }
+local function free_channel(ch)
+    -- return channel to buffer
+    ch_buf[ch_buf_size + 1] = ch
+    ch_buf_size = ch_buf_size + 1
 end
 
 local function one_tuple(tbl)
@@ -98,84 +83,16 @@ local function one_tuple(tbl)
     return
 end
 
-local proto = {
-    _sync = -1,
-
-    -- sync
-    sync    = function(self)
-        self._sync = self._sync + 1
-        if self._sync >= 0x7FFFFFFF then
-            self._sync = 0
-        end
-        return self._sync
-    end,
-
-
-    ping    = function(sync)
-        return request(
-            { [SYNC] = sync, [TYPE] = PING },
-            {}
-        )
-    end,
-
-
-    -- lua call
-    call = function(sync, proc, args)
-        if args == nil then
-            args = {}
-        end
-        return request(
-            { [SYNC] = sync, [TYPE] = CALL  },
-            { [FUNCTION_NAME] = proc, [TUPLE] = args }
-        )
-    end,
-
-    -- lua eval
-    eval = function(sync, expr, args)
-        if args == nil then
-            args = {}
-        end
-        return request(
-            { [SYNC] = sync, [TYPE] = EVAL  },
-            { [EXPR] = expr, [TUPLE] = args }
-        )
-    end,
-
-    -- insert
-    insert = function(sync, spaceno, tuple)
-        return request(
-            { [SYNC] = sync, [TYPE] = INSERT },
-            { [SPACE_ID] = spaceno, [TUPLE] = tuple }
-        )
-    end,
-
-    -- replace
-    replace = function(sync, spaceno, tuple)
-        return request(
-            { [SYNC] = sync, [TYPE] = REPLACE },
-            { [SPACE_ID] = spaceno, [TUPLE] = tuple }
-        )
-    end,
-
-    -- delete
-    delete = function(sync, spaceno, key, index_id)
-        return request(
-            { [SYNC] = sync, [TYPE] = DELETE },
-            { [SPACE_ID] = spaceno, [INDEX_ID] = index_id, [KEY] = keyfy(key) }
-        )
-    end,
-
-    -- update
-    update = function(sync, spaceno, key, oplist, index_id)
-        return request(
-            { [SYNC] = sync, [TYPE] = UPDATE },
-            { [KEY] = keyfy(key), [INDEX_BASE] = 1 , [TUPLE]  = oplist,
-              [SPACE_ID] = spaceno, [INDEX_ID] = index_id }
-        )
-    end,
-
-    -- select
-    select = function(sync, spaceno, indexno, key, opts)
+local requests = {
+    [PING]    = internal.encode_ping;
+    [AUTH]    = internal.encode_auth;
+    [CALL]    = internal.encode_call;
+    [EVAL]    = internal.encode_eval;
+    [INSERT]  = internal.encode_insert;
+    [REPLACE] = internal.encode_replace;
+    [DELETE] = internal.encode_delete;
+    [UPDATE]  = internal.encode_update;
+    [SELECT]  = function(wbuf, sync, spaceno, indexno, key, opts)
         if opts == nil then
             opts = {}
         end
@@ -187,48 +104,24 @@ local proto = {
             box.error(box.error.NO_SUCH_INDEX, indexno, '#'..tostring(spaceno))
         end
 
-        key = keyfy(key)
-
-        local body = {
-            [SPACE_ID] = spaceno,
-            [INDEX_ID] = indexno,
-            [KEY] = key
-        }
-
+        local limit, offset
         if opts.limit ~= nil then
-            body[LIMIT] = tonumber(opts.limit)
+            limit = tonumber(opts.limit)
         else
-            body[LIMIT] = 0xFFFFFFFF
+            limit = 0xFFFFFFFF
         end
         if opts.offset ~= nil then
-            body[OFFSET] = tonumber(opts.offset)
+            offset = tonumber(opts.offset)
         else
-            body[OFFSET] = 0
+            offset = 0
         end
+        local iterator = require('box.internal').check_iterator_type(opts,
+            key == nil or (type(key) == 'table' and #key == 0))
 
-        body[ITERATOR] = require('box.internal').check_iterator_type(opts, #key == 0)
-
-        return request( { [SYNC] = sync, [TYPE] = SELECT }, body )
-    end,
-
-    auth = function(sync, user, password, handshake)
-        local saltb64 = string.sub(handshake, 65)
-        local salt = string.sub(digest.base64_decode(saltb64), 1, 20)
-
-        local hpassword = digest.sha1(password)
-        local hhpassword = digest.sha1(hpassword)
-        local scramble = digest.sha1(salt .. hhpassword)
-
-        local hash = strxor(hpassword, scramble)
-        return request(
-            { [SYNC] = sync, [TYPE] = AUTH },
-            { [USER] = user, [TUPLE] = { 'chap-sha1', hash } }
-        )
-    end,
-
-    b64decode = digest.base64_decode,
+        internal.encode_select(wbuf, sync, spaceno, indexno, iterator,
+            offset, limit, key)
+    end;
 }
-
 
 local function check_if_space(space)
     if type(space) == 'table' and space.id ~= nil then
@@ -360,10 +253,8 @@ local errno_is_transient = {
 local remote = {}
 
 local remote_methods = {
-    proto = proto,
-
     new = function(cls, host, port, opts)
-        local self = {}
+        local self = { _sync = -1 }
 
         if type(cls) == 'table' then
             setmetatable(self, getmetatable(cls))
@@ -423,7 +314,7 @@ local remote_methods = {
 
         self.is_run = true
         self.state = 'init'
-        self.wbuf = {}
+        self.wbuf = buffer.ibuf(buffer.READAHEAD)
         self.rpos = 1
         self.rlen = 0
 
@@ -442,6 +333,14 @@ local remote_methods = {
         return self
     end,
 
+    -- sync
+    sync    = function(self)
+        self._sync = self._sync + 1
+        if self._sync >= 0x7FFFFFFF then
+            self._sync = 0
+        end
+        return self._sync
+    end,
 
     ping    = function(self)
         if type(self) ~= 'table' then
@@ -450,10 +349,7 @@ local remote_methods = {
         if not self:is_connected() then
             return false
         end
-        local sync = self.proto:sync()
-        local req = self.proto.ping(sync)
-
-        local res = self:_request('ping', false)
+        local res = self:_request(PING, false)
 
 
         if res == nil then
@@ -467,8 +363,11 @@ local remote_methods = {
     end,
 
     _console = function(self, line)
-        local res = self:_request_raw('eval', CONSOLE_FAKESYNC,
-            line..CONSOLE_DELIMITER.."\n", true)
+        local data = line..CONSOLE_DELIMITER.."\n\n"
+        ffi.copy(self.wbuf.wpos, data, #data)
+        self.wbuf.wpos = self.wbuf.wpos + #data
+
+        local res = self:_request_raw(EVAL, CONSOLE_FAKESYNC, data, true)
         return res.body[DATA]
     end,
 
@@ -479,7 +378,7 @@ local remote_methods = {
 
         proc_name = tostring(proc_name)
 
-        local res = self:_request('call', true, proc_name, {...})
+        local res = self:_request(CALL, true, proc_name, {...})
         return res.body[DATA]
 
     end,
@@ -490,7 +389,7 @@ local remote_methods = {
         end
 
         expr = tostring(expr)
-        local data = self:_request('eval', true, expr, {...}).body[DATA]
+        local data = self:_request(EVAL, true, expr, {...}).body[DATA]
         local data_len = #data
         if data_len == 1 then
             return data[1]
@@ -577,15 +476,26 @@ local remote_methods = {
         self:_error_waiters(emsg)
         self.rpos = 1
         self.rlen = 0
-        self.wbuf = {}
         self.handshake = ''
+    end,
+
+    _wakeup_client = function(self, hdr, body)
+        local sync = hdr[SYNC]
+
+        local ch = self.ch.sync[sync]
+        if ch ~= nil then
+            ch.response = { hdr = hdr, body = body }
+            fiber.wakeup(ch.fid)
+        else
+            log.warn("Unexpected response %s", tostring(sync))
+        end
     end,
 
     _error_waiters = function(self, emsg)
         local waiters = self.ch.sync
         self.ch.sync = {}
         for sync, channel in pairs(waiters) do
-            channel:put{
+            channel.response = {
                 hdr = {
                     [TYPE] = bit.bor(ERROR_TYPE, box.error.NO_CONNECTION),
                     [SYNC] = sync
@@ -594,6 +504,7 @@ local remote_methods = {
                     [ERROR] = emsg
                 }
             }
+            fiber.wakeup(channel.fid)
         end
     end,
 
@@ -609,25 +520,9 @@ local remote_methods = {
         local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
         local body = { [DATA] = resp }
 
-        if self.ch.sync[CONSOLE_FAKESYNC] ~= nil then
-            self.ch.sync[CONSOLE_FAKESYNC]:put({hdr = hdr, body = body })
-            self.ch.sync[CONSOLE_FAKESYNC] = nil
-        else
-            log.warn("Unexpected console response: %s", resp)
-        end
+        self:_wakeup_client(hdr, body)
         self.rbuf:read(#resp)
         return 0
-    end,
-
-    _wakeup_client = function(self, hdr, body)
-        local sync = hdr[SYNC]
-
-        if self.ch.sync[sync] ~= nil then
-            self.ch.sync[sync]:put({ hdr = hdr, body = body })
-            self.ch.sync[sync] = nil
-        else
-            log.warn("Unexpected response %s", tostring(sync))
-        end
     end,
 
     _check_binary_response = function(self)
@@ -682,7 +577,7 @@ local remote_methods = {
         while timeout > 0 and self:_is_state(states) ~= true do
             local started = fiber.time()
             local fid = fiber.id()
-            local ch = fiber.channel()
+            local ch = get_channel()
             for state, _ in pairs(states) do
                 self.wait.state[state] = self.wait.state[state] or {}
                 self.wait.state[state][fid] = fid
@@ -691,6 +586,7 @@ local remote_methods = {
             self.ch.fid[fid] = ch
             ch:get(timeout)
             self.ch.fid[fid] = nil
+            free_channel(ch)
 
             for state, _ in pairs(states) do
                 self.wait.state[state][fid] = nil
@@ -699,7 +595,6 @@ local remote_methods = {
         end
         return self.state
     end,
-
 
     _connect_worker = function(self)
         fiber.name('net.box.connector')
@@ -735,9 +630,13 @@ local remote_methods = {
                         self._check_response = self._check_console_response
                         -- set delimiter
                         self:_switch_state('schema')
-                        local res = self:_request_raw('eval', CONSOLE_FAKESYNC,
-                            "require('console').delimiter('"..CONSOLE_DELIMITER.."')\n\n",
-                            true)
+
+                        local line = "require('console').delimiter('"..CONSOLE_DELIMITER.."')\n\n"
+                        ffi.copy(self.wbuf.wpos, line, #line)
+                        self.wbuf.wpos = self.wbuf.wpos + #line
+
+                        local res = self:_request_raw(EVAL, CONSOLE_FAKESYNC, line, true)
+
                         if res.hdr[TYPE] ~= OK then
                             self:_fatal(res.body[ERROR])
                         end
@@ -773,7 +672,7 @@ local remote_methods = {
 
         self:_switch_state('auth')
 
-        local auth_res = self:_request_internal('auth',
+        local auth_res = self:_request_internal(AUTH,
             false, self.opts.user, self.opts.password, self.handshake)
 
         if auth_res.hdr[TYPE] ~= OK then
@@ -816,9 +715,9 @@ local remote_methods = {
 
         self:_switch_state('schema')
 
-        local spaces = self:_request_internal('select',
+        local spaces = self:_request_internal(SELECT,
             true, SPACE_SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
-        local indexes = self:_request_internal('select',
+        local indexes = self:_request_internal(SELECT,
             true, SPACE_INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
@@ -930,16 +829,11 @@ local remote_methods = {
     _write_worker = function(self)
         fiber.name('net.box.write')
         while self:_wait_state(self._rw_states) ~= 'closed' do
-            while self.wbuf[1] ~= nil do
-                local s = table.concat(self.wbuf)
-                self.wbuf = {}
-                local written = self.s:syswrite(s)
+            while self.wbuf:size() > 0 do
+                local written = self.s:syswrite(self.wbuf.rpos, self.wbuf:size())
                 if written ~= nil then
-                    if written ~= #s then
-                        table.insert(self.wbuf, string.sub(s, written + 1))
-                    end
+                    self.wbuf.rpos = self.wbuf.rpos + written
                 else
-                    table.insert(self.wbuf, s)
                     if errno_is_transient[errno()] then
                     -- the write is with a timeout to detect FIN
                     -- packet on the receiving end, and close the connection.
@@ -953,13 +847,14 @@ local remote_methods = {
                     end
                 end
             end
+            self.wbuf:reserve(buffer.READAHEAD)
             self:_switch_state(self._to_rstate[self.state])
         end
     end,
 
-    _request = function(self, name, raise, ...)
+    _request = function(self, reqtype, raise, ...)
         if self.console then
-            box.error(box.error.UNSUPPORTED, "console", name)
+            box.error(box.error.UNSUPPORTED, "console", reqtype)
         end
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
@@ -990,28 +885,24 @@ local remote_methods = {
             end
         end
 
-        return self:_request_internal(name, raise, ...)
+        return self:_request_internal(reqtype, raise, ...)
     end,
 
-    _request_raw = function(self, name, sync, request, raise)
+    _request_raw = function(self, reqtype, sync, request, raise)
 
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
             self.timeouts[fid] = TIMEOUT_INFINITY
         end
 
-        table.insert(self.wbuf, request)
-
         self:_switch_state(self._to_wstate[self.state])
 
-        local ch = fiber.channel()
-
+        local ch = { fid = fid; }
         self.ch.sync[sync] = ch
-
-        local response = ch:get(self.timeouts[fid])
+        fiber.sleep(self.timeouts[fid])
+        local response = ch.response
         self.ch.sync[sync] = nil
         self.timeouts[fid] = nil
-
 
         if response == nil then
             if raise then
@@ -1031,7 +922,7 @@ local remote_methods = {
             })
         end
 
-        if response.body[DATA] ~= nil and name ~= 'eval' then
+        if response.body[DATA] ~= nil and reqtype ~= EVAL then
             if rawget(box, 'tuple') ~= nil then
                 for i, v in pairs(response.body[DATA]) do
                     response.body[DATA][i] =
@@ -1045,35 +936,35 @@ local remote_methods = {
         return response
     end,
 
-    _request_internal = function(self, name, raise, ...)
-        local sync = self.proto:sync()
-        local request = self.proto[name](sync, ...)
-        return self:_request_raw(name, sync, request, raise)
+    _request_internal = function(self, reqtype, raise, ...)
+        local sync = self:sync()
+        local request = requests[reqtype](self.wbuf, sync, ...)
+        return self:_request_raw(reqtype, sync, request, raise)
     end,
 
     -- private (low level) methods
     _select = function(self, spaceno, indexno, key, opts)
-        local res = self:_request('select', true, spaceno, indexno, key, opts)
+        local res = self:_request(SELECT, true, spaceno, indexno, key, opts)
         return res.body[DATA]
     end,
 
     _insert = function(self, spaceno, tuple)
-        local res = self:_request('insert', true, spaceno, tuple)
+        local res = self:_request(INSERT, true, spaceno, tuple)
         return one_tuple(res.body[DATA])
     end,
 
     _replace = function(self, spaceno, tuple)
-        local res = self:_request('replace', true, spaceno, tuple)
+        local res = self:_request(REPLACE, true, spaceno, tuple)
         return one_tuple(res.body[DATA])
     end,
 
     _delete  = function(self, spaceno, key, index_id)
-        local res = self:_request('delete', true, spaceno, key, index_id)
+        local res = self:_request(DELETE, true, spaceno, index_id, key, index_id)
         return one_tuple(res.body[DATA])
     end,
 
     _update = function(self, spaceno, key, oplist, index_id)
-        local res = self:_request('update', true, spaceno, key, oplist, index_id)
+        local res = self:_request(UPDATE, true, spaceno, index_id, key, oplist)
         return one_tuple(res.body[DATA])
     end
 }

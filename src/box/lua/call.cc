@@ -467,26 +467,6 @@ SetuidGuard::~SetuidGuard()
 		fiber_set_user(fiber(), orig_credentials);
 }
 
-/**
- * A quick approximation if a Lua table is an array.
- *
- * JSON can only have strings as keys, so if the first
- * table key is 1, it's definitely not a json map,
- * and very likely an array.
- */
-static inline bool
-lua_isarray(struct lua_State *L, int i)
-{
-	if (lua_istable(L, i) == false)
-		return false;
-	lua_pushnil(L);
-	if (lua_next(L, i) == 0) /* the table is empty */
-		return true;
-	bool index_starts_at_1 = lua_isnumber(L, -2) &&
-		lua_tonumber(L, -2) == 1;
-	lua_pop(L, 2);
-	return index_starts_at_1;
-}
 
 static inline void
 execute_c_call(struct func *func, struct request *request, struct obuf *out)
@@ -605,7 +585,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	try {
 		/** Check if we deal with a table of tables. */
 		int nrets = lua_gettop(L);
-		if (nrets == 1 && lua_isarray(L, 1)) {
+		if (nrets == 1 && luaL_isarray(L, 1)) {
 			/*
 			 * The table is not empty and consists of tables
 			 * or tuples. Treat each table element as a tuple,
@@ -613,7 +593,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 		 */
 			lua_pushnil(L);
 			int has_keys = lua_next(L, 1);
-			if (has_keys  && (lua_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
+			if (has_keys && (luaL_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
 				do {
 					luamp_encode_tuple(L, luaL_msgpack_default,
 							   &stream, -1);
@@ -626,12 +606,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 			}
 		}
 		for (int i = 1; i <= nrets; ++i) {
-			if (lua_isarray(L, i) || lua_istuple(L, i)) {
-				luamp_encode_tuple(L, luaL_msgpack_default, &stream, i);
-			} else {
-				luamp_encode_array(luaL_msgpack_default, &stream, 1);
-				luamp_encode(L, luaL_msgpack_default, &stream, i);
-			}
+			luamp_convert_tuple(L, luaL_msgpack_default, &stream, i);
 			++count;
 		}
 

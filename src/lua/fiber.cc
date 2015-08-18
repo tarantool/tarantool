@@ -161,7 +161,12 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
-	uint32_t fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
+	uint32_t fid;
+	if (lua_type(L, index) == LUA_TNUMBER) {
+		fid = lua_tointeger(L, index);
+	} else {
+		fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
+	}
 	struct fiber *f = fiber_find(fid);
 	if (f == NULL)
 		luaL_error(L, "the fiber is dead");
@@ -564,6 +569,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
 	{"kill", lbox_fiber_kill},
+	{"wakeup", lbox_fiber_wakeup},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
 	{"create", lbox_fiber_create},

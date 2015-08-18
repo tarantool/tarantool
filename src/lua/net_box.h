@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H
+#ifndef TARANTOOL_LUA_NET_BOX_H_INCLUDED
+#define TARANTOOL_LUA_NET_BOX_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,56 +31,17 @@
  * SUCH DAMAGE.
  */
 
-#include <box/tuple.h>
-
-struct lua_State;
-struct txn;
-struct tuple;
-
-/**
- * Push tuple on lua stack
- */
-void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
-
-static inline int
-lbox_pushtupleornil(lua_State *L, box_tuple_t *tuple)
-{
-	if (tuple == NULL)
-		return 0;
-	lbox_pushtuple(L, tuple);
-	return 1;
-}
-
-struct tuple *lua_istuple(struct lua_State *L, int narg);
-
-void
-luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
-		  struct mpstream *stream, int index);
-
-void
-luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index);
-
-void
-luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index);
-
-char *
-lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len);
-
-void
-box_lua_tuple_init(struct lua_State *L);
-
 #if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
-struct tuple *
-boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);
+struct lua_State;
+
+int
+luaopen_net_box(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif
+#endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H */
+#endif /* TARANTOOL_LUA_NET_BOX_H_INCLUDED */

@@ -159,6 +159,21 @@ ibuf_reserve(struct ibuf *ibuf, size_t size)
 	return ptr;
 }
 
+static inline void *
+ibuf_reserve_cb(void *ptr, size_t *size)
+{
+	struct ibuf *b = (struct ibuf*) ptr;
+	size_t s = *size;
+	return ibuf_reserve(b, s);
+}
+
+static inline void *
+ibuf_alloc_cb(void *ptr, size_t size)
+{
+	struct ibuf *b = (struct ibuf*) ptr;
+	return ibuf_alloc_nothrow(b, size);
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_SMALL_IBUF_H_INCLUDED */

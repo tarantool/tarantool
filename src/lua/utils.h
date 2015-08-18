@@ -422,6 +422,29 @@ luaL_toint64(struct lua_State *L, int idx);
 /** \endcond public */
 
 /**
+ * A quick approximation if a Lua table is an array.
+ *
+ * JSON can only have strings as keys, so if the first
+ * table key is 1, it's definitely not a json map,
+ * and very likely an array.
+ */
+static inline bool
+luaL_isarray(struct lua_State *L, int idx)
+{
+	if (!lua_istable(L, idx))
+		return false;
+	if (idx < 0)
+		idx = lua_gettop(L) + idx + 1;
+	lua_pushnil(L);
+	if (lua_next(L, idx) == 0) /* the table is empty */
+		return true;
+	bool index_starts_at_1 = lua_isnumber(L, -2) &&
+		lua_tonumber(L, -2) == 1;
+	lua_pop(L, 2);
+	return index_starts_at_1;
+}
+
+/**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.
  * @param L stack

@@ -225,8 +225,6 @@ res[1][1] == 1
 res[1][2] == string.rep('a', 50000)
 
 -- auth
-cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
-cn.proto.b64decode('gJLoc!!!!!!!')
 
 cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()

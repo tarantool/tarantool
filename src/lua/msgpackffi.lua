@@ -232,6 +232,15 @@ local function encode(obj)
     return r
 end
 
+local function encode_ibuf(obj, ibuf)
+    encode_r(ibuf, obj, 0)
+end
+
+local function encode_len(len, wpos)
+    wpos[0] = 0xce
+    ffi.cast(uint32_ptr_t, wpos + 1)[0] = bswap_u32(len)
+end
+
 on_encode(ffi.typeof('uint8_t'), encode_int)
 on_encode(ffi.typeof('uint16_t'), encode_int)
 on_encode(ffi.typeof('uint32_t'), encode_int)
@@ -497,4 +506,9 @@ return {
     decode_unchecked = decode_unchecked;
     decode = decode_unchecked; -- just for tests
     encode_tuple = encode_tuple;
+    encode_ibuf = encode_ibuf;
+    encode_len = encode_len;
+    encode_map = encode_map;
+    encode_int = encode_int;
+    encode_array = encode_array;
 }
