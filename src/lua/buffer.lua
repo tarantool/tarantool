@@ -127,18 +127,8 @@ local function ibuf_read(buf, size)
     return rpos
 end
 
-local ibuf_properties = {
-    size = ibuf_used;
-    capacity = ibuf_capacity;
-    pos = ibuf_pos;
-    unused = ibuf_unused;
-}
-
 local function ibuf_serialize(buf)
     local properties = { rpos = buf.rpos, wpos = buf.wpos }
-    for key, getter in pairs(ibuf_properties) do
-        properties[key] = getter(buf)
-    end
     return { ibuf = properties }
 end
 
@@ -152,26 +142,19 @@ local ibuf_methods = {
     checksize = ibuf_checksize;
     read = ibuf_read;
     __serialize = ibuf_serialize;
-}
 
-local function ibuf_index(buf, key)
-    local property = ibuf_properties[key]
-    if property ~= nil then
-        return property(buf)
-    end
-    local method = ibuf_methods[key]
-    if method ~= nil then
-        return method
-    end
-    return nil
-end
+    size = ibuf_used;
+    capacity = ibuf_capacity;
+    pos = ibuf_pos;
+    unused = ibuf_unused;
+}
 
 local function ibuf_tostring(ibuf)
     return '<ibuf>'
 end
 local ibuf_mt = {
     __gc = ibuf_recycle;
-    __index = ibuf_index;
+    __index = ibuf_methods;
     __tostring = ibuf_tostring;
 };
 

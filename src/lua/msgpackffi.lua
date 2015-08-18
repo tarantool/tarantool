@@ -227,7 +227,7 @@ local function encode(obj)
     local tmpbuf = buffer.IBUF_SHARED
     tmpbuf:reset()
     encode_r(tmpbuf, obj, 0)
-    local r = ffi.string(tmpbuf.rpos, tmpbuf.size)
+    local r = ffi.string(tmpbuf.rpos, tmpbuf:size())
     tmpbuf:recycle()
     return r
 end

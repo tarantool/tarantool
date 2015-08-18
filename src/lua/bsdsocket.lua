@@ -582,7 +582,7 @@ local errno_is_fatal = {
 }
 
 local function check_limit(self, limit)
-    if self.rbuf.size >= limit then
+    if self.rbuf:size() >= limit then
         return limit
     end
     return nil
@@ -593,13 +593,13 @@ local function check_delimiter(self, limit, eols)
         return 0
     end
     local rbuf = self.rbuf
-    if rbuf.size == 0 then
+    if rbuf:size() == 0 then
         return nil
     end
 
     local shortest
     for i, eol in ipairs(eols) do
-        local data = ffi.C.memmem(rbuf.rpos, rbuf.size, eol, #eol)
+        local data = ffi.C.memmem(rbuf.rpos, rbuf:size(), eol, #eol)
         if data ~= nil then
             local len = ffi.cast('char *', data) - rbuf.rpos + #eol
             if shortest == nil or shortest > len then
@@ -609,7 +609,7 @@ local function check_delimiter(self, limit, eols)
     end
     if shortest ~= nil and shortest <= limit then
         return shortest
-    elseif limit <= rbuf.size then
+    elseif limit <= rbuf:size() then
         return limit
     end
     return nil
@@ -636,14 +636,14 @@ local function read(self, limit, timeout, check, ...)
     while timeout > 0 do
         local started = fiber.time()
 
-        assert(rbuf.size < limit)
-        local to_read = math.min(limit - rbuf.size, buffer.READAHEAD)
+        assert(rbuf:size() < limit)
+        local to_read = math.min(limit - rbuf:size(), buffer.READAHEAD)
         local data = rbuf:reserve(to_read)
-        assert(rbuf.unused >= to_read)
-        local res = sysread(self, data, rbuf.unused)
+        assert(rbuf:unused() >= to_read)
+        local res = sysread(self, data, rbuf:unused())
         if res == 0 then -- eof
             self._errno = nil
-            local len = rbuf.size
+            local len = rbuf:size()
             local data = ffi.string(rbuf.rpos, len)
             rbuf.rpos = rbuf.rpos + len
             return data

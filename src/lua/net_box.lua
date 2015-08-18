@@ -599,7 +599,7 @@ local remote_methods = {
 
     _check_console_response = function(self)
         local docend = "\n...\n"
-        local resp = ffi.string(self.rbuf.rpos, self.rbuf.size)
+        local resp = ffi.string(self.rbuf.rpos, self.rbuf:size())
 
         if #resp < #docend or
                 string.sub(resp, #resp + 1 - #docend) ~= docend then
@@ -619,10 +619,21 @@ local remote_methods = {
         return 0
     end,
 
+    _wakeup_client = function(self, hdr, body)
+        local sync = hdr[SYNC]
+
+        if self.ch.sync[sync] ~= nil then
+            self.ch.sync[sync]:put({ hdr = hdr, body = body })
+            self.ch.sync[sync] = nil
+        else
+            log.warn("Unexpected response %s", tostring(sync))
+        end
+    end,
+
     _check_binary_response = function(self)
         while true do
-            if self.rbuf.size < 5 then
-                return 0
+            if self.rbuf.rpos + 5 > self.rbuf.wpos then
+                return 5 - (self.wpos - self.rpos)
             end
 
             local rpos, len = msgpack.ibuf_decode(self.rbuf.rpos)
@@ -639,16 +650,9 @@ local remote_methods = {
             setmetatable(body, mapping_mt)
 
             self.rbuf.rpos = rpos
-            local sync = hdr[SYNC]
+            self:_wakeup_client(hdr, body)
 
-            if self.ch.sync[sync] ~= nil then
-                self.ch.sync[sync]:put({ hdr = hdr, body = body })
-                self.ch.sync[sync] = nil
-            else
-                log.warn("Unexpected response %s", tostring(sync))
-            end
-
-           if self.rbuf.size == 0 then
+           if self.rbuf:size() == 0 then
                 return 0
             end
         end
@@ -899,7 +903,7 @@ local remote_methods = {
         self.rbuf = buffer.ibuf(buffer.READAHEAD)
         while self:_wait_state(self._r_states) ~= 'closed' do
             if self.s:readable() then
-                local len = self.s:sysread(self.rbuf.wpos, self.rbuf.unused)
+                local len = self.s:sysread(self.rbuf.wpos, self.rbuf:unused())
                 if len ~= nil then
                     if len == 0 then
                         self:_fatal('Remote host closed connection')
