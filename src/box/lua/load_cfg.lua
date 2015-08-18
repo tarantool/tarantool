@@ -4,18 +4,19 @@ local ffi = require('ffi')
 ffi.cdef([[
 void check_cfg();
 void load_cfg();
-void box_set_wal_mode(const char *mode);
-void box_set_listen(const char *uri);
-void box_set_replication_source(const char *source);
-void box_set_log_level(int level);
-void box_set_readahead(int readahead);
-void box_set_io_collect_interval(double interval);
-void box_set_too_long_threshold(double threshold);
-void box_set_snap_io_rate_limit(double limit);
-void box_set_panic_on_wal_error(int);
+void box_set_wal_mode(void);
+void box_set_listen(void);
+void box_set_replication_source(void);
+void box_set_log_level(void);
+void box_set_readahead(void);
+void box_set_io_collect_interval(void);
+void box_set_too_long_threshold(void);
+void box_set_snap_io_rate_limit(void);
+void box_set_panic_on_wal_error(void);
 ]])
 
 local log = require('log')
+local json = require('json')
 
 -- see default_cfg below
 local default_sophia_cfg = {
@@ -215,10 +216,15 @@ local function reload_cfg(oldcfg, cfg)
     end
     for key in pairs(cfg) do
         local val = newcfg[key]
-        if oldcfg[key] ~= val then
-            dynamic_cfg[key](val)
+        local oldval = oldcfg[key]
+        if oldval ~= val then
             rawset(oldcfg, key, val)
-            log.info("set '%s' configuration option to '%s'", key, val)
+            if not pcall(dynamic_cfg[key]) then
+                rawset(oldcfg, key, oldval) -- revert the old value
+                return box.error() -- re-throw
+            end
+            log.info("set '%s' configuration option to %s", key,
+                json.encode(val))
         end
     end
     if type(box.on_reload_configuration) == 'function' then
@@ -270,9 +276,9 @@ local function load_cfg(cfg)
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
         if val ~= nil and not dynamic_cfg_skip_at_load[key] then
-            fun(cfg[key])
+            fun()
             if val ~= default_cfg[key] then
-                log.info("set '%s' configuration option to '%s'", key, val)
+                log.info("set '%s' configuration option to %s", key, json.encode(val))
             end
         end
     end

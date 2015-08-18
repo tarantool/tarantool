@@ -219,18 +219,18 @@ do
 
     setmetatable(daemon, {
         __index = {
-            set_snapshot_period = function(snapshot_period)
-                daemon.snapshot_period = snapshot_period
+            set_snapshot_period = function()
+                daemon.snapshot_period = box.cfg.snapshot_period
                 reload(daemon)
                 return
             end,
 
-            set_snapshot_count = function(snapshot_count)
-                if math.floor(snapshot_count) ~= snapshot_count then
+            set_snapshot_count = function()
+                if math.floor(box.cfg.snapshot_count) ~= box.cfg.snapshot_count then
                     box.error(box.error.CFG, "snapshot_count",
                              "must be an integer")
                 end
-                daemon.snapshot_count = snapshot_count
+                daemon.snapshot_count = box.cfg.snapshot_count
                 reload(daemon)
            end
         }

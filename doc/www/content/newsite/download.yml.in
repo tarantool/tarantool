@@ -22,7 +22,7 @@ blocks :
           `<http://tarantool.org/dist/master/ubuntu>`_.
 
           At the moment the repository contains builds for Ubuntu
-          "Precise", "Trusty", "Saucy". It can be added to your
+          "Precise", "Trusty", "Saucy", "Vivid". It can be added to your
           apt sources list with:
 
           .. code-block:: bash
@@ -76,7 +76,7 @@ blocks :
           from `Apple Developer`_ web-site.
 
           .. _Apple Developer: https://developer.apple.com/downloads/
-    - - "Fedora 19, 20 and Rawhide"
+    - - "Fedora 19, 20, 21, 22"
       - format : rst
         content: |
           Fedora repository is available at

@@ -30,7 +30,6 @@
  */
 #include "relay.h"
 #include <say.h>
-#include <fiber.h>
 #include "scoped_guard.h"
 
 #include "recovery.h"
@@ -103,9 +102,8 @@ replication_join(int fd, struct xrow_header *packet,
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(packet, &server_uuid);
 
-	struct cord cord;
-	cord_costart(&cord, "join", replication_join_f, &relay);
-	cord_cojoin(&cord);
+	cord_costart(&relay.cord, "join", replication_join_f, &relay);
+	cord_cojoin(&relay.cord);
 	/**
 	 * Call the server-side hook which stores the replica uuid
 	 * in _cluster hook after sending the last row but before
