@@ -56,7 +56,7 @@ function(lua_source varname filename)
         COMMAND ${ECHO} '\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
-        DEPENDS ${srcfile} txt2c)
+        DEPENDS ${srcfile} txt2c libluajit)
 
     set(var ${${varname}})
     set(${varname} ${var} ${dstfile} PARENT_SCOPE)

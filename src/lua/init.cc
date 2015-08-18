@@ -88,7 +88,18 @@ extern char strict_lua[],
 	help_lua[],
 	help_en_US_lua[],
 	tap_lua[],
-	fio_lua[];
+	fio_lua[],
+	/* jit.* library */
+	vmdef_lua[],
+	bc_lua[],
+	bcsave_lua[],
+	dis_x86_lua[],
+	dis_x64_lua[],
+	dump_lua[],
+	v_lua[];
+#if LUAJIT_VERSION_NUM >= 20100 /* LuaJIT 2.1+ */
+extern char p_lua[], zone_lua[];
+#endif /* LuaJIT 2.1+ */
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
@@ -109,6 +120,19 @@ static const char *lua_modules[] = {
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
+	/* jit.* library */
+	"jit.vmdef", vmdef_lua,
+	"jit.bc", bc_lua,
+	"jit.bcsave", bcsave_lua,
+	"jit.dis_x86", dis_x86_lua,
+	"jit.dis_x64", dis_x64_lua,
+	"jit.dump", dump_lua,
+	"jit.v", v_lua,
+#if LUAJIT_VERSION_NUM >= 20100 /* LuaJIT 2.1+ */
+	/* Profiler */
+	"jit.p", p_lua,
+	"jit.zone", zone_lua,
+#endif /* LuaJIT 2.1+ */
 	NULL
 };
 
@@ -366,8 +390,13 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
 			panic("Error loading Lua module %s...: %s",
 			      modname, lua_tostring(L, -1));
-		lua_call(L, 0, 1);
-		lua_setfield(L, -3, modname); /* package.loaded.modname = t */
+		lua_pushstring(L, modname);
+		lua_call(L, 1, 1);
+		if (!lua_isnil(L, -1)) {
+			lua_setfield(L, -3, modname); /* package.loaded.modname = t */
+		} else {
+			lua_pop(L, 1); /* nil */
+		}
 		lua_pop(L, 1); /* chunkname */
 	}
 	lua_pop(L, 1); /* _LOADED */
