@@ -641,6 +641,7 @@ mp_tuple_assert(const char *tuple, const char *tuple_end)
 	assert(mp_typeof(*tuple) == MP_ARRAY);
 	mp_next(&tuple);
 	assert(tuple == tuple_end);
+	(void) tuple_end;
 }
 
 static inline uint32_t

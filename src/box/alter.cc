@@ -197,6 +197,7 @@ key_def_new_from_tuple(struct tuple *tuple)
 		for (uint32_t i = 0; i < part_count; i++) {
 			uint32_t part_array_len = mp_decode_array(&parts);
 			assert(part_array_len >= 2);
+			(void) part_array_len;
 			uint32_t fieldno = mp_decode_uint(&parts);
 			uint32_t len;
 			const char *field_type_str;
