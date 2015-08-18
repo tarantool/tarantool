@@ -577,8 +577,11 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 			}
 			return 0;
 		}
+		size_t iov_len = 0;
 		begin->used += nwr;             /* advance write position */
-		begin->pos += sio_move_iov(iov, nwr, &begin->iov_len);
+		begin->pos += sio_move_iov(iov, nwr, &iov_len);
+		begin->iov_len = iov_len;
+		assert(begin->pos <= end->pos);
 	}
 	return -1;
 }
