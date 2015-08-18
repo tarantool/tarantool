@@ -39,7 +39,7 @@ lua_source(lua_sources ../third_party/luajit/src/jit/dis_x64.lua)
 lua_source(lua_sources ../third_party/luajit/src/jit/dump.lua)
 lua_source(lua_sources ../third_party/luajit/src/jit/vmdef.lua)
 lua_source(lua_sources ../third_party/luajit/src/jit/v.lua)
-if (EXISTS ../third_party/luajit/src/jit/p.lua)
+if (EXISTS ${PROJECT_BINARY_DIR}/third_party/luajit/src/jit/p.lua)
     # Profiler LuaJIT 2.1+
     lua_source(lua_sources ../third_party/luajit/src/jit/p.lua)
     lua_source(lua_sources ../third_party/luajit/src/jit/zone.lua)

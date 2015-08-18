@@ -41,6 +41,7 @@ extern "C" {
 #include <lauxlib.h>
 #include <lualib.h>
 #include <lj_cdata.h>
+#include <luajit.h>
 } /* extern "C" */
 
 
