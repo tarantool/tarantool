@@ -31,22 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
-
-extern "C" {
-
-/** \cond public */
-struct port;
-struct request;
-
-/**
- * API of C stored function.
- */
-typedef int (*box_function_f)(struct request *request,
-			      struct port *port);
-
-/** \endcond public */
-} /* extern "C" */
-
+#include "request.h"
 
 /**
  * Stored function.

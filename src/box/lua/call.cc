@@ -188,93 +188,31 @@ lbox_process(lua_State *L)
 	return 1;
 }
 
-void
-lbox_request_create(struct request *request,
-		    struct lua_State *L, enum iproto_type type,
-		    int key, int tuple, int ops)
-{
-	request_create(request, type);
-	request->space_id = lua_tointeger(L, 1);
-	struct region *gc = &fiber()->gc;
-	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb);
-
-	if (key > 0) {
-		size_t used = region_used(gc);
-		luamp_encode_tuple(L, luaL_msgpack_default, &stream, key);
-		mpstream_flush(&stream);
-		size_t key_len = region_used(gc) - used;
-		request->key = (char *) region_join(gc, key_len);
-		request->key_end = request->key + key_len;
-	}
-	if (tuple > 0) {
-		size_t used = region_used(gc);
-		/*
-		 * region_join() above could have allocated memory and
-		 * invalidated stream write position. Reset the
-		 * stream to avoid overwriting the key.
-		 */
-		mpstream_reset(&stream);
-		luamp_encode_tuple(L, luaL_msgpack_default, &stream, tuple);
-		mpstream_flush(&stream);
-		size_t tuple_len = region_used(gc) - used;
-		request->tuple = (char *) region_join(gc, tuple_len);
-		request->tuple_end = request->tuple + tuple_len;
-	}
-	if (ops > 0) {
-		size_t used = region_used(gc);
-		mpstream_reset(&stream);
-		luamp_encode_tuple(L, luaL_msgpack_default, &stream, ops);
-		mpstream_flush(&stream);
-		size_t ops_len = region_used(gc) - used;
-		request->ops = (char *) region_join(gc, ops_len);
-		request->ops_end = request->ops + ops_len;
-	}
-}
-
-int
-boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
-	      int iterator, uint32_t offset, uint32_t limit,
-	      const char *key, const char *key_end)
-{
-	struct request request;
-	request_create(&request, IPROTO_SELECT);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.limit = limit;
-	request.offset = offset;
-	request.iterator = iterator;
-	request.key = key;
-	request.key_end = key_end;
-
-	try {
-		box_process(&request, port);
-		return 0;
-	} catch (Exception *e) {
-		/* will be hanled by box.error() in Lua */
-		return -1;
-	}
-}
-
 static int
 lbox_select(lua_State *L)
 {
 	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 		!lua_isnumber(L, 3) || !lua_isnumber(L, 4) || !lua_isnumber(L, 5)) {
-		return luaL_error(L, "Usage index:select(space_id, index_id,"
-			"iterator, offset, limit, key)");
+		return luaL_error(L, "Usage index:select(iterator, offset, "
+				  "limit, key)");
 	}
 
-	struct request request;
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	int iterator = lua_tointeger(L, 3);
+	uint32_t offset = lua_tointeger(L, 4);
+	uint32_t limit = lua_tointeger(L, 5);
+
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
+
+	int top = lua_gettop(L);
 	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_SELECT, 6, -1, -1);
-	request.index_id = lua_tointeger(L, 2);
-	request.iterator = lua_tointeger(L, 3);
-	request.offset = lua_tointeger(L, 4);
-	request.limit = lua_tointeger(L, 5);
 	port_lua_table_create(&port, L);
-	box_process(&request, (struct port *) &port);
-	return 1;
+	if (box_select((struct port *) &port, space_id, index_id, iterator,
+			offset, limit, key, key + key_len) != 0)
+		return lbox_error(L);
+	return lua_gettop(L) - top;
 }
 
 static int
@@ -283,12 +221,14 @@ lbox_insert(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:insert(tuple)");
 
-	struct request request;
-	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2, -1);
-	port_lua_create(&port, L);
-	box_process(&request, (struct port *) &port);
-	return lua_gettop(L) - 2;
+	uint32_t space_id = lua_tointeger(L, 1);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
+
+	box_tuple_t *result;
+	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
 }
 
 static int
@@ -297,12 +237,14 @@ lbox_replace(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:replace(tuple)");
 
-	struct request request;
-	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2, -1);
-	port_lua_create(&port, L);
-	box_process(&request, (struct port *) &port);
-	return lua_gettop(L) - 2;
+	uint32_t space_id = lua_tointeger(L, 1);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
+
+	box_tuple_t *result;
+	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
 }
 
 static int
@@ -310,17 +252,20 @@ lbox_update(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
-		return luaL_error(L, "Usage space:update(key, ops)");
+		return luaL_error(L, "Usage index:update(key, ops)");
 
-	struct request request;
-	struct port_lua port;
-	/** Legacy: in case of update, ops are passed in in request tuple */
-	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4, -1);
-	request.index_base = 1; /* field ids are one-indexed */
-	port_lua_create(&port, L);
-	/* Ignore index_id for now */
-	box_process(&request, (struct port *) &port);
-	return lua_gettop(L) - 4;
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+	size_t ops_len;
+	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
+
+	box_tuple_t *result;
+	if (box_update(space_id, index_id, key, key + key_len,
+		       ops, ops + ops_len, 1, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
 }
 
 static int
@@ -329,51 +274,48 @@ lbox_upsert(lua_State *L)
 	if (lua_gettop(L) != 5 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE ||
 	    lua_type(L, 5) != LUA_TTABLE)
-		return luaL_error(L, "Usage space:upsert(key, ops, tuple)");
+		return luaL_error(L, "Usage index:upsert(key, ops, tuple)");
 
-	struct request request;
-	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_UPSERT, 3, 5, 4);
-	request.index_base = 1; /* field ids are one-indexed */
-	port_lua_create(&port, L);
-	/* Ignore index_id for now */
-	box_process(&request, (struct port *) &port);
-	return lua_gettop(L) - 5;
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+	size_t ops_len;
+	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 5, &tuple_len);
+
+	box_tuple_t *result;
+	if (box_upsert(space_id, index_id, key, key + key_len,
+		       ops, ops + ops_len, tuple, tuple + tuple_len, 1,
+		       &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
 }
 
 static int
 lbox_delete(lua_State *L)
 {
-	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE)
 		return luaL_error(L, "Usage space:delete(key)");
 
-	struct request request;
-	struct port_lua port;
-	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1, -1);
-	port_lua_create(&port, L);
-	/* Ignore index_id for now */
-	box_process(&request, (struct port *) &port);
-	return lua_gettop(L) - 3;
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+
+	box_tuple_t *result;
+	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
 }
 
 static int
-lbox_commit(lua_State * /* L */)
+lbox_commit(lua_State *L)
 {
-	struct txn *txn = in_txn();
-	/**
-	 * COMMIT is like BEGIN or ROLLBACK
-	 * a "transaction-initiating statement".
-	 * Do nothing if transaction is not started,
-	 * it's the same as BEGIN + COMMIT.
-	*/
-	if (! txn)
-		return 0;
-	try {
-		txn_commit(txn);
-	} catch (...) {
-		txn_rollback();
-		throw;
-	}
+	if (box_txn_commit() != 0)
+		return lbox_error(L);
 	return 0;
 }
 
@@ -563,11 +505,23 @@ execute_c_call(struct func *func, struct request *request, struct obuf *out)
 		port_buf_destroy(&port_buf);
 	});
 
-	func->func(request, &port_buf.base);
-
+	box_function_ctx_t ctx = { request, &port_buf.base };
+	int rc = 0;
+	try {
+		rc = func->func(&ctx, request->tuple, request->tuple_end);
+	} catch (...) {
+		panic("C++ exception thrown from stored C function");
+	}
 	if (in_txn()) {
 		say_warn("a transaction is active at CALL return");
 		txn_rollback();
+	}
+
+	if (rc != 0) {
+		Exception *e = diag_last_error(&fiber()->diag);
+		if (e != NULL)
+			e->raise();
+		tnt_raise(ClientError, ER_PROC_C, "unknown procedure error");
 	}
 
 	struct obuf_svp svp = iproto_prepare_select(out);

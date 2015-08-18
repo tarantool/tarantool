@@ -638,7 +638,7 @@ while (true) do table.insert(lots_of_links, s:get{0}) ref_count = ref_count + 1 
 ...
 ref_count
 ---
-- 65534
+- 65532
 ...
 lots_of_links = {}
 ---

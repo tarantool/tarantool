@@ -36,7 +36,9 @@
 #include "object.h"
 #include "key_def.h"
 
-struct tuple;
+/** \cond public */
+typedef struct tuple box_tuple_t;
+typedef struct iterator box_iterator_t;
 
 /**
  * @abstract Iterator type
@@ -59,29 +61,36 @@ struct tuple;
  * to NULL.
  * For ITER_EQ, the key must not be NULL.
  */
-#define ITERATOR_TYPE(_)                                             \
-	/* ITER_EQ must be the first member for request_create  */   \
-	_(ITER_EQ,  0)       /* key == x ASC order              */   \
-	_(ITER_REQ, 1)       /* key == x DESC order             */   \
-	_(ITER_ALL, 2)       /* all tuples                      */   \
-	_(ITER_LT,  3)       /* key <  x                        */   \
-	_(ITER_LE,  4)       /* key <= x                        */   \
-	_(ITER_GE,  5)       /* key >= x                        */   \
-	_(ITER_GT,  6)       /* key >  x                        */   \
-	_(ITER_BITS_ALL_SET,     7) /* all bits from x are set in key      */ \
-	_(ITER_BITS_ANY_SET,     8) /* at least one x's bit is set         */ \
-	_(ITER_BITS_ALL_NOT_SET, 9) /* all bits are not set                */ \
-	_(ITER_OVERLAPS, 10) /* key overlaps x */ \
-	_(ITER_NEIGHBOR, 11) /* typles in distance ascending order from specified point */ \
 
-ENUM(iterator_type, ITERATOR_TYPE);
+enum iterator_type {
+	/* ITER_EQ must be the first member for request_create  */
+	ITER_EQ               =  0, /* key == x ASC order                  */
+	ITER_REQ              =  1, /* key == x DESC order                 */
+	ITER_ALL              =  2, /* all tuples                          */
+	ITER_LT               =  3, /* key <  x                            */
+	ITER_LE               =  4, /* key <= x                            */
+	ITER_GE               =  5, /* key >= x                            */
+	ITER_GT               =  6, /* key >  x                            */
+	ITER_BITS_ALL_SET     =  7, /* all bits from x are set in key      */
+	ITER_BITS_ANY_SET     =  8, /* at least one x's bit is set         */
+	ITER_BITS_ALL_NOT_SET =  9, /* all bits are not set                */
+	ITER_OVERLAPS         = 10, /* key overlaps x                      */
+	ITER_NEIGHBOR         = 11, /* typles in distance ascending order from specified point */
+	iterator_type_MAX     = ITER_NEIGHBOR + 1
+};
+
+API_EXPORT box_iterator_t *
+box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
+		   const char *key, const char *key_end);
+API_EXPORT int
+box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
+
+API_EXPORT void
+box_iterator_free(box_iterator_t *itr);
+
+/** \endcond public */
+
 extern const char *iterator_type_strs[];
-
-static inline bool
-iterator_type_is_reverse(enum iterator_type type)
-{
-	return type == ITER_REQ || type == ITER_LT || type == ITER_LE;
-}
 
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
@@ -94,10 +103,10 @@ struct iterator {
 	class Index *index;
 };
 
-static inline void
-iterator_close(struct iterator *it) {
-	if (it->close)
-		it->close(it);
+static inline bool
+iterator_type_is_reverse(enum iterator_type type)
+{
+	return type == ITER_REQ || type == ITER_LT || type == ITER_LE;
 }
 
 /**
@@ -228,7 +237,8 @@ struct IteratorGuard: public Object {
 
 	~IteratorGuard()
 	{
-		iterator_close(it);
+		if (it->close)
+			it->close(it);
 	}
 };
 
@@ -287,5 +297,35 @@ index_is_primary(const Index *index)
 /** Build this index based on the contents of another index. */
 void
 index_build(Index *index, Index *pk);
+
+/** \cond public */
+
+API_EXPORT size_t
+box_index_len(uint32_t space_id, uint32_t index_id);
+
+API_EXPORT size_t
+box_index_bsize(uint32_t space_id, uint32_t index_id);
+
+API_EXPORT int
+box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
+		box_tuple_t **result);
+
+API_EXPORT int
+box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
+	      const char *key_end, box_tuple_t **result);
+
+API_EXPORT int
+box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
+	      const char *key_end, box_tuple_t **result);
+
+API_EXPORT int
+box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
+	      const char *key_end, box_tuple_t **result);
+
+API_EXPORT ssize_t
+box_index_count(uint32_t space_id, uint32_t index_id, int type,
+		const char *key, const char *key_end);
+
+/** \endcond public */
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

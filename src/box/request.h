@@ -88,4 +88,11 @@ request_decode(struct request *request, const char *data, uint32_t len);
 int
 request_encode(struct request *request, struct iovec *iov);
 
+/**
+ * API of C stored function.
+ */
+typedef struct box_function_ctx box_function_ctx_t;
+typedef int (*box_function_f)(box_function_ctx_t *ctx,
+	     const char *args, const char *args_end);
+
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

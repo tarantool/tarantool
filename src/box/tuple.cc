@@ -33,11 +33,13 @@
 #include <stdio.h>
 
 #include "small/small.h"
+#include "small/mempool.h"
 #include "small/quota.h"
 
 #include "key_def.h"
 #include "tuple_update.h"
 #include "errinj.h"
+#include "fiber.h"
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
@@ -62,6 +64,14 @@ enum {
 	/** Lowest allowed slab size, for mmapped slabs */
 	SLAB_SIZE_MIN = 1024 * 1024
 };
+
+static struct mempool tuple_iterator_pool;
+
+/**
+ * Last tuple returned by public C API
+ * \sa tuple_bless()
+ */
+struct tuple *box_tuple_last;
 
 /** Extract all available type info from keys. */
 void
@@ -622,11 +632,23 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
+	mempool_create(&tuple_iterator_pool, &cord()->slabc,
+		       sizeof(struct tuple_iterator));
+
+	box_tuple_last = NULL;
 }
 
 void
 tuple_free()
 {
+	/* Unref last tuple returned by public C API */
+	if (box_tuple_last != NULL) {
+		tuple_unref(box_tuple_last);
+		box_tuple_last = NULL;
+	}
+
+	mempool_destroy(&tuple_iterator_pool);
+
 	/* Clear recycled ids. */
 	while (recycled_format_ids != FORMAT_ID_NIL) {
 
@@ -677,3 +699,121 @@ double mp_decode_num(const char **data, uint32_t i)
 	return val;
 }
 
+box_tuple_format_t *
+box_tuple_format_default(void)
+{
+	return tuple_format_ber;
+}
+
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
+{
+	try {
+		return tuple_bless(tuple_new(format, data, end));
+	} catch (Exception *e) {
+		return NULL;
+	}
+}
+
+int
+box_tuple_ref(box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	try {
+		tuple_ref(tuple);
+		return 0;
+	} catch (Exception *e) {
+		return -1;
+	}
+}
+
+void
+box_tuple_unref(box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	return tuple_unref(tuple);
+}
+
+uint32_t
+box_tuple_field_count(const box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	return tuple_field_count(tuple);
+}
+
+size_t
+box_tuple_bsize(const box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	return tuple->bsize;
+}
+
+ssize_t
+box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size)
+{
+	assert(tuple != NULL);
+	return tuple_to_buf(tuple, buf, size);
+}
+
+box_tuple_format_t *
+box_tuple_format(const box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	return tuple_format(tuple);
+}
+
+const char *
+box_tuple_field(const box_tuple_t *tuple, uint32_t i)
+{
+	assert(tuple != NULL);
+	return tuple_field(tuple, i);
+}
+
+typedef struct tuple_iterator box_tuple_iterator_t;
+
+box_tuple_iterator_t *
+box_tuple_iterator(box_tuple_t *tuple)
+{
+	assert(tuple != NULL);
+	struct tuple_iterator *it;
+	try {
+		it = (struct tuple_iterator *)
+			mempool_alloc0(&tuple_iterator_pool);
+	} catch (Exception *e) {
+		return NULL;
+	}
+	tuple_ref(tuple);
+	tuple_rewind(it, tuple);
+	return it;
+}
+
+void
+box_tuple_iterator_free(box_tuple_iterator_t *it)
+{
+	tuple_unref(it->tuple);
+	mempool_free(&tuple_iterator_pool, it);
+}
+
+uint32_t
+box_tuple_position(box_tuple_iterator_t *it)
+{
+	return it->fieldno;
+}
+
+void
+box_tuple_rewind(box_tuple_iterator_t *it)
+{
+	tuple_rewind(it, it->tuple);
+}
+
+const char *
+box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no)
+{
+	return tuple_seek(it, field_no);
+}
+
+const char *
+box_tuple_next(box_tuple_iterator_t *it)
+{
+	return tuple_next(it);
+}

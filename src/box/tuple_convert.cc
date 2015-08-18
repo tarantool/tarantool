@@ -37,8 +37,11 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 	obuf_dup(buf, tuple->data, tuple->bsize);
 }
 
-void
-tuple_to_buf(struct tuple *tuple, char *buf)
+ssize_t
+tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
 {
-	memcpy(buf, tuple->data, tuple->bsize);
+	if (likely(tuple->bsize <= size)) {
+		memcpy(buf, tuple->data, tuple->bsize);
+	}
+	return tuple->bsize;
 }

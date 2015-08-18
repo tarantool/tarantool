@@ -83,15 +83,15 @@ SysviewEngine::createIndex(struct key_def *key_def)
 {
 	assert(key_def->type == TREE);
 	switch (key_def->space_id) {
-	case SC_VSPACE_ID:
+	case BOX_VSPACE_ID:
 		return new SysviewVspaceIndex(key_def);
-	case SC_VINDEX_ID:
+	case BOX_VINDEX_ID:
 		return new SysviewVindexIndex(key_def);
-	case SC_VUSER_ID:
+	case BOX_VUSER_ID:
 		return new SysviewVuserIndex(key_def);
-	case SC_VFUNC_ID:
+	case BOX_VFUNC_ID:
 		return new SysviewVfuncIndex(key_def);
-	case SC_VPRIV_ID:
+	case BOX_VPRIV_ID:
 		return new SysviewVprivIndex(key_def);
 	default:
 		struct space *space = space_cache_find(key_def->space_id);

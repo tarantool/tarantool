@@ -31,6 +31,8 @@
 #include "error.h"
 #include <stdio.h>
 
+#include <fiber.h>
+
 static struct method clienterror_methods[] = {
 	make_method(&type_ClientError, "code", &ClientError::errcode),
 	METHODS_SENTINEL
@@ -83,3 +85,49 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 	/* nothing */
 }
 
+const char *
+box_error_type(const box_error_t *error)
+{
+	Exception *e = (Exception *) error;
+	return e->type->name;
+}
+
+uint32_t
+box_error_code(const box_error_t *error)
+{
+	Exception *e = (Exception *) error;
+	return ClientError::get_errcode(e);
+}
+
+const char *
+box_error_message(const box_error_t *error)
+{
+	Exception *e = (Exception *) error;
+	return e->errmsg();
+}
+
+const box_error_t *
+box_error_last(void)
+{
+	return (box_error_t *) diag_last_error(&fiber()->diag);
+}
+
+void
+box_error_clear(void)
+{
+	diag_clear(&fiber()->diag);
+}
+
+int
+box_error_raise(uint32_t code, const char *fmt, ...)
+{
+	char msg[EXCEPTION_ERRMSG_MAX];
+
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(msg, sizeof(msg), fmt, ap);
+	va_end(ap);
+
+	tnt_error(ClientError, msg, code);
+	return -1;
+}

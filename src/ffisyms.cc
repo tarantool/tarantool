@@ -3,10 +3,12 @@
 #include "scramble.h"
 #include <box/box.h>
 #include <box/tuple.h>
-#include <box/lua/index.h>
+#include <box/index.h>
+#include <box/func.h>
 #include <box/lua/tuple.h>
 #include <box/lua/call.h>
 #include <box/sophia_engine.h>
+#include <box/request.h>
 #include <box/port.h>
 #include <lua/init.h>
 #include "main.h"
@@ -17,6 +19,7 @@
 #include "random.h"
 #include "iobuf.h"
 #include <lib/salad/guava.h>
+#include "latch.h"
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -28,23 +31,30 @@ void *ffi_symbols[] = {
 	(void *) bswap_u64,
 	(void *) mp_bswap_float,
 	(void *) mp_bswap_double,
-	(void *) tuple_field_count,
-	(void *) tuple_field,
-	(void *) tuple_rewind,
-	(void *) tuple_seek,
-	(void *) tuple_next,
-	(void *) tuple_unref,
-	(void *) boxffi_index_len,
-	(void *) boxffi_index_bsize,
-	(void *) boxffi_index_random,
-	(void *) boxffi_index_get,
-	(void *) boxffi_index_min,
-	(void *) boxffi_index_max,
-	(void *) boxffi_index_count,
-	(void *) boxffi_index_iterator,
+	(void *) box_select,
+	(void *) box_insert,
+	(void *) box_replace,
+	(void *) box_delete,
+	(void *) box_update,
+	(void *) box_upsert,
+	(void *) box_tuple_field_count,
+	(void *) box_tuple_field,
+	(void *) box_tuple_rewind,
+	(void *) box_tuple_seek,
+	(void *) box_tuple_next,
+	(void *) box_tuple_ref,
+	(void *) box_tuple_unref,
+	(void *) box_tuple_to_buf,
+	(void *) box_index_len,
+	(void *) box_index_bsize,
+	(void *) box_index_random,
+	(void *) box_index_get,
+	(void *) box_index_min,
+	(void *) box_index_max,
+	(void *) box_index_count,
+	(void *) box_index_iterator,
+	(void *) box_iterator_next,
 	(void *) boxffi_tuple_update,
-	(void *) boxffi_iterator_next,
-	(void *) boxffi_select,
 	(void *) password_prepare,
 	(void *) tarantool_error_message,
 	(void *) load_cfg,
@@ -72,5 +82,16 @@ void *ffi_symbols[] = {
 	(void *) ibuf_reserve_nothrow_slow,
 	(void *) port_buf_create,
 	(void *) port_buf_destroy,
-	(void *) port_buf_transfer
+	(void *) port_buf_transfer,
+	(void *) box_return_tuple,
+	(void *) box_error_type,
+	(void *) box_error_code,
+	(void *) box_error_message,
+	(void *) box_error_clear,
+	(void *) box_error_last,
+	(void *) box_latch_new,
+	(void *) box_latch_delete,
+	(void *) box_latch_lock,
+	(void *) box_latch_trylock,
+	(void *) box_latch_unlock
 };

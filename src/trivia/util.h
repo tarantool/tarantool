@@ -57,8 +57,8 @@ extern "C" {
 /* Macros to define enum and corresponding strings. */
 #define ENUM0_MEMBER(s, ...) s,
 #define ENUM_MEMBER(s, v, ...) s = v,
-#define ENUM0(enum_name, enum_members) enum enum_name {enum_members(ENUM0_MEMBER) enum_name##_MAX}
-#define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
+#define ENUM0(enum_name, enum_members) enum enum_name { enum_members(ENUM0_MEMBER) enum_name##_MAX }
+#define ENUM(enum_name, enum_members) enum enum_name { enum_members(ENUM_MEMBER) enum_name##_MAX }
 #if defined(__cplusplus)
 #define ENUM_STRS_MEMBER(s, v, ...) names[s] = #s;
 /* A special hack to emulate C99 designated initializers */
@@ -205,5 +205,12 @@ fmemopen(void *buf, size_t size, const char *mode);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
+
+
+#if defined(__cplusplus)
+#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
+#else
+#define API_EXPORT extern __attribute__ ((visibility ("default")))
+#endif
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

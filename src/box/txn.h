@@ -158,19 +158,33 @@ txn_stmt(struct txn *txn)
  * FFI bindings: do not throw exceptions, do not accept extra
  * arguments
  */
-extern "C" {
+
+/** \cond public */
 
 /**
  * @retval 0 - success
  * @retval -1 - failed, perhaps a transaction has already been
  * started
  */
-int
-boxffi_txn_begin();
+API_EXPORT int
+box_txn_begin(void);
 
-void
-boxffi_txn_rollback();
+API_EXPORT int
+box_txn_commit(void);
 
-} /* extern  "C" */
+API_EXPORT void
+box_txn_rollback(void);
+
+/**
+ * Allocate memory on txn memory pool.
+ * The memory is automatically deallocated when the transaction
+ * is committed or rolled back.
+ *
+ * @retval 0  out of memory
+ */
+API_EXPORT void *
+box_txn_alloc(size_t size);
+
+/** \endcond public */
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

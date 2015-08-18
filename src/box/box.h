@@ -117,4 +117,55 @@ extern struct recovery_state *recovery;
 }
 #endif /* defined(__cplusplus) */
 
+struct request;
+struct port;
+struct box_function_ctx {
+	struct request *request;
+	struct port *port;
+};
+
+typedef struct tuple box_tuple_t;
+
+/* box_select is private and used only by FFI */
+API_EXPORT int
+box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+	   int iterator, uint32_t offset, uint32_t limit,
+	   const char *key, const char *key_end);
+
+/** \cond public */
+typedef struct box_function_ctx box_function_ctx_t;
+API_EXPORT int
+box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple);
+
+API_EXPORT uint32_t
+box_space_id_by_name(const char *name, uint32_t len);
+
+API_EXPORT uint32_t
+box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len);
+
+API_EXPORT int
+box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
+	   box_tuple_t **result);
+
+API_EXPORT int
+box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
+	    box_tuple_t **result);
+
+API_EXPORT int
+box_delete(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, box_tuple_t **result);
+
+API_EXPORT int
+box_update(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, const char *ops, const char *ops_end,
+	   int index_base, box_tuple_t **result);
+
+API_EXPORT int
+box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, const char *ops, const char *ops_end,
+	   const char *tuple, const char *tuple_end, int index_base,
+	   box_tuple_t **result);
+
+/** \endcond public */
+
 #endif /* INCLUDES_TARANTOOL_BOX_H */

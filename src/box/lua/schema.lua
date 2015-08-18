@@ -13,34 +13,45 @@ ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
 
-    struct iterator {
-        struct tuple *(*next)(struct iterator *);
-        void (*free)(struct iterator *);
-        void (*close)(struct iterator *);
-        int sc_version;
-        uint32_t space_id;
-        uint32_t index_id;
-    };
+    typedef struct tuple box_tuple_t;
+    typedef struct iterator box_iterator_t;
+
+    /** \cond public */
+    box_iterator_t *
+    box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
+                       const char *key, const char *key_end);
+    int
+    box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
+    void
+    box_iterator_free(box_iterator_t *itr);
+    /** \endcond public */
+    /** \cond public */
     size_t
-    boxffi_index_len(uint32_t space_id, uint32_t index_id);
+    box_index_len(uint32_t space_id, uint32_t index_id);
     size_t
-    boxffi_index_bsize(uint32_t space_id, uint32_t index_id);
-    struct tuple *
-    boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
-    struct tuple *
-    boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key);
-    struct tuple *
-    boxffi_index_min(uint32_t space_id, uint32_t index_id, const char *key);
-    struct tuple *
-    boxffi_index_max(uint32_t space_id, uint32_t index_id, const char *key);
+    box_index_bsize(uint32_t space_id, uint32_t index_id);
+    int
+    box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
+                     box_tuple_t **result);
+    int
+    box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
+                  const char *key_end, box_tuple_t **result);
+    int
+    box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
+                  const char *key_end, box_tuple_t **result);
+    int
+    box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
+                  const char *key_end, box_tuple_t **result);
     ssize_t
-    boxffi_index_count(uint32_t space_id, uint32_t index_id, int type,
-                       const char *key);
-    struct iterator *
-    boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
-                  const char *key);
-    struct tuple *
-    boxffi_iterator_next(struct iterator *itr);
+    box_index_count(uint32_t space_id, uint32_t index_id, int type,
+                    const char *key, const char *key_end);
+    /** \endcond public */
+    /** \cond public */
+    int
+    box_txn_begin();
+    void
+    box_txn_rollback();
+    /** \endcond public */
 
     struct port
     {
@@ -70,16 +81,11 @@ ffi.cdef[[
     port_buf_transfer(struct port_buf *port_buf);
 
     int
-    boxffi_select(struct port_buf *port, uint32_t space_id, uint32_t index_id,
-              int iterator, uint32_t offset, uint32_t limit,
-              const char *key, const char *key_end);
+    box_select(struct port_buf *port, uint32_t space_id, uint32_t index_id,
+               int iterator, uint32_t offset, uint32_t limit,
+               const char *key, const char *key_end);
     void password_prepare(const char *password, int len,
-		                  char *out, int out_len);
-    int
-    boxffi_txn_begin();
-
-    void
-    boxffi_txn_rollback();
+                          char *out, int out_len);
 ]]
 
 local function user_or_role_resolve(user)
@@ -220,13 +226,13 @@ local function update_param_table(table, defaults)
 end
 
 box.begin = function()
-    if ffi.C.boxffi_txn_begin() == -1 then
+    if builtin.box_txn_begin() == -1 then
         box.error()
     end
 end
 -- box.commit yields, so it's defined in call.cc
 
-box.rollback = ffi.C.boxffi_txn_rollback;
+box.rollback = builtin.box_txn_rollback;
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -529,6 +535,9 @@ box.schema.index.alter = function(space_id, index_id, options)
                    key_opts, parts}
 end
 
+-- a static box_tuple_t ** instance for calling box_index_* API
+local ptuple = ffi.new('box_tuple_t *[1]')
+
 local function keify(key)
     if key == nil then
         return {}
@@ -572,11 +581,10 @@ local iterator_gen = function(param, state)
         error('usage: next(param, state)')
     end
     -- next() modifies state in-place
-    local tuple = builtin.boxffi_iterator_next(state)
-    if tuple == ffi.cast('void *', -1) then
+    if builtin.box_iterator_next(state, ptuple) ~= 0 then
         return box.error() -- error
-    elseif tuple ~= nil then
-        return state, box.tuple.bless(tuple) -- new state, value
+    elseif ptuple[0] ~= nil then
+        return state, box.tuple.bless(ptuple[0]) -- new state, value
     else
         return nil
     end
@@ -589,10 +597,6 @@ local iterator_gen_luac = function(param, state)
     else
         return nil
     end
-end
-
-local iterator_cdata_gc = function(iterator)
-    return iterator.free(iterator)
 end
 
 -- global struct port instance to use by select()/get()
@@ -638,7 +642,7 @@ function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
     index_mt.len = function(index)
-        local ret = builtin.boxffi_index_len(index.space_id, index.id)
+        local ret = builtin.box_index_len(index.space_id, index.id)
         if ret == -1 then
             box.error()
         end
@@ -646,7 +650,7 @@ function box.schema.space.bless(space)
     end
     -- index.bsize
     index_mt.bsize = function(index)
-        local ret = builtin.boxffi_index_bsize(index.space_id, index.id)
+        local ret = builtin.box_index_bsize(index.space_id, index.id)
         if ret == -1 then
             box.error()
         end
@@ -658,12 +662,12 @@ function box.schema.space.bless(space)
     index_mt.__index = index_mt
     -- min and max
     index_mt.min_ffi = function(index, key)
-        local pkey = msgpackffi.encode_tuple(key)
-        local tuple = builtin.boxffi_index_min(index.space_id, index.id, pkey)
-        if tuple == ffi.cast('void *', -1) then
+        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        if builtin.box_index_min(index.space_id, index.id,
+                                 pkey, pkey_end, ptuple) ~= 0 then
             box.error() -- error
-        elseif tuple ~= nil then
-            return box.tuple.bless(tuple)
+        elseif ptuple[0] ~= nil then
+            return box.tuple.bless(ptuple[0])
         else
             return
         end
@@ -673,12 +677,12 @@ function box.schema.space.bless(space)
         return internal.min(index.space_id, index.id, key);
     end
     index_mt.max_ffi = function(index, key)
-        local pkey = msgpackffi.encode_tuple(key)
-        local tuple = builtin.boxffi_index_max(index.space_id, index.id, pkey)
-        if tuple == ffi.cast('void *', -1) then
+        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        if builtin.box_index_max(index.space_id, index.id,
+                                 pkey, pkey_end, ptuple) ~= 0 then
             box.error() -- error
-        elseif tuple ~= nil then
-            return box.tuple.bless(tuple)
+        elseif ptuple[0] ~= nil then
+            return box.tuple.bless(ptuple[0])
         else
             return
         end
@@ -689,11 +693,11 @@ function box.schema.space.bless(space)
     end
     index_mt.random_ffi = function(index, rnd)
         rnd = rnd or math.random()
-        local tuple = builtin.boxffi_index_random(index.space_id, index.id, rnd)
-        if tuple == ffi.cast('void *', -1) then
+        if builtin.box_index_random(index.space_id, index.id, rnd,
+                                    ptuple) ~= 0 then
             box.error() -- error
-        elseif tuple ~= nil then
-            return box.tuple.bless(tuple)
+        elseif ptuple[0] ~= nil then
+            return box.tuple.bless(ptuple[0])
         else
             return
         end
@@ -708,12 +712,14 @@ function box.schema.space.bless(space)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
         local keybuf = ffi.string(pkey, pkey_end - pkey)
-        local cdata = builtin.boxffi_index_iterator(index.space_id, index.id,
-            itype, keybuf);
+        local pkeybuf = ffi.cast('const char *', keybuf)
+        local cdata = builtin.box_index_iterator(index.space_id, index.id,
+            itype, pkeybuf, pkeybuf + #keybuf);
         if cdata == nil then
             box.error()
         end
-        return fun.wrap(iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc))
+        return fun.wrap(iterator_gen, keybuf,
+            ffi.gc(cdata, builtin.box_iterator_free))
     end
     index_mt.pairs_luac = function(index, key, opts)
         key = keify(key)
@@ -722,15 +728,15 @@ function box.schema.space.bless(space)
         local keybuf = ffi.string(keymp, #keymp)
         local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
         return fun.wrap(iterator_gen_luac, keybuf,
-            ffi.gc(cdata, iterator_cdata_gc))
+            ffi.gc(cdata, builtin.box_iterator_free))
     end
 
     -- index subtree size
     index_mt.count_ffi = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
-        local count = builtin.boxffi_index_count(index.space_id, index.id,
-            itype, pkey);
+        local count = builtin.box_index_count(index.space_id, index.id,
+            itype, pkey, pkey_end);
         if count == -1 then
             box.error()
         end
@@ -750,11 +756,11 @@ function box.schema.space.bless(space)
 
     index_mt.get_ffi = function(index, key)
         local key, key_end = msgpackffi.encode_tuple(key)
-        local tuple = builtin.boxffi_index_get(index.space_id, index.id, key)
-        if tuple == ffi.cast('void *', -1) then
+        if builtin.box_index_get(index.space_id, index.id,
+                                 key, key_end, ptuple) ~= 0 then
             return box.error() -- error
-        elseif tuple ~= nil then
-            return box.tuple.bless(tuple)
+        elseif ptuple[0] ~= nil then
+            return box.tuple.bless(ptuple[0])
         else
             return
         end
@@ -784,7 +790,7 @@ function box.schema.space.bless(space)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
         builtin.port_buf_create(port_buf)
-        if builtin.boxffi_select(port_buf, index.space_id,
+        if builtin.box_select(port_buf, index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
             builtin.port_buf_destroy(port_buf);
             return box.error()
@@ -794,12 +800,11 @@ function box.schema.space.bless(space)
         local entry = port_buf.first
         local i = 1
         while entry ~= nil do
-            -- tuple.bless must never fail
             ret[i] = box.tuple.bless(entry.tuple)
             entry = entry.next
             i = i + 1
         end
-        builtin.port_buf_transfer(port_buf);
+        builtin.port_buf_destroy(port_buf);
         return ret
     end
 
@@ -976,11 +981,11 @@ function box.schema.space.bless(space)
         return box.schema.index.create(space.id, name, options)
     end
     space_mt.run_triggers = function(space, yesno)
-        local s = ffi.C.space_by_id(space.id)
+        local s = builtin.space_by_id(space.id)
         if s == nil then
             box.error(box.error.NO_SUCH_SPACE, space.name)
         end
-        ffi.C.space_run_triggers(s, yesno)
+        builtin.space_run_triggers(s, yesno)
     end
     space_mt.__index = space_mt
 
@@ -1158,7 +1163,7 @@ box.schema.user = {}
 box.schema.user.password = function(password)
     local BUF_SIZE = 128
     local buf = ffi.new("char[?]", BUF_SIZE)
-    ffi.C.password_prepare(password, #password, buf, BUF_SIZE)
+    builtin.password_prepare(password, #password, buf, BUF_SIZE)
     return ffi.string(buf)
 end
 

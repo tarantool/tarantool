@@ -206,7 +206,7 @@ tuple_ref_exception();
  *
  * @pre tuple->refs + count >= 0
  */
-extern "C" inline void
+inline void
 tuple_ref(struct tuple *tuple)
 {
 	if (tuple->refs + 1 > TUPLE_REF_MAX)
@@ -220,7 +220,7 @@ tuple_ref(struct tuple *tuple)
  *
  * @pre tuple->refs + count >= 0
  */
-extern "C" inline void
+inline void
 tuple_unref(struct tuple *tuple)
 {
 	assert(tuple->refs - 1 >= 0);
@@ -258,7 +258,7 @@ tuple_format(const struct tuple *tuple)
  * @param tuple
  * @return the number of fields in tuple
  */
-extern "C" inline uint32_t
+inline uint32_t
 tuple_field_count(const struct tuple *tuple)
 {
 	const char *data = tuple->data;
@@ -372,7 +372,7 @@ tuple_field_cstr(struct tuple *tuple, uint32_t i);
 struct tuple_iterator {
 	/** @cond false **/
 	/* State */
-	const struct tuple *tuple;
+	struct tuple *tuple;
 	/** Always points to the beginning of the next field. */
 	const char *pos;
 	/** @endcond **/
@@ -397,8 +397,8 @@ struct tuple_iterator {
  * @param[out] it tuple iterator
  * @param[in]  tuple tuple
  */
-extern "C" inline void
-tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
+inline void
+tuple_rewind(struct tuple_iterator *it, struct tuple *tuple)
 {
 	it->tuple = tuple;
 	it->pos = tuple->data;
@@ -412,7 +412,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
  * @retval field  if the iterator has the requested field
  * @retval NULL   otherwise (iteration is out of range)
  */
-extern "C" const char *
+const char *
 tuple_seek(struct tuple_iterator *it, uint32_t field_no);
 
 /**
@@ -420,7 +420,7 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no);
  * @param it tuple iterator
  * @return next field or NULL if the iteration is out of range
  */
-extern "C" const char *
+const char *
 tuple_next(struct tuple_iterator *it);
 
 /**
@@ -531,11 +531,15 @@ void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
 /**
- * Store tuple fields in the memory buffer. Buffer must have at least
- * tuple->bsize bytes.
+ * Store tuple fields in the memory buffer.
+ * \retval -1 on error.
+ * \retval number of bytes written on success.
+ * Upon successful return, the function returns the number of bytes written.
+ * If buffer size is not enough then the return value is the number of bytes
+ * which would have been written if enough space had been available.
  */
-extern "C" void
-tuple_to_buf(struct tuple *tuple, char *buf);
+ssize_t
+tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
 
 /** Initialize tuple library */
 void
@@ -551,5 +555,102 @@ tuple_begin_snapshot();
 
 void
 tuple_end_snapshot();
+
+/** \cond public */
+typedef struct tuple_format box_tuple_format_t;
+
+API_EXPORT box_tuple_format_t *
+box_tuple_format_default(void);
+
+typedef struct tuple box_tuple_t;
+
+API_EXPORT box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
+
+API_EXPORT int
+box_tuple_ref(box_tuple_t *tuple);
+
+API_EXPORT void
+box_tuple_unref(box_tuple_t *tuple);
+
+API_EXPORT uint32_t
+box_tuple_field_count(const box_tuple_t *tuple);
+
+API_EXPORT size_t
+box_tuple_bsize(const box_tuple_t *tuple);
+
+API_EXPORT ssize_t
+box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
+
+API_EXPORT box_tuple_format_t *
+box_tuple_format(const box_tuple_t *tuple);
+
+API_EXPORT const char *
+box_tuple_field(const box_tuple_t *tuple, uint32_t i);
+
+typedef struct tuple_iterator box_tuple_iterator_t;
+
+API_EXPORT box_tuple_iterator_t *
+box_tuple_iterator(box_tuple_t *tuple);
+
+API_EXPORT void
+box_tuple_iterator_free(box_tuple_iterator_t *it);
+
+API_EXPORT uint32_t
+box_tuple_position(box_tuple_iterator_t *it);
+
+API_EXPORT void
+box_tuple_rewind(box_tuple_iterator_t *it);
+
+API_EXPORT const char *
+box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
+
+API_EXPORT const char *
+box_tuple_next(box_tuple_iterator_t *it);
+
+/** \endcond public */
+
+extern struct tuple *box_tuple_last;
+
+/**
+ * Convert internal `struct tuple` to public `box_tuple_t`.
+ * \post \a tuple ref counted until the next call.
+ * \post tuple_ref() doesn't fail at least once
+ * \sa tuple_ref
+ * \throw ER_TUPLE_REF_OVERFLOW
+ */
+static inline box_tuple_t *
+tuple_bless(struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	/* Ensure tuple can be referenced at least once after return */
+	if (tuple->refs + 2 > TUPLE_REF_MAX)
+		tuple_ref_exception();
+	tuple->refs++;
+	/* Remove previous tuple */
+	if (likely(box_tuple_last != NULL))
+		tuple_unref(box_tuple_last); /* do not throw */
+	/* Remember current tuple */
+	box_tuple_last = tuple;
+	return tuple;
+}
+
+static inline void
+mp_tuple_assert(const char *tuple, const char *tuple_end)
+{
+	assert(mp_typeof(*tuple) == MP_ARRAY);
+	mp_next(&tuple);
+	assert(tuple == tuple_end);
+}
+
+static inline uint32_t
+box_tuple_field_u32(box_tuple_t *tuple, uint32_t field_no, uint32_t deflt)
+{
+	const char *field = box_tuple_field(tuple, field_no);
+	if (field != NULL && mp_typeof(*field) == MP_UINT)
+		return mp_decode_uint(&field);
+	return deflt;
+}
+
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

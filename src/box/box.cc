@@ -303,6 +303,190 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	process_rw(&req, &null_port);
 }
 
+int
+box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
+{
+	try {
+		port_add_tuple(ctx->port, tuple);
+		return 0;
+	} catch (Exception *e) {
+		return -1;
+	}
+}
+
+/* schema_find_id()-like method using only public API */
+uint32_t
+box_space_id_by_name(const char *name, uint32_t len)
+{
+	char buf[1 + 5 + BOX_NAME_MAX + 5];
+	if (len > BOX_NAME_MAX)
+		return BOX_ID_NIL;
+
+	char *p = buf;
+	p = mp_encode_array(p, 1);
+	p = mp_encode_str(p, name, len);
+	assert(p < buf + sizeof(buf));
+
+	/* NOTE: error and missing key cases are indistinguishable */
+	box_tuple_t *tuple;
+	if (box_index_get(BOX_VSPACE_ID, 2, buf, p, &tuple) != 0)
+		return BOX_ID_NIL;
+	if (tuple == NULL)
+		return BOX_ID_NIL;
+	return box_tuple_field_u32(tuple, 0, BOX_ID_NIL);
+}
+
+uint32_t
+box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
+{
+	char buf[1 + 5 + BOX_NAME_MAX + 5];
+	if (len > BOX_NAME_MAX)
+		return BOX_ID_NIL;
+
+	char *p = buf;
+	p = mp_encode_array(p, 2);
+	p = mp_encode_uint(p, space_id);
+	p = mp_encode_str(p, name, len);
+	assert(p < buf + sizeof(buf));
+
+	/* NOTE: error and missing key cases are indistinguishable */
+	box_tuple_t *tuple;
+	if (box_index_get(BOX_VINDEX_ID, 2, buf, p, &tuple) != 0)
+		return BOX_ID_NIL;
+	if (tuple == NULL)
+		return BOX_ID_NIL;
+	return box_tuple_field_u32(tuple, 1, BOX_ID_NIL);
+}
+/** \endcond public */
+
+static inline int
+box_process1(struct request *request, box_tuple_t **result)
+{
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	try {
+		box_process(request, &port_buf.base);
+		box_tuple_t *tuple = NULL;
+		/* Sophia: always bless tuple even if result is NULL */
+		if (port_buf.first != NULL)
+			tuple = tuple_bless(port_buf.first->tuple);
+		port_buf_destroy(&port_buf);
+		if (result)
+			*result = tuple;
+		return 0;
+	} catch (Exception *e) {
+		port_buf_destroy(&port_buf);
+		return -1;
+	}
+}
+
+int
+box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+	   int iterator, uint32_t offset, uint32_t limit,
+	   const char *key, const char *key_end)
+{
+	struct request request;
+	request_create(&request, IPROTO_SELECT);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.limit = limit;
+	request.offset = offset;
+	request.iterator = iterator;
+	request.key = key;
+	request.key_end = key_end;
+
+	try {
+		box_process(&request, port);
+		return 0;
+	} catch (Exception *e) {
+		/* will be hanled by box.error() in Lua */
+		return -1;
+	}
+}
+
+int
+box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
+	   box_tuple_t **result)
+{
+	mp_tuple_assert(tuple, tuple_end);
+	struct request request;
+	request_create(&request, IPROTO_INSERT);
+	request.space_id = space_id;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	return box_process1(&request, result);
+}
+
+int
+box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
+	    box_tuple_t **result)
+{
+	mp_tuple_assert(tuple, tuple_end);
+	struct request request;
+	request_create(&request, IPROTO_REPLACE);
+	request.space_id = space_id;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	return box_process1(&request, result);
+}
+
+int
+box_delete(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, box_tuple_t **result)
+{
+	mp_tuple_assert(key, key_end);
+	struct request request;
+	request_create(&request, IPROTO_DELETE);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = key;
+	request.key_end = key_end;
+	return box_process1(&request, result);
+}
+
+int
+box_update(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, const char *ops, const char *ops_end,
+	   int index_base, box_tuple_t **result)
+{
+	mp_tuple_assert(key, key_end);
+	mp_tuple_assert(ops, ops_end);
+	struct request request;
+	request_create(&request, IPROTO_UPDATE);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = key;
+	request.key_end = key_end;
+	request.index_base = index_base;
+	/** Legacy: in case of update, ops are passed in in request tuple */
+	request.tuple = ops;
+	request.tuple_end = ops_end;
+	return box_process1(&request, result);
+}
+
+int
+box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
+	   const char *key_end, const char *ops, const char *ops_end,
+	   const char *tuple, const char *tuple_end, int index_base,
+	   box_tuple_t **result)
+{
+	mp_tuple_assert(key, key_end);
+	mp_tuple_assert(ops, ops_end);
+	mp_tuple_assert(tuple, tuple_end);
+	struct request request;
+	request_create(&request, IPROTO_UPSERT);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = key;
+	request.key_end = key_end;
+	request.ops = ops;
+	request.ops_end = ops_end;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	request.index_base = index_base;
+	return box_process1(&request, result);
+}
+
 /**
  * @brief Called when recovery/replication wants to add a new server
  * to cluster.
@@ -314,7 +498,7 @@ static void
 box_on_cluster_join(const tt_uuid *server_uuid)
 {
 	/** Find the largest existing server id. */
-	struct space *space = space_cache_find(SC_CLUSTER_ID);
+	struct space *space = space_cache_find(BOX_CLUSTER_ID);
 	class Index *index = index_find(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
@@ -325,7 +509,7 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	if (server_id >= VCLOCK_MAX)
 		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 
-	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
+	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
 
@@ -334,7 +518,7 @@ box_process_join(int fd, struct xrow_header *header)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_R);
-	access_check_space(space_cache_find(SC_CLUSTER_ID), PRIV_W);
+	access_check_space(space_cache_find(BOX_CLUSTER_ID), PRIV_W);
 
 	assert(header->type == IPROTO_JOIN);
 
@@ -361,7 +545,7 @@ box_set_server_uuid()
 	assert(r->server_id == 0);
 	if (vclock_has(&r->vclock, 1))
 		vclock_del_server(&r->vclock, 1);
-	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
+	boxk(IPROTO_REPLACE, BOX_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&r->server_uuid));
 	/* Remove surrogate server */
 	vclock_del_server(&r->vclock, 0);
@@ -377,7 +561,7 @@ box_set_cluster_uuid()
 	/* Generate a new cluster UUID */
 	tt_uuid_create(&uu);
 	/* Save cluster UUID in _schema */
-	boxk(IPROTO_REPLACE, SC_SCHEMA_ID, "%s%s", "cluster",
+	boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "%s%s", "cluster",
 	     tt_uuid_str(&uu));
 }
 

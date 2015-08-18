@@ -85,4 +85,46 @@ public:
 	ErrorInjection(const char *file, unsigned line, const char *msg);
 };
 
+/** \cond public */
+struct box_error;
+typedef struct box_error box_error_t;
+
+/**
+ * Return error type, e.g. "ClientError", "SocketError", etc.
+ */
+API_EXPORT const char *
+box_error_type(const box_error_t *error);
+
+/*
+ * Return IPROTO error code
+ */
+API_EXPORT uint32_t
+box_error_code(const box_error_t *error);
+
+/*
+ * Return error message
+ */
+API_EXPORT const char *
+box_error_message(const box_error_t *error);
+
+/**
+ * Return last error
+ */
+API_EXPORT const box_error_t *
+box_error_last(void);
+
+/*
+ * Clear last error
+ */
+API_EXPORT void
+box_error_clear(void);
+
+/*
+ * Set last error
+ * \param code IPROTO error code
+ */
+API_EXPORT int
+box_error_raise(uint32_t code, const char *fmt, ...);
+/** \endcond public */
+
 #endif /* TARANTOOL_BOX_ERROR_H_INCLUDED */
