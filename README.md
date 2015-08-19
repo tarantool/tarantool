@@ -68,8 +68,8 @@ Additional build options can be set similarly:
 
 'make' creates 'tarantool' executable in directory src/.
 
-There is no 'make install' goal, but no installation
-is required either.
+There is 'make install' goal. One can also run Tarantool executable without
+installation.
 
 To start the server, try:
 
