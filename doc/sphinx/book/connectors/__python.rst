@@ -18,7 +18,7 @@ To prepare, paste the code into a file named example.py and install
 tarantool-python with either ``pip install tarantool\>0.4`` to install
 in ``/usr`` (requires **root** privilege) or ``pip install tarantool\>0.4 --user``
 to install in ``~`` i.e. user's default directory. Before trying to run,
-check that the server is listening and that examples exists, as `described earlier`_.
+check that the server is listening and that examples exists, as described at the start of this chapter.
 To run the program, say ``python example.py``. The program will connect
 to the server, will send the request, and will not throw an exception if
 all went well. If the tuple already exists, the program will throw
@@ -29,5 +29,4 @@ necessary for good practice. For that, see http://github.com/tarantool/tarantool
 For an example of a Python API for `Queue managers on Tarantool`_, see
 https://github.com/tarantool/tarantool-queue-python.
 
-.. _described earlier: https://en.wikipedia.org/wiki/Cpan
 .. _Queue managers on Tarantool: https://github.com/tarantool/queue
