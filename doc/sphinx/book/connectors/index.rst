@@ -95,3 +95,6 @@ script:
 .. include:: __php.rst
 
 .. include:: __python.rst
+
+.. include:: __c.rst
+

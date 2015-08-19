@@ -33,7 +33,7 @@ directory and tell PHP where to find the ``php.ini`` file that contains that lin
 
 Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples'
 via the PHP API. Before trying to run, check that the server is listening and that
-``examples`` exists, as `described earlier`_. To run, paste the code into a file named
+``examples`` exists, as described at the start of this chapter. To run, paste the code into a file named
 example.php and say ``php example.php``. The program will open a socket connection with
 the tarantool server at localhost:3301, then send an INSERT request, then — if all is
 well — print "Insert succeeded". If the tuple already exists, the program will print
@@ -59,5 +59,4 @@ applications.
 The example program only shows one command and does not show all that's necessary
 for good practice. For that, please see `tarantool-php`_ project at GitHub.
 
-.. _described earlier: https://en.wikipedia.org/wiki/Cpan
 .. _tarantool-php: https://github.com/tarantool/tarantool-php
