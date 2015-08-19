@@ -364,6 +364,12 @@ background()
 		goto error;
 
 	/*
+	 * tell libev we've just forked, this is necessary to re-initialize
+	 * kqueue on FreeBSD.
+	 */
+	ev_loop_fork(cord()->loop);
+
+	/*
 	 * reinit signals after fork, because fork() implicitly calls
 	 * signal_reset() via pthread_atfork() hook installed by signal_init().
 	 */
