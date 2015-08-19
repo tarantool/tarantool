@@ -152,9 +152,7 @@ small_alloc_setopt(struct small_alloc *alloc, enum small_opt opt, bool val)
 {
 	switch (opt) {
 	case SMALL_DELAYED_FREE_MODE:
-		/* Delayed mode is only usable if the arena is shared. */
-		if (alloc->cache->arena->flags & MAP_SHARED)
-			alloc->is_delayed_free_mode = val;
+		alloc->is_delayed_free_mode = val;
 		break;
 	default:
 		assert(false);

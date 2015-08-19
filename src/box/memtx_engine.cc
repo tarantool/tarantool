@@ -58,7 +58,7 @@
  */
 extern struct quota memtx_quota;
 static bool memtx_index_arena_initialized = false;
-static struct slab_arena memtx_index_arena;
+extern struct slab_arena memtx_arena;
 static struct slab_cache memtx_index_slab_cache;
 struct mempool memtx_index_extent_pool;
 /**
@@ -897,13 +897,8 @@ memtx_index_arena_init()
 		/* already done.. */
 		return;
 	}
-	/* Creating arena */
-	if (slab_arena_create(&memtx_index_arena, &memtx_quota,
-			      0, MEMTX_SLAB_SIZE, MAP_PRIVATE)) {
-		panic_syserror("failed to initialize index arena");
-	}
 	/* Creating slab cache */
-	slab_cache_create(&memtx_index_slab_cache, &memtx_index_arena);
+	slab_cache_create(&memtx_index_slab_cache, &memtx_arena);
 	/* Creating mempool */
 	mempool_create(&memtx_index_extent_pool,
 		       &memtx_index_slab_cache,
