@@ -32,20 +32,18 @@ lua_source(lua_sources lua/fio.lua)
 lua_source(lua_sources lua/strict.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
-if (EXISTS "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bcsave.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dis_x86.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dis_x64.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dump.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/vmdef.lua")
-    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/v.lua")
-    if (EXISTS "${PROJECT_BINARY_DIR}/third_party/luajit/src/jit/p.lua")
-        # Profiler LuaJIT 2.1+
-        lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/p.lua")
-        lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/zone.lua")
-    endif()
-endif(EXISTS "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bcsave.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dis_x86.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dis_x64.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/dump.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/vmdef.lua")
+lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/v.lua")
+if (EXISTS "${PROJECT_BINARY_DIR}/third_party/luajit/src/jit/p.lua")
+    # Profiler LuaJIT 2.1+
+    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/p.lua")
+    lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/zone.lua")
+endif()
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
