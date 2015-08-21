@@ -33,7 +33,6 @@
 
 struct txn;
 struct port;
-extern int stat_base;
 
 struct request
 {

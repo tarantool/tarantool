@@ -48,6 +48,7 @@ add_library(box
     request.cc
     txn.cc
     box.cc
+    box_stat.c
     user_def.cc
     user.cc
     authentication.cc

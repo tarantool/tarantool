@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -26,6 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stat.h>
+#include "box/box_stat.h"
 #include "box/lua/index.h"
 #include "lua/utils.h"
 #include "box/index.h"
@@ -92,6 +94,7 @@ boxffi_index_get(uint32_t space_id, uint32_t index_id, const char *key)
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		primary_key_validate(index->key_def, key, part_count);
 		struct tuple *tuple = index->findByKey(key, part_count);
+	        stat_collect(stat_base, BOX_SELECT, 1);
 		if (tuple == NULL)
 			return NULL;
 		tuple_ref(tuple); /* must not throw in this case */
