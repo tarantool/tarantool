@@ -347,27 +347,3 @@ cleanup_task:
 	return rc;
 }
 
-static ssize_t
-cord_cojoin_cb(va_list ap)
-{
-	struct cord *cord = va_arg(ap, struct cord *);
-	void *retval = NULL;
-	int res = tt_pthread_join(cord->id, &retval);
-	return res;
-}
-
-int
-cord_cojoin(struct cord *cord)
-{
-	assert(cord() != cord); /* Can't join self. */
-	int rc = coio_call(cord_cojoin_cb, cord);
-	if (rc == 0 && !diag_is_empty(&cord->fiber->diag)) {
-		diag_move(&cord->fiber->diag, &fiber()->diag);
-		cord_destroy(cord);
-		 /* re-throw exception in this fiber */
-		diag_last_error(&fiber()->diag)->raise();
-	}
-	cord_destroy(cord);
-	return rc;
-}
-
