@@ -387,6 +387,38 @@ luaL_pushuint64(struct lua_State *L, uint64_t val);
 LUA_API int
 luaL_pushint64(struct lua_State *L, int64_t val);
 
+/**
+ * Checks whether the argument idx is a uint64 or a convertable string and
+ * returns this number.
+ * \throws error if the argument can't be converted.
+ */
+LUA_API uint64_t
+luaL_checkuint64(struct lua_State *L, int idx);
+
+/**
+ * Checks whether the argument idx is a int64 or a convertable string and
+ * returns this number.
+ * \throws error if the argument can't be converted.
+ */
+LUA_API int64_t
+luaL_checkint64(struct lua_State *L, int idx);
+
+/**
+ * Checks whether the argument idx is a uint64 or a convertable string and
+ * returns this number.
+ * \return the converted number or 0 of argument can't be converted.
+ */
+LUA_API uint64_t
+luaL_touint64(struct lua_State *L, int idx);
+
+/**
+ * Checks whether the argument idx is a int64 or a convertable string and
+ * returns this number.
+ * \return the converted number or 0 of argument can't be converted.
+ */
+LUA_API int64_t
+luaL_toint64(struct lua_State *L, int idx);
+
 /** \endcond public */
 
 /**

@@ -697,6 +697,104 @@ luaL_pushint64(struct lua_State *L, int64_t val)
 	return 1;
 }
 
+static inline int
+luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
+{
+	uint32_t ctypeid;
+	void *cdata;
+	/*
+	 * This code looks mostly like luaL_tofield(), but has less
+	 * cases and optimized for numbers.
+	 */
+	switch (lua_type(L, idx)) {
+	case LUA_TNUMBER:
+		*result = lua_tointeger(L, idx);
+		return 0;
+	case LUA_TCDATA:
+		cdata = luaL_checkcdata(L, 1, &ctypeid);
+		switch (ctypeid) {
+		case CTID_CCHAR:
+		case CTID_INT8:
+			*result = *(int8_t *) cdata;
+			return 0;
+		case CTID_INT16:
+			*result = *(int16_t *) cdata;
+			return 0;
+		case CTID_INT32:
+			*result = *(int32_t *) cdata;
+			return 0;
+		case CTID_INT64:
+			*result = *(int64_t *) cdata;
+			return 0;
+		case CTID_UINT8:
+			*result = *(uint8_t *) cdata;
+			return 0;
+		case CTID_UINT16:
+			*result = *(uint16_t *) cdata;
+			return 0;
+		case CTID_UINT32:
+			*result = *(uint32_t *) cdata;
+			return 0;
+		case CTID_UINT64:
+			*result = *(uint64_t *) cdata;
+			return 0;
+		}
+		return -1;
+	case LUA_TSTRING:
+		const char *arg = luaL_checkstring(L, idx);
+		char *arge;
+		errno = 0;
+		*result = (int64_t) (unsignd ? strtoull(arg, &arge, 10) :
+			strtoll(arg, &arge, 10));
+		if (errno == 0 && arge != arg)
+			return 0;
+		return 1;
+	}
+	return -1;
+}
+
+uint64_t
+luaL_checkuint64(struct lua_State *L, int idx)
+{
+	int64_t result;
+	if (luaL_convertint64(L, idx, true, &result) != 0) {
+		lua_pushfstring(L, "expected uint64_t as %d argument", idx);
+		lua_error(L);
+		return 0;
+	}
+	return result;
+}
+
+int64_t
+luaL_checkint64(struct lua_State *L, int idx)
+{
+	int64_t result;
+	if (luaL_convertint64(L, idx, false, &result) != 0) {
+		lua_pushfstring(L, "expected int64_t as %d argument", idx);
+		lua_error(L);
+		return 0;
+	}
+	return result;
+}
+
+uint64_t
+luaL_touint64(struct lua_State *L, int idx)
+{
+	int64_t result;
+	if (luaL_convertint64(L, idx, true, &result) == 0)
+		return result;
+	return 0;
+}
+
+int64_t
+luaL_toint64(struct lua_State *L, int idx)
+{
+	int64_t result;
+	if (luaL_convertint64(L, idx, false, &result) == 0)
+		return result;
+	return 0;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {

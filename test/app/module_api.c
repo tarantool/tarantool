@@ -101,6 +101,84 @@ test_pushint64(lua_State *L)
 	return 1;
 }
 
+static int
+test_checkuint64(lua_State *L)
+{
+	lua_pushnumber(L, 12345678);
+	if (luaL_checkuint64(L, -1) != 12345678)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushliteral(L, "18446744073709551615");
+	if (luaL_checkuint64(L, -1) != 18446744073709551615ULL)
+		return 0;
+	lua_pop(L, 1);
+
+	luaL_pushuint64(L, 18446744073709551615ULL);
+	if (luaL_checkuint64(L, -1) != 18446744073709551615ULL)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+test_checkint64(lua_State *L)
+{
+	lua_pushnumber(L, 12345678);
+	if (luaL_checkint64(L, -1) != 12345678)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushliteral(L, "9223372036854775807");
+	if (luaL_checkint64(L, -1) != 9223372036854775807LL)
+		return 0;
+	lua_pop(L, 1);
+
+	luaL_pushint64(L, 9223372036854775807LL);
+	if (luaL_checkint64(L, -1) != 9223372036854775807LL)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+test_touint64(lua_State *L)
+{
+	lua_pushliteral(L, "xxx");
+	if (luaL_touint64(L, -1) != 0)
+		return 0;
+	lua_pop(L, 1);
+
+	luaL_pushuint64(L, 18446744073709551615ULL);
+	if (luaL_touint64(L, -1) != 18446744073709551615ULL)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+test_toint64(lua_State *L)
+{
+	lua_pushliteral(L, "xxx");
+	if (luaL_toint64(L, -1) != 0)
+		return 0;
+	lua_pop(L, 1);
+
+	luaL_pushint64(L, 9223372036854775807);
+	if (luaL_toint64(L, -1) != 9223372036854775807)
+		return 0;
+	lua_pop(L, 1);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -112,7 +190,10 @@ luaopen_module_api(lua_State *L)
 		{"test_pushcheck_cdata", test_pushcheck_cdata },
 		{"test_pushuint64", test_pushuint64 },
 		{"test_pushint64", test_pushint64 },
-
+		{"test_checkuint64", test_checkuint64 },
+		{"test_checkint64", test_checkint64 },
+		{"test_touint64", test_touint64 },
+		{"test_toint64", test_toint64 },
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
