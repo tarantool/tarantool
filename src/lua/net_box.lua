@@ -633,7 +633,7 @@ local remote_methods = {
     _check_binary_response = function(self)
         while true do
             if self.rbuf.rpos + 5 > self.rbuf.wpos then
-                return 5 - (self.wpos - self.rpos)
+                return 5 - (self.rbuf.wpos - self.rbuf.rpos)
             end
 
             local rpos, len = msgpack.ibuf_decode(self.rbuf.rpos)
