@@ -138,6 +138,12 @@ public:
 		    const char *object);
 };
 
+extern const struct type type_TimedOut;
+class TimedOut: public SystemError {
+public:
+	TimedOut(const char *file, unsigned line);
+};
+
 /**
  * Diagnostics Area - a container for errors and warnings
  */

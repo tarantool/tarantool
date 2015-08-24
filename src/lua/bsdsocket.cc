@@ -665,7 +665,12 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 		lua_pop(L, 1);
 	}
 
-	int dns_res = coio_getaddrinfo(host, port, &hints, &result, timeout);
+	int dns_res = 0;
+	try {
+		dns_res = coio_getaddrinfo(host, port, &hints, &result, timeout);
+	} catch (TimedOut *e) {
+		dns_res = 1;
+	}
 	lua_pop(L, 2);	/* host, port */
 
 	if (dns_res != 0) {

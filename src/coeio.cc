@@ -174,8 +174,7 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	if (fiber_yield_timeout(timeout) && !task->complete) {
 		/* timed out. */
 		task->fiber = NULL;
-		errno = ETIMEDOUT;
-		return -1;
+		tnt_raise(TimedOut);
 	}
 
 	return task->base.result;
@@ -334,11 +333,8 @@ coio_getaddrinfo(const char *host, const char *port,
 	/* do resolving */
 	/* coio_task() don't throw. */
 	if (coio_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
-		       timeout) == -1) {
-		/* timed out */
-		errno = ETIMEDOUT;
-		return rc;
-	}
+		       timeout) == -1)
+		tnt_raise(TimedOut);
 
 	rc = task->rc;
 	*res = task->result;

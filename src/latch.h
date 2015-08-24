@@ -110,7 +110,6 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 		}
 		timeout -= ev_now(loop()) - start;
 		if (timeout <= 0) {
-			errno = ETIMEDOUT;
 			result = 1;
 			break;
 		}
