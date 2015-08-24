@@ -31,7 +31,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    * **gcc and g++, or clang**                # see above
    * **git**                                  # see above
    * **cmake**                                # see above
-   * **libreadline-dev or libreadline6-dev**  # for interactive mode
+   * **libreadline-dev or libreadline6-dev or readline-devel**  # for interactive mode
    * **autoconf**                             # optional, only in Mac OS scripts
    * **zlib1g** or **zlib**                   # optional, only in Mac OS scripts
 
@@ -41,7 +41,8 @@ explain what the steps are, then on the Internet you can look at some example sc
    "Run the test suite" option in step 7. Say: |br|
    :codenormal:`python --version` |br|
    You should see that the python version is greater than 2.6 --
-   preferably 2.7 -- and less than 3.0
+   preferably 2.7 -- and less than 3.0.
+   It may be necessary to install python first.
 
    On Ubuntu you can get modules from the repository:
 
@@ -54,7 +55,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      # For documentation
      sudo apt-get install python-sphinx python-pelican python-beautifulsoup
 
-   On CentOS too you can get modules from the repository:
+   On CentOS 6 too you can get modules from the repository:
 
    .. code-block:: bash
 
@@ -65,6 +66,9 @@ explain what the steps are, then on the Internet you can look at some example sc
    doing the setup with ``python setup.py``, thus:
 
    .. code-block:: bash
+
+     # On some machines this initial command may be necessary:
+     # wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo python
 
      # python module for parsing YAML (pyYAML): For test suite:
      # (If wget fails, check the http://pyyaml.org/wiki/PyYAML
@@ -94,6 +98,9 @@ explain what the steps are, then on the Internet you can look at some example sc
 
    Finally, use Python :code:`pip` to bring in Python packages
    that may not be up-to-date in the distro repositories.
+   (On CentOS 7 it will be necessary to install pip first,
+   with :code:`sudo yum install epel-release` followed by
+   :code:`sudo yum install python-pip`.)
 
    .. code-block:: bash
 
