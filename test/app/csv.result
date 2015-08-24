@@ -1,0 +1,10 @@
+TAP version 13
+1..8
+ok - obj test1
+ok - obj test2
+ok - obj test3
+ok - fio test1
+ok - fio test2
+ok - fio test3
+ok - test roundtrip
+ok - test load(dump(t))

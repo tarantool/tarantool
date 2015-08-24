@@ -20,6 +20,7 @@
 #include "iobuf.h"
 #include <lib/salad/guava.h>
 #include "latch.h"
+#include <lib/csv/csv.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -93,5 +94,11 @@ void *ffi_symbols[] = {
 	(void *) box_latch_delete,
 	(void *) box_latch_lock,
 	(void *) box_latch_trylock,
-	(void *) box_latch_unlock
+	(void *) box_latch_unlock,
+	(void *) csv_create,
+	(void *) csv_destroy,
+	(void *) csv_setopt,
+	(void *) csv_iterator_create,
+	(void *) csv_next,
+	(void *) csv_feed,
 };
