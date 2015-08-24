@@ -490,10 +490,12 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 }
 
 void
-box_iterator_free(box_iterator_t *itr)
+box_iterator_free(box_iterator_t *it)
 {
-	if (itr->free)
-		itr->free(itr);
+	if (it->close)
+		it->close(it);
+	if (it->free)
+		it->free(it);
 }
 
 /* }}} */
