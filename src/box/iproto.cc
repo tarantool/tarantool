@@ -448,7 +448,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		 * in->rpos.
 		 */
 		if (msg->header.type >= IPROTO_SELECT &&
-		    msg->header.type <= IPROTO_EVAL) {
+		    msg->header.type <= IPROTO_UPSERT) {
 			/* Pre-parse request before putting it into the queue */
 			if (msg->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -630,6 +630,7 @@ tx_process_msg(struct cmsg *m)
 		case IPROTO_REPLACE:
 		case IPROTO_UPDATE:
 		case IPROTO_DELETE:
+		case IPROTO_UPSERT:
 			assert(msg->request.type == msg->header.type);
 			struct iproto_port port;
 			iproto_port_init(&port, out, msg->header.sync);

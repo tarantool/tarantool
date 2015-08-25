@@ -21,6 +21,7 @@ local DELETE            = 5
 local CALL              = 6
 local AUTH              = 7
 local EVAL              = 8
+local UPSERT            = 9
 local PING              = 64
 local ERROR_TYPE        = 65536
 
@@ -38,6 +39,7 @@ local TUPLE             = 0x21
 local FUNCTION_NAME     = 0x22
 local USER              = 0x23
 local EXPR              = 0x27
+local OPS               = 0x28
 local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
@@ -92,6 +94,7 @@ local requests = {
     [REPLACE] = internal.encode_replace;
     [DELETE] = internal.encode_delete;
     [UPDATE]  = internal.encode_update;
+    [UPSERT]  = internal.encode_upsert;
     [SELECT]  = function(wbuf, sync, spaceno, indexno, key, opts)
         if opts == nil then
             opts = {}
@@ -156,6 +159,11 @@ local function space_metatable(self)
             update = function(space, key, oplist)
                 check_if_space(space)
                 return self:_update(space.id, key, oplist, 0)
+            end,
+
+            upsert = function(space, key, oplist, tuple)
+                check_if_space(space)
+                return self:_upsert(space.id, key, oplist, tuple, 0)
             end,
 
             get = function(space, key)
@@ -238,6 +246,11 @@ local function index_metatable(self)
             update = function(idx, key, oplist)
                 check_if_index(idx)
                 return self:_update(idx.space.id, key, oplist, idx.id)
+            end,
+
+            upsert = function(idx, key, oplist, tuple)
+                check_if_index(idx)
+                return self:_upsert(idx.space.id, key, oplist, tuple, idx.id)
             end,
 
         }
@@ -966,7 +979,13 @@ local remote_methods = {
     _update = function(self, spaceno, key, oplist, index_id)
         local res = self:_request(UPDATE, true, spaceno, index_id, key, oplist)
         return one_tuple(res.body[DATA])
-    end
+    end,
+
+    _upsert = function(self, spaceno, key, oplist, tuple, index_id)
+        local res = self:_request(UPSERT, true, spaceno,
+                                  index_id, key, oplist, tuple)
+        return one_tuple(res.body[DATA])
+    end,
 }
 
 setmetatable(remote, { __index = remote_methods })
