@@ -68,9 +68,8 @@ struct slab_arena {
 	 */
 	size_t prealloc;
 	/**
-	 * How much memory in the preallocated arena has
+	 * How much memory in the arena has
 	 * already been initialized for slabs.
-	 * @invariant used <= prealloc.
 	 */
 	size_t used;
 	/**
