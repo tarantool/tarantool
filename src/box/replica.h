@@ -42,10 +42,26 @@ struct recovery_state;
 
 enum { REPLICA_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
-/** State of a replication connection to the master */
+#define replica_STATE(_)                                             \
+	_(REPLICA_OFF, 0)                                            \
+	_(REPLICA_CONNECT, 1)                                        \
+	_(REPLICA_AUTH, 2)                                           \
+	_(REPLICA_CONNECTED, 3)                                      \
+	_(REPLICA_BOOTSTRAP, 4)                                      \
+	_(REPLICA_FOLLOW, 5)                                         \
+	_(REPLICA_STOPPED, 6)                                        \
+	_(REPLICA_DISCONNECTED, 7)                                   \
+
+/** States for the replica */
+ENUM(replica_state, replica_STATE);
+extern const char *replica_state_strs[];
+
+/**
+ * State of a replication connection to the master
+ */
 struct replica {
 	struct fiber *reader;
-	const char *status;
+	enum replica_state state;
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
 	char source[REPLICA_SOURCE_MAXLEN];
@@ -55,30 +71,54 @@ struct replica {
 		struct sockaddr_storage addrstorage;
 	};
 	socklen_t addr_len;
+	/* save master fd to re-use a connection between JOIN and SUBSCRIBE */
+	struct ev_io io;
 };
 
-/** Connect to a master and request a snapshot.
- * Raises an exception on error.
+/**
+ * Start a client to a remote server using a background fiber.
  *
- * @return A connected socket, ready too receive
- * data.
+ * If recovery is finalized (i.e. r->writer != NULL) then the client
+ * connect to a master and follow remote updates using SUBSCRIBE command.
+ *
+ * If recovery is not finalized (i.e. r->writer == NULL) then the client
+ * connect to a master, download and process snapshot using JOIN command
+ * and then exits. The background fiber can be joined to get exit status
+ * using replica_join().
+ *
+ * \pre A connection from io->fd is re-used.
+ * \sa fiber_start()
  */
 void
-replica_bootstrap(struct recovery_state *r);
+replica_start(struct replica *replica, struct recovery_state *r);
 
+/**
+ * Stop a client.
+ */
 void
-recovery_follow_replica(struct recovery_state *r);
+replica_stop(struct replica *replica);
 
+/**
+ * Wait replication client to finish and rethrow exception (if any).
+ * Use this function to wait bootstrap.
+ *
+ * \post This function keeps a open connection in io->fd.
+ * \sa replica_start()
+ * \sa fiber_join()
+ */
 void
-recovery_stop_replica(struct recovery_state *r);
+replica_join(struct replica *replica);
 
+/**
+ * Create replica and initialize remote uri (copied to struct replica).
+ */
 void
-recovery_set_replica(struct recovery_state *r, const char *source);
+replica_create(struct replica *replica, const char *uri);
 
-bool
-recovery_has_replica(struct recovery_state *r);
-
+/**
+ * Destroy replica.
+ */
 void
-recovery_init_replica(struct recovery_state *r);
+replica_destroy(struct replica *replica);
 
 #endif /* TARANTOOL_REPLICA_H_INCLUDED */

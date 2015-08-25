@@ -66,7 +66,7 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr, socklen_t addrlen,
 	    ev_tstamp timeout);
 
 void
-coio_init(struct ev_io *coio);
+coio_init(struct ev_io *coio, int fd);
 
 ssize_t
 coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,

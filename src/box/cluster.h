@@ -87,6 +87,8 @@ extern tt_uuid cluster_id;
 extern "C" struct vclock *
 cluster_clock();
 
+extern struct replica *replica;
+
 /* }}} */
 
 /** {{{ Cluster server id API **/

@@ -70,7 +70,7 @@ parallel_run(
     "box.space.test:update(1, {{'#', 2, 1}})",
     [
         lambda x,y: x == 'stopped' or y == 'stopped',
-        lambda x,y: x == 'connected' and y == 'connected',
+        lambda x,y: x == 'follow' and y == 'follow',
     ]
 )
 check_replication([master, replica], '1')
@@ -82,7 +82,7 @@ parallel_run(
     'box.space.test:insert{20, 2}',
     [
         lambda x,y: x == 'stopped' or y == 'stopped',
-        lambda x,y: x == 'connected' and y == 'connected',
+        lambda x,y: x == 'follow' and y == 'follow',
     ]
 )
 
@@ -91,7 +91,7 @@ prepare_cluster()
 parallel_run(
     "box.space.test:update(2, {{'=', 2, 1}})",
     "box.space.test:update(2, {{'=', 2, 2}})",
-    [lambda x,y: x == 'connected' and y == 'connected',]
+    [lambda x,y: x == 'follow' and y == 'follow',]
 )
 
 # test4: CRDT increment with update
@@ -99,7 +99,7 @@ prepare_cluster()
 parallel_run(
     "box.space.test:update(1, {{'+', 2, 1}})",
     "box.space.test:update(1, {{'+', 2, 2}})",
-    [lambda x,y: x == 'connected' and y == 'connected',]
+    [lambda x,y: x == 'follow' and y == 'follow',]
 )
 check_replication([master, replica], '1')
 
@@ -108,7 +108,7 @@ prepare_cluster()
 parallel_run(
     "box.space.test:delete(999)",
     "box.space.test:delete(999)",
-    [lambda x,y: x == 'connected' and y == 'connected',]
+    [lambda x,y: x == 'follow' and y == 'follow',]
 )
 check_replication([master, replica])
 

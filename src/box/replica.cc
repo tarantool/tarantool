@@ -29,12 +29,11 @@
  * SUCH DAMAGE.
  */
 #include "replica.h"
-#include "recovery.h"
-#include "main.h"
 
 #include "xlog.h"
 #include "fiber.h"
 #include "scoped_guard.h"
+#include "coio.h"
 #include "coio_buf.h"
 #include "recovery.h"
 #include "xrow.h"
@@ -43,6 +42,15 @@
 #include "iproto_constants.h"
 
 static const int RECONNECT_DELAY = 1.0;
+STRS(replica_state, replica_STATE);
+
+static inline void
+replica_set_state(struct replica *replica, enum replica_state state)
+{
+	replica->state = state;
+	say_debug("=> %s", replica_state_strs[state] +
+		  strlen("REPLICA_"));
+}
 
 static void
 replica_read_row(struct ev_io *coio, struct iobuf *iobuf,
@@ -81,13 +89,16 @@ replica_write_row(struct ev_io *coio, const struct xrow_header *row)
 	coio_writev(coio, iov, iovcnt, 0);
 }
 
+/**
+ * Connect to a remote host and authenticate the client.
+ */
 static void
-replica_connect(struct recovery_state *r, struct ev_io *coio,
-	        struct iobuf *iobuf)
+replica_connect(struct replica *replica, struct ev_io *coio,
+		struct iobuf *iobuf)
 {
+	assert(replica->io.fd < 0);
 	char greeting[IPROTO_GREETING_SIZE];
 
-	struct replica *replica = &r->replica;
 	struct uri *uri = &replica->uri;
 	/*
 	 * coio_connect() stores resolved address to \a &replica->addr
@@ -98,20 +109,27 @@ replica_connect(struct recovery_state *r, struct ev_io *coio,
 	 * replica->addr_len will be different even for same uri.
 	 */
 	replica->addr_len = sizeof(replica->addrstorage);
-	/* Prepare null-terminated strings for coio_connect() */
+	replica_set_state(replica, REPLICA_CONNECT);
 	coio_connect(coio, uri, &replica->addr, &replica->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	say_crit("connected to %s", sio_strfaddr(&replica->addr,
-						 replica->addr_len));
+	if (!replica->warning_said) {
+		say_info("connected to %s", sio_strfaddr(&replica->addr,
+			 replica->addr_len));
+	}
+
+	/* Don't display previous error messages in box.info.replication */
+	diag_clear(&fiber()->diag);
 
 	/* Perform authentication if user provided at least login */
-	if (!replica->uri.login)
+	if (!uri->login) {
+		replica_set_state(replica, REPLICA_CONNECTED);
 		return;
+	}
 
 	/* Authenticate */
-	say_debug("authenticating...");
+	replica_set_state(replica, REPLICA_AUTH);
 	struct xrow_header row;
 	xrow_encode_auth(&row, greeting, uri->login,
 			 uri->login_len, uri->password,
@@ -125,56 +143,28 @@ replica_connect(struct recovery_state *r, struct ev_io *coio,
 	say_info("authenticated");
 }
 
-void
-replica_bootstrap(struct recovery_state *r)
+/**
+ * Execute and process JOIN request (bootstrap the server).
+ */
+static void
+replica_process_join(struct replica *replica, struct recovery_state *r,
+		    struct ev_io *coio, struct iobuf *iobuf)
 {
-	say_info("bootstrapping a replica");
-	struct replica *replica = &r->replica;
-	assert(recovery_has_replica(r));
-
-	/* Generate Server-UUID */
-	tt_uuid_create(&r->server_uuid);
-
-	struct ev_io coio;
-	coio_init(&coio);
-	struct iobuf *iobuf = iobuf_new();
-	auto coio_guard = make_scoped_guard([&] {
-		iobuf_delete(iobuf);
-		evio_close(loop(), &coio);
-	});
-
-	for (;;) {
-		try {
-			replica_connect(r, &coio, iobuf);
-			replica->warning_said = false;
-			break;
-		} catch (FiberCancelException *e) {
-			throw;
-		} catch (Exception *e) {
-			if (! replica->warning_said) {
-				say_error("can't connect to master");
-				e->log();
-				say_info("will retry every %i second",
-					 RECONNECT_DELAY);
-				replica->warning_said = true;
-			}
-			iobuf_reset(iobuf);
-			evio_close(loop(), &coio);
-		}
-		fiber_sleep(RECONNECT_DELAY);
+	if (!replica->warning_said) {
+		say_info("bootstrapping a replica from %s",
+			 sio_strfaddr(&replica->addr, replica->addr_len));
 	}
 
 	/* Send JOIN request */
 	struct xrow_header row;
 	xrow_encode_join(&row, &r->server_uuid);
-	replica_write_row(&coio, &row);
+	replica_write_row(coio, &row);
+	replica_set_state(replica, REPLICA_BOOTSTRAP);
 
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&r->vclock, 0);
+	assert(vclock_has(&r->vclock, 0)); /* check for surrogate server_id */
 
 	while (true) {
-		replica_read_row(&coio, iobuf, &row);
-
+		replica_read_row(coio, iobuf, &row);
 		if (row.type == IPROTO_OK) {
 			/* End of stream */
 			say_info("done");
@@ -196,84 +186,139 @@ replica_bootstrap(struct recovery_state *r)
 	/* Replace server vclock using data from snapshot */
 	vclock_copy(&r->vclock, &vclock);
 
-	/* master socket closed by guard */
+	/* Re-enable warnings after successful execution of JOIN */
+	replica_set_state(replica, REPLICA_CONNECTED);
+	/* keep connection */
 }
 
+/**
+ * Execute and process SUBSCRIBE request (follow updates from a master).
+ */
 static void
-replica_set_status(struct replica *replica, const char *status)
+replica_process_subscribe(struct replica *replica, struct recovery_state *r,
+			 struct ev_io *coio, struct iobuf *iobuf)
 {
-	replica->status = status;
+	if (!replica->warning_said) {
+		say_info("subscribing to updates from %s",
+			 sio_strfaddr(&replica->addr, replica->addr_len));
+	}
+
+	/* Send SUBSCRIBE request */
+	struct xrow_header row;
+	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
+	replica_write_row(coio, &row);
+	replica_set_state(replica, REPLICA_FOLLOW);
+	/* Re-enable warnings after successful execution of SUBSCRIBE */
+	replica->warning_said = false;
+
+	/**
+	 * If there is an error in subscribe, it's
+	 * sent directly in response to subscribe.
+	 * If subscribe is successful, there is no
+	 * "OK" response, but a stream of rows.
+	 * from the binary log.
+	 */
+	while (true) {
+		replica_read_row(coio, iobuf, &row);
+		replica->lag = ev_now(loop()) - row.tm;
+		replica->last_row_time = ev_now(loop());
+
+		if (iproto_type_is_error(row.type))
+			xrow_decode_error(&row);  /* error */
+		recovery_apply_row(r, &row);
+
+		iobuf_reset(iobuf);
+		fiber_gc();
+	}
+}
+
+/**
+ * Write a nice error message to log file on SocketError or ClientError
+ * in pull_from_replica().
+ */
+static inline void
+replica_log_exception(struct replica *replica, Exception *e)
+{
+	if (replica->warning_said)
+		return;
+	switch (replica->state) {
+	case REPLICA_CONNECT:
+		say_info("can't connect to master");
+		break;
+	case REPLICA_CONNECTED:
+		say_info("can't join/subscribe");
+		break;
+	case REPLICA_AUTH:
+		say_info("failed to authenticate");
+		break;
+	case REPLICA_FOLLOW:
+	case REPLICA_BOOTSTRAP:
+		say_info("can't read row");
+		break;
+	default:
+		break;
+	}
+	e->log();
+	replica->warning_said = true;
 }
 
 static void
 pull_from_replica(va_list ap)
 {
+	struct replica *replica = va_arg(ap, struct replica *);
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
-	struct replica *replica = &r->replica;
-	struct ev_io coio;
+	struct ev_io *coio = &replica->io;
 	struct iobuf *iobuf = iobuf_new();
 	ev_loop *loop = loop();
 
-	coio_init(&coio);
+	coio_init(coio, coio->fd); /* re-use connection if any */
 
-	auto coio_guard = make_scoped_guard([&] {
-		iobuf_delete(iobuf);
-		evio_close(loop(), &coio);
-	});
-
+	/* Re-connect loop */
 	while (true) {
-		const char *err = NULL;
 		try {
-			struct xrow_header row;
-			if (! evio_has_fd(&coio)) {
-				replica_set_status(replica, "connecting");
-				err = "can't connect to master";
-				replica_connect(r, &coio, iobuf);
-				/* Send SUBSCRIBE request */
-				err = "can't subscribe to master";
-				xrow_encode_subscribe(&row, &cluster_id,
-					&r->server_uuid, &r->vclock);
-				replica_write_row(&coio, &row);
-				replica->warning_said = false;
-				replica_set_status(replica, "connected");
-			}
-			err = "can't read row";
-			/**
-			 * If there is an error in subscribe, it's
-			 * sent directly in response to subscribe.
-			 * If subscribe is successful, there is no
-			 * "OK" response, but a stream of rows.
-			 * from the binary log.
+			if (coio->fd < 0)
+				replica_connect(replica, coio, iobuf);
+
+			/*
+			 * Execute JOIN if recovery is not finalized yet
+			 * and SUBSCRIBE otherwise.
 			 */
-			replica_read_row(&coio, iobuf, &row);
-			err = NULL;
-			replica->lag = ev_now(loop) - row.tm;
-			replica->last_row_time = ev_now(loop);
-
-			if (iproto_type_is_error(row.type))
-				xrow_decode_error(&row);  /* error */
-			recovery_apply_row(r, &row);
-
-			iobuf_reset(iobuf);
-			fiber_gc();
+			if (r->writer == NULL) {
+				replica_process_join(replica, r, coio, iobuf);
+				ev_io_stop(loop(), coio);
+				/* keep connection */
+				return;
+			}
+			replica_process_subscribe(replica, r, coio, iobuf);
+			/*
+			 * process_subscribe() has an infinity loop and
+			 * can be stopped only using fiber_cancel()
+			 */
+			assert(0); /* unreachable */
+			break;
 		} catch (ClientError *e) {
-			replica_set_status(replica, "stopped");
+			replica_log_exception(replica, e);
+			evio_close(loop, coio);
+			iobuf_delete(iobuf);
+			replica_set_state(replica, REPLICA_STOPPED);
 			throw;
 		} catch (FiberCancelException *e) {
-			replica_set_status(replica, "off");
+			evio_close(loop, coio);
+			iobuf_delete(iobuf);
+			replica_set_state(replica, REPLICA_OFF);
 			throw;
-		} catch (Exception *e) {
-			replica_set_status(replica, "disconnected");
-			if (!replica->warning_said) {
-				if (err != NULL)
-					say_info("%s", err);
-				e->log();
-				say_info("will retry every %i second",
-					 RECONNECT_DELAY);
-				replica->warning_said = true;
-			}
-			evio_close(loop, &coio);
+		} catch (SocketError *e) {
+			replica_log_exception(replica, e);
+			evio_close(loop, coio);
+			replica_set_state(replica, REPLICA_DISCONNECTED);
+			/* fall through */
 		}
+
+		if (!replica->warning_said)
+			say_info("will retry every %i second", RECONNECT_DELAY);
+		replica->warning_said = true;
+		iobuf_reset(iobuf);
+		fiber_gc();
 
 		/* Put fiber_sleep() out of catch block.
 		 *
@@ -288,24 +333,26 @@ pull_from_replica(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-		if (! evio_has_fd(&coio))
+
+		try {
 			fiber_sleep(RECONNECT_DELAY);
+		} catch (FiberCancelException *e) {
+			/* Cleanup resources on fiber_cancel() */
+			iobuf_delete(iobuf);
+			throw;
+		}
 	}
 }
 
 void
-recovery_follow_replica(struct recovery_state *r)
+replica_start(struct replica *replica, struct recovery_state *r)
 {
 	char name[FIBER_NAME_MAX];
-	struct replica *replica = &r->replica;
-
 	assert(replica->reader == NULL);
-	assert(recovery_has_replica(r));
 
 	const char *uri = uri_format(&replica->uri);
-	say_crit("starting replication from %s", uri);
+	say_info("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
-
 
 	struct fiber *f = fiber_new(name, pull_from_replica);
 	/**
@@ -313,38 +360,44 @@ recovery_follow_replica(struct recovery_state *r)
 	 * fiber any time we want.
 	 */
 	fiber_set_joinable(f, true);
-
 	replica->reader = f;
-	fiber_start(f, r);
+	fiber_start(f, replica, r);
 }
 
 void
-recovery_stop_replica(struct recovery_state *r)
+replica_stop(struct replica *replica)
 {
-	say_info("shutting down the replica");
-	struct replica *replica = &r->replica;
 	struct fiber *f = replica->reader;
-	replica->reader = NULL;
+	if (f == NULL)
+		return;
+	const char *uri = uri_format(&replica->uri);
+	say_info("shutting down the replica %s", uri);
 	fiber_cancel(f);
 	/**
 	 * If the replica died from an exception, don't throw it
 	 * up.
 	 */
 	diag_clear(&f->diag);
-	fiber_join(f);
-	replica->status = "off";
+	fiber_join(f); /* doesn't throw due do diag_clear() */
+	replica_set_state(replica, REPLICA_OFF);
+	replica->reader = NULL;
 }
 
 void
-recovery_set_replica(struct recovery_state *r, const char *uri)
+replica_join(struct replica *replica)
 {
-	/* First, stop the reader, then set the source */
-	struct replica *replica = &r->replica;
-	assert(replica->reader == NULL);
-	if (uri == NULL) {
-		replica->source[0] = '\0';
-		return;
-	}
+	assert(replica->reader != NULL);
+	auto fiber_guard = make_scoped_guard([=] { replica->reader = NULL; });
+	fiber_join(replica->reader); /* may throw */
+}
+
+void
+replica_create(struct replica *replica, const char *uri)
+{
+	memset(replica, 0, sizeof(*replica));
+	replica->io.fd = -1;
+
+	/* uri_parse() sets pointers to replica->source buffer */
 	snprintf(replica->source, sizeof(replica->source), "%s", uri);
 	int rc = uri_parse(&replica->uri, replica->source);
 	/* URI checked by box_check_replication_source() */
@@ -352,14 +405,9 @@ recovery_set_replica(struct recovery_state *r, const char *uri)
 	(void) rc;
 }
 
-bool
-recovery_has_replica(struct recovery_state *r)
-{
-	return r->replica.source[0];
-}
-
 void
-recovery_init_replica(struct recovery_state *r)
+replica_destroy(struct replica *replica)
 {
-	r->replica.status = "off";
+	assert(replica->reader == NULL);
+	evio_close(loop(), &replica->io);
 }

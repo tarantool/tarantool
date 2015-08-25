@@ -31,6 +31,8 @@
 
 #include "info.h"
 
+#include <ctype.h> /* tolower() */
+
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
@@ -48,13 +50,24 @@ extern "C" {
 static int
 lbox_info_replication(struct lua_State *L)
 {
-	struct recovery_state *r = recovery;
-	struct replica *replica = &r->replica;
-
 	lua_newtable(L);
 
+	if (replica == NULL) {
+		lua_pushstring(L, "status");
+		lua_pushstring(L, "off");
+		lua_settable(L, -3);
+		return 1;
+	}
+
+	/* Get replica state in lower case */
+	static char status[16];
+	char *d = status;
+	const char *s = replica_state_strs[replica->state] + strlen("REPLICA_");
+	assert(strlen(s) < sizeof(status));
+	while ((*(d++) = tolower(*(s++))));
+
 	lua_pushstring(L, "status");
-	lua_pushstring(L, replica->status);
+	lua_pushstring(L, status);
 	lua_settable(L, -3);
 
 	if (replica->reader) {

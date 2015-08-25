@@ -57,8 +57,7 @@ Relay::Relay(int fd_arg, uint64_t sync_arg)
 	recovery_setup_panic(r, cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	coio_init(&io);
-	io.fd = fd_arg;
+	coio_init(&io, fd_arg);
 	sync = sync_arg;
 	wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 }
