@@ -166,25 +166,25 @@ extern "C" void
 box_set_replication_source(void)
 {
 	const char *source = cfg_gets("replication_source");
-	bool old_is_replica = recovery->remote.reader;
+	bool old_is_replica = recovery->replica.reader;
 	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(source, recovery->remote.source) != 0))) {
+	     (strcmp(source, recovery->replica.source) != 0))) {
 
 		if (recovery->writer) {
 			if (old_is_replica)
-				recovery_stop_remote(recovery);
-			recovery_set_remote(recovery, source);
-			if (recovery_has_remote(recovery))
-				recovery_follow_remote(recovery);
+				recovery_stop_replica(recovery);
+			recovery_set_replica(recovery, source);
+			if (recovery_has_replica(recovery))
+				recovery_follow_replica(recovery);
 		} else {
 			/*
 			 * Do nothing, we're in local hot
 			 * standby mode, the server
 			 * will automatically begin following
-			 * the remote when local hot standby
+			 * the replica when local hot standby
 			 * mode is finished, see
 			 * box_leave_local_hot_standby_mode()
 			 */
@@ -635,7 +635,7 @@ box_init(void)
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, NULL);
-	recovery_set_remote(recovery,
+	recovery_set_replica(recovery,
 		cfg_gets("replication_source"));
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
@@ -647,7 +647,7 @@ box_init(void)
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (recovery_has_remote(recovery)) {
+	} else if (recovery_has_replica(recovery)) {
 		/* Initialize a new replica */
 		engine_begin_join();
 		replica_bootstrap(recovery);
@@ -680,8 +680,8 @@ box_init(void)
 
 	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
 
-	if (recovery_has_remote(recovery))
-		recovery_follow_remote(recovery);
+	if (recovery_has_replica(recovery))
+		recovery_follow_replica(recovery);
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
 		box_set_ro(false);

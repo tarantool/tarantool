@@ -45,8 +45,8 @@
 static const int RECONNECT_DELAY = 1.0;
 
 static void
-remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
-		struct xrow_header *row)
+replica_read_row(struct ev_io *coio, struct iobuf *iobuf,
+		 struct xrow_header *row)
 {
 	struct ibuf *in = &iobuf->in;
 
@@ -74,7 +74,7 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 }
 
 static void
-remote_write_row(struct ev_io *coio, const struct xrow_header *row)
+replica_write_row(struct ev_io *coio, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(row, iov);
@@ -82,32 +82,32 @@ remote_write_row(struct ev_io *coio, const struct xrow_header *row)
 }
 
 static void
-remote_connect(struct recovery_state *r, struct ev_io *coio,
-	       struct iobuf *iobuf)
+replica_connect(struct recovery_state *r, struct ev_io *coio,
+	        struct iobuf *iobuf)
 {
 	char greeting[IPROTO_GREETING_SIZE];
 
-	struct remote *remote = &r->remote;
-	struct uri *uri = &r->remote.uri;
+	struct replica *replica = &r->replica;
+	struct uri *uri = &replica->uri;
 	/*
-	 * coio_connect() stores resolved address to \a &remote->addr
-	 * on success. &remote->addr_len is a value-result argument which
+	 * coio_connect() stores resolved address to \a &replica->addr
+	 * on success. &replica->addr_len is a value-result argument which
 	 * must be initialized to the size of associated buffer (addrstorage)
 	 * before calling coio_connect(). Since coio_connect() performs
 	 * DNS resolution under the hood it is theoretically possible that
-	 * remote->addr_len will be different even for same uri.
+	 * replica->addr_len will be different even for same uri.
 	 */
-	remote->addr_len = sizeof(remote->addrstorage);
+	replica->addr_len = sizeof(replica->addrstorage);
 	/* Prepare null-terminated strings for coio_connect() */
-	coio_connect(coio, uri, &remote->addr, &remote->addr_len);
+	coio_connect(coio, uri, &replica->addr, &replica->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	say_crit("connected to %s", sio_strfaddr(&remote->addr,
-						 remote->addr_len));
+	say_crit("connected to %s", sio_strfaddr(&replica->addr,
+						 replica->addr_len));
 
 	/* Perform authentication if user provided at least login */
-	if (!r->remote.uri.login)
+	if (!replica->uri.login)
 		return;
 
 	/* Authenticate */
@@ -116,8 +116,8 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	xrow_encode_auth(&row, greeting, uri->login,
 			 uri->login_len, uri->password,
 			 uri->password_len);
-	remote_write_row(coio, &row);
-	remote_read_row(coio, iobuf, &row);
+	replica_write_row(coio, &row);
+	replica_read_row(coio, iobuf, &row);
 	if (row.type != IPROTO_OK)
 		xrow_decode_error(&row); /* auth failed */
 
@@ -129,7 +129,8 @@ void
 replica_bootstrap(struct recovery_state *r)
 {
 	say_info("bootstrapping a replica");
-	assert(recovery_has_remote(r));
+	struct replica *replica = &r->replica;
+	assert(recovery_has_replica(r));
 
 	/* Generate Server-UUID */
 	tt_uuid_create(&r->server_uuid);
@@ -144,18 +145,18 @@ replica_bootstrap(struct recovery_state *r)
 
 	for (;;) {
 		try {
-			remote_connect(r, &coio, iobuf);
-			r->remote.warning_said = false;
+			replica_connect(r, &coio, iobuf);
+			replica->warning_said = false;
 			break;
 		} catch (FiberCancelException *e) {
 			throw;
 		} catch (Exception *e) {
-			if (! r->remote.warning_said) {
+			if (! replica->warning_said) {
 				say_error("can't connect to master");
 				e->log();
 				say_info("will retry every %i second",
 					 RECONNECT_DELAY);
-				r->remote.warning_said = true;
+				replica->warning_said = true;
 			}
 			iobuf_reset(iobuf);
 			evio_close(loop(), &coio);
@@ -166,13 +167,13 @@ replica_bootstrap(struct recovery_state *r)
 	/* Send JOIN request */
 	struct xrow_header row;
 	xrow_encode_join(&row, &r->server_uuid);
-	remote_write_row(&coio, &row);
+	replica_write_row(&coio, &row);
 
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&r->vclock, 0);
 
 	while (true) {
-		remote_read_row(&coio, iobuf, &row);
+		replica_read_row(&coio, iobuf, &row);
 
 		if (row.type == IPROTO_OK) {
 			/* End of stream */
@@ -199,15 +200,16 @@ replica_bootstrap(struct recovery_state *r)
 }
 
 static void
-remote_set_status(struct remote *remote, const char *status)
+replica_set_status(struct replica *replica, const char *status)
 {
-	remote->status = status;
+	replica->status = status;
 }
 
 static void
-pull_from_remote(va_list ap)
+pull_from_replica(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
+	struct replica *replica = &r->replica;
 	struct ev_io coio;
 	struct iobuf *iobuf = iobuf_new();
 	ev_loop *loop = loop();
@@ -224,16 +226,16 @@ pull_from_remote(va_list ap)
 		try {
 			struct xrow_header row;
 			if (! evio_has_fd(&coio)) {
-				remote_set_status(&r->remote, "connecting");
+				replica_set_status(replica, "connecting");
 				err = "can't connect to master";
-				remote_connect(r, &coio, iobuf);
+				replica_connect(r, &coio, iobuf);
 				/* Send SUBSCRIBE request */
 				err = "can't subscribe to master";
 				xrow_encode_subscribe(&row, &cluster_id,
 					&r->server_uuid, &r->vclock);
-				remote_write_row(&coio, &row);
-				r->remote.warning_said = false;
-				remote_set_status(&r->remote, "connected");
+				replica_write_row(&coio, &row);
+				replica->warning_said = false;
+				replica_set_status(replica, "connected");
 			}
 			err = "can't read row";
 			/**
@@ -243,11 +245,10 @@ pull_from_remote(va_list ap)
 			 * "OK" response, but a stream of rows.
 			 * from the binary log.
 			 */
-			remote_read_row(&coio, iobuf, &row);
+			replica_read_row(&coio, iobuf, &row);
 			err = NULL;
-			r->remote.lag = ev_now(loop) - row.tm;
-			r->remote.last_row_time =
-				ev_now(loop);
+			replica->lag = ev_now(loop) - row.tm;
+			replica->last_row_time = ev_now(loop);
 
 			if (iproto_type_is_error(row.type))
 				xrow_decode_error(&row);  /* error */
@@ -256,20 +257,20 @@ pull_from_remote(va_list ap)
 			iobuf_reset(iobuf);
 			fiber_gc();
 		} catch (ClientError *e) {
-			remote_set_status(&r->remote, "stopped");
+			replica_set_status(replica, "stopped");
 			throw;
 		} catch (FiberCancelException *e) {
-			remote_set_status(&r->remote, "off");
+			replica_set_status(replica, "off");
 			throw;
 		} catch (Exception *e) {
-			remote_set_status(&r->remote, "disconnected");
-			if (! r->remote.warning_said) {
+			replica_set_status(replica, "disconnected");
+			if (!replica->warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
 				e->log();
 				say_info("will retry every %i second",
 					 RECONNECT_DELAY);
-				r->remote.warning_said = true;
+				replica->warning_said = true;
 			}
 			evio_close(loop, &coio);
 		}
@@ -293,70 +294,72 @@ pull_from_remote(va_list ap)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r)
+recovery_follow_replica(struct recovery_state *r)
 {
 	char name[FIBER_NAME_MAX];
+	struct replica *replica = &r->replica;
 
-	assert(r->remote.reader == NULL);
-	assert(recovery_has_remote(r));
+	assert(replica->reader == NULL);
+	assert(recovery_has_replica(r));
 
-	const char *uri = uri_format(&r->remote.uri);
+	const char *uri = uri_format(&replica->uri);
 	say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
 
-	struct fiber *f = fiber_new(name, pull_from_remote);
+	struct fiber *f = fiber_new(name, pull_from_replica);
 	/**
 	 * So that we can safely grab the status of the
 	 * fiber any time we want.
 	 */
 	fiber_set_joinable(f, true);
 
-	r->remote.reader = f;
+	replica->reader = f;
 	fiber_start(f, r);
 }
 
 void
-recovery_stop_remote(struct recovery_state *r)
+recovery_stop_replica(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
-	struct fiber *f = r->remote.reader;
-	r->remote.reader = NULL;
+	struct replica *replica = &r->replica;
+	struct fiber *f = replica->reader;
+	replica->reader = NULL;
 	fiber_cancel(f);
 	/**
-	 * If the remote died from an exception, don't throw it
+	 * If the replica died from an exception, don't throw it
 	 * up.
 	 */
 	diag_clear(&f->diag);
 	fiber_join(f);
-	r->remote.status = "off";
+	replica->status = "off";
 }
 
 void
-recovery_set_remote(struct recovery_state *r, const char *uri)
+recovery_set_replica(struct recovery_state *r, const char *uri)
 {
 	/* First, stop the reader, then set the source */
-	assert(r->remote.reader == NULL);
+	struct replica *replica = &r->replica;
+	assert(replica->reader == NULL);
 	if (uri == NULL) {
-		r->remote.source[0] = '\0';
+		replica->source[0] = '\0';
 		return;
 	}
-	snprintf(r->remote.source, sizeof(r->remote.source), "%s", uri);
-	struct remote *remote = &r->remote;
-	int rc = uri_parse(&remote->uri, r->remote.source);
+	snprintf(replica->source, sizeof(replica->source), "%s", uri);
+	int rc = uri_parse(&replica->uri, replica->source);
 	/* URI checked by box_check_replication_source() */
-	assert(rc == 0 && remote->uri.service != NULL);
+	assert(rc == 0 && replica->uri.service != NULL);
 	(void) rc;
 }
 
 bool
-recovery_has_remote(struct recovery_state *r)
+recovery_has_replica(struct recovery_state *r)
 {
-	return r->remote.source[0];
+	return r->replica.source[0];
 }
 
 void
-recovery_init_remote(struct recovery_state *r)
+recovery_init_replica(struct recovery_state *r)
 {
-	r->remote.status = "off";
+	r->replica.status = "off";
 }

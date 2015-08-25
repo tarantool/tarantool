@@ -31,7 +31,32 @@
  * SUCH DAMAGE.
  */
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#include "trivia/util.h"
+#include "uri.h"
+#include "third_party/tarantool_ev.h"
+
 struct recovery_state;
+
+enum { REPLICA_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
+
+/** State of a replication connection to the master */
+struct replica {
+	struct fiber *reader;
+	const char *status;
+	ev_tstamp lag, last_row_time;
+	bool warning_said;
+	char source[REPLICA_SOURCE_MAXLEN];
+	struct uri uri;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addrstorage;
+	};
+	socklen_t addr_len;
+};
+
 /** Connect to a master and request a snapshot.
  * Raises an exception on error.
  *
@@ -42,18 +67,18 @@ void
 replica_bootstrap(struct recovery_state *r);
 
 void
-recovery_follow_remote(struct recovery_state *r);
+recovery_follow_replica(struct recovery_state *r);
 
 void
-recovery_stop_remote(struct recovery_state *r);
+recovery_stop_replica(struct recovery_state *r);
 
 void
-recovery_set_remote(struct recovery_state *r, const char *source);
+recovery_set_replica(struct recovery_state *r, const char *source);
 
 bool
-recovery_has_remote(struct recovery_state *r);
+recovery_has_replica(struct recovery_state *r);
 
 void
-recovery_init_remote(struct recovery_state *r);
+recovery_init_replica(struct recovery_state *r);
 
 #endif /* TARANTOOL_REPLICA_H_INCLUDED */

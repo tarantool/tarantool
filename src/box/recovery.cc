@@ -91,8 +91,8 @@
  * IR -> HS         # recovery_follow_local()
  * IRR -> RR        # recovery_follow_local()
  * HS -> M          # recovery_finalize()
- * M -> R           # recovery_follow_remote()
- * R -> M           # recovery_stop_remote()
+ * M -> R           # recovery_follow_replica()
+ * R -> M           # recovery_stop_replica()
  */
 
 /* {{{ LSN API */
@@ -172,7 +172,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	xdir_check(&r->wal_dir);
 
 	r->watcher = NULL;
-	recovery_init_remote(r);
+	recovery_init_replica(r);
 
 	guard.is_active = false;
 	return r;

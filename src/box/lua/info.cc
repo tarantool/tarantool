@@ -49,23 +49,24 @@ static int
 lbox_info_replication(struct lua_State *L)
 {
 	struct recovery_state *r = recovery;
+	struct replica *replica = &r->replica;
 
 	lua_newtable(L);
 
 	lua_pushstring(L, "status");
-	lua_pushstring(L, r->remote.status);
+	lua_pushstring(L, replica->status);
 	lua_settable(L, -3);
 
-	if (r->remote.reader) {
+	if (replica->reader) {
 		lua_pushstring(L, "lag");
-		lua_pushnumber(L, r->remote.lag);
+		lua_pushnumber(L, replica->lag);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "idle");
-		lua_pushnumber(L, ev_now(loop()) - r->remote.last_row_time);
+		lua_pushnumber(L, ev_now(loop()) - replica->last_row_time);
 		lua_settable(L, -3);
 
-		Exception *e = diag_last_error(&r->remote.reader->diag);
+		Exception *e = diag_last_error(&replica->reader->diag);
 		if (e != NULL) {
 			lua_pushstring(L, "message");
 			lua_pushstring(L, e->errmsg());
