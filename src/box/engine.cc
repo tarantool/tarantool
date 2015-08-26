@@ -148,9 +148,7 @@ Handler::executeSelect(struct txn* /* txn */, struct space *space,
 	key_validate(index->key_def, type, key, part_count);
 
 	struct iterator *it = index->allocIterator();
-	auto it_guard = make_scoped_guard([=] {
-		it->free(it);
-	});
+	IteratorGuard guard(it);
 	index->initIterator(it, type, key, part_count);
 
 	struct tuple *tuple;

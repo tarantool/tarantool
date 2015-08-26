@@ -208,6 +208,17 @@ space_stat(struct space *sp)
 	return &space_stat;
 }
 
+/**
+ * We do not allow changes of the primary key during
+ * update.
+ * The syntax of update operation allows the user to primary
+ * key of a tuple, which is prohibited, to avoid funny
+ * effects during replication. Some engines can
+ * track down this situation and abort the operation;
+ * such engines (memtx) don't use this function.
+ * Other engines can't do it, so they ask the server to
+ * verify that the primary key of the tuple has not changed.
+ */
 void
 space_check_update(struct space *space,
 		   struct tuple *old_tuple,

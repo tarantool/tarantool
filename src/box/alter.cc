@@ -903,8 +903,6 @@ AddIndex::alter(struct alter_space *alter)
 	 * added to the index (insufficient number of fields,
 	 * etc., the build is aborted.
 	 */
-	new_index->beginBuild();
-	new_index->endBuild();
 	/* Build the new index. */
 	struct tuple *tuple;
 	struct tuple_format *format = alter->new_space->format;

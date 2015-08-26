@@ -35,7 +35,6 @@
  * @brief Index API wrapper for bitset_index
  * @see bitset/index.h
  */
-#include "index.h"
 #include "memtx_index.h"
 #include "bitset/index.h"
 

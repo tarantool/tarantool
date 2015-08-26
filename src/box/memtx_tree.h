@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#include "index.h"
 #include "memtx_index.h"
 #include "memtx_engine.h"
 

@@ -96,9 +96,9 @@ memtx_replace_no_keys(struct txn * /* txn */, struct space *space,
 		      struct tuple * /* new_tuple */,
 		      enum dup_replace_mode /* mode */)
 {
-       Index *index = index_find(space, 0);
-       assert(index == NULL); /* not reached. */
-       (void) index;
+	Index *index = index_find(space, 0);
+	assert(index == NULL); /* not reached. */
+	(void) index;
 }
 
 struct MemtxSpace: public Handler {
@@ -113,15 +113,15 @@ struct MemtxSpace: public Handler {
 		/* engine->close(this); */
 	}
 	virtual void executeReplace(struct txn*, struct space*,
-	                            struct request*, struct port*);
+				    struct request*, struct port*);
 	virtual void executeDelete(struct txn*, struct space *space,
-	                           struct request *request, struct port *port);
+				   struct request *request, struct port *port);
 	virtual void executeUpdate(struct txn*, struct space *space,
-	                           struct request *request, struct port *port);
+				   struct request *request, struct port *port);
 	virtual void executeUpsert(struct txn*, struct space *space,
-	                           struct request *request, struct port *port);
+				   struct request *request, struct port *port);
 	virtual void executeSelect(struct txn*, struct space *space,
-	                           struct request *request, struct port *port);
+				   struct request *request, struct port *port);
 };
 
 static inline enum dup_replace_mode
@@ -132,8 +132,8 @@ dup_replace_mode(uint32_t op)
 
 void
 MemtxSpace::executeReplace(struct txn *txn, struct space *space,
-	                       struct request *request,
-                           struct port *port)
+			   struct request *request,
+			   struct port *port)
 {
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
@@ -152,8 +152,8 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 
 void
 MemtxSpace::executeDelete(struct txn *txn, struct space *space,
-                          struct request *request,
-                          struct port *port)
+			  struct request *request,
+			  struct port *port)
 {
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -166,7 +166,8 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 		return;
 	}
 	TupleGuard old_guard(old_tuple);
-	space->handler->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	space->handler->replace(txn, space, old_tuple, NULL,
+				DUP_REPLACE_OR_INSERT);
 	txn_commit_stmt(txn);
 	/*
 	 * Adding result to port must be after possible WAL write.
@@ -178,8 +179,8 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 
 void
 MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
-                          struct request *request,
-                          struct port *port)
+			  struct request *request,
+			  struct port *port)
 {
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -203,8 +204,6 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					       request->index_base);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	if (! engine_auto_check_update(space->handler->engine->flags))
-		space_check_update(space, old_tuple, new_tuple);
 	space->handler->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
 	txn_commit_stmt(txn);
 	/*
@@ -217,8 +216,8 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 void
 MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
-                          struct request *request,
-                          struct port *port)
+			  struct request *request,
+			  struct port *port)
 {
 	(void)port;
 	Index *pk = index_find_unique(space, request->index_id);
@@ -247,8 +246,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		TupleGuard guard(new_tuple);
 
 		space_validate_tuple(space, new_tuple);
-		if (!engine_auto_check_update(space->handler->engine->flags))
-			space_check_update(space, old_tuple, new_tuple);
 		space->handler->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
 	}
 
@@ -258,8 +255,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 
 void
 MemtxSpace::executeSelect(struct txn* /* txn */, struct space *space,
-                          struct request *request,
-                          struct port *port)
+			  struct request *request,
+			  struct port *port)
 {
 	MemtxIndex *index = (MemtxIndex *)
 		index_find(space, request->index_id);
@@ -282,7 +279,6 @@ MemtxSpace::executeSelect(struct txn* /* txn */, struct space *space,
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
-		TupleGuard tuple_gc(tuple);
 		if (offset > 0) {
 			offset--;
 			continue;
@@ -292,7 +288,7 @@ MemtxSpace::executeSelect(struct txn* /* txn */, struct space *space,
 		port_add_tuple(port, tuple);
 	}
 	if (! in_txn()) {
-		 /* no txn is created, so simply collect garbage here */
+		/* no txn is created, so simply collect garbage here */
 		fiber_gc();
 	}
 }
@@ -343,7 +339,7 @@ memtx_replace_build_next(struct txn * /* txn */, struct space *space,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	space->index[0]->buildNext(new_tuple);
+	((MemtxIndex *) space->index[0])->buildNext(new_tuple);
 	tuple_ref(new_tuple);
 }
 
@@ -412,7 +408,7 @@ memtx_end_build_primary_key(struct space *space, void *param)
 	    space->handler->replace == memtx_replace_all_keys)
 		return;
 
-	space->index[0]->endBuild();
+	((MemtxIndex *) space->index[0])->endBuild();
 	space->handler->replace = memtx_replace_primary_key;
 }
 
@@ -453,8 +449,7 @@ MemtxEngine::MemtxEngine()
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED)
 {
-	flags = ENGINE_CAN_BE_TEMPORARY |
-		ENGINE_AUTO_CHECK_UPDATE;
+	flags = ENGINE_CAN_BE_TEMPORARY;
 }
 
 /**
@@ -485,9 +480,7 @@ recover_snap(struct recovery_state *r)
 	int64_t signature = vclock_sum(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature);
-	auto guard = make_scoped_guard([=]{
-		xlog_close(snap);
-	});
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	r->server_uuid = snap->server_uuid;
 
@@ -533,17 +526,17 @@ memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_READING_SNAPSHOT:
-		space->index[0]->beginBuild();
+		((MemtxIndex *) space->index[0])->beginBuild();
 		space->handler->replace = memtx_replace_build_next;
 		break;
 	case MEMTX_READING_WAL:
-		space->index[0]->beginBuild();
-		space->index[0]->endBuild();
+		((MemtxIndex *) space->index[0])->beginBuild();
+		((MemtxIndex *) space->index[0])->endBuild();
 		space->handler->replace = memtx_replace_primary_key;
 		break;
 	case MEMTX_OK:
-		space->index[0]->beginBuild();
-		space->index[0]->endBuild();
+		((MemtxIndex *) space->index[0])->beginBuild();
+		((MemtxIndex *) space->index[0])->endBuild();
 		space->handler->replace = memtx_replace_all_keys;
 		break;
 	}
@@ -1112,7 +1105,7 @@ memtx_index_extent_alloc()
 		     /* same error as in mempool_alloc */
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
-	);
+		    );
 	return mempool_alloc(&memtx_index_extent_pool);
 }
 
@@ -1133,10 +1126,10 @@ void
 memtx_index_extent_reserve(int num)
 {
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
-	/* same error as in mempool_alloc */
+		     /* same error as in mempool_alloc */
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
-	);
+		    );
 	while (memtx_index_num_reserved_extents < num) {
 		void *ext = mempool_alloc(&memtx_index_extent_pool);
 		*(void **)ext = memtx_index_reserved_extents;

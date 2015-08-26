@@ -285,7 +285,7 @@ tuple_field_count_validate(struct tuple_format *format, const char *data)
  * @returns field data if field exists or NULL
  */
 inline const char *
-tuple_field_of(const char *data, uint32_t bsize, uint32_t i)
+tuple_field_raw(const char *data, uint32_t bsize, uint32_t i)
 {
 	const char *pos = data;
 	uint32_t size = mp_decode_array(&pos);
@@ -325,7 +325,7 @@ tuple_field_old(const struct tuple_format *format,
 			return tuple->data + field_map[idx];
 		}
 	}
-	return tuple_field_of(tuple->data, tuple->bsize, i);
+	return tuple_field_raw(tuple->data, tuple->bsize, i);
 }
 
 /**

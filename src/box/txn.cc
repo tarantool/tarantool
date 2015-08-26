@@ -28,19 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "engine.h"
 #include "txn.h"
-#include "box.h"
+#include "engine.h"
+#include "box.h" /* global recovery */
 #include "tuple.h"
-#include "space.h"
-#include "main.h"
-#include "cluster.h"
 #include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
-#include "session.h"
-#include "port.h"
-#include "iproto_constants.h"
 
 double too_long_threshold;
 

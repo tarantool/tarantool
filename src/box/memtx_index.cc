@@ -37,6 +37,24 @@
 #include "user_def.h"
 #include "space.h"
 
+void
+MemtxIndex::beginBuild()
+{}
+
+void
+MemtxIndex::reserve(uint32_t /* size_hint */)
+{}
+
+void
+MemtxIndex::buildNext(struct tuple *tuple)
+{
+	replace(NULL, tuple, DUP_INSERT);
+}
+
+void
+MemtxIndex::endBuild()
+{}
+
 struct tuple *
 MemtxIndex::min(const char *key, uint32_t part_count) const
 {
@@ -54,7 +72,8 @@ MemtxIndex::max(const char *key, uint32_t part_count) const
 }
 
 size_t
-MemtxIndex::count(enum iterator_type type, const char *key, uint32_t part_count) const
+MemtxIndex::count(enum iterator_type type, const char *key,
+		  uint32_t part_count) const
 {
 	if (type == ITER_ALL && key == NULL)
 		return size(); /* optimization */

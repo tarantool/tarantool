@@ -39,17 +39,6 @@ class Relay;
 
 enum engine_flags {
 	ENGINE_CAN_BE_TEMPORARY = 1,
-	/**
-	 * Identifies that engine can handle changes
-	 * of primary key during update.
-	 * During update operation user could change primary
-	 * key of a tuple, which is prohibited, to avoid funny
-	 * effects during replication. Some engines can
-	 * track down this situation and abort the operation;
-	 * such engines should set this flag.
-	 * If the flag is not set, the server will verify
-	 * that the primary key is not changed.
-	 */
 	ENGINE_AUTO_CHECK_UPDATE = 2,
 };
 
@@ -305,12 +294,6 @@ static inline bool
 engine_can_be_temporary(uint32_t flags)
 {
 	return flags & ENGINE_CAN_BE_TEMPORARY;
-}
-
-static inline bool
-engine_auto_check_update(uint32_t flags)
-{
-	return flags & ENGINE_AUTO_CHECK_UPDATE;
 }
 
 static inline uint32_t

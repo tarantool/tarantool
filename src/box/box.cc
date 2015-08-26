@@ -500,7 +500,7 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 {
 	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	class MemtxIndex *index = (MemtxIndex *)index_find(space, 0);
+	class MemtxIndex *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
 	struct tuple *tuple = it->next(it);

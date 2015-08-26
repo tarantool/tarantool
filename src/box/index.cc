@@ -148,24 +148,6 @@ Index::Index(struct key_def *key_def_arg)
 	sc_version(::sc_version)
 {}
 
-void
-Index::beginBuild()
-{}
-
-void
-Index::reserve(uint32_t /* size_hint */)
-{}
-
-void
-Index::buildNext(struct tuple *tuple)
-{
-	replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-Index::endBuild()
-{}
-
 Index::~Index()
 {
 	key_def_delete(key_def);

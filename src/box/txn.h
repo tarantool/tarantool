@@ -31,8 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "space.h"
-#include "xrow.h"
-#include "iproto_constants.h"
 #include "trigger.h"
 #include "fiber.h"
 
@@ -127,18 +125,10 @@ txn_commit_stmt(struct txn *txn)
 	 * of tuples in the trigger.
 	 */
 	struct txn_stmt *stmt = txn->stmt;
-	if (stmt->row && stmt->space) {
-		switch (stmt->row->type) {
-			case IPROTO_INSERT:
-			case IPROTO_REPLACE:
-			case IPROTO_UPDATE:
-			case IPROTO_DELETE: {
-				if (! rlist_empty(&stmt->space->on_replace) &&
-				    stmt->space->run_triggers)
-					trigger_run(&stmt->space->on_replace, txn);
-				break;
-			}
-		}
+	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
+	    && stmt->space->run_triggers) {
+
+		trigger_run(&stmt->space->on_replace, txn);
 	}
 	if (txn->autocommit)
 		txn_commit(txn);

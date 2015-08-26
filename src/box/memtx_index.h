@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "index.h"
 
 class MemtxIndex: public Index {
 public:
@@ -51,6 +52,19 @@ public:
 			m_position = allocIterator();
 		return m_position;
 	}
+
+	/**
+	 * Two-phase index creation: begin building, add tuples, finish.
+	 */
+	virtual void beginBuild();
+	/**
+	 * Optional hint, given to the index, about
+	 * the total size of the index. If given,
+	 * is given after beginBuild().
+	 */
+	virtual void reserve(uint32_t /* size_hint */);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
 protected:
 	/*
 	 * Pre-allocated iterator to speed up the main case of

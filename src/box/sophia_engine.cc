@@ -160,8 +160,7 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	TupleGuard guard(new_tuple);
 
 	space_validate_tuple(space, new_tuple);
-	if (! engine_auto_check_update(space->handler->engine->flags))
-		space_check_update(space, old_tuple, new_tuple);
+	space_check_update(space, old_tuple, new_tuple);
 
 	index->replace_or_insert(new_tuple->data,
 	                         new_tuple->data + new_tuple->bsize,

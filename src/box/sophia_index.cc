@@ -560,7 +560,7 @@ SophiaIndex::replace_or_insert(const char *tuple,
                                enum dup_replace_mode mode)
 {
 	uint32_t size = tuple_end - tuple;
-	const char *key = tuple_field_of(tuple, size, key_def->parts[0].fieldno);
+	const char *key = tuple_field_raw(tuple, size, key_def->parts[0].fieldno);
 	/* insert: ensure key does not exists */
 	if (mode == DUP_INSERT) {
 		struct tuple *found = findByKey(key);

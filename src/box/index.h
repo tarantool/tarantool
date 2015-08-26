@@ -170,18 +170,6 @@ protected:
 public:
 	virtual ~Index();
 
-	/**
-	 * Two-phase index creation: begin building, add tuples, finish.
-	 */
-	virtual void beginBuild();
-	/**
-	 * Optional hint, given to the index, about
-	 * the total size of the index. If given,
-	 * is given after beginBuild().
-	 */
-	virtual void reserve(uint32_t /* size_hint */);
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
 	virtual size_t size() const;
 	virtual struct tuple *min(const char *key, uint32_t part_count) const;
 	virtual struct tuple *max(const char *key, uint32_t part_count) const;
