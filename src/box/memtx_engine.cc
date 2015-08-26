@@ -261,7 +261,8 @@ MemtxSpace::executeSelect(struct txn* /* txn */, struct space *space,
                           struct request *request,
                           struct port *port)
 {
-	MemtxIndex *index = (MemtxIndex *)index_find(space, request->index_id);
+	MemtxIndex *index = (MemtxIndex *)
+		index_find(space, request->index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -429,7 +430,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		return;
 
 	if (space->index_id_max > 0) {
-		MemtxIndex *pk = (MemtxIndex *)space->index[0];
+		MemtxIndex *pk = (MemtxIndex *) space->index[0];
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
@@ -438,7 +439,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build((MemtxIndex *)space->index[j], pk);
+			index_build((MemtxIndex *) space->index[j], pk);
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
@@ -593,7 +594,7 @@ MemtxEngine::createIndex(struct key_def *key_def)
 void
 MemtxEngine::dropIndex(Index *index)
 {
-	struct iterator *it = ((MemtxIndex*)index)->position();
+	struct iterator *it = ((MemtxIndex*) index)->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
 	while ((tuple = it->next(it)))

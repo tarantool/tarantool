@@ -201,7 +201,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len)
 {
 	struct space *space = space_cache_find(system_space_id);
-	MemtxIndex *index = (MemtxIndex *)index_find(space, index_id);
+	MemtxIndex *index = index_find_system(space, index_id);
 	char buf[BOX_NAME_MAX * 2];
 	/**
 	 * This is an internal-only method, we should know the
@@ -407,7 +407,7 @@ schema_find_grants(const char *type, uint32_t id)
 {
 	struct space *priv = space_cache_find(BOX_PRIV_ID);
 	/** "object" index */
-	MemtxIndex *index = (MemtxIndex *)index_find(priv, 2);
+	MemtxIndex *index = index_find_system(priv, 2);
 	struct iterator *it = index->position();
 	char key[10 + BOX_NAME_MAX];
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);

@@ -190,6 +190,24 @@ index_find_unique(struct space *space, uint32_t index_id)
 	return index;
 }
 
+class MemtxIndex;
+
+/**
+ * Find an index in a system space. Throw an error
+ * if we somehow deal with a non-memtx space (it can't
+ * be used for system spaces.
+ */
+static inline MemtxIndex *
+index_find_system(struct space *space, uint32_t index_id)
+{
+	if (! space_is_memtx(space)) {
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  space->handler->engine->name, "system data");
+	}
+	return (MemtxIndex *) index_find(space, index_id);
+}
+
+
 extern "C" void
 space_run_triggers(struct space *space, bool yesno);
 

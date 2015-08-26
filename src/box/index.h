@@ -216,6 +216,13 @@ public:
 	virtual void destroyReadViewForIterator(struct iterator *iterator);
 };
 
+struct IteratorGuard
+{
+	struct iterator *it;
+	IteratorGuard(struct iterator *it_arg) : it(it_arg) {}
+	~IteratorGuard() { it->free(it); }
+};
+
 /**
  * Check if replacement of an old tuple with a new one is
  * allowed.

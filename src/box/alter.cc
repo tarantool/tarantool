@@ -888,11 +888,12 @@ AddIndex::alter(struct alter_space *alter)
 	if (new_key_def->iid != 0 && !engine->needToBuildSecondaryKey(alter->new_space))
 		return;
 
-	MemtxIndex *pk = (MemtxIndex *)index_find(alter->old_space, 0);
-	MemtxIndex *new_index = (MemtxIndex *)index_find(alter->new_space, new_key_def->iid);
+	Index *pk = index_find(alter->old_space, 0);
+	Index *new_index = index_find(alter->new_space, new_key_def->iid);
 
 	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = pk->position();
+	struct iterator *it = pk->allocIterator();
+	IteratorGuard guard(it);
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	/*
@@ -1185,14 +1186,15 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space == NULL)
 		return false;
 
-	MemtxIndex *index = (MemtxIndex *)space_index(space, iid);
-	if (index == NULL)
+	if (space_index(space, iid) == NULL)
 		return false;
+
+	MemtxIndex *index = index_find_system(space, iid);
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
-
 	struct iterator *it = index->position();
+
 	index->initIterator(it, ITER_EQ, key, 1);
 	if (it->next(it))
 		return true;
