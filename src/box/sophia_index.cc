@@ -91,7 +91,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 
 	/* build tuple */
 	struct tuple *tuple;
-	char *raw;
+	char *raw = NULL;
 	if (format) {
 		tuple = tuple_alloc(format, size);
 		p = tuple->data;
