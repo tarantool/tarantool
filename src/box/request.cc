@@ -62,7 +62,7 @@ process_rw(struct request *request, struct port *port)
 		struct space *space = space_cache_find(request->space_id);
 		struct txn *txn;
 		if (request->type == IPROTO_SELECT) {
-			txn = NULL;
+			txn = in_txn();
 			access_check_space(space, PRIV_R);
 		} else {
 			txn = txn_begin_stmt(request, space);
@@ -71,6 +71,10 @@ process_rw(struct request *request, struct port *port)
 		switch (request->type) {
 		case IPROTO_SELECT:
 			space->handler->executeSelect(txn, space, request, port);
+			if (txn == NULL) {
+				/* no txn is created, so simply collect garbage here */
+				fiber_gc();
+			}
 			break;
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:

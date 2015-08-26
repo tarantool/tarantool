@@ -33,43 +33,14 @@
 #include "schema.h"
 #include "space.h"
 
-static void
-sysview_replace(struct txn *txn, struct space *space,
-		struct tuple *old_tuple, struct tuple *new_tuple,
-		enum dup_replace_mode mode)
-{
-	(void) txn;
-	(void) space;
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "sysview", "replace()");
-}
-
 struct SysviewSpace: public Handler {
-	SysviewSpace(Engine *e)
-		: Handler(e)
-	{
-		replace = sysview_replace;
-	}
+	SysviewSpace(Engine *e) : Handler(e) {}
 
-	virtual ~SysviewSpace()
-	{
-	}
+	virtual ~SysviewSpace() {}
 };
 
 SysviewEngine::SysviewEngine()
 	:Engine("sysview")
-{
-}
-
-void
-SysviewEngine::recoverToCheckpoint(int64_t /* lsn */)
-{
-}
-
-void
-SysviewEngine::endRecovery()
 {
 }
 
@@ -101,59 +72,8 @@ SysviewEngine::createIndex(struct key_def *key_def)
 	}
 }
 
-void
-SysviewEngine::dropIndex(Index *index)
-{
-	(void) index;
-}
-
-void
-SysviewEngine::keydefCheck(struct space *space, struct key_def *key_def)
-{
-	(void) space;
-	(void) key_def;
-	/*
-	 * Don't bother checking key_def to match the view requirements.
-	 * Index::initIterator() must check key on each call.
-	 */
-}
-
-void
-SysviewEngine::beginJoin()
-{
-}
-
-int
-SysviewEngine::beginCheckpoint(int64_t lsn)
-{
-	(void) lsn;
-	return 0;
-}
-
-int
-SysviewEngine::waitCheckpoint()
-{
-	return 0;
-}
-
-void
-SysviewEngine::commitCheckpoint()
-{
-}
-
-void
-SysviewEngine::abortCheckpoint()
-{
-}
-
 bool
 SysviewEngine::needToBuildSecondaryKey(struct space * /* space */)
 {
 	return false;
-}
-
-void
-SysviewEngine::join(Relay *relay)
-{
-	(void) relay;
 }

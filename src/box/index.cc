@@ -165,8 +165,8 @@ struct tuple *
 Index::min(const char* /* key */, uint32_t /* part_count */) const
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-	          index_type_strs[key_def->type],
-	          "min()");
+		  index_type_strs[key_def->type],
+		  "min()");
 	return NULL;
 }
 
@@ -174,8 +174,8 @@ struct tuple *
 Index::max(const char* /* key */, uint32_t /* part_count */) const
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-	          index_type_strs[key_def->type],
-	          "max()");
+		  index_type_strs[key_def->type],
+		  "max()");
 	return NULL;
 }
 

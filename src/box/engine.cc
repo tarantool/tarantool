@@ -91,37 +91,103 @@ bool Engine::needToBuildSecondaryKey(struct space * /* space */)
 	return true;
 }
 
+void
+Engine::beginJoin()
+{
+}
+
+int
+Engine::beginCheckpoint(int64_t lsn)
+{
+	(void) lsn;
+	return 0;
+}
+
+int
+Engine::waitCheckpoint()
+{
+	return 0;
+}
+
+void
+Engine::commitCheckpoint()
+{
+}
+
+void
+Engine::abortCheckpoint()
+{
+}
+
+void
+Engine::endRecovery()
+{
+}
+
+void
+Engine::recoverToCheckpoint(int64_t /* lsn */)
+{
+}
+
+void
+Engine::join(Relay *relay)
+{
+	(void) relay;
+}
+
+void
+Engine::dropIndex(Index *index)
+{
+	(void) index;
+}
+
+void
+Engine::keydefCheck(struct space *space, struct key_def *key_def)
+{
+	(void) space;
+	(void) key_def;
+	/*
+	 * Don't bother checking key_def to match the view requirements.
+	 * Index::initIterator() must check key on each call.
+	 */
+}
+
 Handler::Handler(Engine *f)
 	:engine(f)
 {
 }
 
 void
-Handler::executeReplace(struct txn*, struct space*,
-                        struct request*, struct port*)
+Handler::executeReplace(struct txn *, struct space *,
+                        struct request *, struct port *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace");
 }
 
 void
-Handler::executeDelete(struct txn*, struct space*, struct request*,
-                       struct port*)
+Handler::executeDelete(struct txn*, struct space *, struct request *,
+                       struct port *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete");
 }
 
 void
-Handler::executeUpdate(struct txn*, struct space*, struct request*,
-                       struct port*)
+Handler::executeUpdate(struct txn*, struct space *, struct request *,
+                       struct port *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update");
 }
 
 void
-Handler::executeUpsert(struct txn*, struct space*, struct request*,
-                       struct port*)
+Handler::executeUpsert(struct txn *, struct space *, struct request *,
+                       struct port *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
+}
+
+void
+Handler::onAlter(Handler *)
+{
 }
 
 void
@@ -161,10 +227,6 @@ Handler::executeSelect(struct txn* /* txn */, struct space *space,
 		if (limit == found++)
 			break;
 		port_add_tuple(port, tuple);
-	}
-	if (! in_txn()) {
-		 /* no txn is created, so simply collect garbage here */
-		fiber_gc();
 	}
 }
 

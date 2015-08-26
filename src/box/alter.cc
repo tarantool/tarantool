@@ -529,8 +529,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * snapshot/xlog, but needs to continue staying "fully
 	 * built".
 	 */
-	alter->new_space->handler->replace =
-		alter->old_space->handler->replace;
+	alter->new_space->handler->onAlter(alter->old_space->handler);
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));

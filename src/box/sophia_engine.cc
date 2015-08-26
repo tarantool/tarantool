@@ -188,7 +188,6 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 SophiaSpace::SophiaSpace(Engine *e)
 	:Handler(e)
 {
-	replace = NULL;
 }
 
 SophiaEngine::SophiaEngine()
