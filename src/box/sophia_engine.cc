@@ -315,16 +315,13 @@ sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
 	relay_send(relay, &row);
 }
 
-static inline struct key_def*
+static inline struct key_def *
 sophia_join_key_def(void *env, void *db)
 {
 	uint32_t id = sp_getint(db, "id");
 	uint32_t count = sp_getint(db, "key-count");
 	struct key_def *key_def;
-	struct key_opts key_opts = {
-		.is_unique = true,
-		.dimension = 0
-	};
+	struct key_opts key_opts = { true /* is_unique */, 0 /* dimension */ };
 	key_def = key_def_new(id, 0, "sophia_join", TREE, &key_opts, count);
 	int i = 0;
 	while (i < count) {

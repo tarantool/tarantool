@@ -115,6 +115,7 @@ errors(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	assert(strcmp(box_error_type(error), "ClientError") == 0);
 	assert(box_error_code(error) == ER_PROC_C);
 	assert(strcmp(box_error_message(error), "Proc error") == 0);
+	(void) error;
 
 	box_error_clear();
 	assert(box_error_last() == NULL);
