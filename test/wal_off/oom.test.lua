@@ -75,3 +75,29 @@ space:select{}
 --
 space:drop()
 t = nil
+
+-- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
+--# stop server default
+--# start server default
+arena_bytes = box.cfg.slab_alloc_arena * 1024 * 1024 * 1024
+str = string.rep('a', 15000) -- about size of index memory block
+
+space = box.schema.space.create('tweedledum')
+index = space:create_index('primary', { type = 'hash' })
+
+for i=1,10000 do space:insert{i, str} end
+definatelly_used = index:count() * 16 * 1024
+2 * definatelly_used > arena_bytes -- at least half memory used
+to_del = index:count()
+for i=1,to_del do space:delete{i} end
+index:count()
+
+for i=1,10000 do space:insert{i, str} end
+definatelly_used = index:count() * 16 * 1024
+2 * definatelly_used > arena_bytes -- at least half memory used
+space:truncate()
+index:count()
+
+space:drop()
+str = nil
+
