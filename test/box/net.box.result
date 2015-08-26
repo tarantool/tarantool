@@ -288,7 +288,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:130: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:133: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -901,6 +901,49 @@ c = net:new(box.cfg.listen)
 ...
 r = c.space.test:select(nil, {limit=5000})
 ---
+...
+box.space.test:drop()
+---
+...
+-- gh-970 gh-971 UPSERT over network
+_ = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+---
+...
+_ = box.space.test:insert{1, 2, "string"}
+---
+...
+c = net:new(box.cfg.listen)
+---
+...
+c.space.test:select{}
+---
+- - [1, 2, 'string']
+...
+c.space.test:upsert({1}, {{'+', 2, 1}}, {10, 20, 'nothing'}) -- common update
+---
+...
+c.space.test:select{}
+---
+- - [1, 3, 'string']
+...
+c.space.test:upsert({2}, {{'+', 2, 1}}, {2, 4, 'something'}) -- insert
+---
+...
+c.space.test:select{}
+---
+- - [1, 3, 'string']
+  - [2, 4, 'something']
+...
+c.space.test:upsert({2}, {{'+', 3, 100500}}, {2, 4, 'nothing'}) -- wrong operation
+---
+...
+c.space.test:select{}
+---
+- - [1, 3, 'string']
+  - [2, 4, 'something']
 ...
 box.space.test:drop()
 ---

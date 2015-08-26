@@ -379,4 +379,18 @@ c = net:new(box.cfg.listen)
 r = c.space.test:select(nil, {limit=5000})
 box.space.test:drop()
 
+-- gh-970 gh-971 UPSERT over network
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
+_ = box.space.test:insert{1, 2, "string"}
+c = net:new(box.cfg.listen)
+c.space.test:select{}
+c.space.test:upsert({1}, {{'+', 2, 1}}, {10, 20, 'nothing'}) -- common update
+c.space.test:select{}
+c.space.test:upsert({2}, {{'+', 2, 1}}, {2, 4, 'something'}) -- insert
+c.space.test:select{}
+c.space.test:upsert({2}, {{'+', 3, 100500}}, {2, 4, 'nothing'}) -- wrong operation
+c.space.test:select{}
+box.space.test:drop()
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
