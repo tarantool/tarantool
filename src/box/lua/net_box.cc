@@ -29,16 +29,15 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/net_box.h"
-#include "lua/msgpack.h"
+#include "net_box.h"
 
 #include <lib/small/ibuf.h>
 #include "scramble.h"
 
-/* TODO: net.box depends on src/box/ */
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 
+#include "lua/msgpack.h"
 #include <msgpuck/msgpuck.h> /* mp_store_u32() */
 #include "third_party/base64.h"
 

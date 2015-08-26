@@ -24,7 +24,6 @@ lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
-lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/help.lua)
 lua_source(lua_sources lua/help_en_US.lua)
 lua_source(lua_sources lua/tap.lua)
@@ -106,7 +105,6 @@ set (server_sources
      lua/trigger.cc
      lua/ipc.cc
      lua/msgpack.cc
-     lua/net_box.cc
      lua/utils.cc
      lua/errno.c
      lua/bsdsocket.cc

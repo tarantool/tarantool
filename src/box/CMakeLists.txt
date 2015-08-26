@@ -8,6 +8,7 @@ lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/tuple.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/snapshot_daemon.lua)
+lua_source(lua_sources lua/net_box.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
@@ -67,6 +68,7 @@ add_library(box
     lua/stat.cc
     lua/error.cc
     lua/session.cc
+    lua/net_box.cc
     ${bin_sources})
 
 target_link_libraries(box ${sophia_lib})

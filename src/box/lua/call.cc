@@ -38,6 +38,7 @@
 #include "box/lua/stat.h"
 #include "box/lua/info.h"
 #include "box/lua/session.h"
+#include "box/lua/net_box.h"
 #include "box/tuple.h"
 
 #include "lua/utils.h"
@@ -62,13 +63,15 @@
 extern char session_lua[],
 	schema_lua[],
 	load_cfg_lua[],
-	snapshot_daemon_lua[];
+	snapshot_daemon_lua[],
+	net_box_lua[];
 
 static const char *lua_sources[] = {
 	session_lua,
 	schema_lua,
 	snapshot_daemon_lua,
 	load_cfg_lua,
+	net_box_lua,
 	NULL
 };
 
@@ -745,6 +748,8 @@ box_lua_init(struct lua_State *L)
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	luaL_register(L, "box.internal", boxlib_internal);
+	lua_pop(L, 1);
+	luaopen_net_box(L);
 	lua_pop(L, 1);
 
 #if 0

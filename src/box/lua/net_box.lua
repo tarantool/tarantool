@@ -1076,4 +1076,4 @@ setmetatable(remote.self, {
     end
 })
 
-return remote
+package.loaded['net.box'] = remote
