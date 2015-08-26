@@ -72,7 +72,7 @@ variable which will contain the Debian version code e.g. "Wheezy":
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is always an up-to-date Ubuntu repository at
-http://tarantool.org/dist/master/ubuntu The repository contains builds for
+http://tarantool.org/dist/master/ubuntu. The repository contains builds for
 Ubuntu 12.04 "precise", 13.10 "saucy", and 14.04 "trusty". Add the tarantool.org
 repository to your apt sources list. $release is an environment variable which
 will contain the Ubuntu version code e.g. "precise". If you want the version
@@ -107,17 +107,15 @@ your x86 platform:
 * http://tarantool.org/dist/master/centos/7/os/x86_64 for version 7, x86-64
 
 Add the following section to your yum repository list
-(``/etc/yum.repos.d/tarantool.repo``) (in the following instructions, ``$releasever``
+(``/etc/yum.repos.d/tarantool.repo``) (in these instructions ``$releasever``
 i.e. CentOS release version must be either 6 or 7 and ``$basearch`` i.e. base
 architecture must be either i386 or x86_64):
 
-.. code-block:: ini
-
-    # [tarantool]
-    name=CentOS-$releasever - Tarantool
-    baseurl=http://tarantool.org/dist/master/centos/$releasever/os/$basearch/
-    enabled=1
-    gpgcheck=0
+    | :samp:`# [tarantool]`
+    | :samp:`name=CentOS-$releasever - Tarantool`
+    | :samp:`baseurl=http://tarantool.org/dist/master/centos/{$releasever}/os/{$basearch}/`
+    | :samp:`enabled=1`
+    | :samp:`gpgcheck=0`
 
 For example, if you have CentOS version 6 and x86-64, you can add the new section thus:
 
@@ -131,6 +129,8 @@ For example, if you have CentOS version 6 and x86-64, you can add the new sectio
     echo "enabled=1" | sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "gpgcheck=0" | sudo tee -a /etc/yum.repos.d/tarantool.repo
 
+Then install with :code:`sudo yum install tarantool`.
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                           Fedora
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,17 +138,15 @@ For example, if you have CentOS version 6 and x86-64, you can add the new sectio
 These instructions are applicable for Fedora 19, 20 or rawhide. Pick the Fedora
 repository, for example http://tarantool.org/dist/master/fedora/20/x86_64 for
 version 20, x86-64. Add the following section to your yum repository list
-(``/etc/yum.repos.d/tarantool.repo``) (in the following instructions,
+(``/etc/yum.repos.d/tarantool.repo``) (in these instructions
 ``$releasever`` i.e. Fedora release version must be 19, 20 or rawhide and
 ``$basearch`` i.e. base architecture must be x86_64):
 
-.. code-block:: ini
-
-    [tarantool]
-    name=Fedora-$releasever - Tarantool
-    baseurl=http://tarantool.org/dist/master/fedora/$releasever$basearch/
-    enabled=1
-    gpgcheck=0
+    | :samp:`[tarantool]`
+    | :samp:`name=Fedora-$releasever - Tarantool`
+    | :samp:`baseurl=http://tarantool.org/dist/master/fedora/{$releasever}/{$basearch}/`
+    | :samp:`enabled=1`
+    | :samp:`gpgcheck=0`
 
 For example, if you have Fedora version 20, you can add the new section thus:
 
@@ -161,13 +159,14 @@ For example, if you have Fedora version 20, you can add the new section thus:
     sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "enabled=1" | sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "gpgcheck=0" | sudo tee -a /etc/yum.repos.d/tarantool.repo
-    Then install with sudo yum install tarantool.
+
+Then install with :code:`sudo yum install tarantool`.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                           Gentoo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-available from tarantool portage overlay. Use layman to add the overlay to your system:
+There is a tarantool portage overlay. Use layman to add the overlay to your system:
 
 .. code-block:: bash
 
