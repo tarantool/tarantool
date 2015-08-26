@@ -2,10 +2,11 @@ box.cfg.sophia
 ---
 - page_size: 131072
   memory_limit: 0
-  threads: 0
+  compression_key: 0
+  threads: 3
   node_size: 134217728
   compression: none
 ...
-box.cfg.sophia.threads = 3
+box.cfg.sophia.threads = 5
 ---
 ...

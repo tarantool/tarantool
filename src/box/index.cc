@@ -145,8 +145,7 @@ primary_key_validate(struct key_def *key_def, const char *key,
 
 Index::Index(struct key_def *key_def_arg)
 	:key_def(key_def_dup(key_def_arg)),
-	sc_version(::sc_version),
-	m_position(NULL)
+	sc_version(::sc_version)
 {}
 
 void
@@ -169,8 +168,6 @@ Index::endBuild()
 
 Index::~Index()
 {
-	if (m_position != NULL)
-		m_position->free(m_position);
 	key_def_delete(key_def);
 }
 
@@ -178,26 +175,26 @@ size_t
 Index::size() const
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "size()");
+	          index_type_strs[key_def->type],
+	          "size()");
 }
 
 struct tuple *
-Index::min(const char *key, uint32_t part_count) const
+Index::min(const char* /* key */, uint32_t /* part_count */) const
 {
-	struct iterator *it = position();
-	initIterator(it, ITER_GE, key, part_count);
-	IteratorGuard guard(it);
-	return it->next(it);
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+	          index_type_strs[key_def->type],
+	          "min()");
+	return NULL;
 }
 
 struct tuple *
-Index::max(const char *key, uint32_t part_count) const
+Index::max(const char* /* key */, uint32_t /* part_count */) const
 {
-	struct iterator *it = position();
-	initIterator(it, ITER_LE, key, part_count);
-	IteratorGuard guard(it);
-	return it->next(it);
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+	          index_type_strs[key_def->type],
+	          "max()");
+	return NULL;
 }
 
 struct tuple *
@@ -211,18 +208,13 @@ Index::random(uint32_t rnd) const
 }
 
 size_t
-Index::count(enum iterator_type type, const char *key, uint32_t part_count) const
+Index::count(enum iterator_type /* type */, const char* /* key */,
+             uint32_t /* part_count */) const
 {
-	if (type == ITER_ALL && key == NULL)
-		return size(); /* optimization */
-	struct iterator *it = position();
-	initIterator(it, type, key, part_count);
-	IteratorGuard guard(it);
-	size_t count = 0;
-	struct tuple *tuple = NULL;
-	while ((tuple = it->next(it)) != NULL)
-		++count;
-	return count;
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def->type],
+		  "count()");
+	return 0;
 }
 
 struct tuple *
@@ -265,32 +257,6 @@ Index::destroyReadViewForIterator(struct iterator *iterator)
 	tnt_raise(ClientError, ER_UNSUPPORTED,
 		  index_type_strs[key_def->type],
 		  "consistent read view");
-}
-
-void
-index_build(Index *index, Index *pk)
-{
-	uint32_t n_tuples = pk->size();
-	uint32_t estimated_tuples = n_tuples * 1.2;
-
-	index->beginBuild();
-	index->reserve(estimated_tuples);
-
-	if (n_tuples > 0) {
-		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
-			 n_tuples, index_type_strs[index->key_def->type],
-			 index_name(index));
-	}
-
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-	IteratorGuard it_guard(it);
-
-	struct tuple *tuple;
-	while ((tuple = it->next(it)))
-		index->buildNext(tuple);
-
-	index->endBuild();
 }
 
 static inline Index *
@@ -492,8 +458,6 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 void
 box_iterator_free(box_iterator_t *it)
 {
-	if (it->close)
-		it->close(it);
 	if (it->free)
 		it->free(it);
 }

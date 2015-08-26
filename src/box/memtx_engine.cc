@@ -37,6 +37,8 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
+#include "msgpuck/msgpuck.h"
+#include "salad/rlist.h"
 #include "request.h"
 #include "box.h"
 #include "iproto_constants.h"
@@ -44,6 +46,7 @@
 #include "recovery.h"
 #include "relay.h"
 #include "schema.h"
+#include "port.h"
 #include "main.h"
 #include "coeio_file.h"
 #include "coeio.h"
@@ -109,8 +112,189 @@ struct MemtxSpace: public Handler {
 		/* do nothing */
 		/* engine->close(this); */
 	}
+	virtual void executeReplace(struct txn*, struct space*,
+	                            struct request*, struct port*);
+	virtual void executeDelete(struct txn*, struct space *space,
+	                           struct request *request, struct port *port);
+	virtual void executeUpdate(struct txn*, struct space *space,
+	                           struct request *request, struct port *port);
+	virtual void executeUpsert(struct txn*, struct space *space,
+	                           struct request *request, struct port *port);
+	virtual void executeSelect(struct txn*, struct space *space,
+	                           struct request *request, struct port *port);
 };
 
+static inline enum dup_replace_mode
+dup_replace_mode(uint32_t op)
+{
+	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
+}
+
+void
+MemtxSpace::executeReplace(struct txn *txn, struct space *space,
+	                       struct request *request,
+                           struct port *port)
+{
+	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
+					    request->tuple_end);
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	enum dup_replace_mode mode = dup_replace_mode(request->type);
+	space->handler->replace(txn, space, NULL, new_tuple, mode);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, new_tuple);
+}
+
+void
+MemtxSpace::executeDelete(struct txn *txn, struct space *space,
+                          struct request *request,
+                          struct port *port)
+{
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+	if (old_tuple == NULL) {
+		txn_commit_stmt(txn);
+		return;
+	}
+	TupleGuard old_guard(old_tuple);
+	space->handler->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, old_tuple);
+}
+
+void
+MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
+                          struct request *request,
+                          struct port *port)
+{
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	if (old_tuple == NULL) {
+		txn_commit_stmt(txn);
+		return;
+	}
+	TupleGuard old_guard(old_tuple);
+
+	/* Update the tuple; legacy, request ops are in request->tuple */
+	struct tuple *new_tuple = tuple_update(space->format,
+					       region_alloc_cb,
+					       &fiber()->gc,
+					       old_tuple, request->tuple,
+					       request->tuple_end,
+					       request->index_base);
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	if (! engine_auto_check_update(space->handler->engine->flags))
+		space_check_update(space, old_tuple, new_tuple);
+	space->handler->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	port_add_tuple(port, new_tuple);
+}
+
+void
+MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
+                          struct request *request,
+                          struct port *port)
+{
+	(void)port;
+	Index *pk = index_find_unique(space, request->index_id);
+	/* Try to find the tuple by primary key. */
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	if (old_tuple == NULL) {
+		struct tuple *new_tuple = tuple_new(space->format,
+						    request->tuple,
+						    request->tuple_end);
+		TupleGuard guard(new_tuple);
+		space_validate_tuple(space, new_tuple);
+		space->handler->replace(txn, space, NULL, new_tuple, DUP_INSERT);
+	} else {
+		TupleGuard old_guard(old_tuple);
+
+		/* Update the tuple. */
+		struct tuple *new_tuple =
+			tuple_upsert(space->format, region_alloc_cb,
+				     &fiber()->gc, old_tuple,
+				     request->ops, request->ops_end,
+				     request->index_base);
+		TupleGuard guard(new_tuple);
+
+		space_validate_tuple(space, new_tuple);
+		if (!engine_auto_check_update(space->handler->engine->flags))
+			space_check_update(space, old_tuple, new_tuple);
+		space->handler->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	}
+
+	txn_commit_stmt(txn);
+	/* Return nothing: upsert does not return data. */
+}
+
+void
+MemtxSpace::executeSelect(struct txn* /* txn */, struct space *space,
+                          struct request *request,
+                          struct port *port)
+{
+	MemtxIndex *index = (MemtxIndex *)index_find(space, request->index_id);
+
+	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
+
+	uint32_t found = 0;
+	uint32_t offset = request->offset;
+	uint32_t limit = request->limit;
+	if (request->iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) request->iterator;
+	const char *key = request->key;
+
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	key_validate(index->key_def, type, key, part_count);
+
+	struct iterator *it = index->position();
+	index->initIterator(it, type, key, part_count);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it)) != NULL) {
+		TupleGuard tuple_gc(tuple);
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		if (limit == found++)
+			break;
+		port_add_tuple(port, tuple);
+	}
+	if (! in_txn()) {
+		 /* no txn is created, so simply collect garbage here */
+		fiber_gc();
+	}
+}
 
 static void
 txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
@@ -245,7 +429,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		return;
 
 	if (space->index_id_max > 0) {
-		Index *pk = space->index[0];
+		MemtxIndex *pk = (MemtxIndex *)space->index[0];
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
@@ -254,7 +438,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build(space->index[j], pk);
+			index_build((MemtxIndex *)space->index[j], pk);
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
@@ -409,7 +593,7 @@ MemtxEngine::createIndex(struct key_def *key_def)
 void
 MemtxEngine::dropIndex(Index *index)
 {
-	struct iterator *it = index->position();
+	struct iterator *it = ((MemtxIndex*)index)->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
 	while ((tuple = it->next(it)))
@@ -504,7 +688,6 @@ MemtxEngine::prepare(struct txn *txn)
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
 }
-
 
 void
 MemtxEngine::beginStatement(struct txn *txn)

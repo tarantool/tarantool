@@ -1,0 +1,47 @@
+
+-- select (str)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+for key = 1, 100 do space:replace({tostring(key)}) end
+index:select({}, {iterator = box.index.ALL})
+index:select({}, {iterator = box.index.GE})
+index:select(tostring(44), {iterator = box.index.GE})
+index:select({}, {iterator = box.index.GT})
+index:select(tostring(44), {iterator = box.index.GT})
+index:select({}, {iterator = box.index.LE})
+index:select(tostring(77), {iterator = box.index.LE})
+index:select({}, {iterator = box.index.LT})
+index:select(tostring(77), {iterator = box.index.LT})
+space:drop()
+
+
+-- select (num)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+for key = 1, 100 do space:replace({key}) end
+index:select({}, {iterator = box.index.ALL})
+index:select({}, {iterator = box.index.GE})
+index:select(44, {iterator = box.index.GE})
+index:select({}, {iterator = box.index.GT})
+index:select(44, {iterator = box.index.GT})
+index:select({}, {iterator = box.index.LE})
+index:select(77, {iterator = box.index.LE})
+index:select({}, {iterator = box.index.LT})
+index:select(77, {iterator = box.index.LT})
+space:drop()
+
+
+-- select multi-part (num, num)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+for key = 1, 100 do space:replace({key, key}) end
+index:select({}, {iterator = box.index.ALL})
+index:select({}, {iterator = box.index.GE})
+index:select({44, 44}, {iterator = box.index.GE})
+index:select({}, {iterator = box.index.GT})
+index:select({44, 44}, {iterator = box.index.GT})
+index:select({}, {iterator = box.index.LE})
+index:select({77, 77}, {iterator = box.index.LE})
+index:select({}, {iterator = box.index.LT})
+index:select({77, 77}, {iterator = box.index.LT})
+space:drop()

@@ -27,6 +27,7 @@ cfg_filter(box.cfg)
   sophia:
     page_size: 131072
     memory_limit: 0
+    compression_key: 0
     threads: 5
     node_size: 134217728
     compression: none

@@ -113,7 +113,8 @@ enum fiber_key {
 	FIBER_KEY_TXN = 2,
 	/** User global privilege and authentication token */
 	FIBER_KEY_USER = 3,
-	FIBER_KEY_MAX = 4
+	FIBER_RESULT = 4,
+	FIBER_KEY_MAX = 5
 };
 
 typedef void(*fiber_func)(va_list);

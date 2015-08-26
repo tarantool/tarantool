@@ -1,6 +1,7 @@
 #include <bit/bit.h>
 #include <lib/msgpuck/msgpuck.h>
 #include "scramble.h"
+#include "evio.h"
 #include <box/box.h>
 #include <box/tuple.h>
 #include <box/index.h>
@@ -76,7 +77,6 @@ void *ffi_symbols[] = {
 	(void *) random_bytes,
 	(void *) fiber_time,
 	(void *) fiber_time64,
-	(void *) sophia_schedule,
 	(void *) tarantool_lua_slab_cache,
 	(void *) ibuf_create,
 	(void *) ibuf_destroy,

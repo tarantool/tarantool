@@ -2,51 +2,25 @@
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
-sophia_dir()[1]
----
-- 0
-...
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- index create/drop
+-- space index create/drop
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')
 ---
 ...
-sophia_dir()[1]
----
-- 1
-...
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- index create/drop alter
+-- space index create/drop alter
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
 index = space:create_index('primary')
 ---
-...
-sophia_dir()[1]
----
-- 1
 ...
 _index = box.space[box.schema.INDEX_ID]
 ---
@@ -57,14 +31,7 @@ _index:delete{102, 0}
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- index create/drop tree string
+-- space index create/drop tree string
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
@@ -73,19 +40,11 @@ index = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
 ...
 space:insert({'test'})
 ---
-- ['test']
 ...
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- index create/drop tree num
+-- space index create/drop tree num
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
@@ -94,19 +53,49 @@ index = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
 ...
 space:insert({13})
 ---
-- [13]
 ...
 space:drop()
 ---
 ...
-sophia_schedule()
+-- space index create/drop tree multi-part num
+space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
-sophia_dir()[1]
+index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 2, 'num'}})
 ---
-- 0
 ...
--- index create hash 
+space:insert({13})
+---
+- error: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+space:drop()
+---
+...
+-- space index create/drop tree incorrect key pos
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', {type = 'tree', parts = {3, 'num'}})
+---
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
+    key-parts must follow first and cannot be sparse'
+...
+space:drop()
+---
+...
+-- space index create/drop tree sparse
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 3, 'num'}})
+---
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
+    key-parts must follow first and cannot be sparse'
+...
+space:drop()
+---
+...
+-- space index create hash
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
@@ -117,14 +106,7 @@ index = space:create_index('primary', {type = 'hash'})
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- secondary index create
+-- space secondary index create
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
@@ -139,14 +121,7 @@ index2 = space:create_index('secondary')
 space:drop()
 ---
 ...
-sophia_schedule()
----
-...
-sophia_dir()[1]
----
-- 0
-...
--- index size
+-- space index size
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
@@ -162,15 +137,12 @@ primary:len()
 ...
 space:insert({13})
 ---
-- [13]
 ...
 space:insert({14})
 ---
-- [14]
 ...
 space:insert({15})
 ---
-- [15]
 ...
 primary:len()
 ---
@@ -179,6 +151,17 @@ primary:len()
 space:drop()
 ---
 ...
-sophia_schedule()
+-- ensure alter is not supported
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary')
+---
+...
+index:alter({parts={1,'NUM'}})
+---
+- error: alter is not supported for a Sophia index
+...
+space:drop()
 ---
 ...

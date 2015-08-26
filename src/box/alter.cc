@@ -33,6 +33,7 @@
 #include "user_def.h"
 #include "user.h"
 #include "space.h"
+#include "memtx_index.h"
 #include "func.h"
 #include "txn.h"
 #include "tuple.h"
@@ -887,13 +888,12 @@ AddIndex::alter(struct alter_space *alter)
 	if (new_key_def->iid != 0 && !engine->needToBuildSecondaryKey(alter->new_space))
 		return;
 
-	Index *pk = index_find(alter->old_space, 0);
-	Index *new_index = index_find(alter->new_space, new_key_def->iid);
+	MemtxIndex *pk = (MemtxIndex *)index_find(alter->old_space, 0);
+	MemtxIndex *new_index = (MemtxIndex *)index_find(alter->new_space, new_key_def->iid);
 
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
-	IteratorGuard it_guard(it);
 
 	/*
 	 * The index has to be built tuple by tuple, since
@@ -1185,16 +1185,15 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space == NULL)
 		return false;
 
-	Index *index = space_index(space, iid);
+	MemtxIndex *index = (MemtxIndex *)space_index(space, iid);
 	if (index == NULL)
 		return false;
-	struct iterator *it = index->position();
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
 
+	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, 1);
-	IteratorGuard it_guard(it);
 	if (it->next(it))
 		return true;
 	return false;

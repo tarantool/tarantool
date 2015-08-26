@@ -36,6 +36,7 @@
  * @see bitset/index.h
  */
 #include "index.h"
+#include "memtx_index.h"
 #include "bitset/index.h"
 
 #ifndef OLD_GOOD_BITSET
@@ -43,7 +44,7 @@ struct matras;
 struct mh_bitset_index_t;
 #endif /*#ifndef OLD_GOOD_BITSET*/
 
-class MemtxBitset: public Index {
+class MemtxBitset: public MemtxIndex {
 public:
 	MemtxBitset(struct key_def *key_def);
 	virtual ~MemtxBitset();

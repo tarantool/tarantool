@@ -32,6 +32,7 @@
  */
 #include "index.h"
 
+struct request;
 struct space;
 struct tuple;
 class Relay;
@@ -171,6 +172,7 @@ public:
 	 * An error in one of the engines, abort checkpoint.
 	 */
 	virtual void abortCheckpoint() = 0;
+
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -274,7 +276,16 @@ public:
 	 * primary key.
 	 */
 	engine_replace_f replace;
-
+	virtual void executeReplace(struct txn*, struct space*,
+	                            struct request*, struct port*);
+	virtual void executeDelete(struct txn*, struct space*,
+	                           struct request*, struct port*);
+	virtual void executeUpdate(struct txn*, struct space*,
+	                           struct request*, struct port*);
+	virtual void executeUpsert(struct txn*, struct space*,
+	                           struct request*, struct port*);
+	virtual void executeSelect(struct txn*, struct space*,
+	                           struct request*, struct port*);
 	Engine *engine;
 };
 

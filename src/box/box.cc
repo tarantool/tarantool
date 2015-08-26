@@ -44,6 +44,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 #include "sysview_engine.h"
 #include "sophia_engine.h"
 #include "space.h"
@@ -499,10 +500,9 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 {
 	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	class Index *index = index_find(space, 0);
+	class MemtxIndex *index = (MemtxIndex *)index_find(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
-	IteratorGuard it_guard(it);
 	struct tuple *tuple = it->next(it);
 	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;

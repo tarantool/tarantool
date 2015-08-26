@@ -28,14 +28,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "tuple.h"
+#include "txn.h"
+#include "port.h"
+#include "request.h"
 #include "engine.h"
 #include "space.h"
 #include "exception.h"
 #include "schema.h"
 #include "salad/rlist.h"
+#include "scoped_guard.h"
 #include <stdlib.h>
 #include <string.h>
 #include <latch.h>
+#include <errinj.h>
 
 RLIST_HEAD(engines);
 
@@ -88,6 +94,80 @@ bool Engine::needToBuildSecondaryKey(struct space * /* space */)
 Handler::Handler(Engine *f)
 	:engine(f)
 {
+}
+
+void
+Handler::executeReplace(struct txn*, struct space*,
+                        struct request*, struct port*)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace()");
+}
+
+void
+Handler::executeDelete(struct txn*, struct space*, struct request*,
+                       struct port*)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete()");
+}
+
+void
+Handler::executeUpdate(struct txn*, struct space*, struct request*,
+                       struct port*)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update()");
+}
+
+void
+Handler::executeUpsert(struct txn*, struct space*, struct request*,
+                       struct port*)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert()");
+}
+
+void
+Handler::executeSelect(struct txn* /* txn */, struct space *space,
+                       struct request *request,
+                       struct port *port)
+{
+	/*
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "select()");
+	*/
+	Index *index = index_find(space, request->index_id);
+
+	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
+
+	uint32_t found = 0;
+	uint32_t offset = request->offset;
+	uint32_t limit = request->limit;
+	if (request->iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) request->iterator;
+
+	const char *key = request->key;
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	key_validate(index->key_def, type, key, part_count);
+
+	struct iterator *it = index->allocIterator();
+	auto it_guard = make_scoped_guard([=] {
+		it->free(it);
+	});
+	index->initIterator(it, type, key, part_count);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it)) != NULL) {
+		TupleGuard tuple_gc(tuple);
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		if (limit == found++)
+			break;
+		port_add_tuple(port, tuple);
+	}
+	if (! in_txn()) {
+		 /* no txn is created, so simply collect garbage here */
+		fiber_gc();
+	}
 }
 
 /** Register engine instance. */

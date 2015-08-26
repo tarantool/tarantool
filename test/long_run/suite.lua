@@ -16,7 +16,7 @@ function delete_replace_update(engine_name)
 		box.space.tester:drop()
 	end
 	box.schema.space.create('tester', {engine=engine_name})
-	box.space.tester:create_index('primary',{type = 'tree', parts = {2, 'STR'}})
+	box.space.tester:create_index('primary',{type = 'tree', parts = {1, 'STR'}})
 
 	counter = 1
 	while counter < 100000 do
@@ -24,14 +24,14 @@ function delete_replace_update(engine_name)
 
 		string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'GE', limit = 1})
 		if string_table[1] == nil then
-			box.space.tester:insert{counter, string_value}
+			box.space.tester:insert{string_value, counter}
 			string_value_2 = string_value
 		else
-			string_value_2 = string_table[1][2]
+			string_value_2 = string_table[1][1]
 		end
 
 		if string_value_2 == nil then
-			box.space.tester:insert{counter, string_value}
+			box.space.tester:insert{string_value, counter}
 			string_value_2 = string_value
 		end
 
@@ -43,23 +43,23 @@ function delete_replace_update(engine_name)
 			box.space.tester:delete{string_value_2}
 		end
 		if random_number == 2 then
-			box.space.tester:replace{counter, string_value_2, string_value_3}
+			box.space.tester:replace{string_value_2, counter, string_value_3}
 		end
 		if random_number == 3 then
 			box.space.tester:delete{string_value_2}
-			box.space.tester:insert{counter, string_value_2}
+			box.space.tester:insert{string_value_2, counter}
 		end
 		if random_number == 4 then
 			if counter < 1000000 then
 				box.space.tester:delete{string_value_3}
-				box.space.tester:insert{counter, string_value_3, string_value_2}
+				box.space.tester:insert{string_value_3, counter, string_value_2}
 			end
 		end
 		if random_number == 5 then
-			box.space.tester:update({string_value_2}, {{'=', 1, string_value_3}})
+			box.space.tester:update({string_value_2}, {{'=', 2, string_value_3}})
 		end
 		if random_number == 6 then
-			box.space.tester:update({string_value_2}, {{'=', 1, string_value_3}})
+			box.space.tester:update({string_value_2}, {{'=', 2, string_value_3}})
 		end
 		counter = counter + 1
 	end
@@ -74,7 +74,7 @@ function delete_insert(engine_name)
 		box.space.tester:drop()
 	end
 	box.schema.space.create('tester', {engine=engine_name})
-	box.space.tester:create_index('primary',{type = 'tree', parts = {2, 'STR'}})
+	box.space.tester:create_index('primary',{type = 'tree', parts = {1, 'STR'}})
 	counter = 1
 	while counter < 100000 do
 		string_value = string_function()
@@ -82,15 +82,15 @@ function delete_insert(engine_name)
 
 		if string_table[1] == nil then
 			-- print (1, ' insert', counter, string_value)
-			box.space.tester:insert{counter, string_value}
+			box.space.tester:insert{string_value, counter}
 			string_value_2 = string_value
 		else
-			string_value_2 = string_table[1][2]
+			string_value_2 = string_table[1][1]
 		end
 
 		if string_value_2 == nil then
 			-- print (2, ' insert', counter, string_value)
-			box.space.tester:insert{counter, string_value}
+			box.space.tester:insert{string_value, counter}
 			string_value_2 = string_value
 		end
 
@@ -98,7 +98,7 @@ function delete_insert(engine_name)
 		box.space.tester:delete{string_value_2}
 
 		-- print (4, ' insert', counter, string_value_2)
-		box.space.tester:insert{counter, string_value_2}
+		box.space.tester:insert{string_value_2, counter}
 
 		counter = counter + 1
 	end

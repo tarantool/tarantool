@@ -135,30 +135,6 @@ lbox_info_pid(struct lua_State *L)
 	return 1;
 }
 
-#if 0
-void sophia_info(void (*)(const char*, const char*, void*), void*);
-
-static void
-lbox_info_sophia_cb(const char *key, const char *value, void *arg)
-{
-	struct lua_State *L;
-	L = (struct lua_State*)arg;
-	if (value == NULL)
-		return;
-	lua_pushstring(L, key);
-	lua_pushstring(L, value);
-	lua_settable(L, -3);
-}
-
-static int
-lbox_info_sophia(struct lua_State *L)
-{
-	lua_newtable(L);
-	sophia_info(lbox_info_sophia_cb, (void*)L);
-	return 1;
-}
-#endif
-
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
@@ -168,9 +144,6 @@ lbox_info_dynamic_meta [] =
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},
-#if 0
-	{"sophia", lbox_info_sophia},
-#endif
 	{NULL, NULL}
 };
 
@@ -250,4 +223,54 @@ box_lua_info_init(struct lua_State *L)
 	lbox_info_init_static_values(L);
 
 	lua_pop(L, 1); /* info module */
+}
+
+void sophia_info(void (*)(const char*, const char*, int, void*), void*);
+
+static void
+lbox_sophia_cb(const char *key, const char *value, int /* pos */, void *arg)
+{
+	struct lua_State *L;
+	L = (struct lua_State*)arg;
+	if (value == NULL)
+		return;
+	lua_pushstring(L, key);
+	lua_pushstring(L, value);
+	lua_settable(L, -3);
+}
+
+/**
+ * When user invokes box.sophia(), return a table of key/value
+ * pairs containing the current info.
+ */
+static int
+lbox_sophia_call(struct lua_State *L)
+{
+	lua_newtable(L);
+	sophia_info(lbox_sophia_cb, (void*)L);
+	return 1;
+}
+
+/** Initialize box.sophia package. */
+void
+box_lua_sophia_init(struct lua_State *L)
+{
+	static const struct luaL_reg sophialib [] = {
+		{NULL, NULL}
+	};
+
+	luaL_register_module(L, "box.sophia", sophialib);
+
+	lua_newtable(L);
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_sophia_call);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "__serialize");
+	lua_pushcfunction(L, lbox_sophia_call);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
+	lua_pop(L, 1);
 }

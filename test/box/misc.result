@@ -60,6 +60,7 @@ t
   - session
   - slab
   - snapshot
+  - sophia
   - space
   - stat
   - tuple

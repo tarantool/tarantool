@@ -30,6 +30,7 @@ add_library(box
     tuple_update.cc
     key_def.cc
     index.cc
+    memtx_index.cc
     memtx_hash.cc
     memtx_tree.cc
     memtx_rtree.cc

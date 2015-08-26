@@ -121,7 +121,7 @@ MemtxRTree::~MemtxRTree()
 }
 
 MemtxRTree::MemtxRTree(struct key_def *key_def)
-	: Index(key_def)
+	: MemtxIndex(key_def)
 {
 	assert(key_def->part_count == 1);
 	assert(key_def->parts[0].type = ARRAY);

@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
+#include "third_party/tarantool_ev.h"
 
 struct SophiaEngine: public Engine {
 	SophiaEngine();
@@ -58,13 +59,12 @@ private:
 	int64_t m_checkpoint_lsn;
 public:
 	int recovery_complete;
+	struct cord *cord;
+	ev_async watcher;
+	ev_idle idle;
 };
 
-void sophia_info(void (*)(const char*, const char*, void*), void*);
-void sophia_raise(void*);
-
-extern "C" {
-int sophia_schedule(void);
-}
+void sophia_error(void*);
+void sophia_info(void (*)(const char*, const char*, int, void*), void*);
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */

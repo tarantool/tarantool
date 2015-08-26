@@ -443,6 +443,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
+	if box.space[space_id].engine == 'sophia' then
+		box.error(box.error.SOPHIA, 'alter is not supported for a Sophia index')
+	end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
     end

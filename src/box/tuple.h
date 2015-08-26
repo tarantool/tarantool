@@ -266,6 +266,40 @@ tuple_field_count(const struct tuple *tuple)
 }
 
 /**
+ * @brief Validate a number of fields against format
+ */
+static inline void
+tuple_field_count_validate(struct tuple_format *format, const char *data)
+{
+	uint32_t field_count = mp_decode_array(&data);
+	if (unlikely(field_count < format->field_count))
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->field_count);
+}
+
+/**
+ * Get a field by id from an non-indexed tuple.
+ * Returns a pointer to BER-length prefixed field.
+ *
+ * @returns field data if field exists or NULL
+ */
+inline const char *
+tuple_field_of(const char *data, uint32_t bsize, uint32_t i)
+{
+	const char *pos = data;
+	uint32_t size = mp_decode_array(&pos);
+	if (unlikely(i >= size))
+		return NULL;
+	for (uint32_t k = 0; k < i; k++) {
+		mp_next(&pos);
+	}
+	(void)bsize;
+	assert(pos <= data + bsize);
+	return pos;
+}
+
+/**
  * Get a field from tuple by index.
  * Returns a pointer to BER-length prefixed field.
  *
@@ -291,18 +325,7 @@ tuple_field_old(const struct tuple_format *format,
 			return tuple->data + field_map[idx];
 		}
 	}
-
-	const char *pos = tuple->data;
-	uint32_t size = mp_decode_array(&pos);
-	if (unlikely(i >= size))
-		return NULL;
-
-	for (uint32_t k = 0; k < i; k++) {
-		mp_next(&pos);
-	}
-
-	assert(pos <= tuple->data + tuple->bsize);
-	return pos;
+	return tuple_field_of(tuple->data, tuple->bsize, i);
 }
 
 /**

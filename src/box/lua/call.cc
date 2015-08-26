@@ -765,6 +765,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_index_init(L);
 	box_lua_space_init(L);
 	box_lua_info_init(L);
+	box_lua_sophia_init(L);
 	box_lua_stat_init(L);
 	box_lua_session_init(L);
 

@@ -65,23 +65,6 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	stmt->row = row;
 }
 
-void
-txn_replace(struct txn *txn, struct space *space,
-	    struct tuple *old_tuple, struct tuple *new_tuple,
-	    enum dup_replace_mode mode)
-{
-	assert(old_tuple || new_tuple);
-
-	space->handler->replace(txn, space, old_tuple, new_tuple, mode);
-
-	/*
-	 * Run on_replace triggers. For now, disallow mutation
-	 * of tuples in the trigger.
-	 */
-	if (! rlist_empty(&space->on_replace) && space->run_triggers)
-		trigger_run(&space->on_replace, txn);
-}
-
 /** Initialize a new stmt object within txn. */
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)

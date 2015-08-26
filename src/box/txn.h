@@ -30,13 +30,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include "space.h"
+#include "xrow.h"
+#include "iproto_constants.h"
 #include "trigger.h"
 #include "fiber.h"
 
 extern double too_long_threshold;
 struct tuple;
-struct space;
 
 /**
  * A single statement of a multi-statement
@@ -121,6 +122,24 @@ txn_begin_stmt(struct request *request, struct space *space);
 static inline void
 txn_commit_stmt(struct txn *txn)
 {
+	/*
+	 * Run on_replace triggers. For now, disallow mutation
+	 * of tuples in the trigger.
+	 */
+	struct txn_stmt *stmt = txn->stmt;
+	if (stmt->row && stmt->space) {
+		switch (stmt->row->type) {
+			case IPROTO_INSERT:
+			case IPROTO_REPLACE:
+			case IPROTO_UPDATE:
+			case IPROTO_DELETE: {
+				if (! rlist_empty(&stmt->space->on_replace) &&
+				    stmt->space->run_triggers)
+					trigger_run(&stmt->space->on_replace, txn);
+				break;
+			}
+		}
+	}
 	if (txn->autocommit)
 		txn_commit(txn);
 	else
@@ -141,11 +160,6 @@ txn_rollback_stmt();
  */
 void
 txn_check_autocommit(struct txn *txn, const char *where);
-
-void
-txn_replace(struct txn *txn, struct space *space,
-	    struct tuple *old_tuple, struct tuple *new_tuple,
-	    enum dup_replace_mode mode);
 
 /** Last statement of the transaction. */
 static inline struct txn_stmt *

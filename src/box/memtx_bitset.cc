@@ -181,7 +181,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 }
 
 MemtxBitset::MemtxBitset(struct key_def *key_def)
-	: Index(key_def)
+	: MemtxIndex(key_def)
 {
 	assert(!this->key_def->opts.is_unique);
 
@@ -455,5 +455,5 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 	}
 
 	/* Call generic method */
-	return Index::count(type, key, part_count);
+	return MemtxIndex::count(type, key, part_count);
 }

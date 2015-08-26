@@ -38,19 +38,44 @@ public:
 	SophiaIndex(struct key_def *key_def);
 	~SophiaIndex();
 
-	virtual size_t size() const;
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
-	virtual struct iterator *allocIterator() const;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+	virtual struct tuple*
+	replace(struct tuple*,
+	        struct tuple*, enum dup_replace_mode);
+
+	virtual struct tuple*
+	findByKey(const char *key, uint32_t) const;
+
+	virtual struct iterator*
+	allocIterator() const;
+
+	virtual void
+	initIterator(struct iterator *iterator,
+	             enum iterator_type type,
+	             const char *key, uint32_t part_count) const;
+
+	virtual size_t  size() const;
 	virtual size_t bsize() const;
 
+public:
+	void replace_or_insert(const char *tuple,
+	                       const char *tuple_end,
+	                       enum dup_replace_mode mode);
+	void remove(const char *key);
+	void upsert(const char *key,
+	            const char *ops,
+	            const char *ops_end,
+	            const char *tuple,
+	            const char *tuple_end);
 	void *env;
 	void *db;
+
+private:
+	void *createObject(const char *key, bool async, const char **keyend);
+	struct tuple_format *format;
 };
+
+void *sophia_tuple_new(void*, struct key_def*,
+                       struct tuple_format*,
+                       uint32_t*);
 
 #endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */

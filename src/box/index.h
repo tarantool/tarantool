@@ -95,7 +95,6 @@ extern const char *iterator_type_strs[];
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
 	void (*free)(struct iterator *);
-	void (*close)(struct iterator *);
 	/* optional parameters used in lua */
 	int sc_version;
 	uint32_t space_id;
@@ -168,11 +167,6 @@ protected:
 	 */
 	Index(struct key_def *key_def);
 
-	/*
-	 * Pre-allocated iterator to speed up the main case of
-	 * box_process(). Should not be used elsewhere.
-	 */
-	mutable struct iterator *m_position;
 public:
 	virtual ~Index();
 
@@ -220,26 +214,6 @@ public:
 	 * for which createReadViewForIterator() was called.
 	 */
 	virtual void destroyReadViewForIterator(struct iterator *iterator);
-
-	inline struct iterator *position() const
-	{
-		if (m_position == NULL)
-			m_position = allocIterator();
-		return m_position;
-	}
-};
-
-struct IteratorGuard: public Object {
-	struct iterator *it;
-	IteratorGuard(struct iterator *it)
-		: it(it)
-	{}
-
-	~IteratorGuard()
-	{
-		if (it->close)
-			it->close(it);
-	}
 };
 
 /**
@@ -273,7 +247,6 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 	return 0;
 }
 
-
 /** Get index ordinal number in space. */
 static inline uint32_t
 index_id(const Index *index)
@@ -293,10 +266,6 @@ index_is_primary(const Index *index)
 {
 	return index_id(index) == 0;
 }
-
-/** Build this index based on the contents of another index. */
-void
-index_build(Index *index, Index *pk);
 
 /** \cond public */
 

@@ -45,7 +45,7 @@ struct space {
 	 */
 	Handler *handler;
 
-	/** Triggers fired after space_replace() -- see txn_replace(). */
+	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
 	/**
 	 * The number of *enabled* indexes in the space.
@@ -119,6 +119,9 @@ space_size(struct space *space);
  */
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
+
+void
+space_validate_tuple_raw(struct space *sp, const char *data);
 
 /**
  * Allocate and initialize a space. The space
