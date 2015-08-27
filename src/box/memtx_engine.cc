@@ -120,8 +120,12 @@ struct MemtxSpace: public Handler {
 				   struct request *request, struct port *port);
 	virtual void executeUpsert(struct txn *txn, struct space *space,
 				   struct request *request, struct port *port);
-	virtual void executeSelect(struct txn *txn, struct space *space,
-				   struct request *request, struct port *port);
+	virtual void
+	executeSelect(struct txn *, struct space *space,
+		      uint32_t index_id, uint32_t iterator,
+		      uint32_t offset, uint32_t limit,
+		      const char *key, const char * /* key_end */,
+		      struct port *port);
 	virtual void onAlter(Handler *old);
 public:
 	/**
@@ -344,21 +348,20 @@ MemtxSpace::onAlter(Handler *old)
 }
 
 void
-MemtxSpace::executeSelect(struct txn * txn, struct space *space,
-			  struct request *request, struct port *port)
+MemtxSpace::executeSelect(struct txn *, struct space *space,
+			  uint32_t index_id, uint32_t iterator,
+			  uint32_t offset, uint32_t limit,
+			  const char *key, const char * /* key_end */,
+			  struct port *port)
 {
-	(void) txn;
-	MemtxIndex *index = (MemtxIndex *)index_find(space, request->index_id);
+	MemtxIndex *index = (MemtxIndex *) index_find(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
 	uint32_t found = 0;
-	uint32_t offset = request->offset;
-	uint32_t limit = request->limit;
-	if (request->iterator >= iterator_type_MAX)
+	if (iterator >= iterator_type_MAX)
 		tnt_raise(IllegalParams, "Invalid iterator type");
-	enum iterator_type type = (enum iterator_type) request->iterator;
-	const char *key = request->key;
+	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	key_validate(index->key_def, type, key, part_count);

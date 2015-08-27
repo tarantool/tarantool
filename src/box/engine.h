@@ -188,8 +188,12 @@ public:
 				   struct request *, struct port *);
 	virtual void executeUpsert(struct txn *, struct space *,
 				   struct request *, struct port *);
+
 	virtual void executeSelect(struct txn *, struct space *,
-				   struct request *, struct port *);
+				   uint32_t index_id, uint32_t iterator,
+				   uint32_t offset, uint32_t limit,
+				   const char *key, const char *key_end,
+				   struct port *);
 
 	virtual void onAlter(Handler *old);
 	Engine *engine;

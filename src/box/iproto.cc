@@ -626,6 +626,29 @@ tx_process_msg(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_SELECT:
+		{
+			struct iproto_port port;
+			iproto_port_init(&port, out, msg->header.sync);
+			struct request *req = &msg->request;
+			int rc = box_select((struct port *) &port,
+					    req->space_id, req->index_id,
+					    req->iterator,
+					    req->offset, req->limit,
+					    req->key, req->key_end);
+			if (rc < 0) {
+				/*
+				 * This only works if there are no
+				 * yields between the moment the
+				 * port is first used for
+				 * output and is flushed/an error
+				 * occurs.
+				 */
+				if (port.found)
+					obuf_rollback_to_svp(out, &port.svp);
+				throw (Exception *) box_error_last();
+			}
+			break;
+		}
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
 		case IPROTO_UPDATE:

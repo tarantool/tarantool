@@ -64,6 +64,39 @@ struct recovery_state *recovery;
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 
+void
+process_rw(struct request *request, struct port *port)
+{
+	assert(iproto_type_is_dml(request->type));
+	rmean_collect(rmean_box, request->type, 1);
+	try {
+		struct space *space = space_cache_find(request->space_id);
+		struct txn *txn = txn_begin_stmt(request, space);
+		access_check_space(space, PRIV_W);
+		switch (request->type) {
+		case IPROTO_INSERT:
+		case IPROTO_REPLACE:
+			space->handler->executeReplace(txn, space, request, port);
+			break;
+		case IPROTO_UPDATE:
+			space->handler->executeUpdate(txn, space, request, port);
+			break;
+		case IPROTO_DELETE:
+			space->handler->executeDelete(txn, space, request, port);
+			break;
+		case IPROTO_UPSERT:
+			space->handler->executeUpsert(txn, space, request, port);
+			break;
+		default: break;
+		}
+		port_eof(port);
+	} catch (Exception *e) {
+		txn_rollback_stmt();
+		throw;
+	}
+}
+
+
 static void
 process_ro(struct request *request, struct port *port)
 {
@@ -386,18 +419,19 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end)
 {
-	struct request request;
-	request_create(&request, IPROTO_SELECT);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.limit = limit;
-	request.offset = offset;
-	request.iterator = iterator;
-	request.key = key;
-	request.key_end = key_end;
+	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
 	try {
-		box_process(&request, port);
+		struct space *space = space_cache_find(space_id);
+		struct txn *txn = in_txn();
+		access_check_space(space, PRIV_R);
+		space->handler->executeSelect(txn, space, index_id, iterator,
+					      offset, limit, key, key_end, port);
+		if (txn == NULL) {
+			/* no txn is created, so simply collect garbage here */
+			fiber_gc();
+		}
+		port_eof(port);
 		return 0;
 	} catch (Exception *e) {
 		/* will be hanled by box.error() in Lua */
