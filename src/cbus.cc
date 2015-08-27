@@ -31,6 +31,10 @@
 #include "cbus.h"
 #include "scoped_guard.h"
 
+struct rmean *rmean_net;
+
+bool rmean_cbus_is_count = 0;
+
 static void
 cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	      int /* events */);
@@ -183,9 +187,15 @@ cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	STAILQ_CONCAT(&peer->output, &peer->pipe);
 	cbus_unlock(pipe->bus);
 
+
 	pipe->n_input = 0;
-	if (pipe_was_empty)
+	if (pipe_was_empty) {
+		/* Count statistics */
+		if (rmean_cbus_is_count)
+			rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+
 		ev_async_send(pipe->consumer, &pipe->fetch_output);
+	}
 	if (peer_output_was_empty && !STAILQ_EMPTY(&peer->output))
 		ev_feed_event(peer->consumer, &peer->fetch_output, EV_CUSTOM);
 }
@@ -200,6 +210,8 @@ cpipe_peek_impl(struct cpipe *pipe)
 	assert(peer->producer == loop());
 
 	bool peer_pipe_was_empty = false;
+
+
 	cbus_lock(pipe->bus);
 	STAILQ_CONCAT(&pipe->output, &pipe->pipe);
 	if (! STAILQ_EMPTY(&peer->input)) {
@@ -209,8 +221,13 @@ cpipe_peek_impl(struct cpipe *pipe)
 	cbus_unlock(pipe->bus);
 	peer->n_input = 0;
 
-	if (peer_pipe_was_empty)
+	if (peer_pipe_was_empty) {
+		/* Count statistics */
+		if (rmean_cbus_is_count)
+			rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+
 		ev_async_send(peer->consumer, &peer->fetch_output);
+	}
 	return STAILQ_FIRST(&pipe->output);
 }
 
