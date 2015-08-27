@@ -455,7 +455,7 @@ API is a direct binding to corresponding methods of index objects of type
                                     field-values, or a tuple containing only
                                     the field-values.
 
-        :return: the number of matching index keys. The ``index`` function
+        :return: the number of matching index keys. The ``count`` function
                 is only applicable for the memtx storage engine.
         :rtype:  number
 
