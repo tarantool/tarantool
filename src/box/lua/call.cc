@@ -153,44 +153,6 @@ port_lua_table_create(struct port_lua *port, struct lua_State *L)
 
 /* }}} */
 
-/**
- * The main extension provided to Lua by Tarantool/Box --
- * ability to call INSERT/UPDATE/SELECT/DELETE from within
- * a Lua procedure.
- *
- * This is a low-level API, and it expects
- * all arguments to be packed in accordance
- * with the binary protocol format (iproto
- * header excluded).
- *
- * Signature:
- * box.process(op_code, request)
- */
-static int
-lbox_process(lua_State *L)
-{
-	uint32_t op = lua_tointeger(L, 1); /* Get the first arg. */
-	size_t sz;
-	const char *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
-	if (op == IPROTO_CALL) {
-		/*
-		 * We should not be doing a CALL from within a CALL.
-		 * To invoke one stored procedure from another, one must
-		 * do it in Lua directly. This deals with
-		 * infinite recursion, stack overflow and such.
-		 */
-		return luaL_error(L, "box.process(CALL, ...) is not allowed");
-	}
-	/* Capture all output into a Lua table. */
-	struct port_lua port_lua;
-	struct request request;
-	request_create(&request, op);
-	request_decode(&request, req, sz);
-	port_lua_table_create(&port_lua, L);
-	box_process(&request, (struct port *) &port_lua);
-	return 1;
-}
-
 static int
 lbox_select(lua_State *L)
 {
@@ -730,7 +692,6 @@ static const struct luaL_reg boxlib[] = {
 };
 
 static const struct luaL_reg boxlib_internal[] = {
-	{"process", lbox_process},
 	{"call_loadproc",  lbox_call_loadproc},
 	{"select", lbox_select},
 	{"insert", lbox_insert},
