@@ -884,6 +884,7 @@ net_cord_f(va_list /* ap */)
 	 */
 	fiber_yield();
 
+	rmean_cbus_is_count = false;
 	rmean_delete(rmean_net);
 }
 
