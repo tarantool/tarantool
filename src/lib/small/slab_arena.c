@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <limits.h>
+#include "third_party/pmatomic.h"
 
 #if !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
@@ -184,7 +185,8 @@ slab_map(struct slab_arena *arena)
 		return NULL;
 
 	/** Need to allocate a new slab. */
-	size_t used = __sync_add_and_fetch(&arena->used, arena->slab_size);
+	size_t used = pm_atomic_fetch_add(&arena->used, arena->slab_size);
+	used += arena->slab_size;
 	if (used <= arena->prealloc)
 		return arena->arena + used - arena->slab_size;
 

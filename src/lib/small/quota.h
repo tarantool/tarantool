@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <unistd.h>
+#include "third_party/pmatomic.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -66,14 +67,6 @@ quota_init(struct quota *quota, size_t total)
 				QUOTA_UNIT_SIZE;
 	quota->value = new_total << 32;
 }
-
-/**
- * Provide wrappers around gcc built-ins for now.
- * These built-ins work with all numeric types - may not
- * be the case when another implementation is used.
- * Private use only.
- */
-#define atomic_cas(a, b, c) __sync_val_compare_and_swap(a, b, c)
 
 /**
  * Get current quota limit
@@ -121,7 +114,7 @@ quota_set(struct quota *quota, size_t new_total)
 			return  -1;
 		uint64_t new_value =
 			((uint64_t) new_total_in_units << 32) | used_in_units;
-		if (atomic_cas(&quota->value, value, new_value) == value)
+		if (pm_atomic_compare_exchange_strong(&quota->value, &value, new_value))
 			break;
 	}
 	return new_total_in_units * QUOTA_UNIT_SIZE;
@@ -153,7 +146,7 @@ quota_use(struct quota *quota, size_t size)
 		uint64_t new_value =
 			((uint64_t) total_in_units << 32) | new_used_in_units;
 
-		if (atomic_cas(&quota->value, value, new_value) == value)
+		if (pm_atomic_compare_exchange_strong(&quota->value, &value, new_value))
 			break;
 	}
 	return size_in_units * QUOTA_UNIT_SIZE;
@@ -178,12 +171,11 @@ quota_release(struct quota *quota, size_t size)
 		uint64_t new_value =
 			((uint64_t) total_in_units << 32) | new_used_in_units;
 
-		if (atomic_cas(&quota->value, value, new_value) == value)
+		if (pm_atomic_compare_exchange_strong(&quota->value, &value, new_value))
 			break;
 	}
 }
 
-#undef atomic_cas
 #undef QUOTA_UNIT_SIZE
 
 #if defined(__cplusplus)
