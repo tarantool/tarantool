@@ -157,30 +157,27 @@ Handler::Handler(Engine *f)
 {
 }
 
-void
+struct tuple *
 Handler::executeReplace(struct txn *, struct space *,
-                        struct request *, struct port *)
+                        struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace");
 }
 
-void
-Handler::executeDelete(struct txn*, struct space *, struct request *,
-                       struct port *)
+struct tuple *
+Handler::executeDelete(struct txn*, struct space *, struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete");
 }
 
-void
-Handler::executeUpdate(struct txn*, struct space *, struct request *,
-                       struct port *)
+struct tuple *
+Handler::executeUpdate(struct txn*, struct space *, struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update");
 }
 
 void
-Handler::executeUpsert(struct txn *, struct space *, struct request *,
-                       struct port *)
+Handler::executeUpsert(struct txn *, struct space *, struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
 }

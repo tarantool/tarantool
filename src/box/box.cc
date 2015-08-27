@@ -56,16 +56,14 @@
 #include "iobuf.h"
 #include "coio.h"
 
-static void process_ro(struct request *request, struct port *port);
-box_process_func box_process = process_ro;
-
 struct recovery_state *recovery;
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
+bool is_ro = true;
 
 void
-process_rw(struct request *request, struct port *port)
+process_rw(struct request *request, struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
@@ -73,48 +71,43 @@ process_rw(struct request *request, struct port *port)
 		struct space *space = space_cache_find(request->space_id);
 		struct txn *txn = txn_begin_stmt(request, space);
 		access_check_space(space, PRIV_W);
+		struct tuple *tuple;
 		switch (request->type) {
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
-			space->handler->executeReplace(txn, space, request, port);
+			tuple = space->handler->executeReplace(txn, space, request);
 			break;
 		case IPROTO_UPDATE:
-			space->handler->executeUpdate(txn, space, request, port);
+			tuple = space->handler->executeUpdate(txn, space, request);
 			break;
 		case IPROTO_DELETE:
-			space->handler->executeDelete(txn, space, request, port);
+			tuple = space->handler->executeDelete(txn, space, request);
 			break;
 		case IPROTO_UPSERT:
-			space->handler->executeUpsert(txn, space, request, port);
-			break;
-		default: break;
+			space->handler->executeUpsert(txn, space, request);
+			/** fall through */
+		default:
+			 tuple = NULL;
+
 		}
-		port_eof(port);
+		if (result)
+			*result = tuple;
 	} catch (Exception *e) {
 		txn_rollback_stmt();
 		throw;
 	}
 }
 
-
-static void
-process_ro(struct request *request, struct port *port)
-{
-	if (!iproto_type_is_select(request->type))
-		tnt_raise(LoggedError, ER_READONLY);
-	return process_rw(request, port);
-}
-
 void
 box_set_ro(bool ro)
 {
-	box_process = ro ? process_ro : process_rw;
+	is_ro = ro;
 }
 
 bool
 box_is_ro(void)
 {
-	return box_process == process_ro;
+	return is_ro;
 }
 
 static void
@@ -129,7 +122,7 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 	request_decode(&request, (const char *) row->body[0].iov_base,
 		row->body[0].iov_len);
 	request.header = row;
-	process_rw(&request, &null_port);
+	process_rw(&request, NULL);
 }
 
 /* {{{ configuration bindings */
@@ -334,7 +327,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
-	process_rw(&req, &null_port);
+	process_rw(&req, NULL);
 }
 
 int
@@ -393,23 +386,15 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 }
 /** \endcond public */
 
-static inline int
+int
 box_process1(struct request *request, box_tuple_t **result)
 {
-	struct port_buf port_buf;
-	port_buf_create(&port_buf);
 	try {
-		box_process(request, &port_buf.base);
-		box_tuple_t *tuple = NULL;
-		/* Sophia: always bless tuple even if result is NULL */
-		if (port_buf.first != NULL)
-			tuple = tuple_bless(port_buf.first->tuple);
-		port_buf_destroy(&port_buf);
-		if (result)
-			*result = tuple;
+		if (is_ro)
+			tnt_raise(LoggedError, ER_READONLY);
+		process_rw(request, result);
 		return 0;
 	} catch (Exception *e) {
-		port_buf_destroy(&port_buf);
 		return -1;
 	}
 }

@@ -657,20 +657,12 @@ tx_process_msg(struct cmsg *m)
 			assert(msg->request.type == msg->header.type);
 			struct iproto_port port;
 			iproto_port_init(&port, out, msg->header.sync);
-			try {
-				box_process(&msg->request, (struct port *) &port);
-			} catch (Exception *e) {
-				/*
-				 * This only works if there are no
-				 * yields between the moment the
-				 * port is first used for
-				 * output and is flushed/an error
-				 * occurs.
-				 */
-				if (port.found)
-					obuf_rollback_to_svp(out, &port.svp);
-				throw;
-			}
+			struct tuple *tuple;
+			if (box_process1(&msg->request, &tuple) < 0)
+				throw (Exception *) box_error_last();
+			if (tuple)
+				port_add_tuple(&port.base, tuple);
+			port_eof(&port.base);
 			break;
 		case IPROTO_CALL:
 			assert(msg->request.type == msg->header.type);

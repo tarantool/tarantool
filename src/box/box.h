@@ -53,16 +53,6 @@ void box_free(void);
 void
 box_atfork();
 
-/**
- * The main entry point to the
- * Box: callbacks into the request processor.
- * These are function pointers since they can
- * change when entering/leaving read-only mode
- * (master->slave propagation).
- */
-typedef void (*box_process_func)(struct request *request, struct port *port);
-/** For read-write operations. */
-extern box_process_func box_process;
 
 void
 box_set_ro(bool ro);
@@ -167,5 +157,15 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
 	   box_tuple_t **result);
 
 /** \endcond public */
+
+/**
+ * The main entry point to the
+ * Box: callbacks into the request processor.
+ * These are function pointers since they can
+ * change when entering/leaving read-only mode
+ * (master->slave propagation).
+ */
+int
+box_process1(struct request *request, box_tuple_t **result);
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */
