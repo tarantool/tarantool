@@ -654,16 +654,18 @@ tx_process_msg(struct cmsg *m)
 		case IPROTO_UPDATE:
 		case IPROTO_DELETE:
 		case IPROTO_UPSERT:
+		{
 			assert(msg->request.type == msg->header.type);
-			struct iproto_port port;
-			iproto_port_init(&port, out, msg->header.sync);
 			struct tuple *tuple;
 			if (box_process1(&msg->request, &tuple) < 0)
 				throw (Exception *) box_error_last();
+			struct obuf_svp svp = iproto_prepare_select(out);
 			if (tuple)
-				port_add_tuple(&port.base, tuple);
-			port_eof(&port.base);
+				tuple_to_obuf(tuple, out);
+			iproto_reply_select(out, &svp, msg->header.sync,
+					    tuple != 0);
 			break;
+		}
 		case IPROTO_CALL:
 			assert(msg->request.type == msg->header.type);
 			rmean_collect(rmean_box, msg->request.type, 1);
