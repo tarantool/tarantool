@@ -70,8 +70,6 @@ rmean_age(ev_loop * /* loop */,
 	 ev_timer *timer, int /* events */)
 {
 	struct rmean *rmean = (struct rmean *) timer->data;
-	if (rmean->stats == NULL)
-		return;
 
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
