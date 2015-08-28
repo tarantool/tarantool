@@ -433,7 +433,7 @@ luaL_toint64(struct lua_State *L, int idx);
 static inline bool
 luaL_isarray(struct lua_State *L, int idx)
 {
-	if (!lua_istable(L, idx) == false)
+	if (!lua_istable(L, idx))
 		return false;
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
