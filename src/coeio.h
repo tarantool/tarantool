@@ -84,11 +84,42 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	  coio_task_timeout_cb on_timeout, double timeout);
 
 /** \cond public */
+
+/**
+ * Create new eio task with specified function and
+ * arguments. Yield and wait until the task is complete
+ * or a timeout occurs.
+ *
+ * This function doesn't throw exceptions to avoid double error
+ * checking: in most cases it's also necessary to check the return
+ * value of the called function and perform necessary actions. If
+ * func sets errno, the errno is preserved across the call.
+ *
+ * @retval -1 and errno = ENOMEM if failed to create a task
+ * @retval the function return (errno is preserved).
+ *
+ * @code
+ *	static ssize_t openfile_cb(va_list ap)
+ *	{
+ *	         const char *filename = va_arg(ap);
+ *	         int flags = va_arg(ap);
+ *	         return open(filename, flags);
+ *	}
+ *
+ *	if (coio_call(openfile_cb, 0.10, "/tmp/file", 0) == -1)
+ *		// handle errors.
+ *	...
+ * @endcode
+ */
 ssize_t
 coio_call(ssize_t (*func)(va_list ap), ...);
 
 struct addrinfo;
 
+/**
+ * Fiber-friendly version of getaddrinfo(3).
+ * \sa getaddrinfo().
+ */
 int
 coio_getaddrinfo(const char *host, const char *port,
 		 const struct addrinfo *hints, struct addrinfo **res,

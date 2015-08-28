@@ -166,6 +166,11 @@ txn_stmt(struct txn *txn)
 /** \cond public */
 
 /**
+ * Begin a transaction in the current fiber.
+ *
+ * A transaction is attached to caller fiber, therefore one fiber can have
+ * only one active transaction.
+ *
  * @retval 0 - success
  * @retval -1 - failed, perhaps a transaction has already been
  * started
@@ -173,9 +178,18 @@ txn_stmt(struct txn *txn)
 API_EXPORT int
 box_txn_begin(void);
 
+/**
+ * Commit the current transaction.
+ * @retval 0 - success
+ * @retval -1 - failed, perhaps a disk write failure.
+ * started
+ */
 API_EXPORT int
 box_txn_commit(void);
 
+/**
+ * Rollback the current transaction.
+ */
 API_EXPORT void
 box_txn_rollback(void);
 
@@ -184,7 +198,7 @@ box_txn_rollback(void);
  * The memory is automatically deallocated when the transaction
  * is committed or rolled back.
  *
- * @retval 0  out of memory
+ * @retval NULL out of memory
  */
 API_EXPORT void *
 box_txn_alloc(size_t size);

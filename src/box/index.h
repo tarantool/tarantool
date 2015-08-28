@@ -38,10 +38,10 @@
 
 /** \cond public */
 typedef struct tuple box_tuple_t;
+/** A space iterator */
 typedef struct iterator box_iterator_t;
 
 /**
- * @abstract Iterator type
  * Controls how to iterate over tuples in an index.
  * Different index types support different iterator types.
  * For example, one can start iteration from a particular value
@@ -79,14 +79,42 @@ enum iterator_type {
 	iterator_type_MAX     = ITER_NEIGHBOR + 1
 };
 
+/**
+ * Allocate and initialize iterator for space_id, index_id.
+ *
+ * A returned iterator must be destroyed by box_iterator_free().
+ *
+ * \param space_id space identifier.
+ * \param index_id index identifier.
+ * \param type \link iterator_type iterator type \endlink
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * \param key_end the end of encoded \a key
+ * \retval NULL on error (check box_error_last())
+ * \retval iterator otherwise
+ * \sa box_iterator_next()
+ * \sa box_iterator_free()
+ */
 API_EXPORT box_iterator_t *
 box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		   const char *key, const char *key_end);
+/**
+ * Retrive the next item from the \a iterator.
+ *
+ * \param iterator an iterator returned by box_index_iterator().
+ * \param[out] result a tuple or NULL if there is no more data.
+ * \retval -1 on error (check box_error_last() for details)
+ * \retval 0 on success. The end of data is not an error.
+ */
 API_EXPORT int
-box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
+box_iterator_next(box_iterator_t *iterator, box_tuple_t **result);
 
+/**
+ * Destroy and deallocate iterator.
+ *
+ * \param iterator an interator returned by box_index_iterator()
+ */
 API_EXPORT void
-box_iterator_free(box_iterator_t *itr);
+box_iterator_free(box_iterator_t *iterator);
 
 /** \endcond public */
 
@@ -264,28 +292,114 @@ index_is_primary(const Index *index)
 
 /** \cond public */
 
-API_EXPORT size_t
+/**
+ * Return the number of element in the index.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \retval -1 on error (check box_error_last())
+ * \retval >= 0 otherwise
+ */
+API_EXPORT ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id);
 
-API_EXPORT size_t
+/**
+ * Return the number of bytes used in memory by the index.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \retval -1 on error (check box_error_last())
+ * \retval >= 0 otherwise
+ */
+API_EXPORT ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id);
 
+/**
+ * Return a random tuple from the index (useful for statistical analysis).
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param rnd random seed
+ * \param[out] result a tuple or NULL if index is empty
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:random(rnd) \endcode
+ */
 API_EXPORT int
 box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		box_tuple_t **result);
 
+/**
+ * Get a tuple from index by the key.
+ *
+ * Please note that this function works much more faster than
+ * box_select() or box_index_iterator() + box_iterator_next().
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * \param key_end the end of encoded \a key
+ * \param[out] result a tuple or NULL if index is empty
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \pre key != NULL
+ * \sa \code box.space[space_id].index[index_id]:get(key) \endcode
+ */
 API_EXPORT int
 box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result);
 
+/**
+ * Return a first (minimal) tuple matched the provided key.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * If NULL then equvivalent to an empty array.
+ * \param key_end the end of encoded \a key.
+ * Must be NULL if \a key is NULL.
+ * \param[out] result a tuple or NULL if index is empty
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:min(key) \endcode
+ */
 API_EXPORT int
 box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result);
 
+/**
+ * Return a last (maximal) tuple matched the provided key.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * If NULL then equvivalent to an empty array.
+ * \param key_end the end of encoded \a key.
+ * Must be NULL if \a key is NULL.
+ * \param[out] result a tuple or NULL if index is empty
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:max(key) \endcode
+ */
 API_EXPORT int
 box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	      const char *key_end, box_tuple_t **result);
 
+/**
+ * Count the number of tuple matched the provided key.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param type iterator type - enum \link iterator_type \endlink
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * If NULL then equvivalent to an empty array.
+ * \param key_end the end of encoded \a key.
+ * Must be NULL if \a key is NULL.
+ * \retval -1 on error (check box_error_last())
+ * \retval >=0 on success
+ * \sa \code box.space[space_id].index[index_id]:count(key,
+ *     { iterator = type }) \endcode
+ */
 API_EXPORT ssize_t
 box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		const char *key, const char *key_end);

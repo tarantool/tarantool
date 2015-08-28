@@ -106,7 +106,7 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename);
 /**
 * @brief Declare symbols for FFI
 * @param L Lua State
-* @param what C definitions
+* @param ctypename C definitions, e.g "struct stat"
 * @sa ffi.cdef(def)
 * @retval 0 on success
 * @retval LUA_ERRRUN, LUA_ERRMEM, LUA_ERRERR otherwise
@@ -372,19 +372,21 @@ luaL_register_module(struct lua_State *L, const char *modname,
 /** \cond public */
 
 /**
- * push uint64_t to Lua stack
+ * Push uint64_t onto the stack
  *
  * @param L is a Lua State
  * @param val is a value to push
- *
  */
-LUA_API int
+LUA_API void
 luaL_pushuint64(struct lua_State *L, uint64_t val);
 
 /**
- * @copydoc luaL_pushnumber64
+ * Push int64_t onto the stack
+ *
+ * @param L is a Lua State
+ * @param val is a value to push
  */
-LUA_API int
+LUA_API void
 luaL_pushint64(struct lua_State *L, int64_t val);
 
 /**
@@ -431,7 +433,7 @@ luaL_toint64(struct lua_State *L, int idx);
 static inline bool
 luaL_isarray(struct lua_State *L, int idx)
 {
-	if (!lua_istable(L, idx))
+	if (!lua_istable(L, idx) == false)
 		return false;
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
