@@ -257,7 +257,7 @@ tuple_bless_null(struct tuple *tuple)
 	return NULL;
 }
 
-size_t
+ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {
@@ -267,7 +267,7 @@ box_index_len(uint32_t space_id, uint32_t index_id)
 	}
 }
 
-size_t
+ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id)
 {
        try {

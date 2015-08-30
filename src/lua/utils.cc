@@ -669,7 +669,7 @@ luaL_register_module(struct lua_State *L, const char *modname,
 	luaL_register(L, NULL, methods);
 }
 
-int
+void
 luaL_pushuint64(struct lua_State *L, uint64_t val)
 {
 	if (val < (1ULL << 52)) {
@@ -680,10 +680,9 @@ luaL_pushuint64(struct lua_State *L, uint64_t val)
 		*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
 					     sizeof(uint64_t)) = val;
 	}
-	return 1;
 }
 
-int
+void
 luaL_pushint64(struct lua_State *L, int64_t val)
 {
 	if (val > (-1LL << 52) && val < (1LL << 52)) {
@@ -694,7 +693,6 @@ luaL_pushint64(struct lua_State *L, int64_t val)
 		*(int64_t *) luaL_pushcdata(L, CTID_INT64,
 					    sizeof(int64_t)) = val;
 	}
-	return 1;
 }
 
 static inline int

@@ -180,16 +180,25 @@ public:
 	Handler(Engine *f);
 	virtual ~Handler() {}
 
-	virtual void executeReplace(struct txn *, struct space *,
-				    struct request *, struct port *);
-	virtual void executeDelete(struct txn *, struct space *,
-				   struct request *, struct port *);
-	virtual void executeUpdate(struct txn *, struct space *,
-				   struct request *, struct port *);
-	virtual void executeUpsert(struct txn *, struct space *,
-				   struct request *, struct port *);
-	virtual void executeSelect(struct txn *, struct space *,
-				   struct request *, struct port *);
+	virtual struct tuple *
+	executeReplace(struct txn *, struct space *,
+		       struct request *);
+	virtual struct tuple *
+	executeDelete(struct txn *, struct space *,
+		      struct request *);
+	virtual struct tuple *
+	executeUpdate(struct txn *, struct space *,
+		      struct request *);
+	virtual void
+	executeUpsert(struct txn *, struct space *,
+		      struct request *);
+
+	virtual void
+	executeSelect(struct txn *, struct space *,
+		      uint32_t index_id, uint32_t iterator,
+		      uint32_t offset, uint32_t limit,
+		      const char *key, const char *key_end,
+		      struct port *);
 
 	virtual void onAlter(Handler *old);
 	Engine *engine;

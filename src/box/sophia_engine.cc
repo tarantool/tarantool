@@ -79,24 +79,23 @@ void sophia_info(void (*cb)(const char*, const char*, int, void*), void *arg)
 
 struct SophiaSpace: public Handler {
 	SophiaSpace(Engine*);
-	virtual void
+	virtual struct tuple *
 	executeReplace(struct txn*, struct space *space,
-	               struct request *request, struct port *port);
-	virtual void
+	               struct request *request);
+	virtual struct tuple *
 	executeDelete(struct txn*, struct space *space,
-	              struct request *request, struct port *port);
-	virtual void
+	              struct request *request);
+	virtual struct tuple *
 	executeUpdate(struct txn*, struct space *space,
-	              struct request *request, struct port *port);
+	              struct request *request);
 	virtual void
 	executeUpsert(struct txn*, struct space *space,
-	              struct request *request, struct port *port);
+	              struct request *request);
 };
 
-void
+struct tuple *
 SophiaSpace::executeReplace(struct txn *txn, struct space *space,
-                            struct request *request,
-                            struct port * /* port */)
+                            struct request *request)
 {
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
@@ -116,12 +115,12 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 		(SophiaIndex *)index_find(space, 0);
 	index->replace_or_insert(request->tuple, request->tuple_end, mode);
 	txn_commit_stmt(txn);
+	return NULL;
 }
 
-void
+struct tuple *
 SophiaSpace::executeDelete(struct txn *txn, struct space *space,
-                           struct request *request,
-                           struct port* /* port */)
+                           struct request *request)
 {
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 	const char *key = request->key;
@@ -129,12 +128,12 @@ SophiaSpace::executeDelete(struct txn *txn, struct space *space,
 	primary_key_validate(index->key_def, key, part_count);
 	index->remove(key);
 	txn_commit_stmt(txn);
+	return NULL;
 }
 
-void
+struct tuple *
 SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
-                           struct request *request,
-                           struct port* /* port */)
+                           struct request *request)
 {
 	/* Try to find the tuple by unique key */
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
@@ -145,7 +144,7 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	if (old_tuple == NULL) {
 		txn_commit_stmt(txn);
-		return;
+		return NULL;
 	}
 	TupleGuard old_guard(old_tuple);
 
@@ -166,12 +165,12 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	                         new_tuple->data + new_tuple->bsize,
 	                         DUP_REPLACE);
 	txn_commit_stmt(txn);
+	return NULL;
 }
 
 void
 SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
-                           struct request *request,
-                           struct port* /* port */)
+                           struct request *request)
 {
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 	const char *key = request->key;

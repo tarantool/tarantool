@@ -70,8 +70,6 @@ rmean_age(ev_loop * /* loop */,
 	 ev_timer *timer, int /* events */)
 {
 	struct rmean *rmean = (struct rmean *) timer->data;
-	if (rmean->stats == NULL)
-		return;
 
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
@@ -96,10 +94,11 @@ struct rmean *
 rmean_new(const char **name, size_t n)
 {
 	struct rmean *rmean = (struct rmean *) realloc(NULL,
-				sizeof(rmean) + sizeof(stats) * (n + 1));
+				sizeof(struct rmean) +
+				sizeof(struct stats) * n);
 	if (rmean == NULL)
 		return NULL;
-	memset(rmean, 0, sizeof(rmean) + sizeof(stats) * n);
+	memset(rmean, 0, sizeof(struct rmean) + sizeof(struct stats) * n);
 	rmean->stats_n = n;
 	rmean->timer.data = (void *)rmean;
 	ev_timer_init(&rmean->timer, rmean_age, 0, 1.);

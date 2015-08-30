@@ -41,18 +41,23 @@ enum {
 	BOX_SCHEMA_ID = 272,
 	/** Space id of _space. */
 	BOX_SPACE_ID = 280,
+	/** Space id of _vspace view. */
 	BOX_VSPACE_ID = 281,
 	/** Space id of _index. */
 	BOX_INDEX_ID = 288,
+	/** Space id of _vindex view. */
 	BOX_VINDEX_ID = 289,
 	/** Space id of _func. */
 	BOX_FUNC_ID = 296,
+	/** Space id of _vfunc view. */
 	BOX_VFUNC_ID = 297,
 	/** Space id of _user. */
 	BOX_USER_ID = 304,
+	/** Space id of _vuser view. */
 	BOX_VUSER_ID = 305,
 	/** Space id of _priv. */
 	BOX_PRIV_ID = 312,
+	/** Space id of _vpriv view. */
 	BOX_VPRIV_ID = 313,
 	/** Space id of _cluster. */
 	BOX_CLUSTER_ID = 320,

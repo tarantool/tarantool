@@ -626,17 +626,16 @@ tx_process_msg(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_SELECT:
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-		case IPROTO_UPDATE:
-		case IPROTO_DELETE:
-		case IPROTO_UPSERT:
-			assert(msg->request.type == msg->header.type);
+		{
 			struct iproto_port port;
 			iproto_port_init(&port, out, msg->header.sync);
-			try {
-				box_process(&msg->request, (struct port *) &port);
-			} catch (Exception *e) {
+			struct request *req = &msg->request;
+			int rc = box_select((struct port *) &port,
+					    req->space_id, req->index_id,
+					    req->iterator,
+					    req->offset, req->limit,
+					    req->key, req->key_end);
+			if (rc < 0) {
 				/*
 				 * This only works if there are no
 				 * yields between the moment the
@@ -646,9 +645,27 @@ tx_process_msg(struct cmsg *m)
 				 */
 				if (port.found)
 					obuf_rollback_to_svp(out, &port.svp);
-				throw;
+				throw (Exception *) box_error_last();
 			}
 			break;
+		}
+		case IPROTO_INSERT:
+		case IPROTO_REPLACE:
+		case IPROTO_UPDATE:
+		case IPROTO_DELETE:
+		case IPROTO_UPSERT:
+		{
+			assert(msg->request.type == msg->header.type);
+			struct tuple *tuple;
+			if (box_process1(&msg->request, &tuple) < 0)
+				throw (Exception *) box_error_last();
+			struct obuf_svp svp = iproto_prepare_select(out);
+			if (tuple)
+				tuple_to_obuf(tuple, out);
+			iproto_reply_select(out, &svp, msg->header.sync,
+					    tuple != 0);
+			break;
+		}
 		case IPROTO_CALL:
 			assert(msg->request.type == msg->header.type);
 			rmean_collect(rmean_box, msg->request.type, 1);

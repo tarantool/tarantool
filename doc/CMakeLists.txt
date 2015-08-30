@@ -9,5 +9,3 @@ if (ENABLE_DOC)
     add_subdirectory(sphinx)
     add_subdirectory(www)
 endif()
-
-

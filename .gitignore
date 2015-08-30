@@ -16,6 +16,7 @@ CMakeCache.txt
 CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
+Doxyfile.API
 RPM
 *.src.rpm
 *.i386.rpm
@@ -26,6 +27,8 @@ extra/bin2c
 extra/dist/tarantoolctl.1
 cmake_install.cmake
 config.mk
+doc/doxygen/
+doc/api/
 doc/www/content/doc/dev_guide.html
 doc/www/content/doc/tnt.css
 doc/www/content/doc/user_guide.html

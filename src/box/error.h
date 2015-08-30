@@ -86,45 +86,77 @@ public:
 };
 
 /** \cond public */
+
 struct box_error;
+/**
+ * Error - contains information about error.
+ */
 typedef struct box_error box_error_t;
 
 /**
- * Return error type, e.g. "ClientError", "SocketError", etc.
+ * Return the error type, e.g. "ClientError", "SocketError", etc.
+ * \param error
+ * \return not-null string
  */
 API_EXPORT const char *
 box_error_type(const box_error_t *error);
 
-/*
+/**
  * Return IPROTO error code
+ * \param error error
+ * \return enum box_error_code
  */
 API_EXPORT uint32_t
 box_error_code(const box_error_t *error);
 
-/*
- * Return error message
+/**
+ * Return the error message
+ * \param error error
+ * \return not-null string
  */
 API_EXPORT const char *
 box_error_message(const box_error_t *error);
 
 /**
- * Return last error
+ * Get the information about the last API call error.
+ *
+ * The Tarantool error handling works most like libc's errno. All API calls
+ * return -1 or NULL in the event of error. An internal pointer to
+ * box_error_t type is set by API functions to indicate what went wrong.
+ * This value is only significant if API call failed (returned -1 or NULL).
+ *
+ * Successed function can also touch last error in some cases. You don't
+ * have to clear last error before calling API functions. The returned object
+ * is valid only until next call to **any** API function.
+ *
+ * You must set the last error using box_error_raise() in your stored C
+ * procedures if you want to return custom error message. You can re-throw
+ * the last API error to IPROTO client by keeping the current value and
+ * returning -1 to Tarantool from your stored procedure.
+ *
+ * \return last error.
  */
 API_EXPORT const box_error_t *
 box_error_last(void);
 
-/*
- * Clear last error
+/**
+ * Clear the last error.
  */
 API_EXPORT void
 box_error_clear(void);
 
-/*
- * Set last error
- * \param code IPROTO error code
+/**
+ * Set the last error.
+ *
+ * \param code IPROTO error code (enum \link box_error_code \endlink)
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \returns -1 for convention use
+ *
+ * \sa enum box_error_code
  */
 API_EXPORT int
-box_error_raise(uint32_t code, const char *fmt, ...);
+box_error_raise(uint32_t code, const char *format, ...);
 /** \endcond public */
 
 #endif /* TARANTOOL_BOX_ERROR_H_INCLUDED */

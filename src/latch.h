@@ -120,8 +120,7 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 }
 
 /**
- * Lock a latch (no timeout). Waits indefinitely until
- * the current fiber can gain access to the latch.
+ * \copydoc box_latch_lock
  */
 static inline void
 latch_lock(struct latch *l)
@@ -130,9 +129,7 @@ latch_lock(struct latch *l)
 }
 
 /**
- * Try to lock a latch. Return immediately if the latch is locked.
- * @retval 0 - success
- * @retval 1 - the latch is locked.
+ * \copydoc box_latch_trylock
  */
 static inline int
 latch_trylock(struct latch *l)
@@ -141,8 +138,7 @@ latch_trylock(struct latch *l)
 }
 
 /**
- * Unlock a latch. The fiber calling this function must
- * own the latch.
+ * \copydoc box_latch_unlock
  */
 static inline void
 latch_unlock(struct latch *l)
@@ -157,26 +153,52 @@ latch_unlock(struct latch *l)
 }
 
 /** \cond public */
-/**
- * API of C stored function.
- */
 
+/**
+ * A lock for cooperative multitasking environment
+ */
 typedef struct box_latch box_latch_t;
 
+/**
+ * Allocate and initialize the new latch.
+ * \returns latch
+ */
 API_EXPORT box_latch_t*
 box_latch_new(void);
 
+/**
+ * Destroy and free the latch.
+ * \param latch latch
+ */
 API_EXPORT void
-box_latch_delete(box_latch_t* bl);
+box_latch_delete(box_latch_t *latch);
 
+/**
+* Lock a latch. Waits indefinitely until the current fiber can gain access to
+* the latch.
+*
+* \param latch a latch
+*/
 API_EXPORT void
-box_latch_lock(box_latch_t* bl);
+box_latch_lock(box_latch_t *latch);
 
+/**
+ * Try to lock a latch. Return immediately if the latch is locked.
+ * \param latch a latch
+ * \retval 0 - success
+ * \retval 1 - the latch is locked.
+ */
 API_EXPORT int
-box_latch_trylock(box_latch_t* bl);
+box_latch_trylock(box_latch_t *latch);
 
+/**
+ * Unlock a latch. The fiber calling this function must
+ * own the latch.
+ *
+ * \param latch a ltach
+ */
 API_EXPORT void
-box_latch_unlock(box_latch_t* bl);
+box_latch_unlock(box_latch_t *latch);
 
 /** \endcond public */
 

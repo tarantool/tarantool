@@ -41,6 +41,7 @@ extern "C" {
 
 /** \cond public */
 
+/** Log levels */
 enum say_level {
 	S_FATAL,		/* do not this value use directly */
 	S_SYSERROR,
@@ -78,20 +79,50 @@ void vsay(int level, const char *filename, int line, const char *error,
 typedef void (*sayfunc_t)(int level, const char *filename, int line, const char *error,
                           const char *format, ...);
 
+/** Internal function used to implement say() macros */
 extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
 
-#define say(level, ...) ({ _say(level, __FILE__, __LINE__, __VA_ARGS__); })
+/**
+ * Format and print a message to Tarantool log file.
+ *
+ * \param level (int) - log level (see enum \link say_level \endlink)
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \sa printf()
+ * \sa enum say_level
+ */
+#define say(level, format, ...) ({ _say(level, __FILE__, __LINE__, format, \
+	##__VA_ARGS__); })
+
+/**
+ * Format and print a message to Tarantool log file.
+ *
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \sa printf()
+ * \sa enum say_level
+ * Example:
+ * \code
+ * say_info("Some useful information: %s", status);
+ * \endcode
+ */
+#define say_error(format, ...) say(S_ERROR, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error() */
+#define say_crit(format, ...) say(S_CRIT, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error() */
+#define say_warn(format, ...) say(S_WARN, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error() */
+#define say_info(format, ...) say(S_INFO, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error() */
+#define say_debug(format, ...) say(S_DEBUG, NULL, format, ##__VA_ARGS__)
+/** \copydoc say_error(). */
+#define say_syserror(format, ...) say(S_SYSERROR, strerror(errno), format, \
+	##__VA_ARGS__)
+/** \endcond public */
 
 #define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
-#define say_syserror(...)		say(S_SYSERROR, strerror(errno), __VA_ARGS__)
-#define say_error(...)			say(S_ERROR, NULL, __VA_ARGS__)
-#define say_crit(...)			say(S_CRIT, NULL, __VA_ARGS__)
-#define say_warn(...)			say(S_WARN, NULL, __VA_ARGS__)
-#define say_info(...)			say(S_INFO, NULL, __VA_ARGS__)
-#define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
-/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

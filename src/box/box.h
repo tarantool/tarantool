@@ -53,16 +53,6 @@ void box_free(void);
 void
 box_atfork();
 
-/**
- * The main entry point to the
- * Box: callbacks into the request processor.
- * These are function pointers since they can
- * change when entering/leaving read-only mode
- * (master->slave propagation).
- */
-typedef void (*box_process_func)(struct request *request, struct port *port);
-/** For read-write operations. */
-extern box_process_func box_process;
 
 void
 box_set_ro(bool ro);
@@ -133,33 +123,142 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   const char *key, const char *key_end);
 
 /** \cond public */
+
+/*
+ * Opaque structure passed to the stored C procedure
+ */
 typedef struct box_function_ctx box_function_ctx_t;
+
+/**
+ * Return a tuple from stored C procedure.
+ *
+ * Returned tuple is automatically reference counted by Tarantool.
+ *
+ * \param ctx an opaque structure passed to the stored C procedure by
+ * Tarantool
+ * \param tuple a tuple to return
+ * \retval -1 on error (perhaps, out of memory; check box_error_last())
+ * \retval 0 otherwise
+ */
 API_EXPORT int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple);
 
+/**
+ * Find space id by name.
+ *
+ * This function performs SELECT request to _vspace system space.
+ * \param name space name
+ * \param len length of \a name
+ * \retval BOX_ID_NIL on error or if not found (check box_error_last())
+ * \retval space_id otherwise
+ * \sa box_index_id_by_name
+ */
 API_EXPORT uint32_t
 box_space_id_by_name(const char *name, uint32_t len);
 
+/**
+ * Find index id by name.
+ *
+ * This function performs SELECT request to _vindex system space.
+ * \param space_id space identifier
+ * \param name index name
+ * \param len length of \a name
+ * \retval BOX_ID_NIL on error or if not found (check box_error_last())
+ * \retval index_id otherwise
+ * \sa box_space_id_by_name
+ */
 API_EXPORT uint32_t
 box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len);
 
+/**
+ * Execute an INSERT request.
+ *
+ * \param space_id space identifier
+ * \param tuple encoded tuple in MsgPack Array format ([ field1, field2, ...])
+ * \param tuple_end end of @a tuple
+ * \param[out] result a new tuple. Can be set to NULL to discard result.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id]:insert(tuple) \endcode
+ */
 API_EXPORT int
 box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	   box_tuple_t **result);
 
+/**
+ * Execute an REPLACE request.
+ *
+ * \param space_id space identifier
+ * \param tuple encoded tuple in MsgPack Array format ([ field1, field2, ...])
+ * \param tuple_end end of @a tuple
+ * \param[out] result a new tuple. Can be set to NULL to discard result.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id]:replace(tuple) \endcode
+ */
 API_EXPORT int
 box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	    box_tuple_t **result);
 
+/**
+ * Execute an DELETE request.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * \param key_end the end of encoded \a key.
+ * \param[out] result an old tuple. Can be set to NULL to discard result.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:delete(key) \endcode
+ */
 API_EXPORT int
 box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, box_tuple_t **result);
 
+/**
+ * Execute an UPDATE request.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * \param key_end the end of encoded \a key.
+ * \param ops encoded operations in MsgPack Arrat format, e.g.
+ * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * \param ops_end the end of encoded \a ops
+ * \param index_base 0 if field_ids in update operations are zero-based
+ * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
+ * \param[out] result a new tuple. Can be set to NULL to discard result.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:update(key, ops) \endcode
+ * \sa box_upsert()
+ */
 API_EXPORT int
 box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result);
 
+/**
+ * Execute an UPSERT request.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
+ * \param key_end the end of encoded \a key.
+ * \param ops encoded operations in MsgPack Arrat format, e.g.
+ * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
+ * \param ops_end the end of encoded \a ops
+ * \param tuple encoded tuple in MsgPack Array format ([ field1, field2, ...])
+ * \param tuple_end end of @a tuple
+ * \param index_base 0 if field_ids in update operations are zero-based
+ * indexed (like C) or 1 if for one-based indexed field ids (like Lua).
+ * \param[out] result a new tuple. Can be set to NULL to discard result.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa \code box.space[space_id].index[index_id]:update(key, ops) \endcode
+ * \sa box_update()
+ */
 API_EXPORT int
 box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, const char *ops, const char *ops_end,
@@ -167,5 +266,15 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
 	   box_tuple_t **result);
 
 /** \endcond public */
+
+/**
+ * The main entry point to the
+ * Box: callbacks into the request processor.
+ * These are function pointers since they can
+ * change when entering/leaving read-only mode
+ * (master->slave propagation).
+ */
+int
+box_process1(struct request *request, box_tuple_t **result);
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */
