@@ -289,7 +289,7 @@ end
 
 -- space format - the metadata about space fields
 function box.schema.space.format(id, format)
-    _space = box.space._space
+    local _space = box.space._space
     check_param(id, 'id', 'number')
     check_param(format, 'format', 'table')
     if format == nil then

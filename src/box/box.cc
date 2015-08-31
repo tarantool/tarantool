@@ -602,6 +602,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 		engine_shutdown();
+		rmean_delete(rmean_error);
 		rmean_delete(rmean_box);
 	}
 }
@@ -626,6 +627,25 @@ engine_init()
 	engine_register(sophia);
 }
 
+/**
+ * @brief Reduce the current number of threads in the thread pool to the
+ * bare minimum. Doesn't prevent the pool from spawning new threads later
+ * if demand mounts.
+ */
+static void
+thread_pool_trim()
+{
+	/*
+	 * Trim OpenMP thread pool.
+	 * Though we lack the direct control the workaround below works for
+	 * GNU OpenMP library. The library stops surplus threads on entering
+	 * a parallel region. Can't go below 2 threads due to the
+	 * implementation quirk.
+	 */
+#pragma omp parallel num_threads(2)
+	;
+}
+
 static inline void
 box_init(void)
 {
@@ -635,6 +655,7 @@ box_init(void)
 		   cfg_getd("slab_alloc_factor"));
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
 	engine_init();
 
@@ -695,6 +716,11 @@ box_init(void)
 	recovery_finalize(recovery, wal_mode, rows_per_wal);
 
 	engine_end_recovery();
+
+	/*
+	 * Recovery inflates the thread pool quite a bit (due to parallel sort).
+	 */
+	thread_pool_trim();
 
 	rmean_cleanup(rmean_box);
 
