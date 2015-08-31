@@ -4,7 +4,7 @@
  * Borrowed from FreeBSD (original copyright follows).
  *
  * Standard atomic facilities in stdatomic.h are great, unless you are
- * stuck with an old compiler, or you attemt to compile a code using
+ * stuck with an old compiler, or you attempt to compile code using
  * stdatomic.h in C++ mode [gcc 4.9], or if you were desperate enough to
  * enable OpenMP in C mode [gcc 4.9].
  *
@@ -42,7 +42,7 @@
  * reason we comment unused code regions with #if 0 instead of removing
  * them.
  *
- * Renames are carried out by a scipt generating the final header.
+ * Renames are carried out by a script generating the final header.
  */
 
 /*-
