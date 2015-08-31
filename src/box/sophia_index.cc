@@ -434,6 +434,8 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 	}
 	/* upsert using default tuple */
 	char *p = update + *origin_keysize;
+	uint8_t index_base = *(uint32_t *)p;
+	p += sizeof(uint8_t);
 	uint32_t default_tuple_size = *(uint32_t *)p;
 	p += sizeof(uint32_t);
 	char *default_tuple = p;
@@ -448,7 +450,7 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 		                          expr_end,
 		                          default_tuple,
 		                          default_tuple_end,
-		                          size, 1);
+		                          size, index_base);
 	} catch (...) {
 		return NULL;
 	}
@@ -461,6 +463,8 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
               uint32_t *size)
 {
 	char *p = update + origin_keysize;
+	uint8_t index_base = *(uint32_t *)p;
+	p += sizeof(uint8_t);
 	uint32_t default_tuple_size = *(uint32_t *)p;
 	p += sizeof(uint32_t);
 	char *default_tuple = p;
@@ -477,7 +481,7 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
 		                          expr_end,
 		                          src,
 		                          src + src_size,
-		                          size, 1);
+		                          size, index_base);
 	} catch (...) {
 		return NULL;
 	}
@@ -530,16 +534,19 @@ SophiaIndex::upsert(const char *key,
                     const char *expr,
                     const char *expr_end,
                     const char *tuple,
-                    const char *tuple_end)
+                    const char *tuple_end,
+                    uint8_t index_base)
 {
 	uint32_t tuple_size = tuple_end - tuple;
 	uint32_t expr_size = expr_end - expr;
 	uint32_t valuesize =
-		sizeof(uint32_t) + tuple_size + expr_size;
+		sizeof(uint8_t) + sizeof(uint32_t) + tuple_size + expr_size;
 	char *value = (char *)malloc(valuesize);
 	if (value == NULL) {
 	}
 	char *p = value;
+	memcpy(p, &index_base, sizeof(uint8_t));
+	p += sizeof(uint8_t);
 	memcpy(p, &tuple_size, sizeof(uint32_t));
 	p += sizeof(uint32_t);
 	memcpy(p, tuple, tuple_size);

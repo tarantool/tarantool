@@ -65,7 +65,8 @@ public:
 	            const char *ops,
 	            const char *ops_end,
 	            const char *tuple,
-	            const char *tuple_end);
+	            const char *tuple_end,
+	            uint8_t index_base);
 	void *env;
 	void *db;
 

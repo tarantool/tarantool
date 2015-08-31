@@ -180,7 +180,8 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 	              request->ops,
 	              request->ops_end,
 	              request->tuple,
-	              request->tuple_end);
+	              request->tuple_end,
+	              request->index_base);
 	txn_commit_stmt(txn);
 }
 
