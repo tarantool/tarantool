@@ -63,3 +63,12 @@ s = box.schema.space.create('t', {engine='sophia'})
 i = s:create_index('primary',{parts={1, 'STR'}})
 box.space.t:insert{1,'A'}
 s:drop()
+
+
+-- gh-1009: search for empty string fails
+s = box.schema.space.create('t', {engine='sophia'})
+i = s:create_index('primary',{parts={1, 'STR'}})
+s:insert{''}
+#i:select{''}
+i:get{''}
+s:drop()

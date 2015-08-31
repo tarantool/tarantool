@@ -152,6 +152,8 @@ SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 			part = (char *)&num_parts[i];
 			partsize = sizeof(uint64_t);
 		}
+		if (partsize == 0)
+			part = "";
 		if (sp_setstring(obj, partname, part, partsize) == -1)
 			sophia_error(env);
 		i++;

@@ -107,7 +107,7 @@ t = s:select({''},{iterator='GT', limit =1})
 ...
 t
 ---
-- - ['11']
+- - ['1']
 ...
 t = s:select({},{iterator='GT', limit =1})
 ---
@@ -146,6 +146,27 @@ i = s:create_index('primary',{parts={1, 'STR'}})
 box.space.t:insert{1,'A'}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+s:drop()
+---
+...
+-- gh-1009: search for empty string fails
+s = box.schema.space.create('t', {engine='sophia'})
+---
+...
+i = s:create_index('primary',{parts={1, 'STR'}})
+---
+...
+s:insert{''}
+---
+...
+#i:select{''}
+---
+- 1
+...
+i:get{''}
+---
+- ['']
 ...
 s:drop()
 ---
