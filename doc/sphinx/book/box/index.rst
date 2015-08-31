@@ -434,16 +434,12 @@ Every one of the examples does the same thing:
 select a tuple set from a space named tester where
 the primary-key field value equals 1.
 
-First there are "naming variations":
-
-    1. :codenormal:`box.space.tester:select{1}`
-
-    2. :codenormal:`box.space['tester']:select{1}`
-
-    3. :codenormal:`box.space[512]:select{1}`
-
-    4. :codenormal:`variable = 'tester'; box.space[variable]:select{1}`
-
+First there are "naming variations": |br|
+|nbsp| 1. :codenormal:`box.space.tester:select{1}` |br|
+|nbsp| 2. :codenormal:`box.space['tester']:select{1}` |br|
+|nbsp| 3. :codenormal:`box.space[512]:select{1}` |br|
+|nbsp| 4. :codenormal:`variable = 'tester'` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`box.space[variable]:select{1}` |br|
 ... There is an assumption that the numeric id of
 'tester' is 512, which happens to be the case in our
 sandbox example only. Literal values such as 'tester'
@@ -452,20 +448,15 @@ in this manual have the "box.space.space.tester:" form;
 however, this is a matter of user preference and all
 the variants exist in the wild.
 
-Then there are "parameter variations":
-
-    1. :codenormal:`box.space.tester:select{1}`
-
-    2. :codenormal:`box.space.tester:select({1})`
-
-    3. :codenormal:`box.space.tester:select(1)`
-
-    4. :codenormal:`box.space.tester:select({1},{iterator='EQ'})`
-
-    5. :codenormal:`variable = 1; box.space.tester:select{variable}`
-
-    6. :codenormal:`variable = {1}; box.space.tester:select(variable)`
-
+Then there are "parameter variations": |br|
+|nbsp| 1. :codenormal:`box.space.tester:select{1}` |br|
+|nbsp| 2. :codenormal:`box.space.tester:select({1})` |br|
+|nbsp| 3. :codenormal:`box.space.tester:select(1)` |br|
+|nbsp| 4. :codenormal:`box.space.tester:select({1},{iterator='EQ'})` |br|
+|nbsp| 5. :codenormal:`variable = 1` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`box.space.tester:select{variable}` |br|
+|nbsp| 6. :codenormal:`variable = {1}` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`box.space.tester:select(variable)` |br|
 ... The primary-key value is enclosed in braces, and if
 it was a multi-part primary key then the value would be
 multi-part, for example "...select{1,2,3}". The braces
