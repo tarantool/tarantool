@@ -112,16 +112,24 @@ struct MemtxSpace: public Handler {
 		/* do nothing */
 		/* engine->close(this); */
 	}
-	virtual void executeReplace(struct txn *txn, struct space *space,
-				    struct request *request, struct port *port);
-	virtual void executeDelete(struct txn *txn, struct space *space,
-				   struct request *request, struct port *port);
-	virtual void executeUpdate(struct txn *txn, struct space *space,
-				   struct request *request, struct port *port);
-	virtual void executeUpsert(struct txn *txn, struct space *space,
-				   struct request *request, struct port *port);
-	virtual void executeSelect(struct txn *txn, struct space *space,
-				   struct request *request, struct port *port);
+	virtual struct tuple *
+	executeReplace(struct txn *txn, struct space *space,
+		       struct request *request);
+	virtual struct tuple *
+	executeDelete(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual struct tuple *
+	executeUpdate(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual void
+	executeUpsert(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual void
+	executeSelect(struct txn *, struct space *space,
+		      uint32_t index_id, uint32_t iterator,
+		      uint32_t offset, uint32_t limit,
+		      const char *key, const char * /* key_end */,
+		      struct port *port);
 	virtual void onAlter(Handler *old);
 public:
 	/**
@@ -217,9 +225,9 @@ dup_replace_mode(uint32_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
-void
+struct tuple *
 MemtxSpace::executeReplace(struct txn *txn, struct space *space,
-			   struct request *request, struct port *port)
+			   struct request *request)
 {
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
@@ -233,12 +241,13 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 	 * The reason is that any yield between port_add_tuple and port_eof
 	 * calls could lead to sending not finished response to iproto socket.
 	 */
-	port_add_tuple(port, new_tuple);
+	tuple_bless(new_tuple);
+	return new_tuple;
 }
 
-void
+struct tuple *
 MemtxSpace::executeDelete(struct txn *txn, struct space *space,
-			  struct request *request, struct port *port)
+			  struct request *request)
 {
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -248,7 +257,7 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 	if (old_tuple == NULL) {
 		txn_commit_stmt(txn);
-		return;
+		return NULL;
 	}
 	TupleGuard old_guard(old_tuple);
 	this->replace(txn, space, old_tuple, NULL,
@@ -259,12 +268,13 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	 * The reason is that any yield between port_add_tuple and port_eof
 	 * calls could lead to sending not finished response to iproto socket.
 	 */
-	port_add_tuple(port, old_tuple);
+	tuple_bless(old_tuple);
+	return old_tuple;
 }
 
-void
+struct tuple *
 MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
-			  struct request *request, struct port *port)
+			  struct request *request)
 {
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -275,7 +285,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	if (old_tuple == NULL) {
 		txn_commit_stmt(txn);
-		return;
+		return NULL;
 	}
 	TupleGuard old_guard(old_tuple);
 
@@ -295,14 +305,14 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 	 * The reason is that any yield between port_add_tuple and port_eof
 	 * calls could lead to sending not finished response to iproto socket.
 	 */
-	port_add_tuple(port, new_tuple);
+	tuple_bless(new_tuple);
+	return new_tuple;
 }
 
 void
 MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
-			  struct request *request, struct port *port)
+			  struct request *request)
 {
-	(void)port;
 	Index *pk = index_find_unique(space, request->index_id);
 	/* Try to find the tuple by primary key. */
 	const char *key = request->key;
@@ -344,21 +354,20 @@ MemtxSpace::onAlter(Handler *old)
 }
 
 void
-MemtxSpace::executeSelect(struct txn * txn, struct space *space,
-			  struct request *request, struct port *port)
+MemtxSpace::executeSelect(struct txn *, struct space *space,
+			  uint32_t index_id, uint32_t iterator,
+			  uint32_t offset, uint32_t limit,
+			  const char *key, const char * /* key_end */,
+			  struct port *port)
 {
-	(void) txn;
-	MemtxIndex *index = (MemtxIndex *)index_find(space, request->index_id);
+	MemtxIndex *index = (MemtxIndex *) index_find(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
 	uint32_t found = 0;
-	uint32_t offset = request->offset;
-	uint32_t limit = request->limit;
-	if (request->iterator >= iterator_type_MAX)
+	if (iterator >= iterator_type_MAX)
 		tnt_raise(IllegalParams, "Invalid iterator type");
-	enum iterator_type type = (enum iterator_type) request->iterator;
-	const char *key = request->key;
+	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	key_validate(index->key_def, type, key, part_count);

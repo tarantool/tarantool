@@ -54,51 +54,6 @@ request_create(struct request *request, uint32_t type)
 }
 
 void
-process_rw(struct request *request, struct port *port)
-{
-	assert(iproto_type_is_dml(request->type));
-	rmean_collect(rmean_box, request->type, 1);
-	try {
-		struct space *space = space_cache_find(request->space_id);
-		struct txn *txn;
-		if (request->type == IPROTO_SELECT) {
-			txn = in_txn();
-			access_check_space(space, PRIV_R);
-		} else {
-			txn = txn_begin_stmt(request, space);
-			access_check_space(space, PRIV_W);
-		}
-		switch (request->type) {
-		case IPROTO_SELECT:
-			space->handler->executeSelect(txn, space, request, port);
-			if (txn == NULL) {
-				/* no txn is created, so simply collect garbage here */
-				fiber_gc();
-			}
-			break;
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-			space->handler->executeReplace(txn, space, request, port);
-			break;
-		case IPROTO_UPDATE:
-			space->handler->executeUpdate(txn, space, request, port);
-			break;
-		case IPROTO_DELETE:
-			space->handler->executeDelete(txn, space, request, port);
-			break;
-		case IPROTO_UPSERT:
-			space->handler->executeUpsert(txn, space, request, port);
-			break;
-		default: break;
-		}
-		port_eof(port);
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		throw;
-	}
-}
-
-void
 request_decode(struct request *request, const char *data, uint32_t len)
 {
 	const char *end = data + len;

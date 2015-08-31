@@ -57,7 +57,7 @@
  */
 struct iproto_port
 {
-	struct port_vtab *vtab;
+	struct port base;
 	/** Output buffer. */
 	struct obuf *buf;
 	/** Reply header. */
@@ -74,7 +74,7 @@ static inline void
 iproto_port_init(struct iproto_port *port, struct obuf *buf,
 		 uint64_t sync)
 {
-	port->vtab = &iproto_port_vtab;
+	port->base.vtab = &iproto_port_vtab;
 	port->buf = buf;
 	port->sync = sync;
 	port->found = 0;
