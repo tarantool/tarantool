@@ -146,6 +146,7 @@ t;
   - REPLACE
   - UPSERT
   - AUTH
+  - ERROR
   - UPDATE
   - total
   - rps

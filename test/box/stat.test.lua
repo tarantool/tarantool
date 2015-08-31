@@ -6,6 +6,7 @@ box.stat.DELETE.total
 box.stat.UPDATE.total
 box.stat.REPLACE.total
 box.stat.SELECT.total
+box.stat.ERROR.total
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
@@ -19,6 +20,10 @@ box.stat.UPDATE.total
 box.stat.REPLACE.total
 box.stat.SELECT.total
 
+-- check exceptions
+space:get('Impossible value')
+box.stat.ERROR.total
+
 --# stop server default
 --# start server default
 
@@ -28,6 +33,7 @@ box.stat.DELETE.total
 box.stat.UPDATE.total
 box.stat.REPLACE.total
 box.stat.SELECT.total
+box.stat.ERROR.total
 
 -- cleanup
 box.space.tweedledum:drop()
