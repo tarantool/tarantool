@@ -36,6 +36,7 @@
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
+STRS(distance_type, ENUM_DISTANCE_TYPE);
 
 const char *func_language_strs[] = {"LUA", "C"};
 

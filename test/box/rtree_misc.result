@@ -262,11 +262,6 @@ box.snapshot()
 ---
 - ok
 ...
-for i = 11,20 do s:insert{i, i, i + 1, i + 1}
----
-- error: '[string "for i = 11,20 do s:insert{i, i, i + 1, i + 1} "]:1: ''end'' expected
-    near ''<eof>'''
-...
 i:select({0, 0}, {iterator = 'neighbor'})
 ---
 - - [1, 1, [1, 1, 2, 2]]
@@ -300,6 +295,188 @@ i:select({0, 0}, {iterator = 'neighbor'})
   - [8, 8, [8, 8, 9, 9]]
   - [9, 9, [9, 9, 10, 10]]
   - [10, 10, [10, 10, 11, 11]]
+...
+s:drop()
+---
+...
+s = box.schema.space.create('spatial')
+---
+...
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+---
+...
+i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}, dimension = 4})
+---
+...
+for i = 1,10 do s:insert{i, i, {i, i, i, i, i + 1, i + 1, i + 1, i + 1}} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
+---
+- - [1, 1, [1, 1, 1, 1, 2, 2, 2, 2]]
+  - [2, 2, [2, 2, 2, 2, 3, 3, 3, 3]]
+  - [3, 3, [3, 3, 3, 3, 4, 4, 4, 4]]
+  - [4, 4, [4, 4, 4, 4, 5, 5, 5, 5]]
+  - [5, 5, [5, 5, 5, 5, 6, 6, 6, 6]]
+  - [6, 6, [6, 6, 6, 6, 7, 7, 7, 7]]
+  - [7, 7, [7, 7, 7, 7, 8, 8, 8, 8]]
+  - [8, 8, [8, 8, 8, 8, 9, 9, 9, 9]]
+  - [9, 9, [9, 9, 9, 9, 10, 10, 10, 10]]
+  - [10, 10, [10, 10, 10, 10, 11, 11, 11, 11]]
+...
+--# stop server default
+--# start server default
+s = box.space.spatial
+---
+...
+i = s.index.spatial
+---
+...
+i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
+---
+- - [1, 1, [1, 1, 1, 1, 2, 2, 2, 2]]
+  - [2, 2, [2, 2, 2, 2, 3, 3, 3, 3]]
+  - [3, 3, [3, 3, 3, 3, 4, 4, 4, 4]]
+  - [4, 4, [4, 4, 4, 4, 5, 5, 5, 5]]
+  - [5, 5, [5, 5, 5, 5, 6, 6, 6, 6]]
+  - [6, 6, [6, 6, 6, 6, 7, 7, 7, 7]]
+  - [7, 7, [7, 7, 7, 7, 8, 8, 8, 8]]
+  - [8, 8, [8, 8, 8, 8, 9, 9, 9, 9]]
+  - [9, 9, [9, 9, 9, 9, 10, 10, 10, 10]]
+  - [10, 10, [10, 10, 10, 10, 11, 11, 11, 11]]
+...
+s:drop()
+---
+...
+-- distance type
+iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
+---
+...
+iopts['distance'] = 'euclid'
+---
+...
+s = box.schema.space.create('spatial')
+---
+...
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+---
+...
+i = s:create_index('spatial', iopts)
+---
+...
+s:insert{1, {0, 5}}
+---
+- [1, [0, 5]]
+...
+s:insert{2, {5, 0}}
+---
+- [2, [5, 0]]
+...
+s:insert{3, {5, 5}}
+---
+- [3, [5, 5]]
+...
+s:insert{4, {8, 0}}
+---
+- [4, [8, 0]]
+...
+s:insert{5, {0, 8}}
+---
+- [5, [0, 8]]
+...
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+---
+- - [1, [0, 5]]
+  - [2, [5, 0]]
+  - [3, [5, 5]]
+  - [4, [8, 0]]
+  - [5, [0, 8]]
+...
+s:drop()
+---
+...
+iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
+---
+...
+iopts['distance'] = 'manhattan'
+---
+...
+s = box.schema.space.create('spatial')
+---
+...
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+---
+...
+i = s:create_index('spatial', iopts)
+---
+...
+s:insert{1, {0, 5}}
+---
+- [1, [0, 5]]
+...
+s:insert{2, {5, 0}}
+---
+- [2, [5, 0]]
+...
+s:insert{3, {5, 5}}
+---
+- [3, [5, 5]]
+...
+s:insert{4, {8, 0}}
+---
+- [4, [8, 0]]
+...
+s:insert{5, {0, 8}}
+---
+- [5, [0, 8]]
+...
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+---
+- - [1, [0, 5]]
+  - [2, [5, 0]]
+  - [4, [8, 0]]
+  - [5, [0, 8]]
+  - [3, [5, 5]]
+...
+--# stop server default
+--# start server default
+s = box.space.spatial
+---
+...
+i = s.index.spatial
+---
+...
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+---
+- - [1, [0, 5]]
+  - [2, [5, 0]]
+  - [4, [8, 0]]
+  - [5, [0, 8]]
+  - [3, [5, 5]]
+...
+box.snapshot()
+---
+- ok
+...
+--# stop server default
+--# start server default
+s = box.space.spatial
+---
+...
+i = s.index.spatial
+---
+...
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+---
+- - [1, [0, 5]]
+  - [2, [5, 0]]
+  - [4, [8, 0]]
+  - [5, [0, 8]]
+  - [3, [5, 5]]
 ...
 s:drop()
 ---

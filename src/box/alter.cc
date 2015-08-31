@@ -129,8 +129,6 @@ key_opts_create_from_field(struct key_opts *opts, const char *field)
 		key = mp_decode_str(&field, &len);
 		if (len == strlen("unique") &&
 		    memcmp(key, "unique", len) == 0) {
-
-
 			if (mp_typeof(*field) != MP_BOOL) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE,
@@ -140,7 +138,6 @@ key_opts_create_from_field(struct key_opts *opts, const char *field)
 			opts->is_unique = mp_decode_bool(&field);
 		} else if (len == strlen("dimension") &&
 			   memcmp(key, "dimension", len) == 0) {
-
 			if (mp_typeof(*field) != MP_UINT) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE,
@@ -148,6 +145,31 @@ key_opts_create_from_field(struct key_opts *opts, const char *field)
 					  "unsigned");
 			}
 			opts->dimension = mp_decode_uint(&field);
+		} else if (len == strlen("distance") &&
+			   memcmp(key, "distance", len) == 0) {
+			if (mp_typeof(*field) != MP_STR) {
+				tnt_raise(ClientError,
+					  ER_FIELD_TYPE,
+					  INDEX_OPTS + INDEX_OFFSET,
+					  "unsigned");
+			}
+			const char *str_distance;
+			uint32_t distance_len;
+			str_distance = mp_decode_str(&field, &distance_len);
+			if (distance_len == strlen("euclid") &&
+				memcmp(str_distance, "euclid",
+				       distance_len) == 0) {
+				opts->distance = EUCLID;
+			} else if (distance_len == strlen("manhattan") &&
+				   memcmp(str_distance, "manhattan",
+					  distance_len) == 0) {
+				opts->distance = MANHATTAN;
+			} else {
+				tnt_raise(ClientError,
+					  ER_FIELD_TYPE,
+					  INDEX_OPTS + INDEX_OFFSET,
+					  "string euclid/manhattan");
+			}
 		} else {
 			mp_next(&field);
 		}

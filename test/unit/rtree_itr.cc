@@ -30,7 +30,8 @@ itr_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
+	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+		   RTREE_EUCLID);
 
 	/* Filling tree */
 	const size_t count1 = 10000;
@@ -211,7 +212,8 @@ itr_invalidate_check()
 			del_cnt = test_size - del_pos;
 		}
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+			   RTREE_EUCLID);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);
@@ -255,7 +257,8 @@ itr_invalidate_check()
 		size_t ins_cnt = rand() % max_insert_count + 1;
 
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+			   RTREE_EUCLID);
 		struct rtree_iterator iterators[test_size];
 		for (size_t i = 0; i < test_size; i++)
 			rtree_iterator_init(iterators + i);
