@@ -97,8 +97,16 @@ struct tuple *
 SophiaSpace::executeReplace(struct txn *txn, struct space *space,
                             struct request *request)
 {
+	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
+
+	int size = request->tuple_end - request->tuple;
+	const char *key =
+		tuple_field_raw(request->tuple, size,
+		                index->key_def->parts[0].fieldno);
+	primary_key_validate(index->key_def, key, index->key_def->part_count);
 
 	/* Switch from INSERT to REPLACE during recovery.
 	 *
@@ -111,8 +119,6 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 		if (engine->recovery_complete)
 			mode = DUP_INSERT;
 	}
-	SophiaIndex *index =
-		(SophiaIndex *)index_find(space, 0);
 	index->replace_or_insert(request->tuple, request->tuple_end, mode);
 	txn_commit_stmt(txn);
 	return NULL;

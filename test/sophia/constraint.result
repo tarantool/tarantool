@@ -1,0 +1,76 @@
+-- key type validations (str, num)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+---
+...
+space:insert{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:replace{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:delete{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:update(1, {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:upsert(1, {{'+', 1, 10}}, {0})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:get{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+index:pairs(1, {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:drop()
+---
+...
+-- key type validations (num, str)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+space:insert{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:replace{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:delete{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:update('A', {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:upsert('A', {{'+', 1, 10}}, {0})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:get{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+index:pairs('A', {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:drop()
+---
+...

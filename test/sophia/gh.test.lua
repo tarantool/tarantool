@@ -56,3 +56,10 @@ i = s:create_index('primary',{})
 s:insert{5}
 s.index.primary:alter({parts={1,'NUM'}})
 s:drop()
+
+
+-- gh-1008: assertion if insert of wrong type
+s = box.schema.space.create('t', {engine='sophia'})
+i = s:create_index('primary',{parts={1, 'STR'}})
+box.space.t:insert{1,'A'}
+s:drop()
