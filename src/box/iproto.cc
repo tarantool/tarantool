@@ -55,13 +55,6 @@
 
 /* {{{ iproto_msg - declaration */
 
-const char *rmean_net_names[RMEAN_NET_LAST] = {
-	"EVENTS",
-	"LOCKS",
-	"RECEIVED",
-	"SENT"
-};
-
 
 /**
  * A single msg from io thread. All requests
@@ -865,8 +858,7 @@ net_cord_f(va_list /* ap */)
 
 
 	/* Init statistics counter */
-	rmean_net = rmean_new(rmean_net_names, RMEAN_NET_LAST);
-	rmean_cbus_is_count = true;
+	rmean_net = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
 
 	if (rmean_net == NULL)
 		tnt_raise(OutOfMemory,
@@ -884,7 +876,6 @@ net_cord_f(va_list /* ap */)
 	 */
 	fiber_yield();
 
-	rmean_cbus_is_count = false;
 	rmean_delete(rmean_net);
 }
 

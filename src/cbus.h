@@ -42,7 +42,6 @@ typedef void (*cmsg_f)(struct cmsg *);
 
 /** rmean_net - network statistics (iproto & cbus) */
 extern struct rmean *rmean_net;
-extern bool rmean_cbus_is_count;
 
 enum rmean_net_name {
 	RMEAN_NET_EVENTS,
@@ -52,6 +51,8 @@ enum rmean_net_name {
 
 	RMEAN_NET_LAST
 };
+
+extern const char *rmean_net_strings[RMEAN_NET_LAST];
 
 /**
  * One hop in a message travel route.  A message may need to be
@@ -379,7 +380,7 @@ static inline void
 cbus_lock(struct cbus *bus)
 {
 	/* Count statistics */
-	if (rmean_cbus_is_count)
+	if (rmean_net)
 		rmean_collect(rmean_net, RMEAN_NET_LOCKS, 1);
 
 	tt_pthread_mutex_lock(&bus->mutex);

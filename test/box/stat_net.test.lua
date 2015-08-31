@@ -1,3 +1,6 @@
+-- clear statistics
+--# stop server default
+--# start server default
 
 box.stat.net.SENT -- zero
 box.stat.net.RECEIVED -- zero

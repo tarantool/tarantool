@@ -583,6 +583,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 		engine_shutdown();
+		rmean_delete(rmean_error);
 		rmean_delete(rmean_box);
 	}
 }
@@ -616,6 +617,7 @@ box_init(void)
 		   cfg_getd("slab_alloc_factor"));
 
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
 	engine_init();
 

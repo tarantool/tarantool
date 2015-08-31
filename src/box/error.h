@@ -32,6 +32,17 @@
  */
 #include "errcode.h"
 #include "exception.h"
+#include "rmean.h"
+
+extern struct rmean *rmean_error;
+
+enum rmean_error_name {
+	RMEAN_ERROR_EXCEPTION,
+
+	RMEAN_ERROR_LAST
+};
+extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
+
 
 extern const struct type type_ClientError;
 class ClientError: public Exception {

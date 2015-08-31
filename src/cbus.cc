@@ -31,9 +31,15 @@
 #include "cbus.h"
 #include "scoped_guard.h"
 
-struct rmean *rmean_net;
+struct rmean *rmean_net = NULL;
+const char *rmean_net_strings[RMEAN_NET_LAST] = {
+	"EVENTS",
+	"LOCKS",
+	"RECEIVED",
+	"SENT"
+};
 
-bool rmean_cbus_is_count = 0;
+
 
 static void
 cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
@@ -191,7 +197,7 @@ cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	pipe->n_input = 0;
 	if (pipe_was_empty) {
 		/* Count statistics */
-		if (rmean_cbus_is_count)
+		if (rmean_net)
 			rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
 
 		ev_async_send(pipe->consumer, &pipe->fetch_output);
@@ -223,7 +229,7 @@ cpipe_peek_impl(struct cpipe *pipe)
 
 	if (peer_pipe_was_empty) {
 		/* Count statistics */
-		if (rmean_cbus_is_count)
+		if (rmean_net)
 			rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
 
 		ev_async_send(peer->consumer, &peer->fetch_output);

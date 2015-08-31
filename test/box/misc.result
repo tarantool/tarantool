@@ -142,6 +142,7 @@ t;
   - SELECT
   - INSERT
   - EVAL
+  - EXCEPTION
   - CALL
   - REPLACE
   - UPSERT
