@@ -32,6 +32,11 @@
 #include <stdio.h>
 
 #include <fiber.h>
+struct rmean *rmean_error = NULL;
+
+const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
+	"ERROR"
+};
 
 static struct method clienterror_methods[] = {
 	make_method(&type_ClientError, "code", &ClientError::errcode),
@@ -49,6 +54,8 @@ ClientError::ClientError(const char *file, unsigned line,
 	va_start(ap, errcode);
 	vsnprintf(m_errmsg, sizeof(m_errmsg),
 		  tnt_errcode_desc(m_errcode), ap);
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 	va_end(ap);
 }
 
@@ -59,6 +66,8 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 	m_errcode = errcode;
 	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
 	m_errmsg[sizeof(m_errmsg) - 1] = 0;
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
 
 void

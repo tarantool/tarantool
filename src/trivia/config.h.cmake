@@ -5,14 +5,24 @@
  * config.h.cmake. Please do not modify.
  */
 /** \cond public */
-/*
+
+/**
+ * Package major version - 1 for 1.6.7
+ */
+#define PACKAGE_VERSION_MAJOR @CPACK_PACKAGE_VERSION_MAJOR@
+/**
+ * Package minor version - 6 for 1.6.7
+ */
+#define PACKAGE_VERSION_MINOR @CPACK_PACKAGE_VERSION_MINOR@
+/**
+ * Package patch version - 7 for 1.6.7
+ */
+#define PACKAGE_VERSION_PATCH @CPACK_PACKAGE_VERSION_PATCH@
+/**
  * A string with major-minor-patch-commit-id identifier of the
- * release.
+ * release, e.g. 1.6.6-113-g8399d0e.
  */
 #define PACKAGE_VERSION "@PACKAGE_VERSION@"
-#define PACKAGE_VERSION_MAJOR @CPACK_PACKAGE_VERSION_MAJOR@
-#define PACKAGE_VERSION_MINOR @CPACK_PACKAGE_VERSION_MINOR@
-#define PACKAGE_VERSION_PATCH @CPACK_PACKAGE_VERSION_PATCH@
 
 /** \endcond public */
 
@@ -161,25 +171,32 @@
 
 /** \cond public */
 
-/*
- * predefined /etc directory prefix.
- */
+/** System configuration dir (e.g /etc) */
 #define SYSCONF_DIR "@CMAKE_INSTALL_SYSCONFDIR@"
+/** Install prefix (e.g. /usr) */
 #define INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
+/** Build type, e.g. Debug or Release */
 #define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+/** CMake build type signature, e.g. Linux-x86_64-Debug */
 #define BUILD_INFO "@TARANTOOL_BUILD@"
+/** Command line used to run CMake */
 #define BUILD_OPTIONS "cmake . @TARANTOOL_OPTIONS@"
+/** Pathes to C and CXX compilers */
 #define COMPILER_INFO "@CMAKE_C_COMPILER@ @CMAKE_CXX_COMPILER@"
+/** C compile flags used to build Tarantool */
 #define TARANTOOL_C_FLAGS "@TARANTOOL_C_FLAGS@"
+/** CXX compile flags used to build Tarantool */
 #define TARANTOOL_CXX_FLAGS "@TARANTOOL_CXX_FLAGS@"
 
-/*
- * Modules
- */
+/** A path to install *.lua module files */
 #define MODULE_LIBDIR "@MODULE_FULL_LIBDIR@"
+/** A path to install *.so / *.dylib module files */
 #define MODULE_LUADIR "@MODULE_FULL_LUADIR@"
+/** A path to Lua includes (the same directory where this file is contained) */
 #define MODULE_INCLUDEDIR "@MODULE_FULL_INCLUDEDIR@"
+/** A constant added to package.path in Lua to find *.lua module files */
 #define MODULE_LUAPATH "@MODULE_LUAPATH@"
+/** A constant added to package.cpath in Lua to find *.so module files */
 #define MODULE_LIBPATH "@MODULE_LIBPATH@"
 
 /** \endcond public */

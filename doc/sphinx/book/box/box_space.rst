@@ -447,10 +447,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     space-object:len()
 
-        .. NOTE::
-
-            The ``len()`` function is only applicable for the memtx storage engine.
-
         :return: Number of tuples in the space.
 
         | :codebold:`Example`

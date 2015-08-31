@@ -25,4 +25,5 @@
     expirationd
     shard
     tarantool
+    capi
 

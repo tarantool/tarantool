@@ -14,6 +14,7 @@
  * Tarantool Module API
  */
 
+/** Extern modificator for all public functions */
 #if defined(__cplusplus)
 #define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
 #else
