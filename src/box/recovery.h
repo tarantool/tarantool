@@ -36,7 +36,6 @@
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "wal.h"
-#include "replica.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -67,7 +66,6 @@ struct recovery_state {
 	 * locally or send to the replica.
 	 */
 	struct fiber *watcher;
-	struct replica replica;
 	/**
 	 * apply_row is a module callback invoked during initial
 	 * recovery and when reading rows from the master.

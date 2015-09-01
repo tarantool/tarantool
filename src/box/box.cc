@@ -55,8 +55,12 @@
 #include "cfg.h"
 #include "iobuf.h"
 #include "coio.h"
+#include "cluster.h" /* replica */
+#include "replica.h"
 
 struct recovery_state *recovery;
+
+static struct replica replica_buf; /* used to store the single instance */
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
@@ -192,31 +196,31 @@ box_check_config()
 extern "C" void
 box_set_replication_source(void)
 {
-	const char *source = cfg_gets("replication_source");
-	bool old_is_replica = recovery->replica.reader;
-	bool new_is_replica = source != NULL;
-
-	if (old_is_replica != new_is_replica ||
-	    (old_is_replica &&
-	     (strcmp(source, recovery->replica.source) != 0))) {
-
-		if (recovery->writer) {
-			if (old_is_replica)
-				recovery_stop_replica(recovery);
-			recovery_set_replica(recovery, source);
-			if (recovery_has_replica(recovery))
-				recovery_follow_replica(recovery);
-		} else {
-			/*
-			 * Do nothing, we're in local hot
-			 * standby mode, the server
-			 * will automatically begin following
-			 * the replica when local hot standby
-			 * mode is finished, see
-			 * box_leave_local_hot_standby_mode()
-			 */
-		}
+	if (recovery->writer == NULL) {
+		/*
+		 * Do nothing, we're in local hot standby mode, the server
+		 * will automatically begin following the replica when local
+		 * hot standby mode is finished, see box_init().
+		 */
+		return;
 	}
+
+	const char *source = cfg_gets("replication_source");
+
+	/* This hook is only invoked if source has changed */
+	if (replica != NULL) {
+		replica_stop(replica); /* cancels a background fiber */
+		replica_destroy(replica);
+		replica = NULL;
+	}
+
+	if (source == NULL)
+		return;
+
+	/* Start a new replication client using provided URI */
+	replica_create(&replica_buf, source);
+	replica = &replica_buf;
+	replica_start(replica, recovery); /* starts a background fiber */
 }
 
 extern "C" void
@@ -674,22 +678,32 @@ box_init(void)
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, NULL);
-	recovery_set_replica(recovery,
-		cfg_gets("replication_source"));
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
-
+	const char *source = cfg_gets("replication_source");
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (recovery_has_replica(recovery)) {
+	} else if (source != NULL) {
+		/* Generate Server-UUID */
+		tt_uuid_create(&recovery->server_uuid);
+
 		/* Initialize a new replica */
 		engine_begin_join();
-		replica_bootstrap(recovery);
+
+		/* Add a surrogate server id for snapshot rows */
+		vclock_add_server(&recovery->vclock, 0);
+
+		/* Bootstrap from replica */
+		replica_create(&replica_buf, source);
+		replica = &replica_buf;
+		replica_start(replica, recovery);
+		replica_join(replica); /* throws on failure */
+
 		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
 	} else {
@@ -724,8 +738,16 @@ box_init(void)
 
 	rmean_cleanup(rmean_box);
 
-	if (recovery_has_replica(recovery))
-		recovery_follow_replica(recovery);
+	if (source != NULL) {
+		if (replica == NULL) {
+			replica_create(&replica_buf, source);
+			replica = &replica_buf;
+		} /* else re-use instance from bootstrap */
+		/* Follow replica */
+		assert(recovery->writer);
+		replica_start(replica, recovery);
+	}
+
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
 		box_set_ro(false);

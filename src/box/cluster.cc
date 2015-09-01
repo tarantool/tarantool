@@ -31,12 +31,15 @@
 #include "box.h"
 #include "cluster.h"
 #include "recovery.h"
+#include "replica.h"
 
 /**
  * Globally unique identifier of this cluster.
  * A cluster is a set of connected replicas.
  */
 tt_uuid cluster_id;
+
+struct replica *replica;
 
 extern "C" struct vclock *
 cluster_clock()
