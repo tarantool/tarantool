@@ -320,9 +320,7 @@ sophia_join_key_def(void *env, void *db)
 	uint32_t id = sp_getint(db, "id");
 	uint32_t count = sp_getint(db, "key-count");
 	struct key_def *key_def;
-	struct key_opts key_opts = { true /* is_unique */,
-				     0 /* dimension */,
-				     EUCLID /* distance */ };
+	struct key_opts key_opts = key_opts_default;
 	key_def = key_def_new(id, 0, "sophia_join", TREE, &key_opts, count);
 	int i = 0;
 	while (i < count) {

@@ -36,7 +36,8 @@
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
-STRS(distance_type, ENUM_DISTANCE_TYPE);
+
+const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 
 const char *func_language_strs[] = {"LUA", "C"};
 
@@ -46,6 +47,10 @@ const uint32_t key_mp_type[] = {
 	/* [STR]     =  */  1U << MP_STR,
 	/* [ARRAY]   =  */  1U << MP_ARRAY,
 	/* [NUMBER]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE),
+};
+
+const struct key_opts key_opts_default = {
+	true, 0, RTREE_INDEX_DISTANCE_TYPE_EUCLID
 };
 
 enum schema_object_type

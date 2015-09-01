@@ -365,11 +365,15 @@ tuple_next(struct tuple_iterator *it)
 extern inline uint32_t
 tuple_next_u32(struct tuple_iterator *it);
 
-static const char *
+const char *
 tuple_field_to_cstr(const char *field, uint32_t len)
 {
-	static __thread char buf[256];
-	len = MIN(len, sizeof(buf) - 1);
+	enum { MAX_STR_BUFS = 3, MAX_BUF_LEN = 256 };
+	static __thread char bufs[MAX_STR_BUFS][MAX_BUF_LEN];
+	static __thread int i = 0;
+	char *buf = bufs[i];
+	i = (i + 1) % MAX_STR_BUFS;
+	len = MIN(len, MAX_BUF_LEN - 1);
 	memcpy(buf, field, len);
 	buf[len] = '\0';
 	return buf;

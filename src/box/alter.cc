@@ -105,74 +105,66 @@ access_check_ddl(uint32_t owner_uid)
 	}
 }
 
-
-/** Fill key_opts structure from opts field in tuple of space _index */
-void
-key_opts_create_from_field(struct key_opts *opts, const char *field)
+const char *
+map_field_get(const char *map, const char *needle, int needle_type,
+	      int map_field_no)
 {
-	key_opts_create(opts);
-	if (field == NULL)
-		return;
-	if (mp_typeof(*field) != MP_MAP) {
-		tnt_raise(ClientError, ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
-			  "map");
+	if (map == NULL || mp_typeof(*map) != MP_MAP) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  map_field_no + INDEX_OFFSET, "map");
 	}
-	uint32_t map_size = mp_decode_map(&field);
+	uint32_t map_size = mp_decode_map(&map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		const char *key;
 		uint32_t len;
-		if (mp_typeof(*field) != MP_STR) {
+		if (mp_typeof(*map) != MP_STR) {
+			tnt_raise(ClientError, ER_FIELD_TYPE,
+				  map_field_no + INDEX_OFFSET,
+				  "map key type");
+		}
+		key = mp_decode_str(&map, &len);
+		if (len != strlen(needle) ||
+		    strncasecmp(key, needle, len) != 0) {
+
+			mp_next(&map);
+			continue;
+		}
+		if (mp_typeof(*map) != needle_type) {
+			tnt_raise(ClientError, ER_FIELD_TYPE,
+				  map_field_no + INDEX_OFFSET,
+				  "map value type");
+		}
+		return map;
+	}
+	return NULL;
+}
+
+/** Fill key_opts structure from opts field in tuple of space _index */
+void
+key_opts_create_from_field(struct key_opts *opts, const char *map)
+{
+	*opts = key_opts_default;
+	if (map == NULL)
+		return;
+	const char *field;
+
+	if ((field = map_field_get(map, "unique", MP_BOOL, INDEX_OPTS)))
+		opts->is_unique = mp_decode_bool(&field);
+	if ((field = map_field_get(map, "dimension", MP_UINT, INDEX_OPTS)))
+		opts->dimension = mp_decode_uint(&field);
+	if ((field = map_field_get(map, "distance", MP_STR, INDEX_OPTS))) {
+		uint32_t len;
+		const char *distance = mp_decode_str(&field, &len);
+		distance = tuple_field_to_cstr(distance, len);
+
+		enum rtree_index_distance_type distance_type =
+			STR2ENUM(rtree_index_distance_type, distance);
+		if (distance_type == rtree_index_distance_type_MAX) {
 			tnt_raise(ClientError,
-				  ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
-				  "string");
+				  ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,
+				  distance);
 		}
-		key = mp_decode_str(&field, &len);
-		if (len == strlen("unique") &&
-		    memcmp(key, "unique", len) == 0) {
-			if (mp_typeof(*field) != MP_BOOL) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "bool");
-			}
-			opts->is_unique = mp_decode_bool(&field);
-		} else if (len == strlen("dimension") &&
-			   memcmp(key, "dimension", len) == 0) {
-			if (mp_typeof(*field) != MP_UINT) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "unsigned");
-			}
-			opts->dimension = mp_decode_uint(&field);
-		} else if (len == strlen("distance") &&
-			   memcmp(key, "distance", len) == 0) {
-			if (mp_typeof(*field) != MP_STR) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "unsigned");
-			}
-			const char *str_distance;
-			uint32_t distance_len;
-			str_distance = mp_decode_str(&field, &distance_len);
-			if (distance_len == strlen("euclid") &&
-				memcmp(str_distance, "euclid",
-				       distance_len) == 0) {
-				opts->distance = EUCLID;
-			} else if (distance_len == strlen("manhattan") &&
-				   memcmp(str_distance, "manhattan",
-					  distance_len) == 0) {
-				opts->distance = MANHATTAN;
-			} else {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "string euclid/manhattan");
-			}
-		} else {
-			mp_next(&field);
-		}
+		opts->distance = distance_type;
 	}
 }
 
@@ -208,10 +200,16 @@ key_def_new_from_tuple(struct tuple *tuple)
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5 _index space structure */
-		key_opts_create(&opts);
+		opts = key_opts_default;
 		opts.is_unique = tuple_field_u32(tuple, INDEX_165_IS_UNIQUE);
 		part_count = tuple_field_u32(tuple, INDEX_165_PART_COUNT);
 	}
+	/**
+	 * XXX this is an ugly clutch in absence of Lua-level
+	 * index-type specific defaults.
+	 */
+	if (opts.dimension == 0 && type == RTREE)
+		opts.dimension = 2;
 	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
 	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
 

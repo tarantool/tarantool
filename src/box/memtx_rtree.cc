@@ -163,8 +163,8 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	}
 
 	memtx_index_arena_init();
-	assert((int)RTREE_EUCLID == (int)EUCLID);
-	assert((int)RTREE_MANHATTAN == (int)MANHATTAN);
+	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
+	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
 	enum rtree_distance_type distance_type =
 		(enum rtree_distance_type)(int)key_def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
