@@ -660,7 +660,7 @@ void *cord_thread_func(void *p)
 	 * CORD_ON_EXIT_WONT_RUN to prevent a future handler
 	 * installation (since a handler won't run anyway).
 	 */
-	struct cord_on_exit *handler = NULL; /* expected value */
+	const struct cord_on_exit *handler = NULL; /* expected value */
 	bool changed;
 
 	changed = pm_atomic_compare_exchange_strong(&cord()->on_exit,
@@ -765,7 +765,7 @@ cord_cojoin(struct cord *cord)
 	 * cord->on_exit initially holds a NULL value. This field is
 	 * change-once.
 	 */
-	struct cord_on_exit *prev_handler = NULL; /* expected value */
+	const struct cord_on_exit *prev_handler = NULL; /* expected value */
 	bool changed = pm_atomic_compare_exchange_strong(&cord->on_exit,
 	                                                 &prev_handler,
 	                                                 &handler);

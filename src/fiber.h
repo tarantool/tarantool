@@ -186,7 +186,7 @@ struct cord {
          */
 	uint32_t max_fid;
 	pthread_t id;
-	struct cord_on_exit *on_exit;
+	const struct cord_on_exit *on_exit;
 	/** A helper hash to map id -> fiber. */
 	struct mh_i32ptr_t *fiber_registry;
 	/** All fibers */

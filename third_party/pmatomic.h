@@ -95,6 +95,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /*
  * Removed __PM_CLANG_ATOMICS clause, this is because
