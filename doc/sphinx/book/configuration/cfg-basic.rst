@@ -40,7 +40,7 @@
 .. confval:: sophia_dir
 
     A directory where sophia files will be stored. Can be relative to
-    :confval:`work_dir`. If not specified, defaults to :file:`work_dir/sophia`.
+    :confval:`work_dir`. If not specified, defaults to :file:`work_dir`.
 
     Type: string |br|
     Default: "sophia" |br|

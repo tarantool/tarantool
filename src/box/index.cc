@@ -34,6 +34,8 @@
 #include "schema.h"
 #include "user_def.h"
 #include "space.h"
+#include "iproto_constants.h"
+#include "request.h"
 
 const char *iterator_type_strs[] = {
 	/* [ITER_EQ]  = */ "EQ",
@@ -305,6 +307,9 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		primary_key_validate(index->key_def, key, part_count);
 		struct tuple *tuple = index->findByKey(key, part_count);
+		/* Count statistics */
+		rmean_collect(rmean_box, IPROTO_SELECT, 1);
+
 		*result = tuple_bless_null(tuple);
 		return 0;
 	}  catch (Exception *) {

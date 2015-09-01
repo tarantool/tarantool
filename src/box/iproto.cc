@@ -55,6 +55,7 @@
 
 /* {{{ iproto_msg - declaration */
 
+
 /**
  * A single msg from io thread. All requests
  * from all connections are queued into a single queue
@@ -513,6 +514,9 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			iproto_connection_close(con);
 			return;
 		}
+		/* Count statistics */
+		rmean_collect(rmean_net, RMEAN_NET_RECEIVED, nrd);
+
 		/* Update the read position and connection state. */
 		in->wpos += nrd;
 		con->parse_size += nrd;
@@ -564,6 +568,9 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 	iov[iovcnt-1].iov_len = end->iov_len - begin->iov_len * (iovcnt == 1);
 
 	ssize_t nwr = sio_writev(fd, iov, iovcnt);
+
+	/* Count statistics */
+	rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
 	if (nwr > 0) {
 		if (begin->used + nwr == end->used) {
 			if (ibuf_used(&iobuf->in) == 0) {
@@ -789,8 +796,11 @@ net_send_greeting(struct cmsg *m)
 	if (msg->close_connection) {
 		struct obuf *out = &msg->iobuf->out;
 		try {
-			sio_writev(con->output.fd, out->iov,
-				   obuf_iovcnt(out));
+			int64_t nwr = sio_writev(con->output.fd, out->iov,
+						 obuf_iovcnt(out));
+
+			/* Count statistics */
+			rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
 		} catch (Exception *e) {
 			e->log();
 		}
@@ -863,13 +873,27 @@ net_cord_f(va_list /* ap */)
 	evio_service_init(loop(), &binary, "binary",
 			  iproto_on_accept, NULL);
 
+
+	/* Init statistics counter */
+	rmean_net = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
+
+	if (rmean_net == NULL)
+		tnt_raise(OutOfMemory,
+			  sizeof(*rmean_net) +
+			  RMEAN_NET_LAST * sizeof(stats),
+			  "rmean", "struct rmean");
+
+
 	cbus_join(&net_tx_bus, &net_pipe);
+
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
 	fiber_yield();
+
+	rmean_delete(rmean_net);
 }
 
 /** Initialize the iproto subsystem and start network io thread */
@@ -889,6 +913,7 @@ iproto_init()
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
+
 
 	cbus_join(&net_tx_bus, &tx_pipe);
 }

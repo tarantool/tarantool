@@ -25,8 +25,9 @@ explain what the steps are, then on the Internet you can look at some example sc
    Here are names of tools and libraries which may have to be installed in advance,
    using ``sudo apt-get`` (for Ubuntu), ``sudo yum install`` (for CentOS), or the
    equivalent on other platforms. Different platforms may use slightly different
-   names. Do not worry about the ones marked `optional, only in Mac OS scripts`
-   unless your platform is Mac OS.
+   names. Ignore the ones marked `optional, only in Mac OS scripts`
+   unless the platform is Mac OS. Ignore the one marked `optional,
+   only for documentation` unless the intent is to use the ``-DENABLE_DOC`` option in step 5.
 
    * **gcc and g++, or clang**                # see above
    * **git**                                  # see above
@@ -34,6 +35,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    * **libreadline-dev or libreadline6-dev or readline-devel**  # for interactive mode
    * **autoconf**                             # optional, only in Mac OS scripts
    * **zlib1g** or **zlib**                   # optional, only in Mac OS scripts
+   * **doxygen**                              # optional, only for documentation
 
 2. Set up python modules for running the test suite or creating documentation.
    This step is optional. Python modules are not necessary for building Tarantool
@@ -108,6 +110,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      pip install tarantool\>0.4 --user
      # For documentation
      sudo pip install pelican
+     sudo pip install breathe
      sudo pip install -U sphinx
 
 3. Use :code:`git` to download the latest source code from the
