@@ -99,6 +99,15 @@ field_type_maxlen(enum field_type type)
 ENUM(index_type, ENUM_INDEX_TYPE);
 extern const char *index_type_strs[];
 
+enum rtree_index_distance_type {
+	 /* Euclid distance, sqrt(dx*dx + dy*dy) */
+	RTREE_INDEX_DISTANCE_TYPE_EUCLID,
+	/* Manhattan distance, fabs(dx) + fabs(dy) */
+	RTREE_INDEX_DISTANCE_TYPE_MANHATTAN,
+	rtree_index_distance_type_MAX
+};
+extern const char *rtree_index_distance_type_strs[];
+
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
 	uint32_t fieldno;
@@ -116,22 +125,23 @@ struct key_opts {
 	 * RTREE index dimension.
 	 */
 	uint32_t dimension;
+	/**
+	 * RTREE distance type.
+	 */
+	enum rtree_index_distance_type distance;
 };
 
-static inline void
-key_opts_create(struct key_opts *opts)
-{
-	opts->is_unique = true;
-	opts->dimension = 2;
-}
+extern const struct key_opts key_opts_default;
 
 static inline int
 key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
 {
 	if (o1->is_unique != o2->is_unique)
 		return o1->is_unique < o2->is_unique ? -1 : 1;
-	if (o2->dimension != o1->dimension)
-		return o1->dimension < o2-> dimension ? -1 : 1;
+	if (o1->dimension != o2->dimension)
+		return o1->dimension < o2->dimension ? -1 : 1;
+	if (o1->distance != o2->distance)
+		return o1->distance < o2->distance ? -1 : 1;
 	return 0;
 }
 

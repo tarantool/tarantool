@@ -156,6 +156,7 @@ struct errcode_record {
 	/*100 */_(ER_FUNCTION_LANGUAGE,		2, "Unsupported language '%s' specified for function '%s'") \
 	/*101 */_(ER_RTREE_RECT,		2, "RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \
 	/*102 */_(ER_PROC_C,			2, "%s") \
+	/*103 */_(ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,	2, "Unknown RTREE index distance type %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

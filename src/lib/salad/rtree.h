@@ -114,6 +114,12 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 				   const struct rtree_rect *rt2,
 				   unsigned dimension);
 
+/* Type distance comparison */
+enum rtree_distance_type {
+	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
+	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+};
+
 /* Main rtree struct */
 struct rtree
 {
@@ -144,6 +150,8 @@ struct rtree
 	struct matras mtab;
 	/* List of free pages */
 	void *free_pages;
+	/* Distance type */
+	enum rtree_distance_type distance_type;
 };
 
 /* Struct for iteration and retrieving rtree values */
@@ -227,7 +235,8 @@ rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y);
  */
 int
 rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
-	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free);
+	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free,
+	   enum rtree_distance_type distance_type);
 
 /**
  * @brief Destroy a tree

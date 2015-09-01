@@ -379,6 +379,7 @@ box.schema.index.create = function(space_id, name, options)
         id = 'number',
         if_not_exists = 'boolean',
         dimension = 'number',
+        distance = 'string',
     }
     local options_defaults = {
         type = 'tree',
@@ -417,7 +418,8 @@ box.schema.index.create = function(space_id, name, options)
     for i = 1, #options.parts, 2 do
         table.insert(parts, {options.parts[i], options.parts[i + 1]})
     end
-    local key_opts = { dimension = options.dimension, unique = options.unique }
+    local key_opts = { dimension = options.dimension,
+        unique = options.unique, distance = options.distance }
     _index:insert{space_id, iid, name, options.type, key_opts, parts}
     return box.space[space_id].index[name]
 end
@@ -460,6 +462,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         parts = 'table',
         unique = 'boolean',
         dimension = 'number',
+        distance = 'string',
     }
     check_param_table(options, options_template)
 
@@ -525,6 +528,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     if options.dimension ~= nil then
         key_opts.dimension = options.dimension
+    end
+    if options.distance ~= nil then
+        key_opts.distance = options.distance
     end
     if options.parts ~= nil then
         check_index_parts(options.parts)
