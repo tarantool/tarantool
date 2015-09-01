@@ -139,6 +139,20 @@ struct CBox {
 		}
 		return res;
 	}
+	coord_t DistanceMan(const CBox<DIMENSION> &point) const
+	{
+		coord_t res = 0;
+		for (unsigned i = 0; i < DIMENSION; i++) {
+			if (point.pairs[i].a < pairs[i].a) {
+				coord_t d = pairs[i].a - point.pairs[i].a;
+				res += d;
+			} else if (point.pairs[i].a > pairs[i].b) {
+				coord_t d = point.pairs[i].a - pairs[i].b;
+				res += d;
+			}
+		}
+		return res;
+	}
 };
 
 template<unsigned DIMENSION>
@@ -215,6 +229,8 @@ struct CBoxSet {
 	}
 	void SelectNeigh(const CBox<DIMENSION> &point,
 			 vector<CBoxSetEntry<DIMENSION> > &result) const;
+	void SelectNeighMan(const CBox<DIMENSION> &point,
+			    vector<CBoxSetEntry<DIMENSION> > &result) const;
 };
 
 template<unsigned DIMENSION>
@@ -231,8 +247,21 @@ struct CEntryByDistance {
 };
 
 template<unsigned DIMENSION>
+struct CEntryByDistanceMan {
+	const CBox<DIMENSION> &point;
+	CEntryByDistanceMan(const CBox<DIMENSION> &point_) : point(point_) {}
+	bool operator()(const CBoxSetEntry<DIMENSION> &a,
+			const CBoxSetEntry<DIMENSION> &b) const
+	{
+		coord_t da = a.box.DistanceMan(point);
+		coord_t db = b.box.DistanceMan(point);
+		return da < db ? true : da > db ? false : a.id < b.id;
+	}
+};
+
+template<unsigned DIMENSION>
 void CBoxSet<DIMENSION>::SelectNeigh(const CBox<DIMENSION> &point,
-	vector<CBoxSetEntry<DIMENSION> > &result) const
+				     vector<CBoxSetEntry<DIMENSION> > &result) const
 {
 	result.clear();
 	CEntryByDistance<DIMENSION> comp(point);
@@ -243,6 +272,8 @@ void CBoxSet<DIMENSION>::SelectNeigh(const CBox<DIMENSION> &point,
 			continue;
 		set.insert(entries[i]);
 	}
+	if (set.empty())
+		return;
 	coord_t max_d = set.rbegin()->box.Distance2(point);
 	for (; i < entries.size(); i++) {
 		if (!entries[i].used)
@@ -254,6 +285,38 @@ void CBoxSet<DIMENSION>::SelectNeigh(const CBox<DIMENSION> &point,
 			set.erase(itr);
 			set.insert(entries[i]);
 			max_d = set.rbegin()->box.Distance2(point);
+		}
+	}
+	for (auto itr : set)
+		result.push_back(itr);
+}
+
+template<unsigned DIMENSION>
+void CBoxSet<DIMENSION>::SelectNeighMan(const CBox<DIMENSION> &point,
+	vector<CBoxSetEntry<DIMENSION> > &result) const
+{
+	result.clear();
+	CEntryByDistanceMan<DIMENSION> comp(point);
+	set<CBoxSetEntry<DIMENSION>, CEntryByDistanceMan<DIMENSION> > set(comp);
+	size_t i = 0;
+	for (; i < entries.size() && set.size() < NEIGH_COUNT; i++) {
+		if (!entries[i].used)
+			continue;
+		set.insert(entries[i]);
+	}
+	if (set.empty())
+		return;
+	coord_t max_d = set.rbegin()->box.DistanceMan(point);
+	for (; i < entries.size(); i++) {
+		if (!entries[i].used)
+			continue;
+		coord_t d = entries[i].box.DistanceMan(point);
+		if (d < max_d) {
+			auto itr = set.end();
+			--itr;
+			set.erase(itr);
+			set.insert(entries[i]);
+			max_d = set.rbegin()->box.DistanceMan(point);
 		}
 	}
 	for (auto itr : set)
@@ -291,10 +354,51 @@ test_select_neigh(const CBoxSet<DIMENSION> &set, const struct rtree *tree)
 	} else {
 		for (size_t i = 0; i < res1.size(); i++)
 			if (res1[i].id != res2[i].id &&
-				res1[i].box.Distance2(box) !=
-				res2[i].box.Distance2(box))
+			    res1[i].box.Distance2(box) !=
+			    res2[i].box.Distance2(box))
 				printf("%s result differ!\n", __func__);
 	}
+	rtree_iterator_destroy(&iterator);
+
+}
+
+template<unsigned DIMENSION>
+static void
+test_select_neigh_man(const CBoxSet<DIMENSION> &set, struct rtree *tree)
+{
+	CBox<DIMENSION> box;
+	box.RandomizeBig();
+	vector<CBoxSetEntry<DIMENSION> > res1;
+	set.SelectNeighMan(box, res1);
+
+	struct rtree_rect rt;
+	box.FillRTreeRect(&rt);
+	struct rtree_iterator iterator;
+	rtree_iterator_init(&iterator);
+	vector<CBoxSetEntry<DIMENSION> > res2;
+	tree->distance_type = RTREE_MANHATTAN; /* dirty hack */
+	if (rtree_search(tree, &rt, SOP_NEIGHBOR, &iterator)) {
+		void *record;
+		while((record = rtree_iterator_next(&iterator))) {
+			CBoxSetEntry<DIMENSION> entry;
+			entry.id = ((unsigned)(uintptr_t)record) - 1;
+			entry.box = set.entries[entry.id].box;
+			res2.push_back(entry);
+			if (res2.size() == NEIGH_COUNT)
+				break;
+		}
+	}
+	if (res1.size() != res2.size()) {
+		printf("%s result size differ %d %d\n", __func__,
+		       (int)res1.size(), (int)res2.size());
+	} else {
+		for (size_t i = 0; i < res1.size(); i++)
+			if (res1[i].id != res2[i].id &&
+			    res1[i].box.DistanceMan(box) !=
+			    res2[i].box.DistanceMan(box))
+				printf("%s result differ!\n", __func__);
+	}
+	tree->distance_type = RTREE_EUCLID; /* dirty hack */
 	rtree_iterator_destroy(&iterator);
 
 }
@@ -382,7 +486,8 @@ rand_test()
 	CBoxSet<DIMENSION> set;
 
 	struct rtree tree;
-	rtree_init(&tree, DIMENSION, extent_size, extent_alloc, extent_free);
+	rtree_init(&tree, DIMENSION, extent_size, extent_alloc, extent_free,
+		   RTREE_EUCLID);
 
 	printf("\tDIMENSION: %u, page size: %u, max fill: %u\n",
 	       DIMENSION, tree.page_size, tree.page_max_fill);
@@ -412,6 +517,7 @@ rand_test()
 		}
 		assert(set.boxCount == tree.n_records);
 		test_select_neigh<DIMENSION>(set, &tree);
+		test_select_neigh_man<DIMENSION>(set, &tree);
 		test_select_in<DIMENSION>(set, &tree);
 		test_select_strict_in<DIMENSION>(set, &tree);
 	}

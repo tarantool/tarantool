@@ -3,5 +3,5 @@ dofile('conflict.lua')
 ...
 test_conflict()
 ---
-- 1
+- 2
 ...

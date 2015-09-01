@@ -29,282 +29,584 @@
  * SUCH DAMAGE.
  */
 #include "sophia_index.h"
+#include "sophia_engine.h"
 #include "say.h"
 #include "tuple.h"
+#include "tuple_update.h"
 #include "scoped_guard.h"
 #include "errinj.h"
 #include "schema.h"
 #include "space.h"
 #include "txn.h"
 #include "cfg.h"
-#include "sophia_engine.h"
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sophia.h>
 #include <stdio.h>
 #include <inttypes.h>
 
-enum sophia_op {
-	SOPHIA_SET,
-	SOPHIA_DELETE
-};
-
-static inline void
-sophia_write(void *env, void *db, void *tx, enum sophia_op op,
-             struct key_def *key_def,
-             struct tuple *tuple)
+void*
+sophia_tuple_new(void *obj, struct key_def *key_def,
+                 struct tuple_format *format,
+                 uint32_t *bsize)
 {
-	const char *key = tuple_field(tuple, key_def->parts[0].fieldno);
-	const char *keyptr = key;
-	mp_next(&keyptr);
-	size_t keysize = keyptr - key;
-	void *o = sp_object(db);
-	if (o == NULL)
-		sophia_raise(env);
-	sp_set(o, "key", key, keysize);
-	sp_set(o, "value", tuple->data, tuple->bsize);
-	int rc;
-	switch (op) {
-	case SOPHIA_DELETE:
-		rc = sp_delete(tx, o);
-		break;
-	case SOPHIA_SET:
-		rc = sp_set(tx, o);
-		break;
-	}
-	if (rc == -1)
-		sophia_raise(env);
-}
-
-static struct tuple*
-sophia_read(void *env, void *db, void *tx, const char *key, size_t keysize,
-            struct tuple_format *format)
-{
-	void *o = sp_object(db);
-	if (o == NULL)
-		sophia_raise(env);
-	sp_set(o, "key", key, keysize);
-	void *result = sp_get((tx) ? tx: db, o);
-	if (result == NULL)
-		return NULL;
-	auto scoped_guard =
-		make_scoped_guard([=] { sp_destroy(result); });
 	int valuesize = 0;
-	void *value = sp_get(result, "value", &valuesize);
-	return tuple_new(format, (char*)value, (char*)value + valuesize);
+	char *value = (char *)sp_getstring(obj, "value", &valuesize);
+	char *valueend = value + valuesize;
+
+	assert(key_def->part_count < 16);
+	struct {
+		const char *part;
+		int size;
+	} parts[16];
+
+	/* prepare keys */
+	int size = 0;
+	int i = 0;
+	while (i < key_def->part_count) {
+		char partname[32];
+		int len = snprintf(partname, sizeof(partname), "key");
+		if (i > 0)
+			 snprintf(partname + len, sizeof(partname) - len, "_%d", i);
+		parts[i].part = (const char *)sp_getstring(obj, partname, &parts[i].size);
+		assert(parts[i].part != NULL);
+		if (key_def->parts[i].type == STRING) {
+			size += mp_sizeof_str(parts[i].size);
+		} else {
+			size += mp_sizeof_uint(*(uint64_t *)parts[i].part);
+		}
+		i++;
+	}
+	int count = key_def->part_count;
+	char *p = value;
+	while (p < valueend) {
+		count++;
+		mp_next((const char **)&p);
+	}
+	size += mp_sizeof_array(count);
+	size += valuesize;
+	if (bsize) {
+		*bsize = size;
+	}
+
+	/* build tuple */
+	struct tuple *tuple;
+	char *raw = NULL;
+	if (format) {
+		tuple = tuple_alloc(format, size);
+		p = tuple->data;
+	} else {
+		raw = (char *)malloc(size);
+		if (raw == NULL)
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, size, "tuple");
+		p = raw;
+	}
+	p = mp_encode_array(p, count);
+	for (i = 0; i < key_def->part_count; i++) {
+		if (key_def->parts[i].type == STRING)
+			p = mp_encode_str(p, parts[i].part, parts[i].size);
+		else
+			p = mp_encode_uint(p, *(uint64_t *)parts[i].part);
+	}
+	memcpy(p, value, valuesize);
+	if (format) {
+		try {
+			tuple_init_field_map(format, tuple, (uint32_t *)tuple);
+		} catch (...) {
+			tuple_delete(tuple);
+			throw;
+		}
+		return tuple;
+	}
+	return raw;
 }
 
-struct sophia_format {
-	uint32_t offset;
-	uint16_t size;
-} __attribute__((packed));
+static uint64_t num_parts[16];
 
-static inline int
-sophia_compare(char *a, size_t asz __attribute__((unused)),
-               char *b, size_t bsz __attribute__((unused)),
-               void *arg)
+void*
+SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 {
-	struct key_def *key_def = (struct key_def*)arg;
-	a = a + ((struct sophia_format*)a)[0].offset;
-	b = b + ((struct sophia_format*)b)[0].offset;
-	int rc = tuple_compare_field(a, b, key_def->parts[0].type);
-	return (rc == 0) ? 0 :
-	       ((rc > 0) ? 1 : -1);
+	assert(key_def->part_count < 16);
+	void *host = db;
+	if (async) {
+		host = sp_asynchronous(db);
+	}
+	void *obj = sp_object(host);
+	if (obj == NULL)
+		sophia_error(env);
+	sp_setstring(obj, "arg", fiber(), 0);
+	if (key == NULL)
+		return obj;
+	int i = 0;
+	while (i < key_def->part_count) {
+		char partname[32];
+		int len = snprintf(partname, sizeof(partname), "key");
+		if (i > 0)
+			 snprintf(partname + len, sizeof(partname) - len, "_%d", i);
+		const char *part;
+		uint32_t partsize;
+		if (key_def->parts[i].type == STRING) {
+			part = mp_decode_str(&key, &partsize);
+		} else {
+			num_parts[i] = mp_decode_uint(&key);
+			part = (char *)&num_parts[i];
+			partsize = sizeof(uint64_t);
+		}
+		if (sp_setstring(obj, partname, part, partsize) == -1)
+			sophia_error(env);
+		i++;
+	}
+	if (keyend) {
+		*keyend = key;
+	}
+	return obj;
 }
+
+static int
+sophia_update(int, char*, int, int, char*, int, void*, void**, int*);
 
 static inline void*
 sophia_configure(struct space *space, struct key_def *key_def)
 {
 	SophiaEngine *engine =
-		(SophiaEngine*)space->handler->engine;
+		(SophiaEngine *)space->handler->engine;
 	void *env = engine->env;
-	void *c = sp_ctl(env);
-	char pointer[128];
-	char pointer_arg[128];
-	char name[128];
-	snprintf(name, sizeof(name), "%" PRIu32, key_def->space_id);
-	sp_set(c, "db", name);
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".format",
+	/* create database */
+	char path[128];
+	snprintf(path, sizeof(path), "%" PRIu32, key_def->space_id);
+	sp_setstring(env, "db", path, 0);
+	/* db.id */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".id",
 	         key_def->space_id);
-	sp_set(c, name, "document");
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.cmp",
-	         key_def->space_id);
-	snprintf(pointer, sizeof(pointer), "pointer: %p", (void*)sophia_compare);
-	snprintf(pointer_arg, sizeof(pointer_arg), "pointer: %p", (void*)key_def);
-	sp_set(c, name, pointer, pointer_arg);
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".compression", key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia.compression"));
-	snprintf(name, sizeof(name), "db.%" PRIu32, key_def->space_id);
-	void *db = sp_get(c, name);
+	sp_setint(env, path, key_def->space_id);
+	/* apply space schema */
+	int i = 0;
+	while (i < key_def->part_count)
+	{
+		char *type;
+		if (key_def->parts[i].type == NUM)
+			type = (char *)"u64";
+		else
+			type = (char *)"string";
+		char part[32];
+		if (i == 0) {
+			snprintf(part, sizeof(part), "key");
+		} else {
+			/* create key-part */
+			snprintf(path, sizeof(path), "db.%" PRIu32 ".index",
+			         key_def->space_id);
+			snprintf(part, sizeof(part), "key_%d", i);
+			sp_setstring(env, path, part, 0);
+		}
+		/* set key-part type */
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".index.%s",
+		         key_def->space_id, part);
+		sp_setstring(env, path, type, 0);
+		i++;
+	}
+	/* db.update */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.update", key_def->space_id);
+	sp_setstring(env, path, (const void *)(uintptr_t)sophia_update, 0);
+	/* db.update_arg */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.update_arg", key_def->space_id);
+	sp_setstring(env, path, (const void *)key_def, 0);
+	/* db.compression */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
+	sp_setint(env, path, cfg_geti("sophia.compression"));
+	/* db.compression_key */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
+	sp_setint(env, path, cfg_geti("sophia.compression_key"));
+	/* db.path_fail_on_drop */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".path_fail_on_drop", key_def->space_id);
+	sp_setint(env, path, 0);
+	/* db */
+	snprintf(path, sizeof(path), "db.%" PRIu32, key_def->space_id);
+	void *db = sp_getobject(env, path);
 	if (db == NULL)
-		sophia_raise(env);
+		sophia_error(env);
 	return db;
 }
 
-SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
+SophiaIndex::SophiaIndex(struct key_def *key_def_arg)
 	: Index(key_def_arg)
 {
 	struct space *space = space_cache_find(key_def->space_id);
 	SophiaEngine *engine =
-		(SophiaEngine*)space->handler->engine;
+		(SophiaEngine *)space->handler->engine;
 	env = engine->env;
 	db = sophia_configure(space, key_def);
 	if (db == NULL)
-		sophia_raise(env);
+		sophia_error(env);
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	int rc = sp_open(db);
 	if (rc == -1)
-		sophia_raise(env);
-	tuple_format_ref(space->format, 1);
+		sophia_error(env);
+	format = space->format;
+	tuple_format_ref(format, 1);
 }
 
 SophiaIndex::~SophiaIndex()
 {
-	if (m_position != NULL) {
-		m_position->free(m_position);
-		m_position = NULL;
-	}
-	if (db) {
-		int rc = sp_destroy(db);
-		if (rc == 0)
-			return;
-		void *c = sp_ctl(env);
-		void *o = sp_get(c, "sophia.error");
-		char *error = (char *)sp_get(o, "value", NULL);
-		say_info("sophia space %d close error: %s",
-		         key_def->space_id, error);
-		sp_destroy(o);
-	}
+	if (db == NULL)
+		return;
+	int rc = sp_destroy(db);
+	if (rc == 0)
+		return;
+	char *error = (char *)sp_getstring(env, "sophia.error", 0);
+	say_info("sophia space %d close error: %s",
+			 key_def->space_id, error);
+	free(error);
 }
 
 size_t
 SophiaIndex::size() const
 {
-	void *c = sp_ctl(env);
 	char name[128];
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.count",
 	         key_def->space_id);
-	void *o = sp_get(c, name);
-	if (o == NULL)
-		sophia_raise(env);
-	uint64_t count = atoi((const char *)sp_get(o, "value", NULL));
-	sp_destroy(o);
-	return count;
+	return sp_getint(env, name);
 }
 
 size_t
 SophiaIndex::bsize() const
 {
-	void *c = sp_ctl(env);
 	char name[128];
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.memory_used",
 	         key_def->space_id);
-	void *o = sp_get(c, name);
-	if (o == NULL)
-		sophia_raise(env);
-	uint64_t used = atoi((const char *)sp_get(o, "value", NULL));
-	sp_destroy(o);
-	return used;
+	return sp_getint(env, name);
 }
 
 struct tuple *
-SophiaIndex::findByKey(const char *key, uint32_t part_count) const
+SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 {
-	(void) part_count;
-	assert(part_count == 1);
-	assert(key_def->opts.is_unique && part_count == key_def->part_count);
-	const char *keyptr = key;
-	mp_next(&keyptr);
-	size_t keysize = keyptr - key;
-	struct space *space = space_cache_find(key_def->space_id);
-	void *tx = in_txn() ? in_txn()->engine_tx : NULL;
-	return sophia_read(env, db, tx, key, keysize, space->format);
-}
-
-struct tuple *
-SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-                     enum dup_replace_mode mode)
-{
-	struct space *space = space_cache_find(key_def->space_id);
-	struct txn *txn = in_txn();
-	assert(txn != NULL && txn->engine_tx != NULL);
-	void *tx = txn->engine_tx;
-
-	/* This method does not return old tuple for replace,
-	 * insert or update.
-	 *
-	 * Delete does return old tuple to be properly
-	 * scheduled for wal write.
-	 */
-
-	/* Switch from INSERT to REPLACE during recovery.
-	 *
-	 * Database might hold newer key version than currenly
-	 * recovered log record.
-	 */
-	if (mode == DUP_INSERT) {
-		SophiaEngine *engine = (SophiaEngine*)space->handler->engine;
-		if (! engine->recovery_complete)
-			mode = DUP_REPLACE_OR_INSERT;
-	}
-
-	/* delete */
-	if (old_tuple && new_tuple == NULL) {
-		sophia_write(env, db, tx, SOPHIA_DELETE, key_def, old_tuple);
-		return old_tuple;
-	}
-
-	/* update */
-	if (old_tuple && new_tuple) {
-		/* assume no primary key update is supported */
-		sophia_write(env, db, tx, SOPHIA_SET, key_def, new_tuple);
+	(void)part_count;
+	void *obj = ((SophiaIndex *)this)->createObject(key, true, NULL);
+	void *transaction = db;
+	if (in_txn())
+		transaction = in_txn()->engine_tx;
+	obj = sp_get(transaction, obj);
+	if (obj == NULL)
 		return NULL;
-	}
-
-	/* insert or replace */
-	switch (mode) {
-	case DUP_INSERT: {
-		const char *key = tuple_field(new_tuple, key_def->parts[0].fieldno);
-		const char *keyptr = key;
-		mp_next(&keyptr);
-		size_t keysize = keyptr - key;
-		struct tuple *dup_tuple =
-			sophia_read(env, db, tx, key, keysize, space->format);
-		if (dup_tuple) {
-			int error = tuple_compare(dup_tuple, new_tuple, key_def) == 0;
-			tuple_delete(dup_tuple);
-			if (error) {
-				struct space *sp =
-					space_cache_find(key_def->space_id);
-				tnt_raise(ClientError, ER_TUPLE_FOUND,
-					  index_name(this), space_name(sp));
-			}
+	int rc = sp_getint(obj, "status");
+	if (rc == 0) {
+		sp_destroy(obj);
+		fiber_yield();
+		obj = fiber_get_key(fiber(), FIBER_RESULT);
+		if (obj == NULL)
+			return NULL;
+		rc = sp_getint(obj, "status");
+		if (rc <= 0 || rc == 2) {
+			sp_destroy(obj);
+			return NULL;
 		}
 	}
-	case DUP_REPLACE_OR_INSERT:
-		sophia_write(env, db, tx, SOPHIA_SET, key_def, new_tuple);
-		break;
-	case DUP_REPLACE:
-	default:
-		assert(0);
-		break;
-	}
+	struct tuple *tuple =
+		(struct tuple *)sophia_tuple_new(obj, key_def, format, NULL);
+	sp_destroy(obj);
+	return tuple;
+}
+
+struct tuple *
+SophiaIndex::replace(struct tuple*, struct tuple*, enum dup_replace_mode)
+{
+	/* This method is unused by sophia index.
+	 *
+	 * see ::replace_or_insert() */
+	assert(0);
 	return NULL;
+}
+
+static void *
+sophia_update_alloc(void *, size_t size)
+{
+	return malloc(size);
+}
+
+struct sophiaref {
+	uint32_t offset;
+	uint16_t size;
+} __attribute__((packed));
+
+static inline char*
+sophia_upsert_to_tarantool(struct key_def *key_def, char *origin, int origin_size,
+                           uint32_t *origin_keysize,
+                           uint32_t *size)
+{
+	struct sophiaref *ref = (struct sophiaref *)origin;
+	uint32_t src_keysize_mp = 0;
+	*origin_keysize = 0;
+
+	/* calculate src msgpack size */
+	int i = 0;
+	while (i < key_def->part_count) {
+		char *ptr;
+		if (key_def->parts[i].type == STRING) {
+			src_keysize_mp += mp_sizeof_str(ref[i].size);
+		} else {
+			ptr = origin + ref[i].offset;
+			src_keysize_mp += mp_sizeof_uint(*(uint64_t *)ptr);
+		}
+		*origin_keysize += sizeof(struct sophiaref) + ref[i].size;
+		i++;
+	}
+
+	/* convert src to msgpack */
+	int valueoffset =
+		ref[key_def->part_count-1].offset +
+		ref[key_def->part_count-1].size;
+	int valuesize = origin_size - valueoffset;
+
+	int count = key_def->part_count;
+	const char *p = origin + valueoffset;
+	while (p < (origin + origin_size)) {
+		count++;
+		mp_next((const char **)&p);
+	}
+
+	int src_size = mp_sizeof_array(count) +
+		src_keysize_mp + valuesize;
+	char *src = (char *)malloc(src_size);
+	char *src_ptr = src;
+	if (src == NULL)
+		return NULL;
+
+	src_ptr = mp_encode_array(src_ptr, count);
+	i = 0;
+	while (i < key_def->part_count) {
+		char *ptr = origin + ref[i].offset;
+		if (key_def->parts[i].type == STRING) {
+			src_ptr = mp_encode_str(src_ptr, ptr, ref[i].size);
+		} else {
+			src_ptr = mp_encode_uint(src_ptr, *(uint64_t *)ptr);
+		}
+		i++;
+	}
+	memcpy(src_ptr, origin + valueoffset, valuesize);
+	src_ptr += valuesize;
+	assert((src_ptr - src) == src_size);
+
+	*size = src_size;
+	return src;
+}
+
+static inline char*
+sophia_upsert_to_sophia(struct key_def *key_def, char *dest, int dest_size,
+                        char *key, int key_size,
+                        int *size)
+{
+	const char *p = dest;
+	int i = 0;
+	mp_decode_array(&p);
+	while (i < key_def->part_count) {
+		mp_next(&p);
+		i++;
+	}
+	const char *dest_value = p;
+	uint32_t dest_value_size = dest_size - (p - dest);
+	*size = key_size + dest_value_size;
+	char *cnv = (char *)malloc(*size);
+	if (cnv == NULL)
+		return NULL;
+	p = cnv;
+	memcpy((void *)p, (void *)key, key_size);
+	p += key_size;
+	memcpy((void *)p, (void *)dest_value, dest_value_size);
+	p += dest_value_size;
+	assert((p - cnv) == *size);
+	return cnv;
+}
+
+static inline char*
+sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
+                      uint32_t *origin_keysize,
+                      uint32_t *size)
+{
+	/* calculate keysize */
+	struct sophiaref *ref = (struct sophiaref *)update;
+	*origin_keysize = 0;
+	int i = 0;
+	while (i < key_def->part_count) {
+		*origin_keysize += sizeof(struct sophiaref) + ref[i].size;
+		i++;
+	}
+	/* upsert using default tuple */
+	char *p = update + *origin_keysize;
+	uint32_t default_tuple_size = *(uint32_t *)p;
+	p += sizeof(uint32_t);
+	char *default_tuple = p;
+	char *default_tuple_end = p + default_tuple_size;
+	p += default_tuple_size;
+	char *expr = p;
+	char *expr_end = update + update_size;
+	const char *up;
+	try {
+		up = tuple_upsert_execute(sophia_update_alloc, NULL,
+		                          expr,
+		                          expr_end,
+		                          default_tuple,
+		                          default_tuple_end,
+		                          size, 1);
+	} catch (...) {
+		return NULL;
+	}
+	return (char *)up;
+}
+
+static inline char*
+sophia_upsert(char *src, int src_size, char *update, int update_size,
+              uint32_t origin_keysize,
+              uint32_t *size)
+{
+	char *p = update + origin_keysize;
+	uint32_t default_tuple_size = *(uint32_t *)p;
+	p += sizeof(uint32_t);
+	char *default_tuple = p;
+	char *default_tuple_end = p + default_tuple_size;
+	(void)default_tuple;
+	(void)default_tuple_end;
+	p += default_tuple_size;
+	char *expr = p;
+	char *expr_end = update + update_size;
+	const char *up;
+	try {
+		up = tuple_upsert_execute(sophia_update_alloc, NULL,
+		                          expr,
+		                          expr_end,
+		                          src,
+		                          src + src_size,
+		                          size, 1);
+	} catch (...) {
+		return NULL;
+	}
+	return (char *)up;
+}
+
+static int
+sophia_update(int origin_flags, char *origin, int origin_size,
+              int update_flags, char *update, int update_size,
+              void *arg,
+              void **result, int *size)
+{
+	(void)origin_flags;
+	(void)update_flags;
+	struct key_def *key_def = (struct key_def *)arg;
+	uint32_t origin_keysize;
+	uint32_t src_size;
+	char *src;
+	uint32_t dest_size;
+	char *dest;
+	if (origin) {
+		/* convert origin object to msgpack */
+		src = sophia_upsert_to_tarantool(key_def, origin, origin_size,
+		                                 &origin_keysize,
+		                                 &src_size);
+		if (src == NULL)
+			return -1;
+		/* execute upsert */
+		dest = sophia_upsert(src, src_size, update, update_size,
+		                     origin_keysize, &dest_size);
+		free(src);
+	} else {
+		/* use default tuple from update */
+		dest = sophia_upsert_default(key_def, update, update_size,
+		                             &origin_keysize, &dest_size);
+		origin = update;
+	}
+	if (dest == NULL)
+		return -1;
+
+	/* convert msgpack to sophia format */
+	*result = sophia_upsert_to_sophia(key_def, dest, dest_size, origin,
+	                                  origin_keysize, size);
+	free(dest);
+	return (*result == NULL) ? -1 : 0;
+}
+
+void
+SophiaIndex::upsert(const char *key,
+                    const char *expr,
+                    const char *expr_end,
+                    const char *tuple,
+                    const char *tuple_end)
+{
+	uint32_t tuple_size = tuple_end - tuple;
+	uint32_t expr_size = expr_end - expr;
+	uint32_t valuesize =
+		sizeof(uint32_t) + tuple_size + expr_size;
+	char *value = (char *)malloc(valuesize);
+	if (value == NULL) {
+	}
+	char *p = value;
+	memcpy(p, &tuple_size, sizeof(uint32_t));
+	p += sizeof(uint32_t);
+	memcpy(p, tuple, tuple_size);
+	p += tuple_size;
+	memcpy(p, expr, expr_size);
+	void *transaction = in_txn()->engine_tx;
+	void *obj = createObject(key, false, NULL);
+	sp_setstring(obj, "value", value, valuesize);
+	int rc = sp_update(transaction, obj);
+	free(value);
+	if (rc == -1)
+		sophia_error(env);
+}
+
+void
+SophiaIndex::replace_or_insert(const char *tuple,
+                               const char *tuple_end,
+                               enum dup_replace_mode mode)
+{
+	uint32_t size = tuple_end - tuple;
+	const char *key = tuple_field_raw(tuple, size, key_def->parts[0].fieldno);
+	/* insert: ensure key does not exists */
+	if (mode == DUP_INSERT) {
+		struct tuple *found = findByKey(key);
+		if (found) {
+			tuple_delete(found);
+			struct space *sp = space_cache_find(key_def->space_id);
+			tnt_raise(ClientError, ER_TUPLE_FOUND,
+			          index_name(this), space_name(sp));
+		}
+	}
+
+	/* replace */
+	void *transaction = in_txn()->engine_tx;
+	const char *value;
+	size_t valuesize;
+	void *obj = createObject(key, false, &value);
+	valuesize = size - (value - tuple);
+	if (valuesize > 0)
+		sp_setstring(obj, "value", value, valuesize);
+	int rc;
+	rc = sp_set(transaction, obj);
+	if (rc == -1)
+		sophia_error(env);
+}
+
+void
+SophiaIndex::remove(const char *key)
+{
+	void *obj = createObject(key, false, NULL);
+	void *transaction = in_txn()->engine_tx;
+	int rc = sp_delete(transaction, obj);
+	if (rc == -1)
+		sophia_error(env);
 }
 
 struct sophia_iterator {
 	struct iterator base;
 	const char *key;
-	int keysize;
-	uint32_t part_count;
+	const char *keyend;
 	struct space *space;
+	struct key_def *key_def;
+	int open;
 	void *env;
 	void *db;
 	void *cursor;
-	void *tx;
+	void *current;
 };
 
 void
@@ -312,20 +614,15 @@ sophia_iterator_free(struct iterator *ptr)
 {
 	assert(ptr->free == sophia_iterator_free);
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
-	if (it->cursor)
-		sp_destroy(it->cursor);
-	free(ptr);
-}
-
-void
-sophia_iterator_close(struct iterator *ptr)
-{
-	assert(ptr->free == sophia_iterator_free);
-	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
+	if (it->current) {
+		sp_destroy(it->current);
+		it->current = NULL;
+	}
 	if (it->cursor) {
 		sp_destroy(it->cursor);
 		it->cursor = NULL;
 	}
+	free(ptr);
 }
 
 struct tuple *
@@ -334,12 +631,34 @@ sophia_iterator_next(struct iterator *ptr)
 	assert(ptr->next == sophia_iterator_next);
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor != NULL);
-	void *o = sp_get(it->cursor);
-	if (o == NULL)
+	if (it->open) {
+		it->open = 0;
+		if (it->current) {
+			return (struct tuple *)
+				sophia_tuple_new(it->current, it->key_def,
+				                 it->space->format,
+				                 NULL);
+		} else {
+			return NULL;
+		}
+	}
+	void *obj = sp_get(it->cursor, it->current);
+	it->current = NULL;
+	if (obj == NULL)
 		return NULL;
-	int valuesize = 0;
-	const char *value = (const char*)sp_get(o, "value", &valuesize);
-	return tuple_new(it->space->format, value, value + valuesize);
+	sp_destroy(obj);
+	fiber_yield();
+	obj = fiber_get_key(fiber(), FIBER_RESULT);
+	if (obj == NULL)
+		return NULL;
+	int rc = sp_getint(obj, "status");
+	if (rc <= 0) {
+		sp_destroy(obj);
+		return NULL;
+	}
+	it->current = obj;
+	return (struct tuple *)
+		sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
 }
 
 struct tuple *
@@ -354,8 +673,8 @@ sophia_iterator_eq(struct iterator *ptr)
 	ptr->next = sophia_iterator_last;
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	return sophia_read(it->env, it->db, it->tx, it->key, it->keysize,
-	                   it->space->format);
+	SophiaIndex *index = (SophiaIndex *)index_find(it->space, 0);
+	return index->findByKey(it->key);
 }
 
 struct iterator *
@@ -368,9 +687,8 @@ SophiaIndex::allocIterator() const
 		          sizeof(struct sophia_iterator), "SophiaIndex",
 		          "iterator");
 	}
-	it->base.next  = sophia_iterator_next;
-	it->base.close = sophia_iterator_close;
-	it->base.free  = sophia_iterator_free;
+	it->base.next = sophia_iterator_next;
+	it->base.free = sophia_iterator_free;
 	it->cursor = NULL;
 	return (struct iterator *) it;
 }
@@ -382,27 +700,20 @@ SophiaIndex::initIterator(struct iterator *ptr,
 {
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	size_t keysize;
-	if (part_count > 0) {
-		const char *keyptr = key;
-		mp_next(&keyptr);
-		keysize = keyptr - key;
-	} else {
-		keysize = 0;
+	if (part_count == 0) {
 		key = NULL;
 	}
 	it->key = key;
-	it->keysize = keysize;
-	it->part_count = part_count;
+	it->key_def = key_def;
 	it->env = env;
 	it->db = db;
 	it->space = space_cache_find(key_def->space_id);
-	it->tx = NULL;
+	it->current = NULL;
+	it->open = 1;
 	const char *compare;
 	switch (type) {
 	case ITER_EQ:
 		it->base.next = sophia_iterator_eq;
-		it->tx = in_txn() ? in_txn()->engine_tx : NULL;
 		return;
 	case ITER_ALL:
 	case ITER_GE: compare = ">=";
@@ -418,13 +729,31 @@ SophiaIndex::initIterator(struct iterator *ptr,
 		          "SophiaIndex", "requested iterator type");
 	}
 	it->base.next = sophia_iterator_next;
-	void *o = sp_object(db);
-	if (o == NULL)
-		sophia_raise(env);
-	sp_set(o, "order", compare);
-	if (key)
-		sp_set(o, "key", key, keysize);
-	it->cursor = sp_cursor(db, o);
+	it->cursor = sp_cursor(env);
 	if (it->cursor == NULL)
-		sophia_raise(env);
+		sophia_error(env);
+	void *obj = ((SophiaIndex *)this)->createObject(key, true, &it->keyend);
+	sp_setstring(obj, "order", compare, 0);
+	/* position first key here, since key pointer might be
+	 * unavailable from lua */
+	obj = sp_get(it->cursor, obj);
+	if (obj == NULL) {
+		sp_destroy(it->cursor);
+		it->cursor = NULL;
+		return;
+	}
+	sp_destroy(obj);
+	fiber_yield();
+	obj = fiber_get_key(fiber(), FIBER_RESULT);
+	if (obj == NULL) {
+		it->current = NULL;
+		return;
+	}
+	int rc = sp_getint(obj, "status");
+	if (rc <= 0) {
+		it->current = NULL;
+		sp_destroy(obj);
+		return;
+	}
+	it->current = obj;
 }

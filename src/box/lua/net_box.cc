@@ -29,16 +29,15 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/net_box.h"
-#include "lua/msgpack.h"
+#include "net_box.h"
 
 #include <lib/small/ibuf.h>
 #include "scramble.h"
 
-/* TODO: net.box depends on src/box/ */
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 
+#include "lua/msgpack.h"
 #include <msgpuck/msgpuck.h> /* mp_store_u32() */
 #include "third_party/base64.h"
 
@@ -358,6 +357,51 @@ netbox_encode_update(lua_State *L)
 	return 0;
 }
 
+static int
+netbox_encode_upsert(lua_State *L)
+{
+	if (lua_gettop(L) < 7)
+		return luaL_error(L, "Usage: netbox.encode_update(ibuf, sync, "
+			"space_id, index_id, key, ops, tuple)");
+
+	struct mpstream stream;
+	size_t svp = netbox_prepare_request(L, &stream, IPROTO_UPSERT);
+
+	luamp_encode_map(cfg, &stream, 6);
+
+	/* encode space_id */
+	uint32_t space_id = lua_tointeger(L, 3);
+	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
+	luamp_encode_uint(cfg, &stream, space_id);
+
+	/* encode index_id */
+	uint32_t index_id = lua_tointeger(L, 4);
+	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_ID);
+	luamp_encode_uint(cfg, &stream, index_id);
+
+	/* encode index_id */
+	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_BASE);
+	luamp_encode_uint(cfg, &stream, 1);
+
+	/* encode in reverse order for speedup - see luamp_encode() code */
+	/* encode tuple */
+	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
+	luamp_encode_tuple(L, cfg, &stream, 7);
+	lua_pop(L, 1); /* tuple */
+
+	/* encode ops */
+	luamp_encode_uint(cfg, &stream, IPROTO_OPS);
+	luamp_encode_tuple(L, cfg, &stream, 6);
+	lua_pop(L, 1); /* ops */
+
+	/* encode key */
+	luamp_encode_uint(cfg, &stream, IPROTO_KEY);
+	luamp_convert_key(L, cfg, &stream, 5);
+
+	netbox_encode_request(&stream, svp);
+	return 0;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -370,6 +414,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_replace", netbox_encode_replace },
 		{ "encode_delete",  netbox_encode_delete },
 		{ "encode_update",  netbox_encode_update },
+		{ "encode_upsert",  netbox_encode_upsert },
 		{ "encode_auth",    netbox_encode_auth },
 		{ NULL, NULL}
 	};

@@ -28,19 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "engine.h"
 #include "txn.h"
-#include "box.h"
+#include "engine.h"
+#include "box.h" /* global recovery */
 #include "tuple.h"
-#include "space.h"
-#include "main.h"
-#include "cluster.h"
 #include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
-#include "session.h"
-#include "port.h"
-#include "iproto_constants.h"
 
 double too_long_threshold;
 
@@ -63,23 +57,6 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	row->type = request->type;
 	row->bodycnt = request_encode(request, row->body);
 	stmt->row = row;
-}
-
-void
-txn_replace(struct txn *txn, struct space *space,
-	    struct tuple *old_tuple, struct tuple *new_tuple,
-	    enum dup_replace_mode mode)
-{
-	assert(old_tuple || new_tuple);
-
-	space->handler->replace(txn, space, old_tuple, new_tuple, mode);
-
-	/*
-	 * Run on_replace triggers. For now, disallow mutation
-	 * of tuples in the trigger.
-	 */
-	if (! rlist_empty(&space->on_replace) && space->run_triggers)
-		trigger_run(&space->on_replace, txn);
 }
 
 /** Initialize a new stmt object within txn. */

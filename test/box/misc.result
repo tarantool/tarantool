@@ -60,6 +60,7 @@ t
   - session
   - slab
   - snapshot
+  - sophia
   - space
   - stat
   - tuple
@@ -145,6 +146,7 @@ t;
   - REPLACE
   - UPSERT
   - AUTH
+  - ERROR
   - UPDATE
   - total
   - rps
@@ -248,6 +250,7 @@ t;
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.SOPHIA : 60'
   - 'box.error.NO_SUCH_INDEX : 35'
+  - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
   - 'box.error.TUPLE_IS_TOO_LONG : 27'
   - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'

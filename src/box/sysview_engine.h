@@ -37,17 +37,7 @@ public:
 	SysviewEngine();
 	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
-	virtual void dropIndex(Index *index);
-	virtual void keydefCheck(struct space *space, struct key_def *key_def);
-	virtual void beginJoin();
-	virtual void recoverToCheckpoint(int64_t lsn);
-	virtual void endRecovery();
 	virtual bool needToBuildSecondaryKey(struct space *space);
-	virtual void join(Relay*);
-	virtual int beginCheckpoint(int64_t);
-	virtual int waitCheckpoint();
-	virtual void commitCheckpoint();
-	virtual void abortCheckpoint();
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

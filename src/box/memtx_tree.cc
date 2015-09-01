@@ -184,7 +184,7 @@ tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 /* {{{ MemtxTree  **********************************************************/
 
 MemtxTree::MemtxTree(struct key_def *key_def_arg)
-	: Index(key_def_arg), build_array(0), build_array_size(0),
+	: MemtxIndex(key_def_arg), build_array(0), build_array_size(0),
 	  build_array_alloc_size(0)
 {
 	memtx_index_arena_init();

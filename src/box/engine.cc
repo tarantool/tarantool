@@ -28,14 +28,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "tuple.h"
+#include "txn.h"
+#include "port.h"
+#include "request.h"
 #include "engine.h"
 #include "space.h"
 #include "exception.h"
 #include "schema.h"
 #include "salad/rlist.h"
+#include "scoped_guard.h"
 #include <stdlib.h>
 #include <string.h>
 #include <latch.h>
+#include <errinj.h>
 
 RLIST_HEAD(engines);
 
@@ -85,9 +91,134 @@ bool Engine::needToBuildSecondaryKey(struct space * /* space */)
 	return true;
 }
 
+void
+Engine::beginJoin()
+{
+}
+
+int
+Engine::beginCheckpoint(int64_t lsn)
+{
+	(void) lsn;
+	return 0;
+}
+
+int
+Engine::waitCheckpoint()
+{
+	return 0;
+}
+
+void
+Engine::commitCheckpoint()
+{
+}
+
+void
+Engine::abortCheckpoint()
+{
+}
+
+void
+Engine::endRecovery()
+{
+}
+
+void
+Engine::recoverToCheckpoint(int64_t /* lsn */)
+{
+}
+
+void
+Engine::join(Relay *relay)
+{
+	(void) relay;
+}
+
+void
+Engine::dropIndex(Index *index)
+{
+	(void) index;
+}
+
+void
+Engine::keydefCheck(struct space *space, struct key_def *key_def)
+{
+	(void) space;
+	(void) key_def;
+	/*
+	 * Don't bother checking key_def to match the view requirements.
+	 * Index::initIterator() must check key on each call.
+	 */
+}
+
 Handler::Handler(Engine *f)
 	:engine(f)
 {
+}
+
+struct tuple *
+Handler::executeReplace(struct txn *, struct space *,
+                        struct request *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace");
+}
+
+struct tuple *
+Handler::executeDelete(struct txn*, struct space *, struct request *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete");
+}
+
+struct tuple *
+Handler::executeUpdate(struct txn*, struct space *, struct request *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update");
+}
+
+void
+Handler::executeUpsert(struct txn *, struct space *, struct request *)
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
+}
+
+void
+Handler::onAlter(Handler *)
+{
+}
+
+void
+Handler::executeSelect(struct txn *, struct space *space,
+		       uint32_t index_id, uint32_t iterator,
+		       uint32_t offset, uint32_t limit,
+		       const char *key, const char * /* key_end */,
+		       struct port *port)
+{
+	Index *index = index_find(space, index_id);
+
+	uint32_t found = 0;
+	if (iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) iterator;
+
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	key_validate(index->key_def, type, key, part_count);
+
+	struct iterator *it = index->allocIterator();
+	IteratorGuard guard(it);
+	index->initIterator(it, type, key, part_count);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it)) != NULL) {
+		TupleGuard tuple_gc(tuple);
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		if (limit == found++)
+			break;
+		port_add_tuple(port, tuple);
+	}
 }
 
 /** Register engine instance. */

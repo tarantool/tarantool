@@ -289,7 +289,7 @@ end
 
 -- space format - the metadata about space fields
 function box.schema.space.format(id, format)
-    _space = box.space._space
+    local _space = box.space._space
     check_param(id, 'id', 'number')
     check_param(format, 'format', 'table')
     if format == nil then
@@ -379,6 +379,7 @@ box.schema.index.create = function(space_id, name, options)
         id = 'number',
         if_not_exists = 'boolean',
         dimension = 'number',
+        distance = 'string',
     }
     local options_defaults = {
         type = 'tree',
@@ -417,7 +418,8 @@ box.schema.index.create = function(space_id, name, options)
     for i = 1, #options.parts, 2 do
         table.insert(parts, {options.parts[i], options.parts[i + 1]})
     end
-    local key_opts = { dimension = options.dimension, unique = options.unique }
+    local key_opts = { dimension = options.dimension,
+        unique = options.unique, distance = options.distance }
     _index:insert{space_id, iid, name, options.type, key_opts, parts}
     return box.space[space_id].index[name]
 end
@@ -443,6 +445,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
+	if box.space[space_id].engine == 'sophia' then
+		box.error(box.error.SOPHIA, 'alter is not supported for a Sophia index')
+	end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
     end
@@ -457,6 +462,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         parts = 'table',
         unique = 'boolean',
         dimension = 'number',
+        distance = 'string',
     }
     check_param_table(options, options_template)
 
@@ -522,6 +528,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     if options.dimension ~= nil then
         key_opts.dimension = options.dimension
+    end
+    if options.distance ~= nil then
+        key_opts.distance = options.distance
     end
     if options.parts ~= nil then
         check_index_parts(options.parts)

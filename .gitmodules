@@ -10,7 +10,7 @@
 [submodule "sophia"]
        path = third_party/sophia
        url = https://github.com/tarantool/sophia.git
-       branch = dev
+       branch = current
 [submodule "test-run"]
 	path = test-run
 	url = https://github.com/tarantool/test-run.git

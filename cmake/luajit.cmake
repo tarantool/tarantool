@@ -170,6 +170,7 @@ macro(luajit_build)
         CFLAGS=""
         CXXFLAGS=""
         XCFLAGS="${luajit_xcflags}"
+        CC="${luajit_host_cc}"
         HOST_CC="${luajit_host_cc}"
         TARGET_CC="${luajit_target_cc}"
         CCOPT="${luajit_copt}")

@@ -30,12 +30,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "index.h"
+#include "memtx_index.h"
 
 #include <salad/rtree.h>
 
-class MemtxRTree: public Index
+class MemtxRTree: public MemtxIndex
 {
 public:
 	MemtxRTree(struct key_def *key_def);

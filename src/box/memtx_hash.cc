@@ -211,7 +211,7 @@ hash_iterator_eq(struct iterator *it)
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 MemtxHash::MemtxHash(struct key_def *key_def)
-	: Index(key_def)
+	: MemtxIndex(key_def)
 {
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));

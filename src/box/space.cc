@@ -141,13 +141,26 @@ space_size(struct space *space)
 	return space_index(space, 0)->size();
 }
 
+static inline void
+space_validate_field_count(struct space *sp, uint32_t field_count)
+{
+	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
+		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
+		          field_count, space_name(sp), sp->def.field_count);
+}
+
+void
+space_validate_tuple_raw(struct space *sp, const char *data)
+{
+	uint32_t field_count = mp_decode_array(&data);
+	space_validate_field_count(sp, field_count);
+}
+
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	uint32_t field_count = tuple_field_count(new_tuple);
-	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
-		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
-			  field_count, space_name(sp), sp->def.field_count);
+	space_validate_field_count(sp, field_count);
 }
 
 void
@@ -195,6 +208,17 @@ space_stat(struct space *sp)
 	return &space_stat;
 }
 
+/**
+ * We do not allow changes of the primary key during
+ * update.
+ * The syntax of update operation allows the user to primary
+ * key of a tuple, which is prohibited, to avoid funny
+ * effects during replication. Some engines can
+ * track down this situation and abort the operation;
+ * such engines (memtx) don't use this function.
+ * Other engines can't do it, so they ask the server to
+ * verify that the primary key of the tuple has not changed.
+ */
 void
 space_check_update(struct space *space,
 		   struct tuple *old_tuple,

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_STAT_H_INCLUDED
-#define TARANTOOL_STAT_H_INCLUDED
+#ifndef TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,20 +30,51 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "index.h"
 
-#include <stddef.h>
-#include <stdint.h>
+class MemtxIndex: public Index {
+public:
+	MemtxIndex(struct key_def *key_def)
+		:Index(key_def), m_position(NULL)
+	{ }
+	virtual ~MemtxIndex() {
+		if (m_position != NULL)
+			m_position->free(m_position);
+	}
+	virtual struct tuple *min(const char *key, uint32_t part_count) const;
+	virtual struct tuple *max(const char *key, uint32_t part_count) const;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const;
 
-void stat_init(void);
-void stat_free(void);
-void stat_cleanup(int base, size_t max_idx);
-int stat_register(const char **name, size_t count);
-extern int stat_max_name_len;
+	inline struct iterator *position() const
+	{
+		if (m_position == NULL)
+			m_position = allocIterator();
+		return m_position;
+	}
 
-void stat_collect(int base, int name, int64_t value);
+	/**
+	 * Two-phase index creation: begin building, add tuples, finish.
+	 */
+	virtual void beginBuild();
+	/**
+	 * Optional hint, given to the index, about
+	 * the total size of the index. If given,
+	 * is given after beginBuild().
+	 */
+	virtual void reserve(uint32_t /* size_hint */);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
+protected:
+	/*
+	 * Pre-allocated iterator to speed up the main case of
+	 * box_process(). Should not be used elsewhere.
+	 */
+	mutable struct iterator *m_position;
+};
 
-typedef int (*stat_cb)(const char *name, int rps, int64_t total, void *cb_ctx);
+/** Build this index based on the contents of another index. */
+void
+index_build(MemtxIndex *index, MemtxIndex *pk);
 
-int stat_foreach(stat_cb cb, void *cb_ctx);
-
-#endif /* TARANTOOL_STAT_H_INCLUDED */
+#endif /* TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED */

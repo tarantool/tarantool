@@ -32,7 +32,10 @@
 #include "stat.h"
 
 #include <string.h>
-#include <stat.h>
+#include <rmean.h>
+#include <box/request.h>
+#include <cbus.h>
+#include <box/error.h>
 
 extern "C" {
 #include <lua.h>
@@ -90,14 +93,33 @@ static int
 lbox_stat_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
-	return stat_foreach(seek_stat_item, L);
+	int res = rmean_foreach(rmean_box, seek_stat_item, L);
+	if (res)
+		return res;
+	return rmean_foreach(rmean_error, seek_stat_item, L);
 }
 
 static int
 lbox_stat_call(struct lua_State *L)
 {
 	lua_newtable(L);
-	stat_foreach(set_stat_item, L);
+	rmean_foreach(rmean_box, set_stat_item, L);
+	rmean_foreach(rmean_error, set_stat_item, L);
+	return 1;
+}
+
+static int
+lbox_stat_net_index(struct lua_State *L)
+{
+	luaL_checkstring(L, -1);
+	return rmean_foreach(rmean_net, seek_stat_item, L);
+}
+
+static int
+lbox_stat_net_call(struct lua_State *L)
+{
+	lua_newtable(L);
+	rmean_foreach(rmean_net, set_stat_item, L);
 	return 1;
 }
 
@@ -107,7 +129,13 @@ static const struct luaL_reg lbox_stat_meta [] = {
 	{NULL, NULL}
 };
 
-/** Initialize bos.stat package. */
+static const struct luaL_reg lbox_stat_net_meta [] = {
+	{"__index", lbox_stat_net_index},
+	{"__call",  lbox_stat_net_call},
+	{NULL, NULL}
+};
+
+/** Initialize box.stat package. */
 void
 box_lua_stat_init(struct lua_State *L)
 {
@@ -120,7 +148,14 @@ box_lua_stat_init(struct lua_State *L)
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_meta);
 	lua_setmetatable(L, -2);
-
 	lua_pop(L, 1); /* stat module */
+
+
+	luaL_register_module(L, "box.stat.net", statlib);
+
+	lua_newtable(L);
+	luaL_register(L, NULL, lbox_stat_net_meta);
+	lua_setmetatable(L, -2);
+	lua_pop(L, 1); /* stat net module */
 }
 

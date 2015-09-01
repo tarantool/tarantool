@@ -38,6 +38,25 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
+#include "third_party/pmatomic.h"
+
+/*
+ * Defines a handler to be executed on exit from cord's thread func,
+ * accessible via cord()->on_exit (normally NULL). It is used to
+ * implement cord_cojoin.
+ */
+struct cord_on_exit {
+	void (*callback)(void*);
+	void *argument;
+};
+
+/*
+ * A special value distinct from any valid pointer to cord_on_exit
+ * structure AND NULL. This value is stored in cord()->on_exit by the
+ * thread function prior to thread termination.
+ */
+static const struct cord_on_exit cord_on_exit_sentinel = { NULL, NULL };
+#define CORD_ON_EXIT_WONT_RUN (&cord_on_exit_sentinel)
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -548,6 +567,7 @@ void
 cord_create(struct cord *cord, const char *name)
 {
 	cord->id = pthread_self();
+	cord->on_exit = NULL;
 	cord->loop = cord->id == main_thread_id ?
 		ev_default_loop(EVFLAG_AUTO) : ev_loop_new(EVFLAG_AUTO);
 	slab_cache_create(&cord->slabc, &runtime);
@@ -631,9 +651,25 @@ void *cord_thread_func(void *p)
 		 */
 		res = NULL;
 	}
+	/*
+	 * cord()->on_exit initially holds NULL. This field is
+	 * change-once.
+	 * Either handler installation succeeds (in cord_cojoin())
+	 * or prior to thread exit the thread function discovers
+	 * that no handler was installed so far and it stores
+	 * CORD_ON_EXIT_WONT_RUN to prevent a future handler
+	 * installation (since a handler won't run anyway).
+	 */
+	const struct cord_on_exit *handler = NULL; /* expected value */
+	bool changed;
+
+	changed = pm_atomic_compare_exchange_strong(&cord()->on_exit,
+	                                            &handler,
+	                                            CORD_ON_EXIT_WONT_RUN);
+	if (!changed)
+		handler->callback(handler->argument);
 	return res;
 }
-
 
 int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
@@ -673,6 +709,94 @@ cord_join(struct cord *cord)
 	}
 	cord_destroy(cord);
 	return res;
+}
+
+/** The state of the waiter for a thread to complete. */
+struct cord_cojoin_ctx
+{
+	struct ev_loop *loop;
+	/** Waiting fiber. */
+	struct fiber *fiber;
+	/*
+	 * This event is signalled when the subject thread is
+	 * about to die.
+	 */
+	struct ev_async async;
+	bool task_complete;
+};
+
+static void
+cord_cojoin_on_exit(void *arg)
+{
+	struct cord_cojoin_ctx *ctx = (struct cord_cojoin_ctx *)arg;
+
+	ev_async_send(ctx->loop, &ctx->async);
+}
+
+static void
+cord_cojoin_wakeup(struct ev_loop *loop, struct ev_async *ev, int revents)
+{
+	(void)loop;
+	(void)revents;
+
+	struct cord_cojoin_ctx *ctx = (struct cord_cojoin_ctx *)ev->data;
+
+	ctx->task_complete = true;
+	fiber_wakeup(ctx->fiber);
+}
+
+int
+cord_cojoin(struct cord *cord)
+{
+	assert(cord() != cord); /* Can't join self. */
+
+	struct cord_cojoin_ctx ctx;
+	ctx.loop = loop();
+	ctx.fiber = fiber();
+	ctx.task_complete = false;
+
+	ev_async_init(&ctx.async, cord_cojoin_wakeup);
+	ctx.async.data = &ctx;
+	ev_async_start(loop(), &ctx.async);
+
+	struct cord_on_exit handler = { cord_cojoin_on_exit, &ctx };
+
+	/*
+	 * cord->on_exit initially holds a NULL value. This field is
+	 * change-once.
+	 */
+	const struct cord_on_exit *prev_handler = NULL; /* expected value */
+	bool changed = pm_atomic_compare_exchange_strong(&cord->on_exit,
+	                                                 &prev_handler,
+	                                                 &handler);
+	/*
+	 * A handler installation fails either if the thread did exit or
+	 * if someone is already joining this cord (BUG).
+	 */
+	if (!changed) {
+		/* Assume cord's thread already exited. */
+		assert(prev_handler == CORD_ON_EXIT_WONT_RUN);
+	} else {
+		/*
+		 * Wait until the thread exits. Prior to exit the
+		 * thread invokes cord_cojoin_on_exit, signaling
+		 * ev_async, making the event loop call
+		 * cord_cojoin_wakeup, waking up this fiber again.
+		 *
+		 * The fiber is non-cancellable during the wait to
+		 * avoid invalidating of the cord_cojoin_ctx
+		 * object declared on stack.
+		 */
+		bool cancellable = fiber_set_cancellable(false);
+		fiber_yield();
+		/* Spurious wakeup indicates a severe BUG, fail early. */
+		if (ctx.task_complete == 0)
+			panic("Wrong fiber woken");
+		fiber_set_cancellable(cancellable);
+	}
+
+	ev_async_stop(loop(), &ctx.async);
+	return cord_join(cord);
 }
 
 void

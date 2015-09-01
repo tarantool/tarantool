@@ -25,15 +25,17 @@ explain what the steps are, then on the Internet you can look at some example sc
    Here are names of tools and libraries which may have to be installed in advance,
    using ``sudo apt-get`` (for Ubuntu), ``sudo yum install`` (for CentOS), or the
    equivalent on other platforms. Different platforms may use slightly different
-   names. Do not worry about the ones marked `optional, only in Mac OS scripts`
-   unless your platform is Mac OS.
+   names. Ignore the ones marked `optional, only in Mac OS scripts`
+   unless the platform is Mac OS. Ignore the one marked `optional,
+   only for documentation` unless the intent is to use the ``-DENABLE_DOC`` option in step 5.
 
    * **gcc and g++, or clang**                # see above
    * **git**                                  # see above
    * **cmake**                                # see above
-   * **libreadline-dev or libreadline6-dev**  # for interactive mode
+   * **libreadline-dev or libreadline6-dev or readline-devel**  # for interactive mode
    * **autoconf**                             # optional, only in Mac OS scripts
    * **zlib1g** or **zlib**                   # optional, only in Mac OS scripts
+   * **doxygen**                              # optional, only for documentation
 
 2. Set up python modules for running the test suite or creating documentation.
    This step is optional. Python modules are not necessary for building Tarantool
@@ -41,7 +43,8 @@ explain what the steps are, then on the Internet you can look at some example sc
    "Run the test suite" option in step 7. Say: |br|
    :codenormal:`python --version` |br|
    You should see that the python version is greater than 2.6 --
-   preferably 2.7 -- and less than 3.0
+   preferably 2.7 -- and less than 3.0.
+   It may be necessary to install python first.
 
    On Ubuntu you can get modules from the repository:
 
@@ -54,7 +57,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      # For documentation
      sudo apt-get install python-sphinx python-pelican python-beautifulsoup
 
-   On CentOS too you can get modules from the repository:
+   On CentOS 6 too you can get modules from the repository:
 
    .. code-block:: bash
 
@@ -65,6 +68,9 @@ explain what the steps are, then on the Internet you can look at some example sc
    doing the setup with ``python setup.py``, thus:
 
    .. code-block:: bash
+
+     # On some machines this initial command may be necessary:
+     # wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo python
 
      # python module for parsing YAML (pyYAML): For test suite:
      # (If wget fails, check the http://pyyaml.org/wiki/PyYAML
@@ -94,6 +100,9 @@ explain what the steps are, then on the Internet you can look at some example sc
 
    Finally, use Python :code:`pip` to bring in Python packages
    that may not be up-to-date in the distro repositories.
+   (On CentOS 7 it will be necessary to install pip first,
+   with :code:`sudo yum install epel-release` followed by
+   :code:`sudo yum install python-pip`.)
 
    .. code-block:: bash
 
@@ -101,6 +110,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      pip install tarantool\>0.4 --user
      # For documentation
      sudo pip install pelican
+     sudo pip install breathe
      sudo pip install -U sphinx
 
 3. Use :code:`git` to download the latest source code from the

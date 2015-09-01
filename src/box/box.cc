@@ -36,7 +36,7 @@
 #include "recovery.h"
 #include "relay.h"
 #include "replica.h"
-#include <stat.h>
+#include <rmean.h>
 #include "main.h"
 #include "tuple.h"
 #include "lua/call.h"
@@ -44,6 +44,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 #include "sysview_engine.h"
 #include "sophia_engine.h"
 #include "space.h"
@@ -57,34 +58,60 @@
 #include "cluster.h" /* replica */
 #include "replica.h"
 
-static void process_ro(struct request *request, struct port *port);
-box_process_func box_process = process_ro;
-
 struct recovery_state *recovery;
 
 static struct replica replica_buf; /* used to store the single instance */
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
+bool is_ro = true;
 
-static void
-process_ro(struct request *request, struct port *port)
+void
+process_rw(struct request *request, struct tuple **result)
 {
-	if (!iproto_type_is_select(request->type))
-		tnt_raise(LoggedError, ER_READONLY);
-	return process_rw(request, port);
+	assert(iproto_type_is_dml(request->type));
+	rmean_collect(rmean_box, request->type, 1);
+	try {
+		struct space *space = space_cache_find(request->space_id);
+		struct txn *txn = txn_begin_stmt(request, space);
+		access_check_space(space, PRIV_W);
+		struct tuple *tuple;
+		switch (request->type) {
+		case IPROTO_INSERT:
+		case IPROTO_REPLACE:
+			tuple = space->handler->executeReplace(txn, space, request);
+			break;
+		case IPROTO_UPDATE:
+			tuple = space->handler->executeUpdate(txn, space, request);
+			break;
+		case IPROTO_DELETE:
+			tuple = space->handler->executeDelete(txn, space, request);
+			break;
+		case IPROTO_UPSERT:
+			space->handler->executeUpsert(txn, space, request);
+			/** fall through */
+		default:
+			 tuple = NULL;
+
+		}
+		if (result)
+			*result = tuple;
+	} catch (Exception *e) {
+		txn_rollback_stmt();
+		throw;
+	}
 }
 
 void
 box_set_ro(bool ro)
 {
-	box_process = ro ? process_ro : process_rw;
+	is_ro = ro;
 }
 
 bool
 box_is_ro(void)
 {
-	return box_process == process_ro;
+	return is_ro;
 }
 
 static void
@@ -99,7 +126,7 @@ recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 	request_decode(&request, (const char *) row->body[0].iov_base,
 		row->body[0].iov_len);
 	request.header = row;
-	process_rw(&request, &null_port);
+	process_rw(&request, NULL);
 }
 
 /* {{{ configuration bindings */
@@ -304,7 +331,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
-	process_rw(&req, &null_port);
+	process_rw(&req, NULL);
 }
 
 int
@@ -363,23 +390,15 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 }
 /** \endcond public */
 
-static inline int
+int
 box_process1(struct request *request, box_tuple_t **result)
 {
-	struct port_buf port_buf;
-	port_buf_create(&port_buf);
 	try {
-		box_process(request, &port_buf.base);
-		box_tuple_t *tuple = NULL;
-		/* Sophia: always bless tuple even if result is NULL */
-		if (port_buf.first != NULL)
-			tuple = tuple_bless(port_buf.first->tuple);
-		port_buf_destroy(&port_buf);
-		if (result)
-			*result = tuple;
+		if (is_ro)
+			tnt_raise(LoggedError, ER_READONLY);
+		process_rw(request, result);
 		return 0;
 	} catch (Exception *e) {
-		port_buf_destroy(&port_buf);
 		return -1;
 	}
 }
@@ -389,18 +408,19 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end)
 {
-	struct request request;
-	request_create(&request, IPROTO_SELECT);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.limit = limit;
-	request.offset = offset;
-	request.iterator = iterator;
-	request.key = key;
-	request.key_end = key_end;
+	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
 	try {
-		box_process(&request, port);
+		struct space *space = space_cache_find(space_id);
+		struct txn *txn = in_txn();
+		access_check_space(space, PRIV_R);
+		space->handler->executeSelect(txn, space, index_id, iterator,
+					      offset, limit, key, key_end, port);
+		if (txn == NULL) {
+			/* no txn is created, so simply collect garbage here */
+			fiber_gc();
+		}
+		port_eof(port);
 		return 0;
 	} catch (Exception *e) {
 		/* will be hanled by box.error() in Lua */
@@ -503,10 +523,9 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 {
 	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	class Index *index = index_find(space, 0);
+	class MemtxIndex *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
-	IteratorGuard it_guard(it);
 	struct tuple *tuple = it->next(it);
 	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
@@ -587,7 +606,8 @@ box_free(void)
 		tuple_free();
 		port_free();
 		engine_shutdown();
-		stat_free();
+		rmean_delete(rmean_error);
+		rmean_delete(rmean_box);
 	}
 }
 
@@ -611,6 +631,25 @@ engine_init()
 	engine_register(sophia);
 }
 
+/**
+ * @brief Reduce the current number of threads in the thread pool to the
+ * bare minimum. Doesn't prevent the pool from spawning new threads later
+ * if demand mounts.
+ */
+static void
+thread_pool_trim()
+{
+	/*
+	 * Trim OpenMP thread pool.
+	 * Though we lack the direct control the workaround below works for
+	 * GNU OpenMP library. The library stops surplus threads on entering
+	 * a parallel region. Can't go below 2 threads due to the
+	 * implementation quirk.
+	 */
+#pragma omp parallel num_threads(2)
+	;
+}
+
 static inline void
 box_init(void)
 {
@@ -619,8 +658,8 @@ box_init(void)
 		   cfg_geti("slab_alloc_maximal"),
 		   cfg_getd("slab_alloc_factor"));
 
-	stat_init();
-	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
 	engine_init();
 
@@ -692,7 +731,12 @@ box_init(void)
 
 	engine_end_recovery();
 
-	stat_cleanup(stat_base, IPROTO_TYPE_STAT_MAX);
+	/*
+	 * Recovery inflates the thread pool quite a bit (due to parallel sort).
+	 */
+	thread_pool_trim();
+
+	rmean_cleanup(rmean_box);
 
 	if (source != NULL) {
 		if (replica == NULL) {

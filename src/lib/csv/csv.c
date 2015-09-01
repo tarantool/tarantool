@@ -350,6 +350,7 @@ csv_escape_field(struct csv *csv, const char *field,
 		 size_t field_len, char *dst, size_t buf_size)
 {
 	char *p = dst;
+	(void) buf_size;
 	int inquotes = 0;
 	/* surround quotes, only if there is delimiter \n or \r */
 	if (memchr(field, csv->delimiter, field_len) ||

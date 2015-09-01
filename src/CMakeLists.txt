@@ -24,7 +24,6 @@ lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
-lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/help.lua)
 lua_source(lua_sources lua/help_en_US.lua)
 lua_source(lua_sources lua/tap.lua)
@@ -84,7 +83,7 @@ set (server_sources
      iobuf.cc
      coio_buf.cc
      pickle.cc
-     stat.cc
+     rmean.cc
      ipc.cc
      latch.cc
      errinj.cc
@@ -97,7 +96,6 @@ set (server_sources
      cpu_feature.c
      fiob.c
      tt_uuid.c
-     ffisyms.cc
      uri.c
      coeio_file.cc
      lua/digest.cc
@@ -106,7 +104,6 @@ set (server_sources
      lua/trigger.cc
      lua/ipc.cc
      lua/msgpack.cc
-     lua/net_box.cc
      lua/utils.cc
      lua/errno.c
      lua/bsdsocket.cc
@@ -168,7 +165,7 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
-add_executable(tarantool main.cc)
+add_executable(tarantool main.cc ffisyms.cc)
 add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool box ${common_libraries})
 

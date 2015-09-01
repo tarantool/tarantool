@@ -150,13 +150,3 @@ box.snapshot()
 ---
 - ok
 ...
-ffi = require('ffi')
----
-...
-ffi.cdef("int sophia_schedule(void);")
----
-...
-ffi.C.sophia_schedule() >= 0
----
-- true
-...

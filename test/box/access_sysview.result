@@ -27,7 +27,7 @@ session = box.session
 -- error: sysview does not support replace()
 box.space._vspace:replace({1, 1, 'test'})
 ---
-- error: sysview does not support replace()
+- error: sysview does not support replace
 ...
 session.su('guest')
 ---

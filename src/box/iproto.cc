@@ -50,10 +50,11 @@
 #include "iproto_constants.h"
 #include "user_def.h"
 #include "authentication.h"
-#include "stat.h"
+#include "rmean.h"
 #include "lua/call.h"
 
 /* {{{ iproto_msg - declaration */
+
 
 /**
  * A single msg from io thread. All requests
@@ -448,7 +449,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		 * in->rpos.
 		 */
 		if (msg->header.type >= IPROTO_SELECT &&
-		    msg->header.type <= IPROTO_EVAL) {
+		    msg->header.type <= IPROTO_UPSERT) {
 			/* Pre-parse request before putting it into the queue */
 			if (msg->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -513,6 +514,9 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			iproto_connection_close(con);
 			return;
 		}
+		/* Count statistics */
+		rmean_collect(rmean_net, RMEAN_NET_RECEIVED, nrd);
+
 		/* Update the read position and connection state. */
 		in->wpos += nrd;
 		con->parse_size += nrd;
@@ -564,6 +568,9 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 	iov[iovcnt-1].iov_len = end->iov_len - begin->iov_len * (iovcnt == 1);
 
 	ssize_t nwr = sio_writev(fd, iov, iovcnt);
+
+	/* Count statistics */
+	rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
 	if (nwr > 0) {
 		if (begin->used + nwr == end->used) {
 			if (ibuf_used(&iobuf->in) == 0) {
@@ -626,16 +633,16 @@ tx_process_msg(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_SELECT:
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-		case IPROTO_UPDATE:
-		case IPROTO_DELETE:
-			assert(msg->request.type == msg->header.type);
+		{
 			struct iproto_port port;
 			iproto_port_init(&port, out, msg->header.sync);
-			try {
-				box_process(&msg->request, (struct port *) &port);
-			} catch (Exception *e) {
+			struct request *req = &msg->request;
+			int rc = box_select((struct port *) &port,
+					    req->space_id, req->index_id,
+					    req->iterator,
+					    req->offset, req->limit,
+					    req->key, req->key_end);
+			if (rc < 0) {
 				/*
 				 * This only works if there are no
 				 * yields between the moment the
@@ -645,17 +652,35 @@ tx_process_msg(struct cmsg *m)
 				 */
 				if (port.found)
 					obuf_rollback_to_svp(out, &port.svp);
-				throw;
+				throw (Exception *) box_error_last();
 			}
 			break;
+		}
+		case IPROTO_INSERT:
+		case IPROTO_REPLACE:
+		case IPROTO_UPDATE:
+		case IPROTO_DELETE:
+		case IPROTO_UPSERT:
+		{
+			assert(msg->request.type == msg->header.type);
+			struct tuple *tuple;
+			if (box_process1(&msg->request, &tuple) < 0)
+				throw (Exception *) box_error_last();
+			struct obuf_svp svp = iproto_prepare_select(out);
+			if (tuple)
+				tuple_to_obuf(tuple, out);
+			iproto_reply_select(out, &svp, msg->header.sync,
+					    tuple != 0);
+			break;
+		}
 		case IPROTO_CALL:
 			assert(msg->request.type == msg->header.type);
-			stat_collect(stat_base, msg->request.type, 1);
+			rmean_collect(rmean_box, msg->request.type, 1);
 			box_lua_call(&msg->request, out);
 			break;
 		case IPROTO_EVAL:
 			assert(msg->request.type == msg->header.type);
-			stat_collect(stat_base, msg->request.type, 1);
+			rmean_collect(rmean_box, msg->request.type, 1);
 			box_lua_eval(&msg->request, out);
 			break;
 		case IPROTO_AUTH:
@@ -771,8 +796,11 @@ net_send_greeting(struct cmsg *m)
 	if (msg->close_connection) {
 		struct obuf *out = &msg->iobuf->out;
 		try {
-			sio_writev(con->output.fd, out->iov,
-				   obuf_iovcnt(out));
+			int64_t nwr = sio_writev(con->output.fd, out->iov,
+						 obuf_iovcnt(out));
+
+			/* Count statistics */
+			rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
 		} catch (Exception *e) {
 			e->log();
 		}
@@ -845,13 +873,27 @@ net_cord_f(va_list /* ap */)
 	evio_service_init(loop(), &binary, "binary",
 			  iproto_on_accept, NULL);
 
+
+	/* Init statistics counter */
+	rmean_net = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
+
+	if (rmean_net == NULL)
+		tnt_raise(OutOfMemory,
+			  sizeof(*rmean_net) +
+			  RMEAN_NET_LAST * sizeof(stats),
+			  "rmean", "struct rmean");
+
+
 	cbus_join(&net_tx_bus, &net_pipe);
+
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
 	fiber_yield();
+
+	rmean_delete(rmean_net);
 }
 
 /** Initialize the iproto subsystem and start network io thread */
@@ -871,6 +913,7 @@ iproto_init()
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
+
 
 	cbus_join(&net_tx_bus, &tx_pipe);
 }

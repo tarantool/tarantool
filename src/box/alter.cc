@@ -33,6 +33,7 @@
 #include "user_def.h"
 #include "user.h"
 #include "space.h"
+#include "memtx_index.h"
 #include "func.h"
 #include "txn.h"
 #include "tuple.h"
@@ -104,52 +105,66 @@ access_check_ddl(uint32_t owner_uid)
 	}
 }
 
-
-/** Fill key_opts structure from opts field in tuple of space _index */
-void
-key_opts_create_from_field(struct key_opts *opts, const char *field)
+const char *
+map_field_get(const char *map, const char *needle, int needle_type,
+	      int map_field_no)
 {
-	key_opts_create(opts);
-	if (field == NULL)
-		return;
-	if (mp_typeof(*field) != MP_MAP) {
-		tnt_raise(ClientError, ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
-			  "map");
+	if (map == NULL || mp_typeof(*map) != MP_MAP) {
+		tnt_raise(ClientError, ER_FIELD_TYPE,
+			  map_field_no + INDEX_OFFSET, "map");
 	}
-	uint32_t map_size = mp_decode_map(&field);
+	uint32_t map_size = mp_decode_map(&map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		const char *key;
 		uint32_t len;
-		if (mp_typeof(*field) != MP_STR) {
+		if (mp_typeof(*map) != MP_STR) {
+			tnt_raise(ClientError, ER_FIELD_TYPE,
+				  map_field_no + INDEX_OFFSET,
+				  "map key type");
+		}
+		key = mp_decode_str(&map, &len);
+		if (len != strlen(needle) ||
+		    strncasecmp(key, needle, len) != 0) {
+
+			mp_next(&map);
+			continue;
+		}
+		if (mp_typeof(*map) != needle_type) {
+			tnt_raise(ClientError, ER_FIELD_TYPE,
+				  map_field_no + INDEX_OFFSET,
+				  "map value type");
+		}
+		return map;
+	}
+	return NULL;
+}
+
+/** Fill key_opts structure from opts field in tuple of space _index */
+void
+key_opts_create_from_field(struct key_opts *opts, const char *map)
+{
+	*opts = key_opts_default;
+	if (map == NULL)
+		return;
+	const char *field;
+
+	if ((field = map_field_get(map, "unique", MP_BOOL, INDEX_OPTS)))
+		opts->is_unique = mp_decode_bool(&field);
+	if ((field = map_field_get(map, "dimension", MP_UINT, INDEX_OPTS)))
+		opts->dimension = mp_decode_uint(&field);
+	if ((field = map_field_get(map, "distance", MP_STR, INDEX_OPTS))) {
+		uint32_t len;
+		const char *distance = mp_decode_str(&field, &len);
+		distance = tuple_field_to_cstr(distance, len);
+
+		enum rtree_index_distance_type distance_type =
+			STR2ENUM(rtree_index_distance_type, distance);
+		if (distance_type == rtree_index_distance_type_MAX) {
 			tnt_raise(ClientError,
-				  ER_FIELD_TYPE, INDEX_OPTS + INDEX_OFFSET,
-				  "string");
+				  ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,
+				  distance);
 		}
-		key = mp_decode_str(&field, &len);
-		if (len == strlen("unique") &&
-		    memcmp(key, "unique", len) == 0) {
-
-
-			if (mp_typeof(*field) != MP_BOOL) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "bool");
-			}
-			opts->is_unique = mp_decode_bool(&field);
-		} else if (len == strlen("dimension") &&
-			   memcmp(key, "dimension", len) == 0) {
-
-			if (mp_typeof(*field) != MP_UINT) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE,
-					  INDEX_OPTS + INDEX_OFFSET,
-					  "unsigned");
-			}
-			opts->dimension = mp_decode_uint(&field);
-		} else {
-			mp_next(&field);
-		}
+		opts->distance = distance_type;
 	}
 }
 
@@ -185,10 +200,16 @@ key_def_new_from_tuple(struct tuple *tuple)
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5 _index space structure */
-		key_opts_create(&opts);
+		opts = key_opts_default;
 		opts.is_unique = tuple_field_u32(tuple, INDEX_165_IS_UNIQUE);
 		part_count = tuple_field_u32(tuple, INDEX_165_PART_COUNT);
 	}
+	/**
+	 * XXX this is an ugly clutch in absence of Lua-level
+	 * index-type specific defaults.
+	 */
+	if (opts.dimension == 0 && type == RTREE)
+		opts.dimension = 2;
 	key_def = key_def_new(id, index_id, name, type, &opts, part_count);
 	auto scoped_guard = make_scoped_guard([=] { key_def_delete(key_def); });
 
@@ -528,8 +549,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * snapshot/xlog, but needs to continue staying "fully
 	 * built".
 	 */
-	alter->new_space->handler->replace =
-		alter->old_space->handler->replace;
+	alter->new_space->handler->onAlter(alter->old_space->handler);
 
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
@@ -891,9 +911,9 @@ AddIndex::alter(struct alter_space *alter)
 	Index *new_index = index_find(alter->new_space, new_key_def->iid);
 
 	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = pk->position();
+	struct iterator *it = pk->allocIterator();
+	IteratorGuard guard(it);
 	pk->initIterator(it, ITER_ALL, NULL, 0);
-	IteratorGuard it_guard(it);
 
 	/*
 	 * The index has to be built tuple by tuple, since
@@ -902,8 +922,6 @@ AddIndex::alter(struct alter_space *alter)
 	 * added to the index (insufficient number of fields,
 	 * etc., the build is aborted.
 	 */
-	new_index->beginBuild();
-	new_index->endBuild();
 	/* Build the new index. */
 	struct tuple *tuple;
 	struct tuple_format *format = alter->new_space->format;
@@ -1185,16 +1203,16 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space == NULL)
 		return false;
 
-	Index *index = space_index(space, iid);
-	if (index == NULL)
+	if (space_index(space, iid) == NULL)
 		return false;
-	struct iterator *it = index->position();
+
+	MemtxIndex *index = index_find_system(space, iid);
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
+	struct iterator *it = index->position();
 
 	index->initIterator(it, ITER_EQ, key, 1);
-	IteratorGuard it_guard(it);
 	if (it->next(it))
 		return true;
 	return false;

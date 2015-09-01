@@ -45,7 +45,7 @@ struct space {
 	 */
 	Handler *handler;
 
-	/** Triggers fired after space_replace() -- see txn_replace(). */
+	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
 	/**
 	 * The number of *enabled* indexes in the space.
@@ -120,6 +120,9 @@ space_size(struct space *space);
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
+void
+space_validate_tuple_raw(struct space *sp, const char *data);
+
 /**
  * Allocate and initialize a space. The space
  * needs to be loaded before it can be used
@@ -186,6 +189,24 @@ index_find_unique(struct space *space, uint32_t index_id)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	return index;
 }
+
+class MemtxIndex;
+
+/**
+ * Find an index in a system space. Throw an error
+ * if we somehow deal with a non-memtx space (it can't
+ * be used for system spaces.
+ */
+static inline MemtxIndex *
+index_find_system(struct space *space, uint32_t index_id)
+{
+	if (! space_is_memtx(space)) {
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  space->handler->engine->name, "system data");
+	}
+	return (MemtxIndex *) index_find(space, index_id);
+}
+
 
 extern "C" void
 space_run_triggers(struct space *space, bool yesno);

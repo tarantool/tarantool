@@ -56,7 +56,6 @@ extern "C" {
 #include "third_party/lua-cjson/lua_cjson.h"
 #include "third_party/lua-yaml/lyaml.h"
 #include "lua/msgpack.h"
-#include "lua/net_box.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
 
@@ -86,7 +85,6 @@ extern char strict_lua[],
 	uri_lua[],
 	bsdsocket_lua[],
 	console_lua[],
-	net_box_lua[],
 	help_lua[],
 	help_en_US_lua[],
 	tap_lua[],
@@ -120,7 +118,6 @@ static const char *lua_modules[] = {
 	"fio", fio_lua,
 	"csv", csv_lua,
 	"socket", bsdsocket_lua,
-	"net.box", net_box_lua,
 	"console", console_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
@@ -370,8 +367,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_json(L);
 	lua_pop(L, 1);
 	luaopen_msgpack(L);
-	lua_pop(L, 1);
-	luaopen_net_box(L);
 	lua_pop(L, 1);
 
 #if defined(HAVE_GNU_READLINE)

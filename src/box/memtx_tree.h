@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 
-#include "index.h"
+#include "memtx_index.h"
 #include "memtx_engine.h"
 
 struct tuple;
@@ -54,7 +54,7 @@ tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_de
 
 #include "salad/bps_tree.h"
 
-class MemtxTree: public Index {
+class MemtxTree: public MemtxIndex {
 public:
 	MemtxTree(struct key_def *key_def);
 	virtual ~MemtxTree();

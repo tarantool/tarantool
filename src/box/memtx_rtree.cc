@@ -38,6 +38,10 @@
 
 /* {{{ Utilities. *************************************************/
 
+/**
+ * Extract coordinates of rectangle from message packed string.
+ * There must be <count> or <count * 2> numbers in that string.
+ */
 inline int
 mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 	       const char *mp, unsigned count)
@@ -64,12 +68,34 @@ mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 	return 0;
 }
 
+/**
+ * Extract rectangle from message packed string.
+ * There must be an array with appropriate number of coordinates in
+ * that string.
+ */
 inline int
 mp_decode_rect(struct rtree_rect *rect, unsigned dimension,
 	       const char *mp)
 {
 	uint32_t size = mp_decode_array(&mp);
 	return mp_decode_rect(rect, dimension, mp, size);
+}
+
+/**
+ * Extract rectangle from message packed key.
+ * Due to historical issues,
+ * in key a rectangle could be written in two variants:
+ * a)array with appropriate number of coordinates
+ * b)array with on element - array with appropriate number of coordinates
+ */
+inline int
+mp_decode_rect_from_key(struct rtree_rect *rect, unsigned dimension,
+			const char *mp, uint32_t part_count)
+{
+	if (part_count != 1) /* variant a */
+		return mp_decode_rect(rect, dimension, mp, part_count);
+	else /* variant b */
+		return mp_decode_rect(rect, dimension, mp);
 }
 
 inline void
@@ -121,7 +147,7 @@ MemtxRTree::~MemtxRTree()
 }
 
 MemtxRTree::MemtxRTree(struct key_def *key_def)
-	: Index(key_def)
+	: MemtxIndex(key_def)
 {
 	assert(key_def->part_count == 1);
 	assert(key_def->parts[0].type = ARRAY);
@@ -137,8 +163,13 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	}
 
 	memtx_index_arena_init();
+	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
+	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
+	enum rtree_distance_type distance_type =
+		(enum rtree_distance_type)(int)key_def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
-		   memtx_index_extent_alloc, memtx_index_extent_free);
+		   memtx_index_extent_alloc, memtx_index_extent_free,
+		   distance_type);
 }
 
 size_t
@@ -160,7 +191,7 @@ MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 	rtree_iterator_init(&iterator);
 
 	rtree_rect rect;
-	if (mp_decode_rect(&rect, m_dimension, key, part_count))
+	if (mp_decode_rect_from_key(&rect, m_dimension, key, part_count))
 		assert(false);
 
 	struct tuple *result = NULL;
@@ -217,7 +248,8 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 				  "It is possible to omit "
 				  "key only for ITER_ALL");
 		}
-	} else if (mp_decode_rect(&rect, m_dimension, key, part_count)) {
+	} else if (mp_decode_rect_from_key(&rect, m_dimension,
+					   key, part_count)) {
 		tnt_raise(ClientError, ER_RTREE_RECT,
 			  "Key", m_dimension, m_dimension * 2);
 	}

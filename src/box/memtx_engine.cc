@@ -37,6 +37,8 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
+#include "msgpuck/msgpuck.h"
+#include "salad/rlist.h"
 #include "request.h"
 #include "box.h"
 #include "iproto_constants.h"
@@ -44,6 +46,7 @@
 #include "recovery.h"
 #include "relay.h"
 #include "schema.h"
+#include "port.h"
 #include "main.h"
 #include "coeio_file.h"
 #include "coeio.h"
@@ -93,9 +96,9 @@ memtx_replace_no_keys(struct txn * /* txn */, struct space *space,
 		      struct tuple * /* new_tuple */,
 		      enum dup_replace_mode /* mode */)
 {
-       Index *index = index_find(space, 0);
-       assert(index == NULL); /* not reached. */
-       (void) index;
+	Index *index = index_find(space, 0);
+	assert(index == NULL); /* not reached. */
+	(void) index;
 }
 
 struct MemtxSpace: public Handler {
@@ -109,8 +112,280 @@ struct MemtxSpace: public Handler {
 		/* do nothing */
 		/* engine->close(this); */
 	}
+	virtual struct tuple *
+	executeReplace(struct txn *txn, struct space *space,
+		       struct request *request);
+	virtual struct tuple *
+	executeDelete(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual struct tuple *
+	executeUpdate(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual void
+	executeUpsert(struct txn *txn, struct space *space,
+		      struct request *request);
+	virtual void
+	executeSelect(struct txn *, struct space *space,
+		      uint32_t index_id, uint32_t iterator,
+		      uint32_t offset, uint32_t limit,
+		      const char *key, const char * /* key_end */,
+		      struct port *port);
+	virtual void onAlter(Handler *old);
+public:
+	/**
+	 * @brief A single method to handle REPLACE, DELETE and UPDATE.
+	 *
+	 * @param sp space
+	 * @param old_tuple the tuple that should be removed (can be NULL)
+	 * @param new_tuple the tuple that should be inserted (can be NULL)
+	 * @param mode      dup_replace_mode, used only if new_tuple is not
+	 *                  NULL and old_tuple is NULL, and only for the
+	 *                  primary key.
+	 *
+	 * For DELETE, new_tuple must be NULL. old_tuple must be
+	 * previously found in the primary key.
+	 *
+	 * For REPLACE, old_tuple must be NULL. The additional
+	 * argument dup_replace_mode further defines how REPLACE
+	 * should proceed.
+	 *
+	 * For UPDATE, both old_tuple and new_tuple must be given,
+	 * where old_tuple must be previously found in the primary key.
+	 *
+	 * Let's consider these three cases in detail:
+	 *
+	 * 1. DELETE, old_tuple is not NULL, new_tuple is NULL
+	 *    The effect is that old_tuple is removed from all
+	 *    indexes. dup_replace_mode is ignored.
+	 *
+	 * 2. REPLACE, old_tuple is NULL, new_tuple is not NULL,
+	 *    has one simple sub-case and two with further
+	 *    ramifications:
+	 *
+	 *	A. dup_replace_mode is DUP_INSERT. Attempts to insert the
+	 *	new tuple into all indexes. If *any* of the unique indexes
+	 *	has a duplicate key, deletion is aborted, all of its
+	 *	effects are removed, and an error is thrown.
+	 *
+	 *	B. dup_replace_mode is DUP_REPLACE. It means an existing
+	 *	tuple has to be replaced with the new one. To do it, tries
+	 *	to find a tuple with a duplicate key in the primary index.
+	 *	If the tuple is not found, throws an error. Otherwise,
+	 *	replaces the old tuple with a new one in the primary key.
+	 *	Continues on to secondary keys, but if there is any
+	 *	secondary key, which has a duplicate tuple, but one which
+	 *	is different from the duplicate found in the primary key,
+	 *	aborts, puts everything back, throws an exception.
+	 *
+	 *	For example, if there is a space with 3 unique keys and
+	 *	two tuples { 1, 2, 3 } and { 3, 1, 2 }:
+	 *
+	 *	This REPLACE/DUP_REPLACE is OK: { 1, 5, 5 }
+	 *	This REPLACE/DUP_REPLACE is not OK: { 2, 2, 2 } (there
+	 *	is no tuple with key '2' in the primary key)
+	 *	This REPLACE/DUP_REPLACE is not OK: { 1, 1, 1 } (there
+	 *	is a conflicting tuple in the secondary unique key).
+	 *
+	 *	C. dup_replace_mode is DUP_REPLACE_OR_INSERT. If
+	 *	there is a duplicate tuple in the primary key, behaves the
+	 *	same way as DUP_REPLACE, otherwise behaves the same way as
+	 *	DUP_INSERT.
+	 *
+	 * 3. UPDATE has to delete the old tuple and insert a new one.
+	 *    dup_replace_mode is ignored.
+	 *    Note that old_tuple primary key doesn't have to match
+	 *    new_tuple primary key, thus a duplicate can be found.
+	 *    For this reason, and since there can be duplicates in
+	 *    other indexes, UPDATE is the same as DELETE +
+	 *    REPLACE/DUP_INSERT.
+	 *
+	 * @return old_tuple. DELETE, UPDATE and REPLACE/DUP_REPLACE
+	 * always produce an old tuple. REPLACE/DUP_INSERT always returns
+	 * NULL. REPLACE/DUP_REPLACE_OR_INSERT may or may not find
+	 * a duplicate.
+	 *
+	 * The method is all-or-nothing in all cases. Changes are either
+	 * applied to all indexes, or nothing applied at all.
+	 *
+	 * Note, that even in case of REPLACE, dup_replace_mode only
+	 * affects the primary key, for secondary keys it's always
+	 * DUP_INSERT.
+	 *
+	 * The call never removes more than one tuple: if
+	 * old_tuple is given, dup_replace_mode is ignored.
+	 * Otherwise, it's taken into account only for the
+	 * primary key.
+	 */
+	engine_replace_f replace;
 };
 
+static inline enum dup_replace_mode
+dup_replace_mode(uint32_t op)
+{
+	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
+}
+
+struct tuple *
+MemtxSpace::executeReplace(struct txn *txn, struct space *space,
+			   struct request *request)
+{
+	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
+					    request->tuple_end);
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	enum dup_replace_mode mode = dup_replace_mode(request->type);
+	this->replace(txn, space, NULL, new_tuple, mode);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	tuple_bless(new_tuple);
+	return new_tuple;
+}
+
+struct tuple *
+MemtxSpace::executeDelete(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+	if (old_tuple == NULL) {
+		txn_commit_stmt(txn);
+		return NULL;
+	}
+	TupleGuard old_guard(old_tuple);
+	this->replace(txn, space, old_tuple, NULL,
+				DUP_REPLACE_OR_INSERT);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	tuple_bless(old_tuple);
+	return old_tuple;
+}
+
+struct tuple *
+MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	/* Try to find the tuple by unique key. */
+	Index *pk = index_find_unique(space, request->index_id);
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	if (old_tuple == NULL) {
+		txn_commit_stmt(txn);
+		return NULL;
+	}
+	TupleGuard old_guard(old_tuple);
+
+	/* Update the tuple; legacy, request ops are in request->tuple */
+	struct tuple *new_tuple = tuple_update(space->format,
+					       region_alloc_cb,
+					       &fiber()->gc,
+					       old_tuple, request->tuple,
+					       request->tuple_end,
+					       request->index_base);
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	this->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	txn_commit_stmt(txn);
+	/*
+	 * Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
+	tuple_bless(new_tuple);
+	return new_tuple;
+}
+
+void
+MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
+			  struct request *request)
+{
+	Index *pk = index_find_unique(space, request->index_id);
+	/* Try to find the tuple by primary key. */
+	const char *key = request->key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
+
+	if (old_tuple == NULL) {
+		struct tuple *new_tuple = tuple_new(space->format,
+						    request->tuple,
+						    request->tuple_end);
+		TupleGuard guard(new_tuple);
+		space_validate_tuple(space, new_tuple);
+		this->replace(txn, space, NULL, new_tuple, DUP_INSERT);
+	} else {
+		TupleGuard old_guard(old_tuple);
+
+		/* Update the tuple. */
+		struct tuple *new_tuple =
+			tuple_upsert(space->format, region_alloc_cb,
+				     &fiber()->gc, old_tuple,
+				     request->ops, request->ops_end,
+				     request->index_base);
+		TupleGuard guard(new_tuple);
+
+		space_validate_tuple(space, new_tuple);
+		this->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	}
+
+	txn_commit_stmt(txn);
+	/* Return nothing: upsert does not return data. */
+}
+
+void
+MemtxSpace::onAlter(Handler *old)
+{
+	MemtxSpace *handler = (MemtxSpace *) old;
+	replace = handler->replace;
+}
+
+void
+MemtxSpace::executeSelect(struct txn *, struct space *space,
+			  uint32_t index_id, uint32_t iterator,
+			  uint32_t offset, uint32_t limit,
+			  const char *key, const char * /* key_end */,
+			  struct port *port)
+{
+	MemtxIndex *index = (MemtxIndex *) index_find(space, index_id);
+
+	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
+
+	uint32_t found = 0;
+	if (iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) iterator;
+
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	key_validate(index->key_def, type, key, part_count);
+
+	struct iterator *it = index->position();
+	index->initIterator(it, type, key, part_count);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it)) != NULL) {
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		if (limit == found++)
+			break;
+		port_add_tuple(port, tuple);
+	}
+}
 
 static void
 txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
@@ -138,7 +413,7 @@ memtx_txn_add_undo(struct txn *txn, struct space *space,
 }
 
 /**
- * A short-cut version of space_replace() used during bulk load
+ * A short-cut version of replace() used during bulk load
  * from snapshot.
  */
 void
@@ -158,12 +433,12 @@ memtx_replace_build_next(struct txn * /* txn */, struct space *space,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	space->index[0]->buildNext(new_tuple);
+	((MemtxIndex *) space->index[0])->buildNext(new_tuple);
 	tuple_ref(new_tuple);
 }
 
 /**
- * A short-cut version of space_replace() used when loading
+ * A short-cut version of replace() used when loading
  * data from XLOG files.
  */
 void
@@ -223,12 +498,13 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 static void
 memtx_end_build_primary_key(struct space *space, void *param)
 {
-	if (space->handler->engine != param || space_index(space, 0) == NULL ||
-	    space->handler->replace == memtx_replace_all_keys)
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	if (handler->engine != param || space_index(space, 0) == NULL ||
+	    handler->replace == memtx_replace_all_keys)
 		return;
 
-	space->index[0]->endBuild();
-	space->handler->replace = memtx_replace_primary_key;
+	((MemtxIndex *) space->index[0])->endBuild();
+	handler->replace = memtx_replace_primary_key;
 }
 
 /**
@@ -240,12 +516,13 @@ memtx_end_build_primary_key(struct space *space, void *param)
 void
 memtx_build_secondary_keys(struct space *space, void *param)
 {
-	if (space->handler->engine != param || space_index(space, 0) == NULL ||
-	    space->handler->replace == memtx_replace_all_keys)
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	if (handler->engine != param || space_index(space, 0) == NULL ||
+	    handler->replace == memtx_replace_all_keys)
 		return;
 
 	if (space->index_id_max > 0) {
-		Index *pk = space->index[0];
+		MemtxIndex *pk = (MemtxIndex *) space->index[0];
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
@@ -254,13 +531,13 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build(space->index[j], pk);
+			index_build((MemtxIndex *) space->index[j], pk);
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
 		}
 	}
-	space->handler->replace = memtx_replace_all_keys;
+	handler->replace = memtx_replace_all_keys;
 }
 
 MemtxEngine::MemtxEngine()
@@ -268,8 +545,7 @@ MemtxEngine::MemtxEngine()
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED)
 {
-	flags = ENGINE_CAN_BE_TEMPORARY |
-		ENGINE_AUTO_CHECK_UPDATE;
+	flags = ENGINE_CAN_BE_TEMPORARY;
 }
 
 /**
@@ -300,9 +576,7 @@ recover_snap(struct recovery_state *r)
 	int64_t signature = vclock_sum(res);
 
 	struct xlog *snap = xlog_open(&r->snap_dir, signature);
-	auto guard = make_scoped_guard([=]{
-		xlog_close(snap);
-	});
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	r->server_uuid = snap->server_uuid;
 
@@ -343,23 +617,24 @@ Handler *MemtxEngine::open()
 static void
 memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 {
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
 	switch (state) {
 	case MEMTX_INITIALIZED:
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_READING_SNAPSHOT:
-		space->index[0]->beginBuild();
-		space->handler->replace = memtx_replace_build_next;
+		((MemtxIndex *) space->index[0])->beginBuild();
+		handler->replace = memtx_replace_build_next;
 		break;
 	case MEMTX_READING_WAL:
-		space->index[0]->beginBuild();
-		space->index[0]->endBuild();
-		space->handler->replace = memtx_replace_primary_key;
+		((MemtxIndex *) space->index[0])->beginBuild();
+		((MemtxIndex *) space->index[0])->endBuild();
+		handler->replace = memtx_replace_primary_key;
 		break;
 	case MEMTX_OK:
-		space->index[0]->beginBuild();
-		space->index[0]->endBuild();
-		space->handler->replace = memtx_replace_all_keys;
+		((MemtxIndex *) space->index[0])->beginBuild();
+		((MemtxIndex *) space->index[0])->endBuild();
+		handler->replace = memtx_replace_all_keys;
 		break;
 	}
 }
@@ -373,7 +648,8 @@ MemtxEngine::addPrimaryKey(struct space *space)
 void
 MemtxEngine::dropPrimaryKey(struct space *space)
 {
-	space->handler->replace = memtx_replace_no_keys;
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	handler->replace = memtx_replace_no_keys;
 }
 
 void
@@ -385,7 +661,8 @@ MemtxEngine::initSystemSpace(struct space *space)
 bool
 MemtxEngine::needToBuildSecondaryKey(struct space *space)
 {
-	return space->handler->replace == memtx_replace_all_keys;
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	return handler->replace == memtx_replace_all_keys;
 }
 
 Index *
@@ -409,7 +686,7 @@ MemtxEngine::createIndex(struct key_def *key_def)
 void
 MemtxEngine::dropIndex(Index *index)
 {
-	struct iterator *it = index->position();
+	struct iterator *it = ((MemtxIndex*) index)->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
 	while ((tuple = it->next(it)))
@@ -505,7 +782,6 @@ MemtxEngine::prepare(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 }
 
-
 void
 MemtxEngine::beginStatement(struct txn *txn)
 {
@@ -541,10 +817,11 @@ MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
 	assert(stmt->old_tuple || stmt->new_tuple);
 	struct space *space = stmt->space;
 	int index_count;
+	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
 
-	if (space->handler->replace == memtx_replace_all_keys)
+	if (handler->replace == memtx_replace_all_keys)
 		index_count = space->index_count;
-	else if (space->handler->replace == memtx_replace_primary_key)
+	else if (handler->replace == memtx_replace_primary_key)
 		index_count = 1;
 	else
 		panic("transaction rolled back during snapshot recovery");
@@ -928,7 +1205,7 @@ memtx_index_extent_alloc()
 		     /* same error as in mempool_alloc */
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
-	);
+		    );
 	return mempool_alloc(&memtx_index_extent_pool);
 }
 
@@ -949,10 +1226,10 @@ void
 memtx_index_extent_reserve(int num)
 {
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
-	/* same error as in mempool_alloc */
+		     /* same error as in mempool_alloc */
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
-	);
+		    );
 	while (memtx_index_num_reserved_extents < num) {
 		void *ext = mempool_alloc(&memtx_index_extent_pool);
 		*(void **)ext = memtx_index_reserved_extents;

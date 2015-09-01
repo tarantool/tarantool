@@ -32,6 +32,7 @@
 #include "user_def.h"
 #include "engine.h"
 #include "space.h"
+#include "memtx_index.h"
 #include "func.h"
 #include "tuple.h"
 #include "assoc.h"
@@ -110,7 +111,6 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		struct iterator *it = pk->allocIterator();
 		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
 		pk->initIterator(it, ITER_GE, key, 1);
-		IteratorGuard it_guard(it);
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
@@ -201,7 +201,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len)
 {
 	struct space *space = space_cache_find(system_space_id);
-	Index *index = index_find(space, index_id);
+	MemtxIndex *index = index_find_system(space, index_id);
 	char buf[BOX_NAME_MAX * 2];
 	/**
 	 * This is an internal-only method, we should know the
@@ -214,7 +214,6 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, buf, 1);
-	IteratorGuard it_guard(it);
 
 	struct tuple *tuple = it->next(it);
 	if (tuple) {
@@ -251,7 +250,7 @@ schema_init()
 	struct space_def def = {
 		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
 	};
-	struct key_opts opts = { true /* is_unique */, 0 /* dimension */ };
+	struct key_opts opts = key_opts_default;
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */
@@ -408,11 +407,10 @@ schema_find_grants(const char *type, uint32_t id)
 {
 	struct space *priv = space_cache_find(BOX_PRIV_ID);
 	/** "object" index */
-	Index *index = index_find(priv, 2);
+	MemtxIndex *index = index_find_system(priv, 2);
 	struct iterator *it = index->position();
 	char key[10 + BOX_NAME_MAX];
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
 	index->initIterator(it, ITER_EQ, key, 2);
-	IteratorGuard it_guard(it);
 	return it->next(it);
 }

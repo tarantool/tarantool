@@ -21,6 +21,10 @@ box.stat.SELECT.total
 ---
 - 0
 ...
+box.stat.ERROR.total
+---
+- 0
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -50,6 +54,15 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
+- 2
+...
+-- check exceptions
+space:get('Impossible value')
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+box.stat.ERROR.total
+---
 - 1
 ...
 --# stop server default
@@ -72,6 +85,10 @@ box.stat.REPLACE.total
 - 0
 ...
 box.stat.SELECT.total
+---
+- 0
+...
+box.stat.ERROR.total
 ---
 - 0
 ...

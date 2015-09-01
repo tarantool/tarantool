@@ -187,31 +187,6 @@ coio_on_call(eio_req *req)
 	req->result = task->call_cb(task->ap);
 }
 
-/**
- * Create new eio task with specified function and
- * arguments. Yield and wait until the task is complete
- * or a timeout occurs.
- *
- * This function doesn't throw exceptions to avoid double error
- * checking: in most cases it's also necessary to check the return
- * value of the called function and perform necessary actions. If
- * func sets errno, the errno is preserved across the call.
- *
- * @retval -1 and errno = ENOMEM if failed to create a task
- * @retval the function return (errno is preserved).
- *
- * @code
- *	static ssize_t openfile_cb(va_list ap)
- *	{
- *	         const char *filename = va_arg(ap);
- *	         int flags = va_arg(ap);
- *	         return open(filename, flags);
- *	}
- *
- *	 if (coio_call(openfile_cb, 0.10, "/tmp/file", 0) == -1)
- *		// handle errors.
- *	...
- */
 ssize_t
 coio_call(ssize_t (*func)(va_list ap), ...)
 {
@@ -235,7 +210,9 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 	eio_submit(&task->base);
 
 	fiber_yield();
-	assert(task->complete);
+	/* Spurious wakeup indicates a severe BUG, fail early. */
+	if (task->complete == 0)
+		panic("Wrong fiber woken");
 	va_end(task->ap);
 
 	fiber_set_cancellable(cancellable);
@@ -344,30 +321,6 @@ cleanup_host:
 cleanup_task:
 	free(task);
 	errno = save_errno;
-	return rc;
-}
-
-static ssize_t
-cord_cojoin_cb(va_list ap)
-{
-	struct cord *cord = va_arg(ap, struct cord *);
-	void *retval = NULL;
-	int res = tt_pthread_join(cord->id, &retval);
-	return res;
-}
-
-int
-cord_cojoin(struct cord *cord)
-{
-	assert(cord() != cord); /* Can't join self. */
-	int rc = coio_call(cord_cojoin_cb, cord);
-	if (rc == 0 && !diag_is_empty(&cord->fiber->diag)) {
-		diag_move(&cord->fiber->diag, &fiber()->diag);
-		cord_destroy(cord);
-		 /* re-throw exception in this fiber */
-		diag_last_error(&fiber()->diag)->raise();
-	}
-	cord_destroy(cord);
 	return rc;
 }
 

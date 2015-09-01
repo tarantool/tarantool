@@ -32,6 +32,3 @@ replica.cleanup(True)
 # remove space
 master.admin("space:drop()")
 master.admin('box.snapshot()')
-master.admin("ffi = require('ffi')")
-master.admin("ffi.cdef(\"int sophia_schedule(void);\")")
-master.admin("ffi.C.sophia_schedule() >= 0")

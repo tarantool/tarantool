@@ -17,6 +17,5 @@ function test_conflict()
 	fiber.sleep(0);
 
 	s:drop();
-	sophia_schedule();
 	return commits
 end

@@ -34,17 +34,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include "third_party/pmatomic.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-/**
- * Provide wrappers around gcc built-ins for now.
- * These built-ins work with all numeric types - may not
- * be the case when another implementation is used.
- */
-#define atomic_cas(a, b, c) __sync_val_compare_and_swap(a, b, c)
 
 /**
  * A very primitive implementation of lock-free
@@ -90,7 +84,7 @@ lf_lifo_push(struct lf_lifo *head, void *elem)
 		 * coerce to unsigned short
 		 */
 		void *newhead = (char *) elem + aba_value((char *) tail + 1);
-		if (atomic_cas(&head->next, tail, newhead) == tail)
+		if (pm_atomic_compare_exchange_strong(&head->next, &tail, newhead))
 			return head;
 	} while (true);
 }
@@ -112,7 +106,7 @@ lf_lifo_pop(struct lf_lifo *head)
 		 */
 		void *newhead = ((char *) lf_lifo(elem->next) +
 				 aba_value(tail));
-		if (atomic_cas(&head->next, tail, newhead) == tail)
+		if (pm_atomic_compare_exchange_strong(&head->next, &tail, newhead))
 			return elem;
 	} while (true);
 }

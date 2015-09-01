@@ -31,11 +31,11 @@
  * SUCH DAMAGE.
  */
 
-#include "index.h"
+#include "memtx_index.h"
 
 struct light_index_core;
 
-class MemtxHash: public Index {
+class MemtxHash: public MemtxIndex {
 public:
 	MemtxHash(struct key_def *key_def);
 	~MemtxHash();

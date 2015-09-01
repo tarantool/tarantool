@@ -35,7 +35,9 @@
 
 struct txn;
 struct port;
-extern int stat_base;
+
+/** box statistics */
+extern struct rmean *rmean_box;
 
 struct request
 {
@@ -78,9 +80,6 @@ struct request_replace_body {
 
 void
 request_create(struct request *request, uint32_t code);
-
-void
-process_rw(struct request *request, struct port *port);
 
 void
 request_decode(struct request *request, const char *data, uint32_t len);

@@ -37,7 +37,7 @@ void
 memory_init()
 {
 	static struct quota runtime_quota;
-	static const size_t SLAB_SIZE = 4 * 1024 * 1024;
+	const size_t SLAB_SIZE = 4 * 1024 * 1024;
 	/* default quota initialization */
 	quota_init(&runtime_quota, QUOTA_MAX);
 

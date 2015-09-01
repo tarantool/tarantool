@@ -60,7 +60,8 @@ target_link_libraries(light.test small)
 add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
-    ${CMAKE_SOURCE_DIR}/src/box/error.cc)
+    ${CMAKE_SOURCE_DIR}/src/box/error.cc
+    ${CMAKE_SOURCE_DIR}/src/rmean.cc)
 target_link_libraries(vclock.test core small)
 add_executable(quota.test quota.cc unit.c)
 target_link_libraries(quota.test pthread)
@@ -117,3 +118,7 @@ add_executable(reflection_cxx.test reflection_cxx.cc unit.c
 add_executable(csv.test csv.c
     ${CMAKE_SOURCE_DIR}/src/lib/csv/csv.c
 )
+
+add_executable(rmean.test rmean.cc unit.c
+        ${CMAKE_SOURCE_DIR}/src/rmean.cc)
+target_link_libraries(rmean.test core)

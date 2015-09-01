@@ -109,9 +109,12 @@ slab_is_free(struct slab *slab)
 static inline void
 slab_poison(struct slab *slab)
 {
-	static const char poison_char = 'P';
+	(void)slab;
+#ifndef NDEBUG
+	const char poison_char = 'P';
 	memset((char *) slab + slab_sizeof(), poison_char,
 	       slab->size - slab_sizeof());
+#endif
 }
 
 static inline void

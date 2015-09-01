@@ -30,13 +30,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include "space.h"
 #include "trigger.h"
 #include "fiber.h"
 
 extern double too_long_threshold;
 struct tuple;
-struct space;
 
 /**
  * A single statement of a multi-statement
@@ -121,6 +120,16 @@ txn_begin_stmt(struct request *request, struct space *space);
 static inline void
 txn_commit_stmt(struct txn *txn)
 {
+	/*
+	 * Run on_replace triggers. For now, disallow mutation
+	 * of tuples in the trigger.
+	 */
+	struct txn_stmt *stmt = txn->stmt;
+	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
+	    && stmt->space->run_triggers) {
+
+		trigger_run(&stmt->space->on_replace, txn);
+	}
 	if (txn->autocommit)
 		txn_commit(txn);
 	else
@@ -142,11 +151,6 @@ txn_rollback_stmt();
 void
 txn_check_autocommit(struct txn *txn, const char *where);
 
-void
-txn_replace(struct txn *txn, struct space *space,
-	    struct tuple *old_tuple, struct tuple *new_tuple,
-	    enum dup_replace_mode mode);
-
 /** Last statement of the transaction. */
 static inline struct txn_stmt *
 txn_stmt(struct txn *txn)
@@ -162,6 +166,11 @@ txn_stmt(struct txn *txn)
 /** \cond public */
 
 /**
+ * Begin a transaction in the current fiber.
+ *
+ * A transaction is attached to caller fiber, therefore one fiber can have
+ * only one active transaction.
+ *
  * @retval 0 - success
  * @retval -1 - failed, perhaps a transaction has already been
  * started
@@ -169,9 +178,18 @@ txn_stmt(struct txn *txn)
 API_EXPORT int
 box_txn_begin(void);
 
+/**
+ * Commit the current transaction.
+ * @retval 0 - success
+ * @retval -1 - failed, perhaps a disk write failure.
+ * started
+ */
 API_EXPORT int
 box_txn_commit(void);
 
+/**
+ * Rollback the current transaction.
+ */
 API_EXPORT void
 box_txn_rollback(void);
 
@@ -180,7 +198,7 @@ box_txn_rollback(void);
  * The memory is automatically deallocated when the transaction
  * is committed or rolled back.
  *
- * @retval 0  out of memory
+ * @retval NULL out of memory
  */
 API_EXPORT void *
 box_txn_alloc(size_t size);
