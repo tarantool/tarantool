@@ -371,7 +371,7 @@ replica_stop(struct replica *replica)
 	if (f == NULL)
 		return;
 	const char *uri = uri_format(&replica->uri);
-	say_info("shutting down the replica %s", uri);
+	say_info("shutting down replica %s", uri);
 	fiber_cancel(f);
 	/**
 	 * If the replica died from an exception, don't throw it
