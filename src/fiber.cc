@@ -55,7 +55,8 @@ struct cord_on_exit {
  * structure AND NULL. This value is stored in cord()->on_exit by the
  * thread function prior to thread termination.
  */
-static const struct cord_on_exit CORD_ON_EXIT_WONT_RUN = { NULL, NULL };
+static const struct cord_on_exit cord_on_exit_sentinel = { NULL, NULL };
+#define CORD_ON_EXIT_WONT_RUN (&cord_on_exit_sentinel)
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -660,10 +661,12 @@ void *cord_thread_func(void *p)
 	 * installation (since a handler won't run anyway).
 	 */
 	struct cord_on_exit *handler = NULL; /* expected value */
-	bool rc = pm_atomic_compare_exchange_strong(&cord()->on_exit,
+	bool changed;
+
+	changed = pm_atomic_compare_exchange_strong(&cord()->on_exit,
 	                                            &handler,
-	                                            &CORD_ON_EXIT_WONT_RUN);
-	if (rc == 0)
+	                                            CORD_ON_EXIT_WONT_RUN);
+	if (!changed)
 		handler->callback(handler->argument);
 	return res;
 }
@@ -719,6 +722,7 @@ struct cord_cojoin_ctx
 	 * about to die.
 	 */
 	struct ev_async async;
+	bool task_complete;
 };
 
 static void
@@ -737,6 +741,7 @@ cord_cojoin_wakeup(struct ev_loop *loop, struct ev_async *ev, int revents)
 
 	struct cord_cojoin_ctx *ctx = (struct cord_cojoin_ctx *)ev->data;
 
+	ctx->task_complete = true;
 	fiber_wakeup(ctx->fiber);
 }
 
@@ -748,6 +753,7 @@ cord_cojoin(struct cord *cord)
 	struct cord_cojoin_ctx ctx;
 	ctx.loop = loop();
 	ctx.fiber = fiber();
+	ctx.task_complete = false;
 
 	ev_async_init(&ctx.async, cord_cojoin_wakeup);
 	ctx.async.data = &ctx;
@@ -760,15 +766,16 @@ cord_cojoin(struct cord *cord)
 	 * change-once.
 	 */
 	struct cord_on_exit *prev_handler = NULL; /* expected value */
-	bool rc = pm_atomic_compare_exchange_strong(&cord->on_exit,
-	                                            &prev_handler, &handler);
+	bool changed = pm_atomic_compare_exchange_strong(&cord->on_exit,
+	                                                 &prev_handler,
+	                                                 &handler);
 	/*
 	 * A handler installation fails either if the thread did exit or
 	 * if someone is already joining this cord (BUG).
 	 */
-	if (rc == 0) {
+	if (!changed) {
 		/* Assume cord's thread already exited. */
-		assert(prev_handler == &CORD_ON_EXIT_WONT_RUN);
+		assert(prev_handler == CORD_ON_EXIT_WONT_RUN);
 	} else {
 		/*
 		 * Wait until the thread exits. Prior to exit the
@@ -782,6 +789,9 @@ cord_cojoin(struct cord *cord)
 		 */
 		bool cancellable = fiber_set_cancellable(false);
 		fiber_yield();
+		/* Spurious wakeup indicates a severe BUG, fail early. */
+		if (ctx.task_complete == 0)
+			panic("Wrong fiber woken");
 		fiber_set_cancellable(cancellable);
 	}
 

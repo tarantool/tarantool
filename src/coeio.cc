@@ -210,7 +210,9 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 	eio_submit(&task->base);
 
 	fiber_yield();
-	assert(task->complete);
+	/* Spurious wakeup indicates a severe BUG, fail early. */
+	if (task->complete == 0)
+		panic("Wrong fiber woken");
 	va_end(task->ap);
 
 	fiber_set_cancellable(cancellable);
