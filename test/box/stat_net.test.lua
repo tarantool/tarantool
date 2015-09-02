@@ -22,3 +22,4 @@ box.stat.net.LOCKS.total > 0
 
 space:drop()
 cn:close()
+box.schema.user.revoke('guest','read,write,execute','universe')
