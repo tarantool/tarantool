@@ -383,10 +383,15 @@ replica_join(struct replica *replica)
 	fiber_join(replica->reader); /* may throw */
 }
 
-void
-replica_create(struct replica *replica, const char *uri)
+struct replica *
+replica_new(const char *uri)
 {
-	memset(replica, 0, sizeof(*replica));
+	struct replica *replica = (struct replica *)
+		calloc(1, sizeof(struct replica));
+	if (replica == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*replica), "malloc",
+			  "struct replica");
+	}
 	replica->io.fd = -1;
 
 	/* uri_parse() sets pointers to replica->source buffer */
@@ -395,11 +400,13 @@ replica_create(struct replica *replica, const char *uri)
 	/* URI checked by box_check_replication_source() */
 	assert(rc == 0 && replica->uri.service != NULL);
 	(void) rc;
+	return replica;
 }
 
 void
-replica_destroy(struct replica *replica)
+replica_delete(struct replica *replica)
 {
 	assert(replica->reader == NULL);
 	evio_close(loop(), &replica->io);
+	free(replica);
 }

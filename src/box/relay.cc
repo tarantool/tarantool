@@ -80,7 +80,7 @@ relay_set_cord_name(int fd)
 }
 
 void
-replication_join_f(va_list ap)
+relay_join_f(va_list ap)
 {
 	Relay *relay = va_arg(ap, Relay *);
 
@@ -93,8 +93,9 @@ replication_join_f(va_list ap)
 }
 
 void
-replication_join(int fd, struct xrow_header *packet,
-		 void (*on_join)(const struct tt_uuid *))
+relay_join(int fd, struct xrow_header *packet,
+	   uint32_t server_id,
+	   void (*on_join)(const struct tt_uuid *))
 {
 	Relay relay(fd, packet->sync);
 	struct recovery_state *r = relay.r;
@@ -102,19 +103,28 @@ replication_join(int fd, struct xrow_header *packet,
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(packet, &server_uuid);
 
-	cord_costart(&relay.cord, "join", replication_join_f, &relay);
+	cord_costart(&relay.cord, "join", relay_join_f, &relay);
 	cord_cojoin(&relay.cord);
 	/**
 	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster hook after sending the last row but before
+	 * in _cluster space after sending the last row but before
 	 * sending OK - if the hook fails, the error reaches the
 	 * client.
 	 */
 	on_join(&server_uuid);
 
-	/* Send response to JOIN command = end of stream */
+	/*
+	 * Send a response to JOIN request, an indicator of the
+	 * end of the stream of snapshot rows.
+	 */
 	struct xrow_header row;
 	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
+	/*
+	 * Identify the message with the server id of this
+	 * server, this is the only way for a replica to find
+	 * out the id of the server it has connected to.
+	 */
+	row.server_id = server_id;
 	relay_send(&relay, &row);
 }
 
@@ -130,7 +140,7 @@ feed_event_f(struct trigger *trigger, void * /* event */)
  * its socket, and we get an EOF.
  */
 static void
-replication_subscribe_f(va_list ap)
+relay_subscribe_f(va_list ap)
 {
 	Relay *relay = va_arg(ap, Relay *);
 	struct recovery_state *r = relay->r;
@@ -187,7 +197,7 @@ replication_subscribe_f(va_list ap)
 
 /** Replication acceptor fiber handler. */
 void
-replication_subscribe(int fd, struct xrow_header *packet)
+relay_subscribe(int fd, struct xrow_header *packet)
 {
 	Relay relay(fd, packet->sync);
 
@@ -209,14 +219,14 @@ replication_subscribe(int fd, struct xrow_header *packet)
 
 	/* Check server uuid */
 	r->server_id = schema_find_id(BOX_CLUSTER_ID, 1,
-				   tt_uuid_str(&server_uuid), UUID_STR_LEN);
+				      tt_uuid_str(&server_uuid), UUID_STR_LEN);
 	if (r->server_id == BOX_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&server_uuid));
 	}
 
 	struct cord cord;
-	cord_costart(&cord, "subscribe", replication_subscribe_f, &relay);
+	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
 	cord_cojoin(&cord);
 }
 
@@ -246,7 +256,7 @@ relay_send_row(struct recovery_state *r, void *param,
 	 * (JOIN request). In this case, send every row.
 	 * Otherwise, we're feeding a WAL, thus responding to
 	 * SUBSCRIBE request. In that case, only send a row if
-	 * it not from the same server (i.e. don't send
+	 * it is not from the same server (i.e. don't send
 	 * replica's own rows back).
 	 */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)

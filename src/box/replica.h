@@ -110,15 +110,19 @@ void
 replica_join(struct replica *replica);
 
 /**
- * Create replica and initialize remote uri (copied to struct replica).
+ * Allocate an instance of replica object, create replica and initialize
+ * remote uri (copied to struct replica).
+ *
+ * @pre     the uri is a valid and checked one
+ * @error   throws OutOfMemory exception if out of memory.
  */
-void
-replica_create(struct replica *replica, const char *uri);
+struct replica *
+replica_new(const char *uri);
 
 /**
- * Destroy replica.
+ * Destroy and delete a replica.
  */
 void
-replica_destroy(struct replica *replica);
+replica_delete(struct replica *replica);
 
 #endif /* TARANTOOL_REPLICA_H_INCLUDED */

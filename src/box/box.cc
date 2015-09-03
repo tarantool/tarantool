@@ -60,8 +60,6 @@
 
 struct recovery_state *recovery;
 
-static struct replica replica_buf; /* used to store the single instance */
-
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 bool is_ro = true;
@@ -210,7 +208,7 @@ box_set_replication_source(void)
 	/* This hook is only invoked if source has changed */
 	if (replica != NULL) {
 		replica_stop(replica); /* cancels a background fiber */
-		replica_destroy(replica);
+		replica_delete(replica);
 		replica = NULL;
 	}
 
@@ -218,8 +216,7 @@ box_set_replication_source(void)
 		return;
 
 	/* Start a new replication client using provided URI */
-	replica_create(&replica_buf, source);
-	replica = &replica_buf;
+	replica = replica_new(source);
 	replica_start(replica, recovery); /* starts a background fiber */
 }
 
@@ -545,8 +542,9 @@ box_process_join(int fd, struct xrow_header *header)
 
 	assert(header->type == IPROTO_JOIN);
 
-	/* Process JOIN request via replication relay */
-	replication_join(fd, header, box_on_cluster_join);
+	/* Process JOIN request via a replication relay */
+	relay_join(fd, header, recovery->server_id,
+		   box_on_cluster_join);
 }
 
 void
@@ -556,7 +554,7 @@ box_process_subscribe(int fd, struct xrow_header *header)
 	access_check_universe(PRIV_R);
 
 	/* process SUBSCRIBE request via replication relay */
-	replication_subscribe(fd, header);
+	relay_subscribe(fd, header);
 }
 
 /** Replace the current server id in _cluster */
@@ -699,8 +697,7 @@ box_init(void)
 		vclock_add_server(&recovery->vclock, 0);
 
 		/* Bootstrap from replica */
-		replica_create(&replica_buf, source);
-		replica = &replica_buf;
+		replica = replica_new(source);
 		replica_start(replica, recovery);
 		replica_join(replica); /* throws on failure */
 
@@ -739,10 +736,8 @@ box_init(void)
 	rmean_cleanup(rmean_box);
 
 	if (source != NULL) {
-		if (replica == NULL) {
-			replica_create(&replica_buf, source);
-			replica = &replica_buf;
-		} /* else re-use instance from bootstrap */
+		if (replica == NULL)
+			replica = replica_new(source);
 		/* Follow replica */
 		assert(recovery->writer);
 		replica_start(replica, recovery);
