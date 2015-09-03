@@ -79,3 +79,12 @@ s = box.schema.create_space('t',{engine='sophia'})
 i = s:create_index('primary',{parts={1,'str',2,'str',3,'str',4,'str',5,'str',6,'str',7,'str',8,'str',9,'str'}})
 s:insert{'1','2','3','4','5','6','7','8','9'}
 s:drop()
+
+
+-- gh-1016: behaviour of multi-part indexes
+s = box.schema.create_space('t',{engine='sophia'})
+i = s:create_index('primary',{parts={1,'str',2,'str',3,'str'}})
+s:insert{'1','2','3'}
+s:insert{'1','2','0'}
+i:select({'1','2',nil},{iterator='GT'})
+s:drop()

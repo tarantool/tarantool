@@ -693,7 +693,7 @@ SophiaIndex::allocIterator() const
 		(struct sophia_iterator *) calloc(1, sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-		          sizeof(struct sophia_iterator), "SophiaIndex",
+		          sizeof(struct sophia_iterator), "Sophia Index",
 		          "iterator");
 	}
 	it->base.next = sophia_iterator_next;
@@ -709,7 +709,12 @@ SophiaIndex::initIterator(struct iterator *ptr,
 {
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	if (part_count == 0) {
+	if (part_count > 0) {
+		if (part_count != key_def->part_count) {
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+			          "Sophia Index iterator", "uncomplete keys");
+		}
+	} else {
 		key = NULL;
 	}
 	it->key = key;
@@ -735,7 +740,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,
-		          "SophiaIndex", "requested iterator type");
+		          "Sophia Index", "requested iterator type");
 	}
 	it->base.next = sophia_iterator_next;
 	it->cursor = sp_cursor(env);

@@ -33,3 +33,16 @@ space:drop()
 space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num', 9, 'num'} })
 space:drop()
+
+
+-- ensure all key-parts are passed
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num'} })
+space:insert{1}
+space:replace{1}
+space:delete{1}
+space:update(1, {{'=', 1, 101}})
+space:upsert(1, {{'+', 1, 10}}, {0})
+space:get{1}
+index:select({1}, {iterator = box.index.GT})
+space:drop()
