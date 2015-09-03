@@ -129,27 +129,50 @@ message (STATUS "Use LuaJIT includes: ${LUAJIT_INCLUDE}")
 message (STATUS "Use LuaJIT library: ${LUAJIT_LIB}")
 
 macro(luajit_build)
-    set (luajit_buildoptions BUILDMODE=static)
-    set (luajit_copt "")
-    set (luajit_xcflags "")
+    # Cmake rules concerning strings and lists of strings are weird.
+    #   set (foo "1 2 3") defines a string, while
+    #   set (foo 1 2 3) defines a list.
+    # Use separate_arguments() to turn a string into a list (splits at ws).
+    # It appears that variable expansion rules are context-dependent.
+    # With the current arrangement add_custom_command()
+    # does the right thing. We can even handle pathnames with
+    # spaces though a path with an embeded semicolon or a quotation mark
+    # will most certainly wreak havok.
+    #
+    # This stuff is extremely fragile, proceed with caution.
+    set (luajit_cflags ${CMAKE_C_FLAGS})
+        separate_arguments(luajit_cflags)
+    set (luajut_ldflags ${CMAKE_STATIC_LINKER_FLAGS})
+        separate_arguments(luajit_ldflags)
+    # Use external unwind on all platforms.
+    set (luajit_xcflags "-DLUAJIT_UNWIND_EXTERNAL=1")
+    # We are consciously ommiting debug info in RelWithDebugInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        set (luajit_buildoptions ${luajit_buildoptions} CCDEBUG=${CC_DEBUG_OPT})
-        set (luajit_copt ${luajit_copt} -O1)
+        set (luajit_ccopt -O0)
+        if (CC_HAS_GGDB)
+            set (luajit_ccdebug -g -ggdb)
+        else ()
+            set (luajit_ccdebug -g)
+        endif ()
         set (luajit_xcflags ${luajit_xcflags}
             -DLUA_USE_APICHECK -DLUA_USE_ASSERT)
     else ()
-        set (luajit_copt ${luajit_copt} -O2)
+        set (luajit_ccopt -O2)
+        set (luajit_ccdbebug "")
+    endif()
+    # Pass sysroot settings on OSX
+    if (NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
+        set (luajit_cflags ${luajit_cflags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
+        set (luajit_ldflags ${luajit_ldlags} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT})
     endif()
     if (ENABLE_VALGRIND)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
     endif()
-    set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1} ${CMAKE_C_FLAGS}")
-    # Use external unwind on all platforms.
-    set (luajit_target_cc "${luajit_target_cc} -DLUAJIT_UNWIND_EXTERNAL=1")
+    set (luajit_target_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
     if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
         # Regular mode - use CMake compiler for building host utils.
-        set (luajit_host_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1} ${CMAKE_C_FLAGS})
+        set (luajit_host_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
     else()
         # Crosscompile mode - use a host CC compiler for building host utils.
         # Since CMake does not support cross compilation properly
@@ -161,20 +184,16 @@ macro(luajit_build)
         # The host compiler must have same pointer size as the target compiler.
         set (luajit_host_cc "${luajit_host_cc} -m32")
     endif()
-    set(luajit_ldflags "${CMAKE_SHARED_LINKER_FLAGS}")
-    separate_arguments(luajit_copt)
-    separate_arguments(luajit_ldflags)
-    separate_arguments(luajit_host_cc)
-    separate_arguments(luajit_target_cc)
-    set (luajit_buildoptions ${luajit_buildoptions}
-        CFLAGS=""
-        CXXFLAGS=""
-        XCFLAGS="${luajit_xcflags}"
+    set (luajit_buildoptions
+        BUILDMODE=static
         CC="${luajit_host_cc}"
-        HOST_CC="${luajit_host_cc}"
+        CFLAGS="${luajit_cflags}"
+        LDFLAGS="${luajit_ldflags}"
+        CCOPT="${luajit_ccopt}"
+        CCDEBUG="${luajit_ccdebug}"
+        XCFLAGS="${luajit_xcflags}"
         TARGET_CC="${luajit_target_cc}"
-        CCOPT="${luajit_copt}")
-    set (luajit_buildoptions ${luajit_buildoptions} Q='' LDFLAGS="${luajit_ldflags}")
+        Q='')
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
