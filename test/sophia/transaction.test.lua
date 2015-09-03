@@ -78,3 +78,12 @@ for key = 1, 10 do assert(#b:select({key}) == 0) end
 t
 a:drop()
 b:drop()
+
+
+-- ensure findByKey works in empty transaction context
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+box.begin()
+space:get({0})
+box.rollback()
+space:drop()
