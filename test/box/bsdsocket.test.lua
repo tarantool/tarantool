@@ -495,8 +495,6 @@ os.remove(path)
 
 -- Test serializers with sockets
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
--- waiters is map
-s.waiters
 -- check __serialize hook
 json.decode(json.encode(s)).fd == s:fd()
 yaml.decode(yaml.encode(s)).fd == s:fd()
