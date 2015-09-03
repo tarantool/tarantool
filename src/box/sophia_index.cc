@@ -287,7 +287,10 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	(void)part_count;
 	void *obj = ((SophiaIndex *)this)->createObject(key, true, NULL);
 	void *transaction = db;
-	if (in_txn())
+	/* engine_tx might be empty, even if we are in txn context.
+	 *
+	 * This can happen on a first-read statement. */
+	if (in_txn() && in_txn()->engine_tx)
 		transaction = in_txn()->engine_tx;
 	obj = sp_get(transaction, obj);
 	if (obj == NULL)
