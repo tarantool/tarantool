@@ -114,10 +114,8 @@ replica_connect(struct replica *replica, struct ev_io *coio,
 	assert(coio->fd >= 0);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	if (!replica->warning_said) {
-		say_info("connected to %s", sio_strfaddr(&replica->addr,
-			 replica->addr_len));
-	}
+	say_info("connected to %s",
+		 sio_strfaddr(&replica->addr, replica->addr_len));
 
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&fiber()->diag);
@@ -150,10 +148,8 @@ static void
 replica_process_join(struct replica *replica, struct recovery_state *r,
 		    struct ev_io *coio, struct iobuf *iobuf)
 {
-	if (!replica->warning_said) {
-		say_info("bootstrapping a replica from %s",
-			 sio_strfaddr(&replica->addr, replica->addr_len));
-	}
+	say_info("downloading a snapshot from %s",
+		 sio_strfaddr(&replica->addr, replica->addr_len));
 
 	/* Send JOIN request */
 	struct xrow_header row;
@@ -198,11 +194,6 @@ static void
 replica_process_subscribe(struct replica *replica, struct recovery_state *r,
 			 struct ev_io *coio, struct iobuf *iobuf)
 {
-	if (!replica->warning_said) {
-		say_info("subscribing to updates from %s",
-			 sio_strfaddr(&replica->addr, replica->addr_len));
-	}
-
 	/* Send SUBSCRIBE request */
 	struct xrow_header row;
 	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
@@ -351,7 +342,8 @@ replica_start(struct replica *replica, struct recovery_state *r)
 	assert(replica->reader == NULL);
 
 	const char *uri = uri_format(&replica->uri);
-	say_info("starting replication from %s", uri);
+	if (replica->io.fd < 0)
+		say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
 	struct fiber *f = fiber_new(name, pull_from_replica);
@@ -371,7 +363,7 @@ replica_stop(struct replica *replica)
 	if (f == NULL)
 		return;
 	const char *uri = uri_format(&replica->uri);
-	say_info("shutting down replica %s", uri);
+	say_crit("shutting down replica %s", uri);
 	fiber_cancel(f);
 	/**
 	 * If the replica died from an exception, don't throw it

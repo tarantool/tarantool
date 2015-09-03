@@ -89,6 +89,7 @@ replication_join_f(va_list ap)
 	/* Send snapshot */
 	engine_join(relay);
 
+	say_info("snapshot sent");
 }
 
 void
@@ -115,7 +116,6 @@ replication_join(int fd, struct xrow_header *packet,
 	struct xrow_header row;
 	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
 	relay_send(&relay, &row);
-	say_info("snapshot sent");
 }
 
 static void
