@@ -186,9 +186,6 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 #ifdef SO_BROADCAST
 	{"SO_BROADCAST",	SO_BROADCAST,		1,	1, },
 #endif
-#ifdef SO_BSDCOMPAT
-	{"SO_BSDCOMPAT",	SO_BSDCOMPAT,		1,	1, },
-#endif
 #ifdef SO_DEBUG
 	{"SO_DEBUG",		SO_DEBUG,		1,	1, },
 #endif

@@ -258,10 +258,6 @@ s:error()
 ---
 - null
 ...
-s:setsockopt('SOL_SOCKET', 'SO_BSDCOMPAT', false)
----
-- true
-...
 s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
 ---
 - true

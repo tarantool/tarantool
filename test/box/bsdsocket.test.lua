@@ -86,7 +86,6 @@ sevres[1].host
 s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
 s:getsockopt('SOL_SOCKET', 'SO_TYPE')
 s:error()
-s:setsockopt('SOL_SOCKET', 'SO_BSDCOMPAT', false)
 s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
 s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
