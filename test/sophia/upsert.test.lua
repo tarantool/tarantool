@@ -54,3 +54,18 @@ t = {}
 for key = 1, 100 do table.insert(t, space:get({key, key})) end
 t
 space:drop()
+
+
+-- upsert default tuple constraint
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+space:upsert({0, 0}, {{'+', 3, 1}}, {0, 'key', 0})
+space:drop()
+
+
+-- upsert primary key modify (skipped)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+space:upsert({0}, {{'+', 1, 1}, {'+', 2, 1}}, {0, 0})
+space:get({0})
+space:drop()
