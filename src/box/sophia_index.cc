@@ -54,11 +54,11 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	char *value = (char *)sp_getstring(obj, "value", &valuesize);
 	char *valueend = value + valuesize;
 
-	assert(key_def->part_count < 16);
+	assert(key_def->part_count <= 8);
 	struct {
 		const char *part;
 		int size;
-	} parts[16];
+	} parts[8];
 
 	/* prepare keys */
 	int size = 0;
@@ -121,12 +121,12 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	return raw;
 }
 
-static uint64_t num_parts[16];
+static uint64_t num_parts[8];
 
 void*
 SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 {
-	assert(key_def->part_count < 16);
+	assert(key_def->part_count <= 8);
 	void *host = db;
 	if (async) {
 		host = sp_asynchronous(db);

@@ -72,3 +72,10 @@ s:insert{''}
 #i:select{''}
 i:get{''}
 s:drop()
+
+
+-- gh-1015: assertion if nine indexed fields
+s = box.schema.create_space('t',{engine='sophia'})
+i = s:create_index('primary',{parts={1,'str',2,'str',3,'str',4,'str',5,'str',6,'str',7,'str',8,'str',9,'str'}})
+s:insert{'1','2','3','4','5','6','7','8','9'}
+s:drop()

@@ -22,3 +22,14 @@ space:upsert('A', {{'+', 1, 10}}, {0})
 space:get{'A'}
 index:pairs('A', {iterator = 'GE'})
 space:drop()
+
+
+-- test key-parts limit (8 max)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num'} })
+space:drop()
+
+-- test key-parts limit (hit the limit)
+space = box.schema.space.create('test', { engine = 'sophia' })
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num', 9, 'num'} })
+space:drop()
