@@ -62,19 +62,30 @@ void sophia_error(void *env)
 	tnt_raise(ClientError, ER_SOPHIA, msg);
 }
 
-void sophia_info(void (*cb)(const char*, const char*, int, void*), void *arg)
+int sophia_info(const char *name, sophia_info_f cb, void *arg)
 {
 	SophiaEngine *e = (SophiaEngine *)engine_find("sophia");
 	void *cursor = sp_getobject(e->env, NULL);
 	void *o = NULL;
-	int i = 0;
+	if (name) {
+		while ((o = sp_get(cursor, o))) {
+			char *key = (char *)sp_getstring(o, "key", 0);
+			if (name && strcmp(key, name) != 0)
+				continue;
+			char *value = (char *)sp_getstring(o, "value", 0);
+			cb(key, value, arg);
+			return 1;
+		}
+		sp_destroy(cursor);
+		return 0;
+	}
 	while ((o = sp_get(cursor, o))) {
 		char *key = (char *)sp_getstring(o, "key", 0);
 		char *value = (char *)sp_getstring(o, "value", 0);
-		cb(key, value, i, arg);
-		i++;
+		cb(key, value, arg);
 	}
 	sp_destroy(cursor);
+	return 0;
 }
 
 struct SophiaSpace: public Handler {

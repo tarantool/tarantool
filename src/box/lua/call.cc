@@ -36,6 +36,7 @@
 #include "box/lua/index.h"
 #include "box/lua/space.h"
 #include "box/lua/stat.h"
+#include "box/lua/sophia.h"
 #include "box/lua/info.h"
 #include "box/lua/session.h"
 #include "box/lua/net_box.h"
@@ -726,8 +727,8 @@ box_lua_init(struct lua_State *L)
 	box_lua_index_init(L);
 	box_lua_space_init(L);
 	box_lua_info_init(L);
-	box_lua_sophia_init(L);
 	box_lua_stat_init(L);
+	box_lua_sophia_init(L);
 	box_lua_session_init(L);
 
 	/* Load Lua extension */
