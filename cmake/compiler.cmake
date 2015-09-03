@@ -80,10 +80,9 @@ set(CMAKE_REQUIRED_FLAGS "")
 #
 # Perform build type specific configuration.
 #
-if (CMAKE_COMPILER_IS_GNUCC)
+check_c_compiler_flag("-ggdb" CC_HAS_GGDB)
+if (CC_HAS_GGDB)
     set (CC_DEBUG_OPT "-ggdb")
-else()
-    set (CC_DEBUG_OPT "-g")
 endif()
 
 set (CMAKE_C_FLAGS_DEBUG
