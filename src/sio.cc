@@ -214,7 +214,7 @@ sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
 	/* Establish the connection. */
 	int rc = connect(fd, (struct sockaddr *) addr, addrlen);
 	if (rc < 0 && errno != EINPROGRESS) {
-		tnt_raise(SocketError, fd, "connect");
+		tnt_raise(SocketError, fd, "connect to %s", sio_strfaddr((struct sockaddr *)addr, addrlen));
 	}
 	return rc;
 }
