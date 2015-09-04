@@ -201,11 +201,12 @@ sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc ~= nil
 sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 sc:nonblock(true)
-sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS or errno() == errno.ECONNREFUSED
 string.match(tostring(sc), ', peer') == nil
 sc:writable()
 string.match(tostring(sc), ', peer') == nil
-require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+socket_error == errno.ECONNREFUSED or socket_error == 0
 
 --# setopt delimiter ';'
 socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
