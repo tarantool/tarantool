@@ -251,15 +251,9 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 #endif
 #ifdef SO_PROTOCOL
 	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
-#else
-#define SO_PROTOCOL	38
 #endif
 
-#ifdef SO_TYPE
 	{"SO_TYPE",		SO_TYPE,		1,	0, },
-#else
-#define SO_TYPE		3
-#endif
 
 	{"",			0,			0,	0, }
 };
@@ -718,68 +712,66 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 	return 1;
 }
 
-static void
-lbox_bsdsocket_update_proto_type(struct lua_State *L, int fh)
+static int
+lbox_bsdsocket_name(struct lua_State *L,
+                    int (*getname_func) (int, struct sockaddr *, socklen_t *))
 {
+	lua_pushvalue(L, 1);
+	int fh = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+
+	struct sockaddr_storage addr;
+	socklen_t len = sizeof(addr);
+	if (getname_func(fh, (struct sockaddr *)&addr, &len) != 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	lbox_bsdsocket_push_addr(L, (const struct sockaddr *)&addr, len);
 	if (lua_isnil(L, -1))
-		return;
+		return 1;
 
-	int save_errno = errno;
-
-	int value;
-	socklen_t len = sizeof(value);
-
-	if (getsockopt(fh, SOL_SOCKET, SO_PROTOCOL, &value, &len) == 0) {
-		lua_pushliteral(L, "protocol");
-		lbox_bsdsocket_push_protocol(L, value);
-		lua_rawset(L, -3);
-	}
-
-	len = sizeof(value);
-	if (getsockopt(fh, SOL_SOCKET, SO_TYPE, &value, &len) == 0) {
+	int type;
+	len = sizeof(type);
+	if (getsockopt(fh, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
 		lua_pushliteral(L, "type");
-		lbox_bsdsocket_push_sotype(L, value);
+		lbox_bsdsocket_push_sotype(L, type);
+		lua_rawset(L, -3);
+	} else {
+		type = -1;
+	}
+
+	int protocol = 0;
+#ifdef SO_PROTOCOL
+    len = sizeof(protocol);
+	if (getsockopt(fh, SOL_SOCKET, SO_PROTOCOL, &protocol, &len) == 0) {
+		lua_pushliteral(L, "protocol");
+		lbox_bsdsocket_push_protocol(L, protocol);
 		lua_rawset(L, -3);
 	}
-	errno = save_errno;
-
+#else
+	if (addr.ss_family == AF_INET || addr.ss_family == AF_INET6) {
+		if (type == SOCK_STREAM)
+			protocol = IPPROTO_TCP;
+		if (type == SOCK_DGRAM)
+			protocol = IPPROTO_UDP;
+	}
+	lua_pushliteral(L, "protocol");
+	lbox_bsdsocket_push_protocol(L, protocol);
+	lua_rawset(L, -3);
+#endif
+	return 1;
 }
 
 static int
 lbox_bsdsocket_soname(struct lua_State *L)
 {
-	lua_pushvalue(L, 1);
-	int fh = lua_tointeger(L, -1);
-	lua_pop(L, 1);
-
-
-	struct sockaddr_storage addr;
-	socklen_t len = sizeof(addr);
-	if (getsockname(fh, (struct sockaddr *)&addr, &len) != 0) {
-		lua_pushnil(L);
-		return 1;
-	}
-	lbox_bsdsocket_push_addr(L, (const struct sockaddr *)&addr, len);
-	lbox_bsdsocket_update_proto_type(L, fh);
-	return 1;
+	return lbox_bsdsocket_name(L, getsockname);
 }
 
 static int
 lbox_bsdsocket_peername(struct lua_State *L)
 {
-	lua_pushvalue(L, 1);
-	int fh = lua_tointeger(L, -1);
-	lua_pop(L, 1);
-
-	struct sockaddr_storage addr;
-	socklen_t len = sizeof(addr);
-	if (getpeername(fh, (struct sockaddr *)&addr, &len) != 0) {
-		lua_pushnil(L);
-		return 1;
-	}
-	lbox_bsdsocket_push_addr(L, (const struct sockaddr *)&addr, len);
-	lbox_bsdsocket_update_proto_type(L, fh);
-	return 1;
+	return lbox_bsdsocket_name(L, getpeername);
 }
 
 static int
