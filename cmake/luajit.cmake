@@ -129,7 +129,6 @@ message (STATUS "Use LuaJIT includes: ${LUAJIT_INCLUDE}")
 message (STATUS "Use LuaJIT library: ${LUAJIT_LIB}")
 
 macro(luajit_build)
-    set (luajit_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
     # Cmake rules concerning strings and lists of strings are weird.
     #   set (foo "1 2 3") defines a string, while
     #   set (foo 1 2 3) defines a list.
@@ -170,14 +169,30 @@ macro(luajit_build)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
     endif()
+    set (luajit_target_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
+        # Regular mode - use CMake compiler for building host utils.
+        set (luajit_host_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
+    else()
+        # Crosscompile mode - use a host CC compiler for building host utils.
+        # Since CMake does not support cross compilation properly
+        # we have to use system CC here.
+        set (luajit_host_cc "cc")
+    endif()
+    if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND
+            ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
+        # The host compiler must have same pointer size as the target compiler.
+        set (luajit_host_cc "${luajit_host_cc} -m32")
+    endif()
     set (luajit_buildoptions
         BUILDMODE=static
-        CC="${luajit_cc}"
+        CC="${luajit_host_cc}"
         CFLAGS="${luajit_cflags}"
         LDFLAGS="${luajit_ldflags}"
         CCOPT="${luajit_ccopt}"
         CCDEBUG="${luajit_ccdebug}"
         XCFLAGS="${luajit_xcflags}"
+        TARGET_CC="${luajit_target_cc}"
         Q='')
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
