@@ -553,8 +553,20 @@ box_process_subscribe(int fd, struct xrow_header *header)
 	/* Check permissions */
 	access_check_universe(PRIV_R);
 
-	/* process SUBSCRIBE request via replication relay */
-	relay_subscribe(fd, header);
+	/*
+	 * Process SUBSCRIBE request via replication relay
+	 * Send current recovery vector clock as a marker
+	 * of the "current" state of the master. When
+	 * replica fetches rows up to this position,
+	 * it enters read-write mode.
+	 *
+	 * @todo: this is not implemented, this is imperfect, and
+	 * this is buggy in case there is rollback followed by
+	 * a stall in updates (in this case replica may hang
+	 * indefinitely).
+	 */
+	relay_subscribe(fd, header, recovery->server_id,
+			&recovery->vclock);
 }
 
 /** Replace the current server id in _cluster */

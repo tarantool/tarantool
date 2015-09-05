@@ -68,7 +68,7 @@ public:
  */
 void
 relay_join(int fd, struct xrow_header *packet,
-	   uint32_t server_id,
+	   uint32_t master_server_id,
 	   void (*on_join)(const struct tt_uuid *));
 
 /**
@@ -77,7 +77,9 @@ relay_join(int fd, struct xrow_header *packet,
  * @return none.
  */
 void
-relay_subscribe(int fd, struct xrow_header *packet);
+relay_subscribe(int fd, struct xrow_header *packet,
+		uint32_t master_server_id,
+		struct vclock *master_vclock);
 
 void
 relay_send(Relay *relay, struct xrow_header *packet);

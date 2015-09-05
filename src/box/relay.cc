@@ -94,7 +94,7 @@ relay_join_f(va_list ap)
 
 void
 relay_join(int fd, struct xrow_header *packet,
-	   uint32_t server_id,
+	   uint32_t master_server_id,
 	   void (*on_join)(const struct tt_uuid *))
 {
 	Relay relay(fd, packet->sync);
@@ -124,7 +124,7 @@ relay_join(int fd, struct xrow_header *packet,
 	 * server, this is the only way for a replica to find
 	 * out the id of the server it has connected to.
 	 */
-	row.server_id = server_id;
+	row.server_id = master_server_id;
 	relay_send(&relay, &row);
 }
 
@@ -197,7 +197,9 @@ relay_subscribe_f(va_list ap)
 
 /** Replication acceptor fiber handler. */
 void
-relay_subscribe(int fd, struct xrow_header *packet)
+relay_subscribe(int fd, struct xrow_header *packet,
+		uint32_t master_server_id,
+		struct vclock *master_vclock)
 {
 	Relay relay(fd, packet->sync);
 
@@ -224,6 +226,20 @@ relay_subscribe(int fd, struct xrow_header *packet)
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&server_uuid));
 	}
+	/*
+	 * Send a response to SUBSCRIBE request, tell
+	 * the replica how many rows we have in stock for it,
+	 * and identify ourselves with our own server id.
+	 */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, master_vclock);
+	/*
+	 * Identify the message with the server id of this
+	 * server, this is the only way for a replica to find
+	 * out the id of the server it has connected to.
+	 */
+	row.server_id = master_server_id;
+	relay_send(&relay, &row);
 
 	struct cord cord;
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
@@ -237,10 +253,6 @@ relay_send(Relay *relay, struct xrow_header *packet)
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(packet, iov);
 	coio_writev(&relay->io, iov, iovcnt, 0);
-	ERROR_INJECT(ERRINJ_RELAY,
-	{
-		sleep(1000);
-	});
 }
 
 /** Send a single row to the client. */
@@ -259,8 +271,13 @@ relay_send_row(struct recovery_state *r, void *param,
 	 * it is not from the same server (i.e. don't send
 	 * replica's own rows back).
 	 */
-	if (packet->server_id == 0 || packet->server_id != r->server_id)
+	if (packet->server_id == 0 || packet->server_id != r->server_id) {
 		relay_send(relay, packet);
+		ERROR_INJECT(ERRINJ_RELAY,
+		{
+			fiber_sleep(1000.0);
+		});
+	}
 	/*
 	 * Update local vclock. During normal operation wal_write()
 	 * updates local vclock. In relay mode we have to update

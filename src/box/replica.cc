@@ -145,8 +145,8 @@ replica_connect(struct replica *replica, struct ev_io *coio,
  * Execute and process JOIN request (bootstrap the server).
  */
 static void
-replica_process_join(struct replica *replica, struct recovery_state *r,
-		    struct ev_io *coio, struct iobuf *iobuf)
+replica_join(struct replica *replica, struct recovery_state *r,
+	     struct ev_io *coio, struct iobuf *iobuf)
 {
 	say_info("downloading a snapshot from %s",
 		 sio_strfaddr(&replica->addr, replica->addr_len));
@@ -191,8 +191,8 @@ replica_process_join(struct replica *replica, struct recovery_state *r,
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
-replica_process_subscribe(struct replica *replica, struct recovery_state *r,
-			 struct ev_io *coio, struct iobuf *iobuf)
+replica_subscribe(struct replica *replica, struct recovery_state *r,
+		  struct ev_io *coio, struct iobuf *iobuf)
 {
 	/* Send SUBSCRIBE request */
 	struct xrow_header row;
@@ -225,7 +225,7 @@ replica_process_subscribe(struct replica *replica, struct recovery_state *r,
 
 /**
  * Write a nice error message to log file on SocketError or ClientError
- * in pull_from_replica().
+ * in replica_f().
  */
 static inline void
 replica_log_exception(struct replica *replica, Exception *e)
@@ -254,7 +254,7 @@ replica_log_exception(struct replica *replica, Exception *e)
 }
 
 static void
-pull_from_replica(va_list ap)
+replica_f(va_list ap)
 {
 	struct replica *replica = va_arg(ap, struct replica *);
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
@@ -269,24 +269,25 @@ pull_from_replica(va_list ap)
 		try {
 			if (coio->fd < 0)
 				replica_connect(replica, coio, iobuf);
-
 			/*
-			 * Execute JOIN if recovery is not finalized yet
-			 * and SUBSCRIBE otherwise.
+			 * Execute JOIN if this is a bootstrap, and
+			 * there is no snapshot, and SUBSCRIBE
+			 * otherwise.
 			 */
 			if (r->writer == NULL) {
-				replica_process_join(replica, r, coio, iobuf);
-				ev_io_stop(loop(), coio);
-				/* keep connection */
-				return;
+				replica_join(replica, r, coio, iobuf);
+			} else {
+				replica_subscribe(replica, r, coio, iobuf);
+				/*
+				 * subscribe() has an infinite
+				 * loop which is stoppable only
+				 * with fiber_cancel()
+				 */
+				assert(0);
 			}
-			replica_process_subscribe(replica, r, coio, iobuf);
-			/*
-			 * process_subscribe() has an infinity loop and
-			 * can be stopped only using fiber_cancel()
-			 */
-			assert(0); /* unreachable */
-			break;
+			ev_io_stop(loop(), coio);
+			/* Don't close the socket */
+			return;
 		} catch (ClientError *e) {
 			replica_log_exception(replica, e);
 			evio_close(loop, coio);
@@ -346,7 +347,7 @@ replica_start(struct replica *replica, struct recovery_state *r)
 		say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
-	struct fiber *f = fiber_new(name, pull_from_replica);
+	struct fiber *f = fiber_new(name, replica_f);
 	/**
 	 * So that we can safely grab the status of the
 	 * fiber any time we want.
