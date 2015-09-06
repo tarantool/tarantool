@@ -131,6 +131,28 @@ rtree_set2dp(struct rtree_rect *rect, coord_t x, coord_t y)
 	rect->coords[3] = y;
 }
 
+/* Manhattan distance */
+static sq_coord_t
+rtree_rect_neigh_distance(const struct rtree_rect *rect,
+			   const struct rtree_rect *neigh_rect,
+			   unsigned dimension)
+{
+	sq_coord_t result = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		if (neigh_coord < coords[0]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
+			result += -diff;
+		} else if (neigh_coord > coords[1]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[1]);
+			result += diff;
+		}
+	}
+	return result;
+}
+
+/* Euclid distance, squared */
 static sq_coord_t
 rtree_rect_neigh_distance2(const struct rtree_rect *rect,
 			   const struct rtree_rect *neigh_rect,
@@ -855,8 +877,13 @@ rtree_iterator_process_neigh(struct rtree_iterator *itr,
 	for (int i = 0, n = pg->n; i < n; i++) {
 		struct rtree_page_branch *b;
 		b = rtree_branch_get(itr->tree, pg, i);
-		coord_t distance =
-			rtree_rect_neigh_distance2(&b->rect, &itr->rect, d);
+		coord_t distance;
+		if (itr->tree->distance_type == RTREE_EUCLID)
+			distance = rtree_rect_neigh_distance2(&b->rect,
+							      &itr->rect, d);
+		else
+			distance = rtree_rect_neigh_distance(&b->rect,
+							     &itr->rect, d);
 		struct rtree_neighbor *neigh =
 			rtree_iterator_new_neighbor(itr, b->data.page,
 						    distance, level - 1);
@@ -919,7 +946,8 @@ rtree_iterator_next(struct rtree_iterator *itr)
 
 int
 rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
-	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free)
+	   rtree_extent_alloc_t extent_alloc, rtree_extent_free_t extent_free,
+	   enum rtree_distance_type distance_type)
 {
 	tree->n_records = 0;
 	tree->height = 0;
@@ -929,6 +957,7 @@ rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
 	tree->free_pages = 0;
 
 	tree->dimension = dimension;
+	tree->distance_type = distance_type;
 	tree->page_branch_size =
 		(RTREE_BRANCH_DATA_SIZE + dimension * 2 * sizeof(coord_t));
 	tree->page_size = RTREE_OPTIMAL_BRANCHES_IN_PAGE *
@@ -1071,9 +1100,15 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		if (tree->root) {
 			struct rtree_rect cover;
 			rtree_page_cover(tree, tree->root, &cover);
-			sq_coord_t distance =
+			sq_coord_t distance;
+			if (tree->distance_type == RTREE_EUCLID)
+				distance =
 				rtree_rect_neigh_distance2(&cover, rect,
 							   tree->dimension);
+			else
+				distance =
+				rtree_rect_neigh_distance(&cover, rect,
+							  tree->dimension);
 			struct rtree_neighbor *n =
 				rtree_iterator_new_neighbor(itr, tree->root,
 							    distance,

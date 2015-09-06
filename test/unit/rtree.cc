@@ -36,7 +36,8 @@ simple_check()
 	header();
 
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
+	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+		   RTREE_EUCLID);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (size_t i = 1; i <= rounds; i++) {
@@ -228,7 +229,8 @@ neighbor_test()
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free);
+		rtree_init(&tree, 2, extent_size, extent_alloc, extent_free,
+			   RTREE_EUCLID);
 
 		rtree_test_build(&tree, arr, i);
 

@@ -250,7 +250,7 @@ schema_init()
 	struct space_def def = {
 		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
 	};
-	struct key_opts opts = { true /* is_unique */, 0 /* dimension */ };
+	struct key_opts opts = key_opts_default;
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */

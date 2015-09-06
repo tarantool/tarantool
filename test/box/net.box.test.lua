@@ -302,6 +302,9 @@ cn = remote.new(uri, { password = 'test' })
 cn:ping()
 cn:close()
 
+box.schema.user.revoke('netbox', 'read, write, execute', 'universe');
+box.schema.user.drop('netbox')
+
 -- #594: bad argument #1 to 'setmetatable' (table expected, got number)
 --# setopt delimiter ';'
 function gh594()

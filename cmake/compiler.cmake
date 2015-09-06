@@ -41,7 +41,14 @@ endif()
 if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
    (NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
     set(CMAKE_REQUIRED_FLAGS "-std=c11")
-    check_c_source_compiles("int main(void) { return 0; }" HAVE_STD_C11)
+    check_c_source_compiles("
+    /*
+     * FreeBSD 10 ctype.h header fail to compile on gcc4.8 in c11 mode.
+     * Make sure we aren't affected.
+     */
+    #include <ctype.h>
+    int main(void) { return 0; }
+    " HAVE_STD_C11)
     set(CMAKE_REQUIRED_FLAGS "-std=gnu99")
     check_c_source_compiles("int main(void) { return 0; }" HAVE_STD_GNU99)
     set(CMAKE_REQUIRED_FLAGS "-std=c++11")
@@ -73,10 +80,9 @@ set(CMAKE_REQUIRED_FLAGS "")
 #
 # Perform build type specific configuration.
 #
-if (CMAKE_COMPILER_IS_GNUCC)
+check_c_compiler_flag("-ggdb" CC_HAS_GGDB)
+if (CC_HAS_GGDB)
     set (CC_DEBUG_OPT "-ggdb")
-else()
-    set (CC_DEBUG_OPT "-g")
 endif()
 
 set (CMAKE_C_FLAGS_DEBUG

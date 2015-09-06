@@ -103,7 +103,6 @@ i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
 i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}})
 for i = 1,10 do s:insert{i, i, {i, i, i + 1, i + 1}} end
 box.snapshot()
-for i = 11,20 do s:insert{i, i, i + 1, i + 1}
 i:select({0, 0}, {iterator = 'neighbor'})
 --# stop server default
 --# start server default
@@ -112,3 +111,53 @@ i = s.index.spatial
 i:select({0, 0}, {iterator = 'neighbor'})
 s:drop()
 
+s = box.schema.space.create('spatial')
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'array'}, dimension = 4})
+for i = 1,10 do s:insert{i, i, {i, i, i, i, i + 1, i + 1, i + 1, i + 1}} end
+box.snapshot()
+i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
+--# stop server default
+--# start server default
+s = box.space.spatial
+i = s.index.spatial
+i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
+s:drop()
+
+-- distance type
+iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
+iopts['distance'] = 'euclid'
+s = box.schema.space.create('spatial')
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('spatial', iopts)
+s:insert{1, {0, 5}}
+s:insert{2, {5, 0}}
+s:insert{3, {5, 5}}
+s:insert{4, {8, 0}}
+s:insert{5, {0, 8}}
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+s:drop()
+
+iopts = { type = 'rtree', unique = false, parts = {2, 'array'} }
+iopts['distance'] = 'manhattan'
+s = box.schema.space.create('spatial')
+i = s:create_index('primary', { type = 'tree', parts = {1, 'num'}})
+i = s:create_index('spatial', iopts)
+s:insert{1, {0, 5}}
+s:insert{2, {5, 0}}
+s:insert{3, {5, 5}}
+s:insert{4, {8, 0}}
+s:insert{5, {0, 8}}
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+--# stop server default
+--# start server default
+s = box.space.spatial
+i = s.index.spatial
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+box.snapshot()
+--# stop server default
+--# start server default
+s = box.space.spatial
+i = s.index.spatial
+s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
+s:drop()

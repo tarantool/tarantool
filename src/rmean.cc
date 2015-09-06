@@ -38,6 +38,8 @@
 void
 rmean_collect(struct rmean *rmean, size_t name, int64_t value)
 {
+	assert(name < rmean->stats_n);
+
 	rmean->stats[name].value[0] += value;
 	rmean->stats[name].total += value;
 }
@@ -115,10 +117,10 @@ rmean_new(const char **name, size_t n)
 void
 rmean_delete(struct rmean *rmean)
 {
-	if (rmean) {
-		ev_timer_stop(loop(), &rmean->timer);
-		free(rmean);
-	}
+
+	ev_timer_stop(loop(), &rmean->timer);
+	free(rmean);
+	rmean = 0;
 }
 
 void

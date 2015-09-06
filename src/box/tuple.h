@@ -390,6 +390,10 @@ tuple_field_num(const struct tuple* tuple, uint32_t field_no)
 const char *
 tuple_field_cstr(struct tuple *tuple, uint32_t i);
 
+/** Helper method for the above function. */
+const char *
+tuple_field_to_cstr(const char *field, uint32_t len);
+
 /**
  * @brief Tuple Interator
  */
