@@ -339,10 +339,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
         |
         | :codenormal:`-- In the following update ...`
         | :codenormal:`--    The idea is to delete field[2], then subtract 3 from field[3], but ...`
-        | :codenormal:`--    after the delete, there is a renumbering -- so field[3] becomes field[2]`
+        | :codenormal:`--    after the delete, there is a renumbering, so field[3] becomes field[2]`
         | :codenormal:`--    before we subtract 3 from it, and that's why the seventh argument is 2 not 3.`
         | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 0.`
-        | :codenormal:`box.space.tester:update({999}, {{'-- ', 2, 1}, {'-', 2, 3}})`
+        | :codenormal:`box.space.tester:update({999}, {{'#', 2, 1}, {'-', 2, 3}})`
         |
         | :codenormal:`-- In the following update ...`
         | :codenormal:`--    We're making a long string so that splice will work in the next example.`

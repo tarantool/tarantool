@@ -18,3 +18,4 @@
     app_b_proctitle
     app_c_lua_tutorial
     app_d_plugins
+    sophia
