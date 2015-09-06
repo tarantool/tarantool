@@ -708,10 +708,10 @@ box_init(void)
 		/* Add a surrogate server id for snapshot rows */
 		vclock_add_server(&recovery->vclock, 0);
 
-		/* Bootstrap from replica */
+		/* Bootstrap from a remote master */
 		replica = replica_new(source);
 		replica_start(replica, recovery);
-		replica_join(replica); /* throws on failure */
+		replica_wait(replica); /* throws on failure */
 
 		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);

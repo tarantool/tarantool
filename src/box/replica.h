@@ -71,8 +71,10 @@ struct replica {
 		struct sockaddr_storage addrstorage;
 	};
 	socklen_t addr_len;
-	/* save master fd to re-use a connection between JOIN and SUBSCRIBE */
+	/** Save master fd to re-use a connection between JOIN and SUBSCRIBE */
 	struct ev_io io;
+	/** Input/output buffer for buffered IO */
+	struct iobuf *iobuf;
 };
 
 /**
@@ -100,14 +102,14 @@ replica_stop(struct replica *replica);
 
 /**
  * Wait replication client to finish and rethrow exception (if any).
- * Use this function to wait bootstrap.
+ * Use this function to wait until bootstrap.
  *
  * \post This function keeps a open connection in io->fd.
  * \sa replica_start()
  * \sa fiber_join()
  */
 void
-replica_join(struct replica *replica);
+replica_wait(struct replica *replica);
 
 /**
  * Allocate an instance of replica object, create replica and initialize
