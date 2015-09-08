@@ -336,7 +336,6 @@ the function invocations will look like ``sock:function_name(...)``.
             * SO_ACCEPTCONN
             * SO_BINDTODEVICE
             * SO_BROADCAST
-            * SO_BSDCOMPAT
             * SO_DEBUG
             * SO_DOMAIN
             * SO_ERROR

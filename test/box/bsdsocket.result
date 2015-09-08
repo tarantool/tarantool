@@ -39,21 +39,9 @@ socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-s:wait(.01)
----
-- RW
-...
 type(s)
 ---
 - table
-...
-s:errno()
----
-- 0
-...
-type(s:error())
----
-- nil
 ...
 -- Invalid arguments
 --# setopt delimiter ';'
@@ -270,10 +258,6 @@ s:error()
 ---
 - null
 ...
-s:setsockopt('SOL_SOCKET', 'SO_BSDCOMPAT', false)
----
-- true
-...
 s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
 ---
 - true
@@ -319,10 +303,6 @@ s:linger()
 - false
 - 1
 ...
-s:shutdown('R')
----
-- true
-...
 s:close()
 ---
 - true
@@ -344,14 +324,6 @@ s:listen(128)
 ...
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
-...
-sc:writable()
----
-- true
-...
-sc:readable()
----
-- true
 ...
 sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
 ---
@@ -631,10 +603,6 @@ sc:nonblock(true)
 ---
 - true
 ...
-sc:readable()
----
-- true
-...
 sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
 ---
 - true
@@ -857,11 +825,6 @@ s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ...
 s:bind('127.0.0.1', port)
 ---
-- true
-...
-socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
----
-- null
 - true
 ...
 s:listen()
@@ -1483,14 +1446,6 @@ os.remove(path)
 -- Test serializers with sockets
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 ---
-...
-x = s:wait()
----
-...
--- waiters is map
-s.waiters
----
-- {}
 ...
 -- check __serialize hook
 json.decode(json.encode(s)).fd == s:fd()

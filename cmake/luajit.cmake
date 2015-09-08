@@ -158,7 +158,7 @@ macro(luajit_build)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUA_USE_APICHECK -DLUA_USE_ASSERT)
     else ()
-        set (luajit_cсopt -O2)
+        set (luajit_ccopt -O2)
         set (luajit_ccdbebug "")
     endif()
     # Pass sysroot settings on OSX
