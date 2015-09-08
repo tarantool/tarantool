@@ -109,10 +109,10 @@ process_rw(struct request *request, struct tuple **result)
 			break;
 		case IPROTO_UPSERT:
 			space->handler->executeUpsert(txn, space, request);
-			/** fall through */
+			tuple = NULL;
+			break;
 		default:
 			 tuple = NULL;
-
 		}
 		if (result)
 			*result = tuple;

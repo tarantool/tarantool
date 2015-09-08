@@ -321,12 +321,21 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL) {
-		struct tuple *new_tuple = tuple_new(space->format,
-						    request->tuple,
-						    request->tuple_end);
-		TupleGuard guard(new_tuple);
-		space_validate_tuple(space, new_tuple);
-		this->replace(txn, space, NULL, new_tuple, DUP_INSERT);
+		try {
+			struct tuple *new_tuple = tuple_new(space->format,
+							    request->tuple,
+							    request->tuple_end);
+			TupleGuard guard(new_tuple);
+			space_validate_tuple(space, new_tuple);
+			this->replace(txn, space, NULL,
+				      new_tuple, DUP_INSERT);
+		} catch (ClientError *e) {
+			/* suppress error due to upsert spec */
+			say_error("UPSERT operation failed:");
+			e->log();
+			txn_rollback_stmt();
+			return;
+		}
 	} else {
 		TupleGuard old_guard(old_tuple);
 
@@ -338,8 +347,17 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 				     request->index_base);
 		TupleGuard guard(new_tuple);
 
-		space_validate_tuple(space, new_tuple);
-		this->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+		try {
+			space_validate_tuple(space, new_tuple);
+			this->replace(txn, space, old_tuple, new_tuple,
+				      DUP_REPLACE);
+		} catch (ClientError *e) {
+			/* suppress error due to upsert spec */
+			say_error("UPSERT operation failed:");
+			e->log();
+			txn_rollback_stmt();
+			return;
+		}
 	}
 
 	txn_commit_stmt(txn);
