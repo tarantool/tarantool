@@ -896,3 +896,42 @@ box.schema.role.info('X1')
 ---
 - []
 ...
+-- gh-867 inconsistent role/user info
+box.schema.role.create('test_role')
+---
+...
+box.schema.role.info('test_role')
+---
+- []
+...
+box.schema.user.info('test_role')
+---
+- error: User 'test_role' is not found
+...
+box.schema.role.info('test_not_exist')
+---
+- error: Role 'test_not_exist' is not found
+...
+box.schema.user.create('test_user')
+---
+...
+box.schema.user.info('test_user')
+---
+- - - execute
+    - role
+    - public
+...
+box.schema.role.info('test_user')
+---
+- error: Role 'test_user' is not found
+...
+box.schema.user.info('test_not_exist')
+---
+- error: User 'test_not_exist' is not found
+...
+box.schema.role.drop('test_role')
+---
+...
+box.schema.user.drop('test_user')
+---
+...

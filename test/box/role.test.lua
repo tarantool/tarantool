@@ -352,3 +352,17 @@ box.schema.role.grant('X1','read','role','X2')
 box.schema.role.info('X1')
 box.schema.role.revoke('X1','read','role','X2')
 box.schema.role.info('X1')
+
+-- gh-867 inconsistent role/user info
+box.schema.role.create('test_role')
+box.schema.role.info('test_role')
+box.schema.user.info('test_role')
+box.schema.role.info('test_not_exist')
+
+box.schema.user.create('test_user')
+box.schema.user.info('test_user')
+box.schema.role.info('test_user')
+box.schema.user.info('test_not_exist')
+
+box.schema.role.drop('test_role')
+box.schema.user.drop('test_user')
