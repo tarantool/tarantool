@@ -1372,24 +1372,30 @@ box.schema.user.drop = function(name, opts)
     return drop(uid, opts)
 end
 
+local function info(id)
+    local _priv = box.space._priv
+    local _user = box.space._priv
+    local privs = {}
+    for _, v in pairs(_priv:select{id}) do
+        table.insert(
+            privs,
+            {privilege_name(v[5]), v[3], object_name(v[3], v[4])}
+        )
+    end
+    return privs
+end
+
 box.schema.user.info = function(user_name)
     local uid
     if user_name == nil then
         uid = box.session.uid()
     else
-        uid = user_or_role_resolve(user_name)
+        uid = user_resolve(user_name)
         if uid == nil then
             box.error(box.error.NO_SUCH_USER, user_name)
         end
     end
-    local _priv = box.space._priv
-    local _user = box.space._priv
-    local privs = {}
-    for _, v in pairs(_priv:select{uid}) do
-        table.insert(privs,
-                     {privilege_name(v[5]), v[3], object_name(v[3], v[4])})
-    end
-    return privs
+    return info(uid)
 end
 
 box.schema.role = {}
@@ -1442,7 +1448,13 @@ box.schema.role.revoke = function(user_name, ...)
     end
     return revoke(uid, user_name, ...)
 end
-box.schema.role.info = box.schema.user.info
+box.schema.role.info = function(role_name)
+    local rid = role_resolve(role_name)
+    if rid == nil then
+        box.error(box.error.NO_SUCH_ROLE, role_name)
+    end
+    return info(rid)
+end
 
 --
 -- once
