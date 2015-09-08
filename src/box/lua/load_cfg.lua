@@ -56,7 +56,7 @@ local default_cfg = {
     custom_proc_title   = nil,
     pid_file            = nil,
     background          = false,
-    username            = nil ,
+    username            = nil,
     coredump            = false,
 
     -- snapshot_daemon

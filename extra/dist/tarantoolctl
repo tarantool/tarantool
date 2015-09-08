@@ -106,7 +106,27 @@ local fiber = require 'fiber'
 local digest = require 'digest'
 local urilib = require 'uri'
 
-ffi.cdef[[ int kill(int pid, int sig); ]]
+ffi.cdef[[
+int kill(int pid, int sig);
+struct passwd {
+               char   *pw_name;       /* username */
+               char   *pw_passwd;     /* user password */
+               int   pw_uid;          /* user ID */
+               int   pw_gid;          /* group ID */
+               char   *pw_gecos;      /* user information */
+               char   *pw_dir;        /* home directory */
+               char   *pw_shell;      /* shell program */
+};
+struct group{
+  char *gr_name;
+  char *gr_passwd;
+  int gr_gid;
+  char **gr_mem;
+};
+struct passwd *getpwnam(const char *name);
+struct group *getgrgid(int gid);
+int strlen(char*);
+]]
 
 local available_commands = {
     'start',
@@ -236,6 +256,7 @@ end
 -- System-wide default file may be missing, this is OK,
 -- we'll assume built-in defaults
 --
+local group_name
 function load_default_file(default_file)
     if default_file then
         dofile(default_file)
@@ -268,6 +289,12 @@ function load_default_file(default_file)
         if not instance_dir then
             instance_dir = '/etc/tarantool/instances.enabled'
         end
+        -- get user data
+        local user_data = ffi.C.getpwnam(ffi.cast('const char*', d.username))
+
+        -- get group data
+        local group = ffi.C.getgrgid(user_data.pw_gid)
+        group_name = ffi.string(group.gr_name, ffi.C.strlen(group.gr_name))
     end
 
     if instance_dir == nil then
@@ -310,9 +337,9 @@ local function mkdir(dirname)
         os.exit(-1)
     end
 
-    if not usermode and not fio.chown(dirname, default_cfg.username, default_cfg.username) then
+    if not usermode and not fio.chown(dirname, default_cfg.username, group_name) then
         log.error("Can't chown(%s, %s, %s): %s",
-            default_cfg.username, default_cfg.username, dirname, errno.strerror())
+            default_cfg.username, group_name, dirname, errno.strerror())
     end
 end
 
