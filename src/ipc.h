@@ -39,10 +39,19 @@
  */
 
 struct ipc_channel {
-	struct rlist readers, writers;
+	/**
+	 * Readers blocked waiting for messages while the channel
+	 * is empty.
+	 */
+	struct rlist readers;
+	/**
+	 * Writers blocked waiting for empty space while
+	 * the channel is full.
+	 */
+	struct rlist writers;
 	struct fiber *bcast;		/* broadcast waiter */
 	struct fiber *close;		/* close waiter */
-	bool readonly;			/* channel is for read only */
+	bool readonly;			/* channel is read only */
 	bool closed;			/* channel is closed */
 	unsigned size;
 	unsigned beg;
@@ -88,30 +97,6 @@ ipc_channel_new(unsigned size);
  */
 void
 ipc_channel_delete(struct ipc_channel *ch);
-
-/**
- * @brief Put data into a channel.
- * @detail Yield current fiber if the channel is full.
- * @param channel
- * @param data
- * @code
- *	ipc_channel_put(ch, "message");
- * @endcode
- */
-void
-ipc_channel_put(struct ipc_channel *ch, void *data);
-
-/**
- * @brief Get data from a channel.
- * @detail Yield current fiber if the channel is empty.
- * @param channel
- * @return data that was put into channel by ipc_channel_put
- * @code
- *	char *msg = ipc_channel_get(ch);
- * @endcode
- */
-void *
-ipc_channel_get(struct ipc_channel *ch);
 
 /**
  * @brief Wake up all fibers that sleep in ipc_channel_get and
@@ -174,6 +159,22 @@ ipc_channel_put_timeout(struct ipc_channel *ch,	void *data,
 			ev_tstamp timeout);
 
 /**
+ * @brief Put data into a channel.
+ * @detail Yield current fiber if the channel is full.
+ * @param channel
+ * @param data
+ * @code
+ *	ipc_channel_put(ch, "message");
+ * @endcode
+ * @return  -1 if the channel is closed
+ */
+static inline int
+ipc_channel_put(struct ipc_channel *ch, void *data)
+{
+	return ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
+}
+
+/**
  * @brief Get data from a channel with a timeout
  * @param channel
  * @param timeout
@@ -189,6 +190,22 @@ ipc_channel_put_timeout(struct ipc_channel *ch,	void *data,
  */
 void *
 ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout);
+
+/**
+ * @brief Get data from a channel.
+ * @detail Yield current fiber if the channel is empty.
+ * @param channel
+ * @return data that was put into channel by ipc_channel_put
+ * @code
+ *	char *msg = ipc_channel_get(ch);
+ * @endcode
+ */
+static inline void *
+ipc_channel_get(struct ipc_channel *ch)
+{
+	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
+}
+
 
 /**
  * @brief return true if channel has reader fibers that wait data
@@ -236,15 +253,6 @@ ipc_channel_count(struct ipc_channel *ch)
  */
 void
 ipc_channel_shutdown(struct ipc_channel *ch);
-
-/**
- * @brief return true if the channel is closed for writing
- */
-static inline bool
-ipc_channel_is_readonly(struct ipc_channel *ch)
-{
-	return ch->readonly;
-}
 
 /**
  * @brief close the channel.

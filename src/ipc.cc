@@ -172,12 +172,6 @@ exit:
 	return res;
 }
 
-void *
-ipc_channel_get(struct ipc_channel *ch)
-{
-	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
-}
-
 static void
 ipc_channel_close_waiter(struct ipc_channel *ch, struct fiber *f)
 {
@@ -217,13 +211,15 @@ ipc_channel_close(struct ipc_channel *ch)
 {
 	if (ch->closed)
 		return;
-	assert(ch->readonly);
+	if (!ch->readonly)
+		ipc_channel_shutdown(ch);
 	assert(ch->count == 0);
 	assert(rlist_empty(&ch->readers));
 	assert(rlist_empty(&ch->writers));
 	assert(ch->bcast == NULL);
 	ch->closed = true;
 }
+
 int
 ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 			ev_tstamp timeout)
@@ -289,12 +285,6 @@ exit:
 		errno = save_errno;
 	}
 	return res;
-}
-
-void
-ipc_channel_put(struct ipc_channel *ch, void *data)
-{
-	ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 int

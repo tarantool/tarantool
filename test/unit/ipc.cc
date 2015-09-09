@@ -3,43 +3,81 @@
 #include "ipc.h"
 #include "unit.h"
 
-enum {
-	ITERATIONS = 100000,
-};
+int status;
 
 void
-push_f(va_list ap)
+ipc_basic()
 {
-	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
 
-	for (int i = 0; i < ITERATIONS; i++)
-		ipc_channel_put(channel, NULL);
+	header();
+	plan(10);
+
+	struct ipc_channel *channel = ipc_channel_new(1);
+	ok(channel != NULL, "ipc_channel_new()");
+
+	ok(ipc_channel_size(channel) == 1, "ipc_channel_size()");
+
+	ok(ipc_channel_count(channel) == 0, "ipc_channel_count()");
+
+	ok(ipc_channel_is_full(channel) == false, "ipc_channel_is_full()");
+
+	ok(ipc_channel_is_empty(channel) == true, "ipc_channel_is_empty()");
+
+	char dummy;
+
+	ipc_channel_put(channel, &dummy);
+
+	ok(ipc_channel_size(channel) == 1, "ipc_channel_size(1)");
+
+	ok(ipc_channel_count(channel) == 1, "ipc_channel_count(1)");
+
+	ok(ipc_channel_is_full(channel) == true, "ipc_channel_is_full(1)");
+
+	ok(ipc_channel_is_empty(channel) == false, "ipc_channel_is_empty(1)");
+
+	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get()");
+
+	ipc_channel_delete(channel);
+
+	footer();
+	status = check_plan();
 }
 
 void
-pop_f(va_list ap)
-{
-	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
-
-	for (int i = 0; i < ITERATIONS; i++)
-		(void) ipc_channel_get(channel);
-}
-
-void main_f(va_list ap)
+ipc_get()
 {
 	header();
-	struct fiber *push = fiber_new("push_f", push_f);
-	fiber_set_joinable(push, true);
-	struct fiber *pop = fiber_new("pop_f", pop_f);
-	fiber_set_joinable(pop, true);
+	plan(7);
+
 	struct ipc_channel *channel = ipc_channel_new(1);
-	fiber_start(push, channel);
-	fiber_start(pop, channel);
-	fiber_join(push);
-	fiber_join(pop);
+
+	char dummy;
+	ok(ipc_channel_put_timeout(channel, &dummy, 0) == 0,
+	   "ipc_channel_put(0)");
+	ok(ipc_channel_put_timeout(channel, &dummy, 0) == -1,
+	   "ipc_channel_put_timeout(0)");
+	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get(0)");
+	ok(ipc_channel_put_timeout(channel, &dummy, 0.01) == 0,
+	   "ipc_channel_put_timeout(1)");
+	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get(1)");
+
+	ipc_channel_close(channel);
+
+	ok(ipc_channel_put(channel, &dummy) == -1, "ipc_channel_put(closed)");
+
+	ok(ipc_channel_get(channel) == NULL, "ipc_channel_get(closed)");
+
 	ipc_channel_delete(channel);
-	ev_break(loop(), EVBREAK_ALL);
+
 	footer();
+	status = check_plan();
+}
+
+void main_f(va_list /* ap */)
+{
+	ipc_basic();
+	ipc_get();
+	ev_break(loop(), EVBREAK_ALL);
 }
 
 int main()
@@ -51,5 +89,5 @@ int main()
 	ev_run(loop(), 0);
 	fiber_free();
 	memory_free();
-	return 0;
+	return status;
 }
