@@ -39,7 +39,31 @@
  */
 tt_uuid cluster_id;
 
-struct replica *replica;
+typedef rb_tree(struct replica) replicaset_t;
+rb_proto(, replicaset_, replicaset_t, struct replica)
+
+static int
+replica_compare_by_source(const struct replica *a, const struct replica *b)
+{
+		return strcmp(a->source, b->source);
+}
+
+rb_gen(, replicaset_, replicaset_t, struct replica, link,
+       replica_compare_by_source);
+
+static replicaset_t replicaset; /* zeroed by linker */
+
+void
+cluster_init(void)
+{
+	replicaset_new(&replicaset);
+}
+
+void
+cluster_free(void)
+{
+
+}
 
 extern "C" struct vclock *
 cluster_clock()
@@ -91,4 +115,36 @@ cluster_del_server(uint32_t server_id)
 		r->server_id = 0;
 		box_set_ro(true);
 	}
+}
+
+void
+cluster_add_replica(struct replica *replica)
+{
+	replicaset_insert(&replicaset, replica);
+}
+
+void
+cluster_del_replica(struct replica *replica)
+{
+	replicaset_remove(&replicaset, replica);
+}
+
+struct replica *
+cluster_find_replica(const char *source)
+{
+	struct replica key;
+	snprintf(key.source, sizeof(key.source), "%s", source);
+	return replicaset_search(&replicaset, &key);
+}
+
+struct replica *
+cluster_replica_first(void)
+{
+	return replicaset_first(&replicaset);
+}
+
+struct replica *
+cluster_replica_next(struct replica *replica)
+{
+	return replicaset_next(&replicaset, replica);
 }

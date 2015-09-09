@@ -37,6 +37,8 @@
 #include "trivia/util.h"
 #include "uri.h"
 #include "third_party/tarantool_ev.h"
+#define RB_COMPACT 1
+#include <third_party/rb.h>
 
 struct recovery_state;
 
@@ -65,6 +67,7 @@ struct replica {
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
 	char source[REPLICA_SOURCE_MAXLEN];
+	rb_node(struct replica) link; /* a set by source in cluster.cc */
 	struct uri uri;
 	union {
 		struct sockaddr addr;

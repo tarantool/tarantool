@@ -52,6 +52,7 @@ lbox_info_replication(struct lua_State *L)
 {
 	lua_newtable(L);
 
+	struct replica *replica = cluster_replica_first();
 	if (replica == NULL) {
 		lua_pushstring(L, "status");
 		lua_pushstring(L, "off");

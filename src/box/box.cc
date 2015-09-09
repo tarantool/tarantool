@@ -206,10 +206,13 @@ box_set_replication_source(void)
 	const char *source = cfg_gets("replication_source");
 
 	/* This hook is only invoked if source has changed */
-	if (replica != NULL) {
+	struct replica *replica = cluster_replica_first();
+	while (replica != NULL) {
+		struct replica *next = cluster_replica_next(replica);
 		replica_stop(replica); /* cancels a background fiber */
+		cluster_del_replica(replica);
 		replica_delete(replica);
-		replica = NULL;
+		replica = next; /* safe iteration with cluster_del_replica */
 	}
 
 	if (source == NULL)
@@ -217,6 +220,7 @@ box_set_replication_source(void)
 
 	/* Start a new replication client using provided URI */
 	replica = replica_new(source);
+	cluster_add_replica(replica);
 	replica_start(replica, recovery); /* starts a background fiber */
 }
 
@@ -611,6 +615,7 @@ box_free(void)
 	 */
 	if (box_init_done) {
 		session_free();
+		cluster_free();
 		user_cache_free();
 		schema_free();
 		tuple_free();
@@ -682,6 +687,8 @@ box_init(void)
 	 */
 	session_init();
 
+	cluster_init();
+
 	title("loading", NULL);
 
 	/* recovery initialization */
@@ -692,6 +699,10 @@ box_init(void)
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 	const char *source = cfg_gets("replication_source");
+	if (source != NULL) {
+		struct replica *replica = replica_new(source);
+		cluster_add_replica(replica);
+	}
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
@@ -708,8 +719,8 @@ box_init(void)
 		/* Add a surrogate server id for snapshot rows */
 		vclock_add_server(&recovery->vclock, 0);
 
-		/* Bootstrap from a remote master */
-		replica = replica_new(source);
+		/* Bootstrap from the first master */
+		struct replica *replica = cluster_replica_first();
 		replica_start(replica, recovery);
 		replica_wait(replica); /* throws on failure */
 
@@ -747,9 +758,7 @@ box_init(void)
 
 	rmean_cleanup(rmean_box);
 
-	if (source != NULL) {
-		if (replica == NULL)
-			replica = replica_new(source);
+	cluster_foreach_replica(replica) {
 		/* Follow replica */
 		assert(recovery->writer);
 		replica_start(replica, recovery);

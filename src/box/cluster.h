@@ -79,6 +79,12 @@
  * and is implemented in @file vclock.h
  */
 
+void
+cluster_init(void);
+
+void
+cluster_free(void);
+
 /** {{{ Global cluster identifier API **/
 
 /** UUID of the cluster. */
@@ -86,8 +92,6 @@ extern tt_uuid cluster_id;
 
 extern "C" struct vclock *
 cluster_clock();
-
-extern struct replica *replica;
 
 /* }}} */
 
@@ -112,6 +116,28 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t id);
 void
 cluster_del_server(uint32_t server_id);
 
+/** }}} **/
+
+/** {{{ Cluster replica API **/
+
+void
+cluster_add_replica(struct replica *replica);
+
+void
+cluster_del_replica(struct replica *replica);
+
+struct replica *
+cluster_find_replica(const char *source);
+
+struct replica *
+cluster_replica_first(void);
+
+struct replica *
+cluster_replica_next(struct replica *replica);
+
+#define cluster_foreach_replica(var) \
+	for (struct replica *var = cluster_replica_first(); \
+	     var != NULL; var = cluster_replica_next(var))
 /** }}} **/
 
 #endif
