@@ -299,7 +299,7 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	if (rc == 0) {
 		sp_destroy(obj);
 		fiber_yield();
-		obj = fiber_get_key(fiber(), FIBER_RESULT);
+		obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
 		if (obj == NULL)
 			return NULL;
 		rc = sp_getint(obj, "status");
@@ -660,7 +660,7 @@ sophia_iterator_next(struct iterator *ptr)
 		return NULL;
 	sp_destroy(obj);
 	fiber_yield();
-	obj = fiber_get_key(fiber(), FIBER_RESULT);
+	obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
 	if (obj == NULL)
 		return NULL;
 	int rc = sp_getint(obj, "status");
@@ -761,7 +761,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	}
 	sp_destroy(obj);
 	fiber_yield();
-	obj = fiber_get_key(fiber(), FIBER_RESULT);
+	obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
 	if (obj == NULL) {
 		it->current = NULL;
 		return;

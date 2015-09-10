@@ -238,7 +238,7 @@ sophia_poll(SophiaEngine *e)
 	struct fiber *fiber =
 		(struct fiber *)sp_getstring(req, "arg", NULL);
 	assert(fiber != NULL);
-	fiber_set_key(fiber, FIBER_RESULT, req);
+	fiber_set_key(fiber, FIBER_KEY_MSG, req);
 	fiber_call(fiber);
 	return 1;
 }
