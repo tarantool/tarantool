@@ -121,4 +121,3 @@ string = '>*0*pppp12<'
          └──{ len = 1, height = 1, data = '<'}
 
 	*** test_avl_rotations: done ***
- 

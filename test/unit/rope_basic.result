@@ -4,7 +4,7 @@ string = ''
 └──nil
 
 	*** test_empty_rope: done ***
- 	*** test_append ***
+	*** test_append ***
 insert offset = 0, str = ' a '
 size = 3
 string = ' a '
@@ -25,7 +25,7 @@ string = ' a  b  c '
    └──{ len = 3, height = 1, data = ' c '}
 
 	*** test_append: done ***
- 	*** test_prepend ***
+	*** test_prepend ***
 insert offset = 0, str = ' c '
 size = 3
 string = ' c '
@@ -46,7 +46,7 @@ string = ' a  b  c '
    └──{ len = 3, height = 1, data = ' c '}
 
 	*** test_prepend: done ***
- 	*** test_insert ***
+	*** test_insert ***
 insert offset = 0, str = '   a '
 size = 5
 string = '   a '
@@ -125,7 +125,7 @@ string = '    *abc*    '
          └──nil
 
 	*** test_insert: done ***
- 	*** test_erase ***
+	*** test_erase ***
 erase offset = 0
 size = 0
 string = ''
@@ -137,4 +137,3 @@ string = 'b'
 └──{ len = 1, height = 1, data = 'b'}
 
 	*** test_erase: done ***
- 

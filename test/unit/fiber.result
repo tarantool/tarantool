@@ -5,4 +5,3 @@
 # cancel dead has started
 # by this time the fiber should be dead already
 	*** fiber_join_test: done ***
- 

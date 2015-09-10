@@ -2,7 +2,6 @@
 (null): fiber `touch': exiting
 	*** stat_timeout_test ***
 	*** stat_timeout_test: done ***
- 	*** stat_notify_test ***
+	*** stat_notify_test ***
 # filename: 1.out
 	*** stat_notify_test: done ***
- 

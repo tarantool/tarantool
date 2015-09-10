@@ -11,7 +11,7 @@ ok 8 - ipc_channel_is_full(1)
 ok 9 - ipc_channel_is_empty(1)
 ok 10 - ipc_channel_get()
 	*** ipc_basic: done ***
- 	*** ipc_get ***
+	*** ipc_get ***
 1..7
 ok 1 - ipc_channel_put(0)
 ok 2 - ipc_channel_put_timeout(0)
@@ -21,4 +21,3 @@ ok 5 - ipc_channel_get(1)
 ok 6 - ipc_channel_put(closed)
 ok 7 - ipc_channel_get(closed)
 	*** ipc_get: done ***
- 

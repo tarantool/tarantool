@@ -35,7 +35,7 @@
 #include <stdio.h>
 
 #define header() printf("\t*** %s ***\n", __func__)
-#define footer() printf("\t*** %s: done ***\n ", __func__)
+#define footer() printf("\t*** %s: done ***\n", __func__)
 
 #define fail(expr, result) do {					\
 	fprintf(stderr, "Test failed: %s is %s at %s:%d, in function '%s'\n",\

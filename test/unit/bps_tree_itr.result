@@ -9,8 +9,7 @@ Key 15, empty range [ptr, ptr):  <->
 Key 19998, not empty range [ptr, eof): (19998,0) (19998,1) (19998,2) (19998,3) (19998,4)  <-> (19998,4) (19998,3) (19998,2) (19998,1) (19998,0) 
 Key 20000, empty range [eof, eof):  <-> 
 	*** itr_check: done ***
- 	*** itr_invalidate_check ***
+	*** itr_invalidate_check ***
 	*** itr_invalidate_check: done ***
- 	*** itr_freeze_check ***
+	*** itr_freeze_check ***
 	*** itr_freeze_check: done ***
- 

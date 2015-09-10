@@ -4,15 +4,15 @@ Insert 1..X, remove X..1
 Insert X..1, remove 1..X
 Insert X..1, remove X..1
 	*** simple_check: done ***
- 	*** compare_with_sptree_check ***
+	*** compare_with_sptree_check ***
 	*** compare_with_sptree_check: done ***
- 	*** compare_with_sptree_check_branches ***
+	*** compare_with_sptree_check_branches ***
 	*** compare_with_sptree_check_branches: done ***
- 	*** bps_tree_debug_self_check ***
+	*** bps_tree_debug_self_check ***
 	*** bps_tree_debug_self_check: done ***
- 	*** loading_test ***
+	*** loading_test ***
 	*** loading_test: done ***
- 	*** printing_test ***
+	*** printing_test ***
 Inserting 22
 [(1) 22]
 Inserting 21
@@ -198,7 +198,7 @@ Inserting 0
 33
   [(10) 34 35 36 37 38 39 40 41 42 43]
 	*** printing_test: done ***
- 	*** white_box_test ***
+	*** white_box_test ***
 full leaf:
 [(14) 0 1 2 3 4 5 6 7 8 9 10 11 12 13]
 split now:
@@ -272,4 +272,3 @@ full 10 leafs:
   130
     [(10) 131 132 133 134 135 136 137 138 139 140]
 	*** white_box_test: done ***
- 

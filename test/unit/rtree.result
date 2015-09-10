@@ -4,6 +4,5 @@ Insert 1..X, remove X..1
 Insert X..1, remove 1..X
 Insert X..1, remove X..1
 	*** simple_check: done ***
- 	*** neighbor_test ***
+	*** neighbor_test ***
 	*** neighbor_test: done ***
- 

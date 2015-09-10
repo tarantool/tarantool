@@ -3,6 +3,5 @@ name of a new region: .
 set new region name: region.
 region name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
 	*** region_basic: done ***
- 	*** region_test_truncate ***
+	*** region_test_truncate ***
 	*** region_test_truncate: done ***
- 
