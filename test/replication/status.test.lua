@@ -1,61 +1,29 @@
 --# set connection default
 box.schema.user.grant('guest', 'replication')
----
-...
 -- box.cfg { custom_proc_title = "master" }
 --# create server replica with rpl_master=default, script='replication/replica.lua'
 --# start server replica
 --# set connection replica
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end
----
-...
+
 r = box.info.replication
----
-...
 r.status == "follow"
----
-- true
-...
 r.lag < 1
----
-- true
-...
 r.idle < 1
----
-- true
-...
+
 box.space._schema:insert({'dup'})
----
-- ['dup']
-...
 --# set connection default
 box.space._schema:insert({'dup'})
----
-- ['dup']
-...
 --# set connection replica
 r = box.info.replication
----
-...
 r.status == "stopped"
----
-- true
-...
 r.message:match('Duplicate') ~= nil
----
-- true
-...
+
 box.cfg { replication_source = "" }
----
-...
 box.info.replication.status == "off"
----
-- true
-...
+
 -- Simulate a slow server to test replication info
 control_ch = require('fiber').channel(1)
----
-...
 --# setopt delimiter ';'
 local digest = require('digest')
 slowpoke = require('socket').tcp_server('127.0.0.1', 0, function(s, peer)
@@ -69,56 +37,27 @@ slowpoke = require('socket').tcp_server('127.0.0.1', 0, function(s, peer)
     s:shutdown()
     s:close()
 end);
----
-...
 --# setopt delimiter ''
+
 uri = slowpoke:name()
----
-...
 box.cfg { replication_source = 'user:pass@'..uri.host..':'..uri.port }
----
-...
+
 r = box.info.replication
----
-...
 r.status == "connect"
----
-- true
-...
+
 control_ch:put(true)
----
-- true
-...
+
 r = box.info.replication
----
-...
 r.status == "auth"
----
-- true
-...
 r.lag < 1
----
-- true
-...
 -- r.idle < 1 -- broken
+
 slowpoke:close()
----
-- true
-...
 control_ch:put("goodbye")
----
-- true
-...
 r = box.info.replication
----
-...
 r.status == "disconnected"
----
-- true
-...
+
 --# stop server replica
 --# cleanup server replica
 --# set connection default
 box.schema.user.revoke('guest', 'replication')
----
-...
