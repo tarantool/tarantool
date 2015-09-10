@@ -107,7 +107,7 @@ t = s:select({''},{iterator='GT', limit =1})
 ...
 t
 ---
-- - ['11']
+- - ['1']
 ...
 t = s:select({},{iterator='GT', limit =1})
 ---
@@ -132,6 +132,77 @@ s:insert{5}
 s.index.primary:alter({parts={1,'NUM'}})
 ---
 - error: alter is not supported for a Sophia index
+...
+s:drop()
+---
+...
+-- gh-1008: assertion if insert of wrong type
+s = box.schema.space.create('t', {engine='sophia'})
+---
+...
+i = s:create_index('primary',{parts={1, 'STR'}})
+---
+...
+box.space.t:insert{1,'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+s:drop()
+---
+...
+-- gh-1009: search for empty string fails
+s = box.schema.space.create('t', {engine='sophia'})
+---
+...
+i = s:create_index('primary',{parts={1, 'STR'}})
+---
+...
+s:insert{''}
+---
+...
+#i:select{''}
+---
+- 1
+...
+i:get{''}
+---
+- ['']
+...
+s:drop()
+---
+...
+-- gh-1015: assertion if nine indexed fields
+s = box.schema.create_space('t',{engine='sophia'})
+---
+...
+i = s:create_index('primary',{parts={1,'str',2,'str',3,'str',4,'str',5,'str',6,'str',7,'str',8,'str',9,'str'}})
+---
+- error: 'Can''t create or modify index ''primary'' in space ''t'': Sophia TREE index
+    too many key-parts (8 max)'
+...
+s:insert{'1','2','3','4','5','6','7','8','9'}
+---
+- error: 'No index #0 is defined in space ''t'''
+...
+s:drop()
+---
+...
+-- gh-1016: behaviour of multi-part indexes
+s = box.schema.create_space('t',{engine='sophia'})
+---
+...
+i = s:create_index('primary',{parts={1,'str',2,'str',3,'str'}})
+---
+...
+s:insert{'1','2','3'}
+---
+...
+s:insert{'1','2','0'}
+---
+...
+i:select({'1','2',nil},{iterator='GT'})
+---
+- error: Sophia Index iterator does not support uncomplete keys
 ...
 s:drop()
 ---

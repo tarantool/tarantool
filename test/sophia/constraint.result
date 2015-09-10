@@ -1,0 +1,136 @@
+-- key type validations (str, num)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+---
+...
+space:insert{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:replace{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:delete{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:update(1, {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:upsert(1, {{'+', 1, 10}}, {0})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:get{1}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+index:pairs(1, {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+...
+space:drop()
+---
+...
+-- key type validations (num, str)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+space:insert{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:replace{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:delete{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:update('A', {{'=', 1, 101}})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:upsert('A', {{'+', 1, 10}}, {0})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:get{'A'}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+index:pairs('A', {iterator = 'GE'})
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+space:drop()
+---
+...
+-- test key-parts limit (8 max)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num'} })
+---
+...
+space:drop()
+---
+...
+-- test key-parts limit (hit the limit)
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num', 9, 'num'} })
+---
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
+    index too many key-parts (8 max)'
+...
+space:drop()
+---
+...
+-- ensure all key-parts are passed
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num'} })
+---
+...
+space:insert{1}
+---
+- error: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+space:replace{1}
+---
+- error: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+space:delete{1}
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+space:update(1, {{'=', 1, 101}})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+space:upsert(1, {{'+', 1, 10}}, {0})
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+space:get{1}
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+index:select({1}, {iterator = box.index.GT})
+---
+- error: Sophia Index iterator does not support uncomplete keys
+...
+space:drop()
+---
+...

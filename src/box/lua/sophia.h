@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED
-#define TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_SOPHIA_H
+#define INCLUDES_TARANTOOL_LUA_SOPHIA_H
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,42 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "engine.h"
-#include "third_party/tarantool_ev.h"
 
-struct SophiaEngine: public Engine {
-	SophiaEngine();
-	virtual void init();
-	virtual Handler *open();
-	virtual Index *createIndex(struct key_def *);
-	virtual void dropIndex(Index*);
-	virtual void keydefCheck(struct space *space, struct key_def *f);
-	virtual void beginStatement(struct txn *txn);
-	virtual void prepare(struct txn *txn);
-	virtual void commit(struct txn *txn);
-	virtual void rollbackStatement(struct txn_stmt *stmt);
-	virtual void rollback(struct txn *txn);
-	virtual void beginJoin();
-	virtual void recoverToCheckpoint(int64_t);
-	virtual void endRecovery();
-	virtual void join(Relay*);
-	virtual int beginCheckpoint(int64_t);
-	virtual int waitCheckpoint();
-	virtual void commitCheckpoint();
-	virtual void abortCheckpoint();
-	void *env;
-private:
-	int64_t m_prev_checkpoint_lsn;
-	int64_t m_checkpoint_lsn;
-public:
-	int recovery_complete;
-	struct cord *cord;
-	ev_async watcher;
-	ev_idle idle;
-};
+struct lua_State;
+void box_lua_sophia_init(struct lua_State *L);
 
-typedef void (*sophia_info_f)(const char*, const char*, void*);
-int  sophia_info(const char*, sophia_info_f, void*);
-void sophia_error(void*);
-
-#endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_LUA_SOPHIA_H */

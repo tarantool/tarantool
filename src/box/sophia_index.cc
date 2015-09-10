@@ -54,11 +54,11 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	char *value = (char *)sp_getstring(obj, "value", &valuesize);
 	char *valueend = value + valuesize;
 
-	assert(key_def->part_count < 16);
+	assert(key_def->part_count <= 8);
 	struct {
 		const char *part;
 		int size;
-	} parts[16];
+	} parts[8];
 
 	/* prepare keys */
 	int size = 0;
@@ -121,12 +121,12 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	return raw;
 }
 
-static uint64_t num_parts[16];
+static uint64_t num_parts[8];
 
 void*
 SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 {
-	assert(key_def->part_count < 16);
+	assert(key_def->part_count <= 8);
 	void *host = db;
 	if (async) {
 		host = sp_asynchronous(db);
@@ -152,6 +152,8 @@ SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 			part = (char *)&num_parts[i];
 			partsize = sizeof(uint64_t);
 		}
+		if (partsize == 0)
+			part = "";
 		if (sp_setstring(obj, partname, part, partsize) == -1)
 			sophia_error(env);
 		i++;
@@ -285,7 +287,10 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	(void)part_count;
 	void *obj = ((SophiaIndex *)this)->createObject(key, true, NULL);
 	void *transaction = db;
-	if (in_txn())
+	/* engine_tx might be empty, even if we are in txn context.
+	 *
+	 * This can happen on a first-read statement. */
+	if (in_txn() && in_txn()->engine_tx)
 		transaction = in_txn()->engine_tx;
 	obj = sp_get(transaction, obj);
 	if (obj == NULL)
@@ -434,6 +439,8 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 	}
 	/* upsert using default tuple */
 	char *p = update + *origin_keysize;
+	uint8_t index_base = *(uint32_t *)p;
+	p += sizeof(uint8_t);
 	uint32_t default_tuple_size = *(uint32_t *)p;
 	p += sizeof(uint32_t);
 	char *default_tuple = p;
@@ -448,7 +455,7 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 		                          expr_end,
 		                          default_tuple,
 		                          default_tuple_end,
-		                          size, 1);
+		                          size, index_base);
 	} catch (...) {
 		return NULL;
 	}
@@ -461,6 +468,8 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
               uint32_t *size)
 {
 	char *p = update + origin_keysize;
+	uint8_t index_base = *(uint32_t *)p;
+	p += sizeof(uint8_t);
 	uint32_t default_tuple_size = *(uint32_t *)p;
 	p += sizeof(uint32_t);
 	char *default_tuple = p;
@@ -477,7 +486,7 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
 		                          expr_end,
 		                          src,
 		                          src + src_size,
-		                          size, 1);
+		                          size, index_base);
 	} catch (...) {
 		return NULL;
 	}
@@ -530,16 +539,19 @@ SophiaIndex::upsert(const char *key,
                     const char *expr,
                     const char *expr_end,
                     const char *tuple,
-                    const char *tuple_end)
+                    const char *tuple_end,
+                    uint8_t index_base)
 {
 	uint32_t tuple_size = tuple_end - tuple;
 	uint32_t expr_size = expr_end - expr;
 	uint32_t valuesize =
-		sizeof(uint32_t) + tuple_size + expr_size;
+		sizeof(uint8_t) + sizeof(uint32_t) + tuple_size + expr_size;
 	char *value = (char *)malloc(valuesize);
 	if (value == NULL) {
 	}
 	char *p = value;
+	memcpy(p, &index_base, sizeof(uint8_t));
+	p += sizeof(uint8_t);
 	memcpy(p, &tuple_size, sizeof(uint32_t));
 	p += sizeof(uint32_t);
 	memcpy(p, tuple, tuple_size);
@@ -684,7 +696,7 @@ SophiaIndex::allocIterator() const
 		(struct sophia_iterator *) calloc(1, sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-		          sizeof(struct sophia_iterator), "SophiaIndex",
+		          sizeof(struct sophia_iterator), "Sophia Index",
 		          "iterator");
 	}
 	it->base.next = sophia_iterator_next;
@@ -700,7 +712,12 @@ SophiaIndex::initIterator(struct iterator *ptr,
 {
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	if (part_count == 0) {
+	if (part_count > 0) {
+		if (part_count != key_def->part_count) {
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+			          "Sophia Index iterator", "uncomplete keys");
+		}
+	} else {
 		key = NULL;
 	}
 	it->key = key;
@@ -726,7 +743,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,
-		          "SophiaIndex", "requested iterator type");
+		          "Sophia Index", "requested iterator type");
 	}
 	it->base.next = sophia_iterator_next;
 	it->cursor = sp_cursor(env);

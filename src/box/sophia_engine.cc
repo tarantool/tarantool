@@ -62,19 +62,30 @@ void sophia_error(void *env)
 	tnt_raise(ClientError, ER_SOPHIA, msg);
 }
 
-void sophia_info(void (*cb)(const char*, const char*, int, void*), void *arg)
+int sophia_info(const char *name, sophia_info_f cb, void *arg)
 {
 	SophiaEngine *e = (SophiaEngine *)engine_find("sophia");
 	void *cursor = sp_getobject(e->env, NULL);
 	void *o = NULL;
-	int i = 0;
+	if (name) {
+		while ((o = sp_get(cursor, o))) {
+			char *key = (char *)sp_getstring(o, "key", 0);
+			if (name && strcmp(key, name) != 0)
+				continue;
+			char *value = (char *)sp_getstring(o, "value", 0);
+			cb(key, value, arg);
+			return 1;
+		}
+		sp_destroy(cursor);
+		return 0;
+	}
 	while ((o = sp_get(cursor, o))) {
 		char *key = (char *)sp_getstring(o, "key", 0);
 		char *value = (char *)sp_getstring(o, "value", 0);
-		cb(key, value, i, arg);
-		i++;
+		cb(key, value, arg);
 	}
 	sp_destroy(cursor);
+	return 0;
 }
 
 struct SophiaSpace: public Handler {
@@ -97,8 +108,16 @@ struct tuple *
 SophiaSpace::executeReplace(struct txn *txn, struct space *space,
                             struct request *request)
 {
+	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
+
+	int size = request->tuple_end - request->tuple;
+	const char *key =
+		tuple_field_raw(request->tuple, size,
+		                index->key_def->parts[0].fieldno);
+	primary_key_validate(index->key_def, key, index->key_def->part_count);
 
 	/* Switch from INSERT to REPLACE during recovery.
 	 *
@@ -111,8 +130,6 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 		if (engine->recovery_complete)
 			mode = DUP_INSERT;
 	}
-	SophiaIndex *index =
-		(SophiaIndex *)index_find(space, 0);
 	index->replace_or_insert(request->tuple, request->tuple_end, mode);
 	txn_commit_stmt(txn);
 	return NULL;
@@ -173,14 +190,27 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
+
+	/* validate upsert key */
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
+
+	/* validate default tuple */
+	space_validate_tuple_raw(space, request->tuple);
+	tuple_field_count_validate(space->format, request->tuple);
+
+	int size = request->tuple_end - request->tuple;
+	key = tuple_field_raw(request->tuple, size,
+	                      index->key_def->parts[0].fieldno);
+	primary_key_validate(index->key_def, key, index->key_def->part_count);
+
 	index->upsert(key,
 	              request->ops,
 	              request->ops_end,
 	              request->tuple,
-	              request->tuple_end);
+	              request->tuple_end,
+	              request->index_base);
 	txn_commit_stmt(txn);
 }
 
@@ -457,6 +487,13 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  key_def->name,
 				  space_name(space),
 				  "Sophia TREE secondary indexes are not supported");
+		}
+		const int keypart_limit = 8;
+		if (key_def->part_count > keypart_limit) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+			          key_def->name,
+			          space_name(space),
+			          "Sophia TREE index too many key-parts (8 max)");
 		}
 		int i = 0;
 		while (i < key_def->part_count) {
