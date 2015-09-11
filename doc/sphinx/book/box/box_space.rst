@@ -645,26 +645,27 @@ A list of all ``box.space`` functions follows, then comes a list of all
 .. data::     _space
 
     ``_space`` is a system tuple set. Its tuples contain these fields:
-    ``id, uid, space-name, engine, field_count, temporary``.
+    ``id, uid, space-name, engine, field_count, temporary, format``.
+    These fields are established by :ref:`box.schema.space.create <box.schema.space.create>`.
 
     EXAMPLE. The following function will display all simple fields
     in all tuples of ``_space``.
 
     | :codenormal:`console = require('console'); console.delimiter('!')`
     | :codenormal:`function example()`
-        | :codenormal:`local ta = {}, i, line`
-        | :codenormal:`for k, v in box.space._space:pairs() do`
-            | :codenormal:`i = 1`
-            | :codenormal:`line = ''`
-            | :codenormal:`while i <= #v do`
-                | :codenormal:`if type(v[i]) ~= 'table' then`
-                    | :codenormal:`line = line .. v[i] .. ' '`
-                | :codenormal:`end`
-                | :codenormal:`i = i + 1`
-            | :codenormal:`end`
-            | :codenormal:`table.insert(ta, line)`
-        | :codenormal:`end`
-        | :codenormal:`return ta`
+    | |nbsp| |nbsp| :codenormal:`local ta = {}, i, line`
+    | |nbsp| |nbsp| :codenormal:`for k, v in box.space._space:pairs() do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`i = 1`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`line = ''`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`while i <= #v do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`if type(v[i]) ~= 'table' then`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`line = line .. v[i] .. ' '`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`i = i + 1`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`table.insert(ta, line)`
+    | |nbsp| |nbsp| |nbsp| |nbsp|:codenormal:`end`
+    | |nbsp| |nbsp| :codenormal:`return ta`
     | :codenormal:`end!`
     | :codenormal:`console.delimiter('')!`
 
@@ -682,6 +683,31 @@ A list of all ``box.space`` functions follows, then comes a list of all
     | :codenormal:`- '512 1 tester memtx 0  '`
     | :codenormal:`- '513 1 origin sophia 0  '`
     | :codenormal:`- '514 1 archive memtx 0  '`
+    | :codenormal:`...`
+
+.. _boxspaceexample:
+
+    EXAMPLE. The following requests will create a space using
+    :code:`box.schema.space.create` with a :code:`format` clause.
+    Then it retrieves the _space tuple for the new space.
+    This illustrates the typical use of the :code:`format` clause,
+    it shows the recommended names and data types for the fields.
+
+    | :codenormal:`tarantool>` :codebold:`box.schema.space.create('TM',{format={[1]={["name"]="field#1"},[2]={["type"]="num"}}})`
+    | :codenormal:`---`
+    | :codenormal:`- index: []`
+    | |nbsp| |nbsp| :codenormal:`on_replace: 'function: 0x41c67338'`
+    | |nbsp| |nbsp| :codenormal:`temporary: false`
+    | |nbsp| |nbsp| :codenormal:`id: 522`
+    | |nbsp| |nbsp| :codenormal:`engine: memtx`
+    | |nbsp| |nbsp| :codenormal:`enabled: false`
+    | |nbsp| |nbsp| :codenormal:`name: TM`
+    | |nbsp| |nbsp| :codenormal:`field_count: 0`
+    | :codenormal:`- created`
+    | :codenormal:`...`
+    | :codenormal:`tarantool>` :codebold:`box.space._space:select(522)`
+    | :codenormal:`---`
+    | :codenormal:`- - [522, 1, 'TM', 'memtx', 0, '', [{'name': 'field#1'}, {'type': 'num'}]]`
     | :codenormal:`...`
 
 .. data::     _index

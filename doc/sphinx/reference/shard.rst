@@ -141,7 +141,7 @@ are on `the shard section of github`_.
     | :codenormal:`rm -r *.xlog`
     | :codenormal:`~/tarantool-master/src/tarantool`
     | :codenormal:`box.cfg{listen = 3301}`
-    | :codenormal:`box.schema.create_space('tester')`
+    | :codenormal:`box.schema.space.create('tester')`
     | :codenormal:`box.space.tester:create_index('primary', {})`
     | :codenormal:`box.schema.user.passwd('admin', 'password')`
     | :codenormal:`console = require('console')`
@@ -209,7 +209,7 @@ and shard.tester, should look approximately like this:
     | :codenormal:`rm -r *.xlog`
     | :codenormal:`~/tarantool-master/src/tarantool`
     | :codenormal:`box.cfg{listen = 3301}`
-    | :codenormal:`box.schema.create_space('tester')`
+    | :codenormal:`box.schema.space.create('tester')`
     | :codenormal:`box.space.tester:create_index('primary', {})`
     | :codenormal:`box.schema.user.passwd('admin', 'password')`
     | :codenormal:`console = require('console')`
@@ -236,7 +236,7 @@ and shard.tester, should look approximately like this:
     | :codenormal:`rm -r *.xlog`
     | :codenormal:`~/tarantool-master/src/tarantool`
     | :codenormal:`box.cfg{listen = 3302}`
-    | :codenormal:`box.schema.create_space('tester')`
+    | :codenormal:`box.schema.space.create('tester')`
     | :codenormal:`box.space.tester:create_index('primary', {})`
     | :codenormal:`box.schema.user.passwd('admin', 'password')`
     | :codenormal:`console = require('console')`
