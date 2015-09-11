@@ -807,11 +807,9 @@ function box.schema.space.bless(space)
 
         local ret = {}
         local entry = port_buf.first
-        local i = 1
-        while entry ~= nil do
+        for i=1,tonumber(port_buf.size),1 do
             ret[i] = box.tuple.bless(entry.tuple)
             entry = entry.next
-            i = i + 1
         end
         builtin.port_buf_destroy(port_buf);
         return ret
