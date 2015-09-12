@@ -115,7 +115,7 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Suggests: tarantool-lts, tarantool-tls-client-dbg
-Conflicts: tarantool-client (<< 1.6)
+Conflicts: tarantool-client (<< 1.6), tarantool
 Replaces: tarantool-client (<< 1.6)
 Description: Tarantool in-memory database - command line client
  Tarantool is an in-memory database and Lua application server.

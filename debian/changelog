@@ -1,3 +1,9 @@
+tarantool-lts (1.5.5-18-g2998d20-1) unstable; urgency=medium
+
+  * Add conflict with tarantool, closes: #793867.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 12 Sep 2015 12:13:42 +0300
+
 tarantool-lts (1.5.4.28.gfcf2fef-1) unstable; urgency=medium
 
   * Tarantool 1.6 and tarantool 1.5 aren't compatible, so
