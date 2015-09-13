@@ -131,16 +131,16 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s:select{1}`
         | :codenormal:`---`
         | :codenormal:`- - [1, 'A']`
-        | :codenormal:`- [1, 'B']`
-        | :codenormal:`- [1, 'C']`
+        | |nbsp| |nbsp| :codenormal:`- [1, 'B']`
+        | |nbsp| |nbsp| :codenormal:`- [1, 'C']`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`-- must equal 0 fields, so returns all tuples`
         | :codenormal:`tarantool>` :codebold:`s:select{}`
         | :codenormal:`---`
         | :codenormal:`- - [1, 'A']`
-        | :codenormal:`- [1, 'B']`
-        | :codenormal:`- [1, 'C']`
-        | :codenormal:`- [2, 'D']`
+        | |nbsp| |nbsp| :codenormal:`- [1, 'B']`
+        | |nbsp| |nbsp| :codenormal:`- [1, 'C']`
+        | |nbsp| |nbsp| :codenormal:`- [2, 'D']`
         | :codenormal:`...`
 
         For examples of complex ``select`` requests, where one can specify which index to
@@ -559,6 +559,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Insert a new tuple using an auto-increment primary key. The space specified
         by space-name must have a NUM primary key index of type TREE. The
         primary-key field will be incremented before the insert.
+        This is only applicable for the memtx storage engine.
 
         :param space_object space-object:
         :param lua-table,box.tuple tuple: tuple's fields, other than the primary-key field.
@@ -622,14 +623,14 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     | :codenormal:`console = require('console'); console.delimiter('!')`
     | :codenormal:`function example()`
-    |     :codenormal:`local ta = {}, i, line`
-    |     :codenormal:`for k, v in box.space._schema:pairs() do`
-    |         :codenormal:`i = 1`
-    |         :codenormal:`line = ''`
-    |         :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
-    |         :codenormal:`table.insert(ta, line)`
-    |     :codenormal:`end`
-    |     :codenormal:`return ta`
+    | |nbsp| |nbsp| :codenormal:`local ta = {}, i, line`
+    | |nbsp| |nbsp| :codenormal:`for k, v in box.space._schema:pairs() do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`i = 1`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`line = ''`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`table.insert(ta, line)`
+    | |nbsp| |nbsp| :codenormal:`end`
+    | |nbsp| |nbsp| :codenormal:`return ta`
     | :codenormal:`end!`
     | :codenormal:`console.delimiter('')!`
 
@@ -720,14 +721,14 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     | :codenormal:`console = require('console'); console.delimiter('!')`
     | :codenormal:`function example()`
-    |     :codenormal:`local ta = {}, i, line`
-    |     :codenormal:`for k, v in box.space._index:pairs() do`
-    |         :codenormal:`i = 1`
-    |         :codenormal:`line = ''`
-    |             :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
-    |         :codenormal:`table.insert(ta, line)`
-    |     :codenormal:`end`
-    |     :codenormal:`return ta`
+    | |nbsp| |nbsp| :codenormal:`local ta = {}, i, line`
+    | |nbsp| |nbsp| :codenormal:`for k, v in box.space._index:pairs() do`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`i = 1`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`line = ''`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`table.insert(ta, line)`
+    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`end`
+    | |nbsp| |nbsp| :codenormal:`return ta`
     | :codenormal:`end!`
     | :codenormal:`console.delimiter('')!`
 

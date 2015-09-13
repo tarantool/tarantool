@@ -210,7 +210,7 @@ then it is dropped:
     | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'execute', 'function', 'f7')`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`.schema.user.revoke('guest', 'execute', 'function', 'f7')`
+    | :codenormal:`tarantool>` :codebold:`box.schema.user.revoke('guest', 'execute', 'function', 'f7')`
     | :codenormal:`---`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`box.schema.func.drop('f7')`
@@ -241,7 +241,7 @@ admin might say:
 
 .. _connectors: :doc:`../connectors/index`
 
-    | :codenormal:`box.space._user:insert{123456,0,'manager'}`
+    | :codenormal:`box.space._user:insert{123456,0,'manager','user'}`
     | :codenormal:`box.schema.user.grant('manager', 'read', 'space', '_space')`
     | :codenormal:`box.schema.user.grant('manager', 'read', 'space', 'payroll')`
 
@@ -337,7 +337,7 @@ inherits from role R2.
     box.schema.role.create('R2')
     -- Grant role R2 to role R1 and role R1 to U1 (order doesn't matter)
     box.schema.role.grant('R1','execute','role','R2')
-    box.schema.role.grant('U1','execute','role','R1')
+    box.schema.user.grant('U1','execute','role','R1')
     -- Grant read and execute privileges to R2 (but not to R1 and not to U1)
     box.schema.role.grant('R2','read,write','space','T')
     box.schema.role.grant('R2','execute','universe')
