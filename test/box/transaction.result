@@ -47,19 +47,8 @@ f = fiber.create(sloppy);
 ...
 -- when the sloppy fiber ends, its session has an active transction
 -- ensure it's rolled back automatically
-f:status();
+while f:status() ~= 'dead' do fiber.sleep(0) end;
 ---
-- dead
-...
-fiber.sleep(0);
----
-...
-fiber.sleep(0);
----
-...
-f:status();
----
-- dead
 ...
 -- transactions and system spaces
 box.begin() box.schema.space.create('test');
@@ -205,14 +194,14 @@ box.commit();
 box.begin() s:insert{1, 'Must be rolled back'};
 ---
 ...
+-- nothing - the transaction was rolled back
 -- nothing to commit because of yield
+while s:get{1} ~= nil do fiber.sleep(0) end
 box.commit();
 ---
 ...
--- nothing - the transaction was rolled back
 -- Test background fiber
 --
-s:select{}
 function sloppy()
     box.begin()
     s:insert{1, 'From background fiber'}
@@ -233,6 +222,9 @@ s:select{};
 ---
 - []
 ...
+t = nil;
+---
+...
 function sloppy()
     box.begin()
     s:insert{1, 'From background fiber'}
@@ -245,7 +237,7 @@ end;
 f = fiber.create(sloppy);
 ---
 ...
-while f:status() == 'running' do
+while f:status() ~= 'dead' do
     fiber.sleep(0)
 end;
 ---
@@ -394,4 +386,7 @@ tx_limit(10000)
 box.space.test:len()
 ---
 - 10001
+...
+box.space.test:drop()
+---
 ...
