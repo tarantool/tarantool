@@ -305,12 +305,12 @@ t:unpack(2, 1)
 ...
 t:totable(0)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:182: tuple.totable: invalid second
+- error: '[string "-- tuple.lua (internal file)..."]:156: tuple.totable: invalid second
     argument'
 ...
 t:totable(1, 0)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:191: tuple.totable: invalid third
+- error: '[string "-- tuple.lua (internal file)..."]:165: tuple.totable: invalid third
     argument'
 ...
 --
@@ -443,7 +443,7 @@ t:next(-1)
 ...
 t:next("fdsaf")
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:163: bad argument #2 to ''box_tuple_field''
+- error: '[string "-- tuple.lua (internal file)..."]:137: bad argument #2 to ''box_tuple_field''
     (cannot convert ''string'' to ''unsigned int'')'
 ...
 box.tuple.new({'x', 'y', 'z'}):next()
@@ -612,7 +612,7 @@ r = {}
 ...
 for _state, val in t:pairs(10) do table.insert(r, val) end
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 r
 ---
@@ -698,19 +698,19 @@ t:findall(1, 'xxxxx')
 ...
 t:find(100, 'a')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 t:findall(100, 'a')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 t:find(100, 'xxxxx')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 t:findall(100, 'xxxxx')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 ---
 -- Lua type coercion
@@ -804,12 +804,12 @@ t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
 ...
 t:update()
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:231: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:205: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update(10)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:231: Usage: tuple:update({ {
+- error: '[string "-- tuple.lua (internal file)..."]:205: Usage: tuple:update({ {
     op, field, arg}+ })'
 ...
 t:update({})

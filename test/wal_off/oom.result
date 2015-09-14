@@ -218,6 +218,10 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
+collectgarbage('collect')
+---
+- 0
+...
 for i=1,10000 do space:insert{i, str} end
 ---
 - error: Failed to allocate 15019 bytes in slab allocator for tuple
@@ -236,6 +240,10 @@ for i=1,to_del do space:delete{i} end
 ---
 ...
 index:count()
+---
+- 0
+...
+collectgarbage('collect')
 ---
 - 0
 ...
