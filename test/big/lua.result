@@ -734,7 +734,7 @@ t:find(2, '2')
 ...
 t:find(89, '2')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:151: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:125: error: invalid key to ''next'''
 ...
 t:findall(4, '3')
 ---

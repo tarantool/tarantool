@@ -85,6 +85,7 @@ str = string.rep('a', 15000) -- about size of index memory block
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
+collectgarbage('collect')
 for i=1,10000 do space:insert{i, str} end
 definatelly_used = index:count() * 16 * 1024
 2 * definatelly_used > arena_bytes -- at least half memory used
@@ -92,6 +93,7 @@ to_del = index:count()
 for i=1,to_del do space:delete{i} end
 index:count()
 
+collectgarbage('collect')
 for i=1,10000 do space:insert{i, str} end
 definatelly_used = index:count() * 16 * 1024
 2 * definatelly_used > arena_bytes -- at least half memory used
