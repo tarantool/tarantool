@@ -106,7 +106,10 @@ box.schema.space.create('')
 box.schema.space.create('_Abcde'):drop()
 box.schema.space.create('_5'):drop()
 box.schema.space.create('valid_identifier'):drop()
-box.schema.space.create('ынтыпрайзный_空間'):drop() -- unicode
+-- some OS-es ship incomplete locales, breaking ID validation
+weird_chars=''
+if jit.os~='OSX' and jit.os~='BSD' then weird_chars='空間' end
+box.schema.space.create('ынтыпрайзный_'..weird_chars):drop() -- unicode
 box.schema.space.create('utf8_наше_Фсё'):drop() -- unicode
 
 space = box.schema.space.create('test')
