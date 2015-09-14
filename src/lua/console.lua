@@ -291,11 +291,17 @@ local function connect(uri)
     end
 
     -- check connection && permissions
+    local status, reason
     if remote.console then
-        remote:console('return true')
+        status, reason = pcall(remote.console, remote, 'return true')
     else
-        remote:eval('return true')
+        status, reason = pcall(remote.eval, remote, 'return true')
     end
+    if not status then
+        remote:close() -- don't leak net.box connection
+        error(reason) -- re-throw original error (there is no better way)
+    end
+
     -- override methods
     self.remote = remote
     self.eval = remote_eval
