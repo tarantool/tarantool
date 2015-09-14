@@ -4,23 +4,7 @@ fiber = require 'fiber'
 
 
 PERIOD = 0.03
-
---# setopt delimiter ';'
-
-ffi = require 'ffi'
-ffi.cdef[[int uname(char *buf)]]
-
-function uname()
-    local name = ffi.new('char[?]', 4096)
-    ffi.C.uname(name)
-    return ffi.string(name)
-end
-
-if uname() ~= 'Linux' then
-    PERIOD = 1.5
-end
-
---# setopt delimiter ''
+if jit.os ~= 'Linux' then PERIOD = 1.5 end
 
 
 space = box.schema.space.create('snapshot_daemon')
@@ -67,8 +51,6 @@ fio.basename(snaps[1], '.snap') >= fio.basename(xlogs[1], '.xlog')
 -- restore default options
 box.cfg{snapshot_period = 3600 * 4, snapshot_count = 4 }
 space:drop()
-
-PERIOD
 
 box.cfg{ snapshot_count = .2 }
 

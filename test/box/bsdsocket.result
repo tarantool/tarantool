@@ -603,7 +603,7 @@ sc:nonblock(true)
 ---
 - true
 ...
-sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS or errno() == errno.ECONNREFUSED
 ---
 - true
 ...
@@ -619,9 +619,12 @@ string.match(tostring(sc), ', peer') == nil
 ---
 - true
 ...
-require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 ---
-- Connection refused
+...
+socket_error == errno.ECONNREFUSED or socket_error == 0
+---
+- true
 ...
 --# setopt delimiter ';'
 socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
