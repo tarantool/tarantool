@@ -170,10 +170,11 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	task->complete = 0;
 
 	eio_submit(&task->base);
-
-	if (fiber_yield_timeout(timeout) && !task->complete) {
-		/* timed out. */
+	fiber_yield_timeout(timeout);
+	if (!task->complete) {
+		/* timed out or cancelled. */
 		task->fiber = NULL;
+		fiber_testcancel();
 		tnt_raise(TimedOut);
 	}
 
