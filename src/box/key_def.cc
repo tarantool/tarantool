@@ -50,7 +50,7 @@ const uint32_t key_mp_type[] = {
 };
 
 const struct key_opts key_opts_default = {
-	true, 0, RTREE_INDEX_DISTANCE_TYPE_EUCLID
+	true, 2, RTREE_INDEX_DISTANCE_TYPE_EUCLID
 };
 
 enum schema_object_type

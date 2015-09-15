@@ -159,7 +159,9 @@ struct errcode_record {
 	/*103 */_(ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,	2, "Unknown RTREE index distance type %s") \
 	/*104 */_(ER_PROTOCOL,			2, "%s") \
 	/*105 */_(ER_UPSERT_UNIQUE_SECONDARY_KEY, 2, "Space %s has a unique secondary index and does not support UPSERT") \
-
+	/*106 */_(ER_WRONG_INDEX_SPACE_RECORD,  2, "Wrong record in _index space: got [%s], expected [%s]") \
+	/*107 */_(ER_WRONG_INDEX_PARTS_DEFINITION, 2, "Wrong index parts (field %u) definition: %s; expected [[field0_no(NUM), field0_type(STR), ..][field1_no (NUM), field1_type(STR), ..]..]") \
+	/*108 */_(ER_WRONG_INDEX_OPTS_DEFINITION, 2, "Wrong index options (field %u) definition: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

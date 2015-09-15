@@ -214,7 +214,7 @@ local function update_param_table(table, defaults)
     if table == nil then
         return defaults
     end
-    if (defaults == nil) then
+    if defaults == nil then
         return table
     end
     for k,v in pairs(defaults) do
@@ -381,13 +381,21 @@ box.schema.index.create = function(space_id, name, options)
         dimension = 'number',
         distance = 'string',
     }
+    check_param_table(options, options_template)
     local options_defaults = {
         type = 'tree',
-        parts = { 1, 'num' },
-        unique = true,
     }
-    check_param_table(options, options_template)
     options = update_param_table(options, options_defaults)
+    local type_dependent_defaults = {
+        rtree = {parts = { 2, 'array' }, unique = false},
+        bitset = {parts = { 2, 'num' }, unique = false},
+        other = {parts = { 1, 'num' }, unique = true},
+    }
+    options_defaults = type_dependent_defaults[options.type]
+            and type_dependent_defaults[options.type]
+            or type_dependent_defaults.other
+    options = update_param_table(options, options_defaults)
+
     check_index_parts(options.parts)
     options.parts = update_index_parts(options.parts)
 
@@ -507,7 +515,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     local PARTS = 6
     if type(tuple[OPTS]) == 'number' then
         -- old format
-        key_opts.unique = tuple[OPTS] == 1 and true or false
+        key_opts.unique = tuple[OPTS] == 1
         local part_count = tuple[PARTS]
         for i = 1, part_count do
             table.insert(parts, {tuple[2 * i + 4], tuple[2 * i + 5]});

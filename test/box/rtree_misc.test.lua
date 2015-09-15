@@ -161,3 +161,76 @@ s = box.space.spatial
 i = s.index.spatial
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
 s:drop()
+
+
+-- RTREE QA https://github.com/tarantool/tarantool/issues/976
+s = box.schema.space.create('s')
+i = s:create_index('p')
+
+-- dimension too big
+i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 21})
+
+-- dimension too low
+i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 0})
+
+-- cant be unique
+i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, unique = true})
+
+-- wrong parts
+i = s:create_index('s', {type = 'rtree', parts = {2, 'num'}})
+i = s:create_index('s', {type = 'rtree', parts = {2, 'array', 3, 'array'}})
+
+-- defaults test
+i = s:create_index('s', { type = 'rtree' })
+i.dimension
+i.parts
+i:drop()
+
+-- hide first (id) field of tuple
+function f(t) local r = {} for i, v in ipairs(t) do r[i] = v end r[1] = 0 return setmetatable (r, {__serialize = 'seq'}) end
+
+-- new index through inserting to _index space
+f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'}}})
+s.index.s:drop()
+-- support of 1.6.5 _index structure
+f(box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array'})
+s.index.s:drop()
+
+-- with wrong args
+empty_map = setmetatable({}, {__serialize = 'map'})
+box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'num'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'time'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
+
+-- unknown args ignored
+f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
+s.index.s:drop()
+f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array', {part = 'opts'}}}})
+s.index.s:drop()
+
+-- alter
+i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})
+i:alter{type = 'tree' }
+i:alter{dimension = 3 }
+s:insert{1, {1, 1} }
+s:insert{1, {1, 1, 1} }
+i:alter{dimension = 4 }
+s:select{}
+s:insert{2, {2, 0, 0} }
+i:alter{distance = 'euclid' }
+i:select({0, 0, 0}, {iterator = 'neighbor'})
+i:alter{distance = 'manhattan' }
+i:select({0, 0, 0}, {iterator = 'neighbor'})
+
+s:drop()
