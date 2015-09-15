@@ -1,6 +1,10 @@
 #ifndef TARANTOOL_MODULE_H_INCLUDED
 #define TARANTOOL_MODULE_H_INCLUDED
 
+/**
+ * \file
+ */
+
 #include <stddef.h>
 #include <stdarg.h> /* va_list */
 #include <errno.h>
