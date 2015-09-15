@@ -1526,3 +1526,16 @@ socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == er
 ---
 - true
 ...
+-- gh-574: check that fiber with getaddrinfo can be safely cancelled
+--# setopt delimiter ';'
+f = fiber.create(function()
+    while true do
+        local result = socket.getaddrinfo('localhost', '80')
+    end
+end);
+---
+...
+--# setopt delimiter ''
+f:cancel()
+---
+...
