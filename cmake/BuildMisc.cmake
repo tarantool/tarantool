@@ -26,6 +26,11 @@ macro(libmisc_build)
             ${PROJECT_SOURCE_DIR}/third_party/open_memstream.c
         )
     endif()
+    if (NOT HAVE_CLOCK_GETTIME)
+        list(APPEND misc_src
+            ${PROJECT_SOURCE_DIR}/third_party/clock_gettime.c
+        )
+    endif()
     if (NOT TARGET_OS_DEBIAN_FREEBSD)
         if (TARGET_OS_FREEBSD)
             set_source_files_properties(

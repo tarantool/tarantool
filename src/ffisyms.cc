@@ -21,6 +21,7 @@
 #include <lib/salad/guava.h>
 #include "latch.h"
 #include <lib/csv/csv.h>
+#include <lua/clock.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -76,6 +77,14 @@ void *ffi_symbols[] = {
 	(void *) random_bytes,
 	(void *) fiber_time,
 	(void *) fiber_time64,
+	(void *) clock_realtime,
+	(void *) clock_monotonic,
+	(void *) clock_process,
+	(void *) clock_thread,
+	(void *) clock_realtime64,
+	(void *) clock_monotonic64,
+	(void *) clock_process64,
+	(void *) clock_thread64,
 	(void *) tarantool_lua_slab_cache,
 	(void *) ibuf_create,
 	(void *) ibuf_destroy,

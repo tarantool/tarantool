@@ -97,7 +97,8 @@ extern char strict_lua[],
 	dis_x64_lua[],
 	dump_lua[],
 	csv_lua[],
-	v_lua[];
+	v_lua[],
+	time_lua[];
 
 #if LUAJIT_VERSION_NUM >= 20100 /* LuaJIT 2.1+ */
 extern char p_lua[], zone_lua[];
@@ -117,6 +118,7 @@ static const char *lua_modules[] = {
 	"uri", uri_lua,
 	"fio", fio_lua,
 	"csv", csv_lua,
+	"time", time_lua,
 	"socket", bsdsocket_lua,
 	"console", console_lua,
 	"tap", tap_lua,

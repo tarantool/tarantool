@@ -88,6 +88,7 @@ check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
 check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
+check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
 
 # Checks for libev
 include(CheckStructHasMember)

@@ -168,6 +168,7 @@
 #cmakedefine HAVE_FMEMOPEN 1
 
 #cmakedefine HAVE_UUIDGEN 1
+#cmakedefine HAVE_CLOCK_GETTIME 1
 
 /** \cond public */
 

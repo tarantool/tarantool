@@ -202,6 +202,24 @@ FILE *
 fmemopen(void *buf, size_t size, const char *mode);
 #endif /* HAVE_FMEMOPEN */
 
+
+#include <time.h>
+#include <sys/time.h>
+#ifndef HAVE_CLOCK_GETTIME
+/* Declare clock_gettime(). */
+#include <stdint.h>
+struct timespec
+{
+      time_t  tv_sec;    /* Seconds.  */
+      long    tv_nsec;   /* Nanoseconds. */
+};
+int clock_gettime(uint32_t clock_id, struct timespec *tp);
+#define CLOCK_REALTIME			0
+#define CLOCK_MONOTONIC			1
+#define CLOCK_PROCESS_CPUTIME_ID	2
+#define CLOCK_THREAD_CPUTIME_ID		3
+#endif
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

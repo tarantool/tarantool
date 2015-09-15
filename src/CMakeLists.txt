@@ -30,6 +30,7 @@ lua_source(lua_sources lua/tap.lua)
 lua_source(lua_sources lua/fio.lua)
 lua_source(lua_sources lua/csv.lua)
 lua_source(lua_sources lua/strict.lua)
+lua_source(lua_sources lua/time.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
@@ -109,6 +110,7 @@ set (server_sources
      lua/bsdsocket.cc
      lua/pickle.cc
      lua/fio.cc
+     lua/clock.c
      ${lua_sources}
 )
 
@@ -132,7 +134,7 @@ list(APPEND common_libraries
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
-    set (common_libraries ${common_libraries} dl)
+    set (common_libraries ${common_libraries} dl rt)
 endif()
 
 if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
