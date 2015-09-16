@@ -850,41 +850,41 @@ ok 10 - subtests
     ok 22 - len(mp_decode_array(16))
     ok 23 - mp_sizeof_array(16)
     ok 24 - mp_encode(16) == "\xdc\x00\x10"
-    # array (65535) - 1
-    ok 25 - mp_check_array((65535) - 1) == 0
-    ok 26 - mp_decode(mp_encode((65535) - 1)) == (65535) - 1
-    ok 27 - len(mp_encode_array((65535) - 1)
-    ok 28 - len(mp_decode_array((65535) - 1))
-    ok 29 - mp_sizeof_array((65535) - 1)
-    ok 30 - mp_encode((65535) - 1) == "\xdc\xff\xfe"
-    # array (65535)
-    ok 31 - mp_check_array((65535)) == 0
-    ok 32 - mp_decode(mp_encode((65535))) == (65535)
-    ok 33 - len(mp_encode_array((65535))
-    ok 34 - len(mp_decode_array((65535)))
-    ok 35 - mp_sizeof_array((65535))
-    ok 36 - mp_encode((65535)) == "\xdc\xff\xff"
-    # array (65535) + 1
-    ok 37 - mp_check_array((65535) + 1) == 0
-    ok 38 - mp_decode(mp_encode((65535) + 1)) == (65535) + 1
-    ok 39 - len(mp_encode_array((65535) + 1)
-    ok 40 - len(mp_decode_array((65535) + 1))
-    ok 41 - mp_sizeof_array((65535) + 1)
-    ok 42 - mp_encode((65535) + 1) == "\xdd\x00\x01\x00\x00"
-    # array (4294967295U) - 1
-    ok 43 - mp_check_array((4294967295U) - 1) == 0
-    ok 44 - mp_decode(mp_encode((4294967295U) - 1)) == (4294967295U) - 1
-    ok 45 - len(mp_encode_array((4294967295U) - 1)
-    ok 46 - len(mp_decode_array((4294967295U) - 1))
-    ok 47 - mp_sizeof_array((4294967295U) - 1)
-    ok 48 - mp_encode((4294967295U) - 1) == "\xdd\xff\xff\xff\xfe"
-    # array (4294967295U)
-    ok 49 - mp_check_array((4294967295U)) == 0
-    ok 50 - mp_decode(mp_encode((4294967295U))) == (4294967295U)
-    ok 51 - len(mp_encode_array((4294967295U))
-    ok 52 - len(mp_decode_array((4294967295U)))
-    ok 53 - mp_sizeof_array((4294967295U))
-    ok 54 - mp_encode((4294967295U)) == "\xdd\xff\xff\xff\xff"
+    # array 0xfffe
+    ok 25 - mp_check_array(0xfffe) == 0
+    ok 26 - mp_decode(mp_encode(0xfffe)) == 0xfffe
+    ok 27 - len(mp_encode_array(0xfffe)
+    ok 28 - len(mp_decode_array(0xfffe))
+    ok 29 - mp_sizeof_array(0xfffe)
+    ok 30 - mp_encode(0xfffe) == "\xdc\xff\xfe"
+    # array 0xffff
+    ok 31 - mp_check_array(0xffff) == 0
+    ok 32 - mp_decode(mp_encode(0xffff)) == 0xffff
+    ok 33 - len(mp_encode_array(0xffff)
+    ok 34 - len(mp_decode_array(0xffff))
+    ok 35 - mp_sizeof_array(0xffff)
+    ok 36 - mp_encode(0xffff) == "\xdc\xff\xff"
+    # array 0x10000
+    ok 37 - mp_check_array(0x10000) == 0
+    ok 38 - mp_decode(mp_encode(0x10000)) == 0x10000
+    ok 39 - len(mp_encode_array(0x10000)
+    ok 40 - len(mp_decode_array(0x10000))
+    ok 41 - mp_sizeof_array(0x10000)
+    ok 42 - mp_encode(0x10000) == "\xdd\x00\x01\x00\x00"
+    # array 0xfffffffeU
+    ok 43 - mp_check_array(0xfffffffeU) == 0
+    ok 44 - mp_decode(mp_encode(0xfffffffeU)) == 0xfffffffeU
+    ok 45 - len(mp_encode_array(0xfffffffeU)
+    ok 46 - len(mp_decode_array(0xfffffffeU))
+    ok 47 - mp_sizeof_array(0xfffffffeU)
+    ok 48 - mp_encode(0xfffffffeU) == "\xdd\xff\xff\xff\xfe"
+    # array 0xffffffffU
+    ok 49 - mp_check_array(0xffffffffU) == 0
+    ok 50 - mp_decode(mp_encode(0xffffffffU)) == 0xffffffffU
+    ok 51 - len(mp_encode_array(0xffffffffU)
+    ok 52 - len(mp_decode_array(0xffffffffU))
+    ok 53 - mp_sizeof_array(0xffffffffU)
+    ok 54 - mp_encode(0xffffffffU) == "\xdd\xff\xff\xff\xff"
     # *** test_arrays: done ***
 ok 11 - subtests
     1..54
@@ -917,41 +917,41 @@ ok 11 - subtests
     ok 22 - len(mp_decode_map(16))
     ok 23 - mp_sizeof_map(16)
     ok 24 - mp_encode(16) == "\xde\x00\x10"
-    # map (65535) - 1
-    ok 25 - mp_check_map((65535) - 1) == 0
-    ok 26 - mp_decode(mp_encode((65535) - 1)) == (65535) - 1
-    ok 27 - len(mp_encode_map((65535) - 1)
-    ok 28 - len(mp_decode_map((65535) - 1))
-    ok 29 - mp_sizeof_map((65535) - 1)
-    ok 30 - mp_encode((65535) - 1) == "\xde\xff\xfe"
-    # map (65535)
-    ok 31 - mp_check_map((65535)) == 0
-    ok 32 - mp_decode(mp_encode((65535))) == (65535)
-    ok 33 - len(mp_encode_map((65535))
-    ok 34 - len(mp_decode_map((65535)))
-    ok 35 - mp_sizeof_map((65535))
-    ok 36 - mp_encode((65535)) == "\xde\xff\xff"
-    # map (65535) + 1
-    ok 37 - mp_check_map((65535) + 1) == 0
-    ok 38 - mp_decode(mp_encode((65535) + 1)) == (65535) + 1
-    ok 39 - len(mp_encode_map((65535) + 1)
-    ok 40 - len(mp_decode_map((65535) + 1))
-    ok 41 - mp_sizeof_map((65535) + 1)
-    ok 42 - mp_encode((65535) + 1) == "\xdf\x00\x01\x00\x00"
-    # map (4294967295U) - 1
-    ok 43 - mp_check_map((4294967295U) - 1) == 0
-    ok 44 - mp_decode(mp_encode((4294967295U) - 1)) == (4294967295U) - 1
-    ok 45 - len(mp_encode_map((4294967295U) - 1)
-    ok 46 - len(mp_decode_map((4294967295U) - 1))
-    ok 47 - mp_sizeof_map((4294967295U) - 1)
-    ok 48 - mp_encode((4294967295U) - 1) == "\xdf\xff\xff\xff\xfe"
-    # map (4294967295U)
-    ok 49 - mp_check_map((4294967295U)) == 0
-    ok 50 - mp_decode(mp_encode((4294967295U))) == (4294967295U)
-    ok 51 - len(mp_encode_map((4294967295U))
-    ok 52 - len(mp_decode_map((4294967295U)))
-    ok 53 - mp_sizeof_map((4294967295U))
-    ok 54 - mp_encode((4294967295U)) == "\xdf\xff\xff\xff\xff"
+    # map 0xfffe
+    ok 25 - mp_check_map(0xfffe) == 0
+    ok 26 - mp_decode(mp_encode(0xfffe)) == 0xfffe
+    ok 27 - len(mp_encode_map(0xfffe)
+    ok 28 - len(mp_decode_map(0xfffe))
+    ok 29 - mp_sizeof_map(0xfffe)
+    ok 30 - mp_encode(0xfffe) == "\xde\xff\xfe"
+    # map 0xffff
+    ok 31 - mp_check_map(0xffff) == 0
+    ok 32 - mp_decode(mp_encode(0xffff)) == 0xffff
+    ok 33 - len(mp_encode_map(0xffff)
+    ok 34 - len(mp_decode_map(0xffff))
+    ok 35 - mp_sizeof_map(0xffff)
+    ok 36 - mp_encode(0xffff) == "\xde\xff\xff"
+    # map 0x10000
+    ok 37 - mp_check_map(0x10000) == 0
+    ok 38 - mp_decode(mp_encode(0x10000)) == 0x10000
+    ok 39 - len(mp_encode_map(0x10000)
+    ok 40 - len(mp_decode_map(0x10000))
+    ok 41 - mp_sizeof_map(0x10000)
+    ok 42 - mp_encode(0x10000) == "\xdf\x00\x01\x00\x00"
+    # map 0xfffffffeU
+    ok 43 - mp_check_map(0xfffffffeU) == 0
+    ok 44 - mp_decode(mp_encode(0xfffffffeU)) == 0xfffffffeU
+    ok 45 - len(mp_encode_map(0xfffffffeU)
+    ok 46 - len(mp_decode_map(0xfffffffeU))
+    ok 47 - mp_sizeof_map(0xfffffffeU)
+    ok 48 - mp_encode(0xfffffffeU) == "\xdf\xff\xff\xff\xfe"
+    # map 0xffffffffU
+    ok 49 - mp_check_map(0xffffffffU) == 0
+    ok 50 - mp_decode(mp_encode(0xffffffffU)) == 0xffffffffU
+    ok 51 - len(mp_encode_map(0xffffffffU)
+    ok 52 - len(mp_decode_map(0xffffffffU))
+    ok 53 - mp_sizeof_map(0xffffffffU)
+    ok 54 - mp_encode(0xffffffffU) == "\xdf\xff\xff\xff\xff"
     # *** test_maps: done ***
 ok 12 - subtests
     1..52
@@ -1385,72 +1385,72 @@ ok 15 - subtests
     ok 58 - Test value on step 13
     ok 59 - Test type on step 14
     ok 60 - Test value on step 14
-    ok 61 - check at 551
-    ok 62 - type at 552
-    ok 63 - decode at 553
-    ok 64 - check at 556
-    ok 65 - type at 557
-    ok 66 - check at 561
-    ok 67 - type at 562
-    ok 68 - decode at 563
-    ok 69 - check at 566
-    ok 70 - type at 567
-    ok 71 - decode at 568
-    ok 72 - check at 571
-    ok 73 - type at 572
-    ok 74 - decode at 573
-    ok 75 - check at 576
-    ok 76 - type at 577
-    ok 77 - decode at 578
-    ok 78 - check at 581
-    ok 79 - type at 582
-    ok 80 - decode at 583
-    ok 81 - check at 586
-    ok 82 - type at 587
-    ok 83 - decode at 588
-    ok 84 - check at 591
-    ok 85 - type at 592
-    ok 86 - decode at 593
-    ok 87 - check at 596
-    ok 88 - type at 597
-    ok 89 - decode at 598
-    ok 90 - check at 601
-    ok 91 - type at 602
-    ok 92 - decode at 603
-    ok 93 - check at 606
-    ok 94 - type at 607
-    ok 95 - decode at 608
-    ok 96 - check at 611
-    ok 97 - type at 612
-    ok 98 - decode at 614
-    ok 99 - compare at 615
-    ok 100 - check at 618
-    ok 101 - type at 619
-    ok 102 - decode at 620
-    ok 103 - check at 623
-    ok 104 - type at 624
-    ok 105 - decode at 626
-    ok 106 - compare at 627
-    ok 107 - check at 630
-    ok 108 - type at 631
-    ok 109 - decode at 632
-    ok 110 - check at 635
-    ok 111 - type at 636
-    ok 112 - decode at 638
-    ok 113 - check at 641
-    ok 114 - type at 642
-    ok 115 - check at 646
-    ok 116 - type at 647
-    ok 117 - decode at 648
-    ok 118 - check at 651
-    ok 119 - type at 652
-    ok 120 - decode at 653
-    ok 121 - check at 656
-    ok 122 - type at 657
-    ok 123 - decode at 658
-    ok 124 - check at 661
-    ok 125 - type at 662
-    ok 126 - decode at 663
+    ok 61 - check
+    ok 62 - type
+    ok 63 - decode
+    ok 64 - check
+    ok 65 - type
+    ok 66 - check
+    ok 67 - type
+    ok 68 - decode
+    ok 69 - check
+    ok 70 - type
+    ok 71 - decode
+    ok 72 - check
+    ok 73 - type
+    ok 74 - decode
+    ok 75 - check
+    ok 76 - type
+    ok 77 - decode
+    ok 78 - check
+    ok 79 - type
+    ok 80 - decode
+    ok 81 - check
+    ok 82 - type
+    ok 83 - decode
+    ok 84 - check
+    ok 85 - type
+    ok 86 - decode
+    ok 87 - check
+    ok 88 - type
+    ok 89 - decode
+    ok 90 - check
+    ok 91 - type
+    ok 92 - decode
+    ok 93 - check
+    ok 94 - type
+    ok 95 - decode
+    ok 96 - check
+    ok 97 - type
+    ok 98 - decode
+    ok 99 - compare
+    ok 100 - check
+    ok 101 - type
+    ok 102 - decode
+    ok 103 - check
+    ok 104 - type
+    ok 105 - decode
+    ok 106 - compare
+    ok 107 - check
+    ok 108 - type
+    ok 109 - decode
+    ok 110 - check
+    ok 111 - type
+    ok 112 - decode
+    ok 113 - check
+    ok 114 - type
+    ok 115 - check
+    ok 116 - type
+    ok 117 - decode
+    ok 118 - check
+    ok 119 - type
+    ok 120 - decode
+    ok 121 - check
+    ok 122 - type
+    ok 123 - decode
+    ok 124 - check
+    ok 125 - type
+    ok 126 - decode
     ok 127 - nothing more
     ok 128 - no magic detected
     ok 129 - return value on step 0
