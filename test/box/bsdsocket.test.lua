@@ -523,3 +523,13 @@ socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == err
 socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
+
+-- gh-574: check that fiber with getaddrinfo can be safely cancelled
+--# setopt delimiter ';'
+f = fiber.create(function()
+    while true do
+        local result = socket.getaddrinfo('localhost', '80')
+    end
+end);
+--# setopt delimiter ''
+f:cancel()
