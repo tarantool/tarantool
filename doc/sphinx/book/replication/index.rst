@@ -10,10 +10,10 @@ its changes to all the other servers. Servers which share the same databases
 are a "cluster". Each server in a cluster also has a numeric identifier which
 is unique within the cluster, known as the "server id".
 
-    To set up replication, it's necessary to set up the master servers which
-    make the original data-change requests, set up the replica servers which
-    copy data-change requests from masters, and establish procedures for
-    recovery from a degraded state.
+To set up replication, it's necessary to set up the master servers which
+make the original data-change requests, set up the replica servers which
+copy data-change requests from masters, and establish procedures for
+recovery from a degraded state.
 
 =====================================================================
                     Replication architecture
@@ -127,6 +127,22 @@ computer and the replica on a different computer is very common and provides
 two benefits: FAILOVER (because if the master goes down then the replica can
 take over), or LOAD BALANCING (because clients can connect to either the master
 or the replica for select requests).
+
+=====================================================================
+                    Monitoring a Replica's Actions
+=====================================================================
+
+In :func:`box.info` there is a :code:`box.info.replication.status` field:
+"off", "stopped", "connecting", "connected", or "disconnected". |br|
+If a replica's status is "connected", then there will be two more fields: |br|
+:code:`box.info.replication.idle` = the number of seconds the replica has been idle, |br|
+:code:`box.info.replication.lag` = the number of seconds the replica is behind the master.
+
+In the :mod:`log` there is a record of replication activity.
+If a primary server is started with :codenormal:`box.cfg{...logger =` :codeitalic:`log file name` :codenormal:`...}`,
+then there will be lines in the log file, containing the word "relay",
+when a replica connects or disconnects.
+
 
 =====================================================================
                     Master-Master Replication
