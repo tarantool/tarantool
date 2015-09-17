@@ -33,6 +33,19 @@
 #cmakedefine TARGET_OS_FREEBSD 1
 /*  Defined if building for Darwin */
 #cmakedefine TARGET_OS_DARWIN 1
+
+#ifdef TARGET_OS_LINUX
+#define MOD_FORMAT "so"
+#endif
+
+#ifdef TARGET_OS_FREEBSD
+#define MOD_FORMAT "so"
+#endif
+
+#ifdef TARGET_OS_DARWIN
+#define MOD_FORMAT "dylib"
+#endif
+
 /*
  * Defined if gcov instrumentation should be enabled.
  */
