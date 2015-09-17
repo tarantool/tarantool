@@ -289,3 +289,9 @@ box.cfg = load_cfg
 jit.off(load_cfg)
 jit.off(reload_cfg)
 jit.off(box.cfg)
+
+-- hack luajit default cpath
+local format = require('tarantool').build.mod_format
+package.cpath = package.cpath:gsub(
+    '?.so', '?.' .. format
+):gsub('loadall.so', 'loadall.' .. format)
