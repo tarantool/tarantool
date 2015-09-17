@@ -30,7 +30,7 @@ lua_source(lua_sources lua/tap.lua)
 lua_source(lua_sources lua/fio.lua)
 lua_source(lua_sources lua/csv.lua)
 lua_source(lua_sources lua/strict.lua)
-lua_source(lua_sources lua/time.lua)
+lua_source(lua_sources lua/clock.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")

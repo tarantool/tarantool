@@ -25,6 +25,7 @@ find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
+find_program(CTAGS ctags)
 
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
@@ -88,6 +89,10 @@ check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
 check_function_exists(fopencookie HAVE_FOPENCOOKIE)
 check_function_exists(uuidgen HAVE_UUIDGEN)
+#
+# clock_gettime() is not defined on Mac OS X,
+# or own (slow) implementation is in third_party/clock_gettime.c
+#
 check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
 
 # Checks for libev
@@ -106,8 +111,9 @@ check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 #
 # Enable 'make tags' target.
 #
-add_custom_target(tags COMMAND ctags -R -f tags
+add_custom_target(tags COMMAND ${CTAGS} -R -f tags
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_custom_target(ctags DEPENDS tags)
 
 #
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
