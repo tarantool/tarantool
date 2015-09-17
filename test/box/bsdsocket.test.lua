@@ -529,6 +529,7 @@ socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == er
 f = fiber.create(function()
     while true do
         local result = socket.getaddrinfo('localhost', '80')
+        fiber.sleep(0)
     end
 end);
 --# setopt delimiter ''
