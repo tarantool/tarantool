@@ -85,32 +85,6 @@ local tuple_bless = function(tuple)
     return ffi.gc(ffi.cast(const_tuple_ref_t, tuple), tuple_gc)
 end
 
-local format_lua = nil -- cached box_tuple_format
-local function tuple_new(...)
-    if format_lua == nil then
-        format_lua = builtin.box_tuple_format_default()
-    end
-
-    local obj = ...
-    if select('#', ...) > 1 or type(obj) ~= 'table' then
-        -- Backward-compatible format: box.tuple.new(1, 2, 3).
-        obj = {}
-        for i=1,select('#', ...) do
-            local val = select(i, ...)
-            if val == nil then
-                val = msgpackffi.NULL
-            end
-            obj[i] = val
-        end
-    end
-    local data, data_end = msgpackffi.encode_tuple(obj)
-    local tuple = builtin.box_tuple_new(format_lua, data, data_end)
-    if tuple == nil then
-        return box.error()
-    end
-    return tuple_bless(tuple)
-end
-
 local tuple_iterator_t = ffi.typeof('box_tuple_iterator_t')
 local tuple_iterator_ref_t = ffi.typeof('box_tuple_iterator_t &')
 
@@ -322,8 +296,5 @@ ffi.metatype(tuple_iterator_t, {
 -- Remove the global variable
 cfuncs = nil
 
-box.tuple = {
-    new = tuple_new;
-    -- internal api for box.select and iterators
-    bless = tuple_bless;
-}
+-- internal api for box.select and iterators
+box.tuple.bless = tuple_bless

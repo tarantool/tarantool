@@ -170,6 +170,10 @@ cn.space.net_box_test_space:get(354)
 
 -- -- 1. no reconnect
 cn:_fatal('Test fatal error')
+-- We expect the connection to enter 'closed' state due to 'reconnect_after'
+-- option missing, however 'error'->'closed' transition happens in some
+-- unrelated fiber, scheduling quirks bite (again) (sigh)
+fiber.sleep(0)
 cn.state
 cn:ping()
 cn:call('test_foo')

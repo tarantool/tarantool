@@ -80,6 +80,13 @@ test:is(box.cfg.too_long_threshold, 0.5, "too_long_threshold default value")
 box.cfg{too_long_threshold=0.1}
 test:is(box.cfg.too_long_threshold , 0.1, "too_long_threshold new value")
 
+--------------------------------------------------------------------------------
+-- gh-537: segmentation fault with replication_source
+--------------------------------------------------------------------------------
+
+box.cfg{replication_source = 'guest:password@localhost:0'}
+box.cfg{replication_source = ""}
+
 local tarantool_bin = arg[-1]
 local PANIC = 256
 function run_script(code)

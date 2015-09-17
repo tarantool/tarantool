@@ -91,6 +91,39 @@ lua_istuple(struct lua_State *L, int narg)
 }
 
 static int
+lbox_tuple_new(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (unlikely(argc < 1)) {
+		lua_newtable(L); /* create an empty tuple */
+		++argc;
+	}
+
+	struct region *gc = &fiber()->gc;
+	RegionGuard guard(gc);
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb);
+
+	if (argc == 1 && (lua_istable(L, 1) || lua_istuple(L, 1))) {
+		/* New format: box.tuple.new({1, 2, 3}) */
+		luamp_encode_tuple(L, luaL_msgpack_default, &stream, 1);
+	} else {
+		/* Backward-compatible format: box.tuple.new(1, 2, 3). */
+		luamp_encode_array(luaL_msgpack_default, &stream, argc);
+		for (int k = 1; k <= argc; ++k) {
+			luamp_encode(L, luaL_msgpack_default, &stream, k);
+		}
+	}
+	mpstream_flush(&stream);
+
+	size_t tuple_len = region_used(gc) - guard.used;
+	const char *data = (char *) region_join(gc, tuple_len);
+	struct tuple *tuple = tuple_new(tuple_format_ber, data, data + tuple_len);
+	lbox_pushtuple(L, tuple);
+	return 1;
+}
+
+static int
 lbox_tuple_gc(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
@@ -326,6 +359,11 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 	{NULL, NULL}
 };
 
+static const struct luaL_reg lbox_tuplelib[] = {
+	{"new", lbox_tuple_new},
+	{NULL, NULL}
+};
+
 static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 	{NULL, NULL}
 };
@@ -342,6 +380,8 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_setglobal(L, "cfuncs");
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
+	luaL_register_module(L, tuplelib_name, lbox_tuplelib);
+	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
 

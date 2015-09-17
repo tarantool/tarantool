@@ -26,7 +26,7 @@ box.info.replication.status == "off"
 control_ch = require('fiber').channel(1)
 --# setopt delimiter ';'
 local digest = require('digest')
-slowpoke = require('socket').tcp_server('127.0.0.1', 0, function(s, peer)
+slowpoke_loop = function(s, peer)
     control_ch:get()
     local seed = digest.urandom(20)
     local handshake = string.format("Tarantool %-20s %-32s\n%-63s\n",
@@ -36,8 +36,9 @@ slowpoke = require('socket').tcp_server('127.0.0.1', 0, function(s, peer)
     control_ch:get()
     s:shutdown()
     s:close()
-end);
+end;
 --# setopt delimiter ''
+slowpoke = require('socket').tcp_server('127.0.0.1', 0, slowpoke_loop)
 
 uri = slowpoke:name()
 box.cfg { replication_source = 'user:pass@'..uri.host..':'..uri.port }
@@ -52,10 +53,23 @@ r.status == "auth"
 r.lag < 1
 -- r.idle < 1 -- broken
 
+--
+-- gh-480: check replica reconnect on socket error
+--
 slowpoke:close()
 control_ch:put("goodbye")
 r = box.info.replication
 r.status == "disconnected"
+r.message:match("socket") ~= nil
+
+slowpoke = require('socket').tcp_server(uri.host, uri.port, slowpoke_loop)
+control_ch:put(true)
+
+while box.info.replication.status == 'disconnected' do require('fiber').sleep(0) end
+r = box.info.replication
+r.status == 'connecting' or r.status == 'auth'
+slowpoke:close()
+control_ch:put("goodbye")
 
 --# stop server replica
 --# cleanup server replica

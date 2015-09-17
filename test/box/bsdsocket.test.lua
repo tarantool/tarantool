@@ -201,11 +201,12 @@ sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc ~= nil
 sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 sc:nonblock(true)
-sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS or errno() == errno.ECONNREFUSED
 string.match(tostring(sc), ', peer') == nil
 sc:writable()
 string.match(tostring(sc), ', peer') == nil
-require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+socket_error == errno.ECONNREFUSED or socket_error == 0
 
 --# setopt delimiter ';'
 socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
@@ -522,3 +523,13 @@ socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == err
 socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
+
+-- gh-574: check that fiber with getaddrinfo can be safely cancelled
+--# setopt delimiter ';'
+f = fiber.create(function()
+    while true do
+        local result = socket.getaddrinfo('localhost', '80')
+    end
+end);
+--# setopt delimiter ''
+f:cancel()

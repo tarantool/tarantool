@@ -1,6 +1,10 @@
 #ifndef TARANTOOL_MODULE_H_INCLUDED
 #define TARANTOOL_MODULE_H_INCLUDED
 
+/**
+ * \file
+ */
+
 #include <stddef.h>
 #include <stdarg.h> /* va_list */
 #include <errno.h>
@@ -8,13 +12,7 @@
 #include <stdint.h>
 #include <sys/types.h> /* ssize_t */
 
-
-/**
- * \file
- * Tarantool Module API
- */
-
-/** Extern modificator for all public functions */
+/** Extern modifier for all public functions */
 #if defined(__cplusplus)
 #define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
 #else
