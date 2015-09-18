@@ -36,6 +36,7 @@
 
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
+#include "box/xrow.h"
 
 #include "lua/msgpack.h"
 #include <msgpuck/msgpuck.h> /* mp_store_u32() */
@@ -124,21 +125,17 @@ netbox_encode_auth(lua_State *L)
 	const char *user = lua_tolstring(L, 3, &user_len);
 	size_t password_len;
 	const char *password = lua_tolstring(L, 4, &password_len);
-	size_t greeting_len;
-	const char *greeting = lua_tolstring(L, 5, &greeting_len);
-	if (greeting_len != IPROTO_GREETING_SIZE)
-		return luaL_error(L, "Invalid greeting");
+	size_t salt_len;
+	const char *salt = lua_tolstring(L, 5, &salt_len);
+	if (salt_len < SCRAMBLE_SIZE)
+		return luaL_error(L, "Invalid salt");
 
 	/* Adapted from xrow_encode_auth() */
 	luamp_encode_map(cfg, &stream, password != NULL ? 2 : 1);
 	luamp_encode_uint(cfg, &stream, IPROTO_USER_NAME);
 	luamp_encode_str(cfg, &stream, user, user_len);
 	if (password != NULL) { /* password can be omitted */
-		char salt[SCRAMBLE_SIZE];
 		char scramble[SCRAMBLE_SIZE];
-		if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
-				  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
-			return luaL_error(L, "invalid salt");
 		scramble_prepare(scramble, salt, password, password_len);
 		luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
 		luamp_encode_array(cfg, &stream, 2);

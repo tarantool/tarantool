@@ -121,9 +121,8 @@ tarantool_version(void)
 uint32_t
 tarantool_version_id()
 {
-	return (((PACKAGE_VERSION_MAJOR << 8) |
-		 PACKAGE_VERSION_MINOR) << 8) |
-		PACKAGE_VERSION_PATCH;
+	return version_id(PACKAGE_VERSION_MAJOR, PACKAGE_VERSION_MINOR,
+			  PACKAGE_VERSION_PATCH);
 }
 
 static double start_time;

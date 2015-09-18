@@ -55,6 +55,30 @@ local mapping_mt = { __serialize = 'mapping' }
 local CONSOLE_FAKESYNC  = 15121974
 local CONSOLE_DELIMITER = "$EOF$"
 
+ffi.cdef [[
+enum {
+    /* Maximal length of version in handshake */
+    GREETING_VERSION_LEN_MAX = 20,
+    /* Maximal length of protocol name in handshake */
+    GREETING_PROTOCOL_LEN_MAX = 32,
+    /* Maximal length of salt in handshake */
+    GREETING_SALT_LEN_MAX = 44,
+};
+
+struct greeting {
+    uint32_t version_id;
+    uint32_t salt_len;
+    char version[GREETING_VERSION_LEN_MAX + 1];
+    char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
+    char salt[GREETING_SALT_LEN_MAX];
+};
+
+int
+greeting_decode(const char *greetingbuf, struct greeting *greeting);
+int strcmp(const char *s1, const char *s2);
+]]
+local builtin = ffi.C
+
 local ch_buf = {}
 local ch_buf_size = 0
 
@@ -489,7 +513,9 @@ local remote_methods = {
         self:_error_waiters(emsg)
         self.rpos = 1
         self.rlen = 0
-        self.handshake = ''
+        self.version_id = nil
+        self.version = nil
+        self.salt = nil
     end,
 
     _wakeup_client = function(self, hdr, body)
@@ -631,13 +657,18 @@ local remote_methods = {
 
                 -- on_connect
                 self:_switch_state('handshake')
-                self.handshake = self.s:read(128)
-                if self.handshake == nil then
+                local greetingbuf = self.s:read(GREETING_SIZE)
+                if greetingbuf == nil then
                     self:_fatal(errno.strerror(errno()))
-                elseif string.len(self.handshake) ~= 128 then
+                elseif #greetingbuf ~= GREETING_SIZE then
                     self:_fatal("Can't read handshake")
                 else
-                    if string.match(self.handshake, '^Tarantool .*console') then
+                    local greeting = ffi.new('struct greeting')
+                    if builtin.greeting_decode(greetingbuf, greeting) ~= 0 then
+                        self:_fatal("Can't decode handshake")
+                    elseif builtin.strcmp(greeting.protocol, 'Lua console') == 0 then
+                        self.version_id = greeting.version_id
+                        self.version = ffi.string(greeting.version)
                         -- enable self:console() method
                         self.console = self._console
                         self._check_response = self._check_console_response
@@ -654,7 +685,10 @@ local remote_methods = {
                             self:_fatal(res.body[ERROR])
                         end
                         self:_switch_state('active')
-                    else
+                    elseif builtin.strcmp(greeting.protocol, 'Binary') == 0 then
+                        self.version_id = greeting.version_id
+                        self.version = ffi.string(greeting.version)
+                        self.salt = ffi.string(greeting.salt, greeting.salt_len)
                         self.console = nil
                         self._check_response = self._check_binary_response
                         local s, e = pcall(function()
@@ -672,6 +706,9 @@ local remote_methods = {
                         if self.state ~= 'error' and self.state ~= 'closed' then
                             self:_switch_state('active')
                         end
+                    else
+                        self:_fatal("Unsupported protocol - "..
+                            ffi.string(greeting.protocol))
                     end
                 end
             end
@@ -686,7 +723,7 @@ local remote_methods = {
         self:_switch_state('auth')
 
         local auth_res = self:_request_internal(AUTH,
-            false, self.opts.user, self.opts.password, self.handshake)
+            false, self.opts.user, self.opts.password, self.salt)
 
         if auth_res.hdr[TYPE] ~= OK then
             self:_fatal(auth_res.body[ERROR])

@@ -41,11 +41,11 @@ extern "C" {
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648UL,
+	/* Maximal length of text handshake (greeting) */
 	IPROTO_GREETING_SIZE = 128,
 	/** marker + len + prev crc32 + cur crc32 + (padding) */
 	XLOG_FIXHEADER_SIZE = 19
 };
-
 
 enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,

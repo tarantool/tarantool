@@ -69,6 +69,7 @@ struct replica {
 	char source[REPLICA_SOURCE_MAXLEN];
 	rb_node(struct replica) link; /* a set by source in cluster.cc */
 	struct uri uri;
+	uint32_t version_id; /* remote version */
 	union {
 		struct sockaddr addr;
 		struct sockaddr_storage addrstorage;

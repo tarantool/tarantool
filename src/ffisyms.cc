@@ -10,6 +10,7 @@
 #include <box/sophia_engine.h>
 #include <box/request.h>
 #include <box/port.h>
+#include <box/xrow.h>
 #include <lua/init.h>
 #include "main.h"
 #include "lua/bsdsocket.h"
@@ -109,4 +110,5 @@ void *ffi_symbols[] = {
 	(void *) csv_iterator_create,
 	(void *) csv_next,
 	(void *) csv_feed,
+	(void *) greeting_decode
 };

@@ -40,6 +40,7 @@
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
+#include "trivia/util.h"
 
 static const int RECONNECT_DELAY = 1.0;
 STRS(replica_state, replica_STATE);
@@ -99,7 +100,7 @@ replica_connect(struct replica *replica)
 	struct iobuf *iobuf = replica->iobuf;
 	if (coio->fd >= 0)
 		return;
-	char greeting[IPROTO_GREETING_SIZE];
+	char greetingbuf[IPROTO_GREETING_SIZE];
 
 	struct uri *uri = &replica->uri;
 	/*
@@ -114,9 +115,21 @@ replica_connect(struct replica *replica)
 	replica_set_state(replica, REPLICA_CONNECT);
 	coio_connect(coio, uri, &replica->addr, &replica->addr_len);
 	assert(coio->fd >= 0);
-	coio_readn(coio, greeting, sizeof(greeting));
+	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
 
-	say_info("connected to %s",
+	/* Decode server version and name from greeting */
+	struct greeting greeting;
+	if (greeting_decode(greetingbuf, &greeting) != 0)
+		tnt_raise(LoggedError, ER_PROTOCOL, "Invalid greeting");
+
+	if (strcmp(greeting.protocol, "Binary") != 0) {
+		tnt_raise(LoggedError, ER_PROTOCOL,
+			  "Unsupported protocol for replication");
+	}
+
+	replica->version_id = greeting.version_id;
+
+	say_info("connected to %s at %s\r\n", greeting.version,
 		 sio_strfaddr(&replica->addr, replica->addr_len));
 
 	/* Don't display previous error messages in box.info.replication */
@@ -131,7 +144,7 @@ replica_connect(struct replica *replica)
 	/* Authenticate */
 	replica_set_state(replica, REPLICA_AUTH);
 	struct xrow_header row;
-	xrow_encode_auth(&row, greeting, uri->login,
+	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
 			 uri->login_len, uri->password,
 			 uri->password_len);
 	replica_write_row(coio, &row);

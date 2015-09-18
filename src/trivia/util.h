@@ -231,4 +231,15 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define API_EXPORT extern __attribute__ ((visibility ("default")))
 #endif
 
+/**
+ * Pack version into uint32_t.
+ * The highest byte or result means major version, next - minor,
+ * middle - patch, last - revision.
+ */
+static inline uint32_t
+version_id(unsigned major, unsigned minor, unsigned patch)
+{
+	return (((major << 8) | minor) << 8) | patch;
+}
+
 #endif /* TARANTOOL_UTIL_H_INCLUDED */
