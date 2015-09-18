@@ -21,8 +21,8 @@ example, on Ubuntu, the installation could look like this:
 
 Here is a complete Perl program that inserts [99999,'BB'] into space[999] via
 the Perl API. Before trying to run, check that the server is listening and
-that ``examples`` exists, as `described earlier`_. To run, paste the code into
-a file named example.pl and say ``perl example.pl``. The program will connect
+that :code:`examples` exists, as :ref:`described earlier <connector-setting>`. To run, paste the code into
+a file named example.pl and say :code:`perl example.pl`. The program will connect
 using an application-specific definition of the space. The program will open a
 socket connection with the tarantool server at localhost:3301, then send an
 INSERT request, then — if all is well — end without displaying any messages.
@@ -38,14 +38,14 @@ will print “Connection refused”.
 
     my $tnt = DR::Tarantool::MsgPack::SyncClient->connect(
       host    => '127.0.0.1',                      # look for tarantool on localhost
-      port    => 3301,                             # assume tarantool listen address = default
+      port    => 3301,                             # on port 3301
       user    => 'guest',                          # username. one could also say 'password=>...'
 
       spaces  => {
         999 => {                                   # definition of space[999] ...
           name => 'examples',                      #   space[999] name = 'examples'
           default_type => 'STR',                   #   space[999] field type is 'STR' if undefined
-          fields => [ {                            #   definition of space[512].fields ...
+          fields => [ {                            #   definition of space[999].fields ...
               name => 'field1', type => 'NUM' } ], #     space[999].field[1] name='field1',type='NUM'
           indexes => {                             #   definition of space[999] indexes ...
             0 => {
@@ -58,4 +58,4 @@ necessary for good practice. For that, please see `DR::Tarantool`_ CPAN reposito
 
 .. _DR::Tarantool: http://search.cpan.org/~unera/DR-Tarantool/
 .. _CPAN, the Comprehensive Perl Archive Network: https://en.wikipedia.org/wiki/Cpan
-.. _described earlier: https://en.wikipedia.org/wiki/Cpan
+
