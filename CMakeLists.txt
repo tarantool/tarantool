@@ -93,7 +93,7 @@ check_function_exists(uuidgen HAVE_UUIDGEN)
 # clock_gettime() is not defined on Mac OS X,
 # or own (slow) implementation is in third_party/clock_gettime.c
 #
-check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
+check_library_exists(rt clock_gettime "" HAVE_CLOCK_GETTIME)
 
 # Checks for libev
 include(CheckStructHasMember)
