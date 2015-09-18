@@ -166,6 +166,14 @@ box.cfg {
     too_long_threshold = 0.5;
 }
 
+-- for first run create space and add full grants to guest user
+if box.space.default == nil then
+    space = box.schema.create_space('default')
+    space:create_index('primary')
+    box.schema.user.grant('guest', 'read,write,execute', 'universe')
+end
+
+
 -----------------------
 -- Automatinc sharding
 -----------------------
@@ -202,7 +210,6 @@ box.cfg {
 -- N.B. you need install tarantool-expirationd package to use expirationd
 -- Docs: https://github.com/tarantool/expirationd/blob/master/README.md
 -- Example:
---space = box.space.default
 --job_name = 'clean_all'
 --expirationd = require('expirationd')
 --function is_expired(args, tuple)
