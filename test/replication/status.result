@@ -92,6 +92,9 @@ control_ch:put(true)
 ---
 - true
 ...
+require('fiber').sleep(0) -- wait replica to send auth request
+---
+...
 r = box.info.replication
 ---
 ...
@@ -121,11 +124,7 @@ control_ch:put("goodbye")
 r = box.info.replication
 ---
 ...
-r.status == "disconnected"
----
-- true
-...
-r.message:match("socket") ~= nil
+r.status == "disconnected" and r.message:match("socket") ~= nil or r.status == 'auth'
 ---
 - true
 ...
