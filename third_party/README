@@ -35,7 +35,6 @@ How to update it:
 the source tarball
 - preserve the zero-warnings patch 43771c84f7f5bf04e426dde30a31303d4699f00d
 
-
 How to update libeio
 ====================
 Note: we have two important changes to the stock libeio:

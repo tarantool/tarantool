@@ -319,10 +319,24 @@ void
 fiber_sleep(ev_tstamp delay)
 {
 	/*
+	 * libev sleeps at least backend_mintime, which is 1 ms in
+	 * case of poll()/Linux, unless there are idle watchers.
+	 * This is a special hack to speed up fiber_sleep(0),
+	 * i.e. a sleep with a zero timeout, to ensure that there
+	 * is no 1 ms delay in case of zero sleep timeout.
+	 */
+	if (delay == 0) {
+		ev_idle_start(loop(), &cord()->idle_event);
+	}
+	/*
 	 * We don't use fiber_wakeup() here to ensure there is
 	 * no infinite wakeup loop in case of fiber_sleep(0).
 	 */
 	fiber_yield_timeout(delay);
+
+	if (delay == 0) {
+		ev_idle_stop(loop(), &cord()->idle_event);
+	}
 	fiber_testcancel();
 }
 
@@ -355,6 +369,12 @@ fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
 	struct cord *cord = cord();
 	fiber_schedule_list(&cord->ready);
 }
+
+static void
+fiber_schedule_idle(ev_loop * /* loop */, ev_idle * /* watcher */,
+		    int /* revents */)
+{}
+
 
 struct fiber *
 fiber_find(uint32_t fid)
@@ -591,6 +611,8 @@ cord_create(struct cord *cord, const char *name)
 
 	ev_async_init(&cord->wakeup_event, fiber_schedule_wakeup);
 	ev_async_start(cord->loop, &cord->wakeup_event);
+
+	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 	snprintf(cord->name, sizeof(cord->name), "%s", name);
 }
 

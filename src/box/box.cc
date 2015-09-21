@@ -60,9 +60,32 @@
 
 struct recovery *recovery;
 
+/**
+ * The context of initial recovery.
+ */
+static struct recover_row_ctx {
+	/** How many rows have been recovered so far. */
+	int rows;
+	/** Yield once per 'yield' rows. */
+	int yield;
+} recover_row_ctx;
+
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 bool is_ro = true;
+
+void
+recover_row_ctx_init(struct recover_row_ctx *ctx, int rows_per_wal)
+{
+	ctx->rows = 0;
+	/**
+	 * Make the yield logic covered by the functional test
+	 * suite, which has a small setting for rows_per_wal.
+	 * Each yield can take up to 1ms if there are no events,
+	 * so we can't afford many of them during recovery.
+	 */
+	ctx->yield = (rows_per_wal >> 4)  + 1;
+}
 
 void
 process_rw(struct request *request, struct tuple **result)
@@ -115,16 +138,23 @@ box_is_ro(void)
 static void
 recover_row(struct recovery *r, void *param, struct xrow_header *row)
 {
-	(void) param;
-	(void) r;
-	assert(r == recovery);
+	struct recover_row_ctx *ctx = (struct recover_row_ctx *) param;
+	assert(r == ::recovery);
 	assert(row->bodycnt == 1); /* always 1 for read */
+	(void) r;
+
 	struct request request;
 	request_create(&request, row->type);
 	request_decode(&request, (const char *) row->body[0].iov_base,
 		row->body[0].iov_len);
 	request.header = row;
 	process_rw(&request, NULL);
+	/**
+	 * Yield once in a while, but not too often,
+	 * mostly to allow signal handling to take place.
+	 */
+	if (++ctx->rows % ctx->yield == 0)
+		fiber_sleep(0);
 }
 
 /* {{{ configuration bindings */
@@ -692,9 +722,11 @@ box_init(void)
 	title("loading", NULL);
 
 	/* recovery initialization */
+	recover_row_ctx_init(&recover_row_ctx,
+			     cfg_geti("rows_per_wal"));
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
-				recover_row, NULL);
+				recover_row, &recover_row_ctx);
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));

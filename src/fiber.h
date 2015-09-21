@@ -202,6 +202,14 @@ struct cord {
 	 * first).
 	 * */
 	ev_async wakeup_event;
+	/**
+	 * libev sleeps at least backend_mintime, which is 1 ms in
+	 * case of poll()/Linux, unless there are idle watchers.
+	 * This is a special hack to speed up fiber_sleep(0),
+	 * i.e. a sleep with a zero timeout, to ensure that there
+	 * is no 1 ms delay in case of zero sleep timeout.
+	 */
+	ev_idle idle_event;
 	/** A memory cache for (struct fiber) */
 	struct mempool fiber_pool;
 	/** A runtime slab cache for general use in this cord. */
