@@ -40,6 +40,8 @@
 #define RB_COMPACT 1
 #include <third_party/rb.h>
 
+#include "vclock.h"
+
 struct recovery_state;
 
 enum { REPLICA_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
@@ -66,10 +68,12 @@ struct replica {
 	enum replica_state state;
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
+	uint32_t id;
 	char source[REPLICA_SOURCE_MAXLEN];
 	rb_node(struct replica) link; /* a set by source in cluster.cc */
 	struct uri uri;
 	uint32_t version_id; /* remote version */
+	struct vclock vclock;
 	union {
 		struct sockaddr addr;
 		struct sockaddr_storage addrstorage;
