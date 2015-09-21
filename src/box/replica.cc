@@ -43,18 +43,18 @@
 #include "trivia/util.h"
 
 static const int RECONNECT_DELAY = 1.0;
-STRS(replica_state, replica_STATE);
+STRS(applier_state, applier_STATE);
 
 static inline void
-replica_set_state(struct replica *replica, enum replica_state state)
+applier_set_state(struct applier *applier, enum applier_state state)
 {
-	replica->state = state;
-	say_debug("=> %s", replica_state_strs[state] +
-		  strlen("REPLICA_"));
+	applier->state = state;
+	say_debug("=> %s", applier_state_strs[state] +
+		  strlen("APPLIER_"));
 }
 
 static void
-replica_read_row(struct ev_io *coio, struct iobuf *iobuf,
+applier_read_row(struct ev_io *coio, struct iobuf *iobuf,
 		 struct xrow_header *row)
 {
 	struct ibuf *in = &iobuf->in;
@@ -83,7 +83,7 @@ replica_read_row(struct ev_io *coio, struct iobuf *iobuf,
 }
 
 static void
-replica_write_row(struct ev_io *coio, const struct xrow_header *row)
+applier_write_row(struct ev_io *coio, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec(row, iov);
@@ -94,29 +94,29 @@ replica_write_row(struct ev_io *coio, const struct xrow_header *row)
  * Connect to a remote host and authenticate the client.
  */
 void
-replica_connect(struct replica *replica)
+applier_connect(struct applier *applier)
 {
-	struct ev_io *coio = &replica->io;
-	struct iobuf *iobuf = replica->iobuf;
+	struct ev_io *coio = &applier->io;
+	struct iobuf *iobuf = applier->iobuf;
 	if (coio->fd >= 0)
 		return;
 	char greetingbuf[IPROTO_GREETING_SIZE];
 
-	struct uri *uri = &replica->uri;
+	struct uri *uri = &applier->uri;
 	/*
-	 * coio_connect() stores resolved address to \a &replica->addr
-	 * on success. &replica->addr_len is a value-result argument which
+	 * coio_connect() stores resolved address to \a &applier->addr
+	 * on success. &applier->addr_len is a value-result argument which
 	 * must be initialized to the size of associated buffer (addrstorage)
 	 * before calling coio_connect(). Since coio_connect() performs
 	 * DNS resolution under the hood it is theoretically possible that
-	 * replica->addr_len will be different even for same uri.
+	 * applier->addr_len will be different even for same uri.
 	 */
-	replica->addr_len = sizeof(replica->addrstorage);
-	replica_set_state(replica, REPLICA_CONNECT);
-	coio_connect(coio, uri, &replica->addr, &replica->addr_len);
+	applier->addr_len = sizeof(applier->addrstorage);
+	applier_set_state(applier, APPLIER_CONNECT);
+	coio_connect(coio, uri, &applier->addr, &applier->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
-	replica->last_row_time = ev_now(loop());
+	applier->last_row_time = ev_now(loop());
 
 	/* Decode server version and name from greeting */
 	struct greeting greeting;
@@ -128,29 +128,29 @@ replica_connect(struct replica *replica)
 			  "Unsupported protocol for replication");
 	}
 
-	replica->version_id = greeting.version_id;
+	applier->version_id = greeting.version_id;
 
 	say_info("connected to %s at %s\r\n", greeting.version,
-		 sio_strfaddr(&replica->addr, replica->addr_len));
+		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&fiber()->diag);
 
 	/* Perform authentication if user provided at least login */
 	if (!uri->login) {
-		replica_set_state(replica, REPLICA_CONNECTED);
+		applier_set_state(applier, APPLIER_CONNECTED);
 		return;
 	}
 
 	/* Authenticate */
-	replica_set_state(replica, REPLICA_AUTH);
+	applier_set_state(applier, APPLIER_AUTH);
 	struct xrow_header row;
 	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
 			 uri->login_len, uri->password,
 			 uri->password_len);
-	replica_write_row(coio, &row);
-	replica_read_row(coio, iobuf, &row);
-	replica->last_row_time = ev_now(loop());
+	applier_write_row(coio, &row);
+	applier_read_row(coio, iobuf, &row);
+	applier->last_row_time = ev_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error(&row); /* auth failed */
 
@@ -162,24 +162,24 @@ replica_connect(struct replica *replica)
  * Execute and process JOIN request (bootstrap the server).
  */
 static void
-replica_join(struct replica *replica, struct recovery *r)
+applier_join(struct applier *applier, struct recovery *r)
 {
 	say_info("downloading a snapshot from %s",
-		 sio_strfaddr(&replica->addr, replica->addr_len));
+		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/* Send JOIN request */
-	struct ev_io *coio = &replica->io;
-	struct iobuf *iobuf = replica->iobuf;
+	struct ev_io *coio = &applier->io;
+	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 	xrow_encode_join(&row, &r->server_uuid);
-	replica_write_row(coio, &row);
-	replica_set_state(replica, REPLICA_BOOTSTRAP);
+	applier_write_row(coio, &row);
+	applier_set_state(applier, APPLIER_BOOTSTRAP);
 
 	assert(vclock_has(&r->vclock, 0)); /* check for surrogate server_id */
 
 	while (true) {
-		replica_read_row(coio, iobuf, &row);
-		replica->last_row_time = ev_now(loop());
+		applier_read_row(coio, iobuf, &row);
+		applier->last_row_time = ev_now(loop());
 		if (row.type == IPROTO_OK) {
 			/* End of stream */
 			say_info("done");
@@ -193,15 +193,15 @@ replica_join(struct replica *replica, struct recovery *r)
 	}
 
 	/* Decode end of stream packet */
-	vclock_create(&replica->vclock);
+	vclock_create(&applier->vclock);
 	assert(row.type == IPROTO_OK);
-	xrow_decode_vclock(&row, &replica->vclock);
+	xrow_decode_vclock(&row, &applier->vclock);
 
 	/* Replace server vclock using data from snapshot */
-	vclock_copy(&r->vclock, &replica->vclock);
+	vclock_copy(&r->vclock, &applier->vclock);
 
 	/* Re-enable warnings after successful execution of JOIN */
-	replica_set_state(replica, REPLICA_CONNECTED);
+	applier_set_state(applier, APPLIER_CONNECTED);
 	/* keep connection */
 }
 
@@ -209,25 +209,25 @@ replica_join(struct replica *replica, struct recovery *r)
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
-replica_subscribe(struct replica *replica, struct recovery *r)
+applier_subscribe(struct applier *applier, struct recovery *r)
 {
 	/* Send SUBSCRIBE request */
-	struct ev_io *coio = &replica->io;
-	struct iobuf *iobuf = replica->iobuf;
+	struct ev_io *coio = &applier->io;
+	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 
 	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
-	replica_write_row(coio, &row);
-	replica_set_state(replica, REPLICA_FOLLOW);
+	applier_write_row(coio, &row);
+	applier_set_state(applier, APPLIER_FOLLOW);
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
-	replica->warning_said = false;
-	vclock_create(&replica->vclock);
+	applier->warning_said = false;
+	vclock_create(&applier->vclock);
 
 	/*
 	 * Read SUBSCRIBE response
 	 */
-	if (replica->version_id >= version_id(1, 6, 7)) {
-		replica_read_row(coio, iobuf, &row);
+	if (applier->version_id >= version_id(1, 6, 7)) {
+		applier_read_row(coio, iobuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			return xrow_decode_error(&row);  /* error */
 		} else if (row.type != IPROTO_OK) {
@@ -235,8 +235,8 @@ replica_subscribe(struct replica *replica, struct recovery *r)
 				  "Invalid response to SUBSCRIBE");
 		}
 
-		xrow_decode_vclock(&row, &replica->vclock);
-		replica->id = row.server_id;
+		xrow_decode_vclock(&row, &applier->vclock);
+		applier->id = row.server_id;
 	}
 	/**
 	 * Tarantool < 1.6.7:
@@ -251,9 +251,9 @@ replica_subscribe(struct replica *replica, struct recovery *r)
 	 * Process a stream of rows from the binary log.
 	 */
 	while (true) {
-		replica_read_row(coio, iobuf, &row);
-		replica->lag = ev_now(loop()) - row.tm;
-		replica->last_row_time = ev_now(loop());
+		applier_read_row(coio, iobuf, &row);
+		applier->lag = ev_now(loop()) - row.tm;
+		applier->last_row_time = ev_now(loop());
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error(&row);  /* error */
@@ -266,27 +266,27 @@ replica_subscribe(struct replica *replica, struct recovery *r)
 
 /**
  * Write a nice error message to log file on SocketError or ClientError
- * in replica_f().
+ * in applier_f().
  */
 static inline void
-replica_log_exception(struct replica *replica, Exception *e)
+applier_log_exception(struct applier *applier, Exception *e)
 {
 	if (type_cast(FiberCancelException, e))
 		return;
-	if (replica->warning_said)
+	if (applier->warning_said)
 		return;
-	switch (replica->state) {
-	case REPLICA_CONNECT:
+	switch (applier->state) {
+	case APPLIER_CONNECT:
 		say_info("can't connect to master");
 		break;
-	case REPLICA_CONNECTED:
+	case APPLIER_CONNECTED:
 		say_info("can't join/subscribe");
 		break;
-	case REPLICA_AUTH:
+	case APPLIER_AUTH:
 		say_info("failed to authenticate");
 		break;
-	case REPLICA_FOLLOW:
-	case REPLICA_BOOTSTRAP:
+	case APPLIER_FOLLOW:
+	case APPLIER_BOOTSTRAP:
 		say_info("can't read row");
 		break;
 	default:
@@ -295,39 +295,39 @@ replica_log_exception(struct replica *replica, Exception *e)
 	e->log();
 	if (type_cast(SocketError, e))
 		say_info("will retry every %i second", RECONNECT_DELAY);
-	replica->warning_said = true;
+	applier->warning_said = true;
 }
 
 static inline void
-replica_disconnect(struct replica *replica, Exception *e,
-		   enum replica_state state)
+applier_disconnect(struct applier *applier, Exception *e,
+		   enum applier_state state)
 {
-	replica_log_exception(replica, e);
-	coio_close(loop(), &replica->io);
-	iobuf_reset(replica->iobuf);
-	replica_set_state(replica, state);
+	applier_log_exception(applier, e);
+	coio_close(loop(), &applier->io);
+	iobuf_reset(applier->iobuf);
+	applier_set_state(applier, state);
 	fiber_gc();
 }
 
 static void
-replica_f(va_list ap)
+applier_f(va_list ap)
 {
-	struct replica *replica = va_arg(ap, struct replica *);
+	struct applier *applier = va_arg(ap, struct applier *);
 	struct recovery *r = va_arg(ap, struct recovery *);
 
 	/* Re-connect loop */
 	while (true) {
 		try {
-			replica_connect(replica);
+			applier_connect(applier);
 			/*
 			 * Execute JOIN if this is a bootstrap, and
 			 * there is no snapshot, and SUBSCRIBE
 			 * otherwise.
 			 */
 			if (r->writer == NULL) {
-				replica_join(replica, r);
+				applier_join(applier, r);
 			} else {
-				replica_subscribe(replica, r);
+				applier_subscribe(applier, r);
 				/*
 				 * subscribe() has an infinite
 				 * loop which is stoppable only
@@ -335,18 +335,18 @@ replica_f(va_list ap)
 				 */
 				assert(0);
 			}
-			ev_io_stop(loop(), &replica->io);
-			iobuf_reset(replica->iobuf);
+			ev_io_stop(loop(), &applier->io);
+			iobuf_reset(applier->iobuf);
 			/* Don't close the socket */
 			return;
 		} catch (ClientError *e) {
-			replica_disconnect(replica, e, REPLICA_STOPPED);
+			applier_disconnect(applier, e, APPLIER_STOPPED);
 			throw;
 		} catch (FiberCancelException *e) {
-			replica_disconnect(replica, e, REPLICA_OFF);
+			applier_disconnect(applier, e, APPLIER_OFF);
 			throw;
 		} catch (SocketError *e) {
-			replica_disconnect(replica, e, REPLICA_DISCONNECTED);
+			applier_disconnect(applier, e, APPLIER_DISCONNECTED);
 			/* fall through */
 		}
 		/* Put fiber_sleep() out of catch block.
@@ -367,82 +367,82 @@ replica_f(va_list ap)
 }
 
 void
-replica_start(struct replica *replica, struct recovery *r)
+applier_start(struct applier *applier, struct recovery *r)
 {
 	char name[FIBER_NAME_MAX];
-	assert(replica->reader == NULL);
+	assert(applier->reader == NULL);
 
-	const char *uri = uri_format(&replica->uri);
-	if (replica->io.fd < 0)
-		say_crit("starting replication from %s", uri);
-	snprintf(name, sizeof(name), "replica/%s", uri);
+	const char *uri = uri_format(&applier->uri);
+	if (applier->io.fd < 0)
+		say_crit("starting appliertion from %s", uri);
+	snprintf(name, sizeof(name), "applier/%s", uri);
 
-	struct fiber *f = fiber_new(name, replica_f);
+	struct fiber *f = fiber_new(name, applier_f);
 	/**
 	 * So that we can safely grab the status of the
 	 * fiber any time we want.
 	 */
 	fiber_set_joinable(f, true);
-	replica->reader = f;
-	fiber_start(f, replica, r);
+	applier->reader = f;
+	fiber_start(f, applier, r);
 }
 
 void
-replica_stop(struct replica *replica)
+applier_stop(struct applier *applier)
 {
-	struct fiber *f = replica->reader;
+	struct fiber *f = applier->reader;
 	if (f == NULL)
 		return;
-	const char *uri = uri_format(&replica->uri);
-	say_crit("shutting down replica %s", uri);
+	const char *uri = uri_format(&applier->uri);
+	say_crit("shutting down applier %s", uri);
 	fiber_cancel(f);
 	/**
-	 * If the replica died from an exception, don't throw it
+	 * If the applier died from an exception, don't throw it
 	 * up.
 	 */
 	diag_clear(&f->diag);
 	fiber_join(f); /* doesn't throw due do diag_clear() */
-	replica_set_state(replica, REPLICA_OFF);
-	replica->reader = NULL;
+	applier_set_state(applier, APPLIER_OFF);
+	applier->reader = NULL;
 }
 
 void
-replica_wait(struct replica *replica)
+applier_wait(struct applier *applier)
 {
-	assert(replica->reader != NULL);
-	auto fiber_guard = make_scoped_guard([=] { replica->reader = NULL; });
-	fiber_join(replica->reader); /* may throw */
+	assert(applier->reader != NULL);
+	auto fiber_guard = make_scoped_guard([=] { applier->reader = NULL; });
+	fiber_join(applier->reader); /* may throw */
 }
 
-struct replica *
-replica_new(const char *uri)
+struct applier *
+applier_new(const char *uri)
 {
-	struct replica *replica = (struct replica *)
-		calloc(1, sizeof(struct replica));
-	if (replica == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*replica), "malloc",
-			  "struct replica");
+	struct applier *applier = (struct applier *)
+		calloc(1, sizeof(struct applier));
+	if (applier == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*applier), "malloc",
+			  "struct applier");
 	}
-	coio_init(&replica->io, -1);
-	replica->iobuf = iobuf_new();
-	vclock_create(&replica->vclock);
+	coio_init(&applier->io, -1);
+	applier->iobuf = iobuf_new();
+	vclock_create(&applier->vclock);
 
-	/* uri_parse() sets pointers to replica->source buffer */
-	snprintf(replica->source, sizeof(replica->source), "%s", uri);
-	int rc = uri_parse(&replica->uri, replica->source);
-	/* URI checked by box_check_replication_source() */
-	assert(rc == 0 && replica->uri.service != NULL);
+	/* uri_parse() sets pointers to applier->source buffer */
+	snprintf(applier->source, sizeof(applier->source), "%s", uri);
+	int rc = uri_parse(&applier->uri, applier->source);
+	/* URI checked by box_check_appliertion_source() */
+	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 
-	replica->last_row_time = ev_now(loop());
-	return replica;
+	applier->last_row_time = ev_now(loop());
+	return applier;
 }
 
 void
-replica_delete(struct replica *replica)
+applier_delete(struct applier *applier)
 {
-	assert(replica->reader == NULL);
-	iobuf_delete(replica->iobuf);
-	coio_close(loop(), &replica->io);
-	free(replica);
+	assert(applier->reader == NULL);
+	iobuf_delete(applier->iobuf);
+	coio_close(loop(), &applier->io);
+	free(applier);
 }

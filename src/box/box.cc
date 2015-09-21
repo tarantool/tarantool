@@ -236,22 +236,22 @@ box_set_replication_source(void)
 	const char *source = cfg_gets("replication_source");
 
 	/* This hook is only invoked if source has changed */
-	struct replica *replica = cluster_replica_first();
-	while (replica != NULL) {
-		struct replica *next = cluster_replica_next(replica);
-		replica_stop(replica); /* cancels a background fiber */
-		cluster_del_replica(replica);
-		replica_delete(replica);
-		replica = next; /* safe iteration with cluster_del_replica */
+	struct applier *applier = cluster_applier_first();
+	while (applier != NULL) {
+		struct applier *next = cluster_applier_next(applier);
+		applier_stop(applier); /* cancels a background fiber */
+		cluster_del_applier(applier);
+		applier_delete(applier);
+		applier = next; /* safe iteration with cluster_del_applier */
 	}
 
 	if (source == NULL)
 		return;
 
 	/* Start a new replication client using provided URI */
-	replica = replica_new(source);
-	cluster_add_replica(replica);
-	replica_start(replica, recovery); /* starts a background fiber */
+	applier = applier_new(source);
+	cluster_add_applier(applier);
+	applier_start(applier, recovery); /* starts a background fiber */
 }
 
 extern "C" void
@@ -732,8 +732,8 @@ box_init(void)
 			     cfg_geti("panic_on_wal_error"));
 	const char *source = cfg_gets("replication_source");
 	if (source != NULL) {
-		struct replica *replica = replica_new(source);
-		cluster_add_replica(replica);
+		struct applier *applier = applier_new(source);
+		cluster_add_applier(applier);
 	}
 
 	if (recovery_has_data(recovery)) {
@@ -752,9 +752,9 @@ box_init(void)
 		vclock_add_server(&recovery->vclock, 0);
 
 		/* Bootstrap from the first master */
-		struct replica *replica = cluster_replica_first();
-		replica_start(replica, recovery);
-		replica_wait(replica); /* throws on failure */
+		struct applier *applier = cluster_applier_first();
+		applier_start(applier, recovery);
+		applier_wait(applier); /* throws on failure */
 
 		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
@@ -790,10 +790,10 @@ box_init(void)
 
 	rmean_cleanup(rmean_box);
 
-	cluster_foreach_replica(replica) {
+	cluster_foreach_applier(applier) {
 		/* Follow replica */
 		assert(recovery->writer);
-		replica_start(replica, recovery);
+		applier_start(applier, recovery);
 	}
 
 	/* Enter read-write mode. */
