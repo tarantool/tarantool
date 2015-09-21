@@ -116,6 +116,7 @@ replica_connect(struct replica *replica)
 	coio_connect(coio, uri, &replica->addr, &replica->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
+	replica->last_row_time = ev_now(loop());
 
 	/* Decode server version and name from greeting */
 	struct greeting greeting;
@@ -149,6 +150,7 @@ replica_connect(struct replica *replica)
 			 uri->password_len);
 	replica_write_row(coio, &row);
 	replica_read_row(coio, iobuf, &row);
+	replica->last_row_time = ev_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error(&row); /* auth failed */
 
@@ -177,6 +179,7 @@ replica_join(struct replica *replica, struct recovery *r)
 
 	while (true) {
 		replica_read_row(coio, iobuf, &row);
+		replica->last_row_time = ev_now(loop());
 		if (row.type == IPROTO_OK) {
 			/* End of stream */
 			say_info("done");
@@ -408,6 +411,8 @@ replica_new(const char *uri)
 	/* URI checked by box_check_replication_source() */
 	assert(rc == 0 && replica->uri.service != NULL);
 	(void) rc;
+
+	replica->last_row_time = ev_now(loop());
 	return replica;
 }
 

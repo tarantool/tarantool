@@ -92,6 +92,9 @@ control_ch:put(true)
 ---
 - true
 ...
+require('fiber').sleep(0) -- wait replica to send auth request
+---
+...
 r = box.info.replication
 ---
 ...
@@ -103,7 +106,10 @@ r.lag < 1
 ---
 - true
 ...
--- r.idle < 1 -- broken
+r.idle < 1
+---
+- true
+...
 --
 -- gh-480: check replica reconnect on socket error
 --
@@ -118,11 +124,11 @@ control_ch:put("goodbye")
 r = box.info.replication
 ---
 ...
-r.status == "disconnected"
+r.status == "disconnected" and r.message:match("socket") ~= nil or r.status == 'auth'
 ---
 - true
 ...
-r.message:match("socket") ~= nil
+r.idle < 1
 ---
 - true
 ...
@@ -148,6 +154,22 @@ slowpoke:close()
 - true
 ...
 control_ch:put("goodbye")
+---
+- true
+...
+source = box.cfg.replication_source
+---
+...
+box.cfg { replication_source = "" }
+---
+...
+box.cfg { replication_source = source }
+---
+...
+r = box.info.replication
+---
+...
+r.idle < 1
 ---
 - true
 ...
