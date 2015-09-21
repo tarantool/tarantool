@@ -39,7 +39,7 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "box/replica.h"
+#include "box/applier.h"
 #include "box/recovery.h"
 #include "box/cluster.h"
 #include "main.h"

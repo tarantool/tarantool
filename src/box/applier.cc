@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "replica.h"
+#include "applier.h"
 
 #include "xlog.h"
 #include "fiber.h"

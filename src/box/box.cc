@@ -35,7 +35,7 @@
 #include "iproto_constants.h"
 #include "recovery.h"
 #include "relay.h"
-#include "replica.h"
+#include "applier.h"
 #include <rmean.h>
 #include "main.h"
 #include "tuple.h"
@@ -56,7 +56,6 @@
 #include "iobuf.h"
 #include "coio.h"
 #include "cluster.h" /* replica */
-#include "replica.h"
 
 struct recovery *recovery;
 

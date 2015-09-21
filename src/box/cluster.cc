@@ -31,7 +31,7 @@
 #include "box.h"
 #include "cluster.h"
 #include "recovery.h"
-#include "replica.h"
+#include "applier.h"
 
 /**
  * Globally unique identifier of this cluster.
