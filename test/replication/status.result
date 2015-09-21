@@ -103,7 +103,10 @@ r.lag < 1
 ---
 - true
 ...
--- r.idle < 1 -- broken
+r.idle < 1
+---
+- true
+...
 --
 -- gh-480: check replica reconnect on socket error
 --
@@ -123,6 +126,10 @@ r.status == "disconnected"
 - true
 ...
 r.message:match("socket") ~= nil
+---
+- true
+...
+r.idle < 1
 ---
 - true
 ...
@@ -148,6 +155,22 @@ slowpoke:close()
 - true
 ...
 control_ch:put("goodbye")
+---
+- true
+...
+source = box.cfg.replication_source
+---
+...
+box.cfg { replication_source = "" }
+---
+...
+box.cfg { replication_source = source }
+---
+...
+r = box.info.replication
+---
+...
+r.idle < 1
 ---
 - true
 ...

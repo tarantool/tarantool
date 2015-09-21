@@ -51,7 +51,7 @@ control_ch:put(true)
 r = box.info.replication
 r.status == "auth"
 r.lag < 1
--- r.idle < 1 -- broken
+r.idle < 1
 
 --
 -- gh-480: check replica reconnect on socket error
@@ -61,6 +61,7 @@ control_ch:put("goodbye")
 r = box.info.replication
 r.status == "disconnected"
 r.message:match("socket") ~= nil
+r.idle < 1
 
 slowpoke = require('socket').tcp_server(uri.host, uri.port, slowpoke_loop)
 control_ch:put(true)
@@ -70,6 +71,13 @@ r = box.info.replication
 r.status == 'connecting' or r.status == 'auth'
 slowpoke:close()
 control_ch:put("goodbye")
+
+
+source = box.cfg.replication_source
+box.cfg { replication_source = "" }
+box.cfg { replication_source = source }
+r = box.info.replication
+r.idle < 1
 
 --# stop server replica
 --# cleanup server replica
