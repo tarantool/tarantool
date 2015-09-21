@@ -40,7 +40,7 @@
 #define RB_COMPACT 1
 #include <third_party/rb.h>
 
-struct recovery_state;
+struct recovery;
 
 enum { REPLICA_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
@@ -96,7 +96,7 @@ struct replica {
  * \sa fiber_start()
  */
 void
-replica_start(struct replica *replica, struct recovery_state *r);
+replica_start(struct replica *replica, struct recovery *r);
 
 /**
  * Stop a client.

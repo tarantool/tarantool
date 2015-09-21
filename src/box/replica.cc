@@ -160,7 +160,7 @@ replica_connect(struct replica *replica)
  * Execute and process JOIN request (bootstrap the server).
  */
 static void
-replica_join(struct replica *replica, struct recovery_state *r)
+replica_join(struct replica *replica, struct recovery *r)
 {
 	say_info("downloading a snapshot from %s",
 		 sio_strfaddr(&replica->addr, replica->addr_len));
@@ -207,7 +207,7 @@ replica_join(struct replica *replica, struct recovery_state *r)
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
-replica_subscribe(struct replica *replica, struct recovery_state *r)
+replica_subscribe(struct replica *replica, struct recovery *r)
 {
 	/* Send SUBSCRIBE request */
 	struct ev_io *coio = &replica->io;
@@ -289,7 +289,7 @@ static void
 replica_f(va_list ap)
 {
 	struct replica *replica = va_arg(ap, struct replica *);
-	struct recovery_state *r = va_arg(ap, struct recovery_state *);
+	struct recovery *r = va_arg(ap, struct recovery *);
 
 	/* Re-connect loop */
 	while (true) {
@@ -343,7 +343,7 @@ replica_f(va_list ap)
 }
 
 void
-replica_start(struct replica *replica, struct recovery_state *r)
+replica_start(struct replica *replica, struct recovery *r)
 {
 	char name[FIBER_NAME_MAX];
 	assert(replica->reader == NULL);

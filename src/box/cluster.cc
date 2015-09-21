@@ -74,7 +74,7 @@ cluster_clock()
 void
 cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 {
-	struct recovery_state *r = recovery;
+	struct recovery *r = ::recovery;
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
 	assert(!cserver_id_is_reserved(server_id));
@@ -109,7 +109,7 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 void
 cluster_del_server(uint32_t server_id)
 {
-	struct recovery_state *r = recovery;
+	struct recovery *r = ::recovery;
 	vclock_del_server(&r->vclock, server_id);
 	if (r->server_id == server_id) {
 		r->server_id = 0;

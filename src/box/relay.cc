@@ -47,8 +47,7 @@
 #include "errinj.h"
 
 void
-relay_send_row(struct recovery_state *r, void *param,
-	       struct xrow_header *packet);
+relay_send_row(struct recovery *r, void *param, struct xrow_header *packet);
 
 Relay::Relay(int fd_arg, uint64_t sync_arg)
 {
@@ -98,7 +97,7 @@ relay_join(int fd, struct xrow_header *packet,
 	   void (*on_join)(const struct tt_uuid *))
 {
 	Relay relay(fd, packet->sync);
-	struct recovery_state *r = relay.r;
+	struct recovery *r = relay.r;
 
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(packet, &server_uuid);
@@ -143,7 +142,7 @@ static void
 relay_subscribe_f(va_list ap)
 {
 	Relay *relay = va_arg(ap, Relay *);
-	struct recovery_state *r = relay->r;
+	struct recovery *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, fiber_name(fiber()),
@@ -205,7 +204,7 @@ relay_subscribe(int fd, struct xrow_header *packet,
 
 	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
-	struct recovery_state *r = relay.r;
+	struct recovery *r = relay.r;
 	xrow_decode_subscribe(packet, &uu, &server_uuid, &r->vclock);
 
 	/**
@@ -257,8 +256,7 @@ relay_send(Relay *relay, struct xrow_header *packet)
 
 /** Send a single row to the client. */
 void
-relay_send_row(struct recovery_state *r, void *param,
-	       struct xrow_header *packet)
+relay_send_row(struct recovery *r, void *param, struct xrow_header *packet)
 {
 	Relay *relay = (Relay *) param;
 	assert(iproto_type_is_dml(packet->type));

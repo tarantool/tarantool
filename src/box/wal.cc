@@ -180,7 +180,7 @@ static void wal_writer_f(va_list ap);
  *         points to a newly created WAL writer.
  */
 int
-wal_writer_start(struct recovery_state *r, int rows_per_wal)
+wal_writer_start(struct recovery *r, int rows_per_wal)
 {
 	assert(r->writer == NULL);
 	assert(r->current_wal == NULL);
@@ -209,7 +209,7 @@ wal_writer_start(struct recovery_state *r, int rows_per_wal)
 
 /** Stop and destroy the writer thread (at shutdown). */
 void
-wal_writer_stop(struct recovery_state *r)
+wal_writer_stop(struct recovery *r)
 {
 	struct wal_writer *writer = r->writer;
 
@@ -240,7 +240,7 @@ wal_writer_stop(struct recovery_state *r)
  * @return 0 in case of success, -1 on error.
  */
 static int
-wal_opt_rotate(struct xlog **wal, struct recovery_state *r,
+wal_opt_rotate(struct xlog **wal, struct recovery *r,
 	       struct vclock *vclock)
 {
 	struct xlog *l = *wal, *wal_to_close = NULL;
@@ -308,7 +308,7 @@ wal_writer_pop(struct wal_writer *writer)
 }
 
 static void
-wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
+wal_write_to_disk(struct recovery *r, struct wal_writer *writer,
 		  struct cmsg_fifo *input, struct cmsg_fifo *commit,
 		  struct cmsg_fifo *rollback)
 {
@@ -466,7 +466,7 @@ done:
 static void
 wal_writer_f(va_list ap)
 {
-	struct recovery_state *r = va_arg(ap, struct recovery_state *);
+	struct recovery *r = va_arg(ap, struct recovery *);
 	struct wal_writer *writer = r->writer;
 
 	cpipe_create(&writer->wal_pipe);
@@ -512,7 +512,7 @@ wal_writer_f(va_list ap)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct recovery_state *r, struct wal_request *req)
+wal_write(struct recovery *r, struct wal_request *req)
 {
 	if (r->wal_mode == WAL_NONE)
 		return vclock_sum(&r->vclock);

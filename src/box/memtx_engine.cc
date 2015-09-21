@@ -556,7 +556,7 @@ MemtxEngine::MemtxEngine()
  * recovery_bootstrap() should be used instead.
  */
 void
-recover_snap(struct recovery_state *r)
+recover_snap(struct recovery *r)
 {
 	/* There's no current_wal during initial recover. */
 	assert(r->current_wal == NULL);
@@ -591,7 +591,7 @@ recover_snap(struct recovery_state *r)
 void
 MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 {
-	struct recovery_state *r = ::recovery;
+	struct recovery *r = ::recovery;
 	m_state = MEMTX_READING_SNAPSHOT;
 	/* Process existing snapshot */
 	recover_snap(r);
@@ -985,7 +985,7 @@ struct checkpoint {
 };
 
 static void
-checkpoint_init(struct checkpoint *ckpt, struct recovery_state *recovery,
+checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
 		int64_t lsn_arg)
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);

@@ -325,7 +325,7 @@ static inline void
 sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
                 uint32_t tuple_size)
 {
-	struct recovery_state *r = relay->r;
+	struct recovery *r = relay->r;
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;

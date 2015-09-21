@@ -58,7 +58,7 @@
 #include "cluster.h" /* replica */
 #include "replica.h"
 
-struct recovery_state *recovery;
+struct recovery *recovery;
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
@@ -113,7 +113,7 @@ box_is_ro(void)
 }
 
 static void
-recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
+recover_row(struct recovery *r, void *param, struct xrow_header *row)
 {
 	(void) param;
 	(void) r;
@@ -577,7 +577,7 @@ box_process_subscribe(int fd, struct xrow_header *header)
 static void
 box_set_server_uuid()
 {
-	struct recovery_state *r = recovery;
+	struct recovery *r = ::recovery;
 	tt_uuid_create(&r->server_uuid);
 	assert(r->server_id == 0);
 	if (vclock_has(&r->vclock, 1))

@@ -44,7 +44,7 @@ public:
 	struct ev_io io;
 	/* Request sync */
 	uint64_t sync;
-	struct recovery_state *r;
+	struct recovery *r;
 	ev_tstamp wal_dir_rescan_delay;
 	Relay(int fd_arg, uint64_t sync_arg);
 	~Relay();
