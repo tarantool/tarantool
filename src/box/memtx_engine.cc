@@ -1156,7 +1156,7 @@ MemtxEngine::abortCheckpoint()
 }
 
 void
-MemtxEngine::join(Relay *relay)
+MemtxEngine::join(struct relay *relay)
 {
 	recover_snap(relay->r);
 }

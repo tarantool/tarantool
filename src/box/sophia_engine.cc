@@ -322,7 +322,7 @@ SophiaEngine::open()
 }
 
 static inline void
-sophia_send_row(Relay *relay, uint32_t space_id, char *tuple,
+sophia_send_row(struct relay *relay, uint32_t space_id, char *tuple,
                 uint32_t tuple_size)
 {
 	struct recovery_state *r = relay->r;
@@ -378,7 +378,7 @@ sophia_join_key_def(void *env, void *db)
  * to the replica.
  */
 void
-SophiaEngine::join(Relay *relay)
+SophiaEngine::join(struct relay *relay)
 {
 	struct vclock *res = vclockset_last(&relay->r->snap_dir.index);
 	if (res == NULL)

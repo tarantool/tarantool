@@ -35,7 +35,7 @@
 struct request;
 struct space;
 struct tuple;
-class Relay;
+struct relay;
 
 enum engine_flags {
 	ENGINE_CAN_BE_TEMPORARY = 1,
@@ -94,7 +94,7 @@ public:
 	 */
 	virtual bool needToBuildSecondaryKey(struct space *space);
 
-	virtual void join(Relay *);
+	virtual void join(struct relay *);
 	/**
 	 * Begin a new statement in an existing or new
 	 * transaction.
@@ -258,6 +258,6 @@ engine_checkpoint(int64_t checkpoint_id);
  * Send a snapshot.
  */
 void
-engine_join(Relay *);
+engine_join(struct relay *);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

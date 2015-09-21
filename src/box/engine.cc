@@ -130,7 +130,7 @@ Engine::recoverToCheckpoint(int64_t /* lsn */)
 }
 
 void
-Engine::join(Relay *relay)
+Engine::join(struct relay *relay)
 {
 	(void) relay;
 }
@@ -322,7 +322,7 @@ error:
 }
 
 void
-engine_join(Relay *relay)
+engine_join(struct relay *relay)
 {
 	Engine *engine;
 	engine_foreach(engine) {

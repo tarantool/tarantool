@@ -36,8 +36,7 @@
 struct xrow_header;
 
 /** State of a replication relay. */
-class Relay {
-public:
+struct relay {
 	/** The thread in which we relay data to the replica. */
 	struct cord cord;
 	/** Replica connection */
@@ -46,8 +45,6 @@ public:
 	uint64_t sync;
 	struct recovery_state *r;
 	ev_tstamp wal_dir_rescan_delay;
-	Relay(int fd_arg, uint64_t sync_arg);
-	~Relay();
 };
 
 /**
@@ -82,7 +79,7 @@ relay_subscribe(int fd, struct xrow_header *packet,
 		struct vclock *master_vclock);
 
 void
-relay_send(Relay *relay, struct xrow_header *packet);
+relay_send(struct relay *relay, struct xrow_header *packet);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */
 

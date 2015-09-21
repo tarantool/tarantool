@@ -50,21 +50,24 @@ void
 relay_send_row(struct recovery_state *r, void *param,
 	       struct xrow_header *packet);
 
-Relay::Relay(int fd_arg, uint64_t sync_arg)
+static inline void
+relay_create(struct relay *relay, int fd, uint64_t sync)
 {
-	r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-			 relay_send_row, this);
-	recovery_setup_panic(r, cfg_geti("panic_on_snap_error"),
+	memset(relay, 0, sizeof(*relay));
+	relay->r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+			 relay_send_row, relay);
+	recovery_setup_panic(relay->r, cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	coio_init(&io, fd_arg);
-	sync = sync_arg;
-	wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
+	coio_init(&relay->io, fd);
+	relay->sync = sync;
+	relay->wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 }
 
-Relay::~Relay()
+static inline void
+relay_destroy(struct relay *relay)
 {
-	recovery_delete(r);
+	recovery_delete(relay->r);
 }
 
 static inline void
@@ -82,7 +85,7 @@ relay_set_cord_name(int fd)
 void
 relay_join_f(va_list ap)
 {
-	Relay *relay = va_arg(ap, Relay *);
+	struct relay *relay = va_arg(ap, struct relay *);
 
 	relay_set_cord_name(relay->io.fd);
 
@@ -97,7 +100,11 @@ relay_join(int fd, struct xrow_header *packet,
 	   uint32_t master_server_id,
 	   void (*on_join)(const struct tt_uuid *))
 {
-	Relay relay(fd, packet->sync);
+	struct relay relay;
+	relay_create(&relay, fd, packet->sync);
+	auto scope_guard = make_scoped_guard([&]{
+		relay_destroy(&relay);
+	});
 	struct recovery_state *r = relay.r;
 
 	struct tt_uuid server_uuid = uuid_nil;
@@ -142,7 +149,7 @@ feed_event_f(struct trigger *trigger, void * /* event */)
 static void
 relay_subscribe_f(va_list ap)
 {
-	Relay *relay = va_arg(ap, Relay *);
+	struct relay *relay = va_arg(ap, struct relay *);
 	struct recovery_state *r = relay->r;
 
 	relay_set_cord_name(relay->io.fd);
@@ -201,7 +208,11 @@ relay_subscribe(int fd, struct xrow_header *packet,
 		uint32_t master_server_id,
 		struct vclock *master_vclock)
 {
-	Relay relay(fd, packet->sync);
+	struct relay relay;
+	relay_create(&relay, fd, packet->sync);
+	auto scope_guard = make_scoped_guard([&]{
+		relay_destroy(&relay);
+	});
 
 	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
@@ -247,7 +258,7 @@ relay_subscribe(int fd, struct xrow_header *packet,
 }
 
 void
-relay_send(Relay *relay, struct xrow_header *packet)
+relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	packet->sync = relay->sync;
 	struct iovec iov[XROW_IOVMAX];
@@ -260,7 +271,7 @@ void
 relay_send_row(struct recovery_state *r, void *param,
 	       struct xrow_header *packet)
 {
-	Relay *relay = (Relay *) param;
+	struct relay *relay = (struct relay *) param;
 	assert(iproto_type_is_dml(packet->type));
 
 	/*
