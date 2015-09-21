@@ -193,13 +193,12 @@ replica_join(struct replica *replica, struct recovery *r)
 	}
 
 	/* Decode end of stream packet */
-	struct vclock vclock;
-	vclock_create(&vclock);
+	vclock_create(&replica->vclock);
 	assert(row.type == IPROTO_OK);
-	xrow_decode_vclock(&row, &vclock);
+	xrow_decode_vclock(&row, &replica->vclock);
 
 	/* Replace server vclock using data from snapshot */
-	vclock_copy(&r->vclock, &vclock);
+	vclock_copy(&r->vclock, &replica->vclock);
 
 	/* Re-enable warnings after successful execution of JOIN */
 	replica_set_state(replica, REPLICA_CONNECTED);
@@ -216,18 +215,40 @@ replica_subscribe(struct replica *replica, struct recovery *r)
 	struct ev_io *coio = &replica->io;
 	struct iobuf *iobuf = replica->iobuf;
 	struct xrow_header row;
+
 	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
 	replica_write_row(coio, &row);
 	replica_set_state(replica, REPLICA_FOLLOW);
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	replica->warning_said = false;
+	vclock_create(&replica->vclock);
 
+	/*
+	 * Read SUBSCRIBE response
+	 */
+	if (replica->version_id >= version_id(1, 6, 7)) {
+		replica_read_row(coio, iobuf, &row);
+		if (iproto_type_is_error(row.type)) {
+			return xrow_decode_error(&row);  /* error */
+		} else if (row.type != IPROTO_OK) {
+			tnt_raise(ClientError, ER_PROTOCOL,
+				  "Invalid response to SUBSCRIBE");
+		}
+
+		xrow_decode_vclock(&row, &replica->vclock);
+		replica->id = row.server_id;
+	}
 	/**
+	 * Tarantool < 1.6.7:
 	 * If there is an error in subscribe, it's
 	 * sent directly in response to subscribe.
 	 * If subscribe is successful, there is no
 	 * "OK" response, but a stream of rows.
 	 * from the binary log.
+	 */
+
+	/*
+	 * Process a stream of rows from the binary log.
 	 */
 	while (true) {
 		replica_read_row(coio, iobuf, &row);
@@ -404,6 +425,7 @@ replica_new(const char *uri)
 	}
 	coio_init(&replica->io, -1);
 	replica->iobuf = iobuf_new();
+	vclock_create(&replica->vclock);
 
 	/* uri_parse() sets pointers to replica->source buffer */
 	snprintf(replica->source, sizeof(replica->source), "%s", uri);
