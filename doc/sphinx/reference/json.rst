@@ -95,5 +95,14 @@ The json package provides JSON manipulation routines. It is based on the
     | :codenormal:`- '{"field2":null,"field1":"a","field3":"c"}'`
     | :codenormal:`...`
 
+The JSON output structure  can be specified with :code:`__serialize`:
+__serialize="seq" for an array,
+__serialize="map" for a map.
+Serializing 'A' and 'B' with different __serialize values causes different results: |br|
+:codebold:`json.encode(setmetatable({'A', 'B'}, { __serialize="seq"}))` |br|
+:codenormal:`- '["A","B"]'` |br|
+:codebold:`json.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="map"})})` |br|
+:codenormal:`- '[{"f2":"B","f1":"A"}]'` |br|
+
 .. _Lua-CJSON package by Mark Pulford: http://www.kyne.com.au/~mark/software/lua-cjson.php
 .. _the official documentation: http://www.kyne.com.au/~mark/software/lua-cjson-manual.html

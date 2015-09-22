@@ -6,6 +6,8 @@
 
 The ``box.schema`` package has one data-definition function: ``space.create()``.
 
+.. _box.schema.space.create:
+
 .. function:: space.create(space-name [, {options} ])
 
     Create a space.
@@ -36,6 +38,8 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
         +---------------+--------------------+---------+---------------------+
         | user          | user name          | string  | current user's name |
         +---------------+--------------------+---------+---------------------+
+        | format        | field names+types  | table   | (blank)             |
+        +---------------+--------------------+---------+---------------------+
 
 =================================================
                     Example
@@ -51,6 +55,8 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
  | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space55', {if_not_exists = true})`
  | :codenormal:`---`
  | :codenormal:`...`
+
+For an illustration with the :code:`format` clause, see :ref:`box.space._space example <boxspaceexample>`.
 
 After a space is created, usually the next step is to
 :func:`create an index <space_object.create_index>` for it,

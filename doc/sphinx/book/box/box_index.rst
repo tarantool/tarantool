@@ -663,7 +663,7 @@ is Rectangle#2", and "Rectangle#3 is entirely inside Rectangle#2".
 
 Now let us create a space and add an RTREE index.
 
-    | :codebold:`s = box.schema.create_space('rectangles')`
+    | :codebold:`s = box.schema.space.create('rectangles')`
     | :codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
     | :codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
 

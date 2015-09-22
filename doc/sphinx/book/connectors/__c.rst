@@ -2,8 +2,8 @@
                             C
 =====================================================================
 
-Here is a complete C program that inserts ``[99999,'B']`` into
-space ``examples`` via the high-level C API.
+Here is a complete C program that inserts :code:`[99999,'B']` into
+space :code:`examples` via the high-level C API.
 
 .. code-block:: c
 
@@ -43,8 +43,8 @@ To compile and link the program, say: |br|
 |nbsp| |nbsp| :codenormal:`#Sometimes this is necessary: export LD_LIBRARY_PATH=/usr/local/lib` |br|
 |nbsp| |nbsp| :codenormal:`gcc -o example example.c -ltarantool -ltarantoolnet` |br|
 Before trying to run,
-check that the server is listening and that :code:`examples` exists, as described at the start of this chapter.
-To run the program, say ``./example``. The program will connect
+check that the server is listening and that :code:`examples` exists, as :ref:`described earlier <connector-setting>`.
+To run the program, say :code:`./example`. The program will connect
 to the server, and will send the request.
 If tarantool is not running on localhost with listen address = 3301, the program will print “Connection refused”.
 If the insert fails, the program will print "Insert failed" and an error number.

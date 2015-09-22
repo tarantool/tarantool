@@ -20,21 +20,15 @@ the installation could look like this:
     make
     # make install is optional
 
-At this point there is a file named ``~/tarantool-php/modules/tarantool.so``.
-PHP will only find it if the PHP initialization file ``php.ini`` contains a
-line like ``extension=./tarantool.so``. So copy ``tarantool.so`` to the working
-directory and tell PHP where to find the ``php.ini`` file that contains that line ...
-
-.. code-block:: bash
-
-    cd ~
-    cp ./tarantool-php/modules/tarantool.so .
-    export PHP_INI_SCAN_DIR=~/tarantool-php/test/shared
+At this point there is a file named :code:`~/tarantool-php/modules/tarantool.so`.
+PHP will only find it if the PHP initialization file :code:`php.ini` contains a
+line like :code:`extension=./tarantool.so`, or if PHP is started with the option
+:code:`-d extension=~/tarantool-php/modules/tarantool.so`. 
 
 Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples'
 via the PHP API. Before trying to run, check that the server is listening and that
-``examples`` exists, as described at the start of this chapter. To run, paste the code into a file named
-example.php and say ``php example.php``. The program will open a socket connection with
+:code:`examples` exists, as :ref:`described earlier <connector-setting>`. To run, paste the code into a file named
+example.php and say :code:`php -d extension=~/tarantool-php/modules/tarantool.so example.php`. The program will open a socket connection with
 the tarantool server at localhost:3301, then send an INSERT request, then — if all is
 well — print "Insert succeeded". If the tuple already exists, the program will print
 “Duplicate key exists in unique index 'primary' in space 'examples'”.
@@ -51,10 +45,6 @@ well — print "Insert succeeded". If the tuple already exists, the program will
       echo "Exception: ", $e->getMessage(), "\n";
       }
     ?>
-
-After running the example, it is good practice to delete the file ./tarantool.so,
-since it is only compatible with PHP and its existence could confuse non-PHP
-applications.
 
 The example program only shows one command and does not show all that's necessary
 for good practice. For that, please see `tarantool-php`_ project at GitHub.

@@ -43,5 +43,6 @@ Limitations which are only applicable for the sophia storage engine
     always 1, that is, secondary indexes are not supported. Indexes must be
     type=TREE, that is, the options type=HASH or type=RTREE or type=BITSET are
     not supported. Indexes must be unique, that is, the option unique=false
-    is not supported. The ``alter()`` and ``count()`` functions
-    are not supported.
+    is not supported. The ``alter()`` and ``count()`` and
+    ``min()`` and ``max()`` and ``random()`` and ``auto_increment()`` functions
+    are not supported. Temporary spaces are not supported.
