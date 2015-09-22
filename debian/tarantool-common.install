@@ -1,2 +1,3 @@
 /etc/default/tarantool
 /usr/bin/tarantoolctl
+/etc/tarantool/instances.enabled/default.lua

@@ -54,6 +54,14 @@ install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
     WORLD_READ WORLD_EXECUTE
 )
 
+install (FILES example.lua DESTINATION
+        ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/instances.enabled
+    PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE
+)
+
 pod2man (
     ${CMAKE_SOURCE_DIR}/extra/dist/tarantoolctl
     "tarantoolctl" 1 extra/dist
