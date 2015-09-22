@@ -46,7 +46,11 @@ struct bitset_hash_entry {
 #define mh_int_t uint32_t
 #define mh_arg_t int
 
-#define mh_hash_key(a, arg) ((uint32_t)(((uintptr_t)(a)) >> 33^((uintptr_t)(a)) ^ ((uintptr_t)(a)) << 11));
+#if UINTPTR_MAX == 0xffffffff
+#define mh_hash_key(a, arg) ((uintptr_t)(a))
+#else
+#define mh_hash_key(a, arg) ((uint32_t)(((uintptr_t)(a)) >> 33 ^ ((uintptr_t)(a)) ^ ((uintptr_t)(a)) << 11))
+#endif
 #define mh_hash(a, arg) mh_hash_key((a)->tuple, arg)
 #define mh_cmp(a, b, arg) ((a)->tuple != (b)->tuple)
 #define mh_cmp_key(a, b, arg) ((a) != (b)->tuple)
