@@ -3,7 +3,8 @@
 -- replication, sharding and all major features
 -- Complete documentation available in:  http://tarantool.org/doc/
 --
--- To start this example just run "sudo tarantoolctl start default"
+-- To start this example just run "sudo tarantoolctl start example"
+-- To connect to the instance, use "sudo tarantoolctl enter example"
 -- Features:
 -- 1. Database configuration
 -- 2. Binary logging and snapshots
@@ -26,7 +27,7 @@ box.cfg {
 
     -- A directory where database working files will be stored
     -- If not specified, defaults to the current directory
-    workdir = nil;
+    work_dir = nil;
 
     -- A directory where write-ahead log (.xlog) files are stored
     -- If not specified, defaults to work_dir
@@ -38,21 +39,21 @@ box.cfg {
 
     -- A directory where sophia files will be stored
     -- If not specified, defaults to work_dir
-    sophia_dir = "sophia";
+    sophia_dir = ".";
 
     -- The read/write data port number or URI
     -- Has no default value, so must be specified if
     -- connections will occur from remote clients 
     -- that do not use “admin address”
-    listen=3301;
+    listen = 3301;
 
     -- Store the process id in this file.
     -- Can be relative to work_dir. 
-    -- Default value is “tarantool.pid”.
-    pid_file = nil;
+    -- Default value is nil.
+    pid_file = "example.pid";
 
     -- Inject the given string into server process title
-    custom_proc_title = 'tarantool';
+    custom_proc_title = 'example';
 
     -- Run the server as a background task
     -- The logger and pid_file parameters 
@@ -115,7 +116,8 @@ box.cfg {
     -- "fsync": fibers wait for their data, fsync follows each write;
     wal_mode = "none";
 
-    -- Number of seconds between periodic scans of the write-ahead-log file directory
+    -- Number of seconds between periodic scans of the write-ahead-log
+    -- file directory
     wal_dir_rescan_delay = 2.0;
 
     ---------------
@@ -127,7 +129,7 @@ box.cfg {
     -- which replication_source specifies with a URI
     -- for example konstantin:secret_password@tarantool.org:3301
     -- by default username is "guest"
-    --replication_source="127.0.0.1:3102";
+    -- replication_source="127.0.0.1:3102";
 
     --------------
     -- Networking
@@ -155,7 +157,7 @@ box.cfg {
 
     -- By default, the log is sent to the standard error stream (stderr)
     -- If logger is specified, the log is sent to the file named in the string
-    logger = nil;
+    logger = "example.log";
 
     -- If true, tarantool does not block on the log file descriptor
     -- when it’s not ready for write, and drops the message instead
@@ -166,13 +168,21 @@ box.cfg {
     too_long_threshold = 0.5;
 }
 
--- for first run create space and add full grants to guest user
-if box.space.default == nil then
-    space = box.schema.create_space('default')
+local function bootstrap()
+    local space = box.schema.create_space('example')
     space:create_index('primary')
-    box.schema.user.grant('guest', 'read,write,execute', 'universe')
+-- -- Uncomment this if you don't need grants
+--    box.schema.user.grant('guest', 'read,write,execute', 'universe')
+
+-- -- Keep things safe by default
+--    box.schema.user.create('example', { password = 'secret' })
+--    box.schema.user.grant('example', 'replication')
+--    box.schema.user.grant('example', 'read,write,execute', 'space', 'example')
+--
 end
 
+-- for first run create a space and add set up grants
+box.once('example-1.0', bootstrap)
 
 -----------------------
 -- Automatinc sharding
@@ -197,7 +207,7 @@ end
 -----------------
 -- Message queue
 -----------------
--- N.B. you need install tarantool-queue package to use queue
+-- N.B. you need to install tarantool-queue package to use queue
 -- Docs: https://github.com/tarantool/queue/blob/master/README.md
 -- Example:
 --queue = require('queue')
@@ -207,7 +217,7 @@ end
 -------------------
 -- Data expiration
 -------------------
--- N.B. you need install tarantool-expirationd package to use expirationd
+-- N.B. you need to install tarantool-expirationd package to use expirationd
 -- Docs: https://github.com/tarantool/expirationd/blob/master/README.md
 -- Example:
 --job_name = 'clean_all'

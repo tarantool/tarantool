@@ -54,7 +54,7 @@ install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
     WORLD_READ WORLD_EXECUTE
 )
 
-install (FILES default.lua DESTINATION
+install (FILES example.lua DESTINATION
         ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/instances.enabled
     PERMISSIONS
     OWNER_READ OWNER_WRITE OWNER_EXECUTE
