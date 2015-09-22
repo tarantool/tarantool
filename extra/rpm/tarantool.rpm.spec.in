@@ -234,9 +234,9 @@ chkconfig --del tarantool
 "%{_bindir}/tarantoolctl"
 "%{_mandir}/man1/tarantoolctl.1.gz"
 "%{_sysconfdir}/sysconfig/tarantool"
-%dir "{%_sysconfdir}/tarantool"
-%dir "{%_sysconfdir}/tarantool/instances.enabled"
-"{%_sysconfdir}/tarantool/instances.enabled/example.lua"
+%dir "%{_sysconfdir}/tarantool"
+%dir "%{_sysconfdir}/tarantool/instances.enabled"
+"%{_sysconfdir}/tarantool/instances.enabled/example.lua"
 %if %{with systemd}
 %dir "%{_libdir}/tarantool/"
 "%{_unitdir}/tarantool.service"
