@@ -31,32 +31,32 @@
 #include "box.h"
 #include "cluster.h"
 #include "recovery.h"
-#include "replica.h"
+#include "applier.h"
 
 /**
  * Globally unique identifier of this cluster.
- * A cluster is a set of connected replicas.
+ * A cluster is a set of connected appliers.
  */
 tt_uuid cluster_id;
 
-typedef rb_tree(struct replica) replicaset_t;
-rb_proto(, replicaset_, replicaset_t, struct replica)
+typedef rb_tree(struct applier) applierset_t;
+rb_proto(, applierset_, applierset_t, struct applier)
 
 static int
-replica_compare_by_source(const struct replica *a, const struct replica *b)
+applier_compare_by_source(const struct applier *a, const struct applier *b)
 {
-		return strcmp(a->source, b->source);
+	return strcmp(a->source, b->source);
 }
 
-rb_gen(, replicaset_, replicaset_t, struct replica, link,
-       replica_compare_by_source);
+rb_gen(, applierset_, applierset_t, struct applier, link,
+       applier_compare_by_source);
 
-static replicaset_t replicaset; /* zeroed by linker */
+static applierset_t applierset; /* zeroed by linker */
 
 void
 cluster_init(void)
 {
-	replicaset_new(&replicaset);
+	applierset_new(&applierset);
 }
 
 void
@@ -118,33 +118,33 @@ cluster_del_server(uint32_t server_id)
 }
 
 void
-cluster_add_replica(struct replica *replica)
+cluster_add_applier(struct applier *applier)
 {
-	replicaset_insert(&replicaset, replica);
+	applierset_insert(&applierset, applier);
 }
 
 void
-cluster_del_replica(struct replica *replica)
+cluster_del_applier(struct applier *applier)
 {
-	replicaset_remove(&replicaset, replica);
+	applierset_remove(&applierset, applier);
 }
 
-struct replica *
-cluster_find_replica(const char *source)
+struct applier *
+cluster_find_applier(const char *source)
 {
-	struct replica key;
+	struct applier key;
 	snprintf(key.source, sizeof(key.source), "%s", source);
-	return replicaset_search(&replicaset, &key);
+	return applierset_search(&applierset, &key);
 }
 
-struct replica *
-cluster_replica_first(void)
+struct applier *
+cluster_applier_first(void)
 {
-	return replicaset_first(&replicaset);
+	return applierset_first(&applierset);
 }
 
-struct replica *
-cluster_replica_next(struct replica *replica)
+struct applier *
+cluster_applier_next(struct applier *applier)
 {
-	return replicaset_next(&replicaset, replica);
+	return applierset_next(&applierset, applier);
 }

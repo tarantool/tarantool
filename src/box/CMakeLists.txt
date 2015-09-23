@@ -56,7 +56,7 @@ add_library(box
     vclock.c
     cluster.cc
     recovery.cc
-    replica.cc
+    applier.cc
     relay.cc
     wal.cc
     ${lua_sources}

@@ -118,26 +118,26 @@ cluster_del_server(uint32_t server_id);
 
 /** }}} **/
 
-/** {{{ Cluster replica API **/
+/** {{{ Cluster applier API **/
 
 void
-cluster_add_replica(struct replica *replica);
+cluster_add_applier(struct applier *applier);
 
 void
-cluster_del_replica(struct replica *replica);
+cluster_del_applier(struct applier *applier);
 
-struct replica *
-cluster_find_replica(const char *source);
+struct applier *
+cluster_find_applier(const char *source);
 
-struct replica *
-cluster_replica_first(void);
+struct applier *
+cluster_applier_first(void);
 
-struct replica *
-cluster_replica_next(struct replica *replica);
+struct applier *
+cluster_applier_next(struct applier *applier);
 
-#define cluster_foreach_replica(var) \
-	for (struct replica *var = cluster_replica_first(); \
-	     var != NULL; var = cluster_replica_next(var))
+#define cluster_foreach_applier(var) \
+	for (struct applier *var = cluster_applier_first(); \
+	     var != NULL; var = cluster_applier_next(var))
 /** }}} **/
 
 #endif

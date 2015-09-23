@@ -39,7 +39,7 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "box/replica.h"
+#include "box/applier.h"
 #include "box/recovery.h"
 #include "box/cluster.h"
 #include "main.h"
@@ -52,18 +52,18 @@ lbox_info_replication(struct lua_State *L)
 {
 	lua_newtable(L);
 
-	struct replica *replica = cluster_replica_first();
-	if (replica == NULL) {
+	struct applier *applier = cluster_applier_first();
+	if (applier == NULL) {
 		lua_pushstring(L, "status");
 		lua_pushstring(L, "off");
 		lua_settable(L, -3);
 		return 1;
 	}
 
-	/* Get replica state in lower case */
+	/* Get applier state in lower case */
 	static char status[16];
 	char *d = status;
-	const char *s = replica_state_strs[replica->state] + strlen("REPLICA_");
+	const char *s = applier_state_strs[applier->state] + strlen("APPLIER_");
 	assert(strlen(s) < sizeof(status));
 	while ((*(d++) = tolower(*(s++))));
 
@@ -71,16 +71,16 @@ lbox_info_replication(struct lua_State *L)
 	lua_pushstring(L, status);
 	lua_settable(L, -3);
 
-	if (replica->reader) {
+	if (applier->reader) {
 		lua_pushstring(L, "lag");
-		lua_pushnumber(L, replica->lag);
+		lua_pushnumber(L, applier->lag);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "idle");
-		lua_pushnumber(L, ev_now(loop()) - replica->last_row_time);
+		lua_pushnumber(L, ev_now(loop()) - applier->last_row_time);
 		lua_settable(L, -3);
 
-		Exception *e = diag_last_error(&replica->reader->diag);
+		Exception *e = diag_last_error(&applier->reader->diag);
 		if (e != NULL) {
 			lua_pushstring(L, "message");
 			lua_pushstring(L, e->errmsg());

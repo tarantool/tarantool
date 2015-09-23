@@ -36,7 +36,6 @@
 #include "xlog.h"
 #include "xrow.h"
 
-#include "replica.h"
 #include "cluster.h"
 #include "session.h"
 

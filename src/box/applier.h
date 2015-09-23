@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_REPLICA_H_INCLUDED
-#define TARANTOOL_REPLICA_H_INCLUDED
+#ifndef TARANTOOL_APPLIER_H_INCLUDED
+#define TARANTOOL_APPLIER_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -43,33 +43,33 @@
 
 struct recovery;
 
-enum { REPLICA_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
+enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
-#define replica_STATE(_)                                             \
-	_(REPLICA_OFF, 0)                                            \
-	_(REPLICA_CONNECT, 1)                                        \
-	_(REPLICA_AUTH, 2)                                           \
-	_(REPLICA_CONNECTED, 3)                                      \
-	_(REPLICA_BOOTSTRAP, 4)                                      \
-	_(REPLICA_FOLLOW, 5)                                         \
-	_(REPLICA_STOPPED, 6)                                        \
-	_(REPLICA_DISCONNECTED, 7)                                   \
+#define applier_STATE(_)                                             \
+	_(APPLIER_OFF, 0)                                            \
+	_(APPLIER_CONNECT, 1)                                        \
+	_(APPLIER_AUTH, 2)                                           \
+	_(APPLIER_CONNECTED, 3)                                      \
+	_(APPLIER_BOOTSTRAP, 4)                                      \
+	_(APPLIER_FOLLOW, 5)                                         \
+	_(APPLIER_STOPPED, 6)                                        \
+	_(APPLIER_DISCONNECTED, 7)                                   \
 
-/** States for the replica */
-ENUM(replica_state, replica_STATE);
-extern const char *replica_state_strs[];
+/** States for the applier */
+ENUM(applier_state, applier_STATE);
+extern const char *applier_state_strs[];
 
 /**
  * State of a replication connection to the master
  */
-struct replica {
+struct applier {
 	struct fiber *reader;
-	enum replica_state state;
+	enum applier_state state;
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
 	uint32_t id;
-	char source[REPLICA_SOURCE_MAXLEN];
-	rb_node(struct replica) link; /* a set by source in cluster.cc */
+	char source[APPLIER_SOURCE_MAXLEN];
+	rb_node(struct applier) link; /* a set by source in cluster.cc */
 	struct uri uri;
 	uint32_t version_id; /* remote version */
 	struct vclock vclock;
@@ -93,45 +93,45 @@ struct replica {
  * If recovery is not finalized (i.e. r->writer == NULL) then the client
  * connect to a master, download and process snapshot using JOIN command
  * and then exits. The background fiber can be joined to get exit status
- * using replica_join().
+ * using applier_wait().
  *
  * \pre A connection from io->fd is re-used.
  * \sa fiber_start()
  */
 void
-replica_start(struct replica *replica, struct recovery *r);
+applier_start(struct applier *applier, struct recovery *r);
 
 /**
  * Stop a client.
  */
 void
-replica_stop(struct replica *replica);
+applier_stop(struct applier *applier);
 
 /**
- * Wait replication client to finish and rethrow exception (if any).
+ * Wait appliertion client to finish and rethrow exception (if any).
  * Use this function to wait until bootstrap.
  *
  * \post This function keeps a open connection in io->fd.
- * \sa replica_start()
+ * \sa applier_start()
  * \sa fiber_join()
  */
 void
-replica_wait(struct replica *replica);
+applier_wait(struct applier *applier);
 
 /**
- * Allocate an instance of replica object, create replica and initialize
- * remote uri (copied to struct replica).
+ * Allocate an instance of applier object, create applier and initialize
+ * remote uri (copied to struct applier).
  *
  * @pre     the uri is a valid and checked one
  * @error   throws OutOfMemory exception if out of memory.
  */
-struct replica *
-replica_new(const char *uri);
+struct applier *
+applier_new(const char *uri);
 
 /**
- * Destroy and delete a replica.
+ * Destroy and delete a applier.
  */
 void
-replica_delete(struct replica *replica);
+applier_delete(struct applier *applier);
 
-#endif /* TARANTOOL_REPLICA_H_INCLUDED */
+#endif /* TARANTOOL_APPLIER_H_INCLUDED */
