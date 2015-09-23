@@ -278,12 +278,12 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "path");
 
-	lua_pushliteral(L, "./?." MOD_FORMAT ";");
+	lua_pushliteral(L, "./?." TARANTOOL_LIBEXT ";");
 	if (home != NULL) {
 		lua_pushstring(L, home);
-		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?." MOD_FORMAT ";");
+		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?." TARANTOOL_LIBEXT ";");
 		lua_pushstring(L, home);
-		lua_pushliteral(L, "/.luarocks/lib/lua/?." MOD_FORMAT ";");
+		lua_pushliteral(L, "/.luarocks/lib/lua/?." TARANTOOL_LIBEXT ";");
 	}
 	lua_pushliteral(L, MODULE_LIBPATH ";");
 	lua_getfield(L, top, "cpath");
@@ -331,7 +331,7 @@ luaopen_tarantool(lua_State *L)
 
 	/* build.mod_format */
 	lua_pushstring(L, "mod_format");
-	lua_pushstring(L, MOD_FORMAT);
+	lua_pushstring(L, TARANTOOL_LIBEXT);
 	lua_settable(L, -3);
 
 	/* build.flags */

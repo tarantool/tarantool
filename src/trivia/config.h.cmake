@@ -35,15 +35,15 @@
 #cmakedefine TARGET_OS_DARWIN 1
 
 #ifdef TARGET_OS_LINUX
-#define MOD_FORMAT "so"
+#define TARANTOOL_LIBEXT "so"
 #endif
 
 #ifdef TARGET_OS_FREEBSD
-#define MOD_FORMAT "so"
+#define TARANTOOL_LIBEXT "so"
 #endif
 
 #ifdef TARGET_OS_DARWIN
-#define MOD_FORMAT "dylib"
+#define TARANTOOL_LIBEXT "dylib"
 #endif
 
 /*
