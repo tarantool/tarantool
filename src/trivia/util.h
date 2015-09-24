@@ -207,12 +207,6 @@ fmemopen(void *buf, size_t size, const char *mode);
 #include <sys/time.h>
 #ifndef HAVE_CLOCK_GETTIME
 /* Declare clock_gettime(). */
-#include <stdint.h>
-struct timespec
-{
-      time_t  tv_sec;    /* Seconds.  */
-      long    tv_nsec;   /* Nanoseconds. */
-};
 int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_REALTIME			0
 #define CLOCK_MONOTONIC			1
