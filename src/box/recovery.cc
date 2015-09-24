@@ -439,50 +439,109 @@ recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
 
 /* {{{ Local recovery: support of hot standby and replication relay */
 
-static void
-recovery_stat_cb(ev_loop *loop, ev_stat *stat, int revents);
-
-class EvStat {
+/*
+ * Implements a subscription to WAL updates.
+ * Attempts to register a WAL watcher; if it fails, falls back to fs events.
+ * In the latter mode either a change to the WAL dir itself or a change
+ * in the XLOG file triggers a wakeup. The WAL dir path is set in
+ * constructor. XLOG file path is set via .set_log_path().
+ */
+class WalSubscription {
 public:
-	struct ev_stat stat;
 	struct fiber *f;
-	bool *signaled;
-	char path[PATH_MAX + 1];
+	bool signaled;
+	struct ev_stat dir_stat;
+	struct ev_stat file_stat;
+	struct ev_async async;
+	struct wal_watcher watcher;
+	char dir_path[PATH_MAX];
+	char file_path[PATH_MAX];
 
-	inline void start(const char *path_arg)
+	static void stat_cb(struct ev_loop *, struct ev_stat *stat, int)
+	{
+		((WalSubscription *)stat->data)->wakeup();
+	}
+
+	static void async_cb(struct ev_loop *, ev_async *async, int)
+	{
+		((WalSubscription *)async->data)->wakeup();
+	}
+
+	void wakeup()
+	{
+		signaled = true;
+		if (f->flags & FIBER_IS_CANCELLABLE)
+			fiber_wakeup(f);
+	}
+
+	WalSubscription(const char *wal_dir)
 	{
 		f = fiber();
-		snprintf(path, sizeof(path), "%s", path_arg);
-		ev_stat_init(&stat, recovery_stat_cb, path, 0.0);
-		ev_stat_start(loop(), &stat);
-	}
-	inline void stop()
-	{
-		ev_stat_stop(loop(), &stat);
+		signaled = false;
+		if ((size_t)snprintf(dir_path, sizeof(dir_path), "%s", wal_dir) >=
+				sizeof(dir_path)) {
+
+			panic("path too long: %s", wal_dir);
+		}
+
+		ev_stat_init(&dir_stat, stat_cb, "", 0.0);
+		ev_stat_init(&file_stat, stat_cb, "", 0.0);
+		ev_async_init(&async, async_cb);
+		dir_stat.data = this;
+		file_stat.data = this;
+		async.data = this;
+
+		ev_async_start(loop(), &async);
+		if (wal_register_watcher(recovery, &watcher, &async) == -1) {
+			/* Fallback to fs events. */
+			ev_async_stop(loop(), &async);
+			ev_stat_set(&dir_stat, dir_path, 0.0);
+			ev_stat_start(loop(), &dir_stat);
+		}
 	}
 
-	EvStat(bool *signaled_arg)
-		:signaled(signaled_arg)
+	~WalSubscription()
 	{
-		path[0] = '\0';
-		ev_stat_init(&stat, recovery_stat_cb, path, 0.0);
-		stat.data = this;
+		ev_stat_stop(loop(), &file_stat);
+		ev_stat_stop(loop(), &dir_stat);
+		wal_unregister_watcher(recovery, &watcher);
+		ev_async_stop(loop(), &async);
 	}
-	~EvStat()
+
+	void set_log_path(const char *path)
 	{
-		stop();
-	};
+		if (ev_is_active(&async)) {
+			/*
+			 * Notifications delivered via watcher, fs events
+			 * irrelevant.
+			 */
+			return;
+		}
+
+		/*
+		 * Avoid toggling ev_stat if the path didn't change.
+		 * Note: .file_path valid iff file_stat is active.
+		 */
+		if (path && ev_is_active(&file_stat) &&
+				strcmp(file_path, path) == 0) {
+
+			return;
+		}
+
+		ev_stat_stop(loop(), &file_stat);
+
+		if (path == NULL)
+			return;
+
+		if ((size_t)snprintf(file_path, sizeof(file_path), "%s", path) >=
+				sizeof(file_path)) {
+
+			panic("path too long: %s", path);
+		}
+		ev_stat_set(&file_stat, file_path, 0.0);
+		ev_stat_start(loop(), &file_stat);
+	}
 };
-
-
-static void
-recovery_stat_cb(ev_loop * /* loop */, ev_stat *stat, int /* revents */)
-{
-	EvStat *data = (EvStat *) stat->data;
-	*data->signaled = true;
-	if (data->f->flags & FIBER_IS_CANCELLABLE)
-		fiber_wakeup(data->f);
-}
 
 static void
 recovery_follow_f(va_list ap)
@@ -491,25 +550,16 @@ recovery_follow_f(va_list ap)
 	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
 	fiber_set_user(fiber(), &admin_credentials);
 
-	bool signaled = false;
-	EvStat stat_dir(&signaled);
-	EvStat stat_file(&signaled);
-
-	stat_dir.start(r->wal_dir.dirname);
+	WalSubscription subscription(r->wal_dir.dirname);
 
 	while (! fiber_is_cancelled()) {
+
 		recover_remaining_wals(r);
 
-		if (r->current_wal == NULL ||
-		    strcmp(r->current_wal->filename, stat_file.path) != 0) {
+		subscription.set_log_path(
+			r->current_wal != NULL ? r->current_wal->filename : NULL);
 
-			stat_file.stop();
-		}
-
-		if (r->current_wal != NULL && !ev_is_active(&stat_file.stat))
-			stat_file.start(r->current_wal->filename);
-
-		if (signaled == false) {
+		if (subscription.signaled == false) {
 			/**
 			 * Allow an immediate wakeup/break loop
 			 * from recovery_stop_local().
@@ -518,7 +568,8 @@ recovery_follow_f(va_list ap)
 			fiber_yield_timeout(wal_dir_rescan_delay);
 			fiber_set_cancellable(false);
 		}
-		signaled = false;
+
+		subscription.signaled = false;
 	}
 }
 

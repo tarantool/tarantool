@@ -101,8 +101,6 @@ void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
 
-extern struct recovery *recovery;
-
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

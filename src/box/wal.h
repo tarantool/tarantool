@@ -33,6 +33,7 @@
 #include  <third_party/queue.h>
 #include <stdint.h>
 #include "cbus.h"
+#include "small/rlist.h"
 
 struct fiber;
 struct recovery;
@@ -62,5 +63,25 @@ wal_writer_start(struct recovery *state, int rows_per_wal);
 
 void
 wal_writer_stop(struct recovery *r);
+
+struct wal_watcher
+{
+	struct rlist next;
+	struct ev_loop *loop;
+	struct ev_async *async;
+};
+
+/**
+ * Receive a notification the next time a wal_write is completed
+ * (+unspecified but reasonable latency).
+ * Fails (-1) if recovery is NULL or lacking a WAL writer.
+ */
+int
+wal_register_watcher(
+	struct recovery *, struct wal_watcher *, struct ev_async *);
+
+void
+wal_unregister_watcher(
+	struct recovery *, struct wal_watcher *);
 
 #endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */

@@ -56,6 +56,8 @@ struct wal_writer
 	bool is_rollback;
 	ev_loop *txn_loop;
 	struct vclock vclock;
+	pthread_mutex_t watchers_mutex;
+	struct rlist watchers;
 };
 
 static void
@@ -153,6 +155,9 @@ wal_writer_init(struct wal_writer *writer, struct vclock *vclock,
 	/* Create and fill writer->cluster hash */
 	vclock_create(&writer->vclock);
 	vclock_copy(&writer->vclock, vclock);
+
+	tt_pthread_mutex_init(&writer->watchers_mutex, NULL);
+	rlist_create(&writer->watchers);
 }
 
 /** Destroy a WAL writer structure. */
@@ -162,6 +167,7 @@ wal_writer_destroy(struct wal_writer *writer)
 	cpipe_destroy(&writer->tx_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
 	fio_batch_delete(writer->batch);
+	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
 /** WAL writer thread routine. */
@@ -468,6 +474,7 @@ wal_writer_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct wal_writer *writer = r->writer;
+	struct wal_watcher *watcher;
 
 	cpipe_create(&writer->wal_pipe);
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
@@ -482,6 +489,13 @@ wal_writer_f(va_list ap)
 
 		wal_write_to_disk(r, writer, &writer->wal_pipe.output,
 				  &commit, &rollback);
+
+		/* notify watchers */
+		tt_pthread_mutex_lock(&writer->watchers_mutex);
+		rlist_foreach_entry(watcher, &writer->watchers, next) {
+			ev_async_send(watcher->loop, watcher->async);
+		}
+		tt_pthread_mutex_unlock(&writer->watchers_mutex);
 
 		cbus_lock(&writer->tx_wal_bus);
 		STAILQ_CONCAT(&writer->tx_pipe.pipe, &commit);
@@ -539,3 +553,39 @@ wal_write(struct recovery *r, struct wal_request *req)
 	return req->res;
 }
 
+int
+wal_register_watcher(
+	struct recovery *recovery,
+	struct wal_watcher *watcher, struct ev_async *async)
+{
+	struct wal_writer *writer;
+
+	if (recovery == NULL || recovery->writer == NULL)
+		return -1;
+
+	writer = recovery->writer;
+
+	watcher->loop = loop();
+	watcher->async = async;
+	tt_pthread_mutex_lock(&writer->watchers_mutex);
+	rlist_add_tail_entry(&writer->watchers, watcher, next);
+	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+	return 0;
+}
+
+void
+wal_unregister_watcher(
+	struct recovery *recovery,
+	struct wal_watcher *watcher)
+{
+	struct wal_writer *writer;
+
+	if (recovery == NULL || recovery->writer == NULL)
+		return;
+
+	writer = recovery->writer;
+
+	tt_pthread_mutex_lock(&writer->watchers_mutex);
+	rlist_del_entry(watcher, next);
+	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+}
