@@ -374,7 +374,7 @@ applier_start(struct applier *applier, struct recovery *r)
 
 	const char *uri = uri_format(&applier->uri);
 	if (applier->io.fd < 0)
-		say_crit("starting appliertion from %s", uri);
+		say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "applier/%s", uri);
 
 	struct fiber *f = fiber_new(name, applier_f);
@@ -430,7 +430,7 @@ applier_new(const char *uri)
 	/* uri_parse() sets pointers to applier->source buffer */
 	snprintf(applier->source, sizeof(applier->source), "%s", uri);
 	int rc = uri_parse(&applier->uri, applier->source);
-	/* URI checked by box_check_appliertion_source() */
+	/* URI checked by box_check_replication_source() */
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 

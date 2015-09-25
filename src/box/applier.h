@@ -108,7 +108,7 @@ void
 applier_stop(struct applier *applier);
 
 /**
- * Wait appliertion client to finish and rethrow exception (if any).
+ * Wait replication client to finish and rethrow exception (if any).
  * Use this function to wait until bootstrap.
  *
  * \post This function keeps a open connection in io->fd.
