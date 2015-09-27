@@ -199,8 +199,8 @@ For more tuple examples see :ref:`box.tuple <box-tuple>`.
 Operations
 ----------
 
-The basic operations are: the four data-change operations
-(insert, update, delete, replace), and the data-retrieval
+The basic operations are: the five data-change operations
+(insert, update, upsert, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like
 “ping” which can only be used with the binary protocol.
 Also, there are :ref:`index iterator <index-iterator>` operations, which can only
@@ -422,7 +422,7 @@ Data manipulation
 -----------------
 
 The basic "data-manipulation" requests are:
-:codenormal:`insert`, :codenormal:`replace`, :codenormal:`update`,
+:codenormal:`insert`, :codenormal:`replace`, :codenormal:`update`, :codenormal:`upsert`,
 :codenormal:`delete`, :codenormal:`select`.
 They all are part of the :codenormal:`box` library.
 They all may return data. Usually both inputs and outputs may be Lua tables.
@@ -495,7 +495,7 @@ no arguments. The packages inside the box library are:
 box.schema, box.tuple, box.space, box.index, net.box, box.cfg, box.info, box.slab, box.stat.
 Every package contains one or more Lua functions. A few packages contain
 members as well as functions. The functions allow data definition (create
-alter drop), data manipulation (insert delete update select replace), and
+alter drop), data manipulation (insert delete update upsert select replace), and
 introspection (inspecting contents of spaces, accessing server configuration).
 
 

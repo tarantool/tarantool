@@ -145,7 +145,7 @@ Here is what might appear in the log file in a typical installation:
 .. function:: box.space.<space-name>:on_replace(trigger-function [, old-trigger-function])
 
     Create a "``replace trigger``". The ``function-name`` will be executed whenever
-    a ``replace()`` or ``insert()`` or ``update()`` or ``delete()`` happens to a
+    a ``replace()`` or ``insert()`` or ``update()`` or ``upsert()`` or ``delete()`` happens to a
     tuple in ``<space-name>``.
 
     :param function trigger-function: function which will become the trigger function

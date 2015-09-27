@@ -5,7 +5,7 @@
 .. module:: box.space
 
 The ``box.space`` package has the data-manipulation functions ``select``,
-``insert``, ``replace``, ``update``, ``delete``, ``get``, ``put``. It also has
+``insert``, ``replace``, ``update``, ``upsert``, ``delete``, ``get``, ``put``. It also has
 members, such as id, and whether or not a space is enabled. Package source code
 is available in file
 `src/box/lua/schema.lua <https://github.com/tarantool/tarantool/blob/master/src/box/lua/schema.lua>`_.
@@ -64,6 +64,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
+
+.. _box_insert:
 
     .. function:: insert(tuple)
 
@@ -233,6 +235,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Example: :codenormal:`tarantool>` :codebold:`box.space.tester:replace{5000, 'New value'}`
 
+.. _box_update:
+
     .. function:: update(key, {{operator, field_no, value}, ...})
 
         Update a tuple.
@@ -357,6 +361,39 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`--    The seventh argument is '!!' because '!!' is to be added at this position.`
         | :codenormal:`--    Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.`
         | :codenormal:`box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})`
+
+
+    .. function:: upsert(key, {{operator, field_no, value}, ...}, {tuple})
+
+        Update or insert a tuple.
+
+        If there is an existing tuple which matches :code:`key`, then the
+        request has the same effect as :ref:`update <box_update>` and the
+        :code:`{{operator, field_no, value}, ...}` parameter is used.
+        If there is no existing tuple which matches :code:`key`, then the
+        request has the same effect as :ref:`insert <box_insert>` and the
+        :code:`{tuple}` parameter is used.
+
+        :param space_object space-object:
+        :param lua-value key: primary-key field values, must be passed as a Lua
+                              table if key is multi-part
+        :param table {operator, field_no, value}: a group of arguments for each
+                operation, indicating what the operation is, what field the
+                operation will apply to, and what value will be applied. The
+                field number can be negative, meaning the position from the
+                end of tuple (#tuple + negative field number + 1).
+
+        :return: the updated or inserted tuple.
+        :rtype:  tuple
+
+        Possible errors: it is illegal to modify a primary-key field.
+
+        Complexity Factors: Index size, Index type, number of indexes accessed, WAL
+        settings.
+
+        | :codebold:`Example:`
+        |
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
 
 
     .. function:: delete(key)
