@@ -424,8 +424,8 @@ Data manipulation
 The basic "data-manipulation" requests are:
 :codenormal:`insert`, :codenormal:`replace`, :codenormal:`update`, :codenormal:`upsert`,
 :codenormal:`delete`, :codenormal:`select`.
-They all are part of the :codenormal:`box` library.
-They all may return data. Usually both inputs and outputs may be Lua tables.
+All of them are part of the :codenormal:`box` library.
+Most of them may return data. Usually both inputs and outputs may be Lua tables.
 
 The Lua syntax for data-manipulation functions can vary.
 Here are examples of the variations with :codenormal:`select` examples;

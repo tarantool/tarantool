@@ -495,9 +495,7 @@ API is a direct binding to corresponding methods of index objects of type
         :param lua-value key: key to be matched against the index key
         :param table {operator, field_no, value}: update opearations (see: func:`box.space...update() <space_object.update>`)
 
-        :return: the updated or inserted tuple.
-        :rtype:  tuple
-
+        :return: null.
 
     .. function:: delete(key)
 

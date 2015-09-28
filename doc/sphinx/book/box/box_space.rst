@@ -372,7 +372,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :code:`{{operator, field_no, value}, ...}` parameter is used.
         If there is no existing tuple which matches :code:`key`, then the
         request has the same effect as :ref:`insert <box_insert>` and the
-        :code:`{tuple}` parameter is used.
+        :code:`{tuple}` parameter is used. However, unlike :code:`insert` or
+        :code:`update`, :code:`upsert` will not read a tuple and perform
+        error checks before returning -- this is a design feature which
+        enhances throughput but requires more caution on the part of the user.
 
         :param space_object space-object:
         :param lua-value key: primary-key field values, must be passed as a Lua
@@ -383,8 +386,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
                 field number can be negative, meaning the position from the
                 end of tuple (#tuple + negative field number + 1).
 
-        :return: the updated or inserted tuple.
-        :rtype:  tuple
+        :return: null.
+
 
         Possible errors: it is illegal to modify a primary-key field.
 
