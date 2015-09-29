@@ -115,20 +115,20 @@ access_check_ddl(uint32_t owner_uid)
  * is_166plus is set as false if tuple structure is 1.6.5-
  */
 static void
-validate_tuple_types_for_key_def(const struct tuple *tuple, bool *is_166plus)
+key_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
 {
 	*is_166plus = true;
 	const mp_type common_template[] = {MP_UINT, MP_UINT, MP_STR, MP_STR};
 	const char *data = tuple->data;
 	uint32_t field_count = mp_decode_array(&data);
-	const char *fields_start = data;
+	const char *field_start = data;
 	if (field_count < 6)
 		goto err;
 	for (size_t i = 0; i < lengthof(common_template); i++) {
-	enum mp_type type = mp_typeof(*data);
-	if (type != common_template[i])
-		goto err;
-	mp_next(&data);
+		enum mp_type type = mp_typeof(*data);
+		if (type != common_template[i])
+			goto err;
+		mp_next(&data);
 	}
 	if (mp_typeof(*data) == MP_UINT) {
 		/* old 1.6.5- version */
@@ -160,41 +160,45 @@ validate_tuple_types_for_key_def(const struct tuple *tuple, bool *is_166plus)
 	return;
 
 err:
-	char got[256];
+	char got[EXCEPTION_ERRMSG_MAX];
 	char *p = got, *e = got + sizeof(got);
-	data = fields_start;
+	data = field_start;
 	for (uint32_t i = 0; i < field_count && p < e; i++) {
 		enum mp_type type = mp_typeof(*data);
 		mp_next(&data);
 		const char *type_name;
 		switch (type) {
 		case MP_UINT:
-			type_name = "NUM";
+			type_name = "number";
 			break;
 		case MP_STR:
-			type_name = "STR";
+			type_name = "string";
 			break;
 		case MP_ARRAY:
-			type_name = "ARR";
+			type_name = "array";
 			break;
 		case MP_MAP:
-			type_name = "MAP";
+			type_name = "map";
 			break;
 		default:
-			type_name = "???";
+			type_name = "unknown";
 			break;
 		}
 		p += snprintf(p, e - p, i ? ", %s" : "%s", type_name);
 	}
-	const char *expect;
-	if (is_166plus)
-		expect = "ID(NUM), IID(NUM), name(STR), type(STR), "
-			 "opts(MAP), parts(ARR)";
-	else
-		expect = "ID(NUM), IID(NUM), name(STR), type(STR), "
-			"is_unique(NUM), part_count(NUM)"
-			"part0_field(NUM), part0_type(STR), ...";
-	tnt_raise(ClientError, ER_WRONG_INDEX_SPACE_RECORD, got, expect);
+	const char *expected;
+	if (is_166plus) {
+		expected = "space id (number), index id (number), "
+			"name (string), type (string), "
+			"options (map), parts (array)";
+	} else {
+		expected = "space id (number), index id (number), "
+			"name (string), type (string), "
+			"is_unique (number), part count (number) "
+			"part0 field no (number), "
+			"part0 field type (string), ...";
+	}
+	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
 }
 
 /**
@@ -217,9 +221,9 @@ key_opts_decode_distance(const char **field)
 		return RTREE_INDEX_DISTANCE_TYPE_MANHATTAN;
 	} else {
 		tnt_raise(ClientError,
-			  ER_WRONG_INDEX_OPTS_DEFINITION,
+			  ER_WRONG_INDEX_OPTIONS,
 			  INDEX_OPTS,
-			  "distance opt must 'euclid' or 'manhattan'");
+			  "distance must be either 'euclid' or 'manhattan'");
 	}
 	return RTREE_INDEX_DISTANCE_TYPE_EUCLID; /* unreachabe */
 }
@@ -231,12 +235,12 @@ key_opts_decode_distance(const char **field)
  * Throw an error is smth is wrong
  */
 static void
-decode_key_opts_from_field(struct key_opts *opts, const char *map)
+key_opts_create_from_field(struct key_opts *opts, const char *map)
 {
 	*opts = key_opts_default;
 	if (mp_typeof(*map) != MP_MAP)
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTS_DEFINITION,
-			  INDEX_OPTS, "expected map with options");
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  INDEX_OPTS, "expected a map with options");
 	uint32_t map_size = mp_decode_map(&map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*map) != MP_STR) {
@@ -247,28 +251,29 @@ decode_key_opts_from_field(struct key_opts *opts, const char *map)
 		const char *key = mp_decode_str(&map, &key_len);
 		if (key_len == strlen("unique") &&
 		    strncasecmp(key, "unique", key_len) == 0) {
-			if (mp_typeof(*map) != MP_BOOL)
+			if (mp_typeof(*map) != MP_BOOL) {
 				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTS_DEFINITION,
+					  ER_WRONG_INDEX_OPTIONS,
 					  INDEX_OPTS,
-					  "unique opt must be a bool");
+					  "unique must be a boolean");
+			}
 			opts->is_unique = mp_decode_bool(&map);
 		} else if (key_len == strlen("dimension") &&
 			   strncasecmp(key, "dimension", key_len) == 0) {
-			if (mp_typeof(*map) != MP_UINT)
+			if (mp_typeof(*map) != MP_UINT) {
 				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTS_DEFINITION,
+					  ER_WRONG_INDEX_OPTIONS,
 					  INDEX_OPTS,
-					  "dimension opt must be "
-						  "an unsigned int");
+					  "dimension must be a number");
+			}
 			opts->dimension = (uint32_t) mp_decode_uint(&map);
 		} else if (key_len == strlen("distance") &&
 			   strncasecmp(key, "distance", key_len) == 0) {
 			if (mp_typeof(*map) != MP_STR)
 				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTS_DEFINITION,
+					  ER_WRONG_INDEX_OPTIONS,
 					  INDEX_OPTS,
-					  "distance opt must be a string");
+					  "distance must be a string");
 			opts->distance = key_opts_decode_distance(&map);
 		} else {
 			mp_next(&map); /* skip value */
@@ -286,28 +291,28 @@ decode_key_opts_from_field(struct key_opts *opts, const char *map)
  *  [NUM, STR, ..][NUM, STR, ..]..,
  */
 static void
-decode_index_part_types_from_field(const char *parts, uint32_t part_count,
-				   struct key_def *key_def)
+key_def_fill_parts(struct key_def *key_def, const char *parts,
+		   uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
 		if (mp_typeof(*parts) != MP_ARRAY)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS_DEFINITION,
-				  INDEX_PARTS, "part is not an array");
+			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
+				  INDEX_PARTS, "expected an array");
 		uint32_t item_count = mp_decode_array(&parts);
 		if (item_count < 1)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS_DEFINITION,
-				  INDEX_PARTS, "part is an empty array");
+			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
+				  INDEX_PARTS, "expected a non-empty array");
 		if (item_count < 2)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS_DEFINITION,
-				  INDEX_PARTS, "type missed in part");
+			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
+				  INDEX_PARTS, "a field type is missing");
 		if (mp_typeof(*parts) != MP_UINT)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS_DEFINITION,
-				  INDEX_PARTS, "field_no is not an integer");
+			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
+				  INDEX_PARTS, "field id must be an integer");
 		uint32_t field_no = (uint32_t) mp_decode_uint(&parts);
 		if (mp_typeof(*parts) != MP_STR)
-			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS_DEFINITION,
-				  INDEX_PARTS, "field_type is not a string");
+			tnt_raise(ClientError, ER_WRONG_INDEX_PARTS,
+				  INDEX_PARTS, "field type must be a string");
 		uint32_t len;
 		const char *str = mp_decode_str(&parts, &len);
 		for (uint32_t j = 2; j < item_count; j++)
@@ -328,8 +333,8 @@ decode_index_part_types_from_field(const char *parts, uint32_t part_count,
  *  NUM, STR, NUM, STR, ..,
  */
 static void
-decode_index_part_types_from_field165(const char *parts, uint32_t part_count,
-				      struct key_def *key_def)
+key_def_fill_parts_165(struct key_def *key_def, const char *parts,
+		       uint32_t part_count)
 {
 	char buf[BOX_NAME_MAX];
 	for (uint32_t i = 0; i < part_count; i++) {
@@ -359,7 +364,7 @@ static struct key_def *
 key_def_new_from_tuple(struct tuple *tuple)
 {
 	bool is_166plus;
-	validate_tuple_types_for_key_def(tuple, &is_166plus);
+	key_def_check_tuple(tuple, &is_166plus);
 
 	struct key_def *key_def;
 	struct key_opts opts;
@@ -373,7 +378,7 @@ key_def_new_from_tuple(struct tuple *tuple)
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
 		const char *opts_field = tuple_field(tuple, INDEX_OPTS);
-		decode_key_opts_from_field(&opts, opts_field);
+		key_opts_create_from_field(&opts, opts_field);
 		parts = tuple_field(tuple, INDEX_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
@@ -390,11 +395,10 @@ key_def_new_from_tuple(struct tuple *tuple)
 
 	if (is_166plus) {
 		/* 1.6.6+ */
-		decode_index_part_types_from_field(parts, part_count, key_def);
+		key_def_fill_parts(key_def, parts, part_count);
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		decode_index_part_types_from_field165(parts, part_count,
-						      key_def);
+		key_def_fill_parts_165(key_def, parts, part_count);
 	}
 	key_def_check(key_def);
 	scoped_guard.is_active = false;

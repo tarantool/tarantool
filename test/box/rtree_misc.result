@@ -557,13 +557,15 @@ empty_map = setmetatable({}, {__serialize = 'map'})
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
 ---
-- error: 'Wrong record in _index space: got [NUM, NUM, STR, STR, ???, ARR], expected
-    [ID(NUM), IID(NUM), name(STR), type(STR), opts(MAP), parts(ARR)]'
+- error: 'Wrong record in _index space: got {number, number, string, string, unknown,
+    array}, expected {space id (number), index id (number), name (string), type (string),
+    options (map), parts (array)}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
 ---
-- error: 'Wrong record in _index space: got [NUM, NUM, STR, STR, ARR, ARR], expected
-    [ID(NUM), IID(NUM), name(STR), type(STR), opts(MAP), parts(ARR)]'
+- error: 'Wrong record in _index space: got {number, number, string, string, array,
+    array}, expected {space id (number), index id (number), name (string), type (string),
+    options (map), parts (array)}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
 ---
@@ -576,8 +578,7 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22},
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4) definition: dimension opt must be an unsigned
-    int'
+- error: 'Wrong index options (field 4): dimension must be a number'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'num'}}}
 ---
@@ -590,13 +591,12 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'time'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}}
 ---
-- error: 'Wrong index parts (field 5) definition: field_no is not an integer; expected
-    [[field0_no(NUM), field0_type(STR), ..][field1_no (NUM), field1_type(STR), ..]..]'
+- error: 'Wrong index parts (field 5): field id must be an integer; expected field1
+    id (number), field1 type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4) definition: distance opt must ''euclid'' or
-    ''manhattan'''
+- error: 'Wrong index options (field 4): distance must be either ''euclid'' or ''manhattan'''
 ...
 box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 ---
@@ -604,8 +604,8 @@ box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 ---
-- error: 'Wrong index parts (field 5) definition: part is an empty array; expected
-    [[field0_no(NUM), field0_type(STR), ..][field1_no (NUM), field1_type(STR), ..]..]'
+- error: 'Wrong index parts (field 5): expected a non-empty array; expected field1
+    id (number), field1 type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
 ---
@@ -613,8 +613,9 @@ box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
 ---
-- error: 'Wrong record in _index space: got [NUM, NUM, STR, STR, NUM, NUM, NUM, STR,
-    STR], expected [ID(NUM), IID(NUM), name(STR), type(STR), opts(MAP), parts(ARR)]'
+- error: 'Wrong record in _index space: got {number, number, string, string, number,
+    number, number, string, string}, expected {space id (number), index id (number),
+    name (string), type (string), options (map), parts (array)}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 ---
