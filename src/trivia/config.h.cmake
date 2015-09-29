@@ -183,6 +183,15 @@
 #cmakedefine HAVE_UUIDGEN 1
 #cmakedefine HAVE_CLOCK_GETTIME 1
 
+/** pthread_np.h - non-portable stuff */
+#cmakedefine HAVE_PTHREAD_NP_H 1
+/** pthread_setname_np(pthread_self(), "") - Linux */
+#cmakedefine HAVE_PTHREAD_SETNAME_NP 1
+/** pthread_setname_np("") - OSX */
+#cmakedefine HAVE_PTHREAD_SETNAME_NP_1 1
+/** pthread_set_name_np(pthread_self(), "") - *BSD */
+#cmakedefine HAVE_PTHREAD_SET_NAME_NP 1
+
 /** \cond public */
 
 /** System configuration dir (e.g /etc) */
