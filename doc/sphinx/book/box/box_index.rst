@@ -484,19 +484,6 @@ API is a direct binding to corresponding methods of index objects of type
         :return: the updated tuple.
         :rtype:  tuple
 
-    .. function:: upsert(key, {{operator, field_no, value}, ...}, {tuple})
-
-        Update or insert a tuple.
-
-        Same as :func:`box.space...upsert() <space_object.upsert>`,
-        but key is searched in this index instead of primary key.
-        This index ought to be unique.
-
-        :param lua-value key: key to be matched against the index key
-        :param table {operator, field_no, value}: update opearations (see: func:`box.space...update() <space_object.update>`)
-
-        :return: null.
-
     .. function:: delete(key)
 
         Delete a tuple identified by a key.
