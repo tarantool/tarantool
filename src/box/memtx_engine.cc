@@ -321,6 +321,19 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL) {
+		/**
+		 * Old tuple was not found. In a "true"
+		 * non-reading-write engine, this is known only
+		 * after commit. Thus any error that can happen
+		 * at this point is ignored. Emulate this by
+		 * suppressing the error. It's logged and ignored.
+		 *
+		 * What sort of exception can happen here:
+		 * - the format of the default tuple is incorrect
+		 *   or not acceptable by this space.
+		 * - we're out of memory for a new tuple.
+		 * - unique key validation failure for the new tuple
+		 */
 		try {
 			struct tuple *new_tuple = tuple_new(space->format,
 							    request->tuple,
@@ -330,11 +343,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			this->replace(txn, space, NULL,
 				      new_tuple, DUP_INSERT);
 		} catch (ClientError *e) {
-			/* suppress error due to upsert spec */
-			say_error("UPSERT operation failed:");
+			say_error("UPSERT failed:");
 			e->log();
-			txn_rollback_stmt();
-			return;
 		}
 	} else {
 		TupleGuard old_guard(old_tuple);
@@ -347,21 +357,19 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 				     request->index_base);
 		TupleGuard guard(new_tuple);
 
+		/** The rest must remain silent. */
 		try {
 			space_validate_tuple(space, new_tuple);
 			this->replace(txn, space, old_tuple, new_tuple,
 				      DUP_REPLACE);
 		} catch (ClientError *e) {
-			/* suppress error due to upsert spec */
-			say_error("UPSERT operation failed:");
+			say_error("UPSERT failed:");
 			e->log();
-			txn_rollback_stmt();
-			return;
 		}
 	}
 
 	txn_commit_stmt(txn);
-	/* Return nothing: upsert does not return data. */
+	/* Return nothing: UPSERT does not return data. */
 }
 
 void

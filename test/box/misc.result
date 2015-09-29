@@ -259,6 +259,7 @@ t;
   - 'box.error.TUPLE_NOT_FOUND : 4'
   - 'box.error.DROP_USER : 44'
   - 'box.error.injection : table: <address>
+  - 'box.error.UPSERT_UNIQUE_SECONDARY_KEY : 105'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.PROTOCOL : 104'
   - 'box.error.REPLICA_MAX : 73'

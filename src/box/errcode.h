@@ -158,6 +158,7 @@ struct errcode_record {
 	/*102 */_(ER_PROC_C,			2, "%s") \
 	/*103 */_(ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE,	2, "Unknown RTREE index distance type %s") \
 	/*104 */_(ER_PROTOCOL,			2, "%s") \
+	/*105 */_(ER_UPSERT_UNIQUE_SECONDARY_KEY, 2, "Space %s has a unique secondary index and does not support UPSERT") \
 
 
 /*
