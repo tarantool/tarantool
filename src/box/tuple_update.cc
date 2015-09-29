@@ -862,7 +862,8 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		args = mp_decode_array(&expr);
 		if (args < 1)
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "expected an update operation (array)");
+				  "expected an update operation"
+				  "non empty array)");
 		if (mp_typeof(*expr) != MP_STR)
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "expected an update operation name (string)");

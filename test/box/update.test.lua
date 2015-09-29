@@ -233,48 +233,4 @@ s:update({0}, {{'+', 2, -0x4000000000000000ll}})  -- ok
 s:replace{0, -0x4000000000000000ll}
 s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 
---UPSERT https://github.com/tarantool/tarantool/issues/905
-s:delete{0}
-s:upsert({0}, {{'+', 2, 2}}) -- wrong usage
-s:select{0}
-s:upsert({0}, {{'+', 2, 2}}, {0, 0})
-s:select{0}
-s:delete{0}
-s:upsert({0}, {{'+', 2, 2}}, {0, 0, 0})
-s:select{0}
-s:delete{0}
-s:upsert({0}, {{'+', 2, 2}}, {0})
-s:select{0}
-s:replace{0, 1, 2, 4}
-s:upsert({0}, {{'+', 2, 2}}, {0, 0, "you will not see it"})
-s:select{0}
-s:replace{0, -0x4000000000000000ll}
-s:upsert({0}, {{'+', 2, -0x4000000000000001ll}}, {0})  -- overflow
-s:select{0}
-s:replace{0, "thing"}
-s:upsert({0}, {{'+', 2, 2}}, {0, "nothing"})
-s:select{0}
-s:delete{0}
-s:upsert({0}, {{'+', 2, 2}}, {0, "thing"})
-s:select{0}
-s:replace{0, 1, 2}
-s:upsert({0}, {{'!', 42, 42}}, {0})
-s:select{0}
-s:upsert({0}, {{'#', 42, 42}}, {0})
-s:select{0}
-s:upsert({0}, {{'=', 42, 42}}, {0})
-s:select{0}
-s:replace{0, 1.5}
-s:upsert({0}, {{'|', 1, 255}}, {0})
-s:select{0}
-s:replace{0, 1.5}
-s:replace{0, 'something to splice'}
-s:upsert({0}, {{':', 2, 1, 4, 'no'}}, {0})
-s:select{0}
-s:upsert({0}, {{':', 2, 1, 2, 'every'}}, {0})
-s:select{0}
-s:upsert({0}, {{':', 2, -100, 2, 'every'}}, {0})
-s:select{0}
-
 s:drop()
-

@@ -65,6 +65,12 @@ struct space {
 	struct space_def def;
 	/** Enable/disable triggers. */
 	bool run_triggers;
+	/**
+	 * True if the space has a unique secondary key.
+	 * UPSERT can't work in presence of unique
+	 * secondary keys.
+	 */
+	bool has_unique_secondary_key;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;

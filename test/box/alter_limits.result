@@ -399,7 +399,7 @@ index = s:create_index('test', { type = 'hash', parts = {}})
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = { 1 }})
 ---
-- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
     pairs'
 ...
 -- unknown field type
@@ -411,7 +411,7 @@ index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 ---
-- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
     pairs'
 ...
 -- big field no

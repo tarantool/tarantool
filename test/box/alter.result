@@ -414,7 +414,7 @@ index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
 ...
 index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
 ---
-- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
     pairs'
 ...
 index = s:create_index('primary', {unique = true, parts = 'bug'})

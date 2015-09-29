@@ -99,20 +99,28 @@ process_rw(struct request *request, struct tuple **result)
 		switch (request->type) {
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
-			tuple = space->handler->executeReplace(txn, space, request);
+			tuple = space->handler->executeReplace(txn, space,
+							       request);
 			break;
 		case IPROTO_UPDATE:
-			tuple = space->handler->executeUpdate(txn, space, request);
+			tuple = space->handler->executeUpdate(txn, space,
+							      request);
 			break;
 		case IPROTO_DELETE:
-			tuple = space->handler->executeDelete(txn, space, request);
+			tuple = space->handler->executeDelete(txn, space,
+							      request);
 			break;
 		case IPROTO_UPSERT:
+			if (space->has_unique_secondary_key) {
+				tnt_raise(ClientError,
+					  ER_UPSERT_UNIQUE_SECONDARY_KEY,
+					  space_name(space));
+			}
 			space->handler->executeUpsert(txn, space, request);
-			/** fall through */
+			tuple = NULL;
+			break;
 		default:
-			 tuple = NULL;
-
+			tuple = NULL;
 		}
 		if (result)
 			*result = tuple;

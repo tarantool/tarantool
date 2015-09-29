@@ -341,12 +341,12 @@ local function check_index_parts(parts)
     end
     if #parts % 2 ~= 0 then
         box.error(box.error.ILLEGAL_PARAMS,
-                  "options.parts: expected filed_no (number), type (string) pairs")
+                  "options.parts: expected field_no (number), type (string) pairs")
     end
     for i=1,#parts,2 do
         if type(parts[i]) ~= "number" then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts: expected filed_no (number), type (string) pairs")
+                      "options.parts: expected field_no (number), type (string) pairs")
         elseif parts[i] == 0 then
             -- Lua uses one-based field numbers but _space is zero-based
             box.error(box.error.ILLEGAL_PARAMS,
@@ -356,7 +356,7 @@ local function check_index_parts(parts)
     for i=2,#parts,2 do
         if type(parts[i]) ~= "string" then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts: expected filed_no (number), type (string) pairs")
+                      "options.parts: expected field_no (number), type (string) pairs")
         end
     end
 end
