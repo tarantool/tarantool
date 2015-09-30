@@ -5,6 +5,9 @@ function (do_pthread_checks)
     if (HAVE_PTHREAD_NP_H)
         set(INCLUDE_MISC_PTHREAD_HEADERS "#include <pthread_np.h>")
     endif ()
+    set(CMAKE_REQUIRED_FLAGS -pedantic-errors)
+    set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE -D_DARWIN_C_SOURCE)
+    set(CMAKE_REQUIRED_LIBRARIES pthread)
     # pthread_setname_np(<thread_id>, <name>) - Linux
     check_c_source_compiles("
         #include <pthread.h>
