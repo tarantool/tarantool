@@ -71,3 +71,5 @@ doc/sphinx/_build/*
 !doc/sphinx/_build/.gitignore
 doc/www/content/doc
 extra/dist/default/tarantool
+extra/com.tarantool.tarantool.plist
+extra/postflight
