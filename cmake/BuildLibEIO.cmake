@@ -8,6 +8,10 @@ macro(libeio_build)
     set(eio_compile_flags "${eio_compile_flags} -Wno-unused-value")
     set(eio_compile_flags "${eio_compile_flags} -DENABLE_BUNDLED_LIBEIO=1")
     set(eio_compile_flags "${eio_compile_flags} -DEIO_STACKSIZE=0")
+    if (TARGET_OS_LINUX)
+        set(eio_compile_flags
+            "${eio_compile_flags} -DHAVE_SYS_PRCTL_H -DHAVE_PRCTL_SET_NAME")
+    endif ()
 
     set(eio_src
         ${PROJECT_SOURCE_DIR}/third_party/tarantool_eio.c
