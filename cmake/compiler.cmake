@@ -77,6 +77,10 @@ check_cxx_source_compiles("int main(void) {
 }" HAVE_OPENMP)
 set(CMAKE_REQUIRED_FLAGS "")
 
+if (NOT HAVE_OPENMP)
+    add_compile_flags("C;CXX" -Wno-unknown-pragmas)
+endif()
+
 #
 # Perform build type specific configuration.
 #
