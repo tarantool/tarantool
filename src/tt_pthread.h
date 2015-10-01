@@ -34,7 +34,11 @@
 #include "trivia/config.h"
 #include "trivia/util.h"
 
+#include <stdio.h>
 #include <pthread.h>
+#if HAVE_PTHREAD_NP_H
+#include <pthread_np.h>
+#endif
 #include "say.h"
 
 /**
@@ -176,5 +180,26 @@
 ({	int e = pthread_join(thread, ret);		\
 	tt_pthread_error(e);				\
 })
+
+/** Set the current thread's name
+ */
+static inline void
+tt_pthread_setname(const char *name)
+{
+	/* Setting the name fails if the name was too long. Linux limits a
+	 * name to 16 bytes (including the trailing NUL), other OS don't
+	 * even bother to document the limit.
+	 */
+	char short_name[16];
+	snprintf(short_name, sizeof name, "%s", name);
+
+#if HAVE_PTHREAD_SETNAME_NP
+	pthread_setname_np(pthread_self(), short_name);
+#elif HAVE_PTHREAD_SETNAME_NP_1
+	pthread_setname_np(short_name);
+#elif HAVE_PTHREAD_SET_NAME_NP
+	pthread_set_name_np(pthread_self(), short_name);
+#endif
+}
 
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */

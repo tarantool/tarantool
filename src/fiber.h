@@ -263,14 +263,8 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
 int
 cord_join(struct cord *cord);
 
-static inline void
-cord_set_name(const char *name)
-{
-	snprintf(cord()->name, FIBER_NAME_MAX, "%s", name);
-}
-
 void
-cord_destroy(struct cord *cord);
+cord_set_name(const char *name);
 
 /** True if this cord represents the process main thread. */
 bool
