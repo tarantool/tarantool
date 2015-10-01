@@ -43,8 +43,6 @@ extern "C" {
 
 static const char channel_lib[]   = "fiber.channel";
 
-#define BROADCAST_MASK	(((size_t)1) << (CHAR_BIT * sizeof(size_t) - 1))
-
 /******************** channel ***************************/
 
 static int
@@ -180,35 +178,8 @@ lbox_ipc_channel_get(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	if (vref & BROADCAST_MASK) {
-		vref &= ~BROADCAST_MASK;
-		lua_rawgeti(L, LUA_REGISTRYINDEX, vref);
-		return 1;
-	}
 	lua_rawgeti(L, LUA_REGISTRYINDEX, vref);
 	luaL_unref(L, LUA_REGISTRYINDEX, vref);
-	return 1;
-}
-
-static int
-lbox_ipc_channel_broadcast(struct lua_State *L)
-{
-	struct ipc_channel *ch;
-
-	if (lua_gettop(L) != 2)
-		luaL_error(L, "usage: channel:broadcast(variable)");
-
-	ch = lbox_check_channel(L, 1);
-
-	if (!ipc_channel_has_readers(ch))
-		return lbox_ipc_channel_put(L);
-
-
-	lua_pushvalue(L, 2);
-	size_t vref = luaL_ref(L, LUA_REGISTRYINDEX);
-	int count = ipc_channel_broadcast(ch, (void *)(vref | BROADCAST_MASK));
-	luaL_unref(L, LUA_REGISTRYINDEX, vref);
-	lua_pushnumber(L, count);
 	return 1;
 }
 
@@ -267,7 +238,6 @@ lbox_ipc_channel_close(struct lua_State *L)
 		/* Never yields because channel is not empty */
 		size_t vref = (size_t)ipc_channel_get_timeout(ch, 0);
 		assert(vref);
-		assert((vref & BROADCAST_MASK) == 0);
 		/* Unref lua items */
 		luaL_unref(L, LUA_REGISTRYINDEX, vref);
 	}
@@ -298,7 +268,6 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"is_empty",	lbox_ipc_channel_is_empty},
 		{"put",		lbox_ipc_channel_put},
 		{"get",		lbox_ipc_channel_get},
-		{"broadcast",	lbox_ipc_channel_broadcast},
 		{"has_readers",	lbox_ipc_channel_has_readers},
 		{"has_writers",	lbox_ipc_channel_has_writers},
 		{"count",	lbox_ipc_channel_count},

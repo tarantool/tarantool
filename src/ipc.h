@@ -49,14 +49,12 @@ struct ipc_channel {
 	 * the channel is full.
 	 */
 	struct rlist writers;
-	struct fiber *bcast;		/* broadcast waiter */
 	struct fiber *close;		/* close waiter */
 	bool readonly;			/* channel is read only */
 	bool closed;			/* channel is closed */
 	unsigned size;
 	unsigned beg;
 	unsigned count;
-	void *bcast_msg;
 	void *item[0];
 };
 
@@ -97,16 +95,6 @@ ipc_channel_new(unsigned size);
  */
 void
 ipc_channel_delete(struct ipc_channel *ch);
-
-/**
- * @brief Wake up all fibers that sleep in ipc_channel_get and
- * send a message to them.
- * @param channel
- * @param data
- * @return count of fibers to which the message was delivered
- */
-int
-ipc_channel_broadcast(struct ipc_channel *ch, void *data);
 
 /**
  * @brief check if channel is empty

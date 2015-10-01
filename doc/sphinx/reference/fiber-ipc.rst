@@ -21,7 +21,7 @@ other Lua object. Use object-oriented syntax, for example
     Create a new communication channel.
 
     :param int capacity: positive integer as great as the maximum number of
-                         slots (spaces for get or put or broadcast messages)
+                         slots (spaces for get or put messages)
                          that might be pending at any given time.
 
     :return: new channel.
@@ -54,16 +54,8 @@ other Lua object. Use object-oriented syntax, for example
 
         :param timeout:
         :return: the value placed on the channel by an earlier
-                ``channel:put()`` or ``channel:broadcast()``.
+                ``channel:put()``
         :rtype:  lua_object
-
-    .. method:: broadcast(message)
-
-        If the channel is empty, ``channel:broadcast()`` is equivalent to
-        ``channel:put()``. Otherwise, ``channel:broadcast()`` sends the
-        message to all readers of the channel.
-
-        :param message:
 
     .. method:: is_empty()
 

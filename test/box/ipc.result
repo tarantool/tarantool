@@ -52,7 +52,7 @@ ch:put(234)
 ---
 - true
 ...
-ch:put(345, .5)
+ch:put(345, .1)
 ---
 - false
 ...
@@ -174,18 +174,6 @@ ch:is_empty()
 ---
 - true
 ...
-ch:broadcast()
----
-- error: 'usage: channel:broadcast(variable)'
-...
-ch:broadcast(123)
----
-- true
-...
-ch:get()
----
-- 123
-...
 ch:is_full()
 ---
 - false
@@ -251,10 +239,6 @@ ch:put(5)
 ---
 - true
 ...
-ch:broadcast('broadcast message!')
----
-- 2
-...
 t = {}
 ---
 ...
@@ -287,10 +271,6 @@ buffer
     - '4'
   - - tfbr
     - '5'
-  - - tfbr2
-    - broadcast message!
-  - - tfbr
-    - broadcast message!
   - - tfbr2
     - '35'
   - - tfbr
