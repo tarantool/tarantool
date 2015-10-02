@@ -3,13 +3,14 @@
 -------------------------------------------------------------------------------
                              Building Documentation
 -------------------------------------------------------------------------------
-After building and testing your local instance of Tarantool, you can build a local version of this documentation to contribute to it. 
 
-Documentation is based on python-based Sphinx generator. So, make sure to install all python modules indicated in the BUILDING FROM SOURCE (http://tarantool.org/doc/dev_guide/building_from_source.html) section of this documentation. The procedure below implies that you already took those steps and successfully tested your instance of Tarantool.
+After building and testing your local instance of Tarantool, you can build a local version of this documentation and contribute to it. 
+
+Documentation is based on the python-based Sphinx generator. So, make sure to install all python modules indicated in the BUILDING FROM SOURCE (http://tarantool.org/doc/dev_guide/building_from_source.html) section of this documentation. The procedure below implies that you already took those steps and successfully tested your instance of Tarantool.
 
  1. Build a local version of the existing documentation package.
 
-Run the following set of commands (the example below shows the set for Ubuntu OS, but the precedure is similar for other supported OS's):
+Run the following set of commands (the example below is based on Ubuntu OS, but the precedure is similar for other supported OS's):
 
    .. code-block:: bash
 
@@ -21,7 +22,7 @@ Documentation is created and stored at DOC/WWW/OUTPUT.
 
  2. Set up a web-server. 
 
-Note that if your Tarantool Database runs on a Virtual machine, you need to make sure that your host and client machines operate in the same network, i.e. to configure port forwarding. If you use Oracle VM VirtualBox, follow the guidelines below:
+Note that if your Tarantool Database runs on a Virtual machine, you need to make sure that your host and client machines operate in the same network, i.e., to configure port forwarding. If you use Oracle VM VirtualBox, follow the guidelines below:
 
    * To create a network, navigate to **Network > Advanced > Port Forwarding** in your VirtualBox instance menu.
    * Enable the **Cable connected** checkbox.
@@ -29,7 +30,7 @@ Note that if your Tarantool Database runs on a Virtual machine, you need to make
    * Set Host and Guest Ports to ``8000``, Host IP to ``127.0.0.1`` and Guest IP to ``10.0.2.15``. Make sure to check the IP of your VB instance, it must be 10.0.2.15 (``ifconfig`` command)
    * Save your settings
 
-Run the following command to set up a web-server (the example below is based on Ubuntu, but the procedure is similar for other supported OS's). Make sure to run it from the documentation output folder, as specified below:
+If all the prerequisites are met, run the following command to set up a web-server (the example below is based on Ubuntu, but the procedure is similar for other supported OS's). Make sure to run it from the documentation output folder, as specified below:
 
    .. code-block:: bash
 
@@ -42,7 +43,7 @@ To contribute to documentation, use the ``.rst`` format for drafting and submit 
 
 To comply with the writing and formatting style, use guidelines provided in the documentation, common sense and existing documents. 
 
-Note that if you suggest creating a new documentation section (i.e. a whole new page), it has to be saved to the relevant section at GitHub.
+Note that if you suggest creating a new documentation section (i.e., a whole new page), it has to be saved to the relevant section at GitHub.
 
  * Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx.
  * Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx/dev_guide. 
