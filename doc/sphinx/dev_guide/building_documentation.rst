@@ -18,7 +18,7 @@ Run the following set of commands (the example below is based on Ubuntu OS, but 
     cmake -DENABLE_DOC=TRUE
     make -C doc
 
-Documentation is created and stored at DOC/WWW/OUTPUT.
+Documentation is created and stored at ``doc/www/output``.
 
 2. Set up a web-server. 
 
