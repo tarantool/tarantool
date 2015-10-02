@@ -24,11 +24,11 @@ Documentation is created and stored at DOC/WWW/OUTPUT.
 
 Note that if your Tarantool Database runs on a Virtual machine, you need to make sure that your host and client machines operate in the same network, i.e., to configure port forwarding. If you use Oracle VM VirtualBox, follow the guidelines below:
 
-   * To create a network, navigate to **Network > Advanced > Port Forwarding** in your VirtualBox instance menu.
-   * Enable the **Cable connected** checkbox.
-   * Click the **Port Forwarding** button.
-   * Set Host and Guest Ports to ``8000``, Host IP to ``127.0.0.1`` and Guest IP to ``10.0.2.15``. Make sure to check the IP of your VB instance, it must be 10.0.2.15 (``ifconfig`` command)
-   * Save your settings
+  * To create a network, navigate to **Network > Advanced > Port Forwarding** in your VirtualBox instance menu.
+  * Enable the **Cable connected** checkbox.
+  * Click the **Port Forwarding** button.
+  * Set Host and Guest Ports to ``8000``, Host IP to ``127.0.0.1`` and Guest IP to ``10.0.2.15``. Make sure to check the IP of your VB instance, it must be 10.0.2.15 (``ifconfig`` command)
+  * Save your settings
 
 If all the prerequisites are met, run the following command to set up a web-server (the example below is based on Ubuntu, but the procedure is similar for other supported OS's). Make sure to run it from the documentation output folder, as specified below:
 
@@ -45,5 +45,5 @@ To comply with the writing and formatting style, use guidelines provided in the 
 
 Note that if you suggest creating a new documentation section (i.e., a whole new page), it has to be saved to the relevant section at GitHub. So, please indicate your suggestions in the Pull Request comment. 
 
- * Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx.
- * Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx/dev_guide. 
+* Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx.
+* Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx/dev_guide. 
