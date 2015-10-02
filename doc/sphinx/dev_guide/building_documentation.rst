@@ -8,7 +8,7 @@ After building and testing your local instance of Tarantool, you can build a loc
 
 Documentation is based on the python-based Sphinx generator. So, make sure to install all python modules indicated in the BUILDING FROM SOURCE (http://tarantool.org/doc/dev_guide/building_from_source.html) section of this documentation. The procedure below implies that you already took those steps and successfully tested your instance of Tarantool.
 
- 1. Build a local version of the existing documentation package.
+1. Build a local version of the existing documentation package.
 
 Run the following set of commands (the example below is based on Ubuntu OS, but the precedure is similar for other supported OS's):
 
@@ -20,7 +20,7 @@ Run the following set of commands (the example below is based on Ubuntu OS, but 
 
 Documentation is created and stored at DOC/WWW/OUTPUT.
 
- 2. Set up a web-server. 
+2. Set up a web-server. 
 
 Note that if your Tarantool Database runs on a Virtual machine, you need to make sure that your host and client machines operate in the same network, i.e., to configure port forwarding. If you use Oracle VM VirtualBox, follow the guidelines below:
 
