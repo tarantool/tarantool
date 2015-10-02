@@ -43,5 +43,6 @@ To contribute to documentation, use the ``.rst`` format for drafting and submit 
 To comply with the writing and formatting style, use guidelines provided in the documentation, common sense and existing documents. 
 
 Note that if you suggest creating a new documentation section (i.e. a whole new page), it has to be saved to the relevant section at GitHub.
+
  * Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx.
  * Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx/dev_guide. 
