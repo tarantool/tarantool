@@ -75,4 +75,5 @@ TODO: maybe work around 3.996gb barrier in pread/pwrite as well, maybe readahead
           (cygwin) provides them for a while now.
         - provide pread/pwrite implementations for win32.
         - implement aio_realpath for windows.
+        - add EIO_FALLOC_FL_COLLAPSE_RANGE anbd EIO_FALLOC_FL_ZERO_RANGE.
 

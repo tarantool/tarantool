@@ -193,3 +193,15 @@ int main (void)
 ])],ac_cv_linux_splice=yes,ac_cv_linux_splice=no)])
 test $ac_cv_linux_splice = yes && AC_DEFINE(HAVE_LINUX_SPLICE, 1, splice/vmsplice/tee(2) are available)
 
+AC_CACHE_CHECK(for pipe2, ac_cv_pipe2, [AC_LINK_IFELSE([AC_LANG_SOURCE([[
+#include <fcntl.h>
+#include <unistd.h>
+int res;
+int main (void)
+{
+   res = pipe2 (0, 0);
+   return 0;
+}
+]])],ac_cv_pipe2=yes,ac_cv_pipe2=no)])
+test $ac_cv_pipe2 = yes && AC_DEFINE(HAVE_PIPE2, 1, pipe2(2) is available)
+

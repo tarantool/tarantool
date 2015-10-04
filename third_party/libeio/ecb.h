@@ -76,8 +76,11 @@
   #endif
 #endif
 
+#define ECB_GCC_AMD64 (__amd64 || __amd64__ || __x86_64 || __x86_64__)
+#define ECB_MSVC_AMD64 (_M_AMD64 || _M_X64)
+
 /* work around x32 idiocy by defining proper macros */
-#if __amd64 || __x86_64 || _M_AMD64 || _M_X64
+#if ECB_GCC_AMD64 || ECB_MSVC_AMD64
   #if _ILP32
     #define ECB_AMD64_X32 1
   #else
@@ -149,13 +152,18 @@
   #define ECB_MEMORY_FENCE do { } while (0)
 #endif
 
+/* http://www-01.ibm.com/support/knowledgecenter/SSGH3R_13.1.0/com.ibm.xlcpp131.aix.doc/compiler_ref/compiler_builtins.html */
+#if __xlC__ && ECB_CPP
+  #include <builtins.h>
+#endif
+
 #ifndef ECB_MEMORY_FENCE
   #if ECB_GCC_VERSION(2,5) || defined __INTEL_COMPILER || (__llvm__ && __GNUC__) || __SUNPRO_C >= 0x5110 || __SUNPRO_CC >= 0x5110
     #if __i386 || __i386__
       #define ECB_MEMORY_FENCE         __asm__ __volatile__ ("lock; orb $0, -1(%%esp)" : : : "memory")
       #define ECB_MEMORY_FENCE_ACQUIRE __asm__ __volatile__ (""                        : : : "memory")
       #define ECB_MEMORY_FENCE_RELEASE __asm__ __volatile__ ("")
-    #elif __amd64 || __amd64__ || __x86_64 || __x86_64__
+    #elif ECB_GCC_AMD64
       #define ECB_MEMORY_FENCE         __asm__ __volatile__ ("mfence"   : : : "memory")
       #define ECB_MEMORY_FENCE_ACQUIRE __asm__ __volatile__ (""         : : : "memory")
       #define ECB_MEMORY_FENCE_RELEASE __asm__ __volatile__ ("")
@@ -169,7 +177,7 @@
       #define ECB_MEMORY_FENCE         __asm__ __volatile__ ("dmb"      : : : "memory")
     #elif __aarch64__
       #define ECB_MEMORY_FENCE         __asm__ __volatile__ ("dmb ish"  : : : "memory")
-    #elif (__sparc || __sparc__) && !__sparcv8
+    #elif (__sparc || __sparc__) && !(__sparc_v8__ || defined __sparcv8)
       #define ECB_MEMORY_FENCE         __asm__ __volatile__ ("membar #LoadStore | #LoadLoad | #StoreStore | #StoreLoad" : : : "memory")
       #define ECB_MEMORY_FENCE_ACQUIRE __asm__ __volatile__ ("membar #LoadStore | #LoadLoad"                            : : : "memory")
       #define ECB_MEMORY_FENCE_RELEASE __asm__ __volatile__ ("membar #LoadStore             | #StoreStore")
@@ -304,6 +312,7 @@ typedef int ecb_bool;
 #define ECB_CONCAT(a, b) ECB_CONCAT_(a, b)
 #define ECB_STRINGIFY_(a) # a
 #define ECB_STRINGIFY(a) ECB_STRINGIFY_(a)
+#define ECB_STRINGIFY_EXPR(expr) ((expr), ECB_STRINGIFY_ (expr))
 
 #define ecb_function_ ecb_inline
 
@@ -350,15 +359,32 @@ typedef int ecb_bool;
   #define ecb_deprecated ecb_attribute ((__deprecated__))
 #endif
 
-#define ecb_noinline   ecb_attribute ((__noinline__))
+#if _MSC_VER >= 1500
+  #define ecb_deprecated_message(msg) __declspec (deprecated (msg))
+#elif ECB_GCC_VERSION(4,5)
+  #define ecb_deprecated_message(msg) ecb_attribute ((__deprecated__ (msg))
+#else
+  #define ecb_deprecated_message(msg) ecb_deprecated
+#endif
+
+#if _MSC_VER >= 1400
+  #define ecb_noinline __declspec (noinline)
+#else
+  #define ecb_noinline ecb_attribute ((__noinline__))
+#endif
+
 #define ecb_unused     ecb_attribute ((__unused__))
 #define ecb_const      ecb_attribute ((__const__))
 #define ecb_pure       ecb_attribute ((__pure__))
 
-/* TODO http://msdn.microsoft.com/en-us/library/k6ktzx3s.aspx __declspec(noreturn) */
 #if ECB_C11 || __IBMC_NORETURN
-  /* http://pic.dhe.ibm.com/infocenter/compbg/v121v141/topic/com.ibm.xlcpp121.bg.doc/language_ref/noreturn.html */
+  /* http://www-01.ibm.com/support/knowledgecenter/SSGH3R_13.1.0/com.ibm.xlcpp131.aix.doc/language_ref/noreturn.html */
   #define ecb_noreturn   _Noreturn
+#elif ECB_CPP11
+  #define ecb_noreturn   [[noreturn]]
+#elif _MSC_VER >= 1200
+  /* http://msdn.microsoft.com/en-us/library/k6ktzx3s.aspx */
+  #define ecb_noreturn   __declspec (noreturn)
 #else
   #define ecb_noreturn   ecb_attribute ((__noreturn__))
 #endif
@@ -528,9 +554,18 @@ ecb_inline ecb_const uint64_t ecb_rotl64 (uint64_t x, unsigned int count) { retu
 ecb_inline ecb_const uint64_t ecb_rotr64 (uint64_t x, unsigned int count) { return (x << (64 - count)) | (x >> count); }
 
 #if ECB_GCC_VERSION(4,3) || (ECB_CLANG_BUILTIN(__builtin_bswap32) && ECB_CLANG_BUILTIN(__builtin_bswap64))
+  #if ECB_GCC_VERSION(4,8) || ECB_CLANG_BUILTIN(__builtin_bswap16)
+  #define ecb_bswap16(x)  __builtin_bswap16 (x)
+  #else
   #define ecb_bswap16(x) (__builtin_bswap32 (x) >> 16)
+  #endif
   #define ecb_bswap32(x)  __builtin_bswap32 (x)
   #define ecb_bswap64(x)  __builtin_bswap64 (x)
+#elif _MSC_VER
+  #include <stdlib.h>
+  #define ecb_bswap16(x) ((uint16_t)_byteswap_ushort ((uint16_t)(x)))
+  #define ecb_bswap32(x) ((uint32_t)_byteswap_ulong  ((uint32_t)(x)))
+  #define ecb_bswap64(x) ((uint64_t)_byteswap_uint64 ((uint64_t)(x)))
 #else
   ecb_function_ ecb_const uint16_t ecb_bswap16 (uint16_t x);
   ecb_function_ ecb_const uint16_t
@@ -575,7 +610,7 @@ ecb_byteorder_helper (void)
   /* the reason why we have this horrible preprocessor mess */
   /* is to avoid it in all cases, at least on common architectures */
   /* or when using a recent enough gcc version (>= 4.6) */
-#if __i386 || __i386__ || _M_X86 || __amd64 || __amd64__ || _M_X64
+#if ((__i386 || __i386__) && !__VOS__) || _M_IX86 || ECB_GCC_AMD64 || ECB_MSVC_AMD64
   return 0x44;
 #elif __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   return 0x44;
@@ -636,7 +671,7 @@ ecb_inline ecb_const ecb_bool ecb_little_endian (void) { return ecb_byteorder_he
 /* the only noteworthy exception is ancient armle, which uses order 43218765 */
 #if 0 \
     || __i386 || __i386__ \
-    || __amd64 || __amd64__ || __x86_64 || __x86_64__ \
+    || ECB_GCC_AMD64 \
     || __powerpc__ || __ppc__ || __powerpc64__ || __ppc64__ \
     || defined __s390__ || defined __s390x__ \
     || defined __mips__ \
@@ -646,7 +681,7 @@ ecb_inline ecb_const ecb_bool ecb_little_endian (void) { return ecb_byteorder_he
     || defined __m68k__ \
     || defined __m88k__ \
     || defined __sh__ \
-    || defined _M_IX86 || defined _M_AMD64 || defined _M_IA64 \
+    || defined _M_IX86 || defined ECB_MSVC_AMD64 || defined _M_IA64 \
     || (defined __arm__ && (defined __ARM_EABI__ || defined __EABI__ || defined __VFP_FP__ || defined _WIN32_WCE || defined __ANDROID__)) \
     || defined __aarch64__
   #define ECB_STDFP 1
@@ -674,8 +709,10 @@ ecb_inline ecb_const ecb_bool ecb_little_endian (void) { return ecb_byteorder_he
 
   #if ECB_C99 || _XOPEN_VERSION >= 600 || _POSIX_VERSION >= 200112L
     #define ecb_ldexpf(x,e) ldexpf ((x), (e))
+    #define ecb_frexpf(x,e) frexpf ((x), (e))
   #else
-    #define ecb_ldexpf(x,e) (float) ldexp ((x), (e))
+    #define ecb_ldexpf(x,e) (float) ldexp ((double) (x), (e))
+    #define ecb_frexpf(x,e) (float) frexp ((double) (x), (e))
   #endif
 
   /* converts an ieee half/binary16 to a float */
@@ -714,7 +751,7 @@ ecb_inline ecb_const ecb_bool ecb_little_endian (void) { return ecb_byteorder_he
       if (x < -3.40282346638528860e+38f) return 0xff800000U;
       if (x != x                       ) return 0x7fbfffffU;
 
-      m = frexpf (x, &e) * 0x1000000U;
+      m = ecb_frexpf (x, &e) * 0x1000000U;
 
       r = m & 0x80000000U;
 

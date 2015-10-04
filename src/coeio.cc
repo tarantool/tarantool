@@ -98,6 +98,11 @@ coeio_want_poll_cb(void)
 	ev_async_send(coeio_manager.loop, &coeio_manager.coeio_async);
 }
 
+static void
+coeio_done_poll_cb(void)
+{
+}
+
 /**
  * Init coeio subsystem.
  *
@@ -106,7 +111,7 @@ coeio_want_poll_cb(void)
 void
 coeio_init(void)
 {
-	eio_init(coeio_want_poll_cb, NULL);
+	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
 	coeio_manager.loop = loop();
 
 	ev_idle_init(&coeio_manager.coeio_idle, coeio_idle_cb);

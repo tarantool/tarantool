@@ -1,15 +1,15 @@
-/Changes/1.53/Tue Apr  7 16:19:34 2015//
-/LICENSE/1.1/Tue Nov 18 10:15:55 2014//
-/Makefile.am/1.4/Tue Apr  7 16:19:34 2015//
-/autogen.sh/1.4/Tue Nov 18 10:15:55 2014//
-/configure.ac/1.10/Tue Nov 18 10:15:55 2014//
-/demo.c/1.4/Tue Nov 18 10:15:55 2014//
-/ecb.h/1.23/Tue Apr  7 16:19:34 2015//
-/eio.3/1.1/Tue Nov 18 10:15:55 2014//
-/eio.c/1.132/Result of merge//
-/eio.h/1.54/Tue Apr  7 16:19:34 2015//
-/eio.pod/1.35/Tue Apr  7 16:19:34 2015//
-/libeio.m4/1.22/Tue Nov 18 10:15:55 2014//
-/xthread.h/1.17/Result of merge//
-/etp.c/1.2/Mon Aug 18 04:26:03 2014//
+/Changes/1.54/Sun Oct  4 10:44:32 2015//
+/LICENSE/1.1/Mon Aug 17 17:43:15 2015//
+/Makefile.am/1.4/Mon Aug 17 17:43:15 2015//
+/autogen.sh/1.4/Mon Aug 17 17:43:15 2015//
+/configure.ac/1.10/Mon Aug 17 17:43:15 2015//
+/demo.c/1.4/Mon Aug 17 17:43:15 2015//
+/ecb.h/1.26/Sun Oct  4 10:44:32 2015//
+/eio.3/1.1/Mon Aug 17 17:43:15 2015//
+/eio.c/1.139/Sun Oct  4 10:44:32 2015//
+/eio.h/1.56/Sun Oct  4 10:44:32 2015//
+/eio.pod/1.35/Mon Aug 17 17:43:15 2015//
+/etp.c/1.10/Sun Oct  4 10:44:32 2015//
+/libeio.m4/1.23/Sun Oct  4 10:44:32 2015//
+/xthread.h/1.18/Sun Oct  4 10:44:32 2015//
 D

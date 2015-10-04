@@ -121,6 +121,7 @@ static void eio_destroy (eio_req *req);
   #define chmod(path,mode)     _chmod (path, mode)
   #define dup(fd)              _dup (fd)
   #define dup2(fd1,fd2)        _dup2 (fd1, fd2)
+  #define pipe(fds)            _pipe (fds, 4096, O_BINARY)
 
   #define fchmod(fd,mode)      EIO_ENOSYS ()
   #define chown(path,uid,gid)  EIO_ENOSYS ()
@@ -336,25 +337,7 @@ static void eio_destroy (eio_req *req);
 
 /*****************************************************************************/
 
-struct tmpbuf
-{
-  void *ptr;
-  int len;
-};
-
-static void *
-tmpbuf_get (struct tmpbuf *buf, int len)
-{
-  if (buf->len < len)
-    {
-      free (buf->ptr);
-      buf->ptr = malloc (buf->len = len);
-    }
-
-  return buf->ptr;
-}
-
-struct tmpbuf;
+struct etp_tmpbuf;
 
 #if _POSIX_VERSION >= 200809L
   #define HAVE_AT 1
@@ -364,7 +347,7 @@ struct tmpbuf;
   #endif
 #else
   #define HAVE_AT 0
-  static const char *wd_expand (struct tmpbuf *tmpbuf, eio_wd wd, const char *path);
+  static const char *wd_expand (struct etp_tmpbuf *tmpbuf, eio_wd wd, const char *path);
 #endif
 
 struct eio_pwd
@@ -384,8 +367,14 @@ struct eio_pwd
 #define ETP_TYPE_QUIT -1
 #define ETP_TYPE_GROUP EIO_GROUP
 
-struct etp_worker;
+static void eio_nop_callback (void) { }
+static void (*eio_want_poll_cb)(void) = eio_nop_callback;
+static void (*eio_done_poll_cb)(void) = eio_nop_callback;
 
+#define ETP_WANT_POLL(pool) eio_want_poll_cb ()
+#define ETP_DONE_POLL(pool) eio_done_poll_cb ()
+
+struct etp_worker;
 #define ETP_REQ eio_req
 #define ETP_DESTROY(req) eio_destroy (req)
 static int eio_finish (eio_req *req);
@@ -395,6 +384,9 @@ static void eio_execute (struct etp_worker *self, eio_req *req);
 
 #include "etp.c"
 
+static struct etp_pool eio_pool;
+#define EIO_POOL (&eio_pool)
+
 /*****************************************************************************/
 
 static void
@@ -402,12 +394,12 @@ grp_try_feed (eio_req *grp)
 {
   while (grp->size < grp->int2 && !EIO_CANCELLED (grp))
     {
-      grp->flags &= ~EIO_FLAG_GROUPADD;
+      grp->flags &= ~ETP_FLAG_GROUPADD;
 
       EIO_FEED (grp);
 
       /* stop if no progress has been made */
-      if (!(grp->flags & EIO_FLAG_GROUPADD))
+      if (!(grp->flags & ETP_FLAG_GROUPADD))
         {
           grp->feed = 0;
           break;
@@ -424,7 +416,7 @@ grp_dec (eio_req *grp)
   grp_try_feed (grp);
 
   /* finish, if done */
-  if (!grp->size && grp->int1)
+  if (!grp->size && grp->flags & ETP_FLAG_DELAYED)
     return eio_finish (grp);
   else
     return 0;
@@ -470,84 +462,84 @@ eio_finish (eio_req *req)
 void
 eio_grp_cancel (eio_req *grp)
 {
-  etp_grp_cancel (grp);
+  etp_grp_cancel (EIO_POOL, grp);
 }
 
 void
 eio_cancel (eio_req *req)
 {
-  etp_cancel (req);
+  etp_cancel (EIO_POOL, req);
 }
 
 void
 eio_submit (eio_req *req)
 {
-  etp_submit (req);
+  etp_submit (EIO_POOL, req);
 }
 
 unsigned int
 eio_nreqs (void)
 {
-  return etp_nreqs ();
+  return etp_nreqs (EIO_POOL);
 }
 
 unsigned int
 eio_nready (void)
 {
-  return etp_nready ();
+  return etp_nready (EIO_POOL);
 }
 
 unsigned int
 eio_npending (void)
 {
-  return etp_npending ();
+  return etp_npending (EIO_POOL);
 }
 
 unsigned int ecb_cold
 eio_nthreads (void)
 {
-  return etp_nthreads ();
+  return etp_nthreads (EIO_POOL);
 }
 
 void ecb_cold
 eio_set_max_poll_time (double nseconds)
 {
-  etp_set_max_poll_time (nseconds);
+  etp_set_max_poll_time (EIO_POOL, nseconds);
 }
 
 void ecb_cold
 eio_set_max_poll_reqs (unsigned int maxreqs)
 {
-  etp_set_max_poll_reqs (maxreqs);
+  etp_set_max_poll_reqs (EIO_POOL, maxreqs);
 }
 
 void ecb_cold
 eio_set_max_idle (unsigned int nthreads)
 {
-  etp_set_max_idle (nthreads);
+  etp_set_max_idle (EIO_POOL, nthreads);
 }
 
 void ecb_cold
 eio_set_idle_timeout (unsigned int seconds)
 {
-  etp_set_idle_timeout (seconds);
+  etp_set_idle_timeout (EIO_POOL, seconds);
 }
 
 void ecb_cold
 eio_set_min_parallel (unsigned int nthreads)
 {
-  etp_set_min_parallel (nthreads);
+  etp_set_min_parallel (EIO_POOL, nthreads);
 }
 
 void ecb_cold
 eio_set_max_parallel (unsigned int nthreads)
 {
-  etp_set_max_parallel (nthreads);
+  etp_set_max_parallel (EIO_POOL, nthreads);
 }
 
 int eio_poll (void)
 {
-  return etp_poll ();
+  return etp_poll (EIO_POOL);
 }
 
 /*****************************************************************************/
@@ -967,7 +959,7 @@ eio__lseek (eio_req *req)
 
 /* result will always end up in tmpbuf, there is always space for adding a 0-byte */
 static int
-eio__realpath (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
+eio__realpath (struct etp_tmpbuf *tmpbuf, eio_wd wd, const char *path)
 {
   char *res;
   const char *rel = path;
@@ -986,7 +978,7 @@ eio__realpath (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
   if (!*rel)
     return -1;
 
-  res  = tmpbuf_get (tmpbuf, PATH_MAX * 3);
+  res = etp_tmpbuf_get (tmpbuf, PATH_MAX * 3);
 #ifdef _WIN32
   if (_access (rel, 4) != 0)
     return -1;
@@ -1605,7 +1597,7 @@ eio__scandir (eio_req *req, etp_worker *self)
 /* a bit like realpath, but usually faster because it doesn'T have to return */
 /* an absolute or canonical path */
 static const char *
-wd_expand (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
+wd_expand (struct etp_tmpbuf *tmpbuf, eio_wd wd, const char *path)
 {
   if (!wd || *path == '/')
     return path;
@@ -1617,7 +1609,7 @@ wd_expand (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
     int l1 = wd->len;
     int l2 = strlen (path);
 
-    char *res = tmpbuf_get (tmpbuf, l1 + l2 + 2);
+    char *res = etp_tmpbuf_get (tmpbuf, l1 + l2 + 2);
 
     memcpy (res, wd->str, l1);
     res [l1] = '/';
@@ -1630,7 +1622,7 @@ wd_expand (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
 #endif
 
 static eio_wd
-eio__wd_open_sync (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
+eio__wd_open_sync (struct etp_tmpbuf *tmpbuf, eio_wd wd, const char *path)
 {
   int fd;
   eio_wd res;
@@ -1662,7 +1654,7 @@ eio__wd_open_sync (struct tmpbuf *tmpbuf, eio_wd wd, const char *path)
 eio_wd
 eio_wd_open_sync (eio_wd wd, const char *path)
 {
-  struct tmpbuf tmpbuf = { 0 };
+  struct etp_tmpbuf tmpbuf = { };
   wd = eio__wd_open_sync (&tmpbuf, wd, path);
   free (tmpbuf.ptr);
 
@@ -1721,9 +1713,9 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 #define ALLOC(len)				\
   if (!req->ptr2)				\
     {						\
-      X_LOCK (wrklock);				\
+      X_LOCK (EIO_POOL->wrklock);		\
       req->flags |= EIO_FLAG_PTR2_FREE;		\
-      X_UNLOCK (wrklock);			\
+      X_UNLOCK (EIO_POOL->wrklock);		\
       req->ptr2 = malloc (len);			\
       if (!req->ptr2)				\
         {					\
@@ -1733,112 +1725,15 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
         }					\
     }
 
-static void ecb_noinline ecb_cold
-etp_proc_init (void)
-{
-#if HAVE_PRCTL_SET_NAME
-  /* provide a more sensible "thread name" */
-  char name[16 + 1];
-  const int namelen = sizeof (name) - 1;
-  int len;
-
-  prctl (PR_GET_NAME, (unsigned long)name, 0, 0, 0);
-  name [namelen] = 0;
-  len = strlen (name);
-  strcpy (name + (len <= namelen - 4 ? len : namelen - 4), "/eio");
-  prctl (PR_SET_NAME, (unsigned long)name, 0, 0, 0);
-#endif
-}
-
-/* TODO: move somehow to etp.c */
-X_THREAD_PROC (etp_proc)
-{
-  ETP_REQ *req;
-  struct timespec ts;
-  etp_worker *self = (etp_worker *)thr_arg;
-
-  etp_proc_init ();
-
-  /* try to distribute timeouts somewhat evenly */
-  ts.tv_nsec = ((unsigned long)self & 1023UL) * (1000000000UL / 1024UL);
-
-  for (;;)
-    {
-      ts.tv_sec = 0;
-
-      X_LOCK (reqlock);
-
-      for (;;)
-        {
-          req = reqq_shift (&req_queue);
-
-          if (req)
-            break;
-
-          if (ts.tv_sec == 1) /* no request, but timeout detected, let's quit */
-            {
-              X_UNLOCK (reqlock);
-              X_LOCK (wrklock);
-              --started;
-              X_UNLOCK (wrklock);
-              goto quit;
-            }
-
-          ++idle;
-
-          if (idle <= max_idle)
-            /* we are allowed to idle, so do so without any timeout */
-            X_COND_WAIT (reqwait, reqlock);
-          else
-            {
-              /* initialise timeout once */
-              if (!ts.tv_sec)
-                ts.tv_sec = time (0) + idle_timeout;
-
-              if (X_COND_TIMEDWAIT (reqwait, reqlock, ts) == ETIMEDOUT)
-                ts.tv_sec = 1; /* assuming this is not a value computed above.,.. */
-            }
-
-          --idle;
-        }
-
-      --nready;
-
-      X_UNLOCK (reqlock);
-     
-      if (req->type == ETP_TYPE_QUIT)
-        goto quit;
-
-      ETP_EXECUTE (self, req);
-
-      X_LOCK (reslock);
-
-      ++npending;
-
-      if (!reqq_push (&res_queue, req) && want_poll_cb)
-        want_poll_cb ();
-
-      etp_worker_clear (self);
-
-      X_UNLOCK (reslock);
-    }
-
-quit:
-  free (req);
-
-  X_LOCK (wrklock);
-  etp_worker_free (self);
-  X_UNLOCK (wrklock);
-
-  return 0;
-}
-
 /*****************************************************************************/
 
 int ecb_cold
 eio_init (void (*want_poll)(void), void (*done_poll)(void))
 {
-  return etp_init (want_poll, done_poll);
+  eio_want_poll_cb = want_poll;
+  eio_done_poll_cb = done_poll;
+
+  return etp_init (EIO_POOL, 0, 0, 0);
 }
 
 ecb_inline void
@@ -2073,8 +1968,10 @@ eio_execute (etp_worker *self, eio_req *req)
 #endif
         break;
 
+#if 0
       case EIO_GROUP:
         abort (); /* handled in eio_request */
+#endif
 
       case EIO_NOP:
         req->result = 0;
@@ -2384,7 +2281,7 @@ eio_grp_add (eio_req *grp, eio_req *req)
 {
   assert (("cannot add requests to IO::AIO::GRP after the group finished", grp->int1 != 2));
 
-  grp->flags |= EIO_FLAG_GROUPADD;
+  grp->flags |= ETP_FLAG_GROUPADD;
 
   ++grp->size;
   req->grp = grp;
