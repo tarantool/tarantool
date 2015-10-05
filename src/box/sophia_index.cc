@@ -652,7 +652,24 @@ sophia_iterator_next(struct iterator *ptr)
 			return NULL;
 		}
 	}
+	/* try to read next key from cache */
+	sp_setint(it->current, "async", 0);
+	sp_setint(it->current, "cache_only", 1);
+	sp_setint(it->current, "immutable", 1);
 	void *obj = sp_get(it->cursor, it->current);
+	sp_setint(it->current, "async", 1);
+	sp_setint(it->current, "cache_only", 0);
+	sp_setint(it->current, "immutable", 0);
+	/* key found in cache */
+	if (obj) {
+		sp_destroy(it->current);
+		it->current = obj;
+		return (struct tuple *)
+			sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
+	}
+
+	/* retry search, but use disk this time */
+	obj = sp_get(it->cursor, it->current);
 	it->current = NULL;
 	if (obj == NULL)
 		return NULL;
@@ -749,8 +766,11 @@ SophiaIndex::initIterator(struct iterator *ptr,
 		sophia_error(env);
 	void *obj = ((SophiaIndex *)this)->createObject(key, true, &it->keyend);
 	sp_setstring(obj, "order", compare, 0);
-	/* position first key here, since key pointer might be
-	 * unavailable from lua */
+	/* Position first key here, since key pointer might be
+	 * unavailable from lua.
+	 *
+	 * Read from disk and fill cursor cache.
+	 */
 	obj = sp_get(it->cursor, obj);
 	if (obj == NULL) {
 		sp_destroy(it->cursor);
