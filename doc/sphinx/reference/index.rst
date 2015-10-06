@@ -25,5 +25,6 @@
     expirationd
     shard
     tarantool
+    jit
     capi
 
