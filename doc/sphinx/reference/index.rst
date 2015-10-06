@@ -26,5 +26,6 @@
     shard
     tarantool
     jit
+    strict
     capi
 

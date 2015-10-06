@@ -16,7 +16,7 @@ different parameters when building from source. The section about binaries is
 For development, you will want to download a source package and make the binary
 by yourself using a C/C++ compiler and common tools. Although this is a bit harder,
 it gives more control. And the source packages include additional files, for example
-the Tarantool test suite. The section about source is “:ref:`building-from-source` ”.
+the Tarantool test suite. The section about source is “:ref:`building-from-source`”.
 
 If the installation has already been done, then you should try it out. So we've
 provided some instructions that you can use to make a temporary “sandbox”. In a

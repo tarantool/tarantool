@@ -103,7 +103,7 @@ The possible options are: |br|
 :codenormal:`host =` :codeitalic:`host-name` -- string, default value = 'localhost' |br|
 :codenormal:`port =` :codeitalic:`port-number` -- number, default value = 3306 |br|
 :codenormal:`user =` :codeitalic:`user-name` -- string, default value = operating-system user name |br|
-:codenormal:`password =` :codeitalic:`password` or :codenormal:`pass =` :codeitalic:`password` -- string, default value = blank |br|
+:codenormal:`password =` :codeitalic:`password` -- string, default value = blank |br|
 :codenormal:`db =` :codeitalic:`database-name` -- string, default value = blank |br|
 The names are similar to the names that MySQL's mysql client uses, for details
 see the MySQL manual at `dev.mysql.com/doc/refman/5.6/en/connecting.html`_.
