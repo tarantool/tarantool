@@ -91,7 +91,16 @@ int
 cfg_getarr_size(const char *name)
 {
 	cfg_get(name);
-	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
+	if (lua_isnil(tarantool_L, -1)) {
+		/* missing value is equal to empty array */
+		lua_pop(tarantool_L, 1);
+		return 0;
+	} else if (!lua_istable(tarantool_L, -1)) {
+		/* scalars are handled like an array with one element */
+		lua_pop(tarantool_L, 1);
+		return 1;
+	}
+
 	int result = luaL_getn(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
 	return result;
@@ -101,10 +110,16 @@ const char *
 cfg_getarr_elem(const char *name, int i)
 {
 	cfg_get(name);
-	luaL_checktype(tarantool_L, -1, LUA_TTABLE);
+	if (!lua_istable(tarantool_L, -1)) {
+		/* scalars are handled like an array with one element */
+		assert(i == 0 && !lua_isnil(tarantool_L, -1));
+		const char *val = cfg_tostring(tarantool_L);
+		lua_pop(tarantool_L, 1);
+		return val;
+	}
+
 	lua_rawgeti(tarantool_L, -1, i + 1);
 	const char *val = cfg_tostring(tarantool_L);
 	lua_pop(tarantool_L, 2);
 	return val;
 }
-

@@ -67,6 +67,7 @@ struct applier {
 	enum applier_state state;
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
+	bool cfg_merge_flag; /* used by box_set_replication_source */
 	uint32_t id;
 	char source[APPLIER_SOURCE_MAXLEN];
 	rb_node(struct applier) link; /* a set by source in cluster.cc */
