@@ -126,7 +126,7 @@ coeio_init(void)
 void
 coeio_reinit(void)
 {
-	eio_init(coeio_want_poll_cb, NULL);
+	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
 }
 
 static void
