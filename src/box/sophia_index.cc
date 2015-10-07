@@ -214,7 +214,7 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	sp_setstring(env, path, (const void *)key_def, 0);
 	/* db.compression */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.compression"));
+	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
 	sp_setint(env, path, cfg_geti("sophia.compression_key"));

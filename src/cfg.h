@@ -30,12 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 int
 cfg_geti(const char *param);
+
+int64_t
+cfg_geti64(const char *param);
 
 const char *
 cfg_gets(const char *param);

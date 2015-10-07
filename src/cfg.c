@@ -54,6 +54,15 @@ cfg_geti(const char *param)
 	return val;
 }
 
+int64_t
+cfg_geti64(const char *param)
+{
+	cfg_get(param);
+	int64_t val = luaL_toint64(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return val;
+}
+
 /* Support simultaneous cfg_gets("str1") and cfg_gets("str2") */
 static const char *
 cfg_tostring(struct lua_State *L)

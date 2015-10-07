@@ -298,7 +298,7 @@ SophiaEngine::init()
 	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
 	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
-	sp_setint(env, "memory.limit", cfg_geti("sophia.memory_limit"));
+	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
 	sp_setint(env, "compaction.node_size", cfg_geti("sophia.node_size"));
 	sp_setint(env, "compaction.page_size", cfg_geti("sophia.page_size"));
 	sp_setint(env, "compaction.0.async", 1);
