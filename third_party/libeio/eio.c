@@ -1727,27 +1727,13 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 
 /*****************************************************************************/
 
-static void
-eio_want_poll(void *unused)
-{
-  (void)unused;
-  eio_want_poll_cb();
-}
-
-static void
-eio_done_poll(void *unused)
-{
-  (void)unused;
-  eio_done_poll_cb();
-}
-
 int ecb_cold
 eio_init (void (*want_poll)(void), void (*done_poll)(void))
 {
   eio_want_poll_cb = want_poll;
   eio_done_poll_cb = done_poll;
 
-  return etp_init (EIO_POOL, 0, eio_want_poll, eio_done_poll);
+  return etp_init (EIO_POOL, 0, 0, 0);
 }
 
 ecb_inline void
