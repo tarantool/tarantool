@@ -16,7 +16,7 @@ get a connection object, which will be called ``conn`` for examples in this sect
 Call the other ``net.box()`` routines, passing ``conn:``, to execute requests on
 the remote box. Call :func:`conn:close <socket_object.close>` to disconnect.
 
-All `net.box`` methods are fiber-safe, that is, it is safe to share and use the
+All ``net.box`` methods are fiber-safe, that is, it is safe to share and use the
 same connection object across multiple concurrent fibers. In fact, it's perhaps
 the best programming practice with Tarantool. When multiple fibers use the same
 connection, all requests are pipelined through the same network socket, but each
