@@ -49,6 +49,7 @@ extern "C" {
 #include <lualib.h>
 }
 
+#include <coio.h>
 #include <coeio.h>
 #include <fiber.h>
 #include <scoped_guard.h>
@@ -379,21 +380,6 @@ bsdsocket_nonblock(int fh, int mode)
 	return mode ? 1 : 0;
 }
 
-struct bsdsocket_io_wdata {
-	struct fiber *fiber;
-	int io;
-};
-
-static void
-bsdsocket_io(struct ev_loop *loop, ev_io *watcher, int revents)
-{
-	(void) loop;
-	struct bsdsocket_io_wdata *wdata =
-		(struct bsdsocket_io_wdata *)watcher->data;
-	wdata->io = revents;
-	fiber_wakeup(wdata->fiber);
-}
-
 static int
 lbox_bsdsocket_iowait(struct lua_State *L)
 {
@@ -401,35 +387,7 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 	int events = lua_tointeger(L, 2);
 	ev_tstamp timeout = lua_tonumber(L, 3);
 
-	switch (events) {
-	case 0:
-		events = EV_READ;
-		break;
-	case 1:
-		events = EV_WRITE;
-		break;
-	case 2:
-		events = EV_READ | EV_WRITE;
-		break;
-	default:
-		assert(false);
-	}
-
-	struct ev_io io;
-	ev_io_init(&io, bsdsocket_io, fh, events);
-	struct bsdsocket_io_wdata wdata = { fiber(), 0 };
-	io.data = &wdata;
-	ev_set_priority(&io, EV_MAXPRI);
-	ev_io_start(loop(), &io);
-
-	fiber_yield_timeout(timeout);
-	ev_io_stop(loop(), &io);
-
-	int ret = 0;
-	if (wdata.io & EV_READ)
-		ret |= 1;
-	if (wdata.io & EV_WRITE)
-		ret |= 2;
+	int ret = coio_wait(fh, events, timeout);
 
 	lua_pushinteger(L, ret);
 	return 1;

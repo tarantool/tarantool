@@ -705,3 +705,42 @@ coio_waitpid(pid_t pid)
 	return status;
 }
 
+/* Values of COIO_READ(WRITE) must equal to EV_READ(WRITE) */
+static_assert(COIO_READ == (int) EV_READ, "TNT_IO_READ");
+static_assert(COIO_WRITE == (int) EV_WRITE, "TNT_IO_WRITE");
+
+struct coio_wdata {
+	struct fiber *fiber;
+	int revents;
+};
+
+static void
+coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
+{
+	(void) loop;
+	struct coio_wdata *wdata = (struct coio_wdata *) watcher->data;
+	wdata->revents = revents;
+	fiber_call(wdata->fiber);
+}
+
+int
+coio_wait(int fd, int events, double timeout)
+{
+	struct ev_io io;
+	coio_init(&io, fd);
+	ev_io_init(&io, coio_wait_cb, fd, events);
+	struct coio_wdata wdata = {
+		/* .fiber =   */ fiber(),
+		/* .revents = */ 0
+	};
+	io.data = &wdata;
+
+	/* A special hack to work with zero timeout */
+	ev_set_priority(&io, EV_MAXPRI);
+	ev_io_start(loop(), &io);
+
+	fiber_yield_timeout(timeout);
+
+	ev_io_stop(loop(), &io);
+	return wdata.revents;
+}

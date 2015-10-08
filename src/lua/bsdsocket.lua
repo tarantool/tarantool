@@ -270,20 +270,20 @@ local function wait_safely(self, what, timeout)
     self.waiters[fid] = true
     local res = internal.iowait(fd, what, timeout)
     self.waiters[fid] = nil
-    fiber.testcancel()
     if res == 0 then
         self._errno = boxerrno.ETIMEDOUT
         return 0
     end
+    fiber.testcancel()
     return res
 end
 
 socket_methods.readable = function(self, timeout)
-    return wait_safely(self, 0, timeout) ~= 0
+    return wait_safely(self, 1, timeout) ~= 0
 end
 
 socket_methods.wait = function(self, timeout)
-    local wres = wait_safely(self, 2, timeout)
+    local wres = wait_safely(self, 3, timeout)
     local res = ''
     if bit.band(wres, 1) ~= 0 then
         res = res .. 'R'
@@ -295,7 +295,7 @@ socket_methods.wait = function(self, timeout)
 end
 
 socket_methods.writable = function(self, timeout)
-    return wait_safely(self, 1, timeout) ~= 0
+    return wait_safely(self, 2, timeout) ~= 0
 end
 
 socket_methods.listen = function(self, backlog)
