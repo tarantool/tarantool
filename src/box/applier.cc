@@ -130,7 +130,10 @@ applier_connect(struct applier *applier)
 
 	applier->version_id = greeting.version_id;
 
-	say_info("connected to %s at %s\r\n", greeting.version,
+	say_info("connected to %u.%u.%u at %s\r\n",
+		 version_id_major(greeting.version_id),
+		 version_id_minor(greeting.version_id),
+		 version_id_patch(greeting.version_id),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/* Don't display previous error messages in box.info.replication */

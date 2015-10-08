@@ -63,6 +63,13 @@ add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc
     ${CMAKE_SOURCE_DIR}/src/rmean.cc)
 target_link_libraries(vclock.test core small)
+add_executable(xrow.test xrow.cc unit.c
+    ${CMAKE_SOURCE_DIR}/src/box/xrow.cc
+    ${CMAKE_SOURCE_DIR}/src/box/vclock.c
+    ${CMAKE_SOURCE_DIR}/src/box/iproto_constants.c
+    ${CMAKE_SOURCE_DIR}/src/box/errcode.c
+    ${CMAKE_SOURCE_DIR}/src/box/error.cc)
+target_link_libraries(xrow.test server misc msgpuck)
 add_executable(quota.test quota.cc unit.c)
 target_link_libraries(quota.test pthread)
 

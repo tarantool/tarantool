@@ -236,4 +236,22 @@ version_id(unsigned major, unsigned minor, unsigned patch)
 	return (((major << 8) | minor) << 8) | patch;
 }
 
+static inline unsigned
+version_id_major(uint32_t version_id)
+{
+	return (version_id >> 16) & 0xff;
+}
+
+static inline unsigned
+version_id_minor(uint32_t version_id)
+{
+	return (version_id >> 8) & 0xff;
+}
+
+static inline unsigned
+version_id_patch(uint32_t version_id)
+{
+	return version_id & 0xff;
+}
+
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

@@ -57,8 +57,6 @@ local CONSOLE_DELIMITER = "$EOF$"
 
 ffi.cdef [[
 enum {
-    /* Maximal length of version in handshake */
-    GREETING_VERSION_LEN_MAX = 20,
     /* Maximal length of protocol name in handshake */
     GREETING_PROTOCOL_LEN_MAX = 32,
     /* Maximal length of salt in handshake */
@@ -68,8 +66,8 @@ enum {
 struct greeting {
     uint32_t version_id;
     uint32_t salt_len;
-    char version[GREETING_VERSION_LEN_MAX + 1];
     char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
+    struct tt_uuid uuid;
     char salt[GREETING_SALT_LEN_MAX];
 };
 
@@ -668,7 +666,6 @@ local remote_methods = {
                         self:_fatal("Can't decode handshake")
                     elseif builtin.strcmp(greeting.protocol, 'Lua console') == 0 then
                         self.version_id = greeting.version_id
-                        self.version = ffi.string(greeting.version)
                         -- enable self:console() method
                         self.console = self._console
                         self._check_response = self._check_console_response
@@ -687,7 +684,6 @@ local remote_methods = {
                         self:_switch_state('active')
                     elseif builtin.strcmp(greeting.protocol, 'Binary') == 0 then
                         self.version_id = greeting.version_id
-                        self.version = ffi.string(greeting.version)
                         self.salt = ffi.string(greeting.salt, greeting.salt_len)
                         self.console = nil
                         self._check_response = self._check_binary_response
