@@ -183,7 +183,11 @@ box_check_uri(const char *source, const char *option_name)
 static void
 box_check_replication_source(void)
 {
-	box_check_uri(cfg_gets("replication_source"), "replication_source");
+	int count = cfg_getarr_size("replication_source");
+	for (int i = 0; i < count; i++) {
+		const char *source = cfg_getarr_elem("replication_source", i);
+		box_check_uri(source, "replication_source");
+	}
 }
 
 static enum wal_mode
@@ -228,6 +232,44 @@ box_check_config()
 	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
+/*
+ * Sync box.cfg.replication_source and cluster registry.
+ */
+static void
+box_sync_replication_source(void)
+{
+	/* Reset cfg_merge_flag for all replicas */
+	cluster_foreach_applier(applier) {
+		applier->cfg_merge_flag = false;
+	}
+
+	/* Add new replicas and set cfg_merge_flag for existing */
+	int count = cfg_getarr_size("replication_source");
+	for (int i = 0; i < count; i++) {
+		const char *source = cfg_getarr_elem("replication_source", i);
+		/* Try to find applier with the same source in the registry */
+		struct applier *applier = cluster_find_applier(source);
+		if (applier == NULL) {
+			/* Start new applier using specified source */
+			applier = applier_new(source); /* may throw */
+			cluster_add_applier(applier);
+		}
+		applier->cfg_merge_flag = true;
+	}
+
+	/* Remove replicas without cfg_merge_flag */
+	struct applier *applier = cluster_applier_first();
+	while (applier != NULL) {
+		struct applier *next = cluster_applier_next(applier);
+		if (!applier->cfg_merge_flag) {
+			applier_stop(applier); /* cancels a background fiber */
+			cluster_del_applier(applier);
+			applier_delete(applier);
+		}
+		applier = next;
+	}
+}
+
 extern "C" void
 box_set_replication_source(void)
 {
@@ -240,25 +282,19 @@ box_set_replication_source(void)
 		return;
 	}
 
-	const char *source = cfg_gets("replication_source");
+	box_sync_replication_source();
 
-	/* This hook is only invoked if source has changed */
-	struct applier *applier = cluster_applier_first();
-	while (applier != NULL) {
-		struct applier *next = cluster_applier_next(applier);
-		applier_stop(applier); /* cancels a background fiber */
-		cluster_del_applier(applier);
-		applier_delete(applier);
-		applier = next; /* safe iteration with cluster_del_applier */
+	/* Start all replicas from the cluster registry */
+	cluster_foreach_applier(applier) {
+		if (applier->reader == NULL) {
+			applier_start(applier, recovery);
+		} else if (applier->state == APPLIER_OFF ||
+			   applier->state == APPLIER_STOPPED) {
+			/* Re-start faulted replicas */
+			applier_stop(applier);
+			applier_start(applier, recovery);
+		}
 	}
-
-	if (source == NULL)
-		return;
-
-	/* Start a new replication client using provided URI */
-	applier = applier_new(source);
-	cluster_add_applier(applier);
-	applier_start(applier, recovery); /* starts a background fiber */
 }
 
 extern "C" void
@@ -267,6 +303,29 @@ box_set_listen(void)
 	const char *uri = cfg_gets("listen");
 	box_check_uri(uri, "listen");
 	iproto_set_listen(uri);
+}
+
+/**
+ * Check if (host, port) in box.cfg.listen is equal to (host, port) in uri.
+ * Used to determine that an uri from box.cfg.replication_source is
+ * actually points to the same address as box.cfg.listen.
+ */
+static bool
+box_cfg_listen_eq(struct uri *what)
+{
+	const char *listen = cfg_gets("listen");
+	if (listen == NULL)
+		return false;
+
+	struct uri uri;
+	int rc = uri_parse(&uri, listen);
+	assert(rc == 0 && uri.service);
+	(void) rc;
+
+	return (uri.service_len == what->service_len &&
+		uri.host_len == what->host_len &&
+		memcmp(uri.service, what->service, uri.service_len) == 0 &&
+		memcmp(uri.host, what->host, uri.host_len) == 0);
 }
 
 extern "C" void
@@ -737,18 +796,21 @@ box_init(void)
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
-	const char *source = cfg_gets("replication_source");
-	if (source != NULL) {
-		struct applier *applier = applier_new(source);
-		cluster_add_applier(applier);
-	}
+
+	/*
+	 * Initialize the cluster registry using replication_source,
+	 * but don't start replication right now.
+	 */
+	box_sync_replication_source();
+	/* Use the first replica by URI as a bootstrap leader */
+	struct applier *applier = cluster_applier_first();
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (source != NULL) {
+	} else if (applier != NULL && !box_cfg_listen_eq(&applier->uri)) {
 		/* Generate Server-UUID */
 		tt_uuid_create(&recovery->server_uuid);
 
@@ -759,7 +821,6 @@ box_init(void)
 		vclock_add_server(&recovery->vclock, 0);
 
 		/* Bootstrap from the first master */
-		struct applier *applier = cluster_applier_first();
 		applier_start(applier, recovery);
 		applier_wait(applier); /* throws on failure */
 
@@ -797,11 +858,8 @@ box_init(void)
 
 	rmean_cleanup(rmean_box);
 
-	cluster_foreach_applier(applier) {
-		/* Follow replica */
-		assert(recovery->writer);
-		applier_start(applier, recovery);
-	}
+	/* Follow replica */
+	box_set_replication_source();
 
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
