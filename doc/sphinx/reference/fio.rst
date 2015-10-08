@@ -2,6 +2,8 @@
                                    Package `fio`
 -------------------------------------------------------------------------------
 
+.. _fio-section:
+
 Tarantool supports file input/output with an API that is similar to POSIX
 syscalls. All operations are performed asynchronously. Multiple fibers can
 access the same file simultaneously.

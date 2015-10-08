@@ -27,5 +27,6 @@
     tarantool
     jit
     strict
+    csv
     capi
 
