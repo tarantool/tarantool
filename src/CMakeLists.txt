@@ -120,7 +120,7 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
-target_link_libraries(server core)
+target_link_libraries(server core bit)
 
 set (common_libraries server core misc bitset msgpuck csv)
 

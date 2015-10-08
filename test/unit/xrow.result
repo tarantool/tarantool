@@ -1,0 +1,43 @@
+1..1
+    1..40
+    ok 1 - round trip
+    ok 2 - roundtrip.version_id
+    ok 3 - roundtrip.protocol
+    ok 4 - roundtrip.uuid
+    ok 5 - roundtrip.salt_len
+    ok 6 - roundtrip.salt
+    ok 7 - decode iproto
+    ok 8 - iproto.version_id
+    ok 9 - iproto.protocol
+    ok 10 - iproto.uuid
+    ok 11 - iproto.salt_len
+    ok 12 - iproto.salt
+    ok 13 - decode lua
+    ok 14 - lua.version_id
+    ok 15 - lua.protocol
+    ok 16 - lua.uuid
+    ok 17 - lua.salt_len
+    ok 18 - decode iproto166
+    ok 19 - iproto166.version_id
+    ok 20 - iproto166.protocol
+    ok 21 - iproto166.uuid
+    ok 22 - iproto166.salt_len
+    ok 23 - iproto166.salt
+    ok 24 - decode lua166
+    ok 25 - lua166.version_id
+    ok 26 - lua166.protocol
+    ok 27 - lua166.uuid
+    ok 28 - lua166.salt_len
+    ok 29 - invalid 0
+    ok 30 - invalid 1
+    ok 31 - invalid 2
+    ok 32 - invalid 3
+    ok 33 - invalid 4
+    ok 34 - invalid 5
+    ok 35 - invalid 6
+    ok 36 - invalid 7
+    ok 37 - invalid 8
+    ok 38 - invalid 9
+    ok 39 - invalid 10
+    ok 40 - invalid 11
+ok 1 - subtests

@@ -31,7 +31,6 @@
 #include "xrow.h"
 #include "msgpuck/msgpuck.h"
 #include "fiber.h"
-#include "tt_uuid.h"
 #include "vclock.h"
 #include "scramble.h"
 #include "third_party/base64.h"
@@ -406,18 +405,24 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 }
 
 void
-greeting_encode(char *greetingbuf, const char *version, const char *salt,
-		uint32_t salt_len)
+greeting_encode(char *greetingbuf, uint32_t version_id, const tt_uuid *uuid,
+		const char *salt, uint32_t salt_len)
 {
 	int h = IPROTO_GREETING_SIZE / 2;
-	int r = snprintf(greetingbuf, h + 1, "Tarantool %s (Binary)", version);
-	assert(r < h);
-	memset(greetingbuf + r, ' ', IPROTO_GREETING_SIZE - r - 1);
+	int r = snprintf(greetingbuf, h + 1, "Tarantool %u.%u.%u (Binary) ",
+		version_id_major(version_id), version_id_minor(version_id),
+		version_id_patch(version_id));
+
+	assert(r + UUID_STR_LEN < h);
+	tt_uuid_to_string(uuid, greetingbuf + r);
+	r += UUID_STR_LEN;
+	memset(greetingbuf + r, ' ', h - r - 1);
 	greetingbuf[h - 1] = '\n';
 
-	assert(base64_bufsize(salt_len) < h);
+	assert(base64_bufsize(salt_len) + 1 < h);
 	r = base64_encode(salt, salt_len, greetingbuf + h, h - 1);
 	assert(r < h);
+	memset(greetingbuf + h + r, ' ', h - r - 1);
 	greetingbuf[IPROTO_GREETING_SIZE - 1] = '\n';
 }
 
@@ -429,23 +434,25 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	    greetingbuf[IPROTO_GREETING_SIZE / 2 - 1] != '\n' ||
 	    greetingbuf[IPROTO_GREETING_SIZE - 1] != '\n')
 		return -1;
+	memset(greeting, 0, sizeof(*greeting));
 	int h = IPROTO_GREETING_SIZE / 2;
 	const char *pos = greetingbuf + strlen("Tarantool ");
 	const char *end = greetingbuf + h;
 	for (; pos < end && *pos == ' '; ++pos); /* skip spaces */
 
 	/* Extract a version string - a string until ' ' */
+	char version[20];
 	const char *vend = (const char *) memchr(pos, ' ', end - pos);
-	if (vend == NULL || (vend - pos) > GREETING_VERSION_LEN_MAX)
+	if (vend == NULL || (vend - pos) >= sizeof(version))
 		return -1;
-	memcpy(greeting->version, pos, vend - pos);
-	greeting->version[vend - pos] = '\0';
+	memcpy(version, pos, vend - pos);
+	version[vend - pos] = '\0';
 	pos = vend + 1;
 	for (; pos < end && *pos == ' '; ++pos); /* skip spaces */
 
-	/* Parse a version string - 1.6.7-83-gc6b2129 */
+	/* Parse a version string - 1.6.6-83-gc6b2129 or 1.6.7 */
 	unsigned major, minor, patch;
-	if (sscanf(greeting->version, "%u.%u.%u", &major, &minor, &patch) != 3)
+	if (sscanf(version, "%u.%u.%u", &major, &minor, &patch) != 3)
 		return -1;
 	greeting->version_id = version_id(major, minor, patch);
 
@@ -460,6 +467,16 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 		/* Parse protocol name - Binary or  Lua console. */
 		if (strcmp(greeting->protocol, "Binary") != 0)
 			return 0;
+
+		if (greeting->version_id >= version_id(1, 6, 7)) {
+			if (*(pos++) != ' ')
+				return -1;
+			for (; pos < end && *pos == ' '; ++pos); /* spaces */
+			if (end - pos < UUID_STR_LEN)
+				return -1;
+			if (tt_uuid_from_strl(pos, UUID_STR_LEN, &greeting->uuid))
+				return -1;
+		}
 	} else if (greeting->version_id < version_id(1, 6, 7)) {
 		/* Tarantool < 1.6.7 doesn't add "(Binary)" to greeting */
 		strcpy(greeting->protocol, "Binary");
