@@ -223,6 +223,7 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 			}
 			break;
 		case CSV_NEWFIELD:
+			csv->bufp = csv->buf;
 			csv->state = CSV_LEADING_SPACES;
 			if (is_line_end) {
 				csv->bufp = 0;
