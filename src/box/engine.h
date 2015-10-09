@@ -48,12 +48,15 @@ typedef void
 (*engine_replace_f)(struct txn *txn, struct space *,
 		    struct tuple *, struct tuple *, enum dup_replace_mode);
 
-struct Handler;
+class Handler;
 
 /** Engine instance */
-class Engine: public Object {
+class Engine {
 public:
 	Engine(const char *engine_name);
+
+	Engine(const Engine &) = delete;
+	Engine& operator=(const Engine&) = delete;
 	virtual ~Engine() {}
 	/** Called once at startup. */
 	virtual void init();
@@ -175,10 +178,12 @@ public:
 
 /** Engine handle - an operator of a space */
 
-struct Handler: public Object {
+class Handler {
 public:
 	Handler(Engine *f);
 	virtual ~Handler() {}
+	Handler(const Handler &) = delete;
+	Handler& operator=(const Handler&) = delete;
 
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *,

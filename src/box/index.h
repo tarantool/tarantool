@@ -33,7 +33,6 @@
 #include <stdbool.h>
 #include "trivia/util.h"
 
-#include "object.h"
 #include "key_def.h"
 
 /** \cond public */
@@ -180,7 +179,7 @@ enum dup_replace_mode {
 	DUP_REPLACE
 };
 
-class Index: public Object {
+class Index {
 public:
 	/* Description of a possibly multipart key. */
 	struct key_def *key_def;
@@ -197,6 +196,9 @@ protected:
 
 public:
 	virtual ~Index();
+
+	Index(const Index &) = delete;
+	Index& operator=(const Index&) = delete;
 
 	virtual size_t size() const;
 	virtual struct tuple *min(const char *key, uint32_t part_count) const;

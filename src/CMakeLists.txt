@@ -62,7 +62,6 @@ set (core_sources
      cbus.cc
      exception.cc
      coro.cc
-     object.cc
      reflection.c
      assoc.c
  )

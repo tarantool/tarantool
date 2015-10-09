@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "object.h"
 #include <stdarg.h>
 #include <assert.h>
 
@@ -43,7 +42,8 @@ enum {
 };
 
 extern const struct type type_Exception;
-class Exception: public Object {
+
+class Exception {
 public:
 	const struct type *type; /* reflection */
 
@@ -83,6 +83,8 @@ public:
 			delete this;
 	}
 
+	Exception(const Exception &) = delete;
+	Exception& operator=(const Exception&) = delete;
 protected:
 	Exception(const struct type *type, const char *file, unsigned line);
 

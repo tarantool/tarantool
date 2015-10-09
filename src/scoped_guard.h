@@ -32,8 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#include "object.h"
-
 template <typename Functor>
 struct ScopedGuard {
 	Functor f;
