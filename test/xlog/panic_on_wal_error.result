@@ -1,4 +1,10 @@
 -- preparatory stuff
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 fio = require('fio')
 ---
 ...
@@ -14,8 +20,7 @@ glob = fio.pathjoin(box.cfg.wal_dir, '*.snap')
 for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
 ---
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 box.schema.user.grant('guest', 'replication')
 ---
 ...
@@ -28,8 +33,7 @@ _ = box.space.test:create_index('pk')
 --
 -- reopen xlog
 --
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 box.space.test ~= nil
 ---
 - true
@@ -50,9 +54,18 @@ box.snapshot()
 -- 
 -- create a replica, let it catch up somewhat
 --
---# create server replica with rpl_master=default, script='xlog/replica.lua'
---# start server replica
---# set connection replica
+test_run:cmd("create server replica with rpl_master=default, script='xlog/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
 box.space.test:select{}
 ---
 - - [1, 'before snapshot']
@@ -61,9 +74,14 @@ box.space.test:select{}
 -- stop replica, restart the master, insert more stuff
 -- which will make it into an xlog only
 --
---# stop server replica
--- 
---# set connection default
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
 box.space.test:auto_increment{'after snapshot'}
 ---
 - [2, 'after snapshot']
@@ -91,8 +109,7 @@ files = fio.glob(glob)
 for _, file in pairs(files) do fio.unlink(file) end
 ---
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 --
 -- make sure the server has some xlogs, otherwise the
 -- replica doesn't discover the gap in the logs
@@ -119,8 +136,14 @@ box.cfg.panic_on_wal_error
 -- try to start the replica, ha-ha
 -- (replication should fail, some rows are missing)
 --
---# start server replica
---# set connection replica
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
 fiber = require('fiber')
 ---
 ...
@@ -141,9 +164,18 @@ box.space.test:select{}
 ...
 --
 --
---# set connection default 
---# stop server replica
---# cleanup server replica
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
 --
 -- cleanup
 box.space.test:drop()

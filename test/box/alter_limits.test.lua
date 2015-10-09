@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 -- ----------------------------------------------------------------
 -- LIMITS
 -- ----------------------------------------------------------------
@@ -126,11 +128,11 @@ s:drop()
 -- ----------------------------------------------------------------
 --
 s = box.schema.space.create('test')
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for k=1, box.schema.INDEX_MAX, 1 do
     index = s:create_index('i'..k, { type = 'hash' })
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 -- cleanup
 for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
 -- test limits enforced in key_def_check:
@@ -164,7 +166,7 @@ s = box.schema.space.create('test')
 index = s:create_index('t1', { type = 'hash', parts = { 1, 'num', 1, 'str' }})
 -- a lot of key parts
 parts = {}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for k=1, box.schema.INDEX_PART_MAX + 1, 1 do
     table.insert(parts, k)
     table.insert(parts, 'num')
@@ -178,7 +180,7 @@ for k=1, box.schema.INDEX_PART_MAX, 1 do
 end;
 #parts;
 index = s:create_index('t1', { type = 'hash', parts = parts});
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 -- this is actually incorrect since parts is a lua table
 -- and length of a lua table which has index 0 set is not correct
 #s.index[0].parts
@@ -367,8 +369,7 @@ s_full:insert{8, 8, 'h'}
 
 r_disabled = box.schema.space.create('r_disabled')
 
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 
 s_empty = box.space['s_empty']
 s_full = box.space['s_full']

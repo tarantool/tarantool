@@ -1,4 +1,10 @@
 -- test for https://github.com/tarantool/tarantool/issues/769
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 s = box.schema.create_space('test')
 ---
 ...
@@ -20,7 +26,10 @@ test_res = {}
 too_longs = {}
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function test_run_itr(itr, key)
     for i=1,50 do
         local gen, param, state = s.index.primary:pairs({key}, {iterator = itr})
@@ -47,7 +56,10 @@ for _,itr in pairs(test_itrs) do
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 test_res
 ---
 - LE 1: [1, 10000]

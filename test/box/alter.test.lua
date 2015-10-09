@@ -1,6 +1,8 @@
 _space = box.space[box.schema.SPACE_ID]
 _index = box.space[box.schema.INDEX_ID]
 ADMIN = 1
+env = require('test_run')
+test_run = env.new()
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
@@ -73,8 +75,7 @@ box.space[1000]
 _index:run_triggers(false)
 _space:run_triggers(false)
 box.snapshot()
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 ADMIN = 1
 box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
 box.space[1000].id
@@ -159,7 +160,7 @@ s:drop()
 -- gh-155 Tarantool failure on simultaneous space:drop()
 -- ------------------------------------------------------------------
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 local fiber = require('fiber')
 local W = 4
 local N = 50
@@ -178,4 +179,4 @@ end
 for i=1,W do
     ch:get()
 end
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");

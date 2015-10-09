@@ -123,10 +123,11 @@ space:insert{2, 'brave'}
 space:insert{3, 'new'}
 space:insert{4, 'world'}
 
+env = require('test_run')
+test_run = env.new()
 
 -- Check how build_indexes() works
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 net_box = require('net.box')
 conn = net_box:new('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum

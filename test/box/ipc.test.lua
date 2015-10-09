@@ -1,4 +1,6 @@
 fiber = require('fiber')
+env = require('test_run')
+test_run = env.new()
 
 ch = fiber.channel()
 ch:size()
@@ -18,7 +20,7 @@ ch:count()
 ch:is_full()
 ch:is_empty()
 buffer = {}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 tfbr = fiber.create(
     function()
         while true do
@@ -30,7 +32,7 @@ t = {};
 for i = 1, 10 do
     table.insert(t, {i, ch:put(i, 0.1)})
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 t
 ch:has_readers()
 ch:has_writers()
@@ -53,7 +55,7 @@ ch:get()
 
 ch:is_full()
 ch:is_empty()
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 tfbr = fiber.create(
     function()
         while true do
@@ -70,7 +72,7 @@ tfbr2 = fiber.create(
         end
     end
 );
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 buffer = {}
 
@@ -117,7 +119,7 @@ ch:is_closed()
 chs= {}
 count= 0
 res= { }
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, 10 do table.insert(chs, fiber.channel()) end;
 
 
@@ -156,7 +158,7 @@ for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
 
 count > 2000, #res, res;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 --
 -- gh-756: channel:close() leaks memory

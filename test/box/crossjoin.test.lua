@@ -1,6 +1,8 @@
+env = require('test_run')
+test_run = env.new()
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'tree' })
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function crossjoin(space0, space1, limit)
   local result = {}
   for _,v0 in space0:pairs() do
@@ -16,7 +18,7 @@ function crossjoin(space0, space1, limit)
   end
   return result
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 crossjoin(space, space, 0)
 crossjoin(space, space, 10000)
 space:insert{1}

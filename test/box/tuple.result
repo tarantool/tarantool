@@ -648,16 +648,23 @@ t:pairs("fdsaf")
 --------------------------------------------------------------------------------
 -- test tuple:find
 --------------------------------------------------------------------------------
---# setopt delimiter ';'
-t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
-    -9223372036854775807LL})
+env = require('test_run')
 ---
 ...
---# setopt delimiter ''
-t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
-    -9223372036854775807LL})
-
+test_run = env.new()
 ---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
+    -9223372036854775807LL});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
 ...
 t:find('a')
 ---

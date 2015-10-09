@@ -9,21 +9,23 @@ errno = require 'errno'
 fio = require 'fio'
 ffi = require('ffi')
 type(socket)
+env = require('test_run')
+test_run = env.new()
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 type(s)
 -- Invalid arguments
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for k in pairs(getmetatable(s).__index) do
     local r, msg = pcall(s[k])
     if not msg:match('Usage:') then
         error("Arguments is not checked for "..k)
     end
 end;
-s:close()
---# setopt delimiter ''
+s:close();
+test_run:cmd("setopt delimiter ''");
 
 LISTEN = require('uri').parse(box.cfg.listen)
 LISTEN ~= nil
@@ -176,7 +178,7 @@ s:close()
 
 os.remove('/tmp/tarantool-test-socket')
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function aexitst(ai, hostnames, port)
     for i, a in pairs(ai) do
         for j, host in pairs(hostnames) do
@@ -191,7 +193,7 @@ end;
 
 aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 #(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
 wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
@@ -208,10 +210,10 @@ string.match(tostring(sc), ', peer') == nil
 socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 socket_error == errno.ECONNREFUSED or socket_error == 0
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
     flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 json.encode(sc:name())
@@ -311,7 +313,7 @@ serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 serv:bind('127.0.0.1', port)
 serv:listen()
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function(serv)
     serv:readable()
     sc = serv:accept()
@@ -320,7 +322,7 @@ f = fiber.create(function(serv)
     sc:close()
     serv:close()
 end, serv);
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 s = socket.tcp_connect('127.0.0.1', port)
 ch = fiber.channel()
@@ -335,7 +337,7 @@ master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 master:bind('127.0.0.1', port)
 master:listen()
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function gh361()
     local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
     s:sysconnect('127.0.0.1', port)
@@ -343,7 +345,7 @@ function gh361()
     res = s:read(1200)
 end;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 f = fiber.create(gh361)
 fiber.cancel(f)
 while f:status() ~= 'dead' do fiber.sleep(0.001) end
@@ -358,7 +360,7 @@ s:error()
 s:bind('unix/', path)
 s:error()
 s:listen(128)
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function()
     for i=1,2 do
         s:readable()
@@ -368,7 +370,7 @@ f = fiber.create(function()
         sc:close()
     end
 end);
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 c = socket.tcp_connect('unix/', path)
 c:error()
@@ -413,12 +415,12 @@ server:close()
 -- unix socket automatically removed
 fio.stat(path) == nil
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
     s:read(2)
     s:write('Hello, world')
 end, name = 'testserv'});
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 type(addr)
 server ~= nil
 addr2 = server:name()
@@ -429,14 +431,14 @@ client = socket.tcp_connect(addr2.host, addr2.port)
 client ~= nil
 -- Check that listen and client fibers have appropriate names
 cnt = 0
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i=100,200 do
     local f = fiber.find(i)
     if f and f:name():match('^testserv/') then
         cnt = cnt + 1
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 cnt
 client:write('hi')
 client:read(123)
@@ -459,12 +461,12 @@ server:close()
 -- gh-658: socket:read() incorrectly handles size and delimiter together
 body = "a 10\nb 15\nabc"
 remaining = #body
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 server = socket.tcp_server('unix/', path, function(s)
     s:write(body)
     s:read(100500)
 end);
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 client = socket.tcp_connect('unix/', path)
 buf = client:read({ size = remaining, delimiter = "\n"})
 buf == "a 10\n"
@@ -525,12 +527,12 @@ socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() ==
 socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
 
 -- gh-574: check that fiber with getaddrinfo can be safely cancelled
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function()
     while true do
         local result = socket.getaddrinfo('localhost', '80')
         fiber.sleep(0)
     end
 end);
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 f:cancel()
