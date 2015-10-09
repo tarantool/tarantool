@@ -56,7 +56,7 @@ SocketError::SocketError(const char *file, unsigned line, int fd,
 {
 	int save_errno = errno;
 
-	char buf[EXCEPTION_ERRMSG_MAX];
+	char buf[DIAG_ERRMSG_MAX];
 
 	va_list ap;
 	va_start(ap, format);

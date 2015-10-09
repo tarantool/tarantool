@@ -46,7 +46,8 @@ int
 lbox_error(lua_State *L)
 {
 	(void) L;
-	diag_last_error(&fiber()->diag)->raise();
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	e->raise();
 	return 0;
 }
 
@@ -123,7 +124,7 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	Exception *e = diag_last_error(&fiber()->diag);
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
 
 	if (e == NULL) {
 		lua_pushnil(L);

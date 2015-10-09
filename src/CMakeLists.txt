@@ -56,6 +56,7 @@ add_custom_target(ragel
     COMMAND ragel -G2 src/uri.rl -o src/uri.c)
 
 set (core_sources
+     diag.c
      say.cc
      memory.cc
      fiber.cc

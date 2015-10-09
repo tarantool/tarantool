@@ -80,7 +80,8 @@ lbox_info_replication(struct lua_State *L)
 		lua_pushnumber(L, ev_now(loop()) - applier->last_row_time);
 		lua_settable(L, -3);
 
-		Exception *e = diag_last_error(&applier->reader->diag);
+		Exception *e = (Exception *)
+			diag_last_error(&applier->reader->diag);
 		if (e != NULL) {
 			lua_pushstring(L, "message");
 			lua_pushstring(L, e->errmsg());

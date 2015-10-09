@@ -246,7 +246,7 @@ fiber_join(struct fiber *fiber)
 
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
-	Exception *e = diag_last_error(&fiber()->diag);
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
 	/** Raise exception again, unless it's FiberCancelException */
 	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
 		e->raise();
@@ -729,7 +729,8 @@ cord_join(struct cord *cord)
 		 */
 		diag_move(&cord->fiber->diag, &fiber()->diag);
 		cord_destroy(cord);
-		diag_last_error(&fiber()->diag)->raise();
+		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+		e->raise();
 	}
 	cord_destroy(cord);
 	return res;
@@ -858,7 +859,7 @@ cord_costart_thread_func(void *arg)
 		ev_run(loop(), 0);
 	}
 	diag_move(&f->diag, &fiber()->diag);
-	Exception *e = diag_last_error(&fiber()->diag);
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
 	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
 		e->raise();
 

@@ -96,11 +96,11 @@ public:
 
 /** \cond public */
 
-struct box_error;
+struct diag_msg;
 /**
  * Error - contains information about error.
  */
-typedef struct box_error box_error_t;
+typedef struct diag_msg box_error_t;
 
 /**
  * Return the error type, e.g. "ClientError", "SocketError", etc.

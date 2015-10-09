@@ -30,7 +30,6 @@
  */
 #include "exception.h"
 #include "say.h"
-#include "fiber.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -39,12 +38,6 @@
 /** out_of_memory::size is zero-initialized by the linker. */
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
-
-struct diag *
-diag_get()
-{
-	return &fiber()->diag;
-}
 
 static const struct method exception_methods[] = {
 	make_method(&type_Exception, "message", &Exception::errmsg),
@@ -62,7 +55,7 @@ Exception::operator new(size_t size)
 	void *buf = malloc(size);
 	if (buf != NULL)
 		return buf;
-	diag_add_error(&fiber()->diag, &out_of_memory);
+	diag_add_error(diag_get(), &out_of_memory);
 	throw &out_of_memory;
 }
 
@@ -75,13 +68,20 @@ Exception::operator delete(void *ptr)
 Exception::~Exception()
 {
 	if (this != &out_of_memory) {
-		assert(m_ref == 0);
+		assert(refs == 0);
 	}
 }
 
+extern "C" void
+exception_destroy(struct diag_msg *msg)
+{
+	delete (Exception *) msg;
+}
+
 Exception::Exception(const struct type *type_arg, const char *file,
-	unsigned line)
-	:type(type_arg), m_ref(0) {
+		     unsigned line)
+{
+	diag_msg_create(this, exception_destroy, type_arg);
 	if (file != NULL) {
 		snprintf(m_file, sizeof(m_file), "%s", file);
 		m_line = line;
@@ -92,7 +92,7 @@ Exception::Exception(const struct type *type_arg, const char *file,
 	m_errmsg[0] = '\0';
 	if (this == &out_of_memory) {
 		/* A special workaround for out_of_memory static init */
-		out_of_memory.m_ref = 1;
+		out_of_memory.refs = 1;
 		return;
 	}
 }

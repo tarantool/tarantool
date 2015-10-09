@@ -130,7 +130,7 @@ box_error_clear(void)
 int
 box_error_raise(uint32_t code, const char *fmt, ...)
 {
-	char msg[EXCEPTION_ERRMSG_MAX];
+	char msg[DIAG_ERRMSG_MAX];
 
 	va_list ap;
 	va_start(ap, fmt);

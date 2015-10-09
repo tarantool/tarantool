@@ -160,7 +160,7 @@ key_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
 	return;
 
 err:
-	char got[EXCEPTION_ERRMSG_MAX];
+	char got[DIAG_ERRMSG_MAX];
 	char *p = got, *e = got + sizeof(got);
 	data = field_start;
 	for (uint32_t i = 0; i < field_count && p < e; i++) {

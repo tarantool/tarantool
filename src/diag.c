@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_CORO_H_INCLUDED
-#define TARANTOOL_CORO_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,24 +28,22 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h> /* size_t */
-
-#include <third_party/coro/coro.h>
-
-struct tarantool_coro {
-	coro_context ctx;
-	void *stack;
-	size_t stack_size;
-};
-
-struct slab_cache;
+#include "diag.h"
+#include "fiber.h"
 
 void
-tarantool_coro_create(struct tarantool_coro *ctx,
-		      struct slab_cache *cache,
-		      void (*f) (void *), void *data);
-void
-tarantool_coro_destroy(struct tarantool_coro *ctx,
-		       struct slab_cache *cache);
+diag_msg_create(struct diag_msg *msg,
+		void (*destroy)(struct diag_msg *),
+		const struct type *type)
+{
+	msg->destroy = destroy;
+	msg->type = type;
+	msg->refs = 0;
+}
 
-#endif /* TARANTOOL_CORO_H_INCLUDED */
+struct diag *
+diag_get()
+{
+	return &fiber()->diag;
+}
+
