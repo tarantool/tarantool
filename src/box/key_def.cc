@@ -283,3 +283,10 @@ identifier_check(const char *str)
 		tnt_raise(ClientError, ER_IDENTIFIER, str);
 }
 
+void
+key_def_finalize(struct key_def *def)
+{
+	def->tuple_compare = tuple_gen_compare(def);
+	def->tuple_compare_with_key = tuple_gen_compare_with_key(def);
+}
+

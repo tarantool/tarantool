@@ -258,6 +258,7 @@ schema_init()
 					      &opts,
 					      1); /* part count */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
+	key_def_finalize(key_def);
 	(void) sc_space_new(&def, key_def, &on_replace_schema);
 
 	/* _space - home for all spaces. */
@@ -265,6 +266,7 @@ schema_init()
 	snprintf(def.name, sizeof(def.name), "_space");
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 
+	key_def_finalize(key_def);
 	(void) sc_space_new(&def, key_def, &alter_space_on_replace_space);
 
 	/* _user - all existing users */
@@ -305,6 +307,7 @@ schema_init()
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */, NUM);
+	key_def_finalize(key_def);
 	(void) sc_space_new(&def, key_def, &alter_space_on_replace_index);
 	key_def_delete(key_def);
 }

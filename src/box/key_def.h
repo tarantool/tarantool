@@ -348,16 +348,6 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	assert(part_no < def->part_count);
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
-	uint32_t i;
-	for (i = 0; i < def->part_count &&
-	     def->parts[i].type != UNKNOWN; i++) {
-		/* All types known */
-	}
-	if (i == def->part_count) {
-		def->tuple_compare = tuple_gen_compare(def);
-		def->tuple_compare_with_key =
-				tuple_gen_compare_with_key(def);
-	}
 }
 
 /** Compare two key part arrays.
@@ -451,6 +441,9 @@ identifier_is_valid(const char *str);
  */
 void
 identifier_check(const char *str);
+
+void
+key_def_finalize(struct key_def *def);
 
 #endif /* defined(__cplusplus) */
 
