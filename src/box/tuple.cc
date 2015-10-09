@@ -619,7 +619,7 @@ int
 tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		  const struct key_def *key_def)
 {
-	int r = tuple_compare(tuple_a, tuple_b, key_def);
+	int r = key_def->tuple_compare(tuple_a, tuple_b, key_def);
 	if (r == 0)
 		r = tuple_a < tuple_b ? -1 : tuple_a > tuple_b;
 

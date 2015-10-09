@@ -28,6 +28,8 @@ add_library(box
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
+    tuple_gen.cc
+    tuple_gen_wk.cc
     key_def.cc
     index.cc
     memtx_index.cc
