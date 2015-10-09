@@ -322,10 +322,38 @@ SophiaIndex::replace(struct tuple*, struct tuple*, enum dup_replace_mode)
 	return NULL;
 }
 
-static void *
-sophia_update_alloc(void *, size_t size)
+struct sophia_mempool {
+	void *chunks[128];
+	int count;
+};
+
+static inline void
+sophia_mempool_init(sophia_mempool *p)
 {
-	return malloc(size);
+	memset(p->chunks, 0, sizeof(p->chunks));
+	p->count = 0;
+}
+
+static inline void
+sophia_mempool_free(sophia_mempool *p)
+{
+	int i = 0;
+	while (i < p->count) {
+		free(p->chunks[i]);
+		i++;
+	}
+}
+
+static void *
+sophia_update_alloc(void *arg, size_t size)
+{
+	/* simulate region allocator for use with
+	 * tuple_upsert_execute() */
+	struct sophia_mempool *p = (struct sophia_mempool*)arg;
+	assert(p->count < 128);
+	void *ptr = malloc(size);
+	p->chunks[p->count++] = ptr;
+	return ptr;
 }
 
 struct sophiaref {
@@ -425,7 +453,7 @@ sophia_upsert_to_sophia(struct key_def *key_def, char *dest, int dest_size,
 static inline char*
 sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
                       uint32_t *origin_keysize,
-                      uint32_t *size)
+                      uint32_t *size, struct sophia_mempool *pool)
 {
 	/* calculate keysize */
 	struct sophiaref *ref = (struct sophiaref *)update;
@@ -448,7 +476,7 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 	char *expr_end = update + update_size;
 	const char *up;
 	try {
-		up = tuple_upsert_execute(sophia_update_alloc, NULL,
+		up = tuple_upsert_execute(sophia_update_alloc, pool,
 		                          expr,
 		                          expr_end,
 		                          default_tuple,
@@ -463,7 +491,7 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 static inline char*
 sophia_upsert(char *src, int src_size, char *update, int update_size,
               uint32_t origin_keysize,
-              uint32_t *size)
+              uint32_t *size, struct sophia_mempool *pool)
 {
 	char *p = update + origin_keysize;
 	uint8_t index_base = *(uint32_t *)p;
@@ -479,7 +507,7 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
 	char *expr_end = update + update_size;
 	const char *up;
 	try {
-		up = tuple_upsert_execute(sophia_update_alloc, NULL,
+		up = tuple_upsert_execute(sophia_update_alloc, pool,
 		                          expr,
 		                          expr_end,
 		                          src,
@@ -505,6 +533,8 @@ sophia_update(int origin_flags, char *origin, int origin_size,
 	char *src;
 	uint32_t dest_size;
 	char *dest;
+	struct sophia_mempool p;
+	sophia_mempool_init(&p);
 	if (origin) {
 		/* convert origin object to msgpack */
 		src = sophia_upsert_to_tarantool(key_def, origin, origin_size,
@@ -514,21 +544,23 @@ sophia_update(int origin_flags, char *origin, int origin_size,
 			return -1;
 		/* execute upsert */
 		dest = sophia_upsert(src, src_size, update, update_size,
-		                     origin_keysize, &dest_size);
+		                     origin_keysize, &dest_size, &p);
 		free(src);
 	} else {
 		/* use default tuple from update */
 		dest = sophia_upsert_default(key_def, update, update_size,
-		                             &origin_keysize, &dest_size);
+		                             &origin_keysize, &dest_size, &p);
 		origin = update;
 	}
-	if (dest == NULL)
+	if (dest == NULL) {
+		sophia_mempool_free(&p);
 		return -1;
+	}
 
 	/* convert msgpack to sophia format */
 	*result = sophia_upsert_to_sophia(key_def, dest, dest_size, origin,
 	                                  origin_keysize, size);
-	free(dest);
+	sophia_mempool_free(&p);
 	return (*result == NULL) ? -1 : 0;
 }
 
