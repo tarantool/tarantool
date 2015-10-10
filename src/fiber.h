@@ -37,19 +37,17 @@
 #include <unistd.h>
 #include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
+#include "diag.h"
 #include "coro.h"
 #include "trivia/util.h"
 #include "third_party/queue.h"
 #include "small/mempool.h"
 #include "small/region.h"
+#include "salad/rlist.h"
 
 #if defined(__cplusplus)
-#include "exception.h"
-#else
-#define class struct
-class Exception;
+extern "C" {
 #endif /* defined(__cplusplus) */
-#include "salad/rlist.h"
 
 enum { FIBER_NAME_MAX = REGION_NAME_MAX };
 
@@ -81,26 +79,6 @@ enum {
 	FIBER_IS_DEAD		= 1 << 4,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
-
-/**
- * This is thrown by fiber_* API calls when the fiber is
- * cancelled.
- */
-#if defined(__cplusplus)
-extern const struct type type_FiberCancelException;
-class FiberCancelException: public Exception {
-public:
-	FiberCancelException(const char *file, unsigned line)
-		: Exception(&type_FiberCancelException, file, line) {
-		/* Nothing */
-	}
-
-	virtual void log() const {
-		say_debug("FiberCancelException");
-	}
-	virtual void raise() { throw this; }
-};
-#endif /* defined(__cplusplus) */
 
 /**
  * \brief Pre-defined key for fiber local storage
@@ -408,10 +386,6 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
 /** Report libev time (cheap). */
 inline double
 fiber_time(void)
@@ -428,6 +402,24 @@ fiber_time64(void)
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+/**
+ * This is thrown by fiber_* API calls when the fiber is
+ * cancelled.
+ */
+extern const struct type type_FiberCancelException;
+class FiberCancelException: public Exception {
+public:
+	FiberCancelException(const char *file, unsigned line)
+		: Exception(&type_FiberCancelException, file, line) {
+		/* Nothing */
+	}
+
+	virtual void log() const {
+		say_debug("FiberCancelException");
+	}
+	virtual void raise() { throw this; }
+};
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

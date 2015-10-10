@@ -172,8 +172,9 @@ error:
  * Rotate logs on SIGHUP
  */
 void
-say_logrotate(int /* signo */)
+say_logrotate(int signo)
 {
+	(void) signo;
 	/* For cases when used from a Lua FFI binding */
 	if (logger_pid || strlen(log_path) == 0)
 		return;
