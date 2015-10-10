@@ -58,7 +58,7 @@ add_custom_target(ragel
 set (core_sources
      diag.c
      say.c
-     memory.cc
+     memory.c
      fiber.cc
      cbus.cc
      exception.cc

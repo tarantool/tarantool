@@ -32,6 +32,11 @@
  */
 #include "small/region.h"
 #include "small/small.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * Define the global components of Tarantool memory subsystem:
  * slab caches, allocators, arenas.
@@ -45,5 +50,8 @@ memory_init();
 
 void
 memory_free();
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_MEMORY_H_INCLUDED */
