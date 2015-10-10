@@ -62,7 +62,7 @@ set (core_sources
      fiber.cc
      cbus.c
      exception.cc
-     coro.cc
+     coro.c
      reflection.c
      assoc.c
      rmean.c

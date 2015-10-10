@@ -479,6 +479,12 @@ lbox_fiber_cancel(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
 	fiber_cancel(f);
+	/*
+	 * Check if we're ourselves cancelled.
+	 * This also implements cancel for the case when
+	 * f == fiber().
+	 */
+	fiber_testcancel();
 	return 0;
 }
 
@@ -493,6 +499,8 @@ lbox_fiber_kill(struct lua_State *L)
 	if (f == NULL)
 		luaL_error(L, "fiber.kill(): fiber not found");
 	fiber_cancel(f);
+	/* Check if we're ourselves cancelled. */
+	fiber_testcancel();
 	return 0;
 }
 

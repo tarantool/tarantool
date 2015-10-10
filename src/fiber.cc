@@ -156,7 +156,6 @@ fiber_wakeup(struct fiber *f)
  * in it. For cancellation to work, this exception type should be
  * re-raised whenever (if) it is caught.
  */
-
 void
 fiber_cancel(struct fiber *f)
 {
@@ -175,40 +174,10 @@ fiber_cancel(struct fiber *f)
 			fiber_wakeup(f);
 		fiber_yield();
 	}
-	/*
-	 * Check if we're ourselves cancelled.
-	 * This also implements cancel for the case when
-	 * f == fiber().
-	 */
-	fiber_testcancel();
 }
 
-bool
-fiber_is_cancelled()
-{
-	return fiber()->flags & FIBER_IS_CANCELLED;
-}
-
-/** Test if this fiber is in a cancellable state and was indeed
- * cancelled, and raise an exception (FiberCancelException) if
- * that's the case.
- */
-void
-fiber_testcancel(void)
-{
-	/*
-	 * Fiber can catch FiberCancelException using try..catch
-	 * block in C or pcall()/xpcall() in Lua. However,
-	 * FIBER_IS_CANCELLED flag is still set and the subject
-	 * fiber will be killed by subsequent unprotected call of
-	 * this function.
-	 */
-	if (fiber_is_cancelled())
-		tnt_raise(FiberCancelException);
-}
-
-
-/** Change the current cancellation state of a fiber. This is not
+/**
+ * Change the current cancellation state of a fiber. This is not
  * a cancellation point.
  */
 bool
@@ -252,6 +221,7 @@ fiber_join(struct fiber *fiber)
 		e->raise();
 	fiber_testcancel();
 }
+
 /**
  * @note: this is not a cancellation point (@sa fiber_testcancel())
  * but it is considered good practice to call testcancel()
@@ -525,8 +495,11 @@ fiber_new(const char *name, void (*f) (va_list))
 	} else {
 		fiber = (struct fiber *) mempool_alloc0(&cord->fiber_pool);
 
-		tarantool_coro_create(&fiber->coro, &cord->slabc,
-				      fiber_loop, NULL);
+		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
+					  fiber_loop, NULL)) {
+			tnt_raise(OutOfMemory, 65536,
+				  "runtime arena", "coro stack");
+		}
 
 		region_create(&fiber->gc, &cord->slabc);
 

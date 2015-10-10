@@ -307,13 +307,6 @@ void
 fiber_cancel(struct fiber *f);
 
 /**
- * Check if the current fiber has been cancelled.  Raises
- * tnt_FiberCancelException
- */
-void
-fiber_testcancel(void);
-
-/**
  * Make it possible or not possible to wakeup the current
  * fiber immediately when it's cancelled.
  *
@@ -354,8 +347,12 @@ fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
 	fiber->fls[key] = value;
 }
 
-bool
-fiber_is_cancelled();
+static inline bool
+fiber_is_cancelled()
+{
+	return fiber()->flags & FIBER_IS_CANCELLED;
+}
+
 
 static inline bool
 fiber_is_dead(struct fiber *f)
@@ -420,6 +417,26 @@ public:
 	}
 	virtual void raise() { throw this; }
 };
+
+/*
+ * Test if this fiber is in a cancellable state and was indeed
+ * cancelled, and raise an exception (FiberCancelException) if
+ * that's the case.
+ */
+static inline void
+fiber_testcancel(void)
+{
+	/*
+	 * Fiber can catch FiberCancelException using try..catch
+	 * block in C or pcall()/xpcall() in Lua. However,
+	 * FIBER_IS_CANCELLED flag is still set and the subject
+	 * fiber will be killed by subsequent unprotected call of
+	 * this function.
+	 */
+	if (fiber_is_cancelled())
+		tnt_raise(FiberCancelException);
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

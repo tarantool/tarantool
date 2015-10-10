@@ -31,15 +31,14 @@
 #include "coro.h"
 
 #include "trivia/config.h"
-#include "exception.h"
 #include <unistd.h>
 #include <string.h>
 #include <sys/mman.h>
-
+#include "small/slab_cache.h"
 #include "third_party/valgrind/memcheck.h"
-#include "fiber.h"
 
-void
+
+int
 tarantool_coro_create(struct tarantool_coro *coro,
 		      struct slab_cache *slabc,
 		      void (*f) (void *), void *data)
@@ -54,14 +53,14 @@ tarantool_coro_create(struct tarantool_coro *coro,
 					+ slab_sizeof();
 
 	if (coro->stack == NULL) {
-		tnt_raise(OutOfMemory, sizeof(coro->stack_size),
-			  "mmap", "coro stack");
+		return -1;
 	}
 
 	(void) VALGRIND_STACK_REGISTER(coro->stack, (char *)
 				       coro->stack + coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
+	return 0;
 }
 
 void
