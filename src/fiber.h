@@ -98,6 +98,7 @@ public:
 	virtual void log() const {
 		say_debug("FiberCancelException");
 	}
+	virtual void raise() { throw this; }
 };
 #endif /* defined(__cplusplus) */
 

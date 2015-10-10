@@ -45,6 +45,7 @@ struct XlogError: public Exception
 {
 	XlogError(const char *file, unsigned line,
 		  const char *format, ...);
+	virtual void raise() { throw this; }
 protected:
 	XlogError(const struct type *type, const char *file, unsigned line,
 		  const char *format, ...);
@@ -55,6 +56,7 @@ struct XlogGapError: public XlogError
 	XlogGapError(const char *file, unsigned line,
 		  const struct vclock *from,
 		  const struct vclock *to);
+	virtual void raise() { throw this; }
 };
 
 /* {{{ log dir */

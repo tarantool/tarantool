@@ -509,6 +509,7 @@ class LuajitError: public Exception {
 public:
 	LuajitError(const char *file, unsigned line,
 		    struct lua_State *L);
+	virtual void raise() { throw this; }
 };
 
 static inline void

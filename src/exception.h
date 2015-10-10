@@ -43,11 +43,7 @@ class Exception: public diag_msg {
 public:
 	void *operator new(size_t size);
 	void operator delete(void*);
-	virtual void raise()
-	{
-		/* Throw the most specific type of exception */
-		throw this;
-	}
+	virtual void raise() = 0;
 
 	const char *
 	errmsg() const
@@ -84,10 +80,7 @@ extern const struct type type_SystemError;
 class SystemError: public Exception {
 public:
 
-	virtual void raise()
-	{
-		throw this;
-	}
+	virtual void raise() { throw this; }
 
 	int
 	errnum() const
@@ -119,12 +112,14 @@ public:
 	OutOfMemory(const char *file, unsigned line,
 		    size_t amount, const char *allocator,
 		    const char *object);
+	virtual void raise() { throw this; }
 };
 
 extern const struct type type_TimedOut;
 class TimedOut: public SystemError {
 public:
 	TimedOut(const char *file, unsigned line);
+	virtual void raise() { throw this; }
 };
 
 /** \endcond */
