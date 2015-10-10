@@ -84,7 +84,7 @@ set (server_sources
      coeio.cc
      iobuf.cc
      coio_buf.cc
-     pickle.cc
+     pickle.c
      ipc.cc
      latch.cc
      errinj.cc

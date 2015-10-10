@@ -32,7 +32,10 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
-#include "exception.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /**
  * pickle (pick-little-endian) -- serialize/de-serialize data from
@@ -61,5 +64,9 @@ pack_u(8)
 pack_u(16)
 pack_u(32)
 pack_u(64)
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_PICKLE_H_INCLUDED */
