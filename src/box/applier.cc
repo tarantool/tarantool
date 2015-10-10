@@ -366,6 +366,7 @@ applier_f(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 		fiber_sleep(RECONNECT_DELAY);
+		fiber_testcancel();
 	}
 }
 
@@ -399,12 +400,7 @@ applier_stop(struct applier *applier)
 	const char *uri = uri_format(&applier->uri);
 	say_crit("shutting down applier %s", uri);
 	fiber_cancel(f);
-	/**
-	 * If the applier died from an exception, don't throw it
-	 * up.
-	 */
-	diag_clear(&f->diag);
-	fiber_join(f); /* doesn't throw due do diag_clear() */
+	fiber_join(f);
 	applier_set_state(applier, APPLIER_OFF);
 	applier->reader = NULL;
 }
@@ -414,7 +410,8 @@ applier_wait(struct applier *applier)
 {
 	assert(applier->reader != NULL);
 	auto fiber_guard = make_scoped_guard([=] { applier->reader = NULL; });
-	fiber_join(applier->reader); /* may throw */
+	fiber_join(applier->reader);
+	fiber_testerror();
 }
 
 struct applier *

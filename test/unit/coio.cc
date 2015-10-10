@@ -15,6 +15,7 @@ touch_f(va_list ap)
 		fail_unless(rc == 1);
 		fflush(f);
 		fiber_sleep(0.01);
+		fiber_testcancel();
 	}
 }
 

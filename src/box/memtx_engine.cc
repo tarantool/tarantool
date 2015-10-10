@@ -1113,11 +1113,11 @@ MemtxEngine::waitCheckpoint()
 	assert(m_checkpoint);
 	assert(m_checkpoint->waiting_for_snap_thread);
 
-	int result;
-	try {
-		/* wait for memtx-part snapshot completion */
-		result = cord_cojoin(&m_checkpoint->cord);
-	} catch (Exception *e) {
+	/* wait for memtx-part snapshot completion */
+	int result = cord_cojoin(&m_checkpoint->cord);
+
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	if (e != NULL) {
 		e->log();
 		result = -1;
 		SystemError *se = type_cast(SystemError, e);
@@ -1160,12 +1160,12 @@ MemtxEngine::abortCheckpoint()
 	 * An error in the other engine's first phase.
 	 */
 	if (m_checkpoint->waiting_for_snap_thread) {
-		try {
-			/* wait for memtx-part snapshot completion */
-			cord_cojoin(&m_checkpoint->cord);
-		} catch (Exception *e) {
+		/* wait for memtx-part snapshot completion */
+		cord_cojoin(&m_checkpoint->cord);
+
+		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+		if (e)
 			e->log();
-		}
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 

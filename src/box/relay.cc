@@ -111,6 +111,7 @@ relay_join(int fd, struct xrow_header *packet,
 
 	cord_costart(&relay.cord, "join", relay_join_f, &relay);
 	cord_cojoin(&relay.cord);
+	fiber_testerror();
 	/**
 	 * Call the server-side hook which stores the replica uuid
 	 * in _cluster space after sending the last row but before
@@ -254,6 +255,7 @@ relay_subscribe(int fd, struct xrow_header *packet,
 	struct cord cord;
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);
 	cord_cojoin(&cord);
+	fiber_testerror();
 }
 
 void

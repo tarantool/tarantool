@@ -216,10 +216,9 @@ fiber_join(struct fiber *fiber)
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
 	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-	/** Raise exception again, unless it's FiberCancelException */
-	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
-		e->raise();
-	fiber_testcancel();
+	/** Don't bother with propagation of FiberCancelException */
+	if (e != NULL && type_cast(FiberCancelException, e) != NULL)
+		diag_clear(&fiber()->diag);
 }
 
 /**
@@ -307,7 +306,6 @@ fiber_sleep(ev_tstamp delay)
 	if (delay == 0) {
 		ev_idle_stop(loop(), &cord()->idle_event);
 	}
-	fiber_testcancel();
 }
 
 void
@@ -618,12 +616,15 @@ struct cord_thread_arg
 	pthread_cond_t start_cond;
 };
 
+/**
+ * Cord main thread function. It's not exception-safe, the
+ * body function must catch all exceptions instead.
+ */
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
 	cord() = ct_arg->cord;
 	slab_cache_set_thread(&cord()->slabc);
-	struct cord *cord = cord();
 	cord_init(ct_arg->name);
 	/** Can't possibly be the main thread */
 	assert(cord->id != main_thread_id);
@@ -633,21 +634,7 @@ void *cord_thread_func(void *p)
 	ct_arg->is_started = true;
 	tt_pthread_cond_signal(&ct_arg->start_cond);
 	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
-	void *res;
-	try {
-		res = f(arg);
-		/*
-		 * Clear a possible leftover exception object
-		 * to not confuse the invoker of the thread.
-		 */
-		diag_clear(&cord->fiber->diag);
-	} catch (Exception *) {
-		/*
-		 * The exception is now available to the caller
-		 * via cord->diag.
-		 */
-		res = NULL;
-	}
+	void *res = f(arg);
 	/*
 	 * cord()->on_exit initially holds NULL. This field is
 	 * change-once.
@@ -693,17 +680,16 @@ cord_join(struct cord *cord)
 	assert(cord() != cord); /* Can't join self. */
 	void *retval = NULL;
 	int res = tt_pthread_join(cord->id, &retval);
-	if (res == 0 && !diag_is_empty(&cord->fiber->diag)) {
+	if (res == 0) {
 		/*
 		 * cord_thread_func guarantees that
 		 * cord->exception is only set if the subject cord
 		 * has terminated with an uncaught exception,
-		 * transfer it to the caller.
+		 * transfer it to the caller. If there is
+		 * no exception, this clears the caller's
+		 * diagnostics area.
 		 */
 		diag_move(&cord->fiber->diag, &fiber()->diag);
-		cord_destroy(cord);
-		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-		e->raise();
 	}
 	cord_destroy(cord);
 	return res;
@@ -815,8 +801,13 @@ cord_costart_thread_func(void *arg)
 {
 	struct costart_ctx ctx = *(struct costart_ctx *) arg;
 	free(arg);
+	struct fiber *f;
 
-	struct fiber *f = fiber_new("main", ctx.run);
+	try {
+		f = fiber_new("main", ctx.run);
+	} catch (...) {
+		return NULL;
+	}
 
 	struct trigger break_ev_loop = {
 		RLIST_LINK_INITIALIZER, break_ev_loop_f, NULL, NULL
@@ -831,10 +822,11 @@ cord_costart_thread_func(void *arg)
 		/* The fiber hasn't died right away at start. */
 		ev_run(loop(), 0);
 	}
+	/*
+	 * Preserve the exception with which the main fiber
+	 * terminated, if any.
+	 */
 	diag_move(&f->diag, &fiber()->diag);
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-	if (e != NULL && type_cast(FiberCancelException, e) == NULL)
-		e->raise();
 
 	return NULL;
 }

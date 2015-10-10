@@ -997,8 +997,7 @@ iproto_set_listen(const char *uri)
 	fiber_yield();
 	if (! diag_is_empty(&msg.diag)) {
 		diag_move(&msg.diag, &fiber()->diag);
-		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-		e->raise();
+		fiber_testerror();
 	}
 }
 

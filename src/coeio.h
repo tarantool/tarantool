@@ -40,7 +40,7 @@
 
 #if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
 /**
  * Asynchronous IO Tasks (libeio wrapper)
@@ -127,19 +127,7 @@ coio_getaddrinfo(const char *host, const char *port,
 /** \endcond public */
 
 #if defined(__cplusplus)
-}
-#endif
-
-struct cord;
-/**
- * \brief Yield until \a cord has terminated.
- * If \a cord has terminated with an uncaught exception
- * **re-throws** this exception in the calling cord/fiber.
- * \param cord cord
- * \sa pthread_join()
- * \return 0 on success
- */
-int
-cord_cojoin(struct cord *cord);
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_COEIO_H_INCLUDED */

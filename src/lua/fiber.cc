@@ -439,6 +439,7 @@ lbox_fiber_sleep(struct lua_State *L)
 		luaL_error(L, "fiber.sleep(delay): bad arguments");
 	double delay = lua_tonumber(L, 1);
 	fiber_sleep(delay);
+	fiber_testcancel();
 	return 0;
 }
 
@@ -446,6 +447,7 @@ static int
 lbox_fiber_yield(struct lua_State * /* L */)
 {
 	fiber_sleep(0);
+	fiber_testcancel();
 	return 0;
 }
 

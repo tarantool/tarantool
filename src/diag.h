@@ -178,7 +178,6 @@ diag_last_error(struct diag *diag)
 	return diag->last;
 }
 
-
 /**
  * A helper for tnt_error to avoid cyclic includes (fiber.h and exception.h)
  * \cond false

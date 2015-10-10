@@ -464,9 +464,7 @@ execute_c_call(struct func *func, struct request *request, struct obuf *out)
 	}
 
 	if (rc != 0) {
-		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-		if (e != NULL)
-			e->raise();
+		fiber_testerror();
 		tnt_raise(ClientError, ER_PROC_C, "unknown procedure error");
 	}
 

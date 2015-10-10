@@ -64,6 +64,7 @@ fiber_join_test()
 	fiber_wakeup(fiber);
 	try {
 		fiber_join(fiber);
+		fiber_testerror();
 		fail("exception not raised", "");
 	} catch (Exception *e) {
 		note("exception propagated");
@@ -89,7 +90,6 @@ fiber_join_test()
 	fiber_yield();
 	note("by this time the fiber should be dead already");
 	fiber_cancel(fiber);
-	diag_clear(&fiber->diag);
 	fiber_join(fiber);
 
 	footer();

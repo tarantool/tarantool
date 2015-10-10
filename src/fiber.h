@@ -207,10 +207,10 @@ extern __thread struct cord *cord_ptr;
 /**
  * Start a cord with the given thread function.
  * The return value of the function can be collected
- * with cord_join(). If the function terminates with
- * an exception, the return value is NULL, and cord_join()
- * moves the exception from the terminated cord to
- * the caller of cord_join().
+ * with cord_join(). The function *must catch* all
+ * exceptions and leave them in the diagnostics
+ * area, cord_join() moves the exception from the
+ * terminated cord to the caller of cord_join().
  */
 int
 cord_start(struct cord *cord, const char *name,
@@ -224,6 +224,23 @@ cord_start(struct cord *cord, const char *name,
  */
 int
 cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg);
+
+/**
+ * Yield until \a cord has terminated.
+ *
+ * On success:
+ *
+ * If \a cord has terminated with an uncaught exception
+ * the exception is moved to the current fiber's diagnostics
+ * area, otherwise the current fiber's diagnostics area is
+ * cleared.
+ * @param cord cord
+ * @sa pthread_join()
+ *
+ * @return 0 on success, pthread_join return code on error
+ */
+int
+cord_cojoin(struct cord *cord);
 
 /**
  * Wait for \a cord to terminate. If \a cord has already
@@ -435,6 +452,14 @@ fiber_testcancel(void)
 	 */
 	if (fiber_is_cancelled())
 		tnt_raise(FiberCancelException);
+}
+
+static inline void
+fiber_testerror(void)
+{
+	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	if (e)
+		e->raise();
 }
 
 #endif /* defined(__cplusplus) */
