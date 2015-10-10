@@ -43,9 +43,11 @@ cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
 	      int /* events */);
 
 static void
-cpipe_fetch_output_cb(ev_loop * /* loop */, struct ev_async *watcher,
-			int /* events */)
+cpipe_fetch_output_cb(ev_loop *loop, struct ev_async *watcher,
+			int events)
 {
+	(void) loop;
+	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
 	struct cmsg *msg;
 	/* Force an exchange if there is nothing to do. */
@@ -163,9 +165,11 @@ cbus_join(struct cbus *bus, struct cpipe *pipe)
 }
 
 static void
-cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
-	      int /* events */)
+cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
+	      int events)
 {
+	(void) loop;
+	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
 	if (pipe->n_input == 0)
 		return;
@@ -242,9 +246,9 @@ cmsg_notify_deliver(struct cmsg *msg)
 void
 cmsg_notify_init(struct cmsg_notify *msg)
 {
-	static cmsg_hop route[] = { { cmsg_notify_deliver, NULL }, };
+	static struct cmsg_hop route[] = { { cmsg_notify_deliver, NULL }, };
 
-	cmsg_init(msg, route);
+	cmsg_init(&msg->base, route);
 	msg->fiber = fiber();
 }
 
@@ -288,10 +292,13 @@ restart:
 
 /** Create fibers to handle all outstanding tasks. */
 static void
-cpipe_fiber_pool_cb(ev_loop * /* loop */, struct ev_async *watcher,
-		  int /* events */)
+cpipe_fiber_pool_cb(ev_loop *loop, struct ev_async *watcher,
+		  int events)
 {
-	struct cpipe_fiber_pool *pool = (struct cpipe_fiber_pool *) watcher->data;
+	(void) loop;
+	(void) events;
+	struct cpipe_fiber_pool *pool =
+		(struct cpipe_fiber_pool *) watcher->data;
 	struct cpipe *pipe = pool->pipe;
 	(void) cpipe_peek(pipe);
 	while (! STAILQ_EMPTY(&pipe->output)) {

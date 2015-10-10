@@ -941,7 +941,7 @@ struct iproto_set_listen_msg: public cmsg
 static void
 iproto_on_bind(void *arg)
 {
-	cpipe_push(&tx_pipe, (struct cmsg_notify *) arg);
+	cpipe_push(&tx_pipe, (struct cmsg *) arg);
 }
 
 static void

@@ -60,7 +60,7 @@ set (core_sources
      say.c
      memory.c
      fiber.cc
-     cbus.cc
+     cbus.c
      exception.cc
      coro.cc
      reflection.c

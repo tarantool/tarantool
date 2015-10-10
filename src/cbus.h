@@ -33,6 +33,10 @@
 #include "fiber.h"
 #include "rmean.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** cbus, cmsg - inter-cord bus and messaging */
 
 struct cmsg;
@@ -429,34 +433,24 @@ cmsg_dispatch(struct cpipe *pipe, struct cmsg *msg)
 	}
 }
 
-struct CmsgDispatchGuard {
-	struct cpipe *pipe;
-	struct cmsg *msg;
-	CmsgDispatchGuard(struct cmsg *msg_arg)
-		:pipe(msg_arg->hop->pipe), msg(msg_arg) {}
-	~CmsgDispatchGuard() { cmsg_dispatch(pipe, msg); }
-};
-
 /**
  * Deliver the message and dispatch it to the next hop.
  */
 static inline void
 cmsg_deliver(struct cmsg *msg)
 {
-	/**
-	 * Ensure dispatch happens even if there is an exception,
-	 * otherwise the message may leak.
-	 */
-	CmsgDispatchGuard guard(msg);
+	struct cpipe *pipe = msg->hop->pipe;
 	msg->hop->f(msg);
+	cmsg_dispatch(pipe, msg);
 }
 
 /**
  * A helper message to wakeup caller whenever an event
  * occurs.
  */
-struct cmsg_notify: public cmsg
+struct cmsg_notify
 {
+	struct cmsg base;
 	struct fiber *fiber;
 };
 
@@ -493,5 +487,9 @@ void
 cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
 			const char *name, struct cpipe *pipe,
 			int max_pool_size, float idle_timeout);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_CBUS_H_INCLUDED */
