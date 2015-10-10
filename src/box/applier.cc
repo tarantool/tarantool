@@ -40,7 +40,7 @@
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
-#include "trivia/util.h"
+#include "version.h"
 
 static const int RECONNECT_DELAY = 1.0;
 STRS(applier_state, applier_STATE);

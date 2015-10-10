@@ -52,6 +52,7 @@
 void *__libc_stack_end;
 #endif
 
+#define CRLF "\n"
 
 /** Find a string in an array of strings.
  *
@@ -327,7 +328,7 @@ backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
 	}
 }
 
-extern "C" void
+void
 print_backtrace()
 {
 	void *frame = __builtin_frame_address(0);
@@ -382,7 +383,7 @@ abspath(const char *filename)
 char *
 int2str(long int val)
 {
-	static char __thread buf[22];
+	static __thread char buf[22];
 	snprintf(buf, sizeof(buf), "%ld", val);
 	return buf;
 }

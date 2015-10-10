@@ -113,27 +113,6 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
 #endif
 
-#ifndef TYPEALIGN
-#define TYPEALIGN(ALIGNVAL,LEN)  \
-        (((uintptr_t) (LEN) + ((ALIGNVAL) - 1)) & ~((uintptr_t) ((ALIGNVAL) - 1)))
-
-#define SHORTALIGN(LEN)                 TYPEALIGN(sizeof(int16_t), (LEN))
-#define INTALIGN(LEN)                   TYPEALIGN(sizeof(int32_t), (LEN))
-#define MAXALIGN(LEN)                   TYPEALIGN(sizeof(int64_t), (LEN))
-#define PTRALIGN(LEN)                   TYPEALIGN(sizeof(void*), (LEN))
-#define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
-#endif
-
-#define CRLF "\n"
-
-#ifdef GCC
-# define FORMAT_PRINTF gnu_printf
-#else
-# define FORMAT_PRINTF printf
-#endif
-
-extern int forked;
-pid_t tfork();
 void close_all_xcpt(int fdc, ...);
 void coredump(int dump_interval);
 
@@ -151,12 +130,15 @@ extern void *__libc_stack_end;
 
 #ifdef ENABLE_BACKTRACE
 void print_backtrace();
-char *backtrace(void *frame, void *stack, size_t stack_size);
+
+char *
+backtrace(void *frame, void *stack, size_t stack_size);
 
 typedef int (backtrace_cb)(int frameno, void *frameret,
                            const char *func, size_t offset, void *cb_ctx);
-void backtrace_foreach(backtrace_cb cb, void *frame, void *stack, size_t stack_size,
-                       void *cb_ctx);
+void
+backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
+		  size_t stack_size, void *cb_ctx);
 #endif /* ENABLE_BACKTRACE */
 
 #ifdef HAVE_BFD
@@ -165,13 +147,20 @@ struct symbol {
 	const char *name;
 	void *end;
 };
-struct symbol *addr2symbol(void *addr);
-void symbols_load(const char *name);
-void symbols_free();
-#endif /* HAVE_BFD */
-char *find_path(const char *argv0);
+struct symbol *
+addr2symbol(void *addr);
 
-char *abspath(const char *filename);
+void
+symbols_load(const char *name);
+
+void
+symbols_free();
+#endif /* HAVE_BFD */
+char *
+find_path(const char *argv0);
+
+char *
+abspath(const char *filename);
 
 char *
 int2str(long int val);
@@ -218,40 +207,10 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-
 #if defined(__cplusplus)
 #define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
-#else
+#else /* defined(__cplusplus) */
 #define API_EXPORT extern __attribute__ ((visibility ("default")))
-#endif
-
-/**
- * Pack version into uint32_t.
- * The highest byte or result means major version, next - minor,
- * middle - patch, last - revision.
- */
-static inline uint32_t
-version_id(unsigned major, unsigned minor, unsigned patch)
-{
-	return (((major << 8) | minor) << 8) | patch;
-}
-
-static inline unsigned
-version_id_major(uint32_t version_id)
-{
-	return (version_id >> 16) & 0xff;
-}
-
-static inline unsigned
-version_id_minor(uint32_t version_id)
-{
-	return (version_id >> 8) & 0xff;
-}
-
-static inline unsigned
-version_id_patch(uint32_t version_id)
-{
-	return version_id & 0xff;
-}
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

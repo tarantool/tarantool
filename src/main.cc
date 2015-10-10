@@ -65,6 +65,7 @@
 #include "iobuf.h"
 #include <third_party/gopt/gopt.h>
 #include "cfg.h"
+#include "version.h"
 #include <readline/history.h>
 
 static pid_t master_pid = getpid();

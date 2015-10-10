@@ -35,6 +35,7 @@
 #include "scramble.h"
 #include "third_party/base64.h"
 #include "iproto_constants.h"
+#include "version.h"
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
