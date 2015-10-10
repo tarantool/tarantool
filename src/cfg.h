@@ -30,6 +30,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 int
 cfg_geti(const char *param);
 
@@ -44,5 +48,9 @@ cfg_getarr_size(const char *name);
 
 const char *
 cfg_getarr_elem(const char *name, int i);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_CFG_H */

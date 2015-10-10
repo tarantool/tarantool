@@ -54,6 +54,14 @@ extern "C" {
 
 struct lua_State;
 
+/**
+ * Single global lua_State shared by core and modules.
+ * Created with tarantool_lua_init().
+ * const char *msg = lua_tostring(L, -1);
+ * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
+ */
+extern struct lua_State *tarantool_L;
+
 /** \cond public */
 
 /**
@@ -526,13 +534,6 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 	}
 }
 
-/**
- * Single global lua_State shared by core and modules.
- * Created with tarantool_lua_init().
- * const char *msg = lua_tostring(L, -1);
- * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
- */
-extern struct lua_State *tarantool_L;
 
 /**
  * Make a reference to an object on top of the Lua stack and

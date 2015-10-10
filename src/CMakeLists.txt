@@ -93,7 +93,7 @@ set (server_sources
      random.c
      scramble.c
      opts.c
-     cfg.cc
+     cfg.c
      cpu_feature.c
      fiob.c
      tt_uuid.c
