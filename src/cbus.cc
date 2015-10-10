@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "cbus.h"
-#include "scoped_guard.h"
 
 struct rmean *rmean_net = NULL;
 const char *rmean_net_strings[RMEAN_NET_LAST] = {
@@ -268,7 +267,6 @@ cpipe_fiber_pool_f(va_list ap)
 	struct cpipe *pipe = pool->pipe;
 	struct cmsg *msg;
 	pool->size++;
-	auto size_guard = make_scoped_guard([=]{ pool->size--; });
 restart:
 	while ((msg = cpipe_pop_output(pipe)))
 		cmsg_deliver(msg);
@@ -281,12 +279,10 @@ restart:
 		bool timed_out = fiber_yield_timeout(pool->idle_timeout);
 		pool->cache_size--;
 		pool->size++;
-		if (timed_out) {
-			/** Nothing to do for quite a while */
-			return;
-		}
-		goto restart;
+		if (! timed_out)
+			goto restart;
 	}
+	pool->size--;
 }
 
 

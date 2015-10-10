@@ -30,10 +30,8 @@
  */
 #include "rmean.h"
 
-#include <say.h>
-
-#include <assoc.h>
-
+#include "say.h"
+#include "assoc.h"
 
 void
 rmean_collect(struct rmean *rmean, size_t name, int64_t value)
@@ -52,11 +50,11 @@ rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 			continue;
 
 		int diff = 0;
-		for (size_t j = 1; j <= PERF_SECS; j++)
+		for (size_t j = 1; j <= RMEAN_WINDOW; j++)
 			diff += rmean->stats[i].value[j];
 		/* value[0] not adds because second isn't over */
 
-		diff /= PERF_SECS;
+		diff /= RMEAN_WINDOW;
 
 		int res = cb(rmean->stats[i].name, diff,
 			     rmean->stats[i].total, cb_ctx);
@@ -68,18 +66,20 @@ rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 }
 
 void
-rmean_age(ev_loop * /* loop */,
-	 ev_timer *timer, int /* events */)
+rmean_age(ev_loop *loop,
+	  ev_timer *timer, int events)
 {
+	(void) loop;
+	(void) events;
 	struct rmean *rmean = (struct rmean *) timer->data;
 
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
 			continue;
 
-		for (int j = PERF_SECS - 1; j >= 0;  j--)
+		for (int j = RMEAN_WINDOW - 1; j >= 0;  j--)
 			rmean->stats[i].value[j + 1] =
-					rmean->stats[i].value[j];
+				rmean->stats[i].value[j];
 		rmean->stats[i].value[0] = 0;
 	}
 
@@ -95,9 +95,10 @@ rmean_timer_tick(struct rmean *rmean)
 struct rmean *
 rmean_new(const char **name, size_t n)
 {
-	struct rmean *rmean = (struct rmean *) realloc(NULL,
-				sizeof(struct rmean) +
-				sizeof(struct stats) * n);
+	struct rmean *rmean = (struct rmean *)
+		realloc(NULL,
+			sizeof(struct rmean) +
+			sizeof(struct stats) * n);
 	if (rmean == NULL)
 		return NULL;
 	memset(rmean, 0, sizeof(struct rmean) + sizeof(struct stats) * n);
@@ -117,7 +118,6 @@ rmean_new(const char **name, size_t n)
 void
 rmean_delete(struct rmean *rmean)
 {
-
 	ev_timer_stop(loop(), &rmean->timer);
 	free(rmean);
 	rmean = 0;
@@ -127,8 +127,9 @@ void
 rmean_cleanup(struct rmean *rmean)
 {
 	for (size_t i = 0; i < rmean->stats_n; i++) {
-		for (size_t j = 0; j < PERF_SECS + 1; j++)
+		for (size_t j = 0; j < RMEAN_WINDOW + 1; j++)
 			rmean->stats[i].value[j] = 0;
 		rmean->stats[i].total = 0;
 	}
 }
+

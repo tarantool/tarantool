@@ -61,6 +61,9 @@ extern "C" {
 
 extern const ev_tstamp TIMEOUT_INFINITY;
 
+typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
+typedef void (*ev_async_cb)(ev_loop *, ev_async *, int);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

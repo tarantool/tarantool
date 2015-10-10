@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
-#include "coio.h"
 #include "rmean.h"
 
 /** cbus, cmsg - inter-cord bus and messaging */

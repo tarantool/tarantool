@@ -65,6 +65,7 @@ set (core_sources
      coro.cc
      reflection.c
      assoc.c
+     rmean.c
  )
 
 add_library(core STATIC ${core_sources})
@@ -84,7 +85,6 @@ set (server_sources
      iobuf.cc
      coio_buf.cc
      pickle.cc
-     rmean.cc
      ipc.cc
      latch.cc
      errinj.cc

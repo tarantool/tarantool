@@ -99,9 +99,6 @@ struct evio_service
 	ev_loop *loop;
 };
 
-typedef void (*ev_io_cb)(ev_loop *, ev_io *, int);
-typedef void (*ev_async_cb)(ev_loop *, ev_async *, int);
-
 /** Initialize the service. Don't bind to the port yet. */
 void
 evio_service_init(ev_loop *loop,
