@@ -627,7 +627,7 @@ void *cord_thread_func(void *p)
 	slab_cache_set_thread(&cord()->slabc);
 	cord_init(ct_arg->name);
 	/** Can't possibly be the main thread */
-	assert(cord->id != main_thread_id);
+	assert(cord()->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
 	void *(*f)(void *) = ct_arg->f;
 	void *arg = ct_arg->arg;
