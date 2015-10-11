@@ -52,11 +52,10 @@ ClientError::ClientError(const char *file, unsigned line,
 	m_errcode = errcode;
 	va_list ap;
 	va_start(ap, errcode);
-	vsnprintf(m_errmsg, sizeof(m_errmsg),
-		  tnt_errcode_desc(m_errcode), ap);
+	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
+	va_end(ap);
 	if (rmean_error)
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
-	va_end(ap);
 }
 
 ClientError::ClientError(const char *file, unsigned line, const char *msg,
@@ -64,8 +63,7 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 	: Exception(&type_ClientError, file, line)
 {
 	m_errcode = errcode;
-	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
-	m_errmsg[sizeof(m_errmsg) - 1] = 0;
+	error_format_msg(this, "%s", msg);
 	if (rmean_error)
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
@@ -73,7 +71,7 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 void
 ClientError::log() const
 {
-	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", tnt_errcode_str(m_errcode));
+	_say(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(m_errcode));
 }
 
 
@@ -95,9 +93,8 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 }
 
 const char *
-box_error_type(const box_error_t *error)
+box_error_type(const box_error_t *e)
 {
-	Exception *e = (Exception *) error;
 	return e->type->name;
 }
 
@@ -111,14 +108,13 @@ box_error_code(const box_error_t *error)
 const char *
 box_error_message(const box_error_t *error)
 {
-	Exception *e = (Exception *) error;
-	return e->errmsg();
+	return error->errmsg;
 }
 
 const box_error_t *
 box_error_last(void)
 {
-	return (box_error_t *) diag_last_error(&fiber()->diag);
+	return diag_last_error(&fiber()->diag);
 }
 
 void

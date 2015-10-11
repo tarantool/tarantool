@@ -59,7 +59,6 @@ void *ffi_symbols[] = {
 	(void *) box_iterator_next,
 	(void *) boxffi_tuple_update,
 	(void *) password_prepare,
-	(void *) tarantool_error_message,
 	(void *) load_cfg,
 	(void *) box_set_listen,
 	(void *) box_set_replication_source,

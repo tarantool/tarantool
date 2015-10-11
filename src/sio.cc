@@ -61,9 +61,9 @@ SocketError::SocketError(const char *file, unsigned line, int fd,
 	va_list ap;
 	va_start(ap, format);
 	vsnprintf(buf, sizeof(buf), format, ap);
-	const char *socketname = sio_socketname(fd);
-	init("%s, called on %s", buf, socketname);
 	va_end(ap);
+	const char *socketname = sio_socketname(fd);
+	error_format_msg(this, "%s, called on %s", buf, socketname);
 	errno = save_errno;
 }
 

@@ -84,7 +84,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 void
 iproto_reply_error(struct obuf *out, const Exception *e, uint64_t sync)
 {
-	uint32_t msg_len = strlen(e->errmsg());
+	uint32_t msg_len = strlen(e->get_errmsg());
 	uint32_t errcode = ClientError::get_errcode(e);
 
 	struct iproto_header_bin header = iproto_header_bin;
@@ -99,7 +99,7 @@ iproto_reply_error(struct obuf *out, const Exception *e, uint64_t sync)
 
 	obuf_dup(out, &header, sizeof(header));
 	obuf_dup(out, &body, sizeof(body));
-	obuf_dup(out, e->errmsg(), msg_len);
+	obuf_dup(out, e->get_errmsg(), msg_len);
 }
 
 static inline struct iproto_port *

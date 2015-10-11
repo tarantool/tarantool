@@ -215,7 +215,7 @@ fiber_join(struct fiber *fiber)
 
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	struct error *e = diag_last_error(&fiber()->diag);
 	/** Don't bother with propagation of FiberCancelException */
 	if (e != NULL && type_cast(FiberCancelException, e) != NULL)
 		diag_clear(&fiber()->diag);

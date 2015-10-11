@@ -63,7 +63,7 @@ XlogError::XlogError(const char *file, unsigned line,
 {
 	va_list ap;
 	va_start(ap, format);
-	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
+	error_vformat_msg(this, format, ap);
 	va_end(ap);
 }
 
@@ -73,7 +73,7 @@ XlogError::XlogError(const struct type *type, const char *file, unsigned line,
 {
 	va_list ap;
 	va_start(ap, format);
-	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
+	error_vformat_msg(this, format, ap);
 	va_end(ap);
 }
 
@@ -87,7 +87,7 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 {
 	char *s_from = vclock_to_string(from);
 	char *s_to = vclock_to_string(to);
-	snprintf(m_errmsg, sizeof(m_errmsg),
+	snprintf(errmsg, sizeof(errmsg),
 		 "Missing .xlog file between LSN %lld %s and %lld %s",
 		 (long long) vclock_sum(from), s_from ? s_from : "",
 		 (long long) vclock_sum(to), s_to ? s_to : "");

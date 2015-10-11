@@ -262,7 +262,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 			say_error("%s: failed to bind on %s: %s",
 				  evio_service_name(service),
 				  sio_strfaddr(ai->ai_addr, ai->ai_addrlen),
-				  e->errmsg());
+				  e->get_errmsg());
 			/* ignore */
 		}
 	}

@@ -446,15 +446,6 @@ tarantool_lua_slab_cache()
 	return &cord()->slabc;
 }
 
-extern "C" const char *
-tarantool_error_message(void)
-{
-	/* called only from error handler */
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-	assert(e != NULL);
-	return e->errmsg();
-}
-
 /**
  * Execute start-up script.
  */
@@ -498,7 +489,7 @@ run_script(va_list ap)
 			lua_pushstring(L, argv[i]);
 		lbox_call(L, lua_gettop(L) - 1, 0);
 	} catch (Exception *e) {
-		panic("%s", e->errmsg());
+		panic("%s", e->get_errmsg());
 	}
 
 	/* clear the stack from return values. */

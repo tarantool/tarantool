@@ -831,5 +831,5 @@ LuajitError::LuajitError(const char *file, unsigned line,
 	: Exception(&type_LuajitError, file, line)
 {
 	const char *msg = lua_tostring(L, -1);
-	snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
+	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
 }

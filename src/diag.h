@@ -51,47 +51,61 @@ struct type;
  * code. This is why there is a common infrastructure for errors.
  *
  * Any error or warning or note is represented by an instance of
- * struct diag_msg.
+ * struct error.
  *
- * struct diag_msg has the most common members, but more
+ * struct error has the most common members, but more
  * importantly it has a type descriptor, which makes it possible
  * to work with C++ exceptions and extra members via reflection,
  * in pure C.
  *
  * (destroy) is there to gracefully delete C++ exceptions from C.
  */
-struct diag_msg {
-	void (*destroy)(struct diag_msg *msg);
+struct error {
+	void (*destroy)(struct error *e);
 	const struct type *type;
 	int refs;
+	/** Line number. */
+	unsigned line;
+	/* Source file name. */
+	char file[DIAG_FILENAME_MAX];
+	/* Error description. */
+	char errmsg[DIAG_ERRMSG_MAX];
 };
 
 static inline void
-diag_msg_ref(struct diag_msg *msg)
+error_ref(struct error *e)
 {
-	msg->refs++;
+	e->refs++;
 }
 
 static inline void
-diag_msg_unref(struct diag_msg *msg)
+error_unref(struct error *e)
 {
-	assert(msg->refs > 0);
-	--msg->refs;
-	if (msg->refs == 0)
-		msg->destroy(msg);
+	assert(e->refs > 0);
+	--e->refs;
+	if (e->refs == 0)
+		e->destroy(e);
 }
 
 void
-diag_msg_create(struct diag_msg *msg,
-		void (*destroy)(struct diag_msg *msg),
-		const struct type *type);
+error_create(struct error *e,
+	     void (*destroy)(struct error *e),
+	     const struct type *type,
+	     const char *file,
+	     unsigned line);
+
+void
+error_format_msg(struct error *e, const char *format, ...);
+
+void
+error_vformat_msg(struct error *e, const char *format, va_list ap);
 
 /**
  * Diagnostics Area - a container for errors
  */
 struct diag {
 	/* \cond private */
-	struct diag_msg *last;
+	struct error *last;
 	/* \endcond private */
 };
 
@@ -123,7 +137,7 @@ diag_clear(struct diag *diag)
 {
 	if (diag->last == NULL)
 		return;
-	diag_msg_unref(diag->last);
+	error_unref(diag->last);
 	diag->last = NULL;
 }
 
@@ -133,10 +147,10 @@ diag_clear(struct diag *diag)
  * \param e error to add
  */
 static inline void
-diag_add_error(struct diag *diag, struct diag_msg *e)
+diag_add_error(struct diag *diag, struct error *e)
 {
 	assert(e != NULL);
-	diag_msg_ref(e);
+	error_ref(e);
 	diag_clear(diag);
 	diag->last = e;
 }
@@ -172,7 +186,7 @@ diag_destroy(struct diag *diag)
  * \return last error
  * \param diag diagnostics area
  */
-static inline struct diag_msg *
+static inline struct error *
 diag_last_error(struct diag *diag)
 {
 	return diag->last;

@@ -878,7 +878,7 @@ box_load_cfg()
 		box_init();
 	} catch (Exception *e) {
 		e->log();
-		panic("can't initialize storage: %s", e->errmsg());
+		panic("can't initialize storage: %s", e->get_errmsg());
 	}
 }
 

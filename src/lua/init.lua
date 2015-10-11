@@ -4,8 +4,13 @@
 
 local ffi = require('ffi')
 ffi.cdef[[
-char *
-tarantool_error_message(void);
+struct error;
+
+typedef struct error box_error_t;
+const box_error_t *
+box_error_last(void);
+const char *
+box_error_message(const box_error_t *);
 double
 tarantool_uptime(void);
 typedef int32_t pid_t;
@@ -16,7 +21,7 @@ local pcall_lua = pcall
 
 local function pcall_wrap(status, ...)
     if status == false and ... == 'C++ exception' then
-        return false, ffi.string(ffi.C.tarantool_error_message())
+        return false, ffi.string(ffi.C.box_error_message(ffi.C.box_error_last()))
     end
     return status, ...
 end

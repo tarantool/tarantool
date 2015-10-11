@@ -1122,7 +1122,7 @@ MemtxEngine::waitCheckpoint()
 		result = -1;
 		SystemError *se = type_cast(SystemError, e);
 		if (se)
-			errno = se->errnum();
+			errno = se->get_errno();
 	}
 
 	m_checkpoint->waiting_for_snap_thread = false;

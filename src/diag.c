@@ -32,18 +32,43 @@
 #include "fiber.h"
 
 void
-diag_msg_create(struct diag_msg *msg,
-		void (*destroy)(struct diag_msg *),
-		const struct type *type)
+error_create(struct error *e,
+	     void (*destroy)(struct error *),
+	     const struct type *type,
+	     const char *file,
+	     unsigned line)
 {
-	msg->destroy = destroy;
-	msg->type = type;
-	msg->refs = 0;
+	e->destroy = destroy;
+	e->type = type;
+	e->refs = 0;
+	if (file != NULL) {
+		snprintf(e->file, sizeof(e->file), "%s", file);
+		e->line = line;
+	} else {
+		e->file[0] = '\0';
+		e->line = 0;
+	}
+	e->errmsg[0] = '\0';
 }
 
 struct diag *
 diag_get()
 {
 	return &fiber()->diag;
+}
+
+void
+error_format_msg(struct error *e, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+}
+
+void
+error_vformat_msg(struct error *e, const char *format, va_list ap)
+{
+	vsnprintf(e->errmsg, sizeof(e->errmsg), format, ap);
 }
 

@@ -39,26 +39,16 @@
 
 extern const struct type type_Exception;
 
-class Exception: public diag_msg {
+class Exception: public error {
 public:
 	void *operator new(size_t size);
 	void operator delete(void*);
+
+	const char *get_file() const { return file; }
+	int get_line() const { return line; }
+	const char *get_errmsg() const { return errmsg; }
+
 	virtual void raise() = 0;
-
-	const char *
-	errmsg() const
-	{
-		return m_errmsg;
-	}
-
-	const char *file() const {
-		return m_file;
-	}
-
-	int line() const {
-		return m_line;
-	}
-
 	virtual void log() const;
 	virtual ~Exception();
 
@@ -66,27 +56,14 @@ public:
 	Exception& operator=(const Exception&) = delete;
 protected:
 	Exception(const struct type *type, const char *file, unsigned line);
-
-	/* line number */
-	unsigned m_line;
-	/* file name */
-	char m_file[DIAG_FILENAME_MAX];
-
-	/* error description */
-	char m_errmsg[DIAG_ERRMSG_MAX];
 };
 
 extern const struct type type_SystemError;
 class SystemError: public Exception {
 public:
-
 	virtual void raise() { throw this; }
 
-	int
-	errnum() const
-	{
-		return m_errno;
-	}
+	int get_errno() const { return m_errno; }
 
 	virtual void log() const;
 
@@ -94,13 +71,6 @@ public:
 		    const char *format, ...);
 protected:
 	SystemError(const struct type *type, const char *file, unsigned line);
-
-	void
-	init(const char *format, ...);
-
-	void
-	init(const char *format, va_list ap);
-
 protected:
 	/* system errno */
 	int m_errno;

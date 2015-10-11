@@ -40,9 +40,9 @@ static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
 
 static const struct method exception_methods[] = {
-	make_method(&type_Exception, "message", &Exception::errmsg),
-	make_method(&type_Exception, "file", &Exception::file),
-	make_method(&type_Exception, "line", &Exception::line),
+	make_method(&type_Exception, "message", &Exception::get_errmsg),
+	make_method(&type_Exception, "file", &Exception::get_file),
+	make_method(&type_Exception, "line", &Exception::get_line),
 	make_method(&type_Exception, "log", &Exception::log),
 	METHODS_SENTINEL
 };
@@ -73,7 +73,7 @@ Exception::~Exception()
 }
 
 extern "C" void
-exception_destroy(struct diag_msg *msg)
+exception_destroy(struct error *msg)
 {
 	delete (Exception *) msg;
 }
@@ -81,15 +81,8 @@ exception_destroy(struct diag_msg *msg)
 Exception::Exception(const struct type *type_arg, const char *file,
 		     unsigned line)
 {
-	diag_msg_create(this, exception_destroy, type_arg);
-	if (file != NULL) {
-		snprintf(m_file, sizeof(m_file), "%s", file);
-		m_line = line;
-	} else {
-		m_file[0] = '\0';
-		m_line = 0;
-	}
-	m_errmsg[0] = '\0';
+	error_create(this, exception_destroy, type_arg,
+		     file, line);
 	if (this == &out_of_memory) {
 		/* A special workaround for out_of_memory static init */
 		out_of_memory.refs = 1;
@@ -100,11 +93,11 @@ Exception::Exception(const struct type *type_arg, const char *file,
 void
 Exception::log() const
 {
-	_say(S_ERROR, m_file, m_line, m_errmsg, "%s", type->name);
+	_say(S_ERROR, file, line, errmsg, "%s", type->name);
 }
 
 static const struct method systemerror_methods[] = {
-	make_method(&type_SystemError, "errnum", &SystemError::errnum),
+	make_method(&type_SystemError, "errno", &SystemError::get_errno),
 	METHODS_SENTINEL
 };
 
@@ -126,30 +119,15 @@ SystemError::SystemError(const char *file, unsigned line,
 {
 	va_list ap;
 	va_start(ap, format);
-	init(format, ap);
+	error_vformat_msg(this, format, ap);
 	va_end(ap);
-}
-
-void
-SystemError::init(const char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	init(format, ap);
-	va_end(ap);
-}
-
-void
-SystemError::init(const char *format, va_list ap)
-{
-	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
 }
 
 void
 SystemError::log() const
 {
-	_say(S_SYSERROR, m_file, m_line, strerror(m_errno), "SystemError %s",
-	     m_errmsg);
+	_say(S_SYSERROR, file, line, strerror(m_errno), "SystemError %s",
+	     errmsg);
 }
 
 const struct type type_OutOfMemory =
@@ -161,9 +139,8 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 	: SystemError(&type_OutOfMemory, file, line)
 {
 	m_errno = ENOMEM;
-	snprintf(m_errmsg, sizeof(m_errmsg),
-		 "Failed to allocate %u bytes in %s for %s",
-		 (unsigned) amount, allocator, object);
+	error_format_msg(this, "Failed to allocate %u bytes in %s for %s",
+			 (unsigned) amount, allocator, object);
 }
 
 const struct type type_TimedOut =
