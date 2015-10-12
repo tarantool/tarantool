@@ -109,6 +109,7 @@ unset(CC_DEBUG_OPT)
 #
 
 add_compile_flags("C;CXX"
+    "-fno-common"
     "-fno-omit-frame-pointer"
     "-fno-stack-protector"
     "-fexceptions"
