@@ -46,14 +46,14 @@ static inline bool
 equal(struct tuple *tuple_a, struct tuple *tuple_b,
 	    const struct key_def *key_def)
 {
-	return key_def->tuple_compare(tuple_a, tuple_b, key_def) == 0;
+	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
 }
 
 static inline bool
 equal_key(struct tuple *tuple, const char *key,
 		const struct key_def *key_def)
 {
-	return key_def->tuple_compare_with_key(tuple, key, key_def->part_count,
+	return tuple_compare_with_key(tuple, key, key_def->part_count,
 					       key_def) == 0;
 }
 

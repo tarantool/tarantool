@@ -39,7 +39,7 @@
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>
-#include "tuple_gen.h"
+#include "tuple_compare_gen.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -28,54 +28,69 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple_gen.h"
+#include "tuple_compare_gen.h"
 #include "tuple.h"
 
 
 template <int TYPE>
-int field_compare(const char *&field_a, const char *&field_b);
+static inline int
+field_compare(const char **field_a, const char **field_b);
 
 template <>
-inline int field_compare<NUM>(const char *&field_a, const char *&field_b) {
-	return mp_compare_uint(field_a, field_b);
+inline int
+field_compare<NUM>(const char **field_a, const char **field_b) {
+	return mp_compare_uint(*field_a, *field_b);
 }
+
 template <>
-inline int field_compare<STRING>(const char *&field_a, const char *&field_b) {
+inline int
+field_compare<STRING>(const char **field_a, const char **field_b) {
 	uint32_t size_a, size_b;
-	size_a = mp_decode_strl(&field_a);
-	size_b = mp_decode_strl(&field_b);
-	int r = memcmp(field_a, field_b, MIN(size_a, size_b));
+	size_a = mp_decode_strl(field_a);
+	size_b = mp_decode_strl(field_b);
+	int r = memcmp(*field_a, *field_b, MIN(size_a, size_b));
 	if (r == 0)
 		r = size_a < size_b ? -1 : size_a > size_b;
 	return r;
 }
 
 template <int TYPE>
-int field_compare_buf(const char *&field_a, const char *&field_b);
+static inline int
+field_compare_and_next(const char **field_a, const char **field_b);
+
 template <>
-inline int field_compare_buf<NUM>(const char *&field_a, const char *&field_b) {
-	return mp_compare_uint(field_a, field_b);
-}
-template <>
-inline int field_compare_buf<STRING>(const char *&field_a, const char *&field_b) {
-	uint32_t size_a, size_b;
-	const char *fa = field_a, *fb = field_b;
-	size_a = mp_decode_strl(&fa);
-	size_b = mp_decode_strl(&fb);
-	int r = memcmp(fa, fb, MIN(size_a, size_b));
-	if (r == 0)
-		r = size_a < size_b ? -1 : size_a > size_b;
+inline int
+field_compare_and_next<NUM>(const char **field_a, const char **field_b) {
+	int r = mp_compare_uint(*field_a, *field_b);
+	mp_next(field_a);
+	mp_next(field_b);
 	return r;
 }
 
-/* Tuple with key comparer */
+template <>
+inline int
+field_compare_and_next<STRING>(const char **field_a, const char **field_b) {
+	uint32_t size_a, size_b;
+	size_a = mp_decode_strl(field_a);
+	size_b = mp_decode_strl(field_b);
+	int r = memcmp(*field_a, *field_b, MIN(size_a, size_b));
+	if (r == 0)
+		r = size_a < size_b ? -1 : size_a > size_b;
+	*field_a += size_a;
+	*field_b += size_b;
+	return r;
+}
+
+/* Tuple comparer */
+namespace /* local symbols */ {
+
 template<int IDX, int TYPE, int ...MORE_TYPES>
-struct TupComp { };
+struct ComparerPrimitive { };
 /**
  * common
  */
 template<int IDX, int TYPE, int IDX2, int ...MORE_TYPES>
-struct TupComp<IDX, TYPE, IDX2, MORE_TYPES...> {
+struct ComparerPrimitive<IDX, TYPE, IDX2, MORE_TYPES...> {
 	inline static int compare(const struct tuple *tuple_a,
 				  const struct tuple *tuple_b,
 				  const struct tuple_format *format_a,
@@ -86,23 +101,21 @@ struct TupComp<IDX, TYPE, IDX2, MORE_TYPES...> {
 		int r;
 		/* static if */
 		if(IDX + 1 == IDX2) {
-			if ((r = field_compare_buf<TYPE>(field_a, field_b)) != 0)
+			if ((r = field_compare_and_next<TYPE>(&field_a, &field_b)) != 0)
 				return r;
-			mp_next(&field_a);
-			mp_next(&field_b);
 		} else {
-			if ((r = field_compare<TYPE>(field_a, field_b)) != 0)
+			if ((r = field_compare<TYPE>(&field_a, &field_b)) != 0)
 				return r;
 			field_a = tuple_field_old(format_a, tuple_a, IDX2);
 			field_b = tuple_field_old(format_b, tuple_b, IDX2);
 		}
-		return TupComp<IDX2, MORE_TYPES...>::compare(tuple_a, tuple_b,
+		return ComparerPrimitive<IDX2, MORE_TYPES...>::compare(tuple_a, tuple_b,
 					format_a, format_b,field_a, field_b);
 	}
 };
 
 template<int IDX, int TYPE>
-struct TupComp<IDX, TYPE> {
+struct ComparerPrimitive<IDX, TYPE> {
 	inline static int compare(const struct tuple *,
 				  const struct tuple *,
 				  const struct tuple_format *,
@@ -110,7 +123,7 @@ struct TupComp<IDX, TYPE> {
 				  const char *field_a,
 				  const char *field_b)
 	{
-		return field_compare<TYPE>(field_a, field_b);
+		return field_compare<TYPE>(&field_a, &field_b);
 	}
 };
 
@@ -127,7 +140,7 @@ struct TupleComparer {
 		struct tuple_format *format_b = tuple_format(tuple_b);
 		const char *field_a = tuple_field_old(format_a, tuple_a, IDX);
 		const char *field_b = tuple_field_old(format_b, tuple_b, IDX);
-		return TupComp<IDX, MORE_TYPES...>::compare(tuple_a, tuple_b,
+		return ComparerPrimitive<IDX, MORE_TYPES...>::compare(tuple_a, tuple_b,
 					format_a, format_b,field_a, field_b);
 	}
 };
@@ -143,18 +156,18 @@ struct TupleComparer<0, MORE_TYPES...> {
 		const char *field_b = tuple_b->data;
 		mp_decode_array(&field_a);
 		mp_decode_array(&field_b);
-		return TupComp<0, MORE_TYPES...>::compare(tuple_a, tuple_b,
+		return ComparerPrimitive<0, MORE_TYPES...>::compare(tuple_a, tuple_b,
 					format_a, format_b,field_a, field_b);
 	}
 };
+} /* namespace */
 
-
-struct FuncParams {
+struct function_description {
 	tuple_cmp_t f;
 	uint32_t p[64];
 };
 #define COMPARER(...) {TupleComparer<__VA_ARGS__>::compare, __VA_ARGS__, UINT32_MAX},
-const FuncParams cmp_arr[] = {
+static const function_description cmp_arr[] = {
 	COMPARER(0, NUM   )
 	COMPARER(0, STRING)
 	COMPARER(0, NUM   , 1, NUM   )
@@ -172,7 +185,7 @@ const FuncParams cmp_arr[] = {
 };
 
 tuple_cmp_t
-tuple_gen_compare(const struct key_def *def) {
+tuple_compare_gen(const struct key_def *def) {
 	for (uint32_t k = 0; k < sizeof(cmp_arr) / sizeof(cmp_arr[0]); k++) {
 		uint32_t i = 0;
 		for (; i < def->part_count; i++)

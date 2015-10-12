@@ -102,8 +102,8 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 
 	memset(def->parts, 0, parts_size);
 
-	def->tuple_compare = tuple_gen_compare(def);
-	def->tuple_compare_with_key = tuple_gen_compare_with_key(def);
+	def->tuple_compare = tuple_compare_gen(def);
+	def->tuple_compare_with_key = tuple_compare_with_key_gen(def);
 	return def;
 }
 
@@ -286,7 +286,7 @@ identifier_check(const char *str)
 void
 key_def_finalize(struct key_def *def)
 {
-	def->tuple_compare = tuple_gen_compare(def);
-	def->tuple_compare_with_key = tuple_gen_compare_with_key(def);
+	def->tuple_compare = tuple_compare_gen(def);
+	def->tuple_compare_with_key = tuple_compare_with_key_gen(def);
 }
 
