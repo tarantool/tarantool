@@ -36,7 +36,7 @@
 #include <sys/mman.h>
 #include "small/slab_cache.h"
 #include "third_party/valgrind/memcheck.h"
-
+#include "diag.h"
 
 int
 tarantool_coro_create(struct tarantool_coro *coro,
@@ -53,6 +53,8 @@ tarantool_coro_create(struct tarantool_coro *coro,
 					+ slab_sizeof();
 
 	if (coro->stack == NULL) {
+		diag_set(OutOfMemory, coro->stack_size + slab_sizeof(),
+			 "runtime arena", "coro stack");
 		return -1;
 	}
 

@@ -653,7 +653,7 @@ tx_process_msg(struct cmsg *m)
 				 */
 				if (port.found)
 					obuf_rollback_to_svp(out, &port.svp);
-				throw (Exception *) box_error_last();
+				diag_raise();
 			}
 			break;
 		}
@@ -666,7 +666,7 @@ tx_process_msg(struct cmsg *m)
 			assert(msg->request.type == msg->header.type);
 			struct tuple *tuple;
 			if (box_process1(&msg->request, &tuple) < 0)
-				throw (Exception *) box_error_last();
+				diag_raise();
 			struct obuf_svp svp = iproto_prepare_select(out);
 			if (tuple)
 				tuple_to_obuf(tuple, out);
@@ -997,7 +997,7 @@ iproto_set_listen(const char *uri)
 	fiber_yield();
 	if (! diag_is_empty(&msg.diag)) {
 		diag_move(&msg.diag, &fiber()->diag);
-		fiber_testerror();
+		diag_raise();
 	}
 }
 

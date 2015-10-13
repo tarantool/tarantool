@@ -35,13 +35,13 @@
 
 #include "reflection.h"
 #include "diag.h"
-#include "say.h"
 
 extern const struct type type_Exception;
 
 class Exception: public error {
 public:
 	void *operator new(size_t size);
+	void *operator new(size_t size, void *p) { (void) size; return p; }
 	void operator delete(void*);
 
 	const char *get_file() const { return file; }
@@ -91,6 +91,12 @@ public:
 	TimedOut(const char *file, unsigned line);
 	virtual void raise() { throw this; }
 };
+
+/**
+ * Initialize the exception subsystem.
+ */
+void
+exception_init();
 
 #define tnt_error(class, ...) ({					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\

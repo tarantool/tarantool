@@ -76,7 +76,7 @@ ClientError::log() const
 
 
 uint32_t
-ClientError::get_errcode(const Exception *e)
+ClientError::get_errcode(const struct error *e)
 {
 	ClientError *client_error = type_cast(ClientError, e);
 	if (client_error)
@@ -99,9 +99,8 @@ box_error_type(const box_error_t *e)
 }
 
 uint32_t
-box_error_code(const box_error_t *error)
+box_error_code(const box_error_t *e)
 {
-	Exception *e = (Exception *) error;
 	return ClientError::get_errcode(e);
 }
 
@@ -111,7 +110,7 @@ box_error_message(const box_error_t *error)
 	return error->errmsg;
 }
 
-const box_error_t *
+box_error_t *
 box_error_last(void)
 {
 	return diag_last_error(&fiber()->diag);

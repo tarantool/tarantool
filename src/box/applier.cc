@@ -272,7 +272,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
  * in applier_f().
  */
 static inline void
-applier_log_exception(struct applier *applier, Exception *e)
+applier_log_error(struct applier *applier, struct error *e)
 {
 	if (type_cast(FiberCancelException, e))
 		return;
@@ -295,17 +295,17 @@ applier_log_exception(struct applier *applier, Exception *e)
 	default:
 		break;
 	}
-	e->log();
+	error_log(e);
 	if (type_cast(SocketError, e))
 		say_info("will retry every %i second", RECONNECT_DELAY);
 	applier->warning_said = true;
 }
 
 static inline void
-applier_disconnect(struct applier *applier, Exception *e,
+applier_disconnect(struct applier *applier, struct error *e,
 		   enum applier_state state)
 {
-	applier_log_exception(applier, e);
+	applier_log_error(applier, e);
 	coio_close(loop(), &applier->io);
 	iobuf_reset(applier->iobuf);
 	applier_set_state(applier, state);
@@ -411,7 +411,7 @@ applier_wait(struct applier *applier)
 	assert(applier->reader != NULL);
 	auto fiber_guard = make_scoped_guard([=] { applier->reader = NULL; });
 	fiber_join(applier->reader);
-	fiber_testerror();
+	diag_raise();
 }
 
 struct applier *

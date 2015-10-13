@@ -300,13 +300,7 @@ box_lua_fiber_run(va_list ap)
 			lua_unref(L, storage_ref);
 	});
 
-	try {
-		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
-	} catch (FiberCancelException *e) {
-		throw;
-	} catch (Exception *e) {
-		e->log();
-	}
+	lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 }
 
 /**

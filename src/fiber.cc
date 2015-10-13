@@ -418,10 +418,6 @@ fiber_loop(void *data __attribute__((unused)))
 			 * propagate up to the joiner.
 			 */
 			diag_clear(&fiber->diag);
-		} catch (FiberCancelException *e) {
-			say_info("fiber `%s' has been cancelled",
-				 fiber_name(fiber));
-			say_info("fiber `%s': exiting", fiber_name(fiber));
 		} catch (Exception *e) {
 			/*
 			 * For joinable fibers, it's the business
@@ -495,8 +491,7 @@ fiber_new(const char *name, void (*f) (va_list))
 
 		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
 					  fiber_loop, NULL)) {
-			tnt_raise(OutOfMemory, 65536,
-				  "runtime arena", "coro stack");
+			diag_raise();
 		}
 
 		region_create(&fiber->gc, &cord->slabc);

@@ -609,8 +609,8 @@ coio_service_on_accept(struct evio_service *evio_service,
 	try {
 		iobuf = iobuf_new();
 		f = fiber_new(fiber_name, service->handler);
-	} catch (Exception *e) {
-		e->log();
+	} catch (struct error *e) {
+		error_log(e);
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(loop(), &coio);
 		if (iobuf)

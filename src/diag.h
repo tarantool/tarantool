@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -45,6 +46,11 @@ enum {
 };
 
 struct type;
+struct error;
+struct error_factory;
+extern struct error_factory *error_factory;
+
+typedef void (*error_f)(struct error *e);
 
 /**
  * Error diagnostics needs to be equally usable in C and C++
@@ -61,7 +67,9 @@ struct type;
  * (destroy) is there to gracefully delete C++ exceptions from C.
  */
 struct error {
-	void (*destroy)(struct error *e);
+	error_f destroy;
+	error_f raise;
+	error_f log;
 	const struct type *type;
 	int refs;
 	/** Line number. */
@@ -87,12 +95,22 @@ error_unref(struct error *e)
 		e->destroy(e);
 }
 
+static inline void
+error_raise(struct error *e)
+{
+	e->raise(e);
+}
+
+static inline void
+error_log(struct error *e)
+{
+	e->log(e);
+}
+
 void
 error_create(struct error *e,
-	     void (*destroy)(struct error *e),
-	     const struct type *type,
-	     const char *file,
-	     unsigned line);
+	     error_f create, error_f raise, error_f log,
+	     const struct type *type, const char *file, unsigned line);
 
 void
 error_format_msg(struct error *e, const char *format, ...);
@@ -192,12 +210,23 @@ diag_last_error(struct diag *diag)
 	return diag->last;
 }
 
-/**
- * A helper for tnt_error to avoid cyclic includes (fiber.h and exception.h)
- * \cond false
- * */
+struct error_factory {
+	struct error *(*OutOfMemory)(const char *file,
+				     unsigned line, size_t amount,
+				     const char *allocator,
+				     const char *object);
+};
+
 struct diag *
 diag_get();
+
+#define diag_set(class, ...) ({						\
+	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
+	struct error *e = error_factory->class(__FILE__, __LINE__,	\
+						##__VA_ARGS__);		\
+	diag_add_error(diag_get(), e);					\
+	e;								\
+})
 
 #if defined(__cplusplus)
 } /* extern "C" */

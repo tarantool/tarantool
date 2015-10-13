@@ -86,7 +86,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync);
 
 /** Send an error packet back. */
 void
-iproto_reply_error(struct obuf *out, const Exception *e, uint64_t sync);
+iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync);
 
 struct obuf_svp
 iproto_prepare_select(struct obuf *buf);

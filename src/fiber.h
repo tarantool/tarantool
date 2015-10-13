@@ -430,7 +430,9 @@ public:
 	}
 
 	virtual void log() const {
-		say_debug("FiberCancelException");
+			say_info("fiber `%s' has been cancelled",
+				 fiber_name(fiber()));
+			say_info("fiber `%s': exiting", fiber_name(fiber()));
 	}
 	virtual void raise() { throw this; }
 };
@@ -454,12 +456,13 @@ fiber_testcancel(void)
 		tnt_raise(FiberCancelException);
 }
 
+
 static inline void
-fiber_testerror(void)
+diag_raise(void)
 {
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	struct error *e = diag_last_error(&fiber()->diag);
 	if (e)
-		e->raise();
+		error_raise(e);
 }
 
 #endif /* defined(__cplusplus) */

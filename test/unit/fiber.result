@@ -1,5 +1,3 @@
-(null): fiber `cancel' has been cancelled
-(null): fiber `cancel': exiting
 	*** fiber_join_test ***
 # exception propagated
 # cancel dead has started

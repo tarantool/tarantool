@@ -629,6 +629,8 @@ main(int argc, char **argv)
 	main_argc = argc;
 	main_argv = argv;
 
+	exception_init();
+
 	fiber_init();
 	/* Init iobuf library with default readahead */
 	iobuf_init();
@@ -660,8 +662,8 @@ main(int argc, char **argv)
 			ev_now_update(loop());
 			ev_run(loop(), 0);
 		}
-	} catch (Exception *e) {
-		e->log();
+	} catch (struct error *e) {
+		error_log(e);
 		panic("%s", "fatal error, exiting the event loop");
 	}
 

@@ -29,11 +29,34 @@
  * SUCH DAMAGE.
  */
 #include "exception.h"
-#include "say.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+
+extern "C" {
+
+static void
+exception_destroy(struct error *e)
+{
+	delete (Exception *) e;
+}
+
+static void
+exception_raise(struct error *error)
+{
+	Exception *e = (Exception *) error;
+	e->raise();
+}
+
+static void
+exception_log(struct error *error)
+{
+	Exception *e = (Exception *) error;
+	e->log();
+}
+
+} /* extern "C" */
 
 /** out_of_memory::size is zero-initialized by the linker. */
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
@@ -72,22 +95,11 @@ Exception::~Exception()
 	}
 }
 
-extern "C" void
-exception_destroy(struct error *msg)
-{
-	delete (Exception *) msg;
-}
-
 Exception::Exception(const struct type *type_arg, const char *file,
 		     unsigned line)
 {
-	error_create(this, exception_destroy, type_arg,
-		     file, line);
-	if (this == &out_of_memory) {
-		/* A special workaround for out_of_memory static init */
-		out_of_memory.refs = 1;
-		return;
-	}
+	error_create(this, exception_destroy, exception_raise,
+		     exception_log, type_arg, file, line);
 }
 
 void
@@ -143,6 +155,18 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 (unsigned) amount, allocator, object);
 }
 
+static struct error *
+BuildOutOfMemory(const char *file, unsigned line,
+		 size_t amount, const char *allocator,
+		 const char *object)
+{
+	void *p = malloc(sizeof(OutOfMemory));
+	if (p == NULL)
+		return &out_of_memory;
+	return new (p) OutOfMemory(file, line, amount, allocator,
+				   object);
+}
+
 const struct type type_TimedOut =
 	make_type("TimedOut", &type_SystemError);
 
@@ -150,4 +174,17 @@ TimedOut::TimedOut(const char *file, unsigned line)
 	: SystemError(&type_OutOfMemory, file, line)
 {
 	m_errno = ETIMEDOUT;
+}
+
+void
+exception_init()
+{
+	static struct error_factory exception_error_factory;
+
+	exception_error_factory.OutOfMemory = BuildOutOfMemory;
+
+	error_factory = &exception_error_factory;
+
+	/* A special workaround for out_of_memory static init */
+	out_of_memory.refs = 1;
 }

@@ -31,14 +31,17 @@
 #include "diag.h"
 #include "fiber.h"
 
+/* Must be set by the library user */
+struct error_factory *error_factory = NULL;
+
 void
 error_create(struct error *e,
-	     void (*destroy)(struct error *),
-	     const struct type *type,
-	     const char *file,
-	     unsigned line)
+	     error_f destroy, error_f raise, error_f log,
+	     const struct type *type, const char *file, unsigned line)
 {
 	e->destroy = destroy;
+	e->raise = raise;
+	e->log = log;
 	e->type = type;
 	e->refs = 0;
 	if (file != NULL) {

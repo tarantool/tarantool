@@ -64,7 +64,7 @@ fiber_join_test()
 	fiber_wakeup(fiber);
 	try {
 		fiber_join(fiber);
-		fiber_testerror();
+		diag_raise();
 		fail("exception not raised", "");
 	} catch (Exception *e) {
 		note("exception propagated");

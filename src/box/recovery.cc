@@ -536,7 +536,7 @@ recovery_stop_local(struct recovery *r)
 		r->watcher = NULL;
 		fiber_cancel(f);
 		fiber_join(f);
-		fiber_testerror();
+		diag_raise();
 	}
 }
 

@@ -1116,9 +1116,9 @@ MemtxEngine::waitCheckpoint()
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&m_checkpoint->cord);
 
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	struct error *e = diag_last_error(&fiber()->diag);
 	if (e != NULL) {
-		e->log();
+		error_log(e);
 		result = -1;
 		SystemError *se = type_cast(SystemError, e);
 		if (se)
@@ -1163,9 +1163,9 @@ MemtxEngine::abortCheckpoint()
 		/* wait for memtx-part snapshot completion */
 		cord_cojoin(&m_checkpoint->cord);
 
-		Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+		struct error *e = diag_last_error(&fiber()->diag);
 		if (e)
-			e->log();
+			error_log(e);
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 

@@ -63,7 +63,7 @@ public:
 	ClientError(const char *file, unsigned line, const char *msg,
 		    uint32_t errcode);
 
-	static uint32_t get_errcode(const Exception *e);
+	static uint32_t get_errcode(const struct error *e);
 private:
 	/* client errno code */
 	int m_errcode;
@@ -145,7 +145,7 @@ box_error_message(const box_error_t *error);
  *
  * \return last error.
  */
-API_EXPORT const box_error_t *
+API_EXPORT box_error_t *
 box_error_last(void);
 
 /**

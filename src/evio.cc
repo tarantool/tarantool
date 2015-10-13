@@ -201,29 +201,27 @@ evio_service_bind_addr(struct evio_service *service)
 	int fd = sio_socket(service->addr.sa_family,
 		SOCK_STREAM, IPPROTO_TCP);
 
-	try {
-		evio_setsockopt_server(fd, service->addr.sa_family, SOCK_STREAM);
+	auto fd_guard = make_scoped_guard([=]{ close(fd); });
 
-		if (sio_bind(fd, &service->addr, service->addr_len) ||
-		    sio_listen(fd)) {
-			assert(errno == EADDRINUSE);
-			close(fd);
-			return -1;
-		}
-		say_info("%s: bound to %s", evio_service_name(service),
-			 sio_strfaddr(&service->addr, service->addr_len));
+	evio_setsockopt_server(fd, service->addr.sa_family, SOCK_STREAM);
 
-		/* Invoke on_bind callback if it is set. */
-		if (service->on_bind)
-			service->on_bind(service->on_bind_param);
-
-	} catch (Exception *e) {
+	if (sio_bind(fd, &service->addr, service->addr_len) ||
+	    sio_listen(fd)) {
+		assert(errno == EADDRINUSE);
 		close(fd);
-		throw;
+		return -1;
 	}
+	say_info("%s: bound to %s", evio_service_name(service),
+		 sio_strfaddr(&service->addr, service->addr_len));
+
+	/* Invoke on_bind callback if it is set. */
+	if (service->on_bind)
+		service->on_bind(service->on_bind_param);
+
 	/* Register the socket in the event loop. */
 	ev_io_set(&service->ev, fd, EV_READ);
 	ev_io_start(service->loop, &service->ev);
+	fd_guard.is_active = false;
 	return 0;
 }
 
