@@ -260,10 +260,9 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
  * \sa box_update()
  */
 API_EXPORT int
-box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
-	   const char *key_end, const char *ops, const char *ops_end,
-	   const char *tuple, const char *tuple_end, int index_base,
-	   box_tuple_t **result);
+box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
+	   const char *tuple_end, const char *ops, const char *ops_end,
+	   int index_base, box_tuple_t **result);
 
 /** \endcond public */
 

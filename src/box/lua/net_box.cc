@@ -357,9 +357,9 @@ netbox_encode_update(lua_State *L)
 static int
 netbox_encode_upsert(lua_State *L)
 {
-	if (lua_gettop(L) < 7)
+	if (lua_gettop(L) != 6)
 		return luaL_error(L, "Usage: netbox.encode_update(ibuf, sync, "
-			"space_id, index_id, key, ops, tuple)");
+			"space_id, index_id, tuple, ops)");
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_UPSERT);
@@ -381,19 +381,14 @@ netbox_encode_upsert(lua_State *L)
 	luamp_encode_uint(cfg, &stream, 1);
 
 	/* encode in reverse order for speedup - see luamp_encode() code */
-	/* encode tuple */
-	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 7);
-	lua_pop(L, 1); /* tuple */
-
 	/* encode ops */
 	luamp_encode_uint(cfg, &stream, IPROTO_OPS);
 	luamp_encode_tuple(L, cfg, &stream, 6);
 	lua_pop(L, 1); /* ops */
 
-	/* encode key */
-	luamp_encode_uint(cfg, &stream, IPROTO_KEY);
-	luamp_convert_key(L, cfg, &stream, 5);
+	/* encode tuple */
+	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
+	luamp_encode_tuple(L, cfg, &stream, 5);
 
 	netbox_encode_request(&stream, svp);
 	return 0;

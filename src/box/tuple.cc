@@ -432,6 +432,48 @@ tuple_bless(struct tuple_format *format,
 	return new_tuple;
 }
 
+/**
+ * Extract key from tuple data.
+ * Write the key to the provided buffer ('key' argument), if buffer size is
+ * big enough ('key_buf_size' argument)
+ * Return length of the key (required buffer size for storing it)
+ */
+uint32_t
+extract_key_from_tuple_data(struct key_def *key_def, const char *data,
+			    char *key, uint32_t key_buf_size)
+{
+	uint32_t calculated_key_len = 0;
+	uint32_t part_count = key_def->part_count;
+	const char *field0 = data;
+	mp_decode_array(&field0);
+	const char *field0_end = field0;
+	mp_next(&field0_end);
+	const char *field = field0;
+	const char *field_end = field0_end;
+	uint32_t current_field_no = 0;
+	for (uint32_t i = 0; i < part_count; i++) {
+		uint32_t field_no = key_def->parts[i].fieldno;
+		if (field_no < current_field_no) {
+			field = field0;
+			field_end = field0_end;
+			current_field_no = 0;
+		}
+		while (current_field_no < field_no) {
+			field = field_end;
+			mp_next(&field_end);
+			current_field_no++;
+		}
+		uint32_t field_len = (uint32_t)(field_end - field);
+		calculated_key_len += field_len;
+		if (field_len <= key_buf_size) {
+			memcpy(key, field, field_len);
+			key += field_len;
+			key_buf_size -= field_len;
+		}
+	}
+	return calculated_key_len;
+}
+
 struct tuple *
 tuple_update(struct tuple_format *format,
 	     tuple_update_alloc_func f, void *alloc_ctx,

@@ -54,7 +54,7 @@ replica test 2 (must be ok)
 for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
 ---
 ...
-for k = 20, 29 do box.space[42]:upsert({k}, {}, {k}) end
+for k = 20, 29 do box.space[42]:upsert({k}, {}) end
 ---
 ...
 space = box.space.test

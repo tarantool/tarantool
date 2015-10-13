@@ -486,6 +486,17 @@ void
 tuple_init_field_map(struct tuple_format *format,
 		     struct tuple *tuple, uint32_t *field_map);
 
+
+/**
+ * Extract key from tuple data.
+ * Write the key to the provided buffer ('key' argument), if buffer size is
+ * big enough ('key_buf_size' argument)
+ * Return length of the key (required buffer size for storing it)
+ */
+uint32_t
+extract_key_from_tuple_data(struct key_def *key_def, const char *data,
+			    char *key, uint32_t key_buf_size);
+
 struct tuple *
 tuple_update(struct tuple_format *new_format,
 	     tuple_update_alloc_func f, void *alloc_ctx,

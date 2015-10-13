@@ -183,9 +183,9 @@ local function space_metatable(self)
                 return self:_update(space.id, key, oplist, 0)
             end,
 
-            upsert = function(space, key, oplist, tuple)
+            upsert = function(space, tuple_key, oplist)
                 check_if_space(space)
-                return self:_upsert(space.id, key, oplist, tuple, 0)
+                return self:_upsert(space.id, tuple_key, oplist, 0)
             end,
 
             get = function(space, key)
@@ -270,9 +270,9 @@ local function index_metatable(self)
                 return self:_update(idx.space.id, key, oplist, idx.id)
             end,
 
-            upsert = function(idx, key, oplist, tuple)
+            upsert = function(idx, tuple_key, oplist)
                 check_if_index(idx)
-                return self:_upsert(idx.space.id, key, oplist, tuple, idx.id)
+                return self:_upsert(idx.space.id, tuple_key, oplist, idx.id)
             end,
 
         }
@@ -1014,9 +1014,9 @@ local remote_methods = {
         return one_tuple(res.body[DATA])
     end,
 
-    _upsert = function(self, spaceno, key, oplist, tuple, index_id)
+    _upsert = function(self, spaceno, tuple_key, oplist, index_id)
         local res = self:_request(UPSERT, true, spaceno,
-                                  index_id, key, oplist, tuple)
+                                  index_id, tuple_key, oplist)
         return one_tuple(res.body[DATA])
     end,
 }

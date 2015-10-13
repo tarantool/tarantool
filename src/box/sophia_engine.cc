@@ -185,25 +185,30 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	return NULL;
 }
 
+#include <alya/mp_print.h>
+
 void
 SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 
-	/* validate upsert key */
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
-	primary_key_validate(index->key_def, key, part_count);
-
-	/* validate default tuple */
+	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
 
-	int size = request->tuple_end - request->tuple;
-	key = tuple_field_raw(request->tuple, size,
-	                      index->key_def->parts[0].fieldno);
-	primary_key_validate(index->key_def, key, index->key_def->part_count);
+	mp_print(request->tuple);
+
+	/* Extract key from tuple */
+	uint32_t key_len = extract_key_from_tuple_data(index->key_def,
+						       request->tuple, 0, 0);
+	char *key = (char *)region_alloc(&fiber()->gc, key_len);
+	extract_key_from_tuple_data(index->key_def, request->tuple,
+				    key, key_len);
+
+	/* validate upsert key */
+	uint32_t part_count = index->key_def->part_count;
+	primary_key_validate(index->key_def, key, part_count);
 
 	index->upsert(key,
 	              request->ops,

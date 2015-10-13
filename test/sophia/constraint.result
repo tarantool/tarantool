@@ -17,11 +17,11 @@ space:delete{1}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected STR'
 ...
-space:update(1, {{'=', 1, 101}})
+space:update({1}, {{'=', 1, 101}})
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected STR'
 ...
-space:upsert(1, {{'+', 1, 10}}, {0})
+space:upsert({1}, {{'+', 1, 10}})
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected STR'
 ...
@@ -55,11 +55,11 @@ space:delete{'A'}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-space:update('A', {{'=', 1, 101}})
+space:update({'A'}, {{'=', 1, 101}})
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-space:upsert('A', {{'+', 1, 10}}, {0})
+space:upsert({'A'}, {{'+', 1, 10}})
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
@@ -119,9 +119,9 @@ space:update(1, {{'=', 1, 101}})
 ---
 - error: Invalid key part count in an exact match (expected 2, got 1)
 ...
-space:upsert(1, {{'+', 1, 10}}, {0})
+space:upsert({1}, {{'+', 1, 10}})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Tuple field count 1 is less than required by a defined index (expected 2)
 ...
 space:get{1}
 ---

@@ -314,9 +314,19 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			  struct request *request)
 {
 	Index *pk = index_find_unique(space, request->index_id);
+
+	/* Check field count in tuple */
+	space_validate_tuple_raw(space, request->tuple);
+	tuple_field_count_validate(space->format, request->tuple);
+	uint32_t part_count = pk->key_def->part_count;
+
+	/* Extract key from tuple */
+	uint32_t key_len = extract_key_from_tuple_data(pk->key_def,
+						       request->tuple, 0, 0);
+	char *key = (char *)region_alloc(&fiber()->gc, key_len);
+	extract_key_from_tuple_data(pk->key_def, request->tuple, key, key_len);
+
 	/* Try to find the tuple by primary key. */
-	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 

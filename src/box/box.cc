@@ -586,20 +586,16 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 }
 
 int
-box_upsert(uint32_t space_id, uint32_t index_id, const char *key,
-	   const char *key_end, const char *ops, const char *ops_end,
-	   const char *tuple, const char *tuple_end, int index_base,
-	   box_tuple_t **result)
+box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
+	   const char *tuple_end, const char *ops, const char *ops_end,
+	   int index_base, box_tuple_t **result)
 {
-	mp_tuple_assert(key, key_end);
 	mp_tuple_assert(ops, ops_end);
 	mp_tuple_assert(tuple, tuple_end);
 	struct request request;
 	request_create(&request, IPROTO_UPSERT);
 	request.space_id = space_id;
 	request.index_id = index_id;
-	request.key = key;
-	request.key_end = key_end;
 	request.ops = ops;
 	request.ops_end = ops_end;
 	request.tuple = tuple;

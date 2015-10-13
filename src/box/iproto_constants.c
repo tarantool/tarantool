@@ -114,7 +114,7 @@ const uint64_t iproto_body_key_map[IPROTO_UPSERT + 1] = {
 	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
 	bit(USER_NAME)| bit(TUPLE),                            /* AUTH */
 	bit(EXPR)     | bit(TUPLE),                            /* EVAL */
-	bit(SPACE_ID) | bit(KEY) | bit(OPS) | bit(TUPLE),      /* UPSERT */
+	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
 };
 #undef bit
 

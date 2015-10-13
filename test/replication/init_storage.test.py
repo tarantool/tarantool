@@ -57,7 +57,7 @@ print '-------------------------------------------------------------'
 
 master.restart()
 master.admin('for k = 10, 19 do box.space[42]:insert{k, k*k*k} end')
-master.admin("for k = 20, 29 do box.space[42]:upsert({k}, {}, {k}) end")
+master.admin("for k = 20, 29 do box.space[42]:upsert({k}, {}) end")
 lsn = master.get_lsn(master_id)
 
 replica = TarantoolServer(server.ini)

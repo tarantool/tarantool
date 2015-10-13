@@ -392,11 +392,11 @@ _ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'NUM'}})
 _ = box.space.test:insert{1, 2, "string"}
 c = net:new(box.cfg.listen)
 c.space.test:select{}
-c.space.test:upsert({1}, {{'+', 2, 1}}, {10, 20, 'nothing'}) -- common update
+c.space.test:upsert({1, 2, 'nothing'}, {{'+', 2, 1}}) -- common update
 c.space.test:select{}
-c.space.test:upsert({2}, {{'+', 2, 1}}, {2, 4, 'something'}) -- insert
+c.space.test:upsert({2, 4, 'something'}, {{'+', 2, 1}}) -- insert
 c.space.test:select{}
-c.space.test:upsert({2}, {{'+', 3, 100500}}, {2, 4, 'nothing'}) -- wrong operation
+c.space.test:upsert({2, 4, 'nothing'}, {{'+', 3, 100500}}) -- wrong operation
 c.space.test:select{}
 box.space.test:drop()
 
