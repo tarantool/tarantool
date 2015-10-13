@@ -107,6 +107,23 @@ unset(CC_DEBUG_OPT)
 # internally, we also need to make sure all code is compiled
 # with unwind info.
 #
+# In C a global variable without a storage specifier (static/extern) and
+# without an initialiser is called a ’tentative definition’. The
+# language permits multiple tentative definitions in the single
+# translation unit; i.e. int foo; int foo; is perfectly ok. GNU
+# toolchain goes even further, allowing multiple tentative definitions
+# in *different* translation units. Internally, variables introduced via
+# tentative definitions are implemented as ‘common’ symbols. Linker
+# permits multiple definitions if they are common symbols, and it picks
+# one arbitrarily for inclusion in the binary being linked.
+#
+# -fno-common forces GNU toolchain to behave in a more
+# standard-conformant way in respect to tentative definitions and it
+# prevents common symbols generation. Since we are a cross-platform
+# project it really makes sense. There are toolchains that don’t
+# implement GNU style handling of the tentative definitions and there
+# are platforms lacking proper support for common symbols (osx).
+#
 
 add_compile_flags("C;CXX"
     "-fno-common"
