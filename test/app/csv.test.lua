@@ -36,7 +36,7 @@ local test6_ans = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|" ..
                   "lag[ flag ])|\t\n||\t||\t||\t\n"
 
 test = tap.test("csv")
-test:plan(8)
+test:plan(9)
 
 readable = {}
 readable.read = myread
@@ -106,6 +106,8 @@ f:close()
 test:is(table2str(t), table2str(t2), "test roundtrip")
 
 test:is(table2str(t), table2str(csv.load(csv.dump(t))), "test load(dump(t))")
+
+test:is(table2str(csv.load('a,b,c,')), '|a|\t|b|\t|c|\t||\t\n', "final comma")
 
 fio.unlink(file1)
 fio.unlink(file2)
