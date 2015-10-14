@@ -135,7 +135,8 @@ local available_commands = {
     'status',
     'enter',
     'restart',
-    'reload'
+    'reload',
+    'eval'
 }
 
 --
@@ -563,10 +564,10 @@ elseif cmd == 'status' then
     s:close()
     print(instance_name .. ' is running (pid:' .. default_cfg.pid_file .. ')')
     os.exit(0)
-elseif cmd == 'reload' then
+elseif cmd == 'reload' or cmd == 'eval' then
     local filename = arg[1]
     if filename == nil then
-        log.error("Usage: tarantoolctl reload instance_name file.lua")
+        log.error("Usage: tarantoolctl eval instance_name file.lua")
         os.exit(1)
     end
     if fio.stat(filename) == nil then
