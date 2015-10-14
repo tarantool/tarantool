@@ -775,7 +775,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def);
 
 /**
@@ -803,10 +803,10 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
  * @retval >0 if key_fields(tuple_a) > parts(key)
  */
 int
-tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+tuple_compare_with_key_default(const struct tuple *tuple_a, const char *key,
 		       uint32_t part_count, const struct key_def *key_def);
 
-/*
+
 inline int
 tuple_compare_with_key(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
@@ -820,7 +820,7 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 {
 	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
 }
-*/
+
 
 /** These functions are implemented in tuple_convert.cc. */
 

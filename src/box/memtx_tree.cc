@@ -48,7 +48,7 @@ struct key_data
 int
 tree_index_compare(const tuple *a, const tuple *b, struct key_def *key_def)
 {
-	int r = key_def->tuple_compare(a, b, key_def);
+	int r = tuple_compare(a, b, key_def);
 	if (r == 0 && !key_def->opts.is_unique)
 		r = a < b ? -1 : a > b;
 	return r;
@@ -57,7 +57,7 @@ int
 tree_index_compare_key(const tuple *a, const struct key_data *key_data,
 		       struct key_def *key_def)
 {
-	return key_def->tuple_compare_with_key(a, key_data->key,
+	return tuple_compare_with_key(a, key_data->key,
 				      key_data->part_count, key_def);
 }
 int tree_index_qcompare(const void* a, const void *b, void *c)

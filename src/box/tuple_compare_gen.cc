@@ -195,5 +195,5 @@ tuple_compare_gen(const struct key_def *def) {
 		if (i == def->part_count && cmp_arr[k].p[i * 2] == UINT32_MAX)
 			return cmp_arr[k].f;
 	}
-	return tuple_compare;
+	return tuple_compare_default;
 }

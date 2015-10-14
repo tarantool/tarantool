@@ -47,7 +47,7 @@ typedef int (*tuple_cmp_t)(const struct tuple *tuple_a,
 
 tuple_cmp_t tuple_compare_gen(const struct key_def *key_def);
 
-tuple_cmp_wk_t tuple_compare_with_key_gen(const struct key_def *key_def);
+tuple_cmp_wk_t tuple_compare_wk_gen(const struct key_def *key_def);
 
 
 #endif /* TARANTOOL_BOX_TUPLE_GEN_H_INCLUDED */

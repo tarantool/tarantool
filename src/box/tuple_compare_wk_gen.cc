@@ -191,7 +191,7 @@ const function_description_wk cmp_wk_arr[] = {
 };
 
 tuple_cmp_wk_t
-tuple_compare_with_key_gen(const struct key_def *def) {
+tuple_compare_wk_gen(const struct key_def *def) {
 	for (uint32_t k = 0; k < sizeof(cmp_wk_arr) /
 	     sizeof(cmp_wk_arr[0]); k++) {
 		uint32_t i = 0;
@@ -202,5 +202,5 @@ tuple_compare_with_key_gen(const struct key_def *def) {
 		if (i == def->part_count)
 			return cmp_wk_arr[k].f;
 	}
-	return tuple_compare_with_key;
+	return tuple_compare_with_key_default;
 }
