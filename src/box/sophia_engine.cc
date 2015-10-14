@@ -229,6 +229,12 @@ SophiaEngine::SophiaEngine()
 	env = NULL;
 }
 
+SophiaEngine::~SophiaEngine()
+{
+	if (env)
+		sp_destroy(env);
+}
+
 static inline int
 sophia_poll(SophiaEngine *e)
 {

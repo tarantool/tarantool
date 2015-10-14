@@ -35,6 +35,7 @@
 
 struct SophiaEngine: public Engine {
 	SophiaEngine();
+	~SophiaEngine();
 	virtual void init();
 	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *);
