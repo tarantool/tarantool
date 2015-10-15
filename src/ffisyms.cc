@@ -32,8 +32,6 @@
 void *ffi_symbols[] = {
 	(void *) bswap_u32,
 	(void *) bswap_u64,
-	(void *) mp_bswap_float,
-	(void *) mp_bswap_double,
 	(void *) box_select,
 	(void *) box_insert,
 	(void *) box_replace,
