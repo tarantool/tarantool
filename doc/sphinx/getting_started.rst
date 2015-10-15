@@ -23,6 +23,8 @@ provided some instructions that you can use to make a temporary “sandbox”. I
 few minutes you can start the server and type in some database-manipulation
 statements. The section about sandbox is “`Starting Tarantool and making your first database`_”.
 
+.. _downloading-and-installing-a-binary-package:
+
 =====================================================================
             Downloading and installing a binary package
 =====================================================================

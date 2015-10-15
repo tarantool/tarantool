@@ -4,8 +4,8 @@
 
 Number of fields in an index
     For BITSET indexes, the maximum is 1. For TREE or HASH indexes, the maximum
-    is 255 (``box.schema.INDEX_PART_MAX``). For RTREE indexes, the number of
-    fields must be either 2 or 4.
+    is 255 (``box.schema.INDEX_PART_MAX``). For RTREE indexes, the
+    maximum is 1 but the field is an ARRAY.
 
 Number of indexes in a space
     10 (``box.schema.INDEX_MAX``).

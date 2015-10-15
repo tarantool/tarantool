@@ -196,47 +196,47 @@ API is a direct binding to corresponding methods of index objects of type
 
             **RTREE iterator types**
 
-            +--------------------+-----------+---------------------------------------------+
-            | Type               | Arguments | Description                                 |
-            +====================+===========+=============================================+
-            | box.index.ALL      | none      | All keys match. Tuples are returned in      |
-            | or 'ALL'           |           | ascending order of the primary key.         |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.EQ       | field     | Keys match if the rectangle defined by the  |
-            | or 'EQ'            | values    | field values is the same as the rectangle   |
-            |                    |           | defined by the key -- where "key" means     |
-            |                    |           | "the key in the RTREE index" and            |
-            |                    |           | "rectangle" means "rectangle as explained   |
-            |                    |           | in section RTREE_.                          |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.GT       | field     | Keys match if all points of the rectangle   |
-            | or 'GT'            | values    | defined by the field values are within the  |
-            |                    |           | rectangle defined by the key.               |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.GE       | field     | Keys match if all points of the rectangle   |
-            | or 'GE'            | values    | defined by the field values are within, or  |
-            |                    |           | at the side of, the rectangle defined by    |
-            |                    |           | the key.                                    |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.LT       | field     | Keys match if all points of the rectangle   |
-            | or 'LT'            | values    | defined by the key are within the rectangle |
-            |                    |           | defined by the field values.                |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.LE       | field     | Keys match if all points of the rectangle   |
-            | or 'LE'            | values    | defined by the key are within, or at the    |
-            |                    |           | side of, the rectangle defined by the field |
-            |                    |           | values.                                     |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.OVERLAPS | field     | Keys match if all points of the rectangle   |
-            | or 'OVERLAPS'      | values    | defined by the key are within, or at the    |
-            |                    |           | side of, the rectangle defined by the field |
-            |                    |           | values.                                     |
-            +--------------------+-----------+---------------------------------------------+
-            | box.index.NEIGHBOR | field     | Keys match if all points of the rectangle   |
-            | or 'NEIGHBOR'      | values    | defined by the key are within, or at the    |
-            |                    |           | side of, the rectangle defined by the field |
-            |                    |           | values.                                     |
-            +--------------------+-----------+---------------------------------------------+
+            +--------------------+-----------+-----------------------------------------------------+
+            | Type               | Arguments | Description                                         |
+            +====================+===========+=====================================================+
+            | box.index.ALL      | none      | All keys match. Tuples are returned in              |
+            | or 'ALL'           |           | ascending order of the primary key.                 |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.EQ       | field     | Keys match if the rectangle-or-box defined by the   |
+            | or 'EQ'            | values    | field values is the same as the rectangle-or-box    |
+            |                    |           | defined by the key -- where "key" means             |
+            |                    |           | "the key in the RTREE index" and                    |
+            |                    |           | "rectangle-or-box" means "rectangle-or-box as       |
+            |                    |           | explained in section RTREE_".                       |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.GT       | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'GT'            | values    | defined by the field values are within the          |
+            |                    |           | rectangle-or-box defined by the key.                |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.GE       | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'GE'            | values    | defined by the field values are within, or          |
+            |                    |           | at the side of, the rectangle-or-box defined by     |
+            |                    |           | the key.                                            |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.LT       | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'LT'            | values    | defined by the key are within the rectangle-or-box  |
+            |                    |           | defined by the field values.                        |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.LE       | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'LE'            | values    | defined by the key are within, or at the            |
+            |                    |           | side of, the rectangle-or-box defined by the field  |
+            |                    |           | values.                                             |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.OVERLAPS | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'OVERLAPS'      | values    | defined by the key are within, or at the            |
+            |                    |           | side of, the rectangle-or-box defined by the field  |
+            |                    |           | values.                                             |
+            +--------------------+-----------+-----------------------------------------------------+
+            | box.index.NEIGHBOR | field     | Keys match if all points of the rectangle-or-box    |
+            | or 'NEIGHBOR'      | values    | defined by the key are within, or at the            |
+            |                    |           | side of, the rectangle-or-box defined by the field  |
+            |                    |           | values.                                             |
+            +--------------------+-----------+-----------------------------------------------------+
 
 |br|
 
@@ -627,7 +627,14 @@ Lua functions `os.date()`_ and `string.sub()`_.
 =============================================================================
 
 The :mod:`box.index` package may be used for spatial searches if the index type
-is RTREE. There are operations for searching *rectangles*. Rectangles are
+is RTREE. There are operations for searching *rectangles* (geometric objects
+with 4 corners and 4 sides) and *boxes* (geometric objects with more than 4
+corners and more than 4 sides, sometimes called hyperrectangles).
+This manual uses term *rectangle-or-box* for the whole class
+of objects that includes both rectangles and boxes.
+Only rectangles will be illustrated.
+
+Rectangles are
 described according to their X-axis (horizontal axis) and Y-axis (vertical axis)
 coordinates in a grid of arbitrary size. Here is a picture of four rectangles on
 a grid with 11 horizontal points and 11 vertical points:
@@ -692,6 +699,20 @@ within{3,5,9,10} which was Rectangle#2. Request#3 returns 2 tuples, because the
 NEIGHBOR iterator always returns all tuples, and the first returned tuple will
 be {3,5,9,10} ("Rectangle#2" in the picture) because it is the closest neighbor
 of {1,2,3,4} ("Rectangle#1" in the picture).
+
+Now let us create a space and index for cuboids, which are rectangle-or-boxes that have
+6 corners and 6 sides.
+
+    | :codebold:`box.schema.space.create('R')`
+    | :codebold:`box.space.R:create_index('primary',{parts={1,'NUM'}})`
+    | :codebold:`box.space.R:create_index('S',{type='RTREE',unique=false,dimension=3,parts={2,'ARRAY'}})`
+
+The additional field here is 'dimension=3'. The default dimension is 2, which is
+why it didn't need to be specified for the examples of rectangle. The maximum dimension
+is 20. Now for insertions and selections there will usually be 6 coordinates. For example:
+
+    | :codebold:`box.space.R:insert{1,{0,3,0,3,0,3}}`
+    | :codebold:`box.space.R.index.S:select({1,2,1,2,1,2},{iterator=box.index.GT})`
 
 More examples of spatial searching are online in the file `R tree index quick
 start and usage`_.
