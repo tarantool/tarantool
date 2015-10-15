@@ -219,10 +219,8 @@ addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
 
 set (HAVE_BFD False)
 if (ENABLE_BACKTRACE)
-    if (NOT ${CMAKE_COMPILER_IS_GNUCC} OR
-        NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86|amd64"))
+    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
         # We only know this option to work with gcc
-        # on x86 architecture.
         message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
     endif()
     # Use GNU bfd if present.
