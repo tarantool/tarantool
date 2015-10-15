@@ -46,7 +46,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { VCLOCK_MAX = 16 };
+enum { VCLOCK_MAX = 32 };
 
 /** Cluster vector clock */
 struct vclock {
