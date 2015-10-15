@@ -145,8 +145,10 @@ macro(luajit_build)
         separate_arguments(luajit_cflags)
     set (luajut_ldflags ${CMAKE_STATIC_LINKER_FLAGS})
         separate_arguments(luajit_ldflags)
-    # Use external unwind on all platforms.
-    set (luajit_xcflags "-DLUAJIT_UNWIND_EXTERNAL=1")
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86|amd64")
+        # Use external unwind on x86
+        set (luajit_xcflags "-DLUAJIT_UNWIND_EXTERNAL=1")
+    endif()
     # We are consciously ommiting debug info in RelWithDebugInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)
