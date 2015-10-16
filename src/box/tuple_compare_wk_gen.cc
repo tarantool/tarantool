@@ -149,6 +149,7 @@ struct TupleComparer {
 					       key_def, format, field);
 	}
 };
+
 template<int ...MORE_TYPES>
 struct TupleComparer<0, 0, MORE_TYPES...> {
 	static int compareWithKey(const struct tuple *tuple,
@@ -173,6 +174,7 @@ struct function_description_wk {
 	tuple_cmp_wk_t f;
 	uint32_t p[64];
 };
+
 #define COMPARER_WK(...) {TupleComparer<0, __VA_ARGS__>::compareWithKey, \
 								__VA_ARGS__},
 static const function_description_wk cmp_wk_arr[] = {
