@@ -21,7 +21,7 @@ lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
 lua_source(lua_sources lua/uri.lua)
 lua_source(lua_sources lua/console.lua)
-lua_source(lua_sources lua/bsdsocket.lua)
+lua_source(lua_sources lua/socket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
 lua_source(lua_sources lua/help.lua)
@@ -107,7 +107,7 @@ set (server_sources
      lua/msgpack.cc
      lua/utils.cc
      lua/errno.c
-     lua/bsdsocket.cc
+     lua/socket.cc
      lua/pickle.cc
      lua/fio.cc
      lua/clock.c

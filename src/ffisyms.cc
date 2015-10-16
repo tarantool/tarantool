@@ -13,7 +13,7 @@
 #include <box/xrow.h>
 #include <lua/init.h>
 #include "main.h"
-#include "lua/bsdsocket.h"
+#include "lua/socket.h"
 #include "lua/digest.h"
 #include "fiber.h"
 #include "base64.h"
@@ -65,8 +65,8 @@ void *ffi_symbols[] = {
 	(void *) box_set_io_collect_interval,
 	(void *) box_set_snap_io_rate_limit,
 	(void *) box_set_too_long_threshold,
-	(void *) bsdsocket_local_resolve,
-	(void *) bsdsocket_nonblock,
+	(void *) lbox_socket_local_resolve,
+	(void *) lbox_socket_nonblock,
 	(void *) base64_decode,
 	(void *) base64_encode,
 	(void *) base64_bufsize,

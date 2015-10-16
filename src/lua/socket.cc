@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "bsdsocket.h"
+#include "lua/socket.h"
 
 #include <errno.h>
 #include <sys/socket.h>
@@ -55,7 +55,7 @@ extern "C" {
 #include <scoped_guard.h>
 #include "lua/utils.h"
 
-extern char bsdsocket_lua[];
+extern char socket_lua[];
 
 static const struct { char name[32]; int value; } domains[] = {
 #ifdef	PF_UNIX
@@ -297,8 +297,8 @@ static const struct { char name[32]; int value; } ai_flags[] = {
 };
 
 int
-bsdsocket_local_resolve(const char *host, const char *port,
-			struct sockaddr *addr, socklen_t *socklen)
+lbox_socket_local_resolve(const char *host, const char *port,
+		     struct sockaddr *addr, socklen_t *socklen)
 {
 	if (strcmp(host, "unix/") == 0) {
 		struct sockaddr_un *uaddr = (struct sockaddr_un *) addr;
@@ -350,7 +350,7 @@ bsdsocket_local_resolve(const char *host, const char *port,
 }
 
 int
-bsdsocket_nonblock(int fh, int mode)
+lbox_socket_nonblock(int fh, int mode)
 {
 	int flags = fcntl(fh, F_GETFL, 0);
 	if (flags < 0)
@@ -381,7 +381,7 @@ bsdsocket_nonblock(int fh, int mode)
 }
 
 static int
-lbox_bsdsocket_iowait(struct lua_State *L)
+lbox_socket_iowait(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	int events = lua_tointeger(L, 2);
@@ -394,7 +394,7 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 }
 
 static int
-lbox_bsdsocket_push_family(struct lua_State *L, int family)
+lbox_socket_push_family(struct lua_State *L, int family)
 {
 	switch (family) {
 #ifdef	AF_UNIX
@@ -456,7 +456,7 @@ lbox_bsdsocket_push_family(struct lua_State *L, int family)
 }
 
 static int
-lbox_bsdsocket_push_protocol(struct lua_State *L, int protonumber)
+lbox_socket_push_protocol(struct lua_State *L, int protonumber)
 {
 	if (protonumber == 0) {
 		lua_pushinteger(L, 0);
@@ -473,7 +473,7 @@ lbox_bsdsocket_push_protocol(struct lua_State *L, int protonumber)
 }
 
 static int
-lbox_bsdsocket_push_sotype(struct lua_State *L, int sotype)
+lbox_socket_push_sotype(struct lua_State *L, int sotype)
 {
 	/* man 7 socket says that sotype can contain some flags */
 #if defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
@@ -518,13 +518,13 @@ lbox_bsdsocket_push_sotype(struct lua_State *L, int sotype)
 }
 
 static int
-lbox_bsdsocket_push_addr(struct lua_State *L,
+lbox_socket_push_addr(struct lua_State *L,
 			 const struct sockaddr *addr, socklen_t alen)
 {
 	lua_newtable(L);
 
 	lua_pushliteral(L, "family");
-	lbox_bsdsocket_push_family(L, addr->sa_family);
+	lbox_socket_push_family(L, addr->sa_family);
 	lua_rawset(L, -3);
 
 	switch (addr->sa_family) {
@@ -579,7 +579,7 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 }
 
 static int
-lbox_bsdsocket_getaddrinfo(struct lua_State *L)
+lbox_socket_getaddrinfo(struct lua_State *L)
 {
 	assert(lua_gettop(L) == 4);
 	lua_pushvalue(L, 1);
@@ -642,7 +642,7 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 	for (struct addrinfo *rp = result; rp; rp = rp->ai_next, i++) {
 		lua_pushinteger(L, i);
 
-		lbox_bsdsocket_push_addr(L, rp->ai_addr, rp->ai_addrlen);
+		lbox_socket_push_addr(L, rp->ai_addr, rp->ai_addrlen);
 
 		if (lua_isnil(L, -1)) {
 			lua_pop(L, 2);
@@ -651,11 +651,11 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 		}
 
 		lua_pushliteral(L, "protocol");
-		lbox_bsdsocket_push_protocol(L, rp->ai_protocol);
+		lbox_socket_push_protocol(L, rp->ai_protocol);
 		lua_rawset(L, -3);
 
 		lua_pushliteral(L, "type");
-		lbox_bsdsocket_push_sotype(L, rp->ai_socktype);
+		lbox_socket_push_sotype(L, rp->ai_socktype);
 		lua_rawset(L, -3);
 
 		if (rp->ai_canonname) {
@@ -671,7 +671,7 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 }
 
 static int
-lbox_bsdsocket_name(struct lua_State *L,
+lbox_socket_name(struct lua_State *L,
                     int (*getname_func) (int, struct sockaddr *, socklen_t *))
 {
 	lua_pushvalue(L, 1);
@@ -684,7 +684,7 @@ lbox_bsdsocket_name(struct lua_State *L,
 		lua_pushnil(L);
 		return 1;
 	}
-	lbox_bsdsocket_push_addr(L, (const struct sockaddr *)&addr, len);
+	lbox_socket_push_addr(L, (const struct sockaddr *)&addr, len);
 	if (lua_isnil(L, -1))
 		return 1;
 
@@ -692,7 +692,7 @@ lbox_bsdsocket_name(struct lua_State *L,
 	len = sizeof(type);
 	if (getsockopt(fh, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
 		lua_pushliteral(L, "type");
-		lbox_bsdsocket_push_sotype(L, type);
+		lbox_socket_push_sotype(L, type);
 		lua_rawset(L, -3);
 	} else {
 		type = -1;
@@ -703,7 +703,7 @@ lbox_bsdsocket_name(struct lua_State *L,
     len = sizeof(protocol);
 	if (getsockopt(fh, SOL_SOCKET, SO_PROTOCOL, &protocol, &len) == 0) {
 		lua_pushliteral(L, "protocol");
-		lbox_bsdsocket_push_protocol(L, protocol);
+		lbox_socket_push_protocol(L, protocol);
 		lua_rawset(L, -3);
 	}
 #else
@@ -714,26 +714,26 @@ lbox_bsdsocket_name(struct lua_State *L,
 			protocol = IPPROTO_UDP;
 	}
 	lua_pushliteral(L, "protocol");
-	lbox_bsdsocket_push_protocol(L, protocol);
+	lbox_socket_push_protocol(L, protocol);
 	lua_rawset(L, -3);
 #endif
 	return 1;
 }
 
 static int
-lbox_bsdsocket_soname(struct lua_State *L)
+lbox_socket_soname(struct lua_State *L)
 {
-	return lbox_bsdsocket_name(L, getsockname);
+	return lbox_socket_name(L, getsockname);
 }
 
 static int
-lbox_bsdsocket_peername(struct lua_State *L)
+lbox_socket_peername(struct lua_State *L)
 {
-	return lbox_bsdsocket_name(L, getpeername);
+	return lbox_socket_name(L, getpeername);
 }
 
 static int
-lbox_bsdsocket_accept(struct lua_State *L)
+lbox_socket_accept(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 
@@ -748,12 +748,12 @@ lbox_bsdsocket_accept(struct lua_State *L)
 		return 1;
 	}
 	lua_pushnumber(L, sc);
-	lbox_bsdsocket_push_addr(L, (struct sockaddr *)&fa, len);
+	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
 }
 
 static int
-lbox_bsdsocket_recvfrom(struct lua_State *L)
+lbox_socket_recvfrom(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	int size = lua_tointeger(L, 2);
@@ -779,7 +779,7 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 		return 1;
 	}
 	lua_pushlstring(L, buf, res);
-	lbox_bsdsocket_push_addr(L, (struct sockaddr *)&fa, len);
+	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
 }
 
@@ -788,7 +788,7 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
  * Used only by socket:close().
  */
 static int
-lbox_bsdsocket_abort(struct lua_State *L)
+lbox_socket_abort(struct lua_State *L)
 {
 	int fid = lua_tointeger(L, 1);
 	struct fiber *fiber = fiber_find(fid);
@@ -799,17 +799,17 @@ lbox_bsdsocket_abort(struct lua_State *L)
 }
 
 void
-tarantool_lua_bsdsocket_init(struct lua_State *L)
+tarantool_lua_socket_init(struct lua_State *L)
 {
 	static const struct luaL_Reg internal_methods[] = {
-		{ "iowait",		lbox_bsdsocket_iowait		},
-		{ "getaddrinfo",	lbox_bsdsocket_getaddrinfo	},
-		{ "name",		lbox_bsdsocket_soname		},
-		{ "peer",		lbox_bsdsocket_peername		},
-		{ "recvfrom",		lbox_bsdsocket_recvfrom		},
-		{ "abort",		lbox_bsdsocket_abort		},
-		{ "accept",		lbox_bsdsocket_accept		},
-		{ NULL,			NULL				}
+		{ "iowait",		lbox_socket_iowait	},
+		{ "getaddrinfo",	lbox_socket_getaddrinfo	},
+		{ "name",		lbox_socket_soname	},
+		{ "peer",		lbox_socket_peername	},
+		{ "recvfrom",		lbox_socket_recvfrom	},
+		{ "abort",		lbox_socket_abort	},
+		{ "accept",		lbox_socket_accept	},
+		{ NULL,			NULL			}
 	};
 
 	luaL_register_module(L, "socket", internal_methods);

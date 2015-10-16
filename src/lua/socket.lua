@@ -1,4 +1,4 @@
--- bsdsocket.lua (internal file)
+-- socket.lua (internal file)
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local LIMIT_INFINITY = 2147483647
@@ -36,9 +36,9 @@ ffi.cdef[[
                    const struct sockaddr *dest_addr, socklen_t addrlen);
 
     int
-    bsdsocket_local_resolve(const char *host, const char *port,
-                            struct sockaddr *addr, socklen_t *socklen);
-    int bsdsocket_nonblock(int fd, int mode);
+    lbox_socket_local_resolve(const char *host, const char *port,
+                         struct sockaddr *addr, socklen_t *socklen);
+    int lbox_socket_nonblock(int fd, int mode);
 
     int setsockopt(int s, int level, int iname, const void *opt, size_t optlen);
     int getsockopt(int s, int level, int iname, void *ptr, size_t *optlen);
@@ -91,7 +91,7 @@ end
 local socket_mt
 local function bless_socket(fd)
     -- Make socket to be non-blocked by default
-    if ffi.C.bsdsocket_nonblock(fd, 1) < 0 then
+    if ffi.C.lbox_socket_nonblock(fd, 1) < 0 then
         local errno = boxerrno()
         ffi.C.close(fd)
         boxerrno(errno)
@@ -158,7 +158,7 @@ socket_methods.sysconnect = function(self, host, port)
     port = tostring(port)
 
     addr_len[0] = ffi.sizeof(addrbuf)
-    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    local res = ffi.C.lbox_socket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.connect(fd, addr, addr_len[0]);
         if res == 0 then
@@ -235,11 +235,11 @@ socket_methods.nonblock = function(self, nb)
     local res
 
     if nb == nil then
-        res = ffi.C.bsdsocket_nonblock(fd, 0x80)
+        res = ffi.C.lbox_socket_nonblock(fd, 0x80)
     elseif nb then
-        res = ffi.C.bsdsocket_nonblock(fd, 1)
+        res = ffi.C.lbox_socket_nonblock(fd, 1)
     else
-        res = ffi.C.bsdsocket_nonblock(fd, 0)
+        res = ffi.C.lbox_socket_nonblock(fd, 0)
     end
 
     if res < 0 then
@@ -320,7 +320,7 @@ socket_methods.bind = function(self, host, port)
     port = tostring(port)
 
     addr_len[0] = ffi.sizeof(addrbuf)
-    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    local res = ffi.C.lbox_socket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.bind(fd, addr, addr_len[0]);
     end
@@ -800,7 +800,7 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     octets = tostring(octets)
 
     addr_len[0] = ffi.sizeof(addrbuf)
-    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    local res = ffi.C.lbox_socket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.sendto(fd, octets, string.len(octets), iflags,
             addr, addr_len[0])

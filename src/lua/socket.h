@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_LUA_BSDSOCKET_H
-#define INCLUDES_TARANTOOL_LUA_BSDSOCKET_H
+#ifndef INCLUDES_TARANTOOL_LUA_SOCKET_H
+#define INCLUDES_TARANTOOL_LUA_SOCKET_H
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -34,21 +34,22 @@
 #include <sys/socket.h>
 
 struct lua_State;
-void tarantool_lua_bsdsocket_init(struct lua_State *L);
+void tarantool_lua_socket_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 int
-bsdsocket_local_resolve(const char *host, const char *port,
-			struct sockaddr *addr, socklen_t *socklen);
-int bsdsocket_nonblock(int fh, int mode);
+lbox_socket_local_resolve(const char *host, const char *port,
+			  struct sockaddr *addr, socklen_t *socklen);
+int
+lbox_socket_nonblock(int fh, int mode);
 int bsdsocket_sendto(int fh, const char *host, const char *port,
 		     const void *octets, size_t len, int flags);
 
 #if defined(__cplusplus)
-}
+} /* extern "C" */
 #endif
 
 #endif /* INCLUDES_TARANTOOL_LUA_BSDSOCKET_H */

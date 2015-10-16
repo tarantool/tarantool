@@ -51,7 +51,7 @@ extern "C" {
 #include "lua/fiber.h"
 #include "lua/ipc.h"
 #include "lua/errno.h"
-#include "lua/bsdsocket.h"
+#include "lua/socket.h"
 #include "lua/utils.h"
 #include "third_party/lua-cjson/lua_cjson.h"
 #include "third_party/lua-yaml/lyaml.h"
@@ -83,7 +83,7 @@ extern char strict_lua[],
 	fiber_lua[],
 	log_lua[],
 	uri_lua[],
-	bsdsocket_lua[],
+	socket_lua[],
 	console_lua[],
 	help_lua[],
 	help_en_US_lua[],
@@ -119,7 +119,7 @@ static const char *lua_modules[] = {
 	"fio", fio_lua,
 	"csv", csv_lua,
 	"clock", clock_lua,
-	"socket", bsdsocket_lua,
+	"socket", socket_lua,
 	"console", console_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
@@ -365,7 +365,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_fio_init(L);
-	tarantool_lua_bsdsocket_init(L);
+	tarantool_lua_socket_init(L);
 	tarantool_lua_pickle_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
