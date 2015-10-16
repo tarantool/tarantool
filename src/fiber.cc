@@ -418,18 +418,13 @@ fiber_loop(void *data __attribute__((unused)))
 			 * propagate up to the joiner.
 			 */
 			diag_clear(&fiber->diag);
-		} catch (Exception *e) {
+		} catch (struct error *e) {
 			/*
 			 * For joinable fibers, it's the business
 			 * of the caller to deal with the error.
 			 */
 			if (! (fiber->flags & FIBER_IS_JOINABLE))
-				e->log();
-		} catch (...) {
-			/* This can only happen in case of a server bug. */
-			say_error("fiber `%s': unknown exception",
-				fiber_name(fiber));
-			panic("fiber `%s': exiting", fiber_name(fiber));
+				error_log(e);
 		}
 		fiber->flags |= FIBER_IS_DEAD;
 		while (! rlist_empty(&fiber->wake)) {

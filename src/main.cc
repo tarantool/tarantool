@@ -665,6 +665,9 @@ main(int argc, char **argv)
 	} catch (struct error *e) {
 		error_log(e);
 		panic("%s", "fatal error, exiting the event loop");
+	} catch (...) {
+		/* This can only happen in case of a server bug. */
+		panic("unknown exception");
 	}
 
 	if (start_loop)
