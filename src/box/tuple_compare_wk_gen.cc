@@ -128,7 +128,6 @@ struct ComparerPrimitive<FLD_ID, IDX, TYPE> {
 		return field_compare_with_key<TYPE>(&field, &key);
 	}
 };
-} /* namespace */
 
 /**
  * header
@@ -140,10 +139,10 @@ struct TupleComparer {
 				  uint32_t part_count,
 				  const struct key_def *key_def)
 	{
+		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
 			return 0;
 		struct tuple_format *format = tuple_format(tuple);
-		/* Part count can be 0 in wildcard searches. */
 		const char *field = tuple_field_old(format, tuple, IDX);
 		return ComparerPrimitive<FLD_ID, IDX, MORE_TYPES...>::
 				compareWithKey(tuple, key, part_count,
@@ -157,10 +156,10 @@ struct TupleComparer<0, 0, MORE_TYPES...> {
 				  uint32_t part_count,
 				  const struct key_def *key_def)
 	{
+		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
 			return 0;
 		struct tuple_format *format = tuple_format(tuple);
-		/* Part count can be 0 in wildcard searches. */
 		const char *field = tuple->data;
 		mp_decode_array(&field);
 		return ComparerPrimitive<0, 0, MORE_TYPES...>::
@@ -168,13 +167,15 @@ struct TupleComparer<0, 0, MORE_TYPES...> {
 					       key_def, format, field);
 	}
 };
+} /* namespace */
 
 struct function_description_wk {
 	tuple_cmp_wk_t f;
 	uint32_t p[64];
 };
-#define COMPARER_WK(...) {TupleComparer<0, __VA_ARGS__>::compareWithKey, __VA_ARGS__},
-const function_description_wk cmp_wk_arr[] = {
+#define COMPARER_WK(...) {TupleComparer<0, __VA_ARGS__>::compareWithKey, \
+								__VA_ARGS__},
+static const function_description_wk cmp_wk_arr[] = {
 	COMPARER_WK(0, NUM   , 1, NUM   , 2, NUM   )
 	COMPARER_WK(0, STRING, 1, NUM   , 2, NUM   )
 	COMPARER_WK(0, NUM   , 1, STRING, 2, NUM   )

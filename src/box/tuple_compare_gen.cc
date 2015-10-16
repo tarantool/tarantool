@@ -110,7 +110,7 @@ struct ComparerPrimitive<IDX, TYPE, IDX2, MORE_TYPES...> {
 			field_b = tuple_field_old(format_b, tuple_b, IDX2);
 		}
 		return ComparerPrimitive<IDX2, MORE_TYPES...>::compare(tuple_a, tuple_b,
-					format_a, format_b,field_a, field_b);
+					format_a, format_b, field_a, field_b);
 	}
 };
 
@@ -141,7 +141,7 @@ struct TupleComparer {
 		const char *field_a = tuple_field_old(format_a, tuple_a, IDX);
 		const char *field_b = tuple_field_old(format_b, tuple_b, IDX);
 		return ComparerPrimitive<IDX, MORE_TYPES...>::compare(tuple_a, tuple_b,
-					format_a, format_b,field_a, field_b);
+					format_a, format_b, field_a, field_b);
 	}
 };
 template<int ...MORE_TYPES>
@@ -157,7 +157,7 @@ struct TupleComparer<0, MORE_TYPES...> {
 		mp_decode_array(&field_a);
 		mp_decode_array(&field_b);
 		return ComparerPrimitive<0, MORE_TYPES...>::compare(tuple_a, tuple_b,
-					format_a, format_b,field_a, field_b);
+					format_a, format_b, field_a, field_b);
 	}
 };
 } /* namespace */
@@ -166,7 +166,10 @@ struct function_description {
 	tuple_cmp_t f;
 	uint32_t p[64];
 };
-#define COMPARER(...) {TupleComparer<__VA_ARGS__>::compare, __VA_ARGS__, UINT32_MAX},
+
+#define COMPARER(...) {TupleComparer<__VA_ARGS__>::compare, __VA_ARGS__, \
+								UINT32_MAX},
+
 static const function_description cmp_arr[] = {
 	COMPARER(0, NUM   )
 	COMPARER(0, STRING)

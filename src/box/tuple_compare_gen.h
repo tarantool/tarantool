@@ -34,8 +34,6 @@
 #include <stddef.h>
 #include "trivia/util.h"
 
-
-extern "C" {
 typedef int (*tuple_cmp_wk_t)(const struct tuple *tuple_a,
 			      const char *key,
 			      uint32_t part_count,
@@ -43,7 +41,6 @@ typedef int (*tuple_cmp_wk_t)(const struct tuple *tuple_a,
 typedef int (*tuple_cmp_t)(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
 			   const struct key_def *key_def);
-}
 
 tuple_cmp_t tuple_compare_gen(const struct key_def *key_def);
 
