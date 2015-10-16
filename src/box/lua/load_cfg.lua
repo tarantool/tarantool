@@ -211,8 +211,8 @@ end
 local function reload_cfg(oldcfg, cfg)
     local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     -- iterate over original table because prepare_cfg() may store NILs
-    for key in pairs(cfg) do
-        if dynamic_cfg[key] == nil then
+    for key, val in pairs(cfg) do
+        if dynamic_cfg[key] == nil and oldcfg[key] ~= val then
             box.error(box.error.RELOAD_CFG, key);
         end
     end
