@@ -1,3 +1,10 @@
+    :confval:`panic_on_snap_error`, |br|
+    :confval:`panic_on_wal_error`, |br|
+    :confval:`rows_per_wal`, |br|
+    :confval:`snap_io_rate_limit`, |br|
+    :confval:`wal_mode`, |br|
+    :confval:`wal_dir_rescan_delay` |br|
+
 .. confval:: panic_on_snap_error
 
     If there is an error while reading the snapshot file

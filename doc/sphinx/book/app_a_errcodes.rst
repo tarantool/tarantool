@@ -15,6 +15,18 @@ descriptions of some popular codes. A complete list of errors can be found in fi
                 List of error codes
 ===========================================================
 
+    :errcode:`ER_NONMASTER`, |br|
+    :errcode:`ER_ILLEGAL_PARAMS`, |br|
+    :errcode:`ER_MEMORY_ISSUE`, |br|
+    :errcode:`ER_WAL_IO`, |br|
+    :errcode:`ER_KEY_PART_COUNT`, |br|
+    :errcode:`ER_NO_SUCH_SPACE`, |br|
+    :errcode:`ER_NO_SUCH_INDEX`, |br|
+    :errcode:`ER_PROC_LUA`, |br|
+    :errcode:`ER_FIBER_STACK`, |br|
+    :errcode:`ER_UPDATE_FIELD`, |br|
+    :errcode:`ER_TUPLE_FOUND` |br|
+
 .. errcode:: ER_NONMASTER
 
     Can't modify data on a replication slave.

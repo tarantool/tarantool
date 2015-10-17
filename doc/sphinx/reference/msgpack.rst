@@ -33,27 +33,25 @@ series of non-MsgPack values and encodes them.
                     Example
 =================================================
 
-.. code-block:: lua
-
-    tarantool> msgpack = require('msgpack')
-    ---
-    ...
-    tarantool>  y =  msgpack.encode({'a',1,'b',2})
-    ---
-    ...
-    tarantool>  z = msgpack.decode(y)
-    ---
-    ...
-    tarantool>  z[1],z[2],z[3],z[4]
-    ---
-    - a
-    - 1
-    - b
-    - 2
-    ...
-    tarantool>  box.space.tester:insert{20,msgpack.NULL,20}
-    ---
-    - [20, null, 20]
-    ...
+| :codenormal:`tarantool>` :codebold:`msgpack = require('msgpack')`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`y =  msgpack.encode({'a',1,'b',2})`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`tarantool>  z = msgpack.decode(y)`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`z[1],z[2],z[3],z[4]`
+| :codenormal:`---`
+| :codenormal:`- a`
+| :codenormal:`- 1`
+| :codenormal:`- b`
+| :codenormal:`- 2`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{20,msgpack.NULL,20}`
+| :codenormal:`---`
+| :codenormal:`- [20, null, 20]`
+| :codenormal:`...`
 
 .. _MsgPack: http://msgpack.org/

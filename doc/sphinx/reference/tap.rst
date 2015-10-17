@@ -64,25 +64,25 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true or false.
         :rtype:  boolean
 
-        .. code-block:: lua
+        Example:
 
-            tarantool> taptest:ok(true,'x')
-            ok - x
-            ---
-            - true
-            ...
-            tarantool> tap = require('tap')
-            ---
-            ...
-            tarantool> taptest = tap.test('test-name')
-            TAP version 13
-            ---
-            ...
-            tarantool> taptest:ok(1 + 1 == 2, 'X')
-            ok - X
-            ---
-            - true
-            ...
+        | :codenormal:`tarantool>` :codebold:`taptest:ok(true,'x')`
+        | :codenormal:`ok - x`
+        | :codenormal:`---`
+        | :codenormal:`- true`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`tap = require('tap')`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`taptest = tap.test('test-name')`
+        | :codenormal:`TAP version 13`
+        | :codenormal:`---`
+        | :codenormal:`...`
+        | :codenormal:`tarantool>` :codebold:`taptest:ok(1 + 1 == 2, 'X')`
+        | :codenormal:`ok - X`
+        | :codenormal:`---`
+        | :codenormal:`- true`
+        | :codenormal:`...`
 
     .. method:: fail(test-name)
 
@@ -104,13 +104,13 @@ one can run tests and then use the results for statistics, decision-making, and 
 
         :return: nil
 
-        .. code-block:: lua
+        Example:
 
-            tarantool> taptest:skip('message')
-            ok - message # skip
-            ---
-            - true
-            ...
+        | :codenormal:`tarantool>` :codebold:`taptest:skip('message')`
+        | :codenormal:`ok - message # skip`
+        | :codenormal:`---`
+        | :codenormal:`- true`
+        | :codenormal:`...`
 
     .. method:: is(got, expected, test-name)
 
