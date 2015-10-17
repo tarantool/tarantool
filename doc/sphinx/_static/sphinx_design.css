@@ -178,7 +178,8 @@ a.headerlink {
 }
 
 .b-article ul {
-    padding: 0 0 0 13px;
+    margin: 10px 0 10px 0;
+    padding: 0 0 0 30px;
 }
 
 .b-article p {
@@ -476,3 +477,27 @@ div.b-cols_content_left .b-search-text {
     text-align: left
 }
 
+.line-block {
+    padding: 10px 20px 10px 20px;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    background: #ECECEC;
+    overflow-y: scroll; 
+}
+
+p > code.docutils {
+    padding: 1px 2px 3px 4px;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    background: #ECECEC;
+}
+
+li > code.docutils {
+    padding: 1px 2px 3px 4px;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    background: #ECECEC;
+}
