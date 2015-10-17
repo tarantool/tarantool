@@ -190,8 +190,10 @@ a.headerlink {
 .b-article h4,
 .b-article h5,
 .b-article h6 {
-    margin: 16px 0 16px -25px;
+    margin: 25px 0 10px -25px;
     font-weight: bold;
+    padding-left: 25px;
+    text-indent: -12px;
 }
 
 .b-article ol {
