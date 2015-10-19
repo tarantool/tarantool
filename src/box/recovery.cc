@@ -522,6 +522,16 @@ recovery_follow_local(struct recovery *r, const char *name,
 		      ev_tstamp wal_dir_rescan_delay)
 {
 	assert(r->writer == NULL);
+
+	/*
+	 * Scan wal_dir and recover all existing at the moment xlogs.
+	 * Blocks until finished.
+	 */
+	recover_remaining_wals(r);
+
+	/*
+	 * Start 'hot_standby' background fiber to follow xlog changes.
+	 */
 	assert(r->watcher == NULL);
 	r->watcher = fiber_new(name, recovery_follow_f);
 	fiber_set_joinable(r->watcher, true);
