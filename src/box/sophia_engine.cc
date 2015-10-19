@@ -255,7 +255,7 @@ sophia_poll(SophiaEngine *e)
 static inline int
 sophia_queue(SophiaEngine *e)
 {
-	return sp_getint(e->env, "scheduler.reqs");
+	return sp_getint(e->env, "performance.reqs");
 }
 
 static inline void
