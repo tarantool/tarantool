@@ -7,7 +7,8 @@ local test = tap.test('cfg')
 test:plan(3)
 
 config = {
-	pid_file = '1.pid'	
+	pid_file = '1.pid',
+    logger="tarantool.log"
 }
 
 local status = pcall(box.cfg, config)
