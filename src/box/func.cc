@@ -119,12 +119,12 @@ func_load(struct func *func)
 	}
 	func->dlhandle = dlopen(lua_tostring(L, -1), RTLD_NOW | RTLD_LOCAL);
 	if (func->dlhandle == NULL) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def.name,
 			  dlerror());
 	}
 	func->func = (box_function_f) dlsym(func->dlhandle, sym);
 	if (func->func == NULL) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def.name,
+		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def.name,
 			  dlerror());
 	}
 }
