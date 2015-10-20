@@ -447,10 +447,11 @@ div.b-cols_content_left .b-search-text {
     -webkit-border-radius: 0 6px 6px 6px;
     -moz-border-radius: 0 6px 6px 6px;
     border-radius: 0 6px 6px 6px;
+    overflow-y: scroll;
 }
 
 .b-documentation-tab div {
-    height: 100%;
+    height: 100%; 
 }
 
 /*
