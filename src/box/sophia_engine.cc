@@ -576,17 +576,16 @@ SophiaEngine::commit(struct txn *txn, int64_t signature)
 		return;
 
 	if (txn->n_rows > 0) {
-		/* Check commit order */
+		/* commit transaction using transaction commit signature */
 		assert(signature >= 0);
-		assert(m_prev_commit_lsn < signature);
+
 		if (m_prev_commit_lsn == txn->signature) {
 			panic("sophia commit panic: m_prev_commit_lsn == txn->signature = %"
 			      PRIu64, txn->signature);
 		}
-		m_prev_commit_lsn = signature;
-
 		/* Set tx id in Sophia only if tx has WRITE requests */
 		sp_setint(txn->engine_tx, "lsn", signature);
+		m_prev_commit_lsn = signature;
 	}
 
 	int rc = sp_commit(txn->engine_tx);
