@@ -579,6 +579,10 @@ SophiaEngine::commit(struct txn *txn, int64_t signature)
 		/* Check commit order */
 		assert(signature >= 0);
 		assert(m_prev_commit_lsn < signature);
+		if (m_prev_commit_lsn == txn->signature) {
+			panic("sophia commit panic: m_prev_commit_lsn == txn->signature = %"
+			      PRIu64, txn->signature);
+		}
 		m_prev_commit_lsn = signature;
 
 		/* Set tx id in Sophia only if tx has WRITE requests */
