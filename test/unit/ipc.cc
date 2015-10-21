@@ -34,7 +34,10 @@ ipc_basic()
 
 	ok(ipc_channel_is_empty(channel) == false, "ipc_channel_is_empty(1)");
 
-	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get()");
+	void *ptr;
+
+	ipc_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "ipc_channel_get()");
 
 	ipc_channel_delete(channel);
 
@@ -55,16 +58,19 @@ ipc_get()
 	   "ipc_channel_put(0)");
 	ok(ipc_channel_put_timeout(channel, &dummy, 0) == -1,
 	   "ipc_channel_put_timeout(0)");
-	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get(0)");
+	void *ptr;
+	ipc_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "ipc_channel_get(0)");
 	ok(ipc_channel_put_timeout(channel, &dummy, 0.01) == 0,
 	   "ipc_channel_put_timeout(1)");
-	ok(ipc_channel_get(channel) == &dummy, "ipc_channel_get(1)");
+	ipc_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "ipc_channel_get(1)");
 
 	ipc_channel_close(channel);
 
 	ok(ipc_channel_put(channel, &dummy) == -1, "ipc_channel_put(closed)");
 
-	ok(ipc_channel_get(channel) == NULL, "ipc_channel_get(closed)");
+	ok(ipc_channel_get(channel, &ptr) == -1, "ipc_channel_get(closed)");
 
 	ipc_channel_delete(channel);
 

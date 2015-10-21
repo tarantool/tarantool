@@ -21,8 +21,10 @@ pop_f(va_list ap)
 {
 	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
 
-	for (int i = 0; i < ITERATIONS; i++)
-		(void) ipc_channel_get(channel);
+	for (int i = 0; i < ITERATIONS; i++) {
+		void *ptr;
+		ipc_channel_get(channel, &ptr);
+	}
 }
 
 void main_f(va_list ap)

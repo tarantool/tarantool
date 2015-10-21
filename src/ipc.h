@@ -31,79 +31,174 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <stdint.h>
 #include <tarantool_ev.h>
 #include "salad/rlist.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /**
  * @brief CHANNELS
  */
 
-struct ipc_channel {
-	/**
-	 * Readers blocked waiting for messages while the channel
-	 * is empty.
-	 */
-	struct rlist readers;
-	/**
-	 * Writers blocked waiting for empty space while
-	 * the channel is full.
-	 */
-	struct rlist writers;
-	struct fiber *close;		/* close waiter */
-	bool readonly;			/* channel is read only */
-	bool closed;			/* channel is closed */
-	unsigned size;
-	unsigned beg;
-	unsigned count;
-	void *item[0];
+/**
+ * A base structure for an IPC message.
+ *
+ * A message at any moment can be either:
+ * - new
+ * - in a channel, waiting to get delivered
+ * - delivered
+ *
+ * When a channel is destroyed, all messages buffered by the
+ * channel must be destroyed as well. The destroy callback is
+ * therefore necessary to free any message-specific resources in
+ * case of delivery failure.
+ */
+struct ipc_msg {
+	void (*destroy)(struct ipc_msg *msg);
 };
 
+/**
+ * A message implementation to pass simple value across
+ * a channel.
+ */
+struct ipc_value {
+	struct ipc_msg base;
+	union {
+		void *data;
+		int i;
+	};
+};
+
+void
+ipc_value_delete(struct ipc_msg *msg);
+
+struct ipc_value *
+ipc_value_new();
+
+
+/**
+ * Channel - fiber communication media.
+ *
+ * A channel is a media to deliver messages between fibers.
+ * Any fiber can read or write to/from a channel. Many
+ * readers and writers can work with a channel concurrently.
+ * A message sent to a channel is ready by the first fiber
+ * reading from it. If a channel is empty, the reader blocks
+ * and waits for a message. If a channel has no reader, the
+ * writer waits for the reader to arrive. If a channel is
+ * buffered, i.e. has an associated buffer for messages, it
+ * is possible for a writer to "drop" the message in a channel
+ * until a writer arrives. In case of multiple readers,
+ * messages are delivered in FIFO order. In case of multiple
+ * writers, the first writer to come is released of its message
+ * first.
+ *
+ * If a channel has a buffer of size N, and the buffer
+ * is full (contains N messages), and there is a queue of writers,
+ * the moment the first reader arrives and reads the first message
+ * from a buffer, the first fiber from the wait queue is awoken,
+ * and puts its message to the end of the buffer.
+ *
+ * A channel, once created is "open". I.e. anyone can read or
+ * write to/from a channel. A channel can be closed at any time,
+ * in which case, all messages currently buffered in a channel
+ * are destroyed, waiting readers or writers awoken with an error.
+ *
+ * Waiting for a message, a reader, or space in a buffer can also
+ * return error in case of a wait timeout or cancellation (when the
+ * waiting fiber is cancelled).
+ *
+ * Sending a message to a closed channel, as well as reading
+ * a message from such channel, always fails.
+ *
+ * Channel memory layout
+ * ---------------------
+ * Channel structure has a fixed size. If a channel is created
+ * with a buffer, the buffer must be allocated in a continuous
+ * memory chunk, directly after the channel itself.
+ * ipc_channel_memsize() can be used to find out the amount
+ * of memory necessary to store a channel, given the desired
+ * buffer size.
+ */
+struct ipc_channel {
+	/** Channel buffer size, if the channel is buffered. */
+	uint32_t size;
+	/** The number of messages in the buffer. */
+	uint32_t count;
+	/**
+	 * Readers blocked waiting for messages while the channel
+	 * buffers is empty and/or there are no writers, or
+	 * Writers blocked waiting for empty space while the
+	 * channel buffer is full and/or there are no readers.
+	 */
+	struct rlist waiters;
+	/** Ring buffer read position. */
+	uint32_t beg;
+	/* True if the channel is closed. */
+	bool is_closed;
+	/** Channel buffer, if any. */
+	struct ipc_msg **buf;
+};
+
+/**
+ * The amount of memory necessary to store a channel, given
+ * buffer size.
+ */
 static inline size_t
-ipc_channel_memsize(unsigned size)
+ipc_channel_memsize(uint32_t size)
 {
-	return sizeof(struct ipc_channel) + sizeof(void *) * size;
+	return sizeof(struct ipc_channel) + sizeof(struct ipc_msg *) * size;
 }
 
 /**
  * Initialize a channel (the memory should have
- * been correctly allocated for the channel.
+ * been correctly allocated for the channel).
  */
 void
-ipc_channel_create(struct ipc_channel *ch, unsigned size);
+ipc_channel_create(struct ipc_channel *ch, uint32_t size);
 
-
-/**
- * Destroy a channel. Does not free allocated memory.
- */
+/** Destroy a channel. Does not free allocated memory. */
 void
 ipc_channel_destroy(struct ipc_channel *ch);
 
 /**
- * @brief Allocate and construct new IPC channel
- * @param size of channel
- * @return new channel
+ * Allocate and construct a channel.
+ *
+ * Uses malloc().
+ *
+ * @param	size of the channel buffer
+ * @return	new channel
  * @code
  *	struct ipc_channel *ch = ipc_channel_new(10);
  * @endcode
  */
 struct ipc_channel *
-ipc_channel_new(unsigned size);
+ipc_channel_new(uint32_t size);
 
 /**
- * @brief Destruct and free a IPC channel
- * @param ch channel
+ * Destroy and free an IPC channel.
+ *
+ * @param ch	channel
  */
 void
 ipc_channel_delete(struct ipc_channel *ch);
 
 /**
- * @brief check if channel is empty
+ * Check if the channel buffer is empty.
+ *
  * @param channel
- * @retval 1 (TRUE) if channel is empty
- * @retval 0 otherwise
+ *
+ * @retval true		channel buffer is empty
+ *			(always true for unbuffered
+ *			channels)
+ * @retval false	otherwise
+ *
  * @code
  *	if (!ipc_channel_is_empty(ch))
- *		char *msg = ipc_channel_get(ch);
+ *		ipc_channel_get(ch, ...);
  * @endcode
  */
 static inline bool
@@ -113,10 +208,14 @@ ipc_channel_is_empty(struct ipc_channel *ch)
 }
 
 /**
- * @brief check if channel is full
- * @param channel
- * @return 1 (TRUE) if channel is full
- * @return 0 otherwise
+ * Check if the channel buffer is full.
+ *
+ * @param	channel
+ *
+ * @return true		if the channel buffer is full
+ *			(always true for  unbuffered channels)
+ *
+ * @return false	otherwise
  * @code
  *	if (!ipc_channel_is_full(ch))
  *		ipc_channel_put(ch, "message");
@@ -129,28 +228,43 @@ ipc_channel_is_full(struct ipc_channel *ch)
 }
 
 /**
- * @brief put data into channel in timeout
- * @param channel
- * @param data
- * @param timeout
- * @return 0 if success
- * @return -1, errno=ETIMEDOUT if timeout exceeded
- * @code
- *	if (ipc_channel_put_timeout(ch, "message", 0.25) == 0)
- *		return "ok";
- *	else
- *		return "timeout exceeded";
- * @endcode
+ * Put a message into a channel.
+ * This is for cases when messages need to have
+ * a custom destructor.
  */
 int
-ipc_channel_put_timeout(struct ipc_channel *ch,	void *data,
+ipc_channel_put_msg_timeout(struct ipc_channel *ch,
+			    struct ipc_msg *msg,
+			    ev_tstamp timeout);
+
+/**
+ * Send a message over a channel within given time.
+ *
+ * @param	channel
+ * @param	msg
+ * @param	timeout
+ * @return 0	success
+ * @return -1, errno=ETIMEDOUT if timeout exceeded,
+ *	       errno=ECANCEL if the fiber is cancelled
+ *	       errno=EBADF if the channel is closed
+ *	       while waiting on it.
+ *
+ */
+int
+ipc_channel_put_timeout(struct ipc_channel *ch,
+			void *data,
 			ev_tstamp timeout);
 
 /**
- * @brief Put data into a channel.
- * @detail Yield current fiber if the channel is full.
+ * Send a message over a channel.
+ *
+ * Yields current fiber if the channel is full.
+ * The message does not require a custom
+ * destructor.
+ *
  * @param channel
  * @param data
+ *
  * @code
  *	ipc_channel_put(ch, "message");
  * @endcode
@@ -163,100 +277,98 @@ ipc_channel_put(struct ipc_channel *ch, void *data)
 }
 
 /**
- * @brief Get data from a channel with a timeout
+ * Get a message from the channel, or time out.
+ * The caller is responsible for message destruction.
+ */
+int
+ipc_channel_get_msg_timeout(struct ipc_channel *ch,
+			    struct ipc_msg **msg,
+			    ev_tstamp timeout);
+/**
+ * Get data from a channel within given time.
+ *
  * @param channel
  * @param timeout
- * @return data if success
- * @return NULL if timeout exceeded
+ *
+ * @return	0 on success, -1 on error (timeout, channel is
+ *		closed)
  * @code
  *	do {
- *		char *msg = ipc_channel_get_timeout(ch, 0.5);
+ *		struct ipc_msg *msg;
+ *		int rc = ipc_channel_get_timeout(ch, 0.5, );
  *		printf("message: %p\n", msg);
  *	} while (msg);
- *	return msg;
  * @endcode
  */
-void *
-ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout);
+int
+ipc_channel_get_timeout(struct ipc_channel *ch,
+			void **data,
+			ev_tstamp timeout);
 
 /**
- * @brief Get data from a channel.
- * @detail Yield current fiber if the channel is empty.
+ * Fetch a message from the channel. Yields current fiber if the
+ * channel is empty.
+ *
  * @param channel
- * @return data that was put into channel by ipc_channel_put
- * @code
- *	char *msg = ipc_channel_get(ch);
- * @endcode
+ * @return 0 on success, -1 on error
  */
-static inline void *
-ipc_channel_get(struct ipc_channel *ch)
+static inline int
+ipc_channel_get(struct ipc_channel *ch, void **data)
 {
-	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
-}
-
-
-/**
- * @brief return true if channel has reader fibers that wait data
- * @param channel
- */
-static inline bool
-ipc_channel_has_readers(struct ipc_channel *ch)
-{
-	return !rlist_empty(&ch->readers);
+	return ipc_channel_get_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 /**
- * @brief return true if channel has writer fibers that wait data
- * @param channel
+ * Check if the channel has reader fibers that wait
+ * for new messages.
  */
-static inline bool
-ipc_channel_has_writers(struct ipc_channel *ch)
-{
-	return !rlist_empty(&ch->writers);
-}
+bool
+ipc_channel_has_readers(struct ipc_channel *ch);
 
 /**
- * @brief return channel size
- * @param channel
+ * Check if the channel has writer fibers that wait
+ * for readers.
  */
-static inline unsigned
+bool
+ipc_channel_has_writers(struct ipc_channel *ch);
+
+/** Channel buffer size. */
+static inline uint32_t
 ipc_channel_size(struct ipc_channel *ch)
 {
 	return ch->size;
 }
 
 /**
- * @brief return the number of items
- * @param channel
+ * The number of messages in the buffer.
+ * There may be more messages outstanding
+ * if the buffer is full.
  */
-static inline unsigned
+static inline uint32_t
 ipc_channel_count(struct ipc_channel *ch)
 {
 	return ch->count;
 }
 
 /**
- * @brief shutdown channel for writing.
- * Wake up readers and writers (if they exist)
- */
-void
-ipc_channel_shutdown(struct ipc_channel *ch);
-
-/**
- * @brief close the channel.
- * @pre ipc_channel_is_readonly(ch) && ipc_channel_is_empty(ch)
+ * Close the channel. Discards all messages
+ * and wakes up all readers and writers.
  */
 void
 ipc_channel_close(struct ipc_channel *ch);
 
 /**
- * @brief return true if the channel is closed for both
- * for reading and writing.
+ * True if the channel is closed for both for reading
+ * and writing.
  */
 static inline bool
 ipc_channel_is_closed(struct ipc_channel *ch)
 {
-	return ch->closed;
+	return ch->is_closed;
 }
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_IPC_H_INCLUDED */

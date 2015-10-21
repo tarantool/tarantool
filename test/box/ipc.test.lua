@@ -1,6 +1,6 @@
 fiber = require('fiber')
 
-ch = fiber.channel()
+ch = fiber.channel(1)
 ch:size()
 ch:count()
 ch:is_full()

@@ -1,7 +1,7 @@
 fiber = require('fiber')
 ---
 ...
-ch = fiber.channel()
+ch = fiber.channel(1)
 ---
 ...
 ch:size()
@@ -42,11 +42,11 @@ ch:get()
 ...
 ch:get('wrong timeout')
 ---
-- error: timeout must be a number
+- error: 'usage: channel:get([timeout])'
 ...
 ch:get(-10)
 ---
-- error: wrong timeout
+- error: 'usage: channel:get([timeout])'
 ...
 ch:put(234)
 ---
@@ -273,26 +273,26 @@ buffer
     - '5'
   - - tfbr2
     - '35'
+  - - tfbr2
+    - '37'
+  - - tfbr2
+    - '38'
   - - tfbr
     - '36'
   - - tfbr2
-    - '37'
-  - - tfbr
-    - '38'
-  - - tfbr2
     - '39'
+  - - tfbr2
+    - '41'
+  - - tfbr2
+    - '42'
   - - tfbr
     - '40'
   - - tfbr2
-    - '41'
-  - - tfbr
-    - '42'
-  - - tfbr2
     - '43'
-  - - tfbr
-    - '44'
   - - tfbr2
     - '45'
+  - - tfbr
+    - '44'
 ...
 ch = fiber.channel(1)
 ---

@@ -40,15 +40,16 @@ extern "C" {
 
 #include <ipc.h>
 #include "lua/utils.h"
+#include <fiber.h>
 
-static const char channel_lib[]   = "fiber.channel";
+static const char ipc_lib[]   = "ipc";
 
 /******************** channel ***************************/
 
 static int
 lbox_ipc_channel(struct lua_State *L)
 {
-	lua_Integer size = 1;
+	lua_Integer size = 0;
 
 	if (lua_gettop(L) > 0) {
 		if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
@@ -60,42 +61,44 @@ lbox_ipc_channel(struct lua_State *L)
 	}
 	struct ipc_channel *ch = (struct ipc_channel *)
 		lua_newuserdata(L, ipc_channel_memsize(size));
-	if (!ch)
-		luaL_error(L, "fiber.channel: Not enough memory");
+	if (ch == NULL)
+		luaL_error(L, "fiber.channel: not enough memory");
 	ipc_channel_create(ch, size);
 
-	luaL_getmetatable(L, channel_lib);
-
-	lua_pushstring(L, "rid");	/* first object id */
-	lua_pushnumber(L, 1);
-	lua_settable(L, -3);
+	luaL_getmetatable(L, ipc_lib);
 
 	lua_setmetatable(L, -2);
 	return 1;
 }
 
 static inline struct ipc_channel *
-lbox_check_channel(struct lua_State *L, int narg)
+lbox_check_channel(struct lua_State *L, int narg, const char *source)
 {
-	return (struct ipc_channel *) luaL_checkudata(L, narg, channel_lib);
+	void *ch;
+	int top = lua_gettop(L);
+
+	if (narg > top || top + narg < 0 ||
+	    (ch = luaL_checkudata(L, narg, ipc_lib)) == NULL) {
+
+		luaL_error(L, "usage: %s", source);
+	}
+	return (struct ipc_channel *) ch;
 }
 
 static int
 lbox_ipc_channel_gc(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		return 0;
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
-	ipc_channel_destroy(ch);
+	struct ipc_channel *ch = (struct ipc_channel *)
+		luaL_checkudata(L, -1, ipc_lib);
+	if (ch)
+		ipc_channel_destroy(ch);
 	return 0;
 }
 
 static int
 lbox_ipc_channel_is_full(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: channel:is_full()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1, "channel:is_full()");
 	lua_pushboolean(L, ipc_channel_is_full(ch));
 	return 1;
 }
@@ -103,92 +106,100 @@ lbox_ipc_channel_is_full(struct lua_State *L)
 static int
 lbox_ipc_channel_is_empty(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: channel:is_empty()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1,
+						    "channel:is_empty()");
 	lua_pushboolean(L, ipc_channel_is_empty(ch));
 	return 1;
+}
+
+static void
+lua_ipc_value_destroy(struct ipc_msg *base)
+{
+	struct ipc_value *value = (struct ipc_value *) base;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, value->i);
+	ipc_value_delete(base);
 }
 
 static int
 lbox_ipc_channel_put(struct lua_State *L)
 {
-	ev_tstamp timeout = 0;
-	int top = lua_gettop(L);
-	struct ipc_channel *ch;
+	int rc = -1;
+	struct ipc_channel *ch =
+		lbox_check_channel(L, 1, "channel:put(var, [, timeout])");
+	ev_tstamp timeout;
 
-	switch (top) {
+	switch (lua_gettop(L)) {
 	case 2:
 		timeout = TIMEOUT_INFINITY;
 		break;
 	case 3:
-		if (!lua_isnumber(L, -1))
-			luaL_error(L, "timeout must be a number");
-		timeout = lua_tonumber(L, -1);
-		if (timeout < 0)
-			luaL_error(L, "wrong timeout");
-		break;
+		if (lua_isnumber(L, -1)) {
+			timeout = lua_tonumber(L, -1);
+			if (timeout >= 0)
+				/** Leave var on top of the stack. */
+				lua_pop(L, 1);
+				break;
+		}
+		/** Fall through. */
 	default:
 		luaL_error(L, "usage: channel:put(var [, timeout])");
 	}
-	ch = lbox_check_channel(L, -top);
 
-	lua_pushvalue(L, 2);
-	size_t vref = luaL_ref(L, LUA_REGISTRYINDEX);
+	struct ipc_value *value = ipc_value_new();
+	if (value == NULL)
+		goto end;
 
-	int retval;
-	if (ipc_channel_put_timeout(ch, (void *)vref, timeout) == 0) {
-		retval = 1;
-	} else {
-		/* timed out or closed */
-		luaL_unref(L, LUA_REGISTRYINDEX, vref);
-		retval = 0;
-	}
+	value->base.destroy = lua_ipc_value_destroy;
+	/* The referenced value is on top of the stack. */
+	value->i = luaL_ref(L, LUA_REGISTRYINDEX);
 
-	lua_settop(L, top);
-	lua_pushboolean(L, retval);
+	rc = ipc_channel_put_msg_timeout(ch, &value->base, timeout);
+	if (rc)
+		fiber_testcancel();
+end:
+	lua_pushboolean(L, rc == 0);
 	return 1;
 }
 
 static int
 lbox_ipc_channel_get(struct lua_State *L)
 {
-	int top = lua_gettop(L);
+	struct ipc_channel *ch =
+		lbox_check_channel(L, 1, "channel:get([timeout])");
 	ev_tstamp timeout;
 
-	if (top > 2 || top < 1 || !lua_isuserdata(L, -top))
-		luaL_error(L, "usage: channel:get([timeout])");
-
-	if (top == 2) {
-		if (!lua_isnumber(L, 2))
-			luaL_error(L, "timeout must be a number");
-		timeout = lua_tonumber(L, 2);
-		if (timeout < 0)
-			luaL_error(L, "wrong timeout");
-	} else {
+	switch (lua_gettop(L)) {
+	case 1:
 		timeout = TIMEOUT_INFINITY;
+		break;
+	case 2:
+		if (lua_isnumber(L, -1)) {
+			timeout = lua_tonumber(L, -1);
+			if (timeout >= 0)
+				break;
+		}
+		/** Fall through. */
+	default:
+		luaL_error(L, "usage: channel:get([timeout])");
 	}
 
-	struct ipc_channel *ch = lbox_check_channel(L, 1);
-
-	size_t vref = (size_t)ipc_channel_get_timeout(ch, timeout);
-
-	if (!vref) {
-		/* timed out or closed */
+	struct ipc_value *value;
+	if (ipc_channel_get_msg_timeout(ch, (struct ipc_msg **) &value,
+					timeout)) {
+		fiber_testcancel();
 		lua_pushnil(L);
 		return 1;
 	}
-	lua_rawgeti(L, LUA_REGISTRYINDEX, vref);
-	luaL_unref(L, LUA_REGISTRYINDEX, vref);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, value->i);
+	value->base.destroy(&value->base);
 	return 1;
 }
 
 static int
 lbox_ipc_channel_has_readers(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:has_readers()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1,
+						    "channel:has_readers()");
 	lua_pushboolean(L, ipc_channel_has_readers(ch));
 	return 1;
 }
@@ -196,9 +207,8 @@ lbox_ipc_channel_has_readers(struct lua_State *L)
 static int
 lbox_ipc_channel_has_writers(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:has_writers()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1,
+						    "channel:has_writers()");
 	lua_pushboolean(L, ipc_channel_has_writers(ch));
 	return 1;
 }
@@ -206,9 +216,7 @@ lbox_ipc_channel_has_writers(struct lua_State *L)
 static int
 lbox_ipc_channel_size(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:has_writers()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1, "channel:size()");
 	lua_pushinteger(L, ipc_channel_size(ch));
 	return 1;
 }
@@ -216,9 +224,7 @@ lbox_ipc_channel_size(struct lua_State *L)
 static int
 lbox_ipc_channel_count(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:has_writers()");
-	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1, "channel:count()");
 	lua_pushinteger(L, ipc_channel_count(ch));
 	return 1;
 }
@@ -226,22 +232,8 @@ lbox_ipc_channel_count(struct lua_State *L)
 static int
 lbox_ipc_channel_close(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:close()");
-	struct ipc_channel *ch = lbox_check_channel(L, 1);
-
+	struct ipc_channel *ch = lbox_check_channel(L, 1, "channel:close()");
 	/* Shutdown the channel for writing and wakeup waiters */
-	ipc_channel_shutdown(ch);
-
-	/* Discard all remaining items*/
-	while (!ipc_channel_is_empty(ch)) {
-		/* Never yields because channel is not empty */
-		size_t vref = (size_t)ipc_channel_get_timeout(ch, 0);
-		assert(vref);
-		/* Unref lua items */
-		luaL_unref(L, LUA_REGISTRYINDEX, vref);
-	}
-	/* Close the channel */
 	ipc_channel_close(ch);
 	return 0;
 }
@@ -249,13 +241,9 @@ lbox_ipc_channel_close(struct lua_State *L)
 static int
 lbox_ipc_channel_is_closed(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		luaL_error(L, "usage: channel:is_closed()");
-	struct ipc_channel *ch = lbox_check_channel(L, 1);
-	if (ipc_channel_is_closed(ch))
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
+	struct ipc_channel *ch = lbox_check_channel(L, 1,
+						    "channel:is_closed()");
+	lua_pushboolean(L, ipc_channel_is_closed(ch));
 	return 1;
 }
 
@@ -276,7 +264,7 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"is_closed",	lbox_ipc_channel_is_closed},
 		{NULL, NULL}
 	};
-	luaL_register_type(L, channel_lib, channel_meta);
+	luaL_register_type(L, ipc_lib, channel_meta);
 
 	static const struct luaL_reg ipc_meta[] = {
 		{"channel",	lbox_ipc_channel},
