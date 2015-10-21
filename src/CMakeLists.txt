@@ -59,7 +59,7 @@ set (core_sources
      diag.c
      say.c
      memory.c
-     fiber.cc
+     fiber.c
      cbus.c
      exception.cc
      coro.c

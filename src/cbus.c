@@ -308,7 +308,11 @@ cpipe_fiber_pool_cb(ev_loop *loop, struct ev_async *watcher,
 					      struct fiber, state);
 			fiber_call(f);
 		} else if (! cpipe_fiber_pool_needs_throttling(pool)) {
-			f = fiber_new(pool->name, cpipe_fiber_pool_f);
+			f = fiber_new_nothrow(pool->name, cpipe_fiber_pool_f);
+			if (f == NULL) {
+				error_log(diag_last_error(&fiber()->diag));
+				break;
+			}
 			fiber_start(f, pool);
 		} else {
 			/**

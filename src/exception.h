@@ -92,6 +92,22 @@ public:
 	virtual void raise() { throw this; }
 };
 
+extern const struct type type_FiberCancelException;
+/**
+ * This is thrown by fiber_* API calls when the fiber is
+ * cancelled.
+ */
+class FiberCancelException: public Exception {
+public:
+	FiberCancelException(const char *file, unsigned line)
+		: Exception(&type_FiberCancelException, file, line) {
+		/* Nothing */
+	}
+
+	virtual void log();
+	virtual void raise() { throw this; }
+};
+
 /**
  * Initialize the exception subsystem.
  */

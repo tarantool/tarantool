@@ -96,7 +96,7 @@ enum fiber_key {
 	FIBER_KEY_MAX = 5
 };
 
-typedef void(*fiber_func)(va_list);
+typedef void (*fiber_func)(va_list);
 
 struct fiber {
 	struct tarantool_coro coro;
@@ -136,7 +136,7 @@ struct fiber {
 	 * You can safely ignore all offset_of-related warnings.
 	 * See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
 	 */
-	void (*f) (va_list);
+	fiber_func f;
 	va_list f_data;
 	/** Fiber local storage */
 	void *fls[FIBER_KEY_MAX];
@@ -266,11 +266,14 @@ cord_set_name(const char *name);
 bool
 cord_is_main();
 
-void fiber_init(void);
-void fiber_free(void);
+void
+fiber_init(void (*fiber_invoke)(fiber_func f, va_list ap));
+
+void
+fiber_free(void);
 
 struct fiber *
-fiber_new(const char *name, fiber_func f);
+fiber_new_nothrow(const char *name, fiber_func f);
 
 void
 fiber_set_name(struct fiber *fiber, const char *name);
@@ -414,28 +417,14 @@ fiber_time64(void)
 	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
 }
 
+inline void
+fiber_c_invoke(fiber_func f, va_list ap)
+{
+	return f(ap);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
-
-/**
- * This is thrown by fiber_* API calls when the fiber is
- * cancelled.
- */
-extern const struct type type_FiberCancelException;
-class FiberCancelException: public Exception {
-public:
-	FiberCancelException(const char *file, unsigned line)
-		: Exception(&type_FiberCancelException, file, line) {
-		/* Nothing */
-	}
-
-	virtual void log() const {
-			say_info("fiber `%s' has been cancelled",
-				 fiber_name(fiber()));
-			say_info("fiber `%s': exiting", fiber_name(fiber()));
-	}
-	virtual void raise() { throw this; }
-};
 
 /*
  * Test if this fiber is in a cancellable state and was indeed
@@ -456,13 +445,37 @@ fiber_testcancel(void)
 		tnt_raise(FiberCancelException);
 }
 
-
 static inline void
 diag_raise(void)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	if (e)
 		error_raise(e);
+}
+
+static inline struct fiber *
+fiber_new(const char *name, fiber_func func)
+{
+	struct fiber *f = fiber_new_nothrow(name, func);
+	if (f == NULL) {
+		diag_raise();
+		assert(false);
+	}
+	return f;
+}
+
+inline void
+fiber_cxx_invoke(fiber_func f, va_list ap)
+{
+	try {
+		f(ap);
+		/*
+		 * Make sure a leftover exception does not
+		 * propagate up to the joiner.
+		 */
+		diag_clear(&fiber()->diag);
+	} catch (struct error *e) {
+	}
 }
 
 #endif /* defined(__cplusplus) */

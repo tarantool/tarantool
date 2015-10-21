@@ -32,7 +32,7 @@ void benchmark_f(va_list ap)
 int main()
 {
 	memory_init();
-	fiber_init();
+	fiber_init(fiber_cxx_invoke);
 	struct fiber *benchmark = fiber_new("benchmark", benchmark_f);
 	fiber_wakeup(benchmark);
 	ev_run(loop(), 0);

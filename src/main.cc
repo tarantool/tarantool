@@ -631,7 +631,7 @@ main(int argc, char **argv)
 
 	exception_init();
 
-	fiber_init();
+	fiber_init(fiber_cxx_invoke);
 	/* Init iobuf library with default readahead */
 	iobuf_init();
 	coeio_init();

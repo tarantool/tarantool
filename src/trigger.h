@@ -31,10 +31,15 @@
  * SUCH DAMAGE.
  */
 #include "salad/rlist.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 /**
  * Type of the callback which may be invoked
  * on an event.
  */
+struct trigger;
 typedef void (*trigger_f)(struct trigger *trigger, void *event);
 typedef void (*trigger_f0)(struct trigger *trigger);
 
@@ -105,5 +110,8 @@ trigger_destroy(struct rlist *list)
 			trigger->destroy(trigger);
 	}
 }
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_TRIGGER_H */

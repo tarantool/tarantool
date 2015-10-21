@@ -40,6 +40,8 @@
 #include "trigger.h"
 #include "third_party/pmatomic.h"
 
+static void (*fiber_invoke)(fiber_func f, va_list ap);
+
 /*
  * Defines a handler to be executed on exit from cord's thread func,
  * accessible via cord()->on_exit (normally NULL). It is used to
@@ -61,9 +63,6 @@ static const struct cord_on_exit cord_on_exit_sentinel = { NULL, NULL };
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
 pthread_t main_thread_id;
-
-const struct type type_FiberCancelException =
-	make_type("FiberCancelException", &type_Exception);
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -210,14 +209,14 @@ fiber_join(struct fiber *fiber)
 		fiber_yield();
 	}
 	assert(fiber_is_dead(fiber));
+	bool fiber_was_cancelled = fiber->flags & FIBER_IS_CANCELLED;
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
 
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
-	struct error *e = diag_last_error(&fiber()->diag);
 	/** Don't bother with propagation of FiberCancelException */
-	if (e != NULL && type_cast(FiberCancelException, e) != NULL)
+	if (fiber_was_cancelled)
 		diag_clear(&fiber()->diag);
 }
 
@@ -252,9 +251,10 @@ struct fiber_watcher_data {
 };
 
 static void
-fiber_schedule_timeout(ev_loop * /* loop */,
+fiber_schedule_timeout(ev_loop *loop,
 		       ev_timer *watcher, int revents)
 {
+	(void) loop;
 	(void) revents;
 
 	assert(fiber() == &cord()->sched);
@@ -309,8 +309,10 @@ fiber_sleep(ev_tstamp delay)
 }
 
 void
-fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int /* revents */)
+fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 {
+	(void) loop;
+	(void) revents;
 	assert(fiber() == &cord()->sched);
 	fiber_call((struct fiber *) watcher->data);
 }
@@ -330,8 +332,9 @@ fiber_schedule_list(struct rlist *list)
 }
 
 static void
-fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
+fiber_schedule_wakeup(ev_loop *loop, ev_async *watcher, int revents)
 {
+	(void) loop;
 	(void) watcher;
 	(void) revents;
 	struct cord *cord = cord();
@@ -339,9 +342,13 @@ fiber_schedule_wakeup(ev_loop * /* loop */, ev_async *watcher, int revents)
 }
 
 static void
-fiber_schedule_idle(ev_loop * /* loop */, ev_idle * /* watcher */,
-		    int /* revents */)
-{}
+fiber_schedule_idle(ev_loop *loop, ev_idle *watcher,
+		    int revents)
+{
+	(void) loop;
+	(void) watcher;
+	(void) revents;
+}
 
 
 struct fiber *
@@ -411,20 +418,14 @@ fiber_loop(void *data __attribute__((unused)))
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		try {
-			fiber->f(fiber->f_data);
-			/*
-			 * Make sure a leftover exception does not
-			 * propagate up to the joiner.
-			 */
-			diag_clear(&fiber->diag);
-		} catch (struct error *e) {
+		fiber_invoke(fiber->f, fiber->f_data);
+		struct error *e = diag_last_error(&fiber->diag);
+		if (e != NULL && !(fiber->flags & FIBER_IS_JOINABLE)) {
 			/*
 			 * For joinable fibers, it's the business
 			 * of the caller to deal with the error.
 			 */
-			if (! (fiber->flags & FIBER_IS_JOINABLE))
-				error_log(e);
+			error_log(e);
 		}
 		fiber->flags |= FIBER_IS_DEAD;
 		while (! rlist_empty(&fiber->wake)) {
@@ -472,7 +473,7 @@ fiber_get_key(struct fiber *fiber, enum fiber_key key);
  * completes.
  */
 struct fiber *
-fiber_new(const char *name, void (*f) (va_list))
+fiber_new_nothrow(const char *name, fiber_func f)
 {
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
@@ -482,11 +483,19 @@ fiber_new(const char *name, void (*f) (va_list))
 					  struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
-		fiber = (struct fiber *) mempool_alloc0(&cord->fiber_pool);
+		fiber = (struct fiber *)
+			mempool_alloc_nothrow(&cord->fiber_pool);
+		if (fiber == NULL) {
+			diag_set(OutOfMemory, sizeof(struct fiber),
+				 "fiber pool", "fiber");
+			return NULL;
+		}
+		memset(fiber, 0, sizeof(struct fiber));
 
 		if (tarantool_coro_create(&fiber->coro, &cord->slabc,
 					  fiber_loop, NULL)) {
-			diag_raise();
+			mempool_free(&cord->fiber_pool, fiber);
+			return NULL;
 		}
 
 		region_create(&fiber->gc, &cord->slabc);
@@ -774,8 +783,10 @@ cord_cojoin(struct cord *cord)
 }
 
 void
-break_ev_loop_f(struct trigger * /* trigger */, void * /* event */)
+break_ev_loop_f(struct trigger *trigger, void *event)
 {
+	(void) trigger;
+	(void) event;
 	ev_break(loop(), EVBREAK_ALL);
 }
 
@@ -791,13 +802,10 @@ cord_costart_thread_func(void *arg)
 {
 	struct costart_ctx ctx = *(struct costart_ctx *) arg;
 	free(arg);
-	struct fiber *f;
 
-	try {
-		f = fiber_new("main", ctx.run);
-	} catch (...) {
+	struct fiber *f = fiber_new_nothrow("main", ctx.run);
+	if (f == NULL)
 		return NULL;
-	}
 
 	struct trigger break_ev_loop = {
 		RLIST_LINK_INITIALIZER, break_ev_loop_f, NULL, NULL
@@ -854,8 +862,9 @@ cord_is_main()
 }
 
 void
-fiber_init(void)
+fiber_init(void (*invoke)(fiber_func f, va_list ap))
 {
+	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
 	cord() = &main_cord;
 	cord_init("main");

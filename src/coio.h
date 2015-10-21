@@ -42,7 +42,7 @@ struct coio_service
 {
 	struct evio_service evio_service;
 	/* Fiber function. */
-	void (*handler)(va_list ap);
+	fiber_func handler;
 	/** Passed to the created fiber. */
 	void *handler_param;
 };
@@ -160,7 +160,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 
 void
 coio_service_init(struct coio_service *service, const char *name,
-		  void (*handler)(va_list ap), void *handler_param);
+		  fiber_func handler, void *handler_param);
 
 /** Wait until the service binds to the port. */
 void

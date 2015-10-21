@@ -631,7 +631,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 
 void
 coio_service_init(struct coio_service *service, const char *name,
-		  void (*handler)(va_list ap), void *handler_param)
+		  fiber_func handler, void *handler_param)
 {
 	evio_service_init(loop(), &service->evio_service, name,
 			  coio_service_on_accept, service);

@@ -15,7 +15,8 @@ touch_f(va_list ap)
 		fail_unless(rc == 1);
 		fflush(f);
 		fiber_sleep(0.01);
-		fiber_testcancel();
+		if (fiber_is_cancelled())
+			return;
 	}
 }
 
@@ -63,7 +64,7 @@ main_f(va_list ap)
 int main()
 {
 	memory_init();
-	fiber_init();
+	fiber_init(fiber_cxx_invoke);
 	struct fiber *test = fiber_new("coio_stat", main_f);
 	fiber_wakeup(test);
 	ev_run(loop(), 0);

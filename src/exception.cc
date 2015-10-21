@@ -34,6 +34,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "fiber.h"
+
 extern "C" {
 
 static void
@@ -176,6 +178,17 @@ TimedOut::TimedOut(const char *file, unsigned line)
 	m_errno = ETIMEDOUT;
 }
 
+const struct type type_FiberCancelException =
+	make_type("FiberCancelException", &type_Exception);
+
+void
+FiberCancelException::log()
+{
+	say_info("fiber `%s' has been cancelled",
+		 fiber_name(fiber()));
+	say_info("fiber `%s': exiting", fiber_name(fiber()));
+}
+
 void
 exception_init()
 {
@@ -188,3 +201,4 @@ exception_init()
 	/* A special workaround for out_of_memory static init */
 	out_of_memory.refs = 1;
 }
+

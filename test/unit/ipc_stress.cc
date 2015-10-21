@@ -45,7 +45,7 @@ void main_f(va_list ap)
 int main()
 {
 	memory_init();
-	fiber_init();
+	fiber_init(fiber_c_invoke);
 	struct fiber *main= fiber_new("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);

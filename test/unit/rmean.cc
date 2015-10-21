@@ -46,7 +46,7 @@ int main()
 	printf("Stat. 2 names, timer simulation\n");
 
 	memory_init();
-	fiber_init();
+	fiber_init(fiber_c_invoke);
 
 	struct rmean *st;
 	const char *name[] = {"EV1", "EV2"};
