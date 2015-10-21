@@ -108,11 +108,11 @@ local function encode_int(buf, num)
     else
         if num >= -0x20 then
             encode_fix(buf, 0xe0, num)
-        elseif num >= -0x7f then
+        elseif num >= -0x80 then
             encode_u8(buf, 0xd0, num)
-        elseif num >= -0x7fff then
+        elseif num >= -0x8000 then
             encode_u16(buf, 0xd1, num)
-        elseif num >= -0x7fffffff then
+        elseif num >= -0x80000000 then
             encode_u32(buf, 0xd2, num)
         else
             encode_u64(buf, 0xd3, 0LL + num)
