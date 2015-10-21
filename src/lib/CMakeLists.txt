@@ -1,5 +1,6 @@
 add_subdirectory(bit)
 add_subdirectory(bitset)
+set(SMALL_EMBEDDED ON)
 add_subdirectory(small)
 add_subdirectory(salad)
 add_subdirectory(csv)

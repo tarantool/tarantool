@@ -14,3 +14,6 @@
 [submodule "test-run"]
 	path = test-run
 	url = https://github.com/tarantool/test-run.git
+[submodule "src/lib/small"]
+	path = src/lib/small
+	url = https://github.com/tarantool/small.git
