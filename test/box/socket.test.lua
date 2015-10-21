@@ -411,6 +411,7 @@ client ~= nil
 client:read(123)
 server:close()
 -- unix socket automatically removed
+collectgarbage('collect')
 fio.stat(path) == nil
 
 --# setopt delimiter ';'

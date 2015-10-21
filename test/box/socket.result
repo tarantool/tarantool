@@ -1224,6 +1224,10 @@ server:close()
 - true
 ...
 -- unix socket automatically removed
+collectgarbage('collect')
+---
+- 0
+...
 fio.stat(path) == nil
 ---
 - true
