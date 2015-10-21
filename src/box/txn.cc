@@ -65,13 +65,14 @@ txn_stmt_new(struct txn *txn)
 {
 	assert(txn->stmt == 0);
 	assert(txn->n_stmts == 0 || !txn->autocommit);
-	if (txn->n_stmts++ == 1) {
+	if (txn->n_stmts == 0) {
 		txn->stmt = &txn->first_stmt;
 	} else {
 		txn->stmt = (struct txn_stmt *)
 			region_alloc0(&fiber()->gc, sizeof(struct txn_stmt));
 	}
 	rlist_add_tail_entry(&txn->stmts, txn->stmt, next);
+	++txn->n_stmts;
 	return txn->stmt;
 }
 
