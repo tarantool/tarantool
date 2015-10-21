@@ -453,7 +453,7 @@ done:
 		/* Update row counter for wal_opt_rotate() */
 		wal->rows += req->n_rows;
 		/* Mark request as successed for tx thread */
-		req->res = 0;
+		req->res = vclock_sum(&writer->vclock);
 	}
 
 	fiber_gc();
@@ -536,6 +536,6 @@ wal_write(struct recovery *r, struct wal_request *req)
 	fiber_set_cancellable(cancellable);
 	if (req->res == -1)
 		return -1;
-	return vclock_sum(&r->vclock);
+	return req->res;
 }
 

@@ -85,6 +85,7 @@ txn_begin(bool autocommit)
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
 	txn->autocommit = autocommit;
+	txn->signature = -1;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
@@ -92,6 +93,7 @@ txn_begin(bool autocommit)
 struct txn *
 txn_begin_stmt(struct request *request, struct space *space)
 {
+	/* NOTE: request is NULL for the read requests (select, get, etc.) */
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
@@ -108,30 +110,29 @@ txn_begin_stmt(struct request *request, struct space *space)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	}
 	struct txn_stmt *stmt = txn_stmt_new(txn);
-	if (space_is_temporary(space) == false)
+	/* Create WAL record for the write requests in non-temporary spaces */
+	if (!space_is_temporary(space) && request != NULL) {
 		txn_add_redo(stmt, request);
+		++txn->n_rows;
+	}
+
 	engine->beginStatement(txn);
 	return txn;
 }
 
-void
-txn_commit(struct txn *txn)
+static void
+txn_write_to_wal(struct txn *txn)
 {
-	assert(txn == in_txn());
-	struct txn_stmt *stmt;
-
-	/* Do transaction conflict resolving */
-	if (txn->engine)
-		txn->engine->prepare(txn);
-
+	assert(txn->n_rows > 0);
 	struct wal_request *req = (struct wal_request *)
 		region_alloc(&fiber()->gc, sizeof(struct wal_request) +
-			     sizeof(struct xrow_header) * txn->n_stmts);
+			     sizeof(struct xrow_header) * txn->n_rows);
 	req->n_rows = 0;
 
+	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
-			continue;
+			continue; /* A read (e.g. select) request */
 		/*
 		 * Bump current LSN even if wal_mode = NONE, so that
 		 * snapshots still works with WAL turned off.
@@ -140,16 +141,33 @@ txn_commit(struct txn *txn)
 		stmt->row->tm = ev_now(loop());
 		req->rows[req->n_rows++] = stmt->row;
 	}
-	if (req->n_rows) {
-		ev_tstamp start = ev_now(loop()), stop;
-		int64_t res = wal_write(recovery, req);
-		stop = ev_now(loop());
-		if (stop - start > too_long_threshold)
-			say_warn("too long WAL write: %.3f sec", stop - start);
-		if (res < 0)
-			tnt_raise(LoggedError, ER_WAL_IO);
-		txn->signature = res;
-	}
+	assert(req->n_rows == txn->n_rows);
+
+	ev_tstamp start = ev_now(loop()), stop;
+	int64_t res = wal_write(recovery, req);
+	stop = ev_now(loop());
+	if (stop - start > too_long_threshold)
+		say_warn("too long WAL write: %.3f sec", stop - start);
+	if (res < 0)
+		tnt_raise(LoggedError, ER_WAL_IO);
+
+	/*
+	 * Use vclock_sum() from WAL writer as transaction signature.
+	 */
+	txn->signature = res;
+}
+
+void
+txn_commit(struct txn *txn)
+{
+	assert(txn == in_txn());
+
+	/* Do transaction conflict resolving */
+	if (txn->engine)
+		txn->engine->prepare(txn);
+
+	if (txn->n_rows > 0)
+		txn_write_to_wal(txn);
 
 	/*
 	 * The transaction is in the binary log. No action below
@@ -182,7 +200,11 @@ txn_rollback_stmt()
 	if (txn->stmt == NULL)
 		return;
 	txn->engine->rollbackStatement(txn->stmt);
-	txn->stmt->row = NULL;
+	if (txn->stmt->row != NULL) {
+		txn->stmt->row = NULL;
+		--txn->n_rows;
+		assert(txn->n_rows >= 0);
+	}
 	txn->stmt = NULL;
 }
 

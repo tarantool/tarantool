@@ -63,6 +63,8 @@ struct txn {
 	struct rlist on_commit, on_rollback;
 	/** Total number of statements in this txn. */
 	int n_stmts;
+	/** Total number of WAL rows in this txn. */
+	int n_rows;
 	/** Commit signature (LSN sum) */
 	int64_t signature;
 	/**

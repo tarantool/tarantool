@@ -221,6 +221,7 @@ SophiaSpace::SophiaSpace(Engine *e)
 
 SophiaEngine::SophiaEngine()
 	:Engine("sophia")
+	 ,m_prev_commit_lsn(-1)
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
 	 ,recovery_complete(0)
@@ -573,10 +574,17 @@ SophiaEngine::commit(struct txn *txn)
 {
 	if (txn->engine_tx == NULL)
 		return;
-	/* commit transaction using transaction
-	 * commit signature */
-	assert(txn->signature >= 0);
-	sp_setint(txn->engine_tx, "lsn", txn->signature);
+
+	if (txn->n_rows > 0) {
+		/* Check commit order */
+		assert(txn->signature >= 0);
+		assert(m_prev_commit_lsn < txn->signature);
+		m_prev_commit_lsn = txn->signature;
+
+		/* Set tx id in Sophia only if tx has WRITE requests */
+		sp_setint(txn->engine_tx, "lsn", txn->signature);
+	}
+
 	int rc = sp_commit(txn->engine_tx);
 	if (rc == -1) {
 		panic("sophia commit failed: txn->signature = %"

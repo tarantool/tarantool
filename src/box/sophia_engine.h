@@ -56,6 +56,7 @@ struct SophiaEngine: public Engine {
 	virtual void abortCheckpoint();
 	void *env;
 private:
+	int64_t m_prev_commit_lsn;
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
 public:
