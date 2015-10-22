@@ -2,7 +2,7 @@ TAP version 13
 # json
 1..9
     # unsigned
-    1..118
+    1..104
     ok - encode/decode for 0
     ok - encode/decode type for 0
     ok - encode/decode for 0LL
@@ -101,30 +101,16 @@ TAP version 13
     ok - encode/decode type for 18446744073709551615ULL
     ok - encode/decode for 18446744073709551615ULL
     ok - encode/decode type for 18446744073709551615ULL
-    ok - encode/decode for cdata<unsigned char>:
-    ok - encode/decode type for cdata<unsigned char>:
     ok - encode/decode for cdata<char>:
     ok - encode/decode type for cdata<char>:
     ok - encode/decode for cdata<unsigned short>:
     ok - encode/decode type for cdata<unsigned short>:
-    ok - encode/decode for cdata<short>:
-    ok - encode/decode type for cdata<short>:
     ok - encode/decode for cdata<unsigned int>:
     ok - encode/decode type for cdata<unsigned int>:
-    ok - encode/decode for cdata<int>:
-    ok - encode/decode type for cdata<int>:
-    ok - encode/decode for 128ULL
-    ok - encode/decode type for 128ULL
-    ok - encode/decode for -128LL
-    ok - encode/decode type for -128LL
-    ok - encode/decode for cdata<char>:
-    ok - encode/decode type for cdata<char>:
-    ok - encode/decode for cdata<char>:
-    ok - encode/decode type for cdata<char>:
     # unsigned: end
 ok - unsigned
     # signed
-    1..48
+    1..51
     ok - encode/decode for -1
     ok - encode/decode type for -1
     ok - encode/decode for -1LL
@@ -162,17 +148,20 @@ ok - unsigned
     ok - encode/decode for -2147483648LL
     ok - encode/decode type for -2147483648LL
     ok - encode/decode for -4.5035996273705e+15
-    ok - encode/decode type for -4.5035996273705e+15
-    ok - encode/decode for -4503599627370495LL
-    ok - encode/decode type for -4503599627370495LL
+    ok - encode/decode for -4503599627370494LL
+    ok - encode/decode type for -4503599627370494LL
     ok - encode/decode for -4.5035996273705e+15
     ok - encode/decode type for -4.5035996273705e+15
-    ok - encode/decode for -4503599627370496LL
-    ok - encode/decode type for -4503599627370496LL
+    ok - encode/decode for -4503599627370497LL
+    ok - encode/decode type for -4503599627370497LL
     ok - encode/decode for -9223372036854775806LL
     ok - encode/decode type for -9223372036854775806LL
     ok - encode/decode for -9223372036854775807LL
     ok - encode/decode type for -9223372036854775807LL
+    ok - encode/decode for cdata<short>:
+    ok - encode/decode type for cdata<short>:
+    ok - encode/decode for cdata<int>:
+    ok - encode/decode type for cdata<int>:
     # signed: end
 ok - signed
     # double

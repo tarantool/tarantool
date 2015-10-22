@@ -267,7 +267,9 @@ on_encode(ffi.typeof('double'), encode_double)
 
 local decode_r
 
-local NUMBER_INT_MAX = 4503599627370496LL -- 2^52
+-- See similar constants in utils.cc
+local DBL_INT_MAX = 4503599627370495
+local DBL_INT_MIN = -4503599627370496
 
 local function decode_u8(data)
     local num = ffi.cast(uint8_ptr_t, data[0])[0]
@@ -290,7 +292,7 @@ end
 local function decode_u64(data)
     local num = bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])
     data[0] = data[0] + 8
-    if num < NUMBER_INT_MAX then
+    if num <= DBL_INT_MAX then
         return tonumber(num) -- return as 'number'
     end
     return num -- return as 'cdata'
@@ -318,7 +320,7 @@ local function decode_i64(data)
     local num = ffi.cast('int64_t', ffi.cast('uint64_t',
         bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])))
     data[0] = data[0] + 8
-    if num > -NUMBER_INT_MAX and num < NUMBER_INT_MAX then
+    if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
         return tonumber(num) -- return as 'number'
     end
     return num -- return as 'cdata'

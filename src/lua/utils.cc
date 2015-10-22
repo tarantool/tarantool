@@ -669,12 +669,22 @@ luaL_register_module(struct lua_State *L, const char *modname,
 	luaL_register(L, NULL, methods);
 }
 
+/* Maximum integer that fits to double */
+#define DBL_INT_MAX ((1LL << 52) - 1)
+#define DBL_INT_MIN (-1LL << 52)
+
 void
 luaL_pushuint64(struct lua_State *L, uint64_t val)
 {
-	if (val < (1ULL << 52)) {
-		/* push lua_Number (double) */
-		lua_pushinteger(L, val);
+#if defined(LJ_DUALNUM) /* see setint64V() */
+	if (val <= INT32_MAX) {
+		/* push int32_t */
+		lua_pushinteger(L, (int32_t) val);
+	} else
+#endif /* defined(LJ_DUALNUM) */
+	if (val <= DBL_INT_MAX) {
+		/* push double */
+		lua_pushnumber(L, (double) val);
 	} else {
 		/* push uint64_t */
 		*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
@@ -685,9 +695,15 @@ luaL_pushuint64(struct lua_State *L, uint64_t val)
 void
 luaL_pushint64(struct lua_State *L, int64_t val)
 {
-	if (val > (-1LL << 52) && val < (1LL << 52)) {
-		/* push lua_Number (double) */
-		lua_pushinteger(L, val);
+#if defined(LJ_DUALNUM) /* see setint64V() */
+	if (val >= INT32_MIN && val <= INT32_MAX) {
+		/* push int32_t */
+		lua_pushinteger(L, (int32_t) val);
+	} else
+#endif /* defined(LJ_DUALNUM) */
+	if (val >= DBL_INT_MIN && val <= DBL_INT_MAX) {
+		/* push double */
+		lua_pushnumber(L, (double) val);
 	} else {
 		/* push int64_t */
 		*(int64_t *) luaL_pushcdata(L, CTID_INT64,

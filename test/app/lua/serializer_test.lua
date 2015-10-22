@@ -25,7 +25,7 @@ local function rt(test, s, x, t)
 end
 
 local function test_unsigned(test, s)
-    test:plan(118)
+    test:plan(104)
     rt(test, s, 0, "number")
     rt(test, s, 0LL, "number")
     rt(test, s, 0ULL, "number")
@@ -92,21 +92,15 @@ local function test_unsigned(test, s)
 
     rt(test, s, -1ULL, "cdata")
 
-    rt(test, s, ffi.new('uint8_t', 128), 'number')
-    rt(test, s, ffi.new('int8_t', -128), 'number')
-    rt(test, s, ffi.new('uint16_t', 128), 'number')
-    rt(test, s, ffi.new('int16_t', -128), 'number')
-    rt(test, s, ffi.new('uint32_t', 128), 'number')
-    rt(test, s, ffi.new('int32_t', -128), 'number')
-    rt(test, s, ffi.new('uint64_t', 128), 'number')
-    rt(test, s, ffi.new('int64_t', -128), 'number')
-
+    -- don't use 'unsigned char' or 'signed char' because output
+    -- depends -fsigned-char flag.
     rt(test, s, ffi.new('char', 128), 'number')
-    rt(test, s, ffi.new('char', -128), 'number')
+    rt(test, s, ffi.new('unsigned short', 128), 'number')
+    rt(test, s, ffi.new('unsigned int', 128), 'number')
 end
 
 local function test_signed(test, s)
-    test:plan(48)
+    test:plan(51)
 
     rt(test, s, -1, 'number')
     rt(test, s, -1LL, 'number')
@@ -136,14 +130,17 @@ local function test_signed(test, s)
     rt(test, s, -2147483648LL, 'number')
 
     -- 1e52 - maximum int that can be stored to double without losing precision
-    rt(test, s, -4503599627370495, "number")
-    rt(test, s, -4503599627370495LL, "number")
-    rt(test, s, -4503599627370496, "cdata")
-    rt(test, s, -4503599627370496LL, "cdata")
+    rt(test, s, -4503599627370494)
+    rt(test, s, -4503599627370494LL, "number")
+    rt(test, s, -4503599627370497, "cdata")
+    rt(test, s, -4503599627370497LL, "cdata")
 
     rt(test, s, -9223372036854775806LL, 'cdata')
 
     rt(test, s, -9223372036854775807LL, 'cdata')
+
+    rt(test, s, ffi.new('short', -128), 'number')
+    rt(test, s, ffi.new('int', -128), 'number')
 end
 
 local function test_double(test, s)
