@@ -188,14 +188,6 @@ macro(enable_tnt_compile_flags)
         AND HAVE_STD_C11 AND HAVE_STD_CXX11)
         add_compile_flags("C;CXX" "-Werror")
     endif()
-
-    # For x86 builds our minimum CPU feature requirements are 'i686' in
-    # gcc parlor.  It basically means the support for atomic
-    # instructions.  Some flavours of gcc defaults to an older CPU
-    # family if the option is ommited.
-    if (CMAKE_SYSTEM_PROCESSOR MATCHES "^i[3,9]86$")
-        add_compile_flags("C;CXX" "-march=i686")
-    endif()
 endmacro(enable_tnt_compile_flags)
 
 if (HAVE_OPENMP)
