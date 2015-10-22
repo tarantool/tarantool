@@ -182,7 +182,7 @@ const struct type type_FiberCancelException =
 	make_type("FiberCancelException", &type_Exception);
 
 void
-FiberCancelException::log()
+FiberCancelException::log() const
 {
 	say_info("fiber `%s' has been cancelled",
 		 fiber_name(fiber()));

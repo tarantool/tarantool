@@ -104,7 +104,7 @@ public:
 		/* Nothing */
 	}
 
-	virtual void log();
+	virtual void log() const;
 	virtual void raise() { throw this; }
 };
 
