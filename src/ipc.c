@@ -220,14 +220,25 @@ ipc_channel_delete(struct ipc_channel *ch)
 	free(ch);
 }
 
+static __thread struct mempool ipc_value_pool;
+
 struct ipc_value *
 ipc_value_new()
 {
+	if (! mempool_is_initialized(&ipc_value_pool)) {
+		/*
+		 * We don't need to bother with
+		 * destruction since the entire slab cache
+		 * is freed when the thread ends.
+		 */
+		mempool_create(&ipc_value_pool, &cord()->slabc,
+			       sizeof(struct ipc_value));
+	}
 	struct ipc_value *value = (struct ipc_value *)
-		malloc(sizeof(struct ipc_value));
+		mempool_alloc_nothrow(&ipc_value_pool);
 	if (value == NULL) {
 		diag_set(OutOfMemory, sizeof(struct ipc_value),
-			 "malloc", "struct ipc_value");
+			 "ipc_msg_pool", "struct ipc_value");
 		return NULL;
 	}
 	value->base.destroy = ipc_value_delete;
@@ -237,7 +248,7 @@ ipc_value_new()
 void
 ipc_value_delete(struct ipc_msg *msg)
 {
-	free(msg);
+	mempool_free(&ipc_value_pool, msg);
 }
 
 int
