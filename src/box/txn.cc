@@ -258,6 +258,12 @@ txn_check_autocommit(struct txn *txn, const char *where)
 
 extern "C" {
 
+bool
+box_txn()
+{
+	return in_txn() != NULL;
+}
+
 int
 box_txn_begin()
 {

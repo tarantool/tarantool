@@ -172,6 +172,12 @@ txn_stmt(struct txn *txn)
 /** \cond public */
 
 /**
+ * Return true if there is an active transaction.
+ */
+API_EXPORT bool
+box_txn(void);
+
+/**
  * Begin a transaction in the current fiber.
  *
  * A transaction is attached to caller fiber, therefore one fiber can have
