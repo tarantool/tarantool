@@ -162,7 +162,7 @@ struct cord {
 	/**
 	 * Every new fiber gets a new monotonic id. Ids 1-100 are
 	 * reserved.
-         */
+	 */
 	uint32_t max_fid;
 	pthread_t id;
 	const struct cord_on_exit *on_exit;
@@ -349,7 +349,7 @@ void
 fiber_join(struct fiber *f);
 
 void
-fiber_sleep(ev_tstamp s);
+fiber_sleep(double s);
 
 void
 fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int revents);
@@ -367,7 +367,7 @@ fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
 	fiber->fls[key] = value;
 }
 
-static inline bool
+inline bool
 fiber_is_cancelled()
 {
 	return fiber()->flags & FIBER_IS_CANCELLED;
@@ -479,5 +479,135 @@ fiber_cxx_invoke(fiber_func f, va_list ap)
 }
 
 #endif /* defined(__cplusplus) */
+
+#ifdef PUBLIC_API
+
+/** \cond public */
+
+struct fiber;
+/**
+ * Fiber - contains information about fiber
+ */
+typedef struct fiber box_fiber_t;
+
+typedef void (*fiber_func)(va_list);
+
+/**
+ * Create a new fiber.
+ *
+ * Takes a fiber from fiber cache, if it's not empty.
+ * Can fail only if there is not enough memory for
+ * the fiber structure or fiber stack.
+ *
+ * The created fiber automatically returns itself
+ * to the fiber cache when its "main" function
+ * completes.
+ *
+ * \param name       string with fiber name
+ * \param fiber_func func for run inside fiber
+ *
+ * \sa fiber_start
+ */
+API_EXPORT struct fiber *
+fiber_new_nothrow(const char *name, fiber_func f);
+
+/**
+ * Return control to another fiber and wait until it'll be woken.
+ *
+ * \sa fiber_wakeup
+ */
+API_EXPORT void
+fiber_yield(void);
+
+/**
+ * Start execution of created fiber.
+ *
+ * \param callee fiber to start
+ * \param ...    arguments to start the fiber with
+ *
+ * \sa fiber_new_nothrow
+ */
+API_EXPORT void
+fiber_start(struct fiber *callee, ...);
+
+/**
+ * Interrupt a synchronous wait of a fiber
+ *
+ * \param f fiber to be woken up
+ */
+API_EXPORT void
+fiber_wakeup(struct fiber *f);
+
+/**
+ * Cancel the subject fiber. (set FIBER_IS_CANCELLED flag)
+ *
+ * If target fiber's flag FIBER_IS_CANCELLABLE set, then it would be woken up
+ * (maybe premature). Then current fiber would be yielded until target fiber
+ * would be dead (or would be woken up by \sa fiber_wakeup).
+ *
+ * \param f fiber to be woken up
+ */
+API_EXPORT void
+fiber_cancel(struct fiber *f);
+
+/**
+ * Set current fiber time to be cancellable
+ *
+ * \param yesno status to set
+ */
+API_EXPORT bool
+fiber_set_cancellable(bool yesno);
+
+/**
+ * Set fiber to be joinable
+ *
+ * \param f     fiber to set property to
+ * \param yesno status to set
+ */
+API_EXPORT void
+fiber_set_joinable(struct fiber *fiber, bool yesno);
+
+/**
+ * Wait until fiber is dead and then move exception to the caller.
+ *
+ * If (and only if) fiber's flag FIBER_IS_JOINABLE set, else there'll be
+ * assertion.
+ *
+ * \param f fiber to be woken up
+ */
+API_EXPORT void
+fiber_join(struct fiber *f);
+
+/**
+ * Put the current fiber to sleep for at least 's' seconds.
+ *
+ * \param s time to sleep
+ *
+ * \note this is a cancellation point (\sa fiber_is_cancelled)
+ */
+API_EXPORT void
+fiber_sleep(double s);
+
+/**
+ * Check current fiber for cancellation (it must be checked manually)
+ */
+API_EXPORT bool
+fiber_is_cancelled();
+
+/**
+ * Report loop begin time as double (cheap).
+ */
+API_EXPORT double
+fiber_time(void);
+
+/**
+ * Report loop begin time as 64-bit int.
+ */
+API_EXPORT uint64_t
+fiber_time64(void);
+
+/** \endcond public */
+
+#endif /* PUBLIC_API */
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

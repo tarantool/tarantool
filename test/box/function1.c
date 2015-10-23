@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "tarantool.h"
 
 #include <stdio.h>

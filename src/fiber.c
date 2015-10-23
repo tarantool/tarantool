@@ -285,7 +285,7 @@ fiber_yield_timeout(ev_tstamp delay)
  * @note: this is a cancellation point (@sa fiber_testcancel())
  */
 void
-fiber_sleep(ev_tstamp delay)
+fiber_sleep(double delay)
 {
 	/*
 	 * libev sleeps at least backend_mintime, which is 1 ms in

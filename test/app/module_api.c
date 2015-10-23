@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <tarantool.h>
 
 #include <errno.h>
@@ -179,6 +180,33 @@ test_toint64(lua_State *L)
 	return 1;
 }
 
+void fiber_test_func(va_list va)
+{
+	do {
+		fiber_set_cancellable(true);
+		fiber_sleep(0.01);
+		if (fiber_is_cancelled()) {
+			box_error_raise(10, "test error");
+			return;
+		}
+		fiber_set_cancellable(false);
+	} while (1);
+}
+
+
+static int
+test_fiber(lua_State *L)
+{
+	box_fiber_t *fiber = fiber_new_nothrow("test fiber", fiber_test_func);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_cancel(fiber);
+	fiber_join(fiber);
+	box_error_t *err = box_error_last();
+	lua_pushboolean(L, (int )(err == NULL || box_error_code(err) != 10));
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -194,6 +222,7 @@ luaopen_module_api(lua_State *L)
 		{"test_checkint64", test_checkint64 },
 		{"test_touint64", test_touint64 },
 		{"test_toint64", test_toint64 },
+		{"test_fiber", test_fiber },
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
