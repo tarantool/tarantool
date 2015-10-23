@@ -165,8 +165,7 @@ luaL_setcdatagc(struct lua_State *L, int idx)
 #endif /* !defined(NDEBUG) */
 
 	/* Set finalizer */
-	TValue *tv =  lj_cdata_setfin(L, cd);
-	setgcV(L, tv, gcval(fin), itype(fin));
+	lj_cdata_setfin(L, cd, gcval(fin), itype(fin));
 
 	/* Pop finalizer */
 	lua_pop(L, 1);
