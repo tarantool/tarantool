@@ -72,7 +72,7 @@ static int
 test_pushcheck_cdata(lua_State *L)
 {
 	uint32_t uint64_ctypeid = luaL_ctypeid(L, "uint64_t");
-	*(uint64_t *) luaL_pushcdata(L, uint64_ctypeid, sizeof(uint64_t)) = 48;
+	*(uint64_t *) luaL_pushcdata(L, uint64_ctypeid) = 48;
 	uint32_t test_ctypeid = 0;
 	luaL_checkcdata(L, -1, &test_ctypeid);
 	lua_pushboolean(L, test_ctypeid != 0 && uint64_ctypeid == test_ctypeid);

@@ -65,18 +65,16 @@ extern struct lua_State *tarantool_L;
 /** \cond public */
 
 /**
- * @brief Allocate a new block of memory with the given size, push onto the
- * stack a new cdata of type ctypeid with the block address, and return
- * this address. Allocated memory is a subject of GC.
- * CTypeID must be used from FFI at least once.
+ * @brief Push cdata of given \a ctypeid onto the stack.
+ * CTypeID must be used from FFI at least once. Allocated memory returned
+ * uninitialized. Only numbers and pointers are supported.
  * @param L Lua State
  * @param ctypeid FFI's CTypeID of this cdata
- * @param size size to allocate
  * @sa luaL_checkcdata
  * @return memory associated with this cdata
  */
 LUA_API void *
-luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size);
+luaL_pushcdata(struct lua_State *L, uint32_t ctypeid);
 
 /**
  * @brief Checks whether the function argument idx is a cdata
@@ -95,9 +93,8 @@ luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
  * Finalizer function must be on the top of the stack.
  * @param L Lua State
  * @param idx object
- * @return 1
  */
-LUA_API int
+LUA_API void
 luaL_setcdatagc(struct lua_State *L, int idx);
 
 /**

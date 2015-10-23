@@ -37,23 +37,47 @@ int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
 
 void *
-luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size)
+luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 {
 	/*
 	 * ctypeid is actually has CTypeID type.
 	 * CTypeId is defined somewhere inside luajit's internal
 	 * headers.
 	 */
-	assert(sizeof(ctypeid) == sizeof(CTypeID));
+	static_assert(sizeof(ctypeid) == sizeof(CTypeID), "sizeof(CTypeId)");
+
+	/* Code below is based on ffi_new() from luajit/src/lib_ffi.c */
+
+	/* Get information about ctype */
+	CTSize size;
 	CTState *cts = ctype_cts(L);
-	CType *ct = ctype_raw(cts, ctypeid);
-	CTSize sz;
-	lj_ctype_info(cts, ctypeid, &sz);
+	CTInfo info = lj_ctype_info(cts, ctypeid, &size);
+
+	/* Only numbers and pointers are implemented */
+	assert(ctype_isnum(info) || ctype_isptr(info));
+	(void) info;
+	assert(size != CTSIZE_INVALID);
+
+	/* Allocate a new cdata */
 	GCcdata *cd = lj_cdata_new(cts, ctypeid, size);
+
+	/* Anchor the uninitialized cdata with the stack. */
 	TValue *o = L->top;
 	setcdataV(L, o, cd);
-	lj_cconv_ct_init(cts, ct, sz, (uint8_t *) cdataptr(cd), o, 0);
 	incr_top(L);
+
+	/*
+	 * lj_cconv_ct_init is omitted because it actually does memset()
+	 * Caveats: cdata memory is returned uninitialized
+	 */
+
+	/*
+	 * __gc is omitted because it is only needed for structs.
+	 * Caveats: struct are not supported by this function.
+	 * Please set finalizer using luaL_setcdatagc() if you need.
+	 */
+
+	lj_gc_check(L);
 	return cdataptr(cd);
 }
 
@@ -116,35 +140,36 @@ luaL_cdef(struct lua_State *L, const char *what)
 	return lua_pcall(L, 1, 0, 0);
 }
 
-int
+void
 luaL_setcdatagc(struct lua_State *L, int idx)
 {
+	/* Calculate absolute value in the stack. */
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
-	/* extracted from luajit/src/lib_ffi.c */
-	TValue *o = L->base + idx - 1;
-	assert(o < L->top && tviscdata(o));
-	GCcdata *cd = cdataV(o);
+
+	/* Code below is based on ffi_gc() from luajit/src/lib_ffi.c */
+
+	/* Get cdata from the stack */
+	assert(lua_type(L, idx) == LUA_TCDATA);
+	GCcdata *cd = cdataV(L->base + idx - 1);
+
+	/* Get finalizer from the stack */
 	TValue *fin = lj_lib_checkany(L, lua_gettop(L));
-	CTState *cts = ctype_cts(L);
-	GCtab *t = cts->finalizer;
+
 #if !defined(NDEBUG)
+	CTState *cts = ctype_cts(L);
 	CType *ct = ctype_raw(cts, cd->ctypeid);
 	(void) ct;
 	assert(ctype_isptr(ct->info) || ctype_isstruct(ct->info) ||
 	       ctype_isrefarray(ct->info));
 #endif /* !defined(NDEBUG) */
-	if (gcref(t->metatable)) {  /* Update finalizer table, if still enabled. */
-		copyTV(L, lj_tab_set(L, t, L->base + idx - 1), fin);
-		lj_gc_anybarriert(L, t);
-		if (!tvisnil(fin))
-			cd->marked |= LJ_GC_CDATA_FIN;
-		else
-		cd->marked &= ~LJ_GC_CDATA_FIN;
-	}
-	lua_pop(L, 1);
 
-	return 1;
+	/* Set finalizer */
+	TValue *tv =  lj_cdata_setfin(L, cd);
+	setgcV(L, tv, gcval(fin), itype(fin));
+
+	/* Pop finalizer */
+	lua_pop(L, 1);
 }
 
 
@@ -687,8 +712,7 @@ luaL_pushuint64(struct lua_State *L, uint64_t val)
 		lua_pushnumber(L, (double) val);
 	} else {
 		/* push uint64_t */
-		*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
-					     sizeof(uint64_t)) = val;
+		*(uint64_t *) luaL_pushcdata(L, CTID_UINT64) = val;
 	}
 }
 
@@ -706,8 +730,7 @@ luaL_pushint64(struct lua_State *L, int64_t val)
 		lua_pushnumber(L, (double) val);
 	} else {
 		/* push int64_t */
-		*(int64_t *) luaL_pushcdata(L, CTID_INT64,
-					    sizeof(int64_t)) = val;
+		*(int64_t *) luaL_pushcdata(L, CTID_INT64) = val;
 	}
 }
 
@@ -818,7 +841,7 @@ tarantool_lua_utils_init(struct lua_State *L)
 
 	luaL_register_type(L, LUAL_SERIALIZER, serializermeta);
 	/* Create NULL constant */
-	*(void **) luaL_pushcdata(L, CTID_P_VOID, sizeof(void *)) = NULL;
+	*(void **) luaL_pushcdata(L, CTID_P_VOID) = NULL;
 	luaL_nil_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	lua_createtable(L, 0, 1);
