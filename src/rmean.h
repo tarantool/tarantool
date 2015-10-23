@@ -35,7 +35,7 @@
 #include <stdint.h>
 
 #include "trivia/util.h"
-#include "fiber.h"
+#include "third_party/tarantool_ev.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -56,8 +56,15 @@ struct stats {
 struct rmean {
 	ev_timer timer;
 	int stats_n;
+	double prev_ts;
 	struct stats stats[0];
 };
+
+void
+rmean_roll(int64_t *value, double dt);
+
+int64_t
+rmean_mean(int64_t *value);
 
 struct rmean *
 rmean_new(const char **name, size_t n);

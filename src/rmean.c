@@ -32,6 +32,29 @@
 
 #include "say.h"
 #include "assoc.h"
+#include "fiber.h"
+
+void
+rmean_roll(int64_t *value, double dt) {
+	value[0] /= dt;
+	int j = RMEAN_WINDOW;
+	/* in case when dt >= 2. we update not only last counter */
+	for (; j > (int)(dt + 0.1); j--)
+		value[j] = value[j - 1];
+	for (; j > 0; j--)
+		value[j] = value[0];
+	value[0] = 0;
+}
+
+int64_t
+rmean_mean(int64_t *value) {
+	int64_t mean = 0;
+	for (size_t j = 1; j <= RMEAN_WINDOW; j++)
+		mean += value[j];
+	/* value[0] not adds because second isn't over */
+
+	return mean / RMEAN_WINDOW;
+}
 
 void
 rmean_collect(struct rmean *rmean, size_t name, int64_t value)
@@ -48,16 +71,10 @@ rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
 			continue;
-
-		int diff = 0;
-		for (size_t j = 1; j <= RMEAN_WINDOW; j++)
-			diff += rmean->stats[i].value[j];
-		/* value[0] not adds because second isn't over */
-
-		diff /= RMEAN_WINDOW;
-
-		int res = cb(rmean->stats[i].name, diff,
-			     rmean->stats[i].total, cb_ctx);
+		int res = cb(rmean->stats[i].name,
+			     rmean_mean(rmean->stats[i].value),
+			     rmean->stats[i].total,
+			     cb_ctx);
 		if (res != 0)
 			return res;
 	}
@@ -69,27 +86,19 @@ void
 rmean_age(ev_loop *loop,
 	  ev_timer *timer, int events)
 {
-	(void) loop;
 	(void) events;
 	struct rmean *rmean = (struct rmean *) timer->data;
 
+	double dt = rmean->prev_ts;
+	rmean->prev_ts = ev_now(loop);
+	dt = rmean->prev_ts - dt;
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
 			continue;
-
-		for (int j = RMEAN_WINDOW - 1; j >= 0;  j--)
-			rmean->stats[i].value[j + 1] =
-				rmean->stats[i].value[j];
-		rmean->stats[i].value[0] = 0;
+		rmean_roll(rmean->stats[i].value, dt);
 	}
 
-	ev_timer_again(loop(), timer);
-}
-
-void
-rmean_timer_tick(struct rmean *rmean)
-{
-	rmean_age(loop(), &rmean->timer, 0);
+	ev_timer_again(loop, timer);
 }
 
 struct rmean *
@@ -104,14 +113,12 @@ rmean_new(const char **name, size_t n)
 	memset(rmean, 0, sizeof(struct rmean) + sizeof(struct stats) * n);
 	rmean->stats_n = n;
 	rmean->timer.data = (void *)rmean;
-	ev_timer_init(&rmean->timer, rmean_age, 0, 1.);
-	ev_timer_again(loop(), &rmean->timer);
 	for (size_t i = 0; i < n; i++, name++) {
 		rmean->stats[i].name = *name;
-
-		if (*name == NULL)
-			continue;
 	}
+	rmean->prev_ts = ev_now(loop());
+	ev_timer_init(&rmean->timer, rmean_age, 0, 1.);
+	ev_timer_again(loop(), &rmean->timer);
 	return rmean;
 }
 

@@ -1,6 +1,7 @@
 #include "rmean.h"
 #include "memory.h"
 #include "unit.h"
+#include "fiber.h"
 
 int print_stat(const char *name, int rps, int64_t total, void* ctx)
 {
@@ -16,9 +17,16 @@ void test_100rps(rmean *st)
 	printf("Calc rps at third and last second\n");
 	for(int i = 0; i < 10; i++) { /* 10 seconds */
 		rmean_collect(st, 0, 100); /* send 100 requests */
-		rmean_timer_tick(st);
-		if (i == 2 || i == 9) /* two checks */
-			rmean_foreach(st, print_stat, NULL);
+		rmean_roll(st->stats[0].value, 1);
+		rmean_roll(st->stats[1].value, 1);
+		if (i == 2 || i == 9) { /* two checks */
+			print_stat(st->stats[0].name,
+				   rmean_mean(st->stats[0].value),
+				   st->stats[0].total, NULL);
+			print_stat(st->stats[1].name,
+				   rmean_mean(st->stats[1].value),
+				   st->stats[1].total, NULL);
+		}
 	}
 	/* 10 seconds, 1000 in EV1, 100 rps */
 	footer();
@@ -31,12 +39,19 @@ void test_mean15rps(rmean *st)
 	for(int i = 0; i < 10; i++) { /* 10 seconds */
 		for(int j = 0; j < 15; j++) {
 			rmean_collect(st, 0, 1); /* send 15 requests */
-			if((i * 3 + 2 + j) % 15 == 0)
-				rmean_timer_tick(st);
+			if((i * 3 + 2 + j) % 15 == 0) {
+				rmean_roll(st->stats[0].value, 1);
+				rmean_roll(st->stats[1].value, 1);
+			}
 		}
 		rmean_collect(st, 1, 3);
 	}
-	rmean_foreach(st, print_stat, NULL);
+	print_stat(st->stats[0].name,
+		   rmean_mean(st->stats[0].value),
+		   st->stats[0].total, NULL);
+	print_stat(st->stats[1].name,
+		   rmean_mean(st->stats[1].value),
+		   st->stats[1].total, NULL);
 	/* 10 seconds, 1000 + 150 in EV1, 15 rps. 30 in EV2, 3 rps*/
 	footer();
 }
@@ -46,7 +61,7 @@ int main()
 	printf("Stat. 2 names, timer simulation\n");
 
 	memory_init();
-	fiber_init(fiber_c_invoke);
+	fiber_init(fiber_cxx_invoke);
 
 	struct rmean *st;
 	const char *name[] = {"EV1", "EV2"};
