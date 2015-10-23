@@ -42,6 +42,8 @@ struct tuple;
  * transaction: undo and redo info.
  */
 struct txn_stmt {
+	/* (!) Please update txn_stmt_new() after changing members */
+
 	/** Doubly linked list of all statements. */
 	struct rlist next;
 	/** Undo info. */
@@ -53,6 +55,8 @@ struct txn_stmt {
 };
 
 struct txn {
+	/* (!) Please update txn_begin() after changing members */
+
 	/** Pre-allocated first statement. */
 	struct txn_stmt first_stmt;
 	/** Pointer to the current statement, if any */

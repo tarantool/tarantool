@@ -47,6 +47,8 @@ enum {
 };
 
 struct xrow_header {
+	/* (!) Please update txn_add_redo() after changing members */
+
 	uint32_t type;
 	uint32_t server_id;
 	uint64_t sync;

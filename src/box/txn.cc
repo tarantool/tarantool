@@ -53,8 +53,13 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row= (struct xrow_header *)
-		region_alloc0(&fiber()->gc, sizeof(struct xrow_header));
+		region_alloc(&fiber()->gc, sizeof(struct xrow_header));
+	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
+	row->server_id = 0;
+	row->lsn = 0;
+	row->sync = 0;
+	row->tm = 0;
 	row->bodycnt = request_encode(request, row->body);
 	stmt->row = row;
 }
@@ -65,15 +70,25 @@ txn_stmt_new(struct txn *txn)
 {
 	assert(txn->stmt == 0);
 	assert(txn->n_stmts == 0 || !txn->autocommit);
+	struct txn_stmt *stmt;
 	if (txn->n_stmts == 0) {
-		txn->stmt = &txn->first_stmt;
+		stmt = &txn->first_stmt;
 	} else {
-		txn->stmt = (struct txn_stmt *)
-			region_alloc0(&fiber()->gc, sizeof(struct txn_stmt));
+		stmt = (struct txn_stmt *)
+			region_alloc(&fiber()->gc, sizeof(struct txn_stmt));
 	}
-	rlist_add_tail_entry(&txn->stmts, txn->stmt, next);
+
+	/* Initialize members explicitly to save time on memset() */
+	stmt->space = NULL;
+	stmt->old_tuple = NULL;
+	stmt->new_tuple = NULL;
+	stmt->row = NULL;
+
+	rlist_add_tail_entry(&txn->stmts, stmt, next);
 	++txn->n_stmts;
-	return txn->stmt;
+
+	txn->stmt = stmt;
+	return stmt;
 }
 
 struct txn *
@@ -81,12 +96,20 @@ txn_begin(bool autocommit)
 {
 	assert(! in_txn());
 	struct txn *txn = (struct txn *)
-		region_alloc0(&fiber()->gc, sizeof(*txn));
+		region_alloc(&fiber()->gc, sizeof(*txn));
+	/* Initialize members explicitly to save time on memset() */
+	txn->stmt = NULL;
+	/* first_stmt initialized by txn_stmt_new() */
 	rlist_create(&txn->stmts);
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
-	txn->autocommit = autocommit;
+	txn->n_stmts = 0;
+	txn->n_rows = 0;
 	txn->signature = -1;
+	txn->autocommit = autocommit;
+	txn->engine = NULL;
+	txn->engine_tx = NULL;
+	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
