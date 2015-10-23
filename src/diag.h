@@ -215,18 +215,26 @@ struct error_factory {
 				     unsigned line, size_t amount,
 				     const char *allocator,
 				     const char *object);
+	struct error *(*FiberIsCancelled)(const char *file,
+					  unsigned line);
+	struct error *(*TimedOut)(const char *file,
+				  unsigned line);
+	struct error *(*ChannelIsClosed)(const char *file,
+					 unsigned line);
 };
 
 struct diag *
 diag_get();
 
-#define diag_set(class, ...) ({						\
+#define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	struct error *e = error_factory->class(__FILE__, __LINE__,	\
-						##__VA_ARGS__);		\
-	diag_add_error(diag_get(), e);					\
-	e;								\
-})
+	/* No op if exception subsystem is not initialized. */		\
+	if (error_factory) {						\
+		struct error *e;					\
+		e = error_factory->class(__FILE__, __LINE__, ##__VA_ARGS__);\
+		diag_add_error(diag_get(), e);				\
+	}								\
+} while (0)
 
 #if defined(__cplusplus)
 } /* extern "C" */

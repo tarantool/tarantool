@@ -157,37 +157,79 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 (unsigned) amount, allocator, object);
 }
 
-static struct error *
-BuildOutOfMemory(const char *file, unsigned line,
-		 size_t amount, const char *allocator,
-		 const char *object)
-{
-	void *p = malloc(sizeof(OutOfMemory));
-	if (p == NULL)
-		return &out_of_memory;
-	return new (p) OutOfMemory(file, line, amount, allocator,
-				   object);
-}
-
 const struct type type_TimedOut =
 	make_type("TimedOut", &type_SystemError);
 
 TimedOut::TimedOut(const char *file, unsigned line)
-	: SystemError(&type_OutOfMemory, file, line)
+	: SystemError(&type_TimedOut, file, line)
 {
 	m_errno = ETIMEDOUT;
+	error_format_msg(this, "timed out");
 }
 
-const struct type type_FiberCancelException =
-	make_type("FiberCancelException", &type_Exception);
+const struct type type_ChannelIsClosed =
+	make_type("ChannelIsClosed", &type_Exception);
+
+ChannelIsClosed::ChannelIsClosed(const char *file, unsigned line)
+	: Exception(&type_ChannelIsClosed, file, line)
+{
+	error_format_msg(this, "channel is closed");
+}
+
+const struct type type_FiberIsCancelled =
+	make_type("FiberIsCancelled", &type_Exception);
+
+FiberIsCancelled::FiberIsCancelled(const char *file, unsigned line)
+	: Exception(&type_FiberIsCancelled, file, line)
+{
+	error_format_msg(this, "fiber is cancelled");
+}
 
 void
-FiberCancelException::log() const
+FiberIsCancelled::log() const
 {
 	say_info("fiber `%s' has been cancelled",
 		 fiber_name(fiber()));
 	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
+
+#define BuildAlloc(type)				\
+	void *p = malloc(sizeof(type));			\
+	if (p == NULL)					\
+		return &out_of_memory;
+
+static struct error *
+BuildOutOfMemory(const char *file, unsigned line,
+		 size_t amount, const char *allocator,
+		 const char *object)
+{
+	BuildAlloc(OutOfMemory);
+	return new (p) OutOfMemory(file, line, amount, allocator,
+				   object);
+}
+
+static struct error *
+BuildTimedOut(const char *file, unsigned line)
+{
+	BuildAlloc(TimedOut);
+	return new (p) TimedOut(file, line);
+}
+
+static struct error *
+BuildChannelIsClosed(const char *file, unsigned line)
+{
+	BuildAlloc(ChannelIsClosed);
+	return new (p) ChannelIsClosed(file, line);
+}
+
+static struct error *
+BuildFiberIsCancelled(const char *file, unsigned line)
+{
+	BuildAlloc(FiberIsCancelled);
+	return new (p) FiberIsCancelled(file, line);
+}
+
+#undef BuildAlloc
 
 void
 exception_init()
@@ -195,6 +237,9 @@ exception_init()
 	static struct error_factory exception_error_factory;
 
 	exception_error_factory.OutOfMemory = BuildOutOfMemory;
+	exception_error_factory.FiberIsCancelled = BuildFiberIsCancelled;
+	exception_error_factory.TimedOut = BuildTimedOut;
+	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
 
 	error_factory = &exception_error_factory;
 

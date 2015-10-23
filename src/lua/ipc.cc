@@ -154,8 +154,16 @@ lbox_ipc_channel_put(struct lua_State *L)
 	value->i = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	rc = ipc_channel_put_msg_timeout(ch, &value->base, timeout);
-	if (rc)
+	if (rc) {
+		value->base.destroy(&value->base);
+#if 0
+		/* Treat everything except timeout as error. */
+		if (!type_cast(TimedOut, diag_last_error(&fiber()->diag)))
+			diag_raise();
+#else
 		fiber_testcancel();
+#endif
+	}
 end:
 	lua_pushboolean(L, rc == 0);
 	return 1;
@@ -186,7 +194,13 @@ lbox_ipc_channel_get(struct lua_State *L)
 	struct ipc_value *value;
 	if (ipc_channel_get_msg_timeout(ch, (struct ipc_msg **) &value,
 					timeout)) {
+#if 0
+		/* Treat everything except timeout as error. */
+		if (!type_cast(TimedOut, diag_last_error(&fiber()->diag)))
+			diag_raise();
+#else
 		fiber_testcancel();
+#endif
 		lua_pushnil(L);
 		return 1;
 	}

@@ -274,7 +274,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 static inline void
 applier_log_error(struct applier *applier, struct error *e)
 {
-	if (type_cast(FiberCancelException, e))
+	if (type_cast(FiberIsCancelled, e))
 		return;
 	if (applier->warning_said)
 		return;
@@ -345,7 +345,7 @@ applier_f(va_list ap)
 		} catch (ClientError *e) {
 			applier_disconnect(applier, e, APPLIER_STOPPED);
 			throw;
-		} catch (FiberCancelException *e) {
+		} catch (FiberIsCancelled *e) {
 			applier_disconnect(applier, e, APPLIER_OFF);
 			throw;
 		} catch (SocketError *e) {

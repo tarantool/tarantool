@@ -151,7 +151,7 @@ fiber_wakeup(struct fiber *f)
  * Currently cancellation can only be synchronous: this call
  * returns only when the subject fiber has terminated.
  *
- * The fiber which is cancelled, has FiberCancelException raised
+ * The fiber which is cancelled, has FiberIsCancelled raised
  * in it. For cancellation to work, this exception type should be
  * re-raised whenever (if) it is caught.
  */
@@ -215,7 +215,7 @@ fiber_join(struct fiber *fiber)
 
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
-	/** Don't bother with propagation of FiberCancelException */
+	/** Don't bother with propagation of FiberIsCancelled */
 	if (fiber_was_cancelled)
 		diag_clear(&fiber()->diag);
 }

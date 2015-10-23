@@ -67,8 +67,11 @@ ipc_channel_new(uint32_t size)
 {
 	struct ipc_channel *res = (struct ipc_channel *)
 		malloc(ipc_channel_memsize(size));
-	if (res != NULL)
-		ipc_channel_create(res, size);
+	if (res == NULL) {
+		diag_set(OutOfMemory, size,
+			 "malloc", "struct ipc_channel");
+	}
+	ipc_channel_create(res, size);
 	return res;
 }
 
@@ -154,6 +157,37 @@ ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
 	fiber_wakeup(f);
 }
 
+
+int
+ipc_channel_check_wait(struct ipc_channel *ch, ev_tstamp start_time,
+		       ev_tstamp timeout)
+{
+	/*
+	 * Preconditions of waiting are:
+	 * - the channel is not closed,
+	 * - the current fiber has not been
+	 *   cancelled,
+	 * - the timeout has not expired.
+	 * If timeout is non-zero, yield at least once, otherwise
+	 * rounding errors can lead to an infinite loop in the
+	 * caller, since ev_now() does not get updated without
+	 * a yield.
+	 */
+	if (ch->is_closed) {
+		diag_set(ChannelIsClosed);
+		return -1;
+	}
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	if (timeout == 0 || ev_now(loop()) > start_time + timeout) {
+		diag_set(TimedOut);
+		return -1;
+	}
+	return 0;
+}
+
 void
 ipc_channel_close(struct ipc_channel *ch)
 {
@@ -191,8 +225,12 @@ ipc_value_new()
 {
 	struct ipc_value *value = (struct ipc_value *)
 		malloc(sizeof(struct ipc_value));
-	if (value)
-		value->base.destroy = ipc_value_delete;
+	if (value == NULL) {
+		diag_set(OutOfMemory, sizeof(struct ipc_value),
+			 "malloc", "struct ipc_value");
+		return NULL;
+	}
+	value->base.destroy = ipc_value_delete;
 	return value;
 }
 
@@ -282,8 +320,10 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 			 * Closed channels, are, well, closed,
 			 * even if there is space in the buffer.
 			 */
-			if (ch->is_closed)
+			if (ch->is_closed) {
+				diag_set(ChannelIsClosed);
 				return -1;
+			}
 			ipc_channel_buffer_push(ch, msg);
 			return 0;
 		}
@@ -292,19 +332,8 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 		 * Have to wait.
 		 */
 		struct fiber *f = fiber();
-		/*
-		 * Preconditions of waiting are:
-		 * - the channel is not closed,
-		 * - the current fiber has not been
-		 *   cancelled,
-		 * - the timeout has not expired.
-		 * If timeout is non-zero, yield at least once,
-		 * otherwise rounding errors can lead to an
-		 * infinite loop in the caller, since ev_now()
-		 * does not get updated without a yield.
-		 */
-		if (ch->is_closed || fiber_is_cancelled() ||
-		    timeout == 0 || ev_now(loop()) > start_time + timeout)
+
+		if (ipc_channel_check_wait(ch, start_time, timeout))
 			return -1;
 
 		/* Prepare a wait pad. */
@@ -334,6 +363,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 			 * the channel object. It might be gone
 			 * already.
 			 */
+			diag_set(ChannelIsClosed);
 			return -1;
 		}
 		if (pad.status == IPC_WAIT_DONE)
@@ -406,14 +436,7 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 			ipc_channel_waiter_wakeup(f, IPC_WAIT_DONE);
 			return 0;
 		}
-		/*
-		 * If timeout is non-zero, yield at least once,
-		 * otherwise rounding errors can lead to an
-		 * infinite loop in the caller, since ev_now()
-		 * does not get updated without a yield.
-		 */
-		if (ch->is_closed || fiber_is_cancelled() ||
-		    timeout == 0 || ev_now(loop()) > start_time + timeout)
+		if (ipc_channel_check_wait(ch, start_time, timeout))
 			return -1;
 		f = fiber();
 		/**
@@ -437,8 +460,10 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 		 */
 		rlist_del_entry(f, state);
 		fiber_set_key(f, FIBER_KEY_MSG, NULL);
-		if (pad.status == IPC_WAIT_CLOSED)
+		if (pad.status == IPC_WAIT_CLOSED) {
+			diag_set(ChannelIsClosed);
 			return -1;
+		}
 		if (pad.status == IPC_WAIT_DONE) {
 			*msg = pad.msg;
 			return 0;

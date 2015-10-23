@@ -175,7 +175,7 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
 /**
  * Wait for a child to end.
  * @note this is a cancellation point (can throw
- * FiberCancelException).
+ * FiberIsCancelled).
  *
  * @retval exit status of the child.
  *

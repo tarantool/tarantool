@@ -92,18 +92,21 @@ public:
 	virtual void raise() { throw this; }
 };
 
-extern const struct type type_FiberCancelException;
+extern const struct type type_ChannelIsClosed;
+class ChannelIsClosed: public Exception {
+public:
+	ChannelIsClosed(const char *file, unsigned line);
+	virtual void raise() { throw this; }
+};
+
+extern const struct type type_FiberIsCancelled;
 /**
  * This is thrown by fiber_* API calls when the fiber is
  * cancelled.
  */
-class FiberCancelException: public Exception {
+class FiberIsCancelled: public Exception {
 public:
-	FiberCancelException(const char *file, unsigned line)
-		: Exception(&type_FiberCancelException, file, line) {
-		/* Nothing */
-	}
-
+	FiberIsCancelled(const char *file, unsigned line);
 	virtual void log() const;
 	virtual void raise() { throw this; }
 };

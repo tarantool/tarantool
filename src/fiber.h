@@ -317,7 +317,7 @@ fiber_find(uint32_t fid);
 
 /**
  * Cancel a fiber. A cancelled fiber will have
- * FiberCancelException raised in it.
+ * FiberIsCancelled raised in it.
  *
  * Waits for the fiber to end.
  * A fiber without flag FIBER_IS_CANCELLABLE can not be
@@ -428,21 +428,21 @@ fiber_c_invoke(fiber_func f, va_list ap)
 
 /*
  * Test if this fiber is in a cancellable state and was indeed
- * cancelled, and raise an exception (FiberCancelException) if
+ * cancelled, and raise an exception (FiberIsCancelled) if
  * that's the case.
  */
 static inline void
 fiber_testcancel(void)
 {
 	/*
-	 * Fiber can catch FiberCancelException using try..catch
+	 * Fiber can catch FiberIsCancelled using try..catch
 	 * block in C or pcall()/xpcall() in Lua. However,
 	 * FIBER_IS_CANCELLED flag is still set and the subject
 	 * fiber will be killed by subsequent unprotected call of
 	 * this function.
 	 */
 	if (fiber_is_cancelled())
-		tnt_raise(FiberCancelException);
+		tnt_raise(FiberIsCancelled);
 }
 
 static inline void
