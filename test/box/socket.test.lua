@@ -431,7 +431,7 @@ client ~= nil
 -- Check that listen and client fibers have appropriate names
 cnt = 0
 --# setopt delimiter ';'
-for i=100,200 do
+for i=100,900 do
     local f = fiber.find(i)
     if f and f:name():match('^testserv/') then
         cnt = cnt + 1
