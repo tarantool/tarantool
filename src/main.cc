@@ -606,6 +606,7 @@ main(int argc, char **argv)
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);
 #endif
+	argv = init_set_proc_title(argc, argv);
 	/*
 	 * Support only #!/usr/bin/tarantol but not
 	 * #!/usr/bin/tarantool -a -b because:
@@ -639,7 +640,6 @@ main(int argc, char **argv)
 	crc32_init();
 	memory_init();
 
-	argv = init_set_proc_title(argc, argv);
 	main_argc = argc;
 	main_argv = argv;
 

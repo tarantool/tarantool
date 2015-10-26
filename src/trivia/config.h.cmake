@@ -192,6 +192,10 @@
 /** pthread_set_name_np(pthread_self(), "") - *BSD */
 #cmakedefine HAVE_PTHREAD_SET_NAME_NP 1
 
+#cmakedefine HAVE_SETPROCTITLE 1
+#cmakedefine HAVE_SETPROGNAME 1
+#cmakedefine HAVE_GETPROGNAME 1
+
 /** \cond public */
 
 /** System configuration dir (e.g /etc) */

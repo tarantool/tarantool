@@ -114,6 +114,10 @@ check_struct_has_member("struct stat" "st_mtimensec" "sys/stat.h"
 # stack. Find whether or not it's present.
 check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 
+check_function_exists(setproctitle HAVE_SETPROCTITLE)
+check_function_exists(setprogname HAVE_SETPROGNAME)
+check_function_exists(getprogname HAVE_GETPROGNAME)
+
 #
 # Enable 'make tags' target.
 #

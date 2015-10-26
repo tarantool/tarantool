@@ -22,7 +22,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "proctitle.h"
+#include "trivia/config.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +40,7 @@
 #include <machine/vmparam.h>	/* for old BSD */
 #include <sys/exec.h>
 #endif
-#if defined(__darwin__)
+#if defined(__APPLE__)
 #include <crt_externs.h>
 #endif
 
@@ -73,9 +76,9 @@ extern char **environ;
 #define PS_USE_PSTAT
 #elif defined(HAVE_PS_STRINGS)
 #define PS_USE_PS_STRINGS
-#elif (defined(BSD) || defined(__bsdi__) || defined(__hurd__)) && !defined(__darwin__)
+#elif (defined(BSD) || defined(__bsdi__) || defined(__hurd__)) && !defined(__APPLE__)
 #define PS_USE_CHANGE_ARGV
-#elif defined(__linux__) || defined(_AIX) || defined(__sgi) || (defined(sun) && !defined(BSD)) || defined(ultrix) || defined(__ksr__) || defined(__osf__) || defined(__svr4__) || defined(__svr5__) || defined(__darwin__)
+#elif defined(__linux__) || defined(_AIX) || defined(__sgi) || (defined(sun) && !defined(BSD)) || defined(ultrix) || defined(__ksr__) || defined(__osf__) || defined(__svr4__) || defined(__svr5__) || defined(__APPLE__)
 #define PS_USE_CLOBBER_ARGV
 #elif defined(WIN32)
 #define PS_USE_WIN32
@@ -84,7 +87,7 @@ extern char **environ;
 #endif
 
 /* Different systems want the buffer padded differently */
-#if defined(_AIX) || defined(__linux__) || defined(__svr4__)
+#if defined(_AIX) || defined(__linux__) || defined(__svr4__) || defined(__APPLE__)
 #define PS_PADDING '\0'
 #else
 #define PS_PADDING ' '
@@ -98,16 +101,95 @@ static const size_t ps_buffer_size = PS_BUFFER_SIZE;
 #else /* PS_USE_CLOBBER_ARGV */
 static char *ps_buffer;		/* will point to argv area */
 static size_t ps_buffer_size;	/* space determined at run time */
-static size_t last_status_len;	/* use to minimize length of clobber */
+static size_t ps_last_status_len;	/* use to minimize length of clobber */
 #endif /* PS_USE_CLOBBER_ARGV */
+static size_t ps_sentinel_size; /* that many trailing bytes in ps_buffer
+                                 * are reserved and must be filled with
+                                 * PS_PADDING */
 
-static size_t ps_buffer_fixed_size;	/* size of the constant prefix */
+#if defined(PS_USE_CHANGE_ARGV) || defined(PS_USE_CLOBBER_ARGV)
+static volatile void *ps_leaks[2]; /* we leak memory, hello valgrind */
+#endif
 
-/* save the original argv[] location here */
-static int save_argc;
-static char **save_argv;
-/* save the original environ[] here */
-static char **save_environ = NULL;
+#if defined(PS_USE_CHANGE_ARGV) || defined(PS_USE_CLOBBER_ARGV)
+/*
+ * A copy of the memory block within clobber_begin, clobber_end
+ * was created to preserve its content.
+ */
+struct ps_relocation
+{
+	char *clobber_begin;
+	char *clobber_end;
+	char *copy_begin;
+};
+
+/*
+ * If an entity is in a clobber area, hand back a pointer to
+ * an entity in the copy area (the entity and its copy have the same
+ * offset).
+ */
+static inline void *ps_relocate(
+	const struct ps_relocation *rel, void *p)
+{
+	if (rel && (char *)p >= rel->clobber_begin && (char *)p < rel->clobber_end)
+		return rel->copy_begin + ((char *)p - rel->clobber_begin);
+	return p;
+}
+
+static void
+ps_argv_changed(const struct ps_relocation *rel, char **new_argv)
+{
+	(void)rel;
+	(void)new_argv;
+
+#if defined(__GLIBC__)
+	program_invocation_name =
+		ps_relocate(rel, program_invocation_name);
+	program_invocation_short_name =
+		ps_relocate(rel, program_invocation_short_name);
+#endif
+
+#if defined(HAVE_SETPROGNAME) && defined(HAVE_GETPROGNAME)
+	setprogname(ps_relocate(rel, (void *)getprogname()));
+#endif
+
+#if defined(__APPLE__)
+	/*
+	 * Darwin (and perhaps other NeXT-derived platforms?) has a static
+	 * copy of the argv pointer, which we may fix like so:
+	 */
+	*_NSGetArgv() = new_argv;
+#endif
+}
+#endif
+
+#if defined(PS_USE_CLOBBER_ARGV)
+static void
+ps_expand_clobber_area(struct ps_relocation *rel, int argc, char **argv)
+{
+	int i;
+	for (i = 0; i < argc; i++) {
+		if (rel->clobber_begin == NULL) {
+			rel->clobber_begin = rel->clobber_end = argv[i];
+		}
+		if (argv[i] != NULL && rel->clobber_end == argv[i]) {
+			rel->clobber_end += strlen(argv[i]) + 1;
+		}
+	}
+}
+
+static void
+ps_relocate_argv(struct ps_relocation *rel,
+                  int argc, char **argv,
+			      char **argv_copy)
+{
+	int i;
+	for (i = 0; i < argc; i++) {
+		argv_copy[i] = ps_relocate(rel, argv[i]);
+	}
+	argv_copy[argc] = NULL;
+}
+#endif
 
 /*
  * Call this early in startup to save the original argc/argv values.
@@ -122,127 +204,81 @@ static char **save_environ = NULL;
 char **
 init_set_proc_title(int argc, char **argv)
 {
-	save_argc = argc;
-	save_argv = argv;
-
 #if defined(PS_USE_CLOBBER_ARGV)
-	save_environ = environ;
-	/*
-	 * If we're going to overwrite the argv area, count the available space.
-	 * Also move the environment to make additional room.
-	 */
-	{
-		char *end_of_area = NULL;
-		char **new_environ;
-		int i;
-
-		/*
-		 * check for contiguous argv strings
-		 */
-		for (i = 0; i < argc; i++) {
-			if (i == 0 || end_of_area + 1 == argv[i])
-				end_of_area = argv[i] + strlen(argv[i]);
-		}
-
-		if (end_of_area == NULL) {	/* probably can't happen? */
-			ps_buffer = NULL;
-			ps_buffer_size = 0;
-			return argv;
-		}
-
-		/*
-		 * check for contiguous environ strings following argv
-		 */
-		for (i = 0; environ[i] != NULL; i++) {
-			if (end_of_area + 1 == environ[i])
-				end_of_area = environ[i] + strlen(environ[i]);
-		}
-
-		ps_buffer = argv[0];
-		last_status_len = ps_buffer_size = end_of_area - argv[0];
-
-		/*
-		 * move the environment out of the way
-		 */
-		new_environ = (char **)malloc((i + 1) * sizeof(char *));
-		for (i = 0; environ[i] != NULL; i++)
-			new_environ[i] = strdup(environ[i]);
-		new_environ[i] = NULL;
-		environ = new_environ;
+	struct ps_relocation rel = {NULL, NULL, NULL};
+	char **argv_copy, **environ_copy;
+	char *mem;
+	size_t argv_copy_size, clobber_size;
+	int envc = 0;
+	while (environ[envc]) {
+		envc++;
 	}
-#endif /* PS_USE_CLOBBER_ARGV */
-
-#if defined(PS_USE_CHANGE_ARGV) || defined(PS_USE_CLOBBER_ARGV)
-
+	argv_copy_size = sizeof(argv[0]) * (argc + 1);
 	/*
-	 * If we're going to change the original argv[] then make a copy for
-	 * argument parsing purposes.
-	 *
-	 * (NB: do NOT think to remove the copying of argv[], even though
-	 * postmaster.c finishes looking at argv[] long before we ever consider
-	 * changing the ps display.  On some platforms, getopt() keeps pointers
-	 * into the argv array, and will get horribly confused when it is
-	 * re-called to analyze a subprocess' argument string if the argv storage
-	 * has been clobbered meanwhile.  Other platforms have other dependencies
-	 * on argv[].
+	 * will be overwriting the memory occupied by argv/environ strings
+	 * (clobber area), determine clobber area dimensions
 	 */
-	{
-		char **new_argv;
-		int i;
-
-		new_argv = (char **)malloc((argc + 1) * sizeof(char *));
-		for (i = 0; i < argc; i++)
-			new_argv[i] = strdup(argv[i]);
-		new_argv[argc] = NULL;
-
-#if defined(__darwin__)
-
-		/*
-		 * Darwin (and perhaps other NeXT-derived platforms?) has a static
-		 * copy of the argv pointer, which we may fix like so:
-		 */
-		*_NSGetArgv() = new_argv;
+	ps_expand_clobber_area(&rel, argc, argv);
+	ps_expand_clobber_area(&rel, envc, environ);
+	clobber_size = rel.clobber_end - rel.clobber_begin;
+	/*
+	 * one memory block to store both argv_copy and the copy of the
+	 * clobber area
+	 */
+	mem = malloc(argv_copy_size + clobber_size);
+	if (mem == NULL) {
+		return NULL;
+	}
+	rel.copy_begin = mem + argv_copy_size;
+	memcpy(rel.copy_begin, rel.clobber_begin, clobber_size);
+	argv_copy = (void *)mem;
+	ps_relocate_argv(&rel, argc, argv, argv_copy);
+	/*
+	 * environ_copy is allocated separately, this is due to libc calling
+	 * realloc on the environ in setenv;
+	 * note: do NOT overwrite environ inplace, changing environ pointer
+	 * is mandatory to flush internal libc caches on getenv/setenv
+	 */
+	environ_copy = malloc(sizeof(environ[0]) * (envc + 1));
+	if (environ_copy == NULL) {
+		free(mem);
+		return NULL;
+	}
+	ps_relocate_argv(&rel, envc, environ, environ_copy);
+	ps_argv_changed(&rel, argv_copy);
+	ps_buffer = rel.clobber_begin;
+	ps_buffer_size = ps_last_status_len = clobber_size;
+	ps_leaks[0] = argv = argv_copy;
+	ps_leaks[1] = environ = environ_copy;
+#ifdef __APPLE__
+    /*
+     * http://opensource.apple.com/source/adv_cmds/adv_cmds-158/ps/print.c
+     *
+     * ps on osx fetches command line from a process with {CTL_KERN,
+     * KERN_PROCARGS2, <pid>} sysctl. The call returns cached argc + a
+     * copy of the memory area where argv/environ strings live.
+     *
+     * If initially there were 10 arguments, ps is expecting to find 10
+     * \0 separated strings but we've written the process title on top
+     * of that, so ps will try to find more strings; this can result in
+     * a garbage from environment area showing (which we often fail to
+     * overwrite completely). To fix it we write additional \0
+     * terminators at the end of the title (a 'sentinel').
+     */
+    ps_sentinel_size = argc - 1;
+#endif
 #endif
 
-		argv = new_argv;
+#if defined(PS_USE_CHANGE_ARGV)
+	size_t size = sizeof(argv[0] * (argc + 1));
+	char **argv_copy = malloc(size);
+	if (argv_copy == NULL) {
+		return NULL;
 	}
-#endif /* PS_USE_CHANGE_ARGV or PS_USE_CLOBBER_ARGV */
-
-#ifndef PS_USE_NONE
-	/* init first part of proctitle */
-
-#ifdef PS_USE_SETPROCTITLE
-
-	/*
-	 * apparently setproctitle() already adds a `progname:' prefix to the ps
-	 * line
-	 */
-	ps_buffer_fixed_size = 0;
-#else
-	{
-		char basename_buf[PATH_MAX+1];
-
-		/*
-		 * At least partially mimic FreeBSD, which for
-		 * ./a.out outputs:
-		 *
-		 * a.out: custom title here (a.out)
-	         */
-		snprintf(basename_buf, PATH_MAX, "%s", argv[0]);
-		snprintf(ps_buffer, ps_buffer_size, "%s: ", basename(basename_buf));
-	}
-
-	ps_buffer_fixed_size = strlen(ps_buffer);
-
-#ifdef PS_USE_CLOBBER_ARGV
-	if (ps_buffer_size > ps_buffer_fixed_size)
-		memset(ps_buffer + ps_buffer_fixed_size, PS_PADDING,
-		       ps_buffer_size - ps_buffer_fixed_size);
-#endif /* PS_USE_CLOBBER_ARGV */
-
+	memcpy(argv_copy, argv, size);
+	ps_argv_changed(NULL, argv_copy);
+	ps_leaks[0] = argv = argv_copy;
 #endif
-
-#endif /*PS_USE_NONE */
 
 	return argv;
 }
@@ -250,26 +286,21 @@ init_set_proc_title(int argc, char **argv)
 void
 free_proc_title(int argc, char **argv)
 {
-	int i;
-#if defined(PS_USE_CLOBBER_ARGV)
-	for (i = 0; environ[i] != NULL; i++)
-		free(environ[i]);
-	free(environ);
-	environ = save_environ;
-#endif /* PS_USE_CLOBBER_ARGV */
-#if defined(PS_USE_CHANGE_ARGV) || defined(PS_USE_CLOBBER_ARGV)
-	for (i = 0; i < argc; i++)
-		free(argv[i]);
-	free(argv);
-#endif /* PS_USE_CHANGE_ARGV or PS_USE_CLOBBER_ARGV */
+	(void)argc;
+	(void)argv;
+	/*
+	 * Intentionally a noop. Undoing init_set_proc_title is hard and
+	 * unsafe because all sorts of code could have grabbed pointers from
+	 * argv/environ by now.
+	 */
 }
 
 void
 set_proc_title(const char *format, ...)
 {
-	va_list ap;
-
 #ifndef PS_USE_NONE
+	va_list ap;
+	int buflen;
 
 #ifdef PS_USE_CLOBBER_ARGV
 	/* If ps_buffer is a pointer, it might still be null */
@@ -279,13 +310,16 @@ set_proc_title(const char *format, ...)
 
 	/* Update ps_buffer to contain both fixed part and activity */
 	va_start(ap, format);
-	vsnprintf(ps_buffer + ps_buffer_fixed_size,
-		  ps_buffer_size - ps_buffer_fixed_size, format, ap);
+	buflen = vsnprintf(ps_buffer,
+		  ps_buffer_size - ps_sentinel_size, format, ap);
 	va_end(ap);
+
+	if (buflen < 0)
+		return;
 
 	/* Transmit new setting to kernel, if necessary */
 #ifdef PS_USE_SETPROCTITLE
-	setproctitle("%s", ps_buffer);
+	setproctitle("-%s", ps_buffer);
 #endif
 
 #ifdef PS_USE_PSTAT
@@ -298,20 +332,18 @@ set_proc_title(const char *format, ...)
 #endif /* PS_USE_PSTAT */
 
 #ifdef PS_USE_PS_STRINGS
+    static char *argvstr[2];
+    argvstr[0] = ps_buffer;
 	PS_STRINGS->ps_nargvstr = 1;
-	PS_STRINGS->ps_argvstr = ps_buffer;
+	PS_STRINGS->ps_argvstr = argvstr;
 #endif /* PS_USE_PS_STRINGS */
 
 #ifdef PS_USE_CLOBBER_ARGV
 	{
-		int buflen;
-
-		/* pad unused memory */
-		buflen = strlen(ps_buffer);
 		/* clobber remainder of old status string */
-		if (last_status_len > buflen)
-			memset(ps_buffer + buflen, PS_PADDING, last_status_len - buflen);
-		last_status_len = buflen;
+		if (ps_last_status_len > (size_t)buflen)
+			memset(ps_buffer + buflen, PS_PADDING, ps_last_status_len - buflen);
+		ps_last_status_len = buflen;
 	}
 #endif /* PS_USE_CLOBBER_ARGV */
 
@@ -334,4 +366,10 @@ set_proc_title(const char *format, ...)
 	}
 #endif /* PS_USE_WIN32 */
 #endif /* not PS_USE_NONE */
+}
+
+size_t
+get_proc_title_max_length()
+{
+    return ps_buffer_size - ps_sentinel_size;
 }
