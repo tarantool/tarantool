@@ -30,8 +30,6 @@
  */
 #include "rmean.h"
 
-#include "say.h"
-#include "assoc.h"
 #include "fiber.h"
 
 void
