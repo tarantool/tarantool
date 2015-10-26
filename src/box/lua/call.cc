@@ -459,7 +459,8 @@ execute_c_call(struct func *func, struct request *request, struct obuf *out)
 		panic("C++ exception thrown from stored C function");
 	}
 	if (in_txn()) {
-		say_warn("a transaction is active at CALL return");
+		say_warn("a transaction is active at CALL return from '%.*s'",
+			name_len, name);
 		txn_rollback();
 	}
 
@@ -517,7 +518,8 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
 
 	if (in_txn()) {
-		say_warn("a transaction is active at CALL return");
+		say_warn("a transaction is active at CALL return from '%.*s'",
+			name_len, name);
 		txn_rollback();
 	}
 
