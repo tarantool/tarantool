@@ -190,6 +190,12 @@ fiber_set_cancellable(bool yesno)
 	return prev;
 }
 
+bool
+fiber_is_cancelled()
+{
+	return fiber()->flags & FIBER_IS_CANCELLED;
+}
+
 void
 fiber_set_joinable(struct fiber *fiber, bool yesno)
 {
@@ -197,6 +203,19 @@ fiber_set_joinable(struct fiber *fiber, bool yesno)
 		fiber->flags |= FIBER_IS_JOINABLE;
 	else
 		fiber->flags &= ~FIBER_IS_JOINABLE;
+}
+
+/** Report libev time (cheap). */
+double
+fiber_time(void)
+{
+	return ev_now(loop());
+}
+
+uint64_t
+fiber_time64(void)
+{
+	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
 }
 
 void
