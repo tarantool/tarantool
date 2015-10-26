@@ -1,6 +1,7 @@
 set(api_headers
     ${CMAKE_CURRENT_BINARY_DIR}/config.h
     ${CMAKE_SOURCE_DIR}/src/say.h
+    ${CMAKE_SOURCE_DIR}/src/fiber.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
     ${CMAKE_SOURCE_DIR}/src/coeio.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h

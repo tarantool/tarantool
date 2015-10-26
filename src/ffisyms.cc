@@ -75,6 +75,7 @@ void *ffi_symbols[] = {
 	(void *) random_bytes,
 	(void *) fiber_time,
 	(void *) fiber_time64,
+	(void *) cord_slab_cache,
 	(void *) clock_realtime,
 	(void *) clock_monotonic,
 	(void *) clock_process,

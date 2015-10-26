@@ -1,12 +1,13 @@
 TAP version 13
 # module_api
-1..12
+1..13
 ok - module is loaded
 ok - test_touint64 is ok
 ok - test_checkint64 is ok
 ok - test_say is ok
 ok - test_pushuint64 is ok
 ok - test_fiber is ok
+ok - test_cord is ok
 ok - test_coio_call is ok
 ok - test_checkuint64 is ok
 ok - test_toint64 is ok

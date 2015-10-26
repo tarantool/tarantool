@@ -222,6 +222,13 @@ fiber_time(void);
 API_EXPORT uint64_t
 fiber_time64(void);
 
+/**
+ * Return slab_cache suitable to use with tarantool/small library
+ */
+struct slab_cache;
+API_EXPORT struct slab_cache *
+cord_slab_cache(void);
+
 /** \endcond public */
 
 typedef void (*fiber_func)(va_list);

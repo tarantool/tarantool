@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <tarantool.h>
 
+#include <small/ibuf.h>
+
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -207,6 +209,19 @@ test_fiber(lua_State *L)
 	return 1;
 }
 
+static int
+test_cord(lua_State *L)
+{
+	struct slab_cache *slabc = cord_slab_cache();
+	assert(slabc != NULL);
+	struct ibuf ibuf;
+	ibuf_create(&ibuf, slabc, 16320);
+	ibuf_destroy(&ibuf);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -223,6 +238,7 @@ luaopen_module_api(lua_State *L)
 		{"test_touint64", test_touint64 },
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
+		{"test_cord", test_cord },
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

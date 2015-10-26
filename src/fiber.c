@@ -880,6 +880,12 @@ cord_is_main()
 	return cord() == &main_cord;
 }
 
+struct slab_cache *
+cord_slab_cache(void)
+{
+	return &cord()->slabc;
+}
+
 void
 fiber_init(void (*invoke)(fiber_func f, va_list ap))
 {
