@@ -98,11 +98,8 @@ extern char strict_lua[],
 	dump_lua[],
 	csv_lua[],
 	v_lua[],
-	clock_lua[];
-
-#if LUAJIT_VERSION_NUM >= 20100 /* LuaJIT 2.1+ */
-extern char p_lua[], zone_lua[];
-#endif /* LuaJIT 2.1+ */
+	clock_lua[],
+	p_lua[], zone_lua[];
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
@@ -132,11 +129,9 @@ static const char *lua_modules[] = {
 	"jit.dis_x64", dis_x64_lua,
 	"jit.dump", dump_lua,
 	"jit.v", v_lua,
-#if LUAJIT_VERSION_NUM >= 20100 /* LuaJIT 2.1+ */
 	/* Profiler */
 	"jit.p", p_lua,
 	"jit.zone", zone_lua,
-#endif /* LuaJIT 2.1+ */
 	NULL
 };
 
