@@ -196,11 +196,10 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 	tuple_field_count_validate(space->format, request->tuple);
 
 	/* Extract key from tuple */
-	uint32_t key_len = extract_key_from_tuple_data(index->key_def,
-						       request->tuple, 0, 0);
-	char *key = (char *)region_alloc(&fiber()->gc, key_len);
-	extract_key_from_tuple_data(index->key_def, request->tuple,
-				    key, key_len);
+	uint32_t key_len = request->tuple_end - request->tuple;
+	char *key = (char *) region_alloc(&fiber()->gc, key_len);
+	key_len = key_create_from_tuple(index->key_def, request->tuple,
+					key, key_len);
 
 	/* validate upsert key */
 	uint32_t part_count = index->key_def->part_count;
