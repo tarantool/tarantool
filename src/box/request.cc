@@ -133,7 +133,7 @@ request_encode(struct request *request, struct iovec *iov)
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t ops_len = request->ops_end - request->ops;
 	uint32_t len = MAP_LEN_MAX + key_len;
-	char *begin = (char *) region_alloc(&fiber()->gc, len);
+	char *begin = (char *) region_alloc_ex(&fiber()->gc, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (true) {

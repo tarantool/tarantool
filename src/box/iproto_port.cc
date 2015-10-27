@@ -77,8 +77,8 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5 + 1);
 	reply.v_sync = mp_bswap_u64(sync);
 	uint8_t empty_map[1] = { 0x80 };
-	obuf_dup(out, &reply, sizeof(reply));
-	obuf_dup(out, &empty_map, sizeof(empty_map));
+	obuf_dup_ex(out, &reply, sizeof(reply));
+	obuf_dup_ex(out, &empty_map, sizeof(empty_map));
 }
 
 void
@@ -97,9 +97,9 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 
-	obuf_dup(out, &header, sizeof(header));
-	obuf_dup(out, &body, sizeof(body));
-	obuf_dup(out, e->errmsg, msg_len);
+	obuf_dup_ex(out, &header, sizeof(header));
+	obuf_dup_ex(out, &body, sizeof(body));
+	obuf_dup_ex(out, e->errmsg, msg_len);
 }
 
 static inline struct iproto_port *
@@ -125,7 +125,7 @@ iproto_port_eof(struct port *ptr)
 struct obuf_svp
 iproto_prepare_select(struct obuf *buf)
 {
-	return obuf_book(buf, SVP_SIZE);
+	return obuf_book_ex(buf, SVP_SIZE);
 }
 
 void
