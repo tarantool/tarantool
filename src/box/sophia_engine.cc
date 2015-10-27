@@ -185,8 +185,6 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	return NULL;
 }
 
-#include <alya/mp_print.h>
-
 void
 SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
@@ -196,8 +194,6 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
-
-	mp_print(request->tuple);
 
 	/* Extract key from tuple */
 	uint32_t key_len = extract_key_from_tuple_data(index->key_def,
