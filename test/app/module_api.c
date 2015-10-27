@@ -199,7 +199,7 @@ void fiber_test_func(va_list va)
 static int
 test_fiber(lua_State *L)
 {
-	box_fiber_t *fiber = fiber_new_nothrow("test fiber", fiber_test_func);
+	struct fiber *fiber = fiber_new("test fiber", fiber_test_func);
 	fiber_set_joinable(fiber, true);
 	fiber_start(fiber);
 	fiber_cancel(fiber);
