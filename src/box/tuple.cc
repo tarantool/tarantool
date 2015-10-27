@@ -280,7 +280,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 {
 	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	char *ptr = (char *) smalloc_nothrow(&memtx_alloc, total);
+	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
 	 * to throw an instance of ClientError. Apart from being

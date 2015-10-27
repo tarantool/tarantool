@@ -503,7 +503,7 @@ fiber_new_nothrow(const char *name, fiber_func f)
 		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
 		fiber = (struct fiber *)
-			mempool_alloc_nothrow(&cord->fiber_pool);
+			mempool_alloc(&cord->fiber_pool);
 		if (fiber == NULL) {
 			diag_set(OutOfMemory, sizeof(struct fiber),
 				 "fiber pool", "fiber");

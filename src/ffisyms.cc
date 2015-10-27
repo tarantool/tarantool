@@ -87,7 +87,7 @@ void *ffi_symbols[] = {
 	(void *) tarantool_lua_slab_cache,
 	(void *) ibuf_create,
 	(void *) ibuf_destroy,
-	(void *) ibuf_reserve_nothrow_slow,
+	(void *) ibuf_reserve_slow,
 	(void *) port_buf_create,
 	(void *) port_buf_destroy,
 	(void *) port_buf_transfer,

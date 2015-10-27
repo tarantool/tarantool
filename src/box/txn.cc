@@ -307,7 +307,7 @@ box_txn_rollback()
 void *
 box_txn_alloc(size_t size)
 {
-	return region_alloc_nothrow(&fiber()->gc, size);
+	return region_alloc(&fiber()->gc, size);
 }
 
 } /* extern "C" */
