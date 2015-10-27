@@ -13,6 +13,12 @@ for i = 1,5,1 do space:replace({i, i}) end
 fun = require('fun')
 ---
 ...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 -- print all methods from metatable
 methods = fun.iter(getmetatable(fun.range(5)).__index):totable()
 ---
@@ -153,14 +159,20 @@ space.index[0]:pairs():drop(2):take(3):totable()
   - [5, 5]
 ...
 -- test global functions
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 fun.reduce(function(acc, val) return acc + val end, 0,
     fun.filter(function(x) return x % 11 == 0 end,
     fun.map(function(x) return 2 * x end, fun.range(1000))));
 ---
 - 90090
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 t = {}
 ---
 ...

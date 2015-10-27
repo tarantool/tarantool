@@ -6,23 +6,18 @@
 -- Check how well we handle a failed log write
 -- in panic_on_wal_error=false mode
 --
---# stop server default
---# cleanup server default
---# deploy server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default with cleanup=1')
+
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 box.space._schema:insert{"key"}
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 box.space._schema:insert{"key"}
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 box.space._schema:get{"key"}
 box.space._schema:delete{"key"}
 -- list all the logs
 name = string.match(arg[0], "([^,]+)%.lua")
 require('fio').glob(name .. "/*.xlog")
---# stop server default
---# cleanup server default
---# deploy server default
---# start server default
+test_run:cmd('restart server default with cleanup=1')

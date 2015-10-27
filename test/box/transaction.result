@@ -1,4 +1,13 @@
---# setopt delimiter ';'
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 -- empty transaction - ok
 box.begin() box.commit();
 ---
@@ -253,7 +262,10 @@ s:select{};
 s:drop();
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 test = box.schema.space.create('test')
 ---
 ...
@@ -312,7 +324,10 @@ box.space.test:truncate()
 function insert(a) box.space.test:insert(a) end
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function dup_key()
     box.begin()
     box.space.test:insert{1}
@@ -327,7 +342,10 @@ function dup_key()
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 dup_key()
 ---
 ...
@@ -363,7 +381,10 @@ if not status then box.rollback() end
 test = nil
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function tx_limit(n)
     box.begin()
     for i=0,n do
@@ -373,7 +394,10 @@ function tx_limit(n)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 _ = box.schema.space.create('test');
 ---
 ...

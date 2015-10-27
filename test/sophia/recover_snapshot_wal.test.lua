@@ -1,12 +1,12 @@
-
+env = require('test_run')
+test_run = env.new()
 -- write data recover from latest snapshot and logs
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("rm -f " .. name .."/*.snap")
 os.execute("rm -f " .. name .."/*.xlog")
 
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("touch " .. name .."/lock")
@@ -19,8 +19,7 @@ box.snapshot()
 
 for key = 352, 1000 do space:insert({key}) end
 
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("rm -f " .. name .."/lock")

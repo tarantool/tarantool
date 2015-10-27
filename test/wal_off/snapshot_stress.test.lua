@@ -2,6 +2,8 @@
 -- and a lot of double entry transactions are made that moving random
 -- ammount from random account to another random accont.
 -- Snapshots are made every snapshot_interval seconds and then checked for consistency
+env = require('test_run')
+test_run = env.new()
 -- Settings: You may increase theese value to make test longer
 -- number of worker fibers:
 workers_count = 80
@@ -61,7 +63,7 @@ n_ops = 0
 n_spaces = 0
 workers_done = 0
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 garbage = {};
 str = ""
 for i = 1,string_max_size do
@@ -263,6 +265,6 @@ snapshot_check_status;
 
 log.info('Part II: checking snapshot done');
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 

@@ -1,5 +1,6 @@
 -- test for https://github.com/tarantool/tarantool/issues/769
-
+env = require('test_run')
+test_run = env.new()
 s = box.schema.create_space('test')
 i = s:create_index('primary', { type = 'TREE', parts = {1, 'num', 2, 'num'} })
 s:insert{0, 0} s:insert{2, 0}
@@ -8,7 +9,7 @@ test_itrs = {'EQ', 'REQ', 'GT', 'LT', 'GE', 'LE'}
 test_res = {}
 too_longs = {}
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function test_run_itr(itr, key)
     for i=1,50 do
         local gen, param, state = s.index.primary:pairs({key}, {iterator = itr})
@@ -31,7 +32,7 @@ for _,itr in pairs(test_itrs) do
         table.insert(too_longs, 'Some of the iterators takes too long to position: '.. diff)
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 test_res
 too_longs

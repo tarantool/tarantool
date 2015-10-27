@@ -7,6 +7,12 @@ space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.
@@ -213,7 +219,10 @@ space:truncate()
 ---
 ...
 -- test passing arguments in and out created fiber
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function y()
     space = box.space['tweedledum']
     while true do
@@ -254,7 +263,10 @@ for k = 1, n, 1 do
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 collectgarbage('collect')
 ---
 - 0
@@ -292,7 +304,10 @@ f = nil
 ftest = function() fiber.sleep(0.0001 * math.random() ) return true end
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 result = 0;
 ---
 ...
@@ -306,7 +321,10 @@ for i = 1, 10 do
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 result
 ---
 - 3000
@@ -588,7 +606,10 @@ fiber.self().storage.key
 ---
 - 48
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function testfun(ch)
     while fiber.self().storage.key == nil do
         print('wait')
@@ -598,7 +619,10 @@ function testfun(ch)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 ch = fiber.channel(1)
 ---
 ...
@@ -637,14 +661,20 @@ ffi = require('ffi')
 ch = fiber.channel(1)
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function testfun()
     fiber.self().storage.x = ffi.gc(ffi.new('char[1]'),
          function() ch:put('gc ok') end)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 f = fiber.create(testfun)
 ---
 ...
@@ -665,7 +695,10 @@ ch = nil
 --
 -- Test that local storage is not garbage collected with fiber object
 --
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function testfun(ch)
     fiber.self().storage.x = 'ok'
     collectgarbage('collect')
@@ -673,7 +706,10 @@ function testfun(ch)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 ch = fiber.channel(1)
 ---
 ...
@@ -710,7 +746,10 @@ while f:status() ~= 'dead' do fiber.sleep(0.01) end
 done = false
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function test()
     fiber.name('gh-420')
     local fun, errmsg = loadstring('fiber.cancel(fiber.self())')
@@ -721,7 +760,10 @@ function test()
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 f = fiber.create(test)
 ---
 ...

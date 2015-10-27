@@ -18,8 +18,9 @@ hash:insert{1, 'bar', 1, '', 4}
 hash:insert{1, 'bar', 1, '', 5}
 
 -- output all rows
-
---# setopt delimiter ';'
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("setopt delimiter ';'")
 function box.select_all()
     local result = {}
     local tuple, v
@@ -28,7 +29,7 @@ function box.select_all()
     end
     return result
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 box.sort(box.select_all())
 
 -- primary index select

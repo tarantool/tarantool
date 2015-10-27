@@ -141,7 +141,16 @@ s1:delete{'third'}
 ---
 - ['third', 'tuple 3']
 ...
---# setopt delimiter ';'
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function crossjoin(space0, space1, limit)
     local result = {}
     for state, v0 in space0:pairs() do
@@ -161,7 +170,10 @@ function crossjoin(space0, space1, limit)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 s2:insert{'1', 'tuple'}
 ---
 - ['1', 'tuple']

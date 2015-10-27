@@ -2,6 +2,8 @@ remote = require 'net.box'
 fiber = require 'fiber'
 log = require 'log'
 msgpack = require 'msgpack'
+env = require('test_run')
+test_run = env.new()
 
 LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.space.create('net_box_test_space')
@@ -58,7 +60,7 @@ remote.self:eval('!invalid expression')
 _ = box.schema.space.create('gh822')
 _ = box.space.gh822:create_index('primary')
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 
 -- rollback on invalid function
 function rollback_on_invalid_function()
@@ -88,7 +90,7 @@ function rollback_on_eval_error()
 end;
 rollback_on_eval_error();
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 box.space.gh822:drop()
 
 box.schema.user.revoke('guest','execute','universe')
@@ -310,14 +312,14 @@ box.schema.user.revoke('netbox', 'read, write, execute', 'universe');
 box.schema.user.drop('netbox')
 
 -- #594: bad argument #1 to 'setmetatable' (table expected, got number)
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function gh594()
     local cn = remote:new(box.cfg.listen)
     local ping = fiber.create(function() cn:ping() end)
     cn:call('dostring', 'return 2 + 2')
     cn:close()
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 gh594()
 
 -- #636: Reload schema on demand
@@ -346,7 +348,7 @@ name = string.match(arg[0], "([^,]+)%.lua")
 file_log = require('fio').open(name .. '.log', {'O_RDONLY', 'O_NONBLOCK'})
 file_log:seek(0, 'SEEK_END') ~= 0
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 
 _ = fiber.create(
    function()
@@ -366,7 +368,7 @@ while true do
    fiber.sleep(0.01)
 end;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 file_log:close()
 

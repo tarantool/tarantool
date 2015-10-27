@@ -1,4 +1,6 @@
 print('session.storage')
+env = require('test_run')
+test_run = env.new('localhost')
 session = box.session
 
 dump = function(data) return "'" .. require('json').encode(data) .. "'" end
@@ -14,28 +16,28 @@ session.storage.abc
 all = getmetatable(session).aggregate_storage
 dump(all)
 
---# create connection second to default
---# set connection second
+test_run:cmd("create connection second to default")
+test_run:cmd("set connection second")
 
 type(session.storage)
 type(session.storage.abc)
 session.storage.abc = 'def'
 session.storage.abc
 
---# set connection default
+test_run:cmd("set connection default")
 
 session.storage.abc
 
---# set connection second
+test_run:cmd("set connection second")
 dump(all[session.id()])
 
---# set connection default
+test_run:cmd("set connection default")
 dump(all[session.id()])
 tres1 = {}
 tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 
---# drop connection second
+test_run:cmd("drop connection second")
 require('fiber').sleep(.01)
 for k,v in pairs(all) do table.insert(tres2, v.abc) end
 

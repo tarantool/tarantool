@@ -49,7 +49,16 @@ hash:insert{1, 'bar', 1, '', 5}
 - error: Duplicate key exists in unique index 'primary' in space 'tweedledum'
 ...
 -- output all rows
---# setopt delimiter ';'
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function box.select_all()
     local result = {}
     local tuple, v
@@ -60,7 +69,10 @@ function box.select_all()
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 box.sort(box.select_all())
 ---
 - - [0, 'bar', 0, '', 3]

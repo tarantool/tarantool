@@ -36,7 +36,7 @@ local function test_offsets(test, s)
 end
 
 local function test_other(test, s)
-    test:plan(3)
+    test:plan(19)
     local buf = string.char(0x93, 0x6e, 0xcb, 0x42, 0x2b, 0xed, 0x30, 0x47,
         0x6f, 0xff, 0xff, 0xac, 0x77, 0x6b, 0x61, 0x71, 0x66, 0x7a, 0x73,
         0x7a, 0x75, 0x71, 0x71, 0x78)
@@ -50,6 +50,24 @@ local function test_other(test, s)
         "array save __serialize")
     test:is(getmetatable(s.decode(s.encode(map))).__serialize, "map",
         "map save __serialize")
+
+    -- gh-1095: `-128` is packed as `d1ff80` instead of `d080`
+    test:is(#s.encode(0x7f), 1, "len(encode(0x7f))")
+    test:is(#s.encode(0x80), 2, "len(encode(0x80))")
+    test:is(#s.encode(0xff), 2, "len(encode(0xff))")
+    test:is(#s.encode(0x100), 3, "len(encode(0x100))")
+    test:is(#s.encode(0xffff), 3, "len(encode(0xffff))")
+    test:is(#s.encode(0x10000), 5, "len(encode(0x10000))")
+    test:is(#s.encode(0xffffffff), 5, "len(encode(0xffffffff))")
+    test:is(#s.encode(0x100000000), 9, "len(encode(0x100000000))")
+    test:is(#s.encode(-0x20), 1, "len(encode(-0x20))")
+    test:is(#s.encode(-0x21), 2, "len(encode(-0x21))")
+    test:is(#s.encode(-0x80), 2, "len(encode(-0x80))")
+    test:is(#s.encode(-0x81), 3, "len(encode(-0x81))")
+    test:is(#s.encode(-0x8000), 3, "len(encode(-0x8000))")
+    test:is(#s.encode(-0x8001), 5, "len(encode(-0x8001))")
+    test:is(#s.encode(-0x80000000), 5, "len(encode(-0x80000000))")
+    test:is(#s.encode(-0x80000001), 9, "len(encode(-0x80000001))")
 end
 
 tap.test("msgpackffi", function(test)

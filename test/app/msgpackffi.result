@@ -241,10 +241,26 @@ ok - table
     # offsets: end
 ok - offsets
     # other
-    1..3
+    1..19
     ok - gh-633 double decode
     ok - array save __serialize
     ok - map save __serialize
+    ok - len(encode(0x7f))
+    ok - len(encode(0x80))
+    ok - len(encode(0xff))
+    ok - len(encode(0x100))
+    ok - len(encode(0xffff))
+    ok - len(encode(0x10000))
+    ok - len(encode(0xffffffff))
+    ok - len(encode(0x100000000))
+    ok - len(encode(-0x20))
+    ok - len(encode(-0x21))
+    ok - len(encode(-0x80))
+    ok - len(encode(-0x81))
+    ok - len(encode(-0x8000))
+    ok - len(encode(-0x8001))
+    ok - len(encode(-0x80000000))
+    ok - len(encode(-0x80000001))
     # other: end
 ok - other
 # msgpackffi: end

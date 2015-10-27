@@ -1,6 +1,7 @@
 -- clear statistics
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
 
 box.stat.net.SENT -- zero
 box.stat.net.RECEIVED -- zero

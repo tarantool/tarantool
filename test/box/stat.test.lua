@@ -1,6 +1,8 @@
 -- clear statistics
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
+
 box.stat.INSERT.total
 box.stat.DELETE.total
 box.stat.UPDATE.total
@@ -24,8 +26,7 @@ box.stat.SELECT.total
 space:get('Impossible value')
 box.stat.ERROR.total
 
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 
 -- statistics must be zero
 box.stat.INSERT.total
