@@ -56,6 +56,16 @@
 #include "iobuf.h"
 #include "coio.h"
 #include "cluster.h" /* replica */
+#include "process_title.h"
+
+static char status[64] = "unknown";
+
+static void update_status(const char *new_status)
+{
+	strncpy(status, new_status, sizeof status);
+	process_title_set_status(new_status);
+	process_title_update();
+}
 
 struct recovery *recovery;
 
@@ -791,7 +801,7 @@ box_init(void)
 
 	cluster_init();
 
-	title("loading", NULL);
+	update_status("loading");
 
 	/* recovery initialization */
 	recover_row_ctx_init(&recover_row_ctx,
@@ -842,10 +852,10 @@ box_init(void)
 	}
 	fiber_gc();
 
-	title("orphan", NULL);
+	update_status("orphan");
 	recovery_follow_local(recovery, "hot_standby",
 			      cfg_getd("wal_dir_rescan_delay"));
-	title("hot_standby", NULL);
+	update_status("hot_standby");
 
 	port_init();
 	iproto_init();
@@ -870,7 +880,7 @@ box_init(void)
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
 		box_set_ro(false);
-	title("running", NULL);
+	update_status("running");
 	say_info("ready to accept requests");
 
 	fiber_gc();

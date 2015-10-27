@@ -68,51 +68,18 @@
 #include "version.h"
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "process_title.h"
 
 static pid_t master_pid = getpid();
-char *script = NULL;
-char *pid_file = NULL;
-char *custom_proc_title;
-char status[64] = "unknown";
-char **main_argv;
-int main_argc;
+static char *script = NULL;
+static char *pid_file = NULL;
+static char **main_argv;
+static int main_argc;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 extern const void *opt_def;
-
-/* defined in third_party/proctitle.c */
-extern "C" {
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-} /* extern "C" */
-
-void
-title(const char *role, const char *fmt, ...)
-{
-	(void) role;
-
-	va_list ap;
-	char buf[256], *bufptr = buf, *bufend = buf + sizeof(buf);
-	char *statusptr = status, *statusend = status + sizeof(status);
-	statusptr += snprintf(statusptr, statusend - statusptr, "%s", role);
-	bufptr += snprintf(bufptr, bufend - bufptr, "%s%s", role,
-			    custom_proc_title);
-
-	if (fmt != NULL) {
-		const char *s = statusptr;
-		statusptr += snprintf(statusptr, statusend - statusptr, "/");
-		va_start(ap, fmt);
-		statusptr += vsnprintf(statusptr, statusend - statusptr,
-				       fmt, ap);
-		va_end(ap);
-		bufptr += snprintf(bufptr, bufend - bufptr, "%s", s);
-	}
-
-	set_proc_title(buf);
-}
 
 const char *
 tarantool_version(void)
@@ -466,15 +433,8 @@ load_cfg()
 	}
 
 	const char *proc_title = cfg_gets("custom_proc_title");
-	/* init process title - used for logging */
-	if (proc_title == NULL) {
-		custom_proc_title = (char *) malloc(1);
-		custom_proc_title[0] = '\0';
-	} else {
-		custom_proc_title = (char *) malloc(strlen(proc_title) + 2);
-		strcpy(custom_proc_title, "@");
-		strcat(custom_proc_title, proc_title);
-	}
+	process_title_set_custom(proc_title);
+	process_title_update();
 	say_logger_init(cfg_gets("logger"),
 			cfg_geti("log_level"),
 			cfg_geti("logger_nonblock"),
@@ -498,6 +458,7 @@ tarantool_free(void)
 		clear_history();
 		free(history);
 	}
+	process_title_free(main_argc, main_argv);
 
 	/* unlink pidfile. */
 	if (pid_file != NULL) {
@@ -515,20 +476,8 @@ tarantool_free(void)
 		ssize_t res = write(0, ffi_symbols, 0);
 		(void) res;
 	}
-#if 0
-	/**
-	 * This doesn't work reliably since
-	 * things are too interconnected.
-	 */
-	free_proc_title(main_argc, main_argv);
 	if (script)
 		free(script);
-	tarantool_lua_free();
-
-	fiber_free();
-	memory_free();
-	random_free();
-#endif
 	/* tarantool_lua_free() was formerly reponsible for terminal reset,
 	 * but it is no longer called
 	 */
@@ -538,6 +487,16 @@ tarantool_free(void)
 	}
 #ifdef HAVE_BFD
 	symbols_free();
+#endif
+#if 0
+	/*
+	 * This doesn't work reliably since things
+	 * are too interconnected.
+	 */
+	tarantool_lua_free();
+	fiber_free();
+	memory_free();
+	random_free();
 #endif
 }
 
@@ -606,7 +565,7 @@ main(int argc, char **argv)
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);
 #endif
-	argv = init_set_proc_title(argc, argv);
+	argv = process_title_init(argc, argv);
 	/*
 	 * Support only #!/usr/bin/tarantol but not
 	 * #!/usr/bin/tarantool -a -b because:
@@ -625,6 +584,7 @@ main(int argc, char **argv)
 		argv++;
 		argc--;
 		script = abspath(argv[0]);
+		process_title_set_script_name(argv[0]);
 	} else if (isatty(STDIN_FILENO)) {
 		/* load history file */
 		char *home = getenv("HOME");

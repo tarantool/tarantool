@@ -39,8 +39,6 @@ extern "C" {
 
 struct tbuf;
 
-extern char *custom_proc_title;
-extern char status[];
 const char *tarantool_version(void);
 /**
  * Get version (defined in PACKAGE_VERSION), packed into uint32_t
@@ -50,9 +48,6 @@ const char *tarantool_version(void);
 uint32_t tarantool_version_id(void);
 
 double tarantool_uptime(void);
-
-void __attribute__((format (printf, 2, 3)))
-title(const char *role, const char *fmt, ...);
 
 void
 load_cfg();
