@@ -394,6 +394,14 @@ SophiaEngine::join(struct relay *relay)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signt = vclock_sum(res);
 
+	/*
+	 * Snapshot object used here only to get a list of
+	 * available spaces at the moment when snapshot
+	 * were created.
+	 *
+	 * Feeding slave with a latest versions of data.
+	*/
+
 	/* get snapshot object */
 	char id[128];
 	snprintf(id, sizeof(id), "snapshot.%" PRIu64, signt);
@@ -418,7 +426,7 @@ SophiaEngine::join(struct relay *relay)
 			throw;
 		}
 		/* send database */
-		void *cursor = sp_cursor(snapshot);
+		void *cursor = sp_cursor(env);
 		if (cursor == NULL) {
 			sp_destroy(db_cursor);
 			key_def_delete(key_def);
@@ -429,6 +437,16 @@ SophiaEngine::join(struct relay *relay)
 		{
 			uint32_t tuple_size;
 			char *tuple = (char *)sophia_tuple_new(obj, key_def, NULL, &tuple_size);
+
+			/* TODO:
+			 *
+			 * pass exact lsn as row.lsn and ensure that slave
+			 * properly accepts rows with variadic lsn.
+			 *
+			 */
+			int64_t lsn = sp_getint(obj, "lsn");
+			(void)lsn;
+
 			try {
 				sophia_send_row(relay, key_def->space_id, tuple, tuple_size);
 			} catch (...) {
@@ -633,10 +651,16 @@ sophia_snapshot(void *env, int64_t lsn)
 	if (o) {
 		return;
 	}
+	/* create snapshot */
 	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
 	rc = sp_setstring(env, "snapshot", snapshot, 0);
 	if (rc == -1)
 		sophia_error(env);
+	/* tell snapshot to release a transaction */
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	o = sp_getobject(env, snapshot);
+	assert(o != NULL);
+	sp_setint(o, "db_view_only", 1);
 }
 
 static inline void
@@ -650,6 +674,11 @@ sophia_reference_checkpoint(void *env, int64_t lsn)
 	if (rc == -1)
 		sophia_error(env);
 	char snapshot[128];
+	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	void *o = sp_getobject(env, snapshot);
+	assert(o != NULL);
+	sp_setint(o, "db_view_only", 1);
+	/* update lsn */
 	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
 	rc = sp_setint(env, snapshot, lsn);
 	if (rc == -1)
