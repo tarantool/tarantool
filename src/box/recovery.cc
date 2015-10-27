@@ -528,6 +528,7 @@ recovery_follow_local(struct recovery *r, const char *name,
 	 * Blocks until finished.
 	 */
 	recover_remaining_wals(r);
+	recovery_close_log(r);
 
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.
