@@ -507,7 +507,7 @@ tarantool_lua_run_script(char *path, int argc, char **argv)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	script_fiber = fiber_new(title, run_script);
+	script_fiber = fiber_new_xc(title, run_script);
 	fiber_start(script_fiber, tarantool_L, path, argc, argv);
 
 	/*

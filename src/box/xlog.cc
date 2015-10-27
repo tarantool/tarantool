@@ -425,7 +425,7 @@ error:
 	(void) crc32p;
 
 	/* Allocate memory for body */
-	char *bodybuf = (char *) region_alloc(&fiber()->gc, len);
+	char *bodybuf = (char *) region_alloc_xc(&fiber()->gc, len);
 
 	/* Read header and body */
 	if (fread(bodybuf, len, 1, f) != 1)

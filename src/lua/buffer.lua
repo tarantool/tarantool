@@ -31,7 +31,7 @@ void
 ibuf_reinit(struct ibuf *ibuf);
 
 void *
-ibuf_reserve_nothrow_slow(struct ibuf *ibuf, size_t size);
+ibuf_reserve_slow(struct ibuf *ibuf, size_t size);
 ]]
 
 local builtin = ffi.C
@@ -79,7 +79,7 @@ local function ibuf_reset(buf)
 end
 
 local function ibuf_reserve_slow(buf, size)
-    local ptr = builtin.ibuf_reserve_nothrow_slow(buf, size)
+    local ptr = builtin.ibuf_reserve_slow(buf, size)
     if ptr == nil then
         errorf("Failed to allocate %d bytes in ibuf", size)
     end

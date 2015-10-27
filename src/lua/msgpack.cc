@@ -383,13 +383,13 @@ lua_msgpack_encode(lua_State *L)
 	struct region *gc= &fiber()->gc;
 	RegionGuard guard(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb);
+	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
 
 	luamp_encode_r(L, cfg, &stream, 0);
 	mpstream_flush(&stream);
 
 	size_t len = region_used(gc) - guard.used;
-	const char *res = (char *) region_join(gc, len);
+	const char *res = (char *) region_join_xc(gc, len);
 
 	lua_pushlstring(L, res, len);
 	return 1;

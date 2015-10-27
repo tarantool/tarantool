@@ -533,7 +533,7 @@ recovery_follow_local(struct recovery *r, const char *name,
 	 * Start 'hot_standby' background fiber to follow xlog changes.
 	 */
 	assert(r->watcher == NULL);
-	r->watcher = fiber_new(name, recovery_follow_f);
+	r->watcher = fiber_new_xc(name, recovery_follow_f);
 	fiber_set_joinable(r->watcher, true);
 	fiber_start(r->watcher, r, wal_dir_rescan_delay);
 }

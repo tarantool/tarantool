@@ -492,7 +492,7 @@ fiber_get_key(struct fiber *fiber, enum fiber_key key);
  * completes.
  */
 struct fiber *
-fiber_new_nothrow(const char *name, fiber_func f)
+fiber_new(const char *name, fiber_func f)
 {
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
@@ -503,7 +503,7 @@ fiber_new_nothrow(const char *name, fiber_func f)
 		rlist_move_entry(&cord->alive, fiber, link);
 	} else {
 		fiber = (struct fiber *)
-			mempool_alloc_nothrow(&cord->fiber_pool);
+			mempool_alloc(&cord->fiber_pool);
 		if (fiber == NULL) {
 			diag_set(OutOfMemory, sizeof(struct fiber),
 				 "fiber pool", "fiber");
@@ -822,7 +822,7 @@ cord_costart_thread_func(void *arg)
 	struct costart_ctx ctx = *(struct costart_ctx *) arg;
 	free(arg);
 
-	struct fiber *f = fiber_new_nothrow("main", ctx.run);
+	struct fiber *f = fiber_new("main", ctx.run);
 	if (f == NULL)
 		return NULL;
 

@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <string.h> /* strerror(3) */
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/types.h> /* ssize_t */
 
 /** Extern modifier for all public functions */

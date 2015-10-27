@@ -73,7 +73,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 8-bit int");
 
-			region_dup(buf, &field.ival, sizeof(uint8_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint8_t));
 			break;
 		case 'S':
 		case 's':
@@ -81,7 +81,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
-			region_dup(buf, &field.ival, sizeof(uint16_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'n':
 			/* signed and unsigned 16-bit big endian integers */
@@ -89,7 +89,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
 			field.ival = (uint16_t) htons((uint16_t) field.ival);
-			region_dup(buf, &field.ival, sizeof(uint16_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'I':
 		case 'i':
@@ -97,7 +97,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.ival != MP_INT)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
-			region_dup(buf, &field.ival, sizeof(uint32_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
@@ -105,7 +105,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
 			field.ival = htonl(field.ival);
-			region_dup(buf, &field.ival, sizeof(uint32_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'L':
 		case 'l':
@@ -113,7 +113,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
-			region_dup(buf, &field.ival, sizeof(uint64_t));
+			region_dup_xc(buf, &field.ival, sizeof(uint64_t));
 			break;
 		case 'Q':
 		case 'q':
@@ -122,21 +122,21 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
 			field.ival = bswap_u64(field.ival);
-			region_dup(buf,  &field.ival, sizeof(uint64_t));
+			region_dup_xc(buf,  &field.ival, sizeof(uint64_t));
 			break;
 		case 'd':
 			dbl = (double) lua_tonumber(L, i);
-			region_dup(buf, &dbl, sizeof(double));
+			region_dup_xc(buf, &dbl, sizeof(double));
 			break;
 		case 'f':
 			flt = (float) lua_tonumber(L, i);
-			region_dup(buf, &flt, sizeof(float));
+			region_dup_xc(buf, &flt, sizeof(float));
 			break;
 		case 'A':
 		case 'a':
 			/* A sequence of bytes */
 			str = luaL_checklstring(L, i, &size);
-			region_dup(buf, str, size);
+			region_dup_xc(buf, str, size);
 			break;
 		default:
 			luaL_error(L, "pickle.pack: unsupported pack "
@@ -147,7 +147,7 @@ lbox_pack(struct lua_State *L)
 	}
 
 	size_t len = region_used(buf) - region_guard.used;
-	const char *res = (char *) region_join(buf, len);
+	const char *res = (char *) region_join_xc(buf, len);
 	lua_pushlstring(L, res, len);
 	return 1;
 }

@@ -25,7 +25,7 @@ stat_notify_test(FILE *f, const char *filename)
 {
 	header();
 
-	struct fiber *touch = fiber_new("touch", touch_f);
+	struct fiber *touch = fiber_new_xc("touch", touch_f);
 	fiber_start(touch, f);
 	ev_stat stat;
 	note("filename: %s", filename);
@@ -65,7 +65,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
-	struct fiber *test = fiber_new("coio_stat", main_f);
+	struct fiber *test = fiber_new_xc("coio_stat", main_f);
 	fiber_wakeup(test);
 	ev_run(loop(), 0);
 	fiber_free();

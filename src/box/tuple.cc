@@ -280,7 +280,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 {
 	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	char *ptr = (char *) smalloc_nothrow(&memtx_alloc, total);
+	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
 	 * to throw an instance of ClientError. Apart from being
@@ -816,7 +816,7 @@ box_tuple_iterator(box_tuple_t *tuple)
 	struct tuple_iterator *it;
 	try {
 		it = (struct tuple_iterator *)
-			mempool_alloc0(&tuple_iterator_pool);
+			mempool_alloc0_xc(&tuple_iterator_pool);
 	} catch (Exception *e) {
 		return NULL;
 	}

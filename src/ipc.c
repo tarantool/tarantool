@@ -235,7 +235,7 @@ ipc_value_new()
 			       sizeof(struct ipc_value));
 	}
 	struct ipc_value *value = (struct ipc_value *)
-		mempool_alloc_nothrow(&ipc_value_pool);
+		mempool_alloc(&ipc_value_pool);
 	if (value == NULL) {
 		diag_set(OutOfMemory, sizeof(struct ipc_value),
 			 "ipc_msg_pool", "struct ipc_value");

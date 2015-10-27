@@ -99,7 +99,7 @@ static struct iproto_msg *
 iproto_msg_new(struct iproto_connection *con, struct cmsg_hop *route)
 {
 	struct iproto_msg *msg =
-		(struct iproto_msg *) mempool_alloc(&iproto_msg_pool);
+		(struct iproto_msg *) mempool_alloc_xc(&iproto_msg_pool);
 	cmsg_init(msg, route);
 	msg->connection = con;
 	return msg;
@@ -285,7 +285,7 @@ iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 {
 	(void) name;
 	struct iproto_connection *con = (struct iproto_connection *)
-		mempool_alloc(&iproto_connection_pool);
+		mempool_alloc_xc(&iproto_connection_pool);
 	con->input.data = con->output.data = con;
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
@@ -387,7 +387,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 
 	/** All requests are processed, reuse the buffer. */
 	if (ibuf_used(&oldbuf->in) == con->parse_size) {
-		ibuf_reserve(&oldbuf->in, to_read);
+		ibuf_reserve_xc(&oldbuf->in, to_read);
 		return oldbuf;
 	}
 
@@ -400,7 +400,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	}
 	struct iobuf *newbuf = con->iobuf[1];
 
-	ibuf_reserve(&newbuf->in, to_read + con->parse_size);
+	ibuf_reserve_xc(&newbuf->in, to_read + con->parse_size);
 	/*
 	 * Discard unparsed data in the old buffer, otherwise it
 	 * won't be recycled when all parsed requests are processed.
@@ -766,7 +766,7 @@ tx_process_connect(struct cmsg *m)
 		struct tt_uuid uuid = ::recovery->server_uuid;
 		greeting_encode(greeting, tarantool_version_id(),
 				&uuid, con->session->salt, SESSION_SEED_SIZE);
-		obuf_dup(out, greeting, IPROTO_GREETING_SIZE);
+		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
 		if (! rlist_empty(&session_on_connect))
 			session_run_on_connect_triggers(con->session);
 		msg->write_end = obuf_create_svp(out);

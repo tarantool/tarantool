@@ -102,7 +102,6 @@ struct fiber;
 /**
  * Fiber - contains information about fiber
  */
-typedef struct fiber box_fiber_t;
 
 typedef void (*fiber_func)(va_list);
 
@@ -123,7 +122,7 @@ typedef void (*fiber_func)(va_list);
  * \sa fiber_start
  */
 API_EXPORT struct fiber *
-fiber_new_nothrow(const char *name, fiber_func f);
+fiber_new(const char *name, fiber_func f);
 
 /**
  * Return control to another fiber and wait until it'll be woken.
@@ -139,7 +138,7 @@ fiber_yield(void);
  * \param callee fiber to start
  * \param ...    arguments to start the fiber with
  *
- * \sa fiber_new_nothrow
+ * \sa fiber_new
  */
 API_EXPORT void
 fiber_start(struct fiber *callee, ...);
@@ -521,9 +520,9 @@ diag_raise(void)
 }
 
 static inline struct fiber *
-fiber_new(const char *name, fiber_func func)
+fiber_new_xc(const char *name, fiber_func func)
 {
-	struct fiber *f = fiber_new_nothrow(name, func);
+	struct fiber *f = fiber_new(name, func);
 	if (f == NULL) {
 		diag_raise();
 		assert(false);

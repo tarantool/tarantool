@@ -34,7 +34,7 @@
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
-	obuf_dup(buf, tuple->data, tuple->bsize);
+	obuf_dup_xc(buf, tuple->data, tuple->bsize);
 }
 
 ssize_t

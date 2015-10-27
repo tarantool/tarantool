@@ -64,7 +64,9 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	say_debug("space_id = %u, index_id = %u", space_id, index_id);
 
 	uint32_t arg_count = mp_decode_array(&args);
+	assert(!box_txn());
 	box_txn_begin();
+	assert(box_txn());
 	for (uint32_t i = 0; i < arg_count; i++) {
 		/* Decode next argument */
 		if (mp_typeof(*args) != MP_UINT)
@@ -104,6 +106,7 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 			return -1;
 	}
 	box_txn_commit();
+	assert(!box_txn());
 	return 0;
 }
 

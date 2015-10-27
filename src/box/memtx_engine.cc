@@ -291,7 +291,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
-					       region_alloc_cb,
+					       region_alloc_ex_cb,
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
@@ -363,7 +363,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 
 		/* Update the tuple. */
 		struct tuple *new_tuple =
-			tuple_upsert(space->format, region_alloc_cb,
+			tuple_upsert(space->format, region_alloc_ex_cb,
 				     &fiber()->gc, old_tuple,
 				     request->ops, request->ops_end,
 				     request->index_base);
@@ -1062,7 +1062,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
 	entry = (struct checkpoint_entry *)
-		region_alloc(&fiber()->gc, sizeof(*entry));
+		region_alloc_xc(&fiber()->gc, sizeof(*entry));
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
@@ -1103,7 +1103,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 	assert(m_checkpoint == 0);
 
 	m_checkpoint = (struct checkpoint *)
-		region_alloc(&fiber()->gc, sizeof(*m_checkpoint));
+		region_alloc_xc(&fiber()->gc, sizeof(*m_checkpoint));
 
 	checkpoint_init(m_checkpoint, ::recovery, lsn);
 	space_foreach(checkpoint_add_space, m_checkpoint);
@@ -1244,7 +1244,7 @@ memtx_index_extent_alloc()
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
 		    );
-	return mempool_alloc(&memtx_index_extent_pool);
+	return mempool_alloc_xc(&memtx_index_extent_pool);
 }
 
 /**
@@ -1269,7 +1269,7 @@ memtx_index_extent_reserve(int num)
 			       "mempool", "new slab")
 		    );
 	while (memtx_index_num_reserved_extents < num) {
-		void *ext = mempool_alloc(&memtx_index_extent_pool);
+		void *ext = mempool_alloc_xc(&memtx_index_extent_pool);
 		*(void **)ext = memtx_index_reserved_extents;
 		memtx_index_reserved_extents = ext;
 		memtx_index_num_reserved_extents++;

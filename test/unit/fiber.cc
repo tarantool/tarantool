@@ -47,19 +47,19 @@ fiber_join_test()
 {
 	header();
 
-	struct fiber *fiber= fiber_new("join", noop_f);
+	struct fiber *fiber = fiber_new_xc("join", noop_f);
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	fiber_join(fiber);
 
-	fiber = fiber_new("cancel", cancel_f);
+	fiber = fiber_new_xc("cancel", cancel_f);
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	fiber_sleep(0);
 	fiber_cancel(fiber);
 	fiber_join(fiber);
 
-	fiber = fiber_new("exception", exception_f);
+	fiber = fiber_new_xc("exception", exception_f);
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	try {
@@ -74,7 +74,7 @@ fiber_join_test()
 	 * A fiber which is using exception should not
 	 * push them up the stack.
 	 */
-	fiber = fiber_new("no_exception", no_exception_f);
+	fiber = fiber_new_xc("no_exception", no_exception_f);
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	fiber_join(fiber);
@@ -82,7 +82,7 @@ fiber_join_test()
 	 * Trying to cancel a dead joinable cancellable fiber lead to
 	 * a crash, because cancel would try to schedule it.
 	 */
-	fiber = fiber_new("cancel_dead", cancel_dead_f);
+	fiber = fiber_new_xc("cancel_dead", cancel_dead_f);
 	fiber_set_joinable(fiber, true);
 	fiber_wakeup(fiber);
 	/** Let the fiber schedule */
@@ -106,7 +106,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
-	struct fiber *main = fiber_new("main", main_f);
+	struct fiber *main = fiber_new_xc("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);
 	fiber_free();
