@@ -317,7 +317,7 @@ lbox_fiber_create(struct lua_State *L)
 		tnt_raise(LuajitError, L);
 	}
 
-	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
+	struct fiber *f = fiber_new_xc("lua", box_lua_fiber_run);
 	/* Not a system fiber. */
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);

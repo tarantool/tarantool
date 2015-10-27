@@ -381,7 +381,7 @@ applier_start(struct applier *applier, struct recovery *r)
 		say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "applier/%s", uri);
 
-	struct fiber *f = fiber_new(name, applier_f);
+	struct fiber *f = fiber_new_xc(name, applier_f);
 	/**
 	 * So that we can safely grab the status of the
 	 * fiber any time we want.

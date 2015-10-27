@@ -18,7 +18,7 @@ void benchmark_f(va_list ap)
 {
 	struct fiber *fibers[FIBERS];
 	for (int i = 0; i < FIBERS; i++) {
-		fibers[i] = fiber_new("yield-wielder", yield_f);
+		fibers[i] = fiber_new_xc("yield-wielder", yield_f);
 		fiber_wakeup(fibers[i]);
 	}
 	/** Wait for fibers to die. */
@@ -33,7 +33,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
-	struct fiber *benchmark = fiber_new("benchmark", benchmark_f);
+	struct fiber *benchmark = fiber_new_xc("benchmark", benchmark_f);
 	fiber_wakeup(benchmark);
 	ev_run(loop(), 0);
 	fiber_free();

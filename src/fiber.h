@@ -521,7 +521,7 @@ diag_raise(void)
 }
 
 static inline struct fiber *
-fiber_new(const char *name, fiber_func func)
+fiber_new_xc(const char *name, fiber_func func)
 {
 	struct fiber *f = fiber_new_nothrow(name, func);
 	if (f == NULL) {
