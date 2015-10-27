@@ -212,7 +212,7 @@ mysqld server is already running on the local host 127.0.0.1.
     | :codenormal:`Bye`
     |
     | :codenormal:`# Install luarocks`
-    | :codenormal:`$` :codebold:`sudo apt-get -y install luarocks | grep "Setting up"`
+    | :codenormal:`$` :codebold:`sudo apt-get -y install luarocks | grep -E "Setting up|already"`
     | :codenormal:`Setting up luarocks (2.0.8-2) ...`
     |
     | :codenormal:`# Set up the Tarantool rock list in ~/.luarocks,`
@@ -227,7 +227,7 @@ mysqld server is already running on the local host 127.0.0.1.
     | :codenormal:`deb-src http://tarantool.org/dist/master/ubuntu/ precise main`
     |
     | :codenormal:`# Install tarantool-dev. The displayed line should show version = 1.6`
-    | :codenormal:`$` :codebold:`sudo apt-get -y install tarantool-dev | grep "Setting up"`
+    | :codenormal:`$` :codebold:`sudo apt-get -y install tarantool-dev | grep -E "Setting up|already"`
     | :codenormal:`Setting up tarantool-dev (1.6.6.222.g48b98bb~precise-1) ...`
     | :codenormal:`$`
     |
@@ -362,7 +362,7 @@ The names are similar to the names that PostgreSQL itself uses.
 |br|
 
 Example, using a table literal enclosed in {braces}: |br|
-:codebold:`conn = pg.connect({host='127.0.0.1', port=3306, user='p', password='p', db='test'})` |br|
+:codebold:`conn = pg.connect({host='127.0.0.1', port=5432, user='p', password='p', db='test'})` |br|
 
 Example, creating a function which sets each option in a separate line:
     | :codenormal:`# Connection function. Usage: conn = pg_connect()`
@@ -456,7 +456,7 @@ PostgreSQL server is already running on the local host 127.0.0.1.
     | :codenormal:`$`
     |
     | :codenormal:`# Install luarocks`
-    | :codenormal:`$` :codebold:`sudo apt-get -y install luarocks | grep "Setting up"`
+    | :codenormal:`$` :codebold:`sudo apt-get -y install luarocks | grep -E "Setting up|already"`
     | :codenormal:`Setting up luarocks (2.0.8-2) ...`
     |
     | :codenormal:`# Set up the Tarantool rock list in ~/.luarocks,`
@@ -471,7 +471,7 @@ PostgreSQL server is already running on the local host 127.0.0.1.
     | :codenormal:`deb-src http://tarantool.org/dist/master/ubuntu/ precise main`
     |
     | :codenormal:`# Install tarantool-dev. The displayed line should show version = 1.6`
-    | :codenormal:`$` :codebold:`sudo apt-get -y install tarantool-dev | grep "Setting up"`
+    | :codenormal:`$` :codebold:`sudo apt-get -y install tarantool-dev | grep -E "Setting up|already"`
     | :codenormal:`Setting up tarantool-dev (1.6.6.222.g48b98bb~precise-1) ...`
     | :codenormal:`$`
     |
