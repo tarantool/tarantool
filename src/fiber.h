@@ -102,7 +102,6 @@ struct fiber;
 /**
  * Fiber - contains information about fiber
  */
-typedef struct fiber box_fiber_t;
 
 typedef void (*fiber_func)(va_list);
 
