@@ -289,6 +289,16 @@ coio_getaddrinfo(const char *host, const char *port,
 	if (task == NULL)
 		return rc;
 
+	/*
+	 * getaddrinfo() on osx upto osx 10.8 crashes when AI_NUMERICSERV is
+	 * set and servername is either NULL or "0" ("00" works fine)
+	 *
+	 * Based on the workaround in https://bugs.python.org/issue17269
+	 */
+#if defined(__APPLE__) && defined(AI_NUMERICSERV)
+	if (hints && (hints->ai_flags & AI_NUMERICSERV) &&
+	    (port == NULL || (port[0]=='0' && port[1]=='\0'))) port = "00";
+#endif
 	/* Fill hinting information for use by connect(2) or bind(2). */
 	memcpy(&task->hints, hints, sizeof(task->hints));
 	/* make no difference between empty string and NULL for host */
