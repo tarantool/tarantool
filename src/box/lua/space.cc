@@ -50,7 +50,7 @@ extern "C" {
 static void
 lbox_space_on_replace_trigger(struct trigger *trigger, void *event)
 {
-	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
+	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_guard(tarantool_L);
 

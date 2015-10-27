@@ -99,16 +99,13 @@ public:
 
 	virtual void join(struct relay *);
 	/**
-	 * Begin a new statement in an existing or new
-	 * transaction.
-	 * We use a single call to save a virtual method call
-	 * since it's always clear from txn whether it's
-	 * autocommit mode or not, the first statement or
-	 * a subsequent statement.  Effectively it means that
+	 * Begin a new single or multi-statement transaction.
+	 * Called on first statement in a transaction, not when
+	 * a user said begin(). Effectively it means that
 	 * transaction in the engine begins with the first
 	 * statement.
 	 */
-	virtual void beginStatement(struct txn *);
+	virtual void begin(struct txn *);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
@@ -120,7 +117,7 @@ public:
 	 * This method can't throw: if any error happens here,
 	 * there is no better option than panic.
 	 */
-	virtual void commit(struct txn *);
+	virtual void commit(struct txn *, int64_t signature);
 	/*
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.

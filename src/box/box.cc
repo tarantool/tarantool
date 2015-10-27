@@ -122,8 +122,18 @@ process_rw(struct request *request, struct tuple **result)
 		default:
 			tuple = NULL;
 		}
-		if (result)
+		/*
+		 * Pin the tuple locally before the commit,
+		 * otherwise it may go away during yield in
+		 * when WAL is written in autocommit mode.
+		 */
+		TupleRefNil ref(tuple);
+		txn_commit_stmt(txn);
+		if (result) {
+			if (tuple)
+				tuple_bless(tuple);
 			*result = tuple;
+		}
 	} catch (Exception *e) {
 		txn_rollback_stmt();
 		throw;

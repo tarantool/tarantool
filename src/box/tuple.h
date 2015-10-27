@@ -233,12 +233,23 @@ tuple_unref(struct tuple *tuple)
 }
 
 /** Make tuple references exception-friendly in absence of @finally. */
-struct TupleGuard {
+struct TupleRef {
 	struct tuple *tuple;
-	TupleGuard(struct tuple *arg) :tuple(arg) { tuple_ref(tuple); }
-	~TupleGuard() { tuple_unref(tuple); }
-	TupleGuard(const TupleGuard&) = delete;
-	void operator=(const TupleGuard&) = delete;
+	TupleRef(struct tuple *arg) :tuple(arg) { tuple_ref(tuple); }
+	~TupleRef() { tuple_unref(tuple); }
+	TupleRef(const TupleRef &) = delete;
+	void operator=(const TupleRef&) = delete;
+};
+
+/** Make tuple references exception-friendly in absence of @finally. */
+struct TupleRefNil {
+	struct tuple *tuple;
+	TupleRefNil (struct tuple *arg) :tuple(arg)
+	{ if (tuple) tuple_ref(tuple); }
+	~TupleRefNil() { if (tuple) tuple_unref(tuple); }
+
+	TupleRefNil(const TupleRefNil&) = delete;
+	void operator=(const TupleRefNil&) = delete;
 };
 
 /**

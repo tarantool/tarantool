@@ -33,6 +33,7 @@
 #include "space.h"
 #include "trigger.h"
 #include "fiber.h"
+#include "salad/stailq.h"
 
 extern double too_long_threshold;
 struct tuple;
@@ -44,8 +45,8 @@ struct tuple;
 struct txn_stmt {
 	/* (!) Please update txn_stmt_new() after changing members */
 
-	/** Doubly linked list of all statements. */
-	struct rlist next;
+	/** A linked list of all statements. */
+	struct stailq_entry next;
 	/** Undo info. */
 	struct space *space;
 	struct tuple *old_tuple;
@@ -55,27 +56,19 @@ struct txn_stmt {
 };
 
 struct txn {
-	/* (!) Please update txn_begin() after changing members */
-
-	/** Pre-allocated first statement. */
-	struct txn_stmt first_stmt;
-	/** Pointer to the current statement, if any */
-	struct txn_stmt *stmt;
 	/** List of statements in a transaction. */
-	struct rlist stmts;
-	 /** Commit and rollback triggers */
-	struct rlist on_commit, on_rollback;
-	/** Total number of statements in this txn. */
-	int n_stmts;
+	struct stailq stmts;
 	/** Total number of WAL rows in this txn. */
 	int n_rows;
-	/** Commit signature (LSN sum) */
-	int64_t signature;
 	/**
 	 * True if this transaction is running in autocommit mode
 	 * (statement end causes an automatic transaction commit).
 	 */
-	bool autocommit;
+	bool is_autocommit;
+	/** True if on_commit and on_rollback lists are non-empty. */
+	bool has_triggers;
+	/** A statement-level transaction is active. */
+	bool in_stmt;
 	/** Engine involved in multi-statement transaction. */
 	Engine *engine;
 	/** Engine-specific transaction data */
@@ -85,6 +78,8 @@ struct txn {
 	 * for in-memory engine.
 	 */
 	struct trigger fiber_on_yield, fiber_on_stop;
+	 /** Commit and rollback triggers */
+	struct rlist on_commit, on_rollback;
 };
 
 /* Pointer to the current transaction (if any) */
@@ -99,7 +94,7 @@ in_txn()
  * @pre no transaction is active
  */
 struct txn *
-txn_begin(bool autocommit);
+txn_begin(bool is_autocommit);
 
 /**
  * Commit a transaction.
@@ -111,6 +106,35 @@ txn_commit(struct txn *txn);
 /** Rollback a transaction, if any. */
 void
 txn_rollback();
+
+/**
+ * Most txns don't have triggers, and txn objects
+ * are created on every access to data, so txns
+ * are partially initialized.
+ */
+static inline void
+txn_init_triggers(struct txn *txn)
+{
+	if (txn->has_triggers == false) {
+		rlist_create(&txn->on_commit);
+		rlist_create(&txn->on_rollback);
+		txn->has_triggers = true;
+	}
+}
+
+static inline void
+txn_on_commit(struct txn *txn, struct trigger *trigger)
+{
+	txn_init_triggers(txn);
+	trigger_add(&txn->on_commit, trigger);
+}
+
+static inline void
+txn_on_rollback(struct txn *txn, struct trigger *trigger)
+{
+	txn_init_triggers(txn);
+	trigger_add(&txn->on_rollback, trigger);
+}
 
 /**
  * Start a new statement. If no current transaction,
@@ -126,20 +150,21 @@ txn_begin_stmt(struct request *request, struct space *space);
 static inline void
 txn_commit_stmt(struct txn *txn)
 {
+	assert(txn->in_stmt);
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
 	 */
-	struct txn_stmt *stmt = txn->stmt;
+	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts,
+						  struct txn_stmt, next);
 	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
 	    && stmt->space->run_triggers) {
 
 		trigger_run(&stmt->space->on_replace, txn);
 	}
-	if (txn->autocommit)
+	txn->in_stmt = false;
+	if (txn->is_autocommit)
 		txn_commit(txn);
-	else
-		txn->stmt = NULL;
 }
 
 /**
@@ -157,11 +182,20 @@ txn_rollback_stmt();
 void
 txn_check_autocommit(struct txn *txn, const char *where);
 
-/** Last statement of the transaction. */
+/** The current statement of the transaction. */
 static inline struct txn_stmt *
-txn_stmt(struct txn *txn)
+txn_current_stmt(struct txn *txn)
 {
-	return txn->stmt;
+	return (txn->in_stmt ?
+		stailq_last_entry(&txn->stmts, struct txn_stmt, next) :
+		NULL);
+}
+
+/** The last statement of the transaction. */
+static inline struct txn_stmt *
+txn_last_stmt(struct txn *txn)
+{
+	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
 }
 
 /**

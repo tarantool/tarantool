@@ -108,6 +108,8 @@ struct tuple *
 SophiaSpace::executeReplace(struct txn *txn, struct space *space,
                             struct request *request)
 {
+	(void) txn;
+
 	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 
 	space_validate_tuple_raw(space, request->tuple);
@@ -131,7 +133,6 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 			mode = DUP_INSERT;
 	}
 	index->replace_or_insert(request->tuple, request->tuple_end, mode);
-	txn_commit_stmt(txn);
 	return NULL;
 }
 
@@ -139,12 +140,13 @@ struct tuple *
 SophiaSpace::executeDelete(struct txn *txn, struct space *space,
                            struct request *request)
 {
+	(void) txn;
+
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(index->key_def, key, part_count);
 	index->remove(key);
-	txn_commit_stmt(txn);
 	return NULL;
 }
 
@@ -152,6 +154,8 @@ struct tuple *
 SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
                            struct request *request)
 {
+	(void) txn;
+
 	/* Try to find the tuple by unique key */
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 	const char *key = request->key;
@@ -159,11 +163,10 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	primary_key_validate(index->key_def, key, part_count);
 	struct tuple *old_tuple = index->findByKey(key, part_count);
 
-	if (old_tuple == NULL) {
-		txn_commit_stmt(txn);
+	if (old_tuple == NULL)
 		return NULL;
-	}
-	TupleGuard old_guard(old_tuple);
+	/* Sophia always yields a zero-ref tuple, GC it here. */
+	TupleRef old_ref(old_tuple);
 
 	/* Do tuple update */
 	struct tuple *new_tuple =
@@ -173,7 +176,7 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 		             old_tuple, request->tuple,
 		             request->tuple_end,
 		             request->index_base);
-	TupleGuard guard(new_tuple);
+	TupleRef ref(new_tuple);
 
 	space_validate_tuple(space, new_tuple);
 	space_check_update(space, old_tuple, new_tuple);
@@ -181,7 +184,6 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	index->replace_or_insert(new_tuple->data,
 	                         new_tuple->data + new_tuple->bsize,
 	                         DUP_REPLACE);
-	txn_commit_stmt(txn);
 	return NULL;
 }
 
@@ -189,6 +191,7 @@ void
 SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
+	(void) txn;
 	SophiaIndex *index = (SophiaIndex *)index_find(space, request->index_id);
 
 	/* Check field count in tuple */
@@ -211,7 +214,6 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 	              request->tuple,
 	              request->tuple_end,
 	              request->index_base);
-	txn_commit_stmt(txn);
 }
 
 SophiaSpace::SophiaSpace(Engine *e)
@@ -530,14 +532,12 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 }
 
 void
-SophiaEngine::beginStatement(struct txn *txn)
+SophiaEngine::begin(struct txn *txn)
 {
-	assert(txn->engine_tx == NULL || txn->n_stmts != 1);
-	if (txn->n_stmts == 1) {
-		txn->engine_tx = sp_begin(env);
-		if (txn->engine_tx == NULL)
-			sophia_error(env);
-	}
+	assert(txn->engine_tx == NULL);
+	txn->engine_tx = sp_begin(env);
+	if (txn->engine_tx == NULL)
+		sophia_error(env);
 }
 
 void
@@ -570,25 +570,25 @@ SophiaEngine::prepare(struct txn *txn)
 }
 
 void
-SophiaEngine::commit(struct txn *txn)
+SophiaEngine::commit(struct txn *txn, int64_t signature)
 {
 	if (txn->engine_tx == NULL)
 		return;
 
 	if (txn->n_rows > 0) {
 		/* Check commit order */
-		assert(txn->signature >= 0);
-		assert(m_prev_commit_lsn < txn->signature);
-		m_prev_commit_lsn = txn->signature;
+		assert(signature >= 0);
+		assert(m_prev_commit_lsn < signature);
+		m_prev_commit_lsn = signature;
 
 		/* Set tx id in Sophia only if tx has WRITE requests */
-		sp_setint(txn->engine_tx, "lsn", txn->signature);
+		sp_setint(txn->engine_tx, "lsn", signature);
 	}
 
 	int rc = sp_commit(txn->engine_tx);
 	if (rc == -1) {
 		panic("sophia commit failed: txn->signature = %"
-		      PRIu64, txn->signature);
+		      PRIu64, signature);
 	}
 	txn->engine_tx = NULL;
 }
