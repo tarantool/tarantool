@@ -1,21 +1,24 @@
+env = require('test_run')
+test_run = env.new()
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+
 net_box = require('net.box')
 errinj = box.error.injection
 
 box.schema.user.grant('guest', 'replication')
---# create server replica with rpl_master=default, script='replication/replica.lua'
---# start server replica
---# set connection replica
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
 
---# set connection default
+test_run:cmd("switch default")
 s = box.schema.space.create('test');
 index = s:create_index('primary', {type = 'hash'})
 
---# set connection replica
+test_run:cmd("switch replica")
 fiber = require('fiber')
 while box.space.test == nil do fiber.sleep(0.01) end
---# set connection default
---# stop server replica
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
 
 -- insert values on the master while replica is stopped and can't fetch them
 for i=1,100 do s:insert{i, 'this is test message12345'} end
@@ -23,8 +26,8 @@ for i=1,100 do s:insert{i, 'this is test message12345'} end
 -- sleep after every tuple
 errinj.set("ERRINJ_RELAY", true)
 
---# start server replica
---# set connection replica
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
 
 -- Check that replica doesn't enter read-write mode before
 -- catching up with the master: to check that we inject sleep into
@@ -39,11 +42,11 @@ errinj.set("ERRINJ_RELAY", true)
 box.space.test:len()
 d = box.space.test:delete{1}
 box.space.test:get(1) ~= nil
---
--- case #2: delete tuple via net.box
---
---# set connection default
---# set variable r_uri to 'replica.listen'
+
+-- case #2: delete tuple by net.box
+
+test_run:cmd("switch default")
+test_run:cmd("set variable r_uri to 'replica.listen'")
 c = net_box:new(r_uri)
 d = c.space.test:delete{1}
 c.space.test:get(1) ~= nil
@@ -52,9 +55,8 @@ c.space.test:get(1) ~= nil
 errinj.set("ERRINJ_RELAY", false)
 
 -- cleanup
---# stop server replica
---# cleanup server replica
---# set connection default
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
 

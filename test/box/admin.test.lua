@@ -1,18 +1,19 @@
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary')
 
---# push filter 'listen: .*' to 'listen: <uri>'
+test_run:cmd("push filter 'listen: .*' to 'listen: <uri>'")
 help()
 cfg_filter(box.cfg)
 space:insert{1, 'tuple'}
 box.snapshot()
 space:delete{1}
---# clear filter
+test_run:cmd("clear filter")
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function check_type(arg, typeof)
     return type(arg) == typeof
 end;
@@ -151,3 +152,4 @@ test_box_info();
 test_box_slab_info();
 test_box_fiber_info();
 space:drop();
+test_run:cmd("setopt delimiter ''");

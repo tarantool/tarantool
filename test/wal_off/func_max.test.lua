@@ -1,9 +1,11 @@
 session = box.session
 session.su('admin')
+env = require('test_run')
+test_run = env.new()
 --
 -- Check max function limit
 --
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function func_limit()
     local i = 1
     while true do
@@ -28,4 +30,4 @@ func_limit();
 drop_limit_func();
 session.su('admin')
 box.schema.user.drop('testuser');
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");

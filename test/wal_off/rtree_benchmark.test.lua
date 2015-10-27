@@ -1,6 +1,8 @@
 n_records = 10000
 n_iterations = 10000
 n_neighbors = 10
+env = require('test_run')
+test_run = env.new()
 
 file = io.open("rtree_benchmark.res", "w")
 
@@ -13,7 +15,7 @@ rect_width = 180 / math.pow(n_records, 1 / 2)
 
 start = os.time()
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, n_records do
    s:insert{i,{180*math.random(),180*math.random()}}
 end;
@@ -110,6 +112,6 @@ s:drop();
 
 file:close();
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 

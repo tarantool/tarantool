@@ -1,12 +1,20 @@
---# stop server default
---# start server default
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default')
 space = box.schema.space.create('tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 i = 1;
 ---
 ...
@@ -45,7 +53,10 @@ end;
 ---
 - error: Failed to allocate 2123 bytes in slab allocator for tuple
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 space:len()
 ---
 - 7813
@@ -77,7 +88,10 @@ i = 0
 t = {}
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 for state, v in space:pairs() do
     table.insert(t, v)
     i = i + 1
@@ -87,7 +101,10 @@ for state, v in space:pairs() do
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 t
 ---
 - - [0, 'test']
@@ -165,7 +182,10 @@ space:truncate()
 function insert(a) space:insert(a) end
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function dup_key()
     box.begin()
     space:insert{1}
@@ -185,7 +205,10 @@ function dup_key()
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 dup_key()
 ---
 - 2000
@@ -204,8 +227,7 @@ t = nil
 ---
 ...
 -- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 arena_bytes = box.cfg.slab_alloc_arena * 1024 * 1024 * 1024
 ---
 ...

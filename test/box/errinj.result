@@ -297,6 +297,12 @@ s_withindex:drop()
 ---
 ...
 -- Check transaction rollback when out of memory
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 s = box.schema.space.create('s')
 ---
 ...
@@ -331,7 +337,10 @@ s:select{}
 ---
 - []
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 box.begin()
     s:insert{1}
 box.commit();
@@ -395,7 +404,10 @@ s:select{};
 ---
 - - [1]
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 errinj.set("ERRINJ_TUPLE_ALLOC", false)
 ---
 - ok

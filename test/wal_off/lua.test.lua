@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 space = box.schema.space.create('tweedledum')
 index1 = space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
 index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
@@ -5,7 +7,7 @@ index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, un
 -- https://bugs.launchpad.net/tarantool/+bug/1042738
 -- Iteration over a non-unique TREE index
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, 1000 do
     space:truncate()
     for j = 1, 30 do
@@ -19,7 +21,7 @@ for i = 1, 1000 do
         error('bug at iteration '..i..', count is '..count)
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 space:truncate()
 
 --
@@ -37,7 +39,7 @@ space:drop()
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function mktuple(n)
     local fields = { [n] = n }
     for i = 1,n do
@@ -48,7 +50,7 @@ function mktuple(n)
     assert(t[n] == n, "tuple check")
     return string.format("count %u len %u", #t, t:bsize())
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 mktuple(5000)
 mktuple(100000)

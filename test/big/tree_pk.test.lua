@@ -52,8 +52,10 @@ s1.index['primary']:get{'third'}
 s1:delete{'identifier'}
 s1:delete{'second'}
 s1:delete{'third'}
+env = require('test_run')
+test_run = env.new()
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function crossjoin(space0, space1, limit)
     local result = {}
     for state, v0 in space0:pairs() do
@@ -71,7 +73,7 @@ function crossjoin(space0, space1, limit)
     end
     return result
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 s2:insert{'1', 'tuple'}
 s1:insert{'1', 'tuple'}
