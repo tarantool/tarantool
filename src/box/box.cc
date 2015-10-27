@@ -706,15 +706,17 @@ box_free(void)
 	 * initialized
 	 */
 	if (box_init_done) {
+#if 0
 		session_free();
 		cluster_free();
 		user_cache_free();
 		schema_free();
 		tuple_free();
 		port_free();
-		engine_shutdown();
 		rmean_delete(rmean_error);
 		rmean_delete(rmean_box);
+#endif
+		engine_shutdown();
 	}
 }
 

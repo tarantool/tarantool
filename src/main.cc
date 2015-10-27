@@ -490,33 +490,22 @@ tarantool_free(void)
 	/* Do nothing in a fork. */
 	if (getpid() != master_pid)
 		return;
-	signal_free();
-	tarantool_lua_free();
 	box_free();
 
-	if (script)
-		free(script);
-	else if (history) {
+	if (history) {
 		write_history(history);
 		clear_history();
 		free(history);
 	}
-	free_proc_title(main_argc, main_argv);
 
 	/* unlink pidfile. */
 	if (pid_file != NULL) {
 		unlink(pid_file);
 		free(pid_file);
 	}
-
-	fiber_free();
-	memory_free();
-	random_free();
+	signal_free();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
-#endif
-#ifdef HAVE_BFD
-	symbols_free();
 #endif
 	/* A hack for cc/ld, see ffisyms.c */
 	if (time(NULL) == 0) {
@@ -525,6 +514,23 @@ tarantool_free(void)
 		ssize_t res = write(0, ffi_symbols, 0);
 		(void) res;
 	}
+#if 0
+	/**
+	 * This doesn't work reliably since
+	 * things are too interconnected.
+	 */
+	free_proc_title(main_argc, main_argv);
+	if (script)
+		free(script);
+	tarantool_lua_free();
+
+	fiber_free();
+	memory_free();
+	random_free();
+#ifdef HAVE_BFD
+	symbols_free();
+#endif
+#endif
 }
 
 int
