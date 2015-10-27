@@ -1,4 +1,6 @@
---# setopt delimiter ';'
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("setopt delimiter ';'")
 -- empty transaction - ok
 box.begin() box.commit();
 -- double begin
@@ -119,7 +121,7 @@ end;
 t;
 s:select{};
 s:drop();
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 test = box.schema.space.create('test')
 tindex = test:create_index('primary')
 box.begin() test:insert{1} box.rollback()
@@ -143,7 +145,7 @@ box.schema.func.drop('test')
 --
 box.space.test:truncate()
 function insert(a) box.space.test:insert(a) end
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function dup_key()
     box.begin()
     box.space.test:insert{1}
@@ -156,7 +158,7 @@ function dup_key()
     end
     box.commit()
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 dup_key()
 box.space.test:select{}
 --
@@ -171,7 +173,7 @@ message:match('does not exist')
 if not status then box.rollback() end
 test = nil
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function tx_limit(n)
     box.begin()
     for i=0,n do
@@ -179,7 +181,7 @@ function tx_limit(n)
     end
     box.commit()
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 _ = box.schema.space.create('test');
 _ = box.space.test:create_index('primary');
 tx_limit(10000)

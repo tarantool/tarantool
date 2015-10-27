@@ -7,6 +7,8 @@ index = space:create_index('primary', { type = 'hash' })
 for i = 1,5,1 do space:replace({i, i}) end
 
 fun = require('fun')
+env = require('test_run')
+test_run = env.new()
 
 -- print all methods from metatable
 methods = fun.iter(getmetatable(fun.range(5)).__index):totable()
@@ -35,12 +37,12 @@ fun.iter(space.index[0]:pairs()):totable()
 space.index[0]:pairs():drop(2):take(3):totable()
 
 -- test global functions
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 fun.reduce(function(acc, val) return acc + val end, 0,
     fun.filter(function(x) return x % 11 == 0 end,
     fun.map(function(x) return 2 * x end, fun.range(1000))));
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 t = {}
 fun.foreach(function(x) table.insert(t, x) end, "abcde")

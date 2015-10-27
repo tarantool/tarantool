@@ -1,4 +1,6 @@
---# push filter 'table: .*' to 'table: <address>'
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("push filter 'table: .*' to 'table: <address>'")
 
 -- gh-266: box.info() crash on uncofigured box
 package.loaded['box.space'] == nil
@@ -24,8 +26,9 @@ t = nil
 -- # box.error
 ----------------
 
---# stop server default
---# start server default
+test_run:cmd("restart server default")
+env = require('test_run')
+test_run = env.new()
 box.error.last()
 box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
@@ -42,7 +45,7 @@ space = box.space.tweedledum
 -- # box.stat
 ----------------
 t = {}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for k, v in pairs(box.stat()) do
     table.insert(t, k)
 end;
@@ -94,7 +97,7 @@ for k,v in pairs(box.error) do
 end;
 t;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 -- A test case for Bug#901674
 -- No way to inspect exceptions from Box in Lua
@@ -177,4 +180,4 @@ fifo_top(space, 1)
 space:delete{1}
 
 space:drop()
---# clear filter
+test_run:cmd("clear filter")

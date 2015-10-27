@@ -1,16 +1,34 @@
 --
 -- gh-853 - memory leak on start if replace in xlog
 --
---# create server tiny with script='box/tiny.lua'
---# start server tiny
---# set connection tiny
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("create server tiny with script='box/tiny.lua'")
+---
+- true
+...
+test_run:cmd("start server tiny")
+---
+- true
+...
+test_run:cmd("switch tiny")
+---
+- true
+...
 _ = box.schema.space.create('test')
 ---
 ...
 _ = box.space.test:create_index('pk')
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 -- or we run out of memory too soon
 for i=1, 500 do
     box.space.test:replace{1, string.rep('a', 10000)}
@@ -18,9 +36,11 @@ for i=1, 500 do
 end;
 ---
 ...
---# setopt delimiter ''
---# stop server tiny
---# start server tiny
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+test_run:cmd('restart server tiny')
 box.space.test:len()
 ---
 - 1
@@ -28,5 +48,15 @@ box.space.test:len()
 box.space.test:drop()
 ---
 ...
---# cleanup server tiny
---# set connection default
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server tiny")
+---
+- true
+...
+test_run:cmd("cleanup server tiny")
+---
+- true
+...

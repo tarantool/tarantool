@@ -1,3 +1,9 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 session = box.session
 ---
 ...
@@ -57,7 +63,10 @@ session.su('admin')
 box.schema.user.grant('test', 'write', 'space', '_space')
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 function usermax()
     local i = 1
     while true do
@@ -84,7 +93,10 @@ usermax();
 ---
 - error: User 'user28' is not found
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 box.schema.user.create('rich')
 ---
 ...
@@ -259,8 +271,7 @@ box.snapshot()
 ---
 - ok
 ...
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 box.schema.user.drop('testus')
 ---
 ...

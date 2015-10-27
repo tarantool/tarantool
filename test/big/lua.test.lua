@@ -135,7 +135,9 @@ tmp = space:create_index('i1', { type = 'tree', parts = {2, 'str', 3, 'str'}, un
 
 pid = 1
 tid = 999
---# setopt delimiter ';'
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("setopt delimiter ';'")
 for sid = 1, 2 do
     for i = 1, 3 do
         space:insert{'pid_'..pid, 'sid_'..sid, 'tid_'..tid}
@@ -143,7 +145,7 @@ for sid = 1, 2 do
         tid = tid - 1
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 index = space.index['i1']
 

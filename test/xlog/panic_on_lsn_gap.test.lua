@@ -6,9 +6,11 @@
 -- Check how the server is able to find the next
 -- xlog if there are failed writes (lsn gaps).
 --
---# create server panic with script='xlog/panic.lua'
---# start server panic
---# set connection panic
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("create server panic with script='xlog/panic.lua'")
+test_run:cmd("start server panic")
+test_run:cmd("switch panic")
 box.info.vclock
 s = box.space._schema
 -- we need to have at least one record in the
@@ -24,12 +26,12 @@ t = {}
 -- switch WALs. No switch will happen though,
 -- since no writes were made.
 --
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i=1,box.cfg.rows_per_wal do
     status, msg = pcall(s.replace, s, {"key"})
     table.insert(t, msg)
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 t
 --
 -- Before restart: oops, our LSN is 11,
@@ -38,8 +40,7 @@ t
 name = string.match(arg[0], "([^,]+)%.lua")
 box.info.vclock
 require('fio').glob(name .. "/*.xlog")
---# stop server panic
---# start server panic
+test_run:cmd("restart server panic")
 --
 -- after restart: our LSN is the LSN of the
 -- last *written* row, all the failed
@@ -53,12 +54,12 @@ s = box.space._schema
 --
 -- now do the same
 --
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i=1,box.cfg.rows_per_wal do
     status, msg = pcall(s.replace, s, {"key"})
     table.insert(t, msg)
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 t
 box.info.vclock
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
@@ -75,8 +76,7 @@ s:replace{'key', 'test 2'}
 -- recorded in the last row
 --
 box.info.vclock
---# stop server panic
---# start server panic
+test_run:cmd("restart server panic")
 box.info.vclock
 box.space._schema:select{'key'}
 -- list all the logs
@@ -84,11 +84,11 @@ name = string.match(arg[0], "([^,]+)%.lua")
 require('fio').glob(name .. "/*.xlog")
 -- now insert 10 rows - so that the next
 -- row will need to switch the WAL
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i=1,box.cfg.rows_per_wal do
     box.space._schema:replace{"key", 'test 3'}
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 -- the next insert should switch xlog, but aha - it fails
 -- a new xlog file is created but has 0 rows
 require('fio').glob(name .. "/*.xlog")
@@ -106,9 +106,8 @@ box.space._schema:replace{"key", 'test 4'}
 box.info.vclock
 require('fio').glob(name .. "/*.xlog")
 -- restart is ok
---# stop server panic
---# start server panic
+test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
---# stop server panic
---# cleanup server panic
---# set connection default
+test_run:cmd('switch default')
+test_run:cmd("stop server panic")
+test_run:cmd("cleanup server panic")

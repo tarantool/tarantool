@@ -1,6 +1,8 @@
 --
 -- Insert test
 --
+env = require('test_run')
+test_run = env.new()
 space = box.schema.space.create('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
 i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str', 2, 'str', 3, 'num'}, unique = true })
@@ -128,12 +130,12 @@ space:insert{'c', 'c', 'c'}
 
 t = {}
 gen, param, state = space.index['second']:pairs(nil, { iterator = box.index.GE })
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, 2 do
     state, v = gen(param, state)
     table.insert(t, v)
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 t
 space:truncate()
@@ -147,12 +149,12 @@ collectgarbage('collect')
 v
 
 t = {}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, 3 do
     param, v = gen(param, state)
     table.insert(t, v)
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 t
 space:drop()
 space = nil
@@ -172,7 +174,7 @@ space:drop()
 space = box.schema.space.create('test')
 i1 = space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
 i2 = space:create_index('second', { type  = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for i = 1, 100 do
     v = tostring(i)
     space:insert{v, string.rep(v, 2) , string.rep(v, 3)}
@@ -188,7 +190,7 @@ while pk:len() > 0 do
         space:delete(key)
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 space:drop()
 
 space = nil

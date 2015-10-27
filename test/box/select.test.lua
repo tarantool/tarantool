@@ -1,11 +1,13 @@
 msgpack = require('msgpack')
+env = require('test_run')
+test_run = env.new()
 
 s = box.schema.space.create('select', { temporary = true })
 index1 = s:create_index('primary', { type = 'tree' })
 index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 local function test_op(op, idx, ...)
     local t1 = idx[op .. '_ffi'](idx, ...)
     local t2 = idx[op .. '_luac'](idx, ...)
@@ -16,8 +18,8 @@ local function test_op(op, idx, ...)
 end
 test = setmetatable({}, {
     __index = function(_, op) return function(...) return test_op(op, ...) end end
-})
---# setopt delimiter ''
+});
+test_run:cmd("setopt delimiter ''");
 
 
 --------------------------------------------------------------------------------
