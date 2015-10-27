@@ -53,7 +53,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row= (struct xrow_header *)
-		region_alloc_ex(&fiber()->gc, sizeof(struct xrow_header));
+		region_alloc_xc(&fiber()->gc, sizeof(struct xrow_header));
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
 	row->server_id = 0;
@@ -75,7 +75,7 @@ txn_stmt_new(struct txn *txn)
 		stmt = &txn->first_stmt;
 	} else {
 		stmt = (struct txn_stmt *)
-			region_alloc_ex(&fiber()->gc, sizeof(struct txn_stmt));
+			region_alloc_xc(&fiber()->gc, sizeof(struct txn_stmt));
 	}
 
 	/* Initialize members explicitly to save time on memset() */
@@ -96,7 +96,7 @@ txn_begin(bool autocommit)
 {
 	assert(! in_txn());
 	struct txn *txn = (struct txn *)
-		region_alloc_ex(&fiber()->gc, sizeof(*txn));
+		region_alloc_xc(&fiber()->gc, sizeof(*txn));
 	/* Initialize members explicitly to save time on memset() */
 	txn->stmt = NULL;
 	/* first_stmt initialized by txn_stmt_new() */
@@ -149,7 +149,7 @@ txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_rows > 0);
 	struct wal_request *req = (struct wal_request *)
-		region_alloc_ex(&fiber()->gc, sizeof(struct wal_request) +
+		region_alloc_xc(&fiber()->gc, sizeof(struct wal_request) +
 				sizeof(struct xrow_header) * txn->n_rows);
 	req->n_rows = 0;
 

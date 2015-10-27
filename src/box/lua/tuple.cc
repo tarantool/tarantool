@@ -117,7 +117,7 @@ lbox_tuple_new(lua_State *L)
 	mpstream_flush(&stream);
 
 	size_t tuple_len = region_used(gc) - guard.used;
-	const char *data = (char *) region_join_ex(gc, tuple_len);
+	const char *data = (char *) region_join_xc(gc, tuple_len);
 	struct tuple *tuple = tuple_new(tuple_format_ber, data, data + tuple_len);
 	lbox_pushtuple(L, tuple);
 	return 1;
@@ -246,7 +246,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
 	mpstream_flush(&stream);
 	*p_len = region_used(gc) - used;
-	return (char *) region_join_ex(gc, *p_len);
+	return (char *) region_join_xc(gc, *p_len);
 }
 
 /**
@@ -330,7 +330,7 @@ lbox_tuple_transform(struct lua_State *L)
 
 	/* Execute tuple_update */
 	size_t expr_len = region_used(gc) - guard.used;
-	const char *expr = (char *) region_join_ex(gc, expr_len);
+	const char *expr = (char *) region_join_xc(gc, expr_len);
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       region_alloc_ex_cb,
 					       gc, tuple, expr,

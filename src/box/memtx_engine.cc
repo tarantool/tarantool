@@ -1050,7 +1050,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
 	entry = (struct checkpoint_entry *)
-		region_alloc_ex(&fiber()->gc, sizeof(*entry));
+		region_alloc_xc(&fiber()->gc, sizeof(*entry));
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
@@ -1091,7 +1091,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 	assert(m_checkpoint == 0);
 
 	m_checkpoint = (struct checkpoint *)
-		region_alloc_ex(&fiber()->gc, sizeof(*m_checkpoint));
+		region_alloc_xc(&fiber()->gc, sizeof(*m_checkpoint));
 
 	checkpoint_init(m_checkpoint, ::recovery, lsn);
 	space_foreach(checkpoint_add_space, m_checkpoint);
@@ -1232,7 +1232,7 @@ memtx_index_extent_alloc()
 		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 			       "mempool", "new slab")
 		    );
-	return mempool_alloc_ex(&memtx_index_extent_pool);
+	return mempool_alloc_xc(&memtx_index_extent_pool);
 }
 
 /**
@@ -1257,7 +1257,7 @@ memtx_index_extent_reserve(int num)
 			       "mempool", "new slab")
 		    );
 	while (memtx_index_num_reserved_extents < num) {
-		void *ext = mempool_alloc_ex(&memtx_index_extent_pool);
+		void *ext = mempool_alloc_xc(&memtx_index_extent_pool);
 		*(void **)ext = memtx_index_reserved_extents;
 		memtx_index_reserved_extents = ext;
 		memtx_index_num_reserved_extents++;

@@ -67,7 +67,7 @@ port_buf_add_tuple(struct port *port, struct tuple *tuple)
 		port_buf->first = port_buf->last = e;
 	} else {
 		e = (struct port_buf_entry *)
-			mempool_alloc_ex(&port_buf_entry_pool); /* throws */
+			mempool_alloc_xc(&port_buf_entry_pool); /* throws */
 		try {
 			tuple_ref(tuple); /* throws */
 		} catch (Exception *) {

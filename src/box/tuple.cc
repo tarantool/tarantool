@@ -773,7 +773,7 @@ box_tuple_iterator(box_tuple_t *tuple)
 	struct tuple_iterator *it;
 	try {
 		it = (struct tuple_iterator *)
-			mempool_alloc0_ex(&tuple_iterator_pool);
+			mempool_alloc0_xc(&tuple_iterator_pool);
 	} catch (Exception *e) {
 		return NULL;
 	}

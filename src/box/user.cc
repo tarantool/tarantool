@@ -186,7 +186,7 @@ user_grant_priv(struct user *user, struct priv_def *def)
 	struct priv_def *old = privset_search(&user->privs, def);
 	if (old == NULL) {
 		old = (struct priv_def *)
-			region_alloc_ex(&user->pool, sizeof(struct priv_def));
+			region_alloc_xc(&user->pool, sizeof(struct priv_def));
 		*old = *def;
 		privset_insert(&user->privs, old);
 	} else {

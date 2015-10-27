@@ -70,7 +70,7 @@ struct iobuf *
 iobuf_new_mt(struct slab_cache *slabc_out)
 {
 	struct iobuf *iobuf;
-	iobuf = (struct iobuf *) mempool_alloc_ex(&iobuf_pool);
+	iobuf = (struct iobuf *) mempool_alloc_xc(&iobuf_pool);
 	/* Note: do not allocate memory upfront. */
 	ibuf_create(&iobuf->in, &cord()->slabc, iobuf_readahead);
 	obuf_create(&iobuf->out, slabc_out, iobuf_readahead);

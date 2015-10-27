@@ -75,7 +75,7 @@ struct session *
 session_create(int fd, uint64_t cookie)
 {
 	struct session *session = (struct session *)
-		mempool_alloc_ex(&session_pool);
+		mempool_alloc_xc(&session_pool);
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;

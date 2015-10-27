@@ -389,7 +389,7 @@ lua_msgpack_encode(lua_State *L)
 	mpstream_flush(&stream);
 
 	size_t len = region_used(gc) - guard.used;
-	const char *res = (char *) region_join_ex(gc, len);
+	const char *res = (char *) region_join_xc(gc, len);
 
 	lua_pushlstring(L, res, len);
 	return 1;

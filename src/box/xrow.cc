@@ -111,7 +111,7 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		   size_t fixheader_len)
 {
 	/* allocate memory for sign + header */
-	out->iov_base = region_alloc_ex(&fiber()->gc, HEADER_LEN_MAX +
+	out->iov_base = region_alloc_xc(&fiber()->gc, HEADER_LEN_MAX +
 					fixheader_len);
 	char *data = (char *) out->iov_base + fixheader_len;
 
@@ -192,7 +192,7 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	memset(packet, 0, sizeof(*packet));
 
 	size_t buf_size = BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
-	char *buf = (char *) region_alloc_ex(&fiber()->gc, buf_size);
+	char *buf = (char *) region_alloc_xc(&fiber()->gc, buf_size);
 
 	char *d = buf;
 	d = mp_encode_map(d, password != NULL ? 2 : 1);
@@ -266,7 +266,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 	uint32_t cluster_size = vclock_size(vclock);
 	size_t size = BODY_LEN_MAX + cluster_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc_ex(&fiber()->gc, size);
+	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
@@ -364,7 +364,7 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *server_uuid)
 	memset(row, 0, sizeof(*row));
 
 	size_t size = 64;
-	char *buf = (char *) region_alloc_ex(&fiber()->gc, size);
+	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
@@ -387,7 +387,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	uint32_t cluster_size = vclock_size(vclock);
 	size_t size = 8 + cluster_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc_ex(&fiber()->gc, size);
+	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);

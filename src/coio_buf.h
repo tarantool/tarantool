@@ -42,7 +42,7 @@
 static inline ssize_t
 coio_bread(struct ev_io *coio, struct ibuf *buf, size_t sz)
 {
-	ibuf_reserve_ex(buf, sz);
+	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_read_ahead(coio, buf->wpos, sz, ibuf_unused(buf));
 	buf->wpos += n;
 	return n;
@@ -57,7 +57,7 @@ static inline ssize_t
 coio_bread_timeout(struct ev_io *coio, struct ibuf *buf, size_t sz,
 		   ev_tstamp timeout)
 {
-	ibuf_reserve_ex(buf, sz);
+	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_read_ahead_timeout(coio, buf->wpos, sz, ibuf_unused(buf),
 			                    timeout);
 	buf->wpos += n;
@@ -68,7 +68,7 @@ coio_bread_timeout(struct ev_io *coio, struct ibuf *buf, size_t sz,
 static inline ssize_t
 coio_breadn(struct ev_io *coio, struct ibuf *buf, size_t sz)
 {
-	ibuf_reserve_ex(buf, sz);
+	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_readn_ahead(coio, buf->wpos, sz, ibuf_unused(buf));
 	buf->wpos += n;
 	return n;
@@ -83,7 +83,7 @@ static inline ssize_t
 coio_breadn_timeout(struct ev_io *coio, struct ibuf *buf, size_t sz,
 		    ev_tstamp timeout)
 {
-	ibuf_reserve_ex(buf, sz);
+	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_readn_ahead_timeout(coio, buf->wpos, sz, ibuf_unused(buf),
 			                     timeout);
 	buf->wpos += n;
