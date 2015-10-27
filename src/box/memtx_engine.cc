@@ -324,7 +324,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	 * Allocate enough memory to store the key.
 	 */
 	uint32_t key_len = request->tuple_end - request->tuple;
-	char *key = (char *) region_alloc(&fiber()->gc, key_len);
+	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
 	key_len = key_create_from_tuple(pk->key_def, request->tuple,
 					key, key_len);
 
