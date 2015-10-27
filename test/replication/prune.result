@@ -1,0 +1,137 @@
+env = require('test_run')
+---
+...
+test_run = env.new('127.0.0.1', 8080)
+---
+...
+replica_set = require('fast_replica')
+---
+...
+fiber = require('fiber')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+-- Create space and fill it
+space = box.schema.create_space('test')
+---
+...
+index = box.space.test:create_index('primary')
+---
+...
+for i=1,10 do  space:insert{i, 'test'} end
+---
+...
+-- create max number of replicas and check
+replica_set.join(test_run, 30)
+---
+...
+while #box.space._cluster:select{} ~= 31 do fiber.sleep(0.001) end
+---
+...
+#box.space._cluster:select{}
+---
+- 31
+...
+#box.info.vclock
+---
+- 31
+...
+-- try to add one more replica
+uuid = require('uuid')
+---
+...
+box.space._cluster:insert{#box.info.vclock + 1, uuid.str()}
+---
+- error: 'Replica count limit reached: 32'
+...
+-- Delete all replication nodes
+replica_set.drop_all(test_run)
+---
+...
+#box.space._cluster:select{}
+---
+- 1
+...
+#box.info.vclock
+---
+- 1
+...
+-- restart and check
+box.snapshot()
+---
+- ok
+...
+test_run:cmd('restart server default')
+replica_set = require('fast_replica')
+---
+...
+fiber = require('fiber')
+---
+...
+-- Rejoin 30 new nodes and check
+replica_set.join(test_run, 30)
+---
+...
+while #box.space._cluster:select{} ~= 31 do fiber.sleep(0.001) end
+---
+...
+-- Check server ids
+test = {}
+---
+...
+test_run:cmd('setopt delimiter ";"')
+---
+- true
+...
+for i=1,30 do
+    test[i] = test_run:cmd('eval replica' .. tostring(i) .. ' "return box.info.server.id"')
+end;
+---
+...
+test_run:cmd('setopt delimiter ""');
+---
+- true
+...
+test
+---
+- - '{"result": [2]}'
+  - '{"result": [3]}'
+  - '{"result": [4]}'
+  - '{"result": [5]}'
+  - '{"result": [6]}'
+  - '{"result": [7]}'
+  - '{"result": [8]}'
+  - '{"result": [9]}'
+  - '{"result": [10]}'
+  - '{"result": [11]}'
+  - '{"result": [12]}'
+  - '{"result": [13]}'
+  - '{"result": [14]}'
+  - '{"result": [15]}'
+  - '{"result": [16]}'
+  - '{"result": [17]}'
+  - '{"result": [18]}'
+  - '{"result": [19]}'
+  - '{"result": [20]}'
+  - '{"result": [21]}'
+  - '{"result": [22]}'
+  - '{"result": [23]}'
+  - '{"result": [24]}'
+  - '{"result": [25]}'
+  - '{"result": [26]}'
+  - '{"result": [27]}'
+  - '{"result": [28]}'
+  - '{"result": [29]}'
+  - '{"result": [30]}'
+  - '{"result": [31]}'
+...
+#box.space._cluster:select{}
+---
+- 31
+...
+#box.info.vclock
+---
+- 31
+...
