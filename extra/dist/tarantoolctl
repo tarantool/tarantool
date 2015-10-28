@@ -400,7 +400,6 @@ local function wrapper_cfg(cfg)
     if cfg.background == nil then
         cfg.background = true
     end
-    cfg.custom_proc_title = instance_name
 
     mk_default_dirs(cfg)
     local res = orig_cfg(cfg)
@@ -448,6 +447,10 @@ end
 function start()
     log.info("Starting instance...")
     box.cfg = wrapper_cfg
+    require('proc_title').update{
+        script_name = instance_name,
+        __defer_update = true
+    }
     local success, data = pcall(dofile, instance_path)
     -- if load fails - show last 10 lines of the log file
     if not success then

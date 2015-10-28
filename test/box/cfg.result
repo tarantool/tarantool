@@ -24,7 +24,7 @@ cfg_filter(box.cfg)
   slab_alloc_factor: 1.1
   rows_per_wal: 50
   background: false
-  snapshot_period: 0
+  readahead: 16320
   sophia:
     page_size: 131072
     memory_limit: 0
@@ -38,10 +38,9 @@ cfg_filter(box.cfg)
   wal_mode: write
   panic_on_snap_error: true
   panic_on_wal_error: true
+  snapshot_period: 0
   slab_alloc_arena: 0.1
-  custom_proc_title: box
   log_level: 5
-  readahead: 16320
   wal_dir_rescan_delay: 2
 ...
 -- must be read-only
@@ -57,7 +56,7 @@ cfg_filter(box.cfg)
   slab_alloc_factor: 1.1
   rows_per_wal: 50
   background: false
-  snapshot_period: 0
+  readahead: 16320
   sophia:
     page_size: 131072
     memory_limit: 0
@@ -71,10 +70,9 @@ cfg_filter(box.cfg)
   wal_mode: write
   panic_on_snap_error: true
   panic_on_wal_error: true
+  snapshot_period: 0
   slab_alloc_arena: 0.1
-  custom_proc_title: box
   log_level: 5
-  readahead: 16320
   wal_dir_rescan_delay: 2
 ...
 -- check that cfg with unexpected parameter fails.
