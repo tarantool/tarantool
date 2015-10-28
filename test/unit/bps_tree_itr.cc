@@ -416,6 +416,9 @@ itr_freeze_check()
 			e.first = rand() % test_data_mod;
 			e.second = 0;
 			bps_tree_test_insert(&tree, e, 0);
+			int check = bps_tree_test_debug_check(&tree);
+			fail_if(check);
+			assert(check == 0);
 		}
 		struct bps_tree_test_iterator itr = bps_tree_test_itr_first(&tree);
 		elem_t *e;
@@ -432,6 +435,9 @@ itr_freeze_check()
 			e.first = rand() % test_data_mod;
 			e.second = 0;
 			bps_tree_test_insert(&tree, e, 0);
+			int check = bps_tree_test_debug_check(&tree);
+			fail_if(check);
+			assert(check == 0);
 		}
 		int tested_count = 0;
 		while ((e = bps_tree_test_itr_get_elem(&tree, &itr1))) {
@@ -450,6 +456,9 @@ itr_freeze_check()
 			e.first = rand() % test_data_mod;
 			e.second = 0;
 			bps_tree_test_delete(&tree, e);
+			int check = bps_tree_test_debug_check(&tree);
+			fail_if(check);
+			assert(check == 0);
 		}
 
 		tested_count = 0;
