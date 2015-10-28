@@ -99,7 +99,9 @@ extern char strict_lua[],
 	csv_lua[],
 	v_lua[],
 	clock_lua[],
-	p_lua[], zone_lua[];
+	proc_title_lua[],
+	p_lua[], /* LuaJIT 2.1 profiler */
+	zone_lua[] /* LuaJIT 2.1 profiler */;
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
@@ -118,6 +120,7 @@ static const char *lua_modules[] = {
 	"clock", clock_lua,
 	"socket", socket_lua,
 	"console", console_lua,
+	"proc_title", proc_title_lua,
 	"tap", tap_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
