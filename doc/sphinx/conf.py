@@ -89,3 +89,9 @@ rst_epilog = """
 
     <br />
 """
+
+def setup(sphinx):
+    sys.path.insert(0, os.path.abspath('./ext'))
+    from LuaLexer import LuaLexer
+    sphinx.add_lexer("lua_tarantool", LuaLexer())
+  
