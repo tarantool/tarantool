@@ -76,27 +76,25 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
                     Example
 =================================================
 
-.. code-block:: lua
-
-    tarantool> uuid = require('uuid')
-    ---
-    ...
-    tarantool> uuid(), uuid.bin(), uuid.str()
-    ---
-    - 16ffedc8-cbae-4f93-a05e-349f3ab70baa
-    - !!binary FvG+Vy1MfUC6kIyeM81DYw==
-    - 67c999d2-5dce-4e58-be16-ac1bcb93160f
-    ...
-    tarantool> uu = uuid()
-    ---
-    ...
-    tarantool> #uu:bin(), #uu:str(), type(uu), uu:isnil()
-    ---
-    - 16
-    - 36
-    - cdata
-    - false
-    ...
+| :codenormal:`tarantool>` :codebold:`uuid = require('uuid')`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`uuid(), uuid.bin(), uuid.str()`
+| :codenormal:`---`
+| :codenormal:`- 16ffedc8-cbae-4f93-a05e-349f3ab70baa`
+| :codenormal:`- !!binary FvG+Vy1MfUC6kIyeM81DYw==`
+| :codenormal:`- 67c999d2-5dce-4e58-be16-ac1bcb93160f`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`uu = uuid()`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`#uu:bin(), #uu:str(), type(uu), uu:isnil()`
+| :codenormal:`---`
+| :codenormal:`- 16`
+| :codenormal:`- 36`
+| :codenormal:`- cdata`
+| :codenormal:`- false`
+| :codenormal:`...``
 
 .. _Universally unique identifier: https://en.wikipedia.org/wiki/Universally_unique_identifier
 .. _syscall: https://en.wikipedia.org/wiki/Syscall
