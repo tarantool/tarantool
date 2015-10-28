@@ -363,23 +363,23 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})`
 
 
-    .. function:: upsert(key, {{operator, field_no, value}, ...}, {tuple})
+    .. function:: upsert(tuple_value, {{operator, field_no, value}, ...}, )
 
         Update or insert a tuple.
 
-        If there is an existing tuple which matches :code:`key`, then the
+        If there is an existing tuple which matches the key fields of :code:`tuple_value`, then the
         request has the same effect as :ref:`update <box_update>` and the
         :code:`{{operator, field_no, value}, ...}` parameter is used.
-        If there is no existing tuple which matches :code:`key`, then the
+        If there is no existing tuple which matches the key fields of :code:`tuple_value`, then the
         request has the same effect as :ref:`insert <box_insert>` and the
-        :code:`{tuple}` parameter is used. However, unlike :code:`insert` or
+        :code:`{tuple_value}` parameter is used. However, unlike :code:`insert` or
         :code:`update`, :code:`upsert` will not read a tuple and perform
         error checks before returning -- this is a design feature which
         enhances throughput but requires more caution on the part of the user.
 
         :param space_object space-object:
-        :param lua-value key: primary-key field values, must be passed as a Lua
-                              table if key is multi-part
+        :param lua-value tuple_value: field values, must be passed as a Lua
+                              table if tuple_value contains more than one field
         :param table {operator, field_no, value}: a group of arguments for each
                 operation, indicating what the operation is, what field the
                 operation will apply to, and what value will be applied. The
@@ -388,15 +388,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: null.
 
-
-        Possible errors: it is illegal to modify a primary-key field.
-
         Complexity Factors: Index size, Index type, number of indexes accessed, WAL
         settings.
 
         | :codebold:`Example:`
         |
-        | :codenormal:`tarantool>` :codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
+        | :codenormal:`tarantool>` :codebold:`box.space.tester:upsert({12,'c'},{{'=',3,'a'},{'=',4,'b'}})`
 
 
     .. function:: delete(key)
