@@ -209,27 +209,34 @@ evio_service_accept_cb(ev_io *watcher,
 		       int revents __attribute__((unused)))
 {
 	struct evio_service *service = (struct evio_service *) watcher->data;
-	int fd = -1;
 
-	try {
-		struct sockaddr_in addr;
-		socklen_t addrlen = sizeof(addr);
-		fd = sio_accept(service->ev.fd, &addr, &addrlen);
-
-		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
-			return;
-		/* set common tcp options */
-		evio_setsockopt_client(fd, SOCK_STREAM);
+	while (1) {
 		/*
-		 * Invoke the callback and pass it the accepted
-		 * socket.
+		 * Accept all pending connections from backlog during event
+		 * loop iteration. Significally speed up acceptor with enabled
+		 * io_collect_interval.
 		 */
-		service->on_accept(service, fd, &addr);
+		int fd = -1;
+		try {
+			struct sockaddr_in addr;
+			socklen_t addrlen = sizeof(addr);
+			fd = sio_accept(service->ev.fd, &addr, &addrlen);
 
-	} catch (const Exception& e) {
-		if (fd >= 0)
-			close(fd);
-		e.log();
+			if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
+				return;
+			/* set common tcp options */
+			evio_setsockopt_client(fd, SOCK_STREAM);
+			/*
+			 * Invoke the callback and pass it the accepted
+			 * socket.
+			 */
+			service->on_accept(service, fd, &addr);
+		} catch (const Exception& e) {
+			if (fd >= 0)
+				close(fd);
+			e.log();
+			return;
+		}
 	}
 }
 
