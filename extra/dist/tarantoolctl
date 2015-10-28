@@ -125,7 +125,6 @@ struct group{
 };
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
-int strlen(char*);
 ]]
 
 local available_commands = {
@@ -292,10 +291,19 @@ function load_default_file(default_file)
         end
         -- get user data
         local user_data = ffi.C.getpwnam(ffi.cast('const char*', d.username))
+        if user_data == nil then
+            log.error('Unknown user: %s', d.username)
+            os.exit(-1)
+        end
 
         -- get group data
         local group = ffi.C.getgrgid(user_data.pw_gid)
-        group_name = ffi.string(group.gr_name, ffi.C.strlen(group.gr_name))
+        if group == nil then
+            log.error('Group lookup by gid failed: %d',
+                      user_data.pw_gid)
+            os.exit(-1)
+        end
+        group_name = ffi.string(group.gr_name)
     end
 
     if instance_dir == nil then
