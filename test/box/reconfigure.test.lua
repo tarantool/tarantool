@@ -30,7 +30,6 @@ box.snapshot()
 -- log level
 box.cfg{log_level=5}
 -- constants
-box.cfg{custom_proc_title="custom proc title"}
 box.cfg{wal_dir="dynamic"}
 box.cfg{snap_dir="dynamic"}
 box.cfg{logger="new logger"}

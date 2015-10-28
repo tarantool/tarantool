@@ -137,7 +137,10 @@ local dynamic_cfg = {
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
     -- do nothing, affects new replicas, which query this value on start
-    wal_dir_rescan_delay    = function() end
+    wal_dir_rescan_delay    = function() end,
+    custom_proc_title       = function()
+        require('proc_title').update(box.cfg.custom_proc_title)
+    end
 }
 
 local dynamic_cfg_skip_at_load = {
@@ -146,6 +149,7 @@ local dynamic_cfg_skip_at_load = {
     replication_source      = true,
     wal_dir_rescan_delay    = true,
     panic_on_wal_error      = true,
+    custom_proc_title       = true,
 }
 
 local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
