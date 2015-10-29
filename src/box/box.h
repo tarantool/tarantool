@@ -244,8 +244,6 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
  *
  * \param space_id space identifier
  * \param index_id index identifier
- * \param key encoded key in MsgPack Array format ([part1, part2, ...]).
- * \param key_end the end of encoded \a key.
  * \param ops encoded operations in MsgPack Arrat format, e.g.
  * [ [ '=', field_id,  value ],  ['!', 2, 'xxx'] ]
  * \param ops_end the end of encoded \a ops
