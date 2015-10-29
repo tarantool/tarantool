@@ -1,6 +1,8 @@
 fio = require 'fio'
 errno = require 'errno'
 fiber = require 'fiber'
+env = require('test_run')
+test_run = env.new()
 
 
 PERIOD = 0.03
@@ -27,7 +29,7 @@ for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
 
 -- wait for last snapshot
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 
 for i = 1, 100 do
     fiber.sleep(PERIOD)
@@ -39,7 +41,7 @@ for i = 1, 100 do
     end
 end;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 
 

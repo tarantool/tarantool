@@ -1,8 +1,10 @@
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
+
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 i = 1;
 while true do
     space:insert{space:len(), string.rep('test', i)}
@@ -20,7 +22,7 @@ while true do
     space:insert{space:len(), string.rep('test', i)}
     i = i + 1
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 space:len()
 space.index['primary']:get{0}
 space.index['primary']:get{5}
@@ -30,7 +32,7 @@ space.index['primary']:get{15}
 -- check that iterators work
 i = 0
 t = {}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 for state, v in space:pairs() do
     table.insert(t, v)
     i = i + 1
@@ -38,7 +40,7 @@ for state, v in space:pairs() do
         break
     end
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 t
 space:truncate()
 space:insert{0, 'test'}
@@ -49,7 +51,7 @@ collectgarbage('collect')
 --
 space:truncate()
 function insert(a) space:insert(a) end
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function dup_key()
     box.begin()
     space:insert{1}
@@ -67,7 +69,7 @@ function dup_key()
     box.commit()
     return i
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 dup_key()
 space:select{}
 --
@@ -77,8 +79,7 @@ space:drop()
 t = nil
 
 -- https://github.com/tarantool/tarantool/issues/962 index:delete() failed
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 arena_bytes = box.cfg.slab_alloc_arena * 1024 * 1024 * 1024
 str = string.rep('a', 15000) -- about size of index memory block
 

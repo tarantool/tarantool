@@ -10,8 +10,13 @@ os.execute("rm -f " .. name .."/*.xlog")
 ---
 - 0
 ...
---# stop server default
---# start server default
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('restart server default')
 name = string.match(arg[0], "([^,]+)%.lua")
 ---
 ...
@@ -32,8 +37,7 @@ box.snapshot()
 ---
 - ok
 ...
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 name = string.match(arg[0], "([^,]+)%.lua")
 ---
 ...

@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 --
 -- Access control tests which require a binary protocol
 -- connection to the server
@@ -35,8 +37,7 @@ c:close()
 -- _func space recovered after _user space, so setuid option can be
 -- handled incorrectly
 box.snapshot()
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 remote = require('net.box')
 session = box.session
 setuid_func = function() return box.space.setuid_space:auto_increment{} end

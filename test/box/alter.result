@@ -7,6 +7,12 @@ _index = box.space[box.schema.INDEX_ID]
 ADMIN = 1
 ---
 ...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
@@ -224,8 +230,7 @@ box.snapshot()
 ---
 - ok
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 ADMIN = 1
 ---
 ...
@@ -427,7 +432,10 @@ s:drop()
 -- ------------------------------------------------------------------
 -- gh-155 Tarantool failure on simultaneous space:drop()
 -- ------------------------------------------------------------------
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 local fiber = require('fiber')
 local W = 4
 local N = 50
@@ -446,6 +454,6 @@ end
 for i=1,W do
     ch:get()
 end
+test_run:cmd("setopt delimiter ''");
 ---
 ...
---# setopt delimiter ''

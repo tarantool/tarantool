@@ -5,8 +5,9 @@ name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("rm -f " .. name .."/*.snap")
 os.execute("rm -f " .. name .."/*.xlog")
 
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("touch " .. name .."/lock")
@@ -20,8 +21,7 @@ space = box.schema.space.create('test', { engine = 'sophia' })
 index = space:create_index('primary')
 for key = 500, 1000 do space:insert({key}) end
 
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("rm -f " .. name .."/lock")

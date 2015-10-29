@@ -25,5 +25,8 @@
     expirationd
     shard
     tarantool
+    jit
+    strict
+    csv
     capi
 

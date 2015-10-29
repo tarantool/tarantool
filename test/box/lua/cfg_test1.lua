@@ -6,3 +6,4 @@ box.cfg{
 }
 
 require('console').listen(os.getenv('ADMIN'))
+box.schema.user.grant('guest', 'read,write,execute', 'universe')

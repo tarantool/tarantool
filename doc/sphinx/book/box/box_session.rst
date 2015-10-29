@@ -30,6 +30,14 @@ client connection.
              and port.
     :rtype:  string
 
+.. function:: sync()
+
+    :return: the value of the :code:`sync` integer constant used in the
+             `binary protocol
+             <https://github.com/tarantool/tarantool/blob/master/src/box/iproto_constants.h>`_.
+
+    :rtype:  number
+
 .. data:: storage
 
     A Lua table that can hold arbitrary unordered session-specific

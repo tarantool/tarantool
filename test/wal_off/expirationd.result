@@ -2,6 +2,12 @@ fiber = require('fiber')
 ---
 ...
 -- test for expirationd. iterator must continue iterating after space insert/delete
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 s0 = box.schema.space.create('tweedledum')
 ---
 ...
@@ -12,7 +18,10 @@ s0:insert{20000}
 ---
 - [20000]
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 for i = 1, 10000 do
 	a = math.floor(math.random() * 10000)
     s0:replace{a}
@@ -53,7 +62,10 @@ hit_end;
 ---
 - true
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 s0:drop()
 ---
 ...

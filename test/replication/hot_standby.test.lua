@@ -1,15 +1,16 @@
---# set connection default
+env = require('test_run')
+test_run = env.new()
+
 box.schema.user.grant('guest', 'replication')
 box.schema.func.create('_set_pri_lsn')
 box.schema.user.grant('guest', 'execute', 'function', '_set_pri_lsn')
---# create server hot_standby with script='replication/hot_standby.lua', rpl_master=default
---# create server replica with rpl_master=default, script='replication/replica.lua'
---# start server hot_standby
---# start server replica
---# set connection default
+test_run:cmd("create server hot_standby with script='replication/hot_standby.lua', rpl_master=default")
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server hot_standby")
+test_run:cmd("start server replica")
 
---# setopt delimiter ';'
---# set connection default, hot_standby, replica
+test_run:cmd("setopt delimiter ';'")
+test_run:cmd("set connection default, hot_standby, replica")
 fiber = require('fiber');
 while box.info.server.id == 0 do fiber.sleep(0.01) end;
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
@@ -56,17 +57,17 @@ do
         begin_lsn = begin_lsn + _lsnd
     end
 end;
---# setopt delimiter ''
---# set connection hot_standby
+test_run:cmd("setopt delimiter ''");
+test_run:cmd("switch hot_standby")
 box.info.status
---# set connection default
+test_run:cmd("switch default")
 box.info.status
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
 -- set begin lsn on master, replica and hot_standby.
---# set variable replica_port to 'replica.listen'
+test_run:cmd("set variable replica_port to 'replica.listen'")
 REPLICA = require('uri').parse(tostring(replica_port))
 REPLICA ~= nil
 a = (require 'net.box'):new(REPLICA.host, REPLICA.service)
@@ -76,36 +77,36 @@ a:close()
 _insert(1, 10)
 _select(1, 10)
 
---# set connection replica
+test_run:cmd("switch replica")
 _wait_lsn(10)
 _select(1, 10)
 
---# stop server default
---# set connection hot_standby
+test_run:cmd("stop server default")
+test_run:cmd("switch hot_standby")
 while box.info.status ~= 'running' do fiber.sleep(0.001) end
---# set connection replica
+test_run:cmd("switch replica")
 
 -- hot_standby.listen is garbage, since hot_standby.lua
 -- uses MASTER environment variable for its listen
---# set variable hot_standby_port to 'hot_standby.master'
+test_run:cmd("set variable hot_standby_port to 'hot_standby.master'")
 HOT_STANDBY = require('uri').parse(tostring(hot_standby_port))
 HOT_STANDBY ~= nil
 a = (require 'net.box'):new(HOT_STANDBY.host, HOT_STANDBY.service)
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
---# set connection hot_standby
+test_run:cmd("switch hot_standby")
 _insert(11, 20)
 _select(11, 20)
 
---# set connection replica
+test_run:cmd("switch replica")
 _wait_lsn(10)
 _select(11, 20)
 
---# stop server hot_standby
---# stop server replica
---# cleanup server hot_standby
---# cleanup server replica
---# deploy server default
---# start server default
---# set connection default
+test_run:cmd("deploy server default")
+test_run:cmd("start server default")
+test_run:cmd("switch default")
+test_run:cmd("stop server hot_standby")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server hot_standby")
+test_run:cmd("cleanup server replica")

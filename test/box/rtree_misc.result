@@ -1,3 +1,9 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 s = box.schema.space.create('spatial')
 ---
 ...
@@ -275,8 +281,7 @@ i:select({0, 0}, {iterator = 'neighbor'})
   - [9, 9, [9, 9, 10, 10]]
   - [10, 10, [10, 10, 11, 11]]
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 s = box.space.spatial
 ---
 ...
@@ -328,8 +333,7 @@ i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
   - [9, 9, [9, 9, 9, 9, 10, 10, 10, 10]]
   - [10, 10, [10, 10, 10, 10, 11, 11, 11, 11]]
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 s = box.space.spatial
 ---
 ...
@@ -442,8 +446,7 @@ s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
   - [5, [0, 8]]
   - [3, [5, 5]]
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 s = box.space.spatial
 ---
 ...
@@ -462,8 +465,7 @@ box.snapshot()
 ---
 - ok
 ...
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 s = box.space.spatial
 ---
 ...

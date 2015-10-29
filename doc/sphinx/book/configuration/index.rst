@@ -26,6 +26,8 @@ Tarantool is started by entering the command:
 
     Print an annotated list of all available options and exit.
 
+.. _tarantool-version:
+
 .. option:: -V, --version
 
     Print product name and version, for example:

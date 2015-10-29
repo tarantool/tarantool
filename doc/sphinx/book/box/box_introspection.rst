@@ -33,19 +33,19 @@ access to those parameters.
 
 .. module:: box.info
 
-The ``box.info`` package provides access to information about server variables
--- ``pid``, ``uptime``, ``version`` and others.
+The ``box.info`` package provides access to information about server variables.
+Some important ones:
 
-**recovery_lag** holds the difference (in seconds) between the current time on
-the machine (wall clock time) and the time stamp of the last applied record.
-In replication setup, this difference can indicate the delay taking place
-before a change is applied to a replica.
+**server.uuid** holds the unique identifier of the server.
+This value is also in the :data:`box.space._cluster` system space.
 
-**recovery_last_update** is the wall clock time of the last change recorded in
-the write-ahead log. To convert it to human-readable time,
-you can use **date -d@** 1306964594.980.
+**pid** is the process ID of the server.
+This value is also shown by the :ref:`tarantool <tarantool-build>` package.
 
-**status** is either "primary" or "replica/<hostname>".
+**version** is the Tarantool version.
+This value is also shown by :ref:`tarantool --version <tarantool-version>`.
+
+**uptime** is the number of seconds since the server started.
 
 .. function:: box.info()
 
@@ -65,29 +65,17 @@ you can use **date -d@** 1306964594.980.
     | |nbsp| |nbsp| |nbsp| :codenormal:`ro: false`
     | |nbsp| |nbsp| |nbsp| :codenormal:`uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64`
     | |nbsp| :codenormal:`id: 1`
-    | |nbsp| :codenormal:`pid: 32561`
     | |nbsp| :codenormal:`version: 1.6.4-411-gcff798b`
+    | |nbsp| :codenormal:`pid: 32561`
     | |nbsp| :codenormal:`status: running`
     | |nbsp| :codenormal:`vclock: {1: 158}`
     | |nbsp| :codenormal:`replication:`
     | |nbsp| |nbsp| |nbsp| :codenormal:`status: off`
     | |nbsp| :codenormal:`uptime: 2778`
     | :codenormal:`...`
-
-.. data:: status
-          pid
-          version
-          ...
-
-    .. code-block:: lua
-
     | :codenormal:`tarantool>` :codebold:`box.info.pid`
     | :codenormal:`---`
     | :codenormal:`- 1747`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.logger_pid`
-    | :codenormal:`---`
-    | :codenormal:`- 1748`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`box.info.version`
     | :codenormal:`---`
@@ -100,14 +88,6 @@ you can use **date -d@** 1306964594.980.
     | :codenormal:`tarantool>` :codebold:`box.info.status`
     | :codenormal:`---`
     | :codenormal:`- running`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.recovery_lag`
-    | :codenormal:`---`
-    | :codenormal:`- 0.000`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.recovery_last_update`
-    | :codenormal:`---`
-    | :codenormal:`- 1306964594.980`
     | :codenormal:`...`
 
 =====================================================================

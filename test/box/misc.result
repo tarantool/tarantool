@@ -1,4 +1,13 @@
---# push filter 'table: .*' to 'table: <address>'
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("push filter 'table: .*' to 'table: <address>'")
+---
+- true
+...
 -- gh-266: box.info() crash on uncofigured box
 package.loaded['box.space'] == nil
 ---
@@ -71,8 +80,13 @@ t = nil
 ----------------
 -- # box.error
 ----------------
---# stop server default
---# start server default
+test_run:cmd("restart server default")
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
 box.error.last()
 ---
 - null
@@ -120,7 +134,10 @@ space = box.space.tweedledum
 t = {}
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 for k, v in pairs(box.stat()) do
     table.insert(t, k)
 end;
@@ -343,7 +360,10 @@ t;
   - 'box.error.NO_SUCH_PROC : 33'
   - 'box.error.FUNCTION_ACCESS_DENIED : 53'
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 -- A test case for Bug#901674
 -- No way to inspect exceptions from Box in Lua
 --
@@ -607,4 +627,7 @@ space:delete{1}
 space:drop()
 ---
 ...
---# clear filter
+test_run:cmd("clear filter")
+---
+- true
+...

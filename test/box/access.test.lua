@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 
 session = box.session
 -- user id for a Lua session is admin - 1
@@ -28,7 +30,7 @@ box.schema.space.create('test')
 session.su('admin')
 box.schema.user.grant('test', 'write', 'space', '_space')
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function usermax()
     local i = 1
     while true do
@@ -45,7 +47,7 @@ function usermax()
     end
 end;
 usermax();
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
 box.schema.user.grant('rich', 'read,write', 'universe')
 session.su('rich')
@@ -112,8 +114,7 @@ index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 s:drop()
 box.snapshot()
---# stop server default
---# start server default
+test_run:cmd('restart server default')
 box.schema.user.drop('testus')
 -- ------------------------------------------------------------
 -- a test case for gh-289

@@ -86,6 +86,8 @@ s_disabled:drop()
 s_withindex:drop()
 
 -- Check transaction rollback when out of memory
+env = require('test_run')
+test_run = env.new()
 
 s = box.schema.space.create('s')
 _ = s:create_index('pk')
@@ -96,7 +98,7 @@ s:auto_increment{}
 s:select{}
 s:auto_increment{}
 s:select{}
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 box.begin()
     s:insert{1}
 box.commit();
@@ -126,7 +128,7 @@ box.begin()
 box.commit();
 s:select{};
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 errinj.set("ERRINJ_TUPLE_ALLOC", false)
 
 -- gh-881 iproto request with wal IO error

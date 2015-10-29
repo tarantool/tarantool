@@ -1,3 +1,6 @@
+env = require('test_run')
+test_run = env.new()
+
 s = box.schema.space.create('spatial')
 
 -- rtree index as primary key must be forbidden (unique)
@@ -104,8 +107,9 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'arr
 for i = 1,10 do s:insert{i, i, {i, i, i + 1, i + 1}} end
 box.snapshot()
 i:select({0, 0}, {iterator = 'neighbor'})
---# stop server default
---# start server default
+
+test_run:cmd("restart server default")
+
 s = box.space.spatial
 i = s.index.spatial
 i:select({0, 0}, {iterator = 'neighbor'})
@@ -117,8 +121,9 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {3, 'arr
 for i = 1,10 do s:insert{i, i, {i, i, i, i, i + 1, i + 1, i + 1, i + 1}} end
 box.snapshot()
 i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
---# stop server default
---# start server default
+
+test_run:cmd("restart server default")
+
 s = box.space.spatial
 i = s.index.spatial
 i:select({0, 0, 0, 0}, {iterator = 'neighbor'})
@@ -149,14 +154,16 @@ s:insert{3, {5, 5}}
 s:insert{4, {8, 0}}
 s:insert{5, {0, 8}}
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
---# stop server default
---# start server default
+
+test_run:cmd("restart server default")
+
 s = box.space.spatial
 i = s.index.spatial
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
 box.snapshot()
---# stop server default
---# start server default
+
+test_run:cmd("restart server default")
+
 s = box.space.spatial
 i = s.index.spatial
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})

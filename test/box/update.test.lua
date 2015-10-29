@@ -139,8 +139,9 @@ box.tuple.new({1, 2, 3, 4, 5}):update({{'#', -100500, 1}})
 --
 -- #416: UPDATEs from Lua can't be properly restored due to one based indexing
 --
---# stop server default
---# start server default
+env = require('test_run')
+test_run = env.new()
+test_run:cmd('restart server default')
 
 s = box.space.tweedledum
 s:select{}

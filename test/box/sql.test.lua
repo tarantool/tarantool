@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 net_box = require('net.box')
 
 s = box.schema.space.create('test', { id = 0 })
@@ -23,8 +25,8 @@ space:select{1}
 space:select{0}
 space:select{2}
 
---# stop server default
---# start server default
+test_run:cmd('restart server default')
+
 net_box = require('net.box')
 conn = net_box:new('test:test@' .. box.cfg.listen)
 space = conn.space.test
@@ -33,8 +35,8 @@ space:select{1}
 box.snapshot()
 space:select{1}
 
---# stop server default
---# start server default
+test_run:cmd('restart server default')
+
 net_box = require('net.box')
 conn = net_box:new('test:test@' .. box.cfg.listen)
 space = conn.space.test

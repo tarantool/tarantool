@@ -1,6 +1,12 @@
 print('session.storage')
 ---
 ...
+env = require('test_run')
+---
+...
+test_run = env.new('localhost')
+---
+...
 session = box.session
 ---
 ...
@@ -33,8 +39,14 @@ dump(all)
 ---
 - '''[null,{"abc":"cde"}]'''
 ...
---# create connection second to default
---# set connection second
+test_run:cmd("create connection second to default")
+---
+- true
+...
+test_run:cmd("set connection second")
+---
+- true
+...
 type(session.storage)
 ---
 - table
@@ -50,17 +62,26 @@ session.storage.abc
 ---
 - def
 ...
---# set connection default
+test_run:cmd("set connection default")
+---
+- true
+...
 session.storage.abc
 ---
 - cde
 ...
---# set connection second
+test_run:cmd("set connection second")
+---
+- true
+...
 dump(all[session.id()])
 ---
 - '''{"abc":"def"}'''
 ...
---# set connection default
+test_run:cmd("set connection default")
+---
+- true
+...
 dump(all[session.id()])
 ---
 - '''{"abc":"cde"}'''
@@ -74,7 +95,10 @@ tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 ---
 ...
---# drop connection second
+test_run:cmd("drop connection second")
+---
+- true
+...
 require('fiber').sleep(.01)
 ---
 ...
