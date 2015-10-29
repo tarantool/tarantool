@@ -47,17 +47,17 @@ the preceding and following tokens are mutually exclusive alternatives.
 
 General form:
 
-    | :codenormal:`$` :codebold:`tarantool`
-    | OR
-    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-    | OR
-    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
+| :codenormal:`$` :codebold:`tarantool`
+| OR
+| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
+| OR
+| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
 :codebolditalic:`Lua-initialization-file` can be any script containing code for initializing.
 Effect: The code in the file is executed during startup. Example: ``init.lua``.
 Notes: If a script is used, there will be no prompt. The script should contain
-configuration information including "``box.cfg{...listen=...}``" or
-"``box.listen(...)``" so that a separate program can connect to the server via
+configuration information including ``box.cfg{...listen=...}`` or
+``box.listen(...)`` so that a separate program can connect to the server via
 one of the ports.
 
 Option is one of the following (in alphabetical order by the long form of the
@@ -117,7 +117,7 @@ The string-literal must be a value in single quotes. Effect: string becomes
 end-of-request delimiter, so newline alone is not treated as end of request.
 To go back to normal mode: :samp:`console.delimiter(''){string-literal}`. Example:
 
-.. code-block:: lua
+.. code-block:: lua_tarantool
 
     console = require('console'); console.delimiter('!')
     function f ()
@@ -133,33 +133,33 @@ In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of
 an interactive-mode tarantool client session:
 
-    | :codenormal:`$` :codebold:`tarantool`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display an introductory message`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`including version number here ]`
-    | :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display configuration information`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`here ]`
-    | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool may display an in-progress message here ]`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:insert{1,'My first tuple'}`
-    | :codenormal:`---`
-    | :codenormal:`- [1, 'My first tuple']`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
-    | :codenormal:`---`
-    | :codenormal:`- - [1, 'My first tuple']`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:drop()`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`os.exit()`
-    | :codenormal:`2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown`
-    | :codenormal:`$`
+| :codenormal:`$` :codebold:`tarantool`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display an introductory message`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`including version number here ]`
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display configuration information`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`here ]`
+| :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool may display an in-progress message here ]`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{1,'My first tuple'}`
+| :codenormal:`---`
+| :codenormal:`- [1, 'My first tuple']`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
+| :codenormal:`---`
+| :codenormal:`- - [1, 'My first tuple']`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:drop()`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`os.exit()`
+| :codenormal:`2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown`
+| :codenormal:`$`
 
 Explanatory notes about what tarantool displayed in the above example:
 
@@ -307,39 +307,30 @@ and there currently is no directory named :file:`tarantool_test`.
 
 Create a directory named /tarantool_test:
 
-.. code-block:: bash
 
-    sudo mkdir /tarantool_test
+| :codebold:`$ sudo mkdir /tarantool_test`
 
 Copy tarantoolctl to /tarantool_test. If you made a source
 download to ~/tarantool-master, then
 
-.. code-block:: bash
+| :codebold:`$ sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl`
 
-    sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
+If the file was named tarantoolctl and placed on :file:`/usr/bin/tarantoolctl`, then
 
-If the file was named tarantoolctl and placed on /usr/bin/tarantoolctl, then
+| :codebold:`$ sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl`
 
-.. code-block:: bash
-
-    sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl
-
-Check and possibly change the first line of /tarantool_test/tarantoolctl.
+Check and possibly change the first line of :file:`code/tarantool_test/tarantoolctl`.
 Initially it says
 
-.. code-block:: bash
-
-    #!/usr/bin/env tarantool
+| :codenormal:`#!/usr/bin/env tarantool`
 
 If that is not correct, edit tarantoolctl and change the line. For example,
-if the Tarantool server is actually on /home/user/tarantool-master/src/tarantool,
+if the Tarantool server is actually on :file:`/home/user/tarantool-master/src/tarantool`,
 change the line to
 
-.. code-block:: bash
+| :codebold:`#!/usr/bin/env /home/user/tarantool-master/src/tarantool`
 
-    #!/usr/bin/env /home/user/tarantool-master/src/tarantool
-
-Save a copy of /etc/sysconfig/tarantool, if it exists.
+Save a copy of :file:`/etc/sysconfig/tarantool`, if it exists.
 
 Edit /etc/sysconfig/tarantool. It might be necessary to say sudo mkdir /etc/sysconfig first. Let the new file contents be:
 
@@ -355,7 +346,7 @@ Edit /etc/sysconfig/tarantool. It might be necessary to say sudo mkdir /etc/sysc
     }
     instance_dir = "/tarantool_test"
 
-Make the my_app application file, that is, /tarantool_test/my_app.lua. Let the file contents be:
+Make the my_app application file, that is, :file:`/tarantool_test/my_app.lua`. Let the file contents be:
 
 .. code-block:: lua
 
@@ -375,50 +366,37 @@ Make the my_app application file, that is, /tarantool_test/my_app.lua. Let the f
 
 Tell tarantoolctl to start the application ...
 
-.. code-block:: bash
-
-    cd /tarantool_test
-    sudo ./tarantoolctl start my_app
+| :codebold:`$ cd /tarantool_test`
+| :codebold:`$ sudo ./tarantoolctl start my_app`
 
 ... expect to see messages indicating that the instance has started. Then ...
 
-.. code-block:: bash
-
-    ls -l /tarantool_test/my_app
+| :codebold:`$ ls -l /tarantool_test/my_app`
 
 ... expect to see the .snap file, .xlog file, and sophia directory. Then ...
 
-.. code-block:: bash
-
-    less /tarantool_test/log/my_app.log
+| :codebold:`$ less /tarantool_test/log/my_app.log`
 
 ... expect to see the contents of my_app's log, including error messages, if any. Then ...
 
-.. code-block:: bash
-
-    cd /tarantool_test
-    #assume that 'tarantool' invokes the tarantool server
-    sudo tarantool
-    box.cfg{}
-    console = require('console')
-    console.connect('localhost:3301')
-    box.space.tester:select({0},{iterator='GE'})
+| :codebold:`$ cd /tarantool_test`
+| :codenormal:`#assume that 'tarantool' invokes the tarantool server`
+| :codebold:`$ sudo tarantool`
+| :codebold:`$ box.cfg{}`
+| :codebold:`$ console = require('console')`
+| :codebold:`$ console.connect('localhost:3301')`
+| :codebold:`$ box.space.tester:select({0},{iterator='GE'})`
 
 ... expect to see several tuples that my_app has created.
 
 Stop. The only clean way to stop my_app is with tarantoolctl, thus:
 
+| :codebold:`$ sudo ./tarantoolctl stop my_app`
 
-.. code-block:: bash
+Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
 
-    sudo ./tarantoolctl stop my_app
-
-Clean up. Restore the original contents of /etc/sysconfig/tarantool, and ...
-
-.. code-block:: bash
-
-    cd /
-    sudo rm -R tarantool_test
+| :codebold:`$ cd /`
+| :codebold:`$ sudo rm -R tarantool_test`
 
 =====================================================================
             System-specific administration notes
@@ -433,16 +411,20 @@ particular Linux distribution.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Setting up an instance:
-``ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/``
+
+| :codebold:`$ ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/`
 
 Starting all instances:
-``service tarantool start``
+
+| :codebold:`$ service tarantool start`
 
 Stopping all instances:
-``service tarantool stop``
+
+| :codebold:`$ service tarantool stop`
 
 Starting/stopping one instance:
-``service tarantool-instance-name start/stop``
+
+| :codebold:`$ service tarantool-instance-name start/stop`
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

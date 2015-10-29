@@ -117,7 +117,7 @@ and their expected types. The allowed types for indexed fields are NUM
 (a series of numbers for use with :ref:`RTREE indexes <RTREE>`.
 Take our example, which has the request:
 
- | :codebold:`i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
+| :codenormal:`tarantool>`:codebold:`i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
 
 The effect is that, for all tuples in tester,
 field number 1 must exist and must contain an unsigned integer.
@@ -212,41 +212,37 @@ going in descending order when traversing TREE indexes.)
 
 Five examples of basic operations:
 
-.. code-block:: lua
-
-   -- Add a new tuple to tuple set tester.
-   -- The first field, field[1], will be 999 (type is NUM).
-   -- The second field, field[2], will be 'Taranto' (type is STR).
-   box.space.tester:insert{999, 'Taranto'}
-
-   -- Update the tuple, changing field field[2].
-   -- The clause "{999}", which has the value to look up in
-   -- the index of the tuple's primary-key field, is mandatory
-   -- because update() requests must always have a clause that
-   -- specifies the primary key, which in this case is field[1].
-   -- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
-   -- will happen to field[2] with the new value.
-   box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
-
-   -- Replace the tuple, adding a new field.
-   -- This is also possible with the update() request but
-   -- the update() request is usually more complicated.
-   box.space.tester:replace{999, 'Tarantella', 'Tarantula'}
-
-   -- Retrieve the tuple.
-   -- The clause "{999}" is still mandatory, although it does not have to
-   -- mention the primary key. */
-   box.space.tester:select{999}
-
-   -- Delete the tuple.
-   -- Once again the clause to identify the primary-key field is mandatory.
-   box.space.tester:delete{999}
+| :codenormal:`-- Add a new tuple to tuple set tester.`
+| :codenormal:`-- The first field, field[1], will be 999 (type is NUM).`
+| :codenormal:`-- The second field, field[2], will be 'Taranto' (type is STR).`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{999, 'Taranto'}`
+|
+| :codenormal:`-- Update the tuple, changing field field[2].`
+| :codenormal:`-- The clause "{999}", which has the value to look up in`
+| :codenormal:`-- the index of the tuple's primary-key field, is mandatory`
+| :codenormal:`-- because update() requests must always have a clause that`
+| :codenormal:`-- specifies the primary key, which in this case is field[1].`
+| :codenormal:`-- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment`
+| :codenormal:`-- will happen to field[2] with the new value.`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})`
+|
+| :codenormal:`-- Replace the tuple, adding a new field.`
+| :codenormal:`-- This is also possible with the update() request but`
+| :codenormal:`-- the update() request is usually more complicated.`
+| :codenormal:`box.space.tester:replace{999, 'Tarantella', 'Tarantula'}`
+|
+| :codenormal:`-- Retrieve the tuple.`
+| :codenormal:`-- The clause "{999}" is still mandatory, although it does not have to`
+| :codenormal:`-- mention the primary key. */`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select{999}`
+|
+| :codenormal:`-- Delete the tuple.`
+| :codenormal:`-- Once again the clause to identify the primary-key field is mandatory.`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:delete{999}`
 
 How does Tarantool do a basic operation? Let's take this example:
 
-.. code-block:: lua
-   
-   box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
+| :codenormal:`tarantool>`:codebold:`box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})`
 
 which, for those who know SQL, is equivalent to a statement like
    
@@ -356,7 +352,7 @@ request ("s:insert({1})") for the introductory sandbox exercise
 ":ref:`Starting Tarantool and making your first database <first database>`“.
 On the left are the hexadecimal bytes that one would see with:
 
- | :codebold:`$ hexdump 00000000000000000001.xlog`
+| :codebold:`$ hexdump 00000000000000000001.xlog`
 
 and on the right are comments.
 
@@ -432,18 +428,16 @@ select a tuple set from a space named tester where
 the primary-key field value equals 1.
 
 First, there are four *naming variations*: 
-
-.. code-block:: lua
    
-   -- #1
-   box.space.tester:select{1}
-   -- #2
-   box.space['tester']:select{1}
-   -- #3
-   box.space[512]:select{1}
-   -- #4
-   variable = 'tester'
-   box.space[variable]:select{1}
+| :codenormal:`-- #1`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
+| :codenormal:`-- #2`
+| :codenormal:`tarantool>` :codebold:`box.space['tester']:select{1}`
+| :codenormal:`-- #3`
+| :codenormal:`tarantool>` :codebold:`box.space[512]:select{1}`
+| :codenormal:`-- #4`
+| :codenormal:`tarantool>` :codebold:`variable = 'tester'`
+| :codenormal:`tarantool>` :codebold:`box.space[variable]:select{1}`
 
 There is an assumption that the numeric id of 'tester' is 512, which happens to be the case in our
 sandbox example only. Literal values such as 'tester'
@@ -453,23 +447,21 @@ however, this is a matter of user preference and all
 the variants exist in the wild.
 
 Then, there are six *parameter variations*: 
-
-.. code-block:: lua
    
-   -- #1
-   box.space.tester:select{1}
-   -- #2
-   box.space.tester:select({1})
-   -- #3
-   box.space.tester:select(1)
-   -- #4
-   box.space.tester:select({1},{iterator='EQ'})
-   -- #5
-   variable = 1
-   box.space.tester:select{variable}
-   -- #6
-   variable = {1}
-   box.space.tester:select(variable)
+| :codenormal:`-- #1`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
+| :codenormal:`-- #2`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select({1})`
+| :codenormal:`-- #3`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
+| :codenormal:`-- #4`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select({1},{iterator='EQ'})`
+| :codenormal:`-- #5`
+| :codenormal:`tarantool>` :codebold:`variable = 1`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select{variable}`
+| :codenormal:`-- #6`
+| :codenormal:`tarantool>` :codebold:`variable = {1}`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select(variable)`
 
 The primary-key value is enclosed in braces, and if
 it was a multi-part primary key then the value would be

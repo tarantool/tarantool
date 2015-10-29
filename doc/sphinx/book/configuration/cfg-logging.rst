@@ -1,4 +1,4 @@
-.. confval:: log_level
+.. class:: log_level
 
     How verbose the logging is. There are six log verbosity classes:
 
@@ -18,7 +18,7 @@
     Default: 5 |br|
     Dynamic: **yes** |br|
 
-.. confval:: logger
+.. class:: logger
 
     By default, the log is sent to the standard error stream (``stderr``). If
     ``logger`` is specified, the log is sent to the file named in the string.

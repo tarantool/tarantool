@@ -11,6 +11,8 @@ master_doc = 'index'
 extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.ifconfig',
+    #'sphinx.ext.autodoc',
+    #'sphinx.ext.autosummary',
     'ext.custom',
     'ext.lua',
     'breathe'

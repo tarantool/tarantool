@@ -92,17 +92,15 @@ that the replica is now the new master, by saying ``box.cfg{... listen=URI}``.
 Then, if there are updates on the old master that were not propagated before
 the old master went down, they would have to be re-applied manually.
 
-
-
 =============================================================================
         Instructions for quick startup of a new two-server simple cluster
 =============================================================================
 
 Step 1. Start the first server thus:
 
-    | :codebold:`box.cfg{listen=` :codebolditalic:`uri#1` :codenormal:`}`
-    | :codebold:`box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request`
-    | :codebold:`box.snapshot()`
+|:codenormal:`tarantool>`:codebold:`box.cfg{listen=` :codebolditalic:`uri#1` :codenormal:`}`
+|:codenormal:`tarantool>`:codebold:`box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request`
+|:codenormal:`tarantool>`:codebold:`box.snapshot()`
 
 ... Now a new cluster exists.
 
@@ -114,7 +112,7 @@ server's databases can happen without conflicts.
 
 Step 3. Start the second server thus:
 
-    | :codebold:`box.cfg{listen=` :codebolditalic:`uri#2` :codebold:`, replication_source=` :codebolditalic:`uri#1` :codebold:`}`
+|:codenormal:`tarantool>`:codebold:`box.cfg{listen=` :codebolditalic:`uri#2` :codebold:`, replication_source=` :codebolditalic:`uri#1` :codebold:`}`
 
 ... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
 
@@ -290,15 +288,16 @@ Click the "Terminal #2" tab to switch to the display of the other shell.)
 
 On the first shell, which we'll call Terminal #1, execute these commands:
 
-    | :codebold:`# Terminal 1`
-    | :codebold:`mkdir -p ~/tarantool_test_node_1`
-    | :codebold:`cd ~/tarantool_test_node_1`
-    | :codebold:`rm -R ~/tarantool_test_node_1/*`
-    | :codebold:`~/tarantool/src/tarantool`
-    | :codebold:`box.cfg{listen=3301}`
-    | :codebold:`box.schema.user.create('replicator', {password = 'password'})`
-    | :codebold:`box.schema.user.grant('replicator','read,write','universe')`
-    | :codebold:`box.space._cluster:select({0},{iterator='GE'})`
+| :codenormal:`$` :codebold:`# Terminal 1`
+| :codenormal:`$` :codebold:`mkdir -p ~/tarantool_test_node_1`
+| :codenormal:`$` :codebold:`cd ~/tarantool_test_node_1`
+| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_1/*`
+| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+|
+| :codenormal:`tarantool>`:codebold:`box.cfg{listen=3301}`
+| :codenormal:`tarantool>`:codebold:`box.schema.user.create('replicator', {password = 'password'})`
+| :codenormal:`tarantool>`:codebold:`box.schema.user.grant('replicator','read,write','universe')`
+| :codenormal:`tarantool>`:codebold:`box.space._cluster:select({0},{iterator='GE'})`
 
 The result is that a new cluster is set up, and the UUID is displayed.
 Now the screen looks like this: (except that UUID values are always different):
@@ -364,13 +363,14 @@ Now the screen looks like this: (except that UUID values are always different):
 
 On the second shell, which we'll call Terminal #2, execute these commands:
 
-    | :codebold:`# Terminal 2`
-    | :codebold:`mkdir -p ~/tarantool_test_node_2`
-    | :codebold:`cd ~/tarantool_test_node_2`
-    | :codebold:`rm -R ~/tarantool_test_node_2/*`
-    | :codebold:`~/tarantool/src/tarantool`
-    | :codebold:`box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}`
-    | :codebold:`box.space._cluster:select({0},{iterator='GE'})`
+| :codenormal:`$` :codebold:`# Terminal 2`
+| :codenormal:`$` :codebold:`mkdir -p ~/tarantool_test_node_2`
+| :codenormal:`$` :codebold:`cd ~/tarantool_test_node_2`
+| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_2/*`
+| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+|
+| :codenormal:`tarantool>`:codebold:`box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}`
+| :codenormal:`tarantool>`:codebold:`box.space._cluster:select({0},{iterator='GE'})`
 
 The result is that a replica is set up. Messages appear on Terminal #1
 confirming that the replica has connected and that the WAL contents have
@@ -440,9 +440,9 @@ on Terminal #1, because both servers are in the same cluster.
 
 On Terminal #1, execute these requests:
 
-    | :codebold:`s = box.schema.space.create('tester')`
-    | :codebold:`i = s:create_index('primary', {})`
-    | :codebold:`s:insert{1,'Tuple inserted on Terminal #1'}`
+| :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
+| :codenormal:`tarantool>` :codebold:`i = s:create_index('primary', {})`
+| :codenormal:`tarantool>` :codebold:`s:insert{1,'Tuple inserted on Terminal #1'}`
 
 Now the screen looks like this:
 
@@ -510,9 +510,9 @@ Nothing has happened on Terminal #2.
 
 On Terminal #2, execute these requests:
 
-    | :codebold:`s = box.space.tester`
-    | :codebold:`s:select({1},{iterator='GE'})`
-    | :codebold:`s:insert{2,'Tuple inserted on Terminal #2'}`
+| :codenormal:`tarantool>` :codebold:`s = box.space.tester`
+| :codenormal:`tarantool>` :codebold:`s:select({1},{iterator='GE'})`
+| :codenormal:`tarantool>` :codebold:`s:insert{2,'Tuple inserted on Terminal #2'}`
 
 Now the screen looks like this:
 
@@ -580,9 +580,9 @@ happened on Terminal #1.
 
 On Terminal #1, execute these Tarantool requests and shell commands:
 
-    | :codebold:`os.exit()`
-    | :codebold:`ls -l ~/tarantool_test_node_1`
-    | :codebold:`ls -l ~/tarantool_test_node_2`
+| :codenormal:`$` :codebold:`os.exit()`
+| :codenormal:`$` :codebold:`ls -l ~/tarantool_test_node_1`
+| :codenormal:`$` :codebold:`ls -l ~/tarantool_test_node_2`
 
 Now Tarantool #1 is stopped. Messages appear on Terminal #2 announcing that fact.
 The "ls -l" commands show that both servers have made snapshots, which have the
@@ -650,8 +650,8 @@ same size because they both contain the same tuples.
 On Terminal #2, ignore the repeated messages saying "failed to connect",
 and execute these requests:
 
-    | :codebold:`box.space.tester:select({0},{iterator='GE'})`
-    | :codebold:`box.space.tester:insert{3,'Another'}`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{3,'Another'}`
 
 Now the screen looks like this (ignoring the repeated messages saying
 "failed to connect"):
@@ -719,9 +719,10 @@ Terminal #2 has done a select and an insert, even though Terminal #1 is down.
 
 On Terminal #1 execute these commands:
 
-    | :codebold:`~/tarantool/src/tarantool`
-    | :codebold:`box.cfg{listen=3301}`
-    | :codebold:`box.space.tester:select({0},{iterator='GE'})`
+| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+|
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
 
 Now the screen looks like this (ignoring the repeated messages on terminal
 #2 saying "failed to connect"):
@@ -791,8 +792,8 @@ been asked to act as a replication source.
 
 On Terminal #1, say:
 
-    | :codebold:`box.cfg{replication_source='replicator:password@localhost:3302'}`
-    | :codebold:`box.space.tester:select({0},{iterator='GE'})`
+| :codenormal:`tarantool>`:codebold:`box.cfg{replication_source='replicator:password@localhost:3302'}`
+| :codenormal:`tarantool>`:codebold:`box.space.tester:select({0},{iterator='GE'})`
 
 The screen now looks like this:
 
@@ -861,6 +862,6 @@ sees what the other server wrote.
 To clean up, say "``os.exit()``" on both Terminal #1 and Terminal #2, and then
 on either terminal say:
 
-    | :codebold:`cd ~`
-    | :codebold:`rm -R ~/tarantool_test_node_1`
-    | :codebold:`rm -R ~/tarantool_test_node_2`
+| :codenormal:`$` :codebold:`cd ~`
+| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_1`
+| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_2`

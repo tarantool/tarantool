@@ -267,7 +267,7 @@ and display how many bytes remain in the tuple. The function uses Tarantool
 ``box.tuple`` functions ``new()``, ``unpack()``, ``find()``, ``transform()``,
 ``bsize()``.
 
-.. code-block:: lua
+.. code-block:: lua_tarantool
 
     console = require('console'); console.delimiter('!')
     function example()
@@ -284,10 +284,10 @@ and display how many bytes remain in the tuple. The function uses Tarantool
 
 ... And here is what happens when one invokes the function:
 
-    | :codenormal:`tarantool>` :codebold:`example()`
-    | :codenormal:`---`
-    | :codenormal:`- 'tuple2 = '`
-    | :codenormal:`- ['a', 'c']`
-    | :codenormal:`- ' # of bytes = '`
-    | :codenormal:`- 5`
-    | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`example()`
+| :codenormal:`---`
+| :codenormal:`- 'tuple2 = '`
+| :codenormal:`- ['a', 'c']`
+| :codenormal:`- ' # of bytes = '`
+| :codenormal:`- 5`
+| :codenormal:`...`

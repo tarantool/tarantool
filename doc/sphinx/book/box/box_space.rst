@@ -11,32 +11,33 @@ is available in file
 A list of all ``box.space`` functions follows, then comes a list of all
 ``box.space`` members.
        
-    :ref:`create_index() <space_create_index>`,
-    :ref:`insert() <space_insert>`,
-    :ref:`select() <space_select>`,
-    :ref:`get() <space_get>`,
-    :ref:`drop() <space_drop>`,
-    :ref:`rename() <space_rename>`,
-    :ref:`replace() <space_replace_put>`,
-    :ref:`put() <space_replace_put>`,
-    :ref:`update() <space_update>`,
-    :ref:`delete() <space_delete>`,
-    :ref:`id() <space_id>`,
-    :ref:`enabled() <space_enabled>`, 
-    :ref:`field_count() <space_field_count>`,
-    :ref:`index() <space_index>`,
-    :ref:`len() <space_len>`,
-    :ref:`truncate() <space_truncate>`,
-    :ref:`inc{} <space_inc>`,
-    :ref:`dec{} <space_dec>`,
-    :ref:`auto_increment{} <space_auto_increment>`,
-    :ref:`pairs() <space_pairs>`,
-    :ref:`_schema <data_schema>`,
-    :ref:`_space <data_space>`,
-    :ref:`_index <data_index>`,
-    :ref:`_user <data_user>`,
-    :ref:`_priv <data_priv>`,
-    :ref:`_cluster <data_cluster>`   
+    :func:`box.space...create_index() <space_object.create_index>` |br|
+    :func:`box.space...insert() <space_object.insert>` |br|
+    :func:`box.space...select() <space_object.select>` |br|
+    :func:`box.space...get() <space_object.get>` |br|
+    :func:`box.space...drop() <space_object.drop>` |br|
+    :func:`box.space...rename() <space_object.rename>` |br|
+    :func:`box.space...replace() <space_object.replace>` |br|
+    :func:`box.space...put() <space_object.put>` |br|
+    :func:`box.space...update() <space_object.update>` |br|
+    :func:`box.space...delete() <space_object.delete>` |br|
+    :func:`box.space...id() <space_object.id>` |br|
+    :func:`box.space...enabled() <space_object.enabled>` |br|
+    :func:`box.space...field_count() <space_object.field_count>` |br|
+    :func:`box.space...index() <space_object.index>` |br|
+    :func:`box.space...len() <space_object.len>` |br|
+    :func:`box.space...truncate() <space_object.truncate>` |br|
+    :func:`box.space...inc{} <space_object.inc>` |br|
+    :func:`box.space...dec{} <space_object.dec>` |br|
+    :func:`box.space...auto_increment{} <space_object.auto_increment>` |br|
+    :func:`box.space...pairs() <space_object.pairs>` 
+    
+    :class:`box.space._schema` |br|
+    :class:`box.space._space` |br|
+    :class:`box.space._index` |br|
+    :class:`box.space._user` |br|
+    :class:`box.space._priv` |br|
+    :class:`box.space._cluster`  |br| 
 
 .. _box_space:
 
@@ -44,7 +45,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. class:: space_object
     
-    .. _space_create_index:
     
     .. function:: create_index(index-name [, {options} ])
 
@@ -89,14 +89,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
         unique option other than unique, or a parts option with more than one
         field component, is only applicable for the memtx storage engine.
 
-        | :codenormal:`tarantool>` :codebold:`s = box.space.space55`
+        | :codenormal:`tarantool>`:codebold:`s = box.space.space55`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
-
-    .. _space_insert:
 
     .. function:: insert(tuple)
 
@@ -112,9 +110,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Example:** 
          
-        | :codenormal:`tarantool>` :codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
 
-    .. _space_select:    
 
     .. function:: select(key)
 
@@ -137,10 +134,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Example:**
     
-        | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tmp', {temporary=true})`
+        | :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('tmp', {temporary=true})`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`s:insert{1,'A'}`
@@ -159,19 +156,19 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`- [2, 'D']`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`-- must equal both primary-key fields`
+        | :codenormal:`tarantool>` :codenormal:`-- must equal both primary-key fields`
         | :codenormal:`tarantool>` :codebold:`s:select{1,'B'}`
         | :codenormal:`---`
         | :codenormal:`- - [1, 'B']`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`-- must equal only one primary-key field`
+        | :codenormal:`tarantool>` :codenormal:`-- must equal only one primary-key field`
         | :codenormal:`tarantool>` :codebold:`s:select{1}`
         | :codenormal:`---`
         | :codenormal:`- - [1, 'A']`
         | |nbsp| |nbsp| :codenormal:`- [1, 'B']`
         | |nbsp| |nbsp| :codenormal:`- [1, 'C']`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`-- must equal 0 fields, so returns all tuples`
+        | :codenormal:`tarantool>` :codenormal:`-- must equal 0 fields, so returns all tuples`
         | :codenormal:`tarantool>` :codebold:`s:select{}`
         | :codenormal:`---`
         | :codenormal:`- - [1, 'A']`
@@ -185,7 +182,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         "equal to") and how many tuples to return, see the later section
         :ref:`box.space.space-name[.index.index-name]:select <index_select>`.
 
-    .. _space_get:    
 
     .. function:: get(key)
 
@@ -460,9 +456,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
 
-        | :codebold:`Example:`
-        |
-        | :codenormal:`tarantool>` :codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
+        **Example:**
+        
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
 
 
     .. _space_delete:    
@@ -612,7 +608,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('forty_second_space')`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`box.space.forty_second_space:inc{1,'a'}`
@@ -647,7 +643,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space19')`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`box.space.space19:insert{1,'a',1000}`
@@ -708,14 +704,14 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space33')`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`-- index 'X' has default parts {1,'NUM'}`
+        | :codenormal:`tarantool>` :codenormal:`-- index 'X' has default parts {1,'NUM'}`
         | :codenormal:`tarantool>` :codebold:`s:create_index('X', {})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`s:insert{0,'Hello my '}; s:insert{1,'Lua world'}`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end`
+        | :codenormal:`tarantool>`:codebold:`tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`tmp`
@@ -723,9 +719,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- Hello my Lua world`
         | :codenormal:`...`
 
-.. _data_schema:
+.. module:: box.space 
 
-.. data::     _schema
+.. class:: _schema
 
     ``_schema`` is a system tuple set. Its single tuple contains these fields:
     ``'version', major-version-number, minor-version-number``.
@@ -734,7 +730,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     The following function will display all fields in all tuples of ``_schema``:
 
-    .. code-block:: lua
+    .. code-block:: lua_tarantool
         
         console = require('console'); console.delimiter('!')
         function example()
@@ -760,7 +756,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _data_space:
 
-.. data::     _space
+.. class:: _space
 
     ``_space`` is a system tuple set. Its tuples contain these fields:
     ``id``, ``uid``, ``space-name``, ``engine``, ``field_count``, ``temporary``, ``format``.
@@ -770,7 +766,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     The following function will display all simple fields
     in all tuples of ``_space``.
 
-    .. code-block:: lua
+    .. code-block:: lua_tarantool
     
         console = require('console'); console.delimiter('!')
         function example()
@@ -808,7 +804,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. _boxspaceexample:
 
-    **Exapmle:** 
+    **Example:** 
     
     The following requests will create a space using
     :code:`box.schema.space.create` with a :code:`format` clause.
@@ -816,7 +812,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     This illustrates the typical use of the :code:`format` clause,
     it shows the recommended names and data types for the fields.
 
-    | :codenormal:`tarantool>` :codebold:`box.schema.space.create('TM',{format={[1]={["name"]="field#1"},[2]={["type"]="num"}}})`
+    | :codenormal:`tarantool>`:codebold:`box.schema.space.create('TM',{format={[1]={["name"]="field#1"},[2]={["type"]="num"}}})`
     | :codenormal:`---`
     | :codenormal:`- index: []`
     | |nbsp| |nbsp| :codenormal:`on_replace: 'function: 0x41c67338'`
@@ -835,7 +831,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _data_index:
 
-.. data::     _index
+.. class:: _index
 
     ``_index`` is a system tuple set. Its tuples contain these fields:
     ``space-id index-id index-name index-type index-is-unique
@@ -843,7 +839,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     The following function will display all fields in all tuples of ``_index``:
 
-    .. code-block:: lua
+    .. code-block:: lua_tarantool
     
         console = require('console'); console.delimiter('!')
         function example()
@@ -886,21 +882,21 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _data_user:
 
-.. data::     _user
+.. class:: _user
 
     ``_user`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
 .. _data_priv:
 
-.. data::     _priv
+.. class:: _priv
 
     ``_priv`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
 .. _data_cluster:
 
-.. data::     _cluster
+.. class:: _cluster
 
     ``_cluster`` is a new system tuple set
     for support of the :ref:`replication feature <box-replication>`.
@@ -919,7 +915,7 @@ and ``pairs()``. The iteration through the spaces is coded as a scan of the
 the tuple of ``_space`` that we've just fetched with ``pairs()``. The function
 returns a table.
 
-.. code-block:: lua
+.. code-block:: lua_tarantool
 
     console = require('console'); console.delimiter('!')
     function example()

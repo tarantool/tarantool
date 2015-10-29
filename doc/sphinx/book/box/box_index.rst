@@ -30,8 +30,8 @@ API is a direct binding to corresponding methods of index objects of type
 
         :rtype: table
 
-        | :codebold:`Example`
-        |
+        Example:
+        
         | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary`
         | :codenormal:`---`
         | - :codenormal:`unique: true`
@@ -240,8 +240,8 @@ API is a direct binding to corresponding methods of index objects of type
 
 |br|
 
-        | :codebold:`Example With Default 'TREE' Index and pairs() function`
-        |
+        Example With Default 'TREE' Index and ``pairs()`` function:
+        
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space17')`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -310,29 +310,25 @@ API is a direct binding to corresponding methods of index objects of type
 
         EXAMPLE
 
-        .. code-block:: lua
-
-            -- Create a space named tester.
-            -- Create a unique index 'primary', which won't be needed for this example.
-            -- Create a non-unique index 'secondary' with an index on the second field.
-            -- Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
-            -- Select all tuples where the secondary index keys are greater than 'X'.
-            box.schema.space.create('tester')
-            box.space.tester:create_index('primary', {parts = {1, 'NUM' }})
-            box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
-            box.space.tester:insert{1,'X','Row with field[2]=X'}
-            box.space.tester:insert{2,'Y','Row with field[2]=Y'}
-            box.space.tester:insert{3,'Z','Row with field[2]=Z'}
-            box.space.tester.index.secondary:select({'X'}, {iterator = 'GT', limit = 1000})
+        | :codenormal:`-- Create a space named tester.`
+        | :codenormal:`-- Create a unique index 'primary', which won't be needed for this example.`
+        | :codenormal:`-- Create a non-unique index 'secondary' with an index on the second field.`
+        | :codenormal:`-- Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.`
+        | :codenormal:`-- Select all tuples where the secondary index keys are greater than 'X'.`
+        | :codenormal:`tarantool>`:codebold:`box.schema.space.create('tester')`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:create_index('primary', {parts = {1, 'NUM' }})`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{1,'X','Row with field[2]=X'}`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{2,'Y','Row with field[2]=Y'}`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{3,'Z','Row with field[2]=Z'}`
+        | :codenormal:`tarantool>`:codebold:`box.space.tester.index.secondary:select({'X'}, {iterator = 'GT', limit = 1000})`
 
         The result will be a table of tuple and will look like this:
 
-        .. code-block:: yaml
-
-            ---
-            - - [2, 'Y', 'Row with field[2]=Y']
-              - [3, 'Z', 'Row with field[2]=Z']
-            ...
+        | :codenormal:`---`
+        | :codenormal:`- - [2, 'Y', 'Row with field[2]=Y']`
+        | :codenormal:`  - [3, 'Z', 'Row with field[2]=Z']`
+        | :codenormal:`...`
 
         .. NOTE::
 
@@ -363,29 +359,30 @@ API is a direct binding to corresponding methods of index objects of type
             if there is more than one tuple in the tuple set, then :codenormal:`get` returns
             an error.
 
-        .. code-block:: lua
+        
+        Example with BITSET index:
 
-            EXAMPLE WITH 'BITSET' INDEX
-
-            The following script shows creation and search with a BITSET index.
-             Notice: BITSET cannot be unique, so first a primary-key index is created.
-             Notice: bit values are entered as hexadecimal literals for easier reading.
-            s = box.schema.space.create('space_with_bitset')
-            s:create_index('primary_index',{parts={1,'STR'},unique=true,type='TREE'})
-            s:create_index('bitset_index',{parts={2, 'NUM'},unique=false,type='BITSET'})
-            s:insert{'Tuple with bit value = 01', 0x01}
-            s:insert{'Tuple with bit value = 10', 0x02}
-            s:insert{'Tuple with bit value = 11', 0x03}
-            s.index.bitset_index:select(0x02,{iterator=box.index.EQ})
-            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ANY_SET})
-            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_SET})
-            s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_NOT_SET})
-            ...
-            The above script will return:
-             For EQ: Tuple with bit value = 10
-             For BITS_ANY_SET: Tuple with bit value = 10 + Tuple with bit value = 11
-             For BITS_ALL_SET: Tuple with bit value = 10 + Tuple with bit value = 11
-             For BIT_ALL_NOT_SET: Tuple with bit value = 01
+        The following script shows creation and search with a BITSET index.
+        Notice: BITSET cannot be unique, so first a primary-key index is created.
+        Notice: bit values are entered as hexadecimal literals for easier reading.
+        
+        | :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('space_with_bitset')`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('primary_index',{parts={1,'STR'},unique=true,type='TREE'})`
+        | :codenormal:`tarantool>`:codebold:`s:create_index('bitset_index',{parts={2, 'NUM'},unique=false,type='BITSET'})`
+        | :codenormal:`tarantool>`:codebold:`s:insert{'Tuple with bit value = 01', 0x01}`
+        | :codenormal:`tarantool>`:codebold:`s:insert{'Tuple with bit value = 10', 0x02}`
+        | :codenormal:`tarantool>`:codebold:`s:insert{'Tuple with bit value = 11', 0x03}`
+        | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.EQ})`
+        | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ANY_SET})`
+        | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_SET})`
+        | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_NOT_SET})`
+    
+        The above script will return:
+             
+        | :codenormal:`For EQ: Tuple with bit value = 10`
+        | :codenormal:`For BITS_ANY_SET: Tuple with bit value = 10 + Tuple with bit value = 11`
+        | :codenormal:`For BITS_ALL_SET: Tuple with bit value = 10 + Tuple with bit value = 11`
+        | :codenormal:`For BIT_ALL_NOT_SET: Tuple with bit value = 01`
 
     .. function:: min([key-value])
 
@@ -670,9 +667,9 @@ is Rectangle#2", and "Rectangle#3 is entirely inside Rectangle#2".
 
 Now let us create a space and add an RTREE index.
 
-    | :codebold:`s = box.schema.space.create('rectangles')`
-    | :codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
-    | :codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
+| :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('rectangles')`
+| :codenormal:`tarantool>`:codebold:`i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})`
+| :codenormal:`tarantool>`:codebold:`r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})`
 
 Field#1 doesn't matter, we just make it because we need a primary-key index.
 (RTREE indexes cannot be unique and therefore cannot be primary-key indexes.)
@@ -680,17 +677,17 @@ The second field must be an "array", which means its values must represent
 {x,y} points or {x1,y1,x2,y2} rectangles. Now let us populate the table by
 inserting two tuples, containing the coordinates of Rectangle#2 and Rectangle#4.
 
-    | :codebold:`s:insert{1, {3,5,9,10}}`
-    | :codebold:`s:insert{2, {10,11}}`
+| :codenormal:`tarantool>` :codebold:`s:insert{1, {3,5,9,10}}`
+| :codenormal:`tarantool>` :codebold:`s:insert{2, {10,11}}`
 
 And now, following the description of `RTREE iterator types`_, we can search the
 rectangles with these requests:
 
 .. _RTREE iterator types: rtree-iterator_
 
-    | :codebold:`r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)`
-    | :codebold:`r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)`
-    | :codebold:`r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)`
+| :codenormal:`tarantool>`:codebold:`r:select({10,11,10,11},{iterator='EQ'})   -- Request#1 (returns 1 tuple)`
+| :codenormal:`tarantool>`:codebold:`r:select({4,7,5,9},{iterator='GT'})       -- Request#2 (returns 1 tuple)`
+| :codenormal:`tarantool>`:codebold:`r:select({1,2,3,4},{iterator='NEIGHBOR'}) -- Request#3 (returns 2 tuples)`
 
 Request#1 returns 1 tuple because the point {10,11} is the same as the rectangle
 {10,11,10,11} ("Rectangle#4" in the picture). Request#2 returns 1 tuple because
@@ -703,16 +700,16 @@ of {1,2,3,4} ("Rectangle#1" in the picture).
 Now let us create a space and index for cuboids, which are rectangle-or-boxes that have
 6 corners and 6 sides.
 
-    | :codebold:`box.schema.space.create('R')`
-    | :codebold:`box.space.R:create_index('primary',{parts={1,'NUM'}})`
-    | :codebold:`box.space.R:create_index('S',{type='RTREE',unique=false,dimension=3,parts={2,'ARRAY'}})`
+| :codenormal:`tarantool>`:codebold:`box.schema.space.create('R')`
+| :codenormal:`tarantool>`:codebold:`box.space.R:create_index('primary',{parts={1,'NUM'}})`
+| :codenormal:`tarantool>`:codebold:`box.space.R:create_index('S',{type='RTREE',unique=false,dimension=3,parts={2,'ARRAY'}})`
 
 The additional field here is 'dimension=3'. The default dimension is 2, which is
 why it didn't need to be specified for the examples of rectangle. The maximum dimension
 is 20. Now for insertions and selections there will usually be 6 coordinates. For example:
 
-    | :codebold:`box.space.R:insert{1,{0,3,0,3,0,3}}`
-    | :codebold:`box.space.R.index.S:select({1,2,1,2,1,2},{iterator=box.index.GT})`
+| :codenormal:`tarantool>`:codebold:`box.space.R:insert{1,{0,3,0,3,0,3}}`
+| :codenormal:`tarantool>`:codebold:`box.space.R.index.S:select({1,2,1,2,1,2},{iterator=box.index.GT})`
 
 More examples of spatial searching are online in the file `R tree index quick
 start and usage`_.

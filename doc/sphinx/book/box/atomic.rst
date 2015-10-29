@@ -76,7 +76,7 @@ Assuming that in tuple set 'tester' there are tuples in which the third
 field represents a positive dollar amount ... Start a transaction, withdraw from
 tuple#1, deposit in tuple#2, and end the transaction, making its effects permanent.
 
-.. code-block:: lua
+.. code-block:: lua_tarantool
 
     console = require('console'); console.delimiter('!')
     box.begin()
