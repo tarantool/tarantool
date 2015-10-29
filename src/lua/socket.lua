@@ -961,15 +961,13 @@ local function tcp_connect_remote(remote, timeout)
         boxerrno(save_errno)
         return nil
     end
-    res = s:wait(timeout)
-    save_errno = s:errno()
-    -- When the connection completes succesfully, the descriptor becomes
-    -- writable. When the connection establishment encounters an error,
-    -- the descriptor becomes both readable and writable (Stevens UNP).
-    -- However, in real life if server sends some data immediately on connect,
-    -- descriptor can also become RW. For this case we also check SO_ERROR.
-    if res ~= nil and res ~= 'W' then
+    -- Wait until the connection is established or ultimately fails.
+    -- In either condition the socket becomes writable. To tell these
+    -- conditions appart SO_ERROR must be consulted (man connect).
+    if s:writable(timeout) then
         save_errno = s:getsockopt('SOL_SOCKET', 'SO_ERROR')
+    else
+        save_errno = boxerrno.ETIMEDOUT
     end
     if save_errno ~= 0 then
         s:close()
