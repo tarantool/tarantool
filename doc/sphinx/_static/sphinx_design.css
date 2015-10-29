@@ -479,7 +479,7 @@ div.b-cols_content_left .b-search-text {
 }
 
 .line-block {
-    padding: 10px 20px 10px 20px;
+    padding: 8px 16px 8px 16px;
     -webkit-border-radius: 4px;
     -moz-border-radius: 4px;
     border-radius: 4px;
@@ -488,7 +488,7 @@ div.b-cols_content_left .b-search-text {
 }
 
 p > code.docutils {
-    padding: 1px 2px 3px 4px;
+    padding: 0px 1px 0px 1px;
     -webkit-border-radius: 4px;
     -moz-border-radius: 4px;
     border-radius: 4px;
@@ -496,7 +496,7 @@ p > code.docutils {
 }
 
 li > code.docutils {
-    padding: 1px 2px 3px 4px;
+    padding: 0px 1px 0px 1px;
     -webkit-border-radius: 4px;
     -moz-border-radius: 4px;
     border-radius: 4px;
