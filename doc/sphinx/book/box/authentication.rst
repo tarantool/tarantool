@@ -172,7 +172,7 @@ privileges have been revoked. Only the 'admin' user can grant privileges for the
 ===========================================================
 
 The fields in the _func space are: the numeric function id, a number,
-the function name, and a flag.
+the function name, a flag, and possibly a language name.
 
 The _func space does not include the function's body. One continues to
 create Lua functions in the usual way, by saying
@@ -180,16 +180,28 @@ create Lua functions in the usual way, by saying
 _func space. The _func space only exists for storing function tuples so
 that their names can be used within grant/revoke functions.
 
-The function for creating a _func tuple is:
-:samp:`box.schema.func.create({function-name} [,` :code:`{if_not_exists=true} ])`.
+The function for creating a _func tuple is: |br|
+:samp:`box.schema.func.create({function-name} [,` :code:`{options} ])`. |br|
+The possible options are: |br|
+:code:`if_not_exists={true|false}` -- default = false, |br|
+:code:`setuid={true|false}` -- default = false, |br|
+:code:`language={'LUA'|'C'}` -- default = 'LUA'. |br|
+Example: :code:`box.schema.func.create('f',{language='C',setuid=false})`.
 
-The variant function for creating a _func tuple is:
-:samp:`box.schema.func.create({function-name} ,` :code:`{setuid=true} )`.
-This causes the flag (the fourth field in the _func tuple) to have
+Specifying :code:`if_not_exists=true` would cause "error: Function '...' already exists"
+if the function already exists.
+
+Specifying :code:`setuid=true`
+would cause the setuid flag (the fourth field in the _func tuple) to have
 a value meaning "true", and the effect of that is that the
 function's caller is treated as the function's creator,
 with full privileges. The setuid behavior does not apply for
-users who connect via console.connect.
+users who connect via :code:`console.connect`.
+
+Specifying :code:`language='C'` would cause the language field
+(the fifth field in the _func tuple) to have a value 'C', 
+which means the function was written in C. Tarantool functions
+are normally written in Lua but can be written in C as well.
 
 The function for dropping a _func tuple is:
 :samp:`box.schema.func.drop({function-name})`.

@@ -161,28 +161,36 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 		       int /* revents */)
 {
 	struct evio_service *service = (struct evio_service *) watcher->data;
-	int fd = -1;
 
-	try {
-		struct sockaddr_storage addr;
-		socklen_t addrlen = sizeof(addr);
-		fd = sio_accept(service->ev.fd,
-			(struct sockaddr *)&addr, &addrlen);
-
-		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
-			return;
-		/* set common client socket options */
-		evio_setsockopt_client(fd, service->addr.sa_family, SOCK_STREAM);
+	while (1) {
 		/*
-		 * Invoke the callback and pass it the accepted
-		 * socket.
+		 * Accept all pending connections from backlog during event
+		 * loop iteration. Significally speed up acceptor with enabled
+		 * io_collect_interval.
 		 */
-		service->on_accept(service, fd, (struct sockaddr *)&addr, addrlen);
+		int fd = -1;
+		try {
+			struct sockaddr_storage addr;
+			socklen_t addrlen = sizeof(addr);
+			fd = sio_accept(service->ev.fd,
+				(struct sockaddr *)&addr, &addrlen);
 
-	} catch (Exception *e) {
-		if (fd >= 0)
-			close(fd);
-		e->log();
+			if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
+				return;
+			/* set common client socket options */
+			evio_setsockopt_client(fd, service->addr.sa_family, SOCK_STREAM);
+			/*
+			 * Invoke the callback and pass it the accepted
+			 * socket.
+			 */
+			service->on_accept(service, fd, (struct sockaddr *)&addr, addrlen);
+
+		} catch (Exception *e) {
+			if (fd >= 0)
+				close(fd);
+			e->log();
+			return;
+		}
 	}
 }
 

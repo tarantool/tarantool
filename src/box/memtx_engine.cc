@@ -630,20 +630,62 @@ void
 MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 {
 	struct recovery *r = ::recovery;
-	m_state = MEMTX_READING_SNAPSHOT;
+	assert(m_state == MEMTX_INITIALIZED);
+	/*
+	 * By default, enable fast start: bulk read of tuples
+	 * from the snapshot, in which they are stored in key
+	 * order, and bulk build of the primary key.
+	 *
+	 * If panic_on_snap_error = false, it's a disaster
+	 * recovery mode. Enable all keys on start, to detect and
+	 * discard duplicates in the snapshot.
+	 */
+	m_state = (r->snap_dir.panic_if_error ?
+		   MEMTX_READING_SNAPSHOT : MEMTX_OK);
+
 	/* Process existing snapshot */
 	recover_snap(r);
 	/* Replace server vclock using the data from snapshot */
 	vclock_copy(&r->vclock, vclockset_last(&r->snap_dir.index));
-	m_state = MEMTX_READING_WAL;
-	space_foreach(memtx_end_build_primary_key, this);
+
+	if (m_state == MEMTX_READING_SNAPSHOT) {
+		/* End of the fast path: loaded the primary key. */
+		space_foreach(memtx_end_build_primary_key, this);
+
+		if (r->wal_dir.panic_if_error) {
+			/*
+			 * Fast start path: "play out" WAL
+			 * records using the primary key only,
+			 * then bulk-build all secondary keys.
+			 */
+			m_state = MEMTX_READING_WAL;
+		} else {
+			/*
+			 * If panic_on_wal_error = false, it's
+			 * a disaster recovery mode. Build
+			 * secondary keys before reading the WAL,
+			 * to detect and discard duplicates in
+			 * unique keys.
+			 */
+			m_state = MEMTX_OK;
+			space_foreach(memtx_build_secondary_keys, this);
+		}
+	}
 }
 
 void
 MemtxEngine::endRecovery()
 {
-	m_state = MEMTX_OK;
-	space_foreach(memtx_build_secondary_keys, this);
+	/*
+	 * Recovery is started with enabled keys when:
+	 * - either of panic_on_snap_error/panic_on_wal_error
+	 *   is true
+	 * - it's a replication join
+	 */
+	if (m_state != MEMTX_OK) {
+		m_state = MEMTX_OK;
+		space_foreach(memtx_build_secondary_keys, this);
+	}
 }
 
 Handler *MemtxEngine::open()
