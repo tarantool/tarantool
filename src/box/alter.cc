@@ -723,10 +723,10 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 */
 	struct trigger *on_commit =
 		txn_alter_trigger_new(alter_space_commit, alter);
-	trigger_add(&txn->on_commit, on_commit);
+	txn_on_commit(txn, on_commit);
 	struct trigger *on_rollback =
 		txn_alter_trigger_new(alter_space_rollback, alter);
-	trigger_add(&txn->on_rollback, on_rollback);
+	txn_on_rollback(txn, on_rollback);
 }
 
 /* }}}  */
@@ -1004,7 +1004,7 @@ on_rollback_in_old_space(struct trigger *trigger, void *event)
 	Index *new_index = (Index *) trigger->data;
 	/* Remove the failed tuple from the new index. */
 	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->space->def.id != new_index->key_def->space_id)
 			continue;
 		new_index->replace(stmt->new_tuple, stmt->old_tuple,
@@ -1020,7 +1020,7 @@ static void
 on_replace_in_old_space(struct trigger *trigger, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	Index *new_index = (Index *) trigger->data;
 	/*
 	 * First set a rollback trigger, then do replace, since
@@ -1033,6 +1033,7 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
 	 * may be modified many times, but we need only one
 	 * on_rollback trigger.
 	 */
+	txn_init_triggers(txn);
 	trigger_add_unique(&txn->on_rollback, on_rollback);
 	/* Put the tuple into the new index. */
 	(void) new_index->replace(stmt->old_tuple, stmt->new_tuple,
@@ -1145,7 +1146,7 @@ AddIndex::~AddIndex()
 static void
 on_drop_space(struct trigger * /* trigger */, void *event)
 {
-	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
+	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	uint32_t id = tuple_field_u32(stmt->old_tuple ?
 				      stmt->old_tuple : stmt->new_tuple,
 				      ID);
@@ -1214,7 +1215,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _space");
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	/*
@@ -1251,7 +1252,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		struct trigger *on_rollback =
 				txn_alter_trigger_new(on_drop_space, NULL);
-		trigger_add(&txn->on_rollback, on_rollback);
+		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_space->def.uid);
 		/* Verify that the space is empty (has no indexes) */
@@ -1272,7 +1273,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		struct trigger *on_commit =
 				txn_alter_trigger_new(on_drop_space, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
 		/*
@@ -1336,7 +1337,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _index");
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	uint32_t id = tuple_field_u32(old_tuple ? old_tuple : new_tuple, ID);
@@ -1513,7 +1514,7 @@ static void
 user_cache_remove_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_last_stmt(txn);
 	uint32_t uid = tuple_field_u32(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
 				       ID);
@@ -1524,7 +1525,7 @@ static void
 user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_last_stmt(txn);
 	struct user_def user;
 	user_def_create_from_tuple(&user, stmt->new_tuple);
 	user_cache_replace(&user);
@@ -1537,7 +1538,7 @@ static void
 on_replace_dd_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	txn_check_autocommit(txn, "Space _user");
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -1551,7 +1552,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		(void) user_cache_replace(&user);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
-		trigger_add(&txn->on_rollback, on_rollback);
+		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_user->owner);
 		/* Can't drop guest or super user */
@@ -1570,7 +1571,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	} else { /* UPDATE, REPLACE */
 		assert(old_user != NULL && new_tuple != NULL);
 		/*
@@ -1582,7 +1583,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		user_def_create_from_tuple(&user, new_tuple);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_alter_user, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	}
 }
 
@@ -1620,7 +1621,7 @@ func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 static void
 func_cache_remove_func(struct trigger * /* trigger */, void *event)
 {
-	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
+	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	uint32_t fid = tuple_field_u32(stmt->old_tuple ?
 				       stmt->old_tuple : stmt->new_tuple,
 				       ID);
@@ -1631,7 +1632,7 @@ func_cache_remove_func(struct trigger * /* trigger */, void *event)
 static void
 func_cache_replace_func(struct trigger * /* trigger */, void *event)
 {
-	struct txn_stmt *stmt = txn_stmt((struct txn*) event);
+	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
 	struct func_def def;
 	func_def_create_from_tuple(&def, stmt->new_tuple);
 	func_cache_replace(&def);
@@ -1646,7 +1647,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _func");
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct func_def def;
@@ -1659,7 +1660,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		func_cache_replace(&def);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
-		trigger_add(&txn->on_rollback, on_rollback);
+		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		func_def_create_from_tuple(&def, old_tuple);
 		/*
@@ -1675,13 +1676,13 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&def, new_tuple);
 		access_check_ddl(def.uid);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_replace_func, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	}
 }
 
@@ -1806,7 +1807,7 @@ static void
 revoke_priv(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_last_stmt(txn);
 	struct tuple *tuple = (stmt->new_tuple ?
 			       stmt->new_tuple : stmt->old_tuple);
 	struct priv_def priv;
@@ -1825,7 +1826,7 @@ revoke_priv(struct trigger * /* trigger */, void *event)
 static void
 modify_priv(struct trigger * /* trigger */, void *event)
 {
-	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
+	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	struct priv_def priv;
 	priv_def_create_from_tuple(&priv, stmt->new_tuple);
 	grant_or_revoke(&priv);
@@ -1840,8 +1841,9 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _priv");
-	struct tuple *old_tuple = txn_stmt(txn)->old_tuple;
-	struct tuple *new_tuple = txn_stmt(txn)->new_tuple;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
 	struct priv_def priv;
 
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
@@ -1850,20 +1852,20 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		grant_or_revoke(&priv);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(revoke_priv, NULL);
-		trigger_add(&txn->on_rollback, on_rollback);
+		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
 		access_check_ddl(priv.grantor_id);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(revoke_priv, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	} else {                                       /* modify */
 		priv_def_create_from_tuple(&priv, new_tuple);
 		priv_def_check(&priv);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(modify_priv, NULL);
-		trigger_add(&txn->on_commit, on_commit);
+		txn_on_commit(txn, on_commit);
 	}
 }
 
@@ -1899,7 +1901,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _schema");
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	const char *key = tuple_field_cstr(new_tuple ?
@@ -1921,7 +1923,7 @@ static void
 on_commit_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
+	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	if (new_tuple == NULL) {
@@ -1967,7 +1969,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _cluster");
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) {
 		/* Check fields */
@@ -1983,7 +1985,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 
 	struct trigger *on_commit =
 			txn_alter_trigger_new(on_commit_dd_cluster, NULL);
-	trigger_add(&txn->on_commit, on_commit);
+	txn_on_commit(txn, on_commit);
 }
 
 /* }}} cluster configuration */

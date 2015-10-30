@@ -68,15 +68,10 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
-	assert(txn->stmt == 0);
-	assert(txn->n_stmts == 0 || !txn->autocommit);
-	struct txn_stmt *stmt;
-	if (txn->n_stmts == 0) {
-		stmt = &txn->first_stmt;
-	} else {
-		stmt = (struct txn_stmt *)
-			region_alloc_xc(&fiber()->gc, sizeof(struct txn_stmt));
-	}
+	assert(txn->in_stmt == false);
+	assert(stailq_empty(&txn->stmts) || !txn->is_autocommit);
+	struct txn_stmt *stmt = (struct txn_stmt *)
+		region_alloc_xc(&fiber()->gc, sizeof(struct txn_stmt));
 
 	/* Initialize members explicitly to save time on memset() */
 	stmt->space = NULL;
@@ -84,29 +79,24 @@ txn_stmt_new(struct txn *txn)
 	stmt->new_tuple = NULL;
 	stmt->row = NULL;
 
-	rlist_add_tail_entry(&txn->stmts, stmt, next);
-	++txn->n_stmts;
+	stailq_add_tail_entry(&txn->stmts, stmt, next);
 
-	txn->stmt = stmt;
+	txn->in_stmt = true;
 	return stmt;
 }
 
 struct txn *
-txn_begin(bool autocommit)
+txn_begin(bool is_autocommit)
 {
 	assert(! in_txn());
 	struct txn *txn = (struct txn *)
 		region_alloc_xc(&fiber()->gc, sizeof(*txn));
 	/* Initialize members explicitly to save time on memset() */
-	txn->stmt = NULL;
-	/* first_stmt initialized by txn_stmt_new() */
-	rlist_create(&txn->stmts);
-	rlist_create(&txn->on_commit);
-	rlist_create(&txn->on_rollback);
-	txn->n_stmts = 0;
+	stailq_create(&txn->stmts);
 	txn->n_rows = 0;
-	txn->signature = -1;
-	txn->autocommit = autocommit;
+	txn->is_autocommit = is_autocommit;
+	txn->has_triggers  = false;
+	txn->in_stmt = false;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
@@ -124,8 +114,9 @@ txn_begin_stmt(struct request *request, struct space *space)
 
 	Engine *engine = space->handler->engine;
 	if (txn->engine == NULL) {
-		assert(txn->n_stmts == 0);
+		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
+		engine->begin(txn);
 	} else if (txn->engine != engine) {
 		/**
 		 * Only one engine can be used in
@@ -140,11 +131,10 @@ txn_begin_stmt(struct request *request, struct space *space)
 		++txn->n_rows;
 	}
 
-	engine->beginStatement(txn);
 	return txn;
 }
 
-static void
+static int64_t
 txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_rows > 0);
@@ -154,7 +144,7 @@ txn_write_to_wal(struct txn *txn)
 	req->n_rows = 0;
 
 	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
 		/*
@@ -174,11 +164,10 @@ txn_write_to_wal(struct txn *txn)
 		say_warn("too long WAL write: %.3f sec", stop - start);
 	if (res < 0)
 		tnt_raise(LoggedError, ER_WAL_IO);
-
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.
 	 */
-	txn->signature = res;
+	return res;
 }
 
 void
@@ -186,21 +175,25 @@ txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
 
+	assert(stailq_empty(&txn->stmts) || txn->engine);
+
 	/* Do transaction conflict resolving */
-	if (txn->engine)
+	if (txn->engine) {
+		int64_t signature = -1;
 		txn->engine->prepare(txn);
 
-	if (txn->n_rows > 0)
-		txn_write_to_wal(txn);
+		if (txn->n_rows > 0)
+			signature = txn_write_to_wal(txn);
+		/*
+		 * The transaction is in the binary log. No action below
+		 * may throw. In case an error has happened, there is
+		 * no other option but terminate.
+		 */
+		if (txn->has_triggers)
+			trigger_run(&txn->on_commit, txn);
 
-	/*
-	 * The transaction is in the binary log. No action below
-	 * may throw. In case an error has happened, there is
-	 * no other option but terminate.
-	 */
-	trigger_run(&txn->on_commit, txn);
-	if (txn->engine)
-		txn->engine->commit(txn);
+		txn->engine->commit(txn, signature);
+	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -219,17 +212,19 @@ txn_rollback_stmt()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	if (txn->autocommit)
+	if (txn->is_autocommit)
 		return txn_rollback();
-	if (txn->stmt == NULL)
+	if (txn->in_stmt == false)
 		return;
-	txn->engine->rollbackStatement(txn->stmt);
-	if (txn->stmt->row != NULL) {
-		txn->stmt->row = NULL;
+	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
+						  next);
+	txn->engine->rollbackStatement(stmt);
+	if (stmt->row != NULL) {
+		stmt->row = NULL;
 		--txn->n_rows;
 		assert(txn->n_rows >= 0);
 	}
-	txn->stmt = NULL;
+	txn->in_stmt = false;
 }
 
 void
@@ -238,7 +233,8 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	trigger_run(&txn->on_rollback, txn); /* must not throw. */
+	if (txn->has_triggers)
+		trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	if (txn->engine)
 		txn->engine->rollback(txn);
 	TRASH(txn);
@@ -250,7 +246,7 @@ txn_rollback()
 void
 txn_check_autocommit(struct txn *txn, const char *where)
 {
-	if (txn->autocommit == false) {
+	if (txn->is_autocommit == false) {
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  where, "multi-statement transactions");
 	}

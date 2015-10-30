@@ -56,13 +56,13 @@ Engine::Engine(const char *engine_name)
 void Engine::init()
 {}
 
-void Engine::beginStatement(struct txn *)
+void Engine::begin(struct txn *)
 {}
 
 void Engine::prepare(struct txn *)
 {}
 
-void Engine::commit(struct txn *)
+void Engine::commit(struct txn *, int64_t)
 {}
 
 void Engine::rollback(struct txn *)
@@ -210,7 +210,12 @@ Handler::executeSelect(struct txn *, struct space *space,
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
-		TupleGuard tuple_gc(tuple);
+		/*
+		 * This is for Sophia, which returns a tuple
+		 * with zero refs from the iterator, expecting
+		 * the caller to GC it after use.
+		 */
+		TupleRef tuple_gc(tuple);
 		if (offset > 0) {
 			offset--;
 			continue;

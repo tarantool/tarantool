@@ -51,11 +51,11 @@ struct MemtxEngine: public Engine {
 	virtual void dropPrimaryKey(struct space *space);
 	virtual bool needToBuildSecondaryKey(struct space *space);
 	virtual void keydefCheck(struct space *space, struct key_def *key_def);
-	virtual void beginStatement(struct txn *txn);
+	virtual void begin(struct txn *txn);
 	virtual void rollbackStatement(struct txn_stmt *stmt);
 	virtual void rollback(struct txn *txn);
 	virtual void prepare(struct txn *txn);
-	virtual void commit(struct txn *txn);
+	virtual void commit(struct txn *txn, int64_t signature);
 	virtual void beginJoin();
 	virtual void recoverToCheckpoint(int64_t lsn);
 	virtual void endRecovery();

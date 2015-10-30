@@ -1,0 +1,30 @@
+1..29
+ok 1 - list is empty
+ok 2 - list is empty after reverse
+ok 3 - first item
+ok 4 - last item
+ok 5 - element (foreach) 0
+ok 6 - element (foreach) 1
+ok 7 - element (foreach) 2
+ok 8 - element (foreach) 3
+ok 9 - element (foreach) 4
+ok 10 - element (foreach) 5
+ok 11 - element (foreach) 6
+ok 12 - first item
+ok 13 - head is not empty
+ok 14 - first entry
+ok 15 - next is empty
+ok 16 - element (foreach_entry) 6
+ok 17 - element (foreach_entry) 5
+ok 18 - element (foreach_entry) 4
+ok 19 - element (foreach_entry) 3
+ok 20 - element (foreach_entry) 2
+ok 21 - element (foreach_entry) 1
+ok 22 - element (foreach_entry) 0
+ok 23 - element (foreach_entry) 0
+ok 24 - element (foreach_entry) 1
+ok 25 - element (foreach_entry) 2
+ok 26 - element (foreach_entry) 3
+ok 27 - element (foreach_entry) 4
+ok 28 - element (foreach_entry) 5
+ok 29 - element (foreach_entry) 6

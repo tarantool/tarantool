@@ -231,17 +231,12 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 {
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
-	TupleGuard guard(new_tuple);
+	/* GC the new tuple if there is an exception below. */
+	TupleRef ref(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 	this->replace(txn, space, NULL, new_tuple, mode);
-	txn_commit_stmt(txn);
-	/*
-	 * Adding result to port must be after possible WAL write.
-	 * The reason is that any yield between port_add_tuple and port_eof
-	 * calls could lead to sending not finished response to iproto socket.
-	 */
-	tuple_bless(new_tuple);
+	/** The new tuple is referenced by the primary key. */
 	return new_tuple;
 }
 
@@ -255,20 +250,9 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	uint32_t part_count = mp_decode_array(&key);
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
-	if (old_tuple == NULL) {
-		txn_commit_stmt(txn);
+	if (old_tuple == NULL)
 		return NULL;
-	}
-	TupleGuard old_guard(old_tuple);
-	this->replace(txn, space, old_tuple, NULL,
-				DUP_REPLACE_OR_INSERT);
-	txn_commit_stmt(txn);
-	/*
-	 * Adding result to port must be after possible WAL write.
-	 * The reason is that any yield between port_add_tuple and port_eof
-	 * calls could lead to sending not finished response to iproto socket.
-	 */
-	tuple_bless(old_tuple);
+	this->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 	return old_tuple;
 }
 
@@ -283,11 +267,8 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
-	if (old_tuple == NULL) {
-		txn_commit_stmt(txn);
+	if (old_tuple == NULL)
 		return NULL;
-	}
-	TupleGuard old_guard(old_tuple);
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
@@ -296,16 +277,9 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
 					       request->index_base);
-	TupleGuard guard(new_tuple);
+	TupleRef ref(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	this->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
-	txn_commit_stmt(txn);
-	/*
-	 * Adding result to port must be after possible WAL write.
-	 * The reason is that any yield between port_add_tuple and port_eof
-	 * calls could lead to sending not finished response to iproto socket.
-	 */
-	tuple_bless(new_tuple);
 	return new_tuple;
 }
 
@@ -350,7 +324,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			struct tuple *new_tuple = tuple_new(space->format,
 							    request->tuple,
 							    request->tuple_end);
-			TupleGuard guard(new_tuple);
+			TupleRef ref(new_tuple);
 			space_validate_tuple(space, new_tuple);
 			this->replace(txn, space, NULL,
 				      new_tuple, DUP_INSERT);
@@ -359,15 +333,13 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			e->log();
 		}
 	} else {
-		TupleGuard old_guard(old_tuple);
-
 		/* Update the tuple. */
 		struct tuple *new_tuple =
 			tuple_upsert(space->format, region_alloc_ex_cb,
 				     &fiber()->gc, old_tuple,
 				     request->ops, request->ops_end,
 				     request->index_base);
-		TupleGuard guard(new_tuple);
+		TupleRef ref(new_tuple);
 
 		/** The rest must remain silent. */
 		try {
@@ -379,8 +351,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			e->log();
 		}
 	}
-
-	txn_commit_stmt(txn);
 	/* Return nothing: UPSERT does not return data. */
 }
 
@@ -444,7 +414,7 @@ memtx_txn_add_undo(struct txn *txn, struct space *space,
 	 * successfully, to not remove a tuple inserted by
 	 * another transaction in rollback().
 	 */
-	struct txn_stmt *stmt = txn_stmt(txn);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 	stmt->space = space;
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
@@ -851,7 +821,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 void
 MemtxEngine::prepare(struct txn *txn)
 {
-	if (txn->autocommit || txn->n_stmts < 1)
+	if (txn->is_autocommit)
 		return;
 	/*
 	 * These triggers are only used for memtx and only
@@ -863,15 +833,15 @@ MemtxEngine::prepare(struct txn *txn)
 }
 
 void
-MemtxEngine::beginStatement(struct txn *txn)
+MemtxEngine::begin(struct txn *txn)
 {
 	/*
 	 * Register a trigger to rollback transaction on yield.
-	 * This must be done in beginStatement, since it's
+	 * This must be done in begin(), since it's
 	 * the first thing txn invokes after txn->n_stmts++,
 	 * to match with trigger_clear() in rollbackStatement().
 	 */
-	if (txn->autocommit == false && txn->n_stmts == 1) {
+	if (txn->is_autocommit == false) {
 
 		txn->fiber_on_yield = {
 			RLIST_LINK_INITIALIZER, txn_on_yield_or_stop, NULL, NULL
@@ -923,15 +893,17 @@ MemtxEngine::rollback(struct txn *txn)
 {
 	prepare(txn);
 	struct txn_stmt *stmt;
-	rlist_foreach_entry_reverse(stmt, &txn->stmts, next)
+	stailq_reverse(&txn->stmts);
+	stailq_foreach_entry(stmt, &txn->stmts, next)
 		rollbackStatement(stmt);
 }
 
 void
-MemtxEngine::commit(struct txn *txn)
+MemtxEngine::commit(struct txn *txn, int64_t signature)
 {
+	(void) signature;
 	struct txn_stmt *stmt;
-	rlist_foreach_entry(stmt, &txn->stmts, next) {
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
 			tuple_unref(stmt->old_tuple);
 	}
