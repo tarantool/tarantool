@@ -104,14 +104,9 @@ txn_begin(bool is_autocommit)
 	return txn;
 }
 
-struct txn *
-txn_begin_stmt(struct request *request, struct space *space)
+void
+txn_begin_in_engine(struct txn *txn, struct space *space)
 {
-	/* NOTE: request is NULL for the read requests (select, get, etc.) */
-	struct txn *txn = in_txn();
-	if (txn == NULL)
-		txn = txn_begin(true);
-
 	Engine *engine = space->handler->engine;
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
@@ -124,9 +119,20 @@ txn_begin_stmt(struct request *request, struct space *space)
 		 */
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	}
+}
+
+struct txn *
+txn_begin_stmt(struct request *request, struct space *space)
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		txn = txn_begin(true);
+
+	txn_begin_in_engine(txn, space);
+
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	/* Create WAL record for the write requests in non-temporary spaces */
-	if (!space_is_temporary(space) && request != NULL) {
+	if (!space_is_temporary(space)) {
 		txn_add_redo(stmt, request);
 		++txn->n_rows;
 	}

@@ -143,6 +143,37 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
 struct txn *
 txn_begin_stmt(struct request *request, struct space *space);
 
+void
+txn_begin_in_engine(struct txn *txn, struct space *space);
+
+/**
+ * This is an optimization, which exists to speed up selects
+ * in autocommit mode. For such selects, we only need to
+ * manage fiber garbage heap. If autocommit mode is
+ * off, however, we must start engine transaction with the first
+ * select.
+ */
+static inline struct txn *
+txn_begin_ro_stmt(struct space *space)
+{
+	struct txn *txn = in_txn();
+	if (txn)
+		txn_begin_in_engine(txn, space);
+	return txn;
+}
+
+static inline void
+txn_commit_ro_stmt(struct txn *txn)
+{
+	assert(txn == in_txn());
+	if (txn) {
+		assert(txn->engine);
+		/* nothing to do */
+	} else {
+		fiber_gc();
+	}
+}
+
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.

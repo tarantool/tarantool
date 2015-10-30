@@ -36,6 +36,7 @@
 #include "space.h"
 #include "iproto_constants.h"
 #include "request.h"
+#include "txn.h"
 
 const char *iterator_type_strs[] = {
 	/* [ITER_EQ]  = */ "EQ",
@@ -244,11 +245,11 @@ Index::destroyReadViewForIterator(struct iterator *iterator)
 }
 
 static inline Index *
-check_index(uint32_t space_id, uint32_t index_id)
+check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
-	struct space *space = space_cache_find(space_id);
-	access_check_space(space, PRIV_R);
-	return index_find(space, index_id);
+	*space = space_cache_find(space_id);
+	access_check_space(*space, PRIV_R);
+	return index_find(*space, index_id);
 }
 
 static inline box_tuple_t *
@@ -263,7 +264,9 @@ ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {
-		return check_index(space_id, index_id)->size();
+		struct space *space;
+		/* no tx management, len is approximate in sophia anyway. */
+		return check_index(space_id, index_id, &space)->size();
 	} catch (Exception *) {
 		return (size_t) -1; /* handled by box.error() in Lua */
 	}
@@ -273,7 +276,9 @@ ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id)
 {
        try {
-               return check_index(space_id, index_id)->bsize();
+	       /* no tx management for statistics */
+	       struct space *space;
+	       return check_index(space_id, index_id, &space)->bsize();
        } catch (Exception *) {
                return (size_t) -1; /* handled by box.error() in Lua */
        }
@@ -285,7 +290,9 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 {
 	assert(result != NULL);
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		/* no tx management, random() is for approximation anyway */
+		Index *index = check_index(space_id, index_id, &space);
 		struct tuple *tuple = index->random(rnd);
 		*result = tuple_bless_null(tuple);
 		return 0;
@@ -301,18 +308,23 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	assert(result != NULL);
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
 		if (!index->key_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		primary_key_validate(index->key_def, key, part_count);
+		/* Start transaction in the engine. */
+		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->findByKey(key, part_count);
 		/* Count statistics */
 		rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
 		*result = tuple_bless_null(tuple);
+		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
+		txn_rollback_stmt();
 		return -1;
 	}
 }
@@ -324,7 +336,8 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	assert(result != NULL);
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
 		if (index->key_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(ClientError, ER_UNSUPPORTED,
@@ -333,10 +346,14 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_GE, key, part_count);
+		/* Start transaction in the engine */
+		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->min(key, part_count);
 		*result = tuple_bless_null(tuple);
+		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
+		txn_rollback_stmt();
 		return -1;
 	}
 }
@@ -348,7 +365,8 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	assert(result != NULL);
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
 		if (index->key_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(ClientError, ER_UNSUPPORTED,
@@ -357,10 +375,14 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_LE, key, part_count);
+		/* Start transaction in the engine */
+		struct txn *txn = txn_begin_ro_stmt(space);
 		struct tuple *tuple = index->max(key, part_count);
 		*result = tuple_bless_null(tuple);
+		txn_commit_ro_stmt(txn);
 		return 0;
 	}  catch (Exception *) {
+		txn_rollback_stmt();
 		return -1;
 	}
 }
@@ -372,11 +394,17 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 	mp_tuple_assert(key, key_end);
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, itype, key, part_count);
-		return index->count(itype, key, part_count);
+		/* Start transaction in the engine */
+		struct txn *txn = txn_begin_ro_stmt(space);
+		ssize_t count = index->count(itype, key, part_count);
+		txn_commit_ro_stmt(txn);
+		return count;
 	} catch (Exception *) {
+		txn_rollback_stmt();
 		return -1; /* handled by box.error() in Lua */
 	}
 }
@@ -393,7 +421,8 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	struct iterator *it = NULL;
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
-		Index *index = check_index(space_id, index_id);
+		struct space *space;
+		Index *index = check_index(space_id, index_id, &space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
 		key_validate(index->key_def, itype, key, part_count);
@@ -403,6 +432,12 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		it->space_id = space_id;
 		it->index_id = index_id;
 		it->index = index;
+		/*
+		 * No transaction management: iterators are
+		 * "dirty" in tarantool now, they exist in
+		 * their own read view in sophia or access dirty
+		 * data in memtx.
+		 */
 		return it;
 	} catch (Exception *) {
 		if (it)
@@ -418,7 +453,10 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	assert(result != NULL);
 	try {
 		if (itr->sc_version != sc_version) {
-			Index *index = check_index(itr->space_id, itr->index_id);
+			struct space *space;
+			/* no tx management */
+			Index *index = check_index(itr->space_id, itr->index_id,
+						   &space);
 			if (index != itr->index) {
 				*result = NULL;
 				return 0;

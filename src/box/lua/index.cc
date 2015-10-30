@@ -65,7 +65,6 @@ lbox_index_get(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "Usage index.get(space_id, index_id, key)");
 
-	RegionGuard region_guard(&fiber()->gc);
 	uint32_t space_id = lua_tointeger(L, 1);
 	uint32_t index_id = lua_tointeger(L, 2);
 	size_t key_len;
@@ -83,7 +82,6 @@ lbox_index_min(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "usage index.min(space_id, index_id, key)");
 
-	RegionGuard region_guard(&fiber()->gc);
 	uint32_t space_id = lua_tointeger(L, 1);
 	uint32_t index_id = lua_tointeger(L, 2);
 	size_t key_len;
@@ -101,7 +99,6 @@ lbox_index_max(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "usage index.max(space_id, index_id, key)");
 
-	RegionGuard region_guard(&fiber()->gc);
 	uint32_t space_id = lua_tointeger(L, 1);
 	uint32_t index_id = lua_tointeger(L, 2);
 	size_t key_len;

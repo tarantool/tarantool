@@ -519,17 +519,15 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 
 	try {
 		struct space *space = space_cache_find(space_id);
-		struct txn *txn = in_txn();
 		access_check_space(space, PRIV_R);
+		struct txn *txn = txn_begin_ro_stmt(space);
 		space->handler->executeSelect(txn, space, index_id, iterator,
 					      offset, limit, key, key_end, port);
-		if (txn == NULL) {
-			/* no txn is created, so simply collect garbage here */
-			fiber_gc();
-		}
 		port_eof(port);
+		txn_commit_ro_stmt(txn);
 		return 0;
 	} catch (Exception *e) {
+		txn_rollback_stmt();
 		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
