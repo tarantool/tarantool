@@ -31,7 +31,7 @@
 
 #include "net_box.h"
 
-#include <lib/small/ibuf.h>
+#include <small/ibuf.h>
 #include "scramble.h"
 
 #include "box/iproto_constants.h"

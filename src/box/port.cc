@@ -30,8 +30,8 @@
  */
 #include "port.h"
 #include "tuple.h"
-#include <lib/small/slab_cache.h>
-#include <lib/small/mempool.h>
+#include <small/slab_cache.h>
+#include <small/mempool.h>
 #include <fiber.h>
 
 void
