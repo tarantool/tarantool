@@ -341,7 +341,11 @@ recover_remaining_wals(struct recovery *r)
 
 	struct vclock *last = vclockset_last(&r->wal_dir.index);
 	if (last == NULL) {
-		assert(r->current_wal == NULL);
+		if (r->current_wal != NULL) {
+			say_error("file `%s' was deleted under our feet",
+				  r->current_wal->filename);
+			recovery_close_log(r);
+		}
 		/** Nothing to do. */
 		return;
 	}
@@ -360,7 +364,8 @@ recover_remaining_wals(struct recovery *r)
 		 * assume anything can happen in production and go
 		 * on.
 		 */
-		assert(false);
+		say_error("file `%s' was deleted under our feet",
+			  r->current_wal->filename);
 	}
 
 	for (clock = vclockset_match(&r->wal_dir.index, &r->vclock);

@@ -57,7 +57,7 @@ tfbr = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr', tostring(v)})
+            table.insert(buffer, {'tfbr', v})
         end
     end
 );
@@ -65,7 +65,7 @@ tfbr2 = fiber.create(
     function()
         while true do
             local v = ch:get()
-            table.insert(buffer, {'tfbr2', tostring(v)})
+            table.insert(buffer, {'tfbr2', v})
         end
     end
 );
@@ -84,6 +84,7 @@ ch:put(5)
 t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
+table.sort(buffer, function(a, b) return a[2] < b[2] end)
 buffer
 
 ch = fiber.channel(1)
