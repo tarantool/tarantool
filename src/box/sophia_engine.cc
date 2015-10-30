@@ -556,7 +556,7 @@ SophiaEngine::prepare(struct txn *txn)
 	 */
 	sp_setint(txn->engine_tx, "half_commit", 1);
 
-	int rc = sp_prepare(txn->engine_tx);
+	int rc = sp_commit(txn->engine_tx);
 	switch (rc) {
 	case 1: /* rollback */
 		txn->engine_tx = NULL;

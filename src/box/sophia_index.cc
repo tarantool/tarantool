@@ -127,13 +127,11 @@ void*
 SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
-	void *host = db;
-	if (async) {
-		host = sp_asynchronous(db);
-	}
-	void *obj = sp_object(host);
+	void *obj = sp_object(db);
 	if (obj == NULL)
 		sophia_error(env);
+	if (async)
+		sp_setint(obj, "async", 1);
 	sp_setstring(obj, "arg", fiber(), 0);
 	if (key == NULL)
 		return obj;
@@ -290,7 +288,7 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	/* engine_tx might be empty, even if we are in txn context.
 	 *
 	 * This can happen on a first-read statement. */
-	if (in_txn() && in_txn()->engine_tx)
+	if (in_txn())
 		transaction = in_txn()->engine_tx;
 	obj = sp_get(transaction, obj);
 	if (obj == NULL)
