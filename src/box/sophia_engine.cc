@@ -597,9 +597,9 @@ SophiaEngine::commit(struct txn *txn, int64_t signature)
 		/* commit transaction using transaction commit signature */
 		assert(signature >= 0);
 
-		if (m_prev_commit_lsn == txn->signature) {
-			panic("sophia commit panic: m_prev_commit_lsn == txn->signature = %"
-			      PRIu64, txn->signature);
+		if (m_prev_commit_lsn == signature) {
+			panic("sophia commit panic: m_prev_commit_lsn == signature = %"
+			      PRIu64, signature);
 		}
 		/* Set tx id in Sophia only if tx has WRITE requests */
 		sp_setint(txn->engine_tx, "lsn", signature);
