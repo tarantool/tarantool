@@ -485,12 +485,20 @@ experience in one way to read and process tuples.
     end!
     console.delimiter('')!
 
+.. parsed-literal::
+    
+    :ref:`[[1]] <why_local>`, :ref:`[[3]] <why_pairs>`, :ref:`[[4]] <why_pcall>`, :ref:`[[6]] <line_six>`, :ref:`[[7]] <why_if>`
+    
+.. _why_local:    
+
 **LINE 1: WHY "LOCAL".** This line declares all the variables that will be used in
 the function. Actually it's not necessary to declare all variables at the start,
 and in a long function it would be better to declare variables just before using
 them. In fact it's not even necessary to declare variables at all, but an
 undeclared variable is "global". That's not desirable for any of the variables
 that are declared in line 1, because all of them are for use only within the function.
+
+.. _why_pairs:
 
 **LINE 3: WHY "PAIRS()".** Our job is to go through all the rows and there are two
 ways to do it: with :func:`box.space.space_object:pairs() <space_object.pairs>` or with
@@ -499,14 +507,18 @@ We preferred ``pairs()`` because it is simpler.
 
 **LINE 3: START THE MAIN LOOP.** Everything inside this ":code:`for`" loop will be
 repeated as long as there is another index key. A tuple is fetched and can be
-referenced with variable :code:`t`. 
+referenced with variable :code:`t`.
 
-**LINE 4: WHY "PCALL".** If we simply said "``lua_table = json.decode(t[2]))``", then
+.. _why_pcall:
+
+**LINE 4: WHY "PCALL".** If we simply said ``lua_table = json.decode(t[2]))``, then
 the function would abort with an error if it encountered something wrong with the
 JSON string - a missing colon, for example. By putting the function inside "``pcall``"
 (`protected call`_), we're saying: we want to intercept that sort of error, so if
 there's a problem just set ``is_valid_json = false`` and we will know what to do
 about it later.
+
+.. _meaning:
 
 **LINE 4: MEANING.** The function is :func:`json.decode` which means decode a JSON
 string, and the parameter is t[2] which is a reference to a JSON string. There's
@@ -526,6 +538,8 @@ means "decode ``t[2]`` (the tuple's second field) as a JSON string; if there's a
 error set ``is_valid_json = false``; if there's no error set ``is_valid_json = true`` and
 set ``lua_table =`` a Lua table which has the decoded string".
 
+.. _line_six:
+
 **LINE 6.** At last we are ready to get the JSON field value from the Lua table that
 came from the JSON string. The value in field_name, which is the parameter for the
 whole function, must be a name of a JSON field. For example, inside the JSON string
@@ -535,6 +549,8 @@ then ``field_value = lua_table[field_name]`` is effectively the same as
 ``field_value = lua_table["Quantity"]`` or even ``field_value = lua_table.Quantity``.
 Those are just three different ways of saying: for the Quantity field in the Lua table,
 get the value and put it in variable :code:`field_value`.
+
+.. _why_if:
 
 **LINE 7: WHY "IF".** Suppose that the JSON string is well formed but the JSON field
 is not a number, or is missing. In that case, the function would be aborted when

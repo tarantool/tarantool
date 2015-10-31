@@ -30,8 +30,9 @@ space :code:`examples` via the high-level C API.
      tnt_stream_free(tnt);
     }
 
-:ref:`SETUP <c_setup>`, :ref:`CONNECT <c_connect>`, :ref:`MAKE REQUEST <c_make_request>`,
-:ref:`SEND REQUEST <c_make_request>`, :ref:`GET REPLY <c_get_reply>`, :ref:`TEARDOWN <c_teardown>`   
+.. parsed-literal::
+
+    :ref:`SETUP <c_setup>`, :ref:`CONNECT <c_connect>`, :ref:`MAKE REQUEST <c_make_request>`, :ref:`SEND REQUEST <c_make_request>`, :ref:`GET REPLY <c_get_reply>`, :ref:`TEARDOWN <c_teardown>`   
 
 To prepare, paste the code into a file named example.c and install
 tarantool-c. One way to install tarantool-c (using Ubuntu) is:
