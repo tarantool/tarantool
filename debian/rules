@@ -43,6 +43,7 @@ tarball: clean
 	cd .. && tar --exclude=.git --exclude=debian 		\
 		--exclude=rfc4627.txt				\
 		--exclude=doc/www-data/ycsb			\
+		--exclude=src/lib/small/debian		\
 		--transform='s,^$(DIRNAME),tarantool_$(UVERSION),' \
 		-czf tarantool_$(UVERSION).orig.tar.gz $(DIRNAME)
 
