@@ -7,13 +7,16 @@
 This chapter provides a reference of options which can be set on the command
 line or in an initialization file.
 
-Tarantool is started by entering the command:
+.. contents:: 
+    :local:
 
-    | :codenormal:`$` :codebold:`tarantool`
-    | OR
-    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-    | OR
-    | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
+Tarantool is started by entering the command: 
+
+| :codenormal:`$` :codebold:`tarantool`
+| OR
+| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
+| OR
+| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
 =====================================================================
                         Command options
@@ -78,17 +81,17 @@ If username:password is omitted, then 'guest' is assumed. Some examples:
 
 .. _generic syntax for a URI schema: http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax
 
-.. container:: table
+    .. container:: table
 
-    +-----------------------------+------------------------------+
-    | URI fragment                | Example                      |
-    +=============================+==============================+
-    | port                        | 3301                         |
-    +-----------------------------+------------------------------+
-    | host:port                   | 127.0.0.1:3301               |
-    +-----------------------------+------------------------------+
-    | username:password@host:port | notguest:sesame@mail.ru:3301 |
-    +-----------------------------+------------------------------+
+        +-----------------------------+------------------------------+
+        | URI fragment                | Example                      |
+        +=============================+==============================+
+        | port                        | 3301                         |
+        +-----------------------------+------------------------------+
+        | host:port                   | 127.0.0.1:3301               |
+        +-----------------------------+------------------------------+
+        | username:password@host:port | notguest:sesame@mail.ru:3301 |
+        +-----------------------------+------------------------------+
 
 In certain circumstances a Unix domain socket may be used
 where a URI is expected, for example "unix/:/tmp/unix_domain_socket.sock" or
@@ -122,17 +125,17 @@ and suppose the environment variable LISTEN_URI contains 3301,
 and suppose the command line is ``~/tarantool/src/tarantool script.lua ARG``.
 Then the screen might look like this:
 
-    | :codenormal:`$` :codebold:`export LISTEN_URI=3301`
-    | :codenormal:`$` :codebold:`~/tarantool/src/tarantool script.lua ARG`
-    | :codenormal:`... main/101/script.lua C> version 1.6.3-439-g7e1011b`
-    | :codenormal:`... main/101/script.lua C> log level 5`
-    | :codenormal:`... main/101/script.lua I> mapping 107374184 bytes for a shared arena...`
-    | :codenormal:`... main/101/script.lua I> recovery start`
-    | :codenormal:`... main/101/script.lua I> recovering from `./00000000000000000000.snap'`
-    | :codenormal:`... main/101/script.lua I> primary: bound to 0.0.0.0:3301`
-    | :codenormal:`... main/102/leave_local_hot_standby I> ready to accept requests`
-    | :codenormal:`Starting  ARG`
-    | :codenormal:`... main C> entering the event loop`
+| :codenormal:`$` :codebold:`export LISTEN_URI=3301`
+| :codenormal:`$` :codebold:`~/tarantool/src/tarantool script.lua ARG`
+| :codenormal:`... main/101/script.lua C> version 1.6.3-439-g7e1011b`
+| :codenormal:`... main/101/script.lua C> log level 5`
+| :codenormal:`... main/101/script.lua I> mapping 107374184 bytes for a shared arena...`
+| :codenormal:`... main/101/script.lua I> recovery start`
+| :codenormal:`... main/101/script.lua I> recovering from './00000000000000000000.snap'`
+| :codenormal:`... main/101/script.lua I> primary: bound to 0.0.0.0:3301`
+| :codenormal:`... main/102/leave_local_hot_standby I> ready to accept requests`
+| :codenormal:`Starting  ARG`
+| :codenormal:`... main C> entering the event loop`
 
 .. _local_hot_standby:
 .. _replication_port:
@@ -222,9 +225,7 @@ the same computer with the same :func:`box.cfg` configuration settings -
 including the same directories and same non-null URIs. A warning should appear with a
 message like
 
-.. code-block:: lua
-
-    W> primary: [URI] is already in use, will retry binding after [n] seconds
+| :codenormal:`W> primary: [URI] is already in use, will retry binding after [n] seconds`
 
 This is fine. It means that the second instance is ready to take over if the
 first instance goes down.

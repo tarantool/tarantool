@@ -17,7 +17,7 @@ with :code:`fiber.find()` - via fiber id (fid), which is a numeric identifier.
 
 A runaway fiber can be stopped with :code:`fiber_object:cancel()`. However,
 :code:`fiber_object:cancel()` is advisory — it works only if the runaway fiber
-calls :code:`fiber.testcancel()` occasionally. Most box.* functions, such
+calls :code:`fiber.testcancel()` occasionally. Most ``box.*`` functions, such
 as :code:`box.space...delete()` or :code:`box.space...update()`, do call
 :code:`fiber.testcancel()` but :code:`box.space...select{}` does not. In practice,
 a runaway fiber can only become unresponsive if it does many computations
@@ -44,11 +44,11 @@ can be reused when another fiber is created.
     :param function: the function to be associated with the fiber
     :param function-arguments: what will be passed to function
 
-    | Return: created fiber object
-    | Rtype: userdata
+    :Return: created fiber object
+    :Rtype: userdata
 
+    Example:
 
-    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fiber = require('fiber')`
     | :codenormal:`---`
     | :codenormal:`...`
@@ -62,11 +62,11 @@ can be reused when another fiber is created.
 
 .. function:: self()
 
-    | Return: fiber object for the currently scheduled fiber.
-    | Rtype: userdata
+    :Return: fiber object for the currently scheduled fiber.
+    :Rtype: userdata
 
+    Example:
 
-    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fiber.self()`
     | :codenormal:`---`
     | :codenormal:`- status: running`
@@ -78,11 +78,11 @@ can be reused when another fiber is created.
 
     :param id: numeric identifier of the fiber.
 
-    | Return: fiber object for the specified fiber.
-    | Rtype: userdata
+    :Return: fiber object for the specified fiber.
+    :Rtype: userdata
 
+    Example:
 
-    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fiber.find(101)`
     | :codenormal:`---`
     | :codenormal:`- status: running`
@@ -97,31 +97,38 @@ can be reused when another fiber is created.
 
     :param time: number of seconds to sleep.
 
-    | Example: :codebold:`fiber.sleep(1.5)`
+    Example:
+
+    | :codenormal:`tarantool>` :codebold:`fiber.sleep(1.5)`
 
 .. function:: yield()
 
     Yield control to the scheduler. Equivalent to :code:`fiber.sleep(0)`.
 
-    | Example: :codebold:`fiber.yield()`
+    Example:
+
+    | :codenormal:`tarantool>` :codebold:`fiber.yield()`
 
 .. function:: status()
 
     Return the status of the current fiber.
 
-    | Return: the status of :code:`fiber`. One of: “dead”, “suspended”, or “running”.
-    | Rtype: string
-    | Example: :codebold:`fiber.status()`
+    :Return: the status of ``fiber``. One of: “dead”, “suspended”, or “running”.
+    :Rtype: string
+    
+    Example:
+
+    | :codenormal:`tarantool>` :codebold:`fiber.status()`
 
 .. function:: info()
 
     Return information about all fibers.
 
-    | Return: number of context switches, backtrace, id, total memory, used memory, name for each fiber.
-    | Rtype: table
+    :Return: number of context switches, backtrace, id, total memory, used memory, name for each fiber.
+    :Rtype: table
 
+    Example:
 
-    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fiber.info()`
     | :codenormal:`---`
     | :codenormal:`- 101:`
@@ -141,15 +148,20 @@ can be reused when another fiber is created.
 
     :param id: the id of the fiber to be canceled.
 
-    | Exception: the specified fiber does not exist or cancel is not permitted.
-    | Example: :codebold:`fiber.kill(102)`
+    :Exception: the specified fiber does not exist or cancel is not permitted.
+    
+    Example: 
+
+    | :codenormal:`tarantool>` :codebold:`fiber.kill(102)`
 
 .. function:: testcancel()
 
     Check if the current fiber has been canceled
     and throw an exception if this is the case.
 
-    | Example: :codebold:`fiber.testcancel()`
+    Example: 
+    
+    | :codenormal:`tarantool>` :codebold:`fiber.testcancel()`
 
 
 .. class:: fiber_object
@@ -159,17 +171,23 @@ can be reused when another fiber is created.
         :param self: fiber object, for example the fiber object returned by :code:`fiber.create`
 
 
-        | Return: id of the fiber.
-        | Rtype: number
-        | Example: :codebold:`fiber_object:id()`
+        :Return: id of the fiber.
+        :Rtype: number
+        
+        Example:
+
+        | :codenormal:`tarantool>` :codebold:`fiber_object:id()`
 
     .. method:: name()
 
         :param self: fiber object, for example the fiber object returned by :code:`fiber.create`
 
-        | Return: name of the fiber.
-        | Rtype: string
-        | Example: :codebold:`fiber_object:name()`
+        :Return: name of the fiber.
+        :Rtype: string
+        
+        Example:
+
+        | :codenormal:`tarantool>` :codebold:`fiber_object:name()`
 
     .. method:: name(name)
 
@@ -183,8 +201,11 @@ can be reused when another fiber is created.
                      object returned by :code:`fiber.create`
         :param string name: the new name of the fiber.
 
-        | Return: nil
-        | Example: :codebold:`fiber_object:name('function_name')`
+        :Return: nil
+        
+        Example:
+
+        | :codenormal:`tarantool>` :codebold:`fiber_object:name('function_name')`
 
     .. method:: status()
 
@@ -193,9 +214,12 @@ can be reused when another fiber is created.
         :param self: fiber object, for example the fiber
                      object returned by :code:`fiber.create`
 
-        | Return: the status of fiber. One of: “dead”, “suspended”, or “running”.
-        | Rtype: string
-        | Example: :codebold:`fiber_object:status()`
+        :Return: the status of fiber. One of: “dead”, “suspended”, or “running”.
+        :Rtype: string
+        
+        Example:
+
+        | :codenormal:`tarantool>` :codebold:`fiber_object:status()`
 
     .. method:: cancel()
 
@@ -207,20 +231,23 @@ can be reused when another fiber is created.
         :param self: fiber object, for example the fiber
                      object returned by :code:`fiber.create`
 
-        | Return: nil
-        | Exception: cancel is not permitted for the specified fiber object.
-        | Example: :codebold:`fiber_object:cancel()`
+        :Return: nil
+        :Exception: cancel is not permitted for the specified fiber object.
+        
+        Example:
+
+        | :codenormal:`tarantool>` :codebold:`fiber_object:cancel()`
 
 .. function:: time()
 
-    | Return: current system time (in seconds since the epoch) as a Lua
+    :Return: current system time (in seconds since the epoch) as a Lua
              number. The time is taken from the event loop clock,
              which makes this call very cheap, but still useful for
              constructing artificial tuple keys.
-    | Rtype: num
+    :Rtype: num
 
+    Example:
 
-    | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fiber.time(), fiber.time()`
     | :codenormal:`---`
     | :codenormal:`- 1385758759.2591`
@@ -229,13 +256,14 @@ can be reused when another fiber is created.
 
 .. function:: time64()
 
-    | Return: current system time (in microseconds since the epoch)
+    :Return: current system time (in microseconds since the epoch)
              as a 64-bit integer. The time is taken from the event
              loop clock.
-    | Rtype: num
+    :Rtype: num
 
 
-    | EXAMPLE
+    Example:
+
     | :codenormal:`tarantool>` :codebold:`fiber.time(), fiber.time64()`
     | :codenormal:`---`
     | :codenormal:`- 1385758828.9825`
@@ -247,58 +275,58 @@ can be reused when another fiber is created.
 =================================================
 
 Make the function which will be associated with the fiber. This function
-contains an infinite loop ("while 0 == 0" is always true). Each iteration
+contains an infinite loop (``while 0 == 0`` is always true). Each iteration
 of the loop adds 1 to a global variable named gvar, then goes to sleep for
 2 seconds. The sleep causes an implicit :code:`fiber.yield()`.
 
-   | :codenormal:`tarantool>` :codebold:`fiber = require('fiber')`
-   | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-   | :codenormal:`tarantool>` :codebold:`function function_x()`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`gvar = 0`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`while 0 == 0 do`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`gvar = gvar + 1`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`fiber.sleep(2)`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
-   | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
-   | :codenormal:`---`
-   | :codenormal:`...`
-   | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+| :codenormal:`tarantool>` :codebold:`fiber = require('fiber')`
+| :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+| :codenormal:`tarantool>` :codebold:`function function_x()`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`gvar = 0`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`while 0 == 0 do`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`gvar = gvar + 1`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`fiber.sleep(2)`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
 
 Make a fiber, associate function_x with the fiber, and start function_x.
 It will immediately "detach" so it will be running independently of the caller.
 
-    | :codenormal:`tarantool>` :codebold:`fiber_of_x = fiber.create(function_x)`
-    | :codenormal:`---`
-    | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`fiber_of_x = fiber.create(function_x)`
+| :codenormal:`---`
+| :codenormal:`...`
 
 Get the id of the fiber (fid), to be used in later displays.
 
-    | :codenormal:`tarantool>` :codebold:`fid = fiber_of_x:id()`
-    | :codenormal:`---`
-    | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`fid = fiber_of_x:id()`
+| :codenormal:`---`
+| :codenormal:`...`
 
 Pause for a while, while the detached function runs. Then ... Display the fiber
 id, the fiber status, and gvar (gvar will have gone up a bit depending how long
 the pause lasted). The status is suspended because the fiber spends almost all
 its time sleeping or yielding.
 
-    | :codenormal:`tarantool>` :codebold:`print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)`
-    | :codenormal:`# 102 .  suspended . gvar= 399`
-    | :codenormal:`---`
-    | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)`
+| :codenormal:`# 102 .  suspended . gvar= 399`
+| :codenormal:`---`
+| :codenormal:`...`
 
 Pause for a while, while the detached function runs. Then ... Cancel the fiber.
 Then, once again ... Display the fiber id, the fiber status, and gvar (gvar
 will have gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.
 
-    | :codenormal:`tarantool>` :codebold:`fiber_of_x:cancel()`
-    | :codenormal:`... fiber `lua' has been cancelled`
-    | :codenormal:`... fiber `lua': exiting`
-    | :codenormal:`---`
-    | :codenormal:`- error:`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)`
-    | :codenormal:`# 102 .  dead . gvar= 421`
-    | :codenormal:`---`
-    | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`fiber_of_x:cancel()`
+| :codenormal:`... fiber `lua' has been cancelled`
+| :codenormal:`... fiber `lua' exiting`
+| :codenormal:`---`
+| :codenormal:`- error:`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`print('#',fid,'. ',fiber_of_x:status(),'. gvar=',gvar)`
+| :codenormal:`# 102 .  dead . gvar= 421`
+| :codenormal:`---`
+| :codenormal:`...`

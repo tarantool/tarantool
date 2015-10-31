@@ -128,44 +128,40 @@ In the following example, the user creates two functions, ``password_insert()``
 which inserts a SHA-1_ digest of the word "**^S^e^c^ret Wordpass**" into a tuple
 set, and ``password_check()`` which requires input of a password.
 
-.. code-block:: lua
-
-    localhost> digest = require('digest')
-    localhost> -- this means ignore line feeds until next '!'
-    localhost> console = require('console'); console.delimiter('!')
-    localhost> function password_insert()
-            ->   box.space.tester:insert{12345,
-            ->       digest.sha1('^S^e^c^ret Wordpass')}
-            ->   return 'OK'
-            ->   end!
-    ---
-    ...
-    localhost> function password_check(password)
-            ->   local t
-            ->   t=box.space.tester:select{12345}
-            ->   if (digest.sha1(password)==t[2]) then
-            ->     print('Password is valid')
-            ->     else
-            ->       print('Password is not valid')
-            ->     end
-            -> end!
-    ---
-    ...
-    localhost> password_insert()!
-    Call OK, 1 rows affected
-    ['OK']
-    localhost> -- back to normal: commands end with line feed!
-    localhost> console.delimiter('')
+| :codenormal:`localhost>` :codebold:`digest = require('digest')`
+| :codenormal:`localhost> -- this means ignore line feeds until next '!'`
+| :codenormal:`localhost>` :codebold:`console = require('console'); console.delimiter('!')`
+| :codenormal:`localhost>` :codebold:`function password_insert()`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`box.space.tester:insert{12345,`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`digest.sha1('^S^e^c^ret Wordpass')}`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`return 'OK'`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
+| :codenormal:`localhost>` :codebold:`function password_check(password)`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`local t`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`t=box.space.tester:select{12345}`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`if (digest.sha1(password)==t[2]) then`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`print('Password is valid')`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`else`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`print('Password is not valid')`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
+| :codenormal:`localhost>` :codebold:`password_insert()!`
+| :codenormal:`Call OK, 1 rows affected`
+| :codenormal:`['OK']`
+| :codenormal:`localhost> -- back to normal: commands end with line feed!`
+| :codenormal:`localhost>` :codebold:`console.delimiter('')`
 
 If a later user calls the ``password_check()`` function and enters
 the wrong password, the result is an error.
 
-.. code-block:: lua
-
-    localhost> password_check ('Secret Password')
-    ---
-    Password is not valid
-    ...
+| :codenormal:`localhost>` :codebold:`password_check ('Secret Password')`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`Password is not valid`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
 
 .. _SHA-0: https://en.wikipedia.org/wiki/Sha-0
 .. _SHA-1: https://en.wikipedia.org/wiki/Sha-1
