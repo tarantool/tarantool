@@ -30,8 +30,8 @@ All triggers have the following characteristics.
   order that they were defined in.
 * They must work `within the event context`. If the function contains requests
   which normally could not occur immediately after the event but before the
-  return from the event, effects are undefined. For example, defining a trigger
-  function as ``os.exit()`` or ``box.rollback()`` would be bringing in requests
+  return from the event, effects are undefined. For example, putting
+  ``os.exit()`` or ``box.rollback()`` in a trigger function would be bringing in requests
   outside the event context.
 * They are `replaceable`. The request to "redefine a trigger" consists of passing
   the names of a new trigger function and an old trigger function to one of the
@@ -194,7 +194,7 @@ is executed once after each insert.
 
 The following series of requests will associate an existing function named F
 with an existing space named T, associate the function a second time with the
-same space (so it will be called twice), disable all triggers of T, and destroy
+same space (so it will be called twice), disable all triggers of T, and delete
 each trigger by replacing with ``nil``.
 
 .. code-block:: lua
@@ -210,14 +210,15 @@ each trigger by replacing with ``nil``.
 ===========================================================
 
 The code :code:`on_connect()` -- with no arguments --
-lists all connect-trigger functions;
-:code:`on_auth()` lists all authentication-trigger functions;
-:code:`on_disconnect()` lists all disconnect-trigger functions;
-:code:`on_replace()` lists all replace-trigger functions.
+returns a table of all connect-trigger functions;
+:code:`on_auth()` returns all authentication-trigger functions;
+:code:`on_disconnect()` returns all disconnect-trigger functions;
+:code:`on_replace()` returns all replace-trigger functions.
 In the following example a user finds that there are
 three functions associated with :code:`on_connect`
 triggers, and executes the third function, which happens to
 contain the line "print('function #3')".
+Then it deletes the third trigger.
 
   | :codenormal:`tarantool>` :codebold:`box.session.on_connect()`
   | :codenormal:`---`
@@ -228,6 +229,9 @@ contain the line "print('function #3')".
   |
   | :codenormal:`tarantool>` :codebold:`box.session.on_connect()[3]()`
   | :codenormal:`function #3`
+  | :codenormal:`---`
+  | :codenormal:`...`
+  | :codenormal:`tarantool>` :codebold:`box.session.on_connect(nil,box.session.on_connect()[3])`
   | :codenormal:`---`
   | :codenormal:`...`
 

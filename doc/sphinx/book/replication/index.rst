@@ -143,6 +143,26 @@ If a primary server is started with :codenormal:`box.cfg{...logger =` :codeitali
 then there will be lines in the log file, containing the word "relay",
 when a replica connects or disconnects.
 
+=====================================================================
+                    Preventing Duplicate Actions
+=====================================================================
+
+Suppose that the replica tries to do something
+that the master has already done. For example: |br|
+:code:`box.schema.space.create('X')` |br|
+This would cause an error, "Space X exists".
+For this particular situation, the code could be changed to: |br|
+:code:`box.schema.space.create('X',{if_not_exists=true})` |br|
+But there is a more general solution: the
+:samp:`box.once({key},{function})` method.
+If :code:`box.once()` has been called before with the
+same :codeitalic:`key` value, then :codeitalic:`function`
+is ignored; otherwise :codeitalic:`function` is executed.
+Therefore, actions which should only occur once during the
+life of a replicated session should be placed in a function
+which is executed via :code:`box.once()`. For example: |br|
+:codebold:`function f() box.schema.space.create('X'); end` |br|
+:codebold:`box.once('space_creator',f)`
 
 =====================================================================
                     Master-Master Replication
