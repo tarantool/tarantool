@@ -195,7 +195,7 @@ On each server, specify the :confval:`replication_source` for all the others. Fo
 example, server #3 would have a request:
 :code:`box.cfg{`:samp:`replication_source={uri#1}, replication_source={uri#2}`:code:`}`.
 
-`What if a a server should be taken out of the cluster?` ... |br|
+`What if a server should be taken out of the cluster?` ... |br|
 Run ``box.cfg{}`` again specifying a blank replication source:
 ``box.cfg{replication_source=''}``.
 
@@ -208,6 +208,11 @@ The last changer wins. For example, suppose that server#1 changes the tuple,
 then server#2 changes the tuple. In that case server#2's change overrides
 whatever server#1 did. In order to keep track of who came last, Tarantool
 implements a `vector clock`_.
+
+`What if two servers both insert the same tuple?` ... |br|
+If a master tries to insert a tuple which a replica has inserted already,
+this is an example of a severe error. Replication stops.
+It will have to be restarted manually.
 
 `What if a master disappears and the replica must take over?` ... |br|
 A message will appear on the replica stating that the connection is lost.
