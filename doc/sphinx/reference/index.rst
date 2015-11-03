@@ -28,5 +28,6 @@
     jit
     strict
     csv
+    box
     capi
 

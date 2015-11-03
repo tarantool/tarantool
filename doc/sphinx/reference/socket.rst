@@ -383,12 +383,22 @@ the function invocations will look like ``sock:function_name(...)``.
         otherwise block indefinitely.
 
     .. method:: readable([timeout])
-                writable([timeout])
-                wait([timeout])
 
-        ``sock:readable()`` waits until something is readable, or until a timeout value expires. |br|
-        ``sock:writable()`` waits until something is writable, or until a timeout value expires. |br|
-        ``sock:wait()`` waits until something is either readable or writable, or until a timeout value expires.
+        Wait until something is readable, or until a timeout value expires.
+
+        :return: true if the socket is now readable, false if timeout expired;
+
+    .. method:: writable([timeout])
+
+        Wait until something is writable, or until a timeout value expires.
+
+        :return: true if the socket is now writable, false if timeout expired;
+
+    .. method:: wait([timeout])
+
+        Wait until something is either readable or writable, or until a timeout value expires.
+
+        :return: 'R' if the socket is now readable, 'W' if the socket is now writable, 'RW' if the socket is now both readable and writable, '' (empty string) if timeout expired;
 
     .. method:: name()
 
