@@ -88,6 +88,17 @@ int
 request_encode(struct request *request, struct iovec *iov);
 
 /**
+ * Convert secondary key of request to primary key by given tuple.
+ * Also flush iproto header of request to be recontructed in future.
+ * @param request - request to fix
+ * @param space - space corresponding to request
+ * @param found_tuple - tuple found by secondary key
+ */
+void
+request_rebind_to_primary_index(struct request *request, struct space *space,
+				struct tuple *found_tuple);
+
+/**
  * API of C stored function.
  */
 typedef struct box_function_ctx box_function_ctx_t;

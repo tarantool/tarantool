@@ -178,3 +178,28 @@ request_encode(struct request *request, struct iovec *iov)
 
 	return iovcnt;
 }
+
+/**
+ * Convert secondary key of request to primary key by given tuple.
+ * Also flush iproto header of request to be recontructed in future.
+ * @param request - request to fix
+ * @param space - space corresponding to request
+ * @param found_tuple - tuple found by secondary key
+ */
+void
+request_rebind_to_primary_index(struct request *request, struct space *space,
+				struct tuple *found_tuple)
+{
+	Index *primary = index_find(space, 0);
+	uint32_t key_len = found_tuple->bsize;
+	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
+	const char *data = found_tuple->data;
+	key_len = key_full_create_from_tuple(primary->key_def, data,
+					     key, key_len);
+	assert(key_len <= found_tuple->bsize);
+	request->key = key;
+	request->key_end = key + key_len;
+	request->index_id = 0;
+	/* clear header to guarantee it's rebuild during commit */
+	request->header = NULL;
+}

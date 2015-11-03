@@ -252,6 +252,10 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 	if (old_tuple == NULL)
 		return NULL;
+
+	if (request->index_id != 0)
+		request_rebind_to_primary_index(request, space, old_tuple);
+
 	this->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 	return old_tuple;
 }
@@ -269,6 +273,9 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	if (old_tuple == NULL)
 		return NULL;
+
+	if (request->index_id != 0)
+		request_rebind_to_primary_index(request, space, old_tuple);
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
@@ -299,8 +306,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	 */
 	uint32_t key_len = request->tuple_end - request->tuple;
 	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
-	key_len = key_create_from_tuple(pk->key_def, request->tuple,
-					key, key_len);
+	key_len = key_parts_create_from_tuple(pk->key_def, request->tuple,
+					      key, key_len);
 
 	/* Try to find the tuple by primary key. */
 	primary_key_validate(pk->key_def, key, part_count);

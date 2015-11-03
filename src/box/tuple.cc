@@ -433,14 +433,14 @@ tuple_bless(struct tuple_format *format,
 }
 
 /**
- * Extract key from tuple data.
- * Write the key to the provided buffer ('key' argument), if buffer size is
- * big enough ('key_buf_size' argument)
+ * Extract msgpacked key parts from tuple data.
+ * Write the key to the provided buffer ('key_buf' argument), if the
+ * buffer size is big enough ('key_buf_size' argument)
  * Return length of the key (required buffer size for storing it)
  */
 uint32_t
-key_create_from_tuple(struct key_def *key_def, const char *tuple,
-		      char *key_buf, uint32_t key_buf_size)
+key_parts_create_from_tuple(struct key_def *key_def, const char *tuple,
+			    char *key_buf, uint32_t key_buf_size)
 {
 	uint32_t key_len = 0;
 	uint32_t part_count = key_def->part_count;
@@ -473,6 +473,26 @@ key_create_from_tuple(struct key_def *key_def, const char *tuple,
 		}
 	}
 	return key_len;
+}
+
+/**
+ * Extract msgpacked array with key parts from tuple data/
+ * Write the key to the provided buffer ('key_buf' argument), if the
+ * buffer size is big enough ('key_buf_size' argument)
+ * Return length of the key (required buffer size for storing it)
+ */
+uint32_t
+key_full_create_from_tuple(struct key_def *key_def, const char *tuple,
+			   char *key_buf, uint32_t key_buf_size)
+{
+	uint32_t space_for_arr = mp_sizeof_array(key_def->part_count);
+	if (key_buf_size >= space_for_arr) {
+		key_buf = mp_encode_array(key_buf, key_def->part_count);
+		key_buf_size -= space_for_arr;
+	}
+	return space_for_arr +
+		key_parts_create_from_tuple(key_def, tuple,
+					    key_buf, key_buf_size);
 }
 
 struct tuple *

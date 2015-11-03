@@ -141,7 +141,7 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
  * start a new transaction with autocommit = true.
  */
 struct txn *
-txn_begin_stmt(struct request *request, struct space *space);
+txn_begin_stmt(struct space *space);
 
 void
 txn_begin_in_engine(struct txn *txn, struct space *space);
@@ -178,25 +178,8 @@ txn_commit_ro_stmt(struct txn *txn)
  * End a statement. In autocommit mode, end
  * the current transaction as well.
  */
-static inline void
-txn_commit_stmt(struct txn *txn)
-{
-	assert(txn->in_stmt);
-	/*
-	 * Run on_replace triggers. For now, disallow mutation
-	 * of tuples in the trigger.
-	 */
-	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts,
-						  struct txn_stmt, next);
-	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
-	    && stmt->space->run_triggers) {
-
-		trigger_run(&stmt->space->on_replace, txn);
-	}
-	txn->in_stmt = false;
-	if (txn->is_autocommit)
-		txn_commit(txn);
-}
+void
+txn_commit_stmt(struct request *request, struct space *space, struct txn *txn);
 
 /**
  * Rollback a statement. In autocommit mode,

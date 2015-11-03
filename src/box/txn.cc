@@ -122,7 +122,7 @@ txn_begin_in_engine(struct txn *txn, struct space *space)
 }
 
 struct txn *
-txn_begin_stmt(struct request *request, struct space *space)
+txn_begin_stmt(struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL)
@@ -130,15 +130,41 @@ txn_begin_stmt(struct request *request, struct space *space)
 
 	txn_begin_in_engine(txn, space);
 
-	struct txn_stmt *stmt = txn_stmt_new(txn);
+	txn_stmt_new(txn);
+	return txn;
+}
+
+/**
+ * End a statement. In autocommit mode, end
+ * the current transaction as well.
+ */
+void
+txn_commit_stmt(struct request *request, struct space *space, struct txn *txn)
+{
+	assert(txn->in_stmt);
+	/*
+	 * Run on_replace triggers. For now, disallow mutation
+	 * of tuples in the trigger.
+	 */
+	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts,
+						  struct txn_stmt, next);
+
 	/* Create WAL record for the write requests in non-temporary spaces */
 	if (!space_is_temporary(space)) {
 		txn_add_redo(stmt, request);
 		++txn->n_rows;
 	}
 
-	return txn;
+	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
+	    && stmt->space->run_triggers) {
+
+		trigger_run(&stmt->space->on_replace, txn);
+	}
+	txn->in_stmt = false;
+	if (txn->is_autocommit)
+		txn_commit(txn);
 }
+
 
 static int64_t
 txn_write_to_wal(struct txn *txn)
