@@ -32,6 +32,7 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
+#include <stddef.h>
 #include <sys/types.h>
 
 /*------------------------------------------------------------------------- */
@@ -54,14 +55,14 @@ struct rtree_page_branch {
 };
 
 enum {
-	RTREE_BRANCH_DATA_SIZE = sizeof(((struct rtree_page_branch *)0)->data)
+	RTREE_BRANCH_DATA_SIZE = offsetof(struct rtree_page_branch, rect)
 };
 
 struct rtree_page {
 	/* number of branches at page */
 	int n;
 	/* branches */
-	char data[];
+	struct rtree_page_branch data[];
 };
 
 struct rtree_neighbor_page {
@@ -366,7 +367,7 @@ rtree_branch_get(const struct rtree *tree, const struct rtree_page *page,
 		 unsigned ind)
 {
 	return (struct rtree_page_branch *)
-		(page->data + ind * tree->page_branch_size);
+		((char *)page->data + ind * tree->page_branch_size);
 }
 
 static void
