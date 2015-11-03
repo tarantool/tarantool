@@ -36,6 +36,12 @@ extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+
+/* Help CC understand control flow better, prevent warnings about
+ * uninitialized variables. */
+int luaL_error (lua_State *L, const char *fmt, ...)
+	__attribute__((__noreturn__));
+
 } /* extern "C" */
 
 #include <ipc.h>
