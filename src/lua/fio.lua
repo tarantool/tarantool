@@ -228,4 +228,18 @@ fio.umask = function(umask)
 
 end
 
+fio.abspath = function(path)
+    -- following established conventions of fio module:
+    -- letting nil through and converting path to string
+    if path == nil then
+        return nil
+    end
+    path = tostring(path)
+    if string.sub(path, 1, 1) == '/' then
+        return path
+    else
+        return fio.pathjoin(fio.cwd(), path)
+    end
+end
+
 return fio
