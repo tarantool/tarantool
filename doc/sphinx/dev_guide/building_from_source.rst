@@ -146,9 +146,9 @@ explain what the steps are, then on the Internet you can look at some example sc
    for example |br|
    :code:`CC=gcc-4.8 CXX=g++-4.8 cmake .` |br|
    The option for specifying build type is :samp:`-DCMAKE_BUILD_TYPE={type}` where
-   :samp:`{type} = None | Debug | Release | RelWithDebInfo | MinSizeRel` and a
-   reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebInfo``
-   (``Debug`` is used only by project maintainers and ``Release`` is used only
+   :samp:`{type} = Debug | Release | RelWithDebugInfo` and a
+   reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebugInfo``
+   (``Debug`` is a default used by project maintainers and ``Release`` is used
    when the highest performance is required).
 
    The option for asking to build documentation is :code:`-DENABLE_DOC=true|false`,
