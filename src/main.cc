@@ -66,6 +66,7 @@
 #include <third_party/gopt/gopt.h>
 #include "cfg.h"
 #include "version.h"
+#include <readline/readline.h>
 #include <readline/history.h>
 
 static pid_t master_pid = getpid();
@@ -527,9 +528,16 @@ tarantool_free(void)
 	fiber_free();
 	memory_free();
 	random_free();
+#endif
+	/* tarantool_lua_free() was formerly reponsible for terminal reset,
+	 * but it is no longer called
+	 */
+	if (isatty(STDIN_FILENO)) {
+		/* See comments in readline_cb() */
+		rl_cleanup_after_signal();
+	}
 #ifdef HAVE_BFD
 	symbols_free();
-#endif
 #endif
 }
 
