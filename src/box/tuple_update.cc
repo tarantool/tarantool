@@ -843,6 +843,11 @@ static void
 update_read_ops(struct tuple_update *update, const char *expr,
 		const char *expr_end)
 {
+	if (mp_typeof(*expr) != MP_ARRAY)
+		tnt_raise(IllegalParams,
+			  "update operations must be an "
+			  "array {{op,..}, {op,..}}");
+
 	/* number of operations */
 	update->op_count = mp_decode_array(&expr);
 
@@ -850,6 +855,10 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		tnt_raise(IllegalParams, "too many operations for update");
 	if (update->op_count == 0)
 		tnt_raise(IllegalParams, "no operations for update");
+	if (mp_typeof(*expr) != MP_ARRAY)
+		tnt_raise(IllegalParams,
+			  "update operations"
+			  " must be an array {{op,..}, {op,..}}");
 
 	/* Read update operations.  */
 	update->ops = (struct update_op *) update->alloc(update->alloc_ctx,
@@ -861,12 +870,12 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		uint32_t args, len;
 		args = mp_decode_array(&expr);
 		if (args < 1)
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "expected an update operation"
-				  "non empty array)");
+			tnt_raise(IllegalParams,
+				  "update operation must be an "
+				  "array {op,..}, got empty array");
 		if (mp_typeof(*expr) != MP_STR)
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "expected an update operation name (string)");
+			tnt_raise(IllegalParams,
+				  "update operation name must be a string");
 
 		op->opcode = *mp_decode_str(&expr, &len);
 
@@ -897,6 +906,9 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		}
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
+		if (mp_typeof(*expr) != MP_INT && mp_typeof(*expr) != MP_UINT)
+			tnt_raise(IllegalParams,
+				  "update fieldno option name must be numeric");
 		int32_t field_no = mp_read_int(update, op, &expr);
 		if (field_no - update->index_base >= 0) {
 			op->field_no = field_no - update->index_base;

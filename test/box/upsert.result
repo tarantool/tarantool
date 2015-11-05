@@ -418,8 +418,7 @@ test(t, {{'&', 3, 1}, {'&', 2, 1}, {'&', 4, 1}}, {{1, '1', 1, '1'}})
 ...
 test(t, {{'&', 'a', 3}, {'+', 3, 3}}, {{1, '1', 1, '1'}})
 ---
-- error: 'Argument type in operation ''&'' on field 16777217 does not match field
-    type: expected a UINT'
+- error: Illegal parameters, update fieldno option name must be numeric
 ...
 test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ---

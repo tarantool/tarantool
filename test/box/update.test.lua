@@ -234,4 +234,14 @@ s:update({0}, {{'+', 2, -0x4000000000000000ll}})  -- ok
 s:replace{0, -0x4000000000000000ll}
 s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 
+-- some wrong updates --
+s:update({0}, 0)
+s:update({0}, {})
+s:update({0}, {'+', 2, 2})
+s:update({0}, {{}})
+s:update({0}, {{'+'}})
+s:update({0}, {{'+', 0}})
+s:update({0}, {{'+', '+', '+'}})
+s:update({0}, {{0, 0, 0}})
+
 s:drop()
