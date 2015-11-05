@@ -394,3 +394,20 @@ fio.dirname('/')
 ---
 - /
 ...
+-- abspath
+fio.abspath(nil)
+---
+- null
+...
+fio.abspath("/")
+---
+- /
+...
+fio.abspath("/tmp")
+---
+- /tmp
+...
+type(string.find(fio.abspath("tmp"), "tmp"))
+---
+- number
+...

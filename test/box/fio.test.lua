@@ -129,3 +129,10 @@ fio.dirname('/abc')
 fio.dirname('/abc/cde')
 fio.dirname('/abc/cde/')
 fio.dirname('/')
+
+-- abspath
+fio.abspath(nil)
+fio.abspath("/")
+fio.abspath("/tmp")
+type(string.find(fio.abspath("tmp"), "tmp"))
+
