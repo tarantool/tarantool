@@ -1,5 +1,5 @@
-#include "process_title.h"
-#include "third_party/proctitle.h"
+#include "title.h"
+#include "proc_title.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,54 +13,62 @@ static char *script_name;
 static char *custom;
 static char *status;
 
-char **process_title_init(int argc, char **argv)
+char **title_init(int argc, char **argv)
 {
-	char **argv_copy = init_set_proc_title(argc, argv);
+	char **argv_copy = proc_title_init(argc, argv);
 	if (argv_copy == NULL)
 		return NULL;
 
-	title_buf_size = get_proc_title_max_length();
+	title_buf_size = proc_title_max_length();
 	title_buf = malloc(title_buf_size);
 
-	/* ensure process_title_get() always yields a valid string */
+	/* ensure title_get() always yields a valid string */
 	if (title_buf != NULL && title_buf_size != 0)
 		title_buf[0] = '\0';
 
-	process_title_set_interpretor_name(argv[0]);
+	title_set_interpretor_name(argv[0]);
 
 	return argv_copy;
 }
 
-void process_title_free(int argc, char **argv)
+void title_free(int argc, char **argv)
 {
 	free(title_buf); title_buf = NULL;
 	free(script_name); script_name = NULL;
 	free(custom); custom = NULL;
 	free(status); status = NULL;
 
-	free_proc_title(argc, argv);
+	proc_title_free(argc, argv);
 }
 
-const char *process_title_get()
+const char *title_get()
 {
 	return title_buf;
 }
 
+/**
+ * Return a name without preceding path, e.g. /a/b/c -> c.
+ * Like basename(), but doesn't modify the subject string.
+ * Unlike basename, returns an empty string for directories
+ * /a/b/c/
+ */
 static const char *
-short_name(const char *name)
+my_basename(const char *name)
 {
-	const char *sep = NULL, *p;
+	const char *sep = NULL;
+	const char *p;
 	if (name == NULL)
 		return NULL;
-	for (p = name; *p; p++)
+	for (p = name; *p != '\0'; p++) {
 		if (*p == '/')
 			sep = p;
+	}
 	if (sep)
 		return sep[1] ? sep + 1 : NULL;
 	return name;
 }
 
-void process_title_update()
+void title_update()
 {
 	if (title_buf == NULL || title_buf_size == 0)
 		return;
@@ -68,8 +76,8 @@ void process_title_update()
 	char *output = title_buf;
 	char *output_end = title_buf + title_buf_size;
 	int rc;
-	const char *script_name_short = short_name(script_name);
-	const char *interpretor_name_short = short_name(interpretor_name);
+	const char *script_name_short = my_basename(script_name);
+	const char *interpretor_name_short = my_basename(interpretor_name);
 
 	const char *part1 = "tarantool", *part2 = status, *part3 = NULL;
 
@@ -86,8 +94,9 @@ void process_title_update()
 		assert(script_name_short);
 		assert(interpretor_name_short);
 		part1 = script_name_short;
-		/* omit interpretor name when it is the prefix of scriptname, ex:
-		 * tarantool/tarantoolctl
+		/*
+		 * Omit interpretor name when it is the prefix of
+		 * scriptname, ex: tarantool/tarantoolctl
 		 */
 		if (memcmp(script_name_short, interpretor_name_short,
 		           strlen(interpretor_name_short)) != 0)
@@ -126,15 +135,17 @@ done:
 	if (output >= output_end) {
 		output = output_end - 1;
 	}
-	/* failed snprintf leaves the buffer in unspecified state hence
-	 * explicit NUL termination */
+	/*
+	 * failed snprintf leaves the buffer in unspecified state hence
+	 * explicit NUL termination
+	 */
 	*output = '\0';
-	set_proc_title("%s", title_buf);
+	proc_title_set("%s", title_buf);
 }
 
 #define DEFINE_STRING_ACCESSORS(name) \
-const char *process_title_get_ ## name() { return name; } \
-void process_title_set_ ## name(const char *str) \
+const char *title_get_ ## name() { return name; } \
+void title_set_ ## name(const char *str) \
 { \
 	if (str == NULL || str[0] == '\0') { \
 		free(name); name = NULL; \

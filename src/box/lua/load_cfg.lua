@@ -139,7 +139,7 @@ local dynamic_cfg = {
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
-        require('proc_title').update(box.cfg.custom_proc_title)
+        require('title').update(box.cfg.custom_proc_title)
     end
 }
 

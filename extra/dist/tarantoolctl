@@ -455,7 +455,7 @@ end
 function start()
     log.info("Starting instance...")
     box.cfg = wrapper_cfg
-    require('proc_title').update{
+    require('title').update{
         script_name = instance_name,
         __defer_update = true
     }

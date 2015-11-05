@@ -23,7 +23,7 @@
 #include "latch.h"
 #include <lib/csv/csv.h>
 #include <lua/clock.h>
-#include "process_title.h"
+#include "title.h"
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -110,14 +110,14 @@ void *ffi_symbols[] = {
 	(void *) csv_next,
 	(void *) csv_feed,
 	(void *) greeting_decode,
-	(void *) process_title_update,
-	(void *) process_title_get,
-	(void *) process_title_set_interpretor_name,
-	(void *) process_title_get_interpretor_name,
-	(void *) process_title_set_script_name,
-	(void *) process_title_get_script_name,
-	(void *) process_title_set_custom,
-	(void *) process_title_get_custom,
-	(void *) process_title_set_status,
-	(void *) process_title_get_status,
+	(void *) title_update,
+	(void *) title_get,
+	(void *) title_set_interpretor_name,
+	(void *) title_get_interpretor_name,
+	(void *) title_set_script_name,
+	(void *) title_get_script_name,
+	(void *) title_set_custom,
+	(void *) title_get_custom,
+	(void *) title_set_status,
+	(void *) title_get_status,
 };

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "proctitle.h"
+#include "proc_title.h"
 #include "trivia/config.h"
 
 #include <errno.h>
@@ -202,7 +202,7 @@ ps_relocate_argv(struct ps_relocation *rel,
  * that might try to hang onto a getenv() result.)
  */
 char **
-init_set_proc_title(int argc, char **argv)
+proc_title_init(int argc, char **argv)
 {
 #if defined(PS_USE_CLOBBER_ARGV)
 	struct ps_relocation rel = {NULL, NULL, NULL};
@@ -284,19 +284,19 @@ init_set_proc_title(int argc, char **argv)
 }
 
 void
-free_proc_title(int argc, char **argv)
+proc_title_free(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
 	/*
-	 * Intentionally a noop. Undoing init_set_proc_title is hard and
+	 * Intentionally a noop. Undoing proc_title_init is hard and
 	 * unsafe because all sorts of code could have grabbed pointers from
 	 * argv/environ by now.
 	 */
 }
 
 void
-set_proc_title(const char *format, ...)
+proc_title_set(const char *format, ...)
 {
 #ifndef PS_USE_NONE
 	va_list ap;
@@ -369,7 +369,7 @@ set_proc_title(const char *format, ...)
 }
 
 size_t
-get_proc_title_max_length()
+proc_title_max_length()
 {
     return ps_buffer_size - ps_sentinel_size;
 }

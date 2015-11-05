@@ -31,7 +31,7 @@ lua_source(lua_sources lua/fio.lua)
 lua_source(lua_sources lua/csv.lua)
 lua_source(lua_sources lua/strict.lua)
 lua_source(lua_sources lua/clock.lua)
-lua_source(lua_sources lua/proc_title.lua)
+lua_source(lua_sources lua/title.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
@@ -96,6 +96,7 @@ set (server_sources
      fiob.c
      tt_uuid.c
      uri.c
+     proc_title.c
      coeio_file.cc
      lua/digest.cc
      lua/init.cc
@@ -111,6 +112,14 @@ set (server_sources
      lua/clock.c
      ${lua_sources}
 )
+
+if (NOT TARGET_OS_DEBIAN_FREEBSD)
+    if (TARGET_OS_FREEBSD)
+        set_source_files_properties(
+        ${PROJECT_SOURCE_DIR}/src/proc_title.c
+        PROPERTIES COMPILE_FLAGS "-DHAVE_SETPROCTITLE")
+    endif()
+endif()
 
 if (ENABLE_TRACE)
     set (server_sources ${server_sources} trace.c)
@@ -165,7 +174,7 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
-add_executable(tarantool main.cc ffisyms.cc process_title.c)
+add_executable(tarantool main.cc ffisyms.cc title.c)
 add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool box ${common_libraries})
 

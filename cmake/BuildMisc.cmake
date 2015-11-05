@@ -4,7 +4,6 @@ macro(libmisc_build)
     set(misc_src
         ${PROJECT_SOURCE_DIR}/third_party/crc32.c
         ${PROJECT_SOURCE_DIR}/third_party/sha1.c
-        ${PROJECT_SOURCE_DIR}/third_party/proctitle.c
         ${PROJECT_SOURCE_DIR}/third_party/PMurHash.c
         ${PROJECT_SOURCE_DIR}/third_party/base64.c
     )
@@ -30,13 +29,6 @@ macro(libmisc_build)
         list(APPEND misc_src
             ${PROJECT_SOURCE_DIR}/third_party/clock_gettime.c
         )
-    endif()
-    if (NOT TARGET_OS_DEBIAN_FREEBSD)
-        if (TARGET_OS_FREEBSD)
-            set_source_files_properties(
-            ${PROJECT_SOURCE_DIR}/third_party/proctitle.c
-            PROPERTIES COMPILE_FLAGS "-DHAVE_SETPROCTITLE")
-        endif()
     endif()
 
     if (HAVE_OPENMP)

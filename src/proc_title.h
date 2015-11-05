@@ -34,11 +34,11 @@
 extern "C" {
 #endif
 
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...)
+char **proc_title_init(int argc, char **argv);
+void proc_title_free(int argc, char **argv);
+void proc_title_set(const char *format, ...)
     __attribute__((__format__(__printf__, 1, 2)));
-size_t get_proc_title_max_length();
+size_t proc_title_max_length();
 
 #ifdef __cplusplus
 } /* extern "C" */

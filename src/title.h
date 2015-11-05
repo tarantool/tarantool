@@ -71,30 +71,30 @@ extern "C" {
  *
  * On Linux customized title is writen on top of argv/environ memory block.
  */
-char **process_title_init(int argc, char **argv);
+char **title_init(int argc, char **argv);
 
-void process_title_free(int argc, char **argv);
+void title_free(int argc, char **argv);
 
 /** generate and update process title */
-void process_title_update();
+void title_update();
 
 /** query current title */
-const char *process_title_get();
+const char *title_get();
 
-/* parts: invoke process_title_update() to propagate changes */
+/* parts: invoke title_update() to propagate changes */
 
 /* interpretor name */
-void process_title_set_interpretor_name(const char *name);
-const char *process_title_get_interpretor_name();
+void title_set_interpretor_name(const char *name);
+const char *title_get_interpretor_name();
 /* script name */
-void process_title_set_script_name(const char *name);
-const char *process_title_get_script_name();
+void title_set_script_name(const char *name);
+const char *title_get_script_name();
 /* custom */
-void process_title_set_custom(const char *);
-const char *process_title_get_custom();
+void title_set_custom(const char *);
+const char *title_get_custom();
 /* status */
-void process_title_set_status(const char *);
-const char *process_title_get_status();
+void title_set_status(const char *);
+const char *title_get_status();
 
 #if defined(__cplusplus)
 } /* extern "C" */

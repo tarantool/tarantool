@@ -68,7 +68,7 @@
 #include "version.h"
 #include <readline/readline.h>
 #include <readline/history.h>
-#include "process_title.h"
+#include "title.h"
 
 static pid_t master_pid = getpid();
 static char *script = NULL;
@@ -433,8 +433,8 @@ load_cfg()
 	}
 
 	const char *proc_title = cfg_gets("custom_proc_title");
-	process_title_set_custom(proc_title);
-	process_title_update();
+	title_set_custom(proc_title);
+	title_update();
 	say_logger_init(cfg_gets("logger"),
 			cfg_geti("log_level"),
 			cfg_geti("logger_nonblock"),
@@ -458,7 +458,7 @@ tarantool_free(void)
 		clear_history();
 		free(history);
 	}
-	process_title_free(main_argc, main_argv);
+	title_free(main_argc, main_argv);
 
 	/* unlink pidfile. */
 	if (pid_file != NULL) {
@@ -565,7 +565,7 @@ main(int argc, char **argv)
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);
 #endif
-	argv = process_title_init(argc, argv);
+	argv = title_init(argc, argv);
 	/*
 	 * Support only #!/usr/bin/tarantol but not
 	 * #!/usr/bin/tarantool -a -b because:
@@ -584,7 +584,7 @@ main(int argc, char **argv)
 		argv++;
 		argc--;
 		script = abspath(argv[0]);
-		process_title_set_script_name(argv[0]);
+		title_set_script_name(argv[0]);
 	} else if (isatty(STDIN_FILENO)) {
 		/* load history file */
 		char *home = getenv("HOME");
