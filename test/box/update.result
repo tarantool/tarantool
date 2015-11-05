@@ -463,7 +463,7 @@ s:update({1})
 ...
 s:update({1}, {'=', 1, 1})
 ---
-- error: Invalid MsgPack - expected an update operation name (string)
+- error: Illegal parameters, update operations must be an array {{op,..}, {op,..}}
 ...
 s:drop()
 ---
@@ -764,6 +764,40 @@ s:replace{0, -0x4000000000000000ll}
 s:update({0}, {{'+', 2, -0x4000000000000001ll}})  -- overflow
 ---
 - error: Integer overflow when performing '+' operation on field 2
+...
+-- some wrong updates --
+s:update({0}, 0)
+---
+- error: Usage index:update(key, ops)
+...
+s:update({0}, {})
+---
+- error: Illegal parameters, no operations for update
+...
+s:update({0}, {'+', 2, 2})
+---
+- error: Illegal parameters, update operations must be an array {{op,..}, {op,..}}
+...
+s:update({0}, {{}})
+---
+- error: Illegal parameters, update operation must be an array {op,..}, got empty
+    array
+...
+s:update({0}, {{'+'}})
+---
+- error: Unknown UPDATE operation
+...
+s:update({0}, {{'+', 0}})
+---
+- error: Unknown UPDATE operation
+...
+s:update({0}, {{'+', '+', '+'}})
+---
+- error: Illegal parameters, update fieldno option name must be numeric
+...
+s:update({0}, {{0, 0, 0}})
+---
+- error: Illegal parameters, update operation name must be a string
 ...
 s:drop()
 ---
