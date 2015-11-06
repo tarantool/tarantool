@@ -76,8 +76,8 @@ void vsay(int level, const char *filename, int line, const char *error,
           __attribute__ ((format(printf, 5, 0)));
 
 /** \cond public */
-typedef void (*sayfunc_t)(int level, const char *filename, int line, const char *error,
-                          const char *format, ...);
+typedef void (*sayfunc_t)(int, const char *, int, const char *,
+		    const char *, ...);
 
 /** Internal function used to implement say() macros */
 extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
