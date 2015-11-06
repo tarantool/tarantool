@@ -62,10 +62,13 @@ be presented to the client as ``ER_PROC_LUA``.
 .. function:: box.error.last()
 
     Returns a description of the last error, as a Lua table
-    with three members: "type" (string) error's C++ class,
-    "message" (string) error's message, "code" (numeric) error's number.
+    with five members: "line" (number) Tarantool source file line number,
+    "code" (number) error's number,
+    "type", (string) error's C++ class,
+    "message" (string) error's message,
+    "file" (string) Tarantool source file.
     Additionally, if the error is a system error (for example due to a
-    failure in socket or file io), there is a fourth member:
+    failure in socket or file io), there may be a sixth member:
     "errno" (number) C standard error number.
 
     rtype: table
@@ -82,13 +85,18 @@ be presented to the client as ``ER_PROC_LUA``.
     | :codenormal:`- error: Arbitrary message`
     | :codenormal:`..`
     |
+    | :codenormal:`tarantool>` :codebold:`box.schema.space.create('#')`
+    | :codenormal:`---`
+    | :codenormal:`- error: Invalid identifier '#' (expected letters, digits or an underscore)`
+    | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`box.error.last()`
     | :codenormal:`---`
-    | :codenormal:`- type: ClientError`
-    | :codenormal:`message: Arbitrary message`
-    | :codenormal:`code: 555`
+    | :codenormal:`- line: 278`
+    | |nbsp| |nbsp| :codenormal:`code: 70`
+    | |nbsp| |nbsp| :codenormal:`type: ClientError`
+    | |nbsp| |nbsp| :codenormal:`message: Invalid identifier '#' (expected letters, digits or an underscore)`
+    | |nbsp| |nbsp| :codenormal:`file: /tmp/buildd/tarantool-1.6.6.252.g1654e31~precise/src/box/key_def.cc`
     | :codenormal:`...`
-    |
     | :codenormal:`tarantool>` :codebold:`box.error.clear()`
     | :codenormal:`---`
     | :codenormal:`...`

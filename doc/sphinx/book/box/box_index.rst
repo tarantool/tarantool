@@ -704,12 +704,28 @@ Now let us create a space and index for cuboids, which are rectangle-or-boxes th
 | :codenormal:`tarantool>`:codebold:`box.space.R:create_index('primary',{parts={1,'NUM'}})`
 | :codenormal:`tarantool>`:codebold:`box.space.R:create_index('S',{type='RTREE',unique=false,dimension=3,parts={2,'ARRAY'}})`
 
-The additional field here is 'dimension=3'. The default dimension is 2, which is
+The additional field here is :codenormal:`dimension=3`. The default dimension is 2, which is
 why it didn't need to be specified for the examples of rectangle. The maximum dimension
 is 20. Now for insertions and selections there will usually be 6 coordinates. For example:
 
 | :codenormal:`tarantool>`:codebold:`box.space.R:insert{1,{0,3,0,3,0,3}}`
 | :codenormal:`tarantool>`:codebold:`box.space.R.index.S:select({1,2,1,2,1,2},{iterator=box.index.GT})`
+
+Now let us create a space and index for Manhattan-style spatial objects, which are rectangle-or-boxes that have
+a different way to calculate neighbors.
+
+    | :codebold:`box.schema.space.create('R')`
+    | :codebold:`box.space.R:create_index('primary',{parts={1,'NUM'}})`
+    | :codebold:`box.space.R:create_index('S',{type='RTREE',unique=false,distance='manhattan',parts={2,'ARRAY'}})`
+
+The additional field here is :codenormal:`distance='manhattan'`.
+The default distance calculator is 'euclid', which is the straightforward as-the-crow-flies method.
+The optional distance calculator is 'manhattan', which can be a more appropriate method
+if one is following the lines of a grid rather than traveling in a straight line.
+
+    | :codebold:`box.space.R:insert{1,{0,3,0,3}}`
+    | :codebold:`box.space.R.index.S:select({1,2,1,2},{iterator=box.index.NEIGHBOR})`
+
 
 More examples of spatial searching are online in the file `R tree index quick
 start and usage`_.
