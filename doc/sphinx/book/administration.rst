@@ -249,14 +249,14 @@ The settings in the above script are:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The command format is :samp:`tarantoolctl {operation} {application_name}`, where
-operation is one of: start, stop, enter, logrotate, status, reload. Thus ...
+operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
-| :codenormal:`tarantoolctl start my_app            -- starts application my_app`
-| :codenormal:`tarantoolctl stop my_app             -- stops my_app`
-| :codenormal:`tarantoolctl enter my_app            -- show my_app's admin console, if it has one`
-| :codenormal:`tarantoolctl logrotate my_app        -- rotate my_app's log files (make new, remove old)`
-| :codenormal:`tarantoolctl status my_app           -- check my_app's status`
-| :codenormal:`tarantoolctl reload my_app file_name -- execute code from file_name as an instance of my_app`
+| :codenormal:`tarantoolctl start my_app           -- starts application my_app`
+| :codenormal:`tarantoolctl stop my_app            -- stops my_app`
+| :codenormal:`tarantoolctl enter my_app           -- show my_app's admin console, if it has one`
+| :codenormal:`tarantoolctl logrotate my_app       -- rotate my_app's log files (make new, remove old)`
+| :codenormal:`tarantoolctl status my_app          -- check my_app's status`
+| :codenormal:`tarantoolctl eval my_app file_name  -- execute code from file_name as an instance of my_app`
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl

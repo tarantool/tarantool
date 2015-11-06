@@ -112,7 +112,7 @@ coio_task(struct coio_task *task, coio_task_cb func,
  * @endcode
  */
 ssize_t
-coio_call(ssize_t (*func)(va_list ap), ...);
+coio_call(ssize_t (*func)(va_list), ...);
 
 struct addrinfo;
 

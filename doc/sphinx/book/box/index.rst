@@ -1,3 +1,5 @@
+.. _database-chapter:
+
 *******************************************************************************
                               Database
 *******************************************************************************
@@ -442,7 +444,7 @@ First, there are four *naming variations*:
 There is an assumption that the numeric id of 'tester' is 512, which happens to be the case in our
 sandbox example only. Literal values such as 'tester'
 may be replaced by variable names. Examples and descriptions
-in this manual have the "box.space.space.tester:" form;
+in this manual have the "box.space.tester:" form;
 however, this is a matter of user preference and all
 the variants exist in the wild.
 

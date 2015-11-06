@@ -87,3 +87,5 @@
     is not supported. The ``alter()`` and ``count()`` and
     ``min()`` and ``max()`` and ``random()`` and ``auto_increment()`` functions
     are not supported. Temporary spaces are not supported.
+    The maximum number of fields in an index is 8.
+
