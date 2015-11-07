@@ -61,7 +61,18 @@ authenticate(const char *user_name, uint32_t len,
 			   "authentication request body");
 	}
 	mp_next(&tuple); /* Skip authentication mechanism. */
-	scramble = mp_decode_str(&tuple, &scramble_len);
+	if (mp_typeof(*tuple) == MP_STR) {
+		scramble = mp_decode_str(&tuple, &scramble_len);
+	} else if (mp_typeof(*tuple) == MP_BIN) {
+		/*
+		 * scramble is not a character stream, so some
+		 * codecs automatically pack it as MP_BIN
+		 */
+		scramble = mp_decode_bin(&tuple, &scramble_len);
+	} else {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			   "authentication scramble");
+	}
 	if (scramble_len != SCRAMBLE_SIZE) {
 		/* Authentication mechanism, data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
