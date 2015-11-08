@@ -11,12 +11,15 @@
 
     By setting log_level, one can enable logging of all classes below
     or equal to the given level. Tarantool prints its logs to the standard
-    error stream by default, but this can be changed with the :confval:`logger`
+    error stream by default, but this can be changed with the :ref:`logger <log-label>`
     configuration parameter.
 
     Type: integer |br|
     Default: 5 |br|
     Dynamic: **yes** |br|
+
+.. _log-label:
+
 
 .. class:: logger
 

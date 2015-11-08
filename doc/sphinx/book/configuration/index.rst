@@ -151,7 +151,6 @@ one can use :ref:`console.start() <console-start>`.
 .. _wal_dir:
 .. _wal_mode:
 .. _snapshot daemon:
-.. _logger:
 
 =====================================================================
                 Configuration parameters

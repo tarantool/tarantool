@@ -39,13 +39,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
     :class:`box.space._priv` |br|
     :class:`box.space._cluster`  |br| 
 
-.. _box_space:
+.. _box__space:
 
 .. module:: box.space
 
 .. class:: space_object
     
     
+.. _space_object_create_index:
+
     .. function:: create_index(index-name [, {options} ])
 
         Create an index. It is mandatory to create an index for a tuple set
@@ -96,6 +98,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`...`
 
+.. _space_insert:
+
     .. function:: insert(tuple)
 
         Insert a tuple into a space.
@@ -112,6 +116,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
          
         | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
 
+.. _space_object_select:
 
     .. function:: select(key)
 
@@ -182,6 +187,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         "equal to") and how many tuples to return, see the later section
         :ref:`box.space.space-name[.index.index-name]:select <index_select>`.
 
+.. _space_object_get:
 
     .. function:: get(key)
 
@@ -210,7 +216,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:get{1}`
 
-    .. _space_drop:    
+.. _space_object_drop:    
 
     .. function:: drop()
 
@@ -229,7 +235,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.space_that_does_not_exist:drop()`
 
-    .. _space_rename:    
+.. _space_object_rename:    
 
     .. function:: rename(space-name)
 
@@ -251,7 +257,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`...`
 
-    .. _space_replace_put:    
+.. _space_object_replace:    
 
     .. function:: replace(tuple)
                   put(tuple)
@@ -280,7 +286,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:replace{5000, 'New value'}`
 
-    .. _space_update:
+.. _space_update:
 
     .. function:: update(key, {{operator, field_no, value}, ...})
 
@@ -425,16 +431,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
         The seventh argument is ``'!!'``, because ``'!!'`` is to be added at this position.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'X!!Z'``.
 
+.. _space_object_upsert:
 
     .. function:: upsert(tuple_value, {{operator, field_no, value}, ...}, )
 
         Update or insert a tuple.
 
         If there is an existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :ref:`update <box_update>` and the
+        request has the same effect as :ref:`update <space_update>` and the
         :code:`{{operator, field_no, value}, ...}` parameter is used.
         If there is no existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :ref:`insert <box_insert>` and the
+        request has the same effect as :ref:`insert <space_insert>` and the
         :code:`{tuple_value}` parameter is used. However, unlike :code:`insert` or
         :code:`update`, :code:`upsert` will not read a tuple and perform
         error checks before returning -- this is a design feature which
@@ -459,6 +466,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Example:**
 
         | :codenormal:`tarantool>`:codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
+
+.. _space_object_delete:
 
     .. function:: delete(key)
 
@@ -488,7 +497,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         |   :codenormal:`expected NUM'`
         | :codenormal:`...`
 
-    .. _space_id:
+.. _space_object_id:
 
     .. function:: id()
 
@@ -499,7 +508,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
-    .. _space_enabled:
+.. _space_object_enabled:
 
     .. function:: enabled()
 
@@ -508,7 +517,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: boolean
 
-    .. _space_field_count:
+.. _space_field_count:
 
     .. function:: field_count()
 
@@ -522,7 +531,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
-    .. _space_index:
+.. _space_object_index:
 
     .. function:: index()
 
@@ -547,7 +556,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- TREE`
         | :codenormal:`...`
 
-    .. _space_len:
+.. _space_object_len:
 
     .. function:: len()
 
@@ -560,7 +569,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 2`
         | :codenormal:`...`
 
-    .. _space_truncate:
+.. _space_object_truncate:
 
     .. function:: truncate()
 
@@ -581,7 +590,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`...`
 
 
-    .. _space_inc:
+.. _space_object_inc:
 
     .. function:: inc{field-value [, field-value ...]}
 
@@ -617,7 +626,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 2`
         | :codenormal:`...`
 
-    .. _space_dec:
+.. _space_object_dec:
 
     .. function:: dec{field-value [, field-value ...]}
 
@@ -656,7 +665,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 998`
         | :codenormal:`...`
 
-    .. _space_auto_increment:
+.. _space_object_auto_increment:
 
     .. function:: auto_increment{field-value [, field-value ...]}
 
@@ -687,7 +696,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- [2, 'Fld#3']`
         | :codenormal:`...`
 
-    .. _space_pairs:
+.. _space_object_pairs:
 
     .. function:: pairs()
 
