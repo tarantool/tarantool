@@ -87,5 +87,26 @@ host/port.
     | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`port: /tmp/X.sock`
     | :codenormal:`...`
 
+.. _console-start:
+
+.. function:: start()
+
+    Start the console on the current interactive terminal.
+
+    EXAMPLE |BR|
+    A special use of :codenormal:`console.start()` is with
+    :ref:`initialization files <URI>`.
+    Normally, if one starts the tarantool server with |br|
+    :codenormal:`tarantool` :codeitalic:`initialization file` |br|
+    there is no console. This can be remedied by adding
+    these lines at the end of the initialization file:
+    :codenormal:`console = require('console')` |br|
+    :codenormal:`console.start()` |br|
+
+
+
+
+
+
 
 

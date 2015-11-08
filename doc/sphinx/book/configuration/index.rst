@@ -97,6 +97,7 @@ In certain circumstances a Unix domain socket may be used
 where a URI is expected, for example "unix/:/tmp/unix_domain_socket.sock" or
 simply "/tmp/unix_domain_socket.sock".
 
+.. _init-label:
 
 =====================================================================
                        Initialization file
@@ -136,6 +137,10 @@ Then the screen might look like this:
 | :codenormal:`... main/102/leave_local_hot_standby I> ready to accept requests`
 | :codenormal:`Starting  ARG`
 | :codenormal:`... main C> entering the event loop`
+
+If one wishes to start an interactive session
+on the same terminal after initialization is complete,
+one can use :ref:`console.start() <console-start>`.
 
 .. _local_hot_standby:
 .. _replication_port:
