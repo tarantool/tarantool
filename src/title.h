@@ -42,9 +42,9 @@
  *
  * Parts missing:
  *
- * 1) no custom title (note the trailing colon - its intentional)
+ * 1) no custom title
  *
- * tarantool script.lua <running>:
+ * tarantool script.lua <running>
  *
  * 2) script name missing
  *

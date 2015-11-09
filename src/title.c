@@ -111,15 +111,15 @@ void title_update()
 	assert(part1);
 	if (part2) {
 		if (part3) {
-			rc = OUTPUT("%s %s <%s>:", part1, part2, part3);
+			rc = OUTPUT("%s %s <%s>", part1, part2, part3);
 		} else {
-			rc = OUTPUT("%s %s:", part1, part2);
+			rc = OUTPUT("%s %s", part1, part2);
 		}
 	} else {
 		if (part3) {
-			rc = OUTPUT("%s <%s>:", part1, part3);
+			rc = OUTPUT("%s <%s>", part1, part3);
 		} else {
-			rc = OUTPUT("%s:", part1);
+			rc = OUTPUT("%s", part1);
 		}
 	}
 	if (rc < 0 || (output += rc) >= output_end)
@@ -129,7 +129,7 @@ void title_update()
 	 * custom title
 	 */
 	if (custom) {
-		rc = OUTPUT(" %s", custom);
+		rc = OUTPUT(": %s", custom);
 		if (rc < 0 || (output += rc) >= output_end)
 			goto done;
 	}
