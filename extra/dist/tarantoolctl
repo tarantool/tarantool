@@ -456,7 +456,7 @@ function start()
     log.info("Starting instance...")
     box.cfg = wrapper_cfg
     require('title').update{
-        script_name = instance_name,
+        script_name = instance_path,
         __defer_update = true
     }
     local success, data = pcall(dofile, instance_path)
