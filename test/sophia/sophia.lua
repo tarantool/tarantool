@@ -17,8 +17,7 @@ box.cfg {
 --    pid_file          = "tarantool.pid",
     rows_per_wal      = 50,
     sophia_dir        = "./sophia/sophia_test",
-    sophia            = sophia,
-    custom_proc_title = "default"
+    sophia            = sophia
 }
 
 require('console').listen(os.getenv('ADMIN'))

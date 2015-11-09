@@ -1,6 +1,5 @@
 --# set connection default
 box.schema.user.grant('guest', 'replication')
--- box.cfg { custom_proc_title = "master" }
 --# create server replica with rpl_master=default, script='replication/replica.lua'
 --# start server replica
 --# set connection replica

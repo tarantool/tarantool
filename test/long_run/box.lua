@@ -16,7 +16,6 @@ box.cfg {
     rows_per_wal      = 500000,
     sophia_dir        = "./sophia_test",
     sophia            = sophia,
-    custom_proc_title = "default"
 }
 
 require('console').listen(os.getenv('ADMIN'))
