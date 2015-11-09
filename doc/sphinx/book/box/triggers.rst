@@ -8,14 +8,14 @@ Triggers, also known as callbacks, are functions which the server executes when
 certain events happen. Currently the main types of triggers are `connection triggers`_,
 which are executed when a session begins or ends, and `replace triggers`_ which are
 for database events.
-    
-    :func:`box.session.on_connect`, 
-    :func:`box.session.on_disconnect`, 
-    :func:`box.session.on_auth`, 
-    :func:`space_object.on_replace`, 
+
+    :func:`box.session.on_connect`,
+    :func:`box.session.on_disconnect`,
+    :func:`box.session.on_auth`,
+    :func:`space_object.on_replace`,
     :func:`space_object.run_triggers`
 
-All triggers have the following characteristics: 
+All triggers have the following characteristics:
 
 * They associate a `function` with an `event`. The request to "define a trigger"
   consists of passing the name of the trigger's function to one of the
@@ -60,10 +60,10 @@ All triggers have the following characteristics:
 
     If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
 
-    **Example:** 
+    **Example:**
 
     | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_connect(f)`
-    
+
     .. WARNING::
 
         If a trigger always results in an error, it may become impossible to
@@ -82,7 +82,7 @@ All triggers have the following characteristics:
 
     If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
 
-    **Example:** 
+    **Example:**
 
     | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_disconnect(f)`
 
@@ -145,7 +145,7 @@ Here is what might appear in the log file in a typical installation:
 
     If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
 
-    **Example:** 
+    **Example:**
 
     | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_auth(f)`
 
@@ -168,9 +168,9 @@ Here is what might appear in the log file in a typical installation:
         :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
         :return: nil
 
-        If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted. 
+        If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted.
 
-        **Example:** 
+        **Example:**
 
         | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.space.X:on_replace(f)`
 
@@ -183,7 +183,7 @@ Here is what might appear in the log file in a typical installation:
 
         :return: nil
 
-        **Example:** 
+        **Example:**
 
         | :codenormal:`tarantool>` :codebold:`box.space.X:run_triggers(false)`
 
@@ -251,4 +251,3 @@ Then it deletes the third trigger.
 | :codenormal:`tarantool>` :codebold:`box.session.on_connect(nil,box.session.on_connect()[3])`
 | :codenormal:`---`
 | :codenormal:`...`
-

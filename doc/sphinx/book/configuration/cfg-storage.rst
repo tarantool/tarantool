@@ -1,3 +1,9 @@
+    :confval:`slab_alloc_arena`, |br|
+    :confval:`slab_alloc_minimal`, |br|
+    :confval:`slab_alloc_maximal`, |br|
+    :confval:`slab_alloc_factor`, |br|
+    :confval:`sophia` |br|
+
 .. confval:: slab_alloc_arena
 
     How much memory Tarantool allocates to actually store tuples, in gigabytes.

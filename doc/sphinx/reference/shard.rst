@@ -61,10 +61,10 @@ The most important function is |br|
 This must be called for every shard.
 The shard-configuration is a table with these fields:
 
-* servers (a list of URIs of nodes and the zones the nodes are in) 
-* login (the user name which applies for accessing via the shard package) 
+* servers (a list of URIs of nodes and the zones the nodes are in)
+* login (the user name which applies for accessing via the shard package)
 * password (the password for the login)
-* redundancy (a number, minimum 1) 
+* redundancy (a number, minimum 1)
 * binary (a port number that this host is listening on, on the current host)
 (distinguishable from the 'listen' port specified by box.cfg)
 
@@ -95,7 +95,7 @@ The shard package will conclude that there is only one shard.
 Example: shard.init syntax for three shards
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This describes three shards. Each shard has two replicas. 
+This describes three shards. Each shard has two replicas.
 Since the number of servers is 7, and the number
 of replicas per server is 2, and dividing 7 / 2
 leaves a remainder of 1, one of the servers will
@@ -127,7 +127,7 @@ example) to insert in table T in a sharded database one
 simply says "shard.T:insert{...}" instead of
 "box.T:insert{...}".
 A "shard.T:select{}" request without a primary key will search all shards.
-    
+
 :samp:`q_shard.{space_name}.insert` {:code:`{...}` etc. |br|
 Every queued data-access function has an analogue in the shard package.
 The user must add an operation_id. The details of queued
@@ -209,14 +209,14 @@ This requires two nodes. In real life the two nodes would
 be two computers, but for this illustration the requirement
 is merely: start two shells, which we'll call Terminal#1 and Terminal #2.
 
-On Terminal #1, say: 
+On Terminal #1, say:
 
 | :codenormal:`$` :codebold:`mkdir ~/tarantool_sandbox_1`
 | :codenormal:`$` :codebold:`cd ~/tarantool_sandbox_1`
 | :codenormal:`$` :codebold:`rm -r *.snap`
 | :codenormal:`$` :codebold:`rm -r *.xlog`
 | :codenormal:`$` :codebold:`~/tarantool-master/src/tarantool`
-| 
+|
 | :codenormal:`tarantool>` :codebold:`box.cfg{listen = 3301}`
 | :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
 | :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
@@ -238,14 +238,14 @@ On Terminal #1, say:
 | :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
 | :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
 
-On Terminal #2, say: 
+On Terminal #2, say:
 
 | :codenormal:`$` :codebold:`mkdir ~/tarantool_sandbox_2`
 | :codenormal:`$` :codebold:`cd ~/tarantool_sandbox_2`
 | :codenormal:`$` :codebold:`rm -r *.snap`
 | :codenormal:`$` :codebold:`rm -r *.xlog`
 | :codenormal:`$` :codebold:`~/tarantool-master/src/tarantool`
-| 
+|
 | :codenormal:`tarantool>` :codebold:`box.cfg{listen = 3302}`
 | :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
 | :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`

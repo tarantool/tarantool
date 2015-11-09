@@ -115,7 +115,7 @@ can be reused when another fiber is created.
 
     :Return: the status of ``fiber``. One of: “dead”, “suspended”, or “running”.
     :Rtype: string
-    
+
     Example:
 
     | :codenormal:`tarantool>` :codebold:`fiber.status()`
@@ -149,8 +149,8 @@ can be reused when another fiber is created.
     :param id: the id of the fiber to be canceled.
 
     :Exception: the specified fiber does not exist or cancel is not permitted.
-    
-    Example: 
+
+    Example:
 
     | :codenormal:`tarantool>` :codebold:`fiber.kill(102)`
 
@@ -159,8 +159,8 @@ can be reused when another fiber is created.
     Check if the current fiber has been canceled
     and throw an exception if this is the case.
 
-    Example: 
-    
+    Example:
+
     | :codenormal:`tarantool>` :codebold:`fiber.testcancel()`
 
 
@@ -173,7 +173,7 @@ can be reused when another fiber is created.
 
         :Return: id of the fiber.
         :Rtype: number
-        
+
         Example:
 
         | :codenormal:`tarantool>` :codebold:`fiber_object:id()`
@@ -184,7 +184,7 @@ can be reused when another fiber is created.
 
         :Return: name of the fiber.
         :Rtype: string
-        
+
         Example:
 
         | :codenormal:`tarantool>` :codebold:`fiber_object:name()`
@@ -202,7 +202,7 @@ can be reused when another fiber is created.
         :param string name: the new name of the fiber.
 
         :Return: nil
-        
+
         Example:
 
         | :codenormal:`tarantool>` :codebold:`fiber_object:name('function_name')`
@@ -216,7 +216,7 @@ can be reused when another fiber is created.
 
         :Return: the status of fiber. One of: “dead”, “suspended”, or “running”.
         :Rtype: string
-        
+
         Example:
 
         | :codenormal:`tarantool>` :codebold:`fiber_object:status()`
@@ -233,7 +233,7 @@ can be reused when another fiber is created.
 
         :Return: nil
         :Exception: cancel is not permitted for the specified fiber object.
-        
+
         Example:
 
         | :codenormal:`tarantool>` :codebold:`fiber_object:cancel()`

@@ -3,49 +3,47 @@
 -------------------------------------------------------------------------------
 
 The ``box.space`` package has the data-manipulation functions ``select``,
-``insert``, ``replace``, ``update``, ``upsert``, ``delete``, ``get``, ``put``. It also has
+nnn``insert``, ``replace``, ``update``, ``upsert``, ``delete``, ``get``, ``put``. It also has
 members, such as id, and whether or not a space is enabled. Package source code
 is available in file
 `src/box/lua/schema.lua <https://github.com/tarantool/tarantool/blob/master/src/box/lua/schema.lua>`_.
 
 A list of all ``box.space`` functions follows, then comes a list of all
 ``box.space`` members.
-       
-    :func:`box.space...create_index() <space_object.create_index>` |br|
-    :func:`box.space...insert() <space_object.insert>` |br|
-    :func:`box.space...select() <space_object.select>` |br|
-    :func:`box.space...get() <space_object.get>` |br|
-    :func:`box.space...drop() <space_object.drop>` |br|
-    :func:`box.space...rename() <space_object.rename>` |br|
-    :func:`box.space...replace() <space_object.replace>` |br|
-    :func:`box.space...put() <space_object.put>` |br|
-    :func:`box.space...update() <space_object.update>` |br|
-    :func:`box.space...delete() <space_object.delete>` |br|
-    :func:`box.space...id() <space_object.id>` |br|
-    :func:`box.space...enabled() <space_object.enabled>` |br|
-    :func:`box.space...field_count() <space_object.field_count>` |br|
-    :func:`box.space...index() <space_object.index>` |br|
-    :func:`box.space...len() <space_object.len>` |br|
-    :func:`box.space...truncate() <space_object.truncate>` |br|
-    :func:`box.space...inc{} <space_object.inc>` |br|
-    :func:`box.space...dec{} <space_object.dec>` |br|
-    :func:`box.space...auto_increment{} <space_object.auto_increment>` |br|
-    :func:`box.space...pairs() <space_object.pairs>` 
-    
+
+    :func:`space_object:create_index() <space_object.create_index>` |br|
+    :func:`space_object:insert() <space_object.insert>` |br|
+    :func:`space_object:select() <space_object.select>` |br|
+    :func:`space_object:get() <space_object.get>` |br|
+    :func:`space_object:drop() <space_object.drop>` |br|
+    :func:`space_object:rename() <space_object.rename>` |br|
+    :func:`space_object:replace() <space_object.replace>` |br|
+    :func:`space_object:put() <space_object.put>` |br|
+    :func:`space_object:update() <space_object.update>` |br|
+    :func:`space_object:upsert() <space_object.upsert>` |br|
+    :func:`space_object:delete() <space_object.delete>` |br|
+    :func:`space_object:id() <space_object.id>` |br|
+    :func:`space_object:enabled() <space_object.enabled>` |br|
+    :func:`space_object:field_count() <space_object.field_count>` |br|
+    :func:`space_object:index() <space_object.index>` |br|
+    :func:`space_object:len() <space_object.len>` |br|
+    :func:`space_object:truncate() <space_object.truncate>` |br|
+    :func:`space_object:inc{} <space_object.inc>` |br|
+    :func:`space_object:dec{} <space_object.dec>` |br|
+    :func:`space_object:auto_increment{} <space_object.auto_increment>` |br|
+    :func:`space_object:pairs() <space_object.pairs>`
+
     :class:`box.space._schema` |br|
     :class:`box.space._space` |br|
     :class:`box.space._index` |br|
     :class:`box.space._user` |br|
     :class:`box.space._priv` |br|
-    :class:`box.space._cluster`  |br| 
-
-.. _box_space:
+    :class:`box.space._cluster`  |br|
 
 .. module:: box.space
 
 .. class:: space_object
-    
-    
+
     .. function:: create_index(index-name [, {options} ])
 
         Create an index. It is mandatory to create an index for a tuple set
@@ -108,8 +106,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Possible errors:** If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
 
-        **Example:** 
-         
+        **Example:**
+
         | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
 
 
@@ -133,7 +131,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type.
 
         **Example:**
-    
+
         | :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('tmp', {temporary=true})`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -204,13 +202,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
         the first tuple in a tuple set by appending ``[1]``.
         Therefore ``box.space.tester:get{1}`` has the same
         effect as ``box.space.tester:select{1}[1]``, and
-        may serve as a convenient shorthand. 
+        may serve as a convenient shorthand.
 
-        **Example:** 
+        **Example:**
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:get{1}`
-
-    .. _space_drop:    
 
     .. function:: drop()
 
@@ -229,7 +225,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.space_that_does_not_exist:drop()`
 
-    .. _space_rename:    
 
     .. function:: rename(space-name)
 
@@ -243,7 +238,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Possible errors:** ``space-name`` does not exist.
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.space55:rename('space56')`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -251,7 +246,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`...`
 
-    .. _space_replace_put:    
 
     .. function:: replace(tuple)
                   put(tuple)
@@ -276,11 +270,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        **Example:** 
+        **Example:**
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:replace{5000, 'New value'}`
 
-    .. _space_update:
 
     .. function:: update(key, {{operator, field_no, value}, ...})
 
@@ -329,7 +322,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
 
-        Thus, in the instruction 
+        Thus, in the instruction
 
         | :codenormal:`s:update(44, {{'+',1,55},{'=',3,'x'}})`
 
@@ -340,80 +333,80 @@ A list of all ``box.space`` functions follows, then comes a list of all
         assigned to it is ``'x'``.
 
         **Example:**
-        
-        Assume that the initial state of the database is ``tester`` that has one tuple set and one primary key whose type is ``NUM``.
+
+        Assume that the initial state of the database is ``tester`` that has
+        one tuple set and one primary key whose type is ``NUM``.
         There is one tuple, with ``field[1]`` = ``999`` and ``field[2]`` = ``'A'``.
-        
-        In the update 
+
+        In the update
 
         | :codenormal:`box.space.tester:update(999, {{'=', 2, 'B'}})`
 
         the first argument is ``tester``, that is, the affected space is ``tester``.
         The second argument is ``999``, that is, the affected tuple is identified by
-        primary key value = 999. 
-        The third argument is ``=``, that is, there is one operation — 
+        primary key value = 999.
+        The third argument is ``=``, that is, there is one operation —
         *assignment to a field*.
         The fourth argument is ``2``, that is, the affected field is ``field[2]``.
         The fifth argument is ``'B'``, that is, ``field[2]`` contents change to ``'B'``.
         Therefore, after this update, ``field[1]`` = ``999`` and ``field[2]`` = ``'B'``.
-        
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{'=', 2, 'B'}})`
 
-        the arguments are the same, except that the key is passed as 
-        a Lua table (inside braces). This is unnecessary when the primary key has 
+        the arguments are the same, except that the key is passed as
+        a Lua table (inside braces). This is unnecessary when the primary key has
         only one field, but would be necessary if the primary key had more than one field.
         Therefore, after this update, ``field[1]`` = ``999`` and ``field[2]`` = ``'B'`` (no change).
-        
-        
+
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{'=', 3, 1}})`
 
-        the arguments are the same, except that the fourth argument is ``3``, 
-        that is, the affected field is ``field[3]``. It is okay that, 
+        the arguments are the same, except that the fourth argument is ``3``,
+        that is, the affected field is ``field[3]``. It is okay that,
         until now, ``field[3]`` has not existed. It gets added.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'B'``,
         ``field[3]`` = ``1``.
-        
+
         In the update
 
-        | :codenormal:`box.space.tester:update({999}, {{'+', 3, 1}})` 
+        | :codenormal:`box.space.tester:update({999}, {{'+', 3, 1}})`
 
-        the arguments are the same, except that the third argument is ``'+'``, that is, 
-        the operation is addition rather than assignment. Since ``field[3]`` previously contained ``1``, 
-        this means we're adding ``1`` to ``1``. Therefore, after this update, 
+        the arguments are the same, except that the third argument is ``'+'``, that is,
+        the operation is addition rather than assignment. Since ``field[3]`` previously contained ``1``,
+        this means we're adding ``1`` to ``1``. Therefore, after this update,
         ``field[1]`` = ``999``, ``field[2]`` = ``'B'``, ``field[3]`` = ``2``.
-        
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})`
 
-        the idea is to modify two fields at once. The formats are ``'|'`` and ``=``, 
+        the idea is to modify two fields at once. The formats are ``'|'`` and ``=``,
         that is, there are two operations, OR and assignment.
         The fourth and fifth arguments mean that ``field[3]`` gets OR'ed with ``1``.
         The seventh and eighth arguments mean that ``field[2]`` gets assigned ``'C'``.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'C'``,
         ``field[3]`` = ``3``.
-        
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{'#', 2, 1}, {'-', 2, 3}})`
 
-        The idea is to delete ``field[2]``, then subtract ``3`` from ``field[3]``. 
+        The idea is to delete ``field[2]``, then subtract ``3`` from ``field[3]``.
         But after the delete, there is a renumbering, so ``field[3]`` becomes ``field[2]```
         before we subtract ``3`` from it, and that's why the seventh argument is ``2``, not ``3``.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``0``.
-        
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{'=', 2, 'XYZ'}})`
 
         we're making a long string so that splice will work in the next example.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'XYZ'``.
-        
-        
+
         In the update
 
         | :codenormal:`box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})`
@@ -431,10 +424,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
         Update or insert a tuple.
 
         If there is an existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :ref:`update <box_update>` and the
+        request has the same effect as :func:`space_object:update() <space_object.update>` and the
         :code:`{{operator, field_no, value}, ...}` parameter is used.
         If there is no existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :ref:`insert <box_insert>` and the
+        request has the same effect as :func:`space_object:insert() <space_object.insert>` and the
         :code:`{tuple_value}` parameter is used. However, unlike :code:`insert` or
         :code:`update`, :code:`upsert` will not read a tuple and perform
         error checks before returning -- this is a design feature which
@@ -458,7 +451,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Example:**
 
-        | :codenormal:`tarantool>`:codebold:`box.space.tester:upsert({12},{{'=',3,'a'},{'=',4,'b'}},{13,'c'})`
+        | :codenormal:`tarantool>` :codebold:`\  box.space.tester:upsert({12,'c'},{{'=',3,'a'},{'=',4,'b'}})`
 
     .. function:: delete(key)
 
@@ -485,10 +478,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`box.space.tester:delete('a')`
         | :codenormal:`---`
         | :codenormal:`- error: 'Supplied key type of part 0 does not match index part type:`
-        |   :codenormal:`expected NUM'`
+        | :codenormal:`\   expected NUM'`
         | :codenormal:`...`
 
-    .. _space_id:
 
     .. function:: id()
 
@@ -499,7 +491,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
-    .. _space_enabled:
 
     .. function:: enabled()
 
@@ -508,21 +499,19 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: boolean
 
-    .. _space_field_count:
 
     .. function:: field_count()
 
         The required field count for all tuples in this space. The field_count
         can be set initially with
-        
+
         | :codebold:`box.schema.space:create...`
         | :codebold:`field_count = <field_count_value>`
-        
+
         The default value is ``0``, which means there is no required field count.
 
         :rtype: number
 
-    .. _space_index:
 
     .. function:: index()
 
@@ -547,20 +536,18 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- TREE`
         | :codenormal:`...`
 
-    .. _space_len:
 
     .. function:: len()
 
         :return: Number of tuples in the space.
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.tester:len()`
         | :codenormal:`---`
         | :codenormal:`- 2`
         | :codenormal:`...`
 
-    .. _space_truncate:
 
     .. function:: truncate()
 
@@ -571,7 +558,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: nil
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.tester:truncate()`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -581,7 +568,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`...`
 
 
-    .. _space_inc:
 
     .. function:: inc{field-value [, field-value ...]}
 
@@ -601,11 +587,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('forty_second_space')`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>`:codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`box.space.forty_second_space:inc{1,'a'}`
@@ -617,7 +603,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 2`
         | :codenormal:`...`
 
-    .. _space_dec:
 
     .. function:: dec{field-value [, field-value ...]}
 
@@ -636,11 +621,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity factors:** Index size, Index type, WAL settings.
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space19')`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>`:codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
+        | :codenormal:`tarantool>` :codebold:`s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`box.space.space19:insert{1,'a',1000}`
@@ -656,7 +641,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 998`
         | :codenormal:`...`
 
-    .. _space_auto_increment:
 
     .. function:: auto_increment{field-value [, field-value ...]}
 
@@ -677,7 +661,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Possible errors:** index has wrong type or primary-key indexed field is not a number.
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.tester:auto_increment{'Fld#1', 'Fld#2'}`
         | :codenormal:`---`
         | :codenormal:`- [1, 'Fld#1', 'Fld#2']`
@@ -687,7 +671,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- [2, 'Fld#3']`
         | :codenormal:`...`
 
-    .. _space_pairs:
 
     .. function:: pairs()
 
@@ -697,7 +680,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :rtype:  function, tuple
 
         **Example:**
-        
+
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space33')`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -708,7 +691,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`tarantool>` :codebold:`s:insert{0,'Hello my '}; s:insert{1,'Lua world'}`
         | :codenormal:`---`
         | :codenormal:`...`
-        | :codenormal:`tarantool>`:codebold:`tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end`
+        | :codenormal:`tarantool>` :codebold:`tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`tmp`
@@ -716,19 +699,18 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- Hello my Lua world`
         | :codenormal:`...`
 
-.. module:: box.space 
 
 .. class:: _schema
 
     ``_schema`` is a system tuple set. Its single tuple contains these fields:
     ``'version', major-version-number, minor-version-number``.
 
-    **Example:** 
+    **Example:**
 
     The following function will display all fields in all tuples of ``_schema``:
 
     .. code-block:: lua_tarantool
-        
+
         console = require('console'); console.delimiter('!')
         function example()
           local ta = {}, i, line
@@ -737,9 +719,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
             line = ''
             while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end
             table.insert(ta, line)
-          end    
+          end
           return ta
-        end!    
+        end!
         console.delimiter('')!
 
     Here is what ``example()`` returns in a typical installation:
@@ -747,24 +729,23 @@ A list of all ``box.space`` functions follows, then comes a list of all
     | :codenormal:`tarantool>` :codebold:`example()`
     | :codenormal:`---`
     | :codenormal:`- - 'cluster 1ec4e1f8-8f1b-4304-bb22-6c47ce0cf9c6 '`
-    | :codenormal:`- 'max_id 520 '`
-    | :codenormal:`- 'version 1 6 '`
+    | :codenormal:`\   - 'max_id 520 '`
+    | :codenormal:`\   - 'version 1 6 '`
     | :codenormal:`...`
 
-.. _data_space:
 
 .. class:: _space
 
     ``_space`` is a system tuple set. Its tuples contain these fields:
     ``id``, ``uid``, ``space-name``, ``engine``, ``field_count``, ``temporary``, ``format``.
-    These fields are established by :ref:`box.schema.space.create <box.schema.space.create>`.
+    These fields are established by :func:`space.create() <space.create>`.
 
     **Example:**
     The following function will display all simple fields
     in all tuples of ``_space``.
 
     .. code-block:: lua_tarantool
-    
+
         console = require('console'); console.delimiter('!')
         function example()
           local ta = {}, i, line
@@ -782,34 +763,34 @@ A list of all ``box.space`` functions follows, then comes a list of all
           return ta
         end!
         console.delimiter('')!
-  
+
+
     Here is what ``example()`` returns in a typical installation:
 
     | :codenormal:`tarantool>` :codebold:`example()`
     | :codenormal:`---`
     | :codenormal:`- - '272 1 _schema memtx 0  '`
-    | :codenormal:`- '280 1 _space memtx 0  '`
-    | :codenormal:`- '288 1 _index memtx 0  '`
-    | :codenormal:`- '296 1 _func memtx 0  '`
-    | :codenormal:`- '304 1 _user memtx 0  '`
-    | :codenormal:`- '312 1 _priv memtx 0  '`
-    | :codenormal:`- '320 1 _cluster memtx 0  '`
-    | :codenormal:`- '512 1 tester memtx 0  '`
-    | :codenormal:`- '513 1 origin sophia 0  '`
-    | :codenormal:`- '514 1 archive memtx 0  '`
+    | :codenormal:`\   - '280 1 _space memtx 0  '`
+    | :codenormal:`\   - '288 1 _index memtx 0  '`
+    | :codenormal:`\   - '296 1 _func memtx 0  '`
+    | :codenormal:`\   - '304 1 _user memtx 0  '`
+    | :codenormal:`\   - '312 1 _priv memtx 0  '`
+    | :codenormal:`\   - '320 1 _cluster memtx 0  '`
+    | :codenormal:`\   - '512 1 tester memtx 0  '`
+    | :codenormal:`\   - '513 1 origin sophia 0  '`
+    | :codenormal:`\   - '514 1 archive memtx 0  '`
     | :codenormal:`...`
 
-    .. _boxspaceexample:
 
-    **Example:** 
-    
+    **Example:**
+
     The following requests will create a space using
     :code:`box.schema.space.create` with a :code:`format` clause.
     Then it retrieves the _space tuple for the new space.
     This illustrates the typical use of the :code:`format` clause,
     it shows the recommended names and data types for the fields.
 
-    | :codenormal:`tarantool>`:codebold:`box.schema.space.create('TM',{format={[1]={["name"]="field#1"},[2]={["type"]="num"}}})`
+    | :codenormal:`tarantool>` :codebold:`box.schema.space.create('TM',{format={[1]={["name"]="field#1"},[2]={["type"]="num"}}})`
     | :codenormal:`---`
     | :codenormal:`- index: []`
     | |nbsp| |nbsp| :codenormal:`on_replace: 'function: 0x41c67338'`
@@ -826,7 +807,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
     | :codenormal:`- - [522, 1, 'TM', 'memtx', 0, '', [{'name': 'field#1'}, {'type': 'num'}]]`
     | :codenormal:`...`
 
-.. _data_index:
 
 .. class:: _index
 
@@ -837,7 +817,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     The following function will display all fields in all tuples of ``_index``:
 
     .. code-block:: lua_tarantool
-    
+
         console = require('console'); console.delimiter('!')
         function example()
           local ta = {}, i, line
@@ -856,42 +836,39 @@ A list of all ``box.space`` functions follows, then comes a list of all
     | :codenormal:`tarantool>` :codebold:`example()`
     | :codenormal:`---`
     | :codenormal:`- - '272 0 primary tree 1 1 0 str '`
-    | :codenormal:`- '280 0 primary tree 1 1 0 num '`
-    | :codenormal:`- '280 1 owner tree 0 1 1 num '`
-    | :codenormal:`- '280 2 name tree 1 1 2 str '`
-    | :codenormal:`- '288 0 primary tree 1 2 0 num 1 num '`
-    | :codenormal:`- '288 2 name tree 1 2 0 num 2 str '`
-    | :codenormal:`- '296 0 primary tree 1 1 0 num '`
-    | :codenormal:`- '296 1 owner tree 0 1 1 num '`
-    | :codenormal:`- '296 2 name tree 1 1 2 str '`
-    | :codenormal:`- '304 0 primary tree 1 1 0 num '`
-    | :codenormal:`- '304 1 owner tree 0 1 1 num '`
-    | :codenormal:`- '304 2 name tree 1 1 2 str '`
-    | :codenormal:`- '312 0 primary tree 1 3 1 num 2 str 3 num '`
-    | :codenormal:`- '312 1 owner tree 0 1 0 num '`
-    | :codenormal:`- '312 2 object tree 0 2 2 str 3 num '`
-    | :codenormal:`- '320 0 primary tree 1 1 0 num '`
-    | :codenormal:`- '320 1 uuid tree 1 1 1 str '`
-    | :codenormal:`- '512 0 primary tree 1 1 0 num '`
-    | :codenormal:`- '513 0 first tree 1 1 0 NUM '`
-    | :codenormal:`- '514 0 first tree 1 1 0 STR '`
+    | :codenormal:`\   - '280 0 primary tree 1 1 0 num '`
+    | :codenormal:`\   - '280 1 owner tree 0 1 1 num '`
+    | :codenormal:`\   - '280 2 name tree 1 1 2 str '`
+    | :codenormal:`\   - '288 0 primary tree 1 2 0 num 1 num '`
+    | :codenormal:`\   - '288 2 name tree 1 2 0 num 2 str '`
+    | :codenormal:`\   - '296 0 primary tree 1 1 0 num '`
+    | :codenormal:`\   - '296 1 owner tree 0 1 1 num '`
+    | :codenormal:`\   - '296 2 name tree 1 1 2 str '`
+    | :codenormal:`\   - '304 0 primary tree 1 1 0 num '`
+    | :codenormal:`\   - '304 1 owner tree 0 1 1 num '`
+    | :codenormal:`\   - '304 2 name tree 1 1 2 str '`
+    | :codenormal:`\   - '312 0 primary tree 1 3 1 num 2 str 3 num '`
+    | :codenormal:`\   - '312 1 owner tree 0 1 0 num '`
+    | :codenormal:`\   - '312 2 object tree 0 2 2 str 3 num '`
+    | :codenormal:`\   - '320 0 primary tree 1 1 0 num '`
+    | :codenormal:`\   - '320 1 uuid tree 1 1 1 str '`
+    | :codenormal:`\   - '512 0 primary tree 1 1 0 num '`
+    | :codenormal:`\   - '513 0 first tree 1 1 0 NUM '`
+    | :codenormal:`\   - '514 0 first tree 1 1 0 STR '`
     | :codenormal:`...`
 
-.. _data_user:
 
 .. class:: _user
 
     ``_user`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
-.. _data_priv:
 
 .. class:: _priv
 
     ``_priv`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
-.. _data_cluster:
 
 .. class:: _cluster
 
@@ -943,16 +920,16 @@ And here is what happens when one invokes the function:
 | :codenormal:`tarantool>` :codebold:`example()`
 | :codenormal:`---`
 | :codenormal:`- - _schema tuple_count =3. first field in first tuple = cluster`
-| :codenormal:`- _space tuple_count =15. first field in first tuple = 272`
-| :codenormal:`- _index tuple_count =25. first field in first tuple = 272`
-| :codenormal:`- _func tuple_count =1. first field in first tuple = 1`
-| :codenormal:`- _user tuple_count =4. first field in first tuple = 0`
-| :codenormal:`- _priv tuple_count =6. first field in first tuple = 1`
-| :codenormal:`- _cluster tuple_count =1. first field in first tuple = 1`
-| :codenormal:`- tester tuple_count =2. first field in first tuple = 1`
-| :codenormal:`- origin tuple_count =0`
-| :codenormal:`- archive tuple_count =13. first field in first tuple = test_0@tarantool.org`
-| :codenormal:`- space55 tuple_count =0`
-| :codenormal:`- tmp tuple_count =0`
-| :codenormal:`- forty_second_space tuple_count =1. first field in first tuple = 1`
+| :codenormal:`\   - _space tuple_count =15. first field in first tuple = 272`
+| :codenormal:`\   - _index tuple_count =25. first field in first tuple = 272`
+| :codenormal:`\   - _func tuple_count =1. first field in first tuple = 1`
+| :codenormal:`\   - _user tuple_count =4. first field in first tuple = 0`
+| :codenormal:`\   - _priv tuple_count =6. first field in first tuple = 1`
+| :codenormal:`\   - _cluster tuple_count =1. first field in first tuple = 1`
+| :codenormal:`\   - tester tuple_count =2. first field in first tuple = 1`
+| :codenormal:`\   - origin tuple_count =0`
+| :codenormal:`\   - archive tuple_count =13. first field in first tuple = test_0@tarantool.org`
+| :codenormal:`\   - space55 tuple_count =0`
+| :codenormal:`\   - tmp tuple_count =0`
+| :codenormal:`\   - forty_second_space tuple_count =1. first field in first tuple = 1`
 | :codenormal:`...`

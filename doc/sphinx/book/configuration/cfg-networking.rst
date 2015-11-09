@@ -1,3 +1,6 @@
+    :confval:`io_collect_interval`, |br|
+    :confval:`readahead`  |br|
+
 .. confval:: io_collect_interval
 
     The server will sleep for io_collect_interval seconds between iterations

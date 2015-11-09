@@ -286,7 +286,7 @@ div.highlight {
     -webkit-border-radius: 7px;
     -moz-border-radius: 7px;
     border-radius: 7px;
-    overflow-x: auto;
+    overflow-x: scroll;
     margin: 5px 0px;
     font-size: 13px;
 }
@@ -479,12 +479,24 @@ div.b-cols_content_left .b-search-text {
 }
 
 .line-block {
-    padding: 8px 16px 8px 16px;
-    -webkit-border-radius: 4px;
-    -moz-border-radius: 4px;
-    border-radius: 4px;
-    background: #ECECEC;
-    overflow-y: scroll; 
+    padding: 10px;
+    -webkit-border-radius: 7px;
+    -moz-border-radius: 7px;
+    border-radius: 7px;
+    text-align: left;
+    margin: 5px 0px;
+    background: #0d0d0d;
+    overflow-x: scroll;
+}
+
+.line-block span {
+    color: #f8f8f2;
+    font-size: 13px;
+}
+
+.line-block > .line {
+    color: #f8f8f2;
+    font-size: 13px;
 }
 
 p > code.docutils {
