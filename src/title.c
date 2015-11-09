@@ -79,7 +79,7 @@ void title_update()
 	const char *script_name_short = my_basename(script_name);
 	const char *interpretor_name_short = my_basename(interpretor_name);
 
-	const char *part1 = "tarantool", *part2 = status, *part3 = NULL;
+	const char *part1 = "tarantool", *part2 = NULL, *part3 = status;
 
 	/*
 	 * prefix
@@ -99,23 +99,27 @@ void title_update()
 		 * scriptname, ex: tarantool/tarantoolctl
 		 */
 		if (memcmp(script_name_short, interpretor_name_short,
-		           strlen(interpretor_name_short)) != 0)
-			part3 = interpretor_name_short;
+		           strlen(interpretor_name_short)) == 0) {
+			part1 = script_name_short;
+		} else {
+			part1 = interpretor_name_short;
+			part2 = script_name_short;
+		}
 	}
 
 #define OUTPUT(...) snprintf(output, output_end - output, __VA_ARGS__)
 	assert(part1);
 	if (part2) {
 		if (part3) {
-			rc = OUTPUT("%s/%s (%s)", part1, part2, part3);
+			rc = OUTPUT("%s %s <%s>:", part1, part2, part3);
 		} else {
-			rc = OUTPUT("%s/%s", part1, part2);
+			rc = OUTPUT("%s %s:", part1, part2);
 		}
 	} else {
 		if (part3) {
-			rc = OUTPUT("%s (%s)", part1, part3);
+			rc = OUTPUT("%s <%s>:", part1, part3);
 		} else {
-			rc = OUTPUT("%s", part1);
+			rc = OUTPUT("%s:", part1);
 		}
 	}
 	if (rc < 0 || (output += rc) >= output_end)
@@ -125,7 +129,7 @@ void title_update()
 	 * custom title
 	 */
 	if (custom) {
-		rc = OUTPUT(": %s", custom);
+		rc = OUTPUT(" %s", custom);
 		if (rc < 0 || (output += rc) >= output_end)
 			goto done;
 	}

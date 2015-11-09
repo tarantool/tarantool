@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_PROCESS_TITLE_H_INCLUDED
-#define TARANTOOL_PROCESS_TITLE_H_INCLUDED
+#ifndef TARANTOOL_TITLE_H_INCLUDED
+#define TARANTOOL_TITLE_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -33,30 +33,30 @@
 
 /**
  *
- * script.lua/running (tarantool): my lovely pony
+ * tarantool script.lua <running>: my lovely pony
  *
- *            ^^^^^^^              ^^^^^^^^^^^^^^
- * ^^^^^^^^^^ status   ^^^^^^^^^    custom title
- * script name         interpretor name
+ *           ^^^^^^^^^^ ^^^^^^^^^  ^^^^^^^^^^^^^^
+ * ^^^^^^^^^ script name  status    custom title
+ * interpretor name
  *
  *
  * Parts missing:
  *
- * 1) no custom title
+ * 1) no custom title (note the trailing colon - its intentional)
  *
- * script.lua/running (tarantool)
+ * tarantool script.lua <running>:
  *
  * 2) script name missing
  *
- * tarantool/running: my lovely pony
+ * tarantool <running>: my lovely pony
  *
  * 3) scriptname.matches(tarantool.*)
  *
- * tarantoolctl/running: my lovely pony
+ * tarantoolctl <running>: my lovely pony
  *
  * 4) no status
  *
- * script.lua (tarantool): my lovely pony
+ * tarantool script.lua: my lovely pony
  */
 #include <stddef.h>
 
@@ -100,4 +100,4 @@ const char *title_get_status();
 } /* extern "C" */
 #endif
 
-#endif /* TARANTOOL_PROCESS_TITLE_H_INCLUDED */
+#endif /* TARANTOOL_TITLE_H_INCLUDED */
