@@ -204,6 +204,7 @@ ps_relocate_argv(struct ps_relocation *rel,
 char **
 proc_title_init(int argc, char **argv)
 {
+	(void)argc;
 #if defined(PS_USE_CLOBBER_ARGV)
 	struct ps_relocation rel = {NULL, NULL, NULL};
 	char **argv_copy, **environ_copy;
@@ -251,21 +252,21 @@ proc_title_init(int argc, char **argv)
 	ps_leaks[0] = argv = argv_copy;
 	ps_leaks[1] = environ = environ_copy;
 #ifdef __APPLE__
-    /*
-     * http://opensource.apple.com/source/adv_cmds/adv_cmds-158/ps/print.c
-     *
-     * ps on osx fetches command line from a process with {CTL_KERN,
-     * KERN_PROCARGS2, <pid>} sysctl. The call returns cached argc + a
-     * copy of the memory area where argv/environ strings live.
-     *
-     * If initially there were 10 arguments, ps is expecting to find 10
-     * \0 separated strings but we've written the process title on top
-     * of that, so ps will try to find more strings; this can result in
-     * a garbage from environment area showing (which we often fail to
-     * overwrite completely). To fix it we write additional \0
-     * terminators at the end of the title (a 'sentinel').
-     */
-    ps_sentinel_size = argc - 1;
+	/*
+	 * http://opensource.apple.com/source/adv_cmds/adv_cmds-158/ps/print.c
+	 *
+	 * ps on osx fetches command line from a process with {CTL_KERN,
+	 * KERN_PROCARGS2, <pid>} sysctl. The call returns cached argc + a
+	 * copy of the memory area where argv/environ strings live.
+	 *
+	 * If initially there were 10 arguments, ps is expecting to find 10
+	 * \0 separated strings but we've written the process title on top
+	 * of that, so ps will try to find more strings; this can result in
+	 * a garbage from environment area showing (which we often fail to
+	 * overwrite completely). To fix it we write additional \0
+	 * terminators at the end of the title (a 'sentinel').
+	 */
+	ps_sentinel_size = argc - 1;
 #endif
 #endif
 
@@ -371,5 +372,5 @@ proc_title_set(const char *format, ...)
 size_t
 proc_title_max_length()
 {
-    return ps_buffer_size - ps_sentinel_size;
+	return ps_buffer_size - ps_sentinel_size;
 }
