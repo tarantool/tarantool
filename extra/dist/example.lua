@@ -53,7 +53,7 @@ box.cfg {
     pid_file = "example.pid";
 
     -- Inject the given string into server process title
-    custom_proc_title = 'example';
+    -- custom_proc_title = 'example';
 
     -- Run the server as a background task
     -- The logger and pid_file parameters 
@@ -157,7 +157,7 @@ box.cfg {
 
     -- By default, the log is sent to the standard error stream (stderr)
     -- If logger is specified, the log is sent to the file named in the string
-    logger = "example.log";
+    -- logger = "example.log";
 
     -- If true, tarantool does not block on the log file descriptor
     -- when it’s not ready for write, and drops the message instead
