@@ -179,7 +179,7 @@ txn_commit_ro_stmt(struct txn *txn)
  * the current transaction as well.
  */
 void
-txn_commit_stmt(struct request *request, struct space *space, struct txn *txn);
+txn_commit_stmt(struct txn *txn, struct request *request);
 
 /**
  * Rollback a statement. In autocommit mode,

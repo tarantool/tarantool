@@ -253,9 +253,6 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	if (old_tuple == NULL)
 		return NULL;
 
-	if (request->index_id != 0)
-		request_rebind_to_primary_index(request, space, old_tuple);
-
 	this->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 	return old_tuple;
 }
@@ -273,9 +270,6 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	if (old_tuple == NULL)
 		return NULL;
-
-	if (request->index_id != 0)
-		request_rebind_to_primary_index(request, space, old_tuple);
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
@@ -413,8 +407,8 @@ txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
  * and transaction rollback.
  */
 static void
-memtx_txn_add_undo(struct txn *txn, struct space *space,
-		   struct tuple *old_tuple, struct tuple *new_tuple)
+memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
+		   struct tuple *new_tuple)
 {
 	/*
 	 * Remember the old tuple only if we replaced it
@@ -422,7 +416,7 @@ memtx_txn_add_undo(struct txn *txn, struct space *space,
 	 * another transaction in rollback().
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	stmt->space = space;
+	assert(stmt->space);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
 }
@@ -464,7 +458,7 @@ memtx_replace_primary_key(struct txn *txn, struct space *space,
 	old_tuple = space->index[0]->replace(old_tuple, new_tuple, mode);
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	memtx_txn_add_undo(txn, space, old_tuple, new_tuple);
+	memtx_txn_add_undo(txn, old_tuple, new_tuple);
 }
 
 static void
@@ -507,7 +501,7 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 	}
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	memtx_txn_add_undo(txn, space, old_tuple, new_tuple);
+	memtx_txn_add_undo(txn, old_tuple, new_tuple);
 }
 
 static void
@@ -869,9 +863,8 @@ MemtxEngine::begin(struct txn *txn)
 void
 MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
 {
-	if (stmt->space == NULL)
+	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
 		return;
-	assert(stmt->old_tuple || stmt->new_tuple);
 	struct space *space = stmt->space;
 	int index_count;
 	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
@@ -892,7 +885,6 @@ MemtxEngine::rollbackStatement(struct txn_stmt *stmt)
 
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
-	stmt->space = NULL;
 }
 
 void

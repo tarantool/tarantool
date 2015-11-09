@@ -111,14 +111,31 @@ process_rw(struct request *request, struct tuple **result)
 		case IPROTO_REPLACE:
 			tuple = space->handler->executeReplace(txn, space,
 							       request);
+
+
 			break;
 		case IPROTO_UPDATE:
 			tuple = space->handler->executeUpdate(txn, space,
 							      request);
+			if (tuple && request->index_id != 0) {
+				/*
+				 * XXX: this is going to break with
+				 * sync replication for cases when
+				 * tuple is NULL, since the leader
+				 * will be unable to certify such
+				 * updates correctly.
+				 */
+				request_rebind_to_primary_key(request, space,
+							      tuple);
+			}
 			break;
 		case IPROTO_DELETE:
 			tuple = space->handler->executeDelete(txn, space,
 							      request);
+			if (tuple && request->index_id != 0) {
+				request_rebind_to_primary_key(request, space,
+							      tuple);
+			}
 			break;
 		case IPROTO_UPSERT:
 			if (space->has_unique_secondary_key) {
@@ -138,7 +155,7 @@ process_rw(struct request *request, struct tuple **result)
 		 * when WAL is written in autocommit mode.
 		 */
 		TupleRefNil ref(tuple);
-		txn_commit_stmt(request, space, txn);
+		txn_commit_stmt(txn, request);
 		if (result) {
 			if (tuple)
 				tuple_bless(tuple);

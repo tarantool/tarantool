@@ -515,7 +515,7 @@ key_parts_create_from_tuple(struct key_def *key_def, const char *tuple,
  * Return length of the key (required buffer size for storing it)
  */
 uint32_t
-key_full_create_from_tuple(struct key_def *key_def, const char *tuple,
+key_create_from_tuple(struct key_def *key_def, const char *tuple,
 			   char *key_buf, uint32_t key_buf_size);
 
 struct tuple *

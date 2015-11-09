@@ -95,7 +95,7 @@ request_encode(struct request *request, struct iovec *iov);
  * @param found_tuple - tuple found by secondary key
  */
 void
-request_rebind_to_primary_index(struct request *request, struct space *space,
+request_rebind_to_primary_key(struct request *request, struct space *space,
 				struct tuple *found_tuple);
 
 /**

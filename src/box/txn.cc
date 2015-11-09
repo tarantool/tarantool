@@ -130,7 +130,8 @@ txn_begin_stmt(struct space *space)
 
 	txn_begin_in_engine(txn, space);
 
-	txn_stmt_new(txn);
+	struct txn_stmt *stmt = txn_stmt_new(txn);
+	stmt->space = space;
 	return txn;
 }
 
@@ -139,7 +140,7 @@ txn_begin_stmt(struct space *space)
  * the current transaction as well.
  */
 void
-txn_commit_stmt(struct request *request, struct space *space, struct txn *txn)
+txn_commit_stmt(struct txn *txn, struct request *request)
 {
 	assert(txn->in_stmt);
 	/*
@@ -150,13 +151,21 @@ txn_commit_stmt(struct request *request, struct space *space, struct txn *txn)
 						  struct txn_stmt, next);
 
 	/* Create WAL record for the write requests in non-temporary spaces */
-	if (!space_is_temporary(space)) {
+	if (!space_is_temporary(stmt->space)) {
 		txn_add_redo(stmt, request);
 		++txn->n_rows;
 	}
-
-	if (stmt->row && stmt->space && !rlist_empty(&stmt->space->on_replace)
-	    && stmt->space->run_triggers) {
+	/*
+	 * If there are triggers, and they are not disabled, and
+	 * the statement found any rows, run triggers.
+	 * XXX:
+	 * - sophia doesn't set old/new tuple, so triggers don't
+	 *   work for it
+	 * - perhaps we should run triggers even for deletes which
+	 *   doesn't find any rows
+	 */
+	if (!rlist_empty(&stmt->space->on_replace) &&
+	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
 
 		trigger_run(&stmt->space->on_replace, txn);
 	}
