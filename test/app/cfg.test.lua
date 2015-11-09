@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(33)
+test:plan(35)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -12,15 +12,17 @@ test:plan(33)
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
-local function invalid(name, val)
+local function invalid(name, val, pattern)
     local status, result = pcall(box.cfg, {[name]=val})
-    test:ok(not status and result:match('Incorrect'), 'invalid '..name)
+    test:ok(not status and result:match(pattern or 'Incorrect'), 'invalid '..name)
 end
 
 invalid('replication_source', '//guest@localhost:3301')
 invalid('wal_mode', 'invalid')
 invalid('rows_per_wal', -1)
 invalid('listen', '//!')
+invalid('logger', ':', 'Error:')
+invalid('logger', 'syslog:xxx=', 'Error:')
 
 test:is(type(box.cfg), 'function', 'box is not started')
 

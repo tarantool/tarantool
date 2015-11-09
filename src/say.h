@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/types.h> /* pid_t */
@@ -54,8 +55,6 @@ enum say_level {
 
 /** \endcond public */
 
-extern int log_fd;
-extern int log_level;
 extern pid_t logger_pid;
 
 void
@@ -67,9 +66,9 @@ say_set_log_level(int new_level);
 /** Basic init. */
 void say_init(const char *argv0);
 
-/* Move logging to a separate process. */
-void say_logger_init(const char *logger, int log_level, int nonblock,
-		     int background);
+/* Init logger. */
+void say_logger_init(const char *init_str,
+                     int log_level, int nonblock, int background);
 
 void vsay(int level, const char *filename, int line, const char *error,
           const char *format, va_list ap)
@@ -123,6 +122,54 @@ extern sayfunc_t _say __attribute__ ((format(printf, 5, 6)));
 #define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
+
+/**
+ * validates logger init string;
+ * @param[out] error - a malloc-ed error message
+ * @returns 0 if validation passed or -1
+ *           with an error message
+ */
+int
+say_check_init_str(const char *str, char **error);
+
+/* internals, for unit testing */
+
+enum say_logger_type {
+	SAY_LOGGER_STDERR,
+	SAY_LOGGER_FILE,
+	SAY_LOGGER_PIPE,
+	SAY_LOGGER_SYSLOG
+};
+
+/**
+ * Determine logger type and strip type prefix from init_str.
+ *
+ * @return	-1 on error, 0 on success
+ */
+int
+say_parse_logger_type(const char **str, enum say_logger_type *type);
+
+/** Syslog logger initialization params */
+struct say_syslog_opts {
+	const char *identity;
+	const char *facility;
+	/* Input copy (content unspecified). */
+	char *copy;
+};
+
+/**
+ * Parse syslog logger init string (without the prefix)
+ * @retval -1  error, message is malloc-ed
+ * @retval  0  success
+ */
+int
+say_parse_syslog_opts(const char *init_str,
+		      struct say_syslog_opts *opts,
+		      char **error);
+
+/** Release memory allocated by the option parser. */
+void
+say_free_syslog_opts(struct say_syslog_opts *opts);
 
 #if defined(__cplusplus)
 } /* extern "C" */

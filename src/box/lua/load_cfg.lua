@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 ffi.cdef([[
+void free(void *);
 void check_cfg();
 void load_cfg();
 void box_set_wal_mode(void);
@@ -13,6 +14,7 @@ void box_set_io_collect_interval(void);
 void box_set_too_long_threshold(void);
 void box_set_snap_io_rate_limit(void);
 void box_set_panic_on_wal_error(void);
+int say_check_init_str(const char *, char**);
 ]])
 
 local log = require('log')
@@ -74,6 +76,19 @@ local sophia_template_cfg = {
     compression_key = 'number'
 }
 
+local function check_logger(v)
+    if type(v) ~= 'string' then
+        return "should be of type string"
+    end
+    local err_ptr = ffi.new('char*[1]')
+    if ffi.C.say_check_init_str(v, err_ptr) == -1 then
+	if err_ptr[0] == nil then return 'out of memory' end
+        local result = ffi.string(err_ptr[0])
+	ffi.C.free(err_ptr[0])
+	return result
+    end
+end
+
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
@@ -87,7 +102,7 @@ local template_cfg = {
     wal_dir             = 'string',
     sophia_dir          = 'string',
     sophia              = sophia_template_cfg,
-    logger              = 'string',
+    logger              = check_logger,
     logger_nonblock     = 'boolean',
     log_level           = 'number',
     io_collect_interval = 'number',
@@ -182,6 +197,11 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
                 error("Error: cfg parameter '" .. readable_name .. "' should be a table")
             end
             v = prepare_cfg(v, default_cfg[k], template_cfg[k], modify_cfg[k], readable_name)
+        elseif type(template_cfg[k]) == 'function' then
+            local err = template_cfg[k](v)
+            if err ~= nil then
+                error("Error: cfg parameter '" .. readable_name .. "' ".. tostring(err))
+            end
         elseif (string.find(template_cfg[k], ',') == nil) then
             -- one type
             if type(v) ~= template_cfg[k] then

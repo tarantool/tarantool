@@ -1,0 +1,52 @@
+1..20
+# type: file
+# next: 
+ok 1 - 
+# type: file
+# next: /dev/null
+ok 2 - /dev/null
+# type: pipe
+# next: 
+ok 3 - |
+# type: pipe
+# next: /usr/bin/cronolog
+ok 4 - |/usr/bin/cronolog
+# type: file
+# next: 
+ok 5 - file:
+# type: file
+# next: instance.log
+ok 6 - file:instance.log
+# type: pipe
+# next: 
+ok 7 - pipe:
+# type: pipe
+# next: gzip > instance.log.gz
+ok 8 - pipe:gzip > instance.log.gz
+# type: syslog
+# next: 
+ok 9 - syslog:
+# type: syslog
+# next: identity=
+ok 10 - syslog:identity=
+# next: unknown:
+ok 11 - unknown:
+# next: unknown:example.org
+ok 12 - unknown:example.org
+ok 13 - 
+# identity: tarantool
+ok 14 - identity=tarantool
+# facility: user
+ok 15 - facility=user
+# identity: xtarantoolx
+# facility: local1
+ok 16 - identity=xtarantoolx,facility=local1
+# identity: bar
+# facility: foo
+ok 17 - facility=foo,identity=bar
+# error: bad option 'invalid='
+ok 18 - invalid=
+# error: duplicate option 'facility'
+ok 19 - facility=local1,facility=local2
+# error: duplicate option 'identity'
+ok 20 - identity=foo,identity=bar

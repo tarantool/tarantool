@@ -1,10 +1,12 @@
 TAP version 13
-1..33
+1..35
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
 ok - invalid rows_per_wal
 ok - invalid listen
+ok - invalid logger
+ok - invalid logger
 ok - box is not started
 ok - exception on unconfigured box
 ok - sophia_dir is not auto-created

@@ -120,4 +120,5 @@ void *ffi_symbols[] = {
 	(void *) title_get_custom,
 	(void *) title_set_status,
 	(void *) title_get_status,
+	(void *) say_check_init_str,
 };

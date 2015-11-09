@@ -12,9 +12,13 @@ test_run:cmd("push filter 'admin: .*' to 'admin: <uri>'")
 ---
 - true
 ...
+test_run:cmd("push filter ".."'\\.lua - internal file.*:[0-9]+: ' to '.lua - internal file...\"]:<line>: '")
+---
+- true
+...
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:277: Attempt to modify a read-only
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Attempt to modify a read-only
     table'
 ...
 cfg_filter(box.cfg)
@@ -46,7 +50,7 @@ cfg_filter(box.cfg)
 -- must be read-only
 box.cfg()
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:218: bad argument #1 to ''pairs''
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: bad argument #1 to ''pairs''
     (table expected, got nil)'
 ...
 cfg_filter(box.cfg)
@@ -78,23 +82,23 @@ cfg_filter(box.cfg)
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:174: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''sherlock'' is unexpected'
 ...
 -- check that cfg with unexpected type of parameter failes
 box.cfg{listen = {}}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:194: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''listen'' should be one of types: string, number'
 ...
 box.cfg{wal_dir = 0}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:188: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''wal_dir'' should be of type string'
 ...
 box.cfg{coredump = 'true'}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:188: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''coredump'' should be of type boolean'
 ...
 --------------------------------------------------------------------------------
@@ -102,17 +106,17 @@ box.cfg{coredump = 'true'}
 --------------------------------------------------------------------------------
 box.cfg{slab_alloc_arena = "100500"}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:188: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''slab_alloc_arena'' should be of type number'
 ...
 box.cfg{sophia = "sophia"}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:182: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''sophia'' should be a table'
 ...
 box.cfg{sophia = {threads = "threads"}}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:188: Error: cfg parameter
+- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
     ''sophia.threads'' should be of type number'
 ...
 --------------------------------------------------------------------------------
