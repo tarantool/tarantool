@@ -38,7 +38,7 @@
 #include "memtx_bitset.h"
 #include "space.h"
 #include "msgpuck/msgpuck.h"
-#include "salad/rlist.h"
+#include "small/rlist.h"
 #include "request.h"
 #include "box.h"
 #include "iproto_constants.h"

@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "lib/salad/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {

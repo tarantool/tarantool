@@ -30,7 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "salad/rlist.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -43,7 +43,7 @@
 #include "port.h"
 #include "request.h"
 #include "iproto_constants.h"
-#include "salad/rlist.h"
+#include "small/rlist.h"
 #include <errinj.h>
 #include <sophia.h>
 #include <stdlib.h>

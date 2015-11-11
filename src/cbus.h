@@ -32,6 +32,7 @@
  */
 #include "fiber.h"
 #include "rmean.h"
+#include "third_party/queue.h"
 
 #if defined(__cplusplus)
 extern "C" {
