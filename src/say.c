@@ -50,6 +50,7 @@ int log_level = S_INFO;
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
 
+static bool booting = true;
 static enum say_logger_type logger_type = SAY_LOGGER_STDERR;
 static bool logger_background = true;
 static const char *binary_filename;
@@ -329,6 +330,7 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		int flags = fcntl(log_fd, F_GETFL, 0);
 		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
 	}
+	booting = false;
 }
 
 void
@@ -339,7 +341,7 @@ vsay(int level, const char *filename, int line, const char *error,
 	const char *f;
 	static __thread char buf[PIPE_BUF];
 
-	if (logger_type == SAY_LOGGER_STDERR) {
+	if (booting) {
 		fprintf(stderr, "%s: ", binary_filename);
 		vfprintf(stderr, format, ap);
 		if (error)
