@@ -276,7 +276,7 @@ signal_init(void)
 
 /** Run in the background. */
 static void
-background_enter()
+daemonize()
 {
 	int fd;
 
@@ -435,7 +435,7 @@ load_cfg()
 			background);
 
 	if (background) {
-		background_enter();
+		daemonize();
 		master_pid = getpid();
 	}
 
