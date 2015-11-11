@@ -128,7 +128,20 @@ local function local_read(self)
             return nil
         end
         buf = buf..line
-        if #buf >= #delim and buf:sub(#buf - #delim + 1) == delim then
+        if delim == "" then
+            -- stop once a complete Lua statement is entered
+            local fn, err = loadstring(buf)
+            if fn ~= nil or not string.find(err, " near '<eof>'$") then
+                -- valid Lua code or a syntax error not due to
+                -- an incomplete input
+                break
+            end
+            if loadstring('return '..buf) ~= nil then
+                -- certain obscure inputs like '(42\n)' yield the
+                -- same error as incomplete statement
+                break
+            end
+        elseif #buf >= #delim and buf:sub(#buf - #delim + 1) == delim then
             buf = buf:sub(0, #buf - #delim)
             break
         end
