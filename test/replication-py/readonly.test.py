@@ -31,8 +31,9 @@ os.remove(wal)
 
 # Start replica without master
 server.stop()
+replica.rpl_master = None
+os.putenv("MASTER", "") # clear information about MASTER from env
 replica.start()
-replica.admin('box.cfg{replication_source = ""}')
 
 # Check that replica in read-only mode
 replica.admin('box.info.server.id')

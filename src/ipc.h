@@ -369,6 +369,37 @@ ipc_channel_is_closed(struct ipc_channel *ch)
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "fiber.h"
+
+struct IpcChannelGuard {
+	struct ipc_channel *ch;
+
+	IpcChannelGuard(uint32_t size) {
+		ch = ipc_channel_new(size);
+		if (ch == NULL)
+			diag_raise();
+	}
+
+	~IpcChannelGuard() {
+		ipc_channel_delete(ch);
+	}
+};
+
+static inline void
+ipc_channel_get_xc(struct ipc_channel *ch, void **data)
+{
+	if (ipc_channel_get(ch, data) != 0)
+		diag_raise();
+}
+
+static inline void
+ipc_channel_put_xc(struct ipc_channel *ch, void *data)
+{
+	if (ipc_channel_put(ch, data) != 0)
+		diag_raise();
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_IPC_H_INCLUDED */

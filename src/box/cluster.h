@@ -32,6 +32,10 @@
  */
 #include "tt_uuid.h"
 #include <stdint.h>
+#define RB_COMPACT 1
+#include <third_party/rb.h>
+#include "applier.h"
+
 /**
  * @module cluster - global state of multi-master
  * replicated database.
@@ -126,14 +130,8 @@ cluster_del_server(uint32_t server_id);
 
 /** {{{ Cluster applier API **/
 
-void
-cluster_add_applier(struct applier *applier);
-
-void
-cluster_del_applier(struct applier *applier);
-
-struct applier *
-cluster_find_applier(const char *source);
+int
+cluster_set_appliers(struct applier **appliers, int count);
 
 struct applier *
 cluster_applier_first(void);

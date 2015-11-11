@@ -275,6 +275,9 @@ t;
   - 'box.error.injection : table: <address>
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
+  - 'box.error.injection : table: <address>
+  - 'box.error.ITERATOR_TYPE : 72'
+  - 'box.error.SERVER_UUID_MISMATCH : 109'
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.WRONG_SCHEMA_VERSION : 109'
   - 'box.error.SLAB_ALLOC_MAX : 110'
@@ -326,7 +329,7 @@ t;
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
   - 'box.error.PROC_C : 102'
-  - 'box.error.ITERATOR_TYPE : 72'
+  - 'box.error.SERVER_ID_MISMATCH : 110'
   - 'box.error.NONMASTER : 6'
   - 'box.error.SPACE_EXISTS : 10'
   - 'box.error.MISSING_REQUEST_FIELD : 69'

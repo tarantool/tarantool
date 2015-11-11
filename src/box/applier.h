@@ -36,10 +36,13 @@
 
 #include "trivia/util.h"
 #include "uri.h"
+#include "tt_uuid.h"
+#include "trigger.h"
 #include "third_party/tarantool_ev.h"
 #define RB_COMPACT 1
 #include <third_party/rb.h>
 #include "vclock.h"
+#include "ipc.h"
 
 struct recovery;
 
@@ -67,8 +70,8 @@ struct applier {
 	enum applier_state state;
 	ev_tstamp lag, last_row_time;
 	bool warning_said;
-	bool cfg_merge_flag; /* used by box_set_replication_source */
 	uint32_t id;
+	struct tt_uuid uuid;
 	char source[APPLIER_SOURCE_MAXLEN];
 	rb_node(struct applier) link; /* a set by source in cluster.cc */
 	struct uri uri;
@@ -79,10 +82,13 @@ struct applier {
 		struct sockaddr_storage addrstorage;
 	};
 	socklen_t addr_len;
-	/** Save master fd to re-use a connection between JOIN and SUBSCRIBE */
 	struct ev_io io;
 	/** Input/output buffer for buffered IO */
 	struct iobuf *iobuf;
+	/** Triggers invoked on state change */
+	struct rlist on_state;
+	/* Channel used by applier_connect_all() and applier_resume() */
+	struct ipc_channel pause;
 };
 
 /**
@@ -93,10 +99,8 @@ struct applier {
  *
  * If recovery is not finalized (i.e. r->writer == NULL) then the client
  * connect to a master, download and process snapshot using JOIN command
- * and then exits. The background fiber can be joined to get exit status
- * using applier_wait().
+ * and then switch to follow mode.
  *
- * \pre A connection from io->fd is re-used.
  * \sa fiber_start()
  */
 void
@@ -107,17 +111,6 @@ applier_start(struct applier *applier, struct recovery *r);
  */
 void
 applier_stop(struct applier *applier);
-
-/**
- * Wait replication client to finish and rethrow exception (if any).
- * Use this function to wait until bootstrap.
- *
- * \post This function keeps a open connection in io->fd.
- * \sa applier_start()
- * \sa fiber_join()
- */
-void
-applier_wait(struct applier *applier);
 
 /**
  * Allocate an instance of applier object, create applier and initialize
@@ -134,5 +127,30 @@ applier_new(const char *uri);
  */
 void
 applier_delete(struct applier *applier);
+
+/*
+ * Connect all appliers to remote peer and receive UUID
+ * \post appliers are connected to remote hosts and paused.
+ * Use applier_resume(applier) to resume applier.
+ */
+int
+applier_connect_all(struct applier **appliers, int count,
+		   struct recovery *recovery);
+
+/*
+ * Download and process the data snapshot from master.
+ * \pre applier is paused && applier->state == APPLIER_CONNECTED
+ * \post applier is paused && applier->state == APPLIER_CONNECTED
+ * \sa applier_connect_all
+ */
+int
+applier_bootstrap(struct applier *master);
+
+/*
+ * Resume execution of applier returned by applier_connect_all() or
+ * applier_bootstrap().
+ */
+void
+applier_resume(struct applier *applier);
 
 #endif /* TARANTOOL_APPLIER_H_INCLUDED */

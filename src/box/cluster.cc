@@ -43,15 +43,15 @@ typedef rb_tree(struct applier) applierset_t;
 rb_proto(, applierset_, applierset_t, struct applier)
 
 static int
-applier_compare_by_source(const struct applier *a, const struct applier *b)
+applier_compare_by_uuid(const struct applier *a, const struct applier *b)
 {
-	return strcmp(a->source, b->source);
+	return memcmp(&a->uuid, &b->uuid, sizeof(a->uuid));
 }
 
 rb_gen(, applierset_, applierset_t, struct applier, link,
-       applier_compare_by_source);
+       applier_compare_by_uuid);
 
-static applierset_t applierset; /* zeroed by linker */
+static applierset_t applierset;
 
 void
 cluster_init(void)
@@ -127,24 +127,45 @@ cluster_del_server(uint32_t server_id)
 	}
 }
 
-void
-cluster_add_applier(struct applier *applier)
+int
+cluster_set_appliers(struct applier **appliers, int count)
 {
-	applierset_insert(&applierset, applier);
-}
+	applierset_t uniq;
+	applierset_new(&uniq);
 
-void
-cluster_del_applier(struct applier *applier)
-{
-	applierset_remove(&applierset, applier);
-}
+	/* Check for duplicate UUID */
+	for (int i = 0; i < count; i++) {
+		if (applierset_search(&uniq, appliers[i]) != NULL) {
+			tnt_error(ClientError, ER_CFG, "replication_source",
+				  "duplicate connection to the same server");
+			/* Caveat: applier->link is inconsistent */
+			return -1;
+		}
 
-struct applier *
-cluster_find_applier(const char *source)
-{
-	struct applier key;
-	snprintf(key.source, sizeof(key.source), "%s", source);
-	return applierset_search(&applierset, &key);
+		applierset_insert(&uniq, appliers[i]);
+	}
+	/* Ignore `uniq' set after the checking UUID for uniqueness */
+
+	/*
+	 * All invariants and conditions are checked, now it is safe to
+	 * apply the new configuration. Nothing can fail after this point.
+	 */
+
+	/* Prube old appliers */
+	struct applier *applier = applierset_first(&applierset);
+	while (applier != NULL) {
+		struct applier *next = applierset_next(&applierset, applier);
+		applier_stop(applier); /* cancels a background fiber */
+		applierset_remove(&applierset, applier);
+		applier_delete(applier);
+		applier = next;
+	}
+
+	/* Save new appliers */
+	for (int i = 0; i < count; i++)
+		applierset_insert(&applierset, appliers[i]);
+
+	return 0;
 }
 
 struct applier *

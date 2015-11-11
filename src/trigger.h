@@ -60,6 +60,16 @@ struct trigger
 };
 
 static inline void
+trigger_create(struct trigger *trigger, trigger_f run, void *data,
+	       trigger_f0 destroy)
+{
+	rlist_create(&trigger->link);
+	trigger->run = run;
+	trigger->data = data;
+	trigger->destroy = destroy;
+}
+
+static inline void
 trigger_run(struct rlist *list, void *event)
 {
 	struct trigger *trigger, *tmp;

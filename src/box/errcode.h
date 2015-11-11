@@ -119,7 +119,7 @@ struct errcode_record {
 	/* 63 */_(ER_CLUSTER_ID_MISMATCH,	2, "Cluster id of the replica %s doesn't match cluster id of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		2, "Invalid UUID: %s") \
 	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \
-	/* 66 */_(ER_RESERVED66,		2, "Reserved66") \
+	/* 66 */_(ER_SERVER_ID_MISMATCH,	2, "Remote ID mismatch for %s: expected %u, got %u") \
 	/* 67 */_(ER_SERVER_ID_IS_RESERVED,	2, "Can't initialize server id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
@@ -164,6 +164,7 @@ struct errcode_record {
 	/*108 */_(ER_WRONG_INDEX_OPTIONS, 2, "Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION, 2, "Wrong schema version, current: %d, in request: %u") \
 	/*110 */_(ER_SLAB_ALLOC_MAX, 2, "Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.") \
+	/*111 */_(ER_SERVER_UUID_MISMATCH, 2, "Remote UUID mismatch: expected %s, got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

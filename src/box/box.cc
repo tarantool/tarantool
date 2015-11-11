@@ -270,41 +270,60 @@ box_check_config()
 }
 
 /*
- * Sync box.cfg.replication_source and cluster registry.
+ * Parse box.cfg.replication_source and create appliers.
+ */
+static struct applier **
+cfg_get_replication_source(int *p_count)
+{
+	/* Use static buffer for result */
+	static struct applier *appliers[VCLOCK_MAX];
+
+	int count = cfg_getarr_size("replication_source");
+	if (count >= VCLOCK_MAX) {
+		tnt_raise(ClientError, ER_CFG, "replication_source",
+				"too many replicas");
+	}
+
+	for (int i = 0; i < count; i++) {
+		const char *source = cfg_getarr_elem("replication_source", i);
+		struct applier *applier = applier_new(source);
+		if (applier == NULL) {
+			/* Delete created appliers */
+			while (--i >= 0)
+				applier_delete(appliers[i]);
+			return NULL;
+		}
+		appliers[i] = applier; /* link to the list */
+	}
+
+	*p_count = count;
+
+	return appliers;
+}
+
+/*
+ * Sync box.cfg.replication_source with the cluster registry, but
+ * don't start appliers.
  */
 static void
 box_sync_replication_source(void)
 {
-	/* Reset cfg_merge_flag for all replicas */
-	cluster_foreach_applier(applier) {
-		applier->cfg_merge_flag = false;
-	}
+	int count;
+	struct applier **appliers = cfg_get_replication_source(&count);
+	if (appliers == NULL)
+		diag_raise();
 
-	/* Add new replicas and set cfg_merge_flag for existing */
-	int count = cfg_getarr_size("replication_source");
-	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("replication_source", i);
-		/* Try to find applier with the same source in the registry */
-		struct applier *applier = cluster_find_applier(source);
-		if (applier == NULL) {
-			/* Start new applier using specified source */
-			applier = applier_new(source); /* may throw */
-			cluster_add_applier(applier);
-		}
-		applier->cfg_merge_flag = true;
-	}
+	if (applier_connect_all(appliers, count, recovery) != 0)
+		goto error;
 
-	/* Remove replicas without cfg_merge_flag */
-	struct applier *applier = cluster_applier_first();
-	while (applier != NULL) {
-		struct applier *next = cluster_applier_next(applier);
-		if (!applier->cfg_merge_flag) {
-			applier_stop(applier); /* cancels a background fiber */
-			cluster_del_applier(applier);
-			applier_delete(applier);
-		}
-		applier = next;
-	}
+	if (cluster_set_appliers(appliers, count) != 0)
+		goto error;
+
+	return;
+error:
+	for (int i = 0; i < count; i++)
+		applier_delete(appliers[i]); /* doesn't affect diag */
+	diag_raise(); /* re-throw original error */
 }
 
 extern "C" void
@@ -320,17 +339,8 @@ box_set_replication_source(void)
 	}
 
 	box_sync_replication_source();
-
-	/* Start all replicas from the cluster registry */
 	cluster_foreach_applier(applier) {
-		if (applier->reader == NULL) {
-			applier_start(applier, recovery);
-		} else if (applier->state == APPLIER_OFF ||
-			   applier->state == APPLIER_STOPPED) {
-			/* Re-start faulted replicas */
-			applier_stop(applier);
-			applier_start(applier, recovery);
-		}
+		applier_resume(applier);
 	}
 }
 
@@ -840,14 +850,14 @@ box_init(void)
 	 */
 	box_sync_replication_source();
 	/* Use the first replica by URI as a bootstrap leader */
-	struct applier *applier = cluster_applier_first();
+	struct applier *master = cluster_applier_first();
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (applier != NULL && !box_cfg_listen_eq(&applier->uri)) {
+	} else if (master != NULL && !box_cfg_listen_eq(&master->uri)) {
 		/* Generate Server-UUID */
 		tt_uuid_create(&recovery->server_uuid);
 
@@ -857,9 +867,14 @@ box_init(void)
 		/* Add a surrogate server id for snapshot rows */
 		vclock_add_server(&recovery->vclock, 0);
 
-		/* Bootstrap from the first master */
-		applier_start(applier, recovery);
-		applier_wait(applier); /* throws on failure */
+		/* Download and process a data snapshot from master */
+		if (applier_bootstrap(master) != 0) {
+			diag_raise();
+			assert(0); /* panic() called by box_load_cfg() */
+		}
+
+		/* Replace server vclock using master's vclock */
+		vclock_copy(&recovery->vclock, &master->vclock);
 
 		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
@@ -896,7 +911,9 @@ box_init(void)
 	rmean_cleanup(rmean_box);
 
 	/* Follow replica */
-	box_set_replication_source();
+	cluster_foreach_applier(applier) {
+		applier_resume(applier);
+	}
 
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)

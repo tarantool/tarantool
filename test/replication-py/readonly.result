@@ -16,9 +16,6 @@ box.info.server.lsn
 -------------------------------------------------------------
 replica is read-only until receive self server_id in _cluster
 -------------------------------------------------------------
-box.cfg{replication_source = ""}
----
-...
 box.info.server.id
 ---
 - 0

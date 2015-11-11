@@ -844,12 +844,10 @@ MemtxEngine::begin(struct txn *txn)
 	 */
 	if (txn->is_autocommit == false) {
 
-		txn->fiber_on_yield = {
-			RLIST_LINK_INITIALIZER, txn_on_yield_or_stop, NULL, NULL
-		};
-		txn->fiber_on_stop = {
-			RLIST_LINK_INITIALIZER, txn_on_yield_or_stop, NULL, NULL
-		};
+		trigger_create(&txn->fiber_on_yield, txn_on_yield_or_stop,
+				NULL, NULL);
+		trigger_create(&txn->fiber_on_stop, txn_on_yield_or_stop,
+				NULL, NULL);
 		/*
 		 * Memtx doesn't allow yields between statements of
 		 * a transaction. Set a trigger which would roll
