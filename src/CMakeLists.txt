@@ -67,7 +67,7 @@ set (core_sources
      reflection.c
      assoc.c
      rmean.c
-     util.cc
+     util.c
  )
 
 add_library(core STATIC ${core_sources})
@@ -99,6 +99,7 @@ set (server_sources
      fiob.c
      tt_uuid.c
      uri.c
+     backtrace.cc
      proc_title.c
      coeio_file.cc
      lua/digest.cc

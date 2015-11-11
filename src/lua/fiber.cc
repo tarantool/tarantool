@@ -33,6 +33,7 @@
 #include <fiber.h>
 #include "lua/utils.h"
 #include <scoped_guard.h>
+#include "backtrace.h"
 
 extern "C" {
 #include <lua.h>

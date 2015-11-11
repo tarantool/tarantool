@@ -126,36 +126,6 @@ void __gcov_flush();
 ssize_t
 fdprintf(int fd, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
-extern void *__libc_stack_end;
-
-#ifdef ENABLE_BACKTRACE
-void print_backtrace();
-
-char *
-backtrace(void *frame, void *stack, size_t stack_size);
-
-typedef int (backtrace_cb)(int frameno, void *frameret,
-                           const char *func, size_t offset, void *cb_ctx);
-void
-backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
-		  size_t stack_size, void *cb_ctx);
-#endif /* ENABLE_BACKTRACE */
-
-#ifdef HAVE_BFD
-struct symbol {
-	void *addr;
-	const char *name;
-	void *end;
-};
-struct symbol *
-addr2symbol(void *addr);
-
-void
-symbols_load(const char *name);
-
-void
-symbols_free();
-#endif /* HAVE_BFD */
 char *
 find_path(const char *argv0);
 

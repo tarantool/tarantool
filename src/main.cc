@@ -56,6 +56,7 @@
 #include <rmean.h>
 #include <limits.h>
 #include "trivia/util.h"
+#include "backtrace.h"
 #include "tt_pthread.h"
 #include "lua/init.h"
 #include "box/box.h"
