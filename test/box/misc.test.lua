@@ -191,7 +191,7 @@ s:insert{1, 2, 3}
 s:insert{5, 8, 13}
 i2:update({2}, {{'+', 3, 3}})
 i2:delete{8}
---# restart server default
+test_run:cmd("restart server default")
 box.space.test:select{}
 box.space.test:drop()
 

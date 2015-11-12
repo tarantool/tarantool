@@ -1,10 +1,28 @@
---# set connection default
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd('switch default')
+---
+- true
+...
 box.schema.user.grant('guest', 'replication')
 ---
 ...
---# create server replica with rpl_master=default, script='replication/replica.lua'
---# start server replica
---# set connection replica
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end
 ---
 ...
@@ -27,12 +45,18 @@ box.space._schema:insert({'dup'})
 ---
 - ['dup']
 ...
---# set connection default
+test_run:cmd('switch default')
+---
+- true
+...
 box.space._schema:insert({'dup'})
 ---
 - ['dup']
 ...
---# set connection replica
+test_run:cmd('switch replica')
+---
+- true
+...
 r = box.info.replication
 ---
 ...
@@ -55,7 +79,10 @@ box.info.replication.status == "off"
 control_ch = require('fiber').channel(1)
 ---
 ...
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
 local digest = require('digest')
 slowpoke_loop = function(s, peer)
     control_ch:get()
@@ -70,7 +97,10 @@ slowpoke_loop = function(s, peer)
 end;
 ---
 ...
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 slowpoke = require('socket').tcp_server('127.0.0.1', 0, slowpoke_loop)
 ---
 ...
@@ -172,9 +202,18 @@ r.idle < 1
 ---
 - true
 ...
---# stop server replica
---# cleanup server replica
---# set connection default
+test_run:cmd('switch default')
+---
+- true
+...
 box.schema.user.revoke('guest', 'replication')
 ---
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
 ...

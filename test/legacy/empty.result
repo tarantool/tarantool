@@ -6,3 +6,6 @@ _ = box.schema.space.create('test')
 _ = box.schema.space.create('test')
 ---
 ...
+box.space.test:drop()
+---
+...

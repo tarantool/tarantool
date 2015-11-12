@@ -333,14 +333,12 @@ local function test_ucdata(test, s)
 
     ffi.cdef[[struct serializer_cdata_test {}]]
     local ctype = ffi.typeof('struct serializer_cdata_test')
-    --# setopt delimiter ';'
     ffi.metatype(ctype, {
         __index = {
             __serialize = function(obj) return 'unpack' end,
         },
         __tostring = function(obj) return 'tostring' end
     });
-    --# setopt delimiter ''
 
     local cdata = ffi.new(ctype)
     -- use fiber's userdata for test (supports both __serialize and __tostring)

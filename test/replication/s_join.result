@@ -185,3 +185,6 @@ box.snapshot()
 ---
 - ok
 ...
+box.schema.user.revoke('guest', 'replication')
+---
+...

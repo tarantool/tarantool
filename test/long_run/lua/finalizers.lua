@@ -1,6 +1,8 @@
 #!/usr/bin/env tarantool
+env = require('test_run')
+test_run = env.new()
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 
 function on_gc(t)
 end;
@@ -16,7 +18,7 @@ function test_finalizers()
     return "done"
 end;
 
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''")
 
 test_finalizers()
 test_finalizers()

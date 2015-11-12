@@ -1,4 +1,6 @@
 --UPSERT https://github.com/tarantool/tarantool/issues/905
+env = require('test_run')
+test_run = env.new()
 s = box.schema.create_space('tweedledum')
 index = s:create_index('pk')
 
@@ -43,7 +45,7 @@ s:select{0}
 s:drop()
 
 --UPSERT https://github.com/tarantool/tarantool/issues/966
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function anything_to_string(tab)
     if tab == nil then
         return 'nil'
@@ -117,7 +119,7 @@ function test(key_tuple, ops, expect)
             ') FAILED, got ' .. anything_to_string(box.space.s:select{}) ..
             ' expected ' .. anything_to_string(expect)
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 engine = 'memtx'
 s = box.schema.space.create('s', {engine = engine})
@@ -200,10 +202,9 @@ t[1] = 3
 test(t, {{':', 3, 3, 3, ''}, {'|', 3, 4}}, {{1, '1', 4, '1'}, {2, '2', 2, '2'}, {3, '3', 7, '3'}})
 
 'dump ' .. anything_to_string(box.space.s:select{}) -- (1)
---# stop server default
---# start server default
+test_run:cmd("restart server default")
 
---# setopt delimiter ';'
+test_run:cmd("setopt delimiter ';'")
 function anything_to_string(tab)
     if tab == nil then
         return 'nil'
@@ -231,7 +232,7 @@ function anything_to_string(tab)
     str = str .. ']'
     return str
 end;
---# setopt delimiter ''
+test_run:cmd("setopt delimiter ''");
 
 s = box.space.s
 'dump ' .. anything_to_string(box.space.s:select{})-- compare with (1) visually!
