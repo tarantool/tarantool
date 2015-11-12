@@ -8,6 +8,11 @@ compiler:
   - clang
   - gcc
 
+matrix:
+  exclude:
+    - os: osx
+      compiler: gcc
+
 addons:
   postgresql: "9.1"
 
