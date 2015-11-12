@@ -60,9 +60,9 @@ cpipe_fetch_output_cb(ev_loop *loop, struct ev_async *watcher,
 void
 cpipe_create(struct cpipe *pipe)
 {
-	STAILQ_INIT(&pipe->pipe);
-	STAILQ_INIT(&pipe->input);
-	STAILQ_INIT(&pipe->output);
+	stailq_create(&pipe->pipe);
+	stailq_create(&pipe->input);
+	stailq_create(&pipe->output);
 
 	pipe->n_input = 0;
 	pipe->max_input = INT_MAX;
@@ -179,19 +179,19 @@ cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 
 	/* Trigger task processing when the queue becomes non-empty. */
 	bool pipe_was_empty;
-	bool peer_output_was_empty = STAILQ_EMPTY(&peer->output);
+	bool peer_output_was_empty = stailq_empty(&peer->output);
 
 	cbus_lock(pipe->bus);
 	pipe_was_empty = !ev_async_pending(&pipe->fetch_output);
 	/** Flush input */
-	STAILQ_CONCAT(&pipe->pipe, &pipe->input);
+	stailq_concat(&pipe->pipe, &pipe->input);
 	/*
 	 * While at it, pop output.
 	 * The consumer of the output of the bound queue is the
 	 * same as the producer of input, so we can safely access it.
 	 * We can safely access queue because it's locked.
 	 */
-	STAILQ_CONCAT(&peer->output, &peer->pipe);
+	stailq_concat(&peer->output, &peer->pipe);
 	cbus_unlock(pipe->bus);
 
 
@@ -202,14 +202,14 @@ cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 
 		ev_async_send(pipe->consumer, &pipe->fetch_output);
 	}
-	if (peer_output_was_empty && !STAILQ_EMPTY(&peer->output))
+	if (peer_output_was_empty && !stailq_empty(&peer->output))
 		ev_feed_event(peer->consumer, &peer->fetch_output, EV_CUSTOM);
 }
 
 struct cmsg *
 cpipe_peek_impl(struct cpipe *pipe)
 {
-	assert(STAILQ_EMPTY(&pipe->output));
+	assert(stailq_empty(&pipe->output));
 
 	struct cpipe *peer = pipe->peer;
 	assert(pipe->consumer == loop());
@@ -219,10 +219,10 @@ cpipe_peek_impl(struct cpipe *pipe)
 
 
 	cbus_lock(pipe->bus);
-	STAILQ_CONCAT(&pipe->output, &pipe->pipe);
-	if (! STAILQ_EMPTY(&peer->input)) {
+	stailq_concat(&pipe->output, &pipe->pipe);
+	if (! stailq_empty(&peer->input)) {
 		peer_pipe_was_empty = !ev_async_pending(&peer->fetch_output);
-		STAILQ_CONCAT(&peer->pipe, &peer->input);
+		stailq_concat(&peer->pipe, &peer->input);
 	}
 	cbus_unlock(pipe->bus);
 	peer->n_input = 0;
@@ -233,7 +233,7 @@ cpipe_peek_impl(struct cpipe *pipe)
 
 		ev_async_send(peer->consumer, &peer->fetch_output);
 	}
-	return STAILQ_FIRST(&pipe->output);
+	return stailq_first_entry(&pipe->output, struct cmsg, fifo);
 }
 
 
@@ -301,7 +301,7 @@ cpipe_fiber_pool_cb(ev_loop *loop, struct ev_async *watcher,
 		(struct cpipe_fiber_pool *) watcher->data;
 	struct cpipe *pipe = pool->pipe;
 	(void) cpipe_peek(pipe);
-	while (! STAILQ_EMPTY(&pipe->output)) {
+	while (! stailq_empty(&pipe->output)) {
 		struct fiber *f;
 		if (! rlist_empty(&pool->fiber_cache)) {
 			f = rlist_shift_entry(&pool->fiber_cache,
