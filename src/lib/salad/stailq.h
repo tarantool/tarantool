@@ -73,6 +73,18 @@ stailq_add(struct stailq *head, struct stailq_entry *item)
 }
 
 /**
+ * Pop an item from list head.
+ */
+inline static struct stailq_entry *
+stailq_shift(struct stailq *head)
+{
+	struct stailq_entry *shift = head->first;
+	if ((head->first = head->first->next) == NULL)
+		head->last = &head->first;
+	return shift;
+}
+
+/**
  * Add an item to list tail
  */
 inline static void
@@ -146,6 +158,21 @@ stailq_reverse(struct stailq *head)
 	}
 }
 
+/** Concat all members of head1 starting from elem to the end of head2. */
+static inline void
+stailq_splice(struct stailq *head1, struct stailq_entry *elem,
+	      struct stailq *head2)
+{
+	if (elem) {
+		*head2->last = elem;
+		head2->last = head1->last;
+		head1->last = &head1->first;
+		while (*head1->last != elem)
+			head1->last = &(*head1->last)->next;
+		*head1->last = NULL;
+	}
+}
+
 #define stailq_entry(item, type, member) ({				\
 	const typeof( ((type *)0)->member ) *__mptr = (item);		\
 	(type *)( (char *)__mptr - ((size_t) &((type *)0)->member) ); })
@@ -172,6 +199,12 @@ stailq_reverse(struct stailq *head)
 	for (item = stailq_first_entry((head), typeof(*item), member);	\
 	     item != stailq_entry(0, typeof(*item), member);		\
 	     item = stailq_next_entry(item, member))
+
+#define stailq_foreach_entry_safe(item, next, head, member)		\
+	for (item = stailq_first_entry((head), typeof(*item), member);	\
+	     item != stailq_entry(0, typeof(*item), member) &&		\
+	     (next = stailq_next_entry(item, member), 1);		\
+	     item = next)
 
 /**
  * Remove one element from the list and return it
