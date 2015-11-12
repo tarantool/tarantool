@@ -308,7 +308,7 @@ cfg_get_replication_source(int *p_count)
 static void
 box_sync_replication_source(void)
 {
-	int count;
+	int count = 0;
 	struct applier **appliers = cfg_get_replication_source(&count);
 	if (appliers == NULL)
 		diag_raise();
