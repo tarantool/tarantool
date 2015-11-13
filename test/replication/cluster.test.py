@@ -93,7 +93,7 @@ server.admin("box.schema.user.revoke('guest', 'replication')")
 server.admin('box.snapshot()')
 
 print '-------------------------------------------------------------'
-print 'gh-434: Assertion if replace _cluster tuple'
+print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
 server.stop()
 script = server.script
@@ -123,6 +123,24 @@ server.admin("box.info.server.uuid")
 
 # Invalid UUID
 server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
+
+print '-------------------------------------------------------------'
+print 'gh-1140: Assertion if replace _cluster tuple for remote server'
+print '-------------------------------------------------------------'
+
+# Test that insert is OK
+new_uuid = '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+server.admin("box.info.vclock[5] == 0")
+
+# Replace with the same UUID is OK
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+# Replace with a new UUID is OK
+new_uuid = 'a48a19a3-26c0-4f8c-a5b5-77377bab389b'
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+# Delete is OK
+server.admin("box.space._cluster:delete(5)")
+server.admin("box.info.vclock[5] == nil")
 
 # Cleanup
 server.stop()

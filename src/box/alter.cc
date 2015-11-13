@@ -1940,10 +1940,13 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 		if (id != old_id) {
 			/* box.space._cluster:update(old, {{'=', 1, new}} */
 			cluster_del_server(old_id);
+			cluster_add_server(id, &uuid);
+		} else {
+			cluster_update_server(id, &uuid);
 		}
+	} else {
+		cluster_add_server(id, &uuid);
 	}
-
-	cluster_set_server(&uuid, id);
 }
 
 /**

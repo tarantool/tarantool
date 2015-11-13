@@ -111,7 +111,13 @@ cserver_id_is_reserved(uint32_t id)
  * The server is added to the cluster lsn table with LSN 0.
  */
 void
-cluster_set_server(const tt_uuid *server_uuid, uint32_t id);
+cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid);
+
+/*
+ * Update UUID of a remote server
+ */
+void
+cluster_update_server(uint32_t server_id, const struct tt_uuid *server_uuid);
 
 void
 cluster_del_server(uint32_t server_id);
