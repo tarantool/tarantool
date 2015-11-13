@@ -501,7 +501,7 @@ that are declared in line 1, because all of them are for use only within the fun
 .. _why_pairs:
 
 **LINE 3: WHY "PAIRS()".** Our job is to go through all the rows and there are two
-ways to do it: with :func:`box.space.space_object:pairs() <space_object.pairs>` or with
+ways to do it: with :ref:`box.space.space_object:pairs() <space_object.pairs>` or with
 :func:`index.iterator <index_object.pairs>`.
 We preferred ``pairs()`` because it is simpler.
 

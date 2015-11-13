@@ -11,27 +11,27 @@ is available in file
 A list of all ``box.space`` functions follows, then comes a list of all
 ``box.space`` members.
 
-    :func:`space_object:create_index() <space_object.create_index>` |br|
-    :func:`space_object:insert() <space_object.insert>` |br|
-    :func:`space_object:select() <space_object.select>` |br|
-    :func:`space_object:get() <space_object.get>` |br|
-    :func:`space_object:drop() <space_object.drop>` |br|
-    :func:`space_object:rename() <space_object.rename>` |br|
-    :func:`space_object:replace() <space_object.replace>` |br|
-    :func:`space_object:put() <space_object.put>` |br|
-    :func:`space_object:update() <space_object.update>` |br|
-    :func:`space_object:upsert() <space_object.upsert>` |br|
-    :func:`space_object:delete() <space_object.delete>` |br|
-    :func:`space_object:id() <space_object.id>` |br|
-    :func:`space_object:enabled() <space_object.enabled>` |br|
-    :func:`space_object:field_count() <space_object.field_count>` |br|
-    :func:`space_object:index() <space_object.index>` |br|
-    :func:`space_object:len() <space_object.len>` |br|
-    :func:`space_object:truncate() <space_object.truncate>` |br|
-    :func:`space_object:inc{} <space_object.inc>` |br|
-    :func:`space_object:dec{} <space_object.dec>` |br|
-    :func:`space_object:auto_increment{} <space_object.auto_increment>` |br|
-    :func:`space_object:pairs() <space_object.pairs>`
+    :ref:`space_object:create_index() <space_object.create_index>` |br|
+    :ref:`space_object:insert() <space_object.insert>` |br|
+    :ref:`space_object:select() <space_object.select>` |br|
+    :ref:`space_object:get() <space_object.get>` |br|
+    :ref:`space_object:drop() <space_object.drop>` |br|
+    :ref:`space_object:rename() <space_object.rename>` |br|
+    :ref:`space_object:replace() <space_object.replace>` |br|
+    :ref:`space_object:put() <space_object.replace>` |br|
+    :ref:`space_object:update() <space_object.update>` |br|
+    :ref:`space_object:upsert() <space_object.upsert>` |br|
+    :ref:`space_object:delete() <space_object.delete>` |br|
+    :ref:`space_object:id() <space_object.id>` |br|
+    :ref:`space_object:enabled() <space_object.enabled>` |br|
+    :ref:`space_object:field_count() <space_object.xfield_count>` |br|
+    :ref:`space_object:index() <space_object.index>` |br|
+    :ref:`space_object:len() <space_object.len>` |br|
+    :ref:`space_object:truncate() <space_object.truncate>` |br|
+    :ref:`space_object:inc{} <space_object.inc>` |br|
+    :ref:`space_object:dec{} <space_object.dec>` |br|
+    :ref:`space_object:auto_increment{} <space_object.auto_increment>` |br|
+    :ref:`space_object:pairs() <space_object.pairs>`
 
     :class:`box.space._schema` |br|
     :class:`box.space._space` |br|
@@ -43,6 +43,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 .. module:: box.space
 
 .. class:: space_object
+
+.. _space_object.create_index:
 
     .. function:: create_index(index-name [, {options} ])
 
@@ -94,7 +96,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`...`
 
-.. _space_insert:
+.. _space_object.insert:
 
     .. function:: insert(tuple)
 
@@ -112,7 +114,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>`:codebold:`box.space.tester:insert{5000,'tuple number five thousand'}`
 
-.. _space_object_select:
+.. _space_object.select:
 
     .. function:: select(key)
 
@@ -183,7 +185,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         "equal to") and how many tuples to return, see the later section
         :ref:`box.space.space-name[.index.index-name]:select <index_select>`.
 
-.. _space_object_get:
+.. _space_object.get:
 
     .. function:: get(key)
 
@@ -212,6 +214,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:get{1}`
 
+.. _space_object.drop:
+
     .. function:: drop()
 
         Drop a space.
@@ -229,6 +233,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.space_that_does_not_exist:drop()`
 
+.. _space_object.rename:
 
     .. function:: rename(space-name)
 
@@ -250,6 +255,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`---`
         | :codenormal:`...`
 
+.. _space_object.replace:
 
     .. function:: replace(tuple)
                   put(tuple)
@@ -278,6 +284,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`box.space.tester:replace{5000, 'New value'}`
 
+.. _space_object.update:
 
     .. function:: update(key, {{operator, field_no, value}, ...})
 
@@ -422,17 +429,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
         The seventh argument is ``'!!'``, because ``'!!'`` is to be added at this position.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'X!!Z'``.
 
-.. _space_object_upsert:
+.. _space_object.upsert:
 
     .. function:: upsert(tuple_value, {{operator, field_no, value}, ...}, )
 
         Update or insert a tuple.
 
         If there is an existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :func:`space_object:update() <space_object.update>` and the
+        request has the same effect as :ref:`space_object:update() <space_object.update>` and the
         :code:`{{operator, field_no, value}, ...}` parameter is used.
         If there is no existing tuple which matches the key fields of :code:`tuple_value`, then the
-        request has the same effect as :func:`space_object:insert() <space_object.insert>` and the
+        request has the same effect as :ref:`space_object:insert() <space_object.insert>` and the
         :code:`{tuple_value}` parameter is used. However, unlike :code:`insert` or
         :code:`update`, :code:`upsert` will not read a tuple and perform
         error checks before returning -- this is a design feature which
@@ -458,7 +465,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         | :codenormal:`tarantool>` :codebold:`\  box.space.tester:upsert({12,'c'},{{'=',3,'a'},{'=',4,'b'}})`
 
-.. _space_object_delete:
+.. _space_object.delete:
 
     .. function:: delete(key)
 
@@ -488,6 +495,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`\   expected NUM'`
         | :codenormal:`...`
 
+.. _space_object.id:
 
     .. function:: id()
 
@@ -498,6 +506,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
+.. _space_object.enabled:
 
     .. function:: enabled()
 
@@ -506,6 +515,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: boolean
 
+.. _space_object.xfield_count:
 
     .. function:: field_count()
 
@@ -519,6 +529,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :rtype: number
 
+.. _space_object.index:
 
     .. function:: index()
 
@@ -543,6 +554,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- TREE`
         | :codenormal:`...`
 
+.. _space_object.len:
 
     .. function:: len()
 
@@ -555,6 +567,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 2`
         | :codenormal:`...`
 
+.. _space_object.truncate:
 
     .. function:: truncate()
 
@@ -574,7 +587,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 0`
         | :codenormal:`...`
 
-
+.. _space_object.inc:
 
     .. function:: inc{field-value [, field-value ...]}
 
@@ -610,6 +623,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 2`
         | :codenormal:`...`
 
+.. _space_object.dec:
 
     .. function:: dec{field-value [, field-value ...]}
 
@@ -648,6 +662,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- 998`
         | :codenormal:`...`
 
+.. _space_object.auto_increment:
 
     .. function:: auto_increment{field-value [, field-value ...]}
 
@@ -678,6 +693,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :codenormal:`- [2, 'Fld#3']`
         | :codenormal:`...`
 
+.. _space_object.pairs:
 
     .. function:: pairs()
 

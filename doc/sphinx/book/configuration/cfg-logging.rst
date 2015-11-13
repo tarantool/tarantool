@@ -23,6 +23,8 @@
     Default: 5 |br|
     Dynamic: **yes** |br|
 
+.. _log-label:
+
 .. confval:: logger
 
     By default, the log is sent to the standard error stream (``stderr``). If

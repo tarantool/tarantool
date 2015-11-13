@@ -293,7 +293,7 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. function:: select(key, options)
 
-        This is an alternative to :func:`box.space...select() <space_object.select>`
+        This is an alternative to :ref:`box.space...select() <space_object.select>`
         which goes via a particular index and can make use of additional
         parameters that specify the iterator type, and the limit (that is, the
         maximum number of tuples to return) and the offset (that is, which
@@ -473,12 +473,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Update a tuple.
 
-        Same as :func:`box.space...update() <space_object.update>`,
+        Same as :ref:`box.space...update() <space_object.update>`,
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
         :param lua-value key: key to be matched against the index key
-        :param table {operator, field_no, value}: update opearations (see: func:`box.space...update() <space_object.update>`)
+        :param table {operator, field_no, value}: update opearations (see: ref:`box.space...update() <space_object.update>`)
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -487,7 +487,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Delete a tuple identified by a key.
 
-        Same as :func:`box.space...delete() <space_object.delete>`,
+        Same as :ref:`box.space...delete() <space_object.delete>`,
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
@@ -569,8 +569,8 @@ function will:
 * Return the formatted value.
 
 The function uses Tarantool box functions
-:func:`box.space...select <space_object.select>`,
-:func:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
+:ref:`box.space...select <space_object.select>`,
+:ref:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
 :func:`uuid.str`. The function uses
 Lua functions `os.date()`_ and `string.sub()`_.
 
