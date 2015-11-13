@@ -7,7 +7,7 @@ include/tarantool/lua.hpp
 include/tarantool/luaconf.h
 include/tarantool/luajit.h
 include/tarantool/lualib.h
-include/tarantool/tarantool.h
+include/tarantool/module.h
 man/man1/tarantool.1.gz
 man/man1/tarantoolctl.1.gz
 %%PORTDOCS%%%%DOCSDIR%%/LICENSE

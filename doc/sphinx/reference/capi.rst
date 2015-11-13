@@ -2,5 +2,5 @@
                             Module C API
 -------------------------------------------------------------------------------
 
-.. doxygenfile:: tarantool.h
+.. doxygenfile:: module.h
    :project: api

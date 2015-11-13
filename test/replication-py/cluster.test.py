@@ -188,28 +188,6 @@ replica.admin('box.info.vclock[%d]' % replica_id3)
 replica.stop()
 replica.cleanup(True)
 
-print '-------------------------------------------------------------'
-print 'gh-806: cant prune old replicas by deleting their server ids'
-print '-------------------------------------------------------------'
-
-# Rotate xlog
-master.restart()
-master.admin("box.space._schema:insert{'test', 1}")
-
-# Prune old replicas
-master.admin("cluster_len = box.space._cluster:len()")
-# Delete from _cluster for replicas with lsn=0 is safe
-master.admin('for id, lsn in pairs(box.info.vclock) do'
-             ' if id ~= box.info.server.id then box.space._cluster:delete{id} end '
-             'end');
-master.admin("box.space._cluster:len() < cluster_len")
-
-# Save a snapshot without removed replicas in vclock
-master.admin("box.snapshot()")
-
-# Master is not crashed then recovering xlog with {replica_id: 0} in header
-master.restart()
-
 # Cleanup
 sys.stdout.pop_filter()
 

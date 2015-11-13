@@ -244,4 +244,13 @@ s:update({0}, {{'+', 0}})
 s:update({0}, {{'+', '+', '+'}})
 s:update({0}, {{0, 0, 0}})
 
+-- test for https://github.com/tarantool/tarantool/issues/1142
+-- broken WAL during upsert
+ops = {}
+for i = 1,10 do table.insert(ops, {'=', 2, '1234567890'}) end
+s:upsert({0}, ops, {0})
+--#stop server default
+--#start server default
+s = box.space.tweedledum
+
 s:drop()

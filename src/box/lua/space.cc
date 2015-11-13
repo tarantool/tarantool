@@ -43,6 +43,7 @@ extern "C" {
 #include "box/schema.h"
 #include "box/tuple.h"
 #include "box/txn.h"
+#include "box/vclock.h" /* VCLOCK_MAX */
 
 /**
  * Trigger function for all spaces
@@ -332,5 +333,7 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "NAME_MAX");
 	lua_pushnumber(L, FORMAT_ID_MAX);
 	lua_setfield(L, -2, "FORMAT_ID_MAX");
+	lua_pushnumber(L, VCLOCK_MAX);
+	lua_setfield(L, -2, "REPLICA_MAX");
 	lua_pop(L, 2); /* box, schema */
 }

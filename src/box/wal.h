@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include  <third_party/queue.h>
 #include <stdint.h>
 #include "cbus.h"
 #include "small/rlist.h"
