@@ -56,6 +56,7 @@
 #include <rmean.h>
 #include <limits.h>
 #include "trivia/util.h"
+#include "backtrace.h"
 #include "tt_pthread.h"
 #include "lua/init.h"
 #include "box/box.h"
@@ -69,8 +70,10 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "title.h"
+#include <libutil.h>
 
 static pid_t master_pid = getpid();
+static struct pidfh *pid_file_handle;
 static char *script = NULL;
 static char *pid_file = NULL;
 static char **main_argv;
@@ -272,53 +275,15 @@ signal_init(void)
 	(void) tt_pthread_atfork(NULL, NULL, tarantool_atfork);
 }
 
-static void
-create_pid(void)
-{
-	FILE *f;
-	char buf[16] = { 0 };
-	pid_t pid;
-
-	pid_file = (char *) cfg_gets("pid_file");
-	if (pid_file == NULL)
-		return;
-
-	pid_file = strdup(pid_file);
-
-	f = fopen(pid_file, "a+");
-	if (f == NULL)
-		panic_syserror("can't open pid file");
-	/*
-	 * fopen() is not guaranteed to set the seek position to
-	 * the beginning of file according to ANSI C (and, e.g.,
-	 * on FreeBSD).
-	 */
-	if (fseeko(f, 0, SEEK_SET) != 0)
-		panic_syserror("can't fseek to the beginning of pid file");
-
-	if (fgets(buf, sizeof(buf), f) != NULL && strlen(buf) > 0) {
-		pid = strtol(buf, NULL, 10);
-		if (pid > 0 && kill(pid, 0) == 0)
-			panic("the daemon is already running");
-		else
-			say_info("updating a stale pid file");
-		if (fseeko(f, 0, SEEK_SET) != 0)
-			panic_syserror("can't fseek to the beginning of pid file");
-		if (ftruncate(fileno(f), 0) == -1)
-			panic_syserror("ftruncate(`%s')", pid_file);
-	}
-
-	master_pid = getpid();
-	fprintf(f, "%i\n", master_pid);
-	fclose(f);
-}
-
 /** Run in the background. */
 static void
-background()
+daemonize()
 {
+	int fd;
+
 	/* flush buffers to avoid multiple output */
 	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdin);
 	fflush(stdout);
 	fflush(stderr);
 	switch (fork()) {
@@ -347,15 +312,12 @@ background()
 
 	/* reinit coeio after fork (because libeio required it) */
 	coeio_reinit();
-	/*
-	 * Prints to stdout on failure, so got to be done before
-	 * we close it.
-	 */
-	create_pid();
 
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
+	/* redirect stdin; stdout and stderr handled in say_logger_init */
+	fd = open("/dev/null", O_RDONLY);
+	dup2(fd, STDIN_FILENO);
+	close(fd);
+
 	return;
 error:
 	exit(EXIT_FAILURE);
@@ -418,39 +380,95 @@ load_cfg()
 #endif
 	}
 
-	if (cfg_geti("background")) {
-		if (cfg_gets("logger") == NULL) {
-			say_crit("'background' requires 'logger' configuration option to be set");
-			exit(EXIT_FAILURE);
-		}
-		if (cfg_gets("pid_file") == NULL) {
-			say_crit("'background' requires 'pid_file' configuration option to be set");
-			exit(EXIT_FAILURE);
-		}
-		background();
-	} else {
-		create_pid();
+	int background = cfg_geti("background");
+	const char *logger = cfg_gets("logger");
+
+	pid_file = (char *)cfg_gets("pid_file");
+	if (pid_file != NULL) {
+		pid_file = abspath(pid_file);
+		if (pid_file == NULL)
+			panic("out of memory");
 	}
 
-	const char *proc_title = cfg_gets("custom_proc_title");
-	title_set_custom(proc_title);
-	title_update();
-	say_logger_init(cfg_gets("logger"),
+	if (background) {
+		if (logger == NULL) {
+			say_crit(
+				"'background' requires "
+				"'logger' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		if (pid_file == NULL) {
+			say_crit(
+				"'background' requires "
+				"'pid_file' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	/*
+	 * pid file check must happen before logger init in order for the
+	 * error message to show in stderr
+	 */
+	if (pid_file != NULL) {
+		pid_t other_pid = -1;
+		pid_file_handle = pidfile_open(pid_file, 0644, &other_pid);
+		if (pid_file_handle == NULL) {
+			if (errno == EEXIST) {
+				say_crit(
+					"the daemon is already running: PID %d",
+					(int)other_pid);
+			} else {
+				say_syserror(
+					"failed to create pid file '%s'",
+					pid_file);
+			}
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	/*
+	 * logger init must happen before daemonising in order for the error
+	 * to show and for the process to exit with a failure status
+	 */
+	say_logger_init(logger,
 			cfg_geti("log_level"),
 			cfg_geti("logger_nonblock"),
-			cfg_geti("background"));
+			background);
 
+	if (background) {
+		daemonize();
+		master_pid = getpid();
+	}
+
+	/*
+	 * after (optional) daemonising to avoid confusing messages with
+	 * different pids
+	 */
 	say_crit("version %s", tarantool_version());
 	say_crit("log level %i", cfg_geti("log_level"));
+
+	if (pid_file_handle != NULL) {
+		if (pidfile_write(pid_file_handle) == -1)
+			say_syserror("failed to update pid file '%s'", pid_file);
+	}
+
+	title_set_custom(cfg_gets("custom_proc_title"));
+	title_update();
 	box_load_cfg();
 }
 
 void
 tarantool_free(void)
 {
-	/* Do nothing in a fork. */
+	/*
+	 * Do nothing in a fork.
+	 * Note: technically we should do pidfile_close(), however since our
+	 * forks do exec immediately we can get away without it, thanks to
+	 * the magic O_CLOEXEC
+	 */
 	if (getpid() != master_pid)
 		return;
+
 	box_free();
 
 	if (history) {
@@ -461,10 +479,9 @@ tarantool_free(void)
 	title_free(main_argc, main_argv);
 
 	/* unlink pidfile. */
-	if (pid_file != NULL) {
-		unlink(pid_file);
-		free(pid_file);
-	}
+	if (pid_file_handle != NULL && pidfile_remove(pid_file_handle) == -1)
+		say_syserror("failed to remove pid file '%s'", pid_file);
+	free(pid_file);
 	signal_free();
 #ifdef ENABLE_GCOV
 	__gcov_flush();

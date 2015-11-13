@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_WAL_WRITER_H_INCLUDED
-#define TARANTOOL_WAL_WRITER_H_INCLUDED
+#ifndef TARANTOOL_BACKTRACE_H_INCLUDED
+#define TARANTOOL_BACKTRACE_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,57 +30,30 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdint.h>
-#include "cbus.h"
-#include "small/rlist.h"
+#include "trivia/config.h"
+#include <stddef.h>
 
-struct fiber;
-struct recovery;
+extern void *__libc_stack_end;
 
-enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
+#ifdef ENABLE_BACKTRACE
+void print_backtrace();
 
-/** String constants for the supported modes. */
-extern const char *wal_mode_STRS[];
+char *
+backtrace(void *frame, void *stack, size_t stack_size);
 
-struct wal_request: public cmsg {
-	/* Auxiliary. */
-	int64_t res;
-	struct fiber *fiber;
-	/* Relative position of the start of request (used for rollback) */
-	off_t start_offset;
-	/* Relative position of the end of request (used for rollback) */
-	off_t end_offset;
-	int n_rows;
-	struct xrow_header *rows[];
-};
+typedef int (backtrace_cb)(int frameno, void *frameret,
+                           const char *func, size_t offset, void *cb_ctx);
+void
+backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
+		  size_t stack_size, void *cb_ctx);
+#endif /* ENABLE_BACKTRACE */
 
-int64_t
-wal_write(struct recovery *r, struct wal_request *req);
 
-int
-wal_writer_start(struct recovery *state, int rows_per_wal);
+#ifdef HAVE_BFD
+void
+symbols_load(const char *name);
 
 void
-wal_writer_stop(struct recovery *r);
-
-struct wal_watcher
-{
-	struct rlist next;
-	struct ev_loop *loop;
-	struct ev_async *async;
-};
-
-/**
- * Receive a notification the next time a wal_write is completed
- * (+unspecified but reasonable latency).
- * Fails (-1) if recovery is NULL or lacking a WAL writer.
- */
-int
-wal_register_watcher(
-	struct recovery *, struct wal_watcher *, struct ev_async *);
-
-void
-wal_unregister_watcher(
-	struct recovery *, struct wal_watcher *);
-
-#endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */
+symbols_free();
+#endif /* HAVE_BFD */
+#endif /* TARANTOOL_BACKTRACE_H_INCLUDED */

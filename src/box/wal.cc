@@ -56,6 +56,8 @@ struct wal_writer
 	bool is_rollback;
 	ev_loop *txn_loop;
 	struct vclock vclock;
+	pthread_mutex_t watchers_mutex;
+	struct rlist watchers;
 };
 
 static void
@@ -64,8 +66,8 @@ wal_flush_input(ev_loop * /* loop */, ev_async *watcher, int /* event */)
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
 
 	cbus_lock(pipe->bus);
-	bool input_was_empty = STAILQ_EMPTY(&pipe->pipe);
-	STAILQ_CONCAT(&pipe->pipe, &pipe->input);
+	bool input_was_empty = stailq_empty(&pipe->pipe);
+	stailq_concat(&pipe->pipe, &pipe->input);
 	cbus_unlock(pipe->bus);
 
 	if (input_was_empty)
@@ -88,34 +90,36 @@ wal_flush_input(ev_loop * /* loop */, ev_async *watcher, int /* event */)
  * call in the writer thread loop).
  */
 static void
-tx_schedule_queue(struct cmsg_fifo *queue)
+tx_schedule_queue(struct stailq *queue)
 {
 	/*
-	 * Can't use STAILQ_FOREACH since fiber_call()
+	 * Can't use stailq_foreach since fiber_call()
 	 * destroys the list entry.
 	 */
-	struct cmsg *m, *tmp;
-	STAILQ_FOREACH_SAFE(m, queue, fifo, tmp)
-		fiber_call(((struct wal_request *) m)->fiber);
+	struct wal_request *req, *tmp;
+	stailq_foreach_entry_safe(req, tmp, queue, fifo)
+		fiber_call(req->fiber);
 }
 
 static void
 tx_fetch_output(ev_loop * /* loop */, ev_async *watcher, int /* event */)
 {
 	struct wal_writer *writer = (struct wal_writer *) watcher->data;
-	struct cmsg_fifo commit = STAILQ_HEAD_INITIALIZER(commit);
-	struct cmsg_fifo rollback = STAILQ_HEAD_INITIALIZER(rollback);
+	struct stailq commit;
+	struct stailq rollback;
+	stailq_create(&commit);
+	stailq_create(&rollback);
 
 	bool is_rollback;
 	cbus_lock(&writer->tx_wal_bus);
-	STAILQ_CONCAT(&commit, &writer->tx_pipe.pipe);
+	stailq_concat(&commit, &writer->tx_pipe.pipe);
 	is_rollback = writer->is_rollback;
 	if (is_rollback)
-		STAILQ_CONCAT(&rollback, &writer->wal_pipe.pipe);
+		stailq_concat(&rollback, &writer->wal_pipe.pipe);
 	writer->is_rollback = false;
 	cbus_unlock(&writer->tx_wal_bus);
 	if (is_rollback)
-		STAILQ_CONCAT(&rollback, &writer->wal_pipe.input);
+		stailq_concat(&rollback, &writer->wal_pipe.input);
 
 	tx_schedule_queue(&commit);
 	/*
@@ -125,7 +129,7 @@ tx_fetch_output(ev_loop * /* loop */, ev_async *watcher, int /* event */)
 	 * in reverse order, performing a playback of the
 	 * in-memory database state.
 	 */
-	STAILQ_REVERSE(&rollback, cmsg, fifo);
+	stailq_reverse(&rollback);
 	tx_schedule_queue(&rollback);
 }
 
@@ -153,6 +157,9 @@ wal_writer_init(struct wal_writer *writer, struct vclock *vclock,
 	/* Create and fill writer->cluster hash */
 	vclock_create(&writer->vclock);
 	vclock_copy(&writer->vclock, vclock);
+
+	tt_pthread_mutex_init(&writer->watchers_mutex, NULL);
+	rlist_create(&writer->watchers);
 }
 
 /** Destroy a WAL writer structure. */
@@ -162,6 +169,7 @@ wal_writer_destroy(struct wal_writer *writer)
 	cpipe_destroy(&writer->tx_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
 	fio_batch_delete(writer->batch);
+	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
 /** WAL writer thread routine. */
@@ -298,8 +306,8 @@ wal_writer_pop(struct wal_writer *writer)
 	while (! writer->is_shutdown)
 	{
 		if (! writer->is_rollback &&
-		    ! STAILQ_EMPTY(&writer->wal_pipe.pipe)) {
-			STAILQ_CONCAT(&writer->wal_pipe.output,
+		    ! stailq_empty(&writer->wal_pipe.pipe)) {
+			stailq_concat(&writer->wal_pipe.output,
 				      &writer->wal_pipe.pipe);
 			break;
 		}
@@ -309,19 +317,19 @@ wal_writer_pop(struct wal_writer *writer)
 
 static void
 wal_write_to_disk(struct recovery *r, struct wal_writer *writer,
-		  struct cmsg_fifo *input, struct cmsg_fifo *commit,
-		  struct cmsg_fifo *rollback)
+		  struct stailq *input, struct stailq *commit,
+		  struct stailq *rollback)
 {
 	/*
 	 * Input queue can only be empty on wal writer shutdown.
 	 * In this case wal_opt_rotate can create an extra empty xlog.
 	 */
-	if (unlikely(STAILQ_EMPTY(input)))
+	if (unlikely(stailq_empty(input)))
 		return;
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(&r->current_wal, r, &writer->vclock) != 0) {
-		STAILQ_SPLICE(input, STAILQ_FIRST(input), fifo, rollback);
+		stailq_concat(rollback, input);
 		return;
 	}
 
@@ -359,9 +367,7 @@ wal_write_to_disk(struct recovery *r, struct wal_writer *writer,
 	 * Iterate over requests (transactions)
 	 */
 	struct wal_request *req;
-	for (req = (struct wal_request *) STAILQ_FIRST(input);
-	     req != NULL;
-	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
+	stailq_foreach_entry(req, input, fifo) {
 		/* Save relative offset of request start */
 		req->start_offset = batched_bytes;
 		req->end_offset = -1;
@@ -412,9 +418,9 @@ done:
 	 * `commit` queue and all other to `rollback` queue.
 	 */
 	struct wal_request *reqend = req;
-	for (req = (struct wal_request *) STAILQ_FIRST(input);
+	for (req = stailq_first_entry(input, struct wal_request, fifo);
 	     req != reqend;
-	     req = (struct wal_request *) STAILQ_NEXT(req, fifo)) {
+	     req = stailq_next_entry(req, fifo)) {
 		/*
 		 * Check if request has been fully written to xlog.
 		 */
@@ -442,7 +448,7 @@ done:
 			written_bytes = req->start_offset;
 
 			/* Move tail to `rollback` queue. */
-			STAILQ_SPLICE(input, req, fifo, rollback);
+			stailq_splice(input, &req->fifo, rollback);
 			break;
 		}
 
@@ -458,7 +464,7 @@ done:
 
 	fiber_gc();
 	/* Move all processed requests to `commit` queue */
-	STAILQ_CONCAT(commit, input);
+	stailq_concat(commit, input);
 	return;
 }
 
@@ -468,12 +474,15 @@ wal_writer_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct wal_writer *writer = r->writer;
+	struct wal_watcher *watcher;
 
 	cpipe_create(&writer->wal_pipe);
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
 
-	struct cmsg_fifo commit = STAILQ_HEAD_INITIALIZER(commit);
-	struct cmsg_fifo rollback = STAILQ_HEAD_INITIALIZER(rollback);
+	struct stailq commit;
+	struct stailq rollback;
+	stailq_create(&commit);
+	stailq_create(&rollback);
 
 	cbus_lock(&writer->tx_wal_bus);
 	while (! writer->is_shutdown) {
@@ -483,9 +492,16 @@ wal_writer_f(va_list ap)
 		wal_write_to_disk(r, writer, &writer->wal_pipe.output,
 				  &commit, &rollback);
 
+		/* notify watchers */
+		tt_pthread_mutex_lock(&writer->watchers_mutex);
+		rlist_foreach_entry(watcher, &writer->watchers, next) {
+			ev_async_send(watcher->loop, watcher->async);
+		}
+		tt_pthread_mutex_unlock(&writer->watchers_mutex);
+
 		cbus_lock(&writer->tx_wal_bus);
-		STAILQ_CONCAT(&writer->tx_pipe.pipe, &commit);
-		if (! STAILQ_EMPTY(&rollback)) {
+		stailq_concat(&writer->tx_pipe.pipe, &commit);
+		if (! stailq_empty(&rollback)) {
 			/*
 			 * Begin rollback: create a rollback queue
 			 * from all requests which were not
@@ -493,8 +509,8 @@ wal_writer_f(va_list ap)
 			 * input queue.
 			 */
 			writer->is_rollback = true;
-			STAILQ_CONCAT(&rollback, &writer->wal_pipe.pipe);
-			STAILQ_CONCAT(&writer->wal_pipe.pipe, &rollback);
+			stailq_concat(&rollback, &writer->wal_pipe.pipe);
+			stailq_concat(&writer->wal_pipe.pipe, &rollback);
 		}
 		ev_async_send(writer->tx_pipe.consumer,
 			      &writer->tx_pipe.fetch_output);
@@ -539,3 +555,39 @@ wal_write(struct recovery *r, struct wal_request *req)
 	return req->res;
 }
 
+int
+wal_register_watcher(
+	struct recovery *recovery,
+	struct wal_watcher *watcher, struct ev_async *async)
+{
+	struct wal_writer *writer;
+
+	if (recovery == NULL || recovery->writer == NULL)
+		return -1;
+
+	writer = recovery->writer;
+
+	watcher->loop = loop();
+	watcher->async = async;
+	tt_pthread_mutex_lock(&writer->watchers_mutex);
+	rlist_add_tail_entry(&writer->watchers, watcher, next);
+	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+	return 0;
+}
+
+void
+wal_unregister_watcher(
+	struct recovery *recovery,
+	struct wal_watcher *watcher)
+{
+	struct wal_writer *writer;
+
+	if (recovery == NULL || recovery->writer == NULL)
+		return;
+
+	writer = recovery->writer;
+
+	tt_pthread_mutex_lock(&writer->watchers_mutex);
+	rlist_del_entry(watcher, next);
+	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+}

@@ -38,7 +38,7 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
-#include "third_party/pmatomic.h"
+#include "small/pmatomic.h"
 
 static void (*fiber_invoke)(fiber_func f, va_list ap);
 

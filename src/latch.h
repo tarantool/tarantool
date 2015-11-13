@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <assert.h>
-#include "salad/rlist.h"
+#include "small/rlist.h"
 #include "fiber.h"
 
 /** Latch of cooperative multitasking environment. */

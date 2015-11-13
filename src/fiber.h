@@ -40,10 +40,9 @@
 #include "diag.h"
 #include "coro.h"
 #include "trivia/util.h"
-#include "third_party/queue.h"
 #include "small/mempool.h"
 #include "small/region.h"
-#include "salad/rlist.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -1610,7 +1610,7 @@ func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 		def->language = STR2ENUM(func_language, language);
 		if (def->language == func_language_MAX) {
 			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
-				  name, language);
+				  language, name);
 		}
 	} else {
 		/* Lua is the default. */

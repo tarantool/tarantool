@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "salad/rlist.h"
+#include "small/rlist.h"
 #include "error.h"
 #include "msgpuck/msgpuck.h"
 #define RB_COMPACT 1

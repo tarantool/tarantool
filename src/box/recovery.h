@@ -42,6 +42,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct recovery;
+extern struct recovery *recovery;
 
 typedef void (apply_row_f)(struct recovery *, void *,
 			   struct xrow_header *packet);

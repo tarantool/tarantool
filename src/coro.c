@@ -48,7 +48,20 @@ tarantool_coro_create(struct tarantool_coro *coro,
 	memset(coro, 0, sizeof(*coro));
 
 	/* TODO: guard pages */
+#ifdef __APPLE__
+	/*
+         * We are on the verge of stack overflow already, and without
+         * guard pages it is super fragile. Especially se_metaserialize
+         * is wicked (srmeta meta[1024] local, sizeof meta[0] == 48).
+         *
+         * Mysteriously it only fails on osx and since no one really
+         * cares about Tarantool performance on osx we simply make fiber
+         * stacks bigger.
+	 */
+	coro->stack_size = page * 32 - slab_sizeof();
+#else
 	coro->stack_size = page * 16 - slab_sizeof();
+#endif
 	coro->stack = (char *) slab_get(slabc, coro->stack_size)
 					+ slab_sizeof();
 

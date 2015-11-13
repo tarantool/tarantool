@@ -50,13 +50,14 @@ int log_level = S_INFO;
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
 
+static bool booting = true;
 static enum say_logger_type logger_type = SAY_LOGGER_STDERR;
 static bool logger_background = true;
 static const char *binary_filename;
 static int logger_nonblock;
 
 static int log_fd = STDERR_FILENO;
-static char log_path[PATH_MAX]; /* iff logger_type == SAY_LOGGER_FILE */
+static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -194,8 +195,8 @@ say_pipe_init(const char *init_str)
 	logger_type = SAY_LOGGER_PIPE;
 	return;
 error:
-	say_syserror("can't start logger: %s", log_path);
-	_exit(EXIT_FAILURE);
+	say_syserror("can't start logger: %s", init_str);
+	exit(EXIT_FAILURE);
 }
 
 /**
@@ -241,14 +242,14 @@ static void
 say_file_init(const char *init_str)
 {
 	int fd;
-	if (strlen(init_str) >= sizeof(log_path))
-		panic("path too long: %s", init_str);
-	strcpy(log_path, init_str);
+	log_path = abspath(init_str);
+	if (log_path == NULL)
+		panic("out of memory");
 	fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
 	          S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0) {
 		say_syserror("can't open log file: %s", log_path);
-		_exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 	log_fd = fd;
 	signal(SIGHUP, say_logrotate); /* will access log_fd */
@@ -265,7 +266,7 @@ say_syslog_init(const char *init_str)
 	if (say_parse_syslog_opts(init_str, &opts, &error)) {
 		say_error("syslog logger: %s", error ? error : "out of memory");
 		free(error);
-		_exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	if (opts.identity == NULL)
@@ -274,11 +275,6 @@ say_syslog_init(const char *init_str)
 	/* TODO: ignoring init->facility, presumably no one needs it */
 	openlog(opts.identity, LOG_PID, LOG_USER);
 	say_free_syslog_opts(&opts);
-
-	/* Need something to dup2 on top of stdout/stderr in daemon mode. */
-	int fd = open("/dev/null", O_WRONLY);
-	if (fd != -1)
-		log_fd = fd;
 
 	say_info("started logging to syslog, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_SYSLOG;
@@ -301,7 +297,7 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		if (say_parse_logger_type(&init_str, &type)) {
 			say_error("logger: bad initialization string: %s, %s",
 				init_str, logger_syntax_reminder);
-			_exit(EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 		switch (type) {
 		case SAY_LOGGER_PIPE:
@@ -320,13 +316,21 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 	if (background) {
 		fflush(stderr);
 		fflush(stdout);
-		dup2(log_fd, STDERR_FILENO);
-		dup2(log_fd, STDOUT_FILENO);
+		if (log_fd == STDERR_FILENO) {
+			int fd = open("/dev/null", O_WRONLY);
+			dup2(fd, STDERR_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			close(fd);
+		} else {
+			dup2(log_fd, STDERR_FILENO);
+			dup2(log_fd, STDOUT_FILENO);
+		}
 	}
 	if (nonblock) {
 		int flags = fcntl(log_fd, F_GETFL, 0);
 		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
 	}
+	booting = false;
 }
 
 void
@@ -337,7 +341,7 @@ vsay(int level, const char *filename, int line, const char *error,
 	const char *f;
 	static __thread char buf[PIPE_BUF];
 
-	if (logger_type == SAY_LOGGER_STDERR) {
+	if (booting) {
 		fprintf(stderr, "%s: ", binary_filename);
 		vfprintf(stderr, format, ap);
 		if (error)

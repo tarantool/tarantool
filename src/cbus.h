@@ -32,6 +32,7 @@
  */
 #include "fiber.h"
 #include "rmean.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -86,7 +87,7 @@ struct cmsg {
 	 * message is stuck in currently, waiting to get
 	 * delivered.
 	 */
-	STAILQ_ENTRY(cmsg) fifo;
+	struct stailq_entry fifo;
 	/** The message routing path. */
 	struct cmsg_hop *route;
 	/** The current hop the message is at. */
@@ -104,8 +105,6 @@ cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
 	msg->hop = msg->route = route;
 }
 
-STAILQ_HEAD(cmsg_fifo, cmsg);
-
 #define CACHELINE_SIZE 64
 /** A  uni-directional FIFO queue from one cord to another. */
 struct cpipe {
@@ -120,7 +119,7 @@ struct cpipe {
 	 *     output      <-- owned by the producer thread
 	 */
 	struct {
-		struct cmsg_fifo pipe;
+		struct stailq pipe;
 		/** Peer pipe - the other direction of the bus. */
 		struct cpipe *peer;
 		struct cbus *bus;
@@ -128,7 +127,7 @@ struct cpipe {
 	/** Stuff most actively used in the producer thread. */
 	struct {
 		/** Staging area for pushed messages */
-		struct cmsg_fifo input;
+		struct stailq input;
 		/** Counters are useful for finer-grained scheduling. */
 		int n_input;
 		/**
@@ -151,7 +150,7 @@ struct cpipe {
 	/** Stuff related to the consumer. */
 	struct {
 		/** Staged messages (for pop) */
-		struct cmsg_fifo output;
+		struct stailq output;
 		/**
 		 * Used to trigger task processing when
 		 * the pipe becomes non-empty.
@@ -213,11 +212,9 @@ cpipe_pop_output(struct cpipe *pipe)
 {
 	assert(loop() == pipe->consumer);
 
-	if (STAILQ_EMPTY(&pipe->output))
+	if (stailq_empty(&pipe->output))
 		return NULL;
-	struct cmsg *msg = STAILQ_FIRST(&pipe->output);
-	STAILQ_REMOVE_HEAD(&pipe->output, fifo);
-	return msg;
+	return stailq_shift_entry(&pipe->output, struct cmsg, fifo);
 }
 
 struct cmsg *
@@ -232,10 +229,10 @@ cpipe_peek(struct cpipe *pipe)
 {
 	assert(loop() == pipe->consumer);
 
-	if (STAILQ_EMPTY(&pipe->output))
+	if (stailq_empty(&pipe->output))
 		return cpipe_peek_impl(pipe);
 
-	return STAILQ_FIRST(&pipe->output);
+	return stailq_first_entry(&pipe->output, struct cmsg, fifo);
 }
 
 /**
@@ -309,7 +306,7 @@ cpipe_push_input(struct cpipe *pipe, struct cmsg *msg)
 {
 	assert(loop() == pipe->producer);
 
-	STAILQ_INSERT_TAIL(&pipe->input, msg, fifo);
+	stailq_add_tail_entry(&pipe->input, msg, fifo);
 	pipe->n_input++;
 	if (pipe->n_input >= pipe->max_input)
 		ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);

@@ -11,6 +11,9 @@ include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${READLINE_INCLUDE_DIR})
 
+set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
+include_directories(${LIBUTIL_FREEBSD_SRC})
+
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 set(lua_sources)
 lua_source(lua_sources lua/init.lua)
@@ -64,6 +67,7 @@ set (core_sources
      reflection.c
      assoc.c
      rmean.c
+     util.c
  )
 
 add_library(core STATIC ${core_sources})
@@ -74,7 +78,6 @@ target_link_libraries(core
 )
 
 set (server_sources
-     util.cc
      find_path.c
      sio.cc
      evio.cc
@@ -96,6 +99,7 @@ set (server_sources
      fiob.c
      tt_uuid.c
      uri.c
+     backtrace.cc
      proc_title.c
      coeio_file.cc
      lua/digest.cc
@@ -174,7 +178,10 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
-add_executable(tarantool main.cc ffisyms.cc title.c)
+add_executable(
+	tarantool main.cc ffisyms.cc title.c
+	${LIBUTIL_FREEBSD_SRC}/flopen.c
+	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool box ${common_libraries})
 

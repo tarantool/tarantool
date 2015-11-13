@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "unit.h"
 
-#define PLAN		29
+#define PLAN		37
 
 #define ITEMS		7
 
@@ -47,6 +47,9 @@ main(void)
 
 	is(stailq_first_entry(&head, struct test, next),
 	   &items[0], "first entry");
+	for (i = 0; i < ITEMS; i++)
+		is(stailq_shift(&head), &items[i].next, "shift item %d", i);
+	ok(stailq_empty(&head), "list is empty after shift");
 
 	stailq_create(&head);
 	ok(stailq_empty(&head), "next is empty");

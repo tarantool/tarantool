@@ -36,7 +36,7 @@
 #include "space.h"
 #include "exception.h"
 #include "schema.h"
-#include "salad/rlist.h"
+#include "small/rlist.h"
 #include "scoped_guard.h"
 #include <stdlib.h>
 #include <string.h>
