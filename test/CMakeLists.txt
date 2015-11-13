@@ -1,6 +1,5 @@
 enable_tnt_compile_flags()
 
-include_directories(${CMAKE_BINARY_DIR}/src/trivia)
 function(build_module module files)
     add_library(${module} SHARED ${files})
     set_target_properties(${module} PROPERTIES PREFIX "")

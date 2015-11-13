@@ -1,5 +1,5 @@
 @INCLUDE = @PROJECT_SOURCE_DIR@/Doxyfile
-INPUT                  = @PROJECT_BINARY_DIR@/src/trivia/tarantool.h
+INPUT                  = @PROJECT_BINARY_DIR@/src/module.h
 OUTPUT_DIRECTORY       = @PROJECT_BINARY_DIR@/doc/api/
 ENABLED_SECTIONS       = public
 DISABLE_INDEX          = YES

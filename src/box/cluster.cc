@@ -72,25 +72,16 @@ cluster_clock()
 }
 
 void
-cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
+cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 {
 	struct recovery *r = ::recovery;
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
-	assert(!cserver_id_is_reserved(server_id));
-
-	if (r->server_id == server_id) {
-		if (tt_uuid_is_equal(&r->server_uuid, server_uuid))
-			return;
-		say_warn("server UUID changed to %s",
-			 tt_uuid_str(server_uuid));
-		assert(vclock_has(&r->vclock, server_id));
-		memcpy(&r->server_uuid, server_uuid, sizeof(*server_uuid));
-		return;
-	}
+	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
+	assert(!vclock_has(&r->vclock, server_id));
 
 	/* Add server */
-	vclock_add_server(&r->vclock, server_id);
+	vclock_add_server_nothrow(&r->vclock, server_id);
 	if (tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
 		/* Assign local server id */
 		assert(r->server_id == 0);
@@ -107,9 +98,28 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 }
 
 void
+cluster_update_server(uint32_t server_id, const struct tt_uuid *server_uuid)
+{
+	struct recovery *r = ::recovery;
+	/** Checked in the before-commit trigger */
+	assert(!tt_uuid_is_nil(server_uuid));
+	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
+	assert(vclock_has(&r->vclock, server_id));
+
+	if (r->server_id == server_id &&
+	    !tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
+		say_warn("server UUID changed to %s",
+			 tt_uuid_str(server_uuid));
+		r->server_uuid = *server_uuid;
+	}
+}
+
+void
 cluster_del_server(uint32_t server_id)
 {
 	struct recovery *r = ::recovery;
+	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
+
 	vclock_del_server(&r->vclock, server_id);
 	if (r->server_id == server_id) {
 		r->server_id = 0;

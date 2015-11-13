@@ -93,7 +93,7 @@ server.admin("box.schema.user.revoke('guest', 'replication')")
 server.admin('box.snapshot()')
 
 print '-------------------------------------------------------------'
-print 'gh-434: Assertion if replace _cluster tuple'
+print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
 server.stop()
 script = server.script
@@ -123,6 +123,24 @@ server.admin("box.info.server.uuid")
 
 # Invalid UUID
 server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
+
+print '-------------------------------------------------------------'
+print 'gh-1140: Assertion if replace _cluster tuple for remote server'
+print '-------------------------------------------------------------'
+
+# Test that insert is OK
+new_uuid = '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+server.admin("box.info.vclock[5] == 0")
+
+# Replace with the same UUID is OK
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+# Replace with a new UUID is OK
+new_uuid = 'a48a19a3-26c0-4f8c-a5b5-77377bab389b'
+server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+# Delete is OK
+server.admin("box.space._cluster:delete(5)")
+server.admin("box.info.vclock[5] == nil")
 
 # Cleanup
 server.stop()
@@ -187,28 +205,6 @@ replica.admin('box.info.vclock[%d]' % replica_id2)
 replica.admin('box.info.vclock[%d]' % replica_id3)
 replica.stop()
 replica.cleanup(True)
-
-print '-------------------------------------------------------------'
-print 'gh-806: cant prune old replicas by deleting their server ids'
-print '-------------------------------------------------------------'
-
-# Rotate xlog
-master.restart()
-master.admin("box.space._schema:insert{'test', 1}")
-
-# Prune old replicas
-master.admin("cluster_len = box.space._cluster:len()")
-# Delete from _cluster for replicas with lsn=0 is safe
-master.admin('for id, lsn in pairs(box.info.vclock) do'
-             ' if id ~= box.info.server.id then box.space._cluster:delete{id} end '
-             'end');
-master.admin("box.space._cluster:len() < cluster_len")
-
-# Save a snapshot without removed replicas in vclock
-master.admin("box.snapshot()")
-
-# Master is not crashed then recovering xlog with {replica_id: 0} in header
-master.restart()
 
 # Cleanup
 sys.stdout.pop_filter()

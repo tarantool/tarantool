@@ -663,7 +663,7 @@ i2:delete{8}
 ---
 - [5, 8, 13]
 ...
---# restart server default
+test_run:cmd("restart server default")
 box.space.test:select{}
 ---
 - - [1, 2, 6]

@@ -36,7 +36,7 @@ box.snapshot()
 - ok
 ...
 -------------------------------------------------------------
-gh-434: Assertion if replace _cluster tuple
+gh-434: Assertion if replace _cluster tuple for local server
 -------------------------------------------------------------
 box.space._cluster:replace{1, '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'}
 ---
@@ -65,6 +65,33 @@ box.info.server.uuid
 box.space._cluster:replace{1, require('uuid').NULL:str()}
 ---
 - error: 'Invalid UUID: 00000000-0000-0000-0000-000000000000'
+...
+-------------------------------------------------------------
+gh-1140: Assertion if replace _cluster tuple for remote server
+-------------------------------------------------------------
+box.space._cluster:replace{5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'}
+---
+- [5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95']
+...
+box.info.vclock[5] == 0
+---
+- true
+...
+box.space._cluster:replace{5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'}
+---
+- [5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95']
+...
+box.space._cluster:replace{5, 'a48a19a3-26c0-4f8c-a5b5-77377bab389b'}
+---
+- [5, 'a48a19a3-26c0-4f8c-a5b5-77377bab389b']
+...
+box.space._cluster:delete(5)
+---
+- [5, 'a48a19a3-26c0-4f8c-a5b5-77377bab389b']
+...
+box.info.vclock[5] == nil
+---
+- true
 ...
 -------------------------------------------------------------
 gh-527: update vclock on delete from box.space._cluster
@@ -168,27 +195,6 @@ box.info.vclock[10]
 box.info.vclock[11]
 ---
 - null
-...
--------------------------------------------------------------
-gh-806: cant prune old replicas by deleting their server ids
--------------------------------------------------------------
-box.space._schema:insert{'test', 1}
----
-- ['test', 1]
-...
-cluster_len = box.space._cluster:len()
----
-...
-for id, lsn in pairs(box.info.vclock) do if id ~= box.info.server.id then box.space._cluster:delete{id} end end
----
-...
-box.space._cluster:len() < cluster_len
----
-- true
-...
-box.snapshot()
----
-- ok
 ...
 box.schema.user.revoke('guest', 'replication')
 ---

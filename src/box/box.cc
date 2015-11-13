@@ -463,8 +463,8 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	}
 	va_end(ap);
 	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
+	req.tuple = req.key = buf;
+	req.tuple_end = req.key_end = data;
 	process_rw(&req, NULL);
 }
 
@@ -657,9 +657,6 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	struct tuple *tuple = it->next(it);
 	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
-	if (server_id >= VCLOCK_MAX)
-		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
@@ -704,17 +701,24 @@ box_process_subscribe(int fd, struct xrow_header *header)
 static void
 box_set_server_uuid()
 {
-	struct recovery *r = ::recovery;
-	tt_uuid_create(&r->server_uuid);
+	struct recovery *r = recovery;
+
 	assert(r->server_id == 0);
+
+	/* Unregister local server if it was registered by bootstrap.bin */
 	if (vclock_has(&r->vclock, 1))
-		vclock_del_server(&r->vclock, 1);
-	boxk(IPROTO_REPLACE, BOX_CLUSTER_ID, "%u%s",
+		boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
+	assert(!vclock_has(&r->vclock, 1));
+
+	/* Register local server */
+	tt_uuid_create(&r->server_uuid);
+	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&r->server_uuid));
+	assert(vclock_has(&r->vclock, 1));
+
 	/* Remove surrogate server */
 	vclock_del_server(&r->vclock, 0);
 	assert(r->server_id == 1);
-	assert(vclock_has(&r->vclock, 1));
 }
 
 /** Insert a new cluster into _schema */

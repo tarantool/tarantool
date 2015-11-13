@@ -45,6 +45,7 @@
 #include <ctype.h>
 #include "cluster.h" /* for cluster_set_uuid() */
 #include "session.h" /* to fetch the current user. */
+#include "vclock.h" /* VCLOCK_MAX */
 
 /**
  * Lock of scheme modification
@@ -1939,10 +1940,13 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 		if (id != old_id) {
 			/* box.space._cluster:update(old, {{'=', 1, new}} */
 			cluster_del_server(old_id);
+			cluster_add_server(id, &uuid);
+		} else {
+			cluster_update_server(id, &uuid);
 		}
+	} else {
+		cluster_add_server(id, &uuid);
 	}
-
-	cluster_set_server(&uuid, id);
 }
 
 /**
@@ -1977,6 +1981,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		if (cserver_id_is_reserved(server_id))
 			tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
 				  (unsigned) server_id);
+		if (server_id >= VCLOCK_MAX)
+			tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 		tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
 		if (tt_uuid_is_nil(&server_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
