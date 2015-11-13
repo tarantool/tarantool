@@ -209,5 +209,76 @@ for test in TESTS:
         print
     print
 
+
+print 'Test of schema_id in iproto.'
+c = Connection('localhost', server.iproto.port)
+c.connect()
+s = c._socket
+
+def test_request(req_header, req_body):
+    query_header = msgpack.dumps(req_header)
+    query_body = msgpack.dumps(req_body)
+    packet_len = len(query_header) + len(query_body)
+    query = msgpack.dumps(packet_len) + query_header + query_body
+    try:
+        s.send(query)
+    except OSError as e:
+        print '   => ', 'Failed to send request'
+    resp_len = ''
+    resp_headerbody = ''
+    resp_header = {}
+    resp_body = {}
+    try:
+        resp_len = s.recv(5)
+        resp_len = msgpack.loads(resp_len)
+        resp_headerbody = s.recv(resp_len)
+        unpacker = msgpack.Unpacker(use_list = True)
+        unpacker.feed(resp_headerbody)
+        resp_header = unpacker.unpack()
+        resp_body = unpacker.unpack()
+    except OSError as e:
+        print '   => ', 'Failed to recv response'
+    res = {}
+    res['header'] = resp_header
+    res['body'] = resp_body
+    return res
+
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT}
+body = { IPROTO_SPACE_ID: space_id,
+    IPROTO_INDEX_ID: 0,
+    IPROTO_KEY: [],
+    IPROTO_ITERATOR: 2,
+    IPROTO_OFFSET: 0,
+    IPROTO_LIMIT: 1 }
+resp = test_request(header, body)
+print 'Normal connect done w/o errors:', resp['header'][0] == 0
+print 'Got schema_id:', resp['header'][5] > 0
+schema_id = resp['header'][5]
+
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : 0 }
+resp = test_request(header, body)
+print 'Zero-schema_id connect done w/o errors:', resp['header'][0] == 0
+print 'Same schema_id:', resp['header'][5] == schema_id
+
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+resp = test_request(header, body)
+print 'Normal connect done w/o errors:', resp['header'][0] == 0
+print 'Same schema_id:', resp['header'][5] == schema_id
+
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id + 1 }
+resp = test_request(header, body)
+print 'Wrong schema_id leads to error:', resp['header'][0] != 0
+print 'Same schema_id:', resp['header'][5] == schema_id
+
+admin("space2 = box.schema.create_space('test2')")
+
+header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
+resp = test_request(header, body)
+print 'Schema changed -> error:', resp['header'][0] != 0
+print 'Got another schema_id:', resp['header'][5] != schema_id
+
+c.close()
+
 admin("space:drop()")
+admin("space2:drop()")
 admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")

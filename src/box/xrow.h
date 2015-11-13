@@ -56,6 +56,7 @@ struct xrow_header {
 	double tm;
 
 	int bodycnt;
+	uint32_t schema_id;
 	struct iovec body[XROW_BODY_IOVMAX];
 };
 

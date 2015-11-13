@@ -123,7 +123,24 @@ STR 65536
 --
 0xdb00010000 => ok ok ok
 
+Test of schema_id in iproto.
+Normal connect done w/o errors: True
+Got schema_id: True
+Zero-schema_id connect done w/o errors: True
+Same schema_id: True
+Normal connect done w/o errors: True
+Same schema_id: True
+Wrong schema_id leads to error: True
+Same schema_id: True
+space2 = box.schema.create_space('test2')
+---
+...
+Schema changed -> error: True
+Got another schema_id: True
 space:drop()
+---
+...
+space2:drop()
 ---
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

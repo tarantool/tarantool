@@ -435,7 +435,7 @@ box_set_panic_on_wal_error(void)
  * @note Since this is for internal use, it has
  * no boundary or misuse checks.
  */
-void
+static void
 boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 {
 	struct request req;

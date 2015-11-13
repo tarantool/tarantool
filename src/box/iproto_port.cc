@@ -40,12 +40,18 @@ struct iproto_header_bin {
 	uint8_t m_code;                         /* MP_UINT32 */
 	uint32_t v_code;                        /* response status */
 	uint8_t k_sync;                         /* IPROTO_SYNC */
-	uint8_t m_sync;                         /* MP_UIN64 */
+	uint8_t m_sync;                         /* MP_UINT64 */
 	uint64_t v_sync;                        /* sync */
+	uint8_t k_schema_id;                    /* IPROTO_SCHEMA_ID */
+	uint8_t m_schema_id;                    /* MP_UINT32 */
+	uint32_t v_schema_id;                   /* schema_id */
 } __attribute__((packed));
 
 static const struct iproto_header_bin iproto_header_bin = {
-	0xce, 0, 0x82, IPROTO_REQUEST_TYPE, 0xce, 0, IPROTO_SYNC, 0xcf, 0
+	0xce, 0, 0x83,
+	IPROTO_REQUEST_TYPE, 0xce, 0,
+	IPROTO_SYNC, 0xcf, 0,
+	IPROTO_SCHEMA_ID, 0xce, 0
 };
 
 struct iproto_body_bin {
@@ -63,6 +69,8 @@ static const struct iproto_body_bin iproto_error_bin = {
 	0x81, IPROTO_ERROR, 0xdb, 0
 };
 
+extern int sc_version;
+
 /** Return a 4-byte numeric error code, with status flags. */
 static inline uint32_t
 iproto_encode_error(uint32_t error)
@@ -76,6 +84,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	struct iproto_header_bin reply = iproto_header_bin;
 	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5 + 1);
 	reply.v_sync = mp_bswap_u64(sync);
+	reply.v_schema_id = mp_bswap_u32(sc_version);
 	uint8_t empty_map[1] = { 0x80 };
 	obuf_dup_xc(out, &reply, sizeof(reply));
 	obuf_dup_xc(out, &empty_map, sizeof(empty_map));
@@ -94,6 +103,7 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 	header.v_len = mp_bswap_u32(len);
 	header.v_code = mp_bswap_u32(iproto_encode_error(errcode));
 	header.v_sync = mp_bswap_u64(sync);
+	header.v_schema_id = mp_bswap_u32(sc_version);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 
@@ -137,6 +147,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);
 	header.v_sync = mp_bswap_u64(sync);
+	header.v_schema_id = mp_bswap_u32(sc_version);
 
 	struct iproto_body_bin body = iproto_body_bin;
 	body.v_data_len = mp_bswap_u32(count);

@@ -61,7 +61,8 @@ s:wait(.01)
 pong = s:sysread()
 string.len(pong)
 msgpack.decode(pong)
-msgpack.decode(pong, 6)
+function remove_schema_id(t, x) if t[5] then t[5] = 'XXX' end return t, x end
+remove_schema_id(msgpack.decode(pong, 6))
 
 s:close()
 
