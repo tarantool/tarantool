@@ -657,9 +657,6 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	struct tuple *tuple = it->next(it);
 	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
-	if (server_id >= VCLOCK_MAX)
-		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }

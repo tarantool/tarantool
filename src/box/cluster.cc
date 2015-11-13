@@ -77,7 +77,7 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 	struct recovery *r = ::recovery;
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
-	assert(!cserver_id_is_reserved(server_id));
+	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
 
 	if (r->server_id == server_id) {
 		if (tt_uuid_is_equal(&r->server_uuid, server_uuid))
