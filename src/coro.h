@@ -40,13 +40,20 @@ extern "C" {
 
 struct tarantool_coro {
 	coro_context ctx;
+	/** Coro stack slab. */
+	void *stack_slab;
+	/** Coro stack addr. */
 	void *stack;
+	/** Coro stack size. */
 	size_t stack_size;
 	/** Valgrind stack id. */
 	unsigned int stack_id;
 };
 
 struct slab_cache;
+
+void
+tarantool_coro_init();
 
 int
 tarantool_coro_create(struct tarantool_coro *ctx,

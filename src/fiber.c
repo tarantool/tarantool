@@ -1052,6 +1052,7 @@ cord_slab_cache(void)
 void
 fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
+	tarantool_coro_init();
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
 	main_cord.loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
