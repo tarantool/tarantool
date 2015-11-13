@@ -152,6 +152,7 @@ vclock_sum(const struct vclock *vclock)
 static inline void
 vclock_add_server_nothrow(struct vclock *vclock, uint32_t server_id)
 {
+	assert(server_id < VCLOCK_MAX);
 	vclock->map |= 1 << server_id;
 }
 
