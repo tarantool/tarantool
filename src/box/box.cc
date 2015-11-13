@@ -325,8 +325,8 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	}
 	va_end(ap);
 	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
+	req.tuple = req.key = buf;
+	req.tuple_end = req.key_end = data;
 	process_rw(&req, NULL);
 }
 
@@ -560,16 +560,23 @@ static void
 box_set_server_uuid()
 {
 	struct recovery_state *r = recovery;
-	tt_uuid_create(&r->server_uuid);
+
 	assert(r->server_id == 0);
+
+	/* Unregister local server if it was registered by bootstrap.bin */
 	if (vclock_has(&r->vclock, 1))
-		vclock_del_server(&r->vclock, 1);
-	boxk(IPROTO_REPLACE, BOX_CLUSTER_ID, "%u%s",
+		boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
+	assert(!vclock_has(&r->vclock, 1));
+
+	/* Register local server */
+	tt_uuid_create(&r->server_uuid);
+	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&r->server_uuid));
+	assert(vclock_has(&r->vclock, 1));
+
 	/* Remove surrogate server */
 	vclock_del_server(&r->vclock, 0);
 	assert(r->server_id == 1);
-	assert(vclock_has(&r->vclock, 1));
 }
 
 /** Insert a new cluster into _schema */

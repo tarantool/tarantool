@@ -31,7 +31,7 @@ API is a direct binding to corresponding methods of index objects of type
         :rtype: table
 
         Example:
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary`
         | :codenormal:`---`
         | - :codenormal:`unique: true`
@@ -241,7 +241,7 @@ API is a direct binding to corresponding methods of index objects of type
 |br|
 
         Example With Default 'TREE' Index and ``pairs()`` function:
-        
+
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space17')`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -303,7 +303,7 @@ API is a direct binding to corresponding methods of index objects of type
         :codenormal:`option(s)` any or all of
         :codenormal:`iterator =` :codeitalic:`iterator-type`,
         :codenormal:`limit =` :codeitalic:`maximum-number-of-tuples`,
-        :codenormal:`offset =` :codeitalic:`start-tuple-number`. 
+        :codenormal:`offset =` :codeitalic:`start-tuple-number`.
 
         :return: the tuple or tuples that match the field values.
         :rtype:  tuple set as a Lua table
@@ -325,10 +325,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         The result will be a table of tuple and will look like this:
 
-        | :codenormal:`---`
-        | :codenormal:`- - [2, 'Y', 'Row with field[2]=Y']`
-        | :codenormal:`  - [3, 'Z', 'Row with field[2]=Z']`
-        | :codenormal:`...`
+        .. code-block:: yaml
+
+            ---
+            - - [2, 'Y', 'Row with field[2]=Y']
+              - [3, 'Z', 'Row with field[2]=Z']
+            ...
 
         .. NOTE::
 
@@ -359,13 +361,13 @@ API is a direct binding to corresponding methods of index objects of type
             if there is more than one tuple in the tuple set, then :codenormal:`get` returns
             an error.
 
-        
+
         Example with BITSET index:
 
         The following script shows creation and search with a BITSET index.
         Notice: BITSET cannot be unique, so first a primary-key index is created.
         Notice: bit values are entered as hexadecimal literals for easier reading.
-        
+
         | :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('space_with_bitset')`
         | :codenormal:`tarantool>`:codebold:`s:create_index('primary_index',{parts={1,'STR'},unique=true,type='TREE'})`
         | :codenormal:`tarantool>`:codebold:`s:create_index('bitset_index',{parts={2, 'NUM'},unique=false,type='BITSET'})`
@@ -376,9 +378,9 @@ API is a direct binding to corresponding methods of index objects of type
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ANY_SET})`
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_SET})`
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_NOT_SET})`
-    
+
         The above script will return:
-             
+
         | :codenormal:`For EQ: Tuple with bit value = 10`
         | :codenormal:`For BITS_ANY_SET: Tuple with bit value = 10 + Tuple with bit value = 11`
         | :codenormal:`For BITS_ALL_SET: Tuple with bit value = 10 + Tuple with bit value = 11`

@@ -170,12 +170,12 @@ can be invoked with ``main_function()!``.
 The screen now looks like this:
 
 | :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = string.char(random_number)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = string.char(random_number)`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`main_function()!`
@@ -416,15 +416,15 @@ The screen now looks like this:
 
 | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
 | :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`local random_number`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`local random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`random_string = ""`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`for x = 1,10,1 do`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp|:codebold:`random_number = math.random(65, 90)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp|:codebold:`random_string = random_string .. string.char(random_number)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp|:codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = ""`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for x = 1,10,1 do`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`random_string = random_string .. string.char(random_number)`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`function main_function()`
@@ -486,10 +486,10 @@ experience in one way to read and process tuples.
     console.delimiter('')!
 
 .. parsed-literal::
-    
+
     :ref:`[[1]] <why_local>`, :ref:`[[3]] <why_pairs>`, :ref:`[[4]] <why_pcall>`, :ref:`[[6]] <line_six>`, :ref:`[[7]] <why_if>`
-    
-.. _why_local:    
+
+.. _why_local:
 
 **LINE 1: WHY "LOCAL".** This line declares all the variables that will be used in
 the function. Actually it's not necessary to declare all variables at the start,

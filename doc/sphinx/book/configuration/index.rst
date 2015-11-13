@@ -7,15 +7,15 @@
 This chapter provides a reference of options which can be set on the command
 line or in an initialization file.
 
-.. contents:: 
+.. contents::
     :local:
 
-Tarantool is started by entering the command: 
+Tarantool is started by entering the command:
 
 | :codenormal:`$` :codebold:`tarantool`
-| OR
+| :codenormal:`OR`
 | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-| OR
+| :codenormal:`OR`
 | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
 =====================================================================

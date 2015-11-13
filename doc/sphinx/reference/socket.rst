@@ -118,7 +118,7 @@ the function invocations will look like ``sock:function_name(...)``.
     Example:
 
     | :codenormal:`tarantool>` :codebold:`socket.getaddrinfo('tarantool.org', 'http')`
-    
+
     will return variable information such as
 
     | :codenormal:`---`

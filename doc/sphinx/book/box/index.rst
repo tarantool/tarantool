@@ -5,7 +5,7 @@
 *******************************************************************************
 
 This chapter describes how Tarantool stores values
-and what operations with data it supports. 
+and what operations with data it supports.
 
 ===================
 Document data model
@@ -83,7 +83,7 @@ of a field is the field's number, base 1. For example
 When Tarantool returns a tuple value, it surrounds
 strings with single quotes, separates fields with commas,
 and encloses the tuple inside square brackets.
-For example: :codenormal:`[ 3, 'length', 93 ]`. 
+For example: :codenormal:`[ 3, 'length', 93 ]`.
 
 .. _box.index:
 
@@ -128,7 +128,7 @@ Space definitions and index definitions are stored permanently
 in system spaces. It is possible to add, drop, or alter the
 definitions at runtime, with some restrictions.
 The syntax details for defining spaces and indexes
-are in section :ref:`The box library <box-library>`. 
+are in section :ref:`The box library <box-library>`.
 
 ----------
 Data types
@@ -247,7 +247,7 @@ How does Tarantool do a basic operation? Let's take this example:
 | :codenormal:`tarantool>`:codebold:`box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})`
 
 which, for those who know SQL, is equivalent to a statement like
-   
+
 .. code-block:: SQL
 
    UPDATE tester SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
@@ -389,7 +389,7 @@ Let's clarify how this happens, using the REPLACE request as an example:
 2. The new tuple is then validated. If for example it does not contain an indexed field, or it has an indexed field whose type does not match the type according to the index definition, the change is aborted.
 3. The new tuple replaces the old tuple in all existing indexes.
 4. A message is sent to WAL writer running in a separate thread, requesting that the change be recorded in the WAL. The server switches to work on the next request until the write is acknowledged.
-5. On success, a confirmation is sent to the client. Upon failure, a rollback procedure is begun. During the rollback procedure, the transaction processor rolls back all changes to the database which occurred after the first failed change, from latest to oldest, up to the first failed change. All rolled back requests are aborted with :errcode:`ER_WAL_IO <ER_WAL_IO>` error. No new change is applied while rollback is in progress. When the rollback procedure is finished, the server restarts the processing pipeline. 
+5. On success, a confirmation is sent to the client. Upon failure, a rollback procedure is begun. During the rollback procedure, the transaction processor rolls back all changes to the database which occurred after the first failed change, from latest to oldest, up to the first failed change. All rolled back requests are aborted with :errcode:`ER_WAL_IO <ER_WAL_IO>` error. No new change is applied while rollback is in progress. When the rollback procedure is finished, the server restarts the processing pipeline.
 
 One advantage of the described algorithm is that complete request
 pipelining is achieved, even for requests on the same value of the
@@ -410,7 +410,7 @@ The WAL writer employs a number of durability modes, as defined
 in configuration variable :confval:`wal_mode <wal_mode>`. It is possible to turn
 the write-ahead log completely off, by setting :confval:`wal_mode <wal_mode>` to *none*.
 Even without the write-ahead log it's still possible to take
-a persistent copy of the entire data set with the :func:`box.snapshot() <box.snapshot()>` request. 
+a persistent copy of the entire data set with the :func:`box.snapshot() <box.snapshot()>` request.
 
 -----------------
 Data manipulation
@@ -429,8 +429,8 @@ Every one of the examples does the same thing:
 select a tuple set from a space named tester where
 the primary-key field value equals 1.
 
-First, there are four *naming variations*: 
-   
+First, there are four *naming variations*:
+
 | :codenormal:`-- #1`
 | :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
 | :codenormal:`-- #2`
@@ -448,8 +448,8 @@ in this manual have the "box.space.tester:" form;
 however, this is a matter of user preference and all
 the variants exist in the wild.
 
-Then, there are six *parameter variations*: 
-   
+Then, there are six *parameter variations*:
+
 | :codenormal:`-- #1`
 | :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
 | :codenormal:`-- #2`
@@ -482,7 +482,7 @@ user preference and all the variants exist in the wild.
 All the data-manipulation functions operate on tuple sets but,
 since primary keys are unique, the number of tuples in the
 tuple set is always 1. The only exception is ``box.space...select``,
-which may accept either a primary-key value or a secondary-key value. 
+which may accept either a primary-key value or a secondary-key value.
 
 .. _box-library:
 

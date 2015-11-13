@@ -1,0 +1,5 @@
+import os
+
+# skip test if .so is not found
+if not os.path.exists('box/function1.so'):
+    self.skip=1

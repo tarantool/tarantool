@@ -1,4 +1,4 @@
-=====================================================================
+$ =====================================================================
                             C
 =====================================================================
 
@@ -32,26 +32,30 @@ space :code:`examples` via the high-level C API.
 
 .. parsed-literal::
 
-    :ref:`SETUP <c_setup>`, :ref:`CONNECT <c_connect>`, :ref:`MAKE REQUEST <c_make_request>`, :ref:`SEND REQUEST <c_make_request>`, :ref:`GET REPLY <c_get_reply>`, :ref:`TEARDOWN <c_teardown>`   
+    :ref:`SETUP <c_setup>`, :ref:`CONNECT <c_connect>`, :ref:`MAKE REQUEST <c_make_request>`, :ref:`SEND REQUEST <c_make_request>`, :ref:`GET REPLY <c_get_reply>`, :ref:`TEARDOWN <c_teardown>`
 
 To prepare, paste the code into a file named example.c and install
 tarantool-c. One way to install tarantool-c (using Ubuntu) is:
 
-| :codenormal:`$` :codebold:`git clone git://github.com/tarantool/tarantool-c.git ~/tarantool-c`
-| :codenormal:`$` :codebold:`cd tarantool-c`
-| :codenormal:`$` :codebold:`git submodule init`
-| :codenormal:`$` :codebold:`git submodule update`
-| :codenormal:`$` :codebold:`cmake .`
-| :codenormal:`$` :codebold:`make`
-| :codenormal:`$` :codebold:`make install`
+.. code-block:: console
 
-To compile and link the program, say: 
+    $ git clone git://github.com/tarantool/tarantool-c.git ~/tarantool-c
+    $ cd tarantool-c
+    $ git submodule init
+    $ git submodule update
+    $ cmake .
+    $ make
+    $ make install
 
-| :codenormal:`$ # sometimes this is necessary:`
-| :codenormal:`$` :codebold:`export LD_LIBRARY_PATH=/usr/local/lib`
-| :codenormal:`$` :codebold:`gcc -o example example.c -ltarantool -ltarantoolnet`
+To compile and link the program, say:
 
-Before trying to run, 
+.. code-block:: console
+
+    $ # sometimes this is necessary:
+    $ export LD_LIBRARY_PATH=/usr/local/lib
+    $ gcc -o example example.c -ltarantool -ltarantoolnet
+
+Before trying to run,
 check that the server is listening and that :code:`examples` exists, as :ref:`described earlier <connector-setting>`.
 To run the program, say :code:`./example`. The program will connect
 to the server, and will send the request.
@@ -60,7 +64,7 @@ If the insert fails, the program will print "Insert failed" and an error number.
 
 Here are notes corresponding to comments in the example program.
 
-.. _c_setup: 
+.. _c_setup:
 
 **SETUP:** The setup begins by creating a stream.
 
@@ -75,7 +79,7 @@ The most important option is TNT_OPT_URI.
 In this program the URI is ``localhost:3301``, since that is where the
 Tarantool server is supposed to be listening.
 
-Function description: 
+Function description:
 
 .. c:function:: struct tnt_stream *tnt_net(struct tnt_stream *s)
 .. c:function:: int tnt_set(struct tnt_stream *s, int option, variant option-value)
@@ -83,14 +87,14 @@ Function description:
 .. _c_connect:
 
 **CONNECT:** Now that the stream named :codenormal:`tnt` exists and is associated with a
-URI, this example program can connect to the server. 
+URI, this example program can connect to the server.
 
 .. code-block:: c
 
     if (tnt_connect(tnt) < 0)
        { printf("Connection refused\n"); exit(-1); }
 
-Function description: 
+Function description:
 
 .. c:function:: int tnt_connect(struct tnt_stream *s)
 
@@ -101,14 +105,14 @@ If the connect fails, the return value will be -1.
 .. _c_make_request:
 
 **MAKE REQUEST:** Most requests require passing a structured value, such as
-the contents of a tuple. 
+the contents of a tuple.
 
 .. code-block:: c
 
     struct tnt_stream *tuple = tnt_object(NULL);
      tnt_object_format(tuple, "[%d%s]", 999, "B");
 
-In this program the request will 
+In this program the request will
 be an insert, and the tuple contents will be an integer
 and a string. This is a simple serial set of values, that
 is, there are no sub-structures or arrays. Therefore it
@@ -117,13 +121,13 @@ the same sort of arguments that one would use with a C
 ``printf()`` function: ``%d`` for the integer, ``%s`` for the string,
 then the integer value, then a pointer to the string value.
 
-Function description: 
+Function description:
 
 .. c:function:: ssize_t tnt_object_format(struct tnt_stream *s, const char *fmt, ...)
 
 .. _c_send_request:
 
-**SEND REQUEST:** The database-manipulation requests are analogous to the 
+**SEND REQUEST:** The database-manipulation requests are analogous to the
 requests in the box library.
 
 .. code-block:: c
@@ -135,7 +139,7 @@ In this program the choice is to do an insert request, so
 the program passes the tnt_stream that was used for connection
 (:code:`tnt`) and the stream that was set up with tnt_object_format (:code:`tuple`).
 
-Function description: 
+Function description:
 
 .. c:function:: tnt_insert(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)
 .. c:function:: tnt_replace(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)
@@ -163,7 +167,7 @@ Function description:
 
 .. _c_teardown:
 
-**TEARDOWN:** When a session ends, the connection that was made with 
+**TEARDOWN:** When a session ends, the connection that was made with
 tnt_connect() should be closed and the objects that were made in the setup
 should be destroyed.
 
@@ -173,7 +177,7 @@ should be destroyed.
      tnt_stream_free(tuple);
      tnt_stream_free(tnt);
 
-Function description: 
+Function description:
 
 .. c:function:: tnt_close(struct tnt_stream *s)
 .. c:function:: tnt_stream_free(struct tnt_stream *s)

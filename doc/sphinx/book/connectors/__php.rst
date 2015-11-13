@@ -7,21 +7,24 @@ repository; it must be installed separately. It can be installed with git. It
 requires other modules which should be installed first. For example, on Ubuntu,
 the installation could look like this:
 
-| :codebold:`$ sudo apt-get install php5-cli`
-| :codebold:`$ sudo apt-get install php5-dev`
-| :codebold:`$ sudo apt-get install php-pear`
-| :codebold:`$ cd ~`
-| :codebold:`$ git clone https://github.com/tarantool/tarantool-php.git`
-| :codebold:`$ cd tarantool-php`
-| :codebold:`$ phpize`
-| :codebold:`$ ./configure`
-| :codebold:`$ make`
-| :codenormal:`# make install is optional`
+.. code-block:: console
+
+    $ sudo apt-get install php5-cli
+    $ sudo apt-get install php5-dev
+    $ sudo apt-get install php-pear
+    $ cd ~
+    $ git clone https://github.com/tarantool/tarantool-php.git
+    $ cd tarantool-php
+    $ phpize
+    $ ./configure
+    $ make
+    $ # make install is optional
+
 
 At this point there is a file named :code:`~/tarantool-php/modules/tarantool.so`.
 PHP will only find it if the PHP initialization file :code:`php.ini` contains a
 line like :code:`extension=./tarantool.so`, or if PHP is started with the option
-:code:`-d extension=~/tarantool-php/modules/tarantool.so`. 
+:code:`-d extension=~/tarantool-php/modules/tarantool.so`.
 
 Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples'
 via the PHP API. Before trying to run, check that the server is listening and that

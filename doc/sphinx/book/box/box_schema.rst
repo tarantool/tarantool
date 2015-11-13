@@ -6,40 +6,40 @@
 
 The ``box.schema`` package has one data-definition function: ``space.create()``.
 
-.. _box.schema.space.create:
+.. class:: space
 
-.. function:: space.create(space-name [, {options} ])
+    .. function:: space.create(space-name [, {options} ])
 
-    Create a space.
+        Create a space.
 
-    :param string space-name: name of space, which should not be a number and should not contain special characters
-    :param table options:
+        :param string space-name: name of space, which should not be a number and should not contain special characters
+        :param table options:
 
-    :return: space object
-    :rtype: userdata
+        :return: space object
+        :rtype: userdata
 
-    .. container:: table
+        .. container:: table
 
-        **Options for box.schema.space.create**
+            **Options for box.schema.space.create**
 
-        +---------------+--------------------+---------+---------------------+
-        | Name          | Effect             | Type    | Default             |
-        +===============+====================+=========+=====================+
-        | temporary     | space is temporary | boolean | false               |
-        +---------------+--------------------+---------+---------------------+
-        | id            | unique identifier  | number  | last space's id, +1 |
-        +---------------+--------------------+---------+---------------------+
-        | field_count   | fixed field count  | number  | 0 i.e. not fixed    |
-        +---------------+--------------------+---------+---------------------+
-        | if_not_exists | no error if        | boolean | false               |
-        |               | duplicate name     |         |                     |
-        +---------------+--------------------+---------+---------------------+
-        | engine        | storage package    | string  | 'memtx'             |
-        +---------------+--------------------+---------+---------------------+
-        | user          | user name          | string  | current user's name |
-        +---------------+--------------------+---------+---------------------+
-        | format        | field names+types  | table   | (blank)             |
-        +---------------+--------------------+---------+---------------------+
+            +---------------+--------------------+---------+---------------------+
+            | Name          | Effect             | Type    | Default             |
+            +===============+====================+=========+=====================+
+            | temporary     | space is temporary | boolean | false               |
+            +---------------+--------------------+---------+---------------------+
+            | id            | unique identifier  | number  | last space's id, +1 |
+            +---------------+--------------------+---------+---------------------+
+            | field_count   | fixed field count  | number  | 0 i.e. not fixed    |
+            +---------------+--------------------+---------+---------------------+
+            | if_not_exists | no error if        | boolean | false               |
+            |               | duplicate name     |         |                     |
+            +---------------+--------------------+---------+---------------------+
+            | engine        | storage package    | string  | 'memtx'             |
+            +---------------+--------------------+---------+---------------------+
+            | user          | user name          | string  | current user's name |
+            +---------------+--------------------+---------+---------------------+
+            | format        | field names+types  | table   | (blank)             |
+            +---------------+--------------------+---------+---------------------+
 
 =================================================
                     Example
@@ -56,7 +56,7 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
  | :codenormal:`---`
  | :codenormal:`...`
 
-For an illustration with the :code:`format` clause, see :ref:`box.space._space example <boxspaceexample>`.
+For an illustration with the :code:`format` clause, see :func:`box.space._space <box.space._space>` example.
 
 After a space is created, usually the next step is to
 :func:`create an index <space_object.create_index>` for it,

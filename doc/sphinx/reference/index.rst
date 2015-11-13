@@ -21,7 +21,6 @@
     tap
     fun
     pickle
-    other
     expirationd
     shard
     tarantool
@@ -30,4 +29,4 @@
     csv
     box
     capi
-
+    other
