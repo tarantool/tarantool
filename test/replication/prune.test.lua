@@ -54,3 +54,5 @@ box.space._cluster:len() == 2
 replica_set.drop_all(test_run)
 box.space._cluster:len() == 1
 #box.info.vclock == 1
+box.space.test:drop()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

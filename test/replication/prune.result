@@ -120,3 +120,9 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
+box.space.test:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
