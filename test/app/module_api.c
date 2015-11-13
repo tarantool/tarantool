@@ -1,5 +1,5 @@
 #include <stdbool.h>
-#include <tarantool.h>
+#include <module.h>
 
 #include <small/ibuf.h>
 
