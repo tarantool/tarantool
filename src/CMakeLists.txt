@@ -3,8 +3,6 @@
 #
 enable_tnt_compile_flags()
 
-add_subdirectory(trivia)
-
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
@@ -116,6 +114,26 @@ set (server_sources
      lua/clock.c
      ${lua_sources}
 )
+
+set(api_headers
+    ${CMAKE_BINARY_DIR}/src/trivia/config.h
+    ${CMAKE_SOURCE_DIR}/src/say.h
+    ${CMAKE_SOURCE_DIR}/src/fiber.h
+    ${CMAKE_SOURCE_DIR}/src/coio.h
+    ${CMAKE_SOURCE_DIR}/src/coeio.h
+    ${CMAKE_SOURCE_DIR}/src/lua/utils.h
+    ${CMAKE_SOURCE_DIR}/src/box/txn.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple.h
+    ${CMAKE_SOURCE_DIR}/src/box/schema.h
+    ${CMAKE_SOURCE_DIR}/src/box/box.h
+    ${CMAKE_SOURCE_DIR}/src/box/index.h
+    ${CMAKE_SOURCE_DIR}/src/box/func.h
+    ${CMAKE_SOURCE_DIR}/src/box/error.h
+    ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
+    ${CMAKE_SOURCE_DIR}/src/latch.h
+    ${CMAKE_SOURCE_DIR}/src/fiber.h
+)
+rebuild_module_api(${api_headers})
 
 if (NOT TARGET_OS_DEBIAN_FREEBSD)
     if (TARGET_OS_FREEBSD)
