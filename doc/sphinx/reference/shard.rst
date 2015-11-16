@@ -66,7 +66,7 @@ The shard-configuration is a table with these fields:
 * password (the password for the login)
 * redundancy (a number, minimum 1)
 * binary (a port number that this host is listening on, on the current host)
-(distinguishable from the 'listen' port specified by box.cfg)
+  (distinguishable from the 'listen' port specified by box.cfg)
 
 Possible Errors: Redundancy should not be greater than the number of servers;
 the servers must be alive; two replicas of the same shard should not be in the same zone.

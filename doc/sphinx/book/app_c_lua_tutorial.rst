@@ -252,7 +252,7 @@ a function in Tarantool's library of Lua functions.
 .. code-block:: lua_tarantool
 
     function main_function()
-      local string_value
+      local string_value, t
       string_value = string_function()
       t = box.tuple.new({1, string_value})
       return t
@@ -268,7 +268,7 @@ For more about Tarantool tuples see Tarantool manual section :mod:`Package box.t
 The screen now looks like this:
 
 | :codenormal:`tarantool>` :codebold:`function main_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1, string_value})`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return t`
@@ -293,7 +293,7 @@ it's like a database table.
 .. code-block:: lua_tarantool
 
     function main_function()
-      local string_value
+      local string_value, t
       string_value = string_function()
       t = box.tuple.new({1,string_value})
       box.space.tester:replace(t)
@@ -324,7 +324,7 @@ For more about Tarantool insert and replace calls, see Tarantool manual section
 The screen now looks like this:
 
     | :codenormal:`tarantool>` :codebold:`function main_function()`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1,string_value})`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
@@ -353,16 +353,16 @@ wrinkle that we add here is a timing function.
 .. code-block:: lua_tarantool
 
     function main_function()
-      local string_value
-      start_time = os.clock()
+      local string_value, t
       for i = 1,1000000,1 do
         string_value = string_function()
         t = box.tuple.new({i,string_value})
         box.space.tester:replace(t)
       end
-      end_time = os.clock()
     end!
+    start_time = os.clock()!
     main_function()!
+    end_time = os.clock()!
     'insert done in ' .. end_time - start_time .. ' seconds'!
 
 The Lua ``os.clock()`` function will return the number of seconds since the
@@ -400,16 +400,16 @@ and the request that invokes ``main_function()``.
     end!
 
     function main_function()
-      local string_value
-      start_time = os.clock()
+      local string_value, t
       for i = 1,1000000,1 do
         string_value = string_function()
         t = box.tuple.new({i,string_value})
         box.space.tester:replace(t)
       end
-      end_time = os.clock()
     end!
+    start_time = os.clock()!
     main_function()!
+    end_time = os.clock()!
     'insert done in ' .. end_time - start_time .. ' seconds'!
 
 The screen now looks like this:
@@ -428,23 +428,27 @@ The screen now looks like this:
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`function main_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`start_time = os.clock()`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for i = 1,1000000,1 do`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`string_value = string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`t = box.tuple.new({i,string_value})`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end_time = os.clock()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| :codenormal:`---`
+| :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`start_time = os.clock()`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`main_function()!`
 | :codenormal:`---`
 | :codenormal:`...`
+| :codenormal:`tarantool>` :codebold:`end_time = os.clock()`
+| :codenormal:`---`
+| :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`'insert done in ' .. end_time - start_time .. ' seconds'!`
 | :codenormal:`---`
-| :codenormal:`- insert done in 60.62 seconds`
+| :codenormal:`- insert done in 37.62 seconds`
 | :codenormal:`...`
 | :codenormal:`tarantool>`
 
@@ -453,8 +457,10 @@ do more with Tarantool's Lua stored procedures than one can do with stored
 procedures in some SQL DBMSs), and that it's straightforward to combine
 Lua-library functions and Tarantool-library functions.
 
-What has also been shown is that inserting a million tuples took 60 seconds. The
-host computer was a Toshiba laptop with a 2.2-GHz Intel Core Duo CPU.
+What has also been shown is that inserting a million tuples took 37 seconds. The
+host computer was a Linux laptop. By changing :confval:`wal_mode <wal_mode>` to 'none' before
+running the test, one can reduce the elapsed time to 4 seconds.
+
 
 
 =====================================================================
@@ -470,8 +476,8 @@ experience in one way to read and process tuples.
 .. code-block:: lua_tarantool
 
     console = require('console'); console.delimiter('!')
+    json = require('json')
     function sum_json_field(field_name)
-      json = require('json')
       local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
       sum = 0                                                               --[[2]]
       for v, t in box.space.tester:pairs() do                               --[[3]]
