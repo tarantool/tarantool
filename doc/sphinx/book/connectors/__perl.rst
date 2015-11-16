@@ -8,14 +8,16 @@ common way to install it is with `CPAN, the Comprehensive Perl Archive Network`_
 `DR::Tarantool`_ requires other modules which should be installed first. For
 example, on Ubuntu, the installation could look like this:
 
-| :codenormal:`$` :codebold:`sudo cpan install AnyEvent`
-| :codenormal:`$` :codebold:`sudo cpan install Devel::GlobalDestruction`
-| :codenormal:`$` :codebold:`sudo cpan install Coro`
-| :codenormal:`$` :codebold:`sudo cpan install Test::Pod`
-| :codenormal:`$` :codebold:`sudo cpan install Test::Spelling`
-| :codenormal:`$` :codebold:`sudo cpan install PAR::Dist`
-| :codenormal:`$` :codebold:`sudo cpan install List::MoreUtils`
-| :codenormal:`$` :codebold:`sudo cpan install DR::Tarantool`
+.. code-block:: console
+
+    $ sudo cpan install AnyEvent
+    $ sudo cpan install Devel::GlobalDestruction
+    $ sudo cpan install Coro
+    $ sudo cpan install Test::Pod
+    $ sudo cpan install Test::Spelling
+    $ sudo cpan install PAR::Dist
+    $ sudo cpan install List::MoreUtils
+    $ sudo cpan install DR::Tarantool
 
 Here is a complete Perl program that inserts [99999,'BB'] into space[999] via
 the Perl API. Before trying to run, check that the server is listening and

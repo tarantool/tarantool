@@ -1,3 +1,15 @@
+    :confval:`username`, |br|
+    :confval:`work_dir`, |br|
+    :confval:`wal_dir`, |br|
+    :confval:`snap_dir`, |br|
+    :confval:`sophia_dir`, |br|
+    :confval:`coredump`, |br|
+    :confval:`listen`, |br|
+    :confval:`coredump`, |br|
+    :confval:`pid_file`, |br|
+    :confval:`custom_proc_title`, |br|
+    :confval:`background` |br|
+
 .. confval:: username
 
     UNIX user name to switch to after start.
@@ -110,7 +122,7 @@
 
 .. confval:: background
 
-    Run the server as a background task. The :confval:`logger` and
+    Run the server as a background task. The :ref:`logger <log-label>` and
     :confval:`pid_file` parameters must be non-null for this to work.
 
     Type: boolean |br|

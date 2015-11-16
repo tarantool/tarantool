@@ -1,4 +1,9 @@
-.. class:: log_level
+    :confval:`log_level`, |br|
+    :confval:`logger`, |br|
+    :confval:`logger_nonblock`, |br|
+    :confval:`too_long_threshold` |br|
+
+.. confval:: log_level
 
     How verbose the logging is. There are six log verbosity classes:
 
@@ -11,14 +16,16 @@
 
     By setting log_level, one can enable logging of all classes below
     or equal to the given level. Tarantool prints its logs to the standard
-    error stream by default, but this can be changed with the :confval:`logger`
+    error stream by default, but this can be changed with the :ref:`logger <log-label>`
     configuration parameter.
 
     Type: integer |br|
     Default: 5 |br|
     Dynamic: **yes** |br|
 
-.. class:: logger
+.. _log-label:
+
+.. confval:: logger
 
     By default, the log is sent to the standard error stream (``stderr``). If
     ``logger`` is specified, the log is sent to the file named in the string.

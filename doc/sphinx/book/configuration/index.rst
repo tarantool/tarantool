@@ -7,15 +7,15 @@
 This chapter provides a reference of options which can be set on the command
 line or in an initialization file.
 
-.. contents:: 
+.. contents::
     :local:
 
-Tarantool is started by entering the command: 
+Tarantool is started by entering the command:
 
 | :codenormal:`$` :codebold:`tarantool`
-| OR
+| :codenormal:`OR`
 | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-| OR
+| :codenormal:`OR`
 | :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
 
 =====================================================================
@@ -97,6 +97,7 @@ In certain circumstances a Unix domain socket may be used
 where a URI is expected, for example "unix/:/tmp/unix_domain_socket.sock" or
 simply "/tmp/unix_domain_socket.sock".
 
+.. _init-label:
 
 =====================================================================
                        Initialization file
@@ -137,6 +138,10 @@ Then the screen might look like this:
 | :codenormal:`Starting  ARG`
 | :codenormal:`... main C> entering the event loop`
 
+If one wishes to start an interactive session
+on the same terminal after initialization is complete,
+one can use :ref:`console.start() <console-start>`.
+
 .. _local_hot_standby:
 .. _replication_port:
 .. _slab_alloc_arena:
@@ -146,7 +151,6 @@ Then the screen might look like this:
 .. _wal_dir:
 .. _wal_mode:
 .. _snapshot daemon:
-.. _logger:
 
 =====================================================================
                 Configuration parameters

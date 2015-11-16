@@ -1,3 +1,6 @@
+    :confval:`snapshot_period`, |br|
+    :confval:`snapshot_count` |br|
+
 .. confval:: snapshot_period
 
     The interval between actions by the snapshot daemon, in seconds.

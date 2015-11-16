@@ -98,9 +98,9 @@ the old master went down, they would have to be re-applied manually.
 
 Step 1. Start the first server thus:
 
-|:codenormal:`tarantool>`:codebold:`box.cfg{listen=` :codebolditalic:`uri#1` :codenormal:`}`
-|:codenormal:`tarantool>`:codebold:`box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request`
-|:codenormal:`tarantool>`:codebold:`box.snapshot()`
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=` :codebolditalic:`uri#1` :codenormal:`}`
+| :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request`
+| :codenormal:`tarantool>` :codebold:`box.snapshot()`
 
 ... Now a new cluster exists.
 
@@ -112,7 +112,7 @@ server's databases can happen without conflicts.
 
 Step 3. Start the second server thus:
 
-|:codenormal:`tarantool>`:codebold:`box.cfg{listen=` :codebolditalic:`uri#2` :codebold:`, replication_source=` :codebolditalic:`uri#1` :codebold:`}`
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=` :codebolditalic:`uri#2` :codebold:`, replication_source=` :codebolditalic:`uri#1` :codebold:`}`
 
 ... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
 
@@ -319,10 +319,10 @@ On the first shell, which we'll call Terminal #1, execute these commands:
 | :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_1/*`
 | :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
 |
-| :codenormal:`tarantool>`:codebold:`box.cfg{listen=3301}`
-| :codenormal:`tarantool>`:codebold:`box.schema.user.create('replicator', {password = 'password'})`
-| :codenormal:`tarantool>`:codebold:`box.schema.user.grant('replicator','read,write','universe')`
-| :codenormal:`tarantool>`:codebold:`box.space._cluster:select({0},{iterator='GE'})`
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
+| :codenormal:`tarantool>` :codebold:`box.schema.user.create('replicator', {password = 'password'})`
+| :codenormal:`tarantool>` :codebold:`box.schema.user.grant('replicator','read,write','universe')`
+| :codenormal:`tarantool>` :codebold:`box.space._cluster:select({0},{iterator='GE'})`
 
 The result is that a new cluster is set up, and the UUID is displayed.
 Now the screen looks like this: (except that UUID values are always different):
@@ -394,8 +394,8 @@ On the second shell, which we'll call Terminal #2, execute these commands:
 | :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_2/*`
 | :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
 |
-| :codenormal:`tarantool>`:codebold:`box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}`
-| :codenormal:`tarantool>`:codebold:`box.space._cluster:select({0},{iterator='GE'})`
+| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}`
+| :codenormal:`tarantool>` :codebold:`box.space._cluster:select({0},{iterator='GE'})`
 
 The result is that a replica is set up. Messages appear on Terminal #1
 confirming that the replica has connected and that the WAL contents have
@@ -817,8 +817,8 @@ been asked to act as a replication source.
 
 On Terminal #1, say:
 
-| :codenormal:`tarantool>`:codebold:`box.cfg{replication_source='replicator:password@localhost:3302'}`
-| :codenormal:`tarantool>`:codebold:`box.space.tester:select({0},{iterator='GE'})`
+| :codenormal:`tarantool>` :codebold:`box.cfg{replication_source='replicator:password@localhost:3302'}`
+| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
 
 The screen now looks like this:
 

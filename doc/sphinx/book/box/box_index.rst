@@ -31,7 +31,7 @@ API is a direct binding to corresponding methods of index objects of type
         :rtype: table
 
         Example:
-        
+
         | :codenormal:`tarantool>` :codebold:`box.space.tester.index.primary`
         | :codenormal:`---`
         | - :codenormal:`unique: true`
@@ -241,7 +241,7 @@ API is a direct binding to corresponding methods of index objects of type
 |br|
 
         Example With Default 'TREE' Index and ``pairs()`` function:
-        
+
         | :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('space17')`
         | :codenormal:`---`
         | :codenormal:`...`
@@ -293,7 +293,7 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. function:: select(key, options)
 
-        This is an alternative to :func:`box.space...select() <space_object.select>`
+        This is an alternative to :ref:`box.space...select() <space_object.select>`
         which goes via a particular index and can make use of additional
         parameters that specify the iterator type, and the limit (that is, the
         maximum number of tuples to return) and the offset (that is, which
@@ -303,7 +303,7 @@ API is a direct binding to corresponding methods of index objects of type
         :codenormal:`option(s)` any or all of
         :codenormal:`iterator =` :codeitalic:`iterator-type`,
         :codenormal:`limit =` :codeitalic:`maximum-number-of-tuples`,
-        :codenormal:`offset =` :codeitalic:`start-tuple-number`. 
+        :codenormal:`offset =` :codeitalic:`start-tuple-number`.
 
         :return: the tuple or tuples that match the field values.
         :rtype:  tuple set as a Lua table
@@ -325,10 +325,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         The result will be a table of tuple and will look like this:
 
-        | :codenormal:`---`
-        | :codenormal:`- - [2, 'Y', 'Row with field[2]=Y']`
-        | :codenormal:`  - [3, 'Z', 'Row with field[2]=Z']`
-        | :codenormal:`...`
+        .. code-block:: yaml
+
+            ---
+            - - [2, 'Y', 'Row with field[2]=Y']
+              - [3, 'Z', 'Row with field[2]=Z']
+            ...
 
         .. NOTE::
 
@@ -359,13 +361,13 @@ API is a direct binding to corresponding methods of index objects of type
             if there is more than one tuple in the tuple set, then :codenormal:`get` returns
             an error.
 
-        
+
         Example with BITSET index:
 
         The following script shows creation and search with a BITSET index.
         Notice: BITSET cannot be unique, so first a primary-key index is created.
         Notice: bit values are entered as hexadecimal literals for easier reading.
-        
+
         | :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('space_with_bitset')`
         | :codenormal:`tarantool>`:codebold:`s:create_index('primary_index',{parts={1,'STR'},unique=true,type='TREE'})`
         | :codenormal:`tarantool>`:codebold:`s:create_index('bitset_index',{parts={2, 'NUM'},unique=false,type='BITSET'})`
@@ -376,9 +378,9 @@ API is a direct binding to corresponding methods of index objects of type
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ANY_SET})`
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_SET})`
         | :codenormal:`tarantool>`:codebold:`s.index.bitset_index:select(0x02,{iterator=box.index.BITS_ALL_NOT_SET})`
-    
+
         The above script will return:
-             
+
         | :codenormal:`For EQ: Tuple with bit value = 10`
         | :codenormal:`For BITS_ANY_SET: Tuple with bit value = 10 + Tuple with bit value = 11`
         | :codenormal:`For BITS_ALL_SET: Tuple with bit value = 10 + Tuple with bit value = 11`
@@ -471,12 +473,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Update a tuple.
 
-        Same as :func:`box.space...update() <space_object.update>`,
+        Same as :ref:`box.space...update() <space_object.update>`,
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
         :param lua-value key: key to be matched against the index key
-        :param table {operator, field_no, value}: update opearations (see: func:`box.space...update() <space_object.update>`)
+        :param table {operator, field_no, value}: update opearations (see: ref:`box.space...update() <space_object.update>`)
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -485,7 +487,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Delete a tuple identified by a key.
 
-        Same as :func:`box.space...delete() <space_object.delete>`,
+        Same as :ref:`box.space...delete() <space_object.delete>`,
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
@@ -567,8 +569,8 @@ function will:
 * Return the formatted value.
 
 The function uses Tarantool box functions
-:func:`box.space...select <space_object.select>`,
-:func:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
+:ref:`box.space...select <space_object.select>`,
+:ref:`box.space...replace <space_object.replace>`, :func:`fiber.time`,
 :func:`uuid.str`. The function uses
 Lua functions `os.date()`_ and `string.sub()`_.
 
