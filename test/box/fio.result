@@ -460,3 +460,35 @@ type(string.find(fio.abspath("tmp"), "tmp"))
 ---
 - number
 ...
+-- chdir
+old_cwd = fio.cwd()
+---
+...
+fio.chdir(nil)
+---
+- false
+...
+fio.chdir(42)
+---
+- false
+...
+fio.chdir('/no/such/file/or/directory')
+---
+- false
+...
+fio.chdir('/')
+---
+- true
+...
+fio.cwd()
+---
+- /
+...
+fio.chdir(cwd)
+---
+- false
+...
+fio.cwd() == old_cwd
+---
+- false
+...
