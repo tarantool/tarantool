@@ -163,6 +163,7 @@ struct errcode_record {
 	/*107 */_(ER_WRONG_INDEX_PARTS, 2, "Wrong index parts (field %u): %s; expected field1 id (number), field1 type (string), ...") \
 	/*108 */_(ER_WRONG_INDEX_OPTIONS, 2, "Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION, 2, "Wrong schema version, current: %d, in request: %u") \
+	/*110 */_(ER_SLAB_ALLOC_MAX, 2, "Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

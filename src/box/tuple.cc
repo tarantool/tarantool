@@ -290,8 +290,13 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	 * of disaster recovery.
 	 */
 	if (ptr == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  total, "slab allocator", "tuple");
+		if (total > memtx_alloc.objsize_max) {
+			tnt_raise(LoggedError, ER_SLAB_ALLOC_MAX,
+				  (unsigned) total);
+		} else {
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  (unsigned) total, "slab allocator", "tuple");
+		}
 	}
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 

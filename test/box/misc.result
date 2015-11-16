@@ -272,11 +272,12 @@ t;
   - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'
   - 'box.error.NO_SUCH_FUNCTION : 51'
+  - 'box.error.injection : table: <address>
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
-  - 'box.error.injection : table: <address>
-  - 'box.error.WRONG_SCHEMA_VERSION : 109'
   - 'box.error.ROLE_EXISTS : 83'
+  - 'box.error.WRONG_SCHEMA_VERSION : 109'
+  - 'box.error.SLAB_ALLOC_MAX : 110'
   - 'box.error.WRONG_INDEX_PARTS : 107'
   - 'box.error.DROP_USER : 44'
   - 'box.error.WRONG_INDEX_RECORD : 106'
