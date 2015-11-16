@@ -83,19 +83,6 @@ extern "C" {
 uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
 
-// Macros for printf functions
-#ifdef __x86_64__
-#define PRI_SZ  "lu"
-#define PRI_SSZ "ld"
-#define PRI_OFFT "lu"
-#define PRI_XFFT "lx"
-#else
-#define PRI_SZ  "u"
-#define PRI_SSZ "d"
-#define PRI_OFFT "llu"
-#define PRI_XFFT "llx"
-#endif
-
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
 #define likely(x)    __builtin_expect((x),1)
 #define unlikely(x)  __builtin_expect((x),0)

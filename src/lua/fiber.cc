@@ -216,7 +216,7 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 	char buf[512];
 	int l = snprintf(buf, sizeof(buf), "#%-2d %p in ", frameno, frameret);
 	if (func)
-		snprintf(buf + l, sizeof(buf) - l, "%s+%" PRI_SZ "", func, offset);
+		snprintf(buf + l, sizeof(buf) - l, "%s+%zu", func, offset);
 	else
 		snprintf(buf + l, sizeof(buf) - l, "?");
 	struct lua_State *L = (struct lua_State*)cb_ctx;

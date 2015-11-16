@@ -267,7 +267,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 		struct symbol *s = addr2symbol(frame->ret);
 		if (s != NULL) {
 			size_t offset = (const char *) frame->ret - (const char *) s->addr;
-			p += snprintf(p, end - p, "%s+%" PRI_SZ "",
+			p += snprintf(p, end - p, "%s+%zu",
 				      s->name, offset);
 		} else
 #endif /* HAVE_BFD */
