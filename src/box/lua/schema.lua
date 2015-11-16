@@ -833,7 +833,13 @@ function box.schema.space.bless(space)
     index_mt.update = function(index, key, ops)
         return internal.update(index.space_id, index.id, keify(key), ops);
     end
-    index_mt.upsert = function(index, tuple_key, ops)
+    index_mt.upsert = function(index, tuple_key, ops, deprecated)
+        if deprecated ~= nil then
+            local msg = "Error: extra argument in upsert call: "
+            msg = msg .. tostring(deprecated)
+            msg = msg .. ". Usage :upsert(tuple, operations)"
+            box.error(box.error.PROC_LUA, msg)
+        end
         return internal.upsert(index.space_id, index.id, tuple_key, ops);
     end
     index_mt.delete = function(index, key)
@@ -895,9 +901,9 @@ function box.schema.space.bless(space)
         check_index(space, 0)
         return space.index[0]:update(key, ops)
     end
-    space_mt.upsert = function(space, tuple_key, ops)
+    space_mt.upsert = function(space, tuple_key, ops, deprecated)
         check_index(space, 0)
-        return space.index[0]:upsert(tuple_key, ops)
+        return space.index[0]:upsert(tuple_key, ops, deprecated)
     end
     space_mt.delete = function(space, key)
         check_index(space, 0)
