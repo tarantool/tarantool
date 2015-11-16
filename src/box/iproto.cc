@@ -620,6 +620,8 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
+extern int sc_version;
+
 static void
 tx_process_msg(struct cmsg *m)
 {
@@ -632,6 +634,12 @@ tx_process_msg(struct cmsg *m)
 
 	session->sync = msg->header.sync;
 	try {
+		if (msg->header.schema_id &&
+		    msg->header.schema_id != sc_version) {
+			tnt_raise(ClientError, ER_WRONG_SCHEMA_VERSION,
+				  sc_version, msg->header.schema_id);
+		}
+
 		switch (msg->header.type) {
 		case IPROTO_SELECT:
 		{

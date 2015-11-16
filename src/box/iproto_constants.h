@@ -54,6 +54,7 @@ enum iproto_key {
 	IPROTO_SERVER_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
+	IPROTO_SCHEMA_ID = 0x05,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
@@ -81,7 +82,7 @@ enum iproto_key {
 #define bit(c) (1ULL<<IPROTO_##c)
 
 #define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(SERVER_ID) |\
-			  bit(LSN))
+			  bit(LSN) | bit(SCHEMA_ID))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
 			  bit(KEY) | bit(TUPLE) | bit(FUNCTION_NAME) | \

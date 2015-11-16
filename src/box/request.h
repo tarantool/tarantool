@@ -96,7 +96,7 @@ request_encode(struct request *request, struct iovec *iov);
  */
 void
 request_rebind_to_primary_key(struct request *request, struct space *space,
-				struct tuple *found_tuple);
+			      struct tuple *found_tuple);
 
 /**
  * API of C stored function.
