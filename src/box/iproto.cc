@@ -970,6 +970,7 @@ iproto_do_set_listen(struct cmsg *m)
 		}
 	} catch (Exception *e) {
 		diag_move(&fiber()->diag, &msg->diag);
+		iproto_on_bind(&msg->wakeup);
 	}
 }
 
