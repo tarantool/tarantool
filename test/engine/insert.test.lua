@@ -1,6 +1,9 @@
+test_run = require('test_run')
+inspector = test_run.new()
+engine = inspector:get_cfg('engine')
 
 -- insert (str)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
 for key = 1, 100 do space:insert({tostring(key)}) end
 t = {}
@@ -11,7 +14,7 @@ space:drop()
 
 
 -- insert (num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 for key = 1, 100 do space:insert({key}) end
 t = {}
@@ -22,7 +25,7 @@ space:drop()
 
 
 -- insert multi-part (num, num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
 for key = 1, 100 do space:insert({key, key}) end
 t = {}

@@ -279,6 +279,7 @@ signal_init(void)
 static void
 daemonize()
 {
+	pid_t pid;
 	int fd;
 
 	/* flush buffers to avoid multiple output */
@@ -286,12 +287,15 @@ daemonize()
 	fflush(stdin);
 	fflush(stdout);
 	fflush(stderr);
-	switch (fork()) {
+	pid = fork();
+	switch (pid) {
 	case -1:
 		goto error;
 	case 0:                                     /* child */
+		master_pid = getpid();
 		break;
 	default:                                    /* parent */
+		master_pid = pid;
 		exit(EXIT_SUCCESS);
 	}
 
@@ -435,10 +439,8 @@ load_cfg()
 			cfg_geti("logger_nonblock"),
 			background);
 
-	if (background) {
+	if (background)
 		daemonize();
-		master_pid = getpid();
-	}
 
 	/*
 	 * after (optional) daemonising to avoid confusing messages with
