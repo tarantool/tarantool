@@ -234,10 +234,10 @@ abspath(const char *filename)
 }
 
 char *
-int2str(long int val)
+int2str(long long int val)
 {
 	static __thread char buf[22];
-	snprintf(buf, sizeof(buf), "%ld", val);
+	snprintf(buf, sizeof(buf), "%lld", val);
 	return buf;
 }
 
