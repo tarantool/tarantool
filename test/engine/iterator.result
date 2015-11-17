@@ -1,5 +1,14 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
 -- iterator (str)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
@@ -732,7 +741,7 @@ space:drop()
 ---
 ...
 -- iterator (num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
@@ -1459,7 +1468,7 @@ space:drop()
 ---
 ...
 -- iterator multi-part (num, num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })

@@ -1,15 +1,17 @@
-engine = 'memtx'
+--init
+test_run = require('test_run')
+inspector = test_run.new()
+engine = inspector:get_cfg('engine')
+
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 s = box.schema.create_space('engine', {engine=engine})
 i = s:create_index('primary')
-function demo() require('log').info('TEST') end
-box.space.engine:insert{1,2,3}
 
-test_run = require('test_run')
-inspector = test_run.new()
-inspector:eval('default', 'return demo()')
-inspector:cmd("create server replica with rpl_master=default, script='replication/replica.lua'\n")
-inspector:cmd('start server replica')
-inspector:eval('default', 'return 2+2')
+--test example for memtx and sophia
+_ = box.space.engine:insert{1,2,3}
+box.space.engine:select{}
 
+
+-- cleanup
+box.space.engine:drop()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
