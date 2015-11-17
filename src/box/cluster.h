@@ -32,8 +32,6 @@
  */
 #include "tt_uuid.h"
 #include <stdint.h>
-#define RB_COMPACT 1
-#include <third_party/rb.h>
 #include "applier.h"
 
 /**
