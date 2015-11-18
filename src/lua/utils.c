@@ -45,7 +45,7 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 	 * CTypeId is defined somewhere inside luajit's internal
 	 * headers.
 	 */
-	static_assert(sizeof(ctypeid) == sizeof(CTypeID), "sizeof(CTypeId)");
+	assert(sizeof(ctypeid) == sizeof(CTypeID));
 
 	/* Code below is based on ffi_new() from luajit/src/lib_ffi.c */
 
