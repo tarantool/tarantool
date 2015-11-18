@@ -1,5 +1,14 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
 -- replace (str)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
@@ -117,14 +126,14 @@ t
   - ['99']
   - ['100']
 ...
-space:replace({tostring(7)})
+_ = space:replace({tostring(7)})
 ---
 ...
 space:drop()
 ---
 ...
 -- replace (num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
@@ -242,14 +251,14 @@ t
   - [99]
   - [100]
 ...
-space:replace({7})
+_ = space:replace({7})
 ---
 ...
 space:drop()
 ---
 ...
 -- insert multi-part (num, num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
@@ -367,7 +376,7 @@ t
   - [99, 99]
   - [100, 100]
 ...
-space:replace({7, 7})
+_ = space:replace({7, 7})
 ---
 ...
 space:drop()
