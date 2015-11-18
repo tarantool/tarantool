@@ -322,37 +322,39 @@ luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg
 	return serializer;
 }
 
+static int
+lua_gettable_wrapper(lua_State *L)
+{
+	lua_gettable(L, -2);
+	return 1;
+}
+
 static void
 lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
 	if (!cfg->encode_load_metatables)
 		return;
+
+	/*
+	 * Try to call LUAL_SERIALIZE method on udata/cdata
+	 * LuaJIT specific: lua_getfield/lua_gettable raises exception on
+	 * cdata if field doesn't exist.
+	 */
 	int top = lua_gettop(L);
-	/* try to call LUAL_SERIALIZE method on udata/cdata */
-	try {
-		/*
-		 * LuaJIT specific: cdata metatable can't
-		 *
-		 *lua_getfield raises exception on
-		 * cdata objects if field doesn't exist.
-		 */
-		lua_getfield(L, idx, LUAL_SERIALIZE);
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-			return;
-		}
+	lua_pushcfunction(L, lua_gettable_wrapper);
+	lua_pushvalue(L, idx);
+	lua_pushliteral(L, LUAL_SERIALIZE);
+	if (lua_pcall(L, 2, 1, 0) == 0) {
 		if (!lua_isfunction(L, -1))
 			luaL_error(L, "invalid " LUAL_SERIALIZE  " value");
 		/* copy object itself */
 		lua_pushvalue(L, idx);
-		lua_call(L, 1, 1);
+		lua_pcall(L, 1, 1, 0);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
 		luaL_tofield(L, cfg, idx, field);
-	} catch (...) {
-		/* ignore lua_getfield exceptions */
-	}
+	} /* else ignore lua_gettable exceptions */
 	lua_settop(L, top); /* remove temporary objects */
 }
 
