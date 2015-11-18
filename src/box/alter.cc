@@ -188,7 +188,7 @@ err:
 		p += snprintf(p, e - p, i ? ", %s" : "%s", type_name);
 	}
 	const char *expected;
-	if (is_166plus) {
+	if (*is_166plus) {
 		expected = "space id (number), index id (number), "
 			"name (string), type (string), "
 			"options (map), parts (array)";

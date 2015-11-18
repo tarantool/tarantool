@@ -617,7 +617,8 @@ box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
 ---
 - error: 'Wrong record in _index space: got {number, number, string, string, number,
     number, number, string, string}, expected {space id (number), index id (number),
-    name (string), type (string), options (map), parts (array)}'
+    name (string), type (string), is_unique (number), part count (number) part0 field
+    no (number), part0 field type (string), ...}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 ---
