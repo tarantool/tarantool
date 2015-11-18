@@ -168,15 +168,14 @@ control_ch:put(true)
 ---
 - true
 ...
-while box.info.replication.status == 'disconnected' do require('fiber').sleep(0) end
+fiber = require('fiber')
 ---
 ...
-r = box.info.replication
+status = box.info.replication.status
 ---
 ...
-r.status == 'connecting' or r.status == 'auth'
+while status ~= 'connecting' and status ~= 'auth' do fiber.sleep(0) status = box.info.replication.status end
 ---
-- true
 ...
 slowpoke:close()
 ---
