@@ -106,7 +106,7 @@ set (server_sources
      lua/trigger.c
      lua/ipc.cc
      lua/msgpack.cc
-     lua/utils.cc
+     lua/utils.c
      lua/errno.c
      lua/socket.cc
      lua/pickle.cc

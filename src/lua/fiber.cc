@@ -313,10 +313,8 @@ lbox_fiber_create(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1 || !lua_isfunction(L, 1))
 		luaL_error(L, "fiber.create(function, ...): bad arguments");
-	if (fiber_checkstack()) {
-		lua_pushstring(L, "out of fiber stack");
-		tnt_raise(LuajitError, L);
-	}
+	if (fiber_checkstack())
+		luaL_error(L, "fiber.create(): out of fiber stack");
 
 	struct fiber *f = fiber_new_xc("lua", box_lua_fiber_run);
 	/* Not a system fiber. */

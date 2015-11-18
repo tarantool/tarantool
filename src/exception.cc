@@ -193,6 +193,15 @@ FiberIsCancelled::log() const
 	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
 
+const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
+
+LuajitError::LuajitError(const char *file, unsigned line,
+			 const char *msg)
+	: Exception(&type_LuajitError, file, line)
+{
+	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\

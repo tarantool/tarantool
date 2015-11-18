@@ -31,6 +31,7 @@
 #include "lua/utils.h"
 
 #include <assert.h>
+#include <errno.h>
 
 int luaL_nil_ref = LUA_REFNIL;
 int luaL_map_metatable_ref = LUA_REFNIL;
@@ -364,6 +365,8 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 {
 	assert(lua_type(L, idx) == LUA_TTABLE);
 	const char *type;
+	uint32_t size = 0;
+	uint32_t max = 0;
 
 	/* Try to get field LUAL_SERIALIZER_TYPE from metatable */
 	if (!cfg->encode_load_metatables ||
@@ -406,8 +409,6 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 
 skip:
-	uint32_t size = 0;
-	uint32_t max = 0;
 	field->type = MP_ARRAY;
 
 	/* Calculate size and check that table can represent an array */
@@ -779,6 +780,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		}
 		return -1;
 	case LUA_TSTRING:
+	{
 		const char *arg = luaL_checkstring(L, idx);
 		char *arge;
 		errno = 0;
@@ -787,6 +789,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		if (errno == 0 && arge != arg)
 			return 0;
 		return 1;
+	}
 	}
 	return -1;
 }
@@ -865,11 +868,3 @@ tarantool_lua_utils_init(struct lua_State *L)
 	return 0;
 }
 
-const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
-LuajitError::LuajitError(const char *file, unsigned line,
-			 struct lua_State *L)
-	: Exception(&type_LuajitError, file, line)
-{
-	const char *msg = lua_tostring(L, -1);
-	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
-}

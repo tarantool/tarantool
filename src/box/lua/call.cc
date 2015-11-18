@@ -608,7 +608,7 @@ box_lua_call(struct request *request, struct obuf *out)
 	} catch (...) {
 		txn_rollback();
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
 
@@ -622,7 +622,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	const char *expr = request->key;
 	uint32_t expr_len = mp_decode_strl(&expr);
 	if (luaL_loadbuffer(L, expr, expr_len, "=eval"))
-		tnt_raise(LuajitError, L);
+		tnt_raise(LuajitError, lua_tostring(L, -1));
 
 	/* Unpack arguments */
 	const char *args = request->tuple;
@@ -665,7 +665,7 @@ box_lua_eval(struct request *request, struct obuf *out)
 		throw;
 	} catch (...) {
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
 

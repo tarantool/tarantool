@@ -509,13 +509,6 @@ tarantool_lua_utils_init(struct lua_State *L);
 } /* extern "C" */
 
 #include "exception.h"
-extern const struct type type_LuajitError;
-class LuajitError: public Exception {
-public:
-	LuajitError(const char *file, unsigned line,
-		    struct lua_State *L);
-	virtual void raise() { throw this; }
-};
 
 static inline void
 lbox_call(struct lua_State *L, int nargs, int nreturns)
@@ -527,7 +520,7 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 		throw;
 	} catch (...) {
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L);
+		tnt_raise(LuajitError, lua_tostring(L, -1));
 	}
 }
 
