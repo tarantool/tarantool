@@ -31,9 +31,7 @@
 
 #include <string.h>
 #include <lua/digest.h>
-extern "C" {
 #include <third_party/sha1.h>
-}
 
 unsigned char *
 SHA1internal(const unsigned char *d, size_t n, unsigned char *md)
