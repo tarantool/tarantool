@@ -8,11 +8,12 @@ os.execute("rm -f " .. name .."/*.xlog")
 env = require('test_run')
 test_run = env.new()
 test_run:cmd('restart server default')
+engine = test_run:get_cfg('engine')
 
 name = string.match(arg[0], "([^,]+)%.lua")
 os.execute("touch " .. name .."/lock")
 
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 index = space:create_index('primary')
 
 for key = 1, 351 do space:insert({key}) end

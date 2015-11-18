@@ -120,7 +120,7 @@ char *
 abspath(const char *filename);
 
 char *
-int2str(long int val);
+int2str(long long int val);
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */

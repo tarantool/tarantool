@@ -469,7 +469,7 @@ public:
 template <typename T> T *
 AlterSpaceOp::create()
 {
-	return new (region_alloc0_xc(&fiber()->gc, sizeof(T))) T;
+	return new (region_calloc_object_xc(&fiber()->gc, T)) T;
 }
 
 void
@@ -486,7 +486,7 @@ static struct trigger *
 txn_alter_trigger_new(trigger_f run, void *data)
 {
 	struct trigger *trigger = (struct trigger *)
-		region_alloc0_xc(&fiber()->gc, sizeof(*trigger));
+		region_calloc_object_xc(&fiber()->gc, struct trigger);
 	trigger->run = run;
 	trigger->data = data;
 	trigger->destroy = NULL;
@@ -509,8 +509,8 @@ struct alter_space {
 struct alter_space *
 alter_space_new()
 {
-	struct alter_space *alter = (struct alter_space *)
-		region_alloc0_xc(&fiber()->gc, sizeof(*alter));
+	struct alter_space *alter =
+		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	return alter;
 }
