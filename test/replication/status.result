@@ -26,7 +26,7 @@ test_run:cmd('switch replica')
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end
 ---
 ...
-r = box.info.replication
+r = box.info.replication[1]
 ---
 ...
 r.status == "follow"
@@ -38,6 +38,18 @@ r.lag < 1
 - true
 ...
 r.idle < 1
+---
+- true
+...
+r.vclock[1] > 0
+---
+- true
+...
+r.vclock[2] == 0
+---
+- true
+...
+r.uuid ~= nil
 ---
 - true
 ...
@@ -57,7 +69,7 @@ test_run:cmd('switch replica')
 ---
 - true
 ...
-r = box.info.replication
+r = box.info.replication[1]
 ---
 ...
 r.status == "stopped"
@@ -71,134 +83,7 @@ r.message:match('Duplicate') ~= nil
 box.cfg { replication_source = "" }
 ---
 ...
-box.info.replication.status == "off"
----
-- true
-...
--- Simulate a slow server to test replication info
-control_ch = require('fiber').channel(1)
----
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-local digest = require('digest')
-slowpoke_loop = function(s, peer)
-    control_ch:get()
-    local seed = digest.urandom(20)
-    local handshake = string.format("Tarantool %-20s %-32s\n%-63s\n",
-    "1.6.3-slowpoke", "@megastorage", digest.base64_encode(seed))
-    s:write(handshake)
-    s:readable()
-    control_ch:get()
-    s:shutdown()
-    s:close()
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
-...
-slowpoke = require('socket').tcp_server('127.0.0.1', 0, slowpoke_loop)
----
-...
-uri = slowpoke:name()
----
-...
-box.cfg { replication_source = 'user:pass@'..uri.host..':'..uri.port }
----
-...
-r = box.info.replication
----
-...
-r.status == "connect"
----
-- true
-...
-control_ch:put(true)
----
-- true
-...
-require('fiber').sleep(0) -- wait replica to send auth request
----
-...
-r = box.info.replication
----
-...
-r.status == "auth"
----
-- true
-...
-r.lag < 1
----
-- true
-...
-r.idle < 1
----
-- true
-...
---
--- gh-480: check replica reconnect on socket error
---
-slowpoke:close()
----
-- true
-...
-control_ch:put("goodbye")
----
-- true
-...
-r = box.info.replication
----
-...
-r.status == "disconnected" and r.message:match("socket") ~= nil or r.status == 'auth'
----
-- true
-...
-r.idle < 1
----
-- true
-...
-slowpoke = require('socket').tcp_server(uri.host, uri.port, slowpoke_loop)
----
-...
-control_ch:put(true)
----
-- true
-...
-while box.info.replication.status == 'disconnected' do require('fiber').sleep(0) end
----
-...
-r = box.info.replication
----
-...
-r.status == 'connecting' or r.status == 'auth'
----
-- true
-...
-slowpoke:close()
----
-- true
-...
-control_ch:put("goodbye")
----
-- true
-...
-source = box.cfg.replication_source
----
-...
-box.cfg { replication_source = "" }
----
-...
-box.cfg { replication_source = source }
----
-...
-r = box.info.replication
----
-...
-r.idle < 1
+next(box.info.replication) == nil
 ---
 - true
 ...

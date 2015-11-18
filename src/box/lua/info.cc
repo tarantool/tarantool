@@ -47,18 +47,28 @@ extern "C" {
 #include "lua/utils.h"
 #include "fiber.h"
 
-static int
-lbox_info_replication(struct lua_State *L)
+static void
+lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
 {
-	lua_newtable(L);
-
-	struct applier *applier = cluster_applier_first();
-	if (applier == NULL) {
-		lua_pushstring(L, "status");
-		lua_pushstring(L, "off");
+	lua_createtable(L, 0, vclock_size(vclock));
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, server) {
+		lua_pushinteger(L, server.id);
+		luaL_pushuint64(L, server.lsn);
 		lua_settable(L, -3);
-		return 1;
 	}
+	luaL_setmaphint(L, -1); /* compact flow */
+}
+
+static void
+lbox_pushreplica(lua_State *L, struct applier *applier)
+{
+	lua_createtable(L, 0, 4);
+
+	lua_pushstring(L, "uuid");
+	lua_pushstring(L, tt_uuid_str(&applier->uuid));
+	lua_settable(L, -3);
 
 	/* Get applier state in lower case */
 	static char status[16];
@@ -69,6 +79,10 @@ lbox_info_replication(struct lua_State *L)
 
 	lua_pushstring(L, "status");
 	lua_pushstring(L, status);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "vclock");
+	lbox_pushvclock(L, &applier->vclock);
 	lua_settable(L, -3);
 
 	if (applier->reader) {
@@ -86,6 +100,28 @@ lbox_info_replication(struct lua_State *L)
 			lua_pushstring(L, e->errmsg);
 			lua_settable(L, -3);
 		}
+	}
+}
+
+static int
+lbox_info_replication(struct lua_State *L)
+{
+	lua_newtable(L); /* box.info.replication */
+
+	/* Nice formatting */
+	lua_newtable(L); /* metatable */
+	lua_pushliteral(L, "mapping");
+	lua_setfield(L, -2, "__serialize");
+	lua_setmetatable(L, -2);
+
+	cluster_foreach_applier(applier) {
+		/* Applier hasn't received server_id yet */
+		if (cserver_id_is_reserved(applier->id))
+			continue;
+
+		lbox_pushreplica(L, applier);
+
+		lua_rawseti(L, -2, applier->id);
 	}
 
 	return 1;
@@ -114,17 +150,7 @@ lbox_info_server(struct lua_State *L)
 static int
 lbox_info_vclock(struct lua_State *L)
 {
-	lua_createtable(L, 0, vclock_size(&recovery->vclock));
-	/* Request compact output flow */
-	luaL_setmaphint(L, -1);
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, &recovery->vclock);
-	vclock_foreach(&it, server) {
-		lua_pushinteger(L, server.id);
-		luaL_pushuint64(L, server.lsn);
-		lua_settable(L, -3);
-	}
-
+	lbox_pushvclock(L, &recovery->vclock);
 	return 1;
 }
 

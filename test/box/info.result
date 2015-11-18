@@ -24,9 +24,9 @@ string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
 - false
 ...
-box.info.replication.status
+box.info.replication
 ---
-- off
+- {}
 ...
 box.info.status
 ---

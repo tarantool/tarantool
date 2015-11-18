@@ -19,27 +19,21 @@ server 1 connected
 server 1 connected
 box.info.vclock
 ---
-- - 4
-  - 0
-  - 0
+- {1: 4, 2: 0, 3: 0}
 ...
 server 2 connected
 server 2 connected
 server 2 connected
 box.info.vclock
 ---
-- - 4
-  - 0
-  - 0
+- {1: 4, 2: 0, 3: 0}
 ...
 server 3 connected
 server 3 connected
 server 3 connected
 box.info.vclock
 ---
-- - 4
-  - 0
-  - 0
+- {1: 4, 2: 0, 3: 0}
 ...
 done
 ----------------------------------------------------------------------

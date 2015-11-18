@@ -147,14 +147,14 @@ test_run:cmd("switch replica")
 fiber = require('fiber')
 ---
 ...
-while box.info.replication.status ~= "stopped" do fiber.sleep(0.001) end
+while box.info.replication[1].status ~= "stopped" do fiber.sleep(0.001) end
 ---
 ...
-box.info.replication.status
+box.info.replication[1].status
 ---
 - stopped
 ...
-box.info.replication.message
+box.info.replication[1].message
 ---
 - 'Missing .xlog file between LSN 6 {1: 6, 2: 0} and 8 {1: 8, 2: 0}'
 ...

@@ -26,10 +26,10 @@ def parallel_run(cmd1, cmd2, compare):
 
     # wait for status changing in tarantool
     master_status = yaml.load(master.admin(
-        'box.info().replication.status', silent=True
+        'box.info().replication[2].status', silent=True
     ))[0]
     replica_status = yaml.load(replica.admin(
-        'box.info().replication.status', silent=True
+        'box.info().replication[1].status', silent=True
     ))[0]
 
     # wait for status

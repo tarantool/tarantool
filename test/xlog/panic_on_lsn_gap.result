@@ -26,7 +26,7 @@ test_run:cmd("switch panic")
 ...
 box.info.vclock
 ---
-- - 0
+- {1: 0}
 ...
 s = box.space._schema
 ---
@@ -41,7 +41,7 @@ s:replace{"key", 'test 1'}
 ...
 box.info.vclock
 ---
-- - 1
+- {1: 1}
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 ---
@@ -91,7 +91,7 @@ name = string.match(arg[0], "([^,]+)%.lua")
 ...
 box.info.vclock
 ---
-- - 11
+- {1: 11}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
@@ -105,7 +105,7 @@ test_run:cmd("restart server panic")
 --
 box.info.vclock
 ---
-- - 1
+- {1: 1}
 ...
 box.space._schema:select{'key'}
 ---
@@ -153,7 +153,7 @@ t
 ...
 box.info.vclock
 ---
-- - 11
+- {1: 11}
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
 ---
@@ -176,12 +176,12 @@ s:replace{'key', 'test 2'}
 --
 box.info.vclock
 ---
-- - 12
+- {1: 12}
 ...
 test_run:cmd("restart server panic")
 box.info.vclock
 ---
-- - 12
+- {1: 12}
 ...
 box.space._schema:select{'key'}
 ---
@@ -229,7 +229,7 @@ box.space._schema:replace{"key", 'test 3'}
 ...
 box.info.vclock
 ---
-- - 23
+- {1: 23}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
@@ -245,7 +245,7 @@ box.space._schema:replace{"key", 'test 3'}
 ...
 box.info.vclock
 ---
-- - 24
+- {1: 24}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
@@ -265,7 +265,7 @@ box.space._schema:replace{"key", 'test 4'}
 ...
 box.info.vclock
 ---
-- - 25
+- {1: 25}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---

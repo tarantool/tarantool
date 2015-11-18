@@ -65,9 +65,9 @@ box.cfg.panic_on_wal_error
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 fiber = require('fiber')
-while box.info.replication.status ~= "stopped" do fiber.sleep(0.001) end
-box.info.replication.status
-box.info.replication.message
+while box.info.replication[1].status ~= "stopped" do fiber.sleep(0.001) end
+box.info.replication[1].status
+box.info.replication[1].message
 box.space.test:select{}
 --
 --
