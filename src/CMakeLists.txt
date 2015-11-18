@@ -103,7 +103,7 @@ set (server_sources
      lua/digest.c
      lua/init.cc
      lua/fiber.cc
-     lua/trigger.cc
+     lua/trigger.c
      lua/ipc.cc
      lua/msgpack.cc
      lua/utils.cc

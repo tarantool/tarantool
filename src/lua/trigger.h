@@ -32,6 +32,9 @@
  */
 #include <trigger.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 struct lua_State;
 
 /**
@@ -67,5 +70,8 @@ struct lua_State;
 int
 lbox_trigger_reset(struct lua_State *L, int top,
 		   struct rlist *list, trigger_f run);
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LUA_TRIGGER_H */
