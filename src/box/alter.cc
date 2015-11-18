@@ -1941,8 +1941,6 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 			/* box.space._cluster:update(old, {{'=', 1, new}} */
 			cluster_del_server(old_id);
 			cluster_add_server(id, &uuid);
-		} else {
-			cluster_update_server(id, &uuid);
 		}
 	} else {
 		cluster_add_server(id, &uuid);
@@ -1974,6 +1972,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) {
 		/* Check fields */
@@ -1987,6 +1986,19 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		if (tt_uuid_is_nil(&server_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&server_uuid));
+		if (old_tuple != NULL) {
+			/*
+			 * Forbid UUID changing for registered server.
+			 * This feature is completely useless for customers,
+			 * but requires extra efforts to keep _cluster,
+			 * applier and relay synchronized.
+			 */
+			tt_uuid old_uuid = tuple_field_uuid(old_tuple, 1);
+			if (!tt_uuid_is_equal(&server_uuid, &old_uuid)) {
+				tnt_raise(ClientError, ER_UNSUPPORTED,
+					  "cluster", "UUID modification");
+			}
+		}
 	}
 
 	struct trigger *on_commit =
