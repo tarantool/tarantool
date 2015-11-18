@@ -24,7 +24,10 @@ os.execute("touch " .. name .."/lock")
 ---
 - 0
 ...
-space = box.schema.space.create('test', { engine = 'sophia' })
+engine = test_run:get_cfg('engine')
+---
+...
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary')
@@ -1060,3 +1063,4 @@ index:select({}, {iterator = box.index.ALL})
 space:drop()
 ---
 ...
+test_run:cmd("restart server default with cleanup=1")

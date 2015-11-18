@@ -1,5 +1,14 @@
+test_run = require('test_run')
+---
+...
+inspector = test_run.new()
+---
+...
+engine = inspector:get_cfg('engine')
+---
+...
 -- update (str)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
@@ -120,7 +129,7 @@ t
   - ['99', 99]
   - ['100', 100]
 ...
-space:update({tostring(101)}, {{'=', 2, 101}})
+_ = space:update({tostring(101)}, {{'=', 2, 101}})
 ---
 ...
 space:get({tostring(101)})
@@ -130,7 +139,7 @@ space:drop()
 ---
 ...
 -- update (num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
@@ -251,7 +260,7 @@ t
   - [99, 99]
   - [100, 100]
 ...
-space:update({101}, {{'=', 2, 101}})
+_ = space:update({101}, {{'=', 2, 101}})
 ---
 ...
 space:get({101})
@@ -261,7 +270,7 @@ space:drop()
 ---
 ...
 -- update multi-part (num, num)
-space = box.schema.space.create('test', { engine = 'sophia' })
+space = box.schema.space.create('test', { engine = engine })
 ---
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
@@ -382,7 +391,7 @@ t
   - [99, 99, 99]
   - [100, 100, 100]
 ...
-space:update({101, 101}, {{'=', 3, 101}})
+_ = space:update({101, 101}, {{'=', 3, 101}})
 ---
 ...
 space:get({101, 101})
