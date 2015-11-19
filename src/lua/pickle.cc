@@ -42,8 +42,19 @@ extern "C" {
 #include "lua/utils.h"
 #include "lua/msgpack.h" /* luaL_msgpack_default */
 #include <fiber.h>
-#include "iobuf.h"
 #include "bit/bit.h"
+
+static inline void
+luaL_region_dup(struct lua_State *L, struct region *region,
+		const void *ptr, size_t size)
+{
+	void *to = region_alloc(region, size);
+	if (to == NULL) {
+		diag_set(OutOfMemory, size, "region", "luaL_region_dup");
+		luaL_error(L, diag_last_error(diag_get())->errmsg);
+	}
+	(void) memcpy(to, ptr, size);
+}
 
 static int
 lbox_pack(struct lua_State *L)
@@ -56,7 +67,14 @@ lbox_pack(struct lua_State *L)
 	const char *str;
 
 	struct region *buf = &fiber()->gc;
-	RegionGuard region_guard(buf);
+	/*
+	 * XXX: this code leaks region memory in case of any
+	 * Lua memory. In absence of external unwind, Lua C API
+	 * makes it painfully difficult to clean up resources
+	 * properly in case of error.
+	 * Hope for the best, fiber_gc() will be called eventually.
+	 */
+	size_t used = region_used(buf);
 
 	struct luaL_field field;
 	double dbl;
@@ -73,7 +91,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 8-bit int");
 
-			region_dup_xc(buf, &field.ival, sizeof(uint8_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint8_t));
 			break;
 		case 'S':
 		case 's':
@@ -81,7 +99,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
-			region_dup_xc(buf, &field.ival, sizeof(uint16_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'n':
 			/* signed and unsigned 16-bit big endian integers */
@@ -89,7 +107,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
 			field.ival = (uint16_t) htons((uint16_t) field.ival);
-			region_dup_xc(buf, &field.ival, sizeof(uint16_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'I':
 		case 'i':
@@ -97,7 +115,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.ival != MP_INT)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
-			region_dup_xc(buf, &field.ival, sizeof(uint32_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
@@ -105,7 +123,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
 			field.ival = htonl(field.ival);
-			region_dup_xc(buf, &field.ival, sizeof(uint32_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'L':
 		case 'l':
@@ -113,7 +131,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
-			region_dup_xc(buf, &field.ival, sizeof(uint64_t));
+			luaL_region_dup(L, buf, &field.ival, sizeof(uint64_t));
 			break;
 		case 'Q':
 		case 'q':
@@ -122,21 +140,21 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
 			field.ival = bswap_u64(field.ival);
-			region_dup_xc(buf,  &field.ival, sizeof(uint64_t));
+			luaL_region_dup(L, buf,  &field.ival, sizeof(uint64_t));
 			break;
 		case 'd':
 			dbl = (double) lua_tonumber(L, i);
-			region_dup_xc(buf, &dbl, sizeof(double));
+			luaL_region_dup(L, buf, &dbl, sizeof(double));
 			break;
 		case 'f':
 			flt = (float) lua_tonumber(L, i);
-			region_dup_xc(buf, &flt, sizeof(float));
+			luaL_region_dup(L, buf, &flt, sizeof(float));
 			break;
 		case 'A':
 		case 'a':
 			/* A sequence of bytes */
 			str = luaL_checklstring(L, i, &size);
-			region_dup_xc(buf, str, size);
+			luaL_region_dup(L, buf, str, size);
 			break;
 		default:
 			luaL_error(L, "pickle.pack: unsupported pack "
@@ -146,9 +164,15 @@ lbox_pack(struct lua_State *L)
 		format++;
 	}
 
-	size_t len = region_used(buf) - region_guard.used;
-	const char *res = (char *) region_join_xc(buf, len);
+	size_t len = region_used(buf) - used;
+	const char *res = (char *) region_join(buf, len);
+	if (res == NULL) {
+		region_truncate(buf, used);
+		diag_set(OutOfMemory, size, "region", "region_join");
+		luaL_error(L, diag_last_error(diag_get())->errmsg);
+	}
 	lua_pushlstring(L, res, len);
+	region_truncate(buf, used);
 	return 1;
 }
 
