@@ -1022,9 +1022,6 @@ s:error()
 - error: 'builtin/socket.lua:86: attempt to use closed socket'
 ...
 -- random port
-port = 33123
----
-...
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
@@ -1032,15 +1029,27 @@ master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 ---
 - true
 ...
-master:bind('127.0.0.1', port)
+port = 32768 + math.random(32768)
 ---
-- true
 ...
-master:listen()
+attempt = 0
 ---
-- true
 ...
 test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+while attempt < 10 do
+    if not master:bind('127.0.0.1', port)  then
+        port = 32768 + math.random(32768)
+        attempt = attempt + 1
+    else
+        break
+    end
+end;
+---
+...
+master:listen();
 ---
 - true
 ...
