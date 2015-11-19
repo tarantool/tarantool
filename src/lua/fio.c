@@ -37,13 +37,13 @@
 #include <unistd.h>
 #include <glob.h>
 #include <time.h>
+#include <errno.h>
 #include "coeio.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-}
+
 #include "lua/utils.h"
 #include "coeio_file.h"
 

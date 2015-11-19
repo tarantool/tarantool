@@ -110,7 +110,7 @@ set (server_sources
      lua/errno.c
      lua/socket.c
      lua/pickle.cc
-     lua/fio.cc
+     lua/fio.c
      lua/clock.c
      ${lua_sources}
 )
