@@ -99,7 +99,7 @@ set (server_sources
      uri.c
      backtrace.cc
      proc_title.c
-     coeio_file.cc
+     coeio_file.c
      lua/digest.c
      lua/init.cc
      lua/fiber.c
