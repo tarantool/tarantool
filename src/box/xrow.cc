@@ -36,6 +36,8 @@
 #include "third_party/base64.h"
 #include "iproto_constants.h"
 #include "version.h"
+#include "coio.h"
+#include "coio_buf.h"
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
@@ -406,6 +408,40 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = IPROTO_OK;
+}
+
+void
+coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row)
+{
+	/* Read fixed header */
+	if (ibuf_used(in) < 1)
+		coio_breadn(coio, in, 1);
+
+	/* Read length */
+	if (mp_typeof(*in->rpos) != MP_UINT) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "packet length");
+	}
+	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
+	if (to_read > 0)
+		coio_breadn(coio, in, to_read);
+
+	uint32_t len = mp_decode_uint((const char **) &in->rpos);
+
+	/* Read header and body */
+	to_read = len - ibuf_used(in);
+	if (to_read > 0)
+		coio_breadn(coio, in, to_read);
+
+	xrow_header_decode(row, (const char **) &in->rpos, in->rpos + len);
+}
+
+void
+coio_write_xrow(struct ev_io *coio, const struct xrow_header *row)
+{
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(row, iov);
+	coio_writev(coio, iov, iovcnt, 0);
 }
 
 void

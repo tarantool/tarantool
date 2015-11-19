@@ -262,9 +262,7 @@ void
 relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	packet->sync = relay->sync;
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(packet, iov);
-	coio_writev(&relay->io, iov, iovcnt, 0);
+	coio_write_xrow(&relay->io, packet);
 }
 
 /** Send a single row to the client. */

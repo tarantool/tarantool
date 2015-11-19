@@ -58,43 +58,6 @@ applier_set_state(struct applier *applier, enum applier_state state)
 	trigger_run(&applier->on_state, applier);
 }
 
-static void
-applier_read_row(struct ev_io *coio, struct iobuf *iobuf,
-		 struct xrow_header *row)
-{
-	struct ibuf *in = &iobuf->in;
-
-	/* Read fixed header */
-	if (ibuf_used(in) < 1)
-		coio_breadn(coio, in, 1);
-
-	/* Read length */
-	if (mp_typeof(*in->rpos) != MP_UINT) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "packet length");
-	}
-	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
-	if (to_read > 0)
-		coio_breadn(coio, in, to_read);
-
-	uint32_t len = mp_decode_uint((const char **) &in->rpos);
-
-	/* Read header and body */
-	to_read = len - ibuf_used(in);
-	if (to_read > 0)
-		coio_breadn(coio, in, to_read);
-
-	xrow_header_decode(row, (const char **) &in->rpos, in->rpos + len);
-}
-
-static void
-applier_write_row(struct ev_io *coio, const struct xrow_header *row)
-{
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(row, iov);
-	coio_writev(coio, iov, iovcnt, 0);
-}
-
 /**
  * Connect to a remote host and authenticate the client.
  */
@@ -173,8 +136,8 @@ applier_connect(struct applier *applier)
 	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
 			 uri->login_len, uri->password,
 			 uri->password_len);
-	applier_write_row(coio, &row);
-	applier_read_row(coio, iobuf, &row);
+	coio_write_xrow(coio, &row);
+	coio_read_xrow(coio, &iobuf->in, &row);
 	applier->last_row_time = ev_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error(&row); /* auth failed */
@@ -198,13 +161,13 @@ applier_join(struct applier *applier, struct recovery *r)
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 	xrow_encode_join(&row, &r->server_uuid);
-	applier_write_row(coio, &row);
+	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_BOOTSTRAP);
 
 	assert(vclock_has(&r->vclock, 0)); /* check for surrogate server_id */
 
 	while (true) {
-		applier_read_row(coio, iobuf, &row);
+		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
 		if (row.type == IPROTO_OK) {
 			/* End of stream */
@@ -238,7 +201,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 	struct xrow_header row;
 
 	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
-	applier_write_row(coio, &row);
+	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	applier->warning_said = false;
@@ -248,7 +211,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 	 * Read SUBSCRIBE response
 	 */
 	if (applier->version_id >= version_id(1, 6, 7)) {
-		applier_read_row(coio, iobuf, &row);
+		coio_read_xrow(coio, &iobuf->in, &row);
 		if (iproto_type_is_error(row.type)) {
 			return xrow_decode_error(&row);  /* error */
 		} else if (row.type != IPROTO_OK) {
@@ -292,7 +255,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 	 * Process a stream of rows from the binary log.
 	 */
 	while (true) {
-		applier_read_row(coio, iobuf, &row);
+		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->lag = ev_now(loop()) - row.tm;
 		applier->last_row_time = ev_now(loop());
 

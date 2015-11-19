@@ -162,6 +162,23 @@ xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 	return xrow_decode_subscribe(row, NULL, NULL, vclock);
 }
 
+/**
+ * Read xrow from coio.
+ * \param coio coio
+ * \param in input buffer
+ * \param[out] row resulting xrow
+ */
+void
+coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row);
+
+/**
+ * Write xrow to coio.
+ * \param coio coio
+ * \param row xrow to write
+ */
+void
+coio_write_xrow(struct ev_io *coio, const struct xrow_header *row);
+
 enum {
 	/* Maximal length of protocol name in handshake */
 	GREETING_PROTOCOL_LEN_MAX = 32,
