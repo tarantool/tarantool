@@ -80,7 +80,7 @@ set (server_sources
      sio.cc
      evio.cc
      coio.cc
-     coeio.cc
+     coeio.c
      iobuf.cc
      coio_buf.cc
      pickle.c

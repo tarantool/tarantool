@@ -39,7 +39,7 @@
 #include <sys/socket.h>
 
 #include "fiber.h"
-#include "exception.h"
+#include "diag.h"
 #include "third_party/tarantool_ev.h"
 
 /*
@@ -74,8 +74,9 @@ struct coeio_manager {
 } coeio_manager;
 
 static void
-coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int /* events */)
+coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
 {
+	(void) events;
 	if (eio_poll() != -1) {
 		/* nothing to do */
 		ev_idle_stop(loop, w);

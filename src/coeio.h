@@ -51,6 +51,8 @@ extern "C" {
 void coeio_init(void);
 void coeio_reinit(void);
 
+struct coio_task;
+
 typedef ssize_t (*coio_task_cb)(struct coio_task *task); /* like eio_req */
 typedef ssize_t (*coio_call_cb)(va_list ap);
 
