@@ -33,11 +33,9 @@
 
 #include <arpa/inet.h>
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
 #include "lua/utils.h"
 #include "lua/msgpack.h" /* luaL_msgpack_default */

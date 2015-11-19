@@ -42,20 +42,20 @@ extern "C" {
 
 #include <lua.h>
 
+struct luaL_serializer;
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
  * This instance is used by all box's Lua/C API bindings (e.g. space:replace()).
  * All changes made by msgpack.cfg{} function are also affect box's bindings
  * (this is a feature).
  */
-extern luaL_serializer *luaL_msgpack_default;
+extern struct luaL_serializer *luaL_msgpack_default;
 
 /**
  * A streaming API so that it's possible to encode to any output
  * stream.
  */
 
-extern "C" {
 /**
  * Ask the allocator to reserve at least size bytes. It can reserve
  * more, and update *size with the new size.
@@ -64,7 +64,6 @@ typedef	void *(*luamp_reserve_f)(void *ctx, size_t *size);
 
 /** Actually use the bytes. */
 typedef	void *(*luamp_alloc_f)(void *ctx, size_t size);
-}
 
 struct mpstream {
 	/**
