@@ -40,4 +40,7 @@ struct lua_State;
 void
 tarantool_lua_fiber_init(struct lua_State *L);
 
+void
+luaL_testcancel(struct lua_State *L);
+
 #endif /* TARANTOOL_LUA_FIBER_H_INCLUDED */

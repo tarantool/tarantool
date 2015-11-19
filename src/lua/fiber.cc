@@ -41,9 +41,14 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-/*
- * }}}
- */
+void
+luaL_testcancel(struct lua_State *L)
+{
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		luaL_error(L, diag_last_error(&fiber()->diag)->errmsg);
+	}
+}
 
 /* {{{ fiber Lua library: access to Tarantool fibers
  *
@@ -432,15 +437,15 @@ lbox_fiber_sleep(struct lua_State *L)
 		luaL_error(L, "fiber.sleep(delay): bad arguments");
 	double delay = lua_tonumber(L, 1);
 	fiber_sleep(delay);
-	fiber_testcancel();
+	luaL_testcancel(L);
 	return 0;
 }
 
 static int
-lbox_fiber_yield(struct lua_State * /* L */)
+lbox_fiber_yield(struct lua_State *L)
 {
 	fiber_sleep(0);
-	fiber_testcancel();
+	luaL_testcancel(L);
 	return 0;
 }
 
@@ -479,7 +484,7 @@ lbox_fiber_cancel(struct lua_State *L)
 	 * This also implements cancel for the case when
 	 * f == fiber().
 	 */
-	fiber_testcancel();
+	luaL_testcancel(L);
 	return 0;
 }
 
@@ -495,7 +500,7 @@ lbox_fiber_kill(struct lua_State *L)
 		luaL_error(L, "fiber.kill(): fiber not found");
 	fiber_cancel(f);
 	/* Check if we're ourselves cancelled. */
-	fiber_testcancel();
+	luaL_testcancel(L);
 	return 0;
 }
 
@@ -533,7 +538,7 @@ lbox_fiber_testcancel(struct lua_State *L)
 {
 	if (lua_gettop(L) != 0)
 		luaL_error(L, "fiber.testcancel(): bad arguments");
-	fiber_testcancel();
+	luaL_testcancel(L);
 	return 0;
 }
 
