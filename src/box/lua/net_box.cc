@@ -28,7 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "net_box.h"
 
 #include <small/ibuf.h>
@@ -36,7 +35,6 @@
 
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
-#include "box/xrow.h"
 
 #include "lua/msgpack.h"
 #include <msgpuck/msgpuck.h> /* mp_store_u32() */
@@ -50,7 +48,8 @@ netbox_prepare_request(lua_State *L, struct mpstream *stream, uint32_t r_type)
 	struct ibuf *ibuf = (struct ibuf *) lua_topointer(L, 1);
 	uint64_t sync = luaL_touint64(L, 2);
 
-	mpstream_init(stream, ibuf, ibuf_reserve_ex_cb, ibuf_alloc_ex_cb);
+	mpstream_init(stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      luamp_error_default, NULL);
 
 	/* Remember initial size of ibuf (see netbox_encode_request()) */
 	size_t used = ibuf_used(ibuf);

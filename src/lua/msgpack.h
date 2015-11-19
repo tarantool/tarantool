@@ -65,6 +65,9 @@ typedef	void *(*luamp_reserve_f)(void *ctx, size_t *size);
 /** Actually use the bytes. */
 typedef	void *(*luamp_alloc_f)(void *ctx, size_t size);
 
+/** Actually use the bytes. */
+typedef	void (*luamp_error_f)(void *error_ctx);
+
 struct mpstream {
 	/**
 	 * When pos >= end, or required size doesn't fit in
@@ -75,7 +78,23 @@ struct mpstream {
 	void *ctx;
 	luamp_reserve_f reserve;
 	luamp_alloc_f alloc;
+	luamp_error_f error;
+	void *error_ctx;
 };
+
+void
+luamp_error_default(void *);
+
+void
+mpstream_init(struct mpstream *stream, void *ctx,
+	      luamp_reserve_f reserve, luamp_alloc_f alloc,
+	      luamp_error_f error, void *error_ctx);
+
+void
+mpstream_reset(struct mpstream *stream);
+
+void
+mpstream_reserve_slow(struct mpstream *stream, size_t size);
 
 static inline void
 mpstream_flush(struct mpstream *stream)
@@ -84,34 +103,11 @@ mpstream_flush(struct mpstream *stream)
 	stream->buf = stream->pos;
 }
 
-static inline void
-mpstream_reset(struct mpstream *stream)
-{
-	size_t size = 0;
-	stream->buf = (char *) stream->reserve(stream->ctx, &size);
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
-}
-
-static inline void
-mpstream_init(struct mpstream *stream, void *ctx,
-	      luamp_reserve_f reserve, luamp_alloc_f alloc)
-{
-	stream->ctx = ctx;
-	stream->reserve = reserve;
-	stream->alloc = alloc;
-	mpstream_reset(stream);
-}
-
 static inline char *
 mpstream_reserve(struct mpstream *stream, size_t size)
 {
-	if (stream->pos + size > stream->end) {
-		stream->alloc(stream->ctx, stream->pos - stream->buf);
-		stream->buf = (char *) stream->reserve(stream->ctx, &size);
-		stream->pos = stream->buf;
-		stream->end = stream->pos + size;
-	}
+	if (stream->pos + size > stream->end)
+		mpstream_reserve_slow(stream, size);
 	return stream->pos;
 }
 

@@ -45,6 +45,53 @@ extern "C" {
 #include <fiber.h>
 #include "small/region.h"
 
+void
+luamp_error_default(void *error_ctx)
+{
+	(void) error_ctx;
+	diag_raise();
+}
+
+void
+mpstream_init(struct mpstream *stream, void *ctx,
+	      luamp_reserve_f reserve, luamp_alloc_f alloc,
+	      luamp_error_f error, void *error_ctx)
+{
+	stream->ctx = ctx;
+	stream->reserve = reserve;
+	stream->alloc = alloc;
+	stream->error = error;
+	stream->error_ctx = error_ctx;
+	mpstream_reset(stream);
+}
+
+void
+mpstream_reserve_slow(struct mpstream *stream, size_t size)
+{
+	stream->alloc(stream->ctx, stream->pos - stream->buf);
+	stream->buf = (char *) stream->reserve(stream->ctx, &size);
+	if (stream->buf == NULL) {
+		diag_set(OutOfMemory, size, "mpstream", "reserve");
+		stream->error(stream->error_ctx);
+	}
+	stream->pos = stream->buf;
+	stream->end = stream->pos + size;
+}
+
+void
+mpstream_reset(struct mpstream *stream)
+{
+	size_t size = 0;
+	stream->buf = (char *) stream->reserve(stream->ctx, &size);
+	if (stream->buf == NULL) {
+		diag_set(OutOfMemory, size, "mpstream", "reset");
+		stream->error(stream->error_ctx);
+	}
+	stream->pos = stream->buf;
+	stream->end = stream->pos + size;
+}
+
+
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
 static enum mp_type
@@ -383,7 +430,8 @@ lua_msgpack_encode(lua_State *L)
 	struct region *gc= &fiber()->gc;
 	RegionGuard guard(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
+		      luamp_error_default, NULL);
 
 	luamp_encode_r(L, cfg, &stream, 0);
 	mpstream_flush(&stream);
