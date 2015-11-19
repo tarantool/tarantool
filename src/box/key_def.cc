@@ -33,6 +33,7 @@
 #include "schema.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "scoped_guard.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
@@ -89,7 +90,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 			  "index name is too long");
 	}
 	if (!identifier_is_valid(def->name)) {
-		free(def);
+		auto scoped_guard = make_scoped_guard([=] { free(def); });
 		tnt_raise(ClientError, ER_IDENTIFIER, def->name);
 	}
 	def->type = type;
