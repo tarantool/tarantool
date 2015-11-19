@@ -43,17 +43,15 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-}
 
-#include <coio.h>
 #include <coeio.h>
 #include <fiber.h>
-#include <scoped_guard.h>
 #include "lua/utils.h"
+
+extern int coio_wait(int fd, int event, double timeout);
 
 extern char socket_lua[];
 
@@ -629,10 +627,6 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 		return 1;
 	}
 
-	auto scope_guard = make_scoped_guard([&]{
-					     freeaddrinfo(result);
-					     });
-
 	lua_newtable(L);
 	int i = 1;
 	for (struct addrinfo *rp = result; rp; rp = rp->ai_next, i++) {
@@ -663,6 +657,11 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 		lua_rawset(L, -3);
 
 	}
+	/*
+	 * XXX: this leaks freeaddrinfo() if anything in the loop
+	 * above causes a Lua error.
+	 */
+	freeaddrinfo(result);
 	return 1;
 }
 
@@ -765,8 +764,6 @@ lbox_socket_recvfrom(struct lua_State *L)
 		return 1;
 	}
 
-	auto scope_guard = make_scoped_guard([&]{ free(buf); });
-
 	ssize_t res = recvfrom(fh, buf, size, flags,
 			       (struct sockaddr*)&fa, &len);
 
@@ -775,6 +772,10 @@ lbox_socket_recvfrom(struct lua_State *L)
 		return 1;
 	}
 	lua_pushlstring(L, buf, res);
+	/*
+	 * XXX: this leaks in case of pushlstring() error.
+	 */
+	free(buf);
 	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
 }

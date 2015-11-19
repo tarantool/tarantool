@@ -108,7 +108,7 @@ set (server_sources
      lua/msgpack.cc
      lua/utils.c
      lua/errno.c
-     lua/socket.cc
+     lua/socket.c
      lua/pickle.cc
      lua/fio.cc
      lua/clock.c
