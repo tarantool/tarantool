@@ -32,14 +32,11 @@
 
 #include <fiber.h>
 #include "lua/utils.h"
-#include <scoped_guard.h>
 #include "backtrace.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
 void
 luaL_testcancel(struct lua_State *L)
@@ -296,17 +293,17 @@ lbox_fiber_info(struct lua_State *L)
 static void
 box_lua_fiber_run(va_list ap)
 {
-	LuarefGuard coro_guard(va_arg(ap, int));
+	int coro_ref = va_arg(ap, int);
 	struct lua_State *L = va_arg(ap, struct lua_State *);
-	auto storage_guard = make_scoped_guard([=] {
-		/* Destroy local storage */
-		int storage_ref = (int)(intptr_t)
-			fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
-		if (storage_ref > 0)
-			lua_unref(L, storage_ref);
-	});
 
-	lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+	lua_pcall(L, lua_gettop(L) - 1, LUA_MULTRET, 0);
+
+	/* Destroy local storage */
+	int storage_ref = (int)(intptr_t)
+		fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
+	if (storage_ref > 0)
+		lua_unref(L, storage_ref);
+	lua_unref(L, coro_ref);
 }
 
 /**
@@ -321,7 +318,10 @@ lbox_fiber_create(struct lua_State *L)
 	if (fiber_checkstack())
 		luaL_error(L, "fiber.create(): out of fiber stack");
 
-	struct fiber *f = fiber_new_xc("lua", box_lua_fiber_run);
+	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
+	if (f == NULL)
+		luaL_error(L, diag_last_error(&fiber()->diag)->errmsg);
+
 	/* Not a system fiber. */
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);

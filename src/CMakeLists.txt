@@ -102,7 +102,7 @@ set (server_sources
      coeio_file.cc
      lua/digest.c
      lua/init.cc
-     lua/fiber.cc
+     lua/fiber.c
      lua/trigger.c
      lua/ipc.cc
      lua/msgpack.cc
