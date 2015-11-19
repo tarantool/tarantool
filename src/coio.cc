@@ -201,8 +201,10 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0)
+	    if (rc != 0) {
+		    diag_raise();
 		    tnt_raise(SocketError, -1, "getaddrinfo");
+	    }
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (!uri->host_hint) freeaddrinfo(ai);

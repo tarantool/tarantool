@@ -51,11 +51,8 @@ extern "C" {
 void coeio_init(void);
 void coeio_reinit(void);
 
-struct coeio_task;
-
 typedef ssize_t (*coio_task_cb)(struct coio_task *task); /* like eio_req */
 typedef ssize_t (*coio_call_cb)(va_list ap);
-typedef void (*coio_task_timeout_cb)(struct coio_task *task); /* like eio_req */
 
 /**
  * A single task context.
@@ -68,7 +65,7 @@ struct coio_task {
 	union {
 		struct { /* coio_task() */
 			coio_task_cb task_cb;
-			coio_task_timeout_cb timeout_cb;
+			coio_task_cb timeout_cb;
 		};
 		struct { /* coio_call() */
 			coio_call_cb call_cb;
@@ -78,10 +75,6 @@ struct coio_task {
 	/** Callback results. */
 	int complete;
 };
-
-ssize_t
-coio_task(struct coio_task *task, coio_task_cb func,
-	  coio_task_timeout_cb on_timeout, double timeout);
 
 /** \cond public */
 

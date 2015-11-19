@@ -157,9 +157,18 @@ coio_on_finish(eio_req *req)
 	return 0;
 }
 
-ssize_t
+/**
+ * @retval -1 timeout or the waiting fiber was cancelled;
+ *            the caller should not free the task, it
+ *            will be freed when it's finished in the timeout
+ *            callback.
+ * @retval 0  the task completed successfully. Check the result
+ *            code in task->rc and free the task.
+ */
+
+static ssize_t
 coio_task(struct coio_task *task, coio_task_cb func,
-	  coio_task_timeout_cb on_timeout, double timeout)
+	  coio_task_cb on_timeout, double timeout)
 {
 	/* from eio.c: REQ() definition */
 	memset(&task->base, 0, sizeof(task->base));
@@ -179,11 +188,14 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	if (!task->complete) {
 		/* timed out or cancelled. */
 		task->fiber = NULL;
-		fiber_testcancel();
-		tnt_raise(TimedOut);
+		if (fiber_is_cancelled())
+			diag_set(FiberIsCancelled);
+		else
+			diag_set(TimedOut);
+		return -1;
 	}
-
-	return task->base.result;
+	diag_clear(&fiber()->diag);
+	return 0;
 }
 
 static void
@@ -271,7 +283,7 @@ getaddrinfo_cb(struct coio_task *ptr)
 	return 0;
 }
 
-static void
+static ssize_t
 getaddrinfo_free_cb(struct coio_task *ptr)
 {
 	struct async_getaddrinfo_task *task =
@@ -281,6 +293,7 @@ getaddrinfo_free_cb(struct coio_task *ptr)
 	if (task->result != NULL)
 		freeaddrinfo(task->result);
 	free(task);
+	return 0;
 }
 
 int
@@ -326,8 +339,9 @@ coio_getaddrinfo(const char *host, const char *port,
 	/* do resolving */
 	/* coio_task() don't throw. */
 	if (coio_task(&task->base, getaddrinfo_cb, getaddrinfo_free_cb,
-		       timeout) == -1)
-		tnt_raise(TimedOut);
+		       timeout) == -1) {
+		return -1;
+	}
 
 	rc = task->rc;
 	*res = task->result;

@@ -615,11 +615,7 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 	}
 
 	int dns_res = 0;
-	try {
-		dns_res = coio_getaddrinfo(host, port, &hints, &result, timeout);
-	} catch (TimedOut *e) {
-		dns_res = 1;
-	}
+	dns_res = coio_getaddrinfo(host, port, &hints, &result, timeout);
 	lua_pop(L, 2);	/* host, port */
 
 	if (dns_res != 0) {
