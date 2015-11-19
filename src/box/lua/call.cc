@@ -96,35 +96,6 @@ struct port_lua
 static inline struct port_lua *
 port_lua(struct port *port) { return (struct port_lua *) port; }
 
-/*
- * For addU32/dupU32 do nothing -- the only uint32_t Box can give
- * us is tuple count, and we don't need it, since we intercept
- * everything into Lua stack first.
- * @sa port_add_lua_multret
- */
-
-extern "C" void
-port_lua_add_tuple(struct port *port, struct tuple *tuple)
-{
-	lua_State *L = port_lua(port)->L;
-	try {
-		lbox_pushtuple(L, tuple);
-	} catch (...) {
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-	}
-}
-
-void
-port_lua_create(struct port_lua *port, struct lua_State *L)
-{
-	static struct port_vtab port_lua_vtab = {
-		port_lua_add_tuple,
-		null_port_eof,
-	};
-	port->vtab = &port_lua_vtab;
-	port->L = L;
-}
-
 static void
 port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {

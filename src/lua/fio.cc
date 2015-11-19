@@ -38,7 +38,6 @@
 #include <glob.h>
 #include <time.h>
 #include "coeio.h"
-#include "fiber.h"
 
 extern "C" {
 #include <lua.h>

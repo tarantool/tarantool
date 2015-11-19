@@ -509,16 +509,18 @@ tarantool_lua_utils_init(struct lua_State *L);
 } /* extern "C" */
 
 #include "exception.h"
+#include <fiber.h>
 
 static inline void
 lbox_call(struct lua_State *L, int nargs, int nreturns)
 {
-	try {
-		lua_call(L, nargs, nreturns);
-	} catch (Exception *e) {
-		/* Let all well-behaved exceptions pass through. */
-		throw;
-	} catch (...) {
+	struct fiber *f = fiber();
+	diag_clear(&f->diag);
+	int error = lua_pcall(L, nargs, nreturns, 0);
+	if (error) {
+		struct error *e = diag_last_error(&f->diag);
+		if (e)
+			error_raise(e);
 		/* Convert Lua error to a Tarantool exception. */
 		tnt_raise(LuajitError, lua_tostring(L, -1));
 	}
