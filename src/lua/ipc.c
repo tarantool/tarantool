@@ -28,21 +28,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "lua/ipc.h"
-#include <stdlib.h>
+#include "lua/fiber.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 
 /* Help CC understand control flow better, prevent warnings about
  * uninitialized variables. */
-int luaL_error (lua_State *L, const char *fmt, ...)
-	__attribute__((__noreturn__));
-
-} /* extern "C" */
+int luaL_error(lua_State *L, const char *fmt, ...) __attribute__((__noreturn__));
 
 #include <ipc.h>
 #include "lua/utils.h"
@@ -167,7 +162,7 @@ lbox_ipc_channel_put(struct lua_State *L)
 		if (!type_cast(TimedOut, diag_last_error(&fiber()->diag)))
 			diag_raise();
 #else
-		fiber_testcancel();
+		luaL_testcancel(L);
 #endif
 	}
 end:
@@ -205,7 +200,7 @@ lbox_ipc_channel_get(struct lua_State *L)
 		if (!type_cast(TimedOut, diag_last_error(&fiber()->diag)))
 			diag_raise();
 #else
-		fiber_testcancel();
+		luaL_testcancel(L);
 #endif
 		lua_pushnil(L);
 		return 1;

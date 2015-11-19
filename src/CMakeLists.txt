@@ -104,7 +104,7 @@ set (server_sources
      lua/init.cc
      lua/fiber.c
      lua/trigger.c
-     lua/ipc.cc
+     lua/ipc.c
      lua/msgpack.cc
      lua/utils.c
      lua/errno.c
