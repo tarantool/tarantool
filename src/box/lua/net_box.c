@@ -35,7 +35,6 @@
 
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
-#include "box/lua/error.h"
 
 #include "lua/msgpack.h"
 #include <msgpuck/msgpuck.h> /* mp_store_u32() */

@@ -70,7 +70,7 @@ add_library(box
     lua/sophia.cc
     lua/error.cc
     lua/session.cc
-    lua/net_box.cc
+    lua/net_box.c
     ${bin_sources})
 
 target_link_libraries(box ${sophia_lib})
