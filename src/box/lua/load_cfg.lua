@@ -82,10 +82,10 @@ local function check_logger(v)
     end
     local err_ptr = ffi.new('char*[1]')
     if ffi.C.say_check_init_str(v, err_ptr) == -1 then
-	if err_ptr[0] == nil then return 'out of memory' end
+        if err_ptr[0] == nil then return 'out of memory' end
         local result = ffi.string(err_ptr[0])
-	ffi.C.free(err_ptr[0])
-	return result
+        ffi.C.free(err_ptr[0])
+        return result
     end
 end
 
@@ -186,7 +186,7 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
     for k,v in pairs(cfg) do
         local readable_name = readable_prefix .. k;
         if template_cfg[k] == nil then
-            error("Error: cfg parameter '" .. readable_name .. "' is unexpected")
+            box.error(box.error.CFG, readable_name , "unexpected option")
         elseif v == "" or v == nil then
             -- "" and NULL = ffi.cast('void *', 0) set option to default value
             v = default_cfg[k]
@@ -194,24 +194,26 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
             -- any type is ok
         elseif type(template_cfg[k]) == 'table' then
             if type(v) ~= 'table' then
-                error("Error: cfg parameter '" .. readable_name .. "' should be a table")
+                box.error(box.error.CFG, readable_name, "should be a table")
             end
             v = prepare_cfg(v, default_cfg[k], template_cfg[k], modify_cfg[k], readable_name)
         elseif type(template_cfg[k]) == 'function' then
             local err = template_cfg[k](v)
             if err ~= nil then
-                error("Error: cfg parameter '" .. readable_name .. "' ".. tostring(err))
+                box.error(box.error.CFG, readable_name, tostring(err))
             end
         elseif (string.find(template_cfg[k], ',') == nil) then
             -- one type
             if type(v) ~= template_cfg[k] then
-                error("Error: cfg parameter '" .. readable_name .. "' should be of type " .. template_cfg[k])
+                box.error(box.error.CFG, readable_name, "should be of type "..
+                    template_cfg[k])
             end
         else
             local good_types = string.gsub(template_cfg[k], ' ', '');
             if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
                 good_types = string.gsub(good_types, ',', ', ');
-                error("Error: cfg parameter '" .. readable_name .. "' should be one of types: " .. template_cfg[k])
+                box.error(box.error.CFG, readable_name, "should be one of types "..
+                    template_cfg[k])
             end
         end
         if modify_cfg ~= nil and type(modify_cfg[k]) == 'function' then
