@@ -53,6 +53,7 @@ extern "C" {
 #include <lj_tab.h>
 
 struct lua_State;
+struct ibuf;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -61,6 +62,7 @@ struct lua_State;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
+extern struct ibuf *tarantool_lua_ibuf;
 
 /** \cond public */
 

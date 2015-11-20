@@ -35,7 +35,6 @@
 
 struct lua_State;
 struct luaL_Reg;
-struct tbuf;
 extern bool start_loop;
 
 /**

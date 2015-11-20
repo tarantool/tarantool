@@ -58,6 +58,7 @@ extern "C" {
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
+#include <small/ibuf.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -66,6 +67,8 @@ extern "C" {
  * The single Lua state of the transaction processor (tx) thread.
  */
 struct lua_State *tarantool_L;
+static struct ibuf tarantool_lua_ibuf_body;
+struct ibuf *tarantool_lua_ibuf = &tarantool_lua_ibuf_body;
 /**
  * The fiber running the startup Lua script
  */
@@ -348,6 +351,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	if (L == NULL) {
 		panic("failed to initialize Lua");
 	}
+	ibuf_create(tarantool_lua_ibuf, tarantool_lua_slab_cache(), 16000);
 	luaL_openlibs(L);
 	tarantool_lua_setpaths(L);
 

@@ -425,21 +425,19 @@ lua_msgpack_encode(lua_State *L)
 		luaL_error(L, "msgpack.encode: a Lua object expected");
 
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
-	(void) cfg;
 
-	struct region *gc= &fiber()->gc;
-	RegionGuard guard(gc);
+	struct ibuf *buf = tarantool_lua_ibuf;
+	ibuf_reset(buf);
+
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error_default, NULL);
 
 	luamp_encode_r(L, cfg, &stream, 0);
 	mpstream_flush(&stream);
 
-	size_t len = region_used(gc) - guard.used;
-	const char *res = (char *) region_join_xc(gc, len);
-
-	lua_pushlstring(L, res, len);
+	lua_pushlstring(L, buf->buf, ibuf_used(buf));
+	ibuf_reinit(buf);
 	return 1;
 }
 
