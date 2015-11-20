@@ -31,7 +31,6 @@
 #include "lua/init.h"
 #include "lua/utils.h"
 #include "main.h"
-#include "box/box.h"
 #if defined(__FreeBSD__) || defined(__APPLE__)
 #include "libgen.h"
 #endif
@@ -44,9 +43,7 @@ extern "C" {
 #include <luajit.h>
 } /* extern "C" */
 
-
 #include <fiber.h>
-#include <scoped_guard.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/ipc.h"
@@ -231,12 +228,22 @@ tarantool_console_readline(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	auto scoped_guard = make_scoped_guard([&] { free(line); });
+
 	if (!line) {
 		lua_pushnil(L);
 	} else {
+		/* Make sure the line doesn't leak. */
+		static __thread char *line_buf = NULL;
+		if (line_buf)
+			free(line_buf);
+
+		line_buf = line;
 		lua_pushstring(L, line);
+
+		free(line_buf);
+		line_buf = NULL;
 	}
+
 	return 1;
 }
 
@@ -485,13 +492,18 @@ run_script(va_list ap)
 		lua_remove(L, -2); /* remove package.loaded */
 		start_loop = false;
 	}
-	try {
-		lua_checkstack(L, argc - 1);
-		for (int i = 1; i < argc; i++)
-			lua_pushstring(L, argv[i]);
-		lbox_call(L, lua_gettop(L) - 1, 0);
-	} catch (Exception *e) {
-		panic("%s", e->get_errmsg());
+	lua_checkstack(L, argc - 1);
+	struct fiber *f = fiber();
+	for (int i = 1; i < argc; i++)
+		lua_pushstring(L, argv[i]);
+	diag_clear(&f->diag);
+	int error = lua_pcall(L, lua_gettop(L) - 1, 0, 0);
+	if (error) {
+		struct error *e = diag_last_error(&f->diag);
+		if (e)
+			panic("%s", e->errmsg);
+		else
+			panic("%s", lua_tostring(L, -1));
 	}
 
 	/* clear the stack from return values. */
