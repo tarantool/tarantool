@@ -50,7 +50,7 @@ netbox_prepare_request(lua_State *L, struct mpstream *stream, uint32_t r_type)
 	uint64_t sync = luaL_touint64(L, 2);
 
 	mpstream_init(stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      luamp_throw, NULL);
+		      luamp_error, L);
 
 	/* Remember initial size of ibuf (see netbox_encode_request()) */
 	size_t used = ibuf_used(ibuf);
