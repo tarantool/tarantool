@@ -513,7 +513,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_throw, NULL);
 
 	try {
 		/** Check if we deal with a table of tables. */
@@ -610,7 +610,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_throw, NULL);
 	int nrets = lua_gettop(L);
 	try {
 		for (int k = 1; k <= nrets; ++k) {

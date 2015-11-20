@@ -42,6 +42,13 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
+void
+luamp_throw(void *error_ctx)
+{
+	(void) error_ctx;
+	diag_raise();
+}
+
 int
 lbox_error(lua_State *L)
 {

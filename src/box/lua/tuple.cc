@@ -30,6 +30,7 @@
  */
 #include "box/lua/tuple.h"
 #include "box/lua/slab.h"
+#include "box/lua/error.h"
 #include "box/tuple.h"
 #include "box/tuple_update.h"
 #include "fiber.h"
@@ -103,7 +104,7 @@ lbox_tuple_new(lua_State *L)
 	RegionGuard guard(gc);
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_throw, NULL);
 
 	if (argc == 1 && (lua_istable(L, 1) || lua_istuple(L, 1))) {
 		/* New format: box.tuple.new({1, 2, 3}) */
@@ -244,7 +245,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	size_t used = region_used(gc);
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_throw, NULL);
 	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
 	mpstream_flush(&stream);
 	*p_len = region_used(gc) - used;
@@ -311,7 +312,7 @@ lbox_tuple_transform(struct lua_State *L)
 	RegionGuard guard(gc);
 	struct mpstream stream;
 	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_throw, NULL);
 	/*
 	 * Prepare UPDATE expression
 	 */

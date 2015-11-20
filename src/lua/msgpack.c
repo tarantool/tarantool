@@ -28,17 +28,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "lua/msgpack.h"
 
 #include "lua/utils.h"
 
-extern "C" {
 #if defined(LUAJIT)
 #include <lj_ctype.h>
 #endif /* defined(LUAJIT) */
 #include <lauxlib.h> /* struct luaL_error */
-} /* extern "C" */
 
 #include <msgpuck/msgpuck.h>
 #include <iobuf.h>
@@ -46,10 +43,10 @@ extern "C" {
 #include "small/region.h"
 
 void
-luamp_error_default(void *error_ctx)
+luamp_error(void *error_ctx)
 {
-	(void) error_ctx;
-	diag_raise();
+	struct lua_State *L = (struct lua_State *) error_ctx;
+	luaL_error(L, diag_last_error(diag_get())->errmsg);
 }
 
 void
@@ -204,7 +201,7 @@ luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,
 	mpstream_advance(stream, pos - data);
 }
 
-static mp_type
+static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx,
 			       struct mpstream *stream)
 {
@@ -431,7 +428,7 @@ lua_msgpack_encode(lua_State *L)
 
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      luamp_error_default, NULL);
+		      luamp_error, L);
 
 	luamp_encode_r(L, cfg, &stream, 0);
 	mpstream_flush(&stream);

@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -82,8 +81,11 @@ struct mpstream {
 	void *error_ctx;
 };
 
+/**
+ * luaL_error()
+ */
 void
-luamp_error_default(void *);
+luamp_error(void *);
 
 void
 mpstream_init(struct mpstream *stream, void *ctx,
@@ -148,7 +150,7 @@ luamp_encode_str(struct luaL_serializer *cfg, struct mpstream *stream,
 		 const char *str, uint32_t len);
 
 void
-luamp_encode_nil(struct luaL_serializer *cfg);
+luamp_encode_nil(struct luaL_serializer *cfg, struct mpstream *stream);
 
 void
 luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,
