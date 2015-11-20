@@ -671,7 +671,7 @@ static const struct luaL_reg boxlib_internal[] = {
 	{NULL, NULL}
 };
 
-void
+extern "C" void
 box_lua_init(struct lua_State *L)
 {
 	/* Use luaL_register() to set _G.box */

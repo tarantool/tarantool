@@ -101,7 +101,7 @@ set (server_sources
      proc_title.c
      coeio_file.c
      lua/digest.c
-     lua/init.cc
+     lua/init.c
      lua/fiber.c
      lua/trigger.c
      lua/ipc.c

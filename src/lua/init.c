@@ -35,13 +35,11 @@
 #include "libgen.h"
 #endif
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 #include <lj_cdata.h>
 #include <luajit.h>
-} /* extern "C" */
 
 #include <fiber.h>
 #include "coeio.h"
@@ -59,6 +57,14 @@ extern "C" {
 
 #include <readline/readline.h>
 #include <readline/history.h>
+
+/**
+ * This is a callback used by tarantool_lua_init() to open
+ * module-specific libraries into given Lua state.
+ *
+ * No return value, panics if error.
+ */
+extern void box_lua_init(struct lua_State *L);
 
 /**
  * The single Lua state of the transaction processor (tx) thread.
@@ -526,7 +532,9 @@ tarantool_lua_run_script(char *path, int argc, char **argv)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	script_fiber = fiber_new_xc(title, run_script);
+	script_fiber = fiber_new(title, run_script);
+	if (script_fiber == NULL)
+		panic("%s", diag_last_error(diag_get())->errmsg);
 	fiber_start(script_fiber, tarantool_L, path, argc, argv);
 
 	/*
