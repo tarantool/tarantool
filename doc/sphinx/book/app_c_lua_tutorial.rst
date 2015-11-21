@@ -32,14 +32,12 @@ and a running tarantool server which also serves as a client.
                         Delimiter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We'll be making functions which go over one line. We don't want the client to
-send to the server after every line. So we :ref:`declare a delimiter <setting delimiter>`.
-This means “Do not send to the server until you see an exclamation mark.”
-
-| :codenormal:`tarantool>`:codebold:`console = require('console'); console.delimiter('!')`
-
-From now on it will be possible to use multiple-line statements, but it will be
-necessary to end all statements with exclamation marks.
+In earlier versions of Tarantool, multi-line functions had to be
+enclosed within "delimiters". They are no longer necessary, and
+so they will not be used in this tutorial. However, they are still
+supported. Users who wish to use delimiters, or users of
+older versions of Tarantool, should check the syntax description for
+:ref:`declaring a delimiter <setting delimiter>` before proceeding.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            Create a function that returns a string
@@ -51,20 +49,18 @@ We will start by making a function that returns a fixed string, “Hello world�
 
     function string_function()
       return "hello world"
-    end!
+    end
 
 The word "``function``" is a Lua keyword -- we're about to go into Lua. The
 function name is string_function. The function has one executable statement,
 ``return "hello world"``. The string "hello world" is enclosed in double quotes
 here, although Lua doesn't care -- one could use single quotes instead. The
-word "``end``" means “this is the end of the Lua function declaration.” The
-word "``end``" is followed by "``!``" because "``!``" happens to be the
-delimiter that we chose in the previous step. To confirm that the function works,
-we can say
+word "``end``" means “this is the end of the Lua function declaration.”
+To confirm that the function works, we can say
 
 .. code-block:: lua_tarantool
 
-    string_function()!
+    string_function()
 
 Sending ``function-name()`` means “invoke the Lua function.” The effect is
 that the string which the function returns will end up on the screen.
@@ -79,10 +75,10 @@ The screen now looks like this:
 
 | :codenormal:`tarantool>` :codebold:`function string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return "hello world"`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`string_function()!`
+| :codenormal:`tarantool>` :codebold:`string_function()`
 | :codenormal:`---`
 | :codenormal:`- hello world`
 | :codenormal:`...`
@@ -101,7 +97,7 @@ function.
       local string_value
       string_value = string_function()
       return string_value
-    end!
+    end
 
 We begin by declaring a variable "``string_value``". The word "``local``"
 means that string_value appears only in ``main_function``. If we didn't use
@@ -123,10 +119,10 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return string_value`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()!`
+| :codenormal:`tarantool>` :codebold:`main_function()`
 | :codenormal:`---`
 | :codenormal:`- hello world`
 | :codenormal:`...`
@@ -148,7 +144,7 @@ Now that it's a bit clearer how to make a variable, we can change
       random_number = math.random(65, 90)
       random_string = string.char(random_number)
       return random_string
-    end!
+    end
 
 It is not necessary to destroy the old ``string_function()`` contents, they're
 simply overwritten. The first assignment invokes a random-number function
@@ -165,7 +161,7 @@ For more about Lua string-library functions see Lua users "`String Library Tutor
 .. _String Library Tutorial: http://lua-users.org/wiki/StringLibraryTutorial
 
 Once again the ``string_function()`` can be invoked from main_function() which
-can be invoked with ``main_function()!``.
+can be invoked with ``main_function()``.
 
 The screen now looks like this:
 
@@ -175,10 +171,10 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = string.char(random_number)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()!`
+| :codenormal:`tarantool>` :codebold:`main_function()`
 | :codenormal:`---`
 | :codenormal:`- C`
 | :codenormal:`...`
@@ -207,7 +203,7 @@ in a loop.
         random_string = random_string .. string.char(random_number)
       end
       return random_string
-    end!
+    end
 
 The words "for x = 1,10,1" mean “start with x equals 1, loop until x equals 10,
 increment x by 1 for each iteration.” The symbol ".." means "concatenate", that
@@ -215,7 +211,7 @@ is, add the string on the right of the ".." sign to the string on the left of
 the ".." sign. Since we start by saying that random_string is "" (a blank
 string), the end result is that random_string has 10 random letters. Once
 again the ``string_function()`` can be invoked from ``main_function()`` which
-can be invoked with ``main_function()!``.
+can be invoked with ``main_function()``.
 
 For more about Lua loops see Lua manual `chapter 4.3.4 "Numeric for"`_.
 
@@ -232,10 +228,10 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`random_string = random_string .. string.char(random_number)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()!`
+| :codenormal:`tarantool>` :codebold:`main_function()`
 | :codenormal:`---`
 | :codenormal:`- 'ZUDJBHKEFM'`
 | :codenormal:`...`
@@ -256,12 +252,12 @@ a function in Tarantool's library of Lua functions.
       string_value = string_function()
       t = box.tuple.new({1, string_value})
       return t
-    end!
+    end
 
 Once this is done, t will be the value of a new tuple which has two fields.
 The first field is numeric: 1. The second field is a random string. Once again
 the ``string_function()`` can be invoked from ``main_function()`` which can be
-invoked with  ``main_function()!``.
+invoked with  ``main_function()``.
 
 For more about Tarantool tuples see Tarantool manual section :mod:`Package box.tuple <box.tuple>`.
 
@@ -272,10 +268,10 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1, string_value})`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return t`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()!`
+| :codenormal:`tarantool>` :codebold:`main_function()`
 | :codenormal:`---`
 | :codenormal:`- [1, 'PNPZPCOOKA']`
 | :codenormal:`...`
@@ -297,7 +293,7 @@ it's like a database table.
       string_value = string_function()
       t = box.tuple.new({1,string_value})
       box.space.tester:replace(t)
-    end!
+    end
 
 The new line here is ``box.space.tester:replace(t)``. The name contains
 'tester' because the insertion is going to be to tester. The second parameter
@@ -308,15 +304,15 @@ value is a duplicate”, and that makes it easier to re-run the exercise even if
 the sandbox database isn't empty. Once this is done, tester will contain a tuple
 with two fields. The first field will be 1. The second field will be a random
 10-letter string. Once again the ``string_function(``) can be invoked from
-``main_function()`` which can be invoked with ``main_function()!``. But
+``main_function()`` which can be invoked with ``main_function()``. But
 ``main_function()`` won't tell the whole story, because it does not return t, it
 only puts t into the database. To confirm that something got inserted, we'll use
 a SELECT request.
 
 .. code-block:: lua_tarantool
 
-    main_function()!
-    box.space.tester:select{1}!
+    main_function()
+    box.space.tester:select{1}
 
 For more about Tarantool insert and replace calls, see Tarantool manual section
 :mod:`Package box.space <box.space>`.
@@ -328,13 +324,13 @@ The screen now looks like this:
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1,string_value})`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`main_function()!`
+    | :codenormal:`tarantool>` :codebold:`main_function()`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}!`
+    | :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
     | :codenormal:`---`
     | :codenormal:`- - [1, 'EUJYVEECIL']`
     | :codenormal:`...`
@@ -359,11 +355,11 @@ wrinkle that we add here is a timing function.
         t = box.tuple.new({i,string_value})
         box.space.tester:replace(t)
       end
-    end!
-    start_time = os.clock()!
-    main_function()!
-    end_time = os.clock()!
-    'insert done in ' .. end_time - start_time .. ' seconds'!
+    end
+    start_time = os.clock()
+    main_function()
+    end_time = os.clock()
+    'insert done in ' .. end_time - start_time .. ' seconds'
 
 The Lua ``os.clock()`` function will return the number of seconds since the
 start. Therefore, by getting start_time = number of seconds just before the
@@ -379,14 +375,11 @@ For more on Lua ``os.clock()`` see Lua manual `chapter 22.1 "Date and Time"`_ . 
 .. _chapter 5 "Functions": http://www.lua.org/pil/5.html
 
 Since this is the grand finale, we will redo the final versions of all the
-necessary requests: the ``console.delimiter('!')`` request, the request that
+necessary requests: the request that
 created ``string_function()``, the request that created ``main_function()``,
 and the request that invokes ``main_function()``.
 
 .. code-block:: lua_tarantool
-
-    -- Skip the following statement if you have already said "console.delimiter('!')"
-    console = require('console'); console.delimiter('!')
 
     function string_function()
       local random_number
@@ -397,7 +390,7 @@ and the request that invokes ``main_function()``.
         random_string = random_string .. string.char(random_number)
       end
       return random_string
-    end!
+    end
 
     function main_function()
       local string_value, t
@@ -406,15 +399,14 @@ and the request that invokes ``main_function()``.
         t = box.tuple.new({i,string_value})
         box.space.tester:replace(t)
       end
-    end!
-    start_time = os.clock()!
-    main_function()!
-    end_time = os.clock()!
-    'insert done in ' .. end_time - start_time .. ' seconds'!
+    end
+    start_time = os.clock()
+    main_function()
+    end_time = os.clock()
+    'insert done in ' .. end_time - start_time .. ' seconds'
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
 | :codenormal:`tarantool>` :codebold:`function string_function()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
@@ -424,7 +416,7 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`random_string = random_string .. string.char(random_number)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`function main_function()`
@@ -434,19 +426,19 @@ The screen now looks like this:
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`t = box.tuple.new({i,string_value})`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`start_time = os.clock()`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()!`
+| :codenormal:`tarantool>` :codebold:`main_function()`
 | :codenormal:`---`
 | :codenormal:`...`
 | :codenormal:`tarantool>` :codebold:`end_time = os.clock()`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`'insert done in ' .. end_time - start_time .. ' seconds'!`
+| :codenormal:`tarantool>` :codebold:`'insert done in ' .. end_time - start_time .. ' seconds'`
 | :codenormal:`---`
 | :codenormal:`- insert done in 37.62 seconds`
 | :codenormal:`...`
@@ -475,7 +467,6 @@ experience in one way to read and process tuples.
 
 .. code-block:: lua_tarantool
 
-    console = require('console'); console.delimiter('!')
     json = require('json')
     function sum_json_field(field_name)
       local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
@@ -488,8 +479,7 @@ experience in one way to read and process tuples.
         end                                                                 --[[8]]
       end                                                                   --[[9]]
       return sum                                                            --[[10]]
-    end!
-    console.delimiter('')!
+    end
 
 .. parsed-literal::
 

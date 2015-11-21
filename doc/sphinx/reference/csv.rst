@@ -153,7 +153,6 @@ The possible options which can be passed to csv functions are:
     | :codenormal:`csv.iterate()` is the low level of :codenormal:`csv.load()` and :codenormal:`csv.dump()`.
     | To illustrate that, here is a function which is the same as
     | the :codenormal:`csv.load()` function, as seen in `the Tarantool source code`_.
-    | :codebold:`console=require('console'); console.delimiter('!')`
     | :codebold:`load = function(readable, opts)`
     | :codebold:`opts = opts or {}`
     | :codebold:`local result = {}`
@@ -161,8 +160,7 @@ The possible options which can be passed to csv functions are:
     | :codebold:`result[i] = tup`
     | :codebold:`end`
     | :codebold:`return result`
-    | :codebold:`end!`
-    | :codebold:`console.delimiter('')!`
+    | :codebold:`end`
     | :codebold:`#Now, executing "load('a,b,c')" will return the same result as`
     | :codebold:`#"csv.load('a,b,c')", because it is the same code.`
 

@@ -217,13 +217,11 @@ which inserts a SHA-1_ digest of the word "**^S^e^c^ret Wordpass**" into a tuple
 set, and ``password_check()`` which requires input of a password.
 
 | :codenormal:`localhost>` :codebold:`digest = require('digest')`
-| :codenormal:`localhost> -- this means ignore line feeds until next '!'`
-| :codenormal:`localhost>` :codebold:`console = require('console'); console.delimiter('!')`
 | :codenormal:`localhost>` :codebold:`function password_insert()`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`box.space.tester:insert{12345,`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`digest.sha1('^S^e^c^ret Wordpass')}`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`return 'OK'`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
 | :codenormal:`localhost>` :codebold:`function password_check(password)`
@@ -234,14 +232,13 @@ set, and ``password_check()`` which requires input of a password.
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`else`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`print('Password is not valid')`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
-| :codenormal:`localhost>` :codebold:`password_insert()!`
+| :codenormal:`localhost>` :codebold:`password_insert()`
 | :codenormal:`Call OK, 1 rows affected`
 | :codenormal:`['OK']`
-| :codenormal:`localhost> -- back to normal: commands end with line feed!`
-| :codenormal:`localhost>` :codebold:`console.delimiter('')`
+
 
 If a later user calls the ``password_check()`` function and enters
 the wrong password, the result is an error.

@@ -525,18 +525,17 @@ On the first shell, start Tarantool and say:
 
     box.cfg{}
     socket = require('socket')
-    console = require('console'); console.delimiter('!')
     socket.tcp_server('0.0.0.0',
                   3302,
                   function(s)
                     while true do
+                      local request
                       request = s:read("\n");
                       if request == "" then break end
                       if request == nil then break end
                       print(request)
                       end
                     end)
-    console.delimiter('')!
 
 The above code means: use `tcp_server()` to wait for a
 connection from any host on port 3302. When it happens,

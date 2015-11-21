@@ -264,18 +264,12 @@ API is a direct binding to corresponding methods of index objects of type
         | :codenormal:`---`
         | :codenormal:`- ['A', 'C']`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-        | :codenormal:`---`
-        | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`function example()`
         | :codenormal:`>` :codebold:`for _, tuple in`
         | :codenormal:`>` :codebold:`s.index.primary:pairs(nil, {iterator = box.index.ALL}) do`
         | :codenormal:`>` :codebold:`print(tuple)`
         | :codenormal:`>` :codebold:`end`
-        | :codenormal:`>` :codebold:`end!`
-        | :codenormal:`---`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+        | :codenormal:`>` :codebold:`end`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`example()`
@@ -579,9 +573,8 @@ Lua functions `os.date()`_ and `string.sub()`_.
 
 .. code-block:: lua
 
-    console = require('console'); console.delimiter('st_end')
     function example()
-      local a, b, c, table_of_selected_tuples
+      local a, b, c, table_of_selected_tuples, d
       local replaced_tuple, time_field
       local formatted_time_field
       local fiber = require('fiber')
@@ -601,8 +594,7 @@ Lua functions `os.date()`_ and `string.sub()`_.
       d = string.sub(c, 3, 6)
       formatted_time_field = formatted_time_field .. '.' .. d
       return formatted_time_field
-    end st_end
-    console.delimiter('') st_end
+    end
 
 ... And here is what happens when one invokes the function:
 
