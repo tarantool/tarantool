@@ -139,9 +139,9 @@ seek_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
 }
 #endif
 
-typedef void (*sophia_info_f)(const char*, const char*, void*);
+typedef void (*sophia_info_f)(const char*, const char*, void *);
 
-int sophia_info(const char *name, sophia_info_f, void*);
+extern int sophia_info(const char *name, sophia_info_f, void *);
 
 static void
 lbox_sophia_cb_index(const char *key, const char *value, void *arg)
