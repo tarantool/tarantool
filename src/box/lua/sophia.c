@@ -31,11 +31,9 @@
 
 #include "sophia.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
 #include "lua/utils.h"
 
@@ -146,8 +144,9 @@ typedef void (*sophia_info_f)(const char*, const char*, void*);
 int sophia_info(const char *name, sophia_info_f, void*);
 
 static void
-lbox_sophia_cb_index(const char* /* key */, const char *value, void *arg)
+lbox_sophia_cb_index(const char *key, const char *value, void *arg)
 {
+	(void) key;
 	struct lua_State *L;
 	L = (struct lua_State*)arg;
 	if (value == NULL) {
