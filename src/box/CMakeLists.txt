@@ -62,7 +62,7 @@ add_library(box
     ${lua_sources}
     lua/call.cc
     lua/tuple.cc
-    lua/slab.cc
+    lua/slab.c
     lua/index.cc
     lua/space.cc
     lua/info.cc
