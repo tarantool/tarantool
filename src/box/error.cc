@@ -32,6 +32,8 @@
 #include <stdio.h>
 
 #include <fiber.h>
+#include <rmean.h>
+
 struct rmean *rmean_error = NULL;
 
 const char *rmean_error_strings[RMEAN_ERROR_LAST] = {

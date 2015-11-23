@@ -143,6 +143,17 @@ static struct cbus net_tx_bus;
 /* A pointer to the transaction processor cord. */
 struct cord *tx_cord;
 
+struct rmean *rmean_net;
+struct rmean *rmean_net_tx_bus;
+
+enum rmean_net_name {
+	IPROTO_SENT,
+	IPROTO_RECEIVED,
+	IPROTO_LAST,
+};
+
+const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
+
 /** Context of a single client connection. */
 struct iproto_connection
 {
@@ -516,7 +527,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			return;
 		}
 		/* Count statistics */
-		rmean_collect(rmean_net, RMEAN_NET_RECEIVED, nrd);
+		rmean_collect(rmean_net, IPROTO_RECEIVED, nrd);
 
 		/* Update the read position and connection state. */
 		in->wpos += nrd;
@@ -571,7 +582,7 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 	ssize_t nwr = sio_writev(fd, iov, iovcnt);
 
 	/* Count statistics */
-	rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
+	rmean_collect(rmean_net, IPROTO_SENT, nwr);
 	if (nwr > 0) {
 		if (begin->used + nwr == end->used) {
 			if (ibuf_used(&iobuf->in) == 0) {
@@ -800,7 +811,7 @@ net_send_greeting(struct cmsg *m)
 						 obuf_iovcnt(out));
 
 			/* Count statistics */
-			rmean_collect(rmean_net, RMEAN_NET_SENT, nwr);
+			rmean_collect(rmean_net, IPROTO_SENT, nwr);
 		} catch (Exception *e) {
 			e->log();
 		}
@@ -875,13 +886,12 @@ net_cord_f(va_list /* ap */)
 
 
 	/* Init statistics counter */
-	rmean_net = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
+	rmean_net = rmean_new(rmean_net_strings, IPROTO_LAST);
 
-	if (rmean_net == NULL)
-		tnt_raise(OutOfMemory,
-			  sizeof(*rmean_net) +
-			  RMEAN_NET_LAST * sizeof(stats),
+	if (rmean_net == NULL) {
+		tnt_raise(OutOfMemory, sizeof(struct rmean),
 			  "rmean", "struct rmean");
+	}
 
 
 	cbus_join(&net_tx_bus, &net_pipe);
@@ -903,6 +913,7 @@ iproto_init()
 	tx_cord = cord();
 
 	cbus_create(&net_tx_bus);
+	rmean_net_tx_bus = net_tx_bus.stats;
 	cpipe_create(&tx_pipe);
 	static struct cpipe_fiber_pool fiber_pool;
 

@@ -30,12 +30,9 @@
  */
 #include "cbus.h"
 
-struct rmean *rmean_net = NULL;
-const char *rmean_net_strings[RMEAN_NET_LAST] = {
+const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
 	"LOCKS",
-	"RECEIVED",
-	"SENT"
 };
 
 static void
@@ -97,6 +94,9 @@ void
 cbus_create(struct cbus *bus)
 {
 	bus->pipe[0] = bus->pipe[1] = NULL;
+	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
+	if (bus->stats == NULL)
+		panic_syserror("cbus_create");
 
 	pthread_mutexattr_t errorcheck;
 
@@ -118,6 +118,7 @@ cbus_destroy(struct cbus *bus)
 {
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
 	(void) tt_pthread_cond_destroy(&bus->cond);
+	rmean_delete(bus->stats);
 }
 
 /**
@@ -198,7 +199,7 @@ cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 	pipe->n_input = 0;
 	if (pipe_was_empty) {
 		/* Count statistics */
-		rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
 
 		ev_async_send(pipe->consumer, &pipe->fetch_output);
 	}
@@ -229,7 +230,7 @@ cpipe_peek_impl(struct cpipe *pipe)
 
 	if (peer_pipe_was_empty) {
 		/* Count statistics */
-		rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
 
 		ev_async_send(peer->consumer, &peer->fetch_output);
 	}

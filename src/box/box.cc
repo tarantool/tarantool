@@ -752,8 +752,6 @@ box_free(void)
 		schema_free();
 		tuple_free();
 		port_free();
-		rmean_delete(rmean_error);
-		rmean_delete(rmean_box);
 #endif
 		engine_shutdown();
 	}

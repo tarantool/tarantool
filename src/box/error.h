@@ -32,9 +32,9 @@
  */
 #include "errcode.h"
 #include "exception.h"
-#include "rmean.h"
 
-extern struct rmean *rmean_error;
+struct rmean;
+extern "C" struct rmean *rmean_error;
 
 enum rmean_error_name {
 	RMEAN_ERROR,
