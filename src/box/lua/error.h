@@ -36,11 +36,4 @@ struct lua_State;
 void
 box_lua_error_init(struct lua_State *L);
 
-/**
- * diag_raise()
- */
-void
-luamp_throw(void *);
-
-
 #endif /* INCLUDES_TARANTOOL_LUA_ERROR_H */
