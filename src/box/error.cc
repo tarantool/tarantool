@@ -70,6 +70,21 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
 
+static struct error *
+BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
+{
+	try {
+		struct error *e = new ClientError(file, line, "", errcode);
+		va_list ap;
+		va_start(ap, errcode);
+		error_vformat_msg(e, tnt_errcode_desc(errcode), ap);
+		va_end(ap);
+		return e;
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
 void
 ClientError::log() const
 {
@@ -92,6 +107,12 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 	: LoggedError(file, line, ER_INJECTION, msg)
 {
 	/* nothing */
+}
+
+void
+error_init(void)
+{
+	error_factory->ClientError = BuildClientError;
 }
 
 const char *

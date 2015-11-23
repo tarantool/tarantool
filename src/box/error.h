@@ -94,6 +94,9 @@ public:
 	ErrorInjection(const char *file, unsigned line, const char *msg);
 };
 
+void
+error_init(void);
+
 /** \cond public */
 
 struct error;

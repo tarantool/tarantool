@@ -33,6 +33,7 @@
 #include "box/lua/error.h"
 #include "box/tuple.h"
 #include "box/tuple_update.h"
+#include "diag.h"
 #include "fiber.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
@@ -235,8 +236,10 @@ void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index)
 {
-	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY)
-		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
+	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
+		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
+		diag_raise();
+	}
 }
 
 char *

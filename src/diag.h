@@ -32,6 +32,7 @@
  */
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
 #include "say.h"
@@ -223,6 +224,8 @@ struct error_factory {
 					 unsigned line);
 	struct error *(*LuajitError)(const char *file,
 				     unsigned line, const char *msg);
+	struct error *(*ClientError)(const char *file, unsigned line,
+				     uint32_t errcode, ...);
 };
 
 struct diag *
