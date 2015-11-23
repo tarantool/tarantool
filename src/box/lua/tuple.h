@@ -30,12 +30,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <box/tuple.h>
+#include <stddef.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 struct lua_State;
 struct txn;
 struct tuple;
+struct mpstream;
+struct luaL_serializer;
 
 /**
  * Push tuple on lua stack
@@ -44,7 +48,7 @@ void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
 static inline int
-lbox_pushtupleornil(lua_State *L, box_tuple_t *tuple)
+lbox_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple == NULL)
 		return 0;
@@ -67,14 +71,10 @@ luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		    struct mpstream *stream, int index);
 
 char *
-lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len);
+lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
 
 void
 box_lua_tuple_init(struct lua_State *L);
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
 
 struct tuple *
 boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);

@@ -221,6 +221,8 @@ struct error_factory {
 				  unsigned line);
 	struct error *(*ChannelIsClosed)(const char *file,
 					 unsigned line);
+	struct error *(*LuajitError)(const char *file,
+				     unsigned line, const char *msg);
 };
 
 struct diag *

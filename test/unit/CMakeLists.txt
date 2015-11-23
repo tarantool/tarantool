@@ -70,7 +70,7 @@ add_executable(coio.test coio.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/sio.cc
         ${CMAKE_SOURCE_DIR}/src/evio.cc
         ${CMAKE_SOURCE_DIR}/src/coio.cc
-        ${CMAKE_SOURCE_DIR}/src/coeio.cc
+        ${CMAKE_SOURCE_DIR}/src/coeio.c
         ${CMAKE_SOURCE_DIR}/src/uri.c
         ${CMAKE_SOURCE_DIR}/src/fio.c
         ${CMAKE_SOURCE_DIR}/src/iobuf.cc)

@@ -66,10 +66,10 @@ r.idle < 1
 
 slowpoke = require('socket').tcp_server(uri.host, uri.port, slowpoke_loop)
 control_ch:put(true)
+fiber = require('fiber')
 
-while box.info.replication.status == 'disconnected' do require('fiber').sleep(0) end
-r = box.info.replication
-r.status == 'connecting' or r.status == 'auth'
+status = box.info.replication.status
+while status ~= 'connecting' and status ~= 'auth' do fiber.sleep(0) status = box.info.replication.status end
 slowpoke:close()
 control_ch:put("goodbye")
 

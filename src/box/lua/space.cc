@@ -70,7 +70,7 @@ lbox_space_on_replace_trigger(struct trigger *trigger, void *event)
 	/* @todo: maybe the space object has to be here */
 	lua_pushstring(L, stmt->space->def.name);
 
-	lbox_call(L, 3, 0);
+	lbox_call_xc(L, 3, 0);
 }
 
 /**

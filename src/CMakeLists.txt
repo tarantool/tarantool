@@ -80,7 +80,7 @@ set (server_sources
      sio.cc
      evio.cc
      coio.cc
-     coeio.cc
+     coeio.c
      iobuf.cc
      coio_buf.cc
      pickle.c
@@ -99,18 +99,18 @@ set (server_sources
      uri.c
      backtrace.cc
      proc_title.c
-     coeio_file.cc
-     lua/digest.cc
-     lua/init.cc
-     lua/fiber.cc
-     lua/trigger.cc
-     lua/ipc.cc
-     lua/msgpack.cc
-     lua/utils.cc
+     coeio_file.c
+     lua/digest.c
+     lua/init.c
+     lua/fiber.c
+     lua/trigger.c
+     lua/ipc.c
+     lua/msgpack.c
+     lua/utils.c
      lua/errno.c
-     lua/socket.cc
-     lua/pickle.cc
-     lua/fio.cc
+     lua/socket.c
+     lua/pickle.c
+     lua/fio.c
      lua/clock.c
      ${lua_sources}
 )

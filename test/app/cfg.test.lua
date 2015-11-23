@@ -12,17 +12,17 @@ test:plan(35)
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
-local function invalid(name, val, pattern)
+local function invalid(name, val)
     local status, result = pcall(box.cfg, {[name]=val})
-    test:ok(not status and result:match(pattern or 'Incorrect'), 'invalid '..name)
+    test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
 invalid('replication_source', '//guest@localhost:3301')
 invalid('wal_mode', 'invalid')
 invalid('rows_per_wal', -1)
 invalid('listen', '//!')
-invalid('logger', ':', 'Error:')
-invalid('logger', 'syslog:xxx=', 'Error:')
+invalid('logger', ':')
+invalid('logger', 'syslog:xxx=')
 
 test:is(type(box.cfg), 'function', 'box is not started')
 

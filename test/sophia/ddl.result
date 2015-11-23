@@ -1,76 +1,3 @@
--- space create/drop
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-space:drop()
----
-...
--- space index create/drop
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary')
----
-...
-space:drop()
----
-...
--- space index create/drop alter
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary')
----
-...
-_index = box.space[box.schema.INDEX_ID]
----
-...
-_index:delete{102, 0}
----
-...
-space:drop()
----
-...
--- space index create/drop tree string
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
----
-...
-space:insert({'test'})
----
-...
-space:drop()
----
-...
--- space index create/drop tree num
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
----
-...
-space:insert({13})
----
-...
-space:drop()
----
-...
--- space index create/drop tree multi-part num
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 2, 'num'}})
----
-...
-space:insert({13})
----
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
-...
-space:drop()
----
-...
 -- space index create/drop tree incorrect key pos
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
@@ -95,17 +22,6 @@ index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 3, 'num
 space:drop()
 ---
 ...
--- space index create hash
-space = box.schema.space.create('test', { engine = 'sophia' })
----
-...
-index = space:create_index('primary', {type = 'hash'})
----
-- error: Unsupported index type supplied for index 'primary' in space 'test'
-...
-space:drop()
----
-...
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
@@ -121,32 +37,13 @@ index2 = space:create_index('secondary')
 space:drop()
 ---
 ...
--- space index size
+-- space index create hash
 space = box.schema.space.create('test', { engine = 'sophia' })
 ---
 ...
-index = space:create_index('primary')
+index = space:create_index('primary', {type = 'hash'})
 ---
-...
-primary = space.index[0]
----
-...
-primary:len()
----
-- 0
-...
-space:insert({13})
----
-...
-space:insert({14})
----
-...
-space:insert({15})
----
-...
-primary:len()
----
-- 3
+- error: Unsupported index type supplied for index 'primary' in space 'test'
 ...
 space:drop()
 ---

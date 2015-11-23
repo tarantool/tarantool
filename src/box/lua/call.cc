@@ -96,35 +96,6 @@ struct port_lua
 static inline struct port_lua *
 port_lua(struct port *port) { return (struct port_lua *) port; }
 
-/*
- * For addU32/dupU32 do nothing -- the only uint32_t Box can give
- * us is tuple count, and we don't need it, since we intercept
- * everything into Lua stack first.
- * @sa port_add_lua_multret
- */
-
-extern "C" void
-port_lua_add_tuple(struct port *port, struct tuple *tuple)
-{
-	lua_State *L = port_lua(port)->L;
-	try {
-		lbox_pushtuple(L, tuple);
-	} catch (...) {
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-	}
-}
-
-void
-port_lua_create(struct port_lua *port, struct lua_State *L)
-{
-	static struct port_vtab port_lua_vtab = {
-		port_lua_add_tuple,
-		null_port_eof,
-	};
-	port->vtab = &port_lua_vtab;
-	port->L = L;
-}
-
 static void
 port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {
@@ -511,7 +482,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
-	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
+	lbox_call_xc(L, arg_count + oc - 1, LUA_MULTRET);
 
 	if (in_txn()) {
 		say_warn("a transaction is active at CALL return from '%.*s'",
@@ -538,11 +509,11 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	 * be used, since Lua stack size is limited by 8000 elements,
 	 * while Lua table size is pretty much unlimited.
 	 */
-
 	uint32_t count = 0;
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
-	mpstream_init(&stream, out, obuf_reserve_ex_cb, obuf_alloc_ex_cb);
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_throw, NULL);
 
 	try {
 		/** Check if we deal with a table of tables. */
@@ -608,7 +579,7 @@ box_lua_call(struct request *request, struct obuf *out)
 	} catch (...) {
 		txn_rollback();
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
 
@@ -622,7 +593,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	const char *expr = request->key;
 	uint32_t expr_len = mp_decode_strl(&expr);
 	if (luaL_loadbuffer(L, expr, expr_len, "=eval"))
-		tnt_raise(LuajitError, L);
+		tnt_raise(LuajitError, lua_tostring(L, -1));
 
 	/* Unpack arguments */
 	const char *args = request->tuple;
@@ -633,12 +604,13 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	}
 
 	/* Call compiled code */
-	lua_call(L, arg_count, LUA_MULTRET);
+	lbox_call_xc(L, arg_count, LUA_MULTRET);
 
 	/* Send results of the called procedure to the client. */
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
-	mpstream_init(&stream, out, obuf_reserve_ex_cb, obuf_alloc_ex_cb);
+	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_throw, NULL);
 	int nrets = lua_gettop(L);
 	try {
 		for (int k = 1; k <= nrets; ++k) {
@@ -665,7 +637,7 @@ box_lua_eval(struct request *request, struct obuf *out)
 		throw;
 	} catch (...) {
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L != NULL ? L : tarantool_L);
+		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
 
@@ -699,7 +671,7 @@ static const struct luaL_reg boxlib_internal[] = {
 	{NULL, NULL}
 };
 
-void
+extern "C" void
 box_lua_init(struct lua_State *L)
 {
 	/* Use luaL_register() to set _G.box */

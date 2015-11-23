@@ -43,9 +43,19 @@ backtrace(void *frame, void *stack, size_t stack_size);
 
 typedef int (backtrace_cb)(int frameno, void *frameret,
                            const char *func, size_t offset, void *cb_ctx);
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 void
 backtrace_foreach(backtrace_cb cb, void *frame, void *stack,
 		  size_t stack_size, void *cb_ctx);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
 #endif /* ENABLE_BACKTRACE */
 
 

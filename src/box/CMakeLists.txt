@@ -67,10 +67,10 @@ add_library(box
     lua/space.cc
     lua/info.cc
     lua/stat.cc
-    lua/sophia.cc
+    lua/sophia.c
     lua/error.cc
     lua/session.cc
-    lua/net_box.cc
+    lua/net_box.c
     ${bin_sources})
 
 target_link_libraries(box ${sophia_lib})
