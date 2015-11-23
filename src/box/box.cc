@@ -801,6 +801,8 @@ thread_pool_trim()
 static inline void
 box_init(void)
 {
+	error_init();
+
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_geti("slab_alloc_maximal"),
