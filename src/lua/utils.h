@@ -507,6 +507,12 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
+int
+lbox_error(lua_State *L);
+
+int
+lbox_call(lua_State *L, int nargs, int nreturns);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -514,20 +520,11 @@ tarantool_lua_utils_init(struct lua_State *L);
 #include <fiber.h>
 
 static inline void
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+lbox_call_xc(lua_State *L, int nargs, int nreturns)
 {
-	struct fiber *f = fiber();
-	diag_clear(&f->diag);
-	int error = lua_pcall(L, nargs, nreturns, 0);
-	if (error) {
-		struct error *e = diag_last_error(&f->diag);
-		if (e)
-			error_raise(e);
-		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, lua_tostring(L, -1));
-	}
+	if (lbox_call(L, nargs, nreturns) != 0)
+		diag_raise();
 }
-
 
 /**
  * Make a reference to an object on top of the Lua stack and

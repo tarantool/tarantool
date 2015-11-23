@@ -32,10 +32,13 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <diag.h>
+#include <fiber.h>
 
 int luaL_nil_ref = LUA_REFNIL;
 int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
+static int CTID_CONST_STRUCT_ERROR_REF = 0;
 
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
@@ -836,12 +839,96 @@ luaL_toint64(struct lua_State *L, int idx)
 	return 0;
 }
 
+static struct error *
+luaL_iserror(struct lua_State *L, int narg)
+{
+	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
+	if (lua_type(L, narg) != LUA_TCDATA)
+		return NULL;
+
+	uint32_t ctypeid;
+	void *data = luaL_checkcdata(L, narg, &ctypeid);
+	if (ctypeid != CTID_CONST_STRUCT_ERROR_REF)
+		return NULL;
+
+	struct error *e = *(struct error **) data;
+	assert(e->refs);
+	return e;
+}
+
+static struct error *
+luaL_checkerror(struct lua_State *L, int narg)
+{
+	struct error *error = luaL_iserror(L, narg);
+	if (error == NULL)  {
+		luaL_error(L, "Invalid argument #%d (error expected, got %s)",
+		   narg, lua_typename(L, lua_type(L, narg)));
+	}
+	return error;
+}
+
+static int
+luaL_error_gc(struct lua_State *L)
+{
+	struct error *error = luaL_checkerror(L, 1);
+	error_unref(error);
+	return 0;
+}
+
+static void
+luaL_pusherror(struct lua_State *L, struct error *e)
+{
+	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
+	struct error **ptr = (struct error **) luaL_pushcdata(L,
+		CTID_CONST_STRUCT_ERROR_REF);
+	*ptr = e;
+	/* The order is important - first reference the error, then set gc */
+	error_ref(e);
+	lua_pushcfunction(L, luaL_error_gc);
+	luaL_setcdatagc(L, -2);
+}
+
+int
+lbox_error(lua_State *L)
+{
+	struct error *e = diag_last_error(&fiber()->diag);
+	assert(e != NULL);
+	luaL_pusherror(L, e);
+	lua_error(L);
+	assert(0); /* unreachable */
+	return 0;
+}
+
+int
+lbox_call(struct lua_State *L, int nargs, int nreturns)
+{
+	int error = lua_pcall(L, nargs, nreturns, 0);
+	if (error == 0)
+		return 0;
+	struct error *e = luaL_iserror(L, -1);
+	if (e != NULL) {
+		/* Re-throw original error */
+		diag_add_error(&fiber()->diag, e);
+	} else {
+		/* Convert Lua error to a Tarantool exception. */
+		diag_set(LuajitError, lua_tostring(L, -1));
+	}
+	return 1;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
 	static const struct luaL_reg serializermeta[] = {
 		{NULL, NULL},
 	};
+
+	/* Get CTypeID for `struct error *' */
+	int rc = luaL_cdef(L, "struct error;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_CONST_STRUCT_ERROR_REF = luaL_ctypeid(L, "const struct error &");
+	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
 
 	luaL_register_type(L, LUAL_SERIALIZER, serializermeta);
 	/* Create NULL constant */

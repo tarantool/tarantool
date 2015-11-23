@@ -43,7 +43,7 @@ luaL_testcancel(struct lua_State *L)
 {
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
-		luaL_error(L, diag_last_error(&fiber()->diag)->errmsg);
+		lbox_error(L);
 	}
 }
 
@@ -320,7 +320,7 @@ lbox_fiber_create(struct lua_State *L)
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	if (f == NULL)
-		luaL_error(L, diag_last_error(&fiber()->diag)->errmsg);
+		lbox_error(L);
 
 	/* Not a system fiber. */
 	struct lua_State *child_L = lua_newthread(L);

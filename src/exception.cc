@@ -238,6 +238,13 @@ BuildFiberIsCancelled(const char *file, unsigned line)
 	return new (p) FiberIsCancelled(file, line);
 }
 
+static struct error *
+BuildLuajitError(const char *file, unsigned line, const char *msg)
+{
+	BuildAlloc(LuajitError);
+	return new (p) LuajitError(file, line, msg);
+}
+
 #undef BuildAlloc
 
 void
@@ -249,6 +256,7 @@ exception_init()
 	exception_error_factory.FiberIsCancelled = BuildFiberIsCancelled;
 	exception_error_factory.TimedOut = BuildTimedOut;
 	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
+	exception_error_factory.LuajitError = BuildLuajitError;
 
 	error_factory = &exception_error_factory;
 

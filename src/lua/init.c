@@ -499,17 +499,11 @@ run_script(va_list ap)
 		start_loop = false;
 	}
 	lua_checkstack(L, argc - 1);
-	struct fiber *f = fiber();
 	for (int i = 1; i < argc; i++)
 		lua_pushstring(L, argv[i]);
-	diag_clear(&f->diag);
-	int error = lua_pcall(L, lua_gettop(L) - 1, 0, 0);
-	if (error) {
-		struct error *e = diag_last_error(&f->diag);
-		if (e)
-			panic("%s", e->errmsg);
-		else
-			panic("%s", lua_tostring(L, -1));
+	if (lbox_call(L, lua_gettop(L) - 1, 0) != 0) {
+		struct error *e = diag_last_error(&fiber()->diag);
+		panic("%s", e->errmsg);
 	}
 
 	/* clear the stack from return values. */

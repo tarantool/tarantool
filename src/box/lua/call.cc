@@ -482,7 +482,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
-	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
+	lbox_call_xc(L, arg_count + oc - 1, LUA_MULTRET);
 
 	if (in_txn()) {
 		say_warn("a transaction is active at CALL return from '%.*s'",
@@ -604,7 +604,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	}
 
 	/* Call compiled code */
-	lua_call(L, arg_count, LUA_MULTRET);
+	lbox_call_xc(L, arg_count, LUA_MULTRET);
 
 	/* Send results of the called procedure to the client. */
 	struct obuf_svp svp = iproto_prepare_select(out);

@@ -49,15 +49,6 @@ luamp_throw(void *error_ctx)
 	diag_raise();
 }
 
-int
-lbox_error(lua_State *L)
-{
-	(void) L;
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-	e->raise();
-	return 0;
-}
-
 static int
 lbox_error_raise(lua_State *L)
 {
@@ -121,7 +112,8 @@ raise:
 	say_debug("ClientError at %s:%i", file, line);
 	ClientError *e = new ClientError(file, line, reason, code);
 	diag_add_error(&fiber()->diag, e);
-	throw e;
+	lbox_error(L);
+	assert(0); /* unreachable */
 	return 0;
 }
 
@@ -131,11 +123,16 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
+	/* TODO: use struct error here */
 	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
 
 	if (e == NULL) {
 		lua_pushnil(L);
 	} else {
+		/*
+		 * TODO: use luaL_pusherror here, move type_foreach_method
+		 * to error_unpack() in Lua.
+		 */
 		lua_newtable(L);
 
 		lua_pushstring(L, "type");
