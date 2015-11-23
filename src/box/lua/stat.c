@@ -34,11 +34,9 @@
 #include <string.h>
 #include <rmean.h>
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
 #include "lua/utils.h"
 

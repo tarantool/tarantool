@@ -66,7 +66,7 @@ add_library(box
     lua/index.cc
     lua/space.cc
     lua/info.cc
-    lua/stat.cc
+    lua/stat.c
     lua/sophia.c
     lua/error.cc
     lua/session.cc
