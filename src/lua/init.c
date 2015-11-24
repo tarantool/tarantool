@@ -445,7 +445,8 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 
 #ifdef NDEBUG
 	/* Unload strict after boot in release mode */
-	luaL_dostring(L, "require('strict').off()");
+	if (luaL_dostring(L, "require('strict').off()") != 0)
+		panic("Failed to unload 'strict' Lua module");
 #endif /* NDEBUG */
 
 	/* clear possible left-overs of init */
