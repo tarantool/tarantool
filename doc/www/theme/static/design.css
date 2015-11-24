@@ -1130,6 +1130,7 @@ input.b-button.p-smaller {
     padding:0 0 22px 13px;
 }
 .b-article li {
+    list-style-type: disc;
     padding:0  0 8px 0;
 }
 .b-path-list-item-url,
@@ -1480,6 +1481,23 @@ div.b-rock-list-item-ico {
 
 .b-highlight {
     margin-bottom: 20px;
+}
+
+.b-job_bg {
+    background:url('/theme/bg_job.jpg') center 50%;
+}
+
+.b-job_bg .b-job_opacity-up {
+    opacity: 0.9;
+    margin-top: 5%;
+}
+
+.b-button_container {
+    float: right;
+}
+
+.b-button.b-email {
+    margin-right: 2px;
 }
 
 /* vim: expandtab */

@@ -1,8 +1,8 @@
 ---
-title   : "Tarantool - Job"
-slug    : "job"
-save_as : "job.html"
-template: "job"
+title   : "Tarantool - Careers"
+slug    : "careers"
+save_as : "careers.html"
+template: "careers"
 blocks:
   content_up:
     format:  rst
@@ -45,11 +45,9 @@ blocks:
         of journal log options, load balancing, Lua stored procedures, connectors for C
         Perl, PHP and Python, modules for interaction with MySQL or PostgreSQL.
 
-        The product is in production use within many small and large companies,
-        as well as within Mail.Ru itself.
-
   vacancies:
     - title: Lead Site Reliability Engineer
+      link: https://corp.mail.ru/ru/jobs/vacancy/1047/
       content:
         format : rst
         content: |
@@ -103,11 +101,12 @@ blocks:
           high availability and scalability issues.
 
     - title: C/C++ Developer
+      link: https://corp.mail.ru/ru/jobs/vacancy/839/
       content:
         format : rst
         content: |
 
-          Our team is developing a fully open source project: writing code that
+          Our team develops a fully open source project: writes code that
           automates the testing, assembles packages, and prepares documentation.
           Now we are developing a complete cloud solution which automatically
           replaces defective parts and distributes the database load to multiple

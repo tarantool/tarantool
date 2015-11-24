@@ -4,7 +4,7 @@
   ("Try", "http://try.tarantool.org"),
   ("Documentation", "http://tarantool.org/doc/"),
   ("Download", "http://tarantool.org/download.html"),
-  ("Job", "http://tarantool.org/job.html"),
+  ("Careers", "http://tarantool.org/careers.html"),
   ("Rocks", "http://rocks.tarantool.org")
 ] %}
 
@@ -17,7 +17,7 @@
           (item[0] == "Try" and page.slug == "try") or
           (item[0] == "Documentation" and page.slug == "documentation") or
           (item[0] == "Download" and page.slug == "download") or
-          (item[0] == "Job" and page.slug == "job") or
+          (item[0] == "Careers" and page.slug == "careers") or
           (item[0] == "Rocks" and page.slug == "rocks")
         %}
         <a href="{{ item[1] }}" class="b-menu-item-url p-active">{{ item[0] }}</a>

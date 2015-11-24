@@ -1,4 +1,3 @@
-
 {% extends "base" %}
 
 {% block header_scripts %}
@@ -6,20 +5,27 @@
 {% endblock header_scripts %}
 
 {% block content %}
+{#
 <section class="b-lightgray_block b-job_top b-clearbox">
   <div class="b-block-wrapper">
     <h2 class="b-section-title">Job</h2>
   </div>
 </section>
+#}
+
+<section class="b-block b-job b-job_bg">
+  <div class="b-block-wrapper">
+  </div>
+  <section class="b-lightgray_block b-job_top b-job_opacity-up">
+    <div class="b-block-wrapper">
+      <article class="b-article">
+        {{ page.blocks.content_up }}
+      </article>
+    </div>
+  </section>
+</section>
 
 <section class="b-block b-job">
-  <div class="b-block-wrapper">
-    <article class="b-article">
-      {{ page.blocks.content_up }}
-    </article>
-  </div>
-</section>
-<section class="b-lightgray_block b-job">
   <div class="b-block-wrapper">
     <article class="b-article">
       {{ page.blocks.content_down }}
@@ -35,7 +41,10 @@
         <div class="b-download-list-item-drop">
           <article class="b-article">
             {{ item.content }}
-            <a class="b-button" href="mailto:job@tarantool.org">Apply</a>
+            <div class="b-button_container">
+              <a class="b-button b-email" href="mailto:job@tarantool.org">Email us</a>
+              <a class="b-button b-hr" href="{{ item.link }}">Vacancy</a>
+            </div>
           </article>
         </div>
       </li>
