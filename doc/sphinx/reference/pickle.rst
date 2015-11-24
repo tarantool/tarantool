@@ -58,7 +58,7 @@
              packed according to the format specifiers.
     :rtype:  string
 
-    :except: unknown format specifier.
+    Possible errors: unknown format specifier.
 
     | EXAMPLE
     |

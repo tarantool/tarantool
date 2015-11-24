@@ -182,7 +182,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :param string data:
         :return: the number of bytes sent.
         :rtype:  number
-        :exception: nil on error.
+
+        Possible errors: nil on error.
 
     .. method:: syswrite(size)
 
@@ -197,10 +198,11 @@ the function invocations will look like ``sock:function_name(...)``.
         :param integer size:
         :return: a string of the requested length on success.
         :rtype:  string
-        :exception: On error, returns an empty string, followed by status,
-                    errno, errstr. In case the writing side has closed its
-                    end, returns the remainder read from the socket (possibly
-                    an empty string), followed by "eof" status.
+
+        Possible errors: On error, returns an empty string, followed by status,
+        errno, errstr. In case the writing side has closed its
+        end, returns the remainder read from the socket (possibly
+        an empty string), followed by "eof" status.
 
     .. method:: read(limit [, timeout])
                 read(delimiter [, timeout])
@@ -243,7 +245,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: a socket object on success
         :rtype:  userdata
-        :exception: nil, status, errno, errstr on error.
+
+        Possible errors: Returns nil, status, errno, errstr on error.
 
 
     .. method:: listen(backlog)
@@ -265,7 +268,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: new socket if success.
         :rtype: userdata
-        :exception: nil
+
+        Possible errors: nil.
 
     .. method:: sendto(host, port, data)
 
@@ -277,7 +281,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :return: the number of bytes sent.
         :rtype:  number
-        :exception: status, errno, errstr.
+
+        Possible errors: on error, returns status, errno, errstr.
 
     .. method:: recvfrom(limit)
 
@@ -286,7 +291,8 @@ the function invocations will look like ``sock:function_name(...)``.
         :param integer limit:
         :return: message, a table containing "host", "family" and "port" fields.
         :rtype:  string, table
-        :exception: status, errno, errstr.
+
+        Possible errors: on error, returns status, errno, errstr.
 
         After
 

@@ -42,7 +42,8 @@
                             which will be appended to, or substitute for,
                             items in the Lua chunk.
     :return: whatever is returned by the Lua code chunk.
-    :except: If there is a compilation error, it is raised as a Lua error.
+
+    Possible errors: If there is a compilation error, it is raised as a Lua error.
 
     | EXAMPLE
     |

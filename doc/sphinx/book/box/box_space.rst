@@ -85,7 +85,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             |               | types              |                             |                     |
             +---------------+--------------------+-----------------------------+---------------------+
 
-        **Possible errors:** too many parts. A type option other than TREE, or a
+        Possible errors: too many parts. A type option other than TREE, or a
         unique option other than unique, or a parts option with more than one
         field component, is only applicable for the memtx storage engine.
 
@@ -107,7 +107,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the inserted tuple
         :rtype:  tuple
 
-        **Possible errors:** If a tuple with the same unique-key value already exists,
+        Possible errors: If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
 
         **Example:**
@@ -131,7 +131,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
                  a tuple whose primary key is ``{1,2,3}``.
         :rtype:  tuple
 
-        **Possible errors:** No such space; wrong type.
+        Possible errors: No such space; wrong type.
 
         **Complexity Factors:** Index size, Index type.
 
@@ -197,7 +197,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the selected tuple.
         :rtype:  tuple
 
-        **Possible errors:** If space-name does not exist.
+        Possible errors: If space-name does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -224,7 +224,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        **Possible errors:** If space-name does not exist.
+        Possible errors: If space-name does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -244,7 +244,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        **Possible errors:** ``space-name`` does not exist.
+        Possible errors: ``space-name`` does not exist.
 
         **Example:**
 
@@ -272,7 +272,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the inserted tuple.
         :rtype:  tuple
 
-        **Possible errors:** If a different tuple with the same unique-key
+        Possible errors: If a different tuple with the same unique-key
         value already exists, returns :errcode:`ER_TUPLE_FOUND`. (This
         would only happen if there was a secondary index. By default
         secondary indexes are unique)
@@ -328,7 +328,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the updated tuple.
         :rtype:  tuple
 
-        **Possible errors:** it is illegal to modify a primary-key field.
+        Possible errors: it is illegal to modify a primary-key field.
 
         **Complexity Factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
@@ -456,7 +456,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: null.
 
-        **Possible errors:** it is illegal to modify a primary-key field.
+        Possible errors: it is illegal to modify a primary-key field.
 
         **Complexity factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
@@ -680,7 +680,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        **Possible errors:** index has wrong type or primary-key indexed field is not a number.
+        Possible errors: index has wrong type or primary-key indexed field is not a number.
 
         **Example:**
 

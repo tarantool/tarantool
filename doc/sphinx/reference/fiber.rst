@@ -148,7 +148,7 @@ can be reused when another fiber is created.
 
     :param id: the id of the fiber to be canceled.
 
-    :Exception: the specified fiber does not exist or cancel is not permitted.
+    Possible errors: the specified fiber does not exist or cancel is not permitted.
 
     Example:
 
@@ -232,7 +232,8 @@ can be reused when another fiber is created.
                      object returned by :code:`fiber.create`
 
         :Return: nil
-        :Exception: cancel is not permitted for the specified fiber object.
+
+        Possible errors: cancel is not permitted for the specified fiber object.
 
         Example:
 
