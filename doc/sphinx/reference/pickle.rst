@@ -94,6 +94,7 @@
 .. function:: unpack(format, binary-string)
 
     Counterpart to ``pickle.pack()``.
+    Warning: if format specifier 'A' is used, it must be the last item.
 
     :param string format:
     :param string binary-string:
@@ -128,8 +129,8 @@
     | :codenormal:`- 18446744073709551615`
     | :codenormal:`- 65535`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`tonumber64('666666666666666')))`
+    | :codenormal:`tarantool>` :codebold:`num, num64, str = pickle.unpack('slA', pickle.pack('slA', 666,`
+    | :codenormal:`\         ->` :codebold:`tonumber64('666666666666666'), 'string'))`
     | :codenormal:`---`
     | :codenormal:`...`
 
