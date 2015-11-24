@@ -33,7 +33,9 @@
 #include <stdbool.h>
 #include "trivia/util.h"
 
+#if defined(__cplusplus)
 #include "key_def.h"
+#endif /* defined(__cplusplus) */
 
 /** \cond public */
 typedef struct tuple box_tuple_t;
@@ -116,6 +118,8 @@ API_EXPORT void
 box_iterator_free(box_iterator_t *iterator);
 
 /** \endcond public */
+
+#if defined(__cplusplus)
 
 extern const char *iterator_type_strs[];
 
@@ -292,6 +296,8 @@ index_is_primary(const Index *index)
 {
 	return index_id(index) == 0;
 }
+
+#endif /* defined(__plusplus) */
 
 /** \cond public */
 

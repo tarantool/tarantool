@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "errcode.h"
-#include "exception.h"
 
 struct rmean;
 extern "C" struct rmean *rmean_error;
@@ -41,6 +40,10 @@ enum rmean_error_name {
 	RMEAN_ERROR_LAST
 };
 extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
+
+#if defined(__cplusplus)
+
+#include "exception.h"
 
 extern const struct type type_ClientError;
 class ClientError: public Exception {
@@ -96,6 +99,8 @@ public:
 
 void
 error_init(void);
+
+#endif /* defined(__cplusplus) */
 
 /** \cond public */
 

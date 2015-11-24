@@ -43,6 +43,8 @@ extern "C" {
  */
 
 struct port;
+struct request;
+struct xrow_header;
 
 /** To be called at program start. */
 void box_load_cfg();
@@ -105,8 +107,6 @@ void box_set_readahead(void);
 }
 #endif /* defined(__cplusplus) */
 
-struct request;
-struct port;
 struct box_function_ctx {
 	struct request *request;
 	struct port *port;

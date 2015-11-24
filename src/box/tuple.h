@@ -31,6 +31,9 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+
+#if defined(__cplusplus)
+
 #include "key_def.h" /* for enum field_type */
 #include "tuple_update.h"
 
@@ -611,6 +614,8 @@ tuple_begin_snapshot();
 void
 tuple_end_snapshot();
 
+#endif /* defined(__cplusplus) */
+
 /** \cond public */
 typedef struct tuple_format box_tuple_format_t;
 
@@ -816,6 +821,8 @@ box_tuple_next(box_tuple_iterator_t *it);
 
 /** \endcond public */
 
+#if defined(__cplusplus)
+
 extern struct tuple *box_tuple_last;
 
 /**
@@ -858,6 +865,8 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t field_no, uint32_t deflt)
 		return mp_decode_uint(&field);
 	return deflt;
 }
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 
