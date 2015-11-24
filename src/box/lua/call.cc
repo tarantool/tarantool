@@ -163,7 +163,7 @@ lbox_insert(lua_State *L)
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);
@@ -179,7 +179,7 @@ lbox_replace(lua_State *L)
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);
@@ -199,7 +199,7 @@ lbox_update(lua_State *L)
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_update(space_id, index_id, key, key + key_len,
 		       ops, ops + ops_len, 1, &result) != 0)
 		return lbox_error(L);
@@ -220,7 +220,7 @@ lbox_upsert(lua_State *L)
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
 		       ops, ops + ops_len, 1, &result) != 0)
 		return lbox_error(L);
@@ -239,7 +239,7 @@ lbox_delete(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);

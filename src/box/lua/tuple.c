@@ -57,10 +57,10 @@ extern char tuple_lua[]; /* Lua source */
 
 uint32_t CTID_CONST_STRUCT_TUPLE_REF;
 
-static inline box_tuple_t *
+static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
-	box_tuple_t *tuple = lua_istuple(L, narg);
+	struct tuple *tuple = lua_istuple(L, narg);
 	if (tuple == NULL)  {
 		luaL_error(L, "Invalid argument #%d (box.tuple expected, got %s)",
 		   narg, lua_typename(L, lua_type(L, narg)));
@@ -69,7 +69,7 @@ lua_checktuple(struct lua_State *L, int narg)
 	return tuple;
 }
 
-box_tuple_t *
+struct tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
 	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
@@ -83,7 +83,7 @@ lua_istuple(struct lua_State *L, int narg)
 	if (ctypeid != CTID_CONST_STRUCT_TUPLE_REF)
 		return NULL;
 
-	return *(box_tuple_t **) data;
+	return *(struct tuple **) data;
 }
 
 static int
@@ -114,7 +114,7 @@ lbox_tuple_new(lua_State *L)
 	mpstream_flush(&stream);
 
 	box_tuple_format_t *fmt = box_tuple_format_default();
-	box_tuple_t *tuple = box_tuple_new(fmt, buf->buf,
+	struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 					   buf->buf + ibuf_used(buf));
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	lbox_pushtuple(L, tuple);
@@ -125,7 +125,7 @@ lbox_tuple_new(lua_State *L)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	box_tuple_t *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	box_tuple_unref(tuple);
 	return 0;
 }
@@ -139,7 +139,6 @@ lbox_tuple_slice_wrapper(struct lua_State *L)
 	int end = lua_tointeger(L, 3);
 	const char *field;
 
-	assert(start < field_count);
 	uint32_t field_no = start;
 	field = box_tuple_seek(it, start);
 	while (field && field_no < end) {
@@ -154,7 +153,7 @@ lbox_tuple_slice_wrapper(struct lua_State *L)
 static int
 lbox_tuple_slice(struct lua_State *L)
 {
-	box_tuple_t *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	uint32_t start, end;
 	int offset;
@@ -268,7 +267,7 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 static int
 lbox_tuple_transform(struct lua_State *L)
 {
-	box_tuple_t *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L);
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
@@ -334,7 +333,7 @@ lbox_tuple_transform(struct lua_State *L)
 	mpstream_flush(&stream);
 
 	/* Execute tuple_update */
-	box_tuple_t *new_tuple =
+	struct tuple *new_tuple =
 		box_tuple_update(tuple, buf->buf, buf->buf + ibuf_used(buf));
 	if (tuple == NULL)
 		lbox_error(L);
@@ -345,11 +344,11 @@ lbox_tuple_transform(struct lua_State *L)
 }
 
 void
-lbox_pushtuple(struct lua_State *L, box_tuple_t *tuple)
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
-	box_tuple_t **ptr = (box_tuple_t **) luaL_pushcdata(L,
-		CTID_CONST_STRUCT_TUPLE_REF);
+	struct tuple **ptr = (struct tuple **)
+		luaL_pushcdata(L, CTID_CONST_STRUCT_TUPLE_REF);
 	*ptr = tuple;
 	/* The order is important - first reference tuple, next set gc */
 	if (box_tuple_ref(tuple) != 0) {

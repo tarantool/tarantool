@@ -32,15 +32,14 @@
  */
 #include <stddef.h>
 
-#include "lua/msgpack.h"
-
 #if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
 struct tuple;
 struct lua_State;
 struct mpstream;
+struct luaL_serializer;
 
 /**
  * Push tuple on lua stack
@@ -57,7 +56,8 @@ lbox_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 	return 1;
 }
 
-struct tuple *lua_istuple(struct lua_State *L, int narg);
+struct tuple *
+lua_istuple(struct lua_State *L, int narg);
 
 void
 luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
@@ -76,6 +76,6 @@ box_lua_tuple_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H */
