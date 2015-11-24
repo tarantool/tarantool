@@ -37,8 +37,6 @@
 #include "func.h"
 #include "index.h"
 #include "bit/bit.h"
-#include "fiber.h"
-#include "scoped_guard.h"
 #include "session.h"
 
 struct universe universe;
