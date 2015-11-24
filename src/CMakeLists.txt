@@ -85,7 +85,7 @@ set (server_sources
      coio_buf.cc
      pickle.c
      ipc.c
-     latch.cc
+     latch.c
      errinj.c
      fio.c
      crc32.c
