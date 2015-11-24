@@ -50,7 +50,7 @@ add_library(box
     request.cc
     txn.cc
     box.cc
-    user_def.cc
+    user_def.c
     user.cc
     authentication.cc
     vclock.c
