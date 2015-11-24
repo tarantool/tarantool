@@ -118,17 +118,14 @@ Example, using a table literal enclosed in {braces}: |br|
 
 Example, creating a function which sets each option in a separate line:
     | :codenormal:`# Connection function. Usage: conn = mysql_connect()`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
     | :codenormal:`tarantool>` :codebold:`function mysql_connect ()`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`local p, conn`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p = {}`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p.host = 'widgets.com'`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p.db = 'test'`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`conn = mysql.connect(p)`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`return conn`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end!`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`conn = mysql_connect()`
@@ -263,7 +260,6 @@ mysqld server is already running on the local host 127.0.0.1.
     | :codenormal:`# retrieve one row, and display the row.`
     | :codenormal:`# For explanations of the statement types used here, read the`
     | :codenormal:`# Lua tutorial earlier in the Tarantool user manual.`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
     | :codenormal:`tarantool>` :codebold:`function mysql_select ()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`local conn = mysql.connect(`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`{host='127.0.0.1', port=3306, user='root', db='test'})`
@@ -274,10 +270,9 @@ mysqld server is already running on the local host 127.0.0.1.
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`end`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`conn:close()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`return row`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`end!`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
     | :codenormal:`tarantool>`
     |
     | :codenormal:`# Execute the Lua function.`
@@ -366,17 +361,13 @@ Example, using a table literal enclosed in {braces}: |br|
 
 Example, creating a function which sets each option in a separate line:
     | :codenormal:`# Connection function. Usage: conn = pg_connect()`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
     | :codenormal:`tarantool>` :codebold:`function pg_connect ()`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p = {}`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p.host = 'widgets.com'`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`p.db = 'test'`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`conn = pg.connect(p)`
     | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`return conn`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end!`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`conn = pg_connect()`
@@ -507,7 +498,6 @@ PostgreSQL server is already running on the local host 127.0.0.1.
     | :codenormal:`# retrieve one row, and display the row.`
     | :codenormal:`# For explanations of the statement types used here, read the`
     | :codenormal:`# Lua tutorial earlier in the Tarantool user manual.`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
     | :codenormal:`tarantool>` :codebold:`function pg_select ()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`local conn = pg.connect(`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`{host='127.0.0.1', port=5432, user='postgres', password='postgres', db='postgres'})`
@@ -518,10 +508,9 @@ PostgreSQL server is already running on the local host 127.0.0.1.
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`end`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`conn:close()`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`return row`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`end!`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
     | :codenormal:`tarantool>`
     |
     | :codenormal:`# Execute the Lua function.`

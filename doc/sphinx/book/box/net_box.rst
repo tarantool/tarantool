@@ -159,13 +159,11 @@ the database is nearly empty. Assume that the tarantool server is running on
     | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'read,write,execute', 'universe')`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`net_box = require('net.box')!`
+    | :codenormal:`tarantool>` :codebold:`net_box = require('net.box')`
     | :codenormal:`---`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`function example()`
+    | :codenormal:`>` :codebold:`local conn, wtuple`
     | :codenormal:`>` :codebold:`if net_box.self:ping() then`
     | :codenormal:`>` :codebold:`table.insert(ta, 'self:ping() succeeded')`
     | :codenormal:`>` :codebold:`table.insert(ta, '  (no surprise -- self connection is pre-established)')`
@@ -194,10 +192,7 @@ the database is nearly empty. Assume that the tarantool server is running on
     | :codenormal:`>` :codebold:`table.insert(ta, 'conn update done on tester')`
     | :codenormal:`>` :codebold:`conn:close()`
     | :codenormal:`>` :codebold:`table.insert(ta, 'conn close done')`
-    | :codenormal:`>` :codebold:`end!`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+    | :codenormal:`>` :codebold:`end`
     | :codenormal:`---`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`ta = {}`

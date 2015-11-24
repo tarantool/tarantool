@@ -115,7 +115,10 @@ For multi-line requests, it is possible to change the end-of-request marker.
 Syntax: :samp:`console = require('console'); console.delimiter({string-literal})`.
 The string-literal must be a value in single quotes. Effect: string becomes
 end-of-request delimiter, so newline alone is not treated as end of request.
-To go back to normal mode: :samp:`console.delimiter(''){string-literal}`. Example:
+To go back to normal mode: :samp:`console.delimiter(''){string-literal}`.
+Delimiters are usually not necessary because Tarantool can tell when a
+multi-line request has not ended (for example, if it sees that a function
+declaration does not have an :codenormal:`end` keyword). Example:
 
 .. code-block:: lua_tarantool
 

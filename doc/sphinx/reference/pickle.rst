@@ -58,7 +58,7 @@
              packed according to the format specifiers.
     :rtype:  string
 
-    :except: unknown format specifier.
+    Possible errors: unknown format specifier.
 
     | EXAMPLE
     |
@@ -94,6 +94,7 @@
 .. function:: unpack(format, binary-string)
 
     Counterpart to ``pickle.pack()``.
+    Warning: if format specifier 'A' is used, it must be the last item.
 
     :param string format:
     :param string binary-string:
@@ -106,34 +107,31 @@
     | :codenormal:`tarantool>` :codebold:`pickle = require('pickle')`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`-- this means following commands must end with '!'`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-    | :codenormal:`tarantool>` :codebold:`tuple = box.space.tester:replace{0}!`
+    | :codenormal:`tarantool>` :codebold:`tuple = box.space.tester:replace{0}`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`string.len(tuple[1])!`
+    | :codenormal:`tarantool>` :codebold:`string.len(tuple[1])`
     | :codenormal:`---`
     | :codenormal:`- 1`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`pickle.unpack('b', tuple[1])!`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('b', tuple[1])`
     | :codenormal:`---`
     | :codenormal:`- 48`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))`
     | :codenormal:`---`
     | :codenormal:`- 255`
     | :codenormal:`- 65535`
     | :codenormal:`- 4294967295`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!`
+    | :codenormal:`tarantool>` :codebold:`pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))`
     | :codenormal:`---`
     | :codenormal:`- 18446744073709551615`
     | :codenormal:`- 65535`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`tonumber64('666666666666666')))!`
+    | :codenormal:`tarantool>` :codebold:`num, num64, str = pickle.unpack('slA', pickle.pack('slA', 666,`
+    | :codenormal:`\         ->` :codebold:`tonumber64('666666666666666'), 'string'))`
     | :codenormal:`---`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.delimiter('') -- back to normal: commands end with line feed!`
 
 .. _pack: http://perldoc.perl.org/functions/pack.html

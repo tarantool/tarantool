@@ -148,7 +148,7 @@ can be reused when another fiber is created.
 
     :param id: the id of the fiber to be canceled.
 
-    :Exception: the specified fiber does not exist or cancel is not permitted.
+    Possible errors: the specified fiber does not exist or cancel is not permitted.
 
     Example:
 
@@ -232,7 +232,8 @@ can be reused when another fiber is created.
                      object returned by :code:`fiber.create`
 
         :Return: nil
-        :Exception: cancel is not permitted for the specified fiber object.
+
+        Possible errors: cancel is not permitted for the specified fiber object.
 
         Example:
 
@@ -280,17 +281,16 @@ of the loop adds 1 to a global variable named gvar, then goes to sleep for
 2 seconds. The sleep causes an implicit :code:`fiber.yield()`.
 
 | :codenormal:`tarantool>` :codebold:`fiber = require('fiber')`
-| :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
+| :codenormal:`tarantool>` :codebold:`gvar = 0`
 | :codenormal:`tarantool>` :codebold:`function function_x()`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`gvar = 0`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`while 0 == 0 do`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`gvar = gvar + 1`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`fiber.sleep(2)`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end!`
+| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
 | :codenormal:`---`
 | :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
 
 Make a fiber, associate function_x with the fiber, and start function_x.
 It will immediately "detach" so it will be running independently of the caller.

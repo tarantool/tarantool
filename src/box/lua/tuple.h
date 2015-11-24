@@ -31,13 +31,13 @@
  * SUCH DAMAGE.
  */
 #include <stddef.h>
+
 #if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
-struct lua_State;
-struct txn;
 struct tuple;
+struct lua_State;
 struct mpstream;
 struct luaL_serializer;
 
@@ -56,31 +56,26 @@ lbox_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 	return 1;
 }
 
-struct tuple *lua_istuple(struct lua_State *L, int narg);
-
-void
-luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
-		  struct mpstream *stream, int index);
+struct tuple *
+lua_istuple(struct lua_State *L, int narg);
 
 void
 luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		    struct mpstream *stream, int index);
 
 void
-luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index);
+luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
+		  struct mpstream *stream, int index);
 
-char *
-lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
+void
+luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
+		   struct mpstream *stream, int index);
 
 void
 box_lua_tuple_init(struct lua_State *L);
 
-struct tuple *
-boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);
-
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H */

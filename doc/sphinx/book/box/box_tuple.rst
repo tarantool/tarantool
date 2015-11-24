@@ -269,9 +269,9 @@ and display how many bytes remain in the tuple. The function uses Tarantool
 
 .. code-block:: lua_tarantool
 
-    console = require('console'); console.delimiter('!')
     function example()
       local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
+      local luatable1 = {}
       tuple1 = box.tuple.new({'a', 'b', 'c'})
       luatable1 = {tuple1:unpack()}
       scalar1, scalar2, scalar3 = tuple1:unpack()
@@ -279,8 +279,7 @@ and display how many bytes remain in the tuple. The function uses Tarantool
       field_number = tuple2:find('b')
       tuple2 = tuple2:transform(field_number, 1)
       return 'tuple2 = ' , tuple2 , ' # of bytes = ' , tuple2:bsize()
-    end!
-    console.delimiter('')!
+    end
 
 ... And here is what happens when one invokes the function:
 

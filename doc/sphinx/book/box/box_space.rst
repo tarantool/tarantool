@@ -85,7 +85,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             |               | types              |                             |                     |
             +---------------+--------------------+-----------------------------+---------------------+
 
-        **Possible errors:** too many parts. A type option other than TREE, or a
+        Possible errors: too many parts. A type option other than TREE, or a
         unique option other than unique, or a parts option with more than one
         field component, is only applicable for the memtx storage engine.
 
@@ -107,7 +107,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the inserted tuple
         :rtype:  tuple
 
-        **Possible errors:** If a tuple with the same unique-key value already exists,
+        Possible errors: If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
 
         **Example:**
@@ -131,7 +131,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
                  a tuple whose primary key is ``{1,2,3}``.
         :rtype:  tuple
 
-        **Possible errors:** No such space; wrong type.
+        Possible errors: No such space; wrong type.
 
         **Complexity Factors:** Index size, Index type.
 
@@ -197,7 +197,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the selected tuple.
         :rtype:  tuple
 
-        **Possible errors:** If space-name does not exist.
+        Possible errors: If space-name does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -224,7 +224,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        **Possible errors:** If space-name does not exist.
+        Possible errors: If space-name does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -244,7 +244,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        **Possible errors:** ``space-name`` does not exist.
+        Possible errors: ``space-name`` does not exist.
 
         **Example:**
 
@@ -272,7 +272,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the inserted tuple.
         :rtype:  tuple
 
-        **Possible errors:** If a different tuple with the same unique-key
+        Possible errors: If a different tuple with the same unique-key
         value already exists, returns :errcode:`ER_TUPLE_FOUND`. (This
         would only happen if there was a secondary index. By default
         secondary indexes are unique)
@@ -328,7 +328,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: the updated tuple.
         :rtype:  tuple
 
-        **Possible errors:** it is illegal to modify a primary-key field.
+        Possible errors: it is illegal to modify a primary-key field.
 
         **Complexity Factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
@@ -456,7 +456,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: null.
 
-        **Possible errors:** it is illegal to modify a primary-key field.
+        Possible errors: it is illegal to modify a primary-key field.
 
         **Complexity factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
@@ -680,7 +680,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
 
-        **Possible errors:** index has wrong type or primary-key indexed field is not a number.
+        Possible errors: index has wrong type or primary-key indexed field is not a number.
 
         **Example:**
 
@@ -734,18 +734,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. code-block:: lua_tarantool
 
-        console = require('console'); console.delimiter('!')
         function example()
-          local ta = {}, i, line
-          or k, v in box.space._schema:pairs() do
+          local ta = {}
+          local i, line
+          for k, v in box.space._schema:pairs() do
             i = 1
             line = ''
             while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end
             table.insert(ta, line)
           end
           return ta
-        end!
-        console.delimiter('')!
+        end
 
     Here is what ``example()`` returns in a typical installation:
 
@@ -769,9 +768,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. code-block:: lua_tarantool
 
-        console = require('console'); console.delimiter('!')
         function example()
-          local ta = {}, i, line
+          local ta = {}
+          local i, line
           for k, v in box.space._space:pairs() do
             i = 1
             line = ''
@@ -784,9 +783,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             table.insert(ta, line)
           end
           return ta
-        end!
-        console.delimiter('')!
-
+        end
 
     Here is what ``example()`` returns in a typical installation:
 
@@ -837,22 +834,21 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``space-id index-id index-name index-type index-is-unique
     index-field-count [tuple-field-no, tuple-field-type ...]``.
 
-    The following function will display all fields in all tuples of ``_index``:
+    The following function will display some fields in all tuples of ``_index``:
 
     .. code-block:: lua_tarantool
 
-        console = require('console'); console.delimiter('!')
         function example()
-          local ta = {}, i, line
+          local ta = {}
+          local i, line
           for k, v in box.space._index:pairs() do
             i = 1
             line = ''
-            while i <= #v do line = line .. v[i] .. ' ' i = i + 1 end
+            while i <= 4 do line = line .. v[i] .. ' ' i = i + 1 end
             table.insert(ta, line)
             end
           return ta
-        end!
-        console.delimiter('')!
+        end
 
     Here is what ``example()`` returns in a typical installation:
 
@@ -914,19 +910,18 @@ returns a table.
 
 .. code-block:: lua_tarantool
 
-    console = require('console'); console.delimiter('!')
     function example()
       local tuple_count, space_name, line
       local ta = {}
       for k, v in box.space._space:pairs() do
         space_name = v[3]
         if box.space[space_name].index[0] ~= nil then
-          tuple_count = box.space[space_name]:len()
+          tuple_count = '1 or more'
         else
-          tuple_count = 0
+          tuple_count = '0'
         end
         line = space_name .. ' tuple_count =' .. tuple_count
-        if tuple_count > 0 then
+        if tuple_count == '1 or more' then
           for k1, v1 in box.space[space_name]:pairs() do
             line = line .. '. first field in first tuple = ' .. v1[1]
             break
@@ -935,8 +930,7 @@ returns a table.
         table.insert(ta, line)
       end
       return ta
-    end!
-    console.delimiter('')!
+    end
 
 And here is what happens when one invokes the function:
 

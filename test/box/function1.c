@@ -18,12 +18,12 @@ args(box_function_ctx_t *ctx, const char *args, const char *args_end)
 {
 	uint32_t arg_count = mp_decode_array(&args);
 	if (arg_count < 1) {
-		return box_error_raise(ER_PROC_C, "%s",
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C, "%s",
 			"invalid argument count");
 	}
 
 	if (mp_typeof(*args) != MP_UINT) {
-		return box_error_raise(ER_PROC_C, "%s",
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C, "%s",
 			"first tuple field must be uint");
 	}
 
@@ -57,7 +57,7 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	uint32_t index_id = box_index_id_by_name(space_id, INDEX_NAME,
 		strlen(INDEX_NAME));
 	if (space_id == BOX_ID_NIL || index_id == BOX_ID_NIL) {
-		return box_error_raise(ER_PROC_C,
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C,
 			"Can't find index %s in space %s",
 			INDEX_NAME, SPACE_NAME);
 	}
@@ -70,7 +70,8 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	for (uint32_t i = 0; i < arg_count; i++) {
 		/* Decode next argument */
 		if (mp_typeof(*args) != MP_UINT)
-			return box_error_raise(ER_PROC_C, "Expected uint keys");
+			return box_error_set(__FILE__, __LINE__,
+					       ER_PROC_C, "Expected uint keys");
 		uint32_t key = mp_decode_uint(&args);
 		(void) key;
 
@@ -90,7 +91,9 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 		} else if (tuple != NULL) {
 			const char *field = box_tuple_field(tuple, 1);
 			if (field == NULL || mp_typeof(*field) != MP_UINT)
-				return box_error_raise(ER_PROC_LUA, "Invalid tuple");
+				return box_error_set(__FILE__, __LINE__,
+						       ER_PROC_LUA,
+						       "Invalid tuple");
 			counter = mp_decode_uint(&field) + 1;
 		}
 
@@ -113,7 +116,7 @@ multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 int
 errors(box_function_ctx_t *ctx, const char *args, const char *args_end)
 {
-	box_error_raise(ER_PROC_C, "%s", "Proc error");
+	box_error_set(__FILE__, __LINE__, ER_PROC_C, "%s", "Proc error");
 
 	const box_error_t *error = box_error_last();
 	assert(strcmp(box_error_type(error), "ClientError") == 0);

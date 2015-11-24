@@ -134,7 +134,8 @@ access the same file simultaneously.
     :param string path-name: path-name, which may contain wildcard characters.
     :return: list of files whose names match the input string
     :rtype:  table
-    :except: nil on failure.
+
+    Possible errors: nil.
 
     | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fio.glob('/etc/x*')`
@@ -268,7 +269,8 @@ access the same file simultaneously.
                          combined by enclosing them in braces.
     :return: file handle (later - fh)
     :rtype:  userdata
-    :except: nil
+
+    Possible errors: nil.
 
     | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`fh = fio.open('/home/username/tmp.txt', {'O_RDWR', 'O_APPEND'})`
@@ -368,7 +370,8 @@ access the same file simultaneously.
                     = current position, '``SEEK_SET``' = start of file.
         :return: the new position if success
         :rtype:  number
-        :except: nil
+
+        Possible errors: nil.
 
         | EXAMPLE
         | :codenormal:`tarantool>` :codebold:`fh:seek(20, 'SEEK_SET')`

@@ -5,21 +5,30 @@
 
 The csv package handles records formatted according to Comma-Separated-Values (CSV) rules.
 
-The default formatting rules are: |br|
-() Lua `escape sequences`_ such as \\n or \\10 are legal within strings but not within files, |br|
-() Commas designate end-of-field, |br|
-() Line feeds, or line feeds plus carriage returns, designate end-of-record, |br|
-() Leading or trailing spaces are ignored, |br|
-() Quote marks may enclose fields or parts of fields, |br|
-() When enclosed by quote marks, commas and line feeds and spaces are treated as ordinary characters, and a pair of quote marks "" is treated as a single quote mark. |br|
+The default formatting rules are:
+
+* Lua `escape sequences`_ such as \\n or \\10 are legal within strings but not
+  within files,
+* Commas designate end-of-field,
+* Line feeds, or line feeds plus carriage returns, designate end-of-record,
+* Leading or trailing spaces are ignored,
+* Quote marks may enclose fields or parts of fields,
+* When enclosed by quote marks, commas and line feeds and spaces are treated as
+  ordinary characters, and a pair of quote marks "" is treated as a single
+  quote mark.
 
 .. _csv-options:
 
-The possible options which can be passed to csv functions are: |br|
-() :samp:`delimiter = {string}` -- single-byte character to designate end-of-field, default = comma |br|
-() :samp:`quote_char = {string}` -- single-byte character to designate encloser of string, default = quote mark |br|
-() :samp:`chunk-size = {number}` -- number of characters to read at once (usually for file-IO efficiency), default = 4096 |br|
-() :samp:`skip_head_lines = {number}` -- number of lines to skip at the start (usually for a header), default 0.
+The possible options which can be passed to csv functions are:
+
+* :samp:`delimiter = {string}` -- single-byte character to designate
+  end-of-field, default = comma
+* :samp:`quote_char = {string}` -- single-byte character to designate
+  encloser of string, default = quote mark
+* :samp:`chunk-size = {number}` -- number of characters to read at once
+  (usually for file-IO efficiency), default = 4096
+* :samp:`skip_head_lines = {number}` -- number of lines to skip at the
+  start (usually for a header), default 0.
 
 .. module:: csv
 
@@ -34,7 +43,8 @@ The possible options which can be passed to csv functions are: |br|
     :return: loaded_value
     :rtype:  table
 
-    | EXAMPLES
+    **EXAMPLE**
+
     | :codenormal:`tarantool>` :codebold:`csv = require('csv')`
     | :codenormal:`---`
     | :codenormal:`...`
@@ -42,11 +52,11 @@ The possible options which can be passed to csv functions are: |br|
     | :codenormal:`tarantool>` :codebold:`csv.load('a,"b,c ",d')`
     | :codenormal:`---`
     | :codenormal:`- - - a`
-    | |nbsp| |nbsp| |nbsp| - 'b,c '`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- d`
+    | :codenormal:`\     - 'b,c '`
+    | :codenormal:`\     - d`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`#readable string contains 2-byte character = Cyrillic Letter Palochka`
-    | :codenormal:`tarantool>` :codebold:`(This displays a palochka if and only if character set = UTF-8.)`
+    | :codenormal:`tarantool>` :codebold:`#(This displays a palochka if and only if character set = UTF-8.)`
     | :codenormal:`tarantool>` :codebold:`csv.load('a\\211\\128b')`
     | :codenormal:`---`
     | :codenormal:`- - - aӀb`
@@ -55,17 +65,17 @@ The possible options which can be passed to csv functions are: |br|
     | :codenormal:`tarantool>` :codebold:`csv.load('a,b,c\\10d,e,f')`
     | :codenormal:`---`
     | :codenormal:`- - - a`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- b`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- c`
-    | |nbsp| :codenormal:`- - d`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- e`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- f`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`...`
+    | :codenormal:`\     - b`
+    | :codenormal:`\     - c`
+    | :codenormal:`\   - - d`
+    | :codenormal:`\     - e`
+    | :codenormal:`\     - f`
+    | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`#semicolon instead of comma for the delimiter`
     | :codenormal:`tarantool>` :codebold:`tarantool> csv.load('a,b;c,d',{delimiter=';'})`
     | :codenormal:`---`
     | :codenormal:`- - - a,b`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- c,d`
+    | :codenormal:`\     c,d`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`#readable file ./file.csv contains two CSV records`
     | :codenormal:`tarantool>` :codebold:`#    a,"b,c ",d`
@@ -80,10 +90,10 @@ The possible options which can be passed to csv functions are: |br|
     | :codenormal:`tarantool>` :codebold:`csv.load(f, {chunk_size = 4096})`
     | :codenormal:`---`
     | :codenormal:`- - - a`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- 'b,c '`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`- d`
-    | |nbsp| |nbsp| :codenormal:`- - a\\211\\128b`
-    | |nbsp| |nbsp| :codenormal:`- -`
+    | :codenormal:`\     - 'b,c '`
+    | :codenormal:`\     - d`
+    | :codenormal:`\   - - a\\211\\128b`
+    | :codenormal:`\   - -`
     | :codenormal:`...`
     | :codenormal:`tarantool>` :codebold:`f:close()`
     | :codenormal:`---`
@@ -104,7 +114,8 @@ The possible options which can be passed to csv functions are: |br|
     :return: dumped_value
     :rtype:  string, which is written to :code:`writable` if specified
 
-    | EXAMPLES
+    **EXAMPLE**
+
     | :codenormal:`tarantool>` :codebold:`#csv-table has 3 fields, field#2 has "," so result has quote marks`
     | :codenormal:`tarantool>` :codebold:`csv = require('csv')`
     | :codenormal:`---`
@@ -137,11 +148,11 @@ The possible options which can be passed to csv functions are: |br|
     :return: Lua iterator function
     :rtype:  iterator function
 
-    | EXAMPLE
+    **EXAMPLE**
+
     | :codenormal:`csv.iterate()` is the low level of :codenormal:`csv.load()` and :codenormal:`csv.dump()`.
     | To illustrate that, here is a function which is the same as
     | the :codenormal:`csv.load()` function, as seen in `the Tarantool source code`_.
-    | :codebold:`console=require('console'); console.delimiter('!')`
     | :codebold:`load = function(readable, opts)`
     | :codebold:`opts = opts or {}`
     | :codebold:`local result = {}`
@@ -149,8 +160,7 @@ The possible options which can be passed to csv functions are: |br|
     | :codebold:`result[i] = tup`
     | :codebold:`end`
     | :codebold:`return result`
-    | :codebold:`end!`
-    | :codebold:`console.delimiter('')!`
+    | :codebold:`end`
     | :codebold:`#Now, executing "load('a,b,c')" will return the same result as`
     | :codebold:`#"csv.load('a,b,c')", because it is the same code.`
 

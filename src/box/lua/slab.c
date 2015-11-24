@@ -31,24 +31,22 @@
 #include "box/lua/slab.h"
 #include "lua/utils.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
-#include "box/tuple.h"
-#include "box/memtx_engine.h"
 #include "small/small.h"
 #include "small/quota.h"
 #include "memory.h"
 
-/** A callback passed into salloc_stat() and invoked for every slab class. */
-extern "C" {
+extern struct small_alloc memtx_alloc;
+extern struct mempool memtx_index_extent_pool;
 
 static int
-small_stats_noop_cb(const struct mempool_stats * /* stats */, void * /* cb_ctx */)
+small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
 {
+	(void) stats;
+	(void) cb_ctx;
 	return 0;
 }
 
@@ -101,8 +99,6 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 	lua_settable(L, -3);
 	return 0;
 }
-
-} /* extern "C" */
 
 static int
 lbox_slab_stats(struct lua_State *L)

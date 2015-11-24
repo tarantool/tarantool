@@ -33,7 +33,8 @@
 #include "fiber.h"
 
 void
-rmean_roll(int64_t *value, double dt) {
+rmean_roll(int64_t *value, double dt)
+{
 	value[0] /= dt;
 	int j = RMEAN_WINDOW;
 	/* in case when dt >= 2. we update not only last counter */
@@ -45,7 +46,8 @@ rmean_roll(int64_t *value, double dt) {
 }
 
 int64_t
-rmean_mean(int64_t *value) {
+rmean_mean(int64_t *value)
+{
 	int64_t mean = 0;
 	for (size_t j = 1; j <= RMEAN_WINDOW; j++)
 		mean += value[j];
@@ -80,7 +82,7 @@ rmean_foreach(struct rmean *rmean, rmean_cb cb, void *cb_ctx)
 
 }
 
-void
+static void
 rmean_age(ev_loop *loop,
 	  ev_timer *timer, int events)
 {
@@ -103,9 +105,7 @@ struct rmean *
 rmean_new(const char **name, size_t n)
 {
 	struct rmean *rmean = (struct rmean *)
-		realloc(NULL,
-			sizeof(struct rmean) +
-			sizeof(struct stats) * n);
+		malloc(sizeof(struct rmean) + sizeof(struct stats) * n);
 	if (rmean == NULL)
 		return NULL;
 	memset(rmean, 0, sizeof(struct rmean) + sizeof(struct stats) * n);

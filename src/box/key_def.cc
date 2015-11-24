@@ -36,7 +36,8 @@
 #include "scoped_guard.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
-STRS(index_type, ENUM_INDEX_TYPE);
+
+const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
 const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 

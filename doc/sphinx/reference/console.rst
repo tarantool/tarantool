@@ -38,8 +38,9 @@ host/port.
     :param string uri: the URI of the remote server
 
     :return: nil
-    :except: the connection will fail if the target Tarantool server
-             was not initiated with :code:`box.cfg{listen=...}`.
+
+    Possible errors: the connection will fail if the target Tarantool server
+    was not initiated with :code:`box.cfg{listen=...}`.
 
     | EXAMPLE
     | :codenormal:`tarantool>` :codebold:`console = require('console')`

@@ -32,65 +32,12 @@
 #include <stdio.h>
 
 #include <fiber.h>
-struct rmean *rmean_error = NULL;
+#include <rmean.h>
 
-const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
-	"ERROR"
-};
+static struct error *
+BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
 
-static struct method clienterror_methods[] = {
-	make_method(&type_ClientError, "code", &ClientError::errcode),
-	METHODS_SENTINEL
-};
-const struct type type_ClientError = make_type("ClientError", &type_Exception,
-	clienterror_methods);
-
-ClientError::ClientError(const char *file, unsigned line,
-			 uint32_t errcode, ...)
-	: Exception(&type_ClientError, file, line)
-{
-	m_errcode = errcode;
-	va_list ap;
-	va_start(ap, errcode);
-	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
-	va_end(ap);
-	if (rmean_error)
-		rmean_collect(rmean_error, RMEAN_ERROR, 1);
-}
-
-ClientError::ClientError(const char *file, unsigned line, const char *msg,
-			 uint32_t errcode)
-	: Exception(&type_ClientError, file, line)
-{
-	m_errcode = errcode;
-	error_format_msg(this, "%s", msg);
-	if (rmean_error)
-		rmean_collect(rmean_error, RMEAN_ERROR, 1);
-}
-
-void
-ClientError::log() const
-{
-	_say(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(m_errcode));
-}
-
-
-uint32_t
-ClientError::get_errcode(const struct error *e)
-{
-	ClientError *client_error = type_cast(ClientError, e);
-	if (client_error)
-		return client_error->errcode();
-	if (type_cast(OutOfMemory, e))
-		return ER_MEMORY_ISSUE;
-	return ER_PROC_LUA;
-}
-
-ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
-	: LoggedError(file, line, ER_INJECTION, msg)
-{
-	/* nothing */
-}
+/* {{{ public API */
 
 const char *
 box_error_type(const box_error_t *e)
@@ -123,15 +70,94 @@ box_error_clear(void)
 }
 
 int
-box_error_raise(uint32_t code, const char *fmt, ...)
+box_error_set(const char *file, unsigned line, uint32_t code,
+		const char *fmt, ...)
 {
-	char msg[DIAG_ERRMSG_MAX];
-
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, ap);
-	va_end(ap);
-
-	tnt_error(ClientError, msg, code);
+	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error) {
+		client_error->m_errcode = code;
+		va_list ap;
+		va_start(ap, fmt);
+		error_vformat_msg(e, fmt, ap);
+		va_end(ap);
+	}
+	diag_add_error(&fiber()->diag, e);
 	return -1;
 }
+
+/* }}} */
+
+struct rmean *rmean_error = NULL;
+
+const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
+	"ERROR"
+};
+
+static struct method clienterror_methods[] = {
+	make_method(&type_ClientError, "code", &ClientError::errcode),
+	METHODS_SENTINEL
+};
+
+const struct type type_ClientError = make_type("ClientError", &type_Exception,
+	clienterror_methods);
+
+ClientError::ClientError(const char *file, unsigned line,
+			 uint32_t errcode, ...)
+	: Exception(&type_ClientError, file, line)
+{
+	m_errcode = errcode;
+	va_list ap;
+	va_start(ap, errcode);
+	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
+	va_end(ap);
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
+}
+
+static struct error *
+BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
+{
+	try {
+		ClientError *e = new ClientError(file, line, ER_UNKNOWN);
+		va_list ap;
+		va_start(ap, errcode);
+		error_vformat_msg(e, tnt_errcode_desc(errcode), ap);
+		va_end(ap);
+		e->m_errcode = errcode;
+		return e;
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
+void
+ClientError::log() const
+{
+	_say(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(m_errcode));
+}
+
+
+uint32_t
+ClientError::get_errcode(const struct error *e)
+{
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error)
+		return client_error->errcode();
+	if (type_cast(OutOfMemory, e))
+		return ER_MEMORY_ISSUE;
+	return ER_PROC_LUA;
+}
+
+ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
+	: LoggedError(file, line, ER_INJECTION, msg)
+{
+	/* nothing */
+}
+
+void
+error_init(void)
+{
+	error_factory->ClientError = BuildClientError;
+}
+

@@ -85,8 +85,8 @@ set (server_sources
      coio_buf.cc
      pickle.c
      ipc.c
-     latch.cc
-     errinj.cc
+     latch.c
+     errinj.c
      fio.c
      crc32.c
      random.c
@@ -127,7 +127,6 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/schema.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h
-    ${CMAKE_SOURCE_DIR}/src/box/func.h
     ${CMAKE_SOURCE_DIR}/src/box/error.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
     ${CMAKE_SOURCE_DIR}/src/latch.h

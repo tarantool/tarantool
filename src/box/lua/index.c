@@ -29,13 +29,11 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/index.h"
+
 #include "lua/utils.h"
-#include "lua/msgpack.h"
 #include "box/index.h"
-#include "box/lua/error.h"
 #include "box/lua/tuple.h"
-#include "fiber.h"
-#include "iobuf.h"
+#include "box/lua/call.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
@@ -53,7 +51,7 @@ lbox_index_random(lua_State *L)
 	uint32_t index_id = lua_tointeger(L, 2);
 	uint32_t rnd = lua_tointeger(L, 3);
 
-	box_tuple_t *tuple;
+	struct tuple *tuple;
 	if (box_index_random(space_id, index_id, rnd, &tuple) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, tuple);
@@ -70,7 +68,7 @@ lbox_index_get(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
-	box_tuple_t *tuple;
+	struct tuple *tuple;
 	if (box_index_get(space_id, index_id, key, key + key_len, &tuple) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, tuple);
@@ -87,7 +85,7 @@ lbox_index_min(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
-	box_tuple_t *tuple;
+	struct tuple *tuple;
 	if (box_index_min(space_id, index_id, key, key + key_len, &tuple) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, tuple);
@@ -104,7 +102,7 @@ lbox_index_max(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
-	box_tuple_t *tuple;
+	struct tuple *tuple;
 	if (box_index_max(space_id, index_id, key, key + key_len, &tuple) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, tuple);
@@ -119,7 +117,6 @@ lbox_index_count(lua_State *L)
 		       "iterator, key)");
 	}
 
-	RegionGuard region_guard(&fiber()->gc);
 	uint32_t space_id = lua_tointeger(L, 1);
 	uint32_t index_id = lua_tointeger(L, 2);
 	uint32_t iterator = lua_tointeger(L, 3);
@@ -186,7 +183,7 @@ lbox_iterator_next(lua_State *L)
 		return luaL_error(L, "usage: next(state)");
 
 	struct iterator *itr = *(struct iterator **) data;
-	box_tuple_t *tuple;
+	struct tuple *tuple;
 	if (box_iterator_next(itr, &tuple) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, tuple);

@@ -50,7 +50,7 @@ add_library(box
     request.cc
     txn.cc
     box.cc
-    user_def.cc
+    user_def.c
     user.cc
     authentication.cc
     vclock.c
@@ -61,12 +61,12 @@ add_library(box
     wal.cc
     ${lua_sources}
     lua/call.cc
-    lua/tuple.cc
-    lua/slab.cc
-    lua/index.cc
+    lua/tuple.c
+    lua/slab.c
+    lua/index.c
     lua/space.cc
     lua/info.cc
-    lua/stat.cc
+    lua/stat.c
     lua/sophia.c
     lua/error.cc
     lua/session.cc

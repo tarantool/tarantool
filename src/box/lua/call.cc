@@ -32,6 +32,7 @@
 #include "pickle.h"
 
 #include "box/lua/error.h"
+#include "box/lua/slab.h"
 #include "box/lua/tuple.h"
 #include "box/lua/index.h"
 #include "box/lua/space.h"
@@ -162,7 +163,7 @@ lbox_insert(lua_State *L)
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);
@@ -178,7 +179,7 @@ lbox_replace(lua_State *L)
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);
@@ -198,7 +199,7 @@ lbox_update(lua_State *L)
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_update(space_id, index_id, key, key + key_len,
 		       ops, ops + ops_len, 1, &result) != 0)
 		return lbox_error(L);
@@ -219,7 +220,7 @@ lbox_upsert(lua_State *L)
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
 		       ops, ops + ops_len, 1, &result) != 0)
 		return lbox_error(L);
@@ -238,7 +239,7 @@ lbox_delete(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
-	box_tuple_t *result;
+	struct tuple *result;
 	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
 		return lbox_error(L);
 	return lbox_pushtupleornil(L, result);
@@ -375,7 +376,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		struct user *user = user_cache_find(orig_credentials->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->name, name_buf);
+			  priv_name(access), user->def.name, name_buf);
 	}
 	if (func->def.setuid) {
 		/** Remember and change the current user id. */
@@ -452,6 +453,40 @@ execute_c_call(struct func *func, struct request *request, struct obuf *out)
 	}
 }
 
+char *
+lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
+{
+	struct region *gc = &fiber()->gc;
+	size_t used = region_used(gc);
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
+			luamp_error, L);
+	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
+	mpstream_flush(&stream);
+	*p_len = region_used(gc) - used;
+	return (char *) region_join_xc(gc, *p_len);
+}
+
+static inline void
+luamp_encode_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
+		    struct mpstream *stream, int index)
+{
+	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY)
+		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
+}
+
+static inline void
+luamp_convert_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
+		    struct mpstream *stream, int index)
+{
+	if (luaL_isarray(L, index) || lua_istuple(L, index)) {
+		luamp_encode_tuple_xc(L, cfg, stream, index);
+	} else {
+		luamp_encode_array(cfg, stream, 1);
+		luamp_encode(L, cfg, stream, index);
+	}
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
@@ -513,7 +548,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_throw, NULL);
+		      luamp_error, L);
 
 	try {
 		/** Check if we deal with a table of tables. */
@@ -528,8 +563,8 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 			int has_keys = lua_next(L, 1);
 			if (has_keys && (luaL_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
 				do {
-					luamp_encode_tuple(L, luaL_msgpack_default,
-							   &stream, -1);
+					luamp_encode_tuple_xc(L, luaL_msgpack_default,
+							      &stream, -1);
 					++count;
 					lua_pop(L, 1);
 				} while (lua_next(L, 1));
@@ -539,7 +574,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 			}
 		}
 		for (int i = 1; i <= nrets; ++i) {
-			luamp_convert_tuple(L, luaL_msgpack_default, &stream, i);
+			luamp_convert_tuple_xc(L, luaL_msgpack_default, &stream, i);
 			++count;
 		}
 
@@ -610,7 +645,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	struct obuf_svp svp = iproto_prepare_select(out);
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_throw, NULL);
+		      luamp_error, L);
 	int nrets = lua_gettop(L);
 	try {
 		for (int k = 1; k <= nrets; ++k) {
@@ -692,6 +727,7 @@ box_lua_init(struct lua_State *L)
 #endif
 	box_lua_error_init(L);
 	box_lua_tuple_init(L);
+	box_lua_slab_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);
 	box_lua_info_init(L);
