@@ -61,7 +61,7 @@ add_library(box
     wal.cc
     ${lua_sources}
     lua/call.cc
-    lua/tuple.cc
+    lua/tuple.c
     lua/slab.c
     lua/index.cc
     lua/space.cc

@@ -34,6 +34,7 @@
 #include "box/index.h"
 #include "box/lua/error.h"
 #include "box/lua/tuple.h"
+#include "box/lua/call.h"
 #include "fiber.h"
 #include "iobuf.h"
 

@@ -29,19 +29,14 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/tuple.h"
-#include "box/lua/slab.h"
-#include "box/lua/error.h"
-#include "box/tuple.h"
-#include "box/tuple_update.h"
-#include "diag.h"
-#include "fiber.h"
-#include "lua/utils.h"
-#include "lua/msgpack.h"
-#include "third_party/lua-yaml/lyaml.h"
+
+#include "lua/utils.h" /* lbox_error() */
+#include "lua/msgpack.h" /* luamp_encode_XXX() */
+#include "diag.h" /* diag_set() */
 #include <small/ibuf.h>
-extern "C" {
-#include <lj_obj.h>
-}
+
+#include "box/tuple.h"
+#include "box/errcode.h"
 
 /** {{{ box.tuple Lua library
  *
@@ -62,10 +57,10 @@ extern char tuple_lua[]; /* Lua source */
 
 uint32_t CTID_CONST_STRUCT_TUPLE_REF;
 
-static inline struct tuple *
+static inline box_tuple_t *
 lua_checktuple(struct lua_State *L, int narg)
 {
-	struct tuple *tuple = lua_istuple(L, narg);
+	box_tuple_t *tuple = lua_istuple(L, narg);
 	if (tuple == NULL)  {
 		luaL_error(L, "Invalid argument #%d (box.tuple expected, got %s)",
 		   narg, lua_typename(L, lua_type(L, narg)));
@@ -74,7 +69,7 @@ lua_checktuple(struct lua_State *L, int narg)
 	return tuple;
 }
 
-struct tuple *
+box_tuple_t *
 lua_istuple(struct lua_State *L, int narg)
 {
 	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
@@ -88,16 +83,14 @@ lua_istuple(struct lua_State *L, int narg)
 	if (ctypeid != CTID_CONST_STRUCT_TUPLE_REF)
 		return NULL;
 
-	struct tuple *t = *(struct tuple **) data;
-	assert(t->refs);
-	return t;
+	return *(box_tuple_t **) data;
 }
 
 static int
 lbox_tuple_new(lua_State *L)
 {
 	int argc = lua_gettop(L);
-	if (unlikely(argc < 1)) {
+	if (argc < 1) {
 		lua_newtable(L); /* create an empty tuple */
 		++argc;
 	}
@@ -120,8 +113,10 @@ lbox_tuple_new(lua_State *L)
 	}
 	mpstream_flush(&stream);
 
-	struct tuple *tuple = tuple_new(tuple_format_ber, buf->buf,
-					buf->buf + ibuf_used(buf));
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	box_tuple_t *tuple = box_tuple_new(fmt, buf->buf,
+					   buf->buf + ibuf_used(buf));
+	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	lbox_pushtuple(L, tuple);
 	ibuf_reinit(tarantool_lua_ibuf);
 	return 1;
@@ -130,15 +125,36 @@ lbox_tuple_new(lua_State *L)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
-	tuple_unref(tuple);
+	box_tuple_t *tuple = lua_checktuple(L, 1);
+	box_tuple_unref(tuple);
 	return 0;
+}
+
+static int
+lbox_tuple_slice_wrapper(struct lua_State *L)
+{
+	box_tuple_iterator_t *it = (box_tuple_iterator_t *)
+		lua_topointer(L, 1);
+	int start = lua_tointeger(L, 2);
+	int end = lua_tointeger(L, 3);
+	const char *field;
+
+	assert(start < field_count);
+	uint32_t field_no = start;
+	field = box_tuple_seek(it, start);
+	while (field && field_no < end) {
+		luamp_decode(L, luaL_msgpack_default, &field);
+		++field_no;
+		field = box_tuple_next(it);
+	}
+	assert(field_no == end);
+	return end - start;
 }
 
 static int
 lbox_tuple_slice(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	box_tuple_t *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	uint32_t start, end;
 	int offset;
@@ -151,7 +167,7 @@ lbox_tuple_slice(struct lua_State *L)
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
 
-	uint32_t field_count = tuple_field_count(tuple);
+	uint32_t field_count = box_tuple_field_count(tuple);
 	offset = lua_tointeger(L, 2);
 	if (offset >= 0 && offset < field_count) {
 		start = offset;
@@ -176,36 +192,16 @@ lbox_tuple_slice(struct lua_State *L)
 	if (end <= start)
 		return luaL_error(L, "tuple.slice(): start must be less than end");
 
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	const char *field;
-
-	assert(start < field_count);
-	uint32_t field_no = start;
-	field = tuple_seek(&it, start);
-	while (field && field_no < end) {
-		luamp_decode(L, luaL_msgpack_default, &field);
-		++field_no;
-		field = tuple_next(&it);
-	}
-	assert(field_no == end);
+	box_tuple_iterator_t *it = box_tuple_iterator(tuple);
+	lua_pushcfunction(L, lbox_tuple_slice_wrapper);
+	lua_pushlightuserdata(L, it);
+	lua_pushinteger(L, start);
+	lua_pushinteger(L, end);
+	int rc = lbox_call(L, 3, end - start);
+	box_tuple_iterator_free(it);
+	if (rc != 0)
+		return lbox_error(L);
 	return end - start;
-}
-
-/* A MsgPack extensions handler that supports tuples */
-static mp_type
-luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream)
-{
-	struct tuple *tuple = lua_istuple(L, idx);
-	if (tuple != NULL) {
-		char *ptr = mpstream_reserve(stream, tuple->bsize);
-		tuple_to_buf(tuple, ptr, tuple->bsize);
-		mpstream_advance(stream, tuple->bsize);
-		return MP_ARRAY;
-	}
-
-	return MP_EXT;
 }
 
 void
@@ -238,22 +234,25 @@ luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 {
 	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
 		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
-		diag_raise();
+		lbox_error(L);
 	}
 }
 
-char *
-lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
+/* A MsgPack extensions handler that supports tuples */
+static enum mp_type
+luamp_encode_extension_box(struct lua_State *L, int idx,
+			   struct mpstream *stream)
 {
-	struct region *gc = &fiber()->gc;
-	size_t used = region_used(gc);
-	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
-		      luamp_error, L);
-	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
-	mpstream_flush(&stream);
-	*p_len = region_used(gc) - used;
-	return (char *) region_join_xc(gc, *p_len);
+	struct tuple *tuple = lua_istuple(L, idx);
+	if (tuple != NULL) {
+		size_t bsize = box_tuple_bsize(tuple);
+		char *ptr = mpstream_reserve(stream, bsize);
+		box_tuple_to_buf(tuple, ptr, bsize);
+		mpstream_advance(stream, bsize);
+		return MP_ARRAY;
+	}
+
+	return MP_EXT;
 }
 
 /**
@@ -269,14 +268,14 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 static int
 lbox_tuple_transform(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
+	box_tuple_t *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L);
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
 	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
 	lua_Integer len = lua_tointeger(L, 3);
 
-	uint32_t field_count = tuple_field_count(tuple);
+	uint32_t field_count = box_tuple_field_count(tuple);
 	/* validate offset and len */
 	if (offset == 0) {
 		luaL_error(L, "tuple.transform(): offset is out of bound");
@@ -335,24 +334,28 @@ lbox_tuple_transform(struct lua_State *L)
 	mpstream_flush(&stream);
 
 	/* Execute tuple_update */
-	struct tuple *new_tuple =
-		boxffi_tuple_update(tuple, buf->buf, buf->buf + ibuf_used(buf));
+	box_tuple_t *new_tuple =
+		box_tuple_update(tuple, buf->buf, buf->buf + ibuf_used(buf));
 	if (tuple == NULL)
 		lbox_error(L);
+	/* box_tuple_update() doesn't leak on exception, see public API doc */
 	lbox_pushtuple(L, new_tuple);
 	ibuf_reset(buf);
 	return 1;
 }
 
 void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
+lbox_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 {
 	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
-	struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
+	box_tuple_t **ptr = (box_tuple_t **) luaL_pushcdata(L,
 		CTID_CONST_STRUCT_TUPLE_REF);
 	*ptr = tuple;
 	/* The order is important - first reference tuple, next set gc */
-	tuple_ref(tuple);
+	if (box_tuple_ref(tuple) != 0) {
+		lbox_error(L);
+		return;
+	}
 	lua_pushcfunction(L, lbox_tuple_gc);
 	luaL_setcdatagc(L, -2);
 }
@@ -390,43 +393,14 @@ box_lua_tuple_init(struct lua_State *L)
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
 
-	if (luaL_dostring(L, tuple_lua))
-		panic("Error loading Lua source %.160s...: %s",
+	if (luaL_dostring(L, tuple_lua)) {
+		lua_pushfstring(L, "Error loading Lua source %.160s...: %s",
 		      tuple_lua, lua_tostring(L, -1));
+		lua_error(L);
+	}
 	assert(lua_gettop(L) == 0);
 
 	/* Get CTypeIDs */
 	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
 
-	box_lua_slab_init(L);
-}
-
-struct tuple *
-boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end)
-{
-	try {
-		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_update(tuple_format_ber,
-			region_alloc_xc_cb, &fiber()->gc, tuple,
-			expr, expr_end, 1);
-		tuple_ref(new_tuple); /* must not throw in this case */
-		return new_tuple;
-	} catch (ClientError *e) {
-		return NULL;
-	}
-
-}
-struct tuple *
-boxffi_tuple_upsert(struct tuple *tuple, const char *expr, const char *expr_end)
-{
-	try {
-		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
-			region_alloc_xc_cb, &fiber()->gc, tuple,
-			expr, expr_end, 1);
-		tuple_ref(new_tuple); /* must not throw in this case */
-		return new_tuple;
-	} catch (ClientError *e) {
-		return NULL;
-	}
 }

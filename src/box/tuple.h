@@ -36,6 +36,8 @@
 
 #include "key_def.h" /* for enum field_type */
 #include "tuple_update.h"
+#include "error.h"
+#include <msgpuck/msgpuck.h>
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
@@ -351,7 +353,7 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-extern "C" inline const char *
+static inline const char *
 tuple_field(const struct tuple *tuple, uint32_t i)
 {
 	return tuple_field_old(tuple_format(tuple), tuple, i);
@@ -818,6 +820,12 @@ box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
  */
 API_EXPORT const char *
 box_tuple_next(box_tuple_iterator_t *it);
+
+API_EXPORT box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_end);
+
+API_EXPORT box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 /** \endcond public */
 
