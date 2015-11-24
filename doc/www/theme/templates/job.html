@@ -1,0 +1,48 @@
+
+{% extends "base" %}
+
+{% block header_scripts %}
+<script src="js/main.js"></script>
+{% endblock header_scripts %}
+
+{% block content %}
+<section class="b-lightgray_block b-job_top b-clearbox">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Job</h2>
+  </div>
+</section>
+
+<section class="b-block b-job">
+  <div class="b-block-wrapper">
+    <article class="b-article">
+      {{ page.blocks.content_up }}
+    </article>
+  </div>
+</section>
+<section class="b-lightgray_block b-job">
+  <div class="b-block-wrapper">
+    <article class="b-article">
+      {{ page.blocks.content_down }}
+    </article>
+  </div>
+</section>
+<section class="b-block b-job">
+  <div class="b-block-wrapper">
+    <ul class="b-download-list">
+      {% for item in page.blocks.vacancies %}
+      <li class="b-download-list-item">
+        <a href="#" class="b-download-list-item-url">{{ item.title }}</a>
+        <div class="b-download-list-item-drop">
+          <article class="b-article">
+            {{ item.content }}
+            <a class="b-button" href="mailto:job@tarantool.org">Apply</a>
+          </article>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

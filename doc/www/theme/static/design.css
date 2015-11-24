@@ -882,6 +882,7 @@ input.b-button.p-smaller {
         transform:rotate(360deg);
     }
 }
+.b-job_top .b-block-wrapper,
 .b-documentation_top .b-block-wrapper {
     padding:20px 0 21px 0;
 }
@@ -917,6 +918,7 @@ input.b-button.p-smaller {
     width:941px;
     padding-left:19px;
 }
+.b-job_top .b-section-title,
 .b-documentation_top .b-section-title {
     margin:0 0 17px 0;
 }
@@ -966,6 +968,7 @@ input.b-button.p-smaller {
 .b-documentation_top.p-documentation_in .b-search {
     float:right;
 }
+.b-job_top .b-section-title,
 .b-documentation_top.p-documentation_in .b-section-title {
     float:left;
 }
@@ -1110,12 +1113,12 @@ input.b-button.p-smaller {
     line-height:1.6em;
 }
 .b-article h1 {
-    font-size:18px;
+    font-size:22px;
     margin-bottom:16px;
     line-height:1em;
 }
 .b-article h2 {
-    font-size:18px;
+    font-size:22px;
     margin-bottom:16px;
     line-height:1em;
 }
@@ -1283,7 +1286,7 @@ input.b-button.p-smaller {
 }
 
 .b-download-list-item-drop ul {
-    padding-left: 0px;
+    padding-left: 18px;
 }
 
 .b-download-list-item {
@@ -1474,4 +1477,9 @@ div.b-rock-list-item-ico {
 .b-rocks .b-rock-list {
     padding: 0 0 50px 0;
 }
+
+.b-highlight {
+    margin-bottom: 20px;
+}
+
 /* vim: expandtab */

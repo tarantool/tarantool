@@ -32,7 +32,8 @@ class BSiteGenerator(Generator):
     def _doc_read_file(self, relpath):
         def travel_string_rst(obj):
             def fromrst_to_string(objstring):
-                return docutils.core.publish_parts(source=objstring, writer_name='html')['fragment']
+                obj = docutils.core.publish_parts(source=objstring, writer_name='html')
+                return obj['html_title'] + obj['fragment']
             if isinstance(obj, (list, tuple)):
                 return [travel_string_rst(subobj) for subobj in obj]
             elif isinstance(obj, dict):
