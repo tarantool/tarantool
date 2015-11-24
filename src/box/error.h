@@ -32,6 +32,92 @@
  */
 #include "errcode.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** \cond public */
+
+struct error;
+/**
+ * Error - contains information about error.
+ */
+typedef struct error box_error_t;
+
+/**
+ * Return the error type, e.g. "ClientError", "SocketError", etc.
+ * \param error
+ * \return not-null string
+ */
+const char *
+box_error_type(const box_error_t *error);
+
+/**
+ * Return IPROTO error code
+ * \param error error
+ * \return enum box_error_code
+ */
+uint32_t
+box_error_code(const box_error_t *error);
+
+/**
+ * Return the error message
+ * \param error error
+ * \return not-null string
+ */
+const char *
+box_error_message(const box_error_t *error);
+
+/**
+ * Get the information about the last API call error.
+ *
+ * The Tarantool error handling works most like libc's errno. All API calls
+ * return -1 or NULL in the event of error. An internal pointer to
+ * box_error_t type is set by API functions to indicate what went wrong.
+ * This value is only significant if API call failed (returned -1 or NULL).
+ *
+ * Successful function can also touch the last error in some
+ * cases. You don't have to clear the last error before calling
+ * API functions. The returned object is valid only until next
+ * call to **any** API function.
+ *
+ * You must set the last error using box_error_set() in your stored C
+ * procedures if you want to return a custom error message.
+ * You can re-throw the last API error to IPROTO client by keeping
+ * the current value and returning -1 to Tarantool from your
+ * stored procedure.
+ *
+ * \return last error.
+ */
+box_error_t *
+box_error_last(void);
+
+/**
+ * Clear the last error.
+ */
+void
+box_error_clear(void);
+
+/**
+ * Set the last error.
+ *
+ * \param code IPROTO error code (enum \link box_error_code \endlink)
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \returns -1 for convention use
+ *
+ * \sa enum box_error_code
+ */
+int
+box_error_set(const char *file, unsigned line, uint32_t code,
+	      const char *format, ...);
+
+/** \endcond public */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#include "exception.h"
+
 struct rmean;
 extern "C" struct rmean *rmean_error;
 
@@ -40,10 +126,6 @@ enum rmean_error_name {
 	RMEAN_ERROR_LAST
 };
 extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
-
-#if defined(__cplusplus)
-
-#include "exception.h"
 
 extern const struct type type_ClientError;
 class ClientError: public Exception {
@@ -62,12 +144,8 @@ public:
 	}
 
 	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
-	/* A special constructor for lbox_raise */
-	ClientError(const char *file, unsigned line, const char *msg,
-		    uint32_t errcode);
 
 	static uint32_t get_errcode(const struct error *e);
-private:
 	/* client errno code */
 	int m_errcode;
 };
@@ -101,79 +179,5 @@ void
 error_init(void);
 
 #endif /* defined(__cplusplus) */
-
-/** \cond public */
-
-struct error;
-/**
- * Error - contains information about error.
- */
-typedef struct error box_error_t;
-
-/**
- * Return the error type, e.g. "ClientError", "SocketError", etc.
- * \param error
- * \return not-null string
- */
-API_EXPORT const char *
-box_error_type(const box_error_t *error);
-
-/**
- * Return IPROTO error code
- * \param error error
- * \return enum box_error_code
- */
-API_EXPORT uint32_t
-box_error_code(const box_error_t *error);
-
-/**
- * Return the error message
- * \param error error
- * \return not-null string
- */
-API_EXPORT const char *
-box_error_message(const box_error_t *error);
-
-/**
- * Get the information about the last API call error.
- *
- * The Tarantool error handling works most like libc's errno. All API calls
- * return -1 or NULL in the event of error. An internal pointer to
- * box_error_t type is set by API functions to indicate what went wrong.
- * This value is only significant if API call failed (returned -1 or NULL).
- *
- * Successed function can also touch last error in some cases. You don't
- * have to clear last error before calling API functions. The returned object
- * is valid only until next call to **any** API function.
- *
- * You must set the last error using box_error_raise() in your stored C
- * procedures if you want to return custom error message. You can re-throw
- * the last API error to IPROTO client by keeping the current value and
- * returning -1 to Tarantool from your stored procedure.
- *
- * \return last error.
- */
-API_EXPORT box_error_t *
-box_error_last(void);
-
-/**
- * Clear the last error.
- */
-API_EXPORT void
-box_error_clear(void);
-
-/**
- * Set the last error.
- *
- * \param code IPROTO error code (enum \link box_error_code \endlink)
- * \param format (const char * ) - printf()-like format string
- * \param ... - format arguments
- * \returns -1 for convention use
- *
- * \sa enum box_error_code
- */
-API_EXPORT int
-box_error_raise(uint32_t code, const char *format, ...);
-/** \endcond public */
 
 #endif /* TARANTOOL_BOX_ERROR_H_INCLUDED */

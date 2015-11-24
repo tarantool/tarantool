@@ -34,6 +34,60 @@
 #include <fiber.h>
 #include <rmean.h>
 
+static struct error *
+BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
+
+/* {{{ public API */
+
+const char *
+box_error_type(const box_error_t *e)
+{
+	return e->type->name;
+}
+
+uint32_t
+box_error_code(const box_error_t *e)
+{
+	return ClientError::get_errcode(e);
+}
+
+const char *
+box_error_message(const box_error_t *error)
+{
+	return error->errmsg;
+}
+
+box_error_t *
+box_error_last(void)
+{
+	return diag_last_error(&fiber()->diag);
+}
+
+void
+box_error_clear(void)
+{
+	diag_clear(&fiber()->diag);
+}
+
+int
+box_error_set(const char *file, unsigned line, uint32_t code,
+		const char *fmt, ...)
+{
+	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
+	ClientError *client_error = type_cast(ClientError, e);
+	if (client_error) {
+		client_error->m_errcode = code;
+		va_list ap;
+		va_start(ap, fmt);
+		error_vformat_msg(e, fmt, ap);
+		va_end(ap);
+	}
+	diag_add_error(&fiber()->diag, e);
+	return -1;
+}
+
+/* }}} */
+
 struct rmean *rmean_error = NULL;
 
 const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
@@ -44,6 +98,7 @@ static struct method clienterror_methods[] = {
 	make_method(&type_ClientError, "code", &ClientError::errcode),
 	METHODS_SENTINEL
 };
+
 const struct type type_ClientError = make_type("ClientError", &type_Exception,
 	clienterror_methods);
 
@@ -60,25 +115,16 @@ ClientError::ClientError(const char *file, unsigned line,
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
 
-ClientError::ClientError(const char *file, unsigned line, const char *msg,
-			 uint32_t errcode)
-	: Exception(&type_ClientError, file, line)
-{
-	m_errcode = errcode;
-	error_format_msg(this, "%s", msg);
-	if (rmean_error)
-		rmean_collect(rmean_error, RMEAN_ERROR, 1);
-}
-
 static struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 {
 	try {
-		struct error *e = new ClientError(file, line, "", errcode);
+		ClientError *e = new ClientError(file, line, ER_UNKNOWN);
 		va_list ap;
 		va_start(ap, errcode);
 		error_vformat_msg(e, tnt_errcode_desc(errcode), ap);
 		va_end(ap);
+		e->m_errcode = errcode;
 		return e;
 	} catch (OutOfMemory *e) {
 		return e;
@@ -115,46 +161,3 @@ error_init(void)
 	error_factory->ClientError = BuildClientError;
 }
 
-const char *
-box_error_type(const box_error_t *e)
-{
-	return e->type->name;
-}
-
-uint32_t
-box_error_code(const box_error_t *e)
-{
-	return ClientError::get_errcode(e);
-}
-
-const char *
-box_error_message(const box_error_t *error)
-{
-	return error->errmsg;
-}
-
-box_error_t *
-box_error_last(void)
-{
-	return diag_last_error(&fiber()->diag);
-}
-
-void
-box_error_clear(void)
-{
-	diag_clear(&fiber()->diag);
-}
-
-int
-box_error_raise(uint32_t code, const char *fmt, ...)
-{
-	char msg[DIAG_ERRMSG_MAX];
-
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, ap);
-	va_end(ap);
-
-	tnt_error(ClientError, msg, code);
-	return -1;
-}

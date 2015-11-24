@@ -256,7 +256,8 @@ xrow_decode_error(struct xrow_header *row)
 	}
 
 raise:
-	tnt_raise(ClientError, error, code);
+	box_error_set(__FILE__, __LINE__, code, error);
+	diag_raise();
 }
 
 void
