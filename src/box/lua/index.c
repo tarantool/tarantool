@@ -29,14 +29,11 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/index.h"
+
 #include "lua/utils.h"
-#include "lua/msgpack.h"
 #include "box/index.h"
-#include "box/lua/error.h"
 #include "box/lua/tuple.h"
 #include "box/lua/call.h"
-#include "fiber.h"
-#include "iobuf.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
@@ -120,7 +117,6 @@ lbox_index_count(lua_State *L)
 		       "iterator, key)");
 	}
 
-	RegionGuard region_guard(&fiber()->gc);
 	uint32_t space_id = lua_tointeger(L, 1);
 	uint32_t index_id = lua_tointeger(L, 2);
 	uint32_t iterator = lua_tointeger(L, 3);

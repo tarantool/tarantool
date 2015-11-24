@@ -119,9 +119,9 @@ box_iterator_free(box_iterator_t *iterator);
 
 /** \endcond public */
 
-#if defined(__cplusplus)
+API_EXPORT const char *iterator_type_strs[];
 
-extern const char *iterator_type_strs[];
+#if defined(__cplusplus)
 
 struct iterator {
 	struct tuple *(*next)(struct iterator *);

@@ -36,6 +36,7 @@
 
 struct request;
 struct obuf;
+struct port;
 struct lua_State;
 
 /**
@@ -53,7 +54,7 @@ boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	      int iterator, uint32_t offset, uint32_t limit,
 	      const char *key, const char *key_end);
 
-char *
+API_EXPORT char *
 lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len);
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */

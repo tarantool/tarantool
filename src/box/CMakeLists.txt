@@ -63,7 +63,7 @@ add_library(box
     lua/call.cc
     lua/tuple.c
     lua/slab.c
-    lua/index.cc
+    lua/index.c
     lua/space.cc
     lua/info.cc
     lua/stat.c
