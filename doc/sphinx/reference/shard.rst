@@ -155,8 +155,6 @@ with the magic of cut-and-paste.
 | :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
 | :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
 | :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
 | :codenormal:`tarantool>` :codebold:`cfg = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
@@ -165,17 +163,17 @@ with the magic of cut-and-paste.
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3301;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
+| :codebold:`}`
+| :codenormal:`tarantool>` :codebold:`shard = require('shard')`
+| :codenormal:`tarantool>` :codebold:`shard.init(cfg)`
+| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...`
+| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}`
 
 If one cuts and pastes the above, then the result,
 showing only the requests and responses for shard.init
 and shard.tester, should look approximately like this:
 
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
+| :codenormal:`tarantool>` :codebold:`shard.init(cfg)`
 | :codenormal:`2015-08-09 ... I> Sharding initialization started...`
 | :codenormal:`2015-08-09 ... I> establishing connection to cluster servers...`
 | :codenormal:`2015-08-09 ... I>  - localhost:3301 - connecting...`
@@ -192,11 +190,11 @@ and shard.tester, should look approximately like this:
 | :codenormal:`- true`
 | :codenormal:`...`
 |
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
+| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...`
 | :codenormal:`---`
 | :codenormal:`...`
 |
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
+| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}`
 | :codenormal:`---`
 | :codenormal:`- - [1, 'Tuple #1']`
 | :codenormal:`...`
@@ -222,7 +220,6 @@ On Terminal #1, say:
 | :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
 | :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
 | :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
 | :codenormal:`tarantool>` :codebold:`cfg = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
@@ -232,11 +229,11 @@ On Terminal #1, say:
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3301;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
+| :codebold:`}`
+| :codenormal:`tarantool>` :codebold:`shard = require('shard')`
+| :codenormal:`tarantool>` :codebold:`shard.init(cfg)`
+| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...`
+| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}`
 
 On Terminal #2, say:
 
@@ -251,7 +248,6 @@ On Terminal #2, say:
 | :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
 | :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
 | :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
 | :codenormal:`tarantool>` :codebold:`cfg = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
 | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
@@ -261,11 +257,11 @@ On Terminal #2, say:
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
 | |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3302;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now get something out ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}!`
+| :codebold:`}`
+| :codenormal:`tarantool>` :codebold:`shard = require('shard')`
+| :codenormal:`tarantool>` :codebold:`shard.init(cfg)`
+| :codenormal:`tarantool>` :codenormal:`-- Now get something out ...`
+| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}`
 
 What will appear on Terminal #1 is: a loop of
 error messages saying "Connection refused" and
@@ -275,7 +271,7 @@ go on until Terminal #2 process starts.
 What will appear on Terminal #2, at the end,
 should look like this:
 
-| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}!`
+| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}`
 | :codenormal:`---`
 | :codenormal:`- - - [1, 'Tuple #1']`
 | :codenormal:`...`

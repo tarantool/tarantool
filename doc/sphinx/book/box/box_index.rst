@@ -72,8 +72,8 @@ API is a direct binding to corresponding methods of index objects of type
                 be used to get the next value on each invocation
         :rtype:  function, tuple
 
-        :except: Selected iteration type is not supported in the subject index type,
-                or supplied parameters do not match iteration type.
+        Possible errors: Selected iteration type is not supported in the subject index type,
+        or supplied parameters do not match iteration type.
 
         Complexity Factors: Index size, Index type, Number of tuples accessed.
 
@@ -264,18 +264,12 @@ API is a direct binding to corresponding methods of index objects of type
         | :codenormal:`---`
         | :codenormal:`- ['A', 'C']`
         | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-        | :codenormal:`---`
-        | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`function example()`
         | :codenormal:`>` :codebold:`for _, tuple in`
         | :codenormal:`>` :codebold:`s.index.primary:pairs(nil, {iterator = box.index.ALL}) do`
         | :codenormal:`>` :codebold:`print(tuple)`
         | :codenormal:`>` :codebold:`end`
-        | :codenormal:`>` :codebold:`end!`
-        | :codenormal:`---`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`console.delimiter('')!`
+        | :codenormal:`>` :codebold:`end`
         | :codenormal:`---`
         | :codenormal:`...`
         | :codenormal:`tarantool>` :codebold:`example()`
@@ -394,7 +388,8 @@ API is a direct binding to corresponding methods of index objects of type
                 ``key-value`` is supplied, returns the first key which
                 is greater than or equal to ``key-value``.
         :rtype:  tuple
-        :except: index is not of type 'TREE'.
+
+        Possible errors: index is not of type 'TREE'.
 
         Complexity Factors: Index size, Index type.
 
@@ -413,7 +408,8 @@ API is a direct binding to corresponding methods of index objects of type
                 is supplied, returns the last key which is less than or equal to
                 ``key-value``.
         :rtype:  tuple
-        :except: index is not of type 'TREE'.
+
+        Possible errors: index is not of type 'TREE'.
 
         Complexity Factors: Index size, Index type.
 
@@ -503,9 +499,9 @@ API is a direct binding to corresponding methods of index objects of type
         :param table options: options list for create_index().
         :return: nil
 
-        :except: If index-name doesn't exist.
-        :except: The first index cannot be changed to {unique = false}.
-        :except: The alter function is only applicable for the memtx storage engine.
+        Possible errors: Index does not exist, or
+        the first index cannot be changed to {unique = false}, or
+        the alter function is only applicable for the memtx storage engine.
 
         EXAMPLE
 
@@ -519,7 +515,8 @@ API is a direct binding to corresponding methods of index objects of type
         a side effect: all tuples are deleted.
 
         :return: nil.
-        :except: If index-name doesn't exist.
+
+        Possible errors: Index does not exist.
 
         EXAMPLE
 
@@ -533,7 +530,8 @@ API is a direct binding to corresponding methods of index objects of type
 
         :param string index-name: new name for index.
         :return: nil
-        :except: If index-name doesn't exist.
+
+        Possible errors: If index-name does not exist.
 
         EXAMPLE
 
@@ -579,9 +577,8 @@ Lua functions `os.date()`_ and `string.sub()`_.
 
 .. code-block:: lua
 
-    console = require('console'); console.delimiter('st_end')
     function example()
-      local a, b, c, table_of_selected_tuples
+      local a, b, c, table_of_selected_tuples, d
       local replaced_tuple, time_field
       local formatted_time_field
       local fiber = require('fiber')
@@ -601,8 +598,7 @@ Lua functions `os.date()`_ and `string.sub()`_.
       d = string.sub(c, 3, 6)
       formatted_time_field = formatted_time_field .. '.' .. d
       return formatted_time_field
-    end st_end
-    console.delimiter('') st_end
+    end
 
 ... And here is what happens when one invokes the function:
 

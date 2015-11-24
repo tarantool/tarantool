@@ -95,18 +95,16 @@ using the :mod:`log` package whenever any user connects or disconnects.
 
 .. code-block:: lua_tarantool
 
-    console = require('console'); console.delimiter('!') --this means ignore line feeds until next '!'
     function log_connect ()
       local log = require('log')
       local m = 'Connection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end!
+    end
     function log_disconnect ()
       local log = require('log')
       local m = 'Disconnection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end!
-    console.delimiter('')!
+    end
     box.session.on_connect(log_connect)
     box.session.on_disconnect(log_disconnect)
 

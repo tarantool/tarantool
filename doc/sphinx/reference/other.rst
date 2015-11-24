@@ -42,7 +42,8 @@
                             which will be appended to, or substitute for,
                             items in the Lua chunk.
     :return: whatever is returned by the Lua code chunk.
-    :except: If there is a compilation error, it is raised as a Lua error.
+
+    Possible errors: If there is a compilation error, it is raised as a Lua error.
 
     | EXAMPLE
     |
@@ -59,17 +60,15 @@
     | :codenormal:`- hello`
     | :codenormal:`- world`
     | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console = require('console'); console.delimiter('!')`
-    | :codenormal:`tarantool>` :codebold:`-- This means ignore line feeds until next '!'`
-    | :codenormal:`tarantool>` :codebold:`-- Use` `double square brackets`_ :codebold:`to enclose multi-line literal here!`
+    | :codenormal:`tarantool>` :codebold:`-- Use` `double square brackets`_ :codebold:`to enclose multi-line literal here`
     | :codenormal:`tarantool>` :codebold:`dostring([[local f = function(key)`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`local t`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`t = box.space.tester:select{key};`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`if t ~= nil then return t[1] else return nil end`
     | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`return f(...)]], 1)!`
+    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`return f(...)]], 1)`
     | :codenormal:`---`
     | :codenormal:`- null`
     | :codenormal:`...`
-    | :codenormal:`tarantool> console.delimiter('')!`
 
 .. _double square brackets: http://www.lua.org/pil/2.4.html
