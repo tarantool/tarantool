@@ -36,6 +36,16 @@
 #include "fiber.h"
 #include "user.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+void
+session_init();
+
+void
+session_free();
+
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 
 /**
@@ -77,6 +87,53 @@ struct session {
 };
 
 /**
+ * Find a session by id.
+ */
+struct session *
+session_find(uint32_t sid);
+
+/** Global on-connect triggers. */
+extern struct rlist session_on_connect;
+
+extern struct rlist session_on_auth;
+
+static inline void
+fiber_set_user(struct fiber *fiber, struct credentials *cr)
+{
+	fiber_set_key(fiber, FIBER_KEY_USER, cr);
+}
+
+static inline void
+fiber_set_session(struct fiber *fiber, struct session *session)
+{
+	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
+}
+
+static inline void
+credentials_init(struct credentials *cr, struct user *user)
+{
+	cr->auth_token = user->auth_token;
+	cr->universal_access = universe.access[cr->auth_token].effective;
+	cr->uid = user->uid;
+}
+
+static inline void
+credentials_copy(struct credentials *dst, struct credentials *src)
+{
+	*dst = *src;
+}
+
+/*
+ * For use in local hot standby, which runs directly
+ * from ev watchers (without current fiber), but needs
+ * to execute transactions.
+ */
+extern struct credentials admin_credentials;
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+/**
  * Create a session.
  * Invokes a Lua trigger box.session.on_connect if it is
  * defined. Issues a new session identifier.
@@ -102,15 +159,6 @@ session_create(int fd, uint64_t cookie);
 void
 session_destroy(struct session *);
 
-/**
- * Find a session by id.
- */
-struct session *
-session_find(uint32_t sid);
-
-/** Global on-connect triggers. */
-extern struct rlist session_on_connect;
-
 /** Run on-connect triggers */
 void
 session_run_on_connect_triggers(struct session *session);
@@ -122,31 +170,11 @@ extern struct rlist session_on_disconnect;
 void
 session_run_on_disconnect_triggers(struct session *session);
 
-extern struct rlist session_on_auth;
-
 void
 session_run_on_auth_triggers(const char *user_name);
 
 void
-session_init();
-
-void
-session_free();
-
-void
 session_storage_cleanup(int sid);
-
-static inline void
-fiber_set_user(struct fiber *fiber, struct credentials *cr)
-{
-	fiber_set_key(fiber, FIBER_KEY_USER, cr);
-}
-
-static inline void
-fiber_set_session(struct fiber *fiber, struct session *session)
-{
-	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
-}
 
 /**
  * Create a new session on demand, and set fiber on_stop
@@ -154,13 +182,6 @@ fiber_set_session(struct fiber *fiber, struct session *session)
  */
 struct session *
 session_create_on_demand();
-
-/*
- * For use in local hot standby, which runs directly
- * from ev watchers (without current fiber), but needs
- * to execute transactions.
- */
-extern struct credentials admin_credentials;
 
 /*
  * When creating a new fiber, the database (box)
@@ -201,20 +222,6 @@ current_user()
 }
 
 static inline void
-credentials_init(struct credentials *cr, struct user *user)
-{
-	cr->auth_token = user->auth_token;
-	cr->universal_access = universe.access[cr->auth_token].effective;
-	cr->uid = user->uid;
-}
-
-static inline void
-credentials_copy(struct credentials *dst, struct credentials *src)
-{
-	*dst = *src;
-}
-
-static inline void
 access_check_universe(uint8_t access)
 {
 	struct credentials *credentials = current_user();
@@ -225,5 +232,7 @@ access_check_universe(uint8_t access)
 			  priv_name(access), user->name);
 	}
 }
+
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_SESSION_H */
