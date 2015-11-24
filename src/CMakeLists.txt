@@ -86,7 +86,7 @@ set (server_sources
      pickle.c
      ipc.c
      latch.cc
-     errinj.cc
+     errinj.c
      fio.c
      crc32.c
      random.c

@@ -30,8 +30,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "exception.h"
 #include "trivia/util.h"
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct errinj {
 	const char *name;
@@ -78,5 +80,9 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx);
 	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TATRANTOOL_ERRINJ_H_INCLUDED */
