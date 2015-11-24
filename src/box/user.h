@@ -34,6 +34,10 @@
 #include "user_def.h"
 #include "small/region.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** Global grants. */
 struct universe {
 	/** Global privileges this user has on the universe. */
@@ -66,8 +70,9 @@ user_map_is_empty(struct user_map *map)
 typedef rb_tree(struct priv_def) privset_t;
 rb_proto(, privset_, privset_t, struct priv_def);
 
-struct user: public user_def
+struct user
 {
+	struct user_def def;
 	/**
 	 * An id in privileges array to quickly find a
 	 * respective privilege.
@@ -84,6 +89,9 @@ struct user: public user_def
 	/** Memory pool for privs */
 	struct region pool;
 };
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * For best performance, all users are maintained in this array.
@@ -173,5 +181,7 @@ void
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
 
 /* }}} */
+
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_USER_H */

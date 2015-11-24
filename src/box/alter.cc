@@ -103,7 +103,7 @@ access_check_ddl(uint32_t owner_uid)
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
 		struct user *user = user_cache_find(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", user->name);
+			  "Create or drop", user->def.name);
 	}
 }
 
@@ -1399,7 +1399,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 bool
 user_has_data(struct user *user)
 {
-	uint32_t uid = user->uid;
+	uint32_t uid = user->def.uid;
 	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
@@ -1555,11 +1555,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_user->owner);
+		access_check_ddl(old_user->def.owner);
 		/* Can't drop guest or super user */
 		if (uid == GUEST || uid == ADMIN || uid == PUBLIC) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name,
+				  old_user->def.name,
 				  "the user is a system user");
 		}
 		/*
@@ -1568,7 +1568,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 */
 		if (user_has_data(old_user)) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name, "the user has objects");
+				  old_user->def.name, "the user has objects");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
@@ -1725,48 +1725,54 @@ priv_def_check(struct priv_def *priv)
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
 	}
-	access_check_ddl(grantor->uid);
+	access_check_ddl(grantor->def.uid);
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		if (grantor->uid != ADMIN) {
+		if (grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (space->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func *func = func_cache_find(priv->object_id);
-		if (func->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (func->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_ROLE:
 	{
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE) {
+		if (role == NULL || role->def.type != SC_ROLE) {
 			tnt_raise(ClientError, ER_NO_SUCH_ROLE,
-				  role ? role->name :
+				  role ? role->def.name :
 				  int2str(priv->object_id));
 		}
 		/*
 		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
-		if (role->owner != grantor->uid && grantor->uid != ADMIN &&
-		    (role->uid != PUBLIC || priv->access < PRIV_X)) {
+		if (role->def.owner != grantor->def.uid &&
+		    grantor->def.uid != ADMIN &&
+		    (role->def.uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  role->name, grantor->name);
+				  role->def.name, grantor->def.name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -1792,7 +1798,7 @@ grant_or_revoke(struct priv_def *priv)
 		return;
 	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE)
+		if (role == NULL || role->def.type != SC_ROLE)
 			return;
 		if (priv->access)
 			role_grant(grantee, role);

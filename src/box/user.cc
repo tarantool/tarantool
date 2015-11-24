@@ -246,8 +246,10 @@ user_set_effective_access(struct user *user)
 		struct access *access = &object[user->auth_token];
 		access->effective = access->granted | priv->access;
 		/** Update global access in the current session. */
-		if (priv->object_type == SC_UNIVERSE && user->uid == cr->uid)
+		if (priv->object_type == SC_UNIVERSE &&
+		    user->def.uid == cr->uid) {
 			cr->universal_access = access->effective;
+		}
 	}
 }
 
@@ -279,7 +281,7 @@ user_reload_privs(struct user *user)
 		char key[6];
 		/** Primary key - by user id */
 		MemtxIndex *index = index_find_system(space, 0);
-		mp_encode_uint(key, user->uid);
+		mp_encode_uint(key, user->def.uid);
 
 		struct iterator *it = index->position();
 		index->initIterator(it, ITER_EQ, key, 1);
@@ -436,7 +438,7 @@ user_cache_find_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(BOX_USER_ID, 2, name, len);
 	struct user *user = user_by_id(uid);
-	if (user == NULL || user->type != SC_USER) {
+	if (user == NULL || user->def.type != SC_USER) {
 		char name_buf[BOX_NAME_MAX + 1];
 		/* \0 - to correctly print user name the error message. */
 		snprintf(name_buf, sizeof(name_buf), "%.*s", len, name);
@@ -466,7 +468,7 @@ user_cache_init()
 	def.type = SC_USER;
 	struct user *user = user_cache_replace(&def);
 	/* 0 is the auth token and user id by default. */
-	assert(user->uid == GUEST && user->auth_token == GUEST);
+	assert(user->def.uid == GUEST && user->auth_token == GUEST);
 	(void)user;
 
 	memset(&def, 0, sizeof(def));
@@ -475,7 +477,7 @@ user_cache_init()
 	def.type = SC_USER;
 	user = user_cache_replace(&def);
 	/* ADMIN is both the auth token and user id for 'admin' user. */
-	assert(user->uid == ADMIN && user->auth_token == ADMIN);
+	assert(user->def.uid == ADMIN && user->auth_token == ADMIN);
 }
 
 void
@@ -523,7 +525,7 @@ role_check(struct user *grantee, struct user *role)
 	if (user_map_is_set(&transitive_closure,
 			    role->auth_token)) {
 		tnt_raise(ClientError, ER_ROLE_LOOP,
-			  role->name, grantee->name);
+			  role->def.name, grantee->def.name);
 	}
 }
 

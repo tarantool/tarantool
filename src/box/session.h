@@ -114,7 +114,7 @@ credentials_init(struct credentials *cr, struct user *user)
 {
 	cr->auth_token = user->auth_token;
 	cr->universal_access = universe.access[cr->auth_token].effective;
-	cr->uid = user->uid;
+	cr->uid = user->def.uid;
 }
 
 static inline void
@@ -229,7 +229,7 @@ access_check_universe(uint8_t access)
 		/* Access violation, report error. */
 		struct user *user = user_cache_find(credentials->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  priv_name(access), user->name);
+			  priv_name(access), user->def.name);
 	}
 }
 

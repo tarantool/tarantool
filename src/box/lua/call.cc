@@ -376,7 +376,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		struct user *user = user_cache_find(orig_credentials->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->name, name_buf);
+			  priv_name(access), user->def.name, name_buf);
 	}
 	if (func->def.setuid) {
 		/** Remember and change the current user id. */
