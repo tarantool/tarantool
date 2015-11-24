@@ -22,10 +22,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
     :ref:`space_object:update() <space_object.update>` |br|
     :ref:`space_object:upsert() <space_object.upsert>` |br|
     :ref:`space_object:delete() <space_object.delete>` |br|
-    :ref:`space_object:id() <space_object.id>` |br|
-    :ref:`space_object:enabled() <space_object.enabled>` |br|
-    :ref:`space_object:field_count() <space_object.xfield_count>` |br|
-    :ref:`space_object:index() <space_object.index>` |br|
+    :ref:`space_object:id <space_object.id>` |br|
+    :ref:`space_object:enabled <space_object.enabled>` |br|
+    :ref:`space_object:field_count <space_object.xfield_count>` |br|
+    :ref:`space_object:index <space_object.index>` |br|
     :ref:`space_object:len() <space_object.len>` |br|
     :ref:`space_object:truncate() <space_object.truncate>` |br|
     :ref:`space_object:inc{} <space_object.inc>` |br|
@@ -497,7 +497,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _space_object.id:
 
-    .. function:: id()
+    :codenormal:`box.space.`:codeitalic:`space-name.`:codebold:`id`
 
         Ordinal space number. Spaces can be referenced by either name or
         number. Thus, if space ``tester`` has ``id = 800``, then
@@ -508,7 +508,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _space_object.enabled:
 
-    .. function:: enabled()
+    :codenormal:`box.space.`:codeitalic:`space-name.`:codebold:`enabled`
 
         Whether or not this space is enabled.
         The value is ``false`` if there is no index.
@@ -517,21 +517,18 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. _space_object.xfield_count:
 
-    .. function:: field_count()
+    :codenormal:`box.space.`:codeitalic:`space-name.`:codebold:`field_count`
 
         The required field count for all tuples in this space. The field_count
-        can be set initially with
-
-        | :codebold:`box.schema.space:create...`
-        | :codebold:`field_count = <field_count_value>`
-
+        can be set initially with |br|
+        :codenormal:`box.schema.space.create(`:codeitalic:`space-name`:codenormal:`,{field_count=`:codeitalic:`field-count-value`:codenormal:`})` |br|
         The default value is ``0``, which means there is no required field count.
 
         :rtype: number
 
 .. _space_object.index:
 
-    .. function:: index()
+    :codenormal:`box.space.`:codeitalic:`space-name.`:codebold:`index`
 
         A container for all defined indexes. An index is a Lua object of type
         :mod:`box.index` with methods to search tuples and iterate over them in
