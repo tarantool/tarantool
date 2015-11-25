@@ -373,7 +373,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
-		struct user *user = user_cache_find(orig_credentials->uid);
+		struct user *user = user_find_xc(orig_credentials->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
 			  priv_name(access), user->def.name, name_buf);
@@ -387,7 +387,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user *owner = user_cache_find(func->def.uid);
+			struct user *owner = user_find_xc(func->def.uid);
 			credentials_init(&func->owner_credentials, owner);
 		}
 		setuid = true;

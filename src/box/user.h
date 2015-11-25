@@ -90,6 +90,17 @@ struct user
 	struct region pool;
 };
 
+/** Find user by id. */
+struct user *
+user_by_id(uint32_t uid);
+
+struct user *
+user_find_by_name(const char *name, uint32_t len);
+
+/* Find a user by name. Used by authentication. */
+struct user *
+user_find(uint32_t uid);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -128,16 +139,24 @@ user_cache_replace(struct user_def *user);
 void
 user_cache_delete(uint32_t uid);
 
-/** Find user by id. */
-struct user *
-user_by_id(uint32_t uid);
-
 /* Find a user by name. Used by authentication. */
-struct user *
-user_cache_find(uint32_t uid);
+static inline struct user *
+user_find_xc(uint32_t uid)
+{
+	struct user *user = user_find(uid);
+	if (user == NULL)
+		diag_raise();
+	return user;
+}
 
-struct user *
-user_cache_find_by_name(const char *name, uint32_t len);
+static inline struct user *
+user_find_by_name_xc(const char *name, uint32_t len)
+{
+	struct user *user = user_find_by_name(name, len);
+	if (user == NULL)
+		diag_raise();
+	return user;
+}
 
 /** Initialize the user cache and access control subsystem. */
 void
