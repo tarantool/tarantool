@@ -49,6 +49,9 @@ boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 char *
 lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
 
+void
+box_lua_init(struct lua_State *L);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

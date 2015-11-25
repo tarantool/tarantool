@@ -41,6 +41,8 @@ struct lua_State;
 struct luaL_Reg;
 extern bool start_loop;
 
+extern struct lua_State *tarantool_L;
+
 /**
  * Create an instance of Lua interpreter and load it with
  * Tarantool modules.  Creates a Lua state, imports global

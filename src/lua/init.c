@@ -59,14 +59,6 @@
 #include <readline/history.h>
 
 /**
- * This is a callback used by tarantool_lua_init() to open
- * module-specific libraries into given Lua state.
- *
- * No return value, panics if error.
- */
-extern void box_lua_init(struct lua_State *L);
-
-/**
  * The single Lua state of the transaction processor (tx) thread.
  */
 struct lua_State *tarantool_L;
@@ -429,8 +421,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 
 	luaopen_tarantool(L);
 	lua_pop(L, 1);
-
-	box_lua_init(L);
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);
