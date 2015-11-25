@@ -40,9 +40,57 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <fcntl.h>
-#include "exception.h"
 #include <tarantool_ev.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+const char *
+sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
+
+int
+sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
+
+/**
+ * Advance write position in the iovec array
+ * based on its current value and the number of
+ * bytes written.
+ *
+ * @param[in]  iov        the vector being written with writev().
+ * @param[in]  nwr        number of bytes written, @pre >= 0
+ * @param[in,out] iov_len offset in iov[0];
+ *
+ * @return                offset of iov[0] for the next write
+ */
+static inline int
+sio_move_iov(struct iovec *iov, ssize_t nwr, size_t *iov_len)
+{
+	nwr += *iov_len;
+	struct iovec *begin = iov;
+	while (nwr > 0 && nwr >= iov->iov_len) {
+		nwr -= iov->iov_len;
+		iov++;
+	}
+	*iov_len = nwr;
+	return iov - begin;
+}
+
+/**
+ * Change values of iov->iov_len and iov->iov_base
+ * to adjust to a partial write.
+ */
+static inline void
+sio_add_to_iov(struct iovec *iov, ssize_t size)
+{
+	iov->iov_len += size;
+	iov->iov_base = (char *) iov->iov_base - size;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "exception.h"
 enum { SERVICE_NAME_MAXLEN = 32 };
 
 extern const struct type type_SocketError;
@@ -145,42 +193,6 @@ ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 		     struct sockaddr *src_addr, socklen_t *addrlen);
 
-int sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
-const char *sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
-
-/**
- * Advance write position in the iovec array
- * based on its current value and the number of
- * bytes written.
- *
- * @param[in]  iov        the vector being written with writev().
- * @param[in]  nwr        number of bytes written, @pre >= 0
- * @param[in,out] iov_len offset in iov[0];
- *
- * @return                offset of iov[0] for the next write
- */
-static inline int
-sio_move_iov(struct iovec *iov, ssize_t nwr, size_t *iov_len)
-{
-	nwr += *iov_len;
-	struct iovec *begin = iov;
-	while (nwr > 0 && nwr >= iov->iov_len) {
-		nwr -= iov->iov_len;
-		iov++;
-	}
-	*iov_len = nwr;
-	return iov - begin;
-}
-
-/**
- * Change values of iov->iov_len and iov->iov_base
- * to adjust to a partial write.
- */
-static inline void
-sio_add_to_iov(struct iovec *iov, ssize_t size)
-{
-	iov->iov_len += size;
-	iov->iov_base = (char *) iov->iov_base - size;
-}
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_SIO_H_INCLUDED */

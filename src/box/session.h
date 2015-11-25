@@ -155,6 +155,9 @@ current_session()
 	return s ? s : session_create_on_demand();
 }
 
+/** Global on-disconnect triggers. */
+extern struct rlist session_on_disconnect;
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -187,9 +190,6 @@ session_destroy(struct session *);
 /** Run on-connect triggers */
 void
 session_run_on_connect_triggers(struct session *session);
-
-/** Global on-disconnect triggers. */
-extern struct rlist session_on_disconnect;
 
 /** Run on-disconnect triggers */
 void
