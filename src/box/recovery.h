@@ -44,6 +44,7 @@ extern "C" {
 struct recovery;
 extern struct recovery *recovery;
 
+struct xrow_header;
 typedef void (apply_row_f)(struct recovery *, void *,
 			   struct xrow_header *packet);
 

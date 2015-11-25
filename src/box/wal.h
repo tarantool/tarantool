@@ -42,6 +42,8 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
+#if defined(__cplusplus)
+
 struct wal_request: public cmsg {
 	/* Auxiliary. */
 	int64_t res;
@@ -82,5 +84,7 @@ wal_register_watcher(
 void
 wal_unregister_watcher(
 	struct recovery *, struct wal_watcher *);
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */

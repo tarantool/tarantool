@@ -33,11 +33,9 @@
 
 #include <ctype.h> /* tolower() */
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-} /* extern "C" */
 
 #include "box/applier.h"
 #include "box/recovery.h"
