@@ -231,6 +231,15 @@ struct error_factory {
 struct diag *
 diag_get();
 
+static inline void
+diag_raise(void)
+{
+	struct error *e = diag_last_error(diag_get());
+	if (e)
+		error_raise(e);
+}
+
+
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	/* No op if exception subsystem is not initialized. */		\
