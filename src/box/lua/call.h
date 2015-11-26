@@ -38,19 +38,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct port;
 struct lua_State;
 
-int
-boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
-	      int iterator, uint32_t offset, uint32_t limit,
-	      const char *key, const char *key_end);
-
-char *
-lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
-
 void
-box_lua_init(struct lua_State *L);
+box_lua_call_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */

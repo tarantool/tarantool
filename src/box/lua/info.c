@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "info.h"
+#include "box/lua/info.h"
 
 #include <ctype.h> /* tolower() */
 

@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_LUA_SPACE_H
-#define INCLUDES_TARANTOOL_LUA_SPACE_H
+#ifndef INCLUDES_TARANTOOL_BOX_LUA_INIT_H
+#define INCLUDES_TARANTOOL_BOX_LUA_INIT_H
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,27 +30,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
-
 void
-box_lua_space_init(struct lua_State *L);
+box_lua_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-struct space;
-
-void
-box_lua_space_new(struct lua_State *L, struct space *space);
-
-void
-box_lua_space_delete(struct lua_State *L, uint32_t id);
-
-#endif /* INCLUDES_TARANTOOL_LUA_SPACE_H */
+#endif /* INCLUDES_TARANTOOL_BOX_LUA_INIT_H */

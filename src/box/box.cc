@@ -39,7 +39,6 @@
 #include <rmean.h>
 #include "main.h"
 #include "tuple.h"
-#include "lua/call.h"
 #include "session.h"
 #include "schema.h"
 #include "engine.h"

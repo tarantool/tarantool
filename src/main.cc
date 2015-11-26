@@ -71,7 +71,7 @@
 #include <readline/history.h>
 #include "title.h"
 #include <libutil.h>
-#include "box/lua/call.h" /* box_lua_init() */
+#include "box/lua/init.h" /* box_lua_init() */
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;

@@ -29,25 +29,13 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/call.h"
-#include "pickle.h"
-
-#include "box/lua/error.h"
-#include "box/lua/slab.h"
-#include "box/lua/tuple.h"
-#include "box/lua/index.h"
-#include "box/lua/space.h"
-#include "box/lua/stat.h"
-#include "box/lua/sophia.h"
-#include "box/lua/info.h"
-#include "box/lua/session.h"
-#include "box/lua/net_box.h"
-#include "box/tuple.h"
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 #include "iobuf.h"
 #include "fiber.h"
 #include "scoped_guard.h"
+
 #include "box/box.h"
 #include "box/port.h"
 #include "box/request.h"
@@ -60,198 +48,7 @@
 #include "box/session.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_port.h"
-
-/* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char session_lua[],
-	schema_lua[],
-	load_cfg_lua[],
-	snapshot_daemon_lua[],
-	net_box_lua[];
-
-static const char *lua_sources[] = {
-	session_lua,
-	schema_lua,
-	snapshot_daemon_lua,
-	load_cfg_lua,
-	net_box_lua,
-	NULL
-};
-
-/*
- * Functions, exported in box_lua.h should have prefix
- * "box_lua_"; functions, available in Lua "box"
- * should start with "lbox_".
- */
-
-/** {{{ Lua I/O: facilities to intercept box output
- * and push into Lua stack.
- */
-
-struct port_lua
-{
-	struct port_vtab *vtab;
-	struct lua_State *L;
-	size_t size; /* for port_lua_add_tuple */
-};
-
-static inline struct port_lua *
-port_lua(struct port *port) { return (struct port_lua *) port; }
-
-static void
-port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
-{
-	lua_State *L = port_lua(port)->L;
-	try {
-		lbox_pushtuple(L, tuple);
-		lua_rawseti(L, -2, ++port_lua(port)->size);
-	} catch (...) {
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-	}
-}
-
-/** Add all tuples to a Lua table. */
-void
-port_lua_table_create(struct port_lua *port, struct lua_State *L)
-{
-	static struct port_vtab port_lua_vtab = {
-		port_lua_table_add_tuple,
-		null_port_eof,
-	};
-	port->vtab = &port_lua_vtab;
-	port->L = L;
-	port->size = 0;
-	/* The destination table to append tuples to. */
-	lua_newtable(L);
-}
-
-/* }}} */
-
-static int
-lbox_select(lua_State *L)
-{
-	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-		!lua_isnumber(L, 3) || !lua_isnumber(L, 4) || !lua_isnumber(L, 5)) {
-		return luaL_error(L, "Usage index:select(iterator, offset, "
-				  "limit, key)");
-	}
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	int iterator = lua_tointeger(L, 3);
-	uint32_t offset = lua_tointeger(L, 4);
-	uint32_t limit = lua_tointeger(L, 5);
-
-	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
-
-	int top = lua_gettop(L);
-	struct port_lua port;
-	port_lua_table_create(&port, L);
-	if (box_select((struct port *) &port, space_id, index_id, iterator,
-			offset, limit, key, key + key_len) != 0)
-		return lbox_error(L);
-	return lua_gettop(L) - top;
-}
-
-static int
-lbox_insert(lua_State *L)
-{
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
-		return luaL_error(L, "Usage space:insert(tuple)");
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	size_t tuple_len;
-	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
-
-	struct tuple *result;
-	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
-}
-
-static int
-lbox_replace(lua_State *L)
-{
-	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
-		return luaL_error(L, "Usage space:replace(tuple)");
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	size_t tuple_len;
-	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
-
-	struct tuple *result;
-	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
-}
-
-static int
-lbox_update(lua_State *L)
-{
-	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
-		return luaL_error(L, "Usage index:update(key, ops)");
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-	size_t ops_len;
-	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
-
-	struct tuple *result;
-	if (box_update(space_id, index_id, key, key + key_len,
-		       ops, ops + ops_len, 1, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
-}
-
-static int
-lbox_upsert(lua_State *L)
-{
-	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
-		return luaL_error(L, "Usage index:upsert(tuple_key, ops)");
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	size_t tuple_len;
-	const char *tuple = lbox_encode_tuple_on_gc(L, 3, &tuple_len);
-	size_t ops_len;
-	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
-
-	struct tuple *result;
-	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
-		       ops, ops + ops_len, 1, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
-}
-
-static int
-lbox_delete(lua_State *L)
-{
-	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE)
-		return luaL_error(L, "Usage space:delete(key)");
-
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-
-	struct tuple *result;
-	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
-		return lbox_error(L);
-	return lbox_pushtupleornil(L, result);
-}
-
-static int
-lbox_commit(lua_State *L)
-{
-	if (box_txn_commit() != 0)
-		return lbox_error(L);
-	return 0;
-}
+#include "box/lua/tuple.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -451,20 +248,6 @@ execute_c_call(struct func *func, struct request *request, struct obuf *out)
 		/* Let all well-behaved exceptions pass through. */
 		throw;
 	}
-}
-
-char *
-lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
-{
-	struct region *gc = &fiber()->gc;
-	size_t used = region_used(gc);
-	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
-			luamp_error, L);
-	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
-	mpstream_flush(&stream);
-	*p_len = region_used(gc) - used;
-	return (char *) region_join_xc(gc, *p_len);
 }
 
 static inline void
@@ -676,45 +459,16 @@ box_lua_eval(struct request *request, struct obuf *out)
 	}
 }
 
-static int
-lbox_snapshot(struct lua_State *L)
-{
-	int ret = box_snapshot();
-	if (ret == 0) {
-		lua_pushstring(L, "ok");
-		return 1;
-	}
-	luaL_error(L, "can't save snapshot, errno %d (%s)",
-		   ret, strerror(ret));
-	return 1;
-}
-
-static const struct luaL_reg boxlib[] = {
-	{"snapshot", lbox_snapshot},
-	{"commit", lbox_commit},
-	{NULL, NULL}
-};
 
 static const struct luaL_reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
-	{"select", lbox_select},
-	{"insert", lbox_insert},
-	{"replace", lbox_replace},
-	{"update", lbox_update},
-	{"delete", lbox_delete},
-	{"upsert", lbox_upsert},
 	{NULL, NULL}
 };
 
-extern "C" void
-box_lua_init(struct lua_State *L)
+void
+box_lua_call_init(struct lua_State *L)
 {
-	/* Use luaL_register() to set _G.box */
-	luaL_register(L, "box", boxlib);
-	lua_pop(L, 1);
 	luaL_register(L, "box.internal", boxlib_internal);
-	lua_pop(L, 1);
-	luaopen_net_box(L);
 	lua_pop(L, 1);
 
 #if 0
@@ -725,22 +479,4 @@ box_lua_init(struct lua_State *L)
 	CTID_STRUCT_PORT_PTR = luaL_ctypeid(L, "struct port *");
 	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
 #endif
-	box_lua_error_init(L);
-	box_lua_tuple_init(L);
-	box_lua_slab_init(L);
-	box_lua_index_init(L);
-	box_lua_space_init(L);
-	box_lua_info_init(L);
-	box_lua_stat_init(L);
-	box_lua_sophia_init(L);
-	box_lua_session_init(L);
-
-	/* Load Lua extension */
-	for (const char **s = lua_sources; *s; s++) {
-		if (luaL_dostring(L, *s))
-			panic("Error loading Lua source %.160s...: %s",
-			      *s, lua_tostring(L, -1));
-	}
-
-	assert(lua_gettop(L) == 0);
 }
