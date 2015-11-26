@@ -33,7 +33,13 @@
 #include <dlfcn.h>
 
 #include "lua/utils.h"
+#include "diag.h"
 #include "scoped_guard.h"
+
+#include "box/request.h"
+#include "box/txn.h"
+#include "box/port.h"
+#include "box/iproto_port.h"
 
 struct func *
 func_new(struct func_def *def)
@@ -141,4 +147,55 @@ func_delete(struct func *func)
 {
 	func_unload(func);
 	free(func);
+}
+
+int
+func_call(struct func *func, struct request *request, struct obuf *out)
+{
+	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	if (func->func == NULL)
+		func_load(func);
+
+	/* Create a call context */
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	box_function_ctx_t ctx = { request, &port_buf.base };
+
+	/* Clear all previous errors */
+	diag_clear(&fiber()->diag);
+	assert(!in_txn()); /* transaction is not started */
+	/* Call function from the shared library */
+	int rc = func->func(&ctx, request->tuple, request->tuple_end);
+	if (rc != 0) {
+		if (diag_last_error(&fiber()->diag) == NULL) {
+			/* Stored procedure forget to set diag  */
+			diag_set(ClientError, ER_PROC_C,
+				 "unknown procedure error");
+		}
+		goto error;
+	}
+
+	/* Push results to obuf */
+	struct obuf_svp svp;
+	if (iproto_prepare_select(out, &svp) != 0)
+		goto error;
+
+	for (struct port_buf_entry *entry = port_buf.first;
+	     entry != NULL; entry = entry->next) {
+		if (tuple_to_obuf(entry->tuple, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
+		}
+	}
+	iproto_reply_select(out, &svp, request->header->sync,
+			    port_buf.size);
+
+	port_buf_destroy(&port_buf);
+
+	return 0;
+
+error:
+	port_buf_destroy(&port_buf);
+	txn_rollback();
+	return -1;
 }

@@ -686,9 +686,13 @@ tx_process_msg(struct cmsg *m)
 			struct tuple *tuple;
 			if (box_process1(&msg->request, &tuple) < 0)
 				diag_raise();
-			struct obuf_svp svp = iproto_prepare_select(out);
-			if (tuple)
-				tuple_to_obuf(tuple, out);
+			struct obuf_svp svp;
+			if (iproto_prepare_select(out, &svp) != 0)
+				diag_raise();
+			if (tuple) {
+				if (tuple_to_obuf(tuple, out) != 0)
+					diag_raise();
+			}
 			iproto_reply_select(out, &svp, msg->header.sync,
 					    tuple != 0);
 			break;
@@ -696,7 +700,7 @@ tx_process_msg(struct cmsg *m)
 		case IPROTO_CALL:
 			assert(msg->request.type == msg->header.type);
 			rmean_collect(rmean_box, msg->request.type, 1);
-			box_lua_call(&msg->request, out);
+			box_process_call(&msg->request, out);
 			break;
 		case IPROTO_EVAL:
 			assert(msg->request.type == msg->header.type);
