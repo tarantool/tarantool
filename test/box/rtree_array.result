@@ -48,7 +48,7 @@ s:insert{9,{50.0,50.0}}
 - [9, [50, 50]]
 ...
 -- select all records
-s.index.spatial:select({iterator = 'ALL'})
+s.index.spatial:select({}, {iterator = 'ALL'})
 ---
 - - [1, [0, 0]]
   - [2, [0, 10]]
@@ -195,7 +195,7 @@ rt0_10 = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10 }
 ---
 ...
 -- select all records
-s.index.spatial:select({iterator = 'ALL'})
+s.index.spatial:select({}, {iterator = 'ALL'})
 ---
 - - [1, [0, 0, 0, 0, 0, 0, 0, 0]]
   - [2, [10, 0, 0, 0, 0, 0, 0, 0]]
