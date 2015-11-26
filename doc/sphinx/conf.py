@@ -80,7 +80,7 @@ rst_prolog = """
 
 .. role:: codebolditalic
    :class: ccodebi
-   
+
 .. |nbsp| unicode:: 0xA0 
 
 """
@@ -96,4 +96,6 @@ def setup(sphinx):
     sys.path.insert(0, os.path.abspath('./ext'))
     from LuaLexer import LuaLexer
     sphinx.add_lexer("lua_tarantool", LuaLexer())
-  
+    from TarantoolSessionLexer import TarantoolSessionLexer
+    sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
+

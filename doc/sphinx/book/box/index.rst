@@ -183,18 +183,17 @@ usually represented with alphanumeric characters inside single quotes.
 
 A *boolean* is either :codenormal:`true` or :codenormal:`false`.
 
-A *nil* type has only one possible value, also called *nil*,
-but often displayed as *null*.
-Nils may be compared to values of any types with == (is-equal)
-or ~= (is-not-equal), but other operations will not work.
-Nils may not be used in Lua tables; the workaround
-is to use :ref:`yaml.NULL <yaml-null>` or
-:ref:`json.NULL <json-null>` or :ref:`msgpack.NULL <msgpack-null>`.
+A *nil* type has only one possible value, also called *nil*, but often displayed
+as *null*. Nils may be compared to values of any types with == (is-equal) or
+~= (is-not-equal), but other operations will not work. Nils may not be used in
+Lua tables; the workaround is to use :data:`yaml.NULL` or :data:`json.NULL` or
+:data:`msgpack.NULL`.
 
 A *tuple* is returned in YAML format like :codenormal:`- [120, 'a', 'b', 'c']`.
 A few functions may return tables with multiple tuples.
 A scalar may be converted to a tuple with only one field.
 A Lua table may contain all of a tuple's fields, but not nil.
+
 For more tuple examples see :ref:`box.tuple <box-tuple>`.
 
 ----------
@@ -562,6 +561,10 @@ description will contain the words "only applicable for the memtx storage engine
 
 .. _sphia.org: http://sphia.org
 
+=====================================================================
+                        Library Reference
+=====================================================================
+
 .. toctree::
     :maxdepth: 1
 
@@ -569,10 +572,8 @@ description will contain the words "only applicable for the memtx storage engine
     box_space
     box_index
     box_session
-    box_error
     box_tuple
     box_introspection
-    net_box
     admin
     atomic
     authentication

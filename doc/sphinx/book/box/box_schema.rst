@@ -59,6 +59,6 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
 For an illustration with the :code:`format` clause, see :func:`box.space._space <box.space._space>` example.
 
 After a space is created, usually the next step is to
-:ref:`create an index <space_object.create_index>` for it,
+:func:`create an index <space_object.create_index>` for it,
 and then it is available for insert, select, and all the other :mod:`box.space`
 functions.
