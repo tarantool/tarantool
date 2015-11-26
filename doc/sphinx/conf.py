@@ -81,10 +81,9 @@ rst_prolog = """
 .. role:: codebolditalic
    :class: ccodebi
 
-.. |nbsp| unicode:: 0xA0 
+.. |nbsp| unicode:: 0xA0
 
 """
-
 
 rst_epilog = """
 .. |br| raw:: html
@@ -98,4 +97,6 @@ def setup(sphinx):
     sphinx.add_lexer("lua_tarantool", LuaLexer())
     from TarantoolSessionLexer import TarantoolSessionLexer
     sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
+    from TapLexer import TAPLexer
+    sphinx.add_lexer('tap', TAPLexer())
 
