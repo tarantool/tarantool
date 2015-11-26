@@ -32,21 +32,8 @@
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
-#include "iobuf.h"
-#include "fiber.h"
-#include "scoped_guard.h"
 
-#include "box/box.h"
-#include "box/port.h"
-#include "box/request.h"
-#include "box/engine.h"
 #include "box/txn.h"
-#include "box/user_def.h"
-#include "box/user.h"
-#include "box/func.h"
-#include "box/schema.h"
-#include "box/session.h"
-#include "box/iproto_constants.h"
 #include "box/iproto_port.h"
 #include "box/lua/tuple.h"
 
@@ -237,14 +224,12 @@ done:
 }
 
 int
-box_lua_call(struct func *func, struct request *request, struct obuf *out)
+box_lua_call(struct request *request, struct obuf *out)
 {
 	/*
 	 * func == NULL means that perhaps the user has a global
 	 * "EXECUTE" privilege, so no specific grant to a function.
 	 */
-	assert(func == NULL || func->def.language == FUNC_LANGUAGE_LUA);
-	(void) func;
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);
@@ -261,11 +246,9 @@ box_lua_call(struct func *func, struct request *request, struct obuf *out)
 	}
 }
 
-static inline void
+void
 execute_eval(lua_State *L, struct request *request, struct obuf *out)
 {
-	/* Check permissions */
-	access_check_universe(PRIV_X);
 
 	/* Compile expression */
 	const char *expr = request->key;
@@ -304,6 +287,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	}
 }
 
+
 void
 box_lua_eval(struct request *request, struct obuf *out)
 {
@@ -320,7 +304,6 @@ box_lua_eval(struct request *request, struct obuf *out)
 		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
-
 
 static const struct luaL_reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},

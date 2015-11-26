@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
-#include "request.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -61,12 +60,6 @@ struct func {
 	 */
 	struct access access[BOX_USER_MAX];
 };
-
-struct request;
-struct obuf;
-
-int
-func_call(struct func *func, struct request *request, struct obuf *out);
 
 #if defined(__cplusplus)
 } /* extern "C" */

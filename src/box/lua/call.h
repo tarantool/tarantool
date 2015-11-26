@@ -54,7 +54,7 @@ struct obuf;
  * (implementation of 'CALL' command code).
  */
 int
-box_lua_call(struct func *func, struct request *request, struct obuf *out);
+box_lua_call(struct request *request, struct obuf *out);
 
 void
 box_lua_eval(struct request *request, struct obuf *out);

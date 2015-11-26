@@ -49,10 +49,8 @@
 #include "xrow.h"
 #include "recovery.h" /* server_uuid */
 #include "iproto_constants.h"
-#include "user_def.h"
 #include "authentication.h"
 #include "rmean.h"
-#include "lua/call.h"
 
 /* {{{ iproto_msg - declaration */
 
@@ -705,7 +703,7 @@ tx_process_msg(struct cmsg *m)
 		case IPROTO_EVAL:
 			assert(msg->request.type == msg->header.type);
 			rmean_collect(rmean_box, msg->request.type, 1);
-			box_lua_eval(&msg->request, out);
+			box_process_eval(&msg->request, out);
 			break;
 		case IPROTO_AUTH:
 		{
