@@ -4,51 +4,91 @@
 
 .. module:: jit
 
-The :code:`jit` package has functions for
-tracing the LuaJIT Just-In-Time compiler's progress, showing the byte-code
-or assembler output that the compiler produces, and
-in general providing information about what LuaJIT
-does with Lua code.
+The ``jit`` package has functions for tracing the LuaJIT Just-In-Time compiler's
+progress, showing the byte-code or assembler output that the compiler produces,
+and in general providing information about what LuaJIT does with Lua code.
 
-:codenormal:`jit.bc.dump(` :codeitalic:`function` :codenormal:`)` |br|
-Prints the byte code of a function. |br|
-EXAMPLE |br|
-:codebold:`# Show the byte code of a Lua function` |br|
-:codebold:`function f() print("D") end` |br|
-:codebold:`jit.bc.dump(f)` |br|
-For a list of available options, read `the source code of bc.lua`_.
+.. function:: jit.bc.dump(function)
 
-:codenormal:`jit.dis_x86.disass(` :codeitalic:`string` :codenormal:`)` |br|
-Prints the i386 assembler code of a string of bytes |br|
-EXAMPLE |br|
-:codebold:`# Disassemble hexadecimal 97 which is the x86 code for xchg eax, edi` |br|
-:codebold:`jit.dis_x86.disass ('\x97')` |br|
-For a list of available options, read `the source code of dis_x86.lua`_.
+    Prints the byte code of a function.
 
-:codenormal:`jit.dis_x64.disass(` :codeitalic:`string` :codenormal:`)` |br|
-Prints the x86-64 assembler code of a string of bytes |br|
-EXAMPLE |br|
-:codebold:`# Disassemble hexadecimal 97 which is the x86-64 code for xchg eax, edi` |br|
-:codebold:`jit.dis_x64.disass('\x97')` |br|
-For a list of available options, read `the source code of dis_x64.lua`_.
+    **Example:**
 
-:codenormal:`jit.dump.on(` :codeitalic:`option` :codenormal:`[,` :codeitalic:`output file` :codenormal:`]) / jit.dump.off()` |br|
-Prints the intermediate or machine code of following Lua code |br|
-EXAMPLE |br|
-:codebold:`# Show the machine code of a Lua "for" loop` |br|
-:codebold:`jit.dump.on('m')` |br|
-:codebold:`local x=0; for i=1,1e6 do x=x+i end; print(x)` |br|
-:codebold:`jit.dump.off()` |br|
-For a list of available options, read `the source code of dump.lua`_.
+    .. code-block:: lua
 
-:codenormal:`jit.v.on(` :codeitalic:`option` :codenormal:`[,` :codeitalic:`output file` :codenormal:`]) / jit.v.off()` |br|
-Prints a trace of LuaJIT's progress compiling and interpreting code |br|
-EXAMPLE |br|
-:codebold:`# Show what LuaJIT is doing for a Lua "for" loop` |br|
-:codebold:`jit.v.on()` |br|
-:codebold:`local x=0; for i=1,1e6 do x=x+i end; print(x)` |br|
-:codebold:`jit.v.off()` |br|
-For a list of available options, read `the source code of v.lua`_.
+        function f()
+          print("D")
+        end
+        jit.bc.dump(f)
+
+    For a list of available options, read `the source code of bc.lua`_.
+
+.. function:: jit.dis_x86.disass(string)
+
+    Prints the i386 assembler code of a string of bytes
+
+    **Example:**
+
+    .. code-block:: lua
+
+        -- Disassemble hexadecimal 97 which is the x86 code for xchg eax, edi
+        jit.dis_x86.disass('\x97')
+
+    For a list of available options, read `the source code of dis_x86.lua`_.
+
+.. function:: jit.dis_x64.disass(string)
+
+    Prints the x86-64 assembler code of a string of bytes
+
+    **Example:**
+
+    .. code-block:: lua
+
+        -- Disassemble hexadecimal 97 which is the x86-64 code for xchg eax, edi
+        jit.dis_x64.disass('\x97')
+
+    For a list of available options, read `the source code of dis_x64.lua`_.
+
+.. function:: jit.dump.on(option [, output file])
+              jit.dump.off()
+
+    Prints the intermediate or machine code of following Lua code
+
+    **Example:**
+
+    .. code-block:: lua
+
+        -- Show the machine code of a Lua "for" loop
+        jit.dump.on('m')
+        local x = 0;
+        for i = 1, 1e6 do
+          x = x + i
+        end
+        print(x)
+        jit.dump.off()
+
+    For a list of available options, read `the source code of dump.lua`_.
+
+
+.. function:: jit.v.on(option [, output file])
+              jit.v.off()
+
+    Prints a trace of LuaJIT's progress compiling and interpreting code
+
+    **Example:**
+
+    .. code-block:: lua
+
+        -- Show what LuaJIT is doing for a Lua "for" loop
+        jit.v.on()
+        local x = 0
+        for i = 1, 1e6 do
+            x = x + i
+        end
+        print(x)
+        jit.v.off()
+
+    For a list of available options, read `the source code of v.lua`_.
 
 
 .. _the source code of bc.lua: https://github.com/tarantool/luajit/tree/master/src/jit/bc.lua
@@ -56,4 +96,3 @@ For a list of available options, read `the source code of v.lua`_.
 .. _the source code of dis_x64.lua: https://github.com/tarantool/luajit/tree/master/src/jit/dis_x64.lua
 .. _the source code of dump.lua: https://github.com/tarantool/luajit/tree/master/src/jit/dump.lua
 .. _the source code of v.lua: https://github.com/tarantool/luajit/tree/master/src/jit/v.lua
-

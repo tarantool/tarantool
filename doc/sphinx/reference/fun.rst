@@ -22,12 +22,18 @@ Lua fun manual will work, provided they are preceded by the
 name returned by the :code:`require` request.
 For example:
 
-    | :codenormal:`tarantool>` :codebold:`fun = require('fun')`
-    | :codenormal:`tarantool>` :codebold:`for _k, a in fun.range(3) do print(a) end`
-    | :codenormal:`1`
-    | :codenormal:`2`
-    | :codenormal:`3`
-    | :codenormal:`---`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> fun = require('fun')
+    ---
+    ...
+    tarantool> for _k, a in fun_range(3) do
+             >   print(a)
+             > end
+    1
+    2
+    3
+    ---
+    ...
 
 .. _On the luafun section of github: http://rtsisyk.github.io/luafun
