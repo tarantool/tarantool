@@ -39,6 +39,9 @@ struct lua_State;
 void
 box_lua_session_init(struct lua_State *L);
 
+void
+session_storage_cleanup(int sid);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

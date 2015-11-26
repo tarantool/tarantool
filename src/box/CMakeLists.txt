@@ -71,7 +71,7 @@ add_library(box
     lua/stat.c
     lua/sophia.c
     lua/error.cc
-    lua/session.cc
+    lua/session.c
     lua/net_box.c
     ${bin_sources})
 

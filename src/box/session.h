@@ -158,6 +158,9 @@ current_session()
 /** Global on-disconnect triggers. */
 extern struct rlist session_on_disconnect;
 
+void
+session_storage_cleanup(int sid);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -197,9 +200,6 @@ session_run_on_disconnect_triggers(struct session *session);
 
 void
 session_run_on_auth_triggers(const char *user_name);
-
-void
-session_storage_cleanup(int sid);
 
 /*
  * Return the current user. Create it if it doesn't

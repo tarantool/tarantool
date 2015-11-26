@@ -31,19 +31,14 @@
 #include "session.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
-#include "box/user.h"
-#include "scoped_guard.h"
 
-extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-}
-
-#include <fiber.h>
 #include <sio.h>
 
 #include "box/session.h"
+#include "box/user.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -120,10 +115,12 @@ lbox_session_su(struct lua_State *L)
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
 		const char *name = lua_tolstring(L, 1, &len);
-		user = user_find_by_name_xc(name, len);
+		user = user_find_by_name(name, len);
 	} else {
-		user = user_find_xc(lua_tointeger(L, 1));
+		user = user_find(lua_tointeger(L, 1));
 	}
+	if (user == NULL)
+		lbox_error(L);
 	struct credentials orig_cr;
 	credentials_copy(&orig_cr, &session->credentials);
 	credentials_init(&session->credentials, user);
@@ -131,10 +128,10 @@ lbox_session_su(struct lua_State *L)
 		return 0; /* su */
 
 	/* sudo */
-	auto scoped_guard = make_scoped_guard([&] {
-		credentials_copy(&session->credentials, &orig_cr);
-	});
-	lua_call(L, top - 2, LUA_MULTRET);
+	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
+	credentials_copy(&session->credentials, &orig_cr);
+	if (error)
+		lbox_error(L);
 	return lua_gettop(L) - 1;
 }
 
@@ -195,7 +192,8 @@ lbox_session_peer(struct lua_State *L)
 
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
-	sio_getpeername(fd, (struct sockaddr *)&addr, &addrlen);
+	if (sio_getpeername(fd, (struct sockaddr *)&addr, &addrlen) < 0)
+		luaL_error(L, "session.peer(): getpeername() failed");
 
 	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr, addrlen));
 	return 1;
