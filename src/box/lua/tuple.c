@@ -397,5 +397,5 @@ box_lua_tuple_init(struct lua_State *L)
 	assert(rc == 0);
 	(void) rc;
 	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
-	assert(CTID_CONST_TUPLE_REF != 0);
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
 }
