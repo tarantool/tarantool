@@ -453,6 +453,9 @@ luaL_isarray(struct lua_State *L, int idx)
 	return index_starts_at_1;
 }
 
+struct error *
+luaL_iserror(struct lua_State *L, int narg);
+
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.

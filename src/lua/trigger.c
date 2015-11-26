@@ -30,27 +30,77 @@
  */
 #include "lua/trigger.h"
 #include "lua/utils.h"
+#include <diag.h>
+#include <fiber.h>
 
-void
-lbox_trigger_destroy(struct trigger *trigger)
+struct lbox_trigger
 {
-	if (tarantool_L)
-		luaL_unref(tarantool_L,
-			LUA_REGISTRYINDEX, (intptr_t) trigger->data);
-	free(trigger);
+	struct trigger base;
+	/** A reference to Lua trigger function. */
+	int ref;
+	/*
+	 * A pointer to a C function which pushes the
+	 * event data to Lua stack as arguments of the
+	 * Lua trigger.
+	 */
+	lbox_push_event_f push_event;
+};
+
+static void
+lbox_trigger_destroy(struct trigger *ptr)
+{
+	if (tarantool_L) {
+		struct lbox_trigger *trigger = (struct lbox_trigger *) ptr;
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, trigger->ref);
+	}
+	free(ptr);
 }
 
-
-struct trigger *
-lbox_trigger_find(struct lua_State *L, int index,
-		  struct rlist *list, trigger_f run)
+static void
+lbox_trigger_run(struct trigger *ptr, void *event)
 {
-	struct trigger *trigger;
+	struct lbox_trigger *trigger = (struct lbox_trigger *) ptr;
+	/*
+	 * Create a new coro and reference it. Remove it
+	 * from tarantool_L stack, which is a) scarce
+	 * b) can be used by other triggers while this
+	 * trigger yields, so when it's time to clean
+	 * up the coro, we wouldn't know which stack position
+	 * it is on.
+	 *
+	 * XXX: lua_newthread() may throw if out of memory,
+	 * this needs to be wrapped with lua_pcall() as well.
+	 * Don't, since it's a stupid overhead on every trigger
+	 * invocation, and in future we plan to hack into Lua
+	 * C API to fix this.
+	 */
+	struct lua_State *L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
+	int top = trigger->push_event(L, event);
+	if (lua_pcall(L, top, 0, 0)) {
+		struct error *e = luaL_iserror(L, -1);
+		if (e != NULL) {
+			/* Re-throw original error */
+			diag_add_error(&fiber()->diag, e);
+		} else {
+			/* Convert Lua error to Tarantool exception. */
+			diag_set(LuajitError, lua_tostring(L, -1));
+		}
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		diag_raise();
+	}
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+}
+
+static struct lbox_trigger *
+lbox_trigger_find(struct lua_State *L, int index, struct rlist *list)
+{
+	struct lbox_trigger *trigger;
 	/** Find the old trigger, if any. */
-	rlist_foreach_entry(trigger, list, link) {
-		if (trigger->run == run) {
-			lua_rawgeti(L, LUA_REGISTRYINDEX,
-				    (intptr_t) trigger->data);
+	rlist_foreach_entry(trigger, list, base.link) {
+		if (trigger->base.run == lbox_trigger_run) {
+			lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 			bool found = lua_equal(L, index, lua_gettop(L));
 			lua_pop(L, 1);
 			if (found)
@@ -60,25 +110,23 @@ lbox_trigger_find(struct lua_State *L, int index,
 	return NULL;
 }
 
-int
+static int
 lbox_list_all_triggers(struct lua_State *L, struct rlist *list)
 {
-	struct trigger *trigger;
+	struct lbox_trigger *trigger;
 	int count = 1;
 	lua_newtable(L);
-	rlist_foreach_entry_reverse(trigger, list, link) {
-		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
-		if (lua_isfunction(L, -1) && !lua_iscfunction(L, -1)) {
+	rlist_foreach_entry_reverse(trigger, list, base.link) {
+		if (trigger->base.run == lbox_trigger_run) {
+			lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 			lua_rawseti(L, -2, count);
 			count++;
-		} else {
-			lua_pop(L, 1);
 		}
 	}
 	return 1;
 }
 
-void
+static void
 lbox_trigger_check_input(struct lua_State *L, int top)
 {
 	assert(lua_checkstack(L, top));
@@ -86,10 +134,10 @@ lbox_trigger_check_input(struct lua_State *L, int top)
 	while (lua_gettop(L) < top)
 		lua_pushnil(L);
 	/*
-	 * (nil, function) is OK,
-	 * (function, nil), is OK,
-	 * (function, function) is OK,
-	 * no arguments is OK,
+	 * (nil, function) is OK, deletes the trigger
+	 * (function, nil), is OK, adds the trigger
+	 * (function, function) is OK, replaces the trigger
+	 * no arguments is OK, lists all trigger
 	 * anything else is error.
 	 */
 	if ((lua_isnil(L, top) && lua_isnil(L, top - 1)) ||
@@ -103,7 +151,7 @@ lbox_trigger_check_input(struct lua_State *L, int top)
 
 int
 lbox_trigger_reset(struct lua_State *L, int top,
-		   struct rlist *list, trigger_f run)
+		   struct rlist *list, lbox_push_event_f push_event)
 {
 	/**
 	 * If the stack is empty, pushes nils for optional
@@ -114,10 +162,10 @@ lbox_trigger_reset(struct lua_State *L, int top,
 	if (lua_isnil(L, top) && lua_isnil(L, top - 1))
 		return lbox_list_all_triggers(L, list);
 
-	struct trigger *trg = lbox_trigger_find(L, top, list, run);
+	struct lbox_trigger *trg = lbox_trigger_find(L, top, list);
 
 	if (trg) {
-		luaL_unref(L, LUA_REGISTRYINDEX, (intptr_t) trg->data);
+		luaL_unref(L, LUA_REGISTRYINDEX, trg->ref);
 
 	} else if (lua_isfunction(L, top)) {
 		luaL_error(L, "trigger reset: Trigger is not found");
@@ -128,12 +176,15 @@ lbox_trigger_reset(struct lua_State *L, int top,
 	 */
 	if (lua_isfunction(L, top - 1)) {
 		if (trg == NULL) {
-			trg = (struct trigger *) malloc(sizeof(*trg));
+			trg = (struct lbox_trigger *) malloc(sizeof(*trg));
 			if (trg == NULL)
 				luaL_error(L, "failed to allocate trigger");
-			trg->run = run;
-			trg->destroy = lbox_trigger_destroy;
-			trigger_add(list, trg);
+			trg->base.run = lbox_trigger_run;
+			trg->base.data = NULL;
+			trg->base.destroy = lbox_trigger_destroy;
+			trg->ref = LUA_NOREF;
+			trg->push_event = push_event;
+			trigger_add(list, &trg->base);
 		}
 		/*
 		 * Make the new trigger occupy the top
@@ -141,13 +192,12 @@ lbox_trigger_reset(struct lua_State *L, int top,
 		 */
 		lua_pop(L, 1);
 		/* Reference. */
-		trg->data = (void *) (intptr_t)
-			luaL_ref(L, LUA_REGISTRYINDEX);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trg->data);
+		trg->ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, trg->ref);
 		return 1;
 
 	} else {
-		trigger_clear(trg);
+		trigger_clear(&trg->base);
 		free(trg);
 	}
 	return 0;

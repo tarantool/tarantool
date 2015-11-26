@@ -840,7 +840,7 @@ luaL_toint64(struct lua_State *L, int idx)
 	return 0;
 }
 
-static struct error *
+struct error *
 luaL_iserror(struct lua_State *L, int narg)
 {
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
