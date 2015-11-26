@@ -60,9 +60,6 @@ bool errinj_get(int id);
 void errinj_set(int id, bool state);
 int errinj_set_byname(char *name, bool state);
 
-struct tbuf;
-void errinj_info(struct tbuf *out);
-
 typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
 int errinj_foreach(errinj_cb cb, void *cb_ctx);
 
