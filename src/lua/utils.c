@@ -93,6 +93,7 @@ luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 		idx = lua_gettop(L) + idx + 1;
 
 	if (lua_type(L, idx) != LUA_TCDATA) {
+		*ctypeid = 0;
 		luaL_error(L, "expected cdata as %d argument", idx);
 		return NULL;
 	}
