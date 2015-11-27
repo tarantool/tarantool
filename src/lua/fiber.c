@@ -112,7 +112,7 @@ lbox_create_weak_table(struct lua_State *L, const char *name)
  * Push a userdata for the given fiber onto Lua stack.
  */
 static void
-lbox_pushfiber(struct lua_State *L, struct fiber *f)
+lbox_pushfiber(struct lua_State *L, int fid)
 {
 	/*
 	 * Use 'memoize'  pattern and keep a single userdata for
@@ -121,7 +121,6 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 	 * not remove attached fiber's coro prematurely.
 	 */
 	luaL_getmetatable(L, fiberlib_name);
-	int top = lua_gettop(L);
 	lua_getfield(L, -1, "memoize");
 	if (lua_isnil(L, -1)) {
 		/* first access - instantiate memoize */
@@ -131,34 +130,25 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 		lbox_create_weak_table(L, "memoize");
 	}
 	/* Find out whether the fiber is  already in the memoize table. */
-	lua_pushinteger(L, f->fid);
+	lua_pushinteger(L, fid);
 	lua_gettable(L, -2);
 	if (lua_isnil(L, -1)) {
 		/* no userdata for fiber created so far */
 		/* pop the nil */
 		lua_pop(L, 1);
 		/* push the key back */
-		lua_pushinteger(L, f->fid);
+		lua_pushinteger(L, fid);
 		/* create a new userdata */
 		int *ptr = (int *) lua_newuserdata(L, sizeof(int));
-		*ptr = f->fid;
+		*ptr = fid;
 		luaL_getmetatable(L, fiberlib_name);
 		lua_setmetatable(L, -2);
 		/* memoize it */
 		lua_settable(L, -3);
-		lua_pushinteger(L, f->fid);
+		lua_pushinteger(L, fid);
 		/* get it back */
 		lua_gettable(L, -2);
 	}
-	/*
-	 * Here we have a userdata on top of the stack and
-	 * possibly some garbage just under the top. Move the
-	 * result to the beginning of the stack and clear the rest.
-	 */
-	/* moves the current top to the old top */
-	lua_replace(L, top);
-	/* clears everything after the old top */
-	lua_settop(L, top);
 }
 
 static struct fiber *
@@ -199,16 +189,6 @@ lbox_fiber_id(struct lua_State *L)
 		fid = *(uint32_t *) luaL_checkudata(L, 1, fiberlib_name);
 	lua_pushinteger(L, fid);
 	return 1;
-}
-
-static int
-lbox_fiber_gc(struct lua_State *L)
-{
-	if (lua_gettop(L) == 0)
-		return 0;
-	struct fiber *f = lbox_isfiber(L, 1);
-	(void) f;
-	return 0;
 }
 
 #ifdef ENABLE_BACKTRACE
@@ -318,16 +298,19 @@ lbox_fiber_create(struct lua_State *L)
 	if (fiber_checkstack())
 		luaL_error(L, "fiber.create(): out of fiber stack");
 
-	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
-	if (f == NULL)
-		lbox_error(L);
-
-	/* Not a system fiber. */
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
+	if (f == NULL) {
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+		lbox_error(L);
+	}
+
 	/* Move the arguments to the new coro */
 	lua_xmove(L, child_L, lua_gettop(L));
-	lbox_pushfiber(L, f);
+	/* XXX: 'fiber' is leaked if this throws a Lua error. */
+	lbox_pushfiber(L, f->fid);
 	fiber_start(f, coro_ref, child_L);
 	return 1;
 }
@@ -450,9 +433,9 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 static int
-lbox_fiber(struct lua_State *L)
+lbox_fiber_self(struct lua_State *L)
 {
-	lbox_pushfiber(L, fiber());
+	lbox_pushfiber(L, fiber()->fid);
 	return 1;
 }
 
@@ -464,7 +447,7 @@ lbox_fiber_find(struct lua_State *L)
 	int fid = lua_tointeger(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)
-		lbox_pushfiber(L, f);
+		lbox_pushfiber(L, f->fid);
 	else
 		lua_pushnil(L);
 	return 1;
@@ -565,7 +548,6 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{"__tostring", lbox_fiber_tostring},
 	{"wakeup", lbox_fiber_wakeup},
 	{"__index", lbox_fiber_index},
-	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };
 
@@ -573,7 +555,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"info", lbox_fiber_info},
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},
-	{"self", lbox_fiber},
+	{"self", lbox_fiber_self},
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
 	{"kill", lbox_fiber_kill},
