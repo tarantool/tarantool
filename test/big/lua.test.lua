@@ -1,3 +1,5 @@
+test_run = require('test_run').new()
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 space = box.schema.space.create('tweedledum')
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
 tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })

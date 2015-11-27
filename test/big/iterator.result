@@ -1,6 +1,13 @@
 dofile('utils.lua')
 ---
 ...
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
+---
+- true
+...
 # Tree single-part unique
 ---
 ...
@@ -891,7 +898,7 @@ space.index['primary']:pairs({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 ---
-- error: 'builtin/msgpackffi.lua:226: can not encode Lua type: ''function'''
+- error: 'builtin/msgpackffi.lua: can not encode Lua type: ''function'''
 ...
 -- Check that iterators successfully invalidated when index deleted
 gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
