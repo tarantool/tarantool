@@ -2,12 +2,12 @@
                             Package `box.error`
 -------------------------------------------------------------------------------
 
+.. module:: box.error
+
 The ``box.error`` function is for raising an error. The difference between this
 function and Lua's built-in ``error()`` function is that when the error reaches
 the client, its error code is preserved. In contrast, a Lua error would always
-be presented to the client as ``ER_PROC_LUA``.
-
-.. module:: box.error
+be presented to the client as :errcode:`ER_PROC_LUA`.
 
 .. function:: box.error{reason=string [, code=number]}
 
@@ -43,21 +43,22 @@ be presented to the client as ``ER_PROC_LUA``.
 
     :except: whatever is specified in errcode-number.
 
-    EXAMPLE
+    **Example:**
 
+    .. code-block:: tarantoolsession
 
-    | :codenormal:`tarantool>` :codebold:`box.error({code=555, reason='Arbitrary message'})`
-    | :codenormal:`---`
-    | :codenormal:`- error: Arbitrary message`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.error()`
-    | :codenormal:`---`
-    | :codenormal:`- error: Arbitrary message`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')`
-    | :codenormal:`---`
-    | :codenormal:`- error: A access denied for user 'B' to function 'C'`
-    | :codenormal:`...`
+        tarantool> box.error{code = 555, reason = 'Arbitrary message'}
+        ---
+        - error: Arbitrary message
+        ...
+        tarantool> box.error()
+        ---
+        - error: Arbitrary message
+        ...
+        tarantool> box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')
+        ---
+        - error: A access denied for user 'B' to function 'C'
+        ...
 
 .. function:: box.error.last()
 
@@ -78,30 +79,30 @@ be presented to the client as ``ER_PROC_LUA``.
     Clears the record of errors, so functions like `box.error()`
     or `box.error.last()` will have no effect.
 
-    EXAMPLE
+    **Example:**
 
-    | :codenormal:`tarantool>` :codebold:`box.error({code=555, reason='Arbitrary message'})`
-    | :codenormal:`---`
-    | :codenormal:`- error: Arbitrary message`
-    | :codenormal:`..`
-    |
-    | :codenormal:`tarantool>` :codebold:`box.schema.space.create('#')`
-    | :codenormal:`---`
-    | :codenormal:`- error: Invalid identifier '#' (expected letters, digits or an underscore)`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.error.last()`
-    | :codenormal:`---`
-    | :codenormal:`- line: 278`
-    | |nbsp| |nbsp| :codenormal:`code: 70`
-    | |nbsp| |nbsp| :codenormal:`type: ClientError`
-    | |nbsp| |nbsp| :codenormal:`message: Invalid identifier '#' (expected letters, digits or an underscore)`
-    | |nbsp| |nbsp| :codenormal:`file: /tmp/buildd/tarantool-1.6.6.252.g1654e31~precise/src/box/key_def.cc`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.error.clear()`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    |
-    | :codenormal:`tarantool>` :codebold:`box.error.last()`
-    | :codenormal:`---`
-    | :codenormal:`- null`
-    | :codenormal:`...`
+    .. code-block:: tarantoolsession
+
+        tarantool> box.error{code = 555, reason = 'Arbitrary message'}
+        ---
+        - error: Arbitrary message
+        ...
+        tarantool> box.schema.space.create('#')
+        ---
+        - error: Invalid identifier '#' (expected letters, digits or an underscore)
+        ...
+        tarantool> box.error.last()
+        ---
+        - line: 278
+          code: 70
+          type: ClientError
+          message: Invalid identifier '#' (expected letters, digits or an underscore)
+          file: /tmp/buildd/tarantool-1.6.6.252.g1654e31~precise/src/box/key_def.cc
+        ...
+        tarantool> box.error.clear()
+        ---
+        ...
+        tarantool> box.error.last()
+        ---
+        - null
+        ...

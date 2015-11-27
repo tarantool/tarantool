@@ -1,0 +1,152 @@
+---
+title   : "Tarantool - Careers"
+slug    : "careers"
+save_as : "careers.html"
+template: "careers"
+blocks:
+  content_up:
+    format:  rst
+    content: |
+        -------------------------------------
+                    The Project
+        -------------------------------------
+
+        Tarantool is an open-source in-memory DBMS combined with a Lua application
+        server. In some benchmarks it has proven to be faster than any of the
+        better-known NoSQL products, and Mail.Ru is committed to making Tarantool
+        the best-known as well as the best. The product is in production use
+        within many small and large companies, as well as within Mail.Ru itself.
+
+        The features include sharding, replication, write-ahead logging, a variety
+        of journal log options, load balancing, Lua stored procedures, connectors for C
+        Perl, PHP and Python, modules for interaction with MySQL or PostgreSQL.
+
+        There's a team of developers employed by Mail.Ru which creates and
+        distributes Tarantool in the open source community.
+
+  content_down:
+    format:  rst
+    content: |
+        --------------------------------------
+                      About us
+        --------------------------------------
+
+        Mail.Ru Group is one of the largest Internet companies in Russia and
+        Europe. It operates the world's fifth-largest postal service and three
+        social networks (Odnoklassniki, Moy Mir, Vkontake) with a total audience
+        of over 150 million users per month, and the world's third-most-popular
+        email application, myMail.
+
+
+  vacancies:
+    - title: Lead Site Reliability Engineer
+      link: https://corp.mail.ru/ru/jobs/vacancy/1047/
+      content:
+        format : rst
+        content: |
+
+          Our development team is growing, and needs the experience and
+          skill of the Lead Site Reliability Engineer for the monitoring and
+          maintaintenance work. Hence the job includes development work and
+          inter-team collaboration.
+
+          The engineer responsible for the site's
+          reliability will be working with the most modern technology, with one
+          of Russia's flagship software products, with budget and top-management
+          support as one would expect for an operation that is vital for the
+          entire company. This engineer will have to be an expert in the operation
+          of large-scale systems, able to solve problems at scale, and able to
+          automate the monitoring and maintenance activities.
+
+          --------------------------------------
+                        About you
+          --------------------------------------
+
+          * You have 3+ years experience as a developer or system administrator.
+          * You know Linux, general networking, and TCP/IP very well.
+          * You have experience with commercial product development using any
+            programming language.
+          * You have experience in getting results as part of a team.
+          * You have excellent communication skills.
+          * When you meet a problem with availability or speed of service, you
+            know what steps to take to get back to smooth operation.
+          * You know how to monitor, but more than that, you know how to build
+            a monitoring solution, and you take pride and pleasure in watching a
+            system that displays zero warnings.
+          * You understand that the special needs of operations at large scale.
+          * You know how to automate system operation.
+          * You do not accept response times exceeding 10 milliseconds.
+          * You do take seriosusly "Internal Server Error" displayed to the
+            end user, even if the problem may reside outside your operation domain.
+
+          --------------------------------------
+                    About the job
+          --------------------------------------
+
+          This is a full-time position at Mail.Ru's Moscow headquarters, a large
+          modern building near the "Airport" subway station. Duties include:
+
+          * construction and operation of a Tarantool-cluster-based public cloud
+          * construction and operation of a Tarantool-cluster-based private cloud
+          * ensuring trouble-free and fast operation to the satisfaction of
+            customers and management
+          * continuous improvement of the system as load increases and the number
+            of servers increases
+          * production and testing of better automation tools for Tarantool
+          * handling of emergencies and eventually elimination of emergencies
+          * integration with enterprise private-cloud tools for system monitoring,
+            alerting, and application updates
+
+          The engineer will be directly involved in the cluster's design,
+          development and implementation, and be ultimately responsible for all
+          high availability and scalability issues.
+
+    - title: C/C++ Developer
+      link: https://corp.mail.ru/ru/jobs/vacancy/839/
+      content:
+        format : rst
+        content: |
+
+          Our team develops a fully open source project: writes code that
+          automates the testing, assembles packages, and prepares documentation.
+          Now we are developing a complete cloud solution which automatically
+          replaces defective parts and distributes the database load to multiple
+          machines.
+
+          --------------------------------------
+                        About you
+          --------------------------------------
+
+          * You are fluent in C and C++.
+          * You have Unix system programming skills.
+          * You have experience with creating a "soft" real-time system.
+          * You can read and write English.
+
+          It would also be nice if:
+
+          * You have experience with storage technology and compilers.
+          * You have experience with the implementation of virtual environments.
+          * You have experience with creating distributed systems.
+
+          --------------------------------------
+                    About the job
+          --------------------------------------
+
+
+          This is a full-time position at Mail.Ru's Moscow headquarters, a large
+          modern building near the "Airport" subway station. Duties include:
+
+          * programming for a Tarantool-cluster-based public cloud
+          * ensuring trouble-free and fast operation to the satisfaction of
+            customers and management
+          * communicating with other developers, technical writers, and
+            customers with technical questions
+          * testing
+          * packaging
+
+          Once a developer becomes thoroughly familiar with Tarantool,
+          opportunities may exist for architectural work, consulting, and
+          international travel.
+...
+
+# vim: ts=2 sts=2 sw=2 expandtab

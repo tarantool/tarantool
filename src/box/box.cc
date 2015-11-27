@@ -653,10 +653,15 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
 	class MemtxIndex *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
-	index->initIterator(it, ITER_LE, NULL, 0);
-	struct tuple *tuple = it->next(it);
+	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
 	/** Assign a new server id. */
-	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	uint32_t server_id = 1;
+	while ((tuple = it->next(it))) {
+		if (tuple_field_u32(tuple, 0) != server_id)
+			break;
+		server_id++;
+	}
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
