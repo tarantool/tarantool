@@ -336,7 +336,7 @@ box_txn_commit()
 		return 0;
 	try {
 		txn_commit(txn);
-	} catch (...) {
+	} catch (Exception *e) {
 		txn_rollback();
 		return -1;
 	}

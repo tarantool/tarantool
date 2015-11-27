@@ -130,8 +130,6 @@ session_run_on_disconnect_triggers(struct session *session)
 		trigger_run(&session_on_disconnect, NULL);
 	} catch (Exception *e) {
 		e->log();
-	} catch (...) {
-		/* catch all. */
 	}
 	session_storage_cleanup(session->id);
 }
