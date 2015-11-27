@@ -78,15 +78,7 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 	int top = trigger->push_event(L, event);
-	if (lua_pcall(L, top, 0, 0)) {
-		struct error *e = luaL_iserror(L, -1);
-		if (e != NULL) {
-			/* Re-throw original error */
-			diag_add_error(&fiber()->diag, e);
-		} else {
-			/* Convert Lua error to Tarantool exception. */
-			diag_set(LuajitError, lua_tostring(L, -1));
-		}
+	if (lbox_call(L, top, 0)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}

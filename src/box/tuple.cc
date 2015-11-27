@@ -198,7 +198,7 @@ tuple_format_new(struct rlist *key_list)
 		tuple_format_register(format);
 		field_type_create(format->types, format->field_count,
 				  key_list);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_format_delete(format);
 		throw;
 	}
@@ -542,7 +542,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	memcpy(new_tuple->data, data, tuple_len);
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;
 	}

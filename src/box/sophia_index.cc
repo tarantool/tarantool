@@ -112,7 +112,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	if (format) {
 		try {
 			tuple_init_field_map(format, tuple, (uint32_t *)tuple);
-		} catch (...) {
+		} catch (Exception *e) {
 			tuple_delete(tuple);
 			throw;
 		}
@@ -496,7 +496,7 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
 		                          src,
 		                          src + src_size,
 		                          size, index_base);
-	} catch (...) {
+	} catch (Exception *e) {
 		return NULL;
 	}
 	return (char *)up;
