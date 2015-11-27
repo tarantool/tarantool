@@ -60,7 +60,7 @@ cn:ping()
 -- check permissions
 cn:call('unexists_procedure')
 ---
-- error: Procedure 'unexists_procedure' is not defined
+- error: Execute access denied for user 'guest' to function 'unexists_procedure'
 ...
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 ---
@@ -84,15 +84,15 @@ cn = remote:new(box.cfg.listen)
 ...
 cn:call('unexists_procedure')
 ---
-- error: Procedure 'unexists_procedure' is not defined
+- error: Execute access denied for user 'guest' to function 'unexists_procedure'
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- error: Execute access denied for user 'guest' to function 'test_foo'
 ...
 cn:call(nil, 'a', 'b', 'c')
 ---
-- error: Procedure 'nil' is not defined
+- error: Execute access denied for user 'guest' to function 'nil'
 ...
 cn:eval('return 2+2')
 ---

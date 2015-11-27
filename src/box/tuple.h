@@ -809,7 +809,7 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 /** These functions are implemented in tuple_convert.cc. */
 
 /* Store tuple in the output buffer in iproto format. */
-void
+int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
 /**

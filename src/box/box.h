@@ -47,6 +47,7 @@ extern "C" {
 struct port;
 struct request;
 struct xrow_header;
+struct obuf;
 
 /** To be called at program start. */
 void box_load_cfg();
@@ -82,6 +83,12 @@ const char *box_status(void);
 
 void
 box_process_auth(struct request *request);
+
+void
+box_process_call(struct request *request, struct obuf *out);
+
+void
+box_process_eval(struct request *request, struct obuf *out);
 
 void
 box_process_join(int fd, struct xrow_header *header);

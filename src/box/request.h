@@ -98,11 +98,4 @@ void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple);
 
-/**
- * API of C stored function.
- */
-typedef struct box_function_ctx box_function_ctx_t;
-typedef int (*box_function_f)(box_function_ctx_t *ctx,
-	     const char *args, const char *args_end);
-
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

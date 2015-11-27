@@ -32,21 +32,8 @@
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
-#include "iobuf.h"
-#include "fiber.h"
-#include "scoped_guard.h"
 
-#include "box/box.h"
-#include "box/port.h"
-#include "box/request.h"
-#include "box/engine.h"
 #include "box/txn.h"
-#include "box/user_def.h"
-#include "box/user.h"
-#include "box/func.h"
-#include "box/schema.h"
-#include "box/session.h"
-#include "box/iproto_constants.h"
 #include "box/iproto_port.h"
 #include "box/lua/tuple.h"
 
@@ -128,128 +115,6 @@ lbox_call_loadproc(struct lua_State *L)
 	return box_lua_find(L, name, name + name_len);
 }
 
-/**
- * Check access to a function and change the current
- * user id if the function is a set-definer-user-id one.
- * The original user is restored in the destructor.
- */
-struct SetuidGuard
-{
-	/** True if the function was set-user-id one. */
-	bool setuid;
-	struct credentials *orig_credentials;
-
-	inline SetuidGuard(const char *name, uint32_t name_len,
-			   uint8_t access, struct func *func);
-	inline ~SetuidGuard();
-};
-
-SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
-			 uint8_t access, struct func *func)
-	:setuid(false)
-	,orig_credentials(current_user())
-{
-
-	/*
-	 * If the user has universal access, don't bother with setuid.
-	 * No special check for ADMIN user is necessary
-	 * since ADMIN has universal access.
-	 */
-	if ((orig_credentials->universal_access & PRIV_ALL) == PRIV_ALL)
-		return;
-	access &= ~orig_credentials->universal_access;
-	if (func == NULL && access == 0) {
-		/**
-		 * Well, the function is not explicitly defined,
-		 * so it's obviously not a setuid one.
-		 */
-		return;
-	}
-	if (func == NULL || (func->def.uid != orig_credentials->uid &&
-	     access & ~func->access[orig_credentials->auth_token].effective)) {
-		/* Access violation, report error. */
-		char name_buf[BOX_NAME_MAX + 1];
-		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
-		struct user *user = user_find_xc(orig_credentials->uid);
-
-		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->def.name, name_buf);
-	}
-	if (func->def.setuid) {
-		/** Remember and change the current user id. */
-		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
-			/*
-			 * Fill the cache upon first access, since
-			 * when func is created, no user may
-			 * be around to fill it (recovery of
-			 * system spaces from a snapshot).
-			 */
-			struct user *owner = user_find_xc(func->def.uid);
-			credentials_init(&func->owner_credentials, owner);
-		}
-		setuid = true;
-		fiber_set_user(fiber(), &func->owner_credentials);
-	}
-}
-
-SetuidGuard::~SetuidGuard()
-{
-	if (setuid)
-		fiber_set_user(fiber(), orig_credentials);
-}
-
-
-static inline void
-execute_c_call(struct func *func, struct request *request, struct obuf *out)
-{
-	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
-	if (func->func == NULL)
-		func_load(func);
-
-	const char *name = request->key;
-	uint32_t name_len = mp_decode_strl(&name);
-	SetuidGuard setuid(name, name_len, PRIV_X, func);
-
-	struct port_buf port_buf;
-	port_buf_create(&port_buf);
-	auto guard = make_scoped_guard([&]{
-		port_buf_destroy(&port_buf);
-	});
-
-	box_function_ctx_t ctx = { request, &port_buf.base };
-	int rc = 0;
-	try {
-		rc = func->func(&ctx, request->tuple, request->tuple_end);
-	} catch (...) {
-		panic("C++ exception thrown from stored C function");
-	}
-	if (in_txn()) {
-		say_warn("a transaction is active at CALL return from '%.*s'",
-			name_len, name);
-		txn_rollback();
-	}
-
-	if (rc != 0) {
-		diag_raise();
-		tnt_raise(ClientError, ER_PROC_C, "unknown procedure error");
-	}
-
-	struct obuf_svp svp = iproto_prepare_select(out);
-	try {
-		for (struct port_buf_entry *entry = port_buf.first;
-		     entry != NULL; entry = entry->next) {
-			tuple_to_obuf(entry->tuple, out);
-		}
-		iproto_reply_select(out, &svp, request->header->sync,
-				    port_buf.size);
-	} catch (Exception *e) {
-		obuf_rollback_to_svp(out, &svp);
-		txn_rollback();
-		/* Let all well-behaved exceptions pass through. */
-		throw;
-	}
-}
-
 static inline void
 luamp_encode_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
 		    struct mpstream *stream, int index)
@@ -275,8 +140,7 @@ luamp_convert_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
  * (implementation of 'CALL' command code).
  */
 static inline void
-execute_lua_call(lua_State *L, struct func *func, struct request *request,
-		 struct obuf *out)
+execute_lua_call(lua_State *L, struct request *request, struct obuf *out)
 {
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
@@ -284,14 +148,7 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	int oc = 0; /* how many objects are on stack after box_lua_find */
 	/* Try to find a function by name in Lua */
 	oc = box_lua_find(L, name, name + name_len);
-	/**
-	 * Check access to the function and optionally change
-	 * execution time user id (set user id). Sic: the order
-	 * is important, as is described in
-	 * https://github.com/tarantool/tarantool/issues/300
-	 * - if a function does not exist, say it first.
-	 */
-	SetuidGuard setuid(name, name_len, PRIV_X, func);
+
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 
@@ -301,12 +158,6 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
 	lbox_call_xc(L, arg_count + oc - 1, LUA_MULTRET);
-
-	if (in_txn()) {
-		say_warn("a transaction is active at CALL return from '%.*s'",
-			name_len, name);
-		txn_rollback();
-	}
 
 	/**
 	 * Add all elements from Lua stack to iproto.
@@ -328,7 +179,9 @@ execute_lua_call(lua_State *L, struct func *func, struct request *request,
 	 * while Lua table size is pretty much unlimited.
 	 */
 	uint32_t count = 0;
-	struct obuf_svp svp = iproto_prepare_select(out);
+	struct obuf_svp svp;
+	if (iproto_prepare_select(out, &svp) != 0)
+		diag_raise();
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
@@ -370,42 +223,32 @@ done:
 	}
 }
 
-void
+int
 box_lua_call(struct request *request, struct obuf *out)
 {
-	const char *name = request->key;
-	uint32_t name_len = mp_decode_strl(&name);
-
-	struct func *func = func_by_name(name, name_len);
-	if (func != NULL && func->def.language == FUNC_LANGUAGE_C)
-		return execute_c_call(func, request, out);
-
 	/*
 	 * func == NULL means that perhaps the user has a global
 	 * "EXECUTE" privilege, so no specific grant to a function.
 	 */
-	assert(func == NULL || func->def.language == FUNC_LANGUAGE_LUA);
 	lua_State *L = NULL;
 	try {
 		L = lua_newthread(tarantool_L);
 		LuarefGuard coro_ref(tarantool_L);
-		execute_lua_call(L, func, request, out);
+		execute_lua_call(L, request, out);
+		return 0;
 	} catch (Exception *e) {
-		txn_rollback();
 		/* Let all well-behaved exceptions pass through. */
-		throw;
+		return -1;
 	} catch (...) {
-		txn_rollback();
 		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
+		diag_set(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
+		return -1;
 	}
 }
 
-static inline void
+void
 execute_eval(lua_State *L, struct request *request, struct obuf *out)
 {
-	/* Check permissions */
-	access_check_universe(PRIV_X);
 
 	/* Compile expression */
 	const char *expr = request->key;
@@ -425,7 +268,9 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	lbox_call_xc(L, arg_count, LUA_MULTRET);
 
 	/* Send results of the called procedure to the client. */
-	struct obuf_svp svp = iproto_prepare_select(out);
+	struct obuf_svp svp;
+	if (iproto_prepare_select(out, &svp) != 0)
+		diag_raise();
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
@@ -441,6 +286,7 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 		throw;
 	}
 }
+
 
 void
 box_lua_eval(struct request *request, struct obuf *out)
@@ -458,7 +304,6 @@ box_lua_eval(struct request *request, struct obuf *out)
 		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
 	}
 }
-
 
 static const struct luaL_reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},

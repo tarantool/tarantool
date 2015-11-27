@@ -231,7 +231,7 @@ c = (require 'net.box'):new(LISTEN.host, LISTEN.service)
 ...
 c:call('nosuchfunction')
 ---
-- error: Procedure 'nosuchfunction' is not defined
+- error: Execute access denied for user 'guest' to function 'nosuchfunction'
 ...
 function nosuchfunction() end
 ---
@@ -245,7 +245,7 @@ nosuchfunction = nil
 ...
 c:call('nosuchfunction')
 ---
-- error: Procedure 'nosuchfunction' is not defined
+- error: Execute access denied for user 'guest' to function 'nosuchfunction'
 ...
 c:close()
 ---

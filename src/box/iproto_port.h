@@ -88,8 +88,8 @@ iproto_reply_ok(struct obuf *out, uint64_t sync);
 void
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync);
 
-struct obuf_svp
-iproto_prepare_select(struct obuf *buf);
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp);
 
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,

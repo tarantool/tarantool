@@ -31,7 +31,10 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
-#include "request.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /**
  * Stored function.
@@ -58,6 +61,9 @@ struct func {
 	struct access access[BOX_USER_MAX];
 };
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 struct func *
 func_new(struct func_def *def);
 
@@ -73,5 +79,7 @@ func_delete(struct func *func);
  */
 void
 func_load(struct func *func);
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_FUNC_H_INCLUDED */

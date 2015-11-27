@@ -53,7 +53,7 @@ struct obuf;
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void
+int
 box_lua_call(struct request *request, struct obuf *out);
 
 void
