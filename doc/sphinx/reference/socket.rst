@@ -117,22 +117,26 @@ the function invocations will look like ``sock:function_name(...)``.
 
     Example:
 
-    | :codenormal:`tarantool>` :codebold:`socket.getaddrinfo('tarantool.org', 'http')`
+    .. code-block:: tarantoolsession
+
+        tarantool> socket.getaddrinfo('tarantool.org', 'http')
 
     will return variable information such as
 
-    | :codenormal:`---`
-    | :codenormal:`- - host: 188.93.56.70`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`family: AF_INET`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`type: SOCK_STREAM`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`protocol: tcp`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`port: 80`
-    | |nbsp| |nbsp| :codenormal:`- host: 188.93.56.70`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`family: AF_INET`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`type: SOCK_DGRAM`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`protocol: udp`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`port: 80`
-    | :codenormal:`...`
+    .. code-block:: tarantoolsession
+
+        ---
+        - - host: 188.93.56.70
+            family: AF_INET
+            type: SOCK_STREAM
+            protocol: tcp
+            port: 80
+          - host: 188.93.56.70
+            family: AF_INET
+            type: SOCK_DGRAM
+            protocol: udp
+            port: 80
+        ...
 
 .. function:: tcp_server(host, port, handler-function)
 
@@ -443,32 +447,34 @@ server and tarantool.org, then an HTTP "head" message is sent, and a response
 is received: "``HTTP/1.1 200 OK``". This is not a useful way to communicate
 with this particular site, but shows that the system works.
 
-| :codenormal:`tarantool>` :codebold:`socket = require('socket')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock = socket.tcp_connect('tarantool.org', 80)`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`type(sock)`
-| :codenormal:`---`
-| :codenormal:`- table`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock:error()`
-| :codenormal:`---`
-| :codenormal:`- null`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock:send("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock:read(17)`
-| :codenormal:`---`
-| :codenormal:`- "HTTP/1.1 200 OK\r\n"`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock:close()`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> socket = require('socket')
+    ---
+    ...
+    tarantool> sock = socket.tcp_connect('tarantool.org', 80)
+    ---
+    ...
+    tarantool> type(sock)
+    ---
+    - table
+    ...
+    tarantool> sock:error()
+    ---
+    - null
+    ...
+    tarantool> sock:send("HEAD / HTTP/1.0rnHost: tarantool.orgrnrn")
+    ---
+    - true
+    ...
+    tarantool> sock:read(17)
+    ---
+    - "HTTP/1.1 200 OKrn"
+    ...
+    tarantool> sock:close()
+    ---
+    - true
+    ...
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Use of a UDP socket on localhost
@@ -480,38 +486,40 @@ to ``sock_1``. Using ``sock_1``, receive a message. Display the received
 message. Close both connections. |br| This is not a useful way for a
 computer to communicate with itself, but shows that the system works.
 
-| :codenormal:`tarantool>` :codebold:`socket = require('socket')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_1:bind('127.0.0.1')`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_2:sendto('127.0.0.1', sock_1:name().port,'X')`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`message = sock_1:recvfrom()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`message`
-| :codenormal:`---`
-| :codenormal:`- X`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_1:close()`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`sock_2:close()`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> socket = require('socket')
+    ---
+    ...
+    tarantool> sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+    ---
+    ...
+    tarantool> sock_1:bind('127.0.0.1')
+    ---
+    - true
+    ...
+    tarantool> sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+    ---
+    ...
+    tarantool> sock_2:sendto('127.0.0.1', sock_1:name().port,'X')
+    ---
+    - true
+    ...
+    tarantool> message = sock_1:recvfrom()
+    ---
+    ...
+    tarantool> message
+    ---
+    - X
+    ...
+    tarantool> sock_1:close()
+    ---
+    - true
+    ...
+    tarantool> sock_2:close()
+    ---
+    - true
+    ...
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Use tcp_server to accept file contents sent with socat
@@ -531,17 +539,16 @@ On the first shell, start Tarantool and say:
 
     box.cfg{}
     socket = require('socket')
-    socket.tcp_server('0.0.0.0',
-                  3302,
-                  function(s)
-                    while true do
-                      local request
-                      request = s:read("\n");
-                      if request == "" then break end
-                      if request == nil then break end
-                      print(request)
-                      end
-                    end)
+    socket.tcp_server('0.0.0.0', 3302, function(s)
+        while true do
+          local request
+          request = s:read("\n");
+          if request == "" or request == nil then
+            break
+          end
+          print(request)
+        end
+      end)
 
 The above code means: use `tcp_server()` to wait for a
 connection from any host on port 3302. When it happens,
@@ -558,12 +565,11 @@ contains C. Call this file "tmp.txt".
 On the second shell, use the socat utility to ship the
 tmp.txt file to the server's host and port:
 
-| :codebold:`$ socat TCP:localhost:3302 ./tmp.txt`
+.. code-block:: console
+
+    $ socat TCP:localhost:3302 ./tmp.txt
 
 Now watch what happens on the first shell.
 The strings "A", "B", "C" are printed.
 
-
 .. _luasocket: https://github.com/diegonehab/luasocket
-
-

@@ -12,13 +12,17 @@
     font-size: 13px;
     color: #f8f8f2;
     background:#0d0d0d;
+    padding: 10px;
 }
 
 .linenodiv {
     margin-left: 10px;
 }
 
-.highlight pre  { padding: 10px; margin: 0px}
+.highlight pre  {
+/*  padding: 10px; */
+    margin: 0px;
+}
 .highlight .c   { color: #75715e } /* Comment */
 .highlight .err { color: #960050; background-color: #1e0010 } /* Error */
 .highlight .k  { color: #66d9ef } /* Keyword */
@@ -79,6 +83,7 @@
 .highlight .nn {  color: #cc33cc } /* Name.Namespace (for YAML) */
 .highlight .p-Indicator { color: #00cc00 } /* YAML - Punctuation.Indicator*/
 .highlight .gp { color: #999999 } /* Generic.Prompt */
+.highlight .go { color: #99CCFF } /* Generic.Output */
 
 .highlight .nn,
 .highlight .nv,

@@ -103,7 +103,7 @@ necessary to prioritize requests or to use different authentication ids.
         call, it is good programming practice to close a connection explicitly when it
         is no longer needed, to avoid lengthy stalls of the garbage collector.
 
-        Example: :codebold:`conn:close()`
+        Example: ``conn:close()``
 
     .. method:: conn.space.<space-name>:select{field-value, ...}
 
@@ -140,18 +140,18 @@ necessary to prioritize requests or to use different authentication ids.
         :samp:`func('1', '2', '3')`. That is, ``conn:call`` is a remote
         stored-procedure call.
 
-        Example: :codebold:`conn:call('function5')`
+        Example: ``conn:call('function5')``
 
     .. method:: timeout(timeout)
 
         ``timeout(...)`` is a wrapper which sets a timeout for the request that
         follows it.
 
-        Example: :codebold:`conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})`
+        Example: ``conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})``
 
         All remote calls support execution timeouts. Using a wrapper object makes
         the remote connection API compatible with the local one, removing the need
-        for a separate :codenormal:`timeout` argument, which the local version would ignore. Once
+        for a separate ``timeout`` argument, which the local version would ignore. Once
         a request is sent, it cannot be revoked from the remote server even if a
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.

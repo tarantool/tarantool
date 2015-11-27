@@ -105,7 +105,7 @@ The JSON output structure can be specified with ``__serialize``:
 * ``__serialize="seq"`` for an array
 * ``__serialize="map"`` for a map
 
-Serializing 'A' and 'B' with different __serialize values causes different results:
+Serializing 'A' and 'B' with different ``__serialize`` values causes different results:
 
 .. code-block:: tarantoolsession
 
