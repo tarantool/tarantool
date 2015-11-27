@@ -42,6 +42,7 @@
 #include "user_def.h"
 #include "iproto_constants.h"
 #include "rmean.h"
+#include <sys/uio.h>
 
 struct rmean *rmean_box;
 

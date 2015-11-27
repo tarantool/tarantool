@@ -782,6 +782,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 			*result = *(uint64_t *) cdata;
 			return 0;
 		}
+		*result = 0;
 		return -1;
 	case LUA_TSTRING:
 	{
@@ -795,6 +796,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		return 1;
 	}
 	}
+	*result = 0;
 	return -1;
 }
 
@@ -917,19 +919,17 @@ lbox_catch(lua_State *L)
 int
 lbox_call(struct lua_State *L, int nargs, int nreturns)
 {
-	int error = lua_pcall(L, nargs, nreturns, 0);
-	if (error == 0)
-		return 0;
-	return lbox_catch(L);
+	if (lua_pcall(L, nargs, nreturns, 0))
+		return lbox_catch(L);
+	return 0;
 }
 
 int
 lbox_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
-	int error = lua_cpcall(L, func, ud);
-	if (error == 0)
-		return 0;
-	return lbox_catch(L);
+	if (lua_cpcall(L, func, ud))
+		return lbox_catch(L);
+	return 0;
 }
 
 int

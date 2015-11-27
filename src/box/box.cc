@@ -59,7 +59,7 @@
 #include "title.h"
 #include "lua/call.h" /* box_lua_call */
 #include "iproto_port.h"
-
+#include "xrow.h"
 
 static char status[64] = "unknown";
 

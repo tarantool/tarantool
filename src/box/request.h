@@ -31,10 +31,15 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "xrow.h"
+#include <stdint.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct txn;
 struct port;
+struct tuple;
 
 /** box statistics */
 extern struct rmean *rmean_box;
@@ -69,6 +74,9 @@ struct request
 	int index_base;
 };
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 /** The snapshot row metadata repeats the structure of REPLACE request. */
 struct request_replace_body {
 	uint8_t m_body;
@@ -97,5 +105,7 @@ request_encode(struct request *request, struct iovec *iov);
 void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple);
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

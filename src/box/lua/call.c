@@ -29,13 +29,18 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/call.h"
+#include "box/error.h"
+#include "fiber.h"
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
 #include "box/txn.h"
+#include "box/request.h"
+#include "box/xrow.h"
 #include "box/iproto_port.h"
 #include "box/lua/tuple.h"
+#include "small/obuf.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -52,9 +57,11 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		lua_checkstack(L, 3);
 		lua_pushlstring(L, start, end - start);
 		lua_gettable(L, index);
-		if (! lua_istable(L, -1))
-			tnt_raise(ClientError, ER_NO_SUCH_PROC,
-				  name_end - name, name);
+		if (! lua_istable(L, -1)) {
+			diag_set(ClientError, ER_NO_SUCH_PROC,
+				 name_end - name, name);
+			lbox_error(L);
+		}
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
 	}
@@ -65,9 +72,11 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		lua_pushlstring(L, start, end - start);
 		lua_gettable(L, index);
 		if (! (lua_istable(L, -1) ||
-			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) ))
-				tnt_raise(ClientError, ER_NO_SUCH_PROC,
+			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) )) {
+				diag_set(ClientError, ER_NO_SUCH_PROC,
 					  name_end - name, name);
+				lbox_error(L);
+		}
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
 		objstack = index;

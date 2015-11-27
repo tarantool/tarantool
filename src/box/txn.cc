@@ -35,6 +35,7 @@
 #include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
+#include "xrow.h"
 
 double too_long_threshold;
 
