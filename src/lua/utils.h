@@ -516,6 +516,9 @@ lbox_error(lua_State *L);
 int
 lbox_call(lua_State *L, int nargs, int nreturns);
 
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

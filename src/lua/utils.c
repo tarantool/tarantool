@@ -900,12 +900,9 @@ lbox_error(lua_State *L)
 	return 0;
 }
 
-int
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+static inline int
+lbox_catch(lua_State *L)
 {
-	int error = lua_pcall(L, nargs, nreturns, 0);
-	if (error == 0)
-		return 0;
 	struct error *e = luaL_iserror(L, -1);
 	if (e != NULL) {
 		/* Re-throw original error */
@@ -915,6 +912,24 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 		diag_set(LuajitError, lua_tostring(L, -1));
 	}
 	return 1;
+}
+
+int
+lbox_call(struct lua_State *L, int nargs, int nreturns)
+{
+	int error = lua_pcall(L, nargs, nreturns, 0);
+	if (error == 0)
+		return 0;
+	return lbox_catch(L);
+}
+
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud)
+{
+	int error = lua_cpcall(L, func, ud);
+	if (error == 0)
+		return 0;
+	return lbox_catch(L);
 }
 
 int

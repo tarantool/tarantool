@@ -79,8 +79,9 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	if (!lua_isfunction(L, -1) && !lua_istable(L, -1)) {
 		/* lua_call or lua_gettable would raise a type error
 		 * for us, but our own message is more verbose. */
-		tnt_raise(ClientError, ER_NO_SUCH_PROC,
+		diag_set(ClientError, ER_NO_SUCH_PROC,
 			  name_end - name, name);
+		lbox_error(L);
 	}
 	/* setting stack that it would contain only
 	 * the function pointer. */
@@ -115,33 +116,28 @@ lbox_call_loadproc(struct lua_State *L)
 	return box_lua_find(L, name, name + name_len);
 }
 
-static inline void
-luamp_encode_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index)
-{
-	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY)
-		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-}
-
-static inline void
-luamp_convert_tuple_xc(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index)
-{
-	if (luaL_isarray(L, index) || lua_istuple(L, index)) {
-		luamp_encode_tuple_xc(L, cfg, stream, index);
-	} else {
-		luamp_encode_array(cfg, stream, 1);
-		luamp_encode(L, cfg, stream, index);
-	}
-}
+struct lua_function_ctx {
+	struct request *request;
+	struct obuf *out;
+	struct obuf_svp svp;
+	/* true if `out' was changed and `svp' can be used for rollback  */
+	bool out_is_dirty;
+};
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-static inline void
-execute_lua_call(lua_State *L, struct request *request, struct obuf *out)
+static inline int
+execute_lua_call(lua_State *L)
 {
+	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
+		lua_topointer(L, 1);
+	struct request *request = ctx->request;
+	struct obuf *out = ctx->out;
+	struct obuf_svp *svp = &ctx->svp;
+	lua_settop(L, 0); /* clear the stack to simplify the logic below */
+
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
 
@@ -157,7 +153,7 @@ execute_lua_call(lua_State *L, struct request *request, struct obuf *out)
 
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
-	lbox_call_xc(L, arg_count + oc - 1, LUA_MULTRET);
+	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
 
 	/**
 	 * Add all elements from Lua stack to iproto.
@@ -179,82 +175,64 @@ execute_lua_call(lua_State *L, struct request *request, struct obuf *out)
 	 * while Lua table size is pretty much unlimited.
 	 */
 	uint32_t count = 0;
-	struct obuf_svp svp;
-	if (iproto_prepare_select(out, &svp) != 0)
-		diag_raise();
+	/* TODO: forbid explicit yield from __serialize or __index here */
+	if (iproto_prepare_select(out, svp) != 0)
+		lbox_error(L);
+	ctx->out_is_dirty = true;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
 
-	try {
-		/** Check if we deal with a table of tables. */
-		int nrets = lua_gettop(L);
-		if (nrets == 1 && luaL_isarray(L, 1)) {
-			/*
-			 * The table is not empty and consists of tables
-			 * or tuples. Treat each table element as a tuple,
-			 * and push it.
+	/** Check if we deal with a table of tables. */
+	int nrets = lua_gettop(L);
+	if (nrets == 1 && luaL_isarray(L, 1)) {
+		/*
+		 * The table is not empty and consists of tables
+		 * or tuples. Treat each table element as a tuple,
+		 * and push it.
 		 */
-			lua_pushnil(L);
-			int has_keys = lua_next(L, 1);
-			if (has_keys && (luaL_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
-				do {
-					luamp_encode_tuple_xc(L, luaL_msgpack_default,
-							      &stream, -1);
-					++count;
-					lua_pop(L, 1);
-				} while (lua_next(L, 1));
-				goto done;
-			} else if (has_keys) {
+		lua_pushnil(L);
+		int has_keys = lua_next(L, 1);
+		if (has_keys && (luaL_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
+			do {
+				luamp_encode_tuple(L, luaL_msgpack_default,
+						   &stream, -1);
+				++count;
 				lua_pop(L, 1);
-			}
+			} while (lua_next(L, 1));
+			goto done;
+		} else if (has_keys) {
+			lua_pop(L, 1);
 		}
-		for (int i = 1; i <= nrets; ++i) {
-			luamp_convert_tuple_xc(L, luaL_msgpack_default, &stream, i);
-			++count;
-		}
+	}
+	for (int i = 1; i <= nrets; ++i) {
+		luamp_convert_tuple(L, luaL_msgpack_default, &stream, i);
+		++count;
+	}
 
 done:
-		mpstream_flush(&stream);
-		iproto_reply_select(out, &svp, request->header->sync, count);
-	} catch (...) {
-		obuf_rollback_to_svp(out, &svp);
-		throw;
-	}
+	mpstream_flush(&stream);
+	iproto_reply_select(out, svp, request->header->sync, count);
+	return 0;
 }
 
-int
-box_lua_call(struct request *request, struct obuf *out)
+static int
+execute_lua_eval(lua_State *L)
 {
-	/*
-	 * func == NULL means that perhaps the user has a global
-	 * "EXECUTE" privilege, so no specific grant to a function.
-	 */
-	lua_State *L = NULL;
-	try {
-		L = lua_newthread(tarantool_L);
-		LuarefGuard coro_ref(tarantool_L);
-		execute_lua_call(L, request, out);
-		return 0;
-	} catch (Exception *e) {
-		/* Let all well-behaved exceptions pass through. */
-		return -1;
-	} catch (...) {
-		/* Convert Lua error to a Tarantool exception. */
-		diag_set(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
-		return -1;
-	}
-}
-
-void
-execute_eval(lua_State *L, struct request *request, struct obuf *out)
-{
+	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
+		lua_topointer(L, 1);
+	struct request *request = ctx->request;
+	struct obuf *out = ctx->out;
+	struct obuf_svp *svp = &ctx->svp;
+	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
 	/* Compile expression */
 	const char *expr = request->key;
 	uint32_t expr_len = mp_decode_strl(&expr);
-	if (luaL_loadbuffer(L, expr, expr_len, "=eval"))
-		tnt_raise(LuajitError, lua_tostring(L, -1));
+	if (luaL_loadbuffer(L, expr, expr_len, "=eval")) {
+		diag_set(LuajitError, lua_tostring(L, -1));
+		lbox_error(L);
+	}
 
 	/* Unpack arguments */
 	const char *args = request->tuple;
@@ -265,44 +243,62 @@ execute_eval(lua_State *L, struct request *request, struct obuf *out)
 	}
 
 	/* Call compiled code */
-	lbox_call_xc(L, arg_count, LUA_MULTRET);
+	lua_call(L, arg_count, LUA_MULTRET);
 
 	/* Send results of the called procedure to the client. */
-	struct obuf_svp svp;
-	if (iproto_prepare_select(out, &svp) != 0)
+	if (iproto_prepare_select(out, svp) != 0)
 		diag_raise();
+	ctx->out_is_dirty = true;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
 	int nrets = lua_gettop(L);
-	try {
-		for (int k = 1; k <= nrets; ++k) {
-			luamp_encode(L, luaL_msgpack_default, &stream, k);
-		}
-		mpstream_flush(&stream);
-		iproto_reply_select(out, &svp, request->header->sync, nrets);
-	} catch (...) {
-		obuf_rollback_to_svp(out, &svp);
-		throw;
+	for (int k = 1; k <= nrets; ++k) {
+		luamp_encode(L, luaL_msgpack_default, &stream, k);
 	}
+	mpstream_flush(&stream);
+	iproto_reply_select(out, svp, request->header->sync, nrets);
+
+	return 0;
 }
 
+static inline int
+box_process_lua(struct request *request, struct obuf *out, lua_CFunction handler)
+{
+	struct lua_function_ctx ctx = { request, out, {0, 0, 0}, false };
 
-void
+	lua_State *L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	int rc = lbox_cpcall(L, handler, &ctx);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	if (rc != 0) {
+		if (ctx.out_is_dirty) {
+			/*
+			 * Output buffer has been altered, rollback to svp.
+			 * (!) Please note that a save point for output buffer
+			 * must be taken only after finishing executing of Lua
+			 * function because Lua can yield and leave the
+			 * buffer in inconsistent state (a parallel request
+			 * from the same connection will break the protocol).
+			 */
+			obuf_rollback_to_svp(out, &ctx.svp);
+		}
+
+		return -1;
+	}
+	return 0;
+}
+
+int
+box_lua_call(struct request *request, struct obuf *out)
+{
+	return box_process_lua(request, out, execute_lua_call);
+}
+
+int
 box_lua_eval(struct request *request, struct obuf *out)
 {
-	lua_State *L = NULL;
-	try {
-		L = lua_newthread(tarantool_L);
-		LuarefGuard coro_ref(tarantool_L);
-		execute_eval(L, request, out);
-	} catch (Exception *e) {
-		/* Let all well-behaved exceptions pass through. */
-		throw;
-	} catch (...) {
-		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, lua_tostring(L ? L : tarantool_L, -1));
-	}
+	return box_process_lua(request, out, execute_lua_eval);
 }
 
 static const struct luaL_reg boxlib_internal[] = {

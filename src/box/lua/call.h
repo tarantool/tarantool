@@ -43,9 +43,6 @@ struct lua_State;
 void
 box_lua_call_init(struct lua_State *L);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 struct request;
 struct obuf;
 
@@ -56,9 +53,11 @@ struct obuf;
 int
 box_lua_call(struct request *request, struct obuf *out);
 
-void
+int
 box_lua_eval(struct request *request, struct obuf *out);
 
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */

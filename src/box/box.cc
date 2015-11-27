@@ -809,9 +809,20 @@ box_process_eval(struct request *request, struct obuf *out)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_X);
-	box_lua_eval(request, out);
-}
+	if (box_lua_eval(request, out) != 0) {
+		txn_rollback();
+		diag_raise();
+	}
 
+	if (in_txn()) {
+		/* The procedure forgot to call box.commit() */
+		const char *expr = request->key;
+		uint32_t expr_len = mp_decode_strl(&expr);
+		say_warn("a transaction is active at return from EVAL '%.*s'",
+			expr_len, expr);
+		txn_rollback();
+	}
+}
 
 void
 box_process_join(int fd, struct xrow_header *header)
