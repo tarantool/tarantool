@@ -11,16 +11,18 @@ blocks:
                     The Project
         -------------------------------------
 
-        Mail.Ru has a team which develops and distributes the Tarantool NoSQL
-        DBMS. Tarantool is deployed within Mail.Ru in a large cluster.
-        The system serves many millions of customers, and shows Tarantool's
-        capabilities. Therefore the engineer responsible for the site's
-        reliability will be working with the most modern technology, with one
-        of Russia's flagship software products, with budget and top-management
-        support as one would expect for an operation that is vital for the
-        entire company. This engineer will have to be an expert in the operation
-        of large-scale systems, able to solve problems at scale, and able to
-        automate the monitoring and maintenance activities.
+        Tarantool is an open-source in-memory DBMS combined with a Lua application
+        server. In some benchmarks it has proven to be faster than any of the
+        better-known NoSQL products, and Mail.Ru is committed to making Tarantool
+        the best-known as well as the best. The product is in production use
+        within many small and large companies, as well as within Mail.Ru itself.
+
+        The features include sharding, replication, write-ahead logging, a variety
+        of journal log options, load balancing, Lua stored procedures, connectors for C
+        Perl, PHP and Python, modules for interaction with MySQL or PostgreSQL.
+
+        There's a team of developers employed by Mail.Ru which creates and
+        distributes Tarantool in the open source community.
 
   content_down:
     format:  rst
@@ -35,15 +37,6 @@ blocks:
         of over 150 million users per month, and the world's third-most-popular
         email application, myMail.
 
-        Tarantool is an open-source in-memory DBMS combined with a Lua application
-        server. In some benchmarks it has proven to be faster than any of the
-        better-known NoSQL products, and Mail.Ru is committed to making Tarantool
-        the best-known as well as the best. The product is in production use
-        within many small and large companies, as well as within Mail.Ru itself.
-
-        The features include sharding, replication, write-ahead logging, a variety
-        of journal log options, load balancing, Lua stored procedures, connectors for C
-        Perl, PHP and Python, modules for interaction with MySQL or PostgreSQL.
 
   vacancies:
     - title: Lead Site Reliability Engineer
@@ -54,9 +47,16 @@ blocks:
 
           Our development team is growing, and needs the experience and
           skill of the Lead Site Reliability Engineer for the monitoring and
-          maintaining work. Hence the job includes development work and
+          maintaintenance work. Hence the job includes development work and
           inter-team collaboration.
 
+        The engineer responsible for the site's
+        reliability will be working with the most modern technology, with one
+        of Russia's flagship software products, with budget and top-management
+        support as one would expect for an operation that is vital for the
+        entire company. This engineer will have to be an expert in the operation
+        of large-scale systems, able to solve problems at scale, and able to
+        automate the monitoring and maintenance activities.
           --------------------------------------
                         About you
           --------------------------------------
@@ -70,13 +70,13 @@ blocks:
           * When you meet a problem with availability or speed of service, you
             know what steps to take to get back to smooth operation.
           * You know how to monitor, but more than that, you know how to build
-            a monitor, and you take pride and pleasure in watching a system that
-            displays zero warnings.
-          * You understand that the special needs of a Very Large Scale system.
-          * You understand how to automate system operation.
-          * You do not understand why response time should ever exceed 10 milliseconds.
-          * Being responsible for "Internal Server Error" can make you serious but
-            not uncomfortable.
+            a monitoring solution, and you take pride and pleasure in watching a
+            system that displays zero warnings.
+          * You understand that the special needs of operations at large scale.
+          * You know how to automate system operation.
+          * You do not accept response times exceeding 10 milliseconds.
+          * You do take seriosusly "Internal Server Error" displayed to the
+            end user, even if the problem may reside outside your operation domain.
 
           --------------------------------------
                     About the job
@@ -96,7 +96,7 @@ blocks:
           * integration with enterprise private-cloud tools for system monitoring,
             alerting, and application updates
 
-          The engineer will be directly involved in the cluster's design and
+          The engineer will be directly involved in the cluster's design,
           development and implementation, and be ultimately responsible for all
           high availability and scalability issues.
 
