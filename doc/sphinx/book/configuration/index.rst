@@ -140,7 +140,7 @@ Then the screen might look like this:
 
 If one wishes to start an interactive session
 on the same terminal after initialization is complete,
-one can use :ref:`console.start() <console-start>`.
+one can use :func:`console.start()`.
 
 .. _local_hot_standby:
 .. _replication_port:

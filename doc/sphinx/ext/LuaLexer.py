@@ -1,9 +1,9 @@
 import re
 
-from pygments.lexer import RegexLexer, include, bygroups, default, combined, \
-    words   
-from pygments.token import Text, Comment, Operator, Keyword, Name, String, \
-    Number, Punctuation, Error, Whitespace, Other
+from pygments.lexer import RegexLexer, include, bygroups
+from pygments.lexer import default, combined, words
+from pygments.token import Text, Comment, Operator, Keyword, Name, String
+from pygments.token import Number, Punctuation, Error, Whitespace, Other
 from pygments.util import get_bool_opt, get_list_opt, iteritems
 
 __all__ = ['LuaLexer']

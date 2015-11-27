@@ -202,7 +202,7 @@ class LuaObject(ObjectDescription):
             signode += addnodes.desc_returns(self.retann, self.retann)
 
     def handle_signature(self, sig, signode):
-        context, name, argstart, arglist, argend, retann = self.parse_signature(sig)
+        a = (context, name, argstart, arglist, argend, retann) = self.parse_signature(sig)
 
         self.context, self.contextsep = self.build_context(context)
         self.module = self.options.get('module', self.env.temp_data.get('lua:module'))
@@ -214,6 +214,11 @@ class LuaObject(ObjectDescription):
         self.arglist = arglist
         self.argend = argend
         self.retann = retann
+        # print "context: '%s', name: '%s'" % a[:2]
+        # print "module: '%s', clsname: '%s', idxtype: '%s'" % (self.module, self.clsname, self.idxtype)
+        # print "typename: '%s', objtype: '%s'" % (self.typename, self.objtype)
+        # print "needs_module: '%s', needs_class: '%s'" % (self.needs_class(), self.needs_module())
+        # print ""
 
         add_module = True
         fullname = name
@@ -225,16 +230,26 @@ class LuaObject(ObjectDescription):
         prefix = "%s " % (self.objtype)
         signode += addnodes.desc_annotation(prefix, prefix)
 
-        if self.clsname and self.needs_class():
+        clsname = ''
+        if fullname.find('.') != -1 or str(self.typename) == "object":
+            pass
+        elif self.clsname and self.needs_class():
             sprtr = '.' if str(self.typename) == "data" else ':'
             clsname = '%s%s' % (self.clsname, sprtr)
-            signode += addnodes.desc_addname(clsname, clsname)
-        elif str(self.typename) == "data":
-            clsname = '%s:' % (self.clsname)
-            signode += addnodes.desc_addname(clsname, clsname)
         elif self.module and self.needs_module():
-            modname = '%s.' % (self.module)
-            signode += addnodes.desc_addname(modname, modname)
+            clsname = '%s.' % (self.module)
+
+        if clsname:
+            signode += addnodes.desc_addname(clsname, clsname)
+
+#        if self.clsname and self.needs_class():
+#            signode += addnodes.desc_addname(clsname, clsname)
+#        elif str(self.typename) == "data":
+#            clsname = '%s:' % (self.clsname)
+#            signode += addnodes.desc_addname(clsname, clsname)
+#        elif self.module and self.needs_module():
+#            modname = '%s.' % (self.module)
+#            signode += addnodes.desc_addname(modname, modname)
 
         self.build_signode(signode)
 
