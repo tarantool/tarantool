@@ -511,3 +511,11 @@ ul.first.last.simple {
     margin-bottom: 0px;
     margin-top: 0px;
 }
+
+.method code.descclassname {
+    font-style: italic;
+}
+
+.toctree-l1 li {
+    list-style-type: none;
+}

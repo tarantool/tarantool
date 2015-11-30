@@ -413,6 +413,7 @@ installing :code:`tarantool`, install :code:`tarantool-dev`. For example, on
 Ubuntu, add the line:
 
 .. code-block:: bash
+
     sudo apt-get install tarantool-dev
 
 Now, for the PostgreSQL driver shared library, there are two ways to install:

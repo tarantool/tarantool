@@ -92,3 +92,6 @@ class TAPLexer(RegexLexer):
             (r'\n', Comment, '#pop:2'),
         ],
     }
+
+def setup(app):
+    app.add_lexer('tap', TAPLexer())

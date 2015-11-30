@@ -1,28 +1,24 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
-    ... ...
-    tarantool> s:insert{2,'Tuple inserted on Terminal #2'}
+    <... ...>
+    tarantool> s:insert{2, 'Tuple inserted on Terminal #2'}
     ---
     - [2, 'Tuple inserted on Terminal #2']
     ...
-    tarantool> 2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 I> can't read row
-    2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 !> SystemError
-    unexpected EOF when reading from socket,
-    called on fd 10, aka 127.0.0.1:50884, peer of 127.0.0.1:3301: Broken pipe
-    2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 I> will retry every 1 second
-    tarantool> box.space.tester:select({0},{iterator='GE'})
+    tarantool> 
+    <...> [25579] main/103/replica/localhost:3301 I> can't read row
+    <...> [25579] main/103/replica/localhost:3301 !> SystemError
+      unexpected EOF when reading from socket,
+      called on fd 10, aka 127.0.0.1:50884, peer of 127.0.0.1:3301: Broken pipe
+    <...> [25579] main/103/replica/localhost:3301 I> will retry every 1 second
+    tarantool> box.space.tester:select({0}, {iterator = 'GE'})
     ---
     - - [1, 'Tuple inserted on Terminal #1']
       - [2, 'Tuple inserted on Terminal #2']
     ...
-    tarantool> box.space.tester:insert{3,'Another'}
+    tarantool> box.space.tester:insert{3, 'Another'}
     ---
     - [3, 'Another']
     ...
-    tarantool>
-    2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    2014-10-13 12:01:55.614 [25579] main/103/replica/localhost:3301 I> authenticated
-    </pre>
-
-
+    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
+    <...> [25579] main/103/replica/localhost:3301 I> authenticated

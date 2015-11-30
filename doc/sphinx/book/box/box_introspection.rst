@@ -37,9 +37,9 @@ The ``box.info`` package provides access to information about server variables.
 Some important ones:
 
 * **server.uuid** holds the unique identifier of the server. This value is also
-   in the :data:`box.space._cluster` system space.
+  in the :data:`box.space._cluster` system space.
 * **pid** is the process ID of the server. This value is also shown by the
-   :ref:`tarantool <tarantool-build>` package.
+  :ref:`tarantool <tarantool-build>` package.
 * **version** is the Tarantool version. This value is also shown by
   :ref:`tarantool --version <tarantool-version>`.
 * **uptime** is the number of seconds since the server started.

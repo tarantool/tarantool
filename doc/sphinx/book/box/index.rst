@@ -83,7 +83,7 @@ of a field is the field's number, base 1. For example
 When Tarantool returns a tuple value, it surrounds
 strings with single quotes, separates fields with commas,
 and encloses the tuple inside square brackets.
-For example: :codenormal:`[ 3, 'length', 93 ]`.
+For example: ``[ 3, 'length', 93 ]``.
 
 .. _box.index:
 
@@ -119,7 +119,9 @@ and their expected types. The allowed types for indexed fields are NUM
 (a series of numbers for use with :ref:`RTREE indexes <RTREE>`.
 Take our example, which has the request:
 
-| :codenormal:`tarantool>`:codebold:`i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
+.. code-block:: tarantoolsession
+
+    tarantool> i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 
 The effect is that, for all tuples in tester,
 field number 1 must exist and must contain an unsigned integer.
@@ -181,7 +183,7 @@ integers between 0 and 18,446,744,073,709,551,615.
 A *string* is a variable-length sequence of bytes,
 usually represented with alphanumeric characters inside single quotes.
 
-A *boolean* is either :codenormal:`true` or :codenormal:`false`.
+A *boolean* is either ``true`` or ``false``.
 
 A *nil* type has only one possible value, also called *nil*, but often displayed
 as *null*. Nils may be compared to values of any types with == (is-equal) or
@@ -189,7 +191,7 @@ as *null*. Nils may be compared to values of any types with == (is-equal) or
 Lua tables; the workaround is to use :data:`yaml.NULL` or :data:`json.NULL` or
 :data:`msgpack.NULL`.
 
-A *tuple* is returned in YAML format like :codenormal:`- [120, 'a', 'b', 'c']`.
+A *tuple* is returned in YAML format like ``- [120, 'a', 'b', 'c']``.
 A few functions may return tables with multiple tuples.
 A scalar may be converted to a tuple with only one field.
 A Lua table may contain all of a tuple's fields, but not nil.
@@ -204,7 +206,7 @@ The basic operations are: the five data-change operations
 (insert, update, upsert, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like
 “ping” which can only be used with the binary protocol.
-Also, there are :ref:`index iterator <index-iterator>` operations, which can only
+Also, there are :func:`index iterator <index_object.pairs>` operations, which can only
 be used with Lua code. (Index iterators are for traversing
 indexes one key at a time, taking advantage of features
 that are specific to an index type, for example evaluating
@@ -213,37 +215,41 @@ going in descending order when traversing TREE indexes.)
 
 Five examples of basic operations:
 
-| :codenormal:`-- Add a new tuple to tuple set tester.`
-| :codenormal:`-- The first field, field[1], will be 999 (type is NUM).`
-| :codenormal:`-- The second field, field[2], will be 'Taranto' (type is STR).`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{999, 'Taranto'}`
-|
-| :codenormal:`-- Update the tuple, changing field field[2].`
-| :codenormal:`-- The clause "{999}", which has the value to look up in`
-| :codenormal:`-- the index of the tuple's primary-key field, is mandatory`
-| :codenormal:`-- because update() requests must always have a clause that`
-| :codenormal:`-- specifies the primary key, which in this case is field[1].`
-| :codenormal:`-- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment`
-| :codenormal:`-- will happen to field[2] with the new value.`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})`
-|
-| :codenormal:`-- Replace the tuple, adding a new field.`
-| :codenormal:`-- This is also possible with the update() request but`
-| :codenormal:`-- the update() request is usually more complicated.`
-| :codenormal:`box.space.tester:replace{999, 'Tarantella', 'Tarantula'}`
-|
-| :codenormal:`-- Retrieve the tuple.`
-| :codenormal:`-- The clause "{999}" is still mandatory, although it does not have to`
-| :codenormal:`-- mention the primary key. */`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select{999}`
-|
-| :codenormal:`-- Delete the tuple.`
-| :codenormal:`-- Once again the clause to identify the primary-key field is mandatory.`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:delete{999}`
+.. code-block:: tarantoolsession
+
+    -- Add a new tuple to tuple set tester.
+    -- The first field, field[1], will be 999 (type is NUM).
+    -- The second field, field[2], will be 'Taranto' (type is STR).
+    tarantool> box.space.tester:insert{999, 'Taranto'}
+
+    -- Update the tuple, changing field field[2].
+    -- The clause "{999}", which has the value to look up in
+    -- the index of the tuple's primary-key field, is mandatory
+    -- because update() requests must always have a clause that
+    -- specifies the primary key, which in this case is field[1].
+    -- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
+    -- will happen to field[2] with the new value.
+    tarantool> box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
+
+    -- Replace the tuple, adding a new field.
+    -- This is also possible with the update() request but
+    -- the update() request is usually more complicated.
+    tarantool> box.space.tester:replace{999, 'Tarantella', 'Tarantula'}
+
+    -- Retrieve the tuple.
+    -- The clause "{999}" is still mandatory, although it does not have to
+    -- mention the primary key.
+    tarantool> box.space.tester:select{999}
+
+    -- Delete the tuple.
+    -- Once again the clause to identify the primary-key field is mandatory.
+    tarantool> box.space.tester:delete{999}
 
 How does Tarantool do a basic operation? Let's take this example:
 
-| :codenormal:`tarantool>`:codebold:`box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})`
+.. code-block:: tarantoolsession
+
+    tarantool> box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
 
 which, for those who know SQL, is equivalent to a statement like
 
@@ -321,13 +327,11 @@ A complete grammar of supported data-manipulation functions will come later in t
 
 .. _Tarantool regression test suite: https://github.com/tarantool/tarantool/tree/master/test/box
 
-Since not all Tarantool operations can be expressed with the
-data-manipulation functions, or with Lua, to gain complete access
-to data manipulation functionality one must use a
-:ref:`Perl, PHP, Python or other programming language connector <box-connectors>`.
-The client/server protocol is open and documented:
-an annotated BNF can be found in the source tree, file
-`doc/box-protocol.html`_.
+Since not all Tarantool operations can be expressed with the data-manipulation
+functions, or with Lua, to gain complete access to data manipulation
+functionality one must use a :ref:`Perl, PHP, Python or other programming language connector <box-connectors>`.
+The client/server protocol is open and documented: an annotated BNF can be found
+in the source tree, file `doc/box-protocol.html`_.
 
 .. _doc/box-protocol.html: http://tarantool.org/doc/box-protocol.html
 
@@ -335,25 +339,25 @@ an annotated BNF can be found in the source tree, file
 Data persistence
 ----------------
 
-To maintain data persistence, Tarantool writes each data
-change request (INSERT, UPDATE, DELETE, REPLACE) into
-a write-ahead log (WAL) file in the :confval:`wal_dir <wal_dir>` directory.
-A new WAL file is created for every :confval:`rows_per_wal <rows_per_wal>` records.
-Each data change request gets assigned a continuously growing
-64-bit log sequence number. The name of the WAL file is based
-on the log sequence number of the first record in the file,
-plus an extension :codenormal:`.xlog`.
+To maintain data persistence, Tarantool writes each data change request (INSERT,
+UPDATE, DELETE, REPLACE) into a write-ahead log (WAL) file in the
+:confval:`wal_dir <wal_dir>` directory. A new WAL file is created for every
+:confval:`rows_per_wal <rows_per_wal>` records. Each data change request gets
+assigned a continuously growing 64-bit log sequence number. The name of the WAL
+file is based on the log sequence number of the first record in the file, plus
+an extension ``.xlog``.
 
-Apart from a log sequence number and the data change request
-(its format is the same as in the binary protocol and is described
-in `doc/box-protocol.html`_), each WAL record contains a header,
-some metadata, and then the data formatted according to `msgpack`_ rules.
-For example this is what the WAL file looks like after the first INSERT
-request ("s:insert({1})") for the introductory sandbox exercise
-":ref:`Starting Tarantool and making your first database <first database>`“.
+Apart from a log sequence number and the data change request (its format is the
+same as in the binary protocol and is described in `doc/box-protocol.html`_),
+each WAL record contains a header, some metadata, and then the data formatted
+according to `msgpack`_ rules. For example this is what the WAL file looks like
+after the first INSERT request ("s:insert({1})") for the introductory sandbox
+exercise ":ref:`Starting Tarantool and making your first database <first database>` “.
 On the left are the hexadecimal bytes that one would see with:
 
-| :codebold:`$ hexdump 00000000000000000001.xlog`
+.. code-block:: console
+
+    $ hexdump 00000000000000000001.xlog
 
 and on the right are comments.
 
@@ -380,65 +384,73 @@ and on the right are comments.
    91                         msgpack code meaning "1-element fixed array" follows
    01                         Tuple: field[1] value = 1
 
-Tarantool processes requests atomically: a change is either
-accepted and recorded in the WAL, or discarded completely.
-Let's clarify how this happens, using the REPLACE request as an example:
+Tarantool processes requests atomically: a change is either accepted and recorded
+in the WAL, or discarded completely. Let's clarify how this happens, using the
+REPLACE request as an example:
 
-1. The server attempts to locate the original tuple by primary key. If found, a reference to the tuple is retained for later use.
-2. The new tuple is then validated. If for example it does not contain an indexed field, or it has an indexed field whose type does not match the type according to the index definition, the change is aborted.
+1. The server attempts to locate the original tuple by primary key. If found, a
+   reference to the tuple is retained for later use.
+2. The new tuple is then validated. If for example it does not contain an
+   indexed field, or it has an indexed field whose type does not match the type
+   according to the index definition, the change is aborted.
 3. The new tuple replaces the old tuple in all existing indexes.
-4. A message is sent to WAL writer running in a separate thread, requesting that the change be recorded in the WAL. The server switches to work on the next request until the write is acknowledged.
-5. On success, a confirmation is sent to the client. Upon failure, a rollback procedure is begun. During the rollback procedure, the transaction processor rolls back all changes to the database which occurred after the first failed change, from latest to oldest, up to the first failed change. All rolled back requests are aborted with :errcode:`ER_WAL_IO <ER_WAL_IO>` error. No new change is applied while rollback is in progress. When the rollback procedure is finished, the server restarts the processing pipeline.
+4. A message is sent to WAL writer running in a separate thread, requesting that
+   the change be recorded in the WAL. The server switches to work on the next
+   request until the write is acknowledged.
+5. On success, a confirmation is sent to the client. Upon failure, a rollback
+   procedure is begun. During the rollback procedure, the transaction processor
+   rolls back all changes to the database which occurred after the first failed
+   change, from latest to oldest, up to the first failed change. All rolled back
+   requests are aborted with :errcode:`ER_WAL_IO <ER_WAL_IO>` error. No new
+   change is applied while rollback is in progress. When the rollback procedure
+   is finished, the server restarts the processing pipeline.
 
-One advantage of the described algorithm is that complete request
-pipelining is achieved, even for requests on the same value of the
-primary key. As a result, database performance doesn't degrade even
-if all requests touch upon the same key in the same space.
+One advantage of the described algorithm is that complete request pipelining is
+achieved, even for requests on the same value of the primary key. As a result,
+database performance doesn't degrade even if all requests touch upon the same
+key in the same space.
 
-The transaction processor thread communicates with the WAL writer
-thread using asynchronous (yet reliable) messaging; the transaction
-processor thread, not being blocked on WAL tasks, continues to handle
-requests quickly even at high volumes of disk I/O.
-A response to a request is sent as soon as it is ready,
-even if there were earlier incomplete requests on the same connection.
-In particular, SELECT performance, even for SELECTs running
-on a connection packed with UPDATEs and DELETEs,
-remains unaffected by disk load.
+The transaction processor thread communicates with the WAL writer thread using
+asynchronous (yet reliable) messaging; the transaction processor thread, not
+being blocked on WAL tasks, continues to handle requests quickly even at high
+volumes of disk I/O. A response to a request is sent as soon as it is ready,
+even if there were earlier incomplete requests on the same connection. In
+particular, SELECT performance, even for SELECTs running on a connection packed
+with UPDATEs and DELETEs, remains unaffected by disk load.
 
-The WAL writer employs a number of durability modes, as defined
-in configuration variable :confval:`wal_mode <wal_mode>`. It is possible to turn
-the write-ahead log completely off, by setting :confval:`wal_mode <wal_mode>` to *none*.
-Even without the write-ahead log it's still possible to take
-a persistent copy of the entire data set with the :func:`box.snapshot() <box.snapshot()>` request.
+The WAL writer employs a number of durability modes, as defined in configuration
+variable :confval:`wal_mode <wal_mode>`. It is possible to turn the write-ahead
+log completely off, by setting :confval:`wal_mode <wal_mode>` to *none*. Even
+without the write-ahead log it's still possible to take a persistent copy of the
+entire data set with the :func:`box.snapshot() <box.snapshot()>` request.
 
 -----------------
 Data manipulation
 -----------------
 
-The basic *data-manipulation* requests are:
-``insert``, ``replace``, ``update``, ``upsert``,
-``delete``, ``select``.
-All of them are part of the ``box`` library.
+The basic *data-manipulation* requests are: ``insert``, ``replace``, ``update``,
+``upsert``, ``delete``, ``select``. All of them are part of the ``box`` library.
 Most of them may return data. Usually both inputs and outputs are Lua tables.
 
-The Lua syntax for data-manipulation functions can vary.
-Here are examples of the variations with ``select`` examples;
-the same rules exist for the other data-manipulation functions.
-Every one of the examples does the same thing:
-select a tuple set from a space named tester where
-the primary-key field value equals 1.
+The Lua syntax for data-manipulation functions can vary. Here are examples of
+the variations with ``select`` examples; the same rules exist for the other
+data-manipulation functions. Every one of the examples does the same thing:
+select a tuple set from a space named tester where the primary-key field value
+equals 1.
 
 First, there are four *naming variations*:
 
-| :codenormal:`-- #1`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
-| :codenormal:`-- #2`
-| :codenormal:`tarantool>` :codebold:`box.space['tester']:select{1}`
-| :codenormal:`-- #3`
-| :codenormal:`tarantool>` :codebold:`box.space[512]:select{1}`
-| :codenormal:`-- #4`
-| :codenormal:`tarantool>` :codebold:`variable = 'tester'`
-| :codenormal:`tarantool>` :codebold:`box.space[variable]:select{1}`
+.. code-block:: tarantoolsession
+
+    -- #1
+    tarantool> box.space.tester:select{1}
+    -- #2
+    tarantool> box.space['tester']:select{1}
+    -- #3
+    tarantool> box.space[512]:select{1}
+    -- #4
+    tarantool> variable = 'tester'
+    tarantool> box.space[variable]:select{1}
 
 There is an assumption that the numeric id of 'tester' is 512, which happens to be the case in our
 sandbox example only. Literal values such as 'tester'
@@ -449,20 +461,22 @@ the variants exist in the wild.
 
 Then, there are six *parameter variations*:
 
-| :codenormal:`-- #1`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
-| :codenormal:`-- #2`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select({1})`
-| :codenormal:`-- #3`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
-| :codenormal:`-- #4`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select({1},{iterator='EQ'})`
-| :codenormal:`-- #5`
-| :codenormal:`tarantool>` :codebold:`variable = 1`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select{variable}`
-| :codenormal:`-- #6`
-| :codenormal:`tarantool>` :codebold:`variable = {1}`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select(variable)`
+.. code-block:: tarantoolsession
+
+    -- #1
+    tarantool> box.space.tester:select{1}
+    -- #2
+    tarantool> box.space.tester:select({1})
+    -- #3
+    tarantool> box.space.tester:select(1)
+    -- #4
+    tarantool> box.space.tester:select({1},{iterator='EQ'})
+    -- #5
+    tarantool> variable = 1
+    tarantool> box.space.tester:select{variable}
+    -- #6
+    tarantool> variable = {1}
+    tarantool> box.space.tester:select(variable)
 
 The primary-key value is enclosed in braces, and if
 it was a multi-part primary key then the value would be
@@ -498,7 +512,8 @@ the Tarantool server's storage functionality with the ``Lua library``.
 
 The contents of the ``box`` library can be inspected at runtime
 with ``box``, with no arguments. The packages inside the box library are:
-``box.schema``, ``box.tuple``, ``box.space``, ``box.index``, ``net.box``, ``box.cfg``, ``box.info``, ``box.slab``, ``box.stat``.
+``box.schema``, ``box.tuple``, ``box.space``, ``box.index``, ``net.box``,
+``box.cfg``, ``box.info``, ``box.slab``, ``box.stat``.
 Every package contains one or more Lua functions. A few packages contain
 members as well as functions. The functions allow data definition (create
 alter drop), data manipulation (insert delete update upsert select replace), and

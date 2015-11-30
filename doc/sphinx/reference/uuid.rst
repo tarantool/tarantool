@@ -16,14 +16,14 @@ The functions that can return a UUID are:
 
 The functions that can convert between different types of UUID are:
 
-    * :func:`:bin() <uuid_object.bin>`
-    * :func:`:str() <uuid_object.str>`
+    * :func:`uuid_object:bin() <uuid_object.bin>`
+    * :func:`uuid_object:str() <uuid_object.str>`
     * :func:`uuid.fromstr()`
     * :func:`uuid.frombin()`
 
 The function that can determine whether a UUID is an all-zero value is:
 
-    * :func:`:isnil() <uuid_object.isnil>`
+    * :func:`uuid_object:isnil() <uuid_object.isnil>`
 
 .. module:: uuid
 

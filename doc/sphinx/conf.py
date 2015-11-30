@@ -14,7 +14,10 @@ extensions = [
     #'sphinx.ext.autodoc',
     #'sphinx.ext.autosummary',
     'ext.custom',
-    'ext.lua',
+    'ext.LuaDomain',
+    'ext.LuaLexer',
+    'ext.TapLexer',
+    'ext.TarantoolSessionLexer',
     'breathe'
 ]
 primary_domain = 'lua'
@@ -91,12 +94,11 @@ rst_epilog = """
     <br />
 """
 
-def setup(sphinx):
-    sys.path.insert(0, os.path.abspath('./ext'))
-    from LuaLexer import LuaLexer
-    sphinx.add_lexer("lua_tarantool", LuaLexer())
-    from TarantoolSessionLexer import TarantoolSessionLexer
-    sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
-    from TapLexer import TAPLexer
-    sphinx.add_lexer('tap', TAPLexer())
-
+# def setup(sphinx):
+#     sys.path.insert(0, os.path.abspath('./ext'))
+#     from LuaLexer import LuaLexer
+#     sphinx.add_lexer("lua_tarantool", LuaLexer())
+#     from TarantoolSessionLexer import TarantoolSessionLexer
+#     sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
+#     from TapLexer import TAPLexer
+#     sphinx.add_lexer('tap', TAPLexer())

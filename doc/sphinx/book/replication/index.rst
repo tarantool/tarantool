@@ -98,9 +98,13 @@ the old master went down, they would have to be re-applied manually.
 
 Step 1. Start the first server thus:
 
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=` :codebolditalic:`uri#1` :codenormal:`}`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request`
-| :codenormal:`tarantool>` :codebold:`box.snapshot()`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.cfg{listen = *uri#1*}
+    -- replace with more restrictive request
+    box.schema.user.grant('guest', 'read,write,execute', 'universe')
+    box.snapshot()
 
 ... Now a new cluster exists.
 
@@ -112,7 +116,13 @@ server's databases can happen without conflicts.
 
 Step 3. Start the second server thus:
 
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=` :codebolditalic:`uri#2` :codebold:`, replication_source=` :codebolditalic:`uri#1` :codebold:`}`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.cfg{
+      listen = *uri#2*,
+      replication_source = *uri#1*
+    }
 
 ... where ``uri#1`` = the :ref:`URI` that the first server is listening on.
 
@@ -137,7 +147,17 @@ If a replica's status is "connected", then there will be two more fields: |br|
 :code:`box.info.replication.lag` = the number of seconds the replica is behind the master.
 
 In the :mod:`log` there is a record of replication activity.
-If a primary server is started with :codenormal:`box.cfg{...logger =` :codeitalic:`log file name` :codenormal:`...}`,
+If a primary server is started with:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.cfg{
+      <...>,
+      logger = *log file name*,
+      <...>
+    }
+
 then there will be lines in the log file, containing the word "relay",
 when a replica connects or disconnects.
 
@@ -145,22 +165,27 @@ when a replica connects or disconnects.
                     Preventing Duplicate Actions
 =====================================================================
 
-Suppose that the replica tries to do something
-that the master has already done. For example: |br|
+Suppose that the replica tries to do something that the master has already done.
+For example: |br|
 :code:`box.schema.space.create('X')` |br|
 This would cause an error, "Space X exists".
 For this particular situation, the code could be changed to: |br|
-:code:`box.schema.space.create('X',{if_not_exists=true})` |br|
+:code:`box.schema.space.create('X', {if_not_exists=true})` |br|
 But there is a more general solution: the
-:samp:`box.once({key},{function})` method.
+:samp:`box.once({key}, {function})` method.
 If :code:`box.once()` has been called before with the
-same :codeitalic:`key` value, then :codeitalic:`function`
-is ignored; otherwise :codeitalic:`function` is executed.
+same :samp:`{key}` value, then :samp:`{function}`
+is ignored; otherwise :samp:`{function}` is executed.
 Therefore, actions which should only occur once during the
 life of a replicated session should be placed in a function
-which is executed via :code:`box.once()`. For example: |br|
-:codebold:`function f() box.schema.space.create('X'); end` |br|
-:codebold:`box.once('space_creator',f)`
+which is executed via :code:`box.once()`. For example:
+
+.. code-block:: lua
+
+    function f()
+      box.schema.space.create('X')
+    end
+    box.once('space_creator', f)
 
 =====================================================================
                     Master-Master Replication
@@ -170,7 +195,13 @@ In the simple master-replica configuration, the master's changes are seen by
 the replica, but not vice versa, because the master was specified as the sole
 replication source. Starting with Tarantool 1.6, it's possible to go both ways.
 Starting with the simple configuration, the first server has to say:
-:code:`box.cfg{`:samp:`replication_source={uri#2}`:code:`}`. This request can be performed at any time.
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.cfg{ replication_source = *uri#2* }
+
+This request can be performed at any time.
 
 In this configuration, both servers are "masters" and both servers are
 "replicas". Henceforth every change that happens on either server will
@@ -187,53 +218,63 @@ servers will end up with different contents.
 =====================================================================
                 All the "What If?" Questions
 =====================================================================
+.. container:: faq
 
-`What if there are more than two servers with master-master?` ... |br|
-On each server, specify the :confval:`replication_source` for all the others. For
-example, server #3 would have a request:
-:code:`box.cfg{`:samp:`replication_source={uri#1}, replication_source={uri#2}`:code:`}`.
+    :Q: What if there are more than two servers with master-master?
+    :A: On each server, specify the :confval:`replication_source` for all the
+        others. For example, server #3 would have a request:
 
-`What if a server should be taken out of the cluster?` ... |br|
-Run ``box.cfg{}`` again specifying a blank replication source:
-``box.cfg{replication_source=''}``.
+        .. cssclass:: highlight
+        .. parsed-literal::
 
-`What if a server leaves the cluster?` ... |br|
-The other servers carry on. If the wayward server rejoins, it will receive
-all the updates that the other servers made while it was away.
+            box.cfg{
+                replication_source = *uri#1*,
+                replication_source = *uri#2*
+            }
 
-`What if two servers both change the same tuple?` ... |br|
-The last changer wins. For example, suppose that server#1 changes the tuple,
-then server#2 changes the tuple. In that case server#2's change overrides
-whatever server#1 did. In order to keep track of who came last, Tarantool
-implements a `vector clock`_.
+    :Q: What if a server should be taken out of the cluster?
+    :A: Run ``box.cfg{}`` again specifying a blank replication source:
+        ``box.cfg{replication_source=''}``
 
-`What if two servers both insert the same tuple?` ... |br|
-If a master tries to insert a tuple which a replica has inserted already,
-this is an example of a severe error. Replication stops.
-It will have to be restarted manually.
+    :Q: What if a server leaves the cluster?
+    :A: The other servers carry on. If the wayward server rejoins, it will
+        receive all the updates that the other servers made while it was away.
 
-`What if a master disappears and the replica must take over?` ... |br|
-A message will appear on the replica stating that the connection is lost.
-The replica must now become independent, which can be done by saying
-``box.cfg{replication_source=''}``.
+    :Q: What if two servers both change the same tuple?
+    :A: The last changer wins. For example, suppose that server#1 changes the
+        tuple, then server#2 changes the tuple. In that case server#2's change
+        overrides whatever server#1 did. In order to keep track of who came last,
+        Tarantool implements a `vector clock`_.
 
-`What if it's necessary to know what cluster a server is in?` ... |br|
-The identification of the cluster is a UUID which is generated when the
-first master starts for the first time. This UUID is stored in a tuple
-of the :data:`box.space._cluster` system space, and in a tuple of the
-:data:`box.space._schema` system space. So to see it, say:
-``box.space._schema:select{'cluster'}``
+    :Q: What if two servers both insert the same tuple?
+    :A: If a master tries to insert a tuple which a replica has inserted
+        already, this is an example of a severe error. Replication stops.
+        It will have to be restarted manually.
 
-`What if one of the server's files is corrupted or deleted?` ... |br|
-Stop the server, destroy all the database files (the ones with extension
-"snap" or "xlog" or ".inprogress"), restart the server, and catch up with
-the master by contacting it again (just say ``box.cfg{...replication_source=...}``).
+    :Q: What if a master disappears and the replica must take over?
+    :A: A message will appear on the replica stating that the connection is
+        lost. The replica must now become independent, which can be done by
+        saying ``box.cfg{replication_source=''}``.
 
-`What if replication causes security concerns?` ... |br|
-Prevent unauthorized replication sources by associating a password with
-every user that has access privileges for the relevant spaces. That way,
-the :ref:`URI` for the :confval:`replication_source` parameter will always have to have
-the long form ``replication_source='username:password@host:port'``.
+    :Q: What if it's necessary to know what cluster a server is in?
+    :A: The identification of the cluster is a UUID which is generated when the
+        first master starts for the first time. This UUID is stored in a tuple
+        of the :data:`box.space._cluster` system space, and in a tuple of the
+        :data:`box.space._schema` system space. So to see it, say:
+        ``box.space._schema:select{'cluster'}``
+
+    :Q: What if one of the server's files is corrupted or deleted?
+    :A: Stop the server, destroy all the database files (the ones with extension
+        "snap" or "xlog" or ".inprogress"), restart the server, and catch up
+        with the master by contacting it again (just say
+        ``box.cfg{...replication_source=...}``).
+
+    :Q: What if replication causes security concerns?
+    :A: Prevent unauthorized replication sources by associating a password with
+        every user that has access privileges for the relevant spaces. That way,
+        the :ref:`URI` for the :confval:`replication_source` parameter will
+        always have to have the long form
+        ``replication_source='username:password@host:port'``
 
 .. _vector clock: https://en.wikipedia.org/wiki/Vector_clock
 
@@ -244,9 +285,9 @@ the long form ``replication_source='username:password@host:port'``.
 After following the steps here, an administrator will have experience creating
 a cluster and adding a replica.
 
-Start two shells. Put them side by side on the screen.
-(This manual has a tabbed display showing "Terminal #1".
-Click the "Terminal #2" tab to switch to the display of the other shell.) 
+Start two shells. Put them side by side on the screen. (This manual has a tabbed
+display showing "Terminal #1". Click the "Terminal #2" tab to switch to the
+display of the other shell.)
 
 .. container:: b-block-wrapper_doc
 
@@ -270,16 +311,16 @@ Click the "Terminal #2" tab to switch to the display of the other shell.)
         .. container:: b-documentation_tab
             :name: terminal-1-1
 
-            .. code-block:: lua
+            .. code-block:: console
 
-                $ 
+                $
 
         .. container:: b-documentation_tab
             :name: terminal-1-2
 
-            .. code-block:: lua
+            .. code-block:: console
 
-                $ 
+                $
 
     .. raw:: html
 
@@ -313,19 +354,20 @@ Click the "Terminal #2" tab to switch to the display of the other shell.)
 
 On the first shell, which we'll call Terminal #1, execute these commands:
 
-| :codenormal:`$` :codebold:`# Terminal 1`
-| :codenormal:`$` :codebold:`mkdir -p ~/tarantool_test_node_1`
-| :codenormal:`$` :codebold:`cd ~/tarantool_test_node_1`
-| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_1/*`
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.create('replicator', {password = 'password'})`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.grant('replicator','read,write','universe')`
-| :codenormal:`tarantool>` :codebold:`box.space._cluster:select({0},{iterator='GE'})`
+.. code-block:: tarantoolsession
 
-The result is that a new cluster is set up, and the UUID is displayed.
-Now the screen looks like this: (except that UUID values are always different):
+    $ # Terminal 1
+    $ mkdir -p ~/tarantool_test_node_1
+    $ cd ~/tarantool_test_node_1
+    $ rm -R ~/tarantool_test_node_1/*
+    $ ~/tarantool/src/tarantool
+    tarantool> box.cfg{listen = 3301}
+    tarantool> box.schema.user.create('replicator', {password = 'password'})
+    tarantool> box.schema.user.grant('replicator', 'read,write', 'universe')
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
+
+The result is that a new cluster is set up, and the UUID is displayed. Now the
+screen looks like this: (except that UUID values are always different):
 
 .. container:: b-block-wrapper_doc
 
@@ -388,14 +430,18 @@ Now the screen looks like this: (except that UUID values are always different):
 
 On the second shell, which we'll call Terminal #2, execute these commands:
 
-| :codenormal:`$` :codebold:`# Terminal 2`
-| :codenormal:`$` :codebold:`mkdir -p ~/tarantool_test_node_2`
-| :codenormal:`$` :codebold:`cd ~/tarantool_test_node_2`
-| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_2/*`
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}`
-| :codenormal:`tarantool>` :codebold:`box.space._cluster:select({0},{iterator='GE'})`
+.. code-block:: tarantoolsession
+
+    $ # Terminal 2
+    $ mkdir -p ~/tarantool_test_node_2
+    $ cd ~/tarantool_test_node_2
+    $ rm -R ~/tarantool_test_node_2/*
+    $ ~/tarantool/src/tarantool
+    tarantool> box.cfg{
+             >   listen = 3302,
+             >   replication_source = 'replicator:password@localhost:3301'
+             > }
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
 
 The result is that a replica is set up. Messages appear on Terminal #1
 confirming that the replica has connected and that the WAL contents have
@@ -465,9 +511,11 @@ on Terminal #1, because both servers are in the same cluster.
 
 On Terminal #1, execute these requests:
 
-| :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
-| :codenormal:`tarantool>` :codebold:`i = s:create_index('primary', {})`
-| :codenormal:`tarantool>` :codebold:`s:insert{1,'Tuple inserted on Terminal #1'}`
+.. code-block:: tarantoolsession
+
+    tarantool> s = box.schema.space.create('tester')
+    tarantool> i = s:create_index('primary', {})
+    tarantool> s:insert{1, 'Tuple inserted on Terminal #1'}
 
 Now the screen looks like this:
 
@@ -530,14 +578,16 @@ Now the screen looks like this:
             })();
         </script>
 
-The creation and insertion were successful on Terminal #1.
-Nothing has happened on Terminal #2.
+The creation and insertion were successful on Terminal #1. Nothing has happened
+on Terminal #2.
 
 On Terminal #2, execute these requests:
 
-| :codenormal:`tarantool>` :codebold:`s = box.space.tester`
-| :codenormal:`tarantool>` :codebold:`s:select({1},{iterator='GE'})`
-| :codenormal:`tarantool>` :codebold:`s:insert{2,'Tuple inserted on Terminal #2'}`
+.. code-block:: tarantoolsession
+
+    tarantool> s = box.space.tester
+    tarantool> s:select({1}, {iterator = 'GE'})
+    tarantool> s:insert{2, 'Tuple inserted on Terminal #2'}
 
 Now the screen looks like this:
 
@@ -605,12 +655,14 @@ happened on Terminal #1.
 
 On Terminal #1, execute these Tarantool requests and shell commands:
 
-| :codenormal:`$` :codebold:`os.exit()`
-| :codenormal:`$` :codebold:`ls -l ~/tarantool_test_node_1`
-| :codenormal:`$` :codebold:`ls -l ~/tarantool_test_node_2`
+.. code-block:: console
+
+    $ os.exit()
+    $ ls -l ~/tarantool_test_node_1
+    $ ls -l ~/tarantool_test_node_2
 
 Now Tarantool #1 is stopped. Messages appear on Terminal #2 announcing that fact.
-The "ls -l" commands show that both servers have made snapshots, which have the
+The ``ls -l`` commands show that both servers have made snapshots, which have the
 same size because they both contain the same tuples.
 
 .. container:: b-block-wrapper_doc
@@ -675,8 +727,10 @@ same size because they both contain the same tuples.
 On Terminal #2, ignore the repeated messages saying "failed to connect",
 and execute these requests:
 
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{3,'Another'}`
+.. code-block:: tarantoolsession
+
+    tarantool> box.space.tester:select({0}, {iterator = 'GE'})
+    tarantool> box.space.tester:insert{3, 'Another'}
 
 Now the screen looks like this (ignoring the repeated messages saying
 "failed to connect"):
@@ -744,13 +798,14 @@ Terminal #2 has done a select and an insert, even though Terminal #1 is down.
 
 On Terminal #1 execute these commands:
 
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
+.. code-block:: tarantoolsession
 
-Now the screen looks like this (ignoring the repeated messages on terminal
-#2 saying "failed to connect"):
+    $ ~/tarantool/src/tarantool
+    tarantool> box.cfg{listen = 3301}
+    tarantool> box.space.tester:select({0}, {iteratir = 'GE'})
+
+Now the screen looks like this (ignoring the repeated messages on terminal #2
+saying "failed to connect"):
 
 .. container:: b-block-wrapper_doc
 
@@ -817,8 +872,12 @@ been asked to act as a replication source.
 
 On Terminal #1, say:
 
-| :codenormal:`tarantool>` :codebold:`box.cfg{replication_source='replicator:password@localhost:3302'}`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select({0},{iterator='GE'})`
+.. code-block:: tarantoolsession
+
+    tarantool> box.cfg{
+             >   replication_source = 'replicator:password@localhost:3302'
+             > }
+    tarantool> box.space.tester:select({0}, {iterator = 'GE'})
 
 The screen now looks like this:
 
@@ -887,6 +946,8 @@ sees what the other server wrote.
 To clean up, say "``os.exit()``" on both Terminal #1 and Terminal #2, and then
 on either terminal say:
 
-| :codenormal:`$` :codebold:`cd ~`
-| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_1`
-| :codenormal:`$` :codebold:`rm -R ~/tarantool_test_node_2`
+.. code-block:: console
+
+    $ cd ~
+    $ rm -R ~/tarantool_test_node_1
+    $ rm -R ~/tarantool_test_node_2

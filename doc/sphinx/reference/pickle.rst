@@ -74,7 +74,9 @@
         ---
         - [0, 'bye world']
         ...
-        tarantool> box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})
+        tarantool> box.space.tester:update({0}, {
+                 >   {'=', 2, pickle.pack('iiA', 0, 3, 'hello')}
+                 > })
         ---
         - [0, "\0\0\0\0\x03\0\0\0hello"]
         ...

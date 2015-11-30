@@ -1,25 +1,22 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
-    $ <b># Terminal 1</b>
-    $ <b>mkdir -p ~/tarantool_test_node_1</b>
-    $ <b>cd ~/tarantool_test_node_1</b>
-    ~/tarantool_test_node_1$ <b>rm -R ~/tarantool_test_node_1/*</b>
-    ~/tarantool_test_node_1$ <b>~/tarantool/src/tarantool</b>
-    ~/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
+    $ # Terminal 1
+    $ mkdir -p ~/tarantool_test_node_1
+    $ cd ~/tarantool_test_node_1
+    $ rm -R ./*
+    $ ~/tarantool/src/tarantool
+    $ ~/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
     type 'help' for interactive help
-    tarantool> <b>box.cfg{listen=3301}</b>
-    ... ...
-    tarantool> <b>box.schema.user.create('replicator', {password = 'password'})</b>
-    2014-10-13 11:12:56.052 [25018] wal I> creating ./00000000000000000000.xlog.inprogress'
+    tarantool> box.cfg{listen = 3301}
+    <... ...>
+    tarantool> box.schema.user.create('replicator', {password = 'password'})
+    <...> I> creating ./00000000000000000000.xlog.inprogress'
     ---
     ...
-    tarantool> <b>box.schema.user.grant('replicator','read,write','universe')</b>
+    tarantool> box.schema.user.grant('replicator', 'read,write', 'universe')
     ---
     ...
-    tarantool> <b>box.space._cluster:select({0},{iterator='GE'})</b>
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
     ---
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
     ...
-    </pre>
-

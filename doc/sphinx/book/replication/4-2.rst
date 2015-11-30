@@ -1,23 +1,22 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
-    ... ...
-    tarantool> box.space._cluster:select({0},{iterator='GE'})
-    2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 I> authenticated
-    2014-10-13 11:20:08.901 [25579] wal I> creating ./00000000000000000000.xlog.inprogress'
+    <... ...>
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
+    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
+    <...> [25579] main/103/replica/localhost:3301 I> authenticated
+    <...> [25579] wal I> creating ./00000000000000000000.xlog.inprogress'
     ---
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
       - [2, '236230b8-af3e-406b-b709-15a60b44c20c']
     ...
-    tarantool> <b>s = box.space.tester</b>
+    tarantool> s = box.space.tester
     ---
     ...
-    tarantool> <b>s:select({1},{iterator='GE'})</b>
+    tarantool> s:select({1}, {iterator = 'GE'})
     ---
     - - [1, 'Tuple inserted on Terminal #1']
     ...
-    tarantool> <b>s:insert{2,'Tuple inserted on Terminal #2'}</b>
+    tarantool> s:insert{2, 'Tuple inserted on Terminal #2'}
     ---
     - [2, 'Tuple inserted on Terminal #2']
     ...

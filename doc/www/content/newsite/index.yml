@@ -89,5 +89,5 @@ blocks  :
           server = httpd.new('127.0.0.1', 8080)
           server:route({ path = '/' }, handler)
           server:start()
-  video: '<iframe src="//www.youtube.com/embed/bM0zK0lwEz8" frameborder="0" allowfullscreen></iframe>'
+  video: '<iframe src="//www.youtube.com/embed/R9UHoZDFLWg" frameborder="0" allowfullscreen></iframe>'
 ...

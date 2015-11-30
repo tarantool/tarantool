@@ -64,8 +64,6 @@ necessary to prioritize requests or to use different authentication ids.
 
 .. class:: conn
 
-  conn = net_box.new(host, port [, {other parameter[s]}])
-
     .. method:: ping()
 
         Execute a PING command.
