@@ -58,7 +58,8 @@ The shard package is distributed separately from the main tarantool package.
 To acquire it, do a separate install. For example on Ubuntu say:
 
 .. code-block:: bash
-sudo apt-get install tarantool-shard tarantool-pool
+
+    sudo apt-get install tarantool-shard tarantool-pool
 
 Or, download from github tarantool/shard and compile as described in the README.
 Then, before using the package, say ``shard = require('shard')``
@@ -249,15 +250,13 @@ Terminal#1 and Terminal #2.
 
 On Terminal #1, say:
 
-.. code-block:: console
+.. code-block:: tarantoolsession
 
     $ mkdir ~/tarantool_sandbox_1
     $ cd ~/tarantool_sandbox_1
     $ rm -r *.snap
     $ rm -r *.xlog
     $ ~/tarantool-master/src/tarantool
-
-.. code-block:: tarantoolsession
 
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.space.create('tester')
@@ -329,4 +328,3 @@ Details are on `the shard section of github`_.
 
 .. _consistent: https://en.wikipedia.org/wiki/Consistent_hashing
 .. _the shard section of github: https://github.com/tarantool/shard
-

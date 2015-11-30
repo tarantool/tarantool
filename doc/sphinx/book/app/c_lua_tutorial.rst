@@ -383,7 +383,7 @@ which causes Tarantool to send the value to the client, which prints it. (Lua's
 answer to the C ``printf()`` function, which is ``print()``, will also work.)
 
 For more on Lua ``os.clock()`` see Lua manual `chapter 22.1 "Date and Time"`_.
- For more on Lua print() see Lua manual `chapter 5 "Functions"`_.
+For more on Lua print() see Lua manual `chapter 5 "Functions"`_.
 
 .. _chapter 22.1 "Date and Time": http://www.lua.org/pil/22.1.html
 .. _chapter 5 "Functions": http://www.lua.org/pil/5.html

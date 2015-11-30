@@ -169,3 +169,6 @@ class TarantoolSessionLexer(Lexer):
         if curshs:
             for item in shslexer.get_tokens_unprocessed(curshs):
                 yield item
+
+def setup(app):
+    app.add_lexer("tarantoolsession", TarantoolSessionLexer())

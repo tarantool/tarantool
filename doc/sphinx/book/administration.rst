@@ -50,11 +50,11 @@ General form:
 .. cssclass:: highlight
 .. parsed-literal::
 
-    $ tarantool
+    $ **tarantool**
     OR
-    $ tarantool *options*
+    $ **tarantool** *options*
     OR
-    $ tarantool *lua-initialization-file* **[** *arguments* **]**
+    $ **tarantool** *lua-initialization-file* **[** *arguments* **]**
 
 *lua-initialization-file* can be any script containing code for initializing.
 Effect: The code in the file is executed during startup. Example: ``init.lua``.
@@ -167,7 +167,7 @@ an interactive-mode tarantool client session:
     ...
     tarantool> os.exit()
     2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown
-    $
+    $ 
 
 Explanatory notes about what tarantool displayed in the above example:
 
@@ -261,7 +261,7 @@ operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
 .. option:: start <application>
 
-    Starts application application
+    Starts application *<application>*
 
 .. option:: stop <application>
 
@@ -281,7 +281,7 @@ operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
 .. option:: eval <application> <scriptname>
 
-    Execute code from <scriptname> on an instance of application
+    Execute code from *<scriptname>* on an instance of application
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl
@@ -300,7 +300,7 @@ A user can initiate, for boot time, an init.d set of instructions:
 .. code-block:: bash
 
     for (each file mentioned in the instance_dir directory):
-        tarantoolctl start `basename $ file .lua`3
+        tarantoolctl start `basename $ file .lua`
 
 A user can set up a further configuration file for log rotation, like this:
 

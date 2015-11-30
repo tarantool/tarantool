@@ -129,3 +129,6 @@ class LuaLexer(RegexLexer):
                     yield index + len(a) + 1, Name, b
                     continue
             yield index, token, value
+
+def setup(app):
+    app.add_lexer("lua_tarantool", LuaLexer())
