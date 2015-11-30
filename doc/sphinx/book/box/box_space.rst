@@ -27,7 +27,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
     :func:`space_object:inc{} <space_object.inc>` |br|
     :func:`space_object:dec{} <space_object.dec>` |br|
     :func:`space_object:auto_increment{} <space_object.auto_increment>` |br|
-    :func:`space_object:pairs() <space_object.pairs>`
+    :func:`space_object:pairs() <space_object.pairs>` |br|
     :func:`space_object.id <space_object.id>` |br|
     :func:`space_object.enabled <space_object.enabled>` |br|
     :func:`space_object.field_count <space_object.field_count>` |br|
@@ -186,7 +186,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         For examples of complex ``select`` requests, where one can specify which
         index to search and what condition to use (for example "greater than"
         instead of "equal to") and how many tuples to return, see the later section
-        :ref:`box.space.space-name[.index.index-name]:select <index_object.select>`.
+        :func:`box.space.space-name[.index.index-name]:select <index_object.select>`.
 
     .. method:: get(key)
 
@@ -543,8 +543,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         .. cssclass:: highlight
         .. parsed-literal::
 
-            box.schema.space:create...
-            field_count = <field_count_value>
+            box.schema.space:create(*space-name*, {
+                field_count = *field_count_value*
+            })
 
         **Example:**
 
@@ -567,7 +568,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Example:**
 
-        .. code-block:: lua
+        .. code-block:: tarantoolsession
 
             tarantool> #box.space.tester.index
             ---
