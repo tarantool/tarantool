@@ -31,7 +31,6 @@
 #include "tuple_compare_gen.h"
 #include "tuple.h"
 
-
 template <int TYPE>
 static inline int
 field_compare(const char **field_a, const char **field_b);

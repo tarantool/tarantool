@@ -1,4 +1,4 @@
-#include "tarantool.h"
+#include "module.h"
 #include "msgpuck/msgpuck.h"
 #include <time.h>
 double
@@ -20,7 +20,7 @@ tuple_bench(box_function_ctx_t *ctx, const char *args, const char *args_end)
 		strlen(INDEX_NAME));
 
 	if (space_id == BOX_ID_NIL || index_id == BOX_ID_NIL) {
-		return box_error_raise(ER_PROC_C,
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C,
 			"Can't find index %s in space %s",
 			INDEX_NAME, SPACE_NAME);
 	}
@@ -34,7 +34,7 @@ tuple_bench(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	/* get key types from args, and build test tuples with according types*/
 	uint32_t arg_count = mp_decode_array(&args);
 	if (arg_count < 1) {
-		return box_error_raise(ER_PROC_C, "%s",
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C, "%s",
 			"invalid argument count");
 	}
 	uint32_t n = mp_decode_array(&args);
