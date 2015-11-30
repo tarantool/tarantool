@@ -9,7 +9,7 @@
     then the snapshot daemon will call :func:`box.snapshot` every
     ``snapshot_period`` seconds, creating a new snapshot file each time.
 
-    For example: :codenormal:`box.cfg{snapshot_period=3600}`
+    For example: ``box.cfg{snapshot_period=3600}``
     will cause the snapshot daemon to create a new database snapshot
     once per hour.
 
@@ -22,10 +22,12 @@
     The maximum number of snapshots that the snapshot daemon maintains.
     For example:
 
-        | :codenormal:`box.cfg{`
-        | |nbsp| |nbsp| :codenormal:`snapshot_period=3600,`
-        | |nbsp| |nbsp| :codenormal:`snapshot_count=10`
-        | :codenormal:`}`
+    .. code-block:: lua
+
+        box.cfg{
+            snapshot_period = 3600
+            snapshot_count  = 10
+        }
 
     will cause the snapshot daemon to create a new snapshot each hour until
     it has created ten snapshots. After that, it will remove the oldest

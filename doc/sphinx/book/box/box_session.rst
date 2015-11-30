@@ -47,26 +47,30 @@ client connection.
                       Example
 =================================================
 
-    | :codenormal:`tarantool>` :codebold:`box.session.peer(session.id())`
-    | :codenormal:`---`
-    | :codenormal:`- 127.0.0.1:45129`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.session.storage.random_memorandum = "Don't forget the eggs."`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.session.storage.radius_of_mars = 3396`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`m = ''`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`for k, v in pairs(box.session.storage) do m=m..k..'='..v..' ' end`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`m`
-    | :codenormal:`---`
-    | :codenormal:`- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> box.session.peer(session.id())
+    ---
+    - 127.0.0.1:45129
+    ...
+    tarantool> box.session.storage.random_memorandum = "Don't forget the eggs"
+    ---
+    ...
+    tarantool> box.session.storage.radius_of_mars = 3396
+    ---
+    ...
+    tarantool> m = ''
+    ---
+    ...
+    tarantool> for k, v in pairs(box.session.storage) do
+             >   m = m .. k .. '='.. v .. ' '
+             > end
+    ---
+    ...
+    tarantool> m
+    ---
+    - 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
+    ...
 
 See the section :ref:`Triggers on connect and disconnect <box-triggers>`
 for instructions about defining triggers for connect and disconnect

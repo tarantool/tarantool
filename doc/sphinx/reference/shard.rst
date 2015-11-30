@@ -55,13 +55,21 @@ First some terminology:
         A shard's replicas should be in different zones.
 
 The shard package is distributed separately from the main tarantool package.
-To acquire it, do a separate install. For example on Ubuntu say |br|
-``sudo apt-get install tarantool-shard tarantool-pool`` |br|
+To acquire it, do a separate install. For example on Ubuntu say:
+
+.. code-block:: bash
+sudo apt-get install tarantool-shard tarantool-pool
+
 Or, download from github tarantool/shard and compile as described in the README.
 Then, before using the package, say ``shard = require('shard')``
 
-The most important function is |br|
-:samp:`shard.init ({shard-configuration})` |br|
+The most important function is:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    shard.init(*shard-configuration*)
+
 This must be called for every shard.
 The shard-configuration is a table with these fields:
 
@@ -135,19 +143,34 @@ necessarily an error, because perhaps one of the servers in the list is not aliv
     ---
     ...
 
+.. cssclass:: highlight
+.. parsed-literal::
 
-:samp:`shard.{space_name}.insert` ``{...}`` etc. |br|
+    shard[*space-name*].insert{...}
+    shard[*space-name*].replace{...}
+    shard[*space-name*].delete{...}
+    shard[*space-name*].select{...}
+    shard[*space-name*].update{...}
+    shard[*space-name*].auto_increment{...}
+
 Every data-access function in the box package has an analogue in the shard
 package, so (for example) to insert in table T in a sharded database one simply
 says ``shard.T:insert{...}`` instead of ``box.T:insert{...}``.
 A ``shard.T:select{}`` request without a primary key will search all shards.
 
-:samp:`shard.{space_name}.q_insert` ``{...}`` etc. |br|
-Every queued data-access function has an analogue in the shard package.
-The user must add an operation_id. The details of queued
-data-access functions, and of maintenance-related functions,
-are on `the shard section of github`_.
+.. cssclass:: highlight
+.. parsed-literal::
 
+    shard[*space-name*].q_insert{...}
+    shard[*space-name*].q_replace{...}
+    shard[*space-name*].q_delete{...}
+    shard[*space-name*].q_select{...}
+    shard[*space-name*].q_update{...}
+    shard[*space-name*].q_auto_increment{...}
+
+Every queued data-access function has an analogue in the shard package. The user
+must add an operation_id. The details of queued data-access functions, and of
+maintenance-related functions, are on `the shard section of github`_.
 
 =====================================================================
              Example: Shard, Minimal Configuration
@@ -158,15 +181,13 @@ illustrating the features of either replication or sharding, it's only
 illustrating what the syntax is, and what the messages look like, that anyone
 could duplicate in a minute or two with the magic of cut-and-paste.
 
-.. code-block:: console
+.. code-block:: tarantoolsession
 
     $ mkdir ~/tarantool_sandbox_1
     $ cd ~/tarantool_sandbox_1
     $ rm -r *.snap
     $ rm -r *.xlog
     $ ~/tarantool-master/src/tarantool
-
-.. code-block:: tarantoolsession
 
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.space.create('tester')
@@ -260,15 +281,13 @@ On Terminal #1, say:
 
 On Terminal #2, say:
 
-.. code-block:: console
+.. code-block:: tarantoolsession
 
     $ mkdir ~/tarantool_sandbox_2
     $ cd ~/tarantool_sandbox_2
     $ rm -r *.snap
     $ rm -r *.xlog
     $ ~/tarantool-master/src/tarantool
-
-.. code-block:: tarantoolsession
 
     tarantool> box.cfg{listen = 3302}
     tarantool> box.schema.space.create('tester')

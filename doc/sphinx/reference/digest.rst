@@ -175,10 +175,10 @@ non-cryptographic hash functions (guava_, murmur_). The functions in digest are:
 
     .. code-block:: tarantoolsession
 
-      tarantool> digest.guava(10863919174838991, 11)
-      ---
-      - 8
-      ...
+        tarantool> digest.guava(10863919174838991, 11)
+        ---
+        - 8
+        ...
 
 
 .. function:: digest.murmur({string})

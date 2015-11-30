@@ -80,21 +80,21 @@ The json package provides JSON manipulation routines. It is based on the
 
     .. code-block:: tarantoolsession
 
-        tarantool> -- When nil is assigned to a Lua-table field, the field is null
+        -- When nil is assigned to a Lua-table field, the field is null
         tarantool> {nil, 'a', 'b'}
         ---
         - - null
           - a
           - b
         ...
-        tarantool> -- When json.NULL is assigned to a Lua-table field, the field is json.NULL
+        -- When json.NULL is assigned to a Lua-table field, the field is json.NULL
         tarantool> {json.NULL, 'a', 'b'}
         ---
         - - null
           - a
           - b
         ...
-        tarantool> -- When json.NULL is assigned to a JSON field, the field is null
+        -- When json.NULL is assigned to a JSON field, the field is null
         tarantool> json.encode({field2 = json.NULL, field1 = 'a', field3 = 'c'}
         ---
         - '{"field2":null,"field1":"a","field3":"c"}'

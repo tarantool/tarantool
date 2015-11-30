@@ -24,7 +24,7 @@ signal, and can only be killed with SIGKILL (this signal can not be ignored).
 
 If ``tarantool`` is started without a Lua script to run, it automatically
 enters interactive mode. There will be a prompt ("``tarantool>``") and it will
-be possible to enter requests. When used this way, ``tarantool`` can be 
+be possible to enter requests. When used this way, ``tarantool`` can be
 a client for a remote server.
 
 This section shows all legal syntax for the tarantool program, with short notes
@@ -47,13 +47,16 @@ the preceding and following tokens are mutually exclusive alternatives.
 
 General form:
 
-| :codenormal:`$` :codebold:`tarantool`
-| OR
-| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-| OR
-| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
+.. cssclass:: highlight
+.. parsed-literal::
 
-:codebolditalic:`Lua-initialization-file` can be any script containing code for initializing.
+    $ tarantool
+    OR
+    $ tarantool *options*
+    OR
+    $ tarantool *lua-initialization-file* **[** *arguments* **]**
+
+*lua-initialization-file* can be any script containing code for initializing.
 Effect: The code in the file is executed during startup. Example: ``init.lua``.
 Notes: If a script is used, there will be no prompt. The script should contain
 configuration information including ``box.cfg{...listen=...}`` or
@@ -66,13 +69,13 @@ option):
 .. option:: -?, -h, --help
 
     Client displays a help message including a list of options.
-    Example: :codenormal:`tarantool --help`.
+    Example: ``tarantool --help``.
     The program stops after displaying the help.
 
 .. option:: -V, --version
 
     Client displays version information.
-    Example: :codenormal:`tarantool --version`.
+    Example: ``tarantool --version``.
     The program stops after displaying the version.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +121,7 @@ end-of-request delimiter, so newline alone is not treated as end of request.
 To go back to normal mode: :samp:`console.delimiter(''){string-literal}`.
 Delimiters are usually not necessary because Tarantool can tell when a
 multi-line request has not ended (for example, if it sees that a function
-declaration does not have an :codenormal:`end` keyword). Example:
+declaration does not have an ``end`` keyword). Example:
 
 .. code-block:: lua_tarantool
 
@@ -136,33 +139,35 @@ In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of
 an interactive-mode tarantool client session:
 
-| :codenormal:`$` :codebold:`tarantool`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display an introductory message`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`including version number here ]`
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool will display configuration information`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`here ]`
-| :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`[ tarantool may display an in-progress message here ]`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:insert{1,'My first tuple'}`
-| :codenormal:`---`
-| :codenormal:`- [1, 'My first tuple']`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select(1)`
-| :codenormal:`---`
-| :codenormal:`- - [1, 'My first tuple']`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:drop()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`os.exit()`
-| :codenormal:`2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown`
-| :codenormal:`$`
+.. code-block:: tarantoolsession
+
+    $ tarantool
+    [ tarantool will display an introductory message
+      including version number here ]
+    tarantool> box.cfg{listen = 3301}
+    [ tarantool will display configuration information
+      here ]
+    tarantool> s = box.schema.space.create('tester')
+    [ tarantool may display an in-progress message here ]
+    ---
+    ...
+    tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+    ---
+    ...
+    tarantool> box.space.tester:insert{1,'My first tuple'}
+    ---
+    - [1, 'My first tuple']
+    ...
+    tarantool> box.space.tester:select(1)
+    ---
+    - - [1, 'My first tuple']
+    ...
+    tarantool> box.space.tester:drop()
+    ---
+    ...
+    tarantool> os.exit()
+    2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown
+    $
 
 Explanatory notes about what tarantool displayed in the above example:
 
@@ -194,7 +199,7 @@ and checking status.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The :program:`tarantoolctl` script will read a configuration file named
-:file:`~/.config/tarantool/default`, or 
+:file:`~/.config/tarantool/default`, or
 :file:`/etc/sysconfig/tarantool`, or :file:`/etc/default/tarantool`. Most
 of the settings are similar to the settings used by ``box.cfg{...};``
 however, tarantoolctl adjusts some of them by adding an application name.
@@ -254,12 +259,29 @@ The settings in the above script are:
 The command format is :samp:`tarantoolctl {operation} {application_name}`, where
 operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
-| :codenormal:`tarantoolctl start my_app           -- starts application my_app`
-| :codenormal:`tarantoolctl stop my_app            -- stops my_app`
-| :codenormal:`tarantoolctl enter my_app           -- show my_app's admin console, if it has one`
-| :codenormal:`tarantoolctl logrotate my_app       -- rotate my_app's log files (make new, remove old)`
-| :codenormal:`tarantoolctl status my_app          -- check my_app's status`
-| :codenormal:`tarantoolctl eval my_app file_name  -- execute code from file_name as an instance of my_app`
+.. option:: start <application>
+
+    Starts application application
+
+.. option:: stop <application>
+
+    Stops application
+
+.. option:: enter <application>
+
+    Show application's admin console
+
+.. option:: logrotate <application>
+
+    Rotate application's log files (make new, remove old)
+
+.. option:: status <application>
+
+    Check application's status status
+
+.. option:: eval <application> <scriptname>
+
+    Execute code from <scriptname> on an instance of application
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      typical code snippets for tarantoolctl
@@ -278,7 +300,7 @@ A user can initiate, for boot time, an init.d set of instructions:
 .. code-block:: bash
 
     for (each file mentioned in the instance_dir directory):
-        tarantoolctl start `basename $ file .lua`
+        tarantoolctl start `basename $ file .lua`3
 
 A user can set up a further configuration file for log rotation, like this:
 
@@ -310,28 +332,37 @@ and there currently is no directory named :file:`tarantool_test`.
 
 Create a directory named /tarantool_test:
 
+.. code-block:: console
 
-| :codebold:`$ sudo mkdir /tarantool_test`
+    $ sudo mkdir /tarantool_test
 
 Copy tarantoolctl to /tarantool_test. If you made a source
 download to ~/tarantool-master, then
 
-| :codebold:`$ sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl`
+.. code-block:: console
+
+    $ sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
 
 If the file was named tarantoolctl and placed on :file:`/usr/bin/tarantoolctl`, then
 
-| :codebold:`$ sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl`
+.. code-block:: console
+
+    $ sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl
 
 Check and possibly change the first line of :file:`code/tarantool_test/tarantoolctl`.
 Initially it says
 
-| :codenormal:`#!/usr/bin/env tarantool`
+.. code-block:: bash
+
+    #!/usr/bin/env tarantool
 
 If that is not correct, edit tarantoolctl and change the line. For example,
 if the Tarantool server is actually on :file:`/home/user/tarantool-master/src/tarantool`,
 change the line to
 
-| :codebold:`#!/usr/bin/env /home/user/tarantool-master/src/tarantool`
+.. code-block:: bash
+
+    #!/usr/bin/env /home/user/tarantool-master/src/tarantool
 
 Save a copy of :file:`/etc/sysconfig/tarantool`, if it exists.
 
@@ -369,37 +400,48 @@ Make the my_app application file, that is, :file:`/tarantool_test/my_app.lua`. L
 
 Tell tarantoolctl to start the application ...
 
-| :codebold:`$ cd /tarantool_test`
-| :codebold:`$ sudo ./tarantoolctl start my_app`
+.. code-block:: console
+
+    $ cd /tarantool_test
+    $ sudo ./tarantoolctl start my_app
 
 ... expect to see messages indicating that the instance has started. Then ...
 
-| :codebold:`$ ls -l /tarantool_test/my_app`
+.. code-block:: console
+
+    $ ls -l /tarantool_test/my_app
 
 ... expect to see the .snap file, .xlog file, and sophia directory. Then ...
 
-| :codebold:`$ less /tarantool_test/log/my_app.log`
+.. code-block:: console
+
+    $ less /tarantool_test/log/my_app.log
 
 ... expect to see the contents of my_app's log, including error messages, if any. Then ...
 
-| :codebold:`$ cd /tarantool_test`
-| :codenormal:`#assume that 'tarantool' invokes the tarantool server`
-| :codebold:`$ sudo tarantool`
-| :codebold:`$ box.cfg{}`
-| :codebold:`$ console = require('console')`
-| :codebold:`$ console.connect('localhost:3301')`
-| :codebold:`$ box.space.tester:select({0},{iterator='GE'})`
+.. code-block:: tarantoolsession
+
+    $ cd /tarantool_test
+    $ # assume that 'tarantool' invokes the tarantool server
+    $ sudo tarantool
+    tarantool> box.cfg{}
+    tarantool> console = require('console')
+    tarantool> console.connect('localhost:3301')
+    tarantool> box.space.tester:select({0}, {iterator = 'GE'})
 
 ... expect to see several tuples that my_app has created.
 
 Stop. The only clean way to stop my_app is with tarantoolctl, thus:
 
-| :codebold:`$ sudo ./tarantoolctl stop my_app`
+.. code-block:: console
+
+    $ sudo ./tarantoolctl stop my_app
 
 Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
+.. code-block:: console
 
-| :codebold:`$ cd /`
-| :codebold:`$ sudo rm -R tarantool_test`
+    $ cd /
+    $ sudo rm -R tarantool_test
 
 =====================================================================
             System-specific administration notes
@@ -415,20 +457,27 @@ particular Linux distribution.
 
 Setting up an instance:
 
-| :codebold:`$ ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/`
+.. code-block:: console
+
+    $ ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/
 
 Starting all instances:
 
-| :codebold:`$ service tarantool start`
+.. code-block:: console
+
+    $ service tarantool start
 
 Stopping all instances:
 
-| :codebold:`$ service tarantool stop`
+.. code-block:: console
+
+    $ service tarantool stop
 
 Starting/stopping one instance:
 
-| :codebold:`$ service tarantool-instance-name start/stop`
+.. code-block:: console
 
+    $ service tarantool-instance-name start/stop
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                  Fedora, RHEL, CentOS

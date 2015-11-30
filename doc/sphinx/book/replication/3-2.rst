@@ -1,23 +1,24 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
     $ # Terminal 2
-    ~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
-    ~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
-    ~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
-    ~/tarantool_test_node_2$ ~/tarantool/src/tarantool
+    $ mkdir -p ~/tarantool_test_node_2
+    $ cd ~/tarantool_test_node_2
+    $ rm -R ./*
+    $ ~/tarantool/src/tarantool
     /home/username/tarantool/src/tarantool: version 1.6.3-1724-g033ed69
     type 'help' for interactive help
-    tarantool> box.cfg{listen=3302, replication_source='replicator:password@localhost:3301'}
-    ... ...
+    tarantool> box.cfg{
+             >   listen = 3302,
+             >   replication_source = 'replicator:password@localhost:3301'
+             > }
+    <... ...>
     ---
     ...
-    tarantool> box.space._cluster:select({0},{iterator='GE'})
-    2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    2014-10-13 11:20:08.789 [25579] main/103/replica/localhost:3301 I> authenticated
-    2014-10-13 11:20:08.901 [25579] wal I> creating ./00000000000000000000.xlog.inprogress'
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
+    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
+    <...> [25579] main/103/replica/localhost:3301 I> authenticated
+    <...> [25579] wal I> creating ./00000000000000000000.xlog.inprogress'
     ---
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
       - [2, '236230b8-af3e-406b-b709-15a60b44c20c']
     ...
-    </pre>

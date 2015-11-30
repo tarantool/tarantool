@@ -89,7 +89,7 @@ Function description:
 
 .. _c_connect:
 
-**CONNECT:** Now that the stream named :codenormal:`tnt` exists and is associated with a
+**CONNECT:** Now that the stream named ``tnt`` exists and is associated with a
 URI, this example program can connect to the server.
 
 .. code-block:: c

@@ -334,6 +334,10 @@ can be reused when another fiber is created.
             - 1448466351270762
             ...
 
+.. function:: info()
+
+    Show all running fibers, with their stack. Mainly useful for debugging.
+
 =================================================
              Example Of Fiber Use
 =================================================

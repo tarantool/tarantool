@@ -28,8 +28,10 @@ way that control is not given away for a long time. This can lead to unfair
 scheduling, when a single client throttles the rest of the system, or to
 apparent stalls in request processing. Avoiding this situation is the
 responsibility of the function's author. Most of the box calls, such as
-``box.space...insert``, ``box.space...update``, ``box.space...delete`` are yield
-points; ``box.space...select``, however, is not.
+:func:`box.space...insert <space_object.insert>`,
+:func:`box.space...update <space_object.update>`,
+:func:`box.space...delete <space_object.delete>` are yield points;
+:func:`box.space...select <space_object.select>`, however, is not.
 
 It should also be noted that, in the absence of transactions, any yield in a
 function is a potential change in the database state. Effectively, it's only
@@ -42,8 +44,8 @@ request will commit and yield, but surely there are times when multiple
 data-change requests must happen without yielding." The standard example is the
 money-transfer, where $1 is withdrawn from account #1 and deposited into
 account #2. If something interrupted after the withdrawal, then the institution
-would be out of balance. For such cases, the ``begin ... commit|rollback`` block
-was designed.
+would be out of balance. For such cases, the ``begin ... commit|rollback``
+block was designed.
 
 .. function:: box.begin()
 
@@ -63,7 +65,7 @@ was designed.
     operations. An explicit call to functions outside ``box.space`` that always
     yield, such as ``fiber.yield`` or ``fiber.sleep``, will have the same effect.
 
-The *requests in a transaction must be sent to the server as a single block*.
+The **requests in a transaction must be sent to the server as a single block**.
 It is not enough to enclose them between ``begin`` and ``commit`` or ``rollback``.
 To ensure they are sent as a single block: put them in a function, or put them all
 on one line, or use a delimiter so that multi-line requests are handled together.
@@ -76,12 +78,18 @@ Assuming that in tuple set 'tester' there are tuples in which the third
 field represents a positive dollar amount ... Start a transaction, withdraw from
 tuple#1, deposit in tuple#2, and end the transaction, making its effects permanent.
 
-.. code-block:: lua_tarantool
+.. code-block:: tarantoolsession
 
-    console = require('console'); console.delimiter('!')
-    box.begin()
-    amount_of_money = 1.00
-    box.space.tester:update({999}, {{'-', 3, amount_of_money}})
-    box.space.tester:update({1000}, {{'+', 3, amount_of_money}})
-    box.commit()
-    console.delimiter('')!
+    tarantool> function txn_example(from, to, amount_of_money)
+             >   box.begin()
+             >   box.space.tester:update(from, {{'-', 3, amount_of_money}})
+             >   box.space.tester:update(to,   {{'+', 3, amount_of_money}})
+             >   box.commit()
+             >   return "ok"
+             > end
+    ---
+    ...
+    tarantool> txn_example({999}, {1000}, 1.00)
+    ---
+    - "ok"
+    ...

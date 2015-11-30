@@ -101,9 +101,12 @@ host/port.
 
     A special use of ``console.start()`` is with
     :ref:`initialization files <URI>`.
-    Normally, if one starts the tarantool server with |br|
-    ``tarantool`` :codeitalic:`initialization file` |br|
+    Normally, if one starts the tarantool server with
+    :samp:`tarantool {initialization file}`
     there is no console. This can be remedied by adding
     these lines at the end of the initialization file:
-    ``console = require('console')`` |br|
-    ``console.start()`` |br|
+
+    .. code-block:: lua
+
+        console = require('console')
+        console.start()

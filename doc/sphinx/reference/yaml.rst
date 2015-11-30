@@ -81,7 +81,8 @@ different results:
     tarantool> yaml.encode(setmetatable({'A', 'B'}, { __serialize="seq"}))
     ---
     - |
-      --- ['A', 'B']
+      ---
+      ['A', 'B']
       ...
     ...
     tarantool> yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="map"})})
