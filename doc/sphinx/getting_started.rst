@@ -80,7 +80,7 @@ repository to your apt sources list. $release is an environment variable which
 will contain the Ubuntu version code e.g. "precise". If you want the version
 that comes with Ubuntu, start with the lines that follow the '# install' comment:
 
-.. code-block:: lua
+.. code-block:: bash
 
     cd ~
     wget http://tarantool.org/dist/public.key
@@ -113,11 +113,14 @@ Add the following section to your yum repository list
 i.e. CentOS release version must be either 6 or 7 and ``$basearch`` i.e. base
 architecture must be either i386 or x86_64):
 
-    | :samp:`# [tarantool]`
-    | :samp:`name=CentOS-$releasever - Tarantool`
-    | :samp:`baseurl=http://tarantool.org/dist/master/centos/{$releasever}/os/{$basearch}/`
-    | :samp:`enabled=1`
-    | :samp:`gpgcheck=0`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    # [tarantool]
+    name=CentOS-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/master/centos/*$releasever*/os/*$basearch*/
+    enabled=1
+    gpgcheck=0
 
 For example, if you have CentOS version 6 and x86-64, you can add the new section thus:
 
@@ -144,11 +147,14 @@ version 20, x86-64. Add the following section to your yum repository list
 ``$releasever`` i.e. Fedora release version must be 19, 20 or rawhide and
 ``$basearch`` i.e. base architecture must be x86_64):
 
-    | :samp:`[tarantool]`
-    | :samp:`name=Fedora-$releasever - Tarantool`
-    | :samp:`baseurl=http://tarantool.org/dist/master/fedora/{$releasever}/{$basearch}/`
-    | :samp:`enabled=1`
-    | :samp:`gpgcheck=0`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    [tarantool]
+    name=Fedora-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/master/fedora/*$releasever*/*$basearch*/
+    enabled=1
+    gpgcheck=0
 
 For example, if you have Fedora version 20, you can add the new section thus:
 
@@ -217,28 +223,28 @@ Here is how to create a simple test database after installing.
 
    .. code-block:: bash
 
-       #if you downloaded a binary with apt-get or yum, say this:
+       # if you downloaded a binary with apt-get or yum, say this:
        /usr/bin/tarantool
-       #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+       # if you downloaded and untarred a binary tarball to ~/tarantool, say this:
        ~/tarantool/bin/tarantool
-       #if you built from a source download, say this:
+       # if you built from a source download, say this:
        ~/tarantool/src/tarantool
 
    The server starts in interactive mode and outputs a command prompt.
    To turn on the database, :mod:`configure <box.cfg>` it:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
-      tarantool> box.cfg{listen=3301}
+      tarantool> box.cfg{listen = 3301}
 
    (this minimal example is sufficient).
 
    If all goes well, you will see the server displaying progress as it
    initializes, something like this:
 
-   .. code-block:: bash
+   .. code-block:: tarantoolsession
 
-       tarantool> box.cfg{listen=3301}
+       tarantool> box.cfg{listen = 3301}
        2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b
        2014-08-07 09:41:41.077 ... log level 5
        2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
@@ -265,14 +271,14 @@ Here is how to create a simple test database after installing.
 
    To create the first space and the first :ref:`index <box.index>`, try this:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
        tarantool> s = box.schema.space.create('tester')
        tarantool> i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 
    To insert three “tuples” (our name for “records”) into the first “space” of the database try this:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
        tarantool> t = s:insert({1})
        tarantool> t = s:insert({2, 'Music'})
@@ -280,13 +286,13 @@ Here is how to create a simple test database after installing.
 
    To select a tuple from the first space of the database, using the first defined key, try this:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
        tarantool> s:select{3}
 
    Your terminal screen should now look like this:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
        tarantool> s = box.schema.space.create('tester')
        2014-06-10 12:04:18.158 ... creating './00000000000000000002.xlog.inprogress'
@@ -308,24 +314,22 @@ Here is how to create a simple test database after installing.
        ---
        - - [3, 'Length', 93]
        ...
-
-       tarantool>
+       tarantool> 
 
    Now, to prepare for the example in the next section, try this:
 
-   .. code-block:: lua
+   .. code-block:: tarantoolsession
 
        tarantool> box.schema.user.grant('guest','read,write,execute','universe')
 
 .. _tarantool.org/dist/stable: http://tarantool.org/dist/stable
 .. _tarantool.org/dist/master: http://tarantool.org/dist/master
 
-
 =====================================================================
         Starting another Tarantool instance and connecting remotely
 =====================================================================
 
-In the previous section the first request was with "box.cfg{listen=3301}".
+In the previous section the first request was with ``box.cfg{listen = 3301}``.
 The "listen" value can be any form of URI (uniform resource identifier);
 in this case it's just a local port: port 3301.
 It's possible to send requests to the listen URI via (a) telnet,
@@ -338,49 +342,44 @@ There is no need to use cd to switch to the ~/tarantool_sandbox directory.
 
 2. Start the second instance of Tarantool. The server name is tarantool.
 
-.. code-block:: lua
+    .. code-block:: bash
 
-   #if you downloaded a binary with apt-get or yum, say this:
-   /usr/bin/tarantool
-   #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-   ~/tarantool/bin/tarantool
-   #if you built from a source download, say this:
-   ~/tarantool/src/tarantool 
+        # if you downloaded a binary with apt-get or yum, say this:
+        /usr/bin/tarantool
+        # if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+        ~/tarantool/bin/tarantool
+        # if you built from a source download, say this:
+        ~/tarantool/src/tarantool
 
 3. Try these requests:
 
-.. code-block:: lua
+    .. code-block:: lua
 
-   console = require('console')
-   console.connect('localhost:3301')
-   box.space.tester:select{2}
+        console = require('console')
+        console.connect('localhost:3301')
+        box.space.tester:select{2}
 
 The requests are saying "use the :ref:`console package <package-console>`
-to connect to the Tarantool server that's listening
-on localhost:3301, send a request to that server,
-and display the result." The result in this case is
-one of the tuples that was inserted earlier.
-Your terminal screen should now look like this:
+to connect to the Tarantool server that's listening on ``localhost:3301``, send
+a request to that server, and display the result." The result in this case is
+one of the tuples that was inserted earlier. Your terminal screen should now
+look like this:
 
 .. code-block:: lua
 
-   ...
-
+   <... ...>
    tarantool> console = require('console')
    ---
    ...
-
    tarantool> console.connect('localhost:3301')
-   2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
+   <...> [32628] main/101/interactive I> connected to localhost:3301
    ---
    ...
-
    localhost:3301> box.space.tester:select{2}
    ---
    - - [2, 'Music']
    ...
-
-   localhost:3301>
+   localhost:3301> 
 
 You can repeat box.space...:insert{} and box.space...:select{}
 indefinitely, on either Tarantool instance.
@@ -394,4 +393,3 @@ To review ... If you followed all the instructions
 in this chapter, then so far you have: installed Tarantool
 from either a binary or a source repository,
 started up the Tarantool server, inserted and selected tuples.
-

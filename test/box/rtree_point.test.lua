@@ -13,7 +13,7 @@ s:insert{8,{50,10}}
 s:insert{9,{50,50}}
 
 -- select all records
-s.index.spatial:select({iterator = 'ALL'})
+s.index.spatial:select({}, {iterator = 'ALL'})
 -- select records belonging to rectangle (0,0,10,10)
 s.index.spatial:select({0,0,10,10}, {iterator = 'LE'})
 -- select records with coordinates (10,10)

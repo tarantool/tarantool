@@ -1,17 +1,16 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
     $ # Terminal 1
     $ mkdir -p ~/tarantool_test_node_1
-    ... ...
-    tarantool> box.space._cluster:select({0},{iterator='GE'})
+    <... ...>
+    tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
     ---
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
     ...
-    tarantool> 2014-10-13 11:20:08.691 [25020] main/101/spawner I> created a replication relay: pid = 25583
-    2014-10-13 11:20:08.691 [25583] main/101/relay/127.0.0.1:50883 I> recovery start
-    2014-10-13 11:20:08.691 [25583] main/101/relay/127.0.0.1:50883 I> recovering from ./00000000000000000000.snap'
-    2014-10-13 11:20:08.692 [25583] main/101/relay/127.0.0.1:50883 I> snapshot sent
-    2014-10-13 11:20:08.789 [25020] main/101/spawner I> created a replication relay: pid = 25585
-    2014-10-13 11:20:08.890 [25585] main/101/relay/127.0.0.1:50884 I> recover from ./00000000000000000000.xlog'
-    </pre>
+    tarantool> 
+    <...> [25020] main/101/spawner I> created a replication relay: pid = 25583
+    <...> [25583] main/101/relay/127.0.0.1:50883 I> recovery start
+    <...> [25583] main/101/relay/127.0.0.1:50883 I> recovering from ./00000000000000000000.snap'
+    <...> [25583] main/101/relay/127.0.0.1:50883 I> snapshot sent
+    <...> [25020] main/101/spawner I> created a replication relay: pid = 25585
+    <...> [25585] main/101/relay/127.0.0.1:50884 I> recover from ./00000000000000000000.xlog'

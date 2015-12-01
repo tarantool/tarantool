@@ -115,16 +115,22 @@ sets.
 This manual is written with `Sphinx`_ markup and uses
 standard formatting conventions:
 
-UNIX shell command input is prefixed with ':codenormal:`$` ' and is in a fixed-width font:
-  :codenormal:`$ tarantool --help` 
+UNIX shell command input is prefixed with '``$``' and is in a fixed-width font:
+
+.. code-block:: console
+
+  $ tarantool --help
 
 File names are also in a fixed-width font:
+
   :codenormal:`/path/to/var/dir` 
 
 Text that represents user input is in boldface:
+
   :codebold:`$ your input here` 
 
 Within user input, replaceable items are in italics:
+
   :codebold:`$ tarantool` :codebolditalic:`--option` 
 
 ===============================================================================

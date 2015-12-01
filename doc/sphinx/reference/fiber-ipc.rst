@@ -21,7 +21,7 @@ other Lua object. Use object-oriented syntax, for example
     Create a new communication channel.
 
     :param int capacity: positive integer as great as the maximum number of
-                         slots (spaces for :codenormal:`get` or :codenormal:`put` messages)
+                         slots (spaces for ``get`` or ``put`` messages)
                          that might be pending at any given time.
 
     :return: new channel.

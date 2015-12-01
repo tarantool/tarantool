@@ -71,6 +71,7 @@
 #include <readline/history.h>
 #include "title.h"
 #include <libutil.h>
+#include "box/lua/init.h" /* box_lua_init() */
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -630,6 +631,7 @@ main(int argc, char **argv)
 	coeio_init();
 	signal_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+	box_lua_init(tarantool_L);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);

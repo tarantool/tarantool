@@ -31,14 +31,107 @@
 #include "box/lua/index.h"
 
 #include "lua/utils.h"
+#include "box/box.h"
 #include "box/index.h"
 #include "box/lua/tuple.h"
-#include "box/lua/call.h"
+#include "box/lua/misc.h" /* lbox_encode_tuple_on_gc() */
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
 
 static int CTID_STRUCT_ITERATOR_REF = 0;
+
+static int
+lbox_insert(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
+		return luaL_error(L, "Usage space:insert(tuple)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
+
+	struct tuple *result;
+	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
+}
+
+static int
+lbox_replace(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
+		return luaL_error(L, "Usage space:replace(tuple)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
+
+	struct tuple *result;
+	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
+}
+
+static int
+lbox_index_update(lua_State *L)
+{
+	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
+		return luaL_error(L, "Usage index:update(key, ops)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+	size_t ops_len;
+	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
+
+	struct tuple *result;
+	if (box_update(space_id, index_id, key, key + key_len,
+		       ops, ops + ops_len, 1, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
+}
+
+static int
+lbox_index_upsert(lua_State *L)
+{
+	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
+		return luaL_error(L, "Usage index:upsert(tuple_key, ops)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t tuple_len;
+	const char *tuple = lbox_encode_tuple_on_gc(L, 3, &tuple_len);
+	size_t ops_len;
+	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
+
+	struct tuple *result;
+	if (box_upsert(space_id, index_id, tuple, tuple + tuple_len,
+		       ops, ops + ops_len, 1, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
+}
+
+static int
+lbox_index_delete(lua_State *L)
+{
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    lua_type(L, 3) != LUA_TTABLE)
+		return luaL_error(L, "Usage space:delete(key)");
+
+	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t index_id = lua_tointeger(L, 2);
+	size_t key_len;
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+
+	struct tuple *result;
+	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
+		return lbox_error(L);
+	return lbox_pushtupleornil(L, result);
+}
 
 static int
 lbox_index_random(lua_State *L)
@@ -211,6 +304,11 @@ box_lua_index_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	static const struct luaL_reg boxlib_internal[] = {
+		{"insert", lbox_insert},
+		{"replace",  lbox_replace},
+		{"update", lbox_index_update},
+		{"upsert",  lbox_index_upsert},
+		{"delete",  lbox_index_delete},
 		{"random", lbox_index_random},
 		{"get",  lbox_index_get},
 		{"min", lbox_index_min},

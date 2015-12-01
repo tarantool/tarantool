@@ -93,6 +93,7 @@ luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 		idx = lua_gettop(L) + idx + 1;
 
 	if (lua_type(L, idx) != LUA_TCDATA) {
+		*ctypeid = 0;
 		luaL_error(L, "expected cdata as %d argument", idx);
 		return NULL;
 	}
@@ -781,6 +782,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 			*result = *(uint64_t *) cdata;
 			return 0;
 		}
+		*result = 0;
 		return -1;
 	case LUA_TSTRING:
 	{
@@ -794,6 +796,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		return 1;
 	}
 	}
+	*result = 0;
 	return -1;
 }
 
@@ -839,7 +842,7 @@ luaL_toint64(struct lua_State *L, int idx)
 	return 0;
 }
 
-static struct error *
+struct error *
 luaL_iserror(struct lua_State *L, int narg)
 {
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
@@ -899,12 +902,9 @@ lbox_error(lua_State *L)
 	return 0;
 }
 
-int
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+static inline int
+lbox_catch(lua_State *L)
 {
-	int error = lua_pcall(L, nargs, nreturns, 0);
-	if (error == 0)
-		return 0;
 	struct error *e = luaL_iserror(L, -1);
 	if (e != NULL) {
 		/* Re-throw original error */
@@ -914,6 +914,22 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 		diag_set(LuajitError, lua_tostring(L, -1));
 	}
 	return 1;
+}
+
+int
+lbox_call(struct lua_State *L, int nargs, int nreturns)
+{
+	if (lua_pcall(L, nargs, nreturns, 0))
+		return lbox_catch(L);
+	return 0;
+}
+
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud)
+{
+	if (lua_cpcall(L, func, ud))
+		return lbox_catch(L);
+	return 0;
 }
 
 int

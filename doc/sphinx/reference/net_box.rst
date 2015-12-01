@@ -1,8 +1,8 @@
 .. _package_net_box:
 
------------------------------------------------------------------------------------------
-                            Package `net.box` -- working with networked Tarantool peers
------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+                                Package `net.box`
+--------------------------------------------------------------------------------
 
 The ``net.box`` package contains connectors to remote database systems. One
 variant, ``box.net.sql``, is for connecting to MySQL or MariaDB or PostgreSQL —
@@ -27,9 +27,7 @@ necessary to prioritize requests or to use different authentication ids.
 
 .. module:: net_box
 
-.. class:: conn
-
-  conn = net_box:new(host, port [, {other parameter[s]}])
+.. function:: new(host, port[, {other parameter[s]}])
 
     Create a new connection. The connection is established on demand, at the
     time of the first request. It is re-established automatically after a
@@ -38,7 +36,7 @@ necessary to prioritize requests or to use different authentication ids.
 
     For the local tarantool server there is a pre-created always-established
     connection object named :samp:`{net_box}.self`. Its purpose is to make polymorphic
-    use of the ``net_box`` API easier. Therefore :samp:`conn = {net_box}:new('localhost', 3301)`
+    use of the ``net_box`` API easier. Therefore :samp:`conn = {net_box}.new('localhost', 3301)`
     can be replaced by :samp:`conn = {net_box}.self`. However, there is an important
     difference between the embedded connection and a remote one. With the
     embedded connection, requests which do not modify data do not yield.
@@ -53,17 +51,18 @@ necessary to prioritize requests or to use different authentication ids.
     :return: conn object
     :rtype:  userdata
 
- 
+    **Example:**
 
-        EXAMPLES
+    .. code-block:: lua
 
-        | :codebold:`conn = net_box:new('localhost', 3301)`
-        | :codebold:`conn = net_box:new('127.0.0.1', box.cfg.listen, {`
-        | :codebold:`wait_connect = false,`
-        | :codebold:`user = 'guest',`
-        | :codebold:`password = ''`
-        | :codebold:`})`
+        conn = net_box.new('localhost', 3301)
+        conn = net_box.new('127.0.0.1', box.cfg.listen, {
+          wait_connect = false,
+          user = 'guest',
+          password = ''
+        })
 
+.. class:: conn
 
     .. method:: ping()
 
@@ -72,7 +71,11 @@ necessary to prioritize requests or to use different authentication ids.
         :return: true on success, false on error
         :rtype:  boolean
 
-        Example: :codebold:`net_box.self:ping()`
+        **Example:**
+
+        .. code-block:: lua
+
+            net_box.self:ping()
 
     .. method:: wait_connected([timeout])
 
@@ -82,8 +85,12 @@ necessary to prioritize requests or to use different authentication ids.
         :return: true when connected, false on failure.
         :rtype:  boolean
 
-        Example: :codebold:`net_box.self:wait_connected()`
- 
+        **Example:**
+
+        .. code-block:: lua
+
+            net_box.self:wait_connected()
+
 
     .. method:: close()
 
@@ -94,7 +101,7 @@ necessary to prioritize requests or to use different authentication ids.
         call, it is good programming practice to close a connection explicitly when it
         is no longer needed, to avoid lengthy stalls of the garbage collector.
 
-        Example: :codebold:`conn:close()`
+        Example: ``conn:close()``
 
     .. method:: conn.space.<space-name>:select{field-value, ...}
 
@@ -131,18 +138,18 @@ necessary to prioritize requests or to use different authentication ids.
         :samp:`func('1', '2', '3')`. That is, ``conn:call`` is a remote
         stored-procedure call.
 
-        Example: :codebold:`conn:call('function5')`
+        Example: ``conn:call('function5')``
 
     .. method:: timeout(timeout)
 
         ``timeout(...)`` is a wrapper which sets a timeout for the request that
         follows it.
 
-        Example: :codebold:`conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})`
+        Example: ``conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})``
 
         All remote calls support execution timeouts. Using a wrapper object makes
         the remote connection API compatible with the local one, removing the need
-        for a separate :codenormal:`timeout` argument, which the local version would ignore. Once
+        for a separate ``timeout`` argument, which the local version would ignore. Once
         a request is sent, it cannot be revoked from the remote server even if a
         timeout expires: the timeout expiration only aborts the wait for the remote
         server response, not the request itself.
@@ -156,68 +163,62 @@ That is, there is a space named tester with a numeric primary key. Assume that
 the database is nearly empty. Assume that the tarantool server is running on
 ``localhost 127.0.0.1:3301``.
 
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'read,write,execute', 'universe')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`net_box = require('net.box')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`function example()`
-    | :codenormal:`>` :codebold:`local conn, wtuple`
-    | :codenormal:`>` :codebold:`if net_box.self:ping() then`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'self:ping() succeeded')`
-    | :codenormal:`>` :codebold:`table.insert(ta, '  (no surprise -- self connection is pre-established)')`
-    | :codenormal:`>` :codebold:`end`
-    | :codenormal:`>` :codebold:`if box.cfg.listen == '3301' then`
-    | :codenormal:`>` :codebold:`table.insert(ta,'The local server listen address = 3301')`
-    | :codenormal:`>` :codebold:`else`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'The local server listen address is not 3301')`
-    | :codenormal:`>` :codebold:`table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')`
-    | :codenormal:`>` :codebold:`table.insert(ta, '(  (so connect will fail)')`
-    | :codenormal:`>` :codebold:`end`
-    | :codenormal:`>` :codebold:`conn = net_box:new('127.0.0.1', 3301)`
-    | :codenormal:`>` :codebold:`conn.space.tester:delete{800}`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn delete done on tester.')`
-    | :codenormal:`>` :codebold:`conn.space.tester:insert{800, 'data'}`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn insert done on tester, index 0')`
-    | :codenormal:`>` :codebold:`table.insert(ta, '  primary key value = 800.')`
-    | :codenormal:`>` :codebold:`wtuple = conn.space.tester:select{800}`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn select done on tester, index 0')`
-    | :codenormal:`>` :codebold:`table.insert(ta, '  number of fields = ' .. #wtuple)`
-    | :codenormal:`>` :codebold:`conn.space.tester:delete{800}`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn delete done on tester')`
-    | :codenormal:`>` :codebold:`conn.space.tester:replace{800, 'New data', 'Extra data'}`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn:replace done on tester')`
-    | :codenormal:`>` :codebold:`conn:timeout(0.5).space.tester:update({800}, {{'=', 2, 'Fld#1'}})`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn update done on tester')`
-    | :codenormal:`>` :codebold:`conn:close()`
-    | :codenormal:`>` :codebold:`table.insert(ta, 'conn close done')`
-    | :codenormal:`>` :codebold:`end`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`ta = {}`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`example()`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`ta`
-    | :codenormal:`---`
-    | :codenormal:`- - self:ping() succeeded`
-    | :codenormal:`- '  (no surprise -- self connection is pre-established)'`
-    | :codenormal:`- The local server listen address = 3301`
-    | :codenormal:`- conn delete done on tester.`
-    | :codenormal:`- conn insert done on tester, index 0`
-    | :codenormal:`- '  primary key value = 800.'`
-    | :codenormal:`- conn select done on tester, index 0`
-    | :codenormal:`- '  number of fields = 1'`
-    | :codenormal:`- conn delete done on tester`
-    | :codenormal:`- conn:replace done on tester`
-    | :codenormal:`- conn update done on tester`
-    | :codenormal:`- conn close done`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:select{800} -- Prove that the update succeeded.`
-    | :codenormal:`---`
-    | :codenormal:`- [800, 'Fld#1', 'Extra data']`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
 
+    tarantool> net_box = require('net.box')
+    ---
+    ...
+    tarantool> function example()
+             >   local conn, wtuple
+             >   if net_box.self:ping() then
+             >     table.insert(ta, 'self:ping() succeeded')
+             >     table.insert(ta, '  (no surprise -- self connection is pre-established)')
+             >   end
+             >   if box.cfg.listen == '3301' then
+             >     table.insert(ta,'The local server listen address = 3301')
+             >   else
+             >     table.insert(ta, 'The local server listen address is not 3301')
+             >     table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')
+             >     table.insert(ta, '(  (so connect will fail)')
+             >   end
+             >   conn = net_box.new('127.0.0.1', 3301)
+             >   conn.space.tester:delete{800}
+             >   table.insert(ta, 'conn delete done on tester.')
+             >   conn.space.tester:insert{800, 'data'}
+             >   table.insert(ta, 'conn insert done on tester, index 0')
+             >   table.insert(ta, '  primary key value = 800.')
+             >   wtuple = conn.space.tester:select{800}
+             >   table.insert(ta, 'conn select done on tester, index 0')
+             >   table.insert(ta, '  number of fields = ' .. #wtuple)
+             >   conn.space.tester:delete{800}
+             >   table.insert(ta, 'conn delete done on tester')
+             >   conn.space.tester:replace{800, 'New data', 'Extra data'}
+             >   table.insert(ta, 'conn:replace done on tester')
+             >   conn:timeout(0.5).space.tester:update({800}, {{'=', 2, 'Fld#1'}})
+             >   table.insert(ta, 'conn update done on tester')
+             >   conn:close()
+             >   table.insert(ta, 'conn close done')
+             > end
+    ---
+    ...
+    tarantool> ta = {}
+    ---
+    ...
+    tarantool> example()
+    ---
+    ...
+    tarantool> ta
+    ---
+    - - self:ping() succeeded
+      - '  (no surprise -- self connection is pre-established)'
+      - The local server listen address = 3301
+      - conn delete done on tester.
+      - conn insert done on tester, index 0
+      - '  primary key value = 800.'
+      - conn select done on tester, index 0
+      - '  number of fields = 1'
+      - conn delete done on tester
+      - conn:replace done on tester
+      - conn update done on tester
+      - conn close done
+    ...

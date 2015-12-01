@@ -30,6 +30,24 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct obuf;
+struct obuf_svp;
+
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp);
+
+void
+iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		    uint32_t count);
+#if defined(__cplusplus)
+} /*  extern "C" */
+
 #include "box.h"
 #include "request.h"
 #include "port.h"
@@ -88,11 +106,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync);
 void
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync);
 
-struct obuf_svp
-iproto_prepare_select(struct obuf *buf);
 
-void
-iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		    uint32_t count);
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

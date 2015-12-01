@@ -42,14 +42,17 @@ host/port.
     Possible errors: the connection will fail if the target Tarantool server
     was not initiated with :code:`box.cfg{listen=...}`.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`console = require('console')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`console.connect('198.18.44.44:3301')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`198.18.44.44:3301> -- prompt is telling us that server is remote`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> console = require('console')
+        ---
+        ...
+        tarantool> console.connect('198.18.44.44:3301')
+        ---
+        ...
+        198.18.44.44:3301> -- prompt is telling us that server is remote
 
 .. function:: listen(uri)
 
@@ -71,43 +74,39 @@ host/port.
     numeric TCP port. Connections are often made with telnet.
     A typical port value is 3313.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`console = require('console')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    |
-    | :codenormal:`tarantool>` :codebold:`console.listen('unix/:/tmp/X.sock')`
-    | :codenormal:`... main/103/console/unix/:/tmp/X I> started`
-    | :codenormal:`---`
-    | :codenormal:`- fd: 9`
-    | |nbsp| |nbsp| :codenormal:`name:`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`host: unix/`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`family: AF_UNIX`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`type: SOCK_STREAM`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`protocol: 0`
-    | |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`port: /tmp/X.sock`
-    | :codenormal:`...`
+    **Example:**
 
-.. _console-start:
+    .. code-block:: tarantoolsession
+
+        tarantool> console = require('console')
+        ---
+        ...
+        tarantool> console.listen('unix/:/tmp/X.sock')
+        ... main/103/console/unix/:/tmp/X I> started
+        ---
+        - fd: 6
+          name:
+            host: unix/
+            family: AF_UNIX
+            type: SOCK_STREAM
+            protocol: 0
+            port: /tmp/X.sock
+        ...
 
 .. function:: start()
 
     Start the console on the current interactive terminal.
 
-    EXAMPLE |BR|
-    A special use of :codenormal:`console.start()` is with
+    **Example:**
+
+    A special use of ``console.start()`` is with
     :ref:`initialization files <URI>`.
-    Normally, if one starts the tarantool server with |br|
-    :codenormal:`tarantool` :codeitalic:`initialization file` |br|
+    Normally, if one starts the tarantool server with
+    :samp:`tarantool {initialization file}`
     there is no console. This can be remedied by adding
     these lines at the end of the initialization file:
-    :codenormal:`console = require('console')` |br|
-    :codenormal:`console.start()` |br|
 
+    .. code-block:: lua
 
-
-
-
-
-
-
+        console = require('console')
+        console.start()

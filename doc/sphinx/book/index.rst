@@ -14,8 +14,8 @@
     configuration/index
     administration
     connectors/index
-    app_a_errcodes
-    app_b_proctitle
-    app_c_lua_tutorial
-    app_d_plugins
-    sophia
+    app/a_errcodes
+    app/b_proctitle
+    app/c_lua_tutorial
+    app/d_plugins
+    app/e_sophia/index

@@ -22,6 +22,7 @@ A Tarantool server process title follows the following naming scheme:
 
 For example:
 
-    | :codenormal:`$` :codebold:`ps -A -f | grep tarantool`
-    | :codenormal:`1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running`
+.. code-block:: console
 
+    $ ps -A -f | grep tarantool
+    1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running

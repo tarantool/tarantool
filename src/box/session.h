@@ -130,6 +130,37 @@ credentials_copy(struct credentials *dst, struct credentials *src)
  */
 extern struct credentials admin_credentials;
 
+/**
+ * Create a new session on demand, and set fiber on_stop
+ * trigger to destroy it when this fiber ends.
+ */
+struct session *
+session_create_on_demand();
+
+/*
+ * When creating a new fiber, the database (box)
+ * may not be initialized yet. When later on
+ * this fiber attempts to access the database,
+ * we have no other choice but initialize fiber-specific
+ * database state (something like a database connection)
+ * on demand. This is why this function needs to
+ * check whether or not the current session exists
+ * and create it otherwise.
+ */
+static inline struct session *
+current_session()
+{
+	struct session *s = (struct session *)
+		fiber_get_key(fiber(), FIBER_KEY_SESSION);
+	return s ? s : session_create_on_demand();
+}
+
+/** Global on-disconnect triggers. */
+extern struct rlist session_on_disconnect;
+
+void
+session_storage_cleanup(int sid);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -163,43 +194,12 @@ session_destroy(struct session *);
 void
 session_run_on_connect_triggers(struct session *session);
 
-/** Global on-disconnect triggers. */
-extern struct rlist session_on_disconnect;
-
 /** Run on-disconnect triggers */
 void
 session_run_on_disconnect_triggers(struct session *session);
 
 void
 session_run_on_auth_triggers(const char *user_name);
-
-void
-session_storage_cleanup(int sid);
-
-/**
- * Create a new session on demand, and set fiber on_stop
- * trigger to destroy it when this fiber ends.
- */
-struct session *
-session_create_on_demand();
-
-/*
- * When creating a new fiber, the database (box)
- * may not be initialized yet. When later on
- * this fiber attempts to access the database,
- * we have no other choice but initialize fiber-specific
- * database state (something like a database connection)
- * on demand. This is why this function needs to
- * check whether or not the current session exists
- * and create it otherwise.
- */
-static inline struct session *
-current_session()
-{
-	struct session *s = (struct session *)
-		fiber_get_key(fiber(), FIBER_KEY_SESSION);
-	return s ? s : session_create_on_demand();
-}
 
 /*
  * Return the current user. Create it if it doesn't
@@ -226,8 +226,12 @@ access_check_universe(uint8_t access)
 {
 	struct credentials *credentials = current_user();
 	if (!(credentials->universal_access & access)) {
-		/* Access violation, report error. */
-		struct user *user = user_cache_find(credentials->uid);
+		/*
+		 * Access violation, report error.
+		 * The user may not exist already, if deleted
+		 * from a different connection.
+		 */
+		struct user *user = user_find_xc(credentials->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
 			  priv_name(access), user->def.name);
 	}

@@ -109,7 +109,7 @@ Let's list them here too:
     <function_name> ::= 0x22
     <username>      ::= 0x23
     <expression>    ::= 0x27
-    <def_tuple>     ::= 0x28
+    <ops>           ::= 0x28
     <data>          ::= 0x30
     <error>         ::= 0x31
 
@@ -383,27 +383,20 @@ It's an error to specify an argument of a type that differs from expected type.
 * UPSERT: CODE - 0x09
   Update tuple if it would be found elsewhere try to insert tuple. Always use primary index for key.
 
-  
-  
 .. code-block:: bash
 
     UPSERT BODY:
-    
-    +==================+==========================+
-    |                  |                          |
-    |   0x10: SPACE_ID |   0x20: KEY              |
-    | MP_INT: MP_INT   | MP_INT: MP_ARRAY         |
-    |                  |                          |
-    +==================+==========================+
-    |                  |             +~~~~~~~~~~+ |
-    |                  |             |          | |
-    |                  | (DEF_TUPLE) |    OP    | |
-    |   0x21: TUPLE    |       0x28: |          | |
-    | MP_INT: MP_ARRAY |     MP_INT: +~~~~~~~~~~+ |
-    |                  |               MP_ARRAY   |
-    +==================+==========================+
-                    MP_MAP
-  
+
+    +==================+==================+==========================+
+    |                  |                  |             +~~~~~~~~~~+ |
+    |                  |                  |             |          | |
+    |   0x10: SPACE_ID |   0x21: TUPLE    |       (OPS) |    OP    | |
+    | MP_INT: MP_INT   | MP_INT: MP_ARRAY |       0x28: |          | |
+    |                  |                  |     MP_INT: +~~~~~~~~~~+ |
+    |                  |                  |               MP_ARRAY   |
+    +==================+==================+==========================+
+                                    MP_MAP
+
     Operations structure same as for UPDATE operation.
        0           2
     +-----------+==========+==========+
@@ -413,13 +406,23 @@ It's an error to specify an argument of a type that differs from expected type.
     |           |          |          |
     +-----------+==========+==========+
                   MP_ARRAY
-    
-    Support operations: 
-    '+' - add a value to a numeric field. If the filed is not numeric, it's changed to 0 first. If the field does not exist, the operation is skipped. There is no error in case of overflow either, the value simply wraps around in C style. The range of the integer is MsgPack: from -2^63 to 2^64-1
+
+    Supported operations:
+
+    '+' - add a value to a numeric field. If the filed is not numeric, it's
+          changed to 0 first. If the field does not exist, the operation is
+          skipped. There is no error in case of overflow either, the value
+          simply wraps around in C style. The range of the integer is MsgPack:
+          from -2^63 to 2^64-1
     '-' - same as the previous, but subtract a value
-    '=' - assign a field to a value. The field must exist, if it does not exist, the operation is skipped.
-    '!' - insert a field. It's only possible to insert a field if this create no nil "gaps" between fields. E.g. it's possible to add a field between existing fields or as the last field of the tuple.
-    '#' - delete a field. If the field does not exist, the operation is skipped. It's not possible to change with update operations a part of the primary key (this is validated before performing upsert).
+    '=' - assign a field to a value. The field must exist, if it does not exist,
+          the operation is skipped.
+    '!' - insert a field. It's only possible to insert a field if this create no
+          nil "gaps" between fields. E.g. it's possible to add a field between
+          existing fields or as the last field of the tuple.
+    '#' - delete a field. If the field does not exist, the operation is skipped.
+          It's not possible to change with update operations a part of the primary
+          key (this is validated before performing upsert).
 
 
 ================================================================================

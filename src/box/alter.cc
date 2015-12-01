@@ -30,7 +30,6 @@
  */
 #include "alter.h"
 #include "schema.h"
-#include "user_def.h"
 #include "user.h"
 #include "space.h"
 #include "memtx_index.h"
@@ -101,7 +100,7 @@ access_check_ddl(uint32_t owner_uid)
 	 * ALTER privilege.
 	 */
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
-		struct user *user = user_cache_find(cr->uid);
+		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
 			  "Create or drop", user->def.name);
 	}
@@ -1718,7 +1717,7 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user *grantor = user_cache_find(priv->grantor_id);
+	struct user *grantor = user_find_xc(priv->grantor_id);
 	/* May be a role */
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL) {

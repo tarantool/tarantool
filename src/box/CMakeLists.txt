@@ -60,16 +60,18 @@ add_library(box
     relay.cc
     wal.cc
     ${lua_sources}
-    lua/call.cc
+    lua/init.c
+    lua/call.c
     lua/tuple.c
     lua/slab.c
     lua/index.c
     lua/space.cc
-    lua/info.cc
+    lua/misc.cc
+    lua/info.c
     lua/stat.c
     lua/sophia.c
     lua/error.cc
-    lua/session.cc
+    lua/session.c
     lua/net_box.c
     ${bin_sources})
 

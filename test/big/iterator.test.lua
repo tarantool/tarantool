@@ -1,5 +1,7 @@
 dofile('utils.lua')
 
+test_run = require('test_run').new()
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 # Tree single-part unique
 
 space = box.schema.space.create('tweedledum')

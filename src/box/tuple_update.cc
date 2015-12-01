@@ -907,8 +907,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		if (mp_typeof(*expr) != MP_INT && mp_typeof(*expr) != MP_UINT)
-			tnt_raise(IllegalParams,
-				  "update fieldno option name must be numeric");
+			tnt_raise(IllegalParams, "field id must be a number");
 		int32_t field_no = mp_read_int(update, op, &expr);
 		if (field_no - update->index_base >= 0) {
 			op->field_no = field_no - update->index_base;

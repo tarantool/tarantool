@@ -45,7 +45,7 @@ older versions of Tarantool, should check the syntax description for
 
 We will start by making a function that returns a fixed string, “Hello world”.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function string_function()
       return "hello world"
@@ -58,7 +58,7 @@ here, although Lua doesn't care -- one could use single quotes instead. The
 word "``end``" means “this is the end of the Lua function declaration.”
 To confirm that the function works, we can say
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     string_function()
 
@@ -73,16 +73,18 @@ about functions see Lua manual `chapter 5 "Functions"`_.
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return "hello world"`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`string_function()`
-| :codenormal:`---`
-| :codenormal:`- hello world`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function string_funciton()
+             >   return "hello world"
+             > end
+    ---
+    ...
+    tarantool> string_function()
+    ---
+    - hello world
+    ...
+    tarantool> 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  Create a function that calls another function and sets a variable
@@ -91,7 +93,7 @@ The screen now looks like this:
 Now that ``string_function`` exists, we can invoke it from another
 function.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function main_function()
       local string_value
@@ -115,18 +117,20 @@ For more about Lua variables see Lua manual `chapter 4.2 "Local Variables and Bl
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function main_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return string_value`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()`
-| :codenormal:`---`
-| :codenormal:`- hello world`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function main_function()
+             >   local string_value
+             >   string_value = string_function()
+             >   return string_value
+             > end
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    - hello world
+    ...
+    tarantool> 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Modify the function so it returns a one-letter random string
@@ -136,7 +140,7 @@ Now that it's a bit clearer how to make a variable, we can change
 ``string_function()`` so that, instead of returning a fixed literal
 'Hello world", it returns a random letter between 'A' and 'Z'.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function string_function()
       local random_number
@@ -165,20 +169,22 @@ can be invoked with ``main_function()``.
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = string.char(random_number)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()`
-| :codenormal:`---`
-| :codenormal:`- C`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function string_function()
+             >   local random_number
+             >   local random_string
+             >   random_number = math.random(65, 90)
+             >   random_string = string.char(random_number)
+             >   return random_string
+             > end
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    - C
+    ...
+    tarantool> 
 
 ... Well, actually it won't always look like this because ``math.random()``
 produces random numbers. But for the illustration purposes it won't matter
@@ -192,7 +198,7 @@ Now that it's clear how to produce one-letter random strings, we can reach our
 goal of producing a ten-letter string by concatenating ten one-letter strings,
 in a loop.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function string_function()
       local random_number
@@ -219,23 +225,26 @@ For more about Lua loops see Lua manual `chapter 4.3.4 "Numeric for"`_.
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = ""`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for x = 1,10,1 do`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`random_string = random_string .. string.char(random_number)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()`
-| :codenormal:`---`
-| :codenormal:`- 'ZUDJBHKEFM'`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function string_function()
+             >   local random_number
+             >   local random_string
+             >   random_string = ""
+             >   for x = 1,10,1 do
+             >     random_number = math.random(65, 90)
+             >     random_string = random_string .. string.char(random_number)
+             >   end
+             >   return random_string
+             > end
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    - 'ZUDJBHKEFM'
+    ...
+    tarantool> 
+
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            Make a tuple out of a number and a string
@@ -245,7 +254,7 @@ Now that it's clear how to make a 10-letter random string, it's possible to
 make a tuple that contains a number and a 10-letter random string, by invoking
 a function in Tarantool's library of Lua functions.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function main_function()
       local string_value, t
@@ -263,19 +272,21 @@ For more about Tarantool tuples see Tarantool manual section :mod:`Package box.t
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function main_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1, string_value})`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return t`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()`
-| :codenormal:`---`
-| :codenormal:`- [1, 'PNPZPCOOKA']`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function main_function()
+             > local string_value, t
+             > string_value = string_function()
+             > t = box.tuple.new({1, string_value})
+             > return t
+             > end
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    - [1, 'PNPZPCOOKA']
+    ...
+    tarantool> 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      Modify main_function to insert a tuple into the database
@@ -286,7 +297,7 @@ random string, the only trick remaining is putting that tuple into tester.
 Remember that tester is the first space that was defined in the sandbox, so
 it's like a database table.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function main_function()
       local string_value, t
@@ -309,7 +320,7 @@ with two fields. The first field will be 1. The second field will be a random
 only puts t into the database. To confirm that something got inserted, we'll use
 a SELECT request.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     main_function()
     box.space.tester:select{1}
@@ -319,22 +330,24 @@ For more about Tarantool insert and replace calls, see Tarantool manual section
 
 The screen now looks like this:
 
-    | :codenormal:`tarantool>` :codebold:`function main_function()`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`string_value = string_function()`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`t = box.tuple.new({1,string_value})`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
-    | |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`main_function()`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.space.tester:select{1}`
-    | :codenormal:`---`
-    | :codenormal:`- - [1, 'EUJYVEECIL']`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function main_function()
+             >   local string_value, t
+             >   string_value = string_function()
+             >   t = box.tuple.new({1,string_value})
+             >   box.space.tester:replace(t)
+             > end
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    ...
+    tarantool> box.space.tester:select{1}
+    ---
+    - - [1, 'EUJYVEECIL']
+    ...
+    tarantool> 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  Modify main_function to insert a million tuples into the database
@@ -346,7 +359,7 @@ for the primary key, insert with a variable value = between 1 and 1 million, in
 a loop. Since we already saw how to loop, that's a simple thing. The only extra
 wrinkle that we add here is a timing function.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function main_function()
       local string_value, t
@@ -369,7 +382,8 @@ We will display that value by putting it in a request without any assignments,
 which causes Tarantool to send the value to the client, which prints it. (Lua's
 answer to the C ``printf()`` function, which is ``print()``, will also work.)
 
-For more on Lua ``os.clock()`` see Lua manual `chapter 22.1 "Date and Time"`_ . For more on Lua print() see Lua manual `chapter 5 "Functions"`_.
+For more on Lua ``os.clock()`` see Lua manual `chapter 22.1 "Date and Time"`_.
+For more on Lua print() see Lua manual `chapter 5 "Functions"`_.
 
 .. _chapter 22.1 "Date and Time": http://www.lua.org/pil/22.1.html
 .. _chapter 5 "Functions": http://www.lua.org/pil/5.html
@@ -379,7 +393,7 @@ necessary requests: the request that
 created ``string_function()``, the request that created ``main_function()``,
 and the request that invokes ``main_function()``.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
 
     function string_function()
       local random_number
@@ -407,42 +421,44 @@ and the request that invokes ``main_function()``.
 
 The screen now looks like this:
 
-| :codenormal:`tarantool>` :codebold:`function string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_number`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`random_string = ""`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for x = 1,10,1 do`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`random_number = math.random(65, 90)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| :codebold:`random_string = random_string .. string.char(random_number)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`return random_string`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`function main_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`local string_value, t`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`for i = 1,1000000,1 do`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`string_value = string_function()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`t = box.tuple.new({i,string_value})`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`box.space.tester:replace(t)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`start_time = os.clock()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`main_function()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`end_time = os.clock()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`'insert done in ' .. end_time - start_time .. ' seconds'`
-| :codenormal:`---`
-| :codenormal:`- insert done in 37.62 seconds`
-| :codenormal:`...`
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> function string_function()
+             >   local random_number
+             >   local random_string
+             >   random_string = ""
+             >   for x = 1,10,1 do
+             >     random_number = math.random(65, 90)
+             >     random_string = random_string .. string.char(random_number)
+             >   end
+             >   return random_string
+             > end
+    ---
+    ...
+    tarantool> function main_function()
+             >   local string_value, t
+             >   for i = 1,1000000,1 do
+             >     string_value = string_function()
+             >     t = box.tuple.new({i,string_value})
+             >     box.space.tester:replace(t)
+             >   end
+             > end
+    ---
+    ...
+    tarantool> start_time = os.clock()
+    ---
+    ...
+    tarantool> main_function()
+    ---
+    ...
+    tarantool> end_time = os.clock()
+    ---
+    ...
+    tarantool> 'insert done in ' .. end_time - start_time .. ' seconds'
+    ---
+    - insert done in 37.62 seconds
+    ...
+    tarantool> 
 
 What has been shown is that Lua functions are quite expressive (in fact one can
 do more with Tarantool's Lua stored procedures than one can do with stored
@@ -452,8 +468,6 @@ Lua-library functions and Tarantool-library functions.
 What has also been shown is that inserting a million tuples took 37 seconds. The
 host computer was a Linux laptop. By changing :confval:`wal_mode <wal_mode>` to 'none' before
 running the test, one can reduce the elapsed time to 4 seconds.
-
-
 
 =====================================================================
                   Sum a JSON field for all tuples
@@ -465,58 +479,47 @@ For each tuple, find the numeric field's value and add it to a 'sum' variable.
 At end, return the 'sum' variable.” The purpose of the exercise is to get
 experience in one way to read and process tuples.
 
-.. code-block:: lua_tarantool
+.. code-block:: lua
+    :linenos:
 
     json = require('json')
     function sum_json_field(field_name)
-      local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
-      sum = 0                                                               --[[2]]
-      for v, t in box.space.tester:pairs() do                               --[[3]]
-        is_valid_json, lua_table = pcall(json.decode, t[2])                 --[[4]]
-        if is_valid_json then                                               --[[5]]
-          field_value = lua_table[field_name]                               --[[6]]
-          if type(field_value) == "number" then sum = sum + field_value end --[[7]]
-        end                                                                 --[[8]]
-      end                                                                   --[[9]]
-      return sum                                                            --[[10]]
+      local v, t, sum, field_value, is_valid_json, lua_table
+      sum = 0
+      for v, t in box.space.tester:pairs() do
+        is_valid_json, lua_table = pcall(json.decode, t[2])
+        if is_valid_json then
+          field_value = lua_table[field_name]
+          if type(field_value) == "number" then sum = sum + field_value end
+        end
+      end
+      return sum
     end
 
-.. parsed-literal::
-
-    :ref:`[[1]] <why_local>`, :ref:`[[3]] <why_pairs>`, :ref:`[[4]] <why_pcall>`, :ref:`[[6]] <line_six>`, :ref:`[[7]] <why_if>`
-
-.. _why_local:
-
-**LINE 1: WHY "LOCAL".** This line declares all the variables that will be used in
+**LINE 3: WHY "LOCAL".** This line declares all the variables that will be used in
 the function. Actually it's not necessary to declare all variables at the start,
 and in a long function it would be better to declare variables just before using
 them. In fact it's not even necessary to declare variables at all, but an
 undeclared variable is "global". That's not desirable for any of the variables
 that are declared in line 1, because all of them are for use only within the function.
 
-.. _why_pairs:
-
-**LINE 3: WHY "PAIRS()".** Our job is to go through all the rows and there are two
-ways to do it: with :ref:`box.space.space_object:pairs() <space_object.pairs>` or with
+**LINE 5: WHY "PAIRS()".** Our job is to go through all the rows and there are two
+ways to do it: with :func:`box.space.space_object:pairs() <space_object.pairs>` or with
 :func:`index.iterator <index_object.pairs>`.
 We preferred ``pairs()`` because it is simpler.
 
-**LINE 3: START THE MAIN LOOP.** Everything inside this ":code:`for`" loop will be
+**LINE 5: START THE MAIN LOOP.** Everything inside this ":code:`for`" loop will be
 repeated as long as there is another index key. A tuple is fetched and can be
 referenced with variable :code:`t`.
 
-.. _why_pcall:
-
-**LINE 4: WHY "PCALL".** If we simply said ``lua_table = json.decode(t[2]))``, then
+**LINE 6: WHY "PCALL".** If we simply said ``lua_table = json.decode(t[2]))``, then
 the function would abort with an error if it encountered something wrong with the
 JSON string - a missing colon, for example. By putting the function inside "``pcall``"
 (`protected call`_), we're saying: we want to intercept that sort of error, so if
 there's a problem just set ``is_valid_json = false`` and we will know what to do
 about it later.
 
-.. _meaning:
-
-**LINE 4: MEANING.** The function is :func:`json.decode` which means decode a JSON
+**LINE 6: MEANING.** The function is :func:`json.decode` which means decode a JSON
 string, and the parameter is t[2] which is a reference to a JSON string. There's
 a bit of hard coding here, we're assuming that the second field in the tuple is
 where the JSON string was inserted. For example, we're assuming a tuple looks like
@@ -534,9 +537,7 @@ means "decode ``t[2]`` (the tuple's second field) as a JSON string; if there's a
 error set ``is_valid_json = false``; if there's no error set ``is_valid_json = true`` and
 set ``lua_table =`` a Lua table which has the decoded string".
 
-.. _line_six:
-
-**LINE 6.** At last we are ready to get the JSON field value from the Lua table that
+**LINE 8.** At last we are ready to get the JSON field value from the Lua table that
 came from the JSON string. The value in field_name, which is the parameter for the
 whole function, must be a name of a JSON field. For example, inside the JSON string
 ``'{"Hello": "world", "Quantity": 15}'``, there are two JSON fields: "Hello" and
@@ -546,9 +547,7 @@ then ``field_value = lua_table[field_name]`` is effectively the same as
 Those are just three different ways of saying: for the Quantity field in the Lua table,
 get the value and put it in variable :code:`field_value`.
 
-.. _why_if:
-
-**LINE 7: WHY "IF".** Suppose that the JSON string is well formed but the JSON field
+**LINE 9: WHY "IF".** Suppose that the JSON string is well formed but the JSON field
 is not a number, or is missing. In that case, the function would be aborted when
 there was an attempt to add it to the sum. By first checking
 ``type(field_value) == "number"``, we avoid that abortion. Anyone who knows that
@@ -582,10 +581,12 @@ Therefore the real sum of the Quantity field in the JSON strings should be:
 
 Invoke the function with ``sum_json_field("Quantity")``.
 
-| :codenormal:`tarantool>` :codebold:`sum_json_field("Quantity")`
-| :codenormal:`---`
-| :codenormal:`- 22`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> sum_json_field("Quantity")
+    ---
+    - 22
+    ...
 
 It works. We'll just leave, as exercises for future improvement, the possibility
 that the "hard coding" assumptions could be removed, that there might have to be

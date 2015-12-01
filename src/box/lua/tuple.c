@@ -392,14 +392,10 @@ box_lua_tuple_init(struct lua_State *L)
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
 
-	if (luaL_dostring(L, tuple_lua)) {
-		lua_pushfstring(L, "Error loading Lua source %.160s...: %s",
-		      tuple_lua, lua_tostring(L, -1));
-		lua_error(L);
-	}
-	assert(lua_gettop(L) == 0);
-
-	/* Get CTypeIDs */
+	/* Get CTypeID for `struct tuple' */
+	int rc = luaL_cdef(L, "struct tuple;");
+	assert(rc == 0);
+	(void) rc;
 	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
-
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
 }

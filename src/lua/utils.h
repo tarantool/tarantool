@@ -453,6 +453,9 @@ luaL_isarray(struct lua_State *L, int idx)
 	return index_starts_at_1;
 }
 
+struct error *
+luaL_iserror(struct lua_State *L, int narg);
+
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.
@@ -512,6 +515,9 @@ lbox_error(lua_State *L);
 
 int
 lbox_call(lua_State *L, int nargs, int nreturns);
+
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
 
 #if defined(__cplusplus)
 } /* extern "C" */

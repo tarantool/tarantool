@@ -728,6 +728,8 @@ coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
 int
 coio_wait(int fd, int events, double timeout)
 {
+	if (fiber_is_cancelled())
+		return 0;
 	struct ev_io io;
 	coio_init(&io, fd);
 	ev_io_init(&io, coio_wait_cb, fd, events);

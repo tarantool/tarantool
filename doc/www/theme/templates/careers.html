@@ -1,0 +1,58 @@
+{% extends "base" %}
+
+
+{% block header_scripts %}
+<script src="js/main.js"></script>
+{% endblock header_scripts %}
+
+{% block content %}
+{#
+<section class="b-lightgray_block b-job_top b-clearbox">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Job</h2>
+  </div>
+</section>
+#}
+
+<section class="b-block b-job b-job_bg">
+  <div class="b-block-wrapper">
+  </div>
+  <section class="b-lightgray_block b-job_top b-job_opacity-up">
+    <div class="b-block-wrapper">
+      <article class="b-article">
+        {{ page.blocks.content_up }}
+      </article>
+    </div>
+  </section>
+</section>
+
+<section class="b-block b-job">
+  <div class="b-block-wrapper">
+    <article class="b-article">
+      {{ page.blocks.content_down }}
+    </article>
+  </div>
+</section>
+<section class="b-block b-job">
+  <div class="b-block-wrapper">
+    <ul class="b-download-list">
+      {% for item in page.blocks.vacancies %}
+      <li class="b-download-list-item">
+        <a href="#" class="b-download-list-item-url">{{ item.title }}</a>
+        <div class="b-download-list-item-drop">
+          <article class="b-article">
+            {{ item.content }}
+            <div class="b-button_container">
+              <a class="b-button b-email" href="mailto:job@tarantool.org">Email us</a>
+              <a class="b-button b-hr" href="{{ item.link }}">На русском</a>
+            </div>
+          </article>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

@@ -126,16 +126,25 @@ iproto_port_eof(struct port *ptr)
 	struct iproto_port *port = iproto_port(ptr);
 	/* found == 0 means add_tuple wasn't called at all. */
 	if (port->found == 0) {
-		port->svp = iproto_prepare_select(port->buf);
+		if (iproto_prepare_select(port->buf, &port->svp) != 0)
+			diag_raise();
 	}
 
 	iproto_reply_select(port->buf, &port->svp, port->sync, port->found);
 }
 
-struct obuf_svp
-iproto_prepare_select(struct obuf *buf)
+int
+iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
-	return obuf_book_xc(buf, SVP_SIZE);
+	void *ptr = obuf_reserve(buf, SVP_SIZE);
+	if (ptr == NULL) {
+		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
+		return -1;
+	}
+	*svp = obuf_create_svp(buf);
+	ptr = obuf_alloc(buf, SVP_SIZE);
+	assert(ptr !=  NULL);
+	return 0;
 }
 
 void
@@ -163,7 +172,8 @@ iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
 	struct iproto_port *port = iproto_port(ptr);
 	if (port->found == 0) {
 		/* Found the first tuple, add header. */
-		port->svp = iproto_prepare_select(port->buf);
+		if (iproto_prepare_select(port->buf, &port->svp) != 0)
+			diag_raise();
 	}
 	port->found++;
 	tuple_to_obuf(tuple, port->buf);

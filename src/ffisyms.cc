@@ -5,8 +5,6 @@
 #include <box/tuple.h>
 #include <box/index.h>
 #include <box/func.h>
-#include <box/lua/tuple.h>
-#include <box/lua/call.h>
 #include <box/sophia_engine.h>
 #include <box/request.h>
 #include <box/port.h>

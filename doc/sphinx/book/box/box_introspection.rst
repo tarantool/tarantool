@@ -1,6 +1,6 @@
-----------------------------------------------------------------------------------------------------
-                            Packages box.cfg, box.info, box.slab, and box.stat: server introspection
-----------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+   Server introspection
+-------------------------------------------------------------------------------
 
 =====================================================================
                          Package `box.cfg`
@@ -13,19 +13,19 @@ configuration parameters; the full description of the parameters is in
 section :ref:`book-cfg`. Use ``box.cfg`` without braces to get read-only
 access to those parameters.
 
-.. data:: box.cfg
+**Example:**
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`box.cfg`
-    | :codenormal:`---`
-    | |nbsp| :codenormal:`- too_long_threshold: 0.5`
-    | |nbsp| :codenormal:`slab_alloc_factor: 1.1`
-    | |nbsp| :codenormal:`slab_alloc_minimal: 64`
-    | |nbsp| :codenormal:`background: false`
-    | |nbsp| :codenormal:`slab_alloc_arena: 1`
-    | |nbsp| :codenormal:`log_level: 5`
-    | |nbsp| :codenormal:`...`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> box.cfg
+    ---
+    - snapshot_count: 6
+      too_long_threshold: 0.5
+      slab_alloc_factor: 1.1
+      slab_alloc_maximal: 1048576
+      background: false
+      <...>
+    ...
 
 =====================================================================
                          Package `box.info`
@@ -36,16 +36,13 @@ access to those parameters.
 The ``box.info`` package provides access to information about server variables.
 Some important ones:
 
-**server.uuid** holds the unique identifier of the server.
-This value is also in the :data:`box.space._cluster` system space.
-
-**pid** is the process ID of the server.
-This value is also shown by the :ref:`tarantool <tarantool-build>` package.
-
-**version** is the Tarantool version.
-This value is also shown by :ref:`tarantool --version <tarantool-version>`.
-
-**uptime** is the number of seconds since the server started.
+* **server.uuid** holds the unique identifier of the server. This value is also
+  in the :data:`box.space._cluster` system space.
+* **pid** is the process ID of the server. This value is also shown by the
+  :ref:`tarantool <tarantool-build>` package.
+* **version** is the Tarantool version. This value is also shown by
+  :ref:`tarantool --version <tarantool-version>`.
+* **uptime** is the number of seconds since the server started.
 
 .. function:: box.info()
 
@@ -57,38 +54,42 @@ This value is also shown by :ref:`tarantool --version <tarantool-version>`.
     :return: keys and values in the package.
     :rtype:  table
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`box.info()`
-    | :codenormal:`---`
-    | :codenormal:`- server:`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`lsn: 158`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`ro: false`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`uuid: 75967704-0115-47c2-9d03-bd2bdcc60d64`
-    | |nbsp| :codenormal:`id: 1`
-    | |nbsp| :codenormal:`version: 1.6.4-411-gcff798b`
-    | |nbsp| :codenormal:`pid: 32561`
-    | |nbsp| :codenormal:`status: running`
-    | |nbsp| :codenormal:`vclock: {1: 158}`
-    | |nbsp| :codenormal:`replication:`
-    | |nbsp| |nbsp| |nbsp| :codenormal:`status: off`
-    | |nbsp| :codenormal:`uptime: 2778`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.pid`
-    | :codenormal:`---`
-    | :codenormal:`- 1747`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.version`
-    | :codenormal:`---`
-    | :codenormal:`- 1.6.4-411-gcff798b`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.uptime`
-    | :codenormal:`---`
-    | :codenormal:`- 3672`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.info.status`
-    | :codenormal:`---`
-    | :codenormal:`- running`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> box.info()
+        ---
+        - server:
+            lsn: 158
+            ro: false
+            uuid: a2684219-b2b1-4334-88ab-50b0722283fd
+            id: 1
+          version: 1.6.8-66-g9093daa
+          pid: 12932
+          status: running
+          vclock:
+          - 158
+          replication:
+            status: off
+          uptime: 908
+        ...
+        tarantool> box.info.pid
+        ---
+        - 12932
+        ...
+        tarantool> box.info.status
+        ---
+        - running
+        ...
+        tarantool> box.info.uptime
+        ---
+        - 1065
+        ...
+        tarantool> box.info.version
+        ---
+        - 1.6.8-66-g9093daa
+        ...
 
 =====================================================================
                          Package `box.slab`
@@ -110,79 +111,114 @@ value plus the total of all the bytes_free values (1160+4193200+4194088 = 838844
 The arena_size and arena_used values are the amount of the % of
 :confval:`slab_alloc_arena` that is already distributed to the slab allocator.
 
-.. data:: slab
+**Example:**
 
-    .. code-block:: lua
+.. code-block:: tarantoolsession
 
-    | :codenormal:`tarantool>` :codebold:`box.slab.info().arena_used`
-    | :codenormal:`---`
-    | :codenormal:`- 4194304`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.slab.info().arena_size`
-    | :codenormal:`---`
-    | :codenormal:`- 104857600`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.slab.info().slabs`
-    | :codenormal:`---`
-    | :codenormal:`- - {mem_free: 9320, mem_used: 6976, 'item_count': 109,`
-    | :codenormal:`'item_size': 64, 'slab_count': 1, 'slab_size': 16384}`
-    | :codenormal:`- {mem_free: 16224, mem_used: 72, 'item_count': 1,`
-    | :codenormal:`'item_size': 72, 'slab_count': 1,'slab_size': 16384}`
-    | :codenormal:`etc.`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.slab.info().slabs[1]`
-    | :codenormal:`---`
-    | :codenormal:`- {mem_free: 9320, mem_used: 6976, 'item_count': 109,`
-    | :codenormal:`'item_size': 64, 'slab_count': 1, 'slab_size': 16384}`
-    | :codenormal:`...`
+    tarantool> box.slab.info().arena_used
+    ---
+    - 4194304
+    ...
+    tarantool> box.slab.info().arena_size
+    ---
+    - 104857600
+    ...
+    tarantool> box.slab.stats()
+    ---
+    - - mem_free: 16248
+        mem_used: 48
+        item_count: 2
+        item_size: 24
+        slab_count: 1
+        slab_size: 16384
+      - mem_free: 15736
+        mem_used: 560
+        item_count: 14
+        item_size: 40
+        slab_count: 1
+        slab_size: 16384
+        <...>
+    ...
+    tarantool> box.slab.stats()[1]
+    ---
+    - mem_free: 15736
+      mem_used: 560
+      item_count: 14
+      item_size: 40
+      slab_count: 1
+      slab_size: 16384
+    ...
 
 =====================================================================
                          Package `box.stat`
 =====================================================================
 
-.. module:: box.stat
+The ``box.stat`` package provides access to request and network statistics.
+Show the average number of requests per second, and the total number of
+requests since startup, broken down by request type and network events statistics.
 
-The ``box.stat`` package provides access to request statistics. Show the
-average number of requests per second, and the total number of requests
-since startup, broken down by request type.
+.. code-block:: tarantoolsession
 
-.. data:: box.stat
-
-        | :codenormal:`tarantool>` :codebold:`box.stat, type(box.stat) -- a virtual table`
-        | :codenormal:`---`
-        | :codenormal:`- []`
-        | :codenormal:`- table`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`box.stat() -- the full contents of the table`
-        | :codenormal:`---`
-        | :codenormal:`- DELETE:`
-        | :codenormal:`total: 48902544`
-        | :codenormal:`rps: 147`
-        | :codenormal:`EVAL:`
-        | :codenormal:`total: 0`
-        | :codenormal:`rps: 0`
-        | :codenormal:`SELECT:`
-        | :codenormal:`total: 388322317`
-        | :codenormal:`rps: 1246`
-        | :codenormal:`REPLACE:`
-        | :codenormal:`total: 4`
-        | :codenormal:`rps: 0`
-        | :codenormal:`INSERT:`
-        | :codenormal:`total: 48207694`
-        | :codenormal:`rps: 139`
-        | :codenormal:`AUTH:`
-        | :codenormal:`total: 0`
-        | :codenormal:`rps: 0`
-        | :codenormal:`CALL:`
-        | :codenormal:`total: 8`
-        | :codenormal:`rps: 0`
-        | :codenormal:`UPDATE:`
-        | :codenormal:`total: 743350520`
-        | :codenormal:`rps: 1874`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`box.stat().DELETE -- a selected item of the table`
-        | :codenormal:`---`
-        | :codenormal:`- total: 48902544`
-        | :codenormal:`rps: 0`
-        | :codenormal:`...`
-
+    tarantool> type(box.stat), type(box.stat.net) -- a virtual tables
+    ---
+    - table
+    - table
+    ...
+    tarantool> box.stat, box.stat.net
+    ---
+    - net: []
+    - []
+    ...
+    tarantool> box.stat()
+    ---
+    - DELETE:
+        total: 1873949
+        rps: 123
+      SELECT:
+        total: 1237723
+        rps: 4099
+      INSERT:
+        total: 0
+        rps: 0
+      EVAL:
+        total: 0
+        rps: 0
+      CALL:
+        total: 0
+        rps: 0
+      REPLACE:
+        total: 1239123
+        rps: 7849
+      UPSERT:
+        total: 0
+        rps: 0
+      AUTH:
+        total: 0
+        rps: 0
+      ERROR:
+        total: 0
+        rps: 0
+      UPDATE:
+        total: 0
+        rps: 0
+    ...
+    tarantool> box.stat().DELETE -- a selected item of the table
+    ---
+    - total: 0
+      rps: 0
+    ...
+    tarantool> box.stat.net()
+    ---
+    - SENT:
+        total: 0
+        rps: 0
+      EVENTS:
+        total: 2
+        rps: 0
+      LOCKS:
+        total: 6
+        rps: 0
+      RECEIVED:
+        total: 0
+        rps: 0
+    ...
