@@ -149,7 +149,7 @@ macro(luajit_build)
         # Use external unwind on x86
         set (luajit_xcflags "-DLUAJIT_UNWIND_EXTERNAL=1")
     endif()
-    # We are consciously ommiting debug info in RelWithDebugInfo mode
+    # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)
         if (CC_HAS_GGDB)

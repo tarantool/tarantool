@@ -142,7 +142,7 @@ This package provides common files
         cmd = 'cmake28'
     end
     cmd = cmd .. ' . '
-        .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebugInfo')
+        .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebInfo')
         .. cmake_key_value('ENABLE_BACKTRACE', 'ON')
         .. cmake_key_value('CMAKE_INSTALL_PREFIX', '%{_prefix}')
         .. cmake_key_value('CMAKE_INSTALL_BINDIR', '%{_bindir}')

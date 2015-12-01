@@ -24,7 +24,7 @@ the tarantool package is recommended.
     tarantool> tarantool
     ---
     - build:
-        target: Linux-x86_64-RelWithDebugInfo
+        target: Linux-x86_64-RelWithDebInfo
         options: cmake . -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON
         mod_format: so
         flags: ' -fno-common -fno-omit-frame-pointer -fno-stack-protector -fexceptions
