@@ -586,7 +586,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 }
 
 int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def)
 {
 	if (key_def->part_count == 1 && key_def->parts[0].fieldno == 0) {
@@ -619,7 +619,7 @@ int
 tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		  const struct key_def *key_def)
 {
-	int r = tuple_compare(tuple_a, tuple_b, key_def);
+	int r = key_def->tuple_compare(tuple_a, tuple_b, key_def);
 	if (r == 0)
 		r = tuple_a < tuple_b ? -1 : tuple_a > tuple_b;
 
@@ -627,7 +627,7 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 }
 
 int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
+tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
 {
 	assert(key != NULL || part_count == 0);
