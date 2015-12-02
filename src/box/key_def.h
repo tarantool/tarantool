@@ -39,7 +39,7 @@
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>
-#include "tuple_compare_gen.h"
+#include "tuple_compare.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -175,8 +175,8 @@ struct key_def {
 	enum index_type type;
 	struct key_opts opts;
 	/** comparators */
-	tuple_cmp_t tuple_compare;
-	tuple_cmp_wk_t tuple_compare_with_key;
+	tuple_compare_t tuple_compare;
+	tuple_compare_with_key_t tuple_compare_with_key;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
@@ -298,27 +298,20 @@ typedef int (*box_function_f)(box_function_ctx_t *ctx,
 #if defined(__cplusplus)
 } /* extern "C" */
 
+static inline size_t
+key_def_sizeof(uint32_t part_count)
+{
+	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+}
+
 /** Initialize a pre-allocated key_def. */
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, struct key_opts *opts,
 	    uint32_t part_count);
 
-static inline struct key_def *
-key_def_dup(struct key_def *def)
-{
-	struct key_def *dup = key_def_new(def->space_id, def->iid, def->name,
-					  def->type, &def->opts,
-					  def->part_count);
-	if (dup) {
-		memcpy(dup->parts, def->parts,
-		       def->part_count * sizeof(*def->parts));
-
-		dup->tuple_compare = def->tuple_compare;
-		dup->tuple_compare_with_key = def->tuple_compare_with_key;
-	}
-	return dup;
-}
+struct key_def *
+key_def_dup(struct key_def *def);
 
 /**
  * Copy one key def into another, preserving the membership
@@ -341,14 +334,9 @@ key_def_copy(struct key_def *to, const struct key_def *from)
  * Set a single key part in a key def.
  * @pre part_no < part_count
  */
-static inline void
+void
 key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type)
-{
-	assert(part_no < def->part_count);
-	def->parts[part_no].fieldno = fieldno;
-	def->parts[part_no].type = type;
-}
+		 uint32_t fieldno, enum field_type type);
 
 /** Compare two key part arrays.
  *
@@ -441,9 +429,6 @@ identifier_is_valid(const char *str);
  */
 void
 identifier_check(const char *str);
-
-void
-key_def_finalize(struct key_def *def);
 
 #endif /* defined(__cplusplus) */
 

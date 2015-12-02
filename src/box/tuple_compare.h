@@ -40,20 +40,20 @@ extern "C" {
 struct tuple;
 struct key_def;
 
-typedef int (*tuple_cmp_wk_t)(const struct tuple *tuple_a,
+typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
 			      const char *key,
 			      uint32_t part_count,
 			      const struct key_def *key_def);
 
-typedef int (*tuple_cmp_t)(const struct tuple *tuple_a,
+typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
 			   const struct key_def *key_def);
 
-tuple_cmp_t
-tuple_compare_gen(const struct key_def *key_def);
+tuple_compare_t
+tuple_compare_create(const struct key_def *key_def);
 
-tuple_cmp_wk_t
-tuple_compare_wk_gen(const struct key_def *key_def);
+tuple_compare_with_key_t
+tuple_compare_with_key_create(const struct key_def *key_def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

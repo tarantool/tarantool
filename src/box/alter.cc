@@ -321,7 +321,6 @@ key_def_fill_parts(struct key_def *key_def, const char *parts,
 		enum field_type field_type = STR2ENUM(field_type, buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
-	key_def_finalize(key_def);
 }
 
 /**
@@ -346,7 +345,6 @@ key_def_fill_parts_165(struct key_def *key_def, const char *parts,
 		enum field_type field_type = STR2ENUM(field_type, buf);
 		key_def_set_part(key_def, i, field_no, field_type);
 	}
-	key_def_finalize(key_def);
 }
 
 

@@ -70,13 +70,19 @@ schema_object_type(const char *name)
 	return (enum schema_object_type) (index == n_strs ? 0 : index);
 }
 
+static void
+key_def_set_cmp(struct key_def *def)
+{
+	def->tuple_compare = tuple_compare_create(def);
+	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
+}
+
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, struct key_opts *opts,
 	    uint32_t part_count)
 {
-	uint32_t parts_size = sizeof(struct key_part) * part_count;
-	size_t sz = parts_size + sizeof(struct key_def);
+	size_t sz = key_def_sizeof(part_count);
 	struct key_def *def = (struct key_def *) malloc(sz);
 	if (def == NULL) {
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
@@ -100,8 +106,22 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->opts = *opts;
 	def->part_count = part_count;
 
-	memset(def->parts, 0, parts_size);
+	memset(def->parts, 0, part_count * sizeof(struct key_part));
 	return def;
+}
+
+struct key_def *
+key_def_dup(struct key_def *def)
+{
+	size_t sz = key_def_sizeof(def->part_count);
+	struct key_def *dup = (struct key_def *) malloc(sz);
+	if (dup == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  sz, "struct key_def", "malloc");
+	}
+	memcpy(dup, def, key_def_sizeof(def->part_count));
+	rlist_create(&dup->link);
+	return dup;
 }
 
 /** Free a key definition. */
@@ -219,6 +239,27 @@ key_def_check(struct key_def *key_def)
 }
 
 void
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type)
+{
+	assert(part_no < def->part_count);
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
+	/**
+	 * When all parts are set, initialize the tuple
+	 * comparator function.
+	 */
+	/* Last part is set, initialize the comparators. */
+	bool all_parts_set = true;
+	for (int i = 0; i < def->part_count; i++) {
+		if (def->parts[i].type == UNKNOWN)
+			all_parts_set = false;
+	}
+	if (all_parts_set)
+		key_def_set_cmp(def);
+}
+
+void
 space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
                 int32_t errcode)
 {
@@ -278,12 +319,5 @@ identifier_check(const char *str)
 {
 	if (! identifier_is_valid(str))
 		tnt_raise(ClientError, ER_IDENTIFIER, str);
-}
-
-void
-key_def_finalize(struct key_def *def)
-{
-	def->tuple_compare = tuple_compare_gen(def);
-	def->tuple_compare_with_key = tuple_compare_wk_gen(def);
 }
 
