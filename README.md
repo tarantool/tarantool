@@ -41,7 +41,7 @@ To build, you will need GCC or Apple CLang compiler.
 CMake is used for configuration management.
 3 standard CMake build types are supported:
  * Debug -- used by project maintainers
- * RelWithDebugInfo -- the most common release configuration,
+ * RelWithDebInfo -- the most common release configuration,
  also provides debugging capabilities
  * Release -- use only if the highest performance is required
 
@@ -58,13 +58,13 @@ Please follow these steps to compile Tarantool:
     tarantool $ cmake .
     tarantool $ make
 
-To use a different release type, say, RelWithDebugInfo, use:
+To use a different release type, say, RelWithDebInfo, use:
 
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
 Additional build options can be set similarly:
 
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_DOC=true # builds the docs
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_DOC=true # builds the docs
 
 'make' creates 'tarantool' executable in directory src/.
 

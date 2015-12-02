@@ -71,7 +71,7 @@ NOTE: If you want to get DMG package go to section 6.
     cd tarantool
     mkdir build && cd build
     cmake .. \
-        -DCMAKE_BUILD_TYPE=RelWithDebugInfo \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DENABLE_CLIENT=true \
         -DDARWIN_BUILD_TYPE=Ports
     make

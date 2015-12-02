@@ -101,7 +101,7 @@ Go the site `github.com/tarantool/mysql`_. Follow the instructions there, saying
 .. code-block:: bash
 
     git clone https://github.com/tarantool/mysql.git
-    cd mysql && cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+    cd mysql && cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
     make
     make install
 
@@ -448,7 +448,7 @@ Go the site `github.com/tarantool/pg`_. Follow the instructions there, saying:
 .. code-block:: bash
 
     git clone https://github.com/tarantool/pg.git
-    cd pg && cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+    cd pg && cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
     make
     make install
 

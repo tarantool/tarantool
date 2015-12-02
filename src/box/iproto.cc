@@ -179,7 +179,6 @@ struct iproto_connection
 	struct ev_io output;
 	/** Logical session. */
 	struct session *session;
-	uint64_t cookie;
 	ev_loop *loop;
 	/* Pre-allocated disconnect msg. */
 	struct iproto_msg *disconnect;
@@ -290,7 +289,7 @@ static struct cmsg_hop request_route[] = {
 };
 
 static struct iproto_connection *
-iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
+iproto_connection_new(const char *name, int fd)
 {
 	(void) name;
 	struct iproto_connection *con = (struct iproto_connection *)
@@ -303,7 +302,6 @@ iproto_connection_new(const char *name, int fd, struct sockaddr *addr)
 	con->iobuf[1] = iobuf_new_mt(&tx_cord->slabc);
 	con->parse_size = 0;
 	con->session = NULL;
-	con->cookie = *(uint64_t *) addr;
 	/* It may be very awkward to allocate at close. */
 	con->disconnect = iproto_msg_new(con, disconnect_route);
 	return con;
@@ -781,7 +779,7 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = &msg->iobuf->out;
 	try {              /* connect. */
-		con->session = session_create(con->input.fd, con->cookie);
+		con->session = session_create(con->input.fd);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = ::recovery->server_uuid;
@@ -854,7 +852,7 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 	struct iproto_connection *con;
 
-	con = iproto_connection_new(name, fd, addr);
+	con = iproto_connection_new(name, fd);
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in
