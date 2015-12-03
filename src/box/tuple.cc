@@ -887,7 +887,7 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_en
 	try {
 		RegionGuard region_guard(&fiber()->gc);
 		struct tuple *new_tuple = tuple_update(tuple_format_ber,
-			region_alloc_xc_cb, &fiber()->gc, tuple,
+			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		return tuple_bless(new_tuple);
 	} catch (ClientError *e) {
@@ -901,7 +901,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_en
 	try {
 		RegionGuard region_guard(&fiber()->gc);
 		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
-			region_alloc_xc_cb, &fiber()->gc, tuple,
+			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		return tuple_bless(new_tuple);
 	} catch (ClientError *e) {
