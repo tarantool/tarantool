@@ -1988,15 +1988,15 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 				  tt_uuid_str(&server_uuid));
 		if (old_tuple != NULL) {
 			/*
-			 * Forbid UUID changing for registered server.
-			 * This feature is completely useless for customers,
-			 * but requires extra efforts to keep _cluster,
-			 * applier and relay synchronized.
+			 * Forbid UUID changing for registered server:
+			 * it requires an extra effort to keep _cluster
+			 * in sync with appliers and relays.
 			 */
 			tt_uuid old_uuid = tuple_field_uuid(old_tuple, 1);
 			if (!tt_uuid_is_equal(&server_uuid, &old_uuid)) {
 				tnt_raise(ClientError, ER_UNSUPPORTED,
-					  "cluster", "UUID modification");
+					  "Space _cluster",
+					  "updates of server uuid");
 			}
 		}
 	}

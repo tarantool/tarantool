@@ -44,7 +44,7 @@ box.space._cluster:replace{1, require('uuid').NULL:str()}
 ...
 box.space._cluster:replace{1, require('uuid').str()}
 ---
-- error: cluster does not support UUID modification
+- error: Space _cluster does not support updates of server uuid
 ...
 box.space._cluster:update(1, {{'=', 3, 'test'}})
 ---
@@ -67,7 +67,7 @@ box.space._cluster:replace{5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'}
 ...
 box.space._cluster:replace{5, 'a48a19a3-26c0-4f8c-a5b5-77377bab389b'}
 ---
-- error: cluster does not support UUID modification
+- error: Space _cluster does not support updates of server uuid
 ...
 box.space._cluster:update(5, {{'=', 3, 'test'}})
 ---
