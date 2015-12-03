@@ -112,6 +112,12 @@ int
 box_error_set(const char *file, unsigned line, uint32_t code,
 	      const char *format, ...);
 
+/**
+ * A backward-compatible API define.
+ */
+#define box_error_raise(code, format) \
+	box_error_set(__FILE__, __LINE__, code, format)
+
 /** \endcond public */
 
 #if defined(__cplusplus)
