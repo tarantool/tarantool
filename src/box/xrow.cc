@@ -36,6 +36,8 @@
 #include "third_party/base64.h"
 #include "iproto_constants.h"
 #include "version.h"
+#include "coio.h"
+#include "coio_buf.h"
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 

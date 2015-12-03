@@ -24,6 +24,7 @@ add_library(box
     errcode.c
     error.cc
     xrow.cc
+    xrow_io.cc
     xlog.cc
     tuple.cc
     tuple_convert.cc
