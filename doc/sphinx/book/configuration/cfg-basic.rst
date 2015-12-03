@@ -103,18 +103,20 @@
 
         For example, ordinarily ps shows the Tarantool server process thus:
 
-            | :codenormal:`$` :codebold:`ps -ef | grep tarantool`
-            | :codenormal:`1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running`
-            | :codenormal:`1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner`
-            | :codenormal:`tarantool: primary pri: 3301 adm: 3313`
+        .. code-block:: console
+
+            $ ps -ef | grep tarantool
+            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running
+            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner
+            tarantool: primary pri: 3301 adm: 3313
 
         But if the configuration parameters include
         ``custom_proc_title='sessions'`` then the output looks like:
 
-            | :codenormal:`$` :codebold:`ps -ef | grep tarantool`
-            | :codenormal:`1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions`
-            | :codenormal:`1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions`
-            | :codenormal:`tarantool: primary pri: 3301 adm: 3313`
+            $ ps -ef | grep tarantool
+            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions
+            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions
+            tarantool: primary pri: 3301 adm: 3313
 
     Type: string |br|
     Default: null |br|

@@ -35,7 +35,6 @@
 #include "assoc.h"
 #include "trigger.h"
 #include "random.h"
-#include <sys/socket.h>
 #include "user.h"
 
 static struct mh_i32ptr_t *session_registry;
@@ -72,13 +71,12 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 }
 
 struct session *
-session_create(int fd, uint64_t cookie)
+session_create(int fd)
 {
 	struct session *session = (struct session *)
 		mempool_alloc_xc(&session_pool);
 	session->id = sid_max();
 	session->fd =  fd;
-	session->cookie = cookie;
 	session->sync = 0;
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user);
@@ -102,7 +100,7 @@ struct session *
 session_create_on_demand()
 {
 	/* Create session on demand */
-	struct session *s = session_create(-1, 0);
+	struct session *s = session_create(-1);
 	s->fiber_on_stop = {
 		RLIST_LINK_INITIALIZER, session_on_stop, NULL, NULL
 	};
@@ -131,8 +129,6 @@ session_run_on_disconnect_triggers(struct session *session)
 		trigger_run(&session_on_disconnect, NULL);
 	} catch (Exception *e) {
 		e->log();
-	} catch (...) {
-		/* catch all. */
 	}
 	session_storage_cleanup(session->id);
 }

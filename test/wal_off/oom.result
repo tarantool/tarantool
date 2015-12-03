@@ -5,6 +5,10 @@ test_run = env.new()
 ---
 ...
 test_run:cmd('restart server default')
+test_run:cmd("push filter 'error: Failed to allocate [0-9]+ ' to 'error: Failed to allocate <NUM> '")
+---
+- true
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -23,25 +27,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 25031 bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
-space:len();
+space:len() > 5000;
 ---
-- 6252
-...
-i = 1;
----
-...
-while true do
-    space:insert{space:len(), string.rep('test', i)}
-    i = i + 1
-end;
----
-- error: Failed to allocate 4167 bytes in slab allocator for tuple
-...
-space:len();
----
-- 7288
+- true
 ...
 i = 1;
 ---
@@ -51,15 +41,29 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 2123 bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for tuple
+...
+space:len() > 5000;
+---
+- true
+...
+i = 1;
+---
+...
+while true do
+    space:insert{space:len(), string.rep('test', i)}
+    i = i + 1
+end;
+---
+- error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-space:len()
+space:len() > 5000
 ---
-- 7813
+- true
 ...
 space.index['primary']:get{0}
 ---
@@ -246,7 +250,7 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate 15019 bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
 definatelly_used = index:count() * 16 * 1024
 ---
@@ -271,7 +275,7 @@ collectgarbage('collect')
 ...
 for i=1,10000 do space:insert{i, str} end
 ---
-- error: Failed to allocate 15019 bytes in slab allocator for tuple
+- error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
 definatelly_used = index:count() * 16 * 1024
 ---

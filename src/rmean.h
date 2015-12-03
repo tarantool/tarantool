@@ -75,9 +75,6 @@ void
 rmean_cleanup(struct rmean *rmean);
 
 void
-rmean_timer_tick(struct rmean *rmean);
-
-void
 rmean_collect(struct rmean *rmean, size_t name, int64_t value);
 
 typedef int (*rmean_cb)(const char *name, int rps, int64_t total, void *cb_ctx);

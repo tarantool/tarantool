@@ -510,14 +510,6 @@ fiber_testcancel(void)
 		tnt_raise(FiberIsCancelled);
 }
 
-static inline void
-diag_raise(void)
-{
-	struct error *e = diag_last_error(&fiber()->diag);
-	if (e)
-		error_raise(e);
-}
-
 static inline struct fiber *
 fiber_new_xc(const char *name, fiber_func func)
 {

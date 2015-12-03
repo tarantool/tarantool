@@ -31,6 +31,228 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/** \cond public */
+
+typedef struct tuple_format box_tuple_format_t;
+
+/**
+ * Tuple Format.
+ *
+ * Each Tuple has associated format (class). Default format is used to
+ * create tuples which are not attach to any particular space.
+ */
+box_tuple_format_t *
+box_tuple_format_default(void);
+
+/**
+ * Tuple
+ */
+typedef struct tuple box_tuple_t;
+
+/**
+ * Allocate and initialize a new tuple from a raw MsgPack Array data.
+ *
+ * \param format tuple format.
+ * Use box_tuple_format_default() to create space-independent tuple.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval NULL on out of memory
+ * \retval tuple otherwise
+ * \pre data, end is valid MsgPack Array
+ * \sa \code box.tuple.new(data) \endcode
+ */
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
+
+/**
+ * Increase the reference counter of tuple.
+ *
+ * Tuples are reference counted. All functions that return tuples guarantee
+ * that the last returned tuple is refcounted internally until the next
+ * call to API function that yields or returns another tuple.
+ *
+ * You should increase the reference counter before taking tuples for long
+ * processing in your code. Such tuples will not be garbage collected even
+ * if another fiber remove they from space. After processing please
+ * decrement the reference counter using box_tuple_unref(), otherwise the
+ * tuple will leak.
+ *
+ * \param tuple a tuple
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ * \sa box_tuple_unref()
+ */
+int
+box_tuple_ref(box_tuple_t *tuple);
+
+/**
+ * Decrease the reference counter of tuple.
+ *
+ * \param tuple a tuple
+ * \sa box_tuple_ref()
+ */
+void
+box_tuple_unref(box_tuple_t *tuple);
+
+/**
+ * Return the number of fields in tuple (the size of MsgPack Array).
+ * \param tuple a tuple
+ */
+uint32_t
+box_tuple_field_count(const box_tuple_t *tuple);
+
+/**
+ * Return the number of bytes used to store internal tuple data (MsgPack Array).
+ * \param tuple a tuple
+ */
+size_t
+box_tuple_bsize(const box_tuple_t *tuple);
+
+/**
+ * Dump raw MsgPack data to the memory byffer \a buf of size \a size.
+ *
+ * Store tuple fields in the memory buffer.
+ * \retval -1 on error.
+ * \retval number of bytes written on success.
+ * Upon successful return, the function returns the number of bytes written.
+ * If buffer size is not enough then the return value is the number of bytes
+ * which would have been written if enough space had been available.
+ */
+ssize_t
+box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
+
+/**
+ * Return the associated format.
+ * \param tuple tuple
+ * \return tuple_format
+ */
+box_tuple_format_t *
+box_tuple_format(const box_tuple_t *tuple);
+
+/**
+ * Return the raw tuple field in MsgPack format.
+ *
+ * The buffer is valid until next call to box_tuple_* functions.
+ *
+ * \param tuple a tuple
+ * \param field_id zero-based index in MsgPack array.
+ * \retval NULL if i >= box_tuple_field_count(tuple)
+ * \retval msgpack otherwise
+ */
+const char *
+box_tuple_field(const box_tuple_t *tuple, uint32_t field_id);
+
+/**
+ * Tuple iterator
+ */
+typedef struct tuple_iterator box_tuple_iterator_t;
+
+/**
+ * Allocate and initialize a new tuple iterator. The tuple iterator
+ * allow to iterate over fields at root level of MsgPack array.
+ *
+ * Example:
+ * \code
+ * box_tuple_iterator *it = box_tuple_iterator(tuple);
+ * if (it == NULL) {
+ *      // error handling using box_error_last()
+ * }
+ * const char *field;
+ * while (field = box_tuple_next(it)) {
+ *      // process raw MsgPack data
+ * }
+ *
+ * // rewind iterator to first position
+ * box_tuple_rewind(it);
+ * assert(box_tuple_position(it) == 0);
+ *
+ * // rewind iterator to first position
+ * field = box_tuple_seek(it, 3);
+ * assert(box_tuple_position(it) == 4);
+ *
+ * box_iterator_free(it);
+ * \endcode
+ *
+ * \post box_tuple_position(it) == 0
+ */
+box_tuple_iterator_t *
+box_tuple_iterator(box_tuple_t *tuple);
+
+/**
+ * Destroy and free tuple iterator
+ */
+void
+box_tuple_iterator_free(box_tuple_iterator_t *it);
+
+/**
+ * Return zero-based next position in iterator.
+ * That is, this function return the field id of field that will be
+ * returned by the next call to box_tuple_next(it). Returned value is zero
+ * after initialization or rewind and box_tuple_field_count(tuple)
+ * after the end of iteration.
+ *
+ * \param it tuple iterator
+ * \returns position.
+ */
+uint32_t
+box_tuple_position(box_tuple_iterator_t *it);
+
+/**
+ * Rewind iterator to the initial position.
+ *
+ * \param it tuple iterator
+ * \post box_tuple_position(it) == 0
+ */
+void
+box_tuple_rewind(box_tuple_iterator_t *it);
+
+/**
+ * Seek the tuple iterator.
+ *
+ * The returned buffer is valid until next call to box_tuple_* API.
+ * Requested field_no returned by next call to box_tuple_next(it).
+ *
+ * \param it tuple iterator
+ * \param field_no field no - zero-based position in MsgPack array.
+ * \post box_tuple_position(it) == field_no if returned value is not NULL
+ * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
+ * value is NULL.
+ */
+const char *
+box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
+
+/**
+ * Return the next tuple field from tuple iterator.
+ * The returned buffer is valid until next call to box_tuple_* API.
+ *
+ * \param it tuple iterator.
+ * \retval NULL if there are no more fields.
+ * \retval MsgPack otherwise
+ * \pre box_tuple_position(it) is zerod-based id of returned field
+ * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
+ * value is NULL.
+ */
+const char *
+box_tuple_next(box_tuple_iterator_t *it);
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+/** \endcond public */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
 #include "key_def.h" /* for enum field_type */
 #include "tuple_update.h"
 
@@ -348,7 +570,7 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-extern "C" inline const char *
+static inline const char *
 tuple_field(const struct tuple *tuple, uint32_t i)
 {
 	return tuple_field_old(tuple_format(tuple), tuple, i);
@@ -553,7 +775,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def);
 
 /**
@@ -581,13 +803,29 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
  * @retval >0 if key_fields(tuple_a) > parts(key)
  */
 int
-tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+tuple_compare_with_key_default(const struct tuple *tuple_a, const char *key,
 		       uint32_t part_count, const struct key_def *key_def);
+
+
+inline int
+tuple_compare_with_key(const struct tuple *tuple, const char *key,
+		       uint32_t part_count, const struct key_def *key_def)
+{
+	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
+}
+
+inline int
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def)
+{
+	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
+}
+
 
 /** These functions are implemented in tuple_convert.cc. */
 
 /* Store tuple in the output buffer in iproto format. */
-void
+int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
 /**
@@ -610,211 +848,6 @@ tuple_begin_snapshot();
 
 void
 tuple_end_snapshot();
-
-/** \cond public */
-typedef struct tuple_format box_tuple_format_t;
-
-/**
- * Tuple Format.
- *
- * Each Tuple has associated format (class). Default format is used to
- * create tuples which are not attach to any particular space.
- */
-API_EXPORT box_tuple_format_t *
-box_tuple_format_default(void);
-
-/**
- * Tuple
- */
-typedef struct tuple box_tuple_t;
-
-/**
- * Allocate and initialize a new tuple from a raw MsgPack Array data.
- *
- * \param format tuple format.
- * Use box_tuple_format_default() to create space-independent tuple.
- * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
- * \param end the end of \a data
- * \retval NULL on out of memory
- * \retval tuple otherwise
- * \pre data, end is valid MsgPack Array
- * \sa \code box.tuple.new(data) \endcode
- */
-API_EXPORT box_tuple_t *
-box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
-
-/**
- * Increase the reference counter of tuple.
- *
- * Tuples are reference counted. All functions that return tuples guarantee
- * that the last returned tuple is refcounted internally until the next
- * call to API function that yields or returns another tuple.
- *
- * You should increase the reference counter before taking tuples for long
- * processing in your code. Such tuples will not be garbage collected even
- * if another fiber remove they from space. After processing please
- * decrement the reference counter using box_tuple_unref(), otherwise the
- * tuple will leak.
- *
- * \param tuple a tuple
- * \retval -1 on error (check box_error_last())
- * \retval 0 on success
- * \sa box_tuple_unref()
- */
-API_EXPORT int
-box_tuple_ref(box_tuple_t *tuple);
-
-/**
- * Decrease the reference counter of tuple.
- *
- * \param tuple a tuple
- * \sa box_tuple_ref()
- */
-API_EXPORT void
-box_tuple_unref(box_tuple_t *tuple);
-
-/**
- * Return the number of fields in tuple (the size of MsgPack Array).
- * \param tuple a tuple
- */
-API_EXPORT uint32_t
-box_tuple_field_count(const box_tuple_t *tuple);
-
-/**
- * Return the number of bytes used to store internal tuple data (MsgPack Array).
- * \param tuple a tuple
- */
-API_EXPORT size_t
-box_tuple_bsize(const box_tuple_t *tuple);
-
-/**
- * Dump raw MsgPack data to the memory byffer \a buf of size \a size.
- *
- * Store tuple fields in the memory buffer.
- * \retval -1 on error.
- * \retval number of bytes written on success.
- * Upon successful return, the function returns the number of bytes written.
- * If buffer size is not enough then the return value is the number of bytes
- * which would have been written if enough space had been available.
- */
-API_EXPORT ssize_t
-box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
-
-/**
- * Return the associated format.
- * \param tuple tuple
- * \return tuple_format
- */
-API_EXPORT box_tuple_format_t *
-box_tuple_format(const box_tuple_t *tuple);
-
-/**
- * Return the raw tuple field in MsgPack format.
- *
- * The buffer is valid until next call to box_tuple_* functions.
- *
- * \param tuple a tuple
- * \param field_id zero-based index in MsgPack array.
- * \retval NULL if i >= box_tuple_field_count(tuple)
- * \retval msgpack otherwise
- */
-API_EXPORT const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t field_id);
-
-/**
- * Tuple iterator
- */
-typedef struct tuple_iterator box_tuple_iterator_t;
-
-/**
- * Allocate and initialize a new tuple iterator. The tuple iterator
- * allow to iterate over fields at root level of MsgPack array.
- *
- * Example:
- * \code
- * box_tuple_iterator *it = box_tuple_iterator(tuple);
- * if (it == NULL) {
- *      // error handling using box_error_last()
- * }
- * const char *field;
- * while (field = box_tuple_next(it)) {
- *      // process raw MsgPack data
- * }
- *
- * // rewind iterator to first position
- * box_tuple_rewind(it);
- * assert(box_tuple_position(it) == 0);
- *
- * // rewind iterator to first position
- * field = box_tuple_seek(it, 3);
- * assert(box_tuple_position(it) == 4);
- *
- * box_iterator_free(it);
- * \endcode
- *
- * \post box_tuple_position(it) == 0
- */
-API_EXPORT box_tuple_iterator_t *
-box_tuple_iterator(box_tuple_t *tuple);
-
-/**
- * Destroy and free tuple iterator
- */
-API_EXPORT void
-box_tuple_iterator_free(box_tuple_iterator_t *it);
-
-/**
- * Return zero-based next position in iterator.
- * That is, this function return the field id of field that will be
- * returned by the next call to box_tuple_next(it). Returned value is zero
- * after initialization or rewind and box_tuple_field_count(tuple)
- * after the end of iteration.
- *
- * \param it tuple iterator
- * \returns position.
- */
-API_EXPORT uint32_t
-box_tuple_position(box_tuple_iterator_t *it);
-
-/**
- * Rewind iterator to the initial position.
- *
- * \param it tuple iterator
- * \post box_tuple_position(it) == 0
- */
-API_EXPORT void
-box_tuple_rewind(box_tuple_iterator_t *it);
-
-/**
- * Seek the tuple iterator.
- *
- * The returned buffer is valid until next call to box_tuple_* API.
- * Requested field_no returned by next call to box_tuple_next(it).
- *
- * \param it tuple iterator
- * \param field_no field no - zero-based position in MsgPack array.
- * \post box_tuple_position(it) == field_no if returned value is not NULL
- * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
- * value is NULL.
- */
-API_EXPORT const char *
-box_tuple_seek(box_tuple_iterator_t *it, uint32_t field_no);
-
-/**
- * Return the next tuple field from tuple iterator.
- * The returned buffer is valid until next call to box_tuple_* API.
- *
- * \param it tuple iterator.
- * \retval NULL if there are no more fields.
- * \retval MsgPack otherwise
- * \pre box_tuple_position(it) is zerod-based id of returned field
- * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
- * value is NULL.
- */
-API_EXPORT const char *
-box_tuple_next(box_tuple_iterator_t *it);
-
-/** \endcond public */
 
 extern struct tuple *box_tuple_last;
 
@@ -858,6 +891,8 @@ box_tuple_field_u32(box_tuple_t *tuple, uint32_t field_no, uint32_t deflt)
 		return mp_decode_uint(&field);
 	return deflt;
 }
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

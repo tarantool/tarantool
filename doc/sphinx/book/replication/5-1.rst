@@ -1,24 +1,21 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
-    ... ...
-    tarantool> s:insert{1,'Tuple inserted on Terminal #1'}
+    <... ...>
+    tarantool> s:insert{1, 'Tuple inserted on Terminal #1'}
     ---
     - [1, 'Tuple inserted on Terminal #1']
     ...
-    tarantool> <b>os.exit()</b>
-    2014-10-13 11:45:20.455 [25585] main/101/relay/127.0.0.1:50884 I> done ./00000000000000000000.xlog'
-    2014-10-13 11:45:20.531 [25020] main/101/spawner I> Exiting: master shutdown
-    2014-10-13 11:45:20.531 [25020] main/101/spawner I> sending signal 15 to 1 children
-    2014-10-13 11:45:20.531 [25020] main/101/spawner I> waiting for children for up to 5 seconds
-    ~/tarantool_test_node_1$ <b>ls -l ~/tarantool_test_node_1</b>
+    tarantool> os.exit()
+    <...> [25585] main/101/relay/127.0.0.1:50884 I> done ./00000000000000000000.xlog'
+    <...> [25020] main/101/spawner I> Exiting: master shutdown
+    <...> [25020] main/101/spawner I> sending signal 15 to 1 children
+    <...> [25020] main/101/spawner I> waiting for children for up to 5 seconds
+    $ ls -l ~/tarantool_test_node_1
     total 8
     -rw-rw-r-- 1  1781 Oct 13 11:12 00000000000000000000.snap
     -rw-rw-r-- 1   518 Oct 13 11:45 00000000000000000000.xlog
-    ~/tarantool_test_node_1$ <b>ls -l ~/tarantool_test_node_2/</b>
+    $ ls -l ~/tarantool_test_node_2/
     total 8
     -rw-rw-r-- 1  1781 Oct 13 11:20 00000000000000000000.snap
     -rw-rw-r-- 1   588 Oct 13 11:38 00000000000000000000.xlog
-    ~/tarantool_test_node_1$
-    </pre>
-
+    $ 

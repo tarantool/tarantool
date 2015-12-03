@@ -11,7 +11,8 @@ one can run tests and then use the results for statistics, decision-making, and 
 
 .. function:: test(test-name)
 
-    Initialize. |br|
+    Initialize.
+
     The result of ``tap.test`` is an object, which will be called taptest
     in the rest of this discussion, which is necessary for
     ``taptest:plan()`` and all the other methods.
@@ -64,25 +65,27 @@ one can run tests and then use the results for statistics, decision-making, and 
         :return: true or false.
         :rtype:  boolean
 
-        Example:
+        **Example:**
 
-        | :codenormal:`tarantool>` :codebold:`taptest:ok(true,'x')`
-        | :codenormal:`ok - x`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`tap = require('tap')`
-        | :codenormal:`---`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`taptest = tap.test('test-name')`
-        | :codenormal:`TAP version 13`
-        | :codenormal:`---`
-        | :codenormal:`...`
-        | :codenormal:`tarantool>` :codebold:`taptest:ok(1 + 1 == 2, 'X')`
-        | :codenormal:`ok - X`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        .. code-block:: tarantoolsession
+
+            tarantool> taptest:ok(true, 'x')
+            ok - x
+            ---
+            - true
+            ...
+            tarantool> tap = require('tap')
+            ---
+            ...
+            tarantool> taptest = tap.test('test-name')
+            TAP version 13
+            ---
+            ...
+            tarantool> taptest:ok(1 + 1 == 2, 'X')
+            ok - X
+            ---
+            - true
+            ...
 
     .. method:: fail(test-name)
 
@@ -104,13 +107,15 @@ one can run tests and then use the results for statistics, decision-making, and 
 
         :return: nil
 
-        Example:
+        **Example:**
 
-        | :codenormal:`tarantool>` :codebold:`taptest:skip('message')`
-        | :codenormal:`ok - message # skip`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        .. code-block:: tarantoolsession
+
+            tarantool> taptest:skip('message')
+            ok - message # skip
+            ---
+            - true
+            ...
 
     .. method:: is(got, expected, test-name)
 
@@ -191,7 +196,7 @@ Tarantool as a script processor by saying ./tap.lua.
 
 The output from the above script will look approximately like this:
 
-.. code-block:: none
+.. code-block:: tap
 
     TAP version 13
     1..2

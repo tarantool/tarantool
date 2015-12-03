@@ -30,7 +30,6 @@
  */
 #include "alter.h"
 #include "schema.h"
-#include "user_def.h"
 #include "user.h"
 #include "space.h"
 #include "memtx_index.h"
@@ -101,9 +100,9 @@ access_check_ddl(uint32_t owner_uid)
 	 * ALTER privilege.
 	 */
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
-		struct user *user = user_cache_find(cr->uid);
+		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", user->name);
+			  "Create or drop", user->def.name);
 	}
 }
 
@@ -188,7 +187,7 @@ err:
 		p += snprintf(p, e - p, i ? ", %s" : "%s", type_name);
 	}
 	const char *expected;
-	if (is_166plus) {
+	if (*is_166plus) {
 		expected = "space id (number), index id (number), "
 			"name (string), type (string), "
 			"options (map), parts (array)";
@@ -469,7 +468,7 @@ public:
 template <typename T> T *
 AlterSpaceOp::create()
 {
-	return new (region_alloc0_xc(&fiber()->gc, sizeof(T))) T;
+	return new (region_calloc_object_xc(&fiber()->gc, T)) T;
 }
 
 void
@@ -486,7 +485,7 @@ static struct trigger *
 txn_alter_trigger_new(trigger_f run, void *data)
 {
 	struct trigger *trigger = (struct trigger *)
-		region_alloc0_xc(&fiber()->gc, sizeof(*trigger));
+		region_calloc_object_xc(&fiber()->gc, struct trigger);
 	trigger->run = run;
 	trigger->data = data;
 	trigger->destroy = NULL;
@@ -509,8 +508,8 @@ struct alter_space {
 struct alter_space *
 alter_space_new()
 {
-	struct alter_space *alter = (struct alter_space *)
-		region_alloc0_xc(&fiber()->gc, sizeof(*alter));
+	struct alter_space *alter =
+		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	return alter;
 }
@@ -1399,7 +1398,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 bool
 user_has_data(struct user *user)
 {
-	uint32_t uid = user->uid;
+	uint32_t uid = user->def.uid;
 	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
@@ -1555,11 +1554,11 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_user->owner);
+		access_check_ddl(old_user->def.owner);
 		/* Can't drop guest or super user */
 		if (uid == GUEST || uid == ADMIN || uid == PUBLIC) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name,
+				  old_user->def.name,
 				  "the user is a system user");
 		}
 		/*
@@ -1568,7 +1567,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 */
 		if (user_has_data(old_user)) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name, "the user has objects");
+				  old_user->def.name, "the user has objects");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
@@ -1718,55 +1717,61 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user *grantor = user_cache_find(priv->grantor_id);
+	struct user *grantor = user_find_xc(priv->grantor_id);
 	/* May be a role */
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
 	}
-	access_check_ddl(grantor->uid);
+	access_check_ddl(grantor->def.uid);
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		if (grantor->uid != ADMIN) {
+		if (grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (space->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func *func = func_cache_find(priv->object_id);
-		if (func->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (func->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  priv_name(priv->access),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_ROLE:
 	{
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE) {
+		if (role == NULL || role->def.type != SC_ROLE) {
 			tnt_raise(ClientError, ER_NO_SUCH_ROLE,
-				  role ? role->name :
+				  role ? role->def.name :
 				  int2str(priv->object_id));
 		}
 		/*
 		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
-		if (role->owner != grantor->uid && grantor->uid != ADMIN &&
-		    (role->uid != PUBLIC || priv->access < PRIV_X)) {
+		if (role->def.owner != grantor->def.uid &&
+		    grantor->def.uid != ADMIN &&
+		    (role->def.uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  role->name, grantor->name);
+				  role->def.name, grantor->def.name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -1792,7 +1797,7 @@ grant_or_revoke(struct priv_def *priv)
 		return;
 	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE)
+		if (role == NULL || role->def.type != SC_ROLE)
 			return;
 		if (priv->access)
 			role_grant(grantee, role);
@@ -1941,8 +1946,6 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 			/* box.space._cluster:update(old, {{'=', 1, new}} */
 			cluster_del_server(old_id);
 			cluster_add_server(id, &uuid);
-		} else {
-			cluster_update_server(id, &uuid);
 		}
 	} else {
 		cluster_add_server(id, &uuid);
@@ -1974,6 +1977,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct txn *txn = (struct txn *) event;
 	txn_check_autocommit(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple != NULL) {
 		/* Check fields */
@@ -1987,6 +1991,19 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 		if (tt_uuid_is_nil(&server_uuid))
 			tnt_raise(ClientError, ER_INVALID_UUID,
 				  tt_uuid_str(&server_uuid));
+		if (old_tuple != NULL) {
+			/*
+			 * Forbid UUID changing for registered server:
+			 * it requires an extra effort to keep _cluster
+			 * in sync with appliers and relays.
+			 */
+			tt_uuid old_uuid = tuple_field_uuid(old_tuple, 1);
+			if (!tt_uuid_is_equal(&server_uuid, &old_uuid)) {
+				tnt_raise(ClientError, ER_UNSUPPORTED,
+					  "Space _cluster",
+					  "updates of server uuid");
+			}
+		}
 	}
 
 	struct trigger *on_commit =

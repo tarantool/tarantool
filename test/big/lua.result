@@ -1,3 +1,10 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
+---
+- true
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -586,7 +593,7 @@ space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['i1']:count(function() end)
 ---
-- error: 'builtin/msgpackffi.lua:226: can not encode Lua type: ''function'''
+- error: 'builtin/msgpackffi.lua: can not encode Lua type: ''function'''
 ...
 space:drop()
 ---

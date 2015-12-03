@@ -273,7 +273,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
-					       region_alloc_ex_cb,
+					       region_alloc_xc_cb,
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
@@ -336,7 +336,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	} else {
 		/* Update the tuple. */
 		struct tuple *new_tuple =
-			tuple_upsert(space->format, region_alloc_ex_cb,
+			tuple_upsert(space->format, region_alloc_xc_cb,
 				     &fiber()->gc, old_tuple,
 				     request->ops, request->ops_end,
 				     request->index_base);
@@ -1072,8 +1072,7 @@ checkpoint_add_space(struct space *sp, void *data)
 		return;
 	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
-	entry = (struct checkpoint_entry *)
-		region_alloc_xc(&fiber()->gc, sizeof(*entry));
+	entry = region_alloc_object_xc(&fiber()->gc, struct checkpoint_entry);
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
@@ -1113,8 +1112,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 {
 	assert(m_checkpoint == 0);
 
-	m_checkpoint = (struct checkpoint *)
-		region_alloc_xc(&fiber()->gc, sizeof(*m_checkpoint));
+	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
 	checkpoint_init(m_checkpoint, ::recovery, lsn);
 	space_foreach(checkpoint_add_space, m_checkpoint);

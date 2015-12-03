@@ -39,8 +39,8 @@
 #include <rmean.h>
 #include "main.h"
 #include "tuple.h"
-#include "lua/call.h"
 #include "session.h"
+#include "func.h"
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
@@ -57,6 +57,9 @@
 #include "coio.h"
 #include "cluster.h" /* replica */
 #include "title.h"
+#include "lua/call.h" /* box_lua_call */
+#include "iproto_port.h"
+#include "xrow.h"
 
 static char status[64] = "unknown";
 
@@ -663,12 +666,172 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
 	class MemtxIndex *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
-	index->initIterator(it, ITER_LE, NULL, 0);
-	struct tuple *tuple = it->next(it);
+	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
 	/** Assign a new server id. */
-	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	uint32_t server_id = 1;
+	while ((tuple = it->next(it))) {
+		if (tuple_field_u32(tuple, 0) != server_id)
+			break;
+		server_id++;
+	}
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
+}
+
+static inline struct func *
+access_check_func(const char *name, uint32_t name_len)
+{
+	struct func *func = func_by_name(name, name_len);
+	struct credentials *credentials = current_user();
+	/*
+	 * If the user has universal access, don't bother with checks.
+	 * No special check for ADMIN user is necessary
+	 * since ADMIN has universal access.
+	 */
+	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
+		return func;
+	uint8_t access = PRIV_X & ~credentials->universal_access;
+	if (func == NULL || (func->def.uid != credentials->uid &&
+	     access & ~func->access[credentials->auth_token].effective)) {
+		/* Access violation, report error. */
+		char name_buf[BOX_NAME_MAX + 1];
+		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
+		struct user *user = user_find_xc(credentials->uid);
+		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
+			  priv_name(access), user->def.name, name_buf);
+	}
+
+	return func;
+}
+
+int
+func_call(struct func *func, struct request *request, struct obuf *out)
+{
+	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	if (func->func == NULL)
+		func_load(func);
+
+	/* Create a call context */
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	box_function_ctx_t ctx = { request, &port_buf.base };
+
+	/* Clear all previous errors */
+	diag_clear(&fiber()->diag);
+	assert(!in_txn()); /* transaction is not started */
+	/* Call function from the shared library */
+	int rc = func->func(&ctx, request->tuple, request->tuple_end);
+	if (rc != 0) {
+		if (diag_last_error(&fiber()->diag) == NULL) {
+			/* Stored procedure forget to set diag  */
+			diag_set(ClientError, ER_PROC_C, "unknown error");
+		}
+		goto error;
+	}
+
+	/* Push results to obuf */
+	struct obuf_svp svp;
+	if (iproto_prepare_select(out, &svp) != 0)
+		goto error;
+
+	for (struct port_buf_entry *entry = port_buf.first;
+	     entry != NULL; entry = entry->next) {
+		if (tuple_to_obuf(entry->tuple, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
+		}
+	}
+	iproto_reply_select(out, &svp, request->header->sync,
+			    port_buf.size);
+
+	port_buf_destroy(&port_buf);
+
+	return 0;
+
+error:
+	port_buf_destroy(&port_buf);
+	txn_rollback();
+	return -1;
+}
+
+void
+box_process_call(struct request *request, struct obuf *out)
+{
+	/**
+	 * Find the function definition and check access.
+	 */
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+	struct func *func = access_check_func(name, name_len);
+	/*
+	 * Sic: func == NULL means that perhaps the user has a global
+	 * "EXECUTE" privilege, so no specific grant to a function.
+	 */
+
+	/**
+	 * Change the current user id if the function is
+	 * a set-definer-uid one. If the function is not
+	 * defined, it's obviously not a setuid one.
+	 */
+	struct credentials *orig_credentials = NULL;
+	if (func && func->def.setuid) {
+		orig_credentials = current_user();
+		/* Remember and change the current user id. */
+		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
+			/*
+			 * Fill the cache upon first access, since
+			 * when func is created, no user may
+			 * be around to fill it (recovery of
+			 * system spaces from a snapshot).
+			 */
+			struct user *owner = user_find_xc(func->def.uid);
+			credentials_init(&func->owner_credentials, owner);
+		}
+		fiber_set_user(fiber(), &func->owner_credentials);
+	}
+
+	int rc;
+	if (func && func->def.language == FUNC_LANGUAGE_C) {
+		rc = func_call(func, request, out);
+	} else {
+		rc = box_lua_call(request, out);
+	}
+	/* Restore the original user */
+	if (orig_credentials)
+		fiber_set_user(fiber(), orig_credentials);
+
+	if (rc != 0) {
+		txn_rollback();
+		diag_raise();
+	}
+
+	if (in_txn()) {
+		/* The procedure forgot to call box.commit() */
+		say_warn("a transaction is active at return from '%.*s'",
+			name_len, name);
+		txn_rollback();
+	}
+}
+
+void
+box_process_eval(struct request *request, struct obuf *out)
+{
+	/* Check permissions */
+	access_check_universe(PRIV_X);
+	if (box_lua_eval(request, out) != 0) {
+		txn_rollback();
+		diag_raise();
+	}
+
+	if (in_txn()) {
+		/* The procedure forgot to call box.commit() */
+		const char *expr = request->key;
+		uint32_t expr_len = mp_decode_strl(&expr);
+		say_warn("a transaction is active at return from EVAL '%.*s'",
+			expr_len, expr);
+		txn_rollback();
+	}
 }
 
 void
@@ -762,8 +925,6 @@ box_free(void)
 		schema_free();
 		tuple_free();
 		port_free();
-		rmean_delete(rmean_error);
-		rmean_delete(rmean_box);
 #endif
 		engine_shutdown();
 	}
@@ -811,6 +972,8 @@ thread_pool_trim()
 static inline void
 box_init(void)
 {
+	error_init();
+
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_geti("slab_alloc_maximal"),

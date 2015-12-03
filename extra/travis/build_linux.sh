@@ -4,5 +4,5 @@ sudo apt-get -q install libmysqlclient-dev libpq-dev postgresql-server-dev-all
 sudo pip install six==1.9.0
 sudo pip install gevent
 sudo pip install geventconnpool
-mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
 make -j8

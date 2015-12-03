@@ -18,42 +18,53 @@ Here is how to create a simple test database after installing.
 
 Create a new directory. It's just for tests, you can delete it when the tests are over.
 
-| :codenormal:`$` :codebold:`mkdir` :codebolditalic:`~/tarantool_sandbox`
-| :codenormal:`$` :codebold:`cd` :codebolditalic:`~/tarantool_sandbox`
+.. code-block:: console
+
+    $ mkdir ~/tarantool_sandbox
+    $ cd ~/tarantool_sandbox
 
 Start the server. The server name is tarantool.
 
-| :codenormal:`$ #if you downloaded a binary with apt-get or yum, say this:`
-| :codenormal:`$` :codebold:`/usr/bin/tarantool`
-| :codenormal:`$ #if you downloaded and untarred a binary tarball to ~/tarantool, say this:`
-| :codenormal:`$` :codebold:`~/tarantool/bin/tarantool`
-| :codenormal:`$ #if you built from a source download, say this:`
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+.. code-block:: console
+
+    $ # if you downloaded a binary with apt-get or yum, say this:
+    $ /usr/bin/tarantool
+    $ # if you downloaded and untarred a binary
+    $ # tarball to ~/tarantool, say this:
+    $ ~/tarantool/bin/tarantool
+    $ # if you built from a source download, say this:
+    $ ~/tarantool/src/tarantool
 
 The server starts in interactive mode and outputs a command prompt.
 To turn on the database, :mod:`configure <box.cfg>` it. This minimal example is sufficient:
 
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
+.. code-block:: tarantoolsession
+
+    tarantool> box.cfg{listen = 3301}
 
 If all goes well, you will see the server displaying progress as it
 initializes, something like this:
 
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen=3301}`
-| :codenormal:`2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b`
-| :codenormal:`2014-08-07 09:41:41.077 ... log level 5`
-| :codenormal:`2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...`
-| :codenormal:`2014-08-07 09:41:41.079 ... initialized`
-| :codenormal:`2014-08-07 09:41:41.081 ... initializing an empty data directory`
-| :codenormal:`2014-08-07 09:41:41.095 ... creating './00000000000000000000.snap.inprogress'`
-| :codenormal:`2014-08-07 09:41:41.095 ... saving snapshot './00000000000000000000.snap.inprogress'`
-| :codenormal:`2014-08-07 09:41:41.127 ... done`
-| :codenormal:`2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301`
-| :codenormal:`2014-08-07 09:41:41.128 ... ready to accept requests`
+.. code-block:: tarantoolsession
+
+    tarantool> box.cfg{listen = 3301}
+    2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b
+    2014-08-07 09:41:41.077 ... log level 5
+    2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
+    2014-08-07 09:41:41.079 ... initialized
+    2014-08-07 09:41:41.081 ... initializing an empty data directory
+    2014-08-07 09:41:41.095 ... creating './00000000000000000000.snap.inprogress'
+    2014-08-07 09:41:41.095 ... saving snapshot './00000000000000000000.snap.inprogress'
+    2014-08-07 09:41:41.127 ... done
+    2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301
+    2014-08-07 09:41:41.128 ... ready to accept requests
 
 Now that the server is up, you could start up a different shell
 and connect to its primary port with:
 
-| :codenormal:`$` :codebold:`telnet 0 3301`
+.. code-block:: console
+
+    $ telnet 0 3301
 
 but for example purposes it is simpler to just leave the server
 running in "interactive mode". On production machines the
@@ -63,47 +74,59 @@ this manual. Tarantool is waiting for the user to type instructions.
 
 To create the first space and the first :ref:`index <box.index>`, try this:
 
-| :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('tester')`
-| :codenormal:`tarantool>`:codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
+.. code-block:: tarantoolsession
+
+    tarantool> s = box.schema.space.create('tester')
+    tarantool> s:create_index('primary', {
+             >   type = 'hash',
+             >   parts = {1, 'NUM'}
+             > })
 
 To insert three “tuples” (our name for “records”) into the first “space” of the database try this:
 
-| :codenormal:`tarantool>` :codebold:`t = s:insert({1})`
-| :codenormal:`tarantool>` :codebold:`t = s:insert({2, 'Music'})`
-| :codenormal:`tarantool>` :codebold:`t = s:insert({3, 'Length', 93})`
+.. code-block:: tarantoolsession
+
+    tarantool> t = s:insert({1})
+    tarantool> t = s:insert({2, 'Music'})
+    tarantool> t = s:insert({3, 'Length', 93})
 
 To select a tuple from the first space of the database, using the first defined key, try this:
 
-| :codenormal:`tarantool>` :codebold:`s:select{3}`
+.. code-block:: tarantoolsession
+
+    tarantool> s:select{3}
 
 Your terminal screen should now look like this:
 
-| :codenormal:`tarantool>` :codebold:`s = box.schema.space.create('tester')`
-| :codenormal:`2014-06-10 12:04:18.158 ... creating './00000000000000000002.xlog.inprogress'`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>`:codebold:`s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`t = s:insert{1}`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`t = s:insert{2, 'Music'}`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`t = s:insert{3, 'Length', 93}`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`s:select{3}`
-| :codenormal:`---`
-| :codenormal:`- - [3, 'Length', 93]`
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>`
+.. code-block:: tarantoolsession
+
+    tarantool> s = box.schema.space.create('tester')
+    2014-06-10 12:04:18.158 ... creating './00000000000000000002.xlog.inprogress'
+    ---
+    ...
+    tarantool>s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+    ---
+    ...
+    tarantool> t = s:insert{1}
+    ---
+    ...
+    tarantool> t = s:insert{2, 'Music'}
+    ---
+    ...
+    tarantool> t = s:insert{3, 'Length', 93}
+    ---
+    ...
+    tarantool> s:select{3}
+    ---
+    - - [3, 'Length', 93]
+    ...
+    tarantool> 
 
 Now, to prepare for the example in the next section, try this:
 
-| :codenormal:`tarantool>`:codebold:`box.schema.user.grant('guest','read,write,execute','universe')`
+.. code-block:: tarantoolsession
+
+    tarantool> box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 .. _tarantool.org/dist/stable: http://tarantool.org/dist/stable
 .. _tarantool.org/dist/master: http://tarantool.org/dist/master
@@ -113,7 +136,7 @@ Now, to prepare for the example in the next section, try this:
         Starting another Tarantool instance and connecting remotely
 =====================================================================
 
-In the previous section the first request was with :code:`box.cfg{listen=3301}`.
+In the previous section the first request was with :code:`box.cfg{listen = 3301}`.
 The :code:`listen` value can be any form of URI (uniform resource identifier);
 in this case it's just a local port: port 3301.
 It's possible to send requests to the listen URI via (a) telnet,
@@ -126,18 +149,23 @@ There is no need to use cd to switch to the :code:`~/tarantool_sandbox` director
 
 Start the second instance of Tarantool. The server name is tarantool.
 
-| :codenormal:`$ #if you downloaded a binary with apt-get or yum, say this:`
-| :codenormal:`$` :codebold:`/usr/bin/tarantool`
-| :codenormal:`$ #if you downloaded and untarred a binary tarball to ~/tarantool, say this:`
-| :codenormal:`$` :codebold:`~/tarantool/bin/tarantool`
-| :codenormal:`$ #if you built from a source download, say this:`
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool`
+.. code-block:: console
+
+    $ # if you downloaded a binary with apt-get or yum, say this:
+    $ /usr/bin/tarantool
+    $ # if you downloaded and untarred a
+    $ # binary tarball to ~/tarantool, say this:
+    $ ~/tarantool/bin/tarantool
+    $ # if you built from a source download, say this:
+    $ ~/tarantool/src/tarantool
 
 Try these requests:
 
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.connect('localhost:3301')`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:select{2}`
+.. code-block:: tarantoolsession
+
+    tarantool> console = require('console')
+    tarantool> console.connect('localhost:3301')
+    tarantool> box.space.tester:select{2}
 
 The requests are saying "use the :ref:`console package <package-console>`
 to connect to the Tarantool server that's listening
@@ -146,23 +174,22 @@ and display the result." The result in this case is
 one of the tuples that was inserted earlier.
 Your terminal screen should now look like this:
 
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`---`
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>` :codebold:`console.connect('localhost:3301')`
-| :codenormal:`2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301`
-| :codenormal:`---`
-| :codenormal:`...`
-|
-| :codenormal:`localhost:3301>` :codebold:`box.space.tester:select{2}`
-| :codenormal:`---`
-| :codenormal:`- - [2, 'Music']`
-| :codenormal:`...`
-|
-| :codenormal:`localhost:3301>`
+...
+
+.. code-block:: tarantoolsession
+
+    tarantool> console = require('console')
+    ---
+    ...
+    tarantool> console.connect('localhost:3301')
+    2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
+    ---
+    ...
+    localhost:3301> box.space.tester:select{2}
+    ---
+    - - [2, 'Music']
+    ...
+    localhost:3301> 
 
 You can repeat :code:`box.space...:insert{}` and :code:`box.space...:select{}`
 indefinitely, on either Tarantool instance.
@@ -176,4 +203,3 @@ To review ... If you followed all the instructions
 in this chapter, then so far you have: installed Tarantool
 from either a binary or a source repository,
 started up the Tarantool server, inserted and selected tuples.
-

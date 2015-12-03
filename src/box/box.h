@@ -32,6 +32,8 @@
  */
 #include "trivia/util.h"
 
+#include <stdbool.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -43,6 +45,9 @@ extern "C" {
  */
 
 struct port;
+struct request;
+struct xrow_header;
+struct obuf;
 
 /** To be called at program start. */
 void box_load_cfg();
@@ -80,6 +85,12 @@ void
 box_process_auth(struct request *request);
 
 void
+box_process_call(struct request *request, struct obuf *out);
+
+void
+box_process_eval(struct request *request, struct obuf *out);
+
+void
 box_process_join(int fd, struct xrow_header *header);
 
 void
@@ -105,8 +116,6 @@ void box_set_readahead(void);
 }
 #endif /* defined(__cplusplus) */
 
-struct request;
-struct port;
 struct box_function_ctx {
 	struct request *request;
 	struct port *port;

@@ -35,6 +35,7 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
+#if defined(__cplusplus)
 /**
  * XlogError is raised when there is an error with contents
  * of the data directory or a log file. A special subclass
@@ -58,6 +59,9 @@ struct XlogGapError: public XlogError
 		  const struct vclock *to);
 	virtual void raise() { throw this; }
 };
+
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /* {{{ log dir */
 
@@ -138,6 +142,9 @@ struct xdir {
 	enum xdir_type type;
 };
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 /**
  * Initialize a log dir.
  */
@@ -165,6 +172,9 @@ xdir_scan(struct xdir *dir);
  */
 void
 xdir_check(struct xdir *dir);
+
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /* }}} */
 
@@ -204,7 +214,7 @@ struct xlog {
 	 * when a DBA has manually moved a few logs around
 	 * and messed the data directory up.
 	 */
-	tt_uuid server_uuid;
+	struct tt_uuid server_uuid;
 	/**
 	 * Text file header: vector clock taken at the time
 	 * this file was created. For WALs, this is vector
@@ -213,6 +223,9 @@ struct xlog {
 	 */
 	struct vclock vclock;
 };
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * Open an existing log file or snapshot for reading.
@@ -319,5 +332,7 @@ int
 xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
 /** }}} */
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_XLOG_H_INCLUDED */

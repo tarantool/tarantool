@@ -24,10 +24,12 @@ add_library(box
     errcode.c
     error.cc
     xrow.cc
+    xrow_io.cc
     xlog.cc
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
+    tuple_compare.cc
     key_def.cc
     index.cc
     memtx_index.cc
@@ -50,7 +52,7 @@ add_library(box
     request.cc
     txn.cc
     box.cc
-    user_def.cc
+    user_def.c
     user.cc
     authentication.cc
     vclock.c
@@ -60,17 +62,19 @@ add_library(box
     relay.cc
     wal.cc
     ${lua_sources}
-    lua/call.cc
-    lua/tuple.cc
-    lua/slab.cc
-    lua/index.cc
+    lua/init.c
+    lua/call.c
+    lua/tuple.c
+    lua/slab.c
+    lua/index.c
     lua/space.cc
-    lua/info.cc
-    lua/stat.cc
-    lua/sophia.cc
+    lua/misc.cc
+    lua/info.c
+    lua/stat.c
+    lua/sophia.c
     lua/error.cc
-    lua/session.cc
-    lua/net_box.cc
+    lua/session.c
+    lua/net_box.c
     ${bin_sources})
 
 target_link_libraries(box ${sophia_lib})

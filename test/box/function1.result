@@ -130,7 +130,7 @@ box.schema.user.grant('guest', 'execute', 'function', 'function1.errors')
 ...
 c:call('function1.errors')
 ---
-- error: unknown procedure error
+- error: unknown error
 ...
 box.schema.func.drop("function1.errors")
 ---

@@ -793,7 +793,7 @@ s:update({0}, {{'+', 0}})
 ...
 s:update({0}, {{'+', '+', '+'}})
 ---
-- error: Illegal parameters, update fieldno option name must be numeric
+- error: Illegal parameters, field id must be a number
 ...
 s:update({0}, {{0, 0, 0}})
 ---

@@ -112,7 +112,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	if (format) {
 		try {
 			tuple_init_field_map(format, tuple, (uint32_t *)tuple);
-		} catch (...) {
+		} catch (Exception *e) {
 			tuple_delete(tuple);
 			throw;
 		}
@@ -451,9 +451,9 @@ sophia_upsert_to_sophia(struct key_def *key_def, char *dest, int dest_size,
 }
 
 static inline char*
-sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
+sophia_upsert_default(struct key_def *key_def, char *update,
                       uint32_t *origin_keysize,
-                      uint32_t *size, struct sophia_mempool *pool)
+                      uint32_t *size)
 {
 	/* calculate keysize */
 	struct sophiaref *ref = (struct sophiaref *)update;
@@ -465,27 +465,10 @@ sophia_upsert_default(struct key_def *key_def, char *update, int update_size,
 	}
 	/* upsert using default tuple */
 	char *p = update + *origin_keysize;
-	uint8_t index_base = *(uint32_t *)p;
-	p += sizeof(uint8_t);
-	uint32_t default_tuple_size = *(uint32_t *)p;
+	p += sizeof(uint8_t);   /* index base */
+	*size = *(uint32_t *)p; /* tuple size */
 	p += sizeof(uint32_t);
-	char *default_tuple = p;
-	char *default_tuple_end = p + default_tuple_size;
-	p += default_tuple_size;
-	char *expr = p;
-	char *expr_end = update + update_size;
-	const char *up;
-	try {
-		up = tuple_upsert_execute(sophia_update_alloc, pool,
-		                          expr,
-		                          expr_end,
-		                          default_tuple,
-		                          default_tuple_end,
-		                          size, index_base);
-	} catch (...) {
-		return NULL;
-	}
-	return (char *)up;
+	return p;
 }
 
 static inline char*
@@ -513,7 +496,7 @@ sophia_upsert(char *src, int src_size, char *update, int update_size,
 		                          src,
 		                          src + src_size,
 		                          size, index_base);
-	} catch (...) {
+	} catch (Exception *e) {
 		return NULL;
 	}
 	return (char *)up;
@@ -548,8 +531,7 @@ sophia_update(int origin_flags, char *origin, int origin_size,
 		free(src);
 	} else {
 		/* use default tuple from update */
-		dest = sophia_upsert_default(key_def, update, update_size,
-		                             &origin_keysize, &dest_size, &p);
+		dest = sophia_upsert_default(key_def, update, &origin_keysize, &dest_size);
 		origin = update;
 	}
 	if (dest == NULL) {

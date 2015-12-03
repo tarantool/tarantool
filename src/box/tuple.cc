@@ -198,7 +198,7 @@ tuple_format_new(struct rlist *key_list)
 		tuple_format_register(format);
 		field_type_create(format->types, format->field_count,
 				  key_list);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_format_delete(format);
 		throw;
 	}
@@ -542,7 +542,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	memcpy(new_tuple->data, data, tuple_len);
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;
 	}
@@ -586,7 +586,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 }
 
 int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def)
 {
 	if (key_def->part_count == 1 && key_def->parts[0].fieldno == 0) {
@@ -619,7 +619,7 @@ int
 tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		  const struct key_def *key_def)
 {
-	int r = tuple_compare(tuple_a, tuple_b, key_def);
+	int r = key_def->tuple_compare(tuple_a, tuple_b, key_def);
 	if (r == 0)
 		r = tuple_a < tuple_b ? -1 : tuple_a > tuple_b;
 
@@ -627,7 +627,7 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 }
 
 int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
+tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
 {
 	assert(key != NULL || part_count == 0);
@@ -879,4 +879,32 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
+}
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_end)
+{
+	try {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tuple *new_tuple = tuple_update(tuple_format_ber,
+			region_alloc_xc_cb, &fiber()->gc, tuple,
+			expr, expr_end, 1);
+		return tuple_bless(new_tuple);
+	} catch (ClientError *e) {
+		return NULL;
+	}
+}
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_end)
+{
+	try {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
+			region_alloc_xc_cb, &fiber()->gc, tuple,
+			expr, expr_end, 1);
+		return tuple_bless(new_tuple);
+	} catch (ClientError *e) {
+		return NULL;
+	}
 }

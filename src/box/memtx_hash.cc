@@ -54,7 +54,7 @@ equal_key(struct tuple *tuple, const char *key,
 		const struct key_def *key_def)
 {
 	return tuple_compare_with_key(tuple, key, key_def->part_count,
-				      key_def) == 0;
+					       key_def) == 0;
 }
 
 static inline uint32_t

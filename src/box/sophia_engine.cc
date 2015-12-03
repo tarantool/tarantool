@@ -171,7 +171,7 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	/* Do tuple update */
 	struct tuple *new_tuple =
 		tuple_update(space->format,
-		             region_alloc_ex_cb,
+		             region_alloc_xc_cb,
 		             &fiber()->gc,
 		             old_tuple, request->tuple,
 		             request->tuple_end,
@@ -421,7 +421,7 @@ SophiaEngine::join(struct relay *relay)
 		struct key_def *key_def;
 		try {
 			key_def = sophia_join_key_def(env, db);
-		} catch (...) {
+		} catch (Exception *e) {
 			sp_destroy(db_cursor);
 			throw;
 		}
@@ -449,7 +449,7 @@ SophiaEngine::join(struct relay *relay)
 
 			try {
 				sophia_send_row(relay, key_def->space_id, tuple, tuple_size);
-			} catch (...) {
+			} catch (Exception *e) {
 				key_def_delete(key_def);
 				free(tuple);
 				sp_destroy(obj);

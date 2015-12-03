@@ -32,7 +32,18 @@
  */
 #include <trigger.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 struct lua_State;
+
+/**
+ * The job of lbox_push_event_f is to push trigger arguments
+ * to Lua stack.
+ */
+
+typedef int
+(*lbox_push_event_f)(struct lua_State *L, void *event);
 
 /**
  * Create a Lua trigger, replace an existing one,
@@ -46,7 +57,7 @@ struct lua_State;
  * needs to be updated. If it is not present or is nil, a new
  * trigger is created.
  * The argument just below the top must reference a Lua function
- * or closure for which the trigger needs to be set. 
+ * or closure for which the trigger needs to be set.
  * If argument below the top is nil, but argument at the top is an
  * existing trigger, it's erased.
  *
@@ -66,6 +77,10 @@ struct lua_State;
  */
 int
 lbox_trigger_reset(struct lua_State *L, int top,
-		   struct rlist *list, trigger_f run);
+		   struct rlist *list, lbox_push_event_f push_f);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LUA_TRIGGER_H */

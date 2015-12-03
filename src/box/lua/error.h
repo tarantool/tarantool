@@ -31,12 +31,16 @@
  * SUCH DAMAGE.
  */
 
-struct lua_State;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
+struct lua_State;
 void
 box_lua_error_init(struct lua_State *L);
 
-int
-lbox_error(struct lua_State *L);
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LUA_ERROR_H */

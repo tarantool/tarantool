@@ -1,18 +1,17 @@
-.. raw:: html
+.. code-block:: tarantoolsession
 
-    <pre>
-    ... ...
-    tarantool> s:select({1},{iterator='GE'})
+    <... ...>
+    tarantool> s:select({1}, {iterator = 'GE'})
     ---
     - - [1, 'Tuple inserted on Terminal #1']
     ...
-    tarantool> s:insert{2,'Tuple inserted on Terminal #2'}
+    tarantool> s:insert{2, 'Tuple inserted on Terminal #2'}
     ---
     - [2, 'Tuple inserted on Terminal #2']
     ...
-    tarantool> 2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 I> can't read row
-    2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 !> SystemError
-    unexpected EOF when reading from socket,
-    called on fd 10, aka 127.0.0.1:50884, peer of 127.0.0.1:3301: Broken pipe
-    2014-10-13 11:45:20.532 [25579] main/103/replica/localhost:3301 I> will retry every 1 second
-    </pre>
+    tarantool> 
+    <...> [25579] main/103/replica/localhost:3301 I> can't read row
+    <...> [25579] main/103/replica/localhost:3301 !> SystemError
+      unexpected EOF when reading from socket,
+      called on fd 10, aka 127.0.0.1:50884, peer of 127.0.0.1:3301: Broken pipe
+    <...> [25579] main/103/replica/localhost:3301 I> will retry every 1 second

@@ -12,11 +12,14 @@ line or in an initialization file.
 
 Tarantool is started by entering the command:
 
-| :codenormal:`$` :codebold:`tarantool`
-| :codenormal:`OR`
-| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`options`
-| :codenormal:`OR`
-| :codenormal:`$` :codebold:`tarantool` :codebolditalic:`Lua-initialization-file` :codebold:`[` :codebolditalic:`arguments` :codebold:`]`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    $ **tarantool**
+    # OR
+    $ **tarantool** *options*
+    # OR
+    $ **tarantool** *lua-initialization-file* **[** *arguments* **]**
 
 =====================================================================
                         Command options
@@ -32,10 +35,12 @@ Tarantool is started by entering the command:
 
     Print product name and version, for example:
 
-        | :codenormal:`$`  :codebold:`./tarantool --version`
-        | :codenormal:`Tarantool 1.6.3-439-g7e1011b`
-        | :codenormal:`Target: Linux-x86_64-Debug`
-        | :codenormal:`...`
+    .. code-block:: console
+
+        $ ./tarantool --version
+        Tarantool 1.6.3-439-g7e1011b
+        Target: Linux-x86_64-Debug
+        ...
 
     In this example:
 
@@ -61,7 +66,6 @@ Tarantool is started by entering the command:
 
 .. _git describe: http://www.kernel.org/pub/software/scm/git/docs/git-describe.html
 .. _git repository: http://github.com/tarantool/tarantool.git
-
 
 .. _URI:
 
@@ -126,21 +130,22 @@ and suppose the environment variable LISTEN_URI contains 3301,
 and suppose the command line is ``~/tarantool/src/tarantool script.lua ARG``.
 Then the screen might look like this:
 
-| :codenormal:`$` :codebold:`export LISTEN_URI=3301`
-| :codenormal:`$` :codebold:`~/tarantool/src/tarantool script.lua ARG`
-| :codenormal:`... main/101/script.lua C> version 1.6.3-439-g7e1011b`
-| :codenormal:`... main/101/script.lua C> log level 5`
-| :codenormal:`... main/101/script.lua I> mapping 107374184 bytes for a shared arena...`
-| :codenormal:`... main/101/script.lua I> recovery start`
-| :codenormal:`... main/101/script.lua I> recovering from './00000000000000000000.snap'`
-| :codenormal:`... main/101/script.lua I> primary: bound to 0.0.0.0:3301`
-| :codenormal:`... main/102/leave_local_hot_standby I> ready to accept requests`
-| :codenormal:`Starting  ARG`
-| :codenormal:`... main C> entering the event loop`
+.. code-block:: console
 
-If one wishes to start an interactive session
-on the same terminal after initialization is complete,
-one can use :ref:`console.start() <console-start>`.
+    $ export LISTEN_URI=3301
+    $ ~/tarantool/src/tarantool script.lua ARG
+    ... main/101/script.lua C> version 1.6.3-439-g7e1011b
+    ... main/101/script.lua C> log level 5
+    ... main/101/script.lua I> mapping 107374184 bytes for a shared arena...
+    ... main/101/script.lua I> recovery start
+    ... main/101/script.lua I> recovering from './00000000000000000000.snap'
+    ... main/101/script.lua I> primary: bound to 0.0.0.0:3301
+    ... main/102/leave_local_hot_standby I> ready to accept requests
+    Starting  ARG
+    ... main C> entering the event loop
+
+If one wishes to start an interactive session on the same terminal after
+initialization is complete, one can use :func:`console.start()`.
 
 .. _local_hot_standby:
 .. _replication_port:
@@ -156,7 +161,13 @@ one can use :ref:`console.start() <console-start>`.
                 Configuration parameters
 =====================================================================
 
-Configuration parameters have the form :codenormal:`box.cfg{` :codeitalic:`key = value` :codenormal:`[,` :codeitalic:`key = value` :codenormal:`...]}`.
+Configuration parameters have the form:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.cfg{ *key = value* [, *key = value* ...]]
+
 Since ``box.cfg`` may contain many configuration parameters and since some of the
 parameters (such as directory addresses) are semi-permanent, it's best to keep
 ``box.cfg`` in a Lua file. Typically this Lua file is the initialization file
@@ -229,7 +240,9 @@ the same computer with the same :func:`box.cfg` configuration settings -
 including the same directories and same non-null URIs. A warning should appear with a
 message like
 
-| :codenormal:`W> primary: [URI] is already in use, will retry binding after [n] seconds`
+.. code-block:: none
+
+    W> primary: [URI] is already in use, will retry binding after [n] seconds
 
 This is fine. It means that the second instance is ready to take over if the
 first instance goes down.

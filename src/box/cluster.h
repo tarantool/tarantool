@@ -81,6 +81,10 @@
  * and is implemented in @file vclock.h
  */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 void
 cluster_init(void);
 
@@ -90,9 +94,9 @@ cluster_free(void);
 /** {{{ Global cluster identifier API **/
 
 /** UUID of the cluster. */
-extern tt_uuid cluster_id;
+extern struct tt_uuid cluster_id;
 
-extern "C" struct vclock *
+struct vclock *
 cluster_clock();
 
 /* }}} */
@@ -105,6 +109,9 @@ cserver_id_is_reserved(uint32_t id)
         return id == 0;
 }
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 /**
  * Register the universally unique identifier of a remote server and
  * a matching cluster-local identifier in the  cluster registry.
@@ -114,12 +121,6 @@ cserver_id_is_reserved(uint32_t id)
  */
 void
 cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid);
-
-/*
- * Update UUID of a remote server
- */
-void
-cluster_update_server(uint32_t server_id, const struct tt_uuid *server_uuid);
 
 void
 cluster_del_server(uint32_t server_id);
@@ -131,6 +132,9 @@ cluster_del_server(uint32_t server_id);
 int
 cluster_set_appliers(struct applier **appliers, int count);
 
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct applier *
 cluster_applier_first(void);
 
@@ -141,5 +145,9 @@ cluster_applier_next(struct applier *applier);
 	for (struct applier *var = cluster_applier_first(); \
 	     var != NULL; var = cluster_applier_next(var))
 /** }}} **/
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif

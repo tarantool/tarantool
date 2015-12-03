@@ -1,7 +1,7 @@
 .. _box-authentication:
 
 -------------------------------------------------------------------------------
-                    Authentication and access control
+                              Access control
 -------------------------------------------------------------------------------
 
 Understanding the details of security is primarily an issue for administrators,
@@ -51,8 +51,13 @@ client application, read the `scramble.h`_ header file.
                 Users and the _user space
 ===========================================================
 
-The fields in the _user space are: the numeric id of the tuple, the numeric
-id of the tuple's creator, the user name, the type, and the optional password.
+The fields in the _user space are:
+
+* the numeric id of the tuple
+* the numeric id of the tuple's creator
+* the user name
+* the type
+* optional password
 
 There are four special tuples in the _user space: 'guest', 'admin', 'public', and 'replication'.
 
@@ -79,100 +84,160 @@ To select a row from the _user space, use ``box.space._user:select``. For
 example, here is what happens with a select for user id = 0, which is the
 'guest' user, which by default has no password:
 
-| :codenormal:`tarantool>` :codebold:`box.space._user:select{0}`
-| :codenormal:`---`
-| :codenormal:`- - [0, 1, 'guest', 'user']`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> box.space._user:select{0}
+    ---
+    - - [0, 1, 'guest', 'user']
+    ...
 
 To change tuples in the _user space, do not use ordinary ``box.space``
 functions for insert or update or delete - the _user space is special so
 there are special functions which have appropriate error checking.
 
-To create a new user, say :samp:`box.schema.user.create({user-name})` or
-:code:`box.schema.user.create(`:samp:`{user-name}`:code:`, {`:samp:`if_not_exists=true})` or
-:code:`box.schema.user.create(`:samp:`{user-name}`:code:`, {password=`:samp:`{password}`:code:`})`. The form
-:code:`box.schema.user.create(`:samp:`{user-name}`:code:`, {password=`:samp:`{password}`:code:`})` is better because
-in a :ref:`URI` (Uniform Resource Identifier) it is usually illegal to include a
-user-name without a password.
+To create a new user, say:
 
-To change the current user's password, say :samp:`box.schema.user.passwd({password})`.
+.. cssclass:: highlight
+.. parsed-literal::
 
-To change a different user's password, say :samp:`box.schema.user.passwd({user-name}, {password})`.
+    box.schema.user.create(*user-name*)
+    box.schema.user.create(*user-name*, {if_not_exists = true})
+    box.schema.user.create(*user-name*, {password = *password*}).
+
+Last form is better because in a :ref:`URI` (Uniform Resource Identifier) it is
+usually illegal to include a user-name without a password.
+
+To change the user's password, say:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    -- To change the current user's password
+    box.schema.user.passwd(*password*)
+
+    -- To change a different user's password
+    box.schema.user.passwd(*user-name*, *password*)
+
 (Only the admin user can perform this function.)
 
-To drop a user, say :samp:`box.schema.user.drop({user-name})`.
+To drop a user, say:
 
-To check whether a user exists, say :samp:`box.schema.user.exists({user-name})`,
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.user.drop(*user-name*).
+
+To check whether a user exists, say:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.user.exists(*user-name*)
+
 which returns true or false.
 
-To find what privileges a user has, say :samp:`box.schema.user.info({user-name})`.
+To find what privileges a user has, say:
 
-For example, here is a session which creates a new user with a strong password,
-selects a tuple in the _user space, and then drops the user.
+.. cssclass:: highlight
+.. parsed-literal::
 
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.create('JeanMartin', {password = 'Iwtso_6_os$$'})`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    |
-    | :codenormal:`tarantool>` :codebold:`box.space._user.index.name:select{'JeanMartin'}`
-    | :codenormal:`---`
-    | :codenormal:`- - [17, 1, 'JeanMartin', 'user', {'chap-sha1': 't3xjUpQdrt857O+YRvGbMY5py8Q='}]`
-    | :codenormal:`...`
-    |
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.drop('JeanMartin')`
-    | :codenormal:`---`
-    | :codenormal:`...`
+    box.schema.user.info(*user-name*)
 
-Notes: The maximum number of users is 32.
+**Example:**
+
+Here is a session which creates a new user with a strong password, selects a
+tuple in the _user space, and then drops the user.
+
+.. code-block:: tarantoolsession
+
+    tarantool> box.schema.user.create('JeanMartin', {password = 'Iwtso_6_os$$'})
+    ---
+    ...
+    tarantool> box.space._user_index.name:select{'JeanMartin'}
+    ---
+    - - [17, 1, 'JeanMartin', 'user', {'chap-sha1': 't3xjUpQdrt857O+YRvGbMY5py8Q='}]
+    ...
+    tarantool> box.schema.user.drop('JeanMartin')
+    ---
+    ...
+
+.. NOTE::
+
+    The maximum number of users is 32.
 
 ===========================================================
                Privileges and the _priv space
 ===========================================================
 
 The fields in the _priv space are:
-the numeric id of the user who gave the privilege ("grantor_id"),
-the numeric id of the user who received the privilege ("grantee_id"),
-the type of object - "space" or "function" or "universe",
-the numeric id of the object,
-the type of operation - "read" = 1, or "write" = 2, or
-"execute" = 4, or a combination such as "read,write,execute".
 
-The function for granting a privilege is: |br|
-:samp:`box.schema.user.grant({grantee-user-name-or-id}, {operation-type}, {object-type}, {object-name}[, {grant-option}])`
-or |br|
-:samp:`box.schema.user.grant({grantee-user-name-or-id}, {operation-type}, 'universe'[, {grant-option}])` |br|
-where 'universe' means 'all objects',
-and the optional grant-option can be :code:`{grantor=grantor_id}`,
-:code:`{if_not_exists=true|false}`, or both.
+* the numeric id of the user who gave the privilege ("grantor_id"),
+* the numeric id of the user who received the privilege ("grantee_id"),
+* the type of object - "space" or "function" or "universe",
+* the numeric id of the object,
+* the type of operation - "read" = 1, or "write" = 2, or "execute" = 4, or a
+  combination such as "read,write,execute".
 
-The function for revoking a privilege is: |br|
-:samp:`box.schema.user.revoke({grantee-user-name-or-id}, {operation-type}, {object-type}, {object-name}[, {revoke-option}])`
-or |br|
-:samp:`box.schema.user.revoke({grantee-user-name-or-id}, {operation-type}, 'universe'[, {revoke-option}])` |br|
-where the optional revoke-option can be :code:`{if_exists=true|false}`.
+The function for granting a privilege is:
+
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.user.grant(*grantee*, *operation*, *object-type*, *obejct-name*[, *options*])
+    -- OR
+    box.schema.user.grant(*grantee*, *operation*, 'universe' [, nil, *options*])
+
+where 'universe' means 'all objects', and the optional grant-option can be:
+
+* :samp:`grantor={grantor_name_or_id}` - string or number, for custom grantor
+* :samp:`if_not_exists=true|false` - bool, do not throw error if user is already blessed
+
+The function for revoking a privilege is:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.user.revoke(*grantee*, *operation*, *object-type*, *object-name*[, *options*])
+    box.schema.user.revoke(*grantee*, *operation*, 'universe'[, nil, *options*])
+
+where 'universe' means 'all objects', and the optional grant-option can be:
+
+* :samp:`if_not_exists=true|false` - bool, do not throw error if user is already blessed
 
 For example, here is a session where the admin user gave the guest user the
-privilege to read from a space named space55, and then took the privilege away:
+privilege to read from a space named ``space55``, and then took the privilege away:
 
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'read', 'space', 'space55')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.revoke('guest', 'read', 'space', 'space55')`
-    | :codenormal:`---`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
 
-Notes: Generally privileges are granted or revoked by the owner of the object (the
-user who created it), or by the 'admin' user. Before dropping any objects
-or users, steps should be taken to ensure that all their associated
-privileges have been revoked. Only the 'admin' user can grant privileges for the 'universe'.
+    tarantool> box.schema.user.grant('guest', 'read', 'space', 'space55')
+    ---
+    ...
+    tarantool> box.schema.user.revoke('guest', 'read', 'space', 'space55')
+    ---
+    ...
 
+.. NOTE::
+
+    Generally privileges are granted or revoked by the owner of the object
+    (the user who created it), or by the 'admin' user.
+    Before dropping any objects or users, steps should be taken to ensure
+    that all their associated privileges have been revoked.
+
+.. NOTE::
+
+    Only the 'admin' user can grant privileges for the 'universe'.
 
 ===========================================================
                 Functions and _func space
 ===========================================================
 
-The fields in the _func space are: the numeric function id, a number,
-the function name, a flag, and possibly a language name.
+The fields in the _func space are:
+
+* the numeric function id, a number,
+* the function name
+* flag
+* possibly a language name.
 
 The _func space does not include the function's body. One continues to
 create Lua functions in the usual way, by saying
@@ -180,54 +245,75 @@ create Lua functions in the usual way, by saying
 _func space. The _func space only exists for storing function tuples so
 that their names can be used within grant/revoke functions.
 
-The function for creating a _func tuple is: |br|
-:samp:`box.schema.func.create({function-name} [,` :code:`{options} ])`. |br|
-The possible options are: |br|
-:code:`if_not_exists={true|false}` -- default = false, |br|
-:code:`setuid={true|false}` -- default = false, |br|
-:code:`language={'LUA'|'C'}` -- default = 'LUA'. |br|
-Example: :code:`box.schema.func.create('f',{language='C',setuid=false})`.
+The function for creating a _func tuple is:
 
-Specifying :code:`if_not_exists=true` would cause "error: Function '...' already exists"
-if the function already exists.
+.. cssclass:: highlight
+.. parsed-literal::
 
-Specifying :code:`setuid=true`
-would cause the setuid flag (the fourth field in the _func tuple) to have
-a value meaning "true", and the effect of that is that the
-function's caller is treated as the function's creator,
-with full privileges. The setuid behavior does not apply for
-users who connect via :code:`console.connect`.
+    box.schema.func.create(*function-name* [, *options*])
 
-Specifying :code:`language='C'` would cause the language field
-(the fifth field in the _func tuple) to have a value 'C', 
-which means the function was written in C. Tarantool functions
-are normally written in Lua but can be written in C as well.
+The possible options are:
+
+* :samp:`if_not_exists = {true|false}` - default = false,
+* :samp:`setuid = {true|false}` - default = false,
+* :samp:`language = {'LUA'|'C'}` - default = 'LUA'.
+
+**Example:**
+
+.. code-block:: lua
+
+    box.schema.func.create('f', {language = 'C', setuid = false})
+
+Specifying :code:`if_not_exists=true` would cause ``error: Function '...' already
+exists`` if the function already exists.
+
+Specifying :code:`setuid=true` would cause the setuid flag (the fourth field in
+the _func tuple) to have a value meaning "true", and the effect of that is that
+the function's caller is treated as the function's creator, with full privileges.
+The setuid behavior does not apply for users who connect via :code:`console.connect`.
+
+Specifying :code:`language='C'` would cause the language field (the fifth field
+in the _func tuple) to have a value 'C', which means the function was written in
+C. Tarantool functions are normally written in Lua but can be written in C as well.
 
 The function for dropping a _func tuple is:
-:samp:`box.schema.func.drop({function-name})`.
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.func.drop(*function-name*)
 
 The function for checking whether a _func tuple exists is:
-:samp:`box.schema.func.exists({function-name})`.
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.schema.func.exists(*function-name*)
+
 
 In the following example, a function named 'f7' is created, then it is put in
 the _func space, then it is used in a ``box.schema.user.grant`` function,
 then it is dropped:
 
-    | :codenormal:`tarantool>` :codebold:`function f7() box.session.uid() end`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.schema.func.create('f7')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.grant('guest', 'execute', 'function', 'f7')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.schema.user.revoke('guest', 'execute', 'function', 'f7')`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`box.schema.func.drop('f7')`
-    | :codenormal:`---`
-    | :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> function f7()
+             >   box.session.uid()
+             > end
+    ---
+    ...
+    tarantool> box.schema.func.create('f7')
+    ---
+    ...
+    tarantool> box.schema.user.grant('guest', 'execute', 'function', 'f7')
+    ---
+    ...
+    tarantool> box.schema.user.revoke('guest', 'execute', 'function', 'f7')
+    ---
+    ...
+    tarantool> box.schema.func.drop('f7')
+    ---
+    ...
 
 ===========================================================
              ``box.session`` and security
@@ -237,9 +323,12 @@ After a connection has taken place, the user has access to a "session" object
 which has several functions. The ones which are of interest for security
 purposes are:
 
-    | :codenormal:`box.session.uid()         -- returns the id of the current user`
-    | :codenormal:`box.session.user()        -- returns the name of the current user`
-    | :codenormal:`box.session.su(user-name) -- allows changing current user to 'user-name'`
+.. cssclass:: highlight
+.. parsed-literal::
+
+    box.session.uid()         -- returns the id of the current user
+    box.session.user()        -- returns the name of the current user
+    box.session.su(*user-name*) -- allows changing current user to 'user-name'
 
 If a user types requests directly on the Tarantool server in its interactive
 mode, or if a user connects via telnet to the administrative port (using :ref:`admin <admin_port>`
@@ -253,14 +342,18 @@ admin might say:
 
 .. _connectors: :doc:`../connectors/index`
 
-    | :codenormal:`box.space._user:insert{123456,0,'manager','user'}`
-    | :codenormal:`box.schema.user.grant('manager', 'read', 'space', '_space')`
-    | :codenormal:`box.schema.user.grant('manager', 'read', 'space', 'payroll')`
+.. code-block:: lua
+
+    box.space._user:insert{123456,0,'manager','user'}
+    box.schema.user.grant('manager', 'read', 'space', '_space')
+    box.schema.user.grant('manager', 'read', 'space', 'payroll')
 
 and later a guest user, who wishes to see the payroll, might say:
 
-    | :codenormal:`box.session.su('manager')`
-    | :codenormal:`box.space.payroll:select{'Jones'}`
+.. code-block:: lua
+
+    box.session.su('manager')
+    box.space.payroll:select{'Jones'}
 
 ===========================================================
                          Roles
@@ -320,16 +413,16 @@ or indirectly.
 
     Revoke a role from a user.
 
-There are two predefined roles. The first predefined role, named 'public', is automatically assigned
-to new users when they are created with :samp:`box.schema.user.create({user-name})` --
-Therefore a convenient way to grant 'read' on space 't' to every user that
-will ever exist is: :code:`box.schema.role.grant('public','read','space','t')`.
-The second predefined role, named 'replication', can be assigned
-by the 'admin' user to users who need to use
-replication features.
+There are two predefined roles. The first predefined role, named 'public', is
+automatically assigned to new users when they are created with
+:samp:`box.schema.user.create({user-name})` - Therefore a convenient way to
+grant 'read' on space 't' to every user that will ever exist is:
+:code:`box.schema.role.grant('public','read','space','t')`. The second
+predefined role, named 'replication', can be assigned by the 'admin' user to
+users who need to use replication features.
 
 ================================================================
-                         Example showing a role within a role
+        Example showing a role within a role
 ================================================================
 
 In this example, a new user named U1 will insert a new tuple into a new space
@@ -341,19 +434,19 @@ inherits from role R2.
 
     -- This example will work for a user with many privileges, such as 'admin'
     box.schema.space.create('T')
-    box.space.T:create_index('primary',{})
+    box.space.T:create_index('primary', {})
     -- Create a user U1 so that later it's possible to say box.session.su('U1')
     box.schema.user.create('U1')
     -- Create two roles, R1 and R2
     box.schema.role.create('R1')
     box.schema.role.create('R2')
     -- Grant role R2 to role R1 and role R1 to U1 (order doesn't matter)
-    box.schema.role.grant('R1','execute','role','R2')
-    box.schema.user.grant('U1','execute','role','R1')
+    box.schema.role.grant('R1', 'execute', 'role', 'R2')
+    box.schema.user.grant('U1', 'execute', 'role', 'R1')
     -- Grant read and execute privileges to R2 (but not to R1 and not to U1)
-    box.schema.role.grant('R2','read,write','space','T')
-    box.schema.role.grant('R2','execute','universe')
+    box.schema.role.grant('R2', 'read,write', 'space', 'T')
+    box.schema.role.grant('R2', 'execute', 'universe')
     -- Use box.session.su to say "now become user U1"
     box.session.su('U1')
-    -- The following insert succeeds because U1 in effect has write privilege on T
+    -- Next insert succeeds because U1 in effect has write privilege on T
     box.space.T:insert{1}

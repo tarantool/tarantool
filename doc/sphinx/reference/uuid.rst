@@ -8,9 +8,22 @@ simple counter is better than a UUID, because getting a UUID is time-consuming
 (it requires a syscall_). For clusters of computers, or widely distributed
 applications, UUIDs are better.
 
-The functions that can return a UUID are: ``uuid()``, ``uuid.bin()``, ``uuid.str()``. |br|
-The functions that can convert between different types of UUID are: ``:bin()``, ``:str()``, ``uuid.fromstr()``, ``uuid.frombin()``. |br|
-The function that can determine whether a UUID is an all-zero value is: ``:isnil()``.
+The functions that can return a UUID are:
+
+    * :func:`uuid() <uuid.__call>`
+    * :func:`uuid.bin()`
+    * :func:`uuid.str()`
+
+The functions that can convert between different types of UUID are:
+
+    * :func:`uuid_object:bin() <uuid_object.bin>`
+    * :func:`uuid_object:str() <uuid_object.str>`
+    * :func:`uuid.fromstr()`
+    * :func:`uuid.frombin()`
+
+The function that can determine whether a UUID is an all-zero value is:
+
+    * :func:`uuid_object:isnil() <uuid_object.isnil>`
 
 .. module:: uuid
 
@@ -45,7 +58,7 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
     :return: converted UUID
     :rtype: cdata
 
-.. class:: uuid_cdata
+.. class:: uuid_object
 
     .. method:: bin([byte-order])
 
@@ -76,25 +89,27 @@ The function that can determine whether a UUID is an all-zero value is: ``:isnil
                     Example
 =================================================
 
-| :codenormal:`tarantool>` :codebold:`uuid = require('uuid')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`uuid(), uuid.bin(), uuid.str()`
-| :codenormal:`---`
-| :codenormal:`- 16ffedc8-cbae-4f93-a05e-349f3ab70baa`
-| :codenormal:`- !!binary FvG+Vy1MfUC6kIyeM81DYw==`
-| :codenormal:`- 67c999d2-5dce-4e58-be16-ac1bcb93160f`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`uu = uuid()`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`#uu:bin(), #uu:str(), type(uu), uu:isnil()`
-| :codenormal:`---`
-| :codenormal:`- 16`
-| :codenormal:`- 36`
-| :codenormal:`- cdata`
-| :codenormal:`- false`
-| :codenormal:`...``
+.. code-block:: tarantoolsession
+
+    tarantool> uuid = require('uuid')
+    ---
+    ...
+    tarantool> uuid(), uuid.bin(), uuid.str()
+    ---
+    - 16ffedc8-cbae-4f93-a05e-349f3ab70baa
+    - !!binary FvG+Vy1MfUC6kIyeM81DYw==
+    - 67c999d2-5dce-4e58-be16-ac1bcb93160f
+    ...
+    tarantool> uu = uuid()
+    ---
+    ...
+    tarantool> #uui:bin(), #uu:str(), type(uu), uu:isnil()
+    ---
+    - 16
+    - 36
+    - cdata
+    - false
+    ...
 
 .. _Universally unique identifier: https://en.wikipedia.org/wiki/Universally_unique_identifier
 .. _syscall: https://en.wikipedia.org/wiki/Syscall

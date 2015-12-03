@@ -41,7 +41,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    This step is optional. Python modules are not necessary for building Tarantool
    itself, unless one intends to use the ``-DENABLE_DOC`` option in step 5 or the
    "Run the test suite" option in step 7. Say: |br|
-   :codenormal:`python --version` |br|
+   ``python --version`` |br|
    You should see that the python version is greater than 2.6 --
    preferably 2.7 -- and less than 3.0.
    It may be necessary to install python first.
@@ -146,8 +146,8 @@ explain what the steps are, then on the Internet you can look at some example sc
    for example |br|
    :code:`CC=gcc-4.8 CXX=g++-4.8 cmake .` |br|
    The option for specifying build type is :samp:`-DCMAKE_BUILD_TYPE={type}` where
-   :samp:`{type} = Debug | Release | RelWithDebugInfo` and a
-   reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebugInfo``
+   :samp:`{type} = Debug | Release | RelWithDebInfo` and a
+   reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebInfo``
    (``Debug`` is a default used by project maintainers and ``Release`` is used
    when the highest performance is required).
 

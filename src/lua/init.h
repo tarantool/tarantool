@@ -32,20 +32,16 @@
  */
 #include <stddef.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct lua_State;
 struct luaL_Reg;
-struct tbuf;
 extern bool start_loop;
 
-/**
- * This is a callback used by tarantool_lua_init() to open
- * module-specific libraries into given Lua state.
- *
- * No return value, panics if error.
- */
-extern void
-box_lua_init(struct lua_State *L);
+extern struct lua_State *tarantool_L;
 
 /**
  * Create an instance of Lua interpreter and load it with
@@ -79,13 +75,13 @@ tarantool_lua_tostring(struct lua_State *L, int index);
 void
 tarantool_lua_run_script(char *path, int argc, char **argv);
 
-void
-tarantool_lua(struct lua_State *L,
-	      struct tbuf *out, const char *str);
-
 extern char *history;
 
-extern "C" struct slab_cache *
+struct slab_cache *
 tarantool_lua_slab_cache();
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LUA_H */

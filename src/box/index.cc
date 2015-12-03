@@ -37,6 +37,7 @@
 #include "iproto_constants.h"
 #include "request.h"
 #include "txn.h"
+#include "rmean.h"
 
 const char *iterator_type_strs[] = {
 	/* [ITER_EQ]  = */ "EQ",

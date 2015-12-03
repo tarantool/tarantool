@@ -66,8 +66,10 @@ public:
 	ev_idle idle;
 };
 
+extern "C" {
 typedef void (*sophia_info_f)(const char*, const char*, void*);
 int  sophia_info(const char*, sophia_info_f, void*);
+}
 void sophia_error(void*);
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */

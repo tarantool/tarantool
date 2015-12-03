@@ -430,7 +430,7 @@ test(t, {{'&', 3, 1}, {'&', 2, 1}, {'&', 4, 1}}, {{1, '1', 1, '1'}})
 ...
 test(t, {{'&', 'a', 3}, {'+', 3, 3}}, {{1, '1', 1, '1'}})
 ---
-- error: Illegal parameters, update fieldno option name must be numeric
+- error: Illegal parameters, field id must be a number
 ...
 test(t, {{'+', 3, 3}, {'&', 3, 'a'}}, {{1, '1', 1, '1'}})
 ---

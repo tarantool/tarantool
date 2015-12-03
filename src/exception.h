@@ -111,6 +111,15 @@ public:
 	virtual void raise() { throw this; }
 };
 
+extern const struct type type_LuajitError;
+
+class LuajitError: public Exception {
+public:
+	LuajitError(const char *file, unsigned line,
+		    const char *msg);
+	virtual void raise() { throw this; }
+};
+
 /**
  * Initialize the exception subsystem.
  */

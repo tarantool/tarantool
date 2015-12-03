@@ -37,7 +37,7 @@
  * Globally unique identifier of this cluster.
  * A cluster is a set of connected appliers.
  */
-tt_uuid cluster_id;
+struct tt_uuid cluster_id;
 
 typedef rb_tree(struct applier) applierset_t;
 rb_proto(, applierset_, applierset_t, struct applier)
@@ -94,23 +94,6 @@ cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 		 */
 		if (r->writer)
 			box_set_ro(false);
-	}
-}
-
-void
-cluster_update_server(uint32_t server_id, const struct tt_uuid *server_uuid)
-{
-	struct recovery *r = ::recovery;
-	/** Checked in the before-commit trigger */
-	assert(!tt_uuid_is_nil(server_uuid));
-	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
-	assert(vclock_has(&r->vclock, server_id));
-
-	if (r->server_id == server_id &&
-	    !tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
-		say_warn("server UUID changed to %s",
-			 tt_uuid_str(server_uuid));
-		r->server_uuid = *server_uuid;
 	}
 }
 

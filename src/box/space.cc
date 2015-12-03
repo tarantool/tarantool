@@ -52,9 +52,15 @@ access_check_space(struct space *space, uint8_t access)
 	access &= ~cr->universal_access;
 	if (access && space->def.uid != cr->uid &&
 	    access & ~space->access[cr->auth_token].effective) {
-		struct user *user = user_cache_find(cr->uid);
+		/*
+		 * Report access violation. Throw "no such user"
+		 * error if there is  no user with this id.
+		 * It is possible that the user was dropped
+		 * from a different connection.
+		 */
+		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->name, space->def.name);
+			  priv_name(access), user->def.name, space->def.name);
 	}
 }
 

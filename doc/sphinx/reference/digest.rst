@@ -5,11 +5,10 @@
 .. module:: digest
 
 A "digest" is a value which is returned by a function (usually a
-`Cryptographic hash function`_), applied
-against a string. Tarantool supports five types of cryptographic hash functions
-(SHA-0_, SHA-1_, SHA-2_, MD4_, MD5) as well as a checksum function (CRC32_), two
-functions for base64_, and two non-cryptographic hash functions (guava_, murmur_).
-The functions in digest are:
+`Cryptographic hash function`_), applied against a string. Tarantool supports
+five types of cryptographic hash functions (SHA-0_, SHA-1_, SHA-2_, MD4_, MD5)
+as well as a checksum function (CRC32_), two functions for base64_, and two
+non-cryptographic hash functions (guava_, murmur_). The functions in digest are:
 
     :func:`digest.sha() <digest.sha>`, |br|
     :func:`digest.sha_hex() <digest.sha_hex>`, |br|
@@ -129,7 +128,7 @@ The functions in digest are:
     the same polynomial value. |br| For example, in Python,
     install the crcmod package and say:
 
-    .. code-block:: python
+    .. code-block:: pycon
 
       >>> import crcmod
       >>> fun = crcmod.mkCrcFun('4812730177')
@@ -174,10 +173,12 @@ The functions in digest are:
     buckets; the returned value will be an integer between 0
     and the number of buckets. For example,
 
-    .. code-block:: lua
+    .. code-block:: tarantoolsession
 
-      localhost> digest.guava(10863919174838991, 11)
-      8
+        tarantool> digest.guava(10863919174838991, 11)
+        ---
+        - 8
+        ...
 
 
 .. function:: digest.murmur({string})
@@ -200,13 +201,21 @@ The functions in digest are:
 
     .. code-block:: lua
 
-      digest=require('digest')
+      digest = require('digest')
+
       -- print crc32 of 'AB', with one step, then incrementally
       print(digest.crc32('AB'))
-      c=digest.crc32.new() c:update('A') c:update('B') print(c:result())
+      c = digest.crc32.new()
+      c:update('A')
+      c:update('B')
+      print(c:result())
+
       -- print murmur hash of 'AB', with one step, then incrementally
       print(digest.murmur('AB'))
-      m=digest.murmur.new() m:update('A') m:update('B') print(m:result())
+      m = digest.murmur.new()
+      m:update('A')
+      m:update('B')
+      print(m:result())
 
 =================================================
                      Example
@@ -216,40 +225,42 @@ In the following example, the user creates two functions, ``password_insert()``
 which inserts a SHA-1_ digest of the word "**^S^e^c^ret Wordpass**" into a tuple
 set, and ``password_check()`` which requires input of a password.
 
-| :codenormal:`localhost>` :codebold:`digest = require('digest')`
-| :codenormal:`localhost> -- this means ignore line feeds until next '!'`
-| :codenormal:`localhost>` :codebold:`console = require('console'); console.delimiter('!')`
-| :codenormal:`localhost>` :codebold:`function password_insert()`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`box.space.tester:insert{12345,`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`digest.sha1('^S^e^c^ret Wordpass')}`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`return 'OK'`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
-| :codenormal:`localhost>` :codebold:`function password_check(password)`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`local t`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`t=box.space.tester:select{12345}`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`if (digest.sha1(password)==t[2]) then`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`print('Password is valid')`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`else`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`print('Password is not valid')`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` |nbsp| |nbsp| :codebold:`end`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`->` :codebold:`end!`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`---`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`...`
-| :codenormal:`localhost>` :codebold:`password_insert()!`
-| :codenormal:`Call OK, 1 rows affected`
-| :codenormal:`['OK']`
-| :codenormal:`localhost> -- back to normal: commands end with line feed!`
-| :codenormal:`localhost>` :codebold:`console.delimiter('')`
+.. code-block:: tarantoolsession
+
+    tarantool> digest = require('diges')
+    ---
+    ...
+    tarantool> function password_insert()
+             >   box.space.tester:insert{12345, digest.sha1('^S^e^c^ret Wordpass')}
+             >   return 'OK'
+             > end
+    ---
+    ...
+    tarantool> function password_check(password)
+             >   local t
+             >   local t = box.space.tester:select{12345}
+             >   if digest.sha1(password) == t[2] then
+             >     print('Password is valid')
+             >   else
+             >     print('Password is not valid')
+             >   end
+             > end
+    ---
+    ...
+    tarantool> password_insert()
+    ---
+    - 'OK'
+    ...
 
 If a later user calls the ``password_check()`` function and enters
 the wrong password, the result is an error.
 
-| :codenormal:`localhost>` :codebold:`password_check ('Secret Password')`
-| :codenormal:`---`
-| :codenormal:`Password is not valid`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> password_check('Secret Password')
+    Password is not valid
+    ---
+    ...
 
 .. _SHA-0: https://en.wikipedia.org/wiki/Sha-0
 .. _SHA-1: https://en.wikipedia.org/wiki/Sha-1

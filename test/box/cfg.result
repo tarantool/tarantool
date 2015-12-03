@@ -82,42 +82,35 @@ cfg_filter(box.cfg)
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''sherlock'' is unexpected'
+- error: 'Incorrect value for option ''sherlock'': unexpected option'
 ...
 -- check that cfg with unexpected type of parameter failes
 box.cfg{listen = {}}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''listen'' should be one of types: string, number'
+- error: 'Incorrect value for option ''listen'': should be one of types string, number'
 ...
 box.cfg{wal_dir = 0}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''wal_dir'' should be of type string'
+- error: 'Incorrect value for option ''wal_dir'': should be of type string'
 ...
 box.cfg{coredump = 'true'}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''coredump'' should be of type boolean'
+- error: 'Incorrect value for option ''coredump'': should be of type boolean'
 ...
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------
 box.cfg{slab_alloc_arena = "100500"}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''slab_alloc_arena'' should be of type number'
+- error: 'Incorrect value for option ''slab_alloc_arena'': should be of type number'
 ...
 box.cfg{sophia = "sophia"}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''sophia'' should be a table'
+- error: 'Incorrect value for option ''sophia'': should be a table'
 ...
 box.cfg{sophia = {threads = "threads"}}
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Error: cfg parameter
-    ''sophia.threads'' should be of type number'
+- error: 'Incorrect value for option ''sophia.threads'': should be of type number'
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options

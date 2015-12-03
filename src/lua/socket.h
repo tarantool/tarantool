@@ -33,12 +33,12 @@
 #include <stddef.h>
 #include <sys/socket.h>
 
-struct lua_State;
-void tarantool_lua_socket_init(struct lua_State *L);
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+struct lua_State;
+void tarantool_lua_socket_init(struct lua_State *L);
 
 int
 lbox_socket_local_resolve(const char *host, const char *port,

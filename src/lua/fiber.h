@@ -1,6 +1,5 @@
 #ifndef TARANTOOL_LUA_FIBER_H_INCLUDED
 #define TARANTOOL_LUA_FIBER_H_INCLUDED
-
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,6 +30,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct lua_State;
 
@@ -39,5 +41,12 @@ struct lua_State;
 */
 void
 tarantool_lua_fiber_init(struct lua_State *L);
+
+void
+luaL_testcancel(struct lua_State *L);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LUA_FIBER_H_INCLUDED */

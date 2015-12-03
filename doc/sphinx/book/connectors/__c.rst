@@ -1,4 +1,4 @@
-$ =====================================================================
+=====================================================================
                             C
 =====================================================================
 
@@ -11,23 +11,26 @@ space :code:`examples` via the high-level C API.
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
-    void main()
-    {
-     struct tnt_stream *tnt = tnt_net(NULL);          /* See note = SETUP */
-     tnt_set(tnt, TNT_OPT_URI, "localhost:3301");
-     if (tnt_connect(tnt) < 0)                        /* See note = CONNECT */
-       { printf("Connection refused\n"); exit(-1); }
-     struct tnt_stream *tuple = tnt_object(NULL);     /* See note = MAKE REQUEST */
-     tnt_object_format(tuple, "[%d%s]", 999, "B");
-     tnt_insert(tnt, 999, tuple);                     /* See note = SEND REQUEST */
-     tnt_flush(tnt);
-     struct tnt_reply reply;  tnt_reply_init(&reply); /* See note = GET REPLY */
-     tnt->read_reply(tnt, &reply);
-     if (reply.code != 0)
-       { printf("Insert failed %lu.\n", reply.code); }
-     tnt_close(tnt);                                  /* See below = TEARDOWN */
-     tnt_stream_free(tuple);
-     tnt_stream_free(tnt);
+
+    void main() {
+       struct tnt_stream *tnt = tnt_net(NULL);          /* See note = SETUP */
+       tnt_set(tnt, TNT_OPT_URI, "localhost:3301");
+       if (tnt_connect(tnt) < 0) {                      /* See note = CONNECT */
+           printf("Connection refused\n");
+           exit(-1);
+       }
+       struct tnt_stream *tuple = tnt_object(NULL);     /* See note = MAKE REQUEST */
+       tnt_object_format(tuple, "[%d%s]", 999, "B");
+       tnt_insert(tnt, 999, tuple);                     /* See note = SEND REQUEST */
+       tnt_flush(tnt);
+       struct tnt_reply reply;  tnt_reply_init(&reply); /* See note = GET REPLY */
+       tnt->read_reply(tnt, &reply);
+       if (reply.code != 0) {
+           printf("Insert failed %lu.\n", reply.code);
+       }
+       tnt_close(tnt);                                  /* See below = TEARDOWN */
+       tnt_stream_free(tuple);
+       tnt_stream_free(tnt);
     }
 
 .. parsed-literal::
@@ -86,7 +89,7 @@ Function description:
 
 .. _c_connect:
 
-**CONNECT:** Now that the stream named :codenormal:`tnt` exists and is associated with a
+**CONNECT:** Now that the stream named ``tnt`` exists and is associated with a
 URI, this example program can connect to the server.
 
 .. code-block:: c

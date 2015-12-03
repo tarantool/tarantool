@@ -27,7 +27,7 @@ git clone git://github.com/tarantool/tarantool.git
 git submodule update --init
 
 cd tarantool
-CC=gcc463 CXX=g++463 cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true && make
+CC=gcc463 CXX=g++463 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_CLIENT=true && make
 
 5. Install test-required packages and modules for Python 2.6
 -------------

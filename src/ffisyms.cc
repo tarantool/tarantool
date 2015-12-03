@@ -5,8 +5,6 @@
 #include <box/tuple.h>
 #include <box/index.h>
 #include <box/func.h>
-#include <box/lua/tuple.h>
-#include <box/lua/call.h>
 #include <box/sophia_engine.h>
 #include <box/request.h>
 #include <box/port.h>
@@ -56,7 +54,8 @@ void *ffi_symbols[] = {
 	(void *) box_index_count,
 	(void *) box_index_iterator,
 	(void *) box_iterator_next,
-	(void *) boxffi_tuple_update,
+	(void *) box_tuple_update,
+	(void *) box_tuple_upsert,
 	(void *) password_prepare,
 	(void *) load_cfg,
 	(void *) box_set_listen,

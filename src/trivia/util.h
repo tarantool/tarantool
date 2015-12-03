@@ -83,19 +83,6 @@ extern "C" {
 uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
 
-// Macros for printf functions
-#ifdef __x86_64__
-#define PRI_SZ  "lu"
-#define PRI_SSZ "ld"
-#define PRI_OFFT "lu"
-#define PRI_XFFT "lx"
-#else
-#define PRI_SZ  "u"
-#define PRI_SSZ "d"
-#define PRI_OFFT "llu"
-#define PRI_XFFT "llx"
-#endif
-
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
 #define likely(x)    __builtin_expect((x),1)
 #define unlikely(x)  __builtin_expect((x),0)
@@ -133,7 +120,7 @@ char *
 abspath(const char *filename);
 
 char *
-int2str(long int val);
+int2str(long long int val);
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */
@@ -178,9 +165,9 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #endif /* defined(__cplusplus) */
 
 #if defined(__cplusplus)
-#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
+#define API_EXPORT extern "C" __attribute__ ((nothrow, visibility ("default")))
 #else /* defined(__cplusplus) */
-#define API_EXPORT extern __attribute__ ((visibility ("default")))
+#define API_EXPORT extern __attribute__ ((nothrow, visibility ("default")))
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

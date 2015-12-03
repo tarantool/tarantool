@@ -57,8 +57,8 @@ int
 tree_index_compare_key(const tuple *a, const struct key_data *key_data,
 		       struct key_def *key_def)
 {
-	return tuple_compare_with_key(a, key_data->key, key_data->part_count,
-				      key_def);
+	return tuple_compare_with_key(a, key_data->key,
+				      key_data->part_count, key_def);
 }
 int tree_index_qcompare(const void* a, const void *b, void *c)
 {

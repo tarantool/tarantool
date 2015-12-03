@@ -36,13 +36,13 @@
 #include "space.h"
 #include "schema.h"
 #include "port.h"
-#include "lua/call.h"
 #include <errinj.h>
 #include <fiber.h>
 #include <scoped_guard.h>
 #include "user_def.h"
 #include "iproto_constants.h"
 #include "rmean.h"
+#include <sys/uio.h>
 
 struct rmean *rmean_box;
 

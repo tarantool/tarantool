@@ -107,9 +107,7 @@ iobuf_reset(struct iobuf *iobuf)
 		if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
 			ibuf_reset(&iobuf->in);
 		} else {
-			struct slab_cache *slabc = iobuf->in.slabc;
-			ibuf_destroy(&iobuf->in);
-			ibuf_create(&iobuf->in, slabc, iobuf_readahead);
+			ibuf_reinit(&iobuf->in);
 		}
 	}
 	if (obuf_capacity(&iobuf->out) < iobuf_max_size()) {

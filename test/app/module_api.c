@@ -188,7 +188,7 @@ void fiber_test_func(va_list va)
 		fiber_set_cancellable(true);
 		fiber_sleep(0.01);
 		if (fiber_is_cancelled()) {
-			box_error_raise(10, "test error");
+			box_error_set(__FILE__, __LINE__, 10, "test error");
 			return;
 		}
 		fiber_set_cancellable(false);

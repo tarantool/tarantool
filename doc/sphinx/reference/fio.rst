@@ -22,11 +22,14 @@ access the same file simultaneously.
     :return: path name
     :rtype:  string
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.pathjoin('/etc', 'default', 'myfile')`
-    | :codenormal:`---`
-    | :codenormal:`- /etc/default/myfile`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.pathjoin('/etc', 'default', 'myfile')
+        ---
+        - /etc/default/myfile
+        ...
 
 .. function:: basename(path-name[, suffix])
 
@@ -39,11 +42,14 @@ access the same file simultaneously.
     :return: file name
     :rtype:  string
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.basename('/path/to/my.lua', '.lua')`
-    | :codenormal:`---`
-    | :codenormal:`- my`
-    | :codenormal:`...`
+    **Example:**
+
+     .. code-block:: tarantoolsession
+
+        tarantool> fio.basename('/path/to/my.lua', '.lua')
+        ---
+        - my
+        ...
 
 .. function:: dirname(path-name)
 
@@ -54,11 +60,14 @@ access the same file simultaneously.
     :return: directory name, that is, path name except for file name.
     :rtype:  string
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.dirname('/path/to/my.lua')`
-    | :codenormal:`---`
-    | :codenormal:`- /path/to/`
-    | :codenormal:`...`
+    **Example:**
+
+     .. code-block:: tarantoolsession
+
+        tarantool> fio.dirname('path/to/my.lua')
+        ---
+        - 'path/to/'
+        ...
 
 =================================================
             Common file manipulations
@@ -73,11 +82,14 @@ access the same file simultaneously.
     :return: previous mask bits.
     :rtype:  number
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.umask(tonumber('755', 8)) -- pass 755 octal`
-    | :codenormal:`---`
-    | :codenormal:`- 493`
-    | :codenormal:`...`
+    **Example:**
+
+     .. code-block:: tarantoolsession
+
+        tarantool> fio.umask(tonumber('755', 8))
+        ---
+        - 493
+        ...
 
 .. function:: lstat(path-name)
                stat(path-name)
@@ -90,23 +102,26 @@ access the same file simultaneously.
              and other attributes.
     :rtype:  table
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.lstat('/etc')`
-    | :codenormal:`---`
-    | :codenormal:`- inode: 1048577`
-    | |nbsp| |nbsp| :codenormal:`rdev: 0`
-    | |nbsp| |nbsp| :codenormal:`size: 12288`
-    | |nbsp| |nbsp| :codenormal:`atime: 1421340698`
-    | |nbsp| |nbsp| :codenormal:`mode: 16877`
-    | |nbsp| |nbsp| :codenormal:`mtime: 1424615337`
-    | |nbsp| |nbsp| :codenormal:`nlink: 160`
-    | |nbsp| |nbsp| :codenormal:`uid: 0`
-    | |nbsp| |nbsp| :codenormal:`blksize: 4096`
-    | |nbsp| |nbsp| :codenormal:`gid: 0`
-    | |nbsp| |nbsp| :codenormal:`ctime: 1424615337`
-    | |nbsp| |nbsp| :codenormal:`dev: 2049`
-    | |nbsp| |nbsp| :codenormal:`blocks: 24`
-    | :codenormal:`...`
+    **Example:**
+
+     .. code-block:: tarantoolsession
+
+        tarantool> fio.lstat('/etc')
+        ---
+        - inode: 1048577
+          rdev: 0
+          size: 12288
+          atime: 1421340698
+          mode: 16877
+          mtime: 1424615337
+          nlink: 160
+          uid: 0
+          blksize: 4096
+          gid: 0
+          ctime: 1424615337
+          dev: 2049
+          blocks: 24
+        ...
 
 .. function:: mkdir(path-name)
               rmdir(path-name)
@@ -118,12 +133,14 @@ access the same file simultaneously.
     :return: true if success, false if failure.
     :rtype:  boolean
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.mkdir('/etc')`
-    | :codenormal:`---`
-    | :codenormal:`- false`
-    | :codenormal:`...`
+    **Example:**
 
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.mkdir('/etc')
+        ---
+        - false
+        ...
 
 .. function:: glob(path-name)
 
@@ -134,41 +151,48 @@ access the same file simultaneously.
     :param string path-name: path-name, which may contain wildcard characters.
     :return: list of files whose names match the input string
     :rtype:  table
-    :except: nil on failure.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.glob('/etc/x*')`
-    | :codenormal:`---`
-    | :codenormal:`- - /etc/xdg`
-    | |nbsp| |nbsp| :codenormal:`- /etc/xml`
-    | |nbsp| |nbsp| :codenormal:`- /etc/xul-ext`
-    | :codenormal:`...`
+    Possible errors: nil.
 
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.glob('/etc/x*')
+        ---
+        - - /etc/xdg
+          - /etc/xml
+          - /etc/xul-ext
+        ...
 
 .. function:: tempdir()
 
     Return the name of a directory that can be used to store temporary files.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.tempdir()`
-    | :codenormal:`---`
-    | :codenormal:`- /tmp/lG31e7`
-    | :codenormal:`...`
+    **Example:**
 
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.tempdir()
+        ---
+        - /tmp/lG31e7
+        ...
 
 .. function:: cwd()
 
     Return the name of the current working directory.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.cwd()`
-    | :codenormal:`---`
-    | :codenormal:`- /home/username/tarantool_sandbox`
-    | :codenormal:`...`
+    **Example:**
 
+    .. code-block:: tarantoolsession
 
-.. function:: link     (src , dst)
-              symlink  (src , dst)
+        tarantool> fio.cwd()
+        ---
+        - /home/username/tarantool_sandbox
+        ...
+
+.. function:: link     (src, dst)
+              symlink  (src, dst)
               readlink (src)
               unlink   (src)
 
@@ -182,15 +206,18 @@ access the same file simultaneously.
              success, false if failure. ``fio.readlink`` returns the link value
              if success, nil if failure.
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.link('/home/username/tmp.txt', '/home/username/tmp.txt2')`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`fio.unlink('/home/pgulutzan/tmp.txt2')`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.link('/home/username/tmp.txt', '/home/username/tmp.txt2')
+        ---
+        - true
+        ...
+        tarantool> fio.unlink('/home/username/tmp.txt2')
+        ---
+        - true
+        ...
 
 .. function:: rename(path-name, new-path-name)
 
@@ -202,11 +229,14 @@ access the same file simultaneously.
     :return: true if success, false if failure.
     :rtype:  boolean
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.rename('/home/username/tmp.txt', '/home/username/tmp.txt2')`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.rename('/home/username/tmp.txt', '/home/username/tmp.txt2')
+        ---
+        - true
+        ...
 
 .. function:: chown(path-name, owner-user, owner-group)
               chmod(path-name, new-rights)
@@ -218,15 +248,18 @@ access the same file simultaneously.
     :param string owner-group: new group uid.
     :param number new-rights: new permissions
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.chmod('/home/username/tmp.txt', tonumber('0755', 8))`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`fio.chown('/home/username/tmp.txt', 'username', 'username')`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.chmod('/home/username/tmp.txt', tonumber('0755', 8))
+        ---
+        - true
+        ...
+        tarantool> fio.chown('/home/username/tmp.txt', 'username', 'username')
+        ---
+        - true
+        ...
 
 .. function:: truncate(path-name, new-size)
 
@@ -238,11 +271,14 @@ access the same file simultaneously.
     :return: true if success, false if failure.
     :rtype:  boolean
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.truncate('/home/username/tmp.txt', 99999)`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.truncate('/home/username/tmp.txt', 99999)
+        ---
+        - true
+        ...
 
 .. function:: sync()
 
@@ -251,11 +287,14 @@ access the same file simultaneously.
     :return: true if success, false if failure.
     :rtype:  boolean
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fio.sync()`
-    | :codenormal:`---`
-    | :codenormal:`- true`
-    | :codenormal:`...`
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fio.sync()
+        ---
+        - true
+        ...
 
 .. function:: open(path-name [, flags])
 
@@ -268,16 +307,20 @@ access the same file simultaneously.
                          combined by enclosing them in braces.
     :return: file handle (later - fh)
     :rtype:  userdata
-    :except: nil
 
-    | EXAMPLE
-    | :codenormal:`tarantool>` :codebold:`fh = fio.open('/home/username/tmp.txt', {'O_RDWR', 'O_APPEND'})`
-    | :codenormal:`---`
-    | :codenormal:`...`
-    | :codenormal:`tarantool>` :codebold:`fh -- display file handle returned by fio.open`
-    | :codenormal:`---`
-    | :codenormal:`- fh: 11`
-    | :codenormal:`...`
+    Possible errors: nil.
+
+    **Example:**
+
+    .. code-block:: tarantoolsession
+
+        tarantool> fh = fio.open('/home/username/tmp.txt', {'O_RDWR', 'O_APPEND'})
+        ---
+        ...
+        tarantool> fh -- display file handle returned by fio.open
+        ---
+        - fh: 11
+        ...
 
 .. class:: file-handle
 
@@ -289,11 +332,14 @@ access the same file simultaneously.
         :return: true if success, false on failure.
         :rtype:  boolean
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:close() -- where fh = file-handle`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:close() -- where fh = file-handle
+            ---
+            - true
+            ...
 
     .. method:: pread(count, offset)
                 pwrite(new-string, offset)
@@ -309,13 +355,16 @@ access the same file simultaneously.
         :return: ``fh:pwrite`` returns true if success, false if failure.
                  ``fh:pread`` returns the data that was read, or nil if failure.
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:pread(25, 25)`
-        | :codenormal:`---`
-        | :codenormal:`- |-`
-        | |nbsp| |nbsp| :codenormal:`elete from t8//`
-        | |nbsp| |nbsp| :codenormal:`insert in`
-        | :codenormal:`...`
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:pread(25, 25)
+            ---
+            - |
+              elete from t8//
+              insert in
+            ...
 
     .. method:: read(count)
                 write(new-string)
@@ -336,11 +385,14 @@ access the same file simultaneously.
         :return: ``fh:write`` returns true if success, false if failure.
                  ``fh:read`` returns the data that was read, or nil if failure.
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:write('new data')`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:write('new data')
+            ---
+            - true
+            ...
 
     .. method:: truncate(new-size)
 
@@ -351,11 +403,14 @@ access the same file simultaneously.
         :return: true if success, false if failure.
         :rtype:  boolean
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:truncate(0)`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:truncate(0)
+            ---
+            - true
+            ...
 
     .. method:: seek(position [, offset-from])
 
@@ -368,14 +423,17 @@ access the same file simultaneously.
                     = current position, '``SEEK_SET``' = start of file.
         :return: the new position if success
         :rtype:  number
-        :except: nil
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:seek(20, 'SEEK_SET')`
-        | :codenormal:`---`
-        | :codenormal:`- 20`
-        | :codenormal:`...`
+        Possible errors: nil.
 
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:seek(20, 'SEEK_SET')
+            ---
+            - 20
+            ...
 
     .. method:: stat()
 
@@ -386,23 +444,27 @@ access the same file simultaneously.
         :return: details about the file.
         :rtype:  table
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:stat()`
-        | :codenormal:`---`
-        | :codenormal:`- inode: 729866`
-        | |nbsp| |nbsp| :codenormal:`rdev: 0`
-        | |nbsp| |nbsp| :codenormal:`size: 100`
-        | |nbsp| |nbsp| :codenormal:`atime: 1409429855`
-        | |nbsp| |nbsp| :codenormal:`mode: 33261`
-        | |nbsp| |nbsp| :codenormal:`mtime: 1409430660`
-        | |nbsp| |nbsp| :codenormal:`nlink: 1`
-        | |nbsp| |nbsp| :codenormal:`uid: 1000`
-        | |nbsp| |nbsp| :codenormal:`blksize: 4096`
-        | |nbsp| |nbsp| :codenormal:`gid: 1000`
-        | |nbsp| |nbsp| :codenormal:`ctime: 1409430660`
-        | |nbsp| |nbsp| :codenormal:`dev: 2049`
-        | |nbsp| |nbsp| :codenormal:`blocks: 8`
-        | :codenormal:`...`
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:stat()
+            ---
+            - inode: 729866
+              rdev: 0
+              size: 100
+              atime: 140942855
+              mode: 33261
+              mtime: 1409430660
+              nlink: 1
+              uid: 1000
+              blksize: 4096
+              gid: 1000
+              ctime: 1409430660
+              dev: 2049
+              blocks: 8
+            ...
+
 
     .. method:: fsync()
                 fdatasync()
@@ -414,9 +476,11 @@ access the same file simultaneously.
         :param userdata fh: file-handle as returned by ``fio.open()``.
         :return: true if success, false if failure.
 
-        | EXAMPLE
-        | :codenormal:`tarantool>` :codebold:`fh:fsync()`
-        | :codenormal:`---`
-        | :codenormal:`- true`
-        | :codenormal:`...`
+        **Example:**
 
+        .. code-block:: tarantoolsession
+
+            tarantool> fh:fsync()
+            ---
+            - true
+            ...

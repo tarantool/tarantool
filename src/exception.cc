@@ -193,6 +193,15 @@ FiberIsCancelled::log() const
 	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
 
+const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
+
+LuajitError::LuajitError(const char *file, unsigned line,
+			 const char *msg)
+	: Exception(&type_LuajitError, file, line)
+{
+	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -229,6 +238,13 @@ BuildFiberIsCancelled(const char *file, unsigned line)
 	return new (p) FiberIsCancelled(file, line);
 }
 
+static struct error *
+BuildLuajitError(const char *file, unsigned line, const char *msg)
+{
+	BuildAlloc(LuajitError);
+	return new (p) LuajitError(file, line, msg);
+}
+
 #undef BuildAlloc
 
 void
@@ -240,6 +256,7 @@ exception_init()
 	exception_error_factory.FiberIsCancelled = BuildFiberIsCancelled;
 	exception_error_factory.TimedOut = BuildTimedOut;
 	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
+	exception_error_factory.LuajitError = BuildLuajitError;
 
 	error_factory = &exception_error_factory;
 

@@ -53,6 +53,7 @@ extern "C" {
 #include <lj_tab.h>
 
 struct lua_State;
+struct ibuf;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -61,6 +62,7 @@ struct lua_State;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
+extern struct ibuf *tarantool_lua_ibuf;
 
 /** \cond public */
 
@@ -451,6 +453,9 @@ luaL_isarray(struct lua_State *L, int idx)
 	return index_starts_at_1;
 }
 
+struct error *
+luaL_iserror(struct lua_State *L, int narg);
+
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.
@@ -505,32 +510,27 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
+int
+lbox_error(lua_State *L);
+
+int
+lbox_call(lua_State *L, int nargs, int nreturns);
+
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 #include "exception.h"
-extern const struct type type_LuajitError;
-class LuajitError: public Exception {
-public:
-	LuajitError(const char *file, unsigned line,
-		    struct lua_State *L);
-	virtual void raise() { throw this; }
-};
+#include <fiber.h>
 
 static inline void
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+lbox_call_xc(lua_State *L, int nargs, int nreturns)
 {
-	try {
-		lua_call(L, nargs, nreturns);
-	} catch (Exception *e) {
-		/* Let all well-behaved exceptions pass through. */
-		throw;
-	} catch (...) {
-		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L);
-	}
+	if (lbox_call(L, nargs, nreturns) != 0)
+		diag_raise();
 }
-
 
 /**
  * Make a reference to an object on top of the Lua stack and

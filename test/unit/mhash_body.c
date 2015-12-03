@@ -37,8 +37,12 @@ tst(1);
 tst(2);
 tst(3);
 
-/* delete non existing entry */
-k = get(4); del(k + 1);
+/* delete non existing entry; note: index must come from get */
+set(4);
+k = get(4);
+del(k);
+del(k);
+del(get(4));
 
 set(4);
 set(5);

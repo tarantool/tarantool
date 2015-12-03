@@ -9,10 +9,10 @@ certain events happen. Currently the main types of triggers are `connection trig
 which are executed when a session begins or ends, and `replace triggers`_ which are
 for database events.
 
-    :func:`box.session.on_connect`,
-    :func:`box.session.on_disconnect`,
-    :func:`box.session.on_auth`,
-    :func:`space_object.on_replace`,
+    :func:`box.session.on_connect`, |br|
+    :func:`box.session.on_disconnect`, |br|
+    :func:`box.session.on_auth`, |br|
+    :func:`space_object.on_replace`, |br|
     :func:`space_object.run_triggers`
 
 All triggers have the following characteristics:
@@ -62,7 +62,12 @@ All triggers have the following characteristics:
 
     **Example:**
 
-    | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_connect(f)`
+    .. code-block:: tarantoolsession
+
+        tarantool> function f ()
+                 >   x = x + 1
+                 > end
+        tarantool> box.session.on_connect(f)
 
     .. WARNING::
 
@@ -84,7 +89,12 @@ All triggers have the following characteristics:
 
     **Example:**
 
-    | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_disconnect(f)`
+    .. code-block:: tarantoolsession
+
+        tarantool> function f ()
+                 >   x = x + 1
+                 > end
+        tarantool> box.session.on_disconnect(f)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Example
@@ -95,18 +105,16 @@ using the :mod:`log` package whenever any user connects or disconnects.
 
 .. code-block:: lua_tarantool
 
-    console = require('console'); console.delimiter('!') --this means ignore line feeds until next '!'
     function log_connect ()
       local log = require('log')
       local m = 'Connection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end!
+    end
     function log_disconnect ()
       local log = require('log')
       local m = 'Disconnection. user=' .. box.session.user() .. ' id=' .. box.session.id()
       log.info(m)
-    end!
-    console.delimiter('')!
+    end
     box.session.on_connect(log_connect)
     box.session.on_disconnect(log_disconnect)
 
@@ -147,7 +155,12 @@ Here is what might appear in the log file in a typical installation:
 
     **Example:**
 
-    | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.session.on_auth(f)`
+    .. code-block:: tarantoolsession
+
+        tarantool> function f ()
+                 >   x = x + 1
+                 > end
+        tarantool> box.session.on_auth(f)
 
 
 ===========================================================
@@ -172,7 +185,12 @@ Here is what might appear in the log file in a typical installation:
 
         **Example:**
 
-        | :codenormal:`tarantool>`:codebold:`function f () x = x + 1 end; box.space.X:on_replace(f)`
+        .. code-block:: tarantoolsession
+
+            tarantool> function f ()
+                     >   x = x + 1
+                     > end
+            tarantool> box.space.X:on_replace(f)
 
     .. function:: run_triggers(true|false)
 
@@ -185,7 +203,10 @@ Here is what might appear in the log file in a typical installation:
 
         **Example:**
 
-        | :codenormal:`tarantool>` :codebold:`box.space.X:run_triggers(false)`
+        .. code-block:: tarantoolsession
+
+            tarantool> box.space.X:run_triggers(false)
+
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Example
@@ -196,16 +217,19 @@ a function which increments a counter, create a trigger, do two inserts, drop
 the space, and display the counter value - which is 2, because the function
 is executed once after each insert.
 
+.. code-block:: tarantoolsession
 
-| :codenormal:`tarantool>`:codebold:`s = box.schema.space.create('space53')`
-| :codenormal:`tarantool>`:codebold:`s:create_index('primary', {parts = {1, 'NUM'}})`
-| :codenormal:`tarantool>`:codebold:`function replace_trigger() replace_counter = replace_counter + 1 end`
-| :codenormal:`tarantool>`:codebold:`s:on_replace(replace_trigger)`
-| :codenormal:`tarantool>`:codebold:`replace_counter = 0`
-| :codenormal:`tarantool>`:codebold:`t = s:insert{1, 'First replace'}`
-| :codenormal:`tarantool>`:codebold:`t = s:insert{2, 'Second replace'}`
-| :codenormal:`tarantool>`:codebold:`s:drop()`
-| :codenormal:`tarantool>`:codebold:`replace_counter`
+    tarantool> s = box.schema.space.create('space53')
+    tarantool> s:create_index('primary', {parts = {1, 'NUM'}})
+    tarantool> function replace_trigger()
+             >   replace_counter = replace_counter + 1
+             > end
+    tarantool> s:on_replace(replace_trigger)
+    tarantool> replace_counter = 0
+    tarantool> t = s:insert{1, 'First replace'}
+    tarantool> t = s:insert{2, 'Second replace'}
+    tarantool> s:drop()
+    tarantool> replace_counter
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Another Example
@@ -216,11 +240,13 @@ with an existing space named T, associate the function a second time with the
 same space (so it will be called twice), disable all triggers of T, and delete
 each trigger by replacing with ``nil``.
 
-| :codenormal:`tarantool>` :codebold:`box.space.T:on_replace(F)`
-| :codenormal:`tarantool>` :codebold:`box.space.T:on_replace(F)`
-| :codenormal:`tarantool>` :codebold:`box.space.T:run_triggers(false)`
-| :codenormal:`tarantool>` :codebold:`box.space.T:on_replace(nil, F)`
-| :codenormal:`tarantool>` :codebold:`box.space.T:on_replace(nil, F)`
+.. code-block:: tarantoolsession
+
+    tarantool> box.space.T:on_replace(F)
+    tarantool> box.space.T:on_replace(F)
+    tarantool> box.space.T:run_triggers(false)
+    tarantool> box.space.T:on_replace(nil, F)
+    tarantool> box.space.T:on_replace(nil, F)
 
 ===========================================================
                     Getting a list of triggers
@@ -237,17 +263,19 @@ triggers, and executes the third function, which happens to
 contain the line "print('function #3')".
 Then it deletes the third trigger.
 
-| :codenormal:`tarantool>` :codebold:`box.session.on_connect()`
-| :codenormal:`---`
-| :codenormal:`- - 'function: 0x416ab6f8'`
-| |nbsp| |nbsp| :codenormal:`- 'function: 0x416ab6f8'`
-| |nbsp| |nbsp| :codenormal:`- 'function: 0x416ad800'`
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>` :codebold:`box.session.on_connect()[3]()`
-| :codenormal:`function #3`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`box.session.on_connect(nil,box.session.on_connect()[3])`
-| :codenormal:`---`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
+
+    tarantool> box.session.on_connect()
+    ---
+    - - 'function: 0x416ab6f8'
+      - 'function: 0x416ab6f8'
+      - 'function: 0x416ad800'
+    ...
+
+    tarantool> box.session.on_connect()[3]()
+    function #3
+    ---
+    ...
+    tarantool> box.session.on_connect(nil, box.session.on_connect()[3])
+    ---
+    ...

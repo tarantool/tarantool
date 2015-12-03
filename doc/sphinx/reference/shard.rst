@@ -13,51 +13,64 @@ The Tarantool shard package has facilities for creating shards,
 as well as analogues for the data-manipulation functions of the box library
 (select, insert, replace, update, delete).
 
-First some terminology: |br|
-**Consistent Hash** ...
-The shard package distributes according to a hash algorithm,
-that is, it applies a hash function to a tuple's primary-key value
-in order to decide which shard the tuple belongs to.
-The hash function is `consistent`_
-so that changing the number of servers will not affect results for many keys.
-The specific hash function that the shard package uses is
-guava.digest in the :codeitalic:`digest` package. |br|
-**Queue** ...
-A temporary list of recent update requests. Sometimes called "batching".
-Since updates to a sharded database can be slow, it may
-speed up throughput to send requests to a queue rather
-than wait for the update to finish on ever node.
-The shard package has functions for adding requests to the queue,
-which it will process without further intervention.
-Queuing is optional. |br|
-**Redundancy** ...
-The number of replicas in each shard. |br|
-**Replica** ...
-A complete copy of the data.
-The shard package handles both sharding and replication.
-One shard can contain one or more replicas.
-When a write occurs, the write is attempted on every replica in turn.
-The shard package does not use the built-in replication feature. |br|
-**Shard** ...
-A subset of the tuples in the database partitioned according to the
-value returned by the consistent hash function. Usually each shard
-is on a separate node, or a separate set of nodes (for example if
-redundancy = 3 then the shard will be on three nodes). |br|
-**Zone** ...
-A physical location where the nodes are closely connected, with
-the same security and backup and access points. The simplest example
-of a zone is a single computer with a single tarantool-server instance.
-A shard's replicas should be in different zones.
+First some terminology:
+
+.. glossary::
+
+    **Consistent Hash**
+        The shard package distributes according to a hash algorithm, that is,
+        it applies a hash function to a tuple's primary-key value in order to
+        decide which shard the tuple belongs to. The hash function is `consistent`_
+        so that changing the number of servers will not affect results for many
+        keys. The specific hash function that the shard package uses is
+        :func:`digest.guava` in the :codeitalic:`digest` package.
+
+    **Queue**
+        A temporary list of recent update requests. Sometimes called "batching".
+        Since updates to a sharded database can be slow, it may speed up
+        throughput to send requests to a queue rather than wait for the update
+        to finish on ever node. The shard package has functions for adding
+        requests to the queue, which it will process without further intervention.
+        Queuing is optional.
+
+    **Redundancy**
+        The number of replicas in each shard.
+
+    **Replica**
+        A complete copy of the data. The shard package handles both sharding
+        and replication. One shard can contain one or more replicas.
+        When a write occurs, the write is attempted on every replica in turn.
+        The shard package does not use the built-in replication feature.
+
+    **Shard**
+        A subset of the tuples in the database partitioned according to the
+        value returned by the consistent hash function. Usually each shard
+        is on a separate node, or a separate set of nodes (for example if
+        redundancy = 3 then the shard will be on three nodes).
+
+    **Zone**
+        A physical location where the nodes are closely connected, with
+        the same security and backup and access points. The simplest example
+        of a zone is a single computer with a single tarantool-server instance.
+        A shard's replicas should be in different zones.
 
 The shard package is distributed separately from the main tarantool package.
-To acquire it, do a separate install. For example on Ubuntu say |br|
-sudo apt-get install tarantool-shard tarantool-pool |br|
-Or, download from github tarantool/shard
-and compile as described in the README. Then, before using the package, say
-shard = require('shard')
+To acquire it, do a separate install. For example on Ubuntu say:
 
-The most important function is |br|
-:samp:`shard.init ({shard-configuration})` |br|
+.. code-block:: bash
+
+    sudo apt-get install tarantool-shard tarantool-pool
+
+Or, download from github tarantool/shard and compile as described in the README.
+Then, before using the package, say ``shard = require('shard')``
+
+The most important function is:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    shard.init(*shard-configuration*)
+
 This must be called for every shard.
 The shard-configuration is a table with these fields:
 
@@ -69,222 +82,249 @@ The shard-configuration is a table with these fields:
   (distinguishable from the 'listen' port specified by box.cfg)
 
 Possible Errors: Redundancy should not be greater than the number of servers;
-the servers must be alive; two replicas of the same shard should not be in the same zone.
+the servers must be alive; two replicas of the same shard should not be in the
+same zone.
 
-Example: shard.init syntax for one shard
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=====================================================================
+          Example: shard.init syntax for one shard
+=====================================================================
 
 The number of replicas per shard (redundancy) is 3.
 The number of servers is 3.
 The shard package will conclude that there is only one shard.
 
-| :codenormal:`tarantool>` :codebold:`cfg = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33131', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33132', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33133', zone = '3' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`};`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`login = 'tester';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'pass';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 3;`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 33131;`
-| :codebold:`}`
-| :codenormal:`tarantool>` :codebold:`server.init(cfg)`
+.. code-block:: tarantoolsession
 
+    tarantool> cfg = {
+             >   servers = {
+             >     { uri = 'loclhost:33131', zone = '1' },
+             >     { uri = 'loclhost:33132', zone = '2' },
+             >     { uri = 'loclhost:33133', zone = '3' },1
+             >   },
+             >   login = 'tester',
+             >   password = 'pass',
+             >   redundancy = '3'
+             >   binary = 33131,
+             > }
+    ---
+    ...
+    tarantool> server.init(cfg)
+    ---
+    ...
 
-Example: shard.init syntax for three shards
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+=====================================================================
+           Example: shard.init syntax for three shards
+=====================================================================
 
-This describes three shards. Each shard has two replicas.
-Since the number of servers is 7, and the number
-of replicas per server is 2, and dividing 7 / 2
-leaves a remainder of 1, one of the servers will
-not be used. This is not necessarily an error,
-because perhaps one of the servers in the list is
-not alive.
+This describes three shards. Each shard has two replicas. Since the number of
+servers is 7, and the number of replicas per server is 2, and dividing 7 / 2
+leaves a remainder of 1, one of the servers will not be used. This is not
+necessarily an error, because perhaps one of the servers in the list is not alive.
 
-| :codenormal:`tarantool>` :codebold:`cfg = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33131', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33131', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33132', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33133', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33131', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33132', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:33133', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`};`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`login = 'tester';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'pass';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 3;`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 33131;`
-| :codebold:`}`
-| :codenormal:`tarantool>` :codebold:`server.init(cfg)`
+.. code-block:: tarantoolsession
 
-:samp:`shard.{space_name}.insert` :code:`{...}` etc. |br|
-Every data-access function in the box package
-has an analogue in the shard package, so (for
-example) to insert in table T in a sharded database one
-simply says "shard.T:insert{...}" instead of
-"box.T:insert{...}".
-A "shard.T:select{}" request without a primary key will search all shards.
+    tarantool> cfg = {
+             >   servers = {
+             >     { uri = 'loclhost:33131', zone = '1' },
+             >     { uri = 'loclhost:33131', zone = '2' },
+             >     { uri = 'loclhost:33132', zone = '1' },
+             >     { uri = 'loclhost:33133', zone = '2' },
+             >     { uri = 'loclhost:33131', zone = '1' },
+             >     { uri = 'loclhost:33132', zone = '2' },
+             >     { uri = 'loclhost:33133', zone = '1' },
+             >   },
+             >   login = 'tester',
+             >   password = 'pass',
+             >   redundancy = '3'
+             >   binary = 33131,
+             > }
+    ---
+    ...
+    tarantool> server.init(cfg)
+    ---
+    ...
 
-:samp:`q_shard.{space_name}.insert` {:code:`{...}` etc. |br|
-Every queued data-access function has an analogue in the shard package.
-The user must add an operation_id. The details of queued
-data-access functions, and of maintenance-related functions,
-are on `the shard section of github`_.
+.. cssclass:: highlight
+.. parsed-literal::
 
+    shard[*space-name*].insert{...}
+    shard[*space-name*].replace{...}
+    shard[*space-name*].delete{...}
+    shard[*space-name*].select{...}
+    shard[*space-name*].update{...}
+    shard[*space-name*].auto_increment{...}
 
-Example: Shard, Minimal Configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Every data-access function in the box package has an analogue in the shard
+package, so (for example) to insert in table T in a sharded database one simply
+says ``shard.T:insert{...}`` instead of ``box.T:insert{...}``.
+A ``shard.T:select{}`` request without a primary key will search all shards.
 
-There is only one shard, and that shard contains only one replica.
-So this isn't illustrating the features of either
-replication or sharding, it's only illustrating
-what the syntax is, and what the messages look like,
-that anyone could duplicate in a minute or two
-with the magic of cut-and-paste.
+.. cssclass:: highlight
+.. parsed-literal::
 
-| :codenormal:`$` :codebold:`mkdir ~/tarantool_sandbox_1`
-| :codenormal:`$` :codebold:`cd ~/tarantool_sandbox_1`
-| :codenormal:`$` :codebold:`rm -r *.snap`
-| :codenormal:`$` :codebold:`rm -r *.xlog`
-| :codenormal:`$` :codebold:`~/tarantool-master/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen = 3301}`
-| :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
-| :codenormal:`tarantool>` :codebold:`cfg = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`};`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`login = 'admin';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3301;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
+    shard[*space-name*].q_insert{...}
+    shard[*space-name*].q_replace{...}
+    shard[*space-name*].q_delete{...}
+    shard[*space-name*].q_select{...}
+    shard[*space-name*].q_update{...}
+    shard[*space-name*].q_auto_increment{...}
+
+Every queued data-access function has an analogue in the shard package. The user
+must add an operation_id. The details of queued data-access functions, and of
+maintenance-related functions, are on `the shard section of github`_.
+
+=====================================================================
+             Example: Shard, Minimal Configuration
+=====================================================================
+
+There is only one shard, and that shard contains only one replica. So this isn't
+illustrating the features of either replication or sharding, it's only
+illustrating what the syntax is, and what the messages look like, that anyone
+could duplicate in a minute or two with the magic of cut-and-paste.
+
+.. code-block:: tarantoolsession
+
+    $ mkdir ~/tarantool_sandbox_1
+    $ cd ~/tarantool_sandbox_1
+    $ rm -r *.snap
+    $ rm -r *.xlog
+    $ ~/tarantool-master/src/tarantool
+
+    tarantool> box.cfg{listen = 3301}
+    tarantool> box.schema.space.create('tester')
+    tarantool> box.space.tester:create_index('primary', {})
+    tarantool> box.schema.user.passwd('admin', 'password')
+    tarantool> cfg = {
+             >   servers = {
+             >       { uri = 'localhost:3301', zone = '1' },
+             >   },
+             >   login = 'admin';
+             >   password = 'password';
+             >   redundancy = 1;
+             >   binary = 3301;
+             > }
+    tarantool> shard = require('shard')
+    tarantool> shard.init(cfg)
+    tarantool> -- Now put something in ...
+    tarantool> shard.tester:insert{1,'Tuple #1'}
 
 If one cuts and pastes the above, then the result,
 showing only the requests and responses for shard.init
 and shard.tester, should look approximately like this:
 
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`2015-08-09 ... I> Sharding initialization started...`
-| :codenormal:`2015-08-09 ... I> establishing connection to cluster servers...`
-| :codenormal:`2015-08-09 ... I>  - localhost:3301 - connecting...`
-| :codenormal:`2015-08-09 ... I>  - localhost:3301 - connected`
-| :codenormal:`2015-08-09 ... I> connected to all servers`
-| :codenormal:`2015-08-09 ... I> started`
-| :codenormal:`2015-08-09 ... I> redundancy = 1`
-| :codenormal:`2015-08-09 ... I> Zone len=1 THERE`
-| :codenormal:`2015-08-09 ... I> Adding localhost:3301 to shard 1`
-| :codenormal:`2015-08-09 ... I> Zone len=1 THERE`
-| :codenormal:`2015-08-09 ... I> shards = 1`
-| :codenormal:`2015-08-09 ... I> Done`
-| :codenormal:`---`
-| :codenormal:`- true`
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
-| :codenormal:`---`
-| :codenormal:`...`
-|
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
-| :codenormal:`---`
-| :codenormal:`- - [1, 'Tuple #1']`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
 
-Example: Shard, Scaling Out
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    tarantool> shard.init(cfg)
+    2015-08-09 ... I> Sharding initialization started...
+    2015-08-09 ... I> establishing connection to cluster servers...
+    2015-08-09 ... I>  - localhost:3301 - connecting...
+    2015-08-09 ... I>  - localhost:3301 - connected
+    2015-08-09 ... I> connected to all servers
+    2015-08-09 ... I> started
+    2015-08-09 ... I> redundancy = 1
+    2015-08-09 ... I> Zone len=1 THERE
+    2015-08-09 ... I> Adding localhost:3301 to shard 1
+    2015-08-09 ... I> Zone len=1 THERE
+    2015-08-09 ... I> shards = 1
+    2015-08-09 ... I> Done
+    ---
+    - true
+    ...
+    tarantool> -- Now put something in ...
+    ---
+    ...
+    tarantool> shard.tester:insert{1,'Tuple #1'}
+    ---
+    - - [1, 'Tuple #1']
+    ...
 
-There are two shards, and each shard contains one replica.
-This requires two nodes. In real life the two nodes would
-be two computers, but for this illustration the requirement
-is merely: start two shells, which we'll call Terminal#1 and Terminal #2.
+
+=====================================================================
+                 Example: Shard, Scaling Out
+=====================================================================
+
+There are two shards, and each shard contains one replica. This requires two
+nodes. In real life the two nodes would be two computers, but for this
+illustration the requirement is merely: start two shells, which we'll call
+Terminal#1 and Terminal #2.
 
 On Terminal #1, say:
 
-| :codenormal:`$` :codebold:`mkdir ~/tarantool_sandbox_1`
-| :codenormal:`$` :codebold:`cd ~/tarantool_sandbox_1`
-| :codenormal:`$` :codebold:`rm -r *.snap`
-| :codenormal:`$` :codebold:`rm -r *.xlog`
-| :codenormal:`$` :codebold:`~/tarantool-master/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen = 3301}`
-| :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
-| :codenormal:`tarantool>` :codebold:`cfg = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3302', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`};`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`login = 'admin';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3301;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now put something in ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:insert{1,'Tuple #1'}!`
+.. code-block:: tarantoolsession
+
+    $ mkdir ~/tarantool_sandbox_1
+    $ cd ~/tarantool_sandbox_1
+    $ rm -r *.snap
+    $ rm -r *.xlog
+    $ ~/tarantool-master/src/tarantool
+
+    tarantool> box.cfg{listen = 3301}
+    tarantool> box.schema.space.create('tester')
+    tarantool> box.space.tester:create_index('primary', {})
+    tarantool> box.schema.user.passwd('admin', 'password')
+    tarantool> console = require('console')
+    tarantool> cfg = {
+             >   servers = {
+             >     { uri = 'localhost:3301', zone = '1' },
+             >     { uri = 'localhost:3302', zone = '2' },
+             >   },
+             >   login = 'admin',
+             >   password = 'password',
+             >   redundancy = 1,
+             >   binary = 3301,
+             > }
+    tarantool> shard = require('shard')
+    tarantool> shard.init(cfg)
+    tarantool> -- Now put something in ...
+    tarantool> shard.tester:insert{1,'Tuple #1'}
 
 On Terminal #2, say:
 
-| :codenormal:`$` :codebold:`mkdir ~/tarantool_sandbox_2`
-| :codenormal:`$` :codebold:`cd ~/tarantool_sandbox_2`
-| :codenormal:`$` :codebold:`rm -r *.snap`
-| :codenormal:`$` :codebold:`rm -r *.xlog`
-| :codenormal:`$` :codebold:`~/tarantool-master/src/tarantool`
-|
-| :codenormal:`tarantool>` :codebold:`box.cfg{listen = 3302}`
-| :codenormal:`tarantool>` :codebold:`box.schema.space.create('tester')`
-| :codenormal:`tarantool>` :codebold:`box.space.tester:create_index('primary', {})`
-| :codenormal:`tarantool>` :codebold:`box.schema.user.passwd('admin', 'password')`
-| :codenormal:`tarantool>` :codebold:`console = require('console')`
-| :codenormal:`tarantool>` :codebold:`console.delimiter('!')`
-| :codenormal:`tarantool>` :codebold:`cfg = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`servers = {`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3301', zone = '1' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`{ uri = 'localhost:3302', zone = '2' };`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`};`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`login = 'admin';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`password = 'password';`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`redundancy = 1;`
-| |nbsp| |nbsp| |nbsp| |nbsp| :codebold:`binary = 3302;`
-| :codebold:`}!`
-| :codenormal:`tarantool>` :codebold:`shard = require('shard')!`
-| :codenormal:`tarantool>` :codebold:`shard.init(cfg)!`
-| :codenormal:`tarantool>` :codenormal:`-- Now get something out ...!`
-| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}!`
+.. code-block:: tarantoolsession
 
-What will appear on Terminal #1 is: a loop of
-error messages saying "Connection refused" and
-"server check failure". This is normal. It will
-go on until Terminal #2 process starts.
+    $ mkdir ~/tarantool_sandbox_2
+    $ cd ~/tarantool_sandbox_2
+    $ rm -r *.snap
+    $ rm -r *.xlog
+    $ ~/tarantool-master/src/tarantool
 
-What will appear on Terminal #2, at the end,
-should look like this:
+    tarantool> box.cfg{listen = 3302}
+    tarantool> box.schema.space.create('tester')
+    tarantool> box.space.tester:create_index('primary', {})
+    tarantool> box.schema.user.passwd('admin', 'password')
+    tarantool> console = require('console')
+    tarantool> cfg = {
+             >   servers = {
+             >     { uri = 'localhost:3301', zone = '1' };
+             >     { uri = 'localhost:3302', zone = '2' };
+             >   };
+             >   login = 'admin';
+             >   password = 'password';
+             >   redundancy = 1;
+             >   binary = 3302;
+             > }
+    tarantool> shard = require('shard')
+    tarantool> shard.init(cfg)
+    tarantool> -- Now get something out ...
+    tarantool> shard.tester:select{1}
 
-| :codenormal:`tarantool>` :codebold:`shard.tester:select{1}!`
-| :codenormal:`---`
-| :codenormal:`- - - [1, 'Tuple #1']`
-| :codenormal:`...`
+What will appear on Terminal #1 is: a loop of error messages saying "Connection
+refused" and "server check failure". This is normal. It will go on until
+Terminal #2 process starts.
 
-This shows that what was inserted by Terminal #1
-can be selected by Terminal #2, via the shard package.
+What will appear on Terminal #2, at the end, should look like this:
+
+.. code-block:: tarantoolsession
+
+    tarantool> shard.tester:select{1}
+    ---
+    - - - [1, 'Tuple #1']
+    ...
+
+This shows that what was inserted by Terminal #1 can be selected by Terminal #2,
+via the shard package.
 
 Details are on `the shard section of github`_.
 
 .. _consistent: https://en.wikipedia.org/wiki/Consistent_hashing
 .. _the shard section of github: https://github.com/tarantool/shard
-

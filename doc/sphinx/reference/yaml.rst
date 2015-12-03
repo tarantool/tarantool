@@ -23,8 +23,6 @@ series of non-YAML values and encodes them.
     :return: the original contents formatted as a Lua table.
     :rtype: table
 
-.. _yaml-null:
-
 .. data:: NULL
 
     A value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
@@ -33,46 +31,74 @@ series of non-YAML values and encodes them.
                     Example
 =================================================
 
-| :codenormal:`tarantool>` :codebold:`yaml = require('yaml')`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`y =  yaml.encode({'a',1,'b',2})`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`z = yaml.decode(y)`
-| :codenormal:`---`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`z[1],z[2],z[3],z[4]`
-| :codenormal:`---`
-| :codenormal:`- a`
-| :codenormal:`- 1`
-| :codenormal:`- b`
-| :codenormal:`- 2`
-| :codenormal:`...`
-| :codenormal:`tarantool>` :codebold:`if yaml.NULL == nil then print('hi') end`
-| :codenormal:`hi`
-| :codenormal:`---`
-| :codenormal:`...`
+.. code-block:: tarantoolsession
 
-The `YAML collection style <http://yaml.org/spec/1.1/#id930798>`_  can be specified with :code:`__serialize`:
-``__serialize="sequence"`` for a Block Sequence array,
-``__serialize="seq"`` for a Flow Sequence array,
-``__serialize="mapping"`` for a Block Mapping map,
-``__serialize="map"`` for a Flow Mapping map.
-Serializing 'A' and 'B' with different ``__serialize`` values causes different results: 
+    tarantool> yaml = require('yaml')
+    ---
+    ...
+    tarantool> y = yaml.encode({'a', 1, 'b', 2})
+    ---
+    ...
+    tarantool> z = yaml.decode(y)
+    ---
+    ...
+    tarantool> z[1], z[2], z[3], z[4]
+    ---
+    - a
+    - 1
+    - b
+    - 2
+    ...
+    tarantool> if yaml.NULL == nil then print('hi') end
+    hi
+    ---
+    ...
 
-| :codenormal:`tarantool>`\ :codebold:`yaml.encode(setmetatable({'A', 'B'}, { __serialize="sequence"}))`
-| :codenormal:`- A`
-| :codenormal:`- B`
-| :codenormal:`tarantool>` :codebold:`yaml.encode(setmetatable({'A', 'B'}, { __serialize="seq"}))`
-| :codenormal:`- ['A', 'B']`
-| :codenormal:`tarantool>`\ :codebold:`yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="map"})})`
-| :codenormal:`- f2: B`
-| :codenormal:`- f1: A`
-| :codenormal:`tarantool>`\ :codebold:`yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="mapping"})})`
-| :codenormal:`-  {'f2': 'B', 'f1': 'A'}`
+The `YAML collection style <http://yaml.org/spec/1.1/#id930798>`_ can be
+specified with ``__serialize``:
 
+* ``__serialize="sequence"`` for a Block Sequence array,
+* ``__serialize="seq"`` for a Flow Sequence array,
+* ``__serialize="mapping"`` for a Block Mapping map,
+* ``__serialize="map"`` for a Flow Mapping map.
+
+Serializing 'A' and 'B' with different ``__serialize`` values causes
+different results:
+
+.. code-block:: tarantoolsession
+
+    tarantool> yaml = require('yaml')
+    ---
+    ...
+    tarantool> yaml.encode(setmetatable({'A', 'B'}, { __serialize="sequence"}))
+    ---
+    - |
+      ---
+      - A
+      - B
+      ...
+    ...
+    tarantool> yaml.encode(setmetatable({'A', 'B'}, { __serialize="seq"}))
+    ---
+    - |
+      ---
+      ['A', 'B']
+      ...
+    ...
+    tarantool> yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="map"})})
+    ---
+    - |
+      ---
+      - {'f2': 'B', 'f1': 'A'}
+      ...
+    ...
+    tarantool> yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { __serialize="mapping"})})
+    ---
+    - |
+      ---
+      - f2: B
+        f1: A
+      ...
+    ...
 
 .. _YAML: http://yaml.org/
-
-

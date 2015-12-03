@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -42,20 +41,20 @@ extern "C" {
 
 #include <lua.h>
 
+struct luaL_serializer;
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
  * This instance is used by all box's Lua/C API bindings (e.g. space:replace()).
  * All changes made by msgpack.cfg{} function are also affect box's bindings
  * (this is a feature).
  */
-extern luaL_serializer *luaL_msgpack_default;
+extern struct luaL_serializer *luaL_msgpack_default;
 
 /**
  * A streaming API so that it's possible to encode to any output
  * stream.
  */
 
-extern "C" {
 /**
  * Ask the allocator to reserve at least size bytes. It can reserve
  * more, and update *size with the new size.
@@ -64,7 +63,9 @@ typedef	void *(*luamp_reserve_f)(void *ctx, size_t *size);
 
 /** Actually use the bytes. */
 typedef	void *(*luamp_alloc_f)(void *ctx, size_t size);
-}
+
+/** Actually use the bytes. */
+typedef	void (*luamp_error_f)(void *error_ctx);
 
 struct mpstream {
 	/**
@@ -76,7 +77,26 @@ struct mpstream {
 	void *ctx;
 	luamp_reserve_f reserve;
 	luamp_alloc_f alloc;
+	luamp_error_f error;
+	void *error_ctx;
 };
+
+/**
+ * luaL_error()
+ */
+void
+luamp_error(void *);
+
+void
+mpstream_init(struct mpstream *stream, void *ctx,
+	      luamp_reserve_f reserve, luamp_alloc_f alloc,
+	      luamp_error_f error, void *error_ctx);
+
+void
+mpstream_reset(struct mpstream *stream);
+
+void
+mpstream_reserve_slow(struct mpstream *stream, size_t size);
 
 static inline void
 mpstream_flush(struct mpstream *stream)
@@ -85,34 +105,11 @@ mpstream_flush(struct mpstream *stream)
 	stream->buf = stream->pos;
 }
 
-static inline void
-mpstream_reset(struct mpstream *stream)
-{
-	size_t size = 0;
-	stream->buf = (char *) stream->reserve(stream->ctx, &size);
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
-}
-
-static inline void
-mpstream_init(struct mpstream *stream, void *ctx,
-	      luamp_reserve_f reserve, luamp_alloc_f alloc)
-{
-	stream->ctx = ctx;
-	stream->reserve = reserve;
-	stream->alloc = alloc;
-	mpstream_reset(stream);
-}
-
 static inline char *
 mpstream_reserve(struct mpstream *stream, size_t size)
 {
-	if (stream->pos + size > stream->end) {
-		stream->alloc(stream->ctx, stream->pos - stream->buf);
-		stream->buf = (char *) stream->reserve(stream->ctx, &size);
-		stream->pos = stream->buf;
-		stream->end = stream->pos + size;
-	}
+	if (stream->pos + size > stream->end)
+		mpstream_reserve_slow(stream, size);
 	return stream->pos;
 }
 
@@ -153,7 +150,7 @@ luamp_encode_str(struct luaL_serializer *cfg, struct mpstream *stream,
 		 const char *str, uint32_t len);
 
 void
-luamp_encode_nil(struct luaL_serializer *cfg);
+luamp_encode_nil(struct luaL_serializer *cfg, struct mpstream *stream);
 
 void
 luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,

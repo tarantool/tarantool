@@ -201,8 +201,10 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0)
+	    if (rc != 0) {
+		    diag_raise();
 		    tnt_raise(SocketError, -1, "getaddrinfo");
+	    }
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (!uri->host_hint) freeaddrinfo(ai);
@@ -726,6 +728,8 @@ coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
 int
 coio_wait(int fd, int events, double timeout)
 {
+	if (fiber_is_cancelled())
+		return 0;
 	struct ev_io io;
 	coio_init(&io, fd);
 	ev_io_init(&io, coio_wait_cb, fd, events);

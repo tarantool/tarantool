@@ -38,7 +38,7 @@ void
 authenticate(const char *user_name, uint32_t len,
 	     const char *tuple, const char * /* tuple_end */)
 {
-	struct user *user = user_cache_find_by_name(user_name, len);
+	struct user *user = user_find_by_name_xc(user_name, len);
 	struct session *session = current_session();
 	uint32_t part_count;
 	uint32_t scramble_len;
@@ -49,8 +49,8 @@ authenticate(const char *user_name, uint32_t len,
 	 * pooling.
 	 */
 	part_count = mp_decode_array(&tuple);
-	if (part_count == 0 && user->uid == GUEST &&
-	    memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
+	if (part_count == 0 && user->def.uid == GUEST &&
+	    memcmp(user->def.hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
 		/* No password is set for GUEST, OK. */
 		goto ok;
 	}
@@ -79,12 +79,12 @@ authenticate(const char *user_name, uint32_t len,
 			   "invalid scramble size");
 	}
 
-	if (scramble_check(scramble, session->salt, user->hash2))
-		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
+	if (scramble_check(scramble, session->salt, user->def.hash2))
+		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def.name);
 
 	/* check and run auth triggers on success */
 	if (! rlist_empty(&session_on_auth))
-		session_run_on_auth_triggers(user->name);
+		session_run_on_auth_triggers(user->def.name);
 ok:
 	credentials_init(&session->credentials, user);
 }

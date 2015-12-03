@@ -230,7 +230,7 @@ box.begin = function()
         box.error()
     end
 end
--- box.commit yields, so it's defined in call.cc
+-- box.commit yields, so it's defined as Lua/C binding
 
 box.rollback = builtin.box_txn_rollback;
 
