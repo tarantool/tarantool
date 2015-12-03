@@ -13,7 +13,7 @@ git clone git://github.com/tarantool/tarantool.git
 cd tarantool
 mkdir build && cd build
 git submodule update --init
-CC=gcc49 CXX=g++49 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DCMAKE_C_FLAGS="-Wl,-rpath=/usr/local/lib/gcc49" -DCMAKE_CXX_FLAGS="-Wl,-rpath=/usr/local/lib/gcc49"
+CC=gcc49 CXX=g++49 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_FLAGS="-Wl,-rpath=/usr/local/lib/gcc49" -DCMAKE_CXX_FLAGS="-Wl,-rpath=/usr/local/lib/gcc49"
 gmake
 
 3. Set up python 2.7

@@ -145,7 +145,7 @@ macro(luajit_build)
         separate_arguments(luajit_cflags)
     set (luajut_ldflags ${CMAKE_STATIC_LINKER_FLAGS})
         separate_arguments(luajit_ldflags)
-    # We are consciously ommiting debug info in RelWithDebugInfo mode
+    # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)
         if (CC_HAS_GGDB)

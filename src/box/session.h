@@ -65,11 +65,6 @@ struct session {
 	 */
 	int fd;
 	/**
-	 * Peer cookie - description of the peer.
-	 * Only if the session has a peer.
-	 */
-	uint64_t cookie;
-	/**
 	 * For iproto requests, we set this field
 	 * to the value of packet sync. Since the
 	 * session may be reused between many requests,
@@ -176,7 +171,7 @@ session_storage_cleanup(int sid);
  * trigger fails or runs out of resources.
  */
 struct session *
-session_create(int fd, uint64_t cookie);
+session_create(int fd);
 
 /**
  * Destroy a session.

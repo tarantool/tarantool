@@ -77,7 +77,7 @@ luaL_testcancel(struct lua_State *L)
  *
  * The other potential problem comes from
  * fibers which never get scheduled, because are subscribed
- * or get no events. Such morphing fibers can be killed
+ * to or get no events. Such morphing fibers can be killed
  * with fiber.cancel(), since fiber.cancel()
  * sends an asynchronous wakeup event to the fiber.
  */
