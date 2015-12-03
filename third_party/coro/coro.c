@@ -77,6 +77,20 @@
 #  include <unistd.h>
 # endif
 
+/*
+ * coro_startup, if implemented, can lift new coro parameters from the
+ * saved registers. Alternatively, we can pass parameters via globals at
+ * the cost of 2 additional coro_transfer calls in coro_create.
+ */
+# if CORO_ASM && __arm__
+#  define CORO_STARTUP 1
+# else
+#  define CORO_STARTUP 0
+# endif
+
+# if CORO_STARTUP
+void coro_startup(); /* custom calling convention */
+# else
 static __thread coro_func coro_init_func;
 static __thread void *coro_init_arg;
 static __thread coro_context *new_coro, *create_coro;
@@ -98,6 +112,7 @@ coro_init (void)
   /* the new coro returned. bad. just abort() for now */
   abort ();
 }
+# endif
 
 # if CORO_SJLJ
 
@@ -234,17 +249,56 @@ trampoline (int sig)
          "\tpopl %ecx\n"
          "\tjmpl *%ecx\n"
 
+       #elif __ARM_ARCH==7
+
+         #define NUM_SAVED 25
+         "\tvpush {d8-d15}\n"
+         "\tpush {r4-r11,lr}\n"
+         "\tstr sp, [r0]\n"
+         "\tldr sp, [r1]\n"
+         "\tpop {r4-r11,lr}\n"
+         "\tvpop {d8-d15}\n"
+         "\tmov r15, lr\n"
+
        #else
          #error unsupported architecture
        #endif
   );
 
+#if CORO_STARTUP
+  asm (
+         "\t.globl coro_startup\n"
+         "\t.type coro_startup, %function\n"
+         "coro_startup:\n"
+
+       #if __ARM_ARCH==7
+
+         ".fnstart\n"
+         ".save {lr}\n"
+         ".pad #12\n"
+         "\tmov lr, #0\n"
+         "\tpush {lr}\n"
+         "\tsub sp, #12\n"
+         "\tmov r1, r5\n"
+         "\tblx r4\n"
+         "\tb abort\n"
+         ".fnend\n"
+
+       #else
+         #error unsupported architecture
+       #endif
+  );
+#endif
+
 # endif
+
 
 void
 coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ssize)
 {
+# if !CORO_STARTUP
   coro_context nctx;
+# endif
 # if CORO_SJLJ
   stack_t ostk, nstk;
   struct sigaction osa, nsa;
@@ -254,11 +308,13 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
   if (!coro)
     return;
 
+# if !CORO_STARTUP
   coro_init_func = coro;
   coro_init_arg  = arg;
 
   new_coro    = ctx;
   create_coro = &nctx;
+# endif
 
 # if CORO_SJLJ
   /* we use SIGUSR2. first block it, then fiddle with it. */
@@ -363,8 +419,14 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
 # elif CORO_ASM
 
   ctx->sp = (void **)(ssize + (char *)sptr);
-  *--ctx->sp = (void *)abort; /* needed for alignment only */
+#if __i386 || __x86_64
+  *--ctx->sp = (void *)0;
   *--ctx->sp = (void *)coro_init;
+#elif __arm__ && __ARM_ARCH == 7
+  /* return address stored in lr register, don't push anything */
+#else
+  #error unsupported architecture
+#endif
 
   #if CORO_WIN_TIB
   *--ctx->sp = 0;                    /* ExceptionList */
@@ -374,6 +436,16 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
 
   ctx->sp -= NUM_SAVED;
   memset (ctx->sp, 0, sizeof (*ctx->sp) * NUM_SAVED);
+
+#if __i386 || __x86_64
+  /* done already */
+#elif __arm__ && __ARM_ARCH == 7
+  ctx->sp[0] = coro; /* r4 */
+  ctx->sp[1] = arg;  /* r5 */
+  ctx->sp[8] = (void *)coro_startup; /* lr */
+#else
+  #error unsupported architecture
+#endif
 
 # elif CORO_UCONTEXT
 
@@ -388,7 +460,9 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
 
 # endif
 
+# if !CORO_STARTUP
   coro_transfer (create_coro, new_coro);
+# endif
 }
 
 /*****************************************************************************/
