@@ -95,34 +95,18 @@ server.admin('box.snapshot()')
 print '-------------------------------------------------------------'
 print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
-server.stop()
-script = server.script
-server.script = "replication/panic.lua"
-server.deploy()
 
-new_uuid = '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
-
-# Check log message
-# Requires panic_on_wal_error = false
-server.admin("box.space._cluster:replace{{1, '{0}'}}".format(new_uuid))
-server.admin("box.info.server.uuid")
-
-line = "server UUID changed to " + new_uuid
-print "check log line for '%s'" % line
-print
-if server.logfile_pos.seek_once(line) >= 0:
-    print "'%s' exists in server log" % line
-print
-server.admin("box.info.server.uuid")
-
-# Check that new UUID has been saved in snapshot
-server.admin("box.snapshot()")
-server.restart()
-
-server.admin("box.info.server.uuid")
+master_uuid = server.get_param('server')['uuid']
+sys.stdout.push_filter(master_uuid, '<master uuid>')
 
 # Invalid UUID
 server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
+
+# Update of UUID is not OK
+server.admin("box.space._cluster:replace{1, require('uuid').str()}")
+
+# Update of tail is OK
+server.admin("box.space._cluster:update(1, {{'=', 3, 'test'}})")
 
 print '-------------------------------------------------------------'
 print 'gh-1140: Assertion if replace _cluster tuple for remote server'
@@ -130,22 +114,19 @@ print '-------------------------------------------------------------'
 
 # Test that insert is OK
 new_uuid = '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'
-server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+server.admin("box.space._cluster:insert{{5, '{0}'}}".format(new_uuid))
 server.admin("box.info.vclock[5] == 0")
 
 # Replace with the same UUID is OK
 server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
-# Replace with a new UUID is OK
+# Replace with a new UUID is not OK
 new_uuid = 'a48a19a3-26c0-4f8c-a5b5-77377bab389b'
 server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
+# Update of tail is OK
+server.admin("box.space._cluster:update(5, {{'=', 3, 'test'}})")
 # Delete is OK
 server.admin("box.space._cluster:delete(5)")
 server.admin("box.info.vclock[5] == nil")
-
-# Cleanup
-server.stop()
-server.script = script
-server.deploy()
 
 print '-------------------------------------------------------------'
 print 'gh-527: update vclock on delete from box.space._cluster'
