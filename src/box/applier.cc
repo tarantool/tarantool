@@ -42,6 +42,7 @@
 #include "iproto_constants.h"
 #include "version.h"
 #include "trigger.h"
+#include "xrow_io.h"
 
 /* TODO: add configuration options */
 static const int RECONNECT_DELAY = 1;

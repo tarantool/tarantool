@@ -45,6 +45,7 @@
 #include "cfg.h"
 #include "trigger.h"
 #include "errinj.h"
+#include "xrow_io.h"
 
 void
 relay_send_row(struct recovery *r, void *param, struct xrow_header *packet);
