@@ -44,6 +44,7 @@
 #include <sophia.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include "unaligned.h"
 
 void*
 sophia_tuple_new(void *obj, struct key_def *key_def,
@@ -73,7 +74,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 		if (key_def->parts[i].type == STRING) {
 			size += mp_sizeof_str(parts[i].size);
 		} else {
-			size += mp_sizeof_uint(*(uint64_t *)parts[i].part);
+			size += mp_sizeof_uint(load_u64(parts[i].part));
 		}
 		i++;
 	}
@@ -106,7 +107,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 		if (key_def->parts[i].type == STRING)
 			p = mp_encode_str(p, parts[i].part, parts[i].size);
 		else
-			p = mp_encode_uint(p, *(uint64_t *)parts[i].part);
+			p = mp_encode_uint(p, load_u64(parts[i].part));
 	}
 	memcpy(p, value, valuesize);
 	if (format) {
@@ -378,7 +379,7 @@ sophia_upsert_to_tarantool(struct key_def *key_def, char *origin, int origin_siz
 			src_keysize_mp += mp_sizeof_str(ref[i].size);
 		} else {
 			ptr = origin + ref[i].offset;
-			src_keysize_mp += mp_sizeof_uint(*(uint64_t *)ptr);
+			src_keysize_mp += mp_sizeof_uint(load_u64(ptr));
 		}
 		*origin_keysize += sizeof(struct sophiaref) + ref[i].size;
 		i++;
@@ -411,7 +412,7 @@ sophia_upsert_to_tarantool(struct key_def *key_def, char *origin, int origin_siz
 		if (key_def->parts[i].type == STRING) {
 			src_ptr = mp_encode_str(src_ptr, ptr, ref[i].size);
 		} else {
-			src_ptr = mp_encode_uint(src_ptr, *(uint64_t *)ptr);
+			src_ptr = mp_encode_uint(src_ptr, load_u64(ptr));
 		}
 		i++;
 	}
