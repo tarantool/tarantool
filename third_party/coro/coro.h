@@ -375,7 +375,7 @@ struct coro_context
   void **sp; /* must be at offset 0 */
 };
 
-#if !__arm__
+#if !__arm__ && !__aarch64__
 void __attribute__ ((__noinline__, __regparm__(2)))
 coro_transfer (coro_context *prev, coro_context *next);
 #else

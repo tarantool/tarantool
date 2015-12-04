@@ -308,7 +308,7 @@ add_dependencies(build_bundled_libs coro)
 
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
     add_definitions("-DCORO_ASM")
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
     add_definitions("-DCORO_ASM")
 else()
     add_definitions("-DCORO_SJLJ")
