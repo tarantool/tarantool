@@ -10,13 +10,9 @@ local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
 local uint64_ptr_t = ffi.typeof('uint64_t *')
-local float_ptr_t = ffi.typeof('float *')
-local double_ptr_t = ffi.typeof('double *')
 local const_char_ptr_t = ffi.typeof('const char *')
 
 ffi.cdef([[
-uint32_t bswap_u32(uint32_t x);
-uint64_t bswap_u64(uint64_t x);
 char *
 mp_encode_float(char *data, float num);
 char *
@@ -25,16 +21,23 @@ float
 mp_decode_float(const char **data);
 double
 mp_decode_double(const char **data);
+union tmpint {
+    uint16_t u16;
+    uint32_t u32;
+    uint64_t u64;
+};
 ]])
+
+local strict_alignment = (jit.arch == 'arm')
+
+local tmpint
+if strict_alignment then
+   tmpint = ffi.new('union tmpint[1]')
+end
+
 local function bswap_u16(num)
     return bit.rshift(bit.bswap(tonumber(num)), 16)
 end
-local bswap_u32 = builtin.bswap_u32
-local bswap_u64 = builtin.bswap_u64
---[[ -- LuaJIT 2.1
-local bswap_u32 = bit.bswap
-local bswap_u64 = bit.bswap
---]]
 
 --------------------------------------------------------------------------------
 -- Encoder
@@ -64,22 +67,54 @@ local function encode_u8(buf, code, num)
     ffi.cast(uint8_ptr_t, p + 1)[0] = num
 end
 
-local function encode_u16(buf, code, num)
-    local p = buf:alloc(3)
-    p[0] = code
-    ffi.cast(uint16_ptr_t, p + 1)[0] = bswap_u16(num)
+local encode_u16
+if strict_alignment then
+    encode_u16 = function(buf, code, num)
+        tmpint[0].u16 = bswap_u16(num)
+        local p = buf:alloc(3)
+        p[0] = code
+        ffi.copy(p + 1, tmpint, 2)
+    end
+else
+    encode_u16 = function(buf, code, num)
+        local p = buf:alloc(3)
+        p[0] = code
+        ffi.cast(uint16_ptr_t, p + 1)[0] = bswap_u16(num)
+    end
 end
 
-local function encode_u32(buf, code, num)
-    local p = buf:alloc(5)
-    p[0] = code
-    ffi.cast(uint32_ptr_t, p + 1)[0] = bswap_u32(num)
+local encode_u32
+if strict_alignment then
+    encode_u32 = function(buf, code, num)
+        tmpint[0].u32 =
+            ffi.cast('uint32_t', bit.bswap(tonumber(num)))
+        local p = buf:alloc(5)
+        p[0] = code
+        ffi.copy(p + 1, tmpint, 4)
+    end
+else
+    encode_u32 = function(buf, code, num)
+        local p = buf:alloc(5)
+        p[0] = code
+        ffi.cast(uint32_ptr_t, p + 1)[0] =
+            ffi.cast('uint32_t', bit.bswap(tonumber(num)))
+    end
 end
 
-local function encode_u64(buf, code, num)
-    local p = buf:alloc(9)
-    p[0] = code
-    ffi.cast(uint64_ptr_t, p + 1)[0] = bswap_u64(ffi.cast('uint64_t', num))
+local encode_u64
+if strict_alignment then
+    encode_u64 = function(buf, code, num)
+        tmpint[0].u64 = bit.bswap(ffi.cast('uint64_t', num))
+        local p = buf:alloc(9)
+        p[0] = code
+        ffi.copy(p + 1, tmpint, 8)
+    end
+else
+    encode_u64 = function(buf, code, num)
+        local p = buf:alloc(9)
+        p[0] = code
+        ffi.cast(uint64_ptr_t, p + 1)[0] = bit.bswap(ffi.cast('uint64_t', num))
+    end
 end
 
 local function encode_float(buf, num)
@@ -277,25 +312,59 @@ local function decode_u8(data)
     return tonumber(num)
 end
 
-local function decode_u16(data)
-    local num = bswap_u16(ffi.cast(uint16_ptr_t, data[0])[0])
-    data[0] = data[0] + 2
-    return tonumber(num)
-end
-
-local function decode_u32(data)
-    local num = bswap_u32(ffi.cast(uint32_ptr_t, data[0])[0])
-    data[0] = data[0] + 4
-    return tonumber(num)
-end
-
-local function decode_u64(data)
-    local num = bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])
-    data[0] = data[0] + 8
-    if num <= DBL_INT_MAX then
-        return tonumber(num) -- return as 'number'
+local decode_u16
+if strict_alignment then
+    decode_u16 = function(data)
+        ffi.copy(tmpint, data[0], 2)
+        data[0] = data[0] + 2
+        return tonumber(bswap_u16(tmpint[0].u16))
     end
-    return num -- return as 'cdata'
+else
+    decode_u16 = function(data)
+        local num = bswap_u16(ffi.cast(uint16_ptr_t, data[0])[0])
+        data[0] = data[0] + 2
+        return tonumber(num)
+    end
+end
+
+local decode_u32
+if strict_alignment then
+    decode_u32 = function(data)
+        ffi.copy(tmpint, data[0], 4)
+        data[0] = data[0] + 4
+        return tonumber(
+            ffi.cast('uint32_t', bit.bswap(tonumber(tmpint[0].u32))))
+    end
+else
+    decode_u32 = function(data)
+        local num = ffi.cast('uint32_t',
+            bit.bswap(tonumber(ffi.cast(uint32_ptr_t, data[0])[0])))
+        data[0] = data[0] + 4
+        return tonumber(num)
+    end
+end
+
+local decode_u64
+if strict_alignment then
+    decode_u64 = function(data)
+        ffi.copy(tmpint, data[0], 8);
+        data[0] = data[0] + 8
+        local num = bit.bswap(tmpint[0].u64)
+        if num <= DBL_INT_MAX then
+            return tonumber(num) -- return as 'number'
+        end
+        return num -- return as 'cdata'
+    end
+else
+    decode_u64 = function(data)
+        local num =
+            bit.bswap(ffi.cast(uint64_ptr_t, data[0])[0])
+        data[0] = data[0] + 8
+        if num <= DBL_INT_MAX then
+            return tonumber(num) -- return as 'number'
+        end
+        return num -- return as 'cdata'
+    end
 end
 
 local function decode_i8(data)
@@ -304,26 +373,61 @@ local function decode_i8(data)
     return tonumber(num)
 end
 
-local function decode_i16(data)
-    local num = bswap_u16(ffi.cast(uint16_ptr_t, data[0])[0])
-    data[0] = data[0] + 2
-     return tonumber(ffi.cast('int16_t', ffi.cast('uint16_t', num)))
-end
-
-local function decode_i32(data)
-    local num = bswap_u32(ffi.cast(uint32_ptr_t, data[0])[0])
-    data[0] = data[0] + 4
-    return tonumber(ffi.cast('int32_t', ffi.cast('uint32_t', num)))
-end
-
-local function decode_i64(data)
-    local num = ffi.cast('int64_t', ffi.cast('uint64_t',
-        bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])))
-    data[0] = data[0] + 8
-    if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
-        return tonumber(num) -- return as 'number'
+local decode_i16
+if strict_alignment then
+    decode_i16 = function(data)
+        ffi.copy(tmpint, data[0], 2)
+        local num = bswap_u16(tmpint[0].u16)
+        data[0] = data[0] + 2
+        -- note: this double cast is actually necessary
+        return tonumber(ffi.cast('int16_t', ffi.cast('uint16_t', num)))
     end
-    return num -- return as 'cdata'
+else
+    decode_i16 = function(data)
+        local num = bswap_u16(ffi.cast(uint16_ptr_t, data[0])[0])
+        data[0] = data[0] + 2
+        -- note: this double cast is actually necessary
+        return tonumber(ffi.cast('int16_t', ffi.cast('uint16_t', num)))
+    end
+end
+
+local decode_i32
+if strict_alignment then
+    decode_i32 = function(data)
+        ffi.copy(tmpint, data[0], 4)
+        local num = bit.bswap(tonumber(tmpint[0].u32))
+        data[0] = data[0] + 4
+        return num
+    end
+else
+    decode_i32 = function(data)
+        local num = bit.bswap(tonumber(ffi.cast(uint32_ptr_t, data[0])[0]))
+        data[0] = data[0] + 4
+        return num
+    end
+end
+
+local decode_i64
+if strict_alignment then
+    decode_i64 = function(data)
+        ffi.copy(tmpint, data[0], 8)
+        data[0] = data[0] + 8
+        local num = bit.bswap(ffi.cast('int64_t', tmpint[0].u64))
+        if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
+            return tonumber(num) -- return as 'number'
+        end
+        return num -- return as 'cdata'
+    end
+else
+    decode_i64 = function(data)
+        local num = bit.bswap(ffi.cast('int64_t',
+                ffi.cast(uint64_ptr_t, data[0])[0]))
+        data[0] = data[0] + 8
+        if num >= -DBL_INT_MAX and num <= DBL_INT_MAX then
+            return tonumber(num) -- return as 'number'
+        end
+        return num -- return as 'cdata'
+    end
 end
 
 local function decode_float(data)
