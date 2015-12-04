@@ -44,7 +44,7 @@
 #include <sophia.h>
 #include <stdio.h>
 #include <inttypes.h>
-#include "unaligned.h"
+#include <bit/bit.h> /* load/store */
 
 void*
 sophia_tuple_new(void *obj, struct key_def *key_def,

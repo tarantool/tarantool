@@ -31,6 +31,42 @@
 
 #include "bit/bit.h"
 
+extern inline uint8_t
+load_u8(const void *p);
+
+extern inline uint16_t
+load_u16(const void *p);
+
+extern inline uint32_t
+load_u32(const void *p);
+
+extern inline uint64_t
+load_u64(const void *p);
+
+extern inline float
+load_float(const void *p);
+
+extern inline double
+load_double(const void *p);
+
+extern inline void
+store_u8(void *p, uint8_t v);
+
+extern inline void
+store_u16(void *p, uint16_t v);
+
+extern inline void
+store_u32(void *p, uint32_t v);
+
+extern inline void
+store_u64(void *p, uint64_t v);
+
+extern inline void
+store_float(void *p, float v);
+
+extern inline void
+store_double(void *p, double v);
+
 extern inline bool
 bit_test(const void *data, size_t pos);
 

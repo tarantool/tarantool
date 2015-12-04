@@ -41,7 +41,6 @@
 #include "lua/msgpack.h" /* luaL_msgpack_default */
 #include <fiber.h>
 #include "bit/bit.h"
-#include "unaligned.h"
 
 static inline void
 luaL_region_dup(struct lua_State *L, struct region *region,
