@@ -94,8 +94,8 @@ template <int IDX, int TYPE, int ...MORE_TYPES> struct FieldCompare { };
 /**
  * Common case.
  */
-template <int IDX, int TYPE, int IDX2, int ...MORE_TYPES>
-struct FieldCompare<IDX, TYPE, IDX2, MORE_TYPES...>
+template <int IDX, int TYPE, int IDX2, int TYPE2, int ...MORE_TYPES>
+struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
 	inline static int compare(const struct tuple *tuple_a,
 				  const struct tuple *tuple_b,
@@ -116,7 +116,7 @@ struct FieldCompare<IDX, TYPE, IDX2, MORE_TYPES...>
 			field_a = tuple_field_old(format_a, tuple_a, IDX2);
 			field_b = tuple_field_old(format_b, tuple_b, IDX2);
 		}
-		return FieldCompare<IDX2, MORE_TYPES...>::
+		return FieldCompare<IDX2, TYPE2, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
 				format_b, field_a, field_b);
 	}
@@ -139,7 +139,7 @@ struct FieldCompare<IDX, TYPE>
 /**
  * header
  */
-template <int IDX, int ...MORE_TYPES>
+template <int IDX, int TYPE, int ...MORE_TYPES>
 struct TupleCompare
 {
 	static int compare(const struct tuple *tuple_a,
@@ -150,14 +150,14 @@ struct TupleCompare
 		struct tuple_format *format_b = tuple_format(tuple_b);
 		const char *field_a = tuple_field_old(format_a, tuple_a, IDX);
 		const char *field_b = tuple_field_old(format_b, tuple_b, IDX);
-		return FieldCompare<IDX, MORE_TYPES...>::
+		return FieldCompare<IDX, TYPE, MORE_TYPES...>::
 			compare(tuple_a, tuple_b, format_a,
 				format_b, field_a, field_b);
 	}
 };
 
-template <int ...MORE_TYPES>
-struct TupleCompare<0, MORE_TYPES...> {
+template <int TYPE, int ...MORE_TYPES>
+struct TupleCompare<0, TYPE, MORE_TYPES...> {
 	static int compare(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
 			   const struct key_def *)
@@ -168,7 +168,7 @@ struct TupleCompare<0, MORE_TYPES...> {
 		const char *field_b = tuple_b->data;
 		mp_decode_array(&field_a);
 		mp_decode_array(&field_b);
-		return FieldCompare<0, MORE_TYPES...>::compare(tuple_a, tuple_b,
+		return FieldCompare<0, TYPE, MORE_TYPES...>::compare(tuple_a, tuple_b,
 					format_a, format_b, field_a, field_b);
 	}
 };
@@ -178,9 +178,8 @@ struct comparator_signature {
 	tuple_compare_t f;
 	uint32_t p[64];
 };
-
 #define COMPARATOR(...) \
-	{ TupleCompare<__VA_ARGS__>::compare, __VA_ARGS__, UINT32_MAX },
+	{ TupleCompare<__VA_ARGS__>::compare, { __VA_ARGS__, UINT32_MAX } },
 
 /**
  * field1 no, field1 type, field2 no, field2 type, ...
@@ -283,8 +282,8 @@ struct FieldCompareWithKey {};
 /**
  * common
  */
-template <int FLD_ID, int IDX, int TYPE, int IDX2, int ...MORE_TYPES>
-struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, MORE_TYPES...>
+template <int FLD_ID, int IDX, int TYPE, int IDX2, int TYPE2, int ...MORE_TYPES>
+struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
 	inline static int
 	compare(const struct tuple *tuple, const char *key,
@@ -304,7 +303,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, MORE_TYPES...>
 			field = tuple_field_old(format, tuple, IDX2);
 			mp_next(&key);
 		}
-		return FieldCompareWithKey<FLD_ID + 1, IDX2, MORE_TYPES...>::
+		return FieldCompareWithKey<FLD_ID + 1, IDX2, TYPE2, MORE_TYPES...>::
 				compare(tuple, key, part_count,
 					       key_def, format, field);
 	}
@@ -326,7 +325,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE> {
 /**
  * header
  */
-template <int FLD_ID, int IDX, int ...MORE_TYPES>
+template <int FLD_ID, int IDX, int TYPE, int ...MORE_TYPES>
 struct TupleCompareWithKey
 {
 	static int
@@ -338,14 +337,14 @@ struct TupleCompareWithKey
 			return 0;
 		struct tuple_format *format = tuple_format(tuple);
 		const char *field = tuple_field_old(format, tuple, IDX);
-		return FieldCompareWithKey<FLD_ID, IDX, MORE_TYPES...>::
+		return FieldCompareWithKey<FLD_ID, IDX, TYPE, MORE_TYPES...>::
 				compare(tuple, key, part_count,
 					key_def, format, field);
 	}
 };
 
-template <int ...MORE_TYPES>
-struct TupleCompareWithKey<0, 0, MORE_TYPES...>
+template <int TYPE, int ...MORE_TYPES>
+struct TupleCompareWithKey<0, 0, TYPE, MORE_TYPES...>
 {
 	static int compare(const struct tuple *tuple,
 				  const char *key,
@@ -358,7 +357,7 @@ struct TupleCompareWithKey<0, 0, MORE_TYPES...>
 		struct tuple_format *format = tuple_format(tuple);
 		const char *field = tuple->data;
 		mp_decode_array(&field);
-		return FieldCompareWithKey<0, 0, MORE_TYPES...>::
+		return FieldCompareWithKey<0, 0, TYPE, MORE_TYPES...>::
 			compare(tuple, key, part_count,
 				key_def, format, field);
 	}
@@ -373,7 +372,7 @@ struct comparator_with_key_signature
 };
 
 #define KEY_COMPARATOR(...) \
-	{ TupleCompareWithKey<0, __VA_ARGS__>::compare, __VA_ARGS__ },
+	{ TupleCompareWithKey<0, __VA_ARGS__>::compare, { __VA_ARGS__ } },
 
 static const comparator_with_key_signature cmp_wk_arr[] = {
 	KEY_COMPARATOR(0, NUM   , 1, NUM   , 2, NUM   )

@@ -59,37 +59,16 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 
 /** {{{ Lua/C implementation of index:select(): used only by Sophia **/
 
-struct port_lua
+static inline void
+lbox_port_buf_to_table(lua_State *L, struct port_buf *port_buf)
 {
-	struct port_vtab *vtab;
-	struct lua_State *L;
-	size_t size; /* for port_lua_add_tuple */
-};
-
-static inline struct port_lua *
-port_lua(struct port *port) { return (struct port_lua *) port; }
-
-static void
-port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
-{
-	lua_State *L = port_lua(port)->L;
-	lbox_pushtuple(L, tuple);
-	lua_rawseti(L, -2, ++port_lua(port)->size);
-}
-
-/** Add all tuples to a Lua table. */
-void
-port_lua_table_create(struct port_lua *port, struct lua_State *L)
-{
-	static struct port_vtab port_lua_vtab = {
-		port_lua_table_add_tuple,
-		null_port_eof,
-	};
-	port->vtab = &port_lua_vtab;
-	port->L = L;
-	port->size = 0;
-	/* The destination table to append tuples to. */
-	lua_newtable(L);
+	lua_createtable(L, port_buf->size, 0);
+	struct port_buf_entry *entry = port_buf->first;
+	for (size_t i = 0 ; i < port_buf->size; i++) {
+		lbox_pushtuple(L, entry->tuple);
+		lua_rawseti(L, -2, i + 1);
+		entry = entry->next;
+	}
 }
 
 static int
@@ -110,14 +89,26 @@ lbox_select(lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
 
-	/* TODO: This code definetly leaks without EXTERNAL_UNWIND  */
-	int top = lua_gettop(L);
-	struct port_lua port;
-	port_lua_table_create(&port, L);
+	struct port_buf port;
+	port_buf_create(&port);
 	if (box_select((struct port *) &port, space_id, index_id, iterator,
-			offset, limit, key, key + key_len) != 0)
+			offset, limit, key, key + key_len) != 0) {
+		port_buf_destroy(&port);
 		return lbox_error(L);
-	return lua_gettop(L) - top;
+	}
+
+	/*
+	 * Lua may raise an exception during allocating table or pushing
+	 * tuples. In this case `port' definitely will leak. It is possible to
+	 * wrap lbox_port_buf_to_table() to pcall(), but it was too expensive
+	 * for this binding according to our benchmarks (~5% decrease).
+	 * However, we tried to simulate this situation and LuaJIT finalizers
+	 * table always crashed the first (can't be fixed with pcall).
+	 * https://github.com/tarantool/tarantool/issues/1182
+	 */
+	lbox_port_buf_to_table(L, &port);
+	port_buf_destroy(&port);
+	return 1; /* lua table with tuples */
 }
 
 /* }}} */

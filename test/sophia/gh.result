@@ -202,7 +202,7 @@ s:insert{'1','2','0'}
 ...
 i:select({'1','2',nil},{iterator='GT'})
 ---
-- error: Sophia Index iterator does not support uncomplete keys
+- error: Sophia Index iterator does not support partial keys
 ...
 s:drop()
 ---

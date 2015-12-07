@@ -189,12 +189,6 @@ lbox_unpack(struct lua_State *L)
 
 	int save_stacksize = lua_gettop(L);
 
-	uint8_t  u8buf;
-	uint16_t u16buf;
-	uint32_t u32buf;
-	double dbl;
-	float flt;
-
 #define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
 	luaL_error(L, "pickle.unpack('%c'): got %d bytes (expected: %d+)",	\
 		   *f, (int) (end - str), (int) 1 + ((cur) - str));	\
@@ -203,54 +197,47 @@ lbox_unpack(struct lua_State *L)
 		switch (*f) {
 		case 'b':
 			CHECK_SIZE(s);
-			u8buf = *(uint8_t *) s;
-			lua_pushnumber(L, u8buf);
+			lua_pushnumber(L, load_u8(s));
 			s++;
 			break;
 		case 's':
 			CHECK_SIZE(s + 1);
-			u16buf = *(uint16_t *) s;
-			lua_pushnumber(L, u16buf);
+			lua_pushnumber(L, load_u16(s));
 			s += 2;
 			break;
 		case 'n':
 			CHECK_SIZE(s + 1);
-			u16buf = ntohs(*(uint16_t *) s);
-			lua_pushnumber(L, u16buf);
+			lua_pushnumber(L, ntohs(load_u16(s)));
 			s += 2;
 			break;
 		case 'i':
 			CHECK_SIZE(s + 3);
-			u32buf = *(uint32_t *) s;
-			lua_pushnumber(L, u32buf);
+			lua_pushnumber(L, load_u32(s));
 			s += 4;
 			break;
 		case 'N':
 			CHECK_SIZE(s + 3);
-			u32buf = ntohl(*(uint32_t *) s);
-			lua_pushnumber(L, u32buf);
+			lua_pushnumber(L, ntohl(load_u32(s)));
 			s += 4;
 			break;
 		case 'l':
 			CHECK_SIZE(s + 7);
-			luaL_pushuint64(L, *(uint64_t*) s);
+			luaL_pushuint64(L, load_u64(s));
 			s += 8;
 			break;
 		case 'q':
 			CHECK_SIZE(s + 7);
-			luaL_pushuint64(L, bswap_u64(*(uint64_t*) s));
+			luaL_pushuint64(L, bswap_u64(load_u64(s)));
 			s += 8;
 			break;
 		case 'd':
 			CHECK_SIZE(s + 7);
-			dbl = *(double *) s;
-			lua_pushnumber(L, dbl);
+			lua_pushnumber(L, load_double(s));
 			s += 8;
 			break;
 		case 'f':
 			CHECK_SIZE(s + 3);
-			flt = *(float *) s;
-			lua_pushnumber(L, flt);
+			lua_pushnumber(L, load_float(s));
 			s += 4;
 			break;
 		case 'a':
