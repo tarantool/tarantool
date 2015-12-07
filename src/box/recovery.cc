@@ -148,7 +148,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 		free(r);
 	});
 
-	recovery_update_mode(r, WAL_NONE);
+	r->wal_mode = WAL_NONE;
 
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
@@ -174,13 +174,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	guard.is_active = false;
 	return r;
-}
-
-void
-recovery_update_mode(struct recovery *r, enum wal_mode mode)
-{
-	assert(mode < WAL_MODE_MAX);
-	r->wal_mode = mode;
 }
 
 void
@@ -427,8 +420,8 @@ recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
 	r->wal_mode = wal_mode;
 	if (r->wal_mode == WAL_FSYNC)
 		(void) strcat(r->wal_dir.open_wflags, "s");
-
-	wal_writer_start(r, rows_per_wal);
+	if (r->wal_mode != WAL_NONE)
+		wal_writer_start(r, &r->vclock, rows_per_wal);
 }
 
 
@@ -489,7 +482,7 @@ public:
 		async.data = this;
 
 		ev_async_start(loop(), &async);
-		if (wal_set_watcher(recovery, &watcher, &async) == -1) {
+		if (wal_set_watcher(recovery->writer, &watcher, &async) == -1) {
 			/* Fallback to fs events. */
 			ev_async_stop(loop(), &async);
 			ev_stat_set(&dir_stat, dir_path, 0.0);
@@ -501,7 +494,7 @@ public:
 	{
 		ev_stat_stop(loop(), &file_stat);
 		ev_stat_stop(loop(), &dir_stat);
-		wal_clear_watcher(recovery, &watcher);
+		wal_clear_watcher(recovery->writer, &watcher);
 		ev_async_stop(loop(), &async);
 	}
 

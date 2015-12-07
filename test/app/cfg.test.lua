@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(35)
+test:plan(30)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -58,17 +58,17 @@ test:ok(status and result == 'table', 'configured box')
 --------------------------------------------------------------------------------
 
 test:is(box.cfg.wal_mode, "write", "wal_mode default value")
-box.cfg{wal_mode = ""}
-test:is(box.cfg.wal_mode, "write", "wal_mode default value")
-box.cfg{wal_mode = "none"}
-test:is(box.cfg.wal_mode, "none", "wal_mode change")
+-- box.cfg{wal_mode = ""}
+-- test:is(box.cfg.wal_mode, "write", "wal_mode default value")
+-- box.cfg{wal_mode = "none"}
+-- test:is(box.cfg.wal_mode, "none", "wal_mode change")
 -- "" or NULL resets option to default value
-box.cfg{wal_mode = ""}
-test:is(box.cfg.wal_mode, "write", "wal_mode default value")
-box.cfg{wal_mode = "none"}
-test:is(box.cfg.wal_mode, "none", "wal_mode change")
-box.cfg{wal_mode = require('msgpack').NULL}
-test:is(box.cfg.wal_mode, "write", "wal_mode default value")
+-- box.cfg{wal_mode = ""}
+-- test:is(box.cfg.wal_mode, "write", "wal_mode default value")
+-- box.cfg{wal_mode = "none"}
+-- test:is(box.cfg.wal_mode, "none", "wal_mode change")
+-- box.cfg{wal_mode = require('msgpack').NULL}
+-- test:is(box.cfg.wal_mode, "write", "wal_mode default value")
 
 test:is(box.cfg.panic_on_wal_error, true, "panic_on_wal_mode default value")
 box.cfg{panic_on_wal_error=false}

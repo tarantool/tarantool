@@ -188,7 +188,7 @@ static void wal_writer_f(va_list ap);
  *         points to a newly created WAL writer.
  */
 int
-wal_writer_start(struct recovery *r, int rows_per_wal)
+wal_writer_start(struct recovery *r, struct vclock *vclock, int rows_per_wal)
 {
 	assert(r->writer == NULL);
 	assert(r->current_wal == NULL);
@@ -200,7 +200,7 @@ wal_writer_start(struct recovery *r, int rows_per_wal)
 	r->writer = writer;
 
 	/* I. Initialize the state. */
-	wal_writer_init(writer, &r->vclock, rows_per_wal);
+	wal_writer_init(writer, vclock, rows_per_wal);
 
 	/* II. Start the thread. */
 
@@ -551,15 +551,12 @@ wal_write(struct wal_writer *writer, struct wal_request *req)
 }
 
 int
-wal_set_watcher(struct recovery *recovery, struct wal_watcher *watcher,
-		     struct ev_async *async)
+wal_set_watcher(struct wal_writer *writer, struct wal_watcher *watcher,
+		struct ev_async *async)
 {
-	struct wal_writer *writer;
 
-	if (recovery == NULL || recovery->writer == NULL)
+	if (writer == NULL)
 		return -1;
-
-	writer = recovery->writer;
 
 	watcher->loop = loop();
 	watcher->async = async;
@@ -570,14 +567,10 @@ wal_set_watcher(struct recovery *recovery, struct wal_watcher *watcher,
 }
 
 void
-wal_clear_watcher(struct recovery *recovery, struct wal_watcher *watcher)
+wal_clear_watcher(struct wal_writer *writer, struct wal_watcher *watcher)
 {
-	struct wal_writer *writer;
-
-	if (recovery == NULL || recovery->writer == NULL)
+	if (writer == NULL)
 		return;
-
-	writer = recovery->writer;
 
 	tt_pthread_mutex_lock(&writer->watchers_mutex);
 	rlist_del_entry(watcher, next);

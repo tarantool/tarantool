@@ -5,7 +5,6 @@ ffi.cdef([[
 void free(void *);
 void check_cfg();
 void load_cfg();
-void box_set_wal_mode(void);
 void box_set_listen(void);
 void box_set_replication_source(void);
 void box_set_log_level(void);
@@ -139,7 +138,6 @@ local modify_cfg = {
 
 -- dynamically settable options
 local dynamic_cfg = {
-    wal_mode                = ffi.C.box_set_wal_mode,
     listen                  = ffi.C.box_set_listen,
     replication_source      = ffi.C.box_set_replication_source,
     log_level               = ffi.C.box_set_log_level,

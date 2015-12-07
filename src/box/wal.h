@@ -61,7 +61,7 @@ int64_t
 wal_write(struct wal_writer *writer, struct wal_request *req);
 
 int
-wal_writer_start(struct recovery *state, int rows_per_wal);
+wal_writer_start(struct recovery *state, struct vclock *vclock, int rows_per_wal);
 
 void
 wal_writer_stop(struct recovery *r);
@@ -79,11 +79,11 @@ struct wal_watcher
  * Fails (-1) if recovery is NULL or lacking a WAL writer.
  */
 int
-wal_set_watcher(struct recovery *, struct wal_watcher *,
-		     struct ev_async *);
+wal_set_watcher(struct wal_writer *, struct wal_watcher *,
+		struct ev_async *);
 
 void
-wal_clear_watcher(struct recovery *, struct wal_watcher *);
+wal_clear_watcher(struct wal_writer *, struct wal_watcher *);
 
 #endif /* defined(__cplusplus) */
 

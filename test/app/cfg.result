@@ -1,5 +1,5 @@
 TAP version 13
-1..35
+1..30
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
@@ -11,11 +11,6 @@ ok - box is not started
 ok - exception on unconfigured box
 ok - sophia_dir is not auto-created
 ok - configured box
-ok - wal_mode default value
-ok - wal_mode default value
-ok - wal_mode change
-ok - wal_mode default value
-ok - wal_mode change
 ok - wal_mode default value
 ok - panic_on_wal_mode default value
 ok - panic_on_wal_mode new value

@@ -60,7 +60,6 @@ void *ffi_symbols[] = {
 	(void *) load_cfg,
 	(void *) box_set_listen,
 	(void *) box_set_replication_source,
-	(void *) box_set_wal_mode,
 	(void *) box_set_log_level,
 	(void *) box_set_io_collect_interval,
 	(void *) box_set_snap_io_rate_limit,

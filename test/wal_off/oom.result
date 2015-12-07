@@ -252,10 +252,10 @@ for i=1,10000 do space:insert{i, str} end
 ---
 - error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
-definatelly_used = index:count() * 16 * 1024
+definitely_used = index:count() * 16 * 1024
 ---
 ...
-2 * definatelly_used > arena_bytes -- at least half memory used
+2 * definitely_used > arena_bytes -- at least half memory used
 ---
 - true
 ...
@@ -277,10 +277,10 @@ for i=1,10000 do space:insert{i, str} end
 ---
 - error: Failed to allocate <NUM> bytes in slab allocator for tuple
 ...
-definatelly_used = index:count() * 16 * 1024
+definitely_used = index:count() * 16 * 1024
 ---
 ...
-2 * definatelly_used > arena_bytes -- at least half memory used
+2 * definitely_used > arena_bytes -- at least half memory used
 ---
 - true
 ...

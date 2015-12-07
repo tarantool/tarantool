@@ -266,7 +266,6 @@ box_check_rows_per_wal(int rows_per_wal)
 void
 box_check_config()
 {
-	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));
@@ -377,24 +376,6 @@ box_cfg_listen_eq(struct uri *what)
 		uri.host_len == what->host_len &&
 		memcmp(uri.service, what->service, uri.service_len) == 0 &&
 		memcmp(uri.host, what->host, uri.host_len) == 0);
-}
-
-extern "C" void
-box_set_wal_mode(void)
-{
-	const char *mode_name = cfg_gets("wal_mode");
-	enum wal_mode mode = box_check_wal_mode(mode_name);
-	if (mode != recovery->wal_mode &&
-	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
-		tnt_raise(ClientError, ER_CFG, "wal_mode",
-			  "cannot switch to/from fsync");
-	}
-	/**
-	 * Really update WAL mode only after we left local hot standby,
-	 * since local hot standby expects it to be NONE.
-	 */
-	if (recovery->writer)
-		recovery_update_mode(recovery, mode);
 }
 
 extern "C" void
