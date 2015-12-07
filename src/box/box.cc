@@ -342,8 +342,9 @@ box_set_replication_source(void)
 	}
 
 	box_sync_replication_source();
-	cluster_foreach_applier(applier) {
-		applier_resume(applier);
+	server_foreach(server) {
+		if (server->applier != NULL)
+			applier_resume(server->applier);
 	}
 }
 
@@ -655,7 +656,7 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 /**
  * @brief Called when recovery/replication wants to add a new server
  * to cluster.
- * cluster_add_server() is called as a commit trigger on cluster
+ * server_set_id() is called as a commit trigger on cluster
  * space and actually adds the server to the cluster.
  * @param server_uuid
  */
@@ -1013,14 +1014,15 @@ box_init(void)
 	 */
 	box_sync_replication_source();
 	/* Use the first replica by URI as a bootstrap leader */
-	struct applier *master = cluster_applier_first();
+	struct server *master = server_first();
+	assert(master == NULL || master->applier != NULL);
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (master != NULL && !box_cfg_listen_eq(&master->uri)) {
+	} else if (master != NULL && !box_cfg_listen_eq(&master->applier->uri)) {
 		/* Generate Server-UUID */
 		tt_uuid_create(&recovery->server_uuid);
 
@@ -1031,13 +1033,13 @@ box_init(void)
 		vclock_add_server(&recovery->vclock, 0);
 
 		/* Download and process a data snapshot from master */
-		if (applier_bootstrap(master) != 0) {
+		if (applier_bootstrap(master->applier) != 0) {
 			diag_raise();
 			assert(0); /* panic() called by box_load_cfg() */
 		}
 
 		/* Replace server vclock using master's vclock */
-		vclock_copy(&recovery->vclock, &master->vclock);
+		vclock_copy(&recovery->vclock, &master->applier->vclock);
 
 		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
 		engine_checkpoint(checkpoint_id);
@@ -1074,8 +1076,9 @@ box_init(void)
 	rmean_cleanup(rmean_box);
 
 	/* Follow replica */
-	cluster_foreach_applier(applier) {
-		applier_resume(applier);
+	server_foreach(server) {
+		if (server->applier != NULL)
+			applier_resume(server->applier);
 	}
 
 	/* Enter read-write mode. */

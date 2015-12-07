@@ -209,16 +209,11 @@ relay_subscribe(int fd, struct xrow_header *packet,
 		uint32_t master_server_id,
 		struct vclock *master_vclock)
 {
-	struct relay relay;
-	relay_create(&relay, fd, packet->sync);
-	auto scope_guard = make_scoped_guard([&]{
-		relay_destroy(&relay);
-	});
-
 	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
-	struct recovery *r = relay.r;
-	xrow_decode_subscribe(packet, &uu, &server_uuid, &r->vclock);
+	struct vclock vclock;
+	vclock_create(&vclock);
+	xrow_decode_subscribe(packet, &uu, &server_uuid, &vclock);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
@@ -232,12 +227,30 @@ relay_subscribe(int fd, struct xrow_header *packet,
 	}
 
 	/* Check server uuid */
-	r->server_id = schema_find_id(BOX_CLUSTER_ID, 1,
-				      tt_uuid_str(&server_uuid), UUID_STR_LEN);
-	if (r->server_id == BOX_ID_NIL) {
+	struct server *server = server_by_uuid(&server_uuid);
+	if (server == NULL || server->id == SERVER_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&server_uuid));
 	}
+
+	/* Don't allow multiple relays for the same server */
+	if (server->relay != NULL) {
+		tnt_error(ClientError, ER_CFG, "replication_source",
+			  "duplicate connection with the same server UUID");
+	}
+
+	struct relay relay;
+	relay_create(&relay, fd, packet->sync);
+	server_set_relay(server, &relay);
+	auto scope_guard = make_scoped_guard([&]{
+		server_clear_relay(server);
+		relay_destroy(&relay);
+	});
+
+	struct recovery *r = relay.r;
+	r->server_id = server->id;
+	vclock_copy(&r->vclock, &vclock);
+
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,

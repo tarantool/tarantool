@@ -42,7 +42,7 @@
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
-#include "cluster.h" /* for cluster_set_uuid() */
+#include "cluster.h" /* for server_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
 
@@ -1931,24 +1931,30 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	(void) trigger;
 	struct txn_stmt *stmt = txn_last_stmt((struct txn *) event);
 	struct tuple *new_tuple = stmt->new_tuple;
+	struct tuple *old_tuple = stmt->old_tuple;
 
 	if (new_tuple == NULL) {
-		uint32_t old_id = tuple_field_u32(stmt->old_tuple, 0);
-		cluster_del_server(old_id);
+		struct tt_uuid old_uuid = tuple_field_uuid(stmt->old_tuple, 1);
+		struct server *server = server_by_uuid(&old_uuid);
+		assert(server != NULL);
+		server_clear_id(server);
 		return;
+	} else if (old_tuple != NULL) {
+		return; /* nothing to change */
 	}
+
 	uint32_t id = tuple_field_u32(new_tuple, 0);
 	tt_uuid uuid = tuple_field_uuid(new_tuple, 1);
-	struct tuple *old_tuple = stmt->old_tuple;
-	if (old_tuple != NULL) {
-		uint32_t old_id = tuple_field_u32(old_tuple, 0);
-		if (id != old_id) {
-			/* box.space._cluster:update(old, {{'=', 1, new}} */
-			cluster_del_server(old_id);
-			cluster_add_server(id, &uuid);
-		}
+	struct server *server = server_by_uuid(&uuid);
+	if (server != NULL) {
+		server_set_id(server, id);
 	} else {
-		cluster_add_server(id, &uuid);
+		server = cluster_add_server(id, &uuid);
+		if (server == NULL) {
+			/* Can't throw exceptions from on_commit trigger */
+			panic("Can't register server: %s",
+			      diag_last_error(&fiber()->diag)->errmsg);
+		}
 	}
 }
 
@@ -1982,7 +1988,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	if (new_tuple != NULL) {
 		/* Check fields */
 		uint32_t server_id = tuple_field_u32(new_tuple, 0);
-		if (cserver_id_is_reserved(server_id))
+		if (server_id_is_reserved(server_id))
 			tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
 				  (unsigned) server_id);
 		if (server_id >= VCLOCK_MAX)

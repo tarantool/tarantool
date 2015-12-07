@@ -39,8 +39,6 @@
 #include "tt_uuid.h"
 #include "trigger.h"
 #include "third_party/tarantool_ev.h"
-#define RB_COMPACT 1
-#include <third_party/rb.h>
 #include "vclock.h"
 #include "ipc.h"
 
@@ -73,7 +71,6 @@ struct applier {
 	uint32_t id;
 	struct tt_uuid uuid;
 	char source[APPLIER_SOURCE_MAXLEN];
-	rb_node(struct applier) link; /* a set by source in cluster.cc */
 	struct uri uri;
 	uint32_t version_id; /* remote version */
 	struct vclock vclock;

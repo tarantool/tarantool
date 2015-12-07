@@ -32,7 +32,8 @@
  */
 #include "tt_uuid.h"
 #include <stdint.h>
-#include "applier.h"
+#define RB_COMPACT 1
+#include <third_party/rb.h> /* serverset_t */
 
 /**
  * @module cluster - global state of multi-master
@@ -101,13 +102,76 @@ cluster_clock();
 
 /* }}} */
 
-/** {{{ Cluster server id API **/
+/** {{{ Cluster server API **/
+
+/**
+ * Summary information about server in the cluster.
+ */
+struct server {
+	rb_node(struct server) link;
+	struct tt_uuid uuid;
+	struct applier *applier;
+	struct relay *relay;
+	uint32_t id;
+};
+
+enum {
+	/**
+	 * Reserved id used for local requests, snapshot rows and in cases
+	 * where id is unknown.
+	 */
+	SERVER_ID_NIL = 0,
+};
 
 static inline bool
-cserver_id_is_reserved(uint32_t id)
+server_id_is_reserved(uint32_t id)
 {
-        return id == 0;
+        return id == SERVER_ID_NIL;
 }
+
+/**
+ * Find a server by UUID
+ */
+struct server *
+server_by_uuid(const struct tt_uuid *uuid);
+
+struct server *
+server_first(void);
+
+struct server *
+server_next(struct server *server);
+
+#define server_foreach(var) \
+	for (struct server *var = server_first(); \
+	     var != NULL; var = server_next(var))
+/**
+ * Set numeric cluster-local id of remote server.
+ * table. Add server to the cluster lsn table with LSN = 0.
+ */
+void
+server_set_id(struct server *server, uint32_t id);
+
+/*
+ * Clear numeric cluster-local id of remote server.
+ *
+ * The server is removed from the cluster lsn table.
+ */
+void
+server_clear_id(struct server *server);
+
+/**
+ * Register \a relay within the \a server.
+ * \pre the only one relay can be registered.
+ * \pre server->id != SERVER_ID_NIL
+ */
+void
+server_set_relay(struct server *server, struct relay *relay);
+
+/**
+ * Unregister \a relay from the \a server.
+ */
+void
+server_clear_relay(struct server *server);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -115,39 +179,16 @@ cserver_id_is_reserved(uint32_t id)
 /**
  * Register the universally unique identifier of a remote server and
  * a matching cluster-local identifier in the  cluster registry.
- * Called when a remote master joins the cluster.
- *
- * The server is added to the cluster lsn table with LSN 0.
+ * Called from on_replace_dd_cluster() when a remote master joins the cluster.
  */
-void
+struct server *
 cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid);
-
-void
-cluster_del_server(uint32_t server_id);
-
-/** }}} **/
-
-/** {{{ Cluster applier API **/
 
 int
 cluster_set_appliers(struct applier **appliers, int count);
 
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-struct applier *
-cluster_applier_first(void);
-
-struct applier *
-cluster_applier_next(struct applier *applier);
-
-#define cluster_foreach_applier(var) \
-	for (struct applier *var = cluster_applier_first(); \
-	     var != NULL; var = cluster_applier_next(var))
 /** }}} **/
 
-#if defined(__cplusplus)
-} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif

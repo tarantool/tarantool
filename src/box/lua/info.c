@@ -60,12 +60,14 @@ lbox_pushvclock(struct lua_State *L, struct vclock *vclock)
 }
 
 static void
-lbox_pushreplica(lua_State *L, struct applier *applier)
+lbox_pushreplica(lua_State *L, struct server *server)
 {
+	struct applier *applier = server->applier;
+
 	lua_createtable(L, 0, 4);
 
 	lua_pushstring(L, "uuid");
-	lua_pushstring(L, tt_uuid_str(&applier->uuid));
+	lua_pushstring(L, tt_uuid_str(&server->uuid));
 	lua_settable(L, -3);
 
 	/* Get applier state in lower case */
@@ -112,14 +114,14 @@ lbox_info_replication(struct lua_State *L)
 	lua_setfield(L, -2, "__serialize");
 	lua_setmetatable(L, -2);
 
-	cluster_foreach_applier(applier) {
+	server_foreach(server) {
 		/* Applier hasn't received server_id yet */
-		if (cserver_id_is_reserved(applier->id))
+		if (server->id == SERVER_ID_NIL || server->applier == NULL)
 			continue;
 
-		lbox_pushreplica(L, applier);
+		lbox_pushreplica(L, server);
 
-		lua_rawseti(L, -2, applier->id);
+		lua_rawseti(L, -2, server->id);
 	}
 
 	return 1;
