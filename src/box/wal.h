@@ -36,6 +36,7 @@
 
 struct fiber;
 struct recovery;
+struct wal_writer;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
@@ -57,7 +58,7 @@ struct wal_request: public cmsg {
 };
 
 int64_t
-wal_write(struct recovery *r, struct wal_request *req);
+wal_write(struct wal_writer *writer, struct wal_request *req);
 
 int
 wal_writer_start(struct recovery *state, int rows_per_wal);
@@ -78,12 +79,11 @@ struct wal_watcher
  * Fails (-1) if recovery is NULL or lacking a WAL writer.
  */
 int
-wal_register_watcher(
-	struct recovery *, struct wal_watcher *, struct ev_async *);
+wal_set_watcher(struct recovery *, struct wal_watcher *,
+		     struct ev_async *);
 
 void
-wal_unregister_watcher(
-	struct recovery *, struct wal_watcher *);
+wal_clear_watcher(struct recovery *, struct wal_watcher *);
 
 #endif /* defined(__cplusplus) */
 

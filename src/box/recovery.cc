@@ -489,7 +489,7 @@ public:
 		async.data = this;
 
 		ev_async_start(loop(), &async);
-		if (wal_register_watcher(recovery, &watcher, &async) == -1) {
+		if (wal_set_watcher(recovery, &watcher, &async) == -1) {
 			/* Fallback to fs events. */
 			ev_async_stop(loop(), &async);
 			ev_stat_set(&dir_stat, dir_path, 0.0);
@@ -501,7 +501,7 @@ public:
 	{
 		ev_stat_stop(loop(), &file_stat);
 		ev_stat_stop(loop(), &dir_stat);
-		wal_unregister_watcher(recovery, &watcher);
+		wal_clear_watcher(recovery, &watcher);
 		ev_async_stop(loop(), &async);
 	}
 

@@ -528,14 +528,9 @@ wal_writer_f(va_list ap)
  * to be written to disk and wait until this task is completed.
  */
 int64_t
-wal_write(struct recovery *r, struct wal_request *req)
+wal_write(struct wal_writer *writer, struct wal_request *req)
 {
-	if (r->wal_mode == WAL_NONE)
-		return vclock_sum(&r->vclock);
-
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
-
-	struct wal_writer *writer = r->writer;
 
 	req->fiber = fiber();
 	req->res = -1;
@@ -556,9 +551,8 @@ wal_write(struct recovery *r, struct wal_request *req)
 }
 
 int
-wal_register_watcher(
-	struct recovery *recovery,
-	struct wal_watcher *watcher, struct ev_async *async)
+wal_set_watcher(struct recovery *recovery, struct wal_watcher *watcher,
+		     struct ev_async *async)
 {
 	struct wal_writer *writer;
 
@@ -576,9 +570,7 @@ wal_register_watcher(
 }
 
 void
-wal_unregister_watcher(
-	struct recovery *recovery,
-	struct wal_watcher *watcher)
+wal_clear_watcher(struct recovery *recovery, struct wal_watcher *watcher)
 {
 	struct wal_writer *writer;
 

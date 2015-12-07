@@ -208,7 +208,13 @@ txn_write_to_wal(struct txn *txn)
 	assert(req->n_rows == txn->n_rows);
 
 	ev_tstamp start = ev_now(loop()), stop;
-	int64_t res = wal_write(recovery, req);
+	int64_t res;
+	if (recovery->wal_mode == WAL_NONE) {
+		res = vclock_sum(&recovery->vclock);
+	} else {
+		res = wal_write(recovery->writer, req);
+	}
+
 	stop = ev_now(loop());
 	if (stop - start > too_long_threshold)
 		say_warn("too long WAL write: %.3f sec", stop - start);
