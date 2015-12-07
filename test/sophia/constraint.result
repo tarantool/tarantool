@@ -129,7 +129,7 @@ space:get{1}
 ...
 index:select({1}, {iterator = box.index.GT})
 ---
-- error: Sophia Index iterator does not support uncomplete keys
+- error: Sophia Index iterator does not support partial keys
 ...
 space:drop()
 ---

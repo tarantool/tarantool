@@ -745,7 +745,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	if (part_count > 0) {
 		if (part_count != key_def->part_count) {
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-			          "Sophia Index iterator", "uncomplete keys");
+			          "Sophia Index iterator", "partial keys");
 		}
 	} else {
 		key = NULL;
