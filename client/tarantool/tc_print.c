@@ -60,8 +60,8 @@ void tc_printf(char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	int stat = vfprintf(tc.pager_stream, fmt, args);
-	if (stat < 0)
-		tc_error("Can't write into pager - %d", errno);
+	if (stat < 0 && errno != EPIPE)
+		tc_error("Can't write into pager - %S", strerror(errno));
 	va_end(args);
 	return;
 }
