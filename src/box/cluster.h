@@ -184,7 +184,7 @@ server_clear_relay(struct server *server);
 struct server *
 cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid);
 
-int
+void
 cluster_set_appliers(struct applier **appliers, int count);
 
 /** }}} **/

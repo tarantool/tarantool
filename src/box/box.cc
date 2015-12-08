@@ -31,6 +31,7 @@
 #include "box/box.h"
 
 #include <say.h>
+#include <scoped_guard.h>
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -316,17 +317,15 @@ box_sync_replication_source(void)
 	if (appliers == NULL)
 		diag_raise();
 
-	if (applier_connect_all(appliers, count, recovery) != 0)
-		goto error;
+	auto guard = make_scoped_guard([=]{
+		for (int i = 0; i < count; i++)
+			applier_delete(appliers[i]); /* doesn't affect diag */
+	});
 
-	if (cluster_set_appliers(appliers, count) != 0)
-		goto error;
+	applier_connect_all(appliers, count, recovery);
+	cluster_set_appliers(appliers, count);
 
-	return;
-error:
-	for (int i = 0; i < count; i++)
-		applier_delete(appliers[i]); /* doesn't affect diag */
-	diag_raise(); /* re-throw original error */
+	guard.is_active = false;
 }
 
 extern "C" void
@@ -1033,10 +1032,7 @@ box_init(void)
 		vclock_add_server(&recovery->vclock, 0);
 
 		/* Download and process a data snapshot from master */
-		if (applier_bootstrap(master->applier) != 0) {
-			diag_raise();
-			assert(0); /* panic() called by box_load_cfg() */
-		}
+		applier_bootstrap(master->applier);
 
 		/* Replace server vclock using master's vclock */
 		vclock_copy(&recovery->vclock, &master->applier->vclock);

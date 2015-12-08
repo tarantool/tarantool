@@ -32,6 +32,7 @@
 #include "cluster.h"
 #include "recovery.h"
 #include "applier.h"
+#include <scoped_guard.h>
 #include <fiber.h> /* &cord->slabc */
 #include <small/mempool.h>
 
@@ -93,11 +94,9 @@ static struct server *
 server_new(const struct tt_uuid *uuid)
 {
 	struct server *server = (struct server *) mempool_alloc(&server_pool);
-	if (server == NULL) {
-		diag_set(OutOfMemory, sizeof(*server), "malloc",
-			 "struct server");
-		return NULL;
-	}
+	if (server == NULL)
+		tnt_raise(OutOfMemory, sizeof(*server), "malloc",
+			  "struct server");
 	server->id = 0;
 	server->uuid = *uuid;
 	server->applier = NULL;
@@ -120,8 +119,6 @@ cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 
 	assert(server_by_uuid(server_uuid) == NULL);
 	struct server *server = server_new(server_uuid);
-	if (server == NULL)
-		return NULL;
 	serverset_insert(&serverset, server);
 	server_set_id(server, server_id);
 	return server;
@@ -171,23 +168,26 @@ server_clear_id(struct server *server)
 	}
 }
 
-int
+void
 cluster_set_appliers(struct applier **appliers, int count)
 {
 	serverset_t uniq;
 	serverset_new(&uniq);
 	struct server *server, *next;
 
+	auto uniq_guard = make_scoped_guard([&]{
+		serverset_foreach_safe(&uniq, server, next) {
+			serverset_remove(&uniq, server);
+			server_delete(server);
+		}
+	});
+
 	/* Check for duplicate UUID */
 	for (int i = 0; i < count; i++) {
 		server = server_new(&appliers[i]->uuid);
-		if (server == NULL)
-			goto error;
-
 		if (serverset_search(&uniq, server) != NULL) {
-			tnt_error(ClientError, ER_CFG, "replication_source",
+			tnt_raise(ClientError, ER_CFG, "replication_source",
 				  "duplicate connection to the same server");
-			goto error;
 		}
 
 		server->applier = appliers[i];
@@ -234,13 +234,6 @@ cluster_set_appliers(struct applier **appliers, int count)
 			server_delete(server);
 		}
 	}
-	return 0;
-error:
-	serverset_foreach_safe(&uniq, server, next) {
-	     serverset_remove(&uniq, server);
-	     server_delete(server);
-	}
-	return -1;
 }
 
 void

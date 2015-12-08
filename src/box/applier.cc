@@ -483,12 +483,12 @@ applier_on_bootstrap(struct trigger *trigger, void *event)
 	applier_pause(applier);
 }
 
-int
+void
 applier_connect_all(struct applier **appliers, int count,
 		    struct recovery *recovery)
 {
 	if (count == 0)
-		return 0; /* nothing to do */
+		return; /* nothing to do */
 
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
@@ -544,7 +544,7 @@ applier_connect_all(struct applier **appliers, int count,
 	}
 
 	/* Now all the appliers are connected, finish. */
-	return 0;
+	return;
 error:
 	/*
 	 * Preserve the original error which can be overwritten by
@@ -564,11 +564,11 @@ error:
 	/* Restore original error */
 	diag_move(&diag, &fiber()->diag);
 	diag_destroy(&diag);
-	return -1;
+	diag_raise();
 }
 
 /** Download and process the data snapshot from master. */
-int
+void
 applier_bootstrap(struct applier *master)
 {
 	/* cfg_get_replication_source() post condition */
@@ -619,10 +619,9 @@ applier_bootstrap(struct applier *master)
 		/* Re-throw the original error */
 		assert(!diag_is_empty(&master->reader->diag));
 		diag_move(&master->reader->diag, &fiber()->diag);
-		return -1; /* box_init() will panic */
+		diag_raise();
 	}
 
 	/* Leave the applier in CONNECTED state */
 	assert(master->state == APPLIER_CONNECTED);
-	return 0;
 }

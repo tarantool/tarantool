@@ -1949,11 +1949,11 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	if (server != NULL) {
 		server_set_id(server, id);
 	} else {
-		server = cluster_add_server(id, &uuid);
-		if (server == NULL) {
+		try {
+			server = cluster_add_server(id, &uuid);
 			/* Can't throw exceptions from on_commit trigger */
-			panic("Can't register server: %s",
-			      diag_last_error(&fiber()->diag)->errmsg);
+		} catch(Exception *e) {
+			panic("Can't register server: %s", e->errmsg);
 		}
 	}
 }

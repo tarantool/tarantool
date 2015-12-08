@@ -130,7 +130,7 @@ applier_delete(struct applier *applier);
  * \post appliers are connected to remote hosts and paused.
  * Use applier_resume(applier) to resume applier.
  */
-int
+void
 applier_connect_all(struct applier **appliers, int count,
 		   struct recovery *recovery);
 
@@ -140,7 +140,7 @@ applier_connect_all(struct applier **appliers, int count,
  * \post applier is paused && applier->state == APPLIER_CONNECTED
  * \sa applier_connect_all
  */
-int
+void
 applier_bootstrap(struct applier *master);
 
 /*
