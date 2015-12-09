@@ -1,12 +1,12 @@
 #include "module.h"
 #include "msgpuck/msgpuck.h"
-#include <time.h>
+#include <sys/time.h>
 double
 proctime(void)
 {
-	struct timespec ts;
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-	return (double) ts.tv_sec + ts.tv_nsec / 1e9;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (double) tv.tv_sec + 1e-6 * tv.tv_usec;
 
 }
 int
