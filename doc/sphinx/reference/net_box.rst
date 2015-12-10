@@ -91,6 +91,19 @@ necessary to prioritize requests or to use different authentication ids.
 
             net_box.self:wait_connected()
 
+    .. method:: is_connected()
+
+        Show whether connection is active or closed.
+
+        :return: true if connected, false on failure.
+        :rtype:  boolean
+
+        **Example:**
+
+        .. code-block:: lua
+
+            net_box.self:is_connected()
+
 
     .. method:: close()
 

@@ -9,6 +9,7 @@
 
     box
     box_error
+    clock
     console
     csv
     digest

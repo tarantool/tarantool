@@ -100,7 +100,7 @@ host/port.
     **Example:**
 
     A special use of ``console.start()`` is with
-    :ref:`initialization files <URI>`.
+    :ref:`initialization files <init-label>`.
     Normally, if one starts the tarantool server with
     :samp:`tarantool {initialization file}`
     there is no console. This can be remedied by adding

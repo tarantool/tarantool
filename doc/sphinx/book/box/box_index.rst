@@ -14,7 +14,11 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. data:: unique
 
-        true if the index is unique.
+        True if the index is unique, false if the index is not unique.
+
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
 
         :rtype: boolean
 
@@ -22,11 +26,19 @@ API is a direct binding to corresponding methods of index objects of type
 
         Index type, 'TREE' or 'HASH' or 'BITSET' or 'RTREE'.
 
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+
         :rtype: string
 
     .. data:: parts
 
         An array describing index key fields.
+
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
 
         :rtype: table
 
@@ -66,7 +78,11 @@ API is a direct binding to corresponding methods of index objects of type
         Iteration, resumed after a yield point, does not preserve the read view,
         but continues with the new content of the database.
 
-        :param type: iteration strategy as defined in tables below
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{iterator-type}` = iteration strategy as defined in tables below.
+
         :return: this method returns an iterator closure, i.e. a function which can
                 be used to get the next value on each invocation
         :rtype:  function, tuple
@@ -287,6 +303,8 @@ API is a direct binding to corresponding methods of index objects of type
             ---
             ...
 
+    .. _index_object_select:
+
     .. method:: select(key, options)
 
         This is an alternative to :func:`box.space...select() <space_object.select>`
@@ -297,7 +315,8 @@ API is a direct binding to corresponding methods of index objects of type
 
         Parameters:
 
-        * :samp:`field-value(s)` = values to be matched against the index key.
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`field-value(s)` = values to be matched against the index key;
         * :samp:`option(s)` any or all of
             * :samp:`iterator = {iterator-type}`,
             * :samp:`limit = {maximum-number-of-tuples}`,
@@ -426,6 +445,11 @@ API is a direct binding to corresponding methods of index objects of type
 
         Find the minimum value in the specified index.
 
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`key-value`.
+
         :return: the tuple for the first key in the index. If optional
                 ``key-value`` is supplied, returns the first key which
                 is greater than or equal to ``key-value``.
@@ -447,6 +471,11 @@ API is a direct binding to corresponding methods of index objects of type
     .. method:: max([key-value])
 
         Find the maximum value in the specified index.
+
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`key-value`.
 
         :return: the tuple for the last key in the index. If optional ``key-value``
                 is supplied, returns the last key which is less than or equal to
@@ -472,7 +501,11 @@ API is a direct binding to corresponding methods of index objects of type
         important to get insight into data distribution in an index without having
         to iterate over the entire data set.
 
-        :param integer random-value: an arbitrary non-negative integer.
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`random-value` (type = number) = an arbitrary non-negative integer.
+
         :return: the tuple for the random key in the index.
         :rtype:  tuple
 
@@ -492,10 +525,13 @@ API is a direct binding to corresponding methods of index objects of type
         Iterate over an index, counting the number of
         tuples which equal the provided search criteria.
 
-        :param lua-value key-value: the value which must match the key(s) in the
-                                    specified index. The type may be a list of
-                                    field-values, or a tuple containing only
-                                    the field-values.
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{key-value}` (type = Lua table or scalar) =
+          the value which must match the key(s) in the specified index. The type
+          may be a list of field-values, or a tuple containing only the
+          field-values; :samp:{options}`.
 
         :return: the number of matching index keys. The ``count`` function
                 is only applicable for the memtx storage engine.
@@ -520,8 +556,14 @@ API is a direct binding to corresponding methods of index objects of type
         but key is searched in this index instead of primary key.
         This index ought to be unique.
 
-        :param lua-value key: key to be matched against the index key
-        :param table {operator, field_no, value}: update opearations (see: :func:`box.space...update() <space_object.update>`)
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`key-value`;
+        * :samp:`{key}` (type = Lua table or scalar) = key to be matched against
+          the index key;
+        * :samp:`{operator, field_no, value}` (type = Lua table) = update
+          operations (see: :func:`box.space...update() <space_object.update>`).
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -530,11 +572,15 @@ API is a direct binding to corresponding methods of index objects of type
 
         Delete a tuple identified by a key.
 
-        Same as :func:`box.space...delete() <space_object.delete>`,
-        but key is searched in this index instead of primary key.
-        This index ought to be unique.
+        Same as :func:`box.space...delete() <space_object.delete>`, but key is
+        searched in this index instead of in the primary-key index. This index
+        ought to be unique.
 
-        :param lua-value key: key to be matched against the index key
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`key` (type = Lua table or scalar) = key to be matched against
+          the index key.
 
         :return: the deleted tuple.
         :rtype:  tuple
@@ -543,7 +589,12 @@ API is a direct binding to corresponding methods of index objects of type
 
         Alter an index.
 
-        :param table options: options list for create_index().
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{options}` = options list, same as the options list for
+          :func:`create_index <space_object.create_index>`.
+
         :return: nil
 
         Possible errors: Index does not exist, or
@@ -563,6 +614,10 @@ API is a direct binding to corresponding methods of index objects of type
         Drop an index. Dropping a primary-key index has
         a side effect: all tuples are deleted.
 
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
+
         :return: nil.
 
         Possible errors: Index does not exist.
@@ -579,10 +634,14 @@ API is a direct binding to corresponding methods of index objects of type
 
         Rename an index.
 
-        :param string index-name: new name for index.
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
+        * :samp:`{index-name}` (type = string) = new name for index.
+
         :return: nil
 
-        Possible errors: If index-name does not exist.
+        Possible errors: index_object does not exist.
 
         **Example:**
 
@@ -597,6 +656,10 @@ API is a direct binding to corresponding methods of index objects of type
     .. method:: bsize()
 
         Return the total number of bytes taken by the index.
+
+        Parameters:
+
+        * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
 
         :return: number of bytes
         :rtype: number

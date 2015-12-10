@@ -110,7 +110,7 @@ lbox_session_su(struct lua_State *L)
 		luaL_error(L, "session.su(): bad arguments");
 	struct session *session = current_session();
 	if (session == NULL)
-		luaL_error(L, "session.su(): session does not exit");
+		luaL_error(L, "session.su(): session does not exist");
 	struct user *user;
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
@@ -161,7 +161,7 @@ lbox_session_fd(struct lua_State *L)
 	uint32_t sid = luaL_checkint(L, -1);
 	struct session *session = session_find(sid);
 	if (session == NULL)
-		luaL_error(L, "session.fd(): session does not exit");
+		luaL_error(L, "session.fd(): session does not exist");
 	lua_pushinteger(L, session->fd);
 	return 1;
 }
@@ -183,7 +183,7 @@ lbox_session_peer(struct lua_State *L)
 	else
 		session = current_session();
 	if (session == NULL)
-		luaL_error(L, "session.peer(): session does not exit");
+		luaL_error(L, "session.peer(): session does not exist");
 	fd = session->fd;
 	if (fd < 0) {
 		lua_pushnil(L); /* no associated peer */

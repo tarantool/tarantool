@@ -433,31 +433,40 @@ The basic *data-manipulation* requests are: ``insert``, ``replace``, ``update``,
 Most of them may return data. Usually both inputs and outputs are Lua tables.
 
 The Lua syntax for data-manipulation functions can vary. Here are examples of
-the variations with ``select`` examples; the same rules exist for the other
+the variations with ``select`` requests; the same rules exist for the other
 data-manipulation functions. Every one of the examples does the same thing:
 select a tuple set from a space named tester where the primary-key field value
-equals 1.
+equals 1. For the examples there is an assumption that the numeric id of 'tester' is 512,
+which happens to be the case in our sandbox example only.
 
-First, there are four *naming variations*:
+.. _object-reference:
+
+First, there are five *object reference variations*:
 
 .. code-block:: tarantoolsession
 
-    -- #1
+    -- #1 package . sub-package . name
     tarantool> box.space.tester:select{1}
-    -- #2
+    -- #2 replace name with a literal in square brackets
     tarantool> box.space['tester']:select{1}
-    -- #3
+    -- #3 replace name with a numeric id in square brackets
     tarantool> box.space[512]:select{1}
-    -- #4
+    -- #4 use a variable instead of a literal for the name
     tarantool> variable = 'tester'
     tarantool> box.space[variable]:select{1}
+    -- #5 use a variable for the entire object reference
+    tarantool> s = box.space.tester
+    tarantool> s:select{1}
 
-There is an assumption that the numeric id of 'tester' is 512, which happens to be the case in our
-sandbox example only. Literal values such as 'tester'
-may be replaced by variable names. Examples and descriptions
-in this manual have the "box.space.tester:" form;
-however, this is a matter of user preference and all
-the variants exist in the wild.
+Later examples in this manual will usually have the ":samp:`box.space.{tester}:`" form
+(#1); however, this is a matter of user preference and all
+the variations exist in the wild.
+
+Later descriptions in this manual will use the syntax
+":code:`space_object:`" for references to objects
+which are spaces as in the above examples, and ":code:`index_object:`"
+for references to objects which are indexes (for example
+:samp:`box.space.{tester}.index.{primary}:`).
 
 Then, there are six *parameter variations*:
 
@@ -490,7 +499,7 @@ value) may be replaced by variable names, as in examples
 can be omitted, they are preferable because they signal
 "Lua table". Examples and descriptions in this manual
 have the "{1}" form; however, this too is a matter of
-user preference and all the variants exist in the wild.
+user preference and all the variations exist in the wild.
 
 All the data-manipulation functions operate on tuple sets but,
 since primary keys are unique, the number of tuples in the

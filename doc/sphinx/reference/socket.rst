@@ -152,7 +152,7 @@ the function invocations will look like ``sock:function_name(...)``.
 
     .. code-block:: lua
 
-        socket.tcp_server('localhost', 3302, function () end).
+        socket.tcp_server('localhost', 3302, function () end)
 
 .. class:: socket_object
 
@@ -227,8 +227,8 @@ the function invocations will look like ``sock:function_name(...)``.
 
         :param integer    limit: maximum number of bytes to read for
                                  example 50 means "stop after 50 bytes"
-        :param string delimiter: separator or `Lua pattern`_ for example
-                                 '[0-9]' means "stop after a digit"
+        :param string delimiter: separator for example
+                                 '?' means "stop after a question mark"
         :param number   timeout: maximum number of seconds to wait for
                                  example 50 means "stop after 50 seconds".
 
@@ -437,7 +437,6 @@ the function invocations will look like ``sock:function_name(...)``.
         :return: A table containing these fields: "host", "family", "type", "protocol", "port".
         :rtype:  table
 
-.. _Lua pattern:      http://www.lua.org/pil/20.2.html
 .. _this description: https://github.com/tarantool/tarantool/wiki/sockets%201.6
 
 =================================================
