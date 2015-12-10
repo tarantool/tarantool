@@ -969,6 +969,66 @@ thread_pool_trim()
 	;
 }
 
+/**
+ * Initialize the first server of a new cluster
+ */
+static void
+bootstrap_cluster(void)
+{
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&recovery->vclock, 0);
+
+	/* Process bootstrap.bin */
+	recovery_bootstrap(recovery);
+
+	/* Generate UUID of a new cluster */
+	box_set_cluster_uuid();
+
+	/* Generate Server-UUID */
+	box_set_server_uuid();
+}
+
+/**
+ * Bootstrap from the remote master
+ */
+static void
+bootstrap_from_master(struct server *master)
+{
+	assert(master->applier != NULL);
+
+	/* Generate Server-UUID */
+	tt_uuid_create(&recovery->server_uuid);
+
+	/* Initialize a new replica */
+	engine_begin_join();
+
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&recovery->vclock, 0);
+
+	/* Download and process a data snapshot from master */
+	applier_bootstrap(master->applier);
+
+	/* Replace server vclock using master's vclock */
+	vclock_copy(&recovery->vclock, &master->applier->vclock);
+}
+
+static void
+bootstrap(void)
+{
+	/* Use the first replica by URI as a bootstrap leader */
+	struct server *master = server_first();
+	assert(master == NULL || master->applier != NULL);
+
+	if (master != NULL && !box_cfg_listen_eq(&master->applier->uri)) {
+		bootstrap_from_master(master);
+	} else {
+		bootstrap_cluster();
+	}
+
+	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
+	engine_checkpoint(checkpoint_id);
+}
+
 static inline void
 box_init(void)
 {
@@ -1012,40 +1072,14 @@ box_init(void)
 	 * but don't start replication right now.
 	 */
 	box_sync_replication_source();
-	/* Use the first replica by URI as a bootstrap leader */
-	struct server *master = server_first();
-	assert(master == NULL || master->applier != NULL);
 
 	if (recovery_has_data(recovery)) {
 		/* Tell Sophia engine LSN it must recover to. */
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else if (master != NULL && !box_cfg_listen_eq(&master->applier->uri)) {
-		/* Generate Server-UUID */
-		tt_uuid_create(&recovery->server_uuid);
-
-		/* Initialize a new replica */
-		engine_begin_join();
-
-		/* Add a surrogate server id for snapshot rows */
-		vclock_add_server(&recovery->vclock, 0);
-
-		/* Download and process a data snapshot from master */
-		applier_bootstrap(master->applier);
-
-		/* Replace server vclock using master's vclock */
-		vclock_copy(&recovery->vclock, &master->applier->vclock);
-
-		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
-		engine_checkpoint(checkpoint_id);
-	} else {
-		/* Initialize the first server of a new cluster */
-		recovery_bootstrap(recovery);
-		box_set_cluster_uuid();
-		box_set_server_uuid();
-		int64_t checkpoint_id = vclock_sum(&recovery->vclock);
-		engine_checkpoint(checkpoint_id);
+	} else 	{
+		 bootstrap();
 	}
 	fiber_gc();
 

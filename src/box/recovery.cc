@@ -311,9 +311,6 @@ recover_xlog(struct recovery *r, struct xlog *l)
 void
 recovery_bootstrap(struct recovery *r)
 {
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&r->vclock, 0);
-
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
 	const char *filename = "bootstrap.snap";
