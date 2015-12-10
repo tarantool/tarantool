@@ -9,7 +9,10 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
 
 .. module:: clock
 
-.. function:: time() or time64() or realtime() or realtime64()
+.. function:: time()
+              time64()
+              realtime()
+              realtime64()
 
     The wall clock time. Derived from C function clock_gettime(CLOCK_REALTIME).
     Approximately the same as os.clock().
@@ -20,11 +23,16 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
     :return: seconds or nanoseconds since epoch (1970-01-01 00:00:00), adjusted.
     :rtype: number or number64
 
-    **Example:** |br|
-    -- This will print an approximate number of years since 1970. |br|
-    clock = require('clock'); print(clock.time() / (365*24*60*60))
+    **Example:**
 
-.. function:: monotonic() or monotonic64()
+    .. code-block:: lua
+
+        -- This will print an approximate number of years since 1970.
+        clock = require('clock')
+        print(clock.time() / (365*24*60*60))
+
+.. function:: monotonic()
+              monotonic64()
 
     The monotonic time. Derived from C function clock_gettime(CLOCK_MONOTONIC).
     Monotonic time is similar to wall clock time but is not affected by changes
@@ -34,11 +42,16 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
     :return: seconds or nanoseconds since the last time that the computer was booted.
     :rtype: number or number64
 
-    **Example:** |br|
-    -- This will print nanoseconds since the start. |br|
-    clock = require('clock'); print(clock.monotonic64())
+    **Example:**
 
-.. function:: proc() or proc64()
+    .. code-block:: lua
+
+        -- This will print nanoseconds since the start.
+        clock = require('clock')
+        print(clock.monotonic64())
+
+.. function:: proc()
+              proc64()
 
     The processor time. Derived from C function clock_gettime(CLOCK_PROCESS_CPUTIME_ID).
     This is the best function to use with benchmarks that need to calculate
@@ -47,11 +60,16 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
     :return: seconds or nanoseconds since processor start.
     :rtype: number or number64
 
-    **Example:** |br|
-    -- This will print nanoseconds in the CPU since the start. |br|
-    clock = require('clock'); print(clock.proc64())
+    **Example:**
 
-.. function:: thread() or thread64()
+    .. code-block:: lua
+
+        -- This will print nanoseconds in the CPU since the start.
+        clock = require('clock')
+        print(clock.proc64())
+
+.. function:: thread()
+              thread64()
 
     The thread time. Derived from C function clock_gettime(CLOCK_THREAD_CPUTIME_ID).
     This is the best function to use with benchmarks that need to calculate
@@ -60,9 +78,13 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
     :return: seconds or nanoseconds since thread start.
     :rtype: number or number64
 
-    **Example:** |br|
-    -- This will print seconds in the thread since the start. |br|
-    clock = require('clock'); print(clock.thread64())
+    **Example:**
+
+    .. code-block:: lua
+
+        -- This will print seconds in the thread since the start.
+        clock = require('clock')
+        print(clock.thread64())
 
 .. function:: bench(function [, function parameters ...])
 
@@ -70,19 +92,27 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
     This function uses clock.proc(), therefore it calculates elapsed CPU time.
     Therefore it is not useful for showing actual elapsed time.
 
-    Parameters: :samp:`{function}` = function or function reference;
-    :samp:`{function parameters}` = whatever values are required by the function.
+    Parameters:
+
+    * :samp:`{function}` = function or function reference;
+    * :samp:`{function parameters}` = whatever values are required by the function.
 
     :return: table. first element = seconds of CPU time; second element = whatever the function returns.
     :rtype: table
 
-    **Example:** |br|
-    -- Benchmark a function which sleeps 10 seconds. |br|
-    -- NB: bench() will not calculate sleep time. |br|
-    -- So the returned value will be {a number less than 10, 88}. |br|
-    clock = require('clock') |br|
-    fiber = require('fiber') |br|
-    function f(param) fiber.sleep(param); return 88; end |br|
-    clock.bench(f,10) |br|
-    
+    **Example:**
+
+    .. code-block:: lua
+
+        -- Benchmark a function which sleeps 10 seconds.
+        -- NB: bench() will not calculate sleep time.
+        -- So the returned value will be {a number less than 10, 88}.
+        clock = require('clock')
+        fiber = require('fiber')
+        function f(param)
+          fiber.sleep(param)
+          return 88
+        end
+        clock.bench(f,10)
+
 .. _CLOCK_GETTIME: http://pubs.opengroup.org/onlinepubs/9699919799/functions/clock_getres.html
