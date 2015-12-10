@@ -15,7 +15,7 @@ blocks  :
             <br />
 
         A drop-in replacement for Lua 5.1, based on
-        LuaJIT 2.0; |br| simply use ``#!/usr/bin/tarantool``
+        LuaJIT 2.1; |br| simply use ``#!/usr/bin/tarantool``
         instead of ``#!/usr/bin/lua`` in your script
     - "Lua packages for non-blocking I/O, fibers and HTTP"
     - format: rst

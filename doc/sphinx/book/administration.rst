@@ -16,6 +16,10 @@ thread event loop. Thus, if the control flow never reaches the event loop
 (thanks to a runaway stored procedure), the server stops responding to any
 signal, and can only be killed with SIGKILL (this signal can not be ignored).
 
+SIGHUP can be used to cause a log file rotation. See
+:ref:`the example in section "Logging" <logging_example>`.
+
+
 =====================================================================
                         Using ``tarantool`` as a client
 =====================================================================

@@ -96,31 +96,27 @@
 
 .. confval:: custom_proc_title
 
-    Inject the given string into :ref:`server process title <book-proctitle>`
-    (what’s shown in the COMMAND column for :samp:`ps` and :samp:`top` commands).
+    Add the given string to the server's :ref:`Process title <book-proctitle>`
+    (what’s shown in the COMMAND column for :samp:`ps -ef` and :samp:`top -c` commands).
 
-    .. NOTE::
+    For example, ordinarily :samp:`ps` shows the Tarantool server process thus:
 
-        For example, ordinarily ps shows the Tarantool server process thus:
+    .. code-block:: console
 
-        .. code-block:: console
+        $ ps -ef | grep tarantool
+        1000     14939 14188  1 10:53 pts/2    00:00:13 tarantool <running>
 
-            $ ps -ef | grep tarantool
-            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running
-            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner
-            tarantool: primary pri: 3301 adm: 3313
+    But if the configuration parameters include
+    ``custom_proc_title='sessions'`` then the output looks like:
 
-        But if the configuration parameters include
-        ``custom_proc_title='sessions'`` then the output looks like:
+    .. code-block:: console
 
-            $ ps -ef | grep tarantool
-            1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions
-            1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions
-            tarantool: primary pri: 3301 adm: 3313
+        $ ps -ef | grep tarantool
+        1000     14939 14188  1 10:53 pts/2    00:00:16 tarantool <running>: sessions
 
     Type: string |br|
     Default: null |br|
-    Dynamic: no |br|
+    Dynamic: yes |br|
 
 .. confval:: background
 

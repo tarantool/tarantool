@@ -60,7 +60,7 @@ can be reused when another fiber is created.
                  > end
         ---
         ...
-        tarantool> fiber_object = fiber.create(fiber_name)
+        tarantool> fiber_object = fiber.create(function_name)
         ---
         ...
 
@@ -297,6 +297,49 @@ can be reused when another fiber is created.
             tarantool> fiber.self():cancel()
             ---
             - error: fiber is cancelled
+            ...
+
+    .. data:: storage
+
+        Local storage within the fiber. The storage can contain any number of
+        named values, subject to memory limitations. Naming may be done with
+        :samp:`{fiber_object}.storage.{name}` or :samp:`fiber_object}.storage['{name}'].`
+        or with a number :samp:`{fiber_object}.storage[{number}]`.
+        Values may be either numbers or strings. The storage is garbage-collected
+        when :samp:`{fiber_object}:cancel()` happens. |br|
+        See also :data:`box.session.storage <box.session.storage>`.
+
+        **Example:**
+ 
+        .. code-block:: tarantoolsession
+
+            tarantool> fiber = require('fiber')
+            ---
+            ...
+            tarantool> function f () fiber.sleep(1000); end
+            ---
+            ...
+            tarantool> fiber_function = fiber:create(f)
+            ---
+            - error: '[string "fiber_function = fiber:create(f)"]:1: fiber.create(function, ...):
+                bad arguments'
+            ...
+            tarantool> fiber_function = fiber.create(f)
+            ---
+            ...
+            tarantool> fiber_function.storage.str1 = 'string'
+            ---
+            ...
+            tarantool> fiber_function.storage['str1']
+            ---
+            - string
+            ...
+            tarantool> fiber_function:cancel()
+            ---
+            ...
+            tarantool> fiber_function.storage['str1']
+            ---
+            - error: '[string "return fiber_function.storage[''str1'']"]:1: the fiber is dead'
             ...
 
 .. function:: time()

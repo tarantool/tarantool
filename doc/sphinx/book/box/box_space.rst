@@ -51,16 +51,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
         first created index, which will be used as the primary-key index, must be
         unique.
 
-        :param string index-name: name of index, which should not be a number and
-                                should not contain special characters;
-        :param table options:
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`index_name` (type = string) = name of index, which should not be a number and
+        should not contain special characters;
+        :codeitalic:`options`.
 
         :return: index object
         :rtype:  index_object
 
         .. container:: table
 
-            Options for ``box.space.space_object:create_index``:
+            Options for ``space_object:create_index``:
 
             +---------------+--------------------+-----------------------------+---------------------+
             | Name          | Effect             | Type                        | Default             |
@@ -100,8 +101,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Insert a tuple into a space.
 
-        :param space_object space-object:
-        :param lua-table,box.tuple tuple: tuple to be inserted.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`tuple` (type = Lua table or tuple) = tuple to be inserted.
+
         :return: the inserted tuple
         :rtype:  tuple
 
@@ -121,9 +123,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Search for a tuple or a set of tuples in the given space.
 
-        :param space_object space-object:
-        :param lua-table,scalar key: key to be matched against the index
-                                     key, which may be multi-part.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
+        key, which may be multi-part.
 
         :return: the tuples whose primary-key fields are equal to the passed
                  field-values. If the number of passed field-values is less
@@ -186,19 +188,20 @@ A list of all ``box.space`` functions follows, then comes a list of all
         For examples of complex ``select`` requests, where one can specify which
         index to search and what condition to use (for example "greater than"
         instead of "equal to") and how many tuples to return, see the later section
-        :ref:`box.space.space-name[.index.index-name]:select <index_object.select>`.
+        :ref:`index_object:select <index_object_select>`.
 
     .. method:: get(key)
 
         Search for a tuple in the given space.
 
-        :param space_object space-object:
-        :param lua-table,scalar key: key to be matched against the index
-                                        key, which may be multi-part.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
+        key, which may be multi-part.
+
         :return: the selected tuple.
         :rtype:  tuple
 
-        Possible errors: If space-name does not exist.
+        Possible errors: If space_object does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -221,11 +224,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Drop a space.
 
-        :param space_object space-object:
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
         :return: nil
 
-        Possible errors: If space-name does not exist.
+        Possible errors: If space_object does not exist.
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
@@ -240,12 +243,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Rename a space.
 
-        :param space_object space-object:
-        :param string space-name: new name for space.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`space-name` (type = string) = new name for space.
 
         :return: nil
 
-        Possible errors: ``space-name`` does not exist.
+        Possible errors: space_object does not exist.
 
         **Example:**
 
@@ -267,8 +270,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``box.space...:put()`` have the same effect; the latter is sometimes used
         to show that the effect is the converse of ``box.space...:get()``.
 
-        :param space_object space-object:
-        :param lua-table,box.tuple tuple: tuple to be inserted.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`tuple` (type = Lua table or tuple) = tuple to be inserted.
 
         :return: the inserted tuple.
         :rtype:  tuple
@@ -317,14 +320,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         For ``!`` and ``=`` operations the field number can be ``-1``, meaning the last field in the tuple.
 
-        :param space_object space-object:
-        :param lua-value key: primary-key field values, must be passed as a Lua
-                              table if key is multi-part
-        :param table {operator, field_no, value}: a group of arguments for each
-                operation, indicating what the operation is, what field the
-                operation will apply to, and what value will be applied. The
-                field number can be negative, meaning the position from the
-                end of tuple (#tuple + negative field number + 1).
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`key` (type = Lua table or scalar) = primary-key field values, must be passed as a Lua
+        table if key is multi-part;
+        :codeitalic:`{operator, field_no, value}` (type = table): a group of arguments for each
+        operation, indicating what the operation is, what field the
+        operation will apply to, and what value will be applied. The
+        field number can be negative, meaning the position from the
+        end of tuple (#tuple + negative field number + 1).
 
         :return: the updated tuple.
         :rtype:  tuple
@@ -462,14 +466,15 @@ A list of all ``box.space`` functions follows, then comes a list of all
         error checks before returning -- this is a design feature which
         enhances throughput but requires more caution on the part of the user.
 
-        :param space_object space-object:
-        :param lua-value tuple_value: field values, must be passed as a Lua
-                              table if tuple_value contains more than one field
-        :param table {operator, field_no, value}: a group of arguments for each
-                operation, indicating what the operation is, what field the
-                operation will apply to, and what value will be applied. The
-                field number can be negative, meaning the position from the
-                end of tuple (#tuple + negative field number + 1).
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`tuple_value` (type = Lua table or scalar) = 
+        field values, must be passed as a Lua
+        table if tuple_value contains more than one field;
+        :codeitalic:`{operator, field_no, value}` (type = Lua table) = a group of arguments for each
+        operation, indicating what the operation is, what field the
+        operation will apply to, and what value will be applied. The
+        field number can be negative, meaning the position from the
+        end of tuple (#tuple + negative field number + 1).
 
         :return: null.
 
@@ -488,9 +493,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Delete a tuple identified by a primary key.
 
-        :param space_object space-object:
-        :param lua-table,scalar key: key to be matched against the index
-                                        key, which may be multi-part.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
+        key, which may be multi-part.
 
         :return: the deleted tuple
         :rtype:  tuple
@@ -521,6 +526,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``box.space.tester:insert{0}`` and ``box.space[800]:insert{0}``
         are equivalent requests.
 
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+
         **Example:**
 
         .. code-block:: tarantoolsession
@@ -533,7 +540,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
     .. data:: enabled
 
         Whether or not this space is enabled.
-        The value is ``false`` if there is no index.
+        The value is ``false`` if the space has no index.
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
     .. data:: field_count
 
@@ -545,6 +554,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
             box.schema.space:create...
             field_count = <field_count_value>
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
         **Example:**
 
@@ -563,6 +574,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :mod:`box.index` with methods to search tuples and iterate over them in
         predefined order.
 
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+
         :rtype: table
 
         **Example:**
@@ -580,6 +593,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. method:: len()
 
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
+
         :return: Number of tuples in the space.
 
         **Example:**
@@ -594,6 +609,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
     .. method:: truncate()
 
         Deletes all tuples.
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
         **Complexity Factors:** Index size, Index type, Number of tuples accessed.
 
@@ -619,8 +636,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``field-value(s)``, a new one is inserted with initial counter
         value set to ``1``.
 
-        :param space_object space-object:q
-        :param lua-table,scalar field-value(s): values which must match the primary key
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`field-value(s)` (type = Lua table or scalar) = values which must match the primary key.
 
         :return: the new counter value
         :rtype:  number
@@ -657,9 +675,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ``field-value(s)``, a new one is not inserted. If the counter value drops
         to zero, the tuple is deleted.
 
-        :param space_object space-object:
-        :param lua-table,scalar key: key to be matched against the index
-                                        key, which may be multi-part.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`field-value(s)` (type = Lua table or scalar) = values which must match the primary key.
+
         :return: the new counter value
         :rtype:  number
 
@@ -694,12 +712,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
     .. method:: auto_increment{field-value [, field-value ...]}
 
         Insert a new tuple using an auto-increment primary key. The space specified
-        by space-name must have a ``NUM`` primary key index of type ``TREE``. The
+        by space_object must have a ``NUM`` primary key index of type ``TREE``. The
         primary-key field will be incremented before the insert.
         This is only applicable for the memtx storage engine.
 
-        :param space_object space-object:
-        :param lua-table,box.tuple tuple: tuple's fields, other than the primary-key field.
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`field-value(s)` (type = Lua table or scalar) = tuple's fields, other than the primary-key field.
 
         :return: the inserted tuple.
         :rtype:  tuple
@@ -725,6 +743,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
     .. method:: pairs()
 
         A helper function to prepare for iterating over all tuples in a space.
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
         :return: function which can be used in a for/end loop. Within the loop, a value is returned for each iteration.
         :rtype:  function, tuple
@@ -932,12 +952,10 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_user`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
-
 .. data:: _priv
 
     ``_priv`` is a new system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
-
 
 .. data:: _cluster
 
