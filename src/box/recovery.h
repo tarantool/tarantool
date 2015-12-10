@@ -48,20 +48,12 @@ struct xrow_header;
 typedef void (apply_row_f)(struct recovery *, void *,
 			   struct xrow_header *packet);
 
-/** A "condition variable" that allows fibers to wait when a given
- * LSN makes it to disk.
- */
-
-struct wal_watcher;
-struct wal_writer;
-
 struct recovery {
 	struct vclock vclock;
 	/** The WAL we're currently reading/writing from/to. */
 	struct xlog *current_wal;
 	struct xdir snap_dir;
 	struct xdir wal_dir;
-	struct wal_writer *writer;
 	/**
 	 * This is used in local hot standby or replication
 	 * relay mode: look for changes in the wal_dir and apply them
@@ -75,7 +67,6 @@ struct recovery {
 	apply_row_f *apply_row;
 	void *apply_row_param;
 	uint64_t snap_io_rate_limit;
-	enum wal_mode wal_mode;
 	struct tt_uuid server_uuid;
 	uint32_t server_id;
 };
@@ -90,9 +81,6 @@ recovery_delete(struct recovery *r);
 /* to be called at exit */
 void
 recovery_exit(struct recovery *r);
-
-void
-recovery_update_mode(struct recovery *r, enum wal_mode mode);
 
 void
 recovery_update_io_rate_limit(struct recovery *r, double new_limit);
@@ -136,12 +124,6 @@ recovery_apply_row(struct recovery *r, struct xrow_header *packet);
  */
 int64_t
 recovery_last_checkpoint(struct recovery *r);
-
-/**
- * Ensure we don't corrupt the current WAL file in the child.
- */
-void
-recovery_atfork(struct recovery *r);
 
 #if defined(__cplusplus)
 } /* extern "C" */

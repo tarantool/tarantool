@@ -181,7 +181,7 @@ relay_subscribe_f(va_list ap)
 /** Replication acceptor fiber handler. */
 void
 relay_subscribe(int fd, uint64_t sync, struct server *server,
-		struct vclock *server_vclock)
+		struct vclock *replica_clock)
 {
 	assert(server->id != SERVER_ID_NIL);
 	assert(server->relay == NULL);
@@ -196,7 +196,8 @@ relay_subscribe(int fd, uint64_t sync, struct server *server,
 
 	struct recovery *r = relay.r;
 	r->server_id = server->id;
-	vclock_copy(&r->vclock, server_vclock);
+	/* Initialize the relay with replica's current clock. */
+	vclock_copy(&r->vclock, replica_clock);
 
 	struct cord cord;
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);

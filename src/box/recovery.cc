@@ -148,8 +148,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 		free(r);
 	});
 
-	r->wal_mode = WAL_NONE;
-
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
 	r->snap_io_rate_limit = UINT64_MAX;
@@ -212,9 +210,6 @@ recovery_delete(struct recovery *r)
 {
 	recovery_stop_local(r);
 
-	if (r->writer)
-		wal_writer_stop(r);
-
 	xdir_destroy(&r->snap_dir);
 	xdir_destroy(&r->wal_dir);
 	if (r->current_wal) {
@@ -233,18 +228,8 @@ recovery_exit(struct recovery *r)
 	/* Avoid fibers, there is no event loop */
 	r->watcher = NULL;
 	recovery_delete(r);
-}
-
-void
-recovery_atfork(struct recovery *r)
-{
-       xlog_atfork(&r->current_wal);
-       /*
-        * Make sure that atexit() handlers in the child do
-        * not try to stop the non-existent thread.
-        * The writer is not used in the child.
-        */
-       r->writer = NULL;
+	if (wal)
+		wal_writer_stop();
 }
 
 void
@@ -417,11 +402,10 @@ recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
 		 */
 		vclock_inc(&r->vclock, r->server_id);
 	}
-	r->wal_mode = wal_mode;
-	if (r->wal_mode == WAL_FSYNC)
-		(void) strcat(r->wal_dir.open_wflags, "s");
-	if (r->wal_mode != WAL_NONE)
-		wal_writer_start(r, &r->vclock, rows_per_wal);
+	if (wal_mode != WAL_NONE) {
+		wal_writer_start(wal_mode, r->wal_dir.dirname,
+				 &r->server_uuid, &r->vclock, rows_per_wal);
+	}
 }
 
 
@@ -482,7 +466,7 @@ public:
 		async.data = this;
 
 		ev_async_start(loop(), &async);
-		if (wal_set_watcher(recovery->writer, &watcher, &async) == -1) {
+		if (wal_set_watcher(wal, &watcher, &async) == -1) {
 			/* Fallback to fs events. */
 			ev_async_stop(loop(), &async);
 			ev_stat_set(&dir_stat, dir_path, 0.0);
@@ -494,7 +478,7 @@ public:
 	{
 		ev_stat_stop(loop(), &file_stat);
 		ev_stat_stop(loop(), &dir_stat);
-		wal_clear_watcher(recovery->writer, &watcher);
+		wal_clear_watcher(wal, &watcher);
 		ev_async_stop(loop(), &async);
 	}
 
@@ -546,8 +530,8 @@ recovery_follow_f(va_list ap)
 
 		recover_remaining_wals(r);
 
-		subscription.set_log_path(
-			r->current_wal != NULL ? r->current_wal->filename : NULL);
+		subscription.set_log_path(r->current_wal != NULL ?
+					  r->current_wal->filename : NULL);
 
 		if (subscription.signaled == false) {
 			/**
@@ -567,8 +551,6 @@ void
 recovery_follow_local(struct recovery *r, const char *name,
 		      ev_tstamp wal_dir_rescan_delay)
 {
-	assert(r->writer == NULL);
-
 	/*
 	 * Scan wal_dir and recover all existing at the moment xlogs.
 	 * Blocks until finished.

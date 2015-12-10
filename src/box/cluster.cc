@@ -145,7 +145,7 @@ server_set_id(struct server *server, uint32_t server_id)
 		 * Otherwise, read only is switched
 		 * off after recovery_finalize().
 		 */
-		if (r->writer)
+		if (wal)
 			box_set_ro(false);
 	}
 }

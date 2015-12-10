@@ -209,12 +209,11 @@ txn_write_to_wal(struct txn *txn)
 
 	ev_tstamp start = ev_now(loop()), stop;
 	int64_t res;
-	if (recovery->writer == NULL) {
-		assert(recovery->wal_mode == WAL_NONE);
+	if (wal == NULL) {
 		/** wal_mode = NONE or initial recovery. */
 		res = vclock_sum(&recovery->vclock);
 	} else {
-		res = wal_write(recovery->writer, req);
+		res = wal_write(wal, req);
 	}
 
 	stop = ev_now(loop());

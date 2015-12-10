@@ -331,7 +331,7 @@ box_sync_replication_source(void)
 extern "C" void
 box_set_replication_source(void)
 {
-	if (recovery->writer == NULL) {
+	if (wal == NULL) {
 		/*
 		 * Do nothing, we're in local hot standby mode, the server
 		 * will automatically begin following the replica when local
@@ -864,10 +864,11 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	/* Check permissions */
 	access_check_universe(PRIV_R);
 
-	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
-	struct vclock server_vclock;
-	vclock_create(&server_vclock);
-	xrow_decode_subscribe(header, &uu, &server_uuid, &server_vclock);
+	struct tt_uuid cluster_uuid = uuid_nil, replica_uuid = uuid_nil;
+	struct vclock replica_clock;
+	vclock_create(&replica_clock);
+	xrow_decode_subscribe(header, &cluster_uuid, &replica_uuid,
+			      &replica_clock);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
@@ -875,22 +876,23 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * replica connect, and refuse a connection from a replica
 	 * which belongs to a different cluster.
 	 */
-	if (!tt_uuid_is_equal(&uu, &cluster_id)) {
+	if (!tt_uuid_is_equal(&cluster_uuid, &cluster_id)) {
 		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
-			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
+			  tt_uuid_str(&cluster_uuid),
+			  tt_uuid_str(&cluster_id));
 	}
 
 	/* Check server uuid */
-	struct server *server = server_by_uuid(&server_uuid);
+	struct server *server = server_by_uuid(&replica_uuid);
 	if (server == NULL || server->id == SERVER_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-			  tt_uuid_str(&server_uuid));
+			  tt_uuid_str(&replica_uuid));
 	}
 
 	/* Don't allow multiple relays for the same server */
 	if (server->relay != NULL) {
 		tnt_error(ClientError, ER_CFG, "replication_source",
-			  "duplicate connection with the same server UUID");
+			  "duplicate connection with the same replica UUID");
 	}
 
 	/*
@@ -921,7 +923,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(io->fd, header->sync, server, &server_vclock);
+	relay_subscribe(io->fd, header->sync, server, &replica_clock);
 }
 
 /** Replace the current server id in _cluster */
@@ -1132,7 +1134,7 @@ box_init(void)
 		int64_t checkpoint_id =
 			recovery_last_checkpoint(recovery);
 		engine_recover_to_checkpoint(checkpoint_id);
-	} else 	{
+	} else {
 		 bootstrap();
 	}
 	fiber_gc();
@@ -1186,14 +1188,14 @@ box_load_cfg()
 	}
 }
 
+/**
+ * box.coredump() forks to save a core. The entire
+ * server forks in box.cfg{} if background=true.
+ */
 void
 box_atfork()
 {
-	/* NULL when forking for box.cfg{background = true} */
-	if (recovery == NULL)
-		return;
-	/* box.coredump() forks to save a core. */
-	recovery_atfork(recovery);
+	wal_atfork();
 }
 
 int

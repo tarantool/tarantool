@@ -35,13 +35,14 @@
 #include "small/rlist.h"
 
 struct fiber;
-struct recovery;
 struct wal_writer;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
+
+extern struct wal_writer *wal;
 
 #if defined(__cplusplus)
 
@@ -60,11 +61,13 @@ struct wal_request: public cmsg {
 int64_t
 wal_write(struct wal_writer *writer, struct wal_request *req);
 
-int
-wal_writer_start(struct recovery *state, struct vclock *vclock, int rows_per_wal);
+void
+wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
+		 const struct tt_uuid *server_uuid, struct vclock *vclock,
+		 int rows_per_wal);
 
 void
-wal_writer_stop(struct recovery *r);
+wal_writer_stop();
 
 struct wal_watcher
 {
@@ -84,6 +87,9 @@ wal_set_watcher(struct wal_writer *, struct wal_watcher *,
 
 void
 wal_clear_watcher(struct wal_writer *, struct wal_watcher *);
+
+void
+wal_atfork();
 
 #endif /* defined(__cplusplus) */
 

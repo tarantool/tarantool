@@ -324,13 +324,15 @@ applier_f(va_list ap)
 	while (!fiber_is_cancelled()) {
 		try {
 			applier_connect(applier);
-			/*
-			 * Execute JOIN if this is a bootstrap, and
-			 * there is no snapshot, and SUBSCRIBE
-			 * otherwise.
-			 */
-			if (r->writer == NULL)
+			if (wal == NULL) {
+				/*
+				 * Execute JOIN if this is a bootstrap,
+				 * and there is no snapshot. The
+				 * join will pause the applier
+				 * until WAL is created.
+				 */
 				applier_join(applier, r);
+			}
 			applier_subscribe(applier, r);
 			/*
 			 * subscribe() has an infinite loop which
@@ -531,7 +533,7 @@ applier_connect_all(struct applier **appliers, int count,
 		if (wait < 0.0 ||
 		    ipc_channel_get_timeout(wakeup.ch, &data, wait) != 0) {
 			tnt_error(ClientError, ER_CFG, "replication_source",
-				  "failed to connect to one or more server");
+				  "failed to connect to one or more servers");
 			goto error;
 		}
 	}
