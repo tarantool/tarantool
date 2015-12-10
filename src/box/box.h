@@ -48,6 +48,7 @@ struct port;
 struct request;
 struct xrow_header;
 struct obuf;
+struct ev_io;
 
 /** To be called at program start. */
 void box_load_cfg();
@@ -91,10 +92,10 @@ void
 box_process_eval(struct request *request, struct obuf *out);
 
 void
-box_process_join(int fd, struct xrow_header *header);
+box_process_join(struct ev_io *io, struct xrow_header *header);
 
 void
-box_process_subscribe(int fd, struct xrow_header *header);
+box_process_subscribe(struct ev_io *io, struct xrow_header *header);
 
 /**
  * Check Lua configuration before initialization or

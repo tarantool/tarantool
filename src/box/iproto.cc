@@ -722,7 +722,7 @@ tx_process_msg(struct cmsg *m)
 			 * lambda in the beginning of the block
 			 * will re-activate the watchers for us.
 			 */
-			box_process_join(con->input.fd, &msg->header);
+			box_process_join(&con->input, &msg->header);
 			break;
 		case IPROTO_SUBSCRIBE:
 			/*
@@ -731,7 +731,7 @@ tx_process_msg(struct cmsg *m)
 			 * the write watcher will be re-activated
 			 * the same way as for JOIN.
 			 */
-			box_process_subscribe(con->input.fd, &msg->header);
+			box_process_subscribe(&con->input, &msg->header);
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,

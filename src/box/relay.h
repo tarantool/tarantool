@@ -33,7 +33,9 @@
 #include "evio.h"
 #include "fiber.h"
 
-struct xrow_header;
+struct server;
+struct vclock;
+struct tt_uuid;
 
 /** State of a replication relay. */
 struct relay {
@@ -48,25 +50,15 @@ struct relay {
 };
 
 /**
- * Send an initial snapshot to the replica,
- * register the replica UUID in _cluster
- * space, end the row with OK packet.
+ * Send an initial snapshot to the replica
  *
  * @param fd        client connection
- * @param packet    incoming JOIN request
- *                  packet
- * @param server_id server_id of this server
- *                  to send to the replica
- * @param on_join   the hook to invoke when
- *                  the snapshot is sent
- *                  to the replica - it
- *                  registers the replica with
- *                  the cluster.
+ * @param sync      sync from incoming JOIN request
+ * @param uuid      server UUID of replica
+ * @param[out] join_vclock vclock of initial snapshot
  */
 void
-relay_join(int fd, struct xrow_header *packet,
-	   uint32_t master_server_id,
-	   void (*on_join)(const struct tt_uuid *));
+relay_join(int fd, uint64_t sync, struct vclock *join_vclock);
 
 /**
  * Subscribe a replica to updates.
@@ -74,9 +66,8 @@ relay_join(int fd, struct xrow_header *packet,
  * @return none.
  */
 void
-relay_subscribe(int fd, struct xrow_header *packet,
-		uint32_t master_server_id,
-		struct vclock *master_vclock);
+relay_subscribe(int fd, uint64_t sync, struct server *server,
+		struct vclock *server_vclock);
 
 void
 relay_send(struct relay *relay, struct xrow_header *packet);

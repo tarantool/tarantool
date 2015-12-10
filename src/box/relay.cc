@@ -37,7 +37,6 @@
 #include "iproto_constants.h"
 #include "engine.h"
 #include "cluster.h"
-#include "schema.h"
 #include "vclock.h"
 #include "xrow.h"
 #include "coeio.h"
@@ -96,44 +95,20 @@ relay_join_f(va_list ap)
 }
 
 void
-relay_join(int fd, struct xrow_header *packet,
-	   uint32_t master_server_id,
-	   void (*on_join)(const struct tt_uuid *))
+relay_join(int fd, uint64_t sync, struct vclock *join_vclock)
 {
 	struct relay relay;
-	relay_create(&relay, fd, packet->sync);
+	relay_create(&relay, fd, sync);
 	auto scope_guard = make_scoped_guard([&]{
 		relay_destroy(&relay);
 	});
 	struct recovery *r = relay.r;
 
-	struct tt_uuid server_uuid = uuid_nil;
-	xrow_decode_join(packet, &server_uuid);
-
 	cord_costart(&relay.cord, "join", relay_join_f, &relay);
 	cord_cojoin(&relay.cord);
 	diag_raise();
-	/**
-	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster space after sending the last row but before
-	 * sending OK - if the hook fails, the error reaches the
-	 * client.
-	 */
-	on_join(&server_uuid);
 
-	/*
-	 * Send a response to JOIN request, an indicator of the
-	 * end of the stream of snapshot rows.
-	 */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, vclockset_last(&r->snap_dir.index));
-	/*
-	 * Identify the message with the server id of this
-	 * server, this is the only way for a replica to find
-	 * out the id of the server it has connected to.
-	 */
-	row.server_id = master_server_id;
-	relay_send(&relay, &row);
+	vclock_copy(join_vclock, vclockset_last(&r->snap_dir.index));
 }
 
 static void
@@ -205,42 +180,14 @@ relay_subscribe_f(va_list ap)
 
 /** Replication acceptor fiber handler. */
 void
-relay_subscribe(int fd, struct xrow_header *packet,
-		uint32_t master_server_id,
-		struct vclock *master_vclock)
+relay_subscribe(int fd, uint64_t sync, struct server *server,
+		struct vclock *server_vclock)
 {
-	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
-
-	struct vclock vclock;
-	vclock_create(&vclock);
-	xrow_decode_subscribe(packet, &uu, &server_uuid, &vclock);
-
-	/**
-	 * Check that the given UUID matches the UUID of the
-	 * cluster this server belongs to. Used to handshake
-	 * replica connect, and refuse a connection from a replica
-	 * which belongs to a different cluster.
-	 */
-	if (!tt_uuid_is_equal(&uu, &cluster_id)) {
-		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
-			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
-	}
-
-	/* Check server uuid */
-	struct server *server = server_by_uuid(&server_uuid);
-	if (server == NULL || server->id == SERVER_ID_NIL) {
-		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-			  tt_uuid_str(&server_uuid));
-	}
-
-	/* Don't allow multiple relays for the same server */
-	if (server->relay != NULL) {
-		tnt_error(ClientError, ER_CFG, "replication_source",
-			  "duplicate connection with the same server UUID");
-	}
+	assert(server->id != SERVER_ID_NIL);
+	assert(server->relay == NULL);
 
 	struct relay relay;
-	relay_create(&relay, fd, packet->sync);
+	relay_create(&relay, fd, sync);
 	server_set_relay(server, &relay);
 	auto scope_guard = make_scoped_guard([&]{
 		server_clear_relay(server);
@@ -249,22 +196,7 @@ relay_subscribe(int fd, struct xrow_header *packet,
 
 	struct recovery *r = relay.r;
 	r->server_id = server->id;
-	vclock_copy(&r->vclock, &vclock);
-
-	/*
-	 * Send a response to SUBSCRIBE request, tell
-	 * the replica how many rows we have in stock for it,
-	 * and identify ourselves with our own server id.
-	 */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, master_vclock);
-	/*
-	 * Identify the message with the server id of this
-	 * server, this is the only way for a replica to find
-	 * out the id of the server it has connected to.
-	 */
-	row.server_id = master_server_id;
-	relay_send(&relay, &row);
+	vclock_copy(&r->vclock, server_vclock);
 
 	struct cord cord;
 	cord_costart(&cord, "subscribe", relay_subscribe_f, &relay);

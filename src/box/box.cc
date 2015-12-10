@@ -61,6 +61,7 @@
 #include "lua/call.h" /* box_lua_call */
 #include "iproto_port.h"
 #include "xrow.h"
+#include "xrow_io.h"
 
 static char status[64] = "unknown";
 
@@ -835,7 +836,7 @@ box_process_eval(struct request *request, struct obuf *out)
 }
 
 void
-box_process_join(int fd, struct xrow_header *header)
+box_process_join(struct ev_io *io, struct xrow_header *header)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_R);
@@ -843,16 +844,89 @@ box_process_join(int fd, struct xrow_header *header)
 
 	assert(header->type == IPROTO_JOIN);
 
+	struct tt_uuid server_uuid = uuid_nil;
+	xrow_decode_join(header, &server_uuid);
+
+	struct vclock join_vclock;
+	vclock_create(&join_vclock);
+
 	/* Process JOIN request via a replication relay */
-	relay_join(fd, header, recovery->server_id,
-		   box_on_cluster_join);
+	relay_join(io->fd, header->sync, &join_vclock);
+
+	/**
+	 * Call the server-side hook which stores the replica uuid
+	 * in _cluster space after sending the last row but before
+	 * sending OK - if the hook fails, the error reaches the
+	 * client.
+	 */
+	box_on_cluster_join(&server_uuid);
+
+	/*
+	 * Send a response to JOIN request, an indicator of the
+	 * end of the stream of snapshot rows.
+	 */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &join_vclock);
+	/*
+	 * Identify the message with the server id of this
+	 * server, this is the only way for a replica to find
+	 * out the id of the server it has connected to.
+	 */
+	row.server_id = recovery->server_id;
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
 }
 
 void
-box_process_subscribe(int fd, struct xrow_header *header)
+box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 {
 	/* Check permissions */
 	access_check_universe(PRIV_R);
+
+	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
+	struct vclock server_vclock;
+	vclock_create(&server_vclock);
+	xrow_decode_subscribe(header, &uu, &server_uuid, &server_vclock);
+
+	/**
+	 * Check that the given UUID matches the UUID of the
+	 * cluster this server belongs to. Used to handshake
+	 * replica connect, and refuse a connection from a replica
+	 * which belongs to a different cluster.
+	 */
+	if (!tt_uuid_is_equal(&uu, &cluster_id)) {
+		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
+			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
+	}
+
+	/* Check server uuid */
+	struct server *server = server_by_uuid(&server_uuid);
+	if (server == NULL || server->id == SERVER_ID_NIL) {
+		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
+			  tt_uuid_str(&server_uuid));
+	}
+
+	/* Don't allow multiple relays for the same server */
+	if (server->relay != NULL) {
+		tnt_error(ClientError, ER_CFG, "replication_source",
+			  "duplicate connection with the same server UUID");
+	}
+
+	/*
+	 * Send a response to SUBSCRIBE request, tell
+	 * the replica how many rows we have in stock for it,
+	 * and identify ourselves with our own server id.
+	 */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &recovery->vclock);
+	/*
+	 * Identify the message with the server id of this
+	 * server, this is the only way for a replica to find
+	 * out the id of the server it has connected to.
+	 */
+	row.server_id = recovery->server_id;
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
 
 	/*
 	 * Process SUBSCRIBE request via replication relay
@@ -866,8 +940,7 @@ box_process_subscribe(int fd, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(fd, header, recovery->server_id,
-			&recovery->vclock);
+	relay_subscribe(io->fd, header->sync, server, &server_vclock);
 }
 
 /** Replace the current server id in _cluster */
