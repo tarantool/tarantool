@@ -506,11 +506,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         .. code-block:: tarantoolsession
 
-            tarantool> box.space.tester:delete(0)
+            tarantool> box.space.tester:delete(1)
             ---
-            - [0, 'My first tuple']
+            - [1, 'My first tuple']
             ...
-            tarantool> box.space.tester:delete(0)
+            tarantool> box.space.tester:delete(1)
             ---
             ...
             tarantool> box.space.tester:delete('a')
@@ -547,13 +547,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
     .. data:: field_count
 
         The required field count for all tuples in this space. The field_count
-        can be set initially with:
-
-        .. cssclass:: highlight
-        .. parsed-literal::
-
-            box.schema.space:create...
-            field_count = <field_count_value>
+        can be set initially with
+        :code:`box.schema.space.create(...{...`:samp:`field_count={field_count_value}...`:code:`})`.
+        The default value is ``0``, which means there is no required field count.
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
@@ -565,8 +561,6 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             - 0
             ...
-
-        The default value is ``0``, which means there is no required field count.
 
     .. data:: index
 
@@ -654,7 +648,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ...
             tarantool> s:create_index('primary', {
                      >   unique = true,
-                     >   parts = {1, 'NUM', 2, 'STR'
+                     >   parts = {1, 'NUM', 2, 'STR'}
                      > })
             ---
             ...
@@ -692,7 +686,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ...
             tarantool> s:create_index('primary', {
                      >   unique = true,
-                     >   parts = {1, 'NUM', 2, 'STR'
+                     >   parts = {1, 'NUM', 2, 'STR'}
                      > })
             ---
             ...
@@ -700,11 +694,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             - [1, 'a', 1000]
             ...
-            tarantool> box.space.forty_second_space:dec{1, 'a'}
+            tarantool> box.space.space19:dec{1, 'a'}
             ---
             - 999
             ...
-            tarantool> box.space.forty_second_space:inc{1, 'a'}
+            tarantool> box.space.space19:dec{1, 'a'}
             ---
             - 998
             ...
@@ -852,10 +846,13 @@ A list of all ``box.space`` functions follows, then comes a list of all
         ---
         - - '272 1 _schema memtx 0  '
           - '280 1 _space memtx 0  '
+          - '281 1 _vspace sysview 0  '
           - '288 1 _index memtx 0  '
           - '296 1 _func memtx 0  '
           - '304 1 _user memtx 0  '
+          - '305 1 _vuser sysview 0  '
           - '312 1 _priv memtx 0  '
+          - '313 1 _vpriv sysview 0  '
           - '320 1 _cluster memtx 0  '
           - '512 1 tester memtx 0  '
           - '513 1 origin sophia 0  '
@@ -940,6 +937,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
           - '312 0 primary tree 1 3 1 num 2 str 3 num '
           - '312 1 owner tree 0 1 0 num '
           - '312 2 object tree 0 2 2 str 3 num '
+          - '313 0 primary tree '
+          - '313 1 owner tree '
+          - '313 2 object tree '
           - '320 0 primary tree 1 1 0 num '
           - '320 1 uuid tree 1 1 1 str '
           - '512 0 primary tree 1 1 0 num '
@@ -949,17 +949,17 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
 .. data:: _user
 
-    ``_user`` is a new system tuple set for
+    ``_user`` is a system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
 .. data:: _priv
 
-    ``_priv`` is a new system tuple set for
+    ``_priv`` is a system tuple set for
     support of the :ref:`authorization feature <box-authentication>`.
 
 .. data:: _cluster
 
-    ``_cluster`` is a new system tuple set
+    ``_cluster`` is a system tuple set
     for support of the :ref:`replication feature <box-replication>`.
 
 ===================================================================

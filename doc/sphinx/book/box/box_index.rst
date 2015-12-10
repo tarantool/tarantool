@@ -53,7 +53,7 @@ API is a direct binding to corresponding methods of index objects of type
               - type: NUM
                 fieldno: 1
               id: 0
-              space_id: 513
+              space_id: 512
               name: primary
               type: TREE
             ...
@@ -353,7 +353,7 @@ API is a direct binding to corresponding methods of index objects of type
                      >   limit = 1000
                      > })
 
-        The result will be a table of tuple and will look like this:
+        The result will be a table of tuples and will look like this:
 
         .. code-block:: yaml
 
@@ -531,13 +531,15 @@ API is a direct binding to corresponding methods of index objects of type
         * :samp:`{key-value}` (type = Lua table or scalar) =
           the value which must match the key(s) in the specified index. The type
           may be a list of field-values, or a tuple containing only the
-          field-values; :samp:{options}`.
+          field-values; :samp:`{options}`.
 
         :return: the number of matching index keys. The ``count`` function
                 is only applicable for the memtx storage engine.
         :rtype:  number
 
         **Example:**
+
+        .. code-block:: tarantoolsession
 
             tarantool> box.space.tester.index.primary:count(999)
             ---
@@ -788,7 +790,7 @@ Now let us create a space and add an RTREE index.
              >   type = 'HASH',
              >   parts = {1, 'NUM'}
              > })
-    tarantool> r = s:create_index('primary', {
+    tarantool> r = s:create_index('rtree', {
              >   type = 'RTREE',
              >   unique = false,
              >   parts = {2, 'ARRAY'}
@@ -862,9 +864,9 @@ a different way to calculate neighbors.
 
 .. code-block:: tarantoolsession
 
-    tarantool> s = box.schema.space.create('R')
-    tarantool> i = s:create_index('primary', {parts = {1, 'NUM'}})
-    tarantool> r = s:create_index('S', {
+    tarantool> s2 = box.schema.space.create('R2')
+    tarantool> i2 = s2:create_index('primary', {parts = {1, 'NUM'}})
+    tarantool> r2 = s2:create_index('S', {
              >   type = 'RTREE',
              >   unique = false,
              >   distance = 'manhattan',
@@ -878,8 +880,8 @@ if one is following the lines of a grid rather than traveling in a straight line
 
 .. code-block:: tarantoolsession
 
-    tarantool> s:insert{1, {0, 3, 0, 3}}
-    tarantool> r:select({1, 2, 1, 2}, {iterator = box.index.NEIGHBOR})
+    tarantool> s2:insert{1, {0, 3, 0, 3}}
+    tarantool> r2:select({1, 2, 1, 2}, {iterator = box.index.NEIGHBOR})
 
 
 More examples of spatial searching are online in the file `R tree index quick
