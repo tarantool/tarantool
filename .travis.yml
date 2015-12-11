@@ -1,5 +1,8 @@
-language: cpp
+sudo: required
+services:
+  - docker
 
+language: cpp
 os:
   - linux
   - osx
@@ -8,26 +11,92 @@ compiler:
   - clang
   - gcc
 
+env:
+    matrix:
+      - OS=el DIST=6 PACK=rpm
+      - OS=el DIST=7 PACK=rpm
+      - OS=fedora DIST=20 PACK=rpm
+      - OS=fedora DIST=21 PACK=rpm
+      - OS=fedora DIST=22 PACK=rpm
+      - OS=fedora DIST=23 PACK=rpm
+      - OS=ubuntu DIST=trusty PACK=deb
+      - OS=ubuntu DIST=precise PACK=deb
+      - OS=ubuntu DIST=vivid PACK=deb
+      - OS=debian DIST=jessie PACK=deb
+      - OS=debian DIST=wheezy PACK=deb
+      - OS=debian DIST=stretch PACK=deb
+      - PACK=none
+
 matrix:
-  exclude:
-    - os: osx
-      compiler: gcc
+    allow_failures:
+      - env: OS=el DIST=6 PACK=rpm
+      - env: OS=el DIST=7 PACK=rpm
+      - env: OS=fedora DIST=20 PACK=rpm
+      - env: OS=fedora DIST=21 PACK=rpm
+      - env: OS=fedora DIST=22 PACK=rpm
+      - env: OS=fedora DIST=23 PACK=rpm
+      - env: OS=ubuntu DIST=trusty PACK=deb
+      - env: OS=ubuntu DIST=precise PACK=deb
+      - env: OS=ubuntu DIST=vivid PACK=deb
+      - env: OS=debian DIST=jessie PACK=deb
+      - env: OS=debian DIST=wheezy PACK=deb
+      - env: OS=debian DIST=stretch PACK=deb
 
-addons:
-  postgresql: "9.1"
-
-before_install:
-  - git submodule update --init --recursive
-
-before_script:
-  - export PG='127.0.0.1:5432:tarantool:tarantool:tarantool'
-  - export MYSQL='127.0.0.1:3306:tarantool:tarantool:tarantool'
-
-install:
-  - sh ./extra/travis/build_$TRAVIS_OS_NAME.sh
+    exclude:
+      - env: OS=el DIST=6 PACK=rpm
+        compiler: clang
+      - env: OS=el DIST=7 PACK=rpm
+        compiler: clang
+      - env: OS=fedora DIST=20 PACK=rpm
+        compiler: clang
+      - env: OS=fedora DIST=21 PACK=rpm
+        compiler: clang
+      - env: OS=fedora DIST=22 PACK=rpm
+        compiler: clang
+      - env: OS=fedora DIST=23 PACK=rpm
+        compiler: clang
+      - env: OS=ubuntu DIST=trusty PACK=deb
+        compiler: clang
+      - env: OS=ubuntu DIST=precise PACK=deb
+        compiler: clang
+      - env: OS=ubuntu DIST=vivid PACK=deb
+        compiler: clang
+      - env: OS=debian DIST=jessie PACK=deb
+        compiler: clang
+      - env: OS=debian DIST=wheezy PACK=deb
+        compiler: clang
+      - env: OS=debian DIST=stretch PACK=deb
+        compiler: clang
+      - env: OS=el DIST=6 PACK=rpm
+        os: osx
+      - env: OS=el DIST=7 PACK=rpm
+        os: osx
+      - env: OS=fedora DIST=20 PACK=rpm
+        os: osx
+      - env: OS=fedora DIST=21 PACK=rpm
+        os: osx
+      - env: OS=fedora DIST=22 PACK=rpm
+        os: osx
+      - env: OS=fedora DIST=23 PACK=rpm
+        os: osx
+      - env: OS=ubuntu DIST=trusty PACK=deb
+        os: osx
+      - env: OS=ubuntu DIST=precise PACK=deb
+        os: osx
+      - env: OS=ubuntu DIST=vivid PACK=deb
+        os: osx
+      - env: OS=debian DIST=jessie PACK=deb
+        os: osx
+      - env: OS=debian DIST=wheezy PACK=deb
+        os: osx
+      - env: OS=debian DIST=stretch PACK=deb
+        os: osx
+      - os: osx
+        compiler: gcc
 
 script:
-  - sh ./extra/travis/test_$TRAVIS_OS_NAME.sh
+  - git clone https://github.com/tarantool/build.git
+  - bash build/pack/travis.sh
 
 notifications:
   irc:
@@ -35,7 +104,7 @@ notifications:
       - irc.freenode.net#tarantool
     on_success: change
     on_failure: always
-  email: false
+  email: true
 
 git:
   depth: 500

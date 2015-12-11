@@ -1,1 +1,2 @@
-cd ./build && make test || echo
+cd test
+/usr/bin/python test-run.py --force

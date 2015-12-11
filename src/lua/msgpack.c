@@ -40,7 +40,8 @@
 #include <msgpuck/msgpuck.h>
 #include <iobuf.h>
 #include <fiber.h>
-#include "small/region.h"
+#include <small/region.h>
+#include <small/ibuf.h>
 
 void
 luamp_error(void *error_ctx)
