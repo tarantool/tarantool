@@ -47,20 +47,44 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
  */
 struct wal_writer
 {
+	/** 'wal' thread doing the writes. */
 	struct cord cord;
-	struct cpipe tx_pipe;
+	/** A pipe from 'tx' thread to 'wal' */
 	struct cpipe wal_pipe;
+	/** Return pipe from 'wal' to tx' */
+	struct cpipe tx_pipe;
+	/* tx-wal message bus */
 	struct cbus tx_wal_bus;
+	/** A setting from server configuration */
 	int rows_per_wal;
+	/** Cached write buffer */
 	struct fio_batch *batch;
 	bool is_shutdown;
 	bool is_rollback;
-	ev_loop *txn_loop;
+	/**
+	 * The vector clock of the WAL writer. It's a bit behind
+	 * the vector clock of the transaction thread, since it
+	 * "follows" the tx vector clock.
+	 * By "following" we mean this: whenever a transaction
+	 * is started in 'tx' thread, it's assigned a tentative
+	 * LSN. If the transaction is rolled back, this LSN
+	 * is abandoned. Otherwise, after the transaction is written
+	 * to the log with this LSN, WAL writer vclock is advanced
+	 * with this LSN and LSN becomes "real".
+	 */
 	struct vclock vclock;
-	pthread_mutex_t watchers_mutex;
+	/**
+	 * WAL watchers, i.e. threads that should be alerted
+	 * whenever there are new records appended to the journal.
+	 * Used for replication relays.
+	 */
 	struct rlist watchers;
+	/** The lock protecting the watchers list. */
+	pthread_mutex_t watchers_mutex;
 	enum wal_mode wal_mode;
+	/** wal_dir, from the configuration file. */
 	struct xdir wal_dir;
+	/** The current WAL file. */
 	struct xlog *current_wal;
 };
 
@@ -329,13 +353,17 @@ wal_writer_pop(struct wal_writer *writer)
 }
 
 static void
+wal_notify_watchers(struct wal_writer *writer);
+
+static void
 wal_write_to_disk(struct wal_writer *writer,
 		  struct stailq *input, struct stailq *commit,
 		  struct stailq *rollback)
 {
 	/*
 	 * Input queue can only be empty on wal writer shutdown.
-	 * In this case wal_opt_rotate can create an extra empty xlog.
+	 * In this case wal_opt_rotate can create an extra empty xlog,
+	 * avoid this by an early check.
 	 */
 	if (unlikely(stailq_empty(input)))
 		return;
@@ -471,13 +499,14 @@ done:
 			      req->rows[req->n_rows - 1]->lsn);
 		/* Update row counter for wal_opt_rotate() */
 		wal->rows += req->n_rows;
-		/* Mark request as successed for tx thread */
+		/* Mark request as successful for tx thread */
 		req->res = vclock_sum(&writer->vclock);
 	}
 
 	fiber_gc();
 	/* Move all processed requests to `commit` queue */
 	stailq_concat(commit, input);
+	wal_notify_watchers(writer);
 	return;
 }
 
@@ -486,7 +515,6 @@ static void
 wal_writer_f(va_list ap)
 {
 	struct wal_writer *writer = va_arg(ap, struct wal_writer *);
-	struct wal_watcher *watcher;
 
 	cpipe_create(&writer->wal_pipe);
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
@@ -503,13 +531,6 @@ wal_writer_f(va_list ap)
 
 		wal_write_to_disk(writer, &writer->wal_pipe.output,
 				  &commit, &rollback);
-
-		/* notify watchers */
-		tt_pthread_mutex_lock(&writer->watchers_mutex);
-		rlist_foreach_entry(watcher, &writer->watchers, next) {
-			ev_async_send(watcher->loop, watcher->async);
-		}
-		tt_pthread_mutex_unlock(&writer->watchers_mutex);
 
 		cbus_lock(&writer->tx_wal_bus);
 		stailq_concat(&writer->tx_pipe.pipe, &commit);
@@ -588,6 +609,19 @@ wal_clear_watcher(struct wal_writer *writer, struct wal_watcher *watcher)
 	rlist_del_entry(watcher, next);
 	tt_pthread_mutex_unlock(&writer->watchers_mutex);
 }
+
+static void
+wal_notify_watchers(struct wal_writer *writer)
+{
+	struct wal_watcher *watcher;
+	/* notify watchers */
+	tt_pthread_mutex_lock(&writer->watchers_mutex);
+	rlist_foreach_entry(watcher, &writer->watchers, next) {
+		ev_async_send(watcher->loop, watcher->async);
+	}
+	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+}
+
 
 /**
  * After fork, the WAL writer thread disappears.
