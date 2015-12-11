@@ -139,12 +139,12 @@ blocks :
           - Pure PHP driver,   `<https://github.com/tarantool-php/client>`_
           - Java driver,       `Maven repository`_
           - Python driver,     `<http://pypi.python.org/pypi/tarantool>`_
-          - Ruby driver,       `<https://github.com/funny-falcon/tarantool16-ruby>`_
+          - Ruby driver,       `<https://github.com/tarantool/tarantool-ruby>`_
           - Perl driver,       `DR:Tarantool`_
           - C connector        `<https://github.com/tarantool/tarantool-c>`_
           - node.js driver,    `<https://github.com/KlonD90/node-tarantool-driver>`_
           - Erlang driver,     `<https://github.com/rtsisyk/etarantool>`_
-          - Go driver,         `<https://github.com/mialinx/go-tarantool-1.6>`_
+          - Go driver,         `<https://github.com/tarantool/go-tarantool>`_
           - Lua-nginx driver,  `<https://github.com/ziontab/lua-nginx-tarantool>`_
 
           .. _DR\:Tarantool:    http://search.cpan.org/~unera/DR-Tarantool-0.42/lib/DR/Tarantool.pm
