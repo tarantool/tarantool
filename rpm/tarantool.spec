@@ -13,9 +13,10 @@
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
 
-%global build_version %(([ -f VERSION ] && cat VERSION || git describe --long) | sed "s/[0-9]*\.[0-9]*\.[0-9]*-//" | sed "s/-[a-z 0-9]*//")
-%global git_hash %(([ -f VERSION ] && cat VERSION || git describe --long) | sed "s/.*-//")
-%global prod_version %(([ -f VERSION ] && cat VERSION || git describe --long) | sed "s/-[0-9]*-.*//")
+Source1: VERSION
+%global build_version %(( cat %{SOURCE1} || git describe --long) | sed "s/[0-9]*\.[0-9]*\.[0-9]*-//" | sed "s/-[a-z 0-9]*//")
+%global git_hash %((cat %{SOURCE1} || git describe --long) | sed "s/.*-//")
+%global prod_version %((cat %{SOURCE1} || git describe --long) | sed "s/-[0-9]*-.*//")
 
 %if (0%{?fedora} >= 15 || 0%{?rhel} >= 7) && %{undefined _with_systemd}
 %global _with_systemd 1
