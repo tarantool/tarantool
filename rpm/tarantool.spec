@@ -13,6 +13,10 @@
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
 
+%global build_version %(git describe --long | sed "s/[0-9]*\.[0-9]*\.[0-9]*-//" | sed "s/-[a-z 0-9]*//")
+%global git_hash %(git describe --long | sed "s/.*-//")
+%global prod_version %(git describe --long | sed "s/-[0-9]*-.*//")
+
 %if (0%{?fedora} >= 15 || 0%{?rhel} >= 7) && %{undefined _with_systemd}
 %global _with_systemd 1
 %endif
@@ -54,8 +58,8 @@ Requires(preun): initscripts
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Name: %{?scl_prefix}tarantool
-Version: @RPM_PACKAGE_VERSION@
-Release: @RPM_PACKAGE_RELEASE@
+Version: %{prod_version}
+Release: %{build_version}
 Group: Applications/Databases
 Summary: Tarantool - a NoSQL database in a Lua script
 Vendor: tarantool.org
@@ -65,7 +69,7 @@ Provides: %{?scl_prefix}tarantool-debuginfo
 Provides: %{?scl_prefix}tarantool-debug
 Requires: %{?scl_prefix}tarantool-common
 URL: http://tarantool.org
-Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
+Source0: %{version}.tar.gz
 %description
 Tarantool is a high performance in-memory NoSQL database. It supports
 replication, online backup, stored procedures in Lua.
@@ -78,7 +82,7 @@ scripts.
 Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
-Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+Requires: %{?scl_prefix}tarantool = %{version}-%{release}
 %description dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -103,7 +107,7 @@ This package provides common files
 ##################################################################
 
 %prep
-%setup -n @RPM_SOURCE_DIRECTORY_NAME@
+%setup -q -c tarantool-%{version}
 
 %build
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
