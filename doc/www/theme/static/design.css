@@ -1492,6 +1492,29 @@ div.b-rock-list-item-ico {
     margin-top: 5%;
 }
 
+.b-index_meetup {
+    height: 180px;
+    background: url('/theme/bg_meetup-bg.png') center;
+}
+
+.b-index_meetup .b-block-wrapper {
+    width: auto;
+    height: 180px;
+    padding: 0px;
+    background: url('/theme/bg_meetup.png') no-repeat center;*/
+}
+
+.b-index_meetup a {
+    top: 0; left: 0;
+    position: absolute;
+    width: 100%; height: 100%;
+    text-decoration: none; /* No underlines on the link */
+    z-index: 10; /* Places the link above everything else in the div */
+    background-color: #FFF; /* Fix to make div clickable in IE */
+    opacity: 0; /* Fix to make div clickable in IE */
+    filter: alpha(opacity=1); /* Fix to make div clickable in IE */
+}
+
 .b-button_container {
     float: right;
 }
