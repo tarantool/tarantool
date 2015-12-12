@@ -53,17 +53,19 @@ API is a direct binding to corresponding methods of index objects of type
               - type: NUM
                 fieldno: 1
               id: 0
-              space_id: 512
+              space_id: 513
               name: primary
               type: TREE
             ...
 
-    .. method:: pairs(bitset-value | field-value..., iterator-type)
+    .. method:: pairs(bitset-value | search-value, iterator-type)
 
-        This method provides iteration support within an index. Parameter type is
-        used to identify the semantics of iteration. Different index types support
-        different iterators. The remaining arguments of the function are varying
-        and depend on the iteration type. For example, a TREE index maintains a
+        This method provides iteration support within an index.
+        The :codeitalic:`bitset-value` or :codeitalic:`search-value` parameter
+        specifies what must match within the index.
+        The :codeitalic:`iterator-type`
+        parameter specifies the rule for matching and ordering. Different index types support
+        different iterators. For example, a TREE index maintains a
         strict order of keys and can return all tuples in ascending or descending
         order, starting from the specified key. Other index types, however, do not
         support ordering.
@@ -81,177 +83,193 @@ API is a direct binding to corresponding methods of index objects of type
         Parameters:
 
         * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
-        * :samp:`{iterator-type}` = iteration strategy as defined in tables below.
+        * :samp:`{bitset-value} | {search-value...}` = what to search for
+        * :samp:`{iterator-type}` = as defined in tables below.
 
         :return: this method returns an iterator closure, i.e. a function which can
                 be used to get the next value on each invocation
         :rtype:  function, tuple
 
-        Possible errors: Selected iteration type is not supported in the subject index type,
-        or supplied parameters do not match iteration type.
+        Possible errors: Selected iteration type is not supported for the index type,
+        or search value is not supported for the iteration type.
 
         Complexity Factors: Index size, Index type, Number of tuples accessed.
 
+        A search-value can be a number (for example :codenormal:`1234`), a string
+        (for example :codenormal:`'abcd'`),
+        or a table of numbers and strings (for example :codenormal:`{1234,'abcd'}`).
+        Each part of a search-value will be compared to each part of an index key.
+
         .. container:: table
 
-            **TREE iterator types**
+            **Iterator types for TREE indexes**
+
+            Note: Formally the logic for TREE index searches is: |br|
+            comparison-operator is = or >= or > or <= or < depending on iterator-type |br|
+            for i = 1 to number-of-parts-of-search-value |br|
+            |nbsp|  if search-value-part[i] is ``nil`` |br|
+            |nbsp|  or search-value-part[i] <comparison-operator> index-key-part[i] is true |br|
+            |nbsp|  then comparison-result[i] is true |br|
+            if all comparison-results are true, then search-value "matches" index key. |br|
+            Notice how, according to this logic, regardless what the iterator type is,
+            a comparison is always true when a search-value-part is ``nil`` or is missing.
+            This behavior applies for the memtx storage engine only
+            (the sophia storage engine does not allow search-value-parts to be ``nil`` or missing).
+            This behavior of searches with nil is subject to change.
 
             +---------------+-----------+---------------------------------------------+
             | Type          | Arguments | Description                                 |
             +===============+===========+=============================================+
-            | box.index.ALL | none      | Iterate over all tuples in an index. Tuples |
-            | or 'ALL'      |           | are returned  in ascending order by key.    |
+            | box.index.EQ  | search    | The comparison operator is '==' (equal to). |
+            | or 'EQ'       | value     | If an index key is equal to a search value, |
+            |               |           | it matches.                                 |
+            |               |           | Tuples are returned in ascending order by   |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.EQ  | field     | Equality iterator: iterate over all tuples  |
-            | or 'EQ'       | values    | where field values = key values. Parts of a |
-            |               |           | multi-part key need to be separated by      |
-            |               |           | commas.                                     |
-            |               |           |                                             |
-            |               |           | If the number of field values is less than  |
-            |               |           | the number of parts of a multi-part key,    |
-            |               |           | the missing field values are considered to  |
-            |               |           | be matching.                                |
-            |               |           |                                             |
-            |               |           | If there are multiple matches, then tuples  |
-            |               |           | are returned in ascending order by key.     |
+            | box.index.REQ | search    | Matching is the same as for                 |
+            | or 'REQ'      | value     | ``box.index.EQ``.                           |
+            |               |           | Tuples are returned in descending order by  |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.GT  | field     | Keys match if key values are greater than   |
-            | or 'GT'       | values    | field values. If the number of field values |
-            |               |           | is less than the number of parts of a       |
-            |               |           | multi-part key, the missing field values    |
-            |               |           | are considered to be matching. If the field |
-            |               |           | value is ``nil``, iteration starts from the |
-            |               |           | smallest key in the index. Tuples are       |
-            |               |           | returned in ascending order by key.         |
+            | box.index.GT  | search    | The comparison operator is '>' (greater     |
+            | or 'GT'       | value     | than).                                      |
+            |               |           | If an index key is greater than a search    |
+            |               |           | value, it matches.                          |
+            |               |           | Tuples are returned in ascending order by   |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.REQ | field     | Reverse equality iterator. Matching is      |
-            | or 'REQ'      | values    | determined in the same way as for           |
-            |               |           | ``box.index.EQ``, but, if there are multiple|
-            |               |           | matches, then tuples are returned in        |
-            |               |           | descending order by key,                    |
+            | box.index.GE  | search    | The comparison operator is '>=' (greater    |
+            | or 'GE'       | value     | than or equal to).                          |
+            |               |           | If an index key is greater than or equal to |
+            |               |           | a search value, it matches.                 |
+            |               |           | Tuples are returned in ascending order by   |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.GE  | field     | Keys match if key values are greater than   |
-            | or 'GE'       | values    | or equal to field values. Tuples are        |
-            |               |           | returned in ascending order by key. If the  |
-            |               |           | field value is ``nil``, iteration starts    |
-            |               |           | from the first key in the index.            |
+            | box.index.ALL | search    | All index keys match.                       |
+            | or 'ALL'      | value     | Tuples are returned in ascending order by   |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.LT  | field     | Keys match if key values are less than      |
-            | or 'LT'       | values    | field values. Tuples are returned in        |
-            |               |           | descending order by key. If the field value |
-            |               |           | is ``nil``, iteration starts from the last  |
-            |               |           | key in the index.                           |
+            | box.index.LT  | search    | The comparison operator is '<' (less than). |
+            | or 'LT'       | value     | If an index key is less than a search       |
+            |               |           | value, it matches.                          |
+            |               |           | Tuples are returned in descending order by  |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.LE  | field     | Keys match if key values are less than or   |
-            | or 'LE'       | values    | equal to field values. Tuples are returned  |
-            |               |           | in descending order by key. If the field    |
-            |               |           | value is ``nil``, iteration starts from     |
-            |               |           | the last key in the index.                  |
+            | box.index.LE  | search    | The comparison operator is '<=' (less than  |
+            | or 'LE'       | value     | or equal to).                               |
+            |               |           | If an index key is less than or equal to a  |
+            |               |           | search value, it matches.                   |
+            |               |           | Tuples are returned in descending order by  |
+            |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
 
-            **HASH iterator types**
 
-            +---------------+-----------+---------------------------------------------+
-            | Type          | Arguments | Description                                 |
-            +===============+===========+=============================================+
-            | box.index.ALL | none      | Iterate over all tuples in an index. Tuples |
-            | or 'ALL'      |           | are returned in ascending order of the key. |
-            +---------------+-----------+---------------------------------------------+
-            | box.index.EQ  | field     | Equality iterator: iterate over all tuples  |
-            | or 'EQ'       | values    | matching the key. Parts of a multi-part     |
-            |               |           | key need to be separated by commas.         |
-            |               |           |                                             |
-            |               |           | A HASH index only supports exact match:     |
-            |               |           | all parts of a key participating in the     |
-            |               |           | index must be provided.                     |
-            |               |           |                                             |
-            |               |           | HASH indexes are always unique.             |
-            +---------------+-----------+---------------------------------------------+
-            | box.index.GT  | field     | Keys match if hashed key values are greater |
-            | or 'GT'       | values    | than hashed field values. If the number of  |
-            |               |           | field values is less than the number of     |
-            |               |           | parts of a multi-part key, the result is an |
-            |               |           | error. Tuples are returned in ascending     |
-            |               |           | order by hashed key, so the order will      |
-            |               |           | appear to be random. Provided that the      |
-            |               |           | space is not being updated, the 'GT'        |
-            |               |           | iterator can be used to retrieve all        |
-            |               |           | tuples piece by piece, by supplying the     |
-            |               |           | last returned value from the previous       |
-            |               |           | range as the start field value for an       |
-            |               |           | iterator over the next range.               |
-            +---------------+-----------+---------------------------------------------+
+            **Iterator types for HASH indexes**
 
-            **BITSET iterator types**
+            +---------------+-----------+------------------------------------------------+
+            | Type          | Arguments | Description                                    |
+            +===============+===========+================================================+
+            | box.index.ALL | none      | All index keys match.                          |
+            |               |           | Tuples are returned in ascending order by      |
+            |               |           | hash of index key, which will appear to be     |
+            |               |           | random.                                        |
+            +---------------+-----------+------------------------------------------------+
+            | box.index.EQ  | search    | The comparison operator is '==' (equal to).    |
+            | or 'EQ'       | value     | If an index key is equal to a search value,    |
+            |               |           | it matches.                                    |
+            |               |           | The number of returned tuples will be 0 or 1.  |
+            +---------------+-----------+------------------------------------------------+
+            | box.index.GT  | search    | The comparison operator is '>' (greater than). |
+            | or 'GT'       | value     | If a hash of an index key is greater than a    |
+            |               |           | hash of a search value, it matches.            |
+            |               |           | Tuples are returned in ascending order by hash |
+            |               |           | of index key, which will appear to be random.  |
+            |               |           | Provided that the space is not being updated,  |
+            |               |           | one can retrieve all the tuples in a space,    |
+            |               |           | N tuples at a time, by using                   |
+            |               |           | {iterator='GT', limit=N}                       |
+            |               |           | in each search, and using the last returned    |
+            |               |           | value from the previous result as the start    |
+            |               |           | search value for the next search.              |
+            +---------------+-----------+------------------------------------------------+
 
-            +----------------------------+-----------+---------------------------------------------+
-            | Type                       | Arguments | Description                                 |
-            +============================+===========+=============================================+
-            | box.index.ALL              | none      | Iterate over all tuples in an index. Tuples |
-            | or 'ALL'                   |           | are returned in ascending order of the      |
-            |                            |           | key's bitset, and so will appear to be      |
-            |                            |           | unordered.                                  |
-            +----------------------------+-----------+---------------------------------------------+
-            | box.index.EQ               | field     | Equality iterator: iterate over all tuples  |
-            | or 'EQ'                    | values    | matching the field values. If there are     |
-            |                            |           | multiple field values, they need to be      |
-            |                            |           | separated by commas.                        |
-            +----------------------------+-----------+---------------------------------------------+
-            | box.index.BITS_ALL_SET     | field     | Keys match if all of the bits specified in  |
-            |                            | values    | 'bit mask' are set.                         |
-            +----------------------------+-----------+---------------------------------------------+
-            | box.index.BITS_ANY_SET     | field     | Keys match if any of the bits specified in  |
-            |                            | values    | 'bit mask' is set.                          |
-            +----------------------------+-----------+---------------------------------------------+
-            | box.index.BITS_ALL_NOT_SET | field     | Keys match if none of the bits specified in |
-            |                            | values    | 'bit mask' is set.                          |
-            +----------------------------+-----------+---------------------------------------------+
+            **Iterator types for BITSET indexes**
+
+            +----------------------------+-----------+----------------------------------------------+
+            | Type                       | Arguments | Description                                  |
+            +============================+===========+==============================================+
+            | box.index.ALL              | none      | All index keys match.                        |
+            | or 'ALL'                   |           | Tuples are returned in their order within    |
+            |                            |           | the space.                                   |
+            +----------------------------+-----------+----------------------------------------------+
+            | box.index.EQ               | bitset    | If an index key is equal to a bitset value,  |
+            | or 'EQ'                    | value     | it matches.                                  |
+            |                            |           | Tuples are returned in their order within    |
+            |                            |           | the space.                                   |
+            +----------------------------+-----------+----------------------------------------------+
+            | box.index.BITS_ALL_SET     | bitset    | If all of the bits which are 1 in the bitset |
+            |                            | value     | value are 1 in the index key, it matches.    |
+            |                            |           | Tuples are returned in their order within    |
+            |                            |           | the space.                                   |
+            +----------------------------+-----------+----------------------------------------------+
+            | box.index.BITS_ANY_SET     | bitset    | If any of the bits which are 1 in the bitset |
+            |                            | value     | value are 1 in the index key, it matches.    |
+            |                            |           | Tuples are returned in their order within    |
+            |                            |           | the space.                                   |
+            +----------------------------+-----------+----------------------------------------------+
+            | box.index.BITS_ALL_NOT_SET | bitset    | If all of the bits which are 1 in the bitset |
+            |                            | value     | value are 0 in the index key, it matches.    |
+            |                            |           | Tuples are returned in their order within    |
+            |                            |           | the space.                                   |
+            +----------------------------+-----------+----------------------------------------------+
 
             .. _rtree-iterator:
 
-            **RTREE iterator types**
+            **Iterator types for RTREE indexes**
 
-            +--------------------+-----------+-----------------------------------------------------+
-            | Type               | Arguments | Description                                         |
-            +====================+===========+=====================================================+
-            | box.index.ALL      | none      | All keys match. Tuples are returned in              |
-            | or 'ALL'           |           | ascending order of the primary key.                 |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.EQ       | field     | Keys match if the rectangle-or-box defined by the   |
-            | or 'EQ'            | values    | field values is the same as the rectangle-or-box    |
-            |                    |           | defined by the key -- where "key" means             |
-            |                    |           | "the key in the RTREE index" and                    |
-            |                    |           | "rectangle-or-box" means "rectangle-or-box as       |
-            |                    |           | explained in section RTREE_".                       |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.GT       | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'GT'            | values    | defined by the field values are within the          |
-            |                    |           | rectangle-or-box defined by the key.                |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.GE       | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'GE'            | values    | defined by the field values are within, or          |
-            |                    |           | at the side of, the rectangle-or-box defined by     |
-            |                    |           | the key.                                            |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.LT       | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'LT'            | values    | defined by the key are within the rectangle-or-box  |
-            |                    |           | defined by the field values.                        |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.LE       | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'LE'            | values    | defined by the key are within, or at the            |
-            |                    |           | side of, the rectangle-or-box defined by the field  |
-            |                    |           | values.                                             |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.OVERLAPS | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'OVERLAPS'      | values    | defined by the key are within, or at the            |
-            |                    |           | side of, the rectangle-or-box defined by the field  |
-            |                    |           | values.                                             |
-            +--------------------+-----------+-----------------------------------------------------+
-            | box.index.NEIGHBOR | field     | Keys match if all points of the rectangle-or-box    |
-            | or 'NEIGHBOR'      | values    | defined by the key are within, or at the            |
-            |                    |           | side of, the rectangle-or-box defined by the field  |
-            |                    |           | values.                                             |
-            +--------------------+-----------+-----------------------------------------------------+
+            +--------------------+-----------+---------------------------------------------------------+
+            | Type               | Arguments | Description                                             |
+            +====================+===========+=========================================================+
+            | box.index.ALL      | none      | All keys match.                                         |
+            | or 'ALL'           |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.EQ       | search    | If all points of the rectangle-or-box defined by the    |
+            | or 'EQ'            | value     | search value are the same as the rectangle-or-box       |
+            |                    |           | defined by the index key, it matches.                   |
+            |                    |           | Tuples are returned in their order within the space.    |
+            |                    |           | "Rectangle-or-box" means "rectangle-or-box as           |
+            |                    |           | explained in section RTREE_".                           |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.GT       | search    | If all points of the rectangle-or-box defined by the    |
+            | or 'GT'            | value     | search value are within the rectangle-or-box            |
+            |                    |           | defined by the index key, it matches.                   |
+            |                    |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.GE       | search    | If all points of the rectangle-or-box defined by the    |
+            | or 'GE'            | value     | search value are within, or at the side of, the         |
+            |                    |           | rectangle-or-box defined by the index key, it matches.  |
+            |                    |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.LT       | search    | If all points of the rectangle-or-box defined by the    |
+            | or 'LT'            | value     | index key are within the rectangle-or-box               |
+            |                    |           | defined by the search key, it matches.                  |
+            |                    |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.LE       | search    | If all points of the rectangle-or-box defined by the    |
+            | or 'LE'            | value     | index key are within, or at the side of, the            |
+            |                    |           | rectangle-or-box defined by the search key, it matches. |
+            |                    |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.OVERLAPS | search    | If some points of the rectangle-or-box defined by the   |
+            | or 'OVERLAPS'      | values    | search value are within the rectangle-or-box            |
+            |                    |           | defined by the index key, it matches.                   |
+            |                    |           | Tuples are returned in their order within the space.    |
+            +--------------------+-----------+---------------------------------------------------------+
+            | box.index.NEIGHBOR | search    | If some points of the rectangle-or-box defined by the   |
+            | or 'NEIGHBOR'      | value     | defined by the key are within, or at the side of,       |
+            |                    |           | defined by the index key, it matches.                   |
+            |                    |           | Tuples are returned in order: nearest neighbor first.   |
+            +--------------------+-----------+---------------------------------------------------------+
 
         **Example:**
 
@@ -353,7 +371,7 @@ API is a direct binding to corresponding methods of index objects of type
                      >   limit = 1000
                      > })
 
-        The result will be a table of tuples and will look like this:
+        The result will be a table of tuple and will look like this:
 
         .. code-block:: yaml
 
@@ -531,15 +549,13 @@ API is a direct binding to corresponding methods of index objects of type
         * :samp:`{key-value}` (type = Lua table or scalar) =
           the value which must match the key(s) in the specified index. The type
           may be a list of field-values, or a tuple containing only the
-          field-values; :samp:`{options}`.
+          field-values; :samp:{options}`.
 
         :return: the number of matching index keys. The ``count`` function
                 is only applicable for the memtx storage engine.
         :rtype:  number
 
         **Example:**
-
-        .. code-block:: tarantoolsession
 
             tarantool> box.space.tester.index.primary:count(999)
             ---
@@ -790,7 +806,7 @@ Now let us create a space and add an RTREE index.
              >   type = 'HASH',
              >   parts = {1, 'NUM'}
              > })
-    tarantool> r = s:create_index('rtree', {
+    tarantool> r = s:create_index('primary', {
              >   type = 'RTREE',
              >   unique = false,
              >   parts = {2, 'ARRAY'}
@@ -864,9 +880,9 @@ a different way to calculate neighbors.
 
 .. code-block:: tarantoolsession
 
-    tarantool> s2 = box.schema.space.create('R2')
-    tarantool> i2 = s2:create_index('primary', {parts = {1, 'NUM'}})
-    tarantool> r2 = s2:create_index('S', {
+    tarantool> s = box.schema.space.create('R')
+    tarantool> i = s:create_index('primary', {parts = {1, 'NUM'}})
+    tarantool> r = s:create_index('S', {
              >   type = 'RTREE',
              >   unique = false,
              >   distance = 'manhattan',
@@ -880,8 +896,8 @@ if one is following the lines of a grid rather than traveling in a straight line
 
 .. code-block:: tarantoolsession
 
-    tarantool> s2:insert{1, {0, 3, 0, 3}}
-    tarantool> r2:select({1, 2, 1, 2}, {iterator = box.index.NEIGHBOR})
+    tarantool> s:insert{1, {0, 3, 0, 3}}
+    tarantool> r:select({1, 2, 1, 2}, {iterator = box.index.NEIGHBOR})
 
 
 More examples of spatial searching are online in the file `R tree index quick
