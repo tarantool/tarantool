@@ -22,7 +22,8 @@ client connection.
 
 .. function:: peer(id)
 
-    This function works only if there is a peer, that is, 
+    This function works only if there is a peer, that is,
+    if a connection has been made to a separate server.
 
     :return: The host address and port of the session peer,
              for example "127.0.0.1:55457".

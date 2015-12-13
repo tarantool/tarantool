@@ -145,9 +145,9 @@ API is a direct binding to corresponding methods of index objects of type
             |               |           | Tuples are returned in ascending order by   |
             |               |           | index key.                                  |
             +---------------+-----------+---------------------------------------------+
-            | box.index.ALL | search    | All index keys match.                       |
-            | or 'ALL'      | value     | Tuples are returned in ascending order by   |
-            |               |           | index key.                                  |
+            | box.index.ALL | search    | Same as box.index.GE.                       |
+            | or 'ALL'      | value     |                                             |
+            |               |           |                                             |
             +---------------+-----------+---------------------------------------------+
             | box.index.LT  | search    | The comparison operator is '<' (less than). |
             | or 'LT'       | value     | If an index key is less than a search       |
@@ -557,6 +557,8 @@ API is a direct binding to corresponding methods of index objects of type
 
         **Example:**
 
+        .. code-block:: tarantoolsession
+
             tarantool> box.space.tester.index.primary:count(999)
             ---
             - 0
@@ -577,7 +579,6 @@ API is a direct binding to corresponding methods of index objects of type
         Parameters:
 
         * :samp:`{index_object}` = an :ref:`object reference <object-reference>`;
-        * :samp:`key-value`;
         * :samp:`{key}` (type = Lua table or scalar) = key to be matched against
           the index key;
         * :samp:`{operator, field_no, value}` (type = Lua table) = update
@@ -638,7 +639,8 @@ API is a direct binding to corresponding methods of index objects of type
 
         :return: nil.
 
-        Possible errors: Index does not exist.
+        Possible errors: Index does not exist, or a primary-key index cannot
+        be dropped while a secondary-key index exists.
 
         **Example:**
 
@@ -761,7 +763,7 @@ The :mod:`box.index` package may be used for spatial searches if the index type
 is RTREE. There are operations for searching *rectangles* (geometric objects
 with 4 corners and 4 sides) and *boxes* (geometric objects with more than 4
 corners and more than 4 sides, sometimes called hyperrectangles). This manual
-uses term *rectangle-or-box* for the whole class of objects that includes both
+uses the term *rectangle-or-box* for the whole class of objects that includes both
 rectangles and boxes. Only rectangles will be illustrated.
 
 Rectangles are described according to their X-axis (horizontal axis) and Y-axis
@@ -806,7 +808,7 @@ Now let us create a space and add an RTREE index.
              >   type = 'HASH',
              >   parts = {1, 'NUM'}
              > })
-    tarantool> r = s:create_index('primary', {
+    tarantool> r = s:create_index('rtree', {
              >   type = 'RTREE',
              >   unique = false,
              >   parts = {2, 'ARRAY'}
