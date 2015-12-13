@@ -1133,6 +1133,13 @@ local function tcp_server(host, port, opts, timeout)
 end
 
 local function iowait(fd, events, timeout)
+    if timeout == nil then
+        timeout = TIMEOUT_INFINITY
+    end
+    if fd == nil then
+        fiber.sleep(timeout)
+        return 0x00000100 -- EV_TIMER
+    end
     if type(events) == "string" then
         -- events constants are taken from libev/ev.h
         local ev = 0
@@ -1144,7 +1151,7 @@ local function iowait(fd, events, timeout)
         end
         events = ev
     end
-    return internal.iowait(fd, events, timeout or TIMEOUT_INFINITY)
+    return internal.iowait(fd, events, timeout)
 end
 
 socket_mt   = {
