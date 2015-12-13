@@ -108,6 +108,50 @@ s:wait(.01)
 ---
 - RW
 ...
+socket.iowait(s:fd(), 'RW')
+---
+- RW
+...
+socket.iowait(s:fd(), 3)
+---
+- 3
+...
+socket.iowait(s:fd(), 'R')
+---
+- R
+...
+socket.iowait(s:fd(), 'r')
+---
+- R
+...
+socket.iowait(s:fd(), 1)
+---
+- 1
+...
+socket.iowait(s:fd(), 'W')
+---
+- W
+...
+socket.iowait(s:fd(), 'w')
+---
+- W
+...
+socket.iowait(s:fd(), 2)
+---
+- 2
+...
+socket.iowait(s:fd(), '')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(s:fd(), -1)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait()
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
 s:readable(0)
 ---
 - true
@@ -278,7 +322,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:392: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:384: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
