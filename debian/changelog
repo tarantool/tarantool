@@ -46,6 +46,9 @@ tarantool (1.6.7-523-g816224e) unstable; urgency=medium
 
    - Actualize debian/copyright
    - Remove support for GNU hurd architecture (doesn't work).
+   - Don't use /var/lib/tarantool/started and /var/lib/tarantool/snapshot dirs.
+   - Drop irrelevant README.Debian.
+   - Remove old cron scripts.
 
  -- Roman Tsisyk <roman@tarantool.org>  Mon, 14 Dec 2015 20:00:00 +0300
 

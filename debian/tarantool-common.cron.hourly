@@ -1,6 +1,0 @@
-#!/bin/sh
-
-test -x /usr/bin/tarantool || exit 0
-test -x /usr/sbin/tarantool_snapshot_rotate || exit 0
-
-exec /usr/sbin/tarantool_snapshot_rotate
