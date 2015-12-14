@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Debianized-By: Dmitry E. Oboukhov <unera@debian.org>
-Upstream-Name: tarantool, tarantool-box
-Upstream-Contact: tarantool-developers@lists.launchpad.net
+Upstream-Name: tarantool
+Upstream-Contact: dev@tarantool.org
 Source: https://github.com/tarantool/tarantool
 
 Files: third_party/libev/* third_party/coro/* third_party/libeio/*
@@ -183,40 +183,6 @@ License: BSD-2-Clause
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 
-Files: third_party/memcached/*
-Copyright: 2003, Danga Interactive, Inc.
-License: BSD-3-Clause
- Copyright (c) 2003, Danga Interactive, Inc.
- All rights reserved.
- .
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are
- met:
- .
-     * Redistributions of source code must retain the above copyright
- notice, this list of conditions and the following disclaimer.
- .
-     * Redistributions in binary form must reproduce the above
- copyright notice, this list of conditions and the following disclaimer
- in the documentation and/or other materials provided with the
- distribution.
- .
-     * Neither the name of the Danga Interactive nor the names of its
- contributors may be used to endorse or promote products derived from
- this software without specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 Files: third_party/luajit/* cmake/luatest.cpp
 Copyright: 2005-2011 Mike Pall. All rights reserved.
     1994-2011 Lua.org, PUC-Rio.
@@ -273,7 +239,7 @@ License: MIT
  Doug Lea and released to the public domain, as explained at
  http://creativecommons.org/licenses/publicdomain
 
-Files: test/lib/yapps/*
+Files: test-run/lib/yapps/*
 Copyright: 1999-2003 Amit J. Patel <amitp@cs.stanford.edu>
     2003-2004 by Matthias Urlichs <smurf@debian.org>
 License: MIT
@@ -301,8 +267,8 @@ Files: third_party/qsort_arg.c
     third_party/qsort_arg_mt.c
     third_party/compat/sys/bsd_time.h
     third_party/queue.h
-    connector/c/tntsql/include/tnt_queue.h
     third_party/rb.h
+    src/lib/small/small/rb.h
 Copyright: 1992, 1993 The Regents of the University of California.
 License: BSD-3-Clause
  All rights reserved.
@@ -358,23 +324,6 @@ License: GPL
  License.  This exception does not however invalidate any other
  reasons why the executable file might be covered by the GNU General
  Public License.
-
-Files: third_party/gopt/gopt.*
-Copyright: 2003-2008, Tom Vajzovic <tom.viza@gmail.com>
-License: TFL
- I, Tom Vajzovic, am the author of this software and its documentation
- and permanently abandon all copyright and other intellectual property
- rights in them, including the right to be identified as the author.
- .
- I am fairly certain that this software does what its documentation says
- that it does, but I do not guarantee that it does, or that it does what
- you think it should.  I do not guarantee that it will not have undesirable
- side effects.
- .
- You are free to use, modify and distribute this software as you please,
- but you do so at your own risk.  If you remove or hide this warning then
- you may be responsible for any problems that are encountered by those who
- obtain the software through you.
 
 Files: third_party/valgrind/*
 Copyright: 2000-2010 Julian Seward.
@@ -501,7 +450,7 @@ License: Expat
  REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
  OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
 
-Files: src/rope.c
+Files: src/lib/salad/rope.c
 Copyright: 1993-1994 by Xerox Corporation.
 License: BSD-2-Clause
  Author: Hans-J. Boehm <boehm@parc.xerox.com>
@@ -635,13 +584,44 @@ License: BSD-2-Clause
  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  SUCH DAMAGE.
 
+Files: third_party/sophia/*
+Copyright: Dmitry Simonenko (pmwkaa@gmail.com)
+License: BSD-2-Clause
+ Redistribution and use in source and binary forms, with or
+ without modification, are permitted provided that the following
+ conditions are met:
+ .
+ 1. Redistributions of source code must retain the above
+    copyright notice, this list of conditions and the
+    following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above
+    copyright notice, this list of conditions and the following
+    disclaimer in the documentation and/or other materials
+    provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+
 Files: *
-Copyright: 2010-2014 by Aleksey Demakov, Aleksey Mashanov,
-    Alexandre Kalendarev, Damien Lefortier, Dmitry E. Oboukhov,
-    Dmitry Simonenko, Konstantin Osipov, Konstantin Shulgin,
-    Mons Anderson, Pavel Cherenkov, Roman Antipin, Roman Tokarev,
-    Roman Tsisyk, Teodor Sigaev, Timofey Khryukin, Yuriy Nevinitsin,
-    Yuriy Vostrikov, Veniamin Gvozdikov
+Copyright: 2010-2014 by Aleksandr Lyapunov, Aleksey Demakov, Aleksey Mashanov,
+    Alexandre Kalendarev, Andrey Drozdov, Anton Barabanov, Damien Lefortier,
+    Dmitry E. Oboukhov, Dmitry Simonenko, Eugene Blikh, Eugene Shadrin,
+    Konstantin Knizhnik, Konstantin Osipov, Konstantin Shulgin, Mons Anderson,
+    Marko Kevac, Oleg Tsarev, Pavel Cherenkov, Roman Antipin, Roman Tokarev,
+    Roman Tsisyk, Teodor Sigaev, Timofey Khryukin, Veniamin Gvozdikov,
+    Vassiliy Soshnikov, Vladimir Rudnyh, Yuriy Nevinitsin, Yuriy Vostrikov
 License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or
  without modification, are permitted provided that the following
