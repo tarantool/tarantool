@@ -47,7 +47,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include <coeio.h>
+#include <coio.h> /* coio_wait() */
+#include <coeio.h> /* coio_getaddrinfo() */
 #include <fiber.h>
 #include "lua/utils.h"
 
@@ -381,14 +382,56 @@ lbox_socket_nonblock(int fh, int mode)
 static int
 lbox_socket_iowait(struct lua_State *L)
 {
+	if (lua_gettop(L) < 2)
+		goto usage;
 	int fh = lua_tointeger(L, 1);
-	int events = lua_tointeger(L, 2);
+	if (fh < 0)
+		goto usage;
 	ev_tstamp timeout = lua_tonumber(L, 3);
+	if (timeout < 0)
+		goto usage;
 
+	if (likely(lua_type(L, 2) == LUA_TNUMBER)) {
+		/* Fast path: `events' is a bitmask of (COIO_READ|COIO_WRITE) */
+		int events = lua_tointeger(L, 2);
+		if (events <= 0 || events > (COIO_READ | COIO_WRITE))
+			goto usage;
+		int ret = coio_wait(fh, events, timeout);
+		lua_pushinteger(L, ret);
+		return 1;
+	}
+
+	/* Сonvenient version: `events' is a string ('R', 'W', 'RW') */
+	int events = 0;
+	const char *events_str = lua_tostring(L, 2);
+	if (events_str == NULL)
+		goto usage;
+	for (const char *e = events_str; *e != '\0'; ++e) {
+		/* Lower-case is needed to simplify integration with cqueues */
+		switch (*e) {
+		case 'r':
+		case 'R':
+			events |= COIO_READ;
+			break;
+		case 'w':
+		case 'W':
+			events |= COIO_WRITE;
+			break;
+		default:
+			goto usage;
+		}
+	}
+	if (events == 0)
+		goto usage;
 	int ret = coio_wait(fh, events, timeout);
-
-	lua_pushinteger(L, ret);
+	const char *result[] = { "", "R", "W", "RW" };
+	assert(ret <= (COIO_READ | COIO_WRITE));
+	lua_pushstring(L, result[ret]);
 	return 1;
+
+usage:
+	return luaL_error(L, "Usage: iowait(fd, 1 | 'r' | 2 | 'w' | 3 | 'rw'"
+			" [, timeout])");
 }
 
 static int

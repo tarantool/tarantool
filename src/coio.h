@@ -30,9 +30,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "evio.h"
 #include "fiber.h"
 #include "trivia/util.h"
+#if defined(__cplusplus)
+#include "evio.h"
 
 /**
  * Co-operative I/O
@@ -184,6 +185,9 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
 int
 coio_waitpid(pid_t pid);
 
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** \cond public */
 
 enum {
@@ -207,5 +211,9 @@ API_EXPORT int
 coio_wait(int fd, int event, double timeout);
 
 /** \endcond public */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_COIO_H_INCLUDED */

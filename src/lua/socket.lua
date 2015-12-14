@@ -283,15 +283,7 @@ socket_methods.readable = function(self, timeout)
 end
 
 socket_methods.wait = function(self, timeout)
-    local wres = wait_safely(self, 3, timeout)
-    local res = ''
-    if bit.band(wres, 1) ~= 0 then
-        res = res .. 'R'
-    end
-    if bit.band(wres, 2) ~= 0 then
-        res = res .. 'W'
-    end
-    return res
+    return wait_safely(self, 'RW', timeout)
 end
 
 socket_methods.writable = function(self, timeout)
@@ -1160,7 +1152,8 @@ socket_mt   = {
 return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
-    tcp_server = tcp_server
+    tcp_server = tcp_server,
+    iowait = internal.iowait
 }, {
     __call = function(self, ...) return create_socket(...) end;
 })
