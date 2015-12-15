@@ -182,6 +182,7 @@ wal_writer_init(struct wal_writer *writer, enum wal_mode wal_mode,
 	cbus_create(&writer->tx_wal_bus);
 
 	cpipe_create(&writer->tx_pipe);
+	cpipe_create(&writer->wal_pipe);
 	cpipe_set_fetch_cb(&writer->tx_pipe, tx_fetch_output, writer);
 
 	writer->rows_per_wal = rows_per_wal;
@@ -205,6 +206,7 @@ wal_writer_destroy(struct wal_writer *writer)
 {
 	xdir_destroy(&writer->wal_dir);
 	cpipe_destroy(&writer->tx_pipe);
+	cpipe_destroy(&writer->wal_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
 	fio_batch_delete(writer->batch);
 	tt_pthread_mutex_destroy(&writer->watchers_mutex);
@@ -270,6 +272,7 @@ wal_writer_stop()
 		panic_syserror("WAL writer: thread join failed");
 	}
 
+	cbus_leave(&writer->tx_wal_bus);
 	wal_writer_destroy(writer);
 
 	wal = NULL;
@@ -516,7 +519,6 @@ wal_writer_f(va_list ap)
 {
 	struct wal_writer *writer = va_arg(ap, struct wal_writer *);
 
-	cpipe_create(&writer->wal_pipe);
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
 
 	struct stailq commit;
@@ -553,7 +555,7 @@ wal_writer_f(va_list ap)
 		xlog_close(writer->current_wal);
 		writer->current_wal = NULL;
 	}
-	cpipe_destroy(&writer->wal_pipe);
+	cbus_leave(&writer->tx_wal_bus);
 }
 
 /**

@@ -387,7 +387,7 @@ lbox_socket_iowait(struct lua_State *L)
 	int fh = lua_tointeger(L, 1);
 	if (fh < 0)
 		goto usage;
-	ev_tstamp timeout = lua_tonumber(L, 3);
+	ev_tstamp timeout = luaL_optnumber(L, 3, TIMEOUT_INFINITY);
 	if (timeout < 0)
 		goto usage;
 
