@@ -2,7 +2,7 @@
                             Atomic execution
 -------------------------------------------------------------------------------
 
-In several places it's been noted that Lua processes occur in fibers on a
+In several places in this manual it's been noted that Lua processes occur in fibers on a
 single thread. That is why there can be a guarantee of execution atomicity.
 That requires emphasis.
 
@@ -10,13 +10,13 @@ That requires emphasis.
             Cooperative multitasking environment
 ===========================================================
 
-Tarantool core is built around a cooperative multi-tasking paradigm: unless a
+Tarantool uses cooperative multi-tasking: unless a
 running fiber deliberately yields control to some other fiber, it is not
 preempted. “Yield points” are built into all calls from Tarantool core to the
 operating system. Any system call which can block is performed in an
 asynchronous manner and the fiber waiting on the system call is preempted with
 a fiber ready to run. This model makes all programmatic locks unnecessary:
-cooperative multitasking ensures that there is no concurrency around a resource,
+cooperative multitasking ensures that there will be no concurrency around a resource,
 no race conditions and no memory consistency issues.
 
 When requests are small, e.g. simple UPDATE, INSERT, DELETE, SELECT, fiber
@@ -31,7 +31,7 @@ responsibility of the function's author. Most of the box calls, such as
 :func:`box.space...insert <space_object.insert>`,
 :func:`box.space...update <space_object.update>`,
 :func:`box.space...delete <space_object.delete>` are yield points;
-:func:`box.space...select <space_object.select>`, however, is not.
+however, :func:`box.space...select <space_object.select>` is not.
 
 It should also be noted that, in the absence of transactions, any yield in a
 function is a potential change in the database state. Effectively, it's only

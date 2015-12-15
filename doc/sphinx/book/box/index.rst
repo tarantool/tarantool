@@ -357,7 +357,7 @@ On the left are the hexadecimal bytes that one would see with:
 
 .. code-block:: console
 
-    $ hexdump 00000000000000000001.xlog
+    $ hexdump 00000000000000000000.xlog
 
 and on the right are comments.
 
@@ -379,7 +379,7 @@ and on the right are comments.
    82                         msgpack code meaning "map of 2 elements" follows
    10                         IPROTO_SPACE_ID which is #defined as 16 (hex 10)
    cd                         msgpack code meaning 2-digit number follows
-   02 00                      the id of "tester" which is 513, it's biggest byte first
+   02 00                      the id of "tester" which is 512, it's biggest byte first
    21                         Flags = IPROTO_TUPLE which is #defined as hex 21
    91                         msgpack code meaning "1-element fixed array" follows
    01                         Tuple: field[1] value = 1
@@ -397,7 +397,7 @@ REPLACE request as an example:
 4. A message is sent to WAL writer running in a separate thread, requesting that
    the change be recorded in the WAL. The server switches to work on the next
    request until the write is acknowledged.
-5. On success, a confirmation is sent to the client. Upon failure, a rollback
+5. On success, a confirmation is sent to the client. On failure, a rollback
    procedure is begun. During the rollback procedure, the transaction processor
    rolls back all changes to the database which occurred after the first failed
    change, from latest to oldest, up to the first failed change. All rolled back
@@ -503,7 +503,7 @@ user preference and all the variations exist in the wild.
 
 All the data-manipulation functions operate on tuple sets but,
 since primary keys are unique, the number of tuples in the
-tuple set is always 1. The only exception is ``box.space...select``,
+tuple set is always 0 or 1. The only exception is ``box.space...select``,
 which may accept either a primary-key value or a secondary-key value.
 
 .. _box-library:

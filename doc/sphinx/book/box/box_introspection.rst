@@ -149,6 +149,8 @@ The arena_size and arena_used values are the amount of the % of
       slab_size: 16384
     ...
 
+.. _box_stat:
+
 =====================================================================
                          Package `box.stat`
 =====================================================================

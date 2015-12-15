@@ -26,7 +26,7 @@ properties of online applications, the caches of the underlying data, the
 distribution and sharding algorithms, and much more. Outside Mail.Ru the
 software is used by a growing number of projects in online gaming, digital
 marketing, and social media industries. While product development is sponsored
-by Mail.Ru, the roadmap, the bugs database and the development process are
+by Mail.Ru, the roadmap and the bugs database and the development process are
 fully open. The software incorporates patches from dozens of community
 contributors. The Tarantool community writes and maintains most of the drivers
 for programming languages.  The greater Lua community has hundreds of useful
@@ -69,8 +69,8 @@ a remote procedure invocation API.
 
 Tarantool's DBMS server uses the **storage engine** concept, where
 different sets of algorithms and data structures can be used for different
-collections of objects. Two storage engines are built-in: an in-memory engine,
-which all the data and indexes in RAM, and a two-level B-tree engine,
+collections of objects. Two storage engines are built-in: an in-memory engine
+which has all the data and indexes in RAM, and a two-level B-tree engine
 for data sets whose size is 10 to 1000 times the amount of available RAM.
 All storage engines in Tarantool support transactions and
 replication by using a common **write ahead log** (WAL). This ensures consistency
@@ -96,7 +96,7 @@ branch is a collection of pages, serving different purposes. Pages
 in a fully merged branch contain non-overlapping ranges of keys. A branch
 can be partially merged if there were a lot of changes in its key range
 recently. In that case some pages represent new keys and values in the
-branch. The disk-based engine is append only: new data never overwrites
+branch. The disk-based storage engine is append only: new data never overwrites
 old data.
 
 Unlike most NoSQL DBMSs, Tarantool supports **secondary index keys** as well as
@@ -144,7 +144,7 @@ Tarantool server running on the web at http://try.tarantool.org.
 Either way, the first tryout can be a matter of following the example
 in the second part of chapter 2: "Starting Tarantool and making your first database".
 
-Chapter 3 "Databases" is about the Tarantool NoSQL DBMS.
+Chapter 3 "Database" is about the Tarantool NoSQL DBMS.
 If the only intent is to use Tarantool as a Lua application server,
 most of the material in this chapter and in the following chapter
 (Chapter 4 "Replication") will not be necessary.
@@ -160,7 +160,7 @@ The two long tutorials in Appendix C -- "Insert one million tuples with a Lua st
 and "Sum a JSON field for all tuples" -- start slowly and contain commentary that is especially
 aimed at users who may not consider themselves experts at either Lua or NoSQL database management.
 
-Finally, Appendix D "Plugins" has examples that will be essential for those users who want to
+Finally, Appendix D "Modules" has examples that will be essential for those users who want to
 connect the Tarantool server to another DBMS: MySQL or PostgreSQL.
 
 For experienced users, there is also a developer's guide and an extensive set of comments in the source code. 
@@ -170,7 +170,7 @@ For experienced users, there is also a developer's guide and an extensive set of
 ===============================================================================
 
 Please report bugs in Tarantool at http://github.com/tarantool/tarantool/issues.
-You can contact developers directly on the `#tarantool`_ IRC channel on freenode,
+You can contact developers directly on the `#tarantool` IRC channel on freenode.net,
 or via a mailing list, `Tarantool Google group`_.
 
 .. _#tarantool: irc://irc.freenode.net#tarantool

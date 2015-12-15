@@ -6,7 +6,7 @@
 
 .. module:: box.tuple
 
-The ``box.tuple`` package provides read-only access for the ``box.tuple``
+The ``box.tuple`` package provides read-only access for the ``tuple``
 userdata type. It allows, for a single tuple: selective retrieval of the field
 contents, retrieval of information about size, iteration over all the fields,
 and conversion to a Lua table.
@@ -14,8 +14,10 @@ and conversion to a Lua table.
 .. function:: new(value)
 
     Construct a new tuple from either a scalar or a Lua table. Alternatively,
-    one can get new tuples from tarantool's SQL-like statements: SELECT,
-    INSERT, UPDATE, REPLACE, which can be regarded as statements that do
+    one can get new tuples from tarantool's :func:`select <space_object.select>`
+    or :func:`insert <space_object.insert>` or :func:`replace <space_object.replace>`
+    or :func:`update <space_object.update>` requests,
+    which can be regarded as statements that do
     ``new()`` implicitly.
 
     :param lua-value value: the value that will become the tuple contents.
@@ -38,7 +40,7 @@ and conversion to a Lua table.
                  > }:totable()
         ---
         ...
-        tarantool> t = box.tuple_new{'abc', 'def', 'ghi', 'abc'}
+        tarantool> t = box.tuple.new{'abc', 'def', 'ghi', 'abc'}
         ---
         ...
         tarantool> t
@@ -120,7 +122,7 @@ and conversion to a Lua table.
                   findall([field-number, ] search-value)
 
         If ``t`` is a tuple instance, ``t:find(search-value)`` will return the
-        number of the first field in ``t`` that matches the search value),
+        number of the first field in ``t`` that matches the search value,
         and ``t:findall(search-value [, search-value ...])`` will return numbers
         of all fields in ``t`` that match the search value. Optionally one can
         put a numeric argument ``field-number`` before the search-value to
@@ -227,7 +229,7 @@ and conversion to a Lua table.
             tarantool> t = box.tuple.new{'Fld#1', 'Fld#2', 'Fld#3', 'Fld#4', 'Fld#5'}
             ---
             ...
-            tarantool> mp = ''
+            tarantool> tmp = ''
             ---
             ...
             tarantool> for k, v in t:pairs() do
@@ -254,7 +256,7 @@ and conversion to a Lua table.
         as 'B' for a new assignable value = 'B'.
 
         For details: see the description for ``format``, ``field_number``, and ``value`` in
-        the section ``box.space.space-name:update{key, format, {field_number, value}...)``.
+        the section :func:`box.space.space-name:update{key, format, {field_number, value}...) <space_object.update>`.
 
         :return: new tuple
         :rtype:  tuple

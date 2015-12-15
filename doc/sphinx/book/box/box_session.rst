@@ -22,13 +22,20 @@ client connection.
 
 .. function:: peer(id)
 
-    :return: If the specified session exists, the host address and port of
-             the session peer, for example "127.0.0.1:55457". If the
-             specified session does not exist, "0.0.0.0:0". The command is
-             executed on the server, so the "local name" is the server's host
+    This function works only if there is a peer, that is,
+    if a connection has been made to a separate server.
+
+    :return: The host address and port of the session peer,
+             for example "127.0.0.1:55457".
+             If the session exists but there is no connection to a
+             separate server, the return is null.
+             The command is executed on the server,
+             so the "local name" is the server's host
              and administrative port, and the "peer name" is the client's host
              and port.
     :rtype:  string
+
+    Possible errors: 'session.peer(): session does not exist'
 
 .. function:: sync()
 
@@ -49,7 +56,7 @@ client connection.
 
 .. code-block:: tarantoolsession
 
-    tarantool> box.session.peer(session.id())
+    tarantool> box.session.peer(box.session.id())
     ---
     - 127.0.0.1:45129
     ...
@@ -72,9 +79,9 @@ client connection.
     - 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
     ...
 
-See the section :ref:`Triggers on connect and disconnect <box-triggers>`
+See the section :ref:`Triggers <box-triggers>`
 for instructions about defining triggers for connect and disconnect
 events with ``box.session.on_connect()`` and ``box.session.on_disconnect()``.
-See the section :ref:`Authentication and access control <box-authentication>`
+See the section :ref:`Access control <box-authentication>`
 for instructions about ``box.session`` functions that affect user
 identification and security.

@@ -104,7 +104,7 @@ To create a new user, say:
     box.schema.user.create(*user-name*, {if_not_exists = true})
     box.schema.user.create(*user-name*, {password = *password*}).
 
-Last form is better because in a :ref:`URI` (Uniform Resource Identifier) it is
+The :samp:`password={password}` specification is good because in a :ref:`URI` (Uniform Resource Identifier) it is
 usually illegal to include a user-name without a password.
 
 To change the user's password, say:
@@ -118,7 +118,7 @@ To change the user's password, say:
     -- To change a different user's password
     box.schema.user.passwd(*user-name*, *password*)
 
-(Only the admin user can perform this function.)
+(Usually it is only the admin user who can change a different user's password.)
 
 To drop a user, say:
 
@@ -153,7 +153,7 @@ tuple in the _user space, and then drops the user.
     tarantool> box.schema.user.create('JeanMartin', {password = 'Iwtso_6_os$$'})
     ---
     ...
-    tarantool> box.space._user_index.name:select{'JeanMartin'}
+    tarantool> box.space._user.index.name:select{'JeanMartin'}
     ---
     - - [17, 1, 'JeanMartin', 'user', {'chap-sha1': 't3xjUpQdrt857O+YRvGbMY5py8Q='}]
     ...
@@ -191,7 +191,7 @@ The function for granting a privilege is:
 where 'universe' means 'all objects', and the optional grant-option can be:
 
 * :samp:`grantor={grantor_name_or_id}` - string or number, for custom grantor
-* :samp:`if_not_exists=true|false` - bool, do not throw error if user is already blessed
+* :samp:`if_not_exists=true|false` - bool, do not throw error if user already has the privilege
 
 The function for revoking a privilege is:
 
@@ -203,7 +203,7 @@ The function for revoking a privilege is:
 
 where 'universe' means 'all objects', and the optional grant-option can be:
 
-* :samp:`if_not_exists=true|false` - bool, do not throw error if user is already blessed
+* :samp:`if_not_exists=true|false` - bool, do not throw error if user already lacks the privilege
 
 For example, here is a session where the admin user gave the guest user the
 privilege to read from a space named ``space55``, and then took the privilege away:
@@ -227,6 +227,11 @@ privilege to read from a space named ``space55``, and then took the privilege aw
 .. NOTE::
 
     Only the 'admin' user can grant privileges for the 'universe'.
+
+.. NOTE::
+
+   Only the creator of a space can drop, alter, or truncate the space.
+   Only the creator of a user can change a different user's password.
 
 ===========================================================
                 Functions and _func space
