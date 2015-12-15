@@ -63,7 +63,10 @@ Conflicts: tarantool-lts-common,
  tarantool-plugins (<< 1.6~),
  tarantool-mysql-plugin (<< 1.6~),
  tarantool-postgresql-plugin (<< 1.6~),
- libtarantool-dev (<< 1.6~)
+ libtarantool-dev (<< 1.6~),
+ tarantool-modules (<< 1.6.7),
+ tarantool-mysql-module (<< 1.6.7),
+ tarantool-postgresql-module (<< 1.6.7)
 Recommends: tarantool-common (>= 1.6)
 Description: In-memory database with a Lua application server
  Tarantool is an in-memory database and a Lua application server.
