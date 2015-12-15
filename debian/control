@@ -33,6 +33,9 @@ Conflicts: tarantool-common (<< 1.5.3),
  tarantool-plugins (<< 1.6~),
  tarantool-mysql-plugin (<< 1.6~),
  tarantool-postgresql-plugin (<< 1.6~),
+ tarantool-modules,
+ tarantool-mysql-module,
+ tarantool-postgresql-module,
  libtarantool-dev (<< 1.6~)
 Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
 Depends: ${misc:Depends}, adduser, lsb-base
