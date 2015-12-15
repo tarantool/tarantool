@@ -1,6 +1,60 @@
+tarantool (1.6.7-523-g816224e) unstable; urgency=medium
+
+  * New Debian snapshot for 1.6.7 stable release.
+
+  Major changes:
+
+   - threaded architecture for checkpointing. Tarantool no longer
+     forks to create a snapshot, but uses a separate thread,
+     accessing data via a consistent read view. This eliminates all known
+     latency spikes caused by snapshotting.
+   - threaded architecture for network. Network I/O has finally
+     been moved to a separate thread, increasing single instance
+     performance by up to 50%.
+   - stored procedures in C/C++. Stored procedures in C/C++
+     provide speed (3-4 times, compared to a Lua version in
+     our measurements), as well as unlimited extensibility
+     power.
+   - new HASH index implementation which respects slab_alloc_arena
+     limit and uses significantly less memory.
+   - RTREE index support (Memtx engine).
+   - new 'upsert' command available in the binary protocol
+     and in stored functions.
+   - multi-master replication with support up to 30 peers.
+   - logger option now accepts a syntax for syslog output. Use uri-style
+     syntax for file, pipe or syslog log destination.
+   - new version of sophia engine, with support of compression and multipart
+     primary keys.
+   - jit.*, jit.dump, jit.util, jit.vmdef modules of LuaJIT 2.0 are now
+     available as built-ins.
+   - better documentation and examples.
+   - manifold performance improvements.
+   - bug fixes.
+
+  Incompatible changes:
+
+   - fiber.channel.broadcast() was removed since it wasn't used by
+     anyone and didn't work properly.
+   - tarantoolctl "reload" command renamed to "eval".
+   - panic_on_wal_error is on by default (gh-752)
+   - functions which create objects (users, spaces, or functions)
+     return an error if an object already exists. Use
+     {if_not_exists=true} clause in create functions.
+   - an update of the primary key was forbidden; use replace instead.
+
+   Package changes:
+
+   - Actualize debian/copyright
+   - Remove support for GNU hurd architecture (doesn't work).
+   - Don't use /var/lib/tarantool/started and /var/lib/tarantool/snapshot dirs.
+   - Drop irrelevant README.Debian.
+   - Remove old cron scripts.
+
+ -- Roman Tsisyk <roman@tarantool.org>  Mon, 14 Dec 2015 20:00:00 +0300
+
 tarantool (1.6.5.20.g51b2e0d-1) unstable; urgency=medium
 
-  * Remove tarantool-mysql-module and tarantool-pg-module.
+  * Remove tarantool-mysql-module, tarantool-pg-module and tarantool-modules.
 
  -- Roman Tsisyk <roman@tarantool.org>  Tue, 28 Apr 2015 14:34:17 +0300
 

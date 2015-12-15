@@ -1,49 +1,11 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Debianized-By: Dmitry E. Oboukhov <unera@debian.org>
-Upstream-Name: tarantool, tarantool-box
-Upstream-Contact: tarantool-developers@lists.launchpad.net
+Upstream-Name: tarantool
+Upstream-Contact: dev@tarantool.org
 Source: https://github.com/tarantool/tarantool
 
 Files: third_party/libev/* third_party/coro/* third_party/libeio/*
 Copyright: 2007-2012 Marc Alexander Lehmann.
-License: BSD-2-Clause or GPL
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are
- met:
- .
-     * Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
- .
-     * Redistributions in binary form must reproduce the above
-       copyright notice, this list of conditions and the following
-       disclaimer in the documentation and/or other materials provided
-       with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- .
- Alternatively, the contents of this package may be used under the terms
- of the GNU General Public License ("GPL") version 2 or any later version,
- in which case the provisions of the GPL are applicable instead of the
- above. If you wish to allow the use of your version of this package only
- under the terms of the GPL and not to allow others to use your version of
- this file under the BSD license, indicate your decision by deleting the
- provisions above and replace them with the notice and other provisions
- required by the GPL in this and the other files of this package. If you do
- not delete the provisions above, a recipient may use your version of this
- file under either the BSD or the GPL.
- .
- Debian systems, full text of GPLv2 license is alailable in
- /usr/share/common-licenses/GPL-2.
+License: BSD-2-Clause or GPL-2+
 
 Files: third_party/libev/event_compat.h
 Copyright: 2000-2004 Niels Provos <provos@citi.umich.edu>,
@@ -76,55 +38,20 @@ License: BSD-3-Clause
 Files: third_party/libev/ev.c
 Copyright: 2007-2012 Marc Alexander Lehmann <libeio@schmorp.de>,
 	2011 Emanuele Giaquinta
-License: BSD-2-Clause
- Redistribution and use in source and binary forms, with or without modifica-
- tion, are permitted provided that the following conditions are met:
- .
-   1.  Redistributions of source code must retain the above copyright notice,
-       this list of conditions and the following disclaimer.
- .
-   2.  Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in the
-       documentation and/or other materials provided with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
- WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
- CHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
- EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPE-
- CIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTH-
- ERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- OF THE POSSIBILITY OF SUCH DAMAGE.
+License: BSD-2-Clause or GPL-2+
+
+Files: third_party/libeio/ecb.h
+Copyright: 2011, Emanuele Giaquinta
+           2009-2015, Marc Alexander Lehmann <libecb@schmorp.de>
+License: BSD-2-Clause or GPL-2+
 
 Files: third_party/coro/conftest.c
 Copyright: 1999-2001 Ralf S. Engelschall <rse@engelschall.com>
-License: LGPL-2.1
- This file is part of GNU Pth, a non-preemptive thread scheduling
- library which can be found at http://www.gnu.org/software/pth/.
- .
- This file is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License as published by the Free Software Foundation; either
- version 2.1 of the License, or (at your option) any later version.
- .
- This file is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- Lesser General Public License for more details.
- .
- You should have received a copy of the GNU Lesser General Public
- License along with this library; if not, write to the Free Software
- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
- USA, or contact Marc Lehmann <schmorp@schmorp.de>.
- .
- Debian systems, full text of LGPLv2.1 license is alailable in
- /usr/share/common-licenses/LGPL-2.1
+License: LGPL-2.1+
 
 Files: third_party/crc32.c
-Copyright: 1986 Gary S. Brown.
-	2004-2006 Intel Corporation - All Rights Reserved
+Copyright: 1986 Gary S. Brown
+           2004-2006 Intel Corporation
 License: BSD-3-Clause
  You may use this program, or code or tables extracted from it,
  as desired without restriction.
@@ -156,7 +83,7 @@ License: BSD-3-Clause
 
 Files: third_party/memrchr.c third_party/memmem.c
 Copyright: 2008 The NetBSD Foundation, Inc.
-License: BSD-2-Clause
+License: BSD-2-Clause-NetBSD
  All rights reserved.
  .
  This code is derived from software contributed to The NetBSD Foundation
@@ -183,126 +110,82 @@ License: BSD-2-Clause
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 
-Files: third_party/memcached/*
-Copyright: 2003, Danga Interactive, Inc.
-License: BSD-3-Clause
- Copyright (c) 2003, Danga Interactive, Inc.
- All rights reserved.
- .
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are
- met:
- .
-     * Redistributions of source code must retain the above copyright
- notice, this list of conditions and the following disclaimer.
- .
-     * Redistributions in binary form must reproduce the above
- copyright notice, this list of conditions and the following disclaimer
- in the documentation and/or other materials provided with the
- distribution.
- .
-     * Neither the name of the Danga Interactive nor the names of its
- contributors may be used to endorse or promote products derived from
- this software without specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Files: third_party/pmatomic.h src/lib/small/pmatomic/*
+Copyright: 2011 Ed Schouten <ed@FreeBSD.org>
+                David Chisnall <theraven@FreeBSD.org>
+License: BSD-2-Clause
 
-Files: third_party/luajit/* cmake/luatest.cpp
+Files: third_party/src/lj_alloc.c
+Copyright: Doug Lea <dl@cs.oswego.edu>
+License: public-domain
+  The person or persons who have associated work with this document (the
+  "Dedicator" or "Certifier") hereby either (a) certifies that, to the best
+  of his knowledge, the work of authorship identified is in the public domain
+  of the country from which the work is published, or (b) hereby dedicates
+  whatever copyright the dedicators holds in the work of authorship
+  identified below (the "Work") to the public domain. A certifier, moreover,
+  dedicates any copyright interest he may have in the associated work, and
+  for these purposes, is described as a "dedicator" below.
+  .
+  A certifier has taken reasonable steps to verify the copyright status of
+  this work. Certifier recognizes that his good faith efforts may not shield
+  him from liability if in fact the work certified is not in the public
+  domain.
+  .
+  Dedicator makes this dedication for the benefit of the public at large and
+  to the detriment of the Dedicator's heirs and successors. Dedicator intends
+  this dedication to be an overt act of relinquishment in perpetuity of all
+  present and future rights under copyright law, whether vested or
+  contingent, in the Work. Dedicator understands that such relinquishment of
+  all rights includes the relinquishment of all rights to enforce (by lawsuit
+  or otherwise) those copyrights in the Work.
+  .
+  Dedicator recognizes that, once placed in the public domain, the Work may
+  be freely reproduced, distributed, transmitted, used, modified, built upon,
+  or otherwise exploited by anyone for any purpose, commercial or
+  non-commercial, and in any way, including by methods that have not yet been
+  invented or conceived.
+
+Files: third_party/luajit/*
 Copyright: 2005-2011 Mike Pall. All rights reserved.
-    1994-2011 Lua.org, PUC-Rio.
-License: MIT
- LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
- .
- Copyright (C) 2005-2011 Mike Pall. All rights reserved.
- .
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- .
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
- .
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
- .
- [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
- .
- [ LuaJIT includes code from Lua 5.1/5.2, which has this license statement: ]
- .
- Copyright (C) 1994-2011 Lua.org, PUC-Rio.
- .
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- .
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
- .
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
- .
- [ LuaJIT includes code from dlmalloc, which has this license statement: ]
- .
- This is a version (aka dlmalloc) of malloc/free/realloc written by
- Doug Lea and released to the public domain, as explained at
- http://creativecommons.org/licenses/publicdomain
+           1994-2011 Lua.org, PUC-Rio.
+License: Expat
 
-Files: test/lib/yapps/*
+Files: third_party/libutil_freebsd/*
+Copyright: 2007, Dag-Erling Coïdan Smørgrav
+License: BSD-2-Clause
+
+Files: third_party/libutil_freebsd/pidfile.c
+Copyright: 2005, Pawel Jakub Dawidek <pjd@FreeBSD.org>
+License: BSD-2-Clause
+
+Files: third_party/lua-cjson/*
+Copyright: 2010-2012, Mark Pulford <mark@kyne.com.au>
+License: Expat
+
+Files: third_party/luafun/*
+Copyright: 2013, 2014, Roman Tsisyk <roman@tsisyk.com>
+License: Expat
+
+Files: test-run/lib/msgpack-python/*
+Copyright: 2008-2011, INADA Naoki <songofacandy@gmail.com>
+License: Apache-2.0
+
+Files: test-run/lib/msgpack-python/msgpack/*
+Copyright: 2008-2010, FURUHASHI Sadayuki
+License: Apache-2.0
+
+Files: test-run/lib/yapps/*
 Copyright: 1999-2003 Amit J. Patel <amitp@cs.stanford.edu>
-    2003-2004 by Matthias Urlichs <smurf@debian.org>
-License: MIT
- The MIT License (MIT)
- .
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- .
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
- .
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
+           2003-2004 by Matthias Urlichs <smurf@debian.org>
+License: Expat
 
 Files: third_party/qsort_arg.c
     third_party/qsort_arg_mt.c
     third_party/compat/sys/bsd_time.h
     third_party/queue.h
-    connector/c/tntsql/include/tnt_queue.h
     third_party/rb.h
+    src/lib/small/small/rb.h
 Copyright: 1992, 1993 The Regents of the University of California.
 License: BSD-3-Clause
  All rights reserved.
@@ -358,23 +241,9 @@ License: GPL
  License.  This exception does not however invalidate any other
  reasons why the executable file might be covered by the GNU General
  Public License.
-
-Files: third_party/gopt/gopt.*
-Copyright: 2003-2008, Tom Vajzovic <tom.viza@gmail.com>
-License: TFL
- I, Tom Vajzovic, am the author of this software and its documentation
- and permanently abandon all copyright and other intellectual property
- rights in them, including the right to be identified as the author.
  .
- I am fairly certain that this software does what its documentation says
- that it does, but I do not guarantee that it does, or that it does what
- you think it should.  I do not guarantee that it will not have undesirable
- side effects.
- .
- You are free to use, modify and distribute this software as you please,
- but you do so at your own risk.  If you remove or hide this warning then
- you may be responsible for any problems that are encountered by those who
- obtain the software through you.
+ On Debian systems, the complete text of the GNU General
+ Public License can be found in '/usr/share/common-licenses/GPL'.
 
 Files: third_party/valgrind/*
 Copyright: 2000-2010 Julian Seward.
@@ -414,94 +283,18 @@ License: BSD-4-Clause
 
 Files: third_party/sptree.h
 Copyright: 2010 Mail.RU
-    2010 Teodor Sigaev
+           2010 Teodor Sigaev
 License: BSD-2-Clause
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
- .
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
 
 Files: third_party/proctitle.c
 Copyright: 2000-2010 PostgreSQL Global Development Group
 License: BSD-2-Clause
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
- .
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
 
 Files: third_party/lua-cjson/*
 Copyright: 2010-2012 Mark Pulford <mark@kyne.com.au>
 License: Expat
- Permission is hereby granted, free of charge, to any person obtaining
- a copy of this software and associated documentation files (the
- "Software"), to deal in the Software without restriction, including
- without limitation the rights to use, copy, modify, merge, publish,
- distribute, sublicense, and/or sell copies of the Software, and to
- permit persons to whom the Software is furnished to do so, subject to
- the following conditions:
- .
- The above copyright notice and this permission notice shall be
- included in all copies or substantial portions of the Software.
- .
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Files: third_party/lua-cjson/g_fmt.c
-Copyright: 1991, 1996 by Lucent Technologies.
-License: Expat
- The author of this software is David M. Gay.
- .
- Permission to use, copy, modify, and distribute this software for any
- purpose without fee is hereby granted, provided that this entire notice
- is included in all copies of any software which is or includes a copy
- or modification of this software and in all copies of the supporting
- documentation for such software.
- .
- THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
- WARRANTY.  IN PARTICULAR, NEITHER THE AUTHOR NOR LUCENT MAKES ANY
- REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
- OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
-
-Files: src/rope.c
+Files: src/lib/salad/rope.c
 Copyright: 1993-1994 by Xerox Corporation.
 License: BSD-2-Clause
  Author: Hans-J. Boehm <boehm@parc.xerox.com>
@@ -545,32 +338,6 @@ License: BSD-2-Clause
 Files: third_party/base64.[ch]
 Copyright: Chris Venter <chris.venter@gmail.com>
 License: BSD-2-Clause
- Redistribution and use in source and binary forms, with or
- without modification, are permitted provided that the following
- conditions are met:
- .
- 1. Redistributions of source code must retain the above
-    copyright notice, this list of conditions and the
-    following disclaimer.
- .
- 2. Redistributions in binary form must reproduce the above
-    copyright notice, this list of conditions and the following
-    disclaimer in the documentation and/or other materials
-    provided with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
 
 Files: third_party/PMurHash.*
 Copyright: Austin Appleby
@@ -584,25 +351,12 @@ License: Public-Domain
  with support for progressive processing.
 
 Files: third_party/lua-yaml/*
-Copyright: 2009, Andrew Danforth
+Copyright: 2006, Kirill Simonov <xi@resolvent.net>
 License: Expat
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- .
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
- .
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
+
+Files: third_party/lua-yaml/lyaml.cc
+Copyright: 2009, Andrew Danforth <acd@weirdness.net>
+License: Expat
 
 Files: ./third_party/sha1.*
 Copyright: Steve Reid <steve@edmweb.com>
@@ -613,10 +367,43 @@ Files: third_party/open_memstream.*
 Copyright: 2013 Advanced Computing Technologies LLC,
  Written by: John H. Baldwin <jhb@FreeBSD.org>
 License: BSD-2-Clause
+
+Files: third_party/sophia/sophia/std/ss_crc.c
+Copyright: Dmitry Simonenko <pmwkaa@gmail.com>
+           2008-2010 Massachusetts Institute of Technology
+           2004-2006 Intel Corporation
+License: BSD-2-Clause
+
+Files: third_party/sophia/sophia/std/ss_lz4filter.c
+       third_party/sophia/sophia/std/ss_zstdfilter.c
+Copyright: Dmitry Simonenko <pmwkaa@gmail.com>
+           2014-2015, Yann Collet
+License: BSD-2-Clause
+
+Files: third_party/sophia/*
+Copyright: Dmitry Simonenko <pmwkaa@gmail.com>
+License: BSD-2-Clause
+
+Files: src/proc_title.c
+Copyright: 2000-2010, PostgreSQL Global Development Group
+License: BSD-2-Clause
+
+Files: *
+Copyright: 2010-2015 Tarantool AUTHORS:
+    Aleksandr Lyapunov, Aleksey Demakov, Aleksey Mashanov,
+    Alexandre Kalendarev, Andrey Drozdov, Anton Barabanov,
+    Damien Lefortier,  Dmitry E. Oboukhov, Dmitry Simonenko,
+    Eugene Blikh, Eugene Shadrin, Konstantin Knizhnik, Konstantin Osipov,
+    Konstantin Shulgin, Mons Anderson, Marko Kevac, Oleg Tsarev,
+    Pavel Cherenkov, Roman Antipin, Roman Tokarev, Roman Tsisyk,
+    Teodor Sigaev, Timofey Khryukin, Veniamin Gvozdikov, Vassiliy Soshnikov,
+    Vladimir Rudnyh, Yuriy Nevinitsin, Yuriy Vostrikov
+License: BSD-2-Clause
+
+License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
- .
  1. Redistributions of source code must retain the above copyright
     notice, this list of conditions and the following disclaimer.
  2. Redistributions in binary form must reproduce the above copyright
@@ -635,37 +422,85 @@ License: BSD-2-Clause
  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  SUCH DAMAGE.
 
-Files: *
-Copyright: 2010-2014 by Aleksey Demakov, Aleksey Mashanov,
-    Alexandre Kalendarev, Damien Lefortier, Dmitry E. Oboukhov,
-    Dmitry Simonenko, Konstantin Osipov, Konstantin Shulgin,
-    Mons Anderson, Pavel Cherenkov, Roman Antipin, Roman Tokarev,
-    Roman Tsisyk, Teodor Sigaev, Timofey Khryukin, Yuriy Nevinitsin,
-    Yuriy Vostrikov, Veniamin Gvozdikov
-License: BSD-2-Clause
- Redistribution and use in source and binary forms, with or
- without modification, are permitted provided that the following
- conditions are met:
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of this software and associated documentation files (the
+ “Software”), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
  .
- 1. Redistributions of source code must retain the above
-    copyright notice, this list of conditions and the
-    following disclaimer.
+ The above copyright notice and this permission notice shall be
+ included in all copies or substantial portions of the Software.
  .
- 2. Redistributions in binary form must reproduce the above
-    copyright notice, this list of conditions and the following
-    disclaimer in the documentation and/or other materials
-    provided with the distribution.
+ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+License: BSD-2-Clause or GPL-2+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
  .
- THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+ .
+     * Redistributions in binary form must reproduce the above
+       copyright notice, this list of conditions and the following
+       disclaimer in the documentation and/or other materials provided
+       with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ .
+ Alternatively, the contents of this package may be used under the terms
+ of the GNU General Public License ("GPL") version 2 or any later version,
+ in which case the provisions of the GPL are applicable instead of the
+ above. If you wish to allow the use of your version of this package only
+ under the terms of the GPL and not to allow others to use your version of
+ this file under the BSD license, indicate your decision by deleting the
+ provisions above and replace them with the notice and other provisions
+ required by the GPL in this and the other files of this package. If you do
+ not delete the provisions above, a recipient may use your version of this
+ file under either the BSD or the GPL.
+ .
+ Debian systems, full text of GPLv2 license is alailable in
+ /usr/share/common-licenses/GPL-2.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+     http://www.apache.org/licenses/LICENSE-2.0
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS"BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ .
+ On Debian systems, the complete text of the Apache License,
+ Version 2.0 can be found in '/usr/share/common-licenses/Apache-2.0'.
+
+License: LGPL-2.1+
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU Lesser General Public License as published by the
+ Free Software Foundation; version 2.1 of the License, or (at
+ your option) any later version.
+ .
+ On Debian systems, the complete text of version 2.1 of the GNU Lesser
+ General Public License can be found in `/usr/share/common-licenses/LGPL-2.1'.
