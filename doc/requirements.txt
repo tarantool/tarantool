@@ -1,0 +1,4 @@
+pygments>=2.0.0
+pelican>=3.5.0
+BeautifulSoup>=3.2.0
+breathe>=4.0.0
