@@ -877,7 +877,6 @@ net_cord_f(va_list /* ap */)
 	iobuf_init();
 	mempool_create(&iproto_msg_pool, &cord()->slabc,
 		       sizeof(struct iproto_msg));
-	cpipe_create(&net_pipe);
 	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
 
@@ -904,6 +903,7 @@ net_cord_f(va_list /* ap */)
 	fiber_yield();
 
 	rmean_delete(rmean_net);
+	cbus_leave(&net_tx_bus);
 }
 
 /** Initialize the iproto subsystem and start network io thread */
@@ -915,6 +915,7 @@ iproto_init()
 	cbus_create(&net_tx_bus);
 	rmean_net_tx_bus = net_tx_bus.stats;
 	cpipe_create(&tx_pipe);
+	cpipe_create(&net_pipe);
 	static struct cpipe_fiber_pool fiber_pool;
 
 	cpipe_fiber_pool_create(&fiber_pool, "iproto", &tx_pipe,
@@ -924,7 +925,6 @@ iproto_init()
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
-
 
 	cbus_join(&net_tx_bus, &tx_pipe);
 }

@@ -171,7 +171,8 @@ static inline void
 cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
 		   void *data)
 {
-	assert(loop() == pipe->consumer);
+	/** Must be done before starting the bus. */
+	assert(pipe->consumer == NULL);
 	/*
 	 * According to libev documentation, you can set cb at
 	 * virtually any time, modulo threads.
@@ -367,6 +368,12 @@ cbus_destroy(struct cbus *bus);
  */
 struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe);
+
+/**
+ * Stop listening for events on the bus.
+ */
+void
+cbus_leave(struct cbus *bus);
 
 /**
  * Lock the bus. Ideally should never be used

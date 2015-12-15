@@ -69,16 +69,16 @@ cpipe_create(struct cpipe *pipe)
 
 	ev_async_init(&pipe->fetch_output, cpipe_fetch_output_cb);
 	pipe->fetch_output.data = pipe;
-	pipe->consumer = loop();
-	pipe->producer = NULL; /* set in join() under a mutex */
-	ev_async_start(pipe->consumer, &pipe->fetch_output);
+	/* Set in join(), which is always called by the consumer thread. */
+	pipe->consumer = NULL;
+	/* Set in join() under a mutex. */
+	pipe->producer = NULL;
 }
 
 void
 cpipe_destroy(struct cpipe *pipe)
 {
-	assert(loop() == pipe->consumer);
-	ev_async_stop(pipe->consumer, &pipe->fetch_output);
+	(void) pipe;
 }
 
 static void
@@ -128,6 +128,8 @@ cbus_destroy(struct cbus *bus)
 struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe)
 {
+	pipe->consumer = loop();
+	ev_async_start(pipe->consumer, &pipe->fetch_output);
 	/*
 	 * We can't let one or the other thread go off and
 	 * produce events/send ev_async callback messages
@@ -163,6 +165,15 @@ cbus_join(struct cbus *bus, struct cpipe *pipe)
 	 */
 	cbus_signal(bus);
 	return bus->pipe[peer_idx];
+}
+
+void
+cbus_leave(struct cbus *bus)
+{
+	struct cpipe *pipe = bus->pipe[bus->pipe[0]->consumer != cord()->loop];
+
+	assert(loop() == pipe->consumer);
+	ev_async_stop(pipe->consumer, &pipe->fetch_output);
 }
 
 static void
