@@ -5,7 +5,7 @@
 #include "unit.h"
 #include "unit.h"
 
-void
+int
 touch_f(va_list ap)
 {
 	FILE *f = va_arg(ap, FILE *);
@@ -16,8 +16,9 @@ touch_f(va_list ap)
 		fflush(f);
 		fiber_sleep(0.01);
 		if (fiber_is_cancelled())
-			return;
+			return -1;
 	}
+	return 0;
 }
 
 static void
@@ -49,7 +50,7 @@ stat_timeout_test(const char *filename)
 	footer();
 }
 
-void
+static int
 main_f(va_list ap)
 {
 	const char *filename = "1.out";
@@ -59,6 +60,7 @@ main_f(va_list ap)
 	fclose(f);
 	remove(filename);
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 int main()

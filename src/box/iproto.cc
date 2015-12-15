@@ -870,7 +870,7 @@ static struct evio_service binary; /* iproto binary listener */
  * The network io thread main function:
  * begin serving the message bus.
  */
-static void
+static int
 net_cord_f(va_list /* ap */)
 {
 	/* Got to be called in every thread using iobuf */
@@ -904,6 +904,7 @@ net_cord_f(va_list /* ap */)
 
 	rmean_delete(rmean_net);
 	cbus_leave(&net_tx_bus);
+	return 0;
 }
 
 /** Initialize the iproto subsystem and start network io thread */

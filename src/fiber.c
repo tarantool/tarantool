@@ -42,6 +42,13 @@
 
 static void (*fiber_invoke)(fiber_func f, va_list ap);
 
+void
+fiber_c_invoke(fiber_func f, va_list ap)
+{
+	if (f(ap) == 0)
+		diag_clear(&fiber()->diag);
+}
+
 /*
  * Defines a handler to be executed on exit from cord's thread func,
  * accessible via cord()->on_exit (normally NULL). It is used to

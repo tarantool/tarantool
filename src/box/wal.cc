@@ -175,7 +175,8 @@ wal_writer_destroy(struct wal_writer *writer)
 }
 
 /** WAL writer thread routine. */
-static void wal_writer_f(va_list ap);
+static int
+wal_writer_f(va_list ap);
 
 /**
  * Initialize WAL writer, start the thread.
@@ -472,7 +473,7 @@ done:
 }
 
 /** WAL writer thread main loop.  */
-static void
+static int
 wal_writer_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
@@ -523,6 +524,7 @@ wal_writer_f(va_list ap)
 		r->current_wal = NULL;
 	}
 	cbus_leave(&writer->tx_wal_bus);
+	return 0;
 }
 
 /**

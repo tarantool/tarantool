@@ -1089,7 +1089,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	pk->createReadViewForIterator(entry->iterator);
 };
 
-void
+int
 checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
@@ -1112,6 +1112,7 @@ checkpoint_f(va_list ap)
 		}
 	}
 	say_info("done");
+	return 0;
 }
 
 int

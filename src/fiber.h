@@ -102,7 +102,7 @@ struct fiber;
  * Fiber - contains information about fiber
  */
 
-typedef void (*fiber_func)(va_list);
+typedef int (*fiber_func)(va_list);
 
 /**
  * Create a new fiber.
@@ -228,8 +228,6 @@ API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
 /** \endcond public */
-
-typedef void (*fiber_func)(va_list);
 
 struct fiber {
 	struct tarantool_coro coro;
@@ -482,11 +480,8 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
-inline void
-fiber_c_invoke(fiber_func f, va_list ap)
-{
-	return f(ap);
-}
+void
+fiber_c_invoke(fiber_func f, va_list ap);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -525,12 +520,13 @@ inline void
 fiber_cxx_invoke(fiber_func f, va_list ap)
 {
 	try {
-		f(ap);
-		/*
-		 * Make sure a leftover exception does not
-		 * propagate up to the joiner.
-		 */
-		diag_clear(&fiber()->diag);
+		if (f(ap) == 0) {
+			/*
+			 * Make sure a leftover exception does not
+			 * propagate up to the joiner.
+			 */
+			diag_clear(&fiber()->diag);
+		}
 	} catch (struct error *e) {
 	}
 }

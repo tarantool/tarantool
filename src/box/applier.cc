@@ -312,7 +312,7 @@ applier_disconnect(struct applier *applier, struct error *e,
 	fiber_gc();
 }
 
-static void
+static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
@@ -341,7 +341,7 @@ applier_f(va_list ap)
 			ev_io_stop(loop(), &applier->io);
 			iobuf_reset(applier->iobuf);
 			/* Don't close the socket */
-			return;
+			return 0;
 		} catch (ClientError *e) {
 			applier_disconnect(applier, e, APPLIER_STOPPED);
 			throw;
@@ -368,6 +368,7 @@ applier_f(va_list ap)
 		fiber_sleep(RECONNECT_DELAY);
 		fiber_testcancel();
 	}
+	return 0;
 }
 
 void

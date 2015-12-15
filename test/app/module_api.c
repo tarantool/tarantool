@@ -182,17 +182,18 @@ test_toint64(lua_State *L)
 	return 1;
 }
 
-void fiber_test_func(va_list va)
+int fiber_test_func(va_list va)
 {
 	do {
 		fiber_set_cancellable(true);
 		fiber_sleep(0.01);
 		if (fiber_is_cancelled()) {
 			box_error_set(__FILE__, __LINE__, 10, "test error");
-			return;
+			return -1;
 		}
 		fiber_set_cancellable(false);
 	} while (1);
+	return 0;
 }
 
 

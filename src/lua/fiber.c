@@ -270,8 +270,8 @@ lbox_fiber_info(struct lua_State *L)
 	return 1;
 }
 
-static void
-box_lua_fiber_run(va_list ap)
+static int
+lua_fiber_run_f(va_list ap)
 {
 	int coro_ref = va_arg(ap, int);
 	struct lua_State *L = va_arg(ap, struct lua_State *);
@@ -284,6 +284,7 @@ box_lua_fiber_run(va_list ap)
 	if (storage_ref > 0)
 		lua_unref(L, storage_ref);
 	lua_unref(L, coro_ref);
+	return 0;
 }
 
 /**
@@ -301,7 +302,7 @@ lbox_fiber_create(struct lua_State *L)
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
+	struct fiber *f = fiber_new("lua", lua_fiber_run_f);
 	if (f == NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
 		lbox_error(L);

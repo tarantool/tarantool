@@ -276,7 +276,7 @@ cpipe_fiber_pool_needs_throttling(struct cpipe_fiber_pool *pool)
  * Main function of the fiber invoked to handle all outstanding
  * tasks in a queue.
  */
-static void
+static int
 cpipe_fiber_pool_f(va_list ap)
 {
 	struct cpipe_fiber_pool *pool = va_arg(ap, struct cpipe_fiber_pool *);
@@ -299,6 +299,7 @@ restart:
 			goto restart;
 	}
 	pool->size--;
+	return 0;
 }
 
 
