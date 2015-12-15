@@ -315,9 +315,6 @@ daemonize()
 	 */
 	signal_init();
 
-	/* reinit coeio after fork (because libeio required it) */
-	coeio_reinit();
-
 	/* redirect stdin; stdout and stderr handled in say_logger_init */
 	fd = open("/dev/null", O_RDONLY);
 	dup2(fd, STDIN_FILENO);

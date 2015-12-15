@@ -367,13 +367,6 @@ struct eio_pwd
 #define ETP_TYPE_QUIT -1
 #define ETP_TYPE_GROUP EIO_GROUP
 
-static void eio_nop_callback (void) { }
-static void (*eio_want_poll_cb)(void) = eio_nop_callback;
-static void (*eio_done_poll_cb)(void) = eio_nop_callback;
-
-#define ETP_WANT_POLL(pool) eio_want_poll_cb ()
-#define ETP_DONE_POLL(pool) eio_done_poll_cb ()
-
 struct etp_worker;
 #define ETP_REQ eio_req
 #define ETP_DESTROY(req) eio_destroy (req)
@@ -384,8 +377,19 @@ static void eio_execute (struct etp_worker *self, eio_req *req);
 
 #include "etp.c"
 
+static void
+eio_warn_uninitialized()
+{
+  fputs("Please initialize libeio in this thread.\n", stderr);
+}
+
 static struct etp_pool eio_pool;
+static __thread struct etp_pool_user eio_pool_user;
+static struct etp_pool_user *eio_main_user;
 #define EIO_POOL (&eio_pool)
+#define EIO_POOL_USER (ecb_expect_true(eio_pool_user.pool) ? \
+  &eio_pool_user : \
+  (eio_warn_uninitialized(), eio_main_user))
 
 /*****************************************************************************/
 
@@ -462,37 +466,31 @@ eio_finish (eio_req *req)
 void
 eio_grp_cancel (eio_req *grp)
 {
-  etp_grp_cancel (EIO_POOL, grp);
+  etp_grp_cancel (EIO_POOL_USER, grp);
 }
 
 void
 eio_cancel (eio_req *req)
 {
-  etp_cancel (EIO_POOL, req);
+  etp_cancel (EIO_POOL_USER, req);
 }
 
 void
 eio_submit (eio_req *req)
 {
-  etp_submit (EIO_POOL, req);
+  etp_submit (EIO_POOL_USER, req);
 }
 
 unsigned int
 eio_nreqs (void)
 {
-  return etp_nreqs (EIO_POOL);
-}
-
-unsigned int
-eio_nready (void)
-{
-  return etp_nready (EIO_POOL);
+  return etp_nreqs (EIO_POOL_USER);
 }
 
 unsigned int
 eio_npending (void)
 {
-  return etp_npending (EIO_POOL);
+  return etp_npending (EIO_POOL_USER);
 }
 
 unsigned int ecb_cold
@@ -504,13 +502,13 @@ eio_nthreads (void)
 void ecb_cold
 eio_set_max_poll_time (double nseconds)
 {
-  etp_set_max_poll_time (EIO_POOL, nseconds);
+  etp_set_max_poll_time (EIO_POOL_USER, nseconds);
 }
 
 void ecb_cold
 eio_set_max_poll_reqs (unsigned int maxreqs)
 {
-  etp_set_max_poll_reqs (EIO_POOL, maxreqs);
+  etp_set_max_poll_reqs (EIO_POOL_USER, maxreqs);
 }
 
 void ecb_cold
@@ -539,7 +537,7 @@ eio_set_max_parallel (unsigned int nthreads)
 
 int eio_poll (void)
 {
-  return etp_poll (EIO_POOL);
+  return etp_poll (EIO_POOL_USER);
 }
 
 /*****************************************************************************/
@@ -1713,9 +1711,7 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 #define ALLOC(len)				\
   if (!req->ptr2)				\
     {						\
-      X_LOCK (EIO_POOL->wrklock);		\
       req->flags |= EIO_FLAG_PTR2_FREE;		\
-      X_UNLOCK (EIO_POOL->wrklock);		\
       req->ptr2 = malloc (len);			\
       if (!req->ptr2)				\
         {					\
@@ -1727,13 +1723,38 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 
 /*****************************************************************************/
 
-int ecb_cold
-eio_init (void (*want_poll)(void), void (*done_poll)(void))
-{
-  eio_want_poll_cb = want_poll;
-  eio_done_poll_cb = done_poll;
+static int eio_threads;
 
-  return etp_init (EIO_POOL, 0, 0, 0);
+static void ecb_cold
+eio_prefork()
+{
+    eio_threads = etp_set_max_parallel(EIO_POOL, 0);
+}
+
+static void ecb_cold
+eio_postfork()
+{
+    etp_set_min_parallel(EIO_POOL, eio_threads);
+}
+
+static void ecb_cold
+eio_init_once()
+{
+  etp_init (EIO_POOL);
+  eio_main_user = &eio_pool_user;
+  X_THREAD_ATFORK(eio_prefork, eio_postfork, eio_postfork);
+}
+
+int ecb_cold
+eio_init (void *user, void (*want_poll)(void *), void (*done_poll)(void *))
+{
+  static pthread_once_t once = PTHREAD_ONCE_INIT;
+  pthread_once(&once, eio_init_once);
+
+  etp_user_init (&eio_pool_user, user, want_poll, done_poll);
+
+  eio_pool_user.pool = EIO_POOL;
+  return 0;
 }
 
 ecb_inline void

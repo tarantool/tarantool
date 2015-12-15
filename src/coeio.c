@@ -71,7 +71,9 @@ struct coeio_manager {
 	ev_loop *loop;
 	ev_idle coeio_idle;
 	ev_async coeio_async;
-} coeio_manager;
+};
+
+static __thread struct coeio_manager coeio_manager;
 
 static void
 coeio_idle_cb(ev_loop *loop, struct ev_idle *w, int events)
@@ -94,14 +96,16 @@ coeio_async_cb(ev_loop *loop, struct ev_async *w __attribute__((unused)),
 }
 
 static void
-coeio_want_poll_cb(void)
+coeio_want_poll_cb(void *ptr)
 {
-	ev_async_send(coeio_manager.loop, &coeio_manager.coeio_async);
+	struct coeio_manager *manager = ptr;
+	ev_async_send(manager->loop, &manager->coeio_async);
 }
 
 static void
-coeio_done_poll_cb(void)
+coeio_done_poll_cb(void *ptr)
 {
+	(void)ptr;
 }
 
 /**
@@ -112,22 +116,13 @@ coeio_done_poll_cb(void)
 void
 coeio_init(void)
 {
-	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
+	eio_init(&coeio_manager, coeio_want_poll_cb, coeio_done_poll_cb);
 	coeio_manager.loop = loop();
 
 	ev_idle_init(&coeio_manager.coeio_idle, coeio_idle_cb);
 	ev_async_init(&coeio_manager.coeio_async, coeio_async_cb);
 
 	ev_async_start(loop(), &coeio_manager.coeio_async);
-}
-
-/**
- * ReInit coeio subsystem (for example after 'fork')
- */
-void
-coeio_reinit(void)
-{
-	eio_init(coeio_want_poll_cb, coeio_done_poll_cb);
 }
 
 static void

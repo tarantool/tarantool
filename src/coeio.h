@@ -49,7 +49,6 @@ extern "C" {
  */
 
 void coeio_init(void);
-void coeio_reinit(void);
 
 struct coio_task;
 
