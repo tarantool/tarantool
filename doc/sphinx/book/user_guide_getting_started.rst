@@ -48,16 +48,16 @@ initializes, something like this:
 .. code-block:: tarantoolsession
 
     tarantool> box.cfg{listen = 3301}
-    2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b
-    2014-08-07 09:41:41.077 ... log level 5
-    2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
-    2014-08-07 09:41:41.079 ... initialized
-    2014-08-07 09:41:41.081 ... initializing an empty data directory
-    2014-08-07 09:41:41.095 ... creating './00000000000000000000.snap.inprogress'
-    2014-08-07 09:41:41.095 ... saving snapshot './00000000000000000000.snap.inprogress'
-    2014-08-07 09:41:41.127 ... done
-    2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301
-    2014-08-07 09:41:41.128 ... ready to accept requests
+    2015-08-07 09:41:41.077 ... version 1.6.7-439-g7e1011b
+    2015-08-07 09:41:41.077 ... log level 5
+    2015-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
+    2015-08-07 09:41:41.079 ... initialized
+    2015-08-07 09:41:41.081 ... initializing an empty data directory
+    2015-08-07 09:41:41.095 ... creating './00000000000000000000.snap.inprogress'
+    2015-08-07 09:41:41.095 ... saving snapshot './00000000000000000000.snap.inprogress'
+    2015-08-07 09:41:41.127 ... done
+    2015-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301
+    2015-08-07 09:41:41.128 ... ready to accept requests
 
 Now that the server is up, you could start up a different shell
 and connect to its primary port with:
@@ -101,7 +101,7 @@ Your terminal screen should now look like this:
 .. code-block:: tarantoolsession
 
     tarantool> s = box.schema.space.create('tester')
-    2014-06-10 12:04:18.158 ... creating './00000000000000000002.xlog.inprogress'
+    2015-06-10 12:04:18.158 ... creating './00000000000000000000.xlog.inprogress'
     ---
     ...
     tarantool>s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
@@ -182,8 +182,9 @@ Your terminal screen should now look like this:
     ---
     ...
     tarantool> console.connect('localhost:3301')
-    2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
+    tarantool: connected to localhost:3301
     ---
+    - true
     ...
     localhost:3301> box.space.tester:select{2}
     ---
