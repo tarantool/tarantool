@@ -27,6 +27,8 @@ extra/bin2c
 extra/dist/tarantoolctl.1
 cmake_install.cmake
 config.mk
+config.guess
+config.sub
 doc/doxygen/
 doc/api/
 doc/www/content/doc/dev_guide.html

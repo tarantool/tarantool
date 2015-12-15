@@ -1,6 +1,8 @@
 Source: tarantool
 Priority: optional
 Maintainer: Dmitry E. Oboukhov <unera@debian.org>
+Uploaders: Andrey Drozdov <andrey@tarantool.org>,
+           Roman Tsisyk <roman@tarantool.org>
 Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
@@ -14,7 +16,7 @@ VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
 Package: tarantool-common
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Priority: optional
 Conflicts: tarantool-common (<< 1.5.3),
  tarantool-lts-common,
@@ -31,6 +33,9 @@ Conflicts: tarantool-common (<< 1.5.3),
  tarantool-plugins (<< 1.6~),
  tarantool-mysql-plugin (<< 1.6~),
  tarantool-postgresql-plugin (<< 1.6~),
+ tarantool-modules,
+ tarantool-mysql-module,
+ tarantool-postgresql-module,
  libtarantool-dev (<< 1.6~)
 Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
 Depends: ${misc:Depends}, adduser, lsb-base
@@ -40,7 +45,7 @@ Description: Tarantool in-memory database - common files
  and log files.
 
 Package: tarantool
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, binutils
 Replaces: tarantool-lts
@@ -71,10 +76,10 @@ Description: In-memory database with a Lua application server
   * Lua functions, procedures, triggers, with rich access to database API,
     JSON support, inter-procedure and network communication libraries
  .
- This package provides Tarantool server.
+ This package provides Tarantool command line interpreter and server.
 
 Package: tarantool-dev
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Priority: optional
 Section: libdevel
 Replaces: tarantool-lts-dev
@@ -97,4 +102,5 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - development headers
  Tarantool is an in-memory database and Lua application server.
- This package provides server headers needed to build pluggable modules.
+ This package provides server develoment files needed to build pluggable
+ modules.

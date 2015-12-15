@@ -20,8 +20,6 @@ case "$1" in
 
         install -d -o$SYSUSER -gadm -m2750 /var/log/tarantool
         install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/tarantool
-        install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/started
-        install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/snapshot
     ;;
 esac
 
