@@ -113,6 +113,8 @@ set (server_sources
      lua/fio.cc
      lua/clock.c
      ${lua_sources}
+     ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
+     ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
 )
 
 set(api_headers

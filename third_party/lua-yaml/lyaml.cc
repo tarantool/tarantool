@@ -673,6 +673,10 @@ static yaml_scalar_style_t analyze_string(struct lua_yaml_dumper *dumper,
    else if (allowSingleQuoted)
       return YAML_SINGLE_QUOTED_SCALAR_STYLE;
    return YAML_DOUBLE_QUOTED_SCALAR_STYLE;
+
+   /* TODO: Probably causes https://github.com/tarantool/tarantool/issues/354 */
+   (void) flowIndicators;
+   (void) lineBreaks;
 }
 
 static int dump_node(struct lua_yaml_dumper *dumper)
@@ -681,7 +685,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    const char *str = NULL;
    yaml_char_t *tag = NULL;
    yaml_event_t ev;
-   yaml_event_t *evp;
+   //yaml_event_t *evp;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
    int is_binary = 0;
    char buf[FPCONV_G_FMT_BUFSIZE];

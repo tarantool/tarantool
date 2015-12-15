@@ -7,6 +7,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
  libncurses5-dev,
+ libyaml-dev,
  libiberty-dev | binutils-dev,
  libbfd-dev | binutils-dev
 Section: database
@@ -47,7 +48,7 @@ Description: Tarantool in-memory database - common files
 Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1
+Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
  tarantool-lts,
