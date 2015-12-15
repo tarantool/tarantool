@@ -48,7 +48,7 @@ socket.iowait(s:fd(), 'w')
 socket.iowait(s:fd(), 2)
 socket.iowait(s:fd(), '')
 socket.iowait(s:fd(), -1)
-socket.iowait()
+socket.iowait(s:fd(), 'RW')
 s:readable(0)
 s:errno() > 0
 s:error()

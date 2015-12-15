@@ -148,9 +148,9 @@ socket.iowait(s:fd(), -1)
 ---
 - error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
 ...
-socket.iowait()
+socket.iowait(s:fd(), 'RW')
 ---
-- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+- RW
 ...
 s:readable(0)
 ---
