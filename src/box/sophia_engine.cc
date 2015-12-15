@@ -286,6 +286,10 @@ sophia_async_schedule(ev_loop *loop, struct ev_async *w, int /* events */)
 void
 SophiaEngine::init()
 {
+	char sophia_dir[PATH_MAX];
+	if (abspath_inplace(cfg_gets("sophia_dir"),
+		            sophia_dir, sizeof(sophia_dir)) == -1)
+		panic_syserror("getcwd");
 	cord = cord();
 	ev_idle_init(&idle, sophia_idle_cb);
 	ev_async_init(&watcher, sophia_async_schedule);
@@ -296,7 +300,7 @@ SophiaEngine::init()
 	if (env == NULL)
 		panic("failed to create sophia environment");
 	sp_setint(env, "sophia.path_create", 0);
-	sp_setstring(env, "sophia.path", cfg_gets("sophia_dir"), 0);
+	sp_setstring(env, "sophia.path", sophia_dir, 0);
 	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
 	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));

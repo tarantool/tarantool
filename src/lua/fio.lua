@@ -155,36 +155,35 @@ fio.open = function(path, flags, mode)
     return fh
 end
 
-fio.pathjoin = function(path, ...)
-    path = tostring(path)
-    if path == nil or path == '' then
-        error("Empty path part")
-    end
+-- Create a pathjoin(...) function
+-- pythonic==false: pathjoin('/foo', '/bar', 'dummy') -> '/foo/bar/dummy'
+-- pythonic==true:  pathjoin('/foo', '/bar', 'dummy') -> '/bar/dummy'
+local function pathjoin_factory(pythonic) return function(...)
+    local path = {}
+    local absp = ''
     for i = 1, select('#', ...) do
-        if string.match(path, '/$') ~= nil then
-            path = string.gsub(path, '/$', '')
-        end
-
         local sp = select(i, ...)
-        if sp == nil then
-            error("Undefined path part")
+        sp = tostring(sp or '')
+        if string.sub(sp,1,1)=='/' and (pythonic or i==1) then
+            path = {}
+            absp = '/'
         end
-        if sp == '' or sp == '/' then
-            error("Empty path part")
-        end
-        if string.match(sp, '^/') ~= nil then
-            sp = string.gsub(sp, '^/', '')
-        end
-        if sp ~= '' then
-            path = path .. '/' .. sp
+        for sp in string.gmatch(sp, '[^/]+') do
+           if sp=='..' then
+               if table.remove(path)==nil and absp=='' then
+                   table.insert(path, "..")
+               end
+           elseif sp~='.' then
+               table.insert(path, sp)
+           end
         end
     end
-    if string.match(path, '/$') ~= nil and #path > 1 then
-        path = string.gsub(path, '/$', '')
-    end
+    local res = absp..table.concat(path, '/')
+    return res~='' and res or '.'
+end end
 
-    return path
-end
+fio.pathjoin = pathjoin_factory(false)
+fio.pathjoin2 = pathjoin_factory(true)
 
 fio.basename = function(path, suffix)
     if path == nil then

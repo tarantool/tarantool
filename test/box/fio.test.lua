@@ -13,6 +13,20 @@ fio.pathjoin('/', 'abc')
 fio.pathjoin('abc/', '/cde')
 fio.pathjoin('/', '/cde')
 
+-- pathjoin2
+fio.pathjoin2()
+fio.pathjoin2(nil)
+fio.pathjoin2('a')
+fio.pathjoin2('/a')
+fio.pathjoin2('a', 'b', 'c')
+fio.pathjoin2('/a', 'b', 'c')
+fio.pathjoin2('a', '/b', 'c')
+fio.pathjoin2('a/b/c', 'd')
+fio.pathjoin2('..', 'a/b/c')
+fio.pathjoin2('/', '..', 'a/b/c')
+fio.pathjoin2('a/b/c', '..')
+fio.pathjoin2('a//b//c/', 'd/.')
+
 -- basename
 fio.basename(nil)
 fio.basename('/')

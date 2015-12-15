@@ -219,4 +219,11 @@ uri_format(const struct uri *uri)
 		 (int) uri->service_len, uri->service);
 	return buf;
 }
+
+int
+uri_is_unix_path(const struct uri *uri)
+{
+	return strcmp(uri->host, URI_HOST_UNIX) == 0;
+}
+
 /* vim: set ft=ragel: */
