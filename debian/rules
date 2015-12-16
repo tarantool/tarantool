@@ -41,11 +41,16 @@ DIRNAME=$(shell basename $(CURDIR))
 
 
 tarball: clean
-	git describe > VERSION
+	git describe --long --always > VERSION
 	cd .. && tar --exclude=.git --exclude=debian 		\
-		--exclude=rfc4627.txt				\
-		--exclude=doc/www-data/ycsb			\
+		--exclude=doc/www/					\
+		--exclude=doc/sphinx/				\
 		--exclude=src/lib/small/debian		\
+		--exclude=src/lib/msgpuck/debian    \
+		--exclude=test-run/lib/tarantool-python/debian \
+		--exclude=third_party/sophia/debian \
+		--exclude=third_party/luafun/debian \
+		--exclude=FreeBSD \
 		--transform='s,^$(DIRNAME),tarantool_$(UVERSION),' \
 		-czf tarantool_$(UVERSION).orig.tar.gz $(DIRNAME)
 
