@@ -291,4 +291,13 @@ map['test'] = 48
 map
 getmetatable(map) == nil
 
+-- gh-1189: tuple is not checked as first argument
+t = box.tuple.new({1, 2, {}})
+t.bsize()
+t.find(9223372036854775807LL)
+t.findall(9223372036854775807LL)
+t.update()
+t.upsert()
+t = nil
+
 space:drop()
