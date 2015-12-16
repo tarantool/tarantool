@@ -1132,6 +1132,28 @@ local function tcp_server(host, port, opts, timeout)
     return nil
 end
 
+local function iowait(fd, events, timeout)
+    if timeout == nil then
+        timeout = TIMEOUT_INFINITY
+    end
+    if fd == nil then
+        fiber.sleep(timeout)
+        return 0x00000100 -- EV_TIMER
+    end
+    if type(events) == "string" then
+        -- events constants are taken from libev/ev.h
+        local ev = 0
+        if events:match"r" then
+            ev = ev + 1 -- EV_READ
+        end
+        if events:match"w" then
+            ev = ev + 2 -- EV_WRITE
+        end
+        events = ev
+    end
+    return internal.iowait(fd, events, timeout)
+end
+
 socket_mt   = {
     __index     = socket_methods,
     __tostring  = function(self)
@@ -1160,7 +1182,8 @@ socket_mt   = {
 return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
-    tcp_server = tcp_server
+    tcp_server = tcp_server,
+    iowait = iowait
 }, {
     __call = function(self, ...) return create_socket(...) end;
 })
