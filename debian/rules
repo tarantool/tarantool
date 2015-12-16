@@ -24,7 +24,6 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE           := /usr/lib/tarantool
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
@@ -37,22 +36,19 @@ include /usr/share/cdbs/1/class/cmake.mk
 
 DEB_BUILDDIR := build-area
 
-DIRNAME=$(shell basename $(CURDIR))
-
-
 tarball: clean
 	git describe --long --always > VERSION
-	cd .. && tar --exclude=.git --exclude=debian 		\
-		--exclude=doc/www/					\
-		--exclude=doc/sphinx/				\
+	tar --exclude=.git --exclude=debian 		\
+		--exclude=doc/www					\
+		--exclude=doc/sphinx				\
 		--exclude=src/lib/small/debian		\
 		--exclude=src/lib/msgpuck/debian    \
 		--exclude=test-run/lib/tarantool-python/debian \
 		--exclude=third_party/sophia/debian \
 		--exclude=third_party/luafun/debian \
 		--exclude=FreeBSD \
-		--transform='s,^$(DIRNAME),tarantool_$(UVERSION),' \
-		-czf tarantool_$(UVERSION).orig.tar.gz $(DIRNAME)
+		--transform='s,^\.,tarantool_$(UVERSION),S' \
+		-czf ../tarantool_$(UVERSION).orig.tar.gz .
 
 clean::
 	find -type f -name \*.pyc -delete
@@ -60,9 +56,7 @@ clean::
 	rm -f CMakeCache.txt
 	rm -f CPackConfig.cmake
 	rm -f CPackSourceConfig.cmake
-	rm -f include/tarantool/config.h
-	rm -f doc/tnt.ent
-	rm -f www-data.in/download
+	rm -f src/trivia/config.h
 
 install/tarantool::
 
