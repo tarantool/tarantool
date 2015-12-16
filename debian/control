@@ -47,7 +47,7 @@ Description: Tarantool in-memory database - common files
 Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, binutils
+Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
  tarantool-lts,
