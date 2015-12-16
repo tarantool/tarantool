@@ -1,4 +1,4 @@
-tarantool (1.6.7.531.g6e78a8b-1) unstable; urgency=medium
+tarantool (1.6.7-541-g89c4578) unstable; urgency=medium
 
   * New Debian snapshot for 1.6.7 stable release.
    - New tarantool doesn't have 8K tuples problem, closes: #704720.
