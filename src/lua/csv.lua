@@ -63,6 +63,8 @@ local iter = function(csvstate, i)
             if readable then
                 local buf = readable:read(csv_chunk_size)
                 ffi.C.csv_feed(it, buf, string.len(buf))
+                -- extend buf lifetime - csv_feed saves pointers
+                csvstate[5] = buf
             else
                 ffi.C.csv_feed(it, "", 0)
             end
@@ -135,7 +137,9 @@ module.iterate = function(readable, opts)
     ffi.C.csv_iterator_create(it, csv)
     ffi.C.csv_feed(it, str, string.len(str))
 
-    return iter, {readable, opts.chunk_size, csv, it}, -opts.skip_head_lines
+    -- csv_feed remembers the pointer;
+    -- str included in csv state to make sure it lives long enough
+    return iter, {readable, opts.chunk_size, csv, it, str}, -opts.skip_head_lines
 end
 
 --@brief parse csv and make table
