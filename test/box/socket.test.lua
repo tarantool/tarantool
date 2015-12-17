@@ -55,6 +55,7 @@ s:error()
 s:writable(.00000000000001)
 s:writable(0)
 s:wait(.01)
+socket.iowait(nil, nil, 0.0001)
 
 handshake = ffi.new('char[128]')
 -- test sysread with char *

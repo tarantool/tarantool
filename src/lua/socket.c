@@ -384,11 +384,22 @@ lbox_socket_iowait(struct lua_State *L)
 {
 	if (lua_gettop(L) < 2)
 		goto usage;
-	int fh = lua_tointeger(L, 1);
-	if (fh < 0)
-		goto usage;
 	ev_tstamp timeout = luaL_optnumber(L, 3, TIMEOUT_INFINITY);
 	if (timeout < 0)
+		goto usage;
+
+	/*
+	 * A special shortcut for gh-1204: if fd and events are nil then
+	 * just sleep. This hack simplifies integration of third-party Lua
+	 * modules with Tarantool event loop.
+	 */
+	if (unlikely(lua_isnil(L, 1) && lua_isnil(L, 2))) {
+		fiber_sleep(timeout);
+		return 0;
+	}
+
+	int fh = lua_tointeger(L, 1);
+	if (fh < 0)
 		goto usage;
 
 	if (likely(lua_type(L, 2) == LUA_TNUMBER)) {
