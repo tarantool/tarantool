@@ -55,10 +55,10 @@ All triggers have the following characteristics:
     error, the error is sent to the client and the connection is closed.
 
     :param function trigger-function: function which will become the trigger function
-    :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
-    :return: nil
+    :param function old-trigger-function-name: existing trigger function which will be replaced by trigger-function
+    :return: nil or function list
 
-    If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
+    If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted.
 
     **Example:**
 
@@ -74,7 +74,7 @@ All triggers have the following characteristics:
         If a trigger always results in an error, it may become impossible to
         connect to the server to reset it.
 
-.. function:: box.session.on_disconnect(trigger-function [, old-trigger-function])
+.. function:: box.session.on_disconnect(trigger-function [, old-trigger-function-name])
 
     Define a trigger for execution after a client has disconnected. If the trigger
     function causes an error, the error is logged but otherwise is ignored. The
@@ -82,10 +82,10 @@ All triggers have the following characteristics:
     and can access session properties, such as box.session.id.
 
     :param function trigger-function: function which will become the trigger function
-    :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
-    :return: nil
+    :param function old-trigger-function-name: existing trigger function which will be replaced by trigger-function
+    :return: nil or function list
 
-    If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
+    If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted.
 
     **Example:**
 
@@ -148,10 +148,10 @@ Here is what might appear in the log file in a typical installation:
     error, the error is sent to the client and the connection is closed.
 
     :param function trigger-function: function which will become the trigger function
-    :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
+    :param function old-trigger-function-name: existing trigger function which will be replaced by trigger-function
     :return: nil
 
-    If the parameters are (nil, old-trigger-function), then the old trigger is deleted.
+    If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted.
 
     **Example:**
 
@@ -171,15 +171,15 @@ Here is what might appear in the log file in a typical installation:
 
 .. class:: space_object
 
-    .. function:: on_replace(trigger-function [, old-trigger-function])
+    .. function:: on_replace(trigger-function [, old-trigger-function-name])
 
         Create a "``replace trigger``". The ``function-name`` will be executed whenever
         a ``replace()`` or ``insert()`` or ``update()`` or ``upsert()`` or ``delete()`` happens to a
         tuple in ``<space-name>``.
 
         :param function trigger-function: function which will become the trigger function
-        :param function old-trigger-function: existing trigger function which will be replaced by trigger-function
-        :return: nil
+        :param function old-trigger-function-name: existing trigger function which will be replaced by trigger-function
+        :return: nil or function list
 
         If the parameters are (nil, old-trigger-function-name), then the old trigger is deleted.
 

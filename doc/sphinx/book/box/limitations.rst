@@ -33,7 +33,7 @@
 
     The theoretical maximum is 2147483647 (``box.schema.FIELD_MAX``). The
     practical maximum is whatever is specified by the space's
-    :func:`space_object:field_count() <space_object.field_count>`
+    :ref:`field_count <space-object-field-count>`
     member, or the maximum tuple length.
 
 .. _lim_number_of_spaces:
@@ -68,7 +68,7 @@
 
 **Number of users and roles**
 
-    32
+    32 (BOX_USER_MAX).
 
 .. _lim_length:
 
