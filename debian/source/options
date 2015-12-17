@@ -1,3 +1,14 @@
 # don't pack some non-free and generated files for Debian
---extend-diff-ignore=rfc4627\.txt|www-data/ycsb|test-run|src/lib/msgpuck/debian|src/lib/small/debian/
-
+extend-diff-ignore = ".*\.git$"
+extend-diff-ignore = ".*\.git/.*"
+extend-diff-ignore = "FreeBSD/"
+extend-diff-ignore = "test-run/lib/.*/debian/"
+extend-diff-ignore = "doc/www/"
+extend-diff-ignore = "doc/sphinx/"
+extend-diff-ignore = "src/lib/.*/debian/"
+extend-diff-ignore = "src/lib/.*/test.sh"
+extend-diff-ignore = "src/lib/small/test"
+extend-diff-ignore = "third_party/.*/debian/"
+extend-diff-ignore = "third_party/sophia/sophia/build$"
+extend-diff-ignore = "third_party/luajit/doc"
+extend-diff-ignore = "third_party/luafun/(tests|doc)"

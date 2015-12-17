@@ -156,7 +156,7 @@ which will go over many lines. There is a
 Tarantool instruction that means <don’t execute
 every time I type Enter; wait until I type a
 special string called the "delimiter".>
-More in the Tarantool manual: http://tarantool.org/doc/master/user_guide.html#utility-tarantool-delim
+More in the Tarantool manual: http://tarantool.org/doc/book/administration.html#requests
 
 Request #6 is:
 
@@ -305,7 +305,7 @@ and sending a "GET" request to mail.ru’s server.
 The response will be short -- "- "HTTP/1.1 302 OK\r\n"" --
 but it shows you’ve gotten in touch with a distant server.
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#sp-box-socket
+http://tarantool.org/doc/reference/socket.html
 ]];
 
 [[
@@ -320,7 +320,7 @@ tasks each get a slice, but they have to yield
 occasionally so that other tasks get a chance.
 That’s what a properly designed fiber will do.
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#sp-box-fiber
+http://tarantool.org/doc/reference/fiber.html
 
 Request #12 is:
 
@@ -361,7 +361,7 @@ and granted read/write access to you, but here
 you’re the "admin" user -- you have administrative
 powers -- so you can start manipulating data immediately.
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#databases
+http://tarantool.org/doc/book/box/index.html
 
 Request #13 is:
 
@@ -437,7 +437,7 @@ That’s all you need to replace the rest of the fields with
 new values. The syntax of box.replace(), pared down, is:
 box.space.tutor:replace{primary-key-field, other-fields}
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#box.replace
+http://tarantool.org/doc/book/box/box_schema.html
 Tarantool by default keeps database changes in memory,
 but box.replace() will cause a write to a log, and log
 information can later be consolidated with another box
@@ -466,7 +466,7 @@ But you’ve been confined to a space and an index
 that Tarantool started with.
 Suppose that you want to create your own.
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#box.schema
+
 
 Request #16 is:
 
@@ -491,7 +491,7 @@ Indexes can be declared to be "unique", which
 is important because some combination of the
 fields must be unique, for identification purposes.
 More in the Tarantool manual:
-http://tarantool.org/doc/master/user_guide.html#box.create_index
+http://tarantool.org/doc/book/box/box_space.html#lua-function.space_object.create_index
 
 Request #17 is:
 
@@ -563,7 +563,7 @@ administrator and create your own permanent databases. The
 Tarantool manual has two significant tutorials:
 
 Insert one million tuples with a Lua stored procedure
-http://tarantool.org/doc/master/user_guide.html#lua-tutorial-insert
+http://tarantool.org/doc/book/app/c_lua_tutorial.html#insert-one-million-tuples-with-a-lua-stored-procedure
 and
 Sum a JSON field for all tuples
 http://tarantool.org/doc/master/user_guide.html#lua-tutorial-sum
