@@ -398,7 +398,7 @@ wal_write_to_disk(struct wal_writer *writer,
 	 * of request in xlog file is stored inside `struct wal_request`.
 	 */
 
-	struct xlog *wal = writer->current_wal;
+	struct xlog *l = writer->current_wal;
 	/* The size of batched data */
 	off_t batched_bytes = 0;
 	/* The size of written data */
@@ -429,7 +429,7 @@ wal_write_to_disk(struct wal_writer *writer,
 				 */
 				assert(fio_batch_size(batch) > 0);
 				ssize_t nwr = wal_fio_batch_write(batch,
-					fileno(wal->f));
+					fileno(l->f));
 				if (nwr < 0)
 					goto done; /* to break outer loop */
 
@@ -449,7 +449,7 @@ wal_write_to_disk(struct wal_writer *writer,
 	}
 	/* Flush remaining data in batch (if any) */
 	if (fio_batch_size(batch) > 0) {
-		ssize_t nwr = wal_fio_batch_write(batch, fileno(wal->f));
+		ssize_t nwr = wal_fio_batch_write(batch, fileno(l->f));
 		if (nwr > 0) {
 			/* Update cached file offset */
 			written_bytes += nwr;
@@ -481,13 +481,13 @@ done:
 			assert(garbage_bytes >= 0);
 
 			/* Get absolute position */
-			off_t good_offset = fio_lseek(fileno(wal->f),
+			off_t good_offset = fio_lseek(fileno(l->f),
 				-garbage_bytes, SEEK_CUR);
 			if (good_offset < 0)
 				panic_syserror("failed to get xlog position");
 
 			/* Truncate xlog */
-			if (ftruncate(fileno(wal->f), good_offset) != 0)
+			if (ftruncate(fileno(l->f), good_offset) != 0)
 				panic_syserror("failed to rollback xlog");
 			written_bytes = req->start_offset;
 
@@ -501,7 +501,7 @@ done:
 			      req->rows[req->n_rows - 1]->server_id,
 			      req->rows[req->n_rows - 1]->lsn);
 		/* Update row counter for wal_opt_rotate() */
-		wal->rows += req->n_rows;
+		l->rows += req->n_rows;
 		/* Mark request as successful for tx thread */
 		req->res = vclock_sum(&writer->vclock);
 	}
@@ -510,7 +510,6 @@ done:
 	/* Move all processed requests to `commit` queue */
 	stailq_concat(commit, input);
 	wal_notify_watchers(writer);
-	return;
 }
 
 /** WAL writer thread main loop.  */
