@@ -135,20 +135,23 @@ blocks :
     - - "Connectors"
       - format : rst
         content: |
-          - PHP PECL driver,   `<https://github.com/tarantool/tarantool-php>`_
-          - Pure PHP driver,   `<https://github.com/tarantool-php/client>`_
-          - Java driver,       `Maven repository`_
-          - Python driver,     `<http://pypi.python.org/pypi/tarantool>`_
-          - Ruby driver,       `<https://github.com/tarantool/tarantool-ruby>`_
-          - Perl driver,       `DR:Tarantool`_
-          - C connector        `<https://github.com/tarantool/tarantool-c>`_
-          - node.js driver,    `<https://github.com/KlonD90/node-tarantool-driver>`_
-          - Erlang driver,     `<https://github.com/rtsisyk/etarantool>`_
-          - Go driver,         `<https://github.com/tarantool/go-tarantool>`_
-          - Lua-nginx driver,  `<https://github.com/ziontab/lua-nginx-tarantool>`_
+          - PHP PECL driver,       `<https://github.com/tarantool/tarantool-php>`_
+          - Pure PHP driver,       `<https://github.com/tarantool-php/client>`_
+          - Java driver,           `Maven repository`_ or `Java connector GitHub page`_
+          - Python driver,         `<http://pypi.python.org/pypi/tarantool>`_
+          - Ruby driver,           `<https://github.com/tarantool/tarantool-ruby>`_
+          - Perl driver,           `DR:Tarantool`_
+          - C connector            `<https://github.com/tarantool/tarantool-c>`_
+          - node.js driver,        `<https://github.com/KlonD90/node-tarantool-driver>`_
+          - Erlang driver,         `<https://github.com/rtsisyk/etarantool>`_
+          - Go driver,             `<https://github.com/tarantool/go-tarantool>`_
+          - Lua-nginx driver,      `<https://github.com/ziontab/lua-nginx-tarantool>`_
+          - Lua-resty driver,      `<https://github.com/perusio/lua-resty-tarantool>`_
+          - Nginx Upstream module, `<https://github.com/tarantool/nginx_upstream_module>`_
 
           .. _DR\:Tarantool:    http://search.cpan.org/~unera/DR-Tarantool-0.42/lib/DR/Tarantool.pm
           .. _Maven repository: http://github.com/tarantool/tarantool-java
+          .. _Java connector GitHub page: https://github.com/tarantool/tarantool-java
     - - "Source tarball"
       - format : rst
         content: |

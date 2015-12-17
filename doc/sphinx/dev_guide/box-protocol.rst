@@ -99,6 +99,7 @@ Let's list them here too:
     -- user keys
     <code>          ::= 0x00
     <sync>          ::= 0x01
+    <schema_id>     ::= 0x05
     <space_id>      ::= 0x10
     <index_id>      ::= 0x11
     <limit>         ::= 0x12
@@ -140,29 +141,32 @@ Both :code:`<header>` and :code:`<body>` are msgpack maps:
 
     Request/Response:
 
-    0      5
-    +------+ +============+ +===================================+
-    |BODY +| |            | |                                   |
-    |HEADER| |   HEADER   | |               BODY                |
-    | SIZE | |            | |                                   |
-    +------+ +============+ +===================================+
-     MP_INT      MP_MAP                     MP_MAP
+    0        5
+    +--------+ +============+ +===================================+
+    | BODY + | |            | |                                   |
+    | HEADER | |   HEADER   | |               BODY                |
+    |  SIZE  | |            | |                                   |
+    +--------+ +============+ +===================================+
+      MP_INT       MP_MAP                     MP_MAP
 
 .. code-block:: bash
 
     UNIFIED HEADER:
 
-    +================+================+
-    |                |                |
-    |   0x00: CODE   |   0x01: SYNC   |
-    | MP_INT: MP_INT | MP_INT: MP_INT |
-    |                |                |
-    +================+================+
-                   MP_MAP
+    +================+================+=====================+
+    |                |                |                     |
+    |   0x00: CODE   |   0x01: SYNC   |    0x05: SCHEMA_ID  |
+    | MP_INT: MP_INT | MP_INT: MP_INT |  MP_INT: MP_INT     |
+    |                |                |                     |
+    +================+================+=====================+
+                              MP_MAP
 
-They only differ in the allowed set of keys and values, the key defines the
-type of value that follows. If a body has no keys, entire msgpack map for
-the body may be missing. Such is the case, for example, in <ping> request.
+They only differ in the allowed set of keys and values, the key defines the type
+of value that follows. If a body has no keys, entire msgpack map for the body
+may be missing. Such is the case, for example, in <ping> request. ``schema_id``
+may be absent in request's header, that means that there'll be no version
+checking, but it must be present in the response. If ``schema_id`` is sent in
+the header, then it'll be checked.
 
 ================================================================================
                             Authentication
@@ -575,7 +579,9 @@ So, **Header** of an SNAP/XLOG consists of:
     \n
 
 
-There are two markers: tuple beginning - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with the following schema:
+There are two markers: tuple beginning - **0xd5ba0bab** and EOF marker -
+**0xd510aded**. So, next, between **Header** and EOF marker there's data with
+the following schema:
 
 .. code-block:: bash
 
