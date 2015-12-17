@@ -176,6 +176,9 @@ s:wait(.01)
 ---
 - RW
 ...
+socket.iowait(nil, nil, 0.0001)
+---
+...
 handshake = ffi.new('char[128]')
 ---
 ...
