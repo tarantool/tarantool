@@ -915,6 +915,7 @@ iproto_init()
 	cbus_create(&net_tx_bus);
 	rmean_net_tx_bus = net_tx_bus.stats;
 	cpipe_create(&tx_pipe);
+	cpipe_set_max_input(&tx_pipe, CPIPE_MAX_INPUT);
 	cpipe_create(&net_pipe);
 	static struct cpipe_fiber_pool fiber_pool;
 

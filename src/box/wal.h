@@ -31,8 +31,9 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
-#include "cbus.h"
+#include <sys/types.h>
 #include "small/rlist.h"
+#include "salad/stailq.h"
 
 struct fiber;
 struct wal_writer;
@@ -43,11 +44,16 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 extern const char *wal_mode_STRS[];
 
 extern struct wal_writer *wal;
+extern struct rmean *rmean_tx_wal_bus;
 
 #if defined(__cplusplus)
 
-struct wal_request: public cmsg {
-	/* Auxiliary. */
+struct wal_request {
+	struct stailq_entry fifo;
+	/*
+	 * On success, contains vclock signature (lsn) of
+	 * committed transaction, on error is -1
+	 */
 	int64_t res;
 	struct fiber *fiber;
 	/* Relative position of the start of request (used for rollback) */

@@ -52,6 +52,8 @@ enum cbus_stat_name {
 
 extern const char *cbus_stat_strings[CBUS_STAT_LAST];
 
+enum { CPIPE_MAX_INPUT = 2048 };
+
 /**
  * One hop in a message travel route.  A message may need to be
  * delivered to many destinations before it can be dispensed with.
@@ -88,7 +90,6 @@ struct cmsg {
 	struct cmsg_hop *hop;
 };
 
-/** Initialize the message and set its route. */
 static inline void
 cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
 {
@@ -257,7 +258,6 @@ cpipe_pop(struct cpipe *pipe)
 static inline void
 cpipe_set_max_input(struct cpipe *pipe, int max_input)
 {
-	assert(loop() == pipe->producer);
 	pipe->max_input = max_input;
 }
 
@@ -439,6 +439,11 @@ cmsg_dispatch(struct cpipe *pipe, struct cmsg *msg)
 static inline void
 cmsg_deliver(struct cmsg *msg)
 {
+	/*
+	 * Save the pointer to the last pipe,
+	 * the memory where it is stored may be destroyed
+	 * on the last hop.
+	 */
 	struct cpipe *pipe = msg->hop->pipe;
 	msg->hop->f(msg);
 	cmsg_dispatch(pipe, msg);
