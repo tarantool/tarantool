@@ -380,7 +380,9 @@ static void eio_execute (struct etp_worker *self, eio_req *req);
 static void
 eio_warn_uninitialized()
 {
+#if 0
   fputs("Please initialize libeio in this thread.\n", stderr);
+#endif
 }
 
 static struct etp_pool eio_pool;
