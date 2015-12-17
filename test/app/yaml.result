@@ -271,7 +271,7 @@ ok - ucdata
     # compact: end
 ok - compact
     # output
-    1..8
+    1..9
     ok - encode for true
     ok - decode for 'yes'
     ok - encode for false
@@ -279,6 +279,7 @@ ok - compact
     ok - encode for nil
     ok - decode for ~
     ok - encode for binary
+    ok - encode for binary (2) - gh-354
     ok - tutorial string
     # output: end
 ok - output
