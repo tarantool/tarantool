@@ -300,7 +300,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: '[string "-- net_box.lua (internal file)..."]:155: Use space:method(...)
+- error: '[string "-- net_box.lua (internal file)..."]:157: Use space:method(...)
     instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
