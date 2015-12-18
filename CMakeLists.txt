@@ -335,9 +335,15 @@ add_dependencies(build_bundled_libs cjson)
 # LibYAML
 #
 
-include(BuildLibYAML)
-libyaml_build()
-add_dependencies(build_bundled_libs yaml)
+option(ENABLE_BUNDLED_LIBYAML "Enable building of the bundled libyaml" ON)
+if (ENABLE_BUNDLED_LIBYAML)
+    include(BuildLibYAML)
+    libyaml_build()
+    add_dependencies(build_bundled_libs yaml)
+else()
+    set(LIBYAML_FIND_REQUIRED ON)
+    find_package(LibYAML)
+endif()
 
 #
 # Third-Party misc
@@ -412,6 +418,7 @@ message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
 message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
 message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
 message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
+message (STATUS "ENABLE_BUNDLED_LIBYAML: ${ENABLE_BUNDLED_LIBYAML}")
 message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
 list_optional_packages()
 if (TARGET_OS_DARWIN)

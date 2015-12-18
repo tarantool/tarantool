@@ -1,5 +1,7 @@
-test_run = require('test_run').new()
-test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+
 space = box.schema.space.create('tweedledum')
 tmp = space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
 tmp = space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
@@ -352,4 +354,5 @@ index_random_test(space, 'secondary')
 space:drop()
 space = nil
 
+test_run:cmd("clear filter")
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

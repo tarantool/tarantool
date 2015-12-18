@@ -26,7 +26,7 @@ extern "C" {
 
 /** The public API declaration. */
 
-#ifdef WIN32
+#ifdef _WIN32
 #   if defined(YAML_DECLARE_STATIC)
 #       define  YAML_DECLARE(type)  type
 #   elif defined(YAML_DECLARE_EXPORT)
@@ -164,9 +164,6 @@ typedef struct yaml_mark_s {
 typedef enum yaml_scalar_style_e {
     /** Let the emitter choose the style. */
     YAML_ANY_SCALAR_STYLE,
-
-    /** The verbatim scalar style. */
-    YAML_VERBATIM_SCALAR_STYLE,
 
     /** The plain scalar style. */
     YAML_PLAIN_SCALAR_STYLE,
