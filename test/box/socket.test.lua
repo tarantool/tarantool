@@ -49,13 +49,18 @@ socket.iowait(s:fd(), 2)
 socket.iowait(s:fd(), '')
 socket.iowait(s:fd(), -1)
 socket.iowait(s:fd(), 'RW')
+socket.iowait(s:fd(), 'RW', -100500)
 s:readable(0)
 s:errno() > 0
 s:error()
 s:writable(.00000000000001)
 s:writable(0)
 s:wait(.01)
+socket.iowait(nil, nil, -1)
 socket.iowait(nil, nil, 0.0001)
+socket.iowait(-1, nil, 0.0001)
+socket.iowait(nil, 'RW')
+socket.iowait(0, nil)
 
 handshake = ffi.new('char[128]')
 -- test sysread with char *

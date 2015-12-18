@@ -152,6 +152,10 @@ socket.iowait(s:fd(), 'RW')
 ---
 - RW
 ...
+socket.iowait(s:fd(), 'RW', -100500)
+---
+- RW
+...
 s:readable(0)
 ---
 - true
@@ -176,8 +180,22 @@ s:wait(.01)
 ---
 - RW
 ...
+socket.iowait(nil, nil, -1)
+---
+...
 socket.iowait(nil, nil, 0.0001)
 ---
+...
+socket.iowait(-1, nil, 0.0001)
+---
+...
+socket.iowait(nil, 'RW')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(0, nil)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
 ...
 handshake = ffi.new('char[128]')
 ---
