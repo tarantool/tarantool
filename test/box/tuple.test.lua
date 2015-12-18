@@ -1,4 +1,8 @@
 -- box.tuple test
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+
 -- Test box.tuple:slice()
 t=box.tuple.new{'0', '1', '2', '3', '4', '5', '6', '7'}
 t:slice(0)
@@ -301,3 +305,5 @@ t.upsert()
 t = nil
 
 space:drop()
+
+test_run:cmd("clear filter")

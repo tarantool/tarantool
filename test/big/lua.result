@@ -1,3 +1,13 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -586,7 +596,7 @@ space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['i1']:count(function() end)
 ---
-- error: 'builtin/msgpackffi.lua:226: can not encode Lua type: ''function'''
+- error: 'builtin/msgpackffi.lua..."]:<line>: can not encode Lua type: ''function'''
 ...
 space:drop()
 ---
@@ -746,7 +756,7 @@ t:find(2, '2')
 ...
 t:find(89, '2')
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:130: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 t:findall(4, '3')
 ---
@@ -939,5 +949,9 @@ space:drop()
 ...
 space = nil
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

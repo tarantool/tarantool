@@ -94,9 +94,6 @@ local tuple_iterator_t = ffi.typeof('box_tuple_iterator_t')
 local tuple_iterator_ref_t = ffi.typeof('box_tuple_iterator_t &')
 
 local function tuple_iterator(tuple)
-    if tuple == nil then
-        error("Invalid tuple for iterator")
-    end
     local it = builtin.box_tuple_iterator(tuple)
     if it == nil then
         box.error()
@@ -136,6 +133,7 @@ end;
 
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-next
 local function tuple_next(tuple, pos)
+    tuple_check(tuple, "tuple:next(tuple[, pos])")
     if pos == nil then
         pos = 0
     end
@@ -148,6 +146,7 @@ end
 
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-ipairs
 local function tuple_ipairs(tuple, pos)
+    tuple_check(tuple, "tuple:pairs(tuple[, pos])")
     local it = tuple_iterator(tuple)
     return fun.wrap(it, tuple, pos)
 end
@@ -236,10 +235,16 @@ end
 
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
-    local bsize = tuple:bsize()
+    assert(ffi.istype(tuple_t, tuple))
+    local bsize = builtin.box_tuple_bsize(tuple)
     buf:reserve(bsize)
     builtin.box_tuple_to_buf(tuple, buf.wpos, bsize)
     buf.wpos = buf.wpos + bsize
+end
+
+local function tuple_bsize(tuple)
+    tuple_check(tuple, "tuple:bsize()");
+    return tonumber(builtin.box_tuple_bsize(tuple))
 end
 
 msgpackffi.on_encode(const_tuple_ref_t, tuple_to_msgpack)
@@ -259,10 +264,7 @@ local methods = {
     ["totable"]     = tuple_totable;
     ["update"]      = tuple_update;
     ["upsert"]      = tuple_upsert;
-    ["bsize"]       = function(tuple)
-        tuple_check(tuple, "tuple:bsize()");
-        return tonumber(builtin.box_tuple_bsize(tuple))
-    end;
+    ["bsize"]       = tuple_bsize;
     ["__serialize"] = tuple_totable; -- encode hook for msgpack/yaml/json
 }
 
