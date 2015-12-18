@@ -1,4 +1,8 @@
 -- box.tuple test
+env = require('test_run')
+test_run = env.new()
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+
 -- Test box.tuple:slice()
 t=box.tuple.new{'0', '1', '2', '3', '4', '5', '6', '7'}
 t:slice(0)
@@ -291,4 +295,15 @@ map['test'] = 48
 map
 getmetatable(map) == nil
 
+-- gh-1189: tuple is not checked as first argument
+t = box.tuple.new({1, 2, {}})
+t.bsize()
+t.find(9223372036854775807LL)
+t.findall(9223372036854775807LL)
+t.update()
+t.upsert()
+t = nil
+
 space:drop()
+
+test_run:cmd("clear filter")

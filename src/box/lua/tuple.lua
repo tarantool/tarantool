@@ -65,8 +65,7 @@ box_tuple_t *
 boxffi_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 box_tuple_t *
-boxffi_tuple_upsert(box_tuple_t *tuple, const char *expr,
-                    const char *expr_end);
+boxffi_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 ]])
 
 local builtin = ffi.C
@@ -85,13 +84,16 @@ local tuple_bless = function(tuple)
     return ffi.gc(ffi.cast(const_tuple_ref_t, tuple), tuple_gc)
 end
 
+local tuple_check = function(tuple, usage)
+    if not ffi.istype(tuple_t, tuple) then
+        error('Usage: ' .. usage)
+    end
+end
+
 local tuple_iterator_t = ffi.typeof('box_tuple_iterator_t')
 local tuple_iterator_ref_t = ffi.typeof('box_tuple_iterator_t &')
 
 local function tuple_iterator(tuple)
-    if tuple == nil then
-        error("Invalid tuple for iterator")
-    end
     local it = builtin.box_tuple_iterator(tuple)
     if it == nil then
         box.error()
@@ -131,6 +133,7 @@ end;
 
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-next
 local function tuple_next(tuple, pos)
+    tuple_check(tuple, "tuple:next(tuple[, pos])")
     if pos == nil then
         pos = 0
     end
@@ -143,11 +146,13 @@ end
 
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-ipairs
 local function tuple_ipairs(tuple, pos)
+    tuple_check(tuple, "tuple:pairs(tuple[, pos])")
     local it = tuple_iterator(tuple)
     return fun.wrap(it, tuple, pos)
 end
 
 local function tuple_totable(tuple, i, j)
+    tuple_check(tuple, "tuple:totable([from[, to]])");
     local it = tuple_iterator(tuple)
     builtin.box_tuple_rewind(it)
     local field
@@ -182,6 +187,7 @@ local function tuple_unpack(tuple, i, j)
 end
 
 local function tuple_find(tuple, offset, val)
+    tuple_check(tuple, "tuple:find([offset, ]val)");
     if val == nil then
         val = offset
         offset = 0
@@ -191,6 +197,7 @@ local function tuple_find(tuple, offset, val)
 end
 
 local function tuple_findall(tuple, offset, val)
+    tuple_check(tuple, "tuple:findall([offset, ]val)");
     if val == nil then
         val = offset
         offset = 0
@@ -201,6 +208,7 @@ local function tuple_findall(tuple, offset, val)
 end
 
 local function tuple_update(tuple, expr)
+    tuple_check(tuple, "tuple:update({ { op, field, arg}+ })");
     if type(expr) ~= 'table' then
         error("Usage: tuple:update({ { op, field, arg}+ })")
     end
@@ -213,6 +221,7 @@ local function tuple_update(tuple, expr)
 end
 
 local function tuple_upsert(tuple, expr)
+    tuple_check(tuple, "tuple:upsert({ { op, field, arg}+ })");
     if type(expr) ~= 'table' then
         error("Usage: tuple:upsert({ { op, field, arg}+ })")
     end
@@ -226,10 +235,16 @@ end
 
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
-    local bsize = tuple:bsize()
+    assert(ffi.istype(tuple_t, tuple))
+    local bsize = builtin.box_tuple_bsize(tuple)
     buf:reserve(bsize)
     builtin.box_tuple_to_buf(tuple, buf.wpos, bsize)
     buf.wpos = buf.wpos + bsize
+end
+
+local function tuple_bsize(tuple)
+    tuple_check(tuple, "tuple:bsize()");
+    return tonumber(builtin.box_tuple_bsize(tuple))
 end
 
 msgpackffi.on_encode(const_tuple_ref_t, tuple_to_msgpack)
@@ -249,9 +264,7 @@ local methods = {
     ["totable"]     = tuple_totable;
     ["update"]      = tuple_update;
     ["upsert"]      = tuple_upsert;
-    ["bsize"]       = function(tuple)
-        return tonumber(builtin.box_tuple_bsize(tuple))
-    end;
+    ["bsize"]       = tuple_bsize;
     ["__serialize"] = tuple_totable; -- encode hook for msgpack/yaml/json
 }
 
