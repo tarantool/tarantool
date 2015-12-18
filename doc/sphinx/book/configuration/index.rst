@@ -38,7 +38,7 @@ Tarantool is started by entering the command:
     .. code-block:: console
 
         $ ./tarantool --version
-        Tarantool 1.6.3-439-g7e1011b
+        Tarantool 1.6.8-235-gb948587
         Target: Linux-x86_64-Debug
         ...
 

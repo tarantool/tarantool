@@ -26,7 +26,8 @@ SIGHUP can be used to cause a log file rotation. See
 
 .. program:: tarantool
 
-If ``tarantool`` is started without a Lua script to run, it automatically
+If ``tarantool`` is started without an :ref:`initialization file <init-label>`,
+or if the initialization file contains :func:`console.start()`, then ``tarantool``
 enters interactive mode. There will be a prompt ("``tarantool>``") and it will
 be possible to enter requests. When used this way, ``tarantool`` can be
 a client for a remote server.
@@ -99,10 +100,12 @@ described in `Lua documentation`_. Examples: 'Hello, world', 'A', [[A\\B!]].
 .. _Lua documentation: http://www.lua.org/pil/2.4.html
 
 Numeric literals are: Character sequences containing only digits, optionally
-preceded by + or -. Examples: 55, -. Notes: Tarantool NUM data type is
+preceded by + or -. Large or floating-point numeric
+literals may include decimal points, exponential notation, or suffixes.
+Examples: 500, -500, 5e2, 500.1, 5LL, 5ULL. Notes: Tarantool NUM data type is
 unsigned, so -1 is understood as a large unsigned number.
 
-Single-byte tokens are: * or , or ( or ). Examples: * , ( ).
+Single-byte tokens are: , or ( or ) or arithmetic operators. Examples: * , ( ).
 
 Tokens must be separated from each other by one or more spaces, except that
 spaces are not necessary around single-byte tokens or string literals.

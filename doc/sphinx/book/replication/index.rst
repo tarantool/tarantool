@@ -89,7 +89,7 @@ degraded state requires a human inspection.
 
 However, once a master failure is detected, the recovery is simple: declare
 that the replica is now the new master, by saying
-:codenormal:`box.cfg{... listen=`:codeitalic:`URI`:codenormal`}`.
+:codenormal:`box.cfg{... listen=`:codeitalic:`URI`:codenormal:`}`.
 Then, if there are updates on the old master that were not propagated before
 the old master went down, they would have to be re-applied manually.
 
