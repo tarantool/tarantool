@@ -350,11 +350,11 @@ License: Public-Domain
  This is a portable ANSI C implementation of MurmurHash3_x86_32 (Murmur3A)
  with support for progressive processing.
 
-Files: third_party/lua-yaml/*
+Files: third_party/libyaml/*
 Copyright: 2006, Kirill Simonov <xi@resolvent.net>
 License: Expat
 
-Files: third_party/lua-yaml/lyaml.cc
+Files: third_party/lua-yaml/*
 Copyright: 2009, Andrew Danforth <acd@weirdness.net>
 License: Expat
 

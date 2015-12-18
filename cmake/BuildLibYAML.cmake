@@ -1,31 +1,25 @@
 #
-# A macro to build the bundled liblua-yaml
+# A macro to build the bundled libyaml
 macro(libyaml_build)
-    set(yaml_src ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/api.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/dumper.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/emitter.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/loader.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/parser.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/reader.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/scanner.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/writer.c
-	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c)
-
-    set_source_files_properties(${yaml_src} PROPERTIES COMPILE_FLAGS
-        "-std=c99 -I\"${PROJECT_SOURCE_DIR}/third_party/lua-yaml\"")
-    set_source_files_properties(
-        ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
-        PROPERTIES COMPILE_FLAGS
-        "-std=gnu++0x -D__STDC_FORMAT_MACROS=1 -D__STDC_LIMIT_MACROS=1")
+    set(yaml_src ${PROJECT_SOURCE_DIR}/third_party/libyaml/api.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/dumper.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/emitter.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/loader.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/parser.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/reader.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/scanner.c
+        ${PROJECT_SOURCE_DIR}/third_party/libyaml/writer.c)
 
     add_library(yaml STATIC ${yaml_src})
 
-    set(LIBYAML_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/lua-yaml)
+    set(LIBYAML_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/libyaml)
     set(LIBYAML_LIBRARIES yaml)
 
-    message(STATUS "Use bundled Lua-YAML library: ${LIBYAML_LIBRARIES}")
+    # A workaround for config.h
+    set_target_properties(yaml PROPERTIES  COMPILE_DEFINITIONS "HAVE_CONFIG_H")
+    include_directories(${LIBYAML_INCLUDE_DIR})
 
-    unset(lua_yaml_src)
+    message(STATUS "Use bundled libyaml library")
+    unset(yaml_src)
 endmacro(libyaml_build)
 

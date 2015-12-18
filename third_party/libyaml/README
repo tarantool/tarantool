@@ -1,7 +1,5 @@
 LibYAML - A C library for parsing and emitting YAML.
 
-The project is in an early stage of development.
-
 To build and install the library, run:
 $ ./configure
 $ make
