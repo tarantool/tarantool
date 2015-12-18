@@ -230,6 +230,15 @@ res = cn:call('long_rep')
 res[1][1] == 1
 res[1][2] == string.rep('a', 50000)
 
+-- a.b.c.d
+u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'
+X = {}
+X.X = X
+function X.fn(x,y) return y or x end
+cn:call('X.fn', u)
+cn:call('X.X.X.X.X.X.X.fn', u)
+cn:call('X.X.X.X:fn', u)
+
 -- auth
 
 cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
