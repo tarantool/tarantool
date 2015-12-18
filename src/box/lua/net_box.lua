@@ -765,11 +765,10 @@ local remote_methods = {
 
         self:_switch_state('schema')
 
-        -- FIXME: box.schema.VSPACE_ID
         local spaces = self:_request_internal(SELECT,
-            true, SPACE_SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, box.schema.VSPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
         local indexes = self:_request_internal(SELECT,
-            true, SPACE_INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+            true, box.schema.VINDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
 
