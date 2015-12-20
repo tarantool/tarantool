@@ -63,8 +63,6 @@ install (FILES example.lua DESTINATION
 )
 
 pod2man (
-    ${CMAKE_SOURCE_DIR}/extra/dist/tarantoolctl
-    "tarantoolctl" 1 extra/dist
+    tarantoolctl "tarantoolctl" 1
     "tarantoolctl instances control"
 )
-
