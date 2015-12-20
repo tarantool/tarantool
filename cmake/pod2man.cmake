@@ -19,7 +19,7 @@ macro(pod2man PODFILE NAME SECTION CENTER)
         add_custom_command(
             OUTPUT ${MANFILE_FULL}
             COMMAND ${POD2MAN} --section ${SECTION} --center ${CENTER}
-                --release --name ${MANFILE} ${PODFILE_FULL} ${MANFILE_FULL}
+                --release --name ${NAME} ${PODFILE_FULL} ${MANFILE_FULL}
         )
         set(MANPAGE_TARGET "man-${NAME}")
         add_custom_target(${MANPAGE_TARGET} ALL
