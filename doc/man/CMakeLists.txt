@@ -1,5 +1,4 @@
 pod2man (
-    ${CMAKE_SOURCE_DIR}/doc/man/tarantool.pod
-    "tarantool" 1 doc/man
+    tarantool.pod "tarantool" 1
     "Lua application server and NoSQL database"
 )
