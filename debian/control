@@ -9,7 +9,8 @@ Build-Depends: cdbs, debhelper (>= 8),
  libncurses5-dev,
  libyaml-dev,
  libiberty-dev | binutils-dev,
- libbfd-dev | binutils-dev
+ libbfd-dev | binutils-dev,
+ zlib1g-dev
 Section: database
 Standards-Version: 3.9.6
 Homepage: http://tarantool.org/

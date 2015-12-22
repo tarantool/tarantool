@@ -8,27 +8,26 @@ if(NOT POD2MAN)
     message(STATUS "Could not find pod2man - man pages disabled")
 endif(NOT POD2MAN)
 
-macro(pod2man PODFILE MANFILE SECTION OUTPATH CENTER)
-    if(NOT EXISTS ${PODFILE})
-        message(FATAL ERROR "Could not find pod file ${PODFILE} to generate man page")
-    endif(NOT EXISTS ${PODFILE})
+macro(pod2man PODFILE NAME SECTION CENTER)
+    set(PODFILE_FULL "${CMAKE_CURRENT_SOURCE_DIR}/${PODFILE}")
+    set(MANFILE_FULL "${CMAKE_CURRENT_BINARY_DIR}/${NAME}.${SECTION}")
+    if(NOT EXISTS ${PODFILE_FULL})
+        message(FATAL ERROR "Could not find pod file ${PODFILE_FULL} to generate man page")
+    endif(NOT EXISTS ${PODFILE_FULL})
 
     if(POD2MAN)
-        set(OUTPATH_NEW "${PROJECT_BINARY_DIR}/${OUTPATH}")
-
         add_custom_command(
-            OUTPUT ${OUTPATH_NEW}/${MANFILE}.${SECTION}
-            COMMAND ${POD2MAN} --section ${SECTION} --center ${CENTER}
-                --release --name ${MANFILE} ${PODFILE}
-                ${OUTPATH_NEW}/${MANFILE}.${SECTION}
+            OUTPUT ${MANFILE_FULL}
+            COMMAND ${POD2MAN} --section="${SECTION}" --center="${CENTER}"
+                --release --name="${NAME}" "${PODFILE_FULL}" "${MANFILE_FULL}"
         )
-        set(MANPAGE_TARGET "man-${MANFILE}")
+        set(MANPAGE_TARGET "man-${NAME}")
         add_custom_target(${MANPAGE_TARGET} ALL
-            DEPENDS ${OUTPATH_NEW}/${MANFILE}.${SECTION}
+            DEPENDS ${MANFILE_FULL}
         )
         install(
-            FILES ${OUTPATH_NEW}/${MANFILE}.${SECTION}
+            FILES ${MANFILE_FULL}
             DESTINATION ${CMAKE_INSTALL_MANDIR}/man${SECTION}
         )
     endif()
-endmacro(pod2man PODFILE MANFILE SECTION OUTPATH CENTER)
+endmacro(pod2man PODFILE NAME SECTION OUTPATH CENTER)
