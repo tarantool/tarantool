@@ -125,10 +125,10 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 static uint64_t num_parts[8];
 
 void*
-SophiaIndex::createObject(const char *key, bool async, const char **keyend)
+SophiaIndex::createDocument(const char *key, bool async, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
-	void *obj = sp_object(db);
+	void *obj = sp_document(db);
 	if (obj == NULL)
 		sophia_error(env);
 	if (async)
@@ -164,7 +164,11 @@ SophiaIndex::createObject(const char *key, bool async, const char **keyend)
 }
 
 static int
-sophia_update(int, char*, int, int, char*, int, void*, void**, int*);
+sophia_upsert_callback(char **result,
+                       char **key, int *key_size, int key_count,
+                       char *src, int src_size,
+                       char *upsert, int upsert_size,
+                       void *arg);
 
 static inline void*
 sophia_configure(struct space *space, struct key_def *key_def)
@@ -205,14 +209,17 @@ sophia_configure(struct space *space, struct key_def *key_def)
 		sp_setstring(env, path, type, 0);
 		i++;
 	}
-	/* db.update */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.update", key_def->space_id);
-	sp_setstring(env, path, (const void *)(uintptr_t)sophia_update, 0);
-	/* db.update_arg */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.update_arg", key_def->space_id);
+	/* db.upsert */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert", key_def->space_id);
+	sp_setstring(env, path, (const void *)(uintptr_t)sophia_upsert_callback, 0);
+	/* db.upsert_arg */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert_arg", key_def->space_id);
 	sp_setstring(env, path, (const void *)key_def, 0);
 	/* db.compression */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
+	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
+	/* db.compression_branch */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
 	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
@@ -284,7 +291,7 @@ struct tuple *
 SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 {
 	(void)part_count;
-	void *obj = ((SophiaIndex *)this)->createObject(key, true, NULL);
+	void *obj = ((SophiaIndex *)this)->createDocument(key, true, NULL);
 	void *transaction = db;
 	/* engine_tx might be empty, even if we are in txn context.
 	 *
@@ -357,223 +364,163 @@ sophia_update_alloc(void *arg, size_t size)
 	return ptr;
 }
 
-struct sophiaref {
-	uint32_t offset;
-	uint16_t size;
-} __attribute__((packed));
-
-static inline char*
-sophia_upsert_to_tarantool(struct key_def *key_def, char *origin, int origin_size,
-                           uint32_t *origin_keysize,
-                           uint32_t *size)
+static inline int
+sophia_upsert_mp(char **tuple, int *tuple_size_key, struct key_def *key_def,
+                 char **key, int *key_size,
+                 char *src, int src_size)
 {
-	struct sophiaref *ref = (struct sophiaref *)origin;
-	uint32_t src_keysize_mp = 0;
-	*origin_keysize = 0;
-
-	/* calculate src msgpack size */
+	/* calculate msgpack size */
+	uint32_t mp_keysize = 0;
 	int i = 0;
 	while (i < key_def->part_count) {
-		char *ptr;
-		if (key_def->parts[i].type == STRING) {
-			src_keysize_mp += mp_sizeof_str(ref[i].size);
-		} else {
-			ptr = origin + ref[i].offset;
-			src_keysize_mp += mp_sizeof_uint(load_u64(ptr));
-		}
-		*origin_keysize += sizeof(struct sophiaref) + ref[i].size;
+		if (key_def->parts[i].type == STRING)
+			mp_keysize += mp_sizeof_str(key_size[i]);
+		else
+			mp_keysize += mp_sizeof_uint(load_u64(key[i]));
 		i++;
 	}
+	*tuple_size_key = mp_keysize + mp_sizeof_array(key_def->part_count);
 
-	/* convert src to msgpack */
-	int valueoffset =
-		ref[key_def->part_count-1].offset +
-		ref[key_def->part_count-1].size;
-	int valuesize = origin_size - valueoffset;
-
+	/* count fields */
 	int count = key_def->part_count;
-	const char *p = origin + valueoffset;
-	while (p < (origin + origin_size)) {
+	const char *p = src;
+	while (p < (src + src_size)) {
 		count++;
 		mp_next((const char **)&p);
 	}
 
-	int src_size = mp_sizeof_array(count) +
-		src_keysize_mp + valuesize;
-	char *src = (char *)malloc(src_size);
-	char *src_ptr = src;
-	if (src == NULL)
-		return NULL;
-
-	src_ptr = mp_encode_array(src_ptr, count);
+	/* allocate and encode tuple */
+	int mp_size = mp_sizeof_array(count) +
+		mp_keysize + src_size;
+	char *mp = (char *)malloc(mp_size);
+	char *mp_ptr = mp;
+	if (mp == NULL)
+		return -1;
+	mp_ptr = mp_encode_array(mp_ptr, count);
 	i = 0;
 	while (i < key_def->part_count) {
-		char *ptr = origin + ref[i].offset;
-		if (key_def->parts[i].type == STRING) {
-			src_ptr = mp_encode_str(src_ptr, ptr, ref[i].size);
-		} else {
-			src_ptr = mp_encode_uint(src_ptr, load_u64(ptr));
-		}
+		if (key_def->parts[i].type == STRING)
+			mp_ptr = mp_encode_str(mp_ptr, key[i], key_size[i]);
+		else
+			mp_ptr = mp_encode_uint(mp_ptr, load_u64(key[i]));
 		i++;
 	}
-	memcpy(src_ptr, origin + valueoffset, valuesize);
-	src_ptr += valuesize;
-	assert((src_ptr - src) == src_size);
+	memcpy(mp_ptr, src, src_size);
 
-	*size = src_size;
-	return src;
+	*tuple = mp;
+	return mp_size;
 }
 
-static inline char*
-sophia_upsert_to_sophia(struct key_def *key_def, char *dest, int dest_size,
-                        char *key, int key_size,
-                        int *size)
+static inline int
+sophia_upsert(char **result,
+              char *tuple, int tuple_size, int tuple_size_key,
+              char *upsert, int upsert_size)
 {
-	const char *p = dest;
-	int i = 0;
-	mp_decode_array(&p);
-	while (i < key_def->part_count) {
-		mp_next(&p);
-		i++;
-	}
-	const char *dest_value = p;
-	uint32_t dest_value_size = dest_size - (p - dest);
-	*size = key_size + dest_value_size;
-	char *cnv = (char *)malloc(*size);
-	if (cnv == NULL)
-		return NULL;
-	p = cnv;
-	memcpy((void *)p, (void *)key, key_size);
-	p += key_size;
-	memcpy((void *)p, (void *)dest_value, dest_value_size);
-	p += dest_value_size;
-	assert((p - cnv) == *size);
-	return cnv;
-}
-
-static inline char*
-sophia_upsert_default(struct key_def *key_def, char *update,
-                      uint32_t *origin_keysize,
-                      uint32_t *size)
-{
-	/* calculate keysize */
-	struct sophiaref *ref = (struct sophiaref *)update;
-	*origin_keysize = 0;
-	int i = 0;
-	while (i < key_def->part_count) {
-		*origin_keysize += sizeof(struct sophiaref) + ref[i].size;
-		i++;
-	}
-	/* upsert using default tuple */
-	char *p = update + *origin_keysize;
-	p += sizeof(uint8_t);   /* index base */
-	*size = *(uint32_t *)p; /* tuple size */
-	p += sizeof(uint32_t);
-	return p;
-}
-
-static inline char*
-sophia_upsert(char *src, int src_size, char *update, int update_size,
-              uint32_t origin_keysize,
-              uint32_t *size, struct sophia_mempool *pool)
-{
-	char *p = update + origin_keysize;
-	uint8_t index_base = *(uint32_t *)p;
+	char *p = upsert;
+	uint8_t index_base = *(uint8_t *)p;
 	p += sizeof(uint8_t);
 	uint32_t default_tuple_size = *(uint32_t *)p;
 	p += sizeof(uint32_t);
-	char *default_tuple = p;
-	char *default_tuple_end = p + default_tuple_size;
-	(void)default_tuple;
-	(void)default_tuple_end;
 	p += default_tuple_size;
 	char *expr = p;
-	char *expr_end = update + update_size;
+	char *expr_end = upsert + upsert_size;
 	const char *up;
+	uint32_t up_size;
+	/* emit upsert */
+	struct sophia_mempool alloc;
+	sophia_mempool_init(&alloc);
 	try {
-		up = tuple_upsert_execute(sophia_update_alloc, pool,
+		up = tuple_upsert_execute(sophia_update_alloc, &alloc,
 		                          expr,
 		                          expr_end,
-		                          src,
-		                          src + src_size,
-		                          size, index_base);
+		                          tuple,
+		                          tuple + tuple_size,
+		                          &up_size, index_base);
 	} catch (Exception *e) {
-		return NULL;
+		sophia_mempool_free(&alloc);
+		return -1;
 	}
-	return (char *)up;
+	/* get new value */
+	int size = up_size - tuple_size_key;
+	*result = (char *)malloc(size);
+	if (! *result) {
+		sophia_mempool_free(&alloc);
+		return -1;
+	}
+	memcpy(*result, up + tuple_size_key, size);
+	sophia_mempool_free(&alloc);
+	return size;
 }
 
 static int
-sophia_update(int origin_flags, char *origin, int origin_size,
-              int update_flags, char *update, int update_size,
-              void *arg,
-              void **result, int *size)
+sophia_upsert_callback(char **result,
+                       char **key, int *key_size, int /* key_count */,
+                       char *src, int src_size,
+                       char *upsert, int upsert_size,
+                       void *arg)
 {
-	(void)origin_flags;
-	(void)update_flags;
-	struct key_def *key_def = (struct key_def *)arg;
-	uint32_t origin_keysize;
-	uint32_t src_size;
-	char *src;
-	uint32_t dest_size;
-	char *dest;
-	struct sophia_mempool p;
-	sophia_mempool_init(&p);
-	if (origin) {
-		/* convert origin object to msgpack */
-		src = sophia_upsert_to_tarantool(key_def, origin, origin_size,
-		                                 &origin_keysize,
-		                                 &src_size);
-		if (src == NULL)
+	/* use default tuple value */
+	if (src == NULL) {
+		char *p = upsert;
+		p += sizeof(uint8_t); /* index base */
+		uint32_t value_size = *(uint32_t *)p;
+		p += sizeof(uint32_t);
+		*result = (char *)malloc(value_size);
+		if (! *result)
 			return -1;
-		/* execute upsert */
-		dest = sophia_upsert(src, src_size, update, update_size,
-		                     origin_keysize, &dest_size, &p);
-		free(src);
-	} else {
-		/* use default tuple from update */
-		dest = sophia_upsert_default(key_def, update, &origin_keysize, &dest_size);
-		origin = update;
+		memcpy(*result, p, value_size);
+		return value_size;
 	}
-	if (dest == NULL) {
-		sophia_mempool_free(&p);
+	struct key_def *key_def = (struct key_def *)arg;
+	/* convert to msgpack */
+	char *tuple;
+	int tuple_size_key;
+	int tuple_size;
+	tuple_size = sophia_upsert_mp(&tuple, &tuple_size_key,
+	                              key_def, key, key_size,
+	                              src, src_size);
+	if (tuple_size == -1)
 		return -1;
-	}
-
-	/* convert msgpack to sophia format */
-	*result = sophia_upsert_to_sophia(key_def, dest, dest_size, origin,
-	                                  origin_keysize, size);
-	sophia_mempool_free(&p);
-	return (*result == NULL) ? -1 : 0;
+	/* execute upsert */
+	int size;
+	size = sophia_upsert(result,
+	                     tuple, tuple_size, tuple_size_key,
+	                     upsert,
+	                     upsert_size);
+	free(tuple);
+	return size;
 }
 
 void
-SophiaIndex::upsert(const char *key,
-                    const char *expr,
+SophiaIndex::upsert(const char *expr,
                     const char *expr_end,
                     const char *tuple,
                     const char *tuple_end,
                     uint8_t index_base)
 {
+	mp_decode_array(&tuple);
+	uint32_t expr_size  = expr_end - expr;
 	uint32_t tuple_size = tuple_end - tuple;
-	uint32_t expr_size = expr_end - expr;
-	uint32_t valuesize =
-		sizeof(uint8_t) + sizeof(uint32_t) + tuple_size + expr_size;
-	char *value = (char *)malloc(valuesize);
+	uint32_t tuple_value_size;
+	const char *tuple_value;
+	void *obj = createDocument(tuple, false, &tuple_value);
+	tuple_value_size = tuple_size - (tuple_value - tuple);
+	uint32_t value_size =
+		sizeof(uint8_t) + sizeof(uint32_t) + tuple_value_size + expr_size;
+	char *value = (char *)malloc(value_size);
 	if (value == NULL) {
 	}
 	char *p = value;
 	memcpy(p, &index_base, sizeof(uint8_t));
 	p += sizeof(uint8_t);
-	memcpy(p, &tuple_size, sizeof(uint32_t));
+	memcpy(p, &tuple_value_size, sizeof(uint32_t));
 	p += sizeof(uint32_t);
-	memcpy(p, tuple, tuple_size);
-	p += tuple_size;
+	memcpy(p, tuple_value, tuple_value_size);
+	p += tuple_value_size;
 	memcpy(p, expr, expr_size);
+	sp_setstring(obj, "value", value, value_size);
 	void *transaction = in_txn()->engine_tx;
-	void *obj = createObject(key, false, NULL);
-	sp_setstring(obj, "value", value, valuesize);
-	int rc = sp_update(transaction, obj);
+	int rc = sp_upsert(transaction, obj);
 	free(value);
 	if (rc == -1)
 		sophia_error(env);
@@ -601,7 +548,7 @@ SophiaIndex::replace_or_insert(const char *tuple,
 	void *transaction = in_txn()->engine_tx;
 	const char *value;
 	size_t valuesize;
-	void *obj = createObject(key, false, &value);
+	void *obj = createDocument(key, false, &value);
 	valuesize = size - (value - tuple);
 	if (valuesize > 0)
 		sp_setstring(obj, "value", value, valuesize);
@@ -614,7 +561,7 @@ SophiaIndex::replace_or_insert(const char *tuple,
 void
 SophiaIndex::remove(const char *key)
 {
-	void *obj = createObject(key, false, NULL);
+	void *obj = createDocument(key, false, NULL);
 	void *transaction = in_txn()->engine_tx;
 	int rc = sp_delete(transaction, obj);
 	if (rc == -1)
@@ -779,7 +726,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	it->cursor = sp_cursor(env);
 	if (it->cursor == NULL)
 		sophia_error(env);
-	void *obj = ((SophiaIndex *)this)->createObject(key, true, &it->keyend);
+	void *obj = ((SophiaIndex *)this)->createDocument(key, true, &it->keyend);
 	sp_setstring(obj, "order", compare, 0);
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
