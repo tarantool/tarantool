@@ -718,19 +718,18 @@ box_set_server_uuid()
 	assert(r->server_id == 0);
 
 	/* Unregister local server if it was registered by bootstrap.bin */
-	if (vclock_has(&r->vclock, 1))
-		boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
-	assert(!vclock_has(&r->vclock, 1));
+	boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
 
 	/* Register local server */
 	tt_uuid_create(&r->server_uuid);
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&r->server_uuid));
-	assert(vclock_has(&r->vclock, 1));
-
-	/* Remove surrogate server */
-	vclock_del_server(&r->vclock, 0);
 	assert(r->server_id == 1);
+
+	/* Ugly hack: bootstrap always starts from scratch */
+	vclock_create(&r->vclock);
+	vclock_add_server(&r->vclock, 1);
+	assert(vclock_sum(&r->vclock) == 0);
 }
 
 /** Insert a new cluster into _schema */

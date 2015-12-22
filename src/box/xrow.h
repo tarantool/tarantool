@@ -52,7 +52,7 @@ struct xrow_header {
 	uint32_t type;
 	uint32_t server_id;
 	uint64_t sync;
-	uint64_t lsn;
+	int64_t lsn; /* LSN must be signed for correct comparison */
 	double tm;
 
 	int bodycnt;

@@ -89,7 +89,7 @@ box.space._cluster:delete(5)
 ---
 - [5, 'a48a19a3-26c0-4f8c-a5b5-77377bab389b']
 ...
-box.info.vclock[5] == nil
+box.info.vclock[5] == 0
 ---
 - true
 ...
@@ -149,6 +149,10 @@ box.info.server.lsn == -1
 ---
 - true
 ...
+box.info.vclock[2] == 1
+---
+- true
+...
 box.space._schema:replace{"test", 48}
 ---
 - error: Can't modify data because this server is in read-only mode.
@@ -168,11 +172,11 @@ not box.info.server.ro
 ---
 - true
 ...
-box.info.server.lsn == 0
+box.info.server.lsn == 1
 ---
 - true
 ...
-box.info.vclock[2] == 0
+box.info.vclock[2] == 1
 ---
 - true
 ...
@@ -199,7 +203,7 @@ box.info.server.lsn == 0
 ---
 - true
 ...
-box.info.vclock[2] == nil
+box.info.vclock[2] == 1
 ---
 - true
 ...
@@ -227,7 +231,7 @@ box.info.server.lsn == 0
 ---
 - true
 ...
-box.info.vclock[2] == nil
+box.info.vclock[2] == 1
 ---
 - true
 ...
@@ -258,7 +262,7 @@ box.info.server.lsn == -1
 ---
 - true
 ...
-box.info.vclock[10] == nil
+box.info.vclock[10] == 0
 ---
 - true
 ...
@@ -266,6 +270,54 @@ box.info.vclock[10] == nil
 JOIN replica to read-only master
 -------------------------------------------------------------
 'ER_READONLY' exists in server log
+-------------------------------------------------------------
+Sync master with replica
+-------------------------------------------------------------
+box.cfg{ replication_source = '<replication_source>' }
+---
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.vclock[10] == 0
+---
+- true
+...
+box.info.vclock[11] == nil
+---
+- true
+...
+box.cfg{ replication_source = '' }
+---
+...
+-------------------------------------------------------------
+Start a new replica and check that server_id, LSN is re-used
+-------------------------------------------------------------
+box.snapshot()
+---
+- ok
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.server.id == 2
+---
+- true
+...
+not box.info.server.ro
+---
+- true
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.vclock[10] == 0
+---
+- true
+...
 -------------------------------------------------------------
 Cleanup
 -------------------------------------------------------------
