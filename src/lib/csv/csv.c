@@ -38,12 +38,14 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-void csv_emit_row_empty(void *ctx)
+static void
+csv_emit_row_empty(void *ctx)
 {
 	(void) ctx;
 }
 
-void csv_emit_field_empty(void *ctx, const char *field, const char *end)
+static void
+csv_emit_field_empty(void *ctx, const char *field, const char *end)
 {
 	(void) ctx;
 	(void) field;

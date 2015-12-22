@@ -132,7 +132,6 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/error.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
     ${CMAKE_SOURCE_DIR}/src/latch.h
-    ${CMAKE_SOURCE_DIR}/src/fiber.h
 )
 rebuild_module_api(${api_headers})
 

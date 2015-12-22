@@ -1,3 +1,9 @@
+tarantool (1.6.7.551.ga5bafc5-1) unstable; urgency=medium
+
+  * Add zlib1g-dev to B-D (FTBFS), closes: #808516.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 21 Dec 2015 12:46:41 +0300
+
 tarantool (1.6.7.541.g89c4578-1) unstable; urgency=medium
 
   * New Debian snapshot for 1.6.7 stable release.

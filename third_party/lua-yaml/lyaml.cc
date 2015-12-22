@@ -45,6 +45,8 @@ extern "C" {
 
 #include "yaml.h"
 #include "b64.h"
+/* Use private header from bundled libyaml for IS_PRINTABLE() macro */
+#include "third_party/libyaml/yaml_private.h"
 } /* extern "C" */
 #include "lua/utils.h"
 
@@ -515,8 +517,24 @@ static yaml_scalar_style_t analyze_string(struct lua_yaml_dumper *dumper,
             return YAML_PLAIN_SCALAR_STYLE;
          }
 
+         /* Truncated UTF-8 sequence? */
+         if (p + continuation_bytes >= e) {
+            *is_binary = 1;
+            return YAML_PLAIN_SCALAR_STYLE;
+         }
+
+         /*
+          * Valid non-printable UTF-8? Encode as binary since otherwise
+          * the conversion may be lossy, ex: '\xc2\x80' -> '\x80'.
+          */
+         yaml_string_t ys; ys.pointer = (yaml_char_t *)p;
+         if (!IS_PRINTABLE(ys)) {
+            *is_binary = 1;
+            return YAML_PLAIN_SCALAR_STYLE;
+         }
+
          ++p;
-         while (p < e  && continuation_bytes > 0 && *p >= 0x80 && *p <= 0xBF) {
+         while (continuation_bytes > 0 && *p >= 0x80 && *p <= 0xBF) {
             ++p;
             continuation_bytes -= 1;
          }

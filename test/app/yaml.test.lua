@@ -42,7 +42,7 @@ local function test_compact(test, s)
 end
 
 local function test_output(test, s)
-    test:plan(8)
+    test:plan(9)
     test:is(s.encode({true}), '---\n- true\n...\n', "encode for true")
     test:is(s.decode("---\nyes\n..."), true, "decode for 'yes'")
     test:is(s.encode({false}), '---\n- false\n...\n', "encode for false")
@@ -51,6 +51,8 @@ local function test_output(test, s)
     test:is(s.decode("---\n~\n..."), s.NULL, "decode for ~")
     test:is(s.encode("\x80\x92\xe8s\x16"), '--- !!binary gJLocxY=\n...\n',
         "encode for binary")
+    test:is(s.encode("\x08\x5c\xc2\x80\x12\x2f"), '--- !!binary CFzCgBIv\n...\n',
+        "encode for binary (2) - gh-354")
     test:is(s.encode("Tutorial -- Header\n====\n\nText"),
         "--- |-\n  Tutorial -- Header\n  ====\n\n  Text\n...\n", "tutorial string");
 end

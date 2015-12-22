@@ -198,18 +198,14 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 	space_validate_tuple_raw(space, request->tuple);
 	tuple_field_count_validate(space->format, request->tuple);
 
-	/* Extract key from tuple */
-	uint32_t key_len = request->tuple_end - request->tuple;
-	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
-	key_len = key_parts_create_from_tuple(index->key_def, request->tuple,
-					      key, key_len);
-
 	/* validate upsert key */
+	uint32_t tuple_len = request->tuple_end - request->tuple;
+	const char *key = tuple_field_raw(request->tuple, tuple_len, 0);
+
 	uint32_t part_count = index->key_def->part_count;
 	primary_key_validate(index->key_def, key, part_count);
 
-	index->upsert(key,
-	              request->ops,
+	index->upsert(request->ops,
 	              request->ops_end,
 	              request->tuple,
 	              request->tuple_end,
@@ -404,14 +400,14 @@ SophiaEngine::join(struct relay *relay)
 
 	/* get snapshot object */
 	char id[128];
-	snprintf(id, sizeof(id), "snapshot.%" PRIu64, signt);
+	snprintf(id, sizeof(id), "view.%" PRIu64, signt);
 	void *snapshot = sp_getobject(env, id);
 	assert(snapshot != NULL);
 
 	/* iterate through a list of databases which took a
 	 * part in the snapshot */
 	void *db;
-	void *db_cursor = sp_getobject(snapshot, "db-cursor");
+	void *db_cursor = sp_getobject(snapshot, "db");
 	if (db_cursor == NULL)
 		sophia_error(env);
 
@@ -432,7 +428,7 @@ SophiaEngine::join(struct relay *relay)
 			key_def_delete(key_def);
 			sophia_error(env);
 		}
-		void *obj = sp_object(db);
+		void *obj = sp_document(db);
 		while ((obj = sp_get(cursor, obj)))
 		{
 			uint32_t tuple_size;
@@ -645,7 +641,7 @@ sophia_snapshot(void *env, int64_t lsn)
 	if (rc == -1)
 		sophia_error(env);
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	/* ensure snapshot is not already exists */
 	void *o = sp_getobject(env, snapshot);
 	if (o) {
@@ -653,14 +649,14 @@ sophia_snapshot(void *env, int64_t lsn)
 	}
 	/* create snapshot */
 	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
-	rc = sp_setstring(env, "snapshot", snapshot, 0);
+	rc = sp_setstring(env, "view", snapshot, 0);
 	if (rc == -1)
 		sophia_error(env);
 	/* tell snapshot to release a transaction */
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	o = sp_getobject(env, snapshot);
 	assert(o != NULL);
-	sp_setint(o, "db_view_only", 1);
+	sp_setint(o, "db-view-only", 1);
 }
 
 static inline void
@@ -670,16 +666,16 @@ sophia_reference_checkpoint(void *env, int64_t lsn)
 	 * engine lsn */
 	char checkpoint_id[32];
 	snprintf(checkpoint_id, sizeof(checkpoint_id), "%" PRIu64, lsn);
-	int rc = sp_setstring(env, "snapshot", checkpoint_id, 0);
+	int rc = sp_setstring(env, "view", checkpoint_id, 0);
 	if (rc == -1)
 		sophia_error(env);
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	void *o = sp_getobject(env, snapshot);
 	assert(o != NULL);
-	sp_setint(o, "db_view_only", 1);
+	sp_setint(o, "db-view-only", 1);
 	/* update lsn */
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64 ".lsn", lsn);
 	rc = sp_setint(env, snapshot, lsn);
 	if (rc == -1)
 		sophia_error(env);
@@ -690,7 +686,7 @@ sophia_snapshot_ready(void *env, int64_t lsn)
 {
 	/* get sophia lsn associated with snapshot */
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64 ".lsn", lsn);
 	int64_t snapshot_start_lsn = sp_getint(env, snapshot);
 	if (snapshot_start_lsn == -1) {
 		if (sp_error(env))
@@ -706,7 +702,7 @@ static inline void
 sophia_delete_checkpoint(void *env, int64_t lsn)
 {
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	void *s = sp_getobject(env, snapshot);
 	if (s == NULL) {
 		if (sp_error(env))

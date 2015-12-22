@@ -124,6 +124,20 @@ errors(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	assert(strcmp(box_error_message(error), "Proc error") == 0);
 	(void) error;
 
+	/* Backwards compatibility */
+	box_error_raise(ER_PROC_C, "hello %s", "world");
+	assert(box_error_last() != NULL);
+	error = box_error_last();
+	assert(box_error_code(error) == ER_PROC_C);
+	assert(strcmp(box_error_message(error), "hello world") == 0);
+
+	/* Backwards compatibility */
+	box_error_raise(ER_PROC_C, "hello, lalala");
+	assert(box_error_last() != NULL);
+	error = box_error_last();
+	assert(box_error_code(error) == ER_PROC_C);
+	assert(strcmp(box_error_message(error), "hello, lalala") == 0);
+
 	box_error_clear();
 	assert(box_error_last() == NULL);
 

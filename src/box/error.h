@@ -115,8 +115,8 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 /**
  * A backward-compatible API define.
  */
-#define box_error_raise(code, format) \
-	box_error_set(__FILE__, __LINE__, code, format)
+#define box_error_raise(code, format, ...) \
+	box_error_set(__FILE__, __LINE__, code, format, ##__VA_ARGS__)
 
 /** \endcond public */
 
