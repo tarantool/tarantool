@@ -35,31 +35,10 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
+struct iovec;
+struct xrow_header;
+
 #if defined(__cplusplus)
-/**
- * XlogError is raised when there is an error with contents
- * of the data directory or a log file. A special subclass
- * of exception is introduced to gracefully skip such errors
- * in panic_if_error = false mode.
- */
-struct XlogError: public Exception
-{
-	XlogError(const char *file, unsigned line,
-		  const char *format, ...);
-	virtual void raise() { throw this; }
-protected:
-	XlogError(const struct type *type, const char *file, unsigned line,
-		  const char *format, ...);
-};
-
-struct XlogGapError: public XlogError
-{
-	XlogGapError(const char *file, unsigned line,
-		  const struct vclock *from,
-		  const struct vclock *to);
-	virtual void raise() { throw this; }
-};
-
 extern "C" {
 #endif /* defined(__cplusplus) */
 
@@ -142,9 +121,6 @@ struct xdir {
 	enum xdir_type type;
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /**
  * Initialize a log dir.
  */
@@ -164,17 +140,14 @@ xdir_destroy(struct xdir *dir);
  * Must be used if it is necessary to find the last log/
  * snapshot or scan through all logs.
  */
-void
+int
 xdir_scan(struct xdir *dir);
 
 /**
  * Check that a directory exists and is writable.
  */
-void
+int
 xdir_check(struct xdir *dir);
-
-extern "C" {
-#endif /* defined(__cplusplus) */
 
 /* }}} */
 
@@ -223,9 +196,6 @@ struct xlog {
 	 */
 	struct vclock vclock;
 };
-
-#if defined(__cplusplus)
-} /* extern "C" */
 
 /**
  * Open an existing log file or snapshot for reading.
@@ -332,6 +302,75 @@ int
 xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
 /** }}} */
+
+#if defined(__cplusplus)
+} /* extern C */
+
+/**
+ * XlogError is raised when there is an error with contents
+ * of the data directory or a log file. A special subclass
+ * of exception is introduced to gracefully skip such errors
+ * in panic_if_error = false mode.
+ */
+struct XlogError: public Exception
+{
+	XlogError(const char *file, unsigned line,
+		  const char *format, ...);
+	virtual void raise() { throw this; }
+protected:
+	XlogError(const struct type *type, const char *file, unsigned line,
+		  const char *format, ...);
+};
+
+struct XlogGapError: public XlogError
+{
+	XlogGapError(const char *file, unsigned line,
+		  const struct vclock *from,
+		  const struct vclock *to);
+	virtual void raise() { throw this; }
+};
+
+static inline void
+xdir_scan_xc(struct xdir *dir)
+{
+	if (xdir_scan(dir) == -1)
+		diag_raise();
+}
+
+static inline void
+xdir_check_xc(struct xdir *dir)
+{
+	if (xdir_check(dir) == -1)
+		diag_raise();
+}
+
+static inline int
+xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
+{
+	int rv = xlog_cursor_next(i, row);
+	if (rv == -1)
+		diag_raise();
+	return rv;
+}
+
+static inline struct xlog *
+xlog_open_stream_xc(struct xdir *dir, int64_t signature, FILE *file,
+		    const char *filename)
+{
+	struct xlog *rv = xlog_open_stream(dir, signature, file, filename);
+	if (rv == NULL)
+		diag_raise();
+	return rv;
+}
+
+static inline struct xlog *
+xlog_open_xc(struct xdir *dir, int64_t signature)
+{
+	struct xlog *rv = xlog_open(dir, signature);
+	if (rv == NULL)
+		diag_raise();
+	return rv;
+}
 
 #endif /* defined(__cplusplus) */
 

@@ -589,7 +589,7 @@ recover_snap(struct recovery *r)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_sum(res);
 
-	struct xlog *snap = xlog_open(&r->snap_dir, signature);
+	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	r->server_uuid = snap->server_uuid;

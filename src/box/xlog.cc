@@ -152,7 +152,7 @@ xdir_destroy(struct xdir *dir)
  * Add a single log file to the index of all log files
  * in a given log directory.
  */
-static inline void
+static inline int
 xdir_index_file(struct xdir *dir, int64_t signature)
 {
 	/*
@@ -163,7 +163,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	struct xlog *wal;
 
 	try {
-		wal = xlog_open(dir, signature);
+		wal = xlog_open_xc(dir, signature);
 		/*
 		 * All log files in a directory must satisfy Lamport's
 		 * eventual order: events in each log file must be
@@ -183,10 +183,12 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 		}
 	} catch (XlogError *e) {
 		if (dir->panic_if_error)
-			throw;
+			return -1;
 		/** Skip a corrupted file */
 		e->log();
-		return;
+		return 0;
+	} catch (...) {
+		return -1;
 	}
 
 	auto log_guard = make_scoped_guard([=]{
@@ -199,6 +201,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 */
 	struct vclock *vclock = vclock_dup(&wal->vclock);
 	vclockset_insert(&dir->index, vclock);
+	return 0;
 }
 
 static int
@@ -244,7 +247,7 @@ cmp_i64(const void *_a, const void *_b)
  *
  * @return nothing.
  */
-void
+int
 xdir_scan(struct xdir *dir)
 {
 	DIR *dh = opendir(dir->dirname);        /* log dir */
@@ -252,8 +255,9 @@ xdir_scan(struct xdir *dir)
 	size_t s_count = 0, s_capacity = 0;
 
 	if (dh == NULL) {
-		tnt_raise(SystemError, "error reading directory '%s'",
+		tnt_error(SystemError, "error reading directory '%s'",
 			  dir->dirname);
+		return -1;
 	}
 
 	auto dir_guard = make_scoped_guard([&]{
@@ -306,8 +310,9 @@ xdir_scan(struct xdir *dir)
 			size_t size = sizeof(*signatures) * s_capacity;
 			signatures = (int64_t *) realloc(signatures, size);
 			if (signatures == NULL) {
-				tnt_raise(OutOfMemory,
+				tnt_error(OutOfMemory,
 					  size, "realloc", "signatures array");
+				return -1;
 			}
 		}
 		signatures[s_count++] = signature;
@@ -333,7 +338,9 @@ xdir_scan(struct xdir *dir)
 			vclock = next;
 		} else if (s_old > s_new) {
 			/** Add a new file. */
-			xdir_index_file(dir, s_new);
+			if (xdir_index_file(dir, s_new) == -1) {
+				return -1;
+			}
 			i++;
 		} else {
 			assert(s_old == s_new && i < s_count &&
@@ -342,17 +349,20 @@ xdir_scan(struct xdir *dir)
 			i++;
 		}
 	}
+	return 0;
 }
 
-void
+int
 xdir_check(struct xdir *dir)
 {
 	DIR *dh = opendir(dir->dirname);        /* log dir */
 	if (dh == NULL) {
-		tnt_raise(SystemError, "error reading directory '%s'",
+		tnt_error(SystemError, "error reading directory '%s'",
 			  dir->dirname);
+		return -1;
 	}
 	closedir(dh);
+	return 0;
 }
 
 char *
@@ -388,10 +398,11 @@ row_reader(FILE *f, struct xrow_header *row)
 			return 1;
 error:
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s: failed to read or parse row header"
-			 " at offset %" PRIu64, fio_filename(fileno(f)),
+		snprintf(buf, sizeof(buf), "%s: failed to read or parse row "
+			 "header at offset %" PRIu64, fio_filename(fileno(f)),
 			 (uint64_t) ftello(f));
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
+		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+		return -1;
 	}
 
 	/* Decode len, previous crc32 and row crc32 */
@@ -409,13 +420,14 @@ error:
 		snprintf(buf, sizeof(buf),
 			 "%s: row is too big at offset %" PRIu64,
 			 fio_filename(fileno(f)), (uint64_t) ftello(f));
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
+		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+		return -1;
 	}
 
 	/* Read previous crc32 */
 	if (mp_typeof(*data) != MP_UINT)
 		goto error;
-
+ 
 	/* Read current crc32 */
 	uint32_t crc32p = mp_decode_uint(&data);
 	if (mp_typeof(*data) != MP_UINT)
@@ -425,7 +437,13 @@ error:
 	(void) crc32p;
 
 	/* Allocate memory for body */
-	char *bodybuf = (char *) region_alloc_xc(&fiber()->gc, len);
+	char *bodybuf = (char *) region_alloc(&fiber()->gc, len + sizeof(void *));
+	if (bodybuf == NULL) {
+		tnt_error(OutOfMemory, len, "region", "new slab");
+		return -1;
+	}
+	/* add sizeof(void*) zeros for corrupted files */
+	*((void **)(bodybuf + len)) = NULL;
 
 	/* Read header and body */
 	if (fread(bodybuf, len, 1, f) != 1)
@@ -439,7 +457,8 @@ error:
 			 " at offset %" PRIu64,
 			 fio_filename(fileno(f)), (unsigned) crc32c,
 			 (uint64_t) ftello(f));
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, buf);
+		tnt_error(ClientError, ER_INVALID_MSGPACK, buf);
+		return -1;
 	}
 
 	data = bodybuf;
@@ -722,7 +741,7 @@ xlog_write_meta(struct xlog *l)
  *
  * @return 0 if success, -1 on error.
  */
-static void
+static int
 xlog_read_meta(struct xlog *l, int64_t signature)
 {
 	char filetype[32], version[32], buf[256];
@@ -731,22 +750,25 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
 	    fgets(version, sizeof(version), stream) == NULL) {
-		tnt_raise(XlogError, "%s: failed to read log file header",
+		tnt_error(XlogError, "%s: failed to read log file header",
 			  l->filename);
+		return -1;
 	}
 	if (strcmp(dir->filetype, filetype) != 0) {
-		tnt_raise(XlogError, "%s: unknown filetype", l->filename);
+		tnt_error(XlogError, "%s: unknown filetype", l->filename);
+		return -1;
 	}
 
 	if (strcmp(v12, version) != 0) {
-		tnt_raise(XlogError, "%s: unsupported file format version",
+		tnt_error(XlogError, "%s: unsupported file format version",
 			  l->filename);
+		return -1;
 	}
 	for (;;) {
 		if (fgets(buf, sizeof(buf), stream) == NULL) {
-			tnt_raise(XlogError,
-				  "%s: failed to read log file header",
-				  l->filename);
+			tnt_error(XlogError, "%s: failed to read log file "
+				  "header", l->filename);
+			return -1;
 		}
 		/** Empty line indicates the end of file header. */
 		if (strcmp(buf, "\n") == 0)
@@ -759,7 +781,8 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 		char *key = buf;
 		char *val = strchr(buf, ':');
 		if (val == NULL) {
-			tnt_raise(XlogError, "%s: invalid meta", l->filename);
+			tnt_error(XlogError, "%s: invalid meta", l->filename);
+			return -1;
 		}
 		*val++ = 0;
 		while (isspace(*val))
@@ -768,14 +791,16 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 		if (strcmp(key, SERVER_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
 			    tt_uuid_from_string(val, &l->server_uuid) != 0) {
-				tnt_raise(XlogError, "%s: can't parse node UUID",
+				tnt_error(XlogError, "%s: can't parse node UUID",
 					  l->filename);
+				return -1;
 			}
 		} else if (strcmp(key, VCLOCK_KEY) == 0){
 			size_t offset = vclock_from_string(&l->vclock, val);
 			if (offset != 0) {
-				tnt_raise(XlogError, "%s: invalid vclock at offset %zd",
-					  l->filename, offset);
+				tnt_error(XlogError, "%s: invalid vclock at "
+					  "offset %zd", l->filename, offset);
+				return -1;
 			}
 		} else {
 			/* Skip unknown key */
@@ -784,8 +809,9 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 
 	if (!tt_uuid_is_nil(dir->server_uuid) &&
 	    !tt_uuid_is_equal(dir->server_uuid, &l->server_uuid)) {
-		tnt_raise(XlogError, "%s: invalid server UUID",
+		tnt_error(XlogError, "%s: invalid server UUID",
 			  l->filename);
+		return -1;
 	}
 	/*
 	 * Check the match between log file name and contents:
@@ -794,20 +820,25 @@ xlog_read_meta(struct xlog *l, int64_t signature)
 	 */
 	int64_t signature_check = vclock_sum(&l->vclock);
 	if (signature_check != signature) {
-		tnt_raise(XlogError, "%s: signature check failed",
+		tnt_error(XlogError, "%s: signature check failed",
 			  l->filename);
+		return -1;
 	}
+	return 0;
 }
 
 struct xlog *
-xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file, const char *filename)
+xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file,
+		 const char *filename)
 {
 	/*
 	 * Check fopen() result the caller first thing, to
 	 * preserve the errno.
 	 */
-	if (file == NULL)
-		tnt_raise(SystemError, "%s: failed to open file", filename);
+	if (file == NULL) {
+		tnt_error(SystemError, "%s: failed to open file", filename);
+		return NULL;
+	}
 
 	struct xlog *l = (struct xlog *) calloc(1, sizeof(*l));
 
@@ -816,8 +847,10 @@ xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file, const char *fi
 		free(l);
 	});
 
-	if (l == NULL)
-		tnt_raise(OutOfMemory, sizeof(*l), "malloc", "struct xlog");
+	if (l == NULL) {
+		tnt_error(OutOfMemory, sizeof(*l), "malloc", "struct xlog");
+		return NULL;
+	}
 
 	l->f = file;
 	snprintf(l->filename, PATH_MAX, "%s", filename);
@@ -827,7 +860,9 @@ xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file, const char *fi
 	l->eof_read = false;
 	vclock_create(&l->vclock);
 
-	xlog_read_meta(l, signature);
+	if (xlog_read_meta(l, signature) == -1) {
+		return NULL;
+	}
 
 	log_guard.is_active = false;
 	return l;

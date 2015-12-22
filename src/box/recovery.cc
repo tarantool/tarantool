@@ -160,7 +160,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	vclock_create(&r->vclock);
 
-	xdir_scan(&r->snap_dir);
+	xdir_scan_xc(&r->snap_dir);
 	/**
 	 * Avoid scanning WAL dir before we recovered
 	 * the snapshot and know server UUID - this will
@@ -168,7 +168,7 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	 * UUID, see replication/cluster.test for
 	 * details.
 	 */
-	xdir_check(&r->wal_dir);
+	xdir_check_xc(&r->wal_dir);
 
 	r->watcher = NULL;
 
@@ -286,7 +286,7 @@ recover_xlog(struct recovery *r, struct xlog *l)
 	 * the file is fully read: it's fully read only
 	 * when EOF marker has been read, see i.eof_read
 	 */
-	while (xlog_cursor_next(&i, &row) == 0) {
+	while (xlog_cursor_next_xc(&i, &row) == 0) {
 		try {
 			recovery_apply_row(r, &row);
 		} catch (ClientError *e) {
@@ -319,7 +319,7 @@ recovery_bootstrap(struct recovery *r)
 	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream(&r->snap_dir, 0, f, filename);
+	struct xlog *snap = xlog_open_stream_xc(&r->snap_dir, 0, f, filename);
 	auto guard = make_scoped_guard([=]{
 		xlog_close(snap);
 	});
@@ -337,7 +337,7 @@ recovery_bootstrap(struct recovery *r)
 static void
 recover_remaining_wals(struct recovery *r)
 {
-	xdir_scan(&r->wal_dir);
+	xdir_scan_xc(&r->wal_dir);
 
 	struct vclock *last = vclockset_last(&r->wal_dir.index);
 	if (last == NULL) {
@@ -389,7 +389,7 @@ recover_remaining_wals(struct recovery *r)
 		}
 		recovery_close_log(r);
 
-		r->current_wal = xlog_open(&r->wal_dir, vclock_sum(clock));
+		r->current_wal = xlog_open_xc(&r->wal_dir, vclock_sum(clock));
 
 		say_info("recover from `%s'", r->current_wal->filename);
 
