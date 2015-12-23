@@ -237,4 +237,10 @@ test_run:cmd("setopt delimiter ''");
 s = box.space.s
 'dump ' .. anything_to_string(box.space.s:select{})-- compare with (1) visually!
 
+errinj = box.error.injection
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+s:upsert({111, '111', 222, '222'}, {{'!', 5, '!'}})
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+s:select{111}
+
 box.space.s:drop()

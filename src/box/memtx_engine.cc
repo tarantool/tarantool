@@ -329,7 +329,11 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			space_validate_tuple(space, new_tuple);
 			this->replace(txn, space, NULL,
 				      new_tuple, DUP_INSERT);
+		} catch (OutOfMemory *) {
+			throw;
 		} catch (ClientError *e) {
+			if (e->errcode() == ER_MEMORY_ISSUE)
+				throw;
 			say_error("UPSERT failed:");
 			e->log();
 		}

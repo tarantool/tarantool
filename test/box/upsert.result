@@ -537,6 +537,25 @@ s = box.space.s
 ---
 - dump [[1,'1',4,'1'],[2,'2',2,'2'],[3,'3',7,'3']]
 ...
+errinj = box.error.injection
+---
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", true)
+---
+- ok
+...
+s:upsert({111, '111', 222, '222'}, {{'!', 5, '!'}})
+---
+- error: Failed to allocate 28 bytes in slab allocator for tuple
+...
+errinj.set("ERRINJ_TUPLE_ALLOC", false)
+---
+- ok
+...
+s:select{111}
+---
+- []
+...
 box.space.s:drop()
 ---
 ...
