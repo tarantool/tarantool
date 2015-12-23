@@ -45,9 +45,6 @@ local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
 
-local SPACE_SPACE_ID    = 280
-local SPACE_INDEX_ID    = 288
-
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
 local sequence_mt = { __serialize = 'sequence' }
@@ -354,6 +351,7 @@ local remote_methods = {
         self.wbuf = buffer.ibuf(buffer.READAHEAD)
         self.rpos = 1
         self.rlen = 0
+        self._schema_id = 0
 
         self.ch = { sync = {}, fid = {} }
         self.wait = { state = {} }
@@ -474,7 +472,7 @@ local remote_methods = {
     end,
 
     reload_schema = function(self)
-         self._schema_id = nil
+         self._schema_id = 0
          self:_load_schema()
          if self.state ~= 'error' and self.state ~= 'closed' then
                self:_switch_state('active')
@@ -577,7 +575,6 @@ local remote_methods = {
             end
 
             local rpos, hdr = msgpack.ibuf_decode(rpos)
-            self._schema_id = hdr[SCHEMA_ID]
             local body = {}
 
             if rpos < self.rbuf.wpos then
@@ -698,11 +695,7 @@ local remote_methods = {
                             self:_fatal(e)
                         end
 
-                        xpcall(function() self:_load_schema() end,
-                            function(e)
-                                log.error("Can't load schema: %s", tostring(e))
-                            end)
-
+                        self:_load_schema()
                         if self.state ~= 'error' and self.state ~= 'closed' then
                             self:_switch_state('active')
                         end
@@ -765,10 +758,16 @@ local remote_methods = {
 
         self:_switch_state('schema')
 
-        local spaces = self:_request_internal(SELECT,
-            true, box.schema.VSPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
-        local indexes = self:_request_internal(SELECT,
-            true, box.schema.VINDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+        local resp = self:_request_internal(SELECT,
+            true, box.schema.VSPACE_ID, 0, nil, { iterator = 'ALL' })
+
+        -- set new schema id after first request
+        self._schema_id = resp.hdr[SCHEMA_ID]
+
+        local spaces = resp.body[DATA]
+        resp = self:_request_internal(SELECT,
+            true, box.schema.VINDEX_ID, 0, nil, { iterator = 'ALL' })
+        local indexes = resp.body[DATA]
 
         local sl = {}
 
@@ -981,27 +980,29 @@ local remote_methods = {
     end,
 
     _request_internal = function(self, reqtype, raise, ...)
-        local sync = self:sync()
-        local schema_id = 0
-        if self._schema_id ~= nil then
-            schema_id = self._schema_id
-        end
-        local request = requests[reqtype](self.wbuf, sync, schema_id, ...)
-        local response =  self:_request_raw(reqtype, sync, request, raise)
-        local resptype = response.hdr[TYPE]
-        if resptype ~= OK then
-            local err_code = bit.band(resptype, bit.lshift(1, 15) - 1)
-            -- handle expired schema:
-            -- reload schema and return error
-            if err_code == ER_WRONG_SCHEMA_VERSION then
-                self._schema_id = nil
-                self:reload_schema()
-                return self:_request_internal(reqtype, raise, ...)
-            elseif raise then
-                box.error({
-                    code = err_code,
-                    reason = response.body[ERROR]
-                })
+        local response = nil
+        local resptype = -1
+
+        while resptype ~= OK do
+            local sync = self:sync()
+            local request = requests[reqtype](self.wbuf, sync, self._schema_id, ...)
+            response =  self:_request_raw(reqtype, sync, request, raise)
+            resptype = response.hdr[TYPE]
+            if resptype ~= OK then
+                local err_code = bit.band(resptype, bit.lshift(1, 15) - 1)
+                -- handle expired schema:
+                -- reload schema and return error
+                if err_code == ER_WRONG_SCHEMA_VERSION then
+                    self._schema_id = 0
+                    self:reload_schema()
+                elseif raise then
+                    box.error({
+                        code = err_code,
+                        reason = response.body[ERROR]
+                    })
+                else
+                    return response
+                end
             end
         end
         return response
