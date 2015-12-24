@@ -26,11 +26,6 @@ function (do_pthread_checks)
         ${INCLUDE_MISC_PTHREAD_HEADERS}
         int main() { pthread_set_name_np(pthread_self(), \"\"); }
         " HAVE_PTHREAD_SET_NAME_NP)
-    if (NOT (HAVE_PTHREAD_SETNAME_NP OR
-             HAVE_PTHREAD_SETNAME_NP_1 OR
-             HAVE_PTHREAD_SET_NAME_NP))
-        message(FATAL_ERROR "No suitable function for setting thread names found")
-    endif ()
 endfunction (do_pthread_checks)
 do_pthread_checks()
 
