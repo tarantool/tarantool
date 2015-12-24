@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "say.h"
 #include "cfg.h"
 #include "lua/utils.h"
 
@@ -38,7 +39,8 @@ cfg_get(const char *param)
 {
 	char buf[MAX_OPT_NAME_LEN];
 	snprintf(buf, sizeof(buf), "return box.cfg.%s", param);
-	(void) luaL_dostring(tarantool_L, buf);
+	if (luaL_dostring(tarantool_L, buf) != 0)
+		panic("cfg_get('%s')", param);
 }
 
 int

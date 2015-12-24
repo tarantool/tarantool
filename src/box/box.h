@@ -111,6 +111,7 @@ void box_set_io_collect_interval(void);
 void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
+void box_set_panic_on_wal_error(void);
 
 #if defined(__cplusplus)
 }

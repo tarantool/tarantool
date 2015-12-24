@@ -1,24 +1,8 @@
 -- load_cfg.lua - internal file
 
-local ffi = require('ffi')
-ffi.cdef([[
-void free(void *);
-void check_cfg();
-void load_cfg();
-void box_set_wal_mode(void);
-void box_set_listen(void);
-void box_set_replication_source(void);
-void box_set_log_level(void);
-void box_set_readahead(void);
-void box_set_io_collect_interval(void);
-void box_set_too_long_threshold(void);
-void box_set_snap_io_rate_limit(void);
-void box_set_panic_on_wal_error(void);
-int say_check_init_str(const char *, char**);
-]])
-
 local log = require('log')
 local json = require('json')
+local private = require('box.internal')
 
 -- see default_cfg below
 local default_sophia_cfg = {
@@ -76,19 +60,6 @@ local sophia_template_cfg = {
     compression_key = 'number'
 }
 
-local function check_logger(v)
-    if type(v) ~= 'string' then
-        return "should be of type string"
-    end
-    local err_ptr = ffi.new('char*[1]')
-    if ffi.C.say_check_init_str(v, err_ptr) == -1 then
-        if err_ptr[0] == nil then return 'out of memory' end
-        local result = ffi.string(err_ptr[0])
-        ffi.C.free(err_ptr[0])
-        return result
-    end
-end
-
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 local template_cfg = {
@@ -102,7 +73,7 @@ local template_cfg = {
     wal_dir             = 'string',
     sophia_dir          = 'string',
     sophia              = sophia_template_cfg,
-    logger              = check_logger,
+    logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',
     io_collect_interval = 'number',
@@ -139,15 +110,15 @@ local modify_cfg = {
 
 -- dynamically settable options
 local dynamic_cfg = {
-    wal_mode                = ffi.C.box_set_wal_mode,
-    listen                  = ffi.C.box_set_listen,
-    replication_source      = ffi.C.box_set_replication_source,
-    log_level               = ffi.C.box_set_log_level,
-    io_collect_interval     = ffi.C.box_set_io_collect_interval,
-    readahead               = ffi.C.box_set_readahead,
-    too_long_threshold      = ffi.C.box_set_too_long_threshold,
-    snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
-    panic_on_wal_error      = ffi.C.box_set_panic_on_wal_error,
+    wal_mode                = private.cfg_set_wal_mode,
+    listen                  = private.cfg_set_listen,
+    replication_source      = private.cfg_set_replication_source,
+    log_level               = private.cfg_set_log_level,
+    io_collect_interval     = private.cfg_set_io_collect_interval,
+    readahead               = private.cfg_set_readahead,
+    too_long_threshold      = private.cfg_set_too_long_threshold,
+    snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
+    panic_on_wal_error      = private.cfg_set_panic_on_wal_error,
     -- snapshot_daemon
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
@@ -197,11 +168,6 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg, prefix)
                 box.error(box.error.CFG, readable_name, "should be a table")
             end
             v = prepare_cfg(v, default_cfg[k], template_cfg[k], modify_cfg[k], readable_name)
-        elseif type(template_cfg[k]) == 'function' then
-            local err = template_cfg[k](v)
-            if err ~= nil then
-                box.error(box.error.CFG, readable_name, tostring(err))
-            end
         elseif (string.find(template_cfg[k], ',') == nil) then
             -- one type
             if type(v) ~= template_cfg[k] then
@@ -283,7 +249,7 @@ local function load_cfg(cfg)
     apply_default_cfg(cfg, default_cfg);
     -- Save new box.cfg
     box.cfg = cfg
-    if not pcall(ffi.C.check_cfg) then
+    if not pcall(private.cfg_check)  then
         box.cfg = load_cfg -- restore original box.cfg
         return box.error() -- re-throw exception from check_cfg()
     end
@@ -300,7 +266,7 @@ local function load_cfg(cfg)
             end,
             __call = reload_cfg,
         })
-    ffi.C.load_cfg()
+    private.cfg_load()
     for key, fun in pairs(dynamic_cfg) do
         local val = cfg[key]
         if val ~= nil and not dynamic_cfg_skip_at_load[key] then
@@ -312,9 +278,6 @@ local function load_cfg(cfg)
     end
 end
 box.cfg = load_cfg
-jit.off(load_cfg)
-jit.off(reload_cfg)
-jit.off(box.cfg)
 
 -- gh-810:
 -- hack luajit default cpath

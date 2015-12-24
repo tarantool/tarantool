@@ -51,6 +51,7 @@
 #include "box/lua/info.h"
 #include "box/lua/session.h"
 #include "box/lua/net_box.h"
+#include "box/lua/cfg.h"
 
 
 extern char session_lua[],
@@ -109,6 +110,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_error_init(L);
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
+	box_lua_cfg_init(L);
 	box_lua_slab_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);

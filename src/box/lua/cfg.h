@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_CFG_H
+#define INCLUDES_TARANTOOL_LUA_CFG_H
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,28 +30,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
-#include "trivia/util.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-const char *tarantool_version(void);
-/**
- * Get version (defined in PACKAGE_VERSION), packed into uint32_t
- * The highest byte or result means major version, next - minor,
- * middle - patch, last - revision.
- */
-uint32_t tarantool_version_id(void);
-
-double tarantool_uptime(void);
+struct lua_State;
 
 void
-load_cfg();
+box_lua_cfg_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_LUA_CFG_H */

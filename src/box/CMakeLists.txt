@@ -63,6 +63,7 @@ add_library(box
     ${lua_sources}
     lua/init.c
     lua/call.c
+    lua/cfg.cc
     lua/tuple.c
     lua/slab.c
     lua/index.c
