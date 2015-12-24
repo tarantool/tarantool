@@ -65,7 +65,7 @@ do
             return false
         end
         if snstat.mtime <= fiber.time() + daemon.snapshot_period then
-            return snapshot(snaps)
+            return snapshot()
         end
     end
 
