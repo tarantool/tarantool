@@ -243,6 +243,23 @@ replica.admin('box.info.server.lsn == -1')
 replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 
 print '-------------------------------------------------------------'
+print 'JOIN replica to read-only master'
+print '-------------------------------------------------------------'
+
+#gh-1230 Assertion vclock_has on attempt to JOIN read-only master
+failed = TarantoolServer(server.ini)
+failed.script = 'replication-py/failed.lua'
+failed.vardir = server.vardir
+failed.rpl_master = replica
+failed.name = "failed"
+try:
+    failed.deploy()
+except Exception as e:
+    line = "ER_READONLY"
+    if failed.logfile_pos.seek_once(line) >= 0:
+        print "'%s' exists in server log" % line
+
+print '-------------------------------------------------------------'
 print 'Cleanup'
 print '-------------------------------------------------------------'
 
