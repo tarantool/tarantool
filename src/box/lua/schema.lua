@@ -496,7 +496,7 @@ box.schema.index.alter = function(space_id, index_id, options)
                       "Don't know how to update both id and" ..
                        cant_update_fields)
         end
-        ops = {}
+        local ops = {}
         local function add_op(value, field_no)
             if value then
                 table.insert(ops, {'=', field_no, value})

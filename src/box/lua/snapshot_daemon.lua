@@ -61,7 +61,7 @@ do
 
         local snstat = fio.stat(last_snap)
         if snstat == nil then
-            log.error("can't stat %s: %s", snaps[#snaps], errno.strerror())
+            log.error("can't stat %s: %s", last_snap, errno.strerror())
             return false
         end
         if snstat.mtime <= fiber.time() + daemon.snapshot_period then
