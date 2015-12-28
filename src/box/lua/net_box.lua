@@ -52,7 +52,6 @@ local mapping_mt = { __serialize = 'mapping' }
 
 local CONSOLE_FAKESYNC  = 15121974
 local CONSOLE_DELIMITER = "$EOF$"
-local ER_WRONG_SCHEMA_VERSION = 109
 
 ffi.cdef [[
 enum {
@@ -471,13 +470,6 @@ local remote_methods = {
         }
     end,
 
-    reload_schema = function(self)
-         self._schema_id = 0
-         self:_load_schema()
-         if self.state ~= 'error' and self.state ~= 'closed' then
-               self:_switch_state('active')
-         end
-    end,
 
     close = function(self)
         if self.state ~= 'closed' then
@@ -695,10 +687,7 @@ local remote_methods = {
                             self:_fatal(e)
                         end
 
-                        self:_load_schema()
-                        if self.state ~= 'error' and self.state ~= 'closed' then
-                            self:_switch_state('active')
-                        end
+                        self:reload_schema()
                     else
                         self:_fatal("Unsupported protocol - "..
                             ffi.string(greeting.protocol))
@@ -750,7 +739,8 @@ local remote_methods = {
         return is_state(self._rw_states)
     end,
 
-    _load_schema = function(self)
+    reload_schema = function(self)
+        self._schema_id = 0
         if self.state == 'closed' or self.state == 'error' then
             self:_fatal('Can not load schema from the state')
             return
@@ -844,6 +834,9 @@ local remote_methods = {
         end
 
         self.space = sl
+        if self.state ~= 'error' and self.state ~= 'closed' then
+            self:_switch_state('active')
+        end
     end,
 
     _read_worker = function(self)
@@ -980,32 +973,35 @@ local remote_methods = {
     end,
 
     _request_internal = function(self, reqtype, raise, ...)
-        local response = nil
-        local resptype = -1
-
-        while resptype ~= OK do
+        while true do
             local sync = self:sync()
             local request = requests[reqtype](self.wbuf, sync, self._schema_id, ...)
-            response =  self:_request_raw(reqtype, sync, request, raise)
-            resptype = response.hdr[TYPE]
-            if resptype ~= OK then
-                local err_code = bit.band(resptype, bit.lshift(1, 15) - 1)
-                -- handle expired schema:
-                -- reload schema and return error
-                if err_code == ER_WRONG_SCHEMA_VERSION then
-                    self._schema_id = 0
-                    self:reload_schema()
-                elseif raise then
+            local response = self:_request_raw(reqtype, sync, request, raise)
+            local resptype = response.hdr[TYPE]
+            if resptype == OK then
+                return response
+            end
+            local err_code = bit.band(resptype, bit.lshift(1, 15) - 1)
+            if err_code ~= box.error.WRONG_SCHEMA_VERSION then
+                if raise then
                     box.error({
                         code = err_code,
                         reason = response.body[ERROR]
                     })
-                else
-                    return response
                 end
+                return response
             end
+
+            --
+            -- Schema has been changed on the remote server. Try to reload
+            -- schema and re-send request again. Please note reload_schema()
+            -- also calls current function which can loop on WRONG_SCHEMA as
+            -- well. This logic may lead to deep recursion if server
+            -- continuously performs DDL for the long time.
+            --
+            self:reload_schema()
         end
-        return response
+        -- unreachable
     end,
 
     -- private (low level) methods
