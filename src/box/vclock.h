@@ -149,6 +149,13 @@ vclock_sum(const struct vclock *vclock)
 	return vclock->signature;
 }
 
+/**
+ * Add a new server to vclock.
+ *
+ * Please never, ever, ever remove servers with LSN > 0 from vclock!
+ * The vclock_sum() must always grow, it is a core invariant of the recovery
+ * subsystem!
+ */
 static inline void
 vclock_add_server_nothrow(struct vclock *vclock, uint32_t server_id)
 {
@@ -287,15 +294,6 @@ vclock_add_server(struct vclock *vclock, uint32_t server_id)
 		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
 	assert(! vclock_has(vclock, server_id));
 	vclock_add_server_nothrow(vclock, server_id);
-}
-
-static inline void
-vclock_del_server(struct vclock *vclock, uint32_t server_id)
-{
-	assert(vclock_has(vclock, server_id));
-	vclock->lsn[server_id] = 0;
-	vclock->map &= ~(1 << server_id);
-	vclock->signature = vclock_calc_sum(vclock);
 }
 
 #endif /* defined(__cplusplus) */
