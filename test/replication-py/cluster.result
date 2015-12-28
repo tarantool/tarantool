@@ -77,113 +77,238 @@ box.space._cluster:delete(5)
 ---
 - [5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95', 'test']
 ...
-box.info.vclock[5] == nil
+box.info.vclock[5] == 0
 ---
 - true
 ...
 -------------------------------------------------------------
-gh-527: update vclock on delete from box.space._cluster
+Start a new replica and check box.info on the start
 -------------------------------------------------------------
 box.schema.user.grant('guest', 'replication')
 ---
 ...
+box.info.server.id == 2
+---
+- true
+...
+not box.info.server.ro
+---
+- true
+...
+box.info.server.lsn == 0
+---
+- true
+...
+box.info.vclock[2] == 0
+---
+- true
+...
+-------------------------------------------------------------
+Modify data to change LSN and check box.info
+-------------------------------------------------------------
 box.space._schema:insert{"test", 48}
 ---
 - ['test', 48]
 ...
-box.info.server.id
+box.info.server.lsn == 1
 ---
-- 2
+- true
 ...
-box.info.server.ro
+box.info.vclock[2] == 1
 ---
-- false
+- true
 ...
-box.info.server.lsn
+-------------------------------------------------------------
+Unregister replica and check box.info
+-------------------------------------------------------------
+box.space._cluster:delete{2} ~= nil
 ---
-- 1
+- true
 ...
-box.info.vclock[2]
+box.info.server.id ~= 2
 ---
-- 1
-...
-box.space._cluster:delete{2}
----
-- [2, '<replica uuid>']
-...
-box.info.server.id
----
-- 0
+- true
 ...
 box.info.server.ro
 ---
 - true
 ...
-box.info.server.lsn
+box.info.server.lsn == -1
 ---
-- -1
+- true
 ...
-box.info.vclock[2]
+box.info.vclock[2] == 1
 ---
-- null
+- true
 ...
 box.space._schema:replace{"test", 48}
 ---
 - error: Can't modify data because this server is in read-only mode.
 ...
-box.space._cluster:insert{10, "<replica uuid>"}
+-------------------------------------------------------------
+Re-register replica with the same server_id
+-------------------------------------------------------------
+box.space._cluster:insert{2, "<replica uuid>"} ~= nil
 ---
-- [10, '<replica uuid>']
+- true
 ...
-box.info.server.id
+box.info.server.id == 2
 ---
-- 10
+- true
 ...
-box.info.server.ro
+not box.info.server.ro
 ---
-- false
+- true
 ...
-box.info.server.lsn
+box.info.server.lsn == 1
 ---
-- 0
+- true
 ...
-box.info.vclock[2]
+box.info.vclock[2] == 1
 ---
-- null
+- true
 ...
-box.info.vclock[10]
+-------------------------------------------------------------
+Re-register replica with a new server_id
+-------------------------------------------------------------
+box.space._cluster:delete{2} ~= nil
 ---
-- 0
+- true
 ...
+box.space._cluster:insert{10, "<replica uuid>"} ~= nil
+---
+- true
+...
+box.info.server.id == 10
+---
+- true
+...
+not box.info.server.ro
+---
+- true
+...
+box.info.server.lsn == 0
+---
+- true
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.vclock[10] == 0
+---
+- true
+...
+-------------------------------------------------------------
+Check that server_id can't be changed by UPDATE
+-------------------------------------------------------------
 box.space._cluster:update(10, {{'=', 1, 11}})
 ---
 - error: Attempt to modify a tuple field which is part of index 'primary' in space
     '_cluster'
 ...
-box.info.server.id
+box.info.server.id == 10
 ---
-- 10
+- true
+...
+not box.info.server.ro
+---
+- true
+...
+box.info.server.lsn == 0
+---
+- true
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.vclock[10] == 0
+---
+- true
+...
+box.info.vclock[11] == nil
+---
+- true
+...
+-------------------------------------------------------------
+Unregister replica and check box.info (second attempt)
+-------------------------------------------------------------
+box.space._cluster:delete{10} ~= nil
+---
+- true
+...
+box.info.server.id ~= 2
+---
+- true
 ...
 box.info.server.ro
 ---
-- false
+- true
 ...
-box.info.server.lsn
+box.info.server.lsn == -1
 ---
-- 0
+- true
 ...
-box.info.vclock[2]
+box.info.vclock[10] == 0
 ---
-- null
+- true
 ...
-box.info.vclock[10]
+-------------------------------------------------------------
+JOIN replica to read-only master
+-------------------------------------------------------------
+'ER_READONLY' exists in server log
+-------------------------------------------------------------
+Sync master with replica
+-------------------------------------------------------------
+box.cfg{ replication_source = '<replication_source>' }
 ---
-- 0
 ...
-box.info.vclock[11]
+box.info.vclock[2] == 1
 ---
-- null
+- true
 ...
+box.info.vclock[10] == 0
+---
+- true
+...
+box.info.vclock[11] == nil
+---
+- true
+...
+box.cfg{ replication_source = '' }
+---
+...
+-------------------------------------------------------------
+Start a new replica and check that server_id, LSN is re-used
+-------------------------------------------------------------
+box.snapshot()
+---
+- ok
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.server.id == 2
+---
+- true
+...
+not box.info.server.ro
+---
+- true
+...
+box.info.vclock[2] == 1
+---
+- true
+...
+box.info.vclock[10] == 0
+---
+- true
+...
+-------------------------------------------------------------
+Cleanup
+-------------------------------------------------------------
 box.schema.user.revoke('guest', 'replication')
 ---
 ...

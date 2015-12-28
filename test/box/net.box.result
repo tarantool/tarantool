@@ -16,6 +16,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
 LISTEN = require('uri').parse(box.cfg.listen)
 ---
 ...
@@ -300,7 +304,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: '[string "-- net_box.lua (internal file)..."]:155: Use space:method(...)
+- error: '[string "-- net_box.lua..."]:<line>: Use space:method(...)
     instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
@@ -1012,4 +1016,8 @@ box.space.test:drop()
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

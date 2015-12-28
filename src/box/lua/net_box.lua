@@ -28,6 +28,7 @@ local ERROR_TYPE        = 65536
 -- packet keys
 local TYPE              = 0x00
 local SYNC              = 0x01
+local SCHEMA_ID         = 0x05
 local SPACE_ID          = 0x10
 local INDEX_ID          = 0x11
 local LIMIT             = 0x12
@@ -43,9 +44,6 @@ local OPS               = 0x28
 local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
-
-local SPACE_SPACE_ID    = 280
-local SPACE_INDEX_ID    = 288
 
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
@@ -117,7 +115,7 @@ local requests = {
     [DELETE] = internal.encode_delete;
     [UPDATE]  = internal.encode_update;
     [UPSERT]  = internal.encode_upsert;
-    [SELECT]  = function(wbuf, sync, spaceno, indexno, key, opts)
+    [SELECT]  = function(wbuf, sync, schema_id, spaceno, indexno, key, opts)
         if opts == nil then
             opts = {}
         end
@@ -143,8 +141,8 @@ local requests = {
         local iterator = require('box.internal').check_iterator_type(opts,
             key == nil or (type(key) == 'table' and #key == 0))
 
-        internal.encode_select(wbuf, sync, spaceno, indexno, iterator,
-            offset, limit, key)
+        internal.encode_select(wbuf, sync, schema_id, spaceno, indexno,
+            iterator, offset, limit, key)
     end;
 }
 
@@ -352,6 +350,7 @@ local remote_methods = {
         self.wbuf = buffer.ibuf(buffer.READAHEAD)
         self.rpos = 1
         self.rlen = 0
+        self._schema_id = 0
 
         self.ch = { sync = {}, fid = {} }
         self.wait = { state = {} }
@@ -471,12 +470,6 @@ local remote_methods = {
         }
     end,
 
-    reload_schema = function(self)
-         self:_load_schema()
-         if self.state ~= 'error' and self.state ~= 'closed' then
-               self:_switch_state('active')
-         end
-    end,
 
     close = function(self)
         if self.state ~= 'closed' then
@@ -694,14 +687,7 @@ local remote_methods = {
                             self:_fatal(e)
                         end
 
-                        xpcall(function() self:_load_schema() end,
-                            function(e)
-                                log.error("Can't load schema: %s", tostring(e))
-                            end)
-
-                        if self.state ~= 'error' and self.state ~= 'closed' then
-                            self:_switch_state('active')
-                        end
+                        self:reload_schema()
                     else
                         self:_fatal("Unsupported protocol - "..
                             ffi.string(greeting.protocol))
@@ -753,7 +739,8 @@ local remote_methods = {
         return is_state(self._rw_states)
     end,
 
-    _load_schema = function(self)
+    reload_schema = function(self)
+        self._schema_id = 0
         if self.state == 'closed' or self.state == 'error' then
             self:_fatal('Can not load schema from the state')
             return
@@ -761,10 +748,16 @@ local remote_methods = {
 
         self:_switch_state('schema')
 
-        local spaces = self:_request_internal(SELECT,
-            true, SPACE_SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
-        local indexes = self:_request_internal(SELECT,
-            true, SPACE_INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
+        local resp = self:_request_internal(SELECT,
+            true, box.schema.VSPACE_ID, 0, nil, { iterator = 'ALL' })
+
+        -- set new schema id after first request
+        self._schema_id = resp.hdr[SCHEMA_ID]
+
+        local spaces = resp.body[DATA]
+        resp = self:_request_internal(SELECT,
+            true, box.schema.VINDEX_ID, 0, nil, { iterator = 'ALL' })
+        local indexes = resp.body[DATA]
 
         local sl = {}
 
@@ -841,6 +834,9 @@ local remote_methods = {
         end
 
         self.space = sl
+        if self.state ~= 'error' and self.state ~= 'closed' then
+            self:_switch_state('active')
+        end
     end,
 
     _read_worker = function(self)
@@ -961,12 +957,6 @@ local remote_methods = {
             end
         end
 
-        if raise and response.hdr[TYPE] ~= OK then
-            box.error({
-                code = bit.band(response.hdr[TYPE], bit.lshift(1, 15) - 1),
-                reason = response.body[ERROR]
-            })
-        end
 
         if response.body[DATA] ~= nil and reqtype ~= EVAL then
             if rawget(box, 'tuple') ~= nil then
@@ -983,9 +973,35 @@ local remote_methods = {
     end,
 
     _request_internal = function(self, reqtype, raise, ...)
-        local sync = self:sync()
-        local request = requests[reqtype](self.wbuf, sync, ...)
-        return self:_request_raw(reqtype, sync, request, raise)
+        while true do
+            local sync = self:sync()
+            local request = requests[reqtype](self.wbuf, sync, self._schema_id, ...)
+            local response = self:_request_raw(reqtype, sync, request, raise)
+            local resptype = response.hdr[TYPE]
+            if resptype == OK then
+                return response
+            end
+            local err_code = bit.band(resptype, bit.lshift(1, 15) - 1)
+            if err_code ~= box.error.WRONG_SCHEMA_VERSION then
+                if raise then
+                    box.error({
+                        code = err_code,
+                        reason = response.body[ERROR]
+                    })
+                end
+                return response
+            end
+
+            --
+            -- Schema has been changed on the remote server. Try to reload
+            -- schema and re-send request again. Please note reload_schema()
+            -- also calls current function which can loop on WRONG_SCHEMA as
+            -- well. This logic may lead to deep recursion if server
+            -- continuously performs DDL for the long time.
+            --
+            self:reload_schema()
+        end
+        -- unreachable
     end,
 
     -- private (low level) methods

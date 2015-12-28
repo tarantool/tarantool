@@ -278,8 +278,10 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
-	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
+	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
+		     tnt_raise(ClientError, ER_MEMORY_ISSUE, (unsigned) total,
+			       "slab allocator", "tuple"));
 	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
