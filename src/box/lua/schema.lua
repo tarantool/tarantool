@@ -1134,7 +1134,8 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    opts = update_param_table(opts, { setuid = false, type = 'lua'})
+    opts = update_param_table(opts, { setuid = false, language = 'lua'})
+    opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
     _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
 end

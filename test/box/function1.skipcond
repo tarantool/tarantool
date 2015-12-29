@@ -2,4 +2,5 @@ import os
 
 # skip test if .so is not found
 if not os.path.exists('box/function1.so'):
-    self.skip=1
+    if not os.path.exists('box/function1.dylib'):
+        self.skip=1
