@@ -113,7 +113,6 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 
 	space_validate_tuple_raw(space, request->tuple);
-	tuple_field_count_validate(space->format, request->tuple);
 
 	int size = request->tuple_end - request->tuple;
 	const char *key =
@@ -196,14 +195,8 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 
 	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
-	tuple_field_count_validate(space->format, request->tuple);
-
-	/* validate upsert key */
-	uint32_t tuple_len = request->tuple_end - request->tuple;
-	const char *key = tuple_field_raw(request->tuple, tuple_len, 0);
-
-	uint32_t part_count = index->key_def->part_count;
-	primary_key_validate(index->key_def, key, part_count);
+	/* Check tuple fields */
+	tuple_validate_raw(space->format, request->tuple);
 
 	index->upsert(request->ops,
 	              request->ops_end,

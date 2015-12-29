@@ -166,6 +166,9 @@ space_validate_field_count(struct space *sp, uint32_t field_count)
 	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
 		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
 		          field_count, space_name(sp), sp->def.field_count);
+	if (field_count < sp->format->field_count)
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  field_count, sp->format->field_count);
 }
 
 void
