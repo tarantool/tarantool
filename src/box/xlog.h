@@ -218,7 +218,7 @@ xlog_open(struct xdir *dir, int64_t signature);
  * The caller must free the created xlog object with
  * xlog_close().
  *
- * Throws an exception in case of error.
+ * Return NULL in case of error.
  */
 
 struct xlog *
@@ -305,6 +305,8 @@ xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
 #if defined(__cplusplus)
 } /* extern C */
+
+#include "exception.h"
 
 /**
  * XlogError is raised when there is an error with contents

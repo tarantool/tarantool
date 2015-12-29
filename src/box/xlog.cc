@@ -160,46 +160,38 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 * The vclock stores the state of the log at the
 	 * time it is created.
 	 */
-	struct xlog *wal;
+	struct xlog *wal = xlog_open(dir, signature);
+	if (wal == NULL)
+		return -1;
 
-	try {
-		wal = xlog_open_xc(dir, signature);
-		/*
-		 * All log files in a directory must satisfy Lamport's
-		 * eventual order: events in each log file must be
-		 * separable with consistent cuts, for example:
-		 *
-		 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
-		 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
-		 */
-		struct vclock *dup = vclockset_search(&dir->index,
-						      &wal->vclock);
-		if (dup != NULL) {
-			XlogError *e = tnt_error(XlogError,
-						 "%s: invalid xlog order",
-						 wal->filename);
-			xlog_close(wal);
-			throw e;
-		}
-	} catch (XlogError *e) {
-		if (dir->panic_if_error)
-			return -1;
-		/** Skip a corrupted file */
-		e->log();
-		return 0;
-	} catch (...) {
+	/*
+	 * All log files in a directory must satisfy Lamport's
+	 * eventual order: events in each log file must be
+	 * separable with consistent cuts, for example:
+	 *
+	 * log1: {1, 1, 0, 1}, log2: {1, 2, 0, 2} -- good
+	 * log2: {1, 1, 0, 1}, log2: {2, 0, 2, 0} -- bad
+	 */
+	struct vclock *dup = vclockset_search(&dir->index, &wal->vclock);
+	if (dup != NULL) {
+		tnt_error(XlogError, "%s: invalid xlog order", wal->filename);
+		xlog_close(wal);
 		return -1;
 	}
-
-	auto log_guard = make_scoped_guard([=]{
-		xlog_close(wal);
-	});
 
 	/*
 	 * Append the clock describing the file to the
 	 * directory index.
 	 */
-	struct vclock *vclock = vclock_dup(&wal->vclock);
+	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		tnt_error(OutOfMemory, sizeof(*vclock), "vclock", "malloc");
+		xlog_close(wal);
+		return -1;
+	}
+
+	vclock_copy(vclock, &wal->vclock);
+	xlog_close(wal);
 	vclockset_insert(&dir->index, vclock);
 	return 0;
 }
@@ -338,8 +330,17 @@ xdir_scan(struct xdir *dir)
 			vclock = next;
 		} else if (s_old > s_new) {
 			/** Add a new file. */
-			if (xdir_index_file(dir, s_new) == -1) {
-				return -1;
+			if (xdir_index_file(dir, s_new) != 0) {
+				/*
+				 * panic_if_error must not affect OOM
+				 */
+				struct error *e = diag_last_error(&fiber()->diag);
+				if (dir->panic_if_error ||
+				    type_cast(OutOfMemory, e))
+					return -1;
+				/** Skip a corrupted file */
+				error_log(e);
+				return 0;
 			}
 			i++;
 		} else {
@@ -383,6 +384,7 @@ format_filename(struct xdir *dir, int64_t signature,
 /* {{{ struct xlog_cursor */
 
 /**
+ * @retval -1 error
  * @retval 0 success
  * @retval 1 EOF
  */
@@ -427,7 +429,7 @@ error:
 	/* Read previous crc32 */
 	if (mp_typeof(*data) != MP_UINT)
 		goto error;
- 
+
 	/* Read current crc32 */
 	uint32_t crc32p = mp_decode_uint(&data);
 	if (mp_typeof(*data) != MP_UINT)
@@ -437,13 +439,11 @@ error:
 	(void) crc32p;
 
 	/* Allocate memory for body */
-	char *bodybuf = (char *) region_alloc(&fiber()->gc, len + sizeof(void *));
+	char *bodybuf = (char *) region_alloc(&fiber()->gc, len);
 	if (bodybuf == NULL) {
 		tnt_error(OutOfMemory, len, "region", "new slab");
 		return -1;
 	}
-	/* add sizeof(void*) zeros for corrupted files */
-	*((void **)(bodybuf + len)) = NULL;
 
 	/* Read header and body */
 	if (fread(bodybuf, len, 1, f) != 1)
@@ -860,9 +860,8 @@ xlog_open_stream(struct xdir *dir, int64_t signature, FILE *file,
 	l->eof_read = false;
 	vclock_create(&l->vclock);
 
-	if (xlog_read_meta(l, signature) == -1) {
+	if (xlog_read_meta(l, signature) != 0)
 		return NULL;
-	}
 
 	log_guard.is_active = false;
 	return l;
