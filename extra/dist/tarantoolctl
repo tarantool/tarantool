@@ -404,7 +404,11 @@ local function wrapper_cfg(cfg)
     -- force these startup options
     --
     cfg.pid_file = default_cfg.pid_file
-    cfg.username = default_cfg.username
+    if os.getenv('USER') ~= default_cfg.username then
+        cfg.username = default_cfg.username
+    else
+        cfg.username = nil
+    end
     if cfg.background == nil then
         cfg.background = true
     end
