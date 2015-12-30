@@ -62,12 +62,12 @@ extern char session_lua[],
 	net_box_lua[];
 
 static const char *lua_sources[] = {
-	session_lua,
-	schema_lua,
-	tuple_lua,
-	snapshot_daemon_lua,
-	load_cfg_lua,
-	net_box_lua,
+	"box/session", session_lua,
+	"box/schema", schema_lua,
+	"box/tuple", tuple_lua,
+	"box/snapshot_daemon", snapshot_daemon_lua,
+	"box/load_cfg", load_cfg_lua,
+	"box/net_box", net_box_lua,
 	NULL
 };
 
@@ -123,11 +123,16 @@ box_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	/* Load Lua extension */
-	for (const char **s = lua_sources; *s; s++) {
-		if (luaL_dostring(L, *s) != 0) {
-			panic("Error loading Lua source %.160s...: %s",
-			      *s, lua_tostring(L, -1));
-		}
+	for (const char **s = lua_sources; *s; s += 2) {
+		const char *modname = *s;
+		const char *modsrc = *(s + 1);
+		const char *modfile = lua_pushfstring(L,
+			"@builtin/%s.lua", modname);
+		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
+			panic("Error loading Lua module %s...: %s",
+			      modname, lua_tostring(L, -1));
+		lua_call(L, 0, 0);
+		lua_pop(L, 1); /* modfile */
 	}
 
 	assert(lua_gettop(L) == 0);
