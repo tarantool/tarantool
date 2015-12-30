@@ -756,7 +756,7 @@ t:find(2, '2')
 ...
 t:find(89, '2')
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 t:findall(4, '3')
 ---
