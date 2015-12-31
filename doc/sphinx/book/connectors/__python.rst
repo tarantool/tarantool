@@ -22,7 +22,7 @@ check that the server is listening and that examples exists, as :ref:`described 
 To run the program, say :code:`python example.py`. The program will connect
 to the server, will send the request, and will not throw an exception if
 all went well. If the tuple already exists, the program will throw
-:code:`DatabaseException(“Duplicate key exists in unique index”)`.
+:code:`tarantool.error.DatabaseError: (3, "Duplicate key exists in unique index 'primary' in space 'examples'")`.
 
 The example program only shows one request and does not show all that's
 necessary for good practice. For that, see http://github.com/tarantool/tarantool-python.

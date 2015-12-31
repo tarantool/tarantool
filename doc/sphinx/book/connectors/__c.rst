@@ -140,9 +140,9 @@ the program passes the tnt_stream that was used for connection
 (:code:`tnt`) and the stream that was set up with tnt_object_format (:code:`tuple`).
 
 Function description: |br|
-:codenormal:`tnt_insert(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)` |br|
-:codenormal:`tnt_replace(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)` |br|
-:codenormal:`tnt_select(struct tnt_stream *s, uint32_t space, uint32_t index, uint32_t limit, uint32_t offset, uint8_t iterator, struct tnt_stream *key)` |br|
+:codenormal:`ssize_t tnt_insert(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)` |br|
+:codenormal:`ssize_t tnt_replace(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)` |br|
+:codenormal:`ssize_t tnt_select(struct tnt_stream *s, uint32_t space, uint32_t index, uint32_t limit, uint32_t offset, uint8_t iterator, struct tnt_stream *key)` |br|
 :codenormal:`ssize_t tnt_update(struct tnt_stream *s, uint32_t space, uint32_t index, struct tnt_stream *key, struct tnt_stream *ops)`
 
 .. _c_get_reply:
@@ -177,8 +177,8 @@ should be destroyed.
     tnt_stream_free(tnt);
 
 Function description: |br|
-:codenormal:`tnt_close(struct tnt_stream *s)` |br|
-:codenormal:`tnt_stream_free(struct tnt_stream *s)`
+:codenormal:`void tnt_close(struct tnt_stream *s)` |br|
+:codenormal:`void tnt_stream_free(struct tnt_stream *s)`
 
 The example program only shows one request and does not show all that's
 necessary for good practice. For that, see http://github.com/tarantool/tarantool-c.
