@@ -78,10 +78,16 @@ cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
 	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
-	assert(!vclock_has(&r->vclock, server_id));
 
-	/* Add server */
-	vclock_add_server_nothrow(&r->vclock, server_id);
+	/*
+	 * Add a new server into vclock if the specified server_id has never
+	 * been registered in the cluster. A fresh server starts from
+	 * LSN = 0 (i.e. a first request is LSN = 1). LSN starts from the
+	 * last known value in case server was registered and then
+	 * unregistered somewhere in the past.
+	 */
+	if (!vclock_has(&r->vclock, server_id))
+		vclock_add_server_nothrow(&r->vclock, server_id);
 	if (tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
 		/* Assign local server id */
 		assert(r->server_id == 0);
@@ -120,7 +126,15 @@ cluster_del_server(uint32_t server_id)
 	struct recovery *r = ::recovery;
 	assert(!cserver_id_is_reserved(server_id) && server_id < VCLOCK_MAX);
 
-	vclock_del_server(&r->vclock, server_id);
+	/*
+	 * Don't remove servers from vclock here.
+	 * The vclock_sum() must always grow, it is a core invariant of
+	 * the recovery subsystem. Further attempts to register a server
+	 * with the removed server_id will re-use LSN from the last value.
+	 * Servers with LSN == 0 also can't not be safely removed.
+	 * Some records may arrive later on due to asynchronus nature of
+	 * replication.
+	 */
 	if (r->server_id == server_id) {
 		r->server_id = 0;
 		box_set_ro(true);

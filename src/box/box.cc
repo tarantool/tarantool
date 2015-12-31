@@ -649,6 +649,9 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 static void
 box_on_cluster_join(const tt_uuid *server_uuid)
 {
+	if (is_ro)
+		tnt_raise(LoggedError, ER_READONLY);
+
 	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
 	class MemtxIndex *index = index_find_system(space, 0);
@@ -669,11 +672,15 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 void
 box_process_join(int fd, struct xrow_header *header)
 {
+	assert(header->type == IPROTO_JOIN);
+
 	/* Check permissions */
 	access_check_universe(PRIV_R);
 	access_check_space(space_cache_find(BOX_CLUSTER_ID), PRIV_W);
 
-	assert(header->type == IPROTO_JOIN);
+	/* Check that we actually can register a new replica */
+	if (is_ro)
+		tnt_raise(LoggedError, ER_READONLY);
 
 	/* Process JOIN request via a replication relay */
 	relay_join(fd, header, recovery->server_id,
@@ -711,19 +718,18 @@ box_set_server_uuid()
 	assert(r->server_id == 0);
 
 	/* Unregister local server if it was registered by bootstrap.bin */
-	if (vclock_has(&r->vclock, 1))
-		boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
-	assert(!vclock_has(&r->vclock, 1));
+	boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
 
 	/* Register local server */
 	tt_uuid_create(&r->server_uuid);
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&r->server_uuid));
-	assert(vclock_has(&r->vclock, 1));
-
-	/* Remove surrogate server */
-	vclock_del_server(&r->vclock, 0);
 	assert(r->server_id == 1);
+
+	/* Ugly hack: bootstrap always starts from scratch */
+	vclock_create(&r->vclock);
+	vclock_add_server(&r->vclock, 1);
+	assert(vclock_sum(&r->vclock) == 0);
 }
 
 /** Insert a new cluster into _schema */

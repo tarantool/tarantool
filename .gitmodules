@@ -8,9 +8,9 @@
 	path = third_party/luafun
 	url = https://github.com/rtsisyk/luafun.git
 [submodule "sophia"]
-       path = third_party/sophia
-       url = https://github.com/tarantool/sophia.git
-       branch = current
+	path = third_party/sophia
+	url = https://github.com/tarantool/sophia.git
+	branch = tarantool-master
 [submodule "test-run"]
 	path = test-run
 	url = https://github.com/tarantool/test-run.git
