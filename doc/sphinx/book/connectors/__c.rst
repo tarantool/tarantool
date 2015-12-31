@@ -180,7 +180,67 @@ Function description: |br|
 :codenormal:`void tnt_close(struct tnt_stream *s)` |br|
 :codenormal:`void tnt_stream_free(struct tnt_stream *s)`
 
-The example program only shows one request and does not show all that's
+A second example.
+Here is a complete C program that selects, using index key :code:`[99999]`, from
+space :code:`examples` via the high-level C API.
+To display the results the program uses functions in the
+`MsgPuck`_ library which allow decoding of `MessagePack`_  arrays.
+
+.. code-block:: c
+
+    #include <stdio.h>
+    #include <tarantool/tarantool.h>
+    #include <tarantool/tnt_net.h>
+    #include <tarantool/tnt_opt.h>
+    void main() {
+      struct tnt_stream *tnt = tnt_net(NULL);
+      tnt_set(tnt, TNT_OPT_URI, "localhost:3301");
+      if (tnt_connect(tnt) < 0) {printf("Connection refused\n"); exit(1);}
+      struct tnt_stream *tuple = tnt_object(NULL);
+      tnt_object_format(tuple, "[%d]", 99999); /* tuple = search key */
+      tnt_select(tnt, 999, 0, (2^32) - 1, 0, 0, tuple);
+      tnt_flush(tnt);
+      struct tnt_reply reply;  tnt_reply_init(&reply);
+      tnt->read_reply(tnt, &reply);
+      if (reply.code != 0) {printf("Select failed.\n"); exit(1); }
+      char field_type;
+      field_type= mp_typeof(*reply.data);
+      if (field_type != MP_ARRAY) {printf("no tuple array\n"); exit(1); }
+      long unsigned int row_count;
+      uint32_t tuple_count= mp_decode_array(&reply.data);
+      printf("tuple count=%u\n", tuple_count);
+      unsigned int i,j;
+      for (i= 0; i < tuple_count; ++i)
+      {
+        field_type= mp_typeof(*reply.data);
+        if (field_type != MP_ARRAY) {printf("no field array\n"); exit(1); }
+        uint32_t field_count= mp_decode_array(&reply.data);
+        printf("  field count=%u\n", field_count);
+        for (j= 0; j < field_count; ++j)
+        {
+          field_type= mp_typeof(*reply.data);
+          if (field_type == MP_UINT)
+          {
+            uint64_t num_value= mp_decode_uint(&reply.data);
+            printf("    value=%lu.\n", num_value);
+          }
+          else if (field_type == MP_STR)
+          {
+            const char *str_value;
+            uint32_t str_value_length;
+            str_value= mp_decode_str(&reply.data,&str_value_length);
+            printf("    value=%.*s.\n", str_value_length, str_value);
+          }
+          else {printf("wrong field type\n"); exit(1); }
+        }
+      }   
+      tnt_close(tnt);
+      tnt_stream_free(tuple);
+      tnt_stream_free(tnt);
+    }
+
+The example programs only shows two requests and do not show all that's
 necessary for good practice. For that, see http://github.com/tarantool/tarantool-c.
 
-.. _Queue managers on Tarantool: https://github.com/tarantool/queue
+.. _MsgPuck: http://rtsisyk.github.io/msgpuck/
+.. _MessagePack: https://en.wikipedia.org/wiki/MessagePack
