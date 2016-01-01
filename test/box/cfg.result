@@ -4,79 +4,143 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
-test_run:cmd("push filter 'listen: .*' to 'primary: <uri>'")
----
-- true
-...
-test_run:cmd("push filter 'admin: .*' to 'admin: <uri>'")
----
-- true
-...
-test_run:cmd("push filter ".."'\\.lua - internal file.*:[0-9]+: ' to '.lua - internal file...\"]:<line>: '")
+test_run:cmd("push filter '(error: .*)\\.lua:[0-9]+: ' to '\\1.lua:<line>: '")
 ---
 - true
 ...
 box.cfg.nosuchoption = 1
 ---
-- error: 'builtin/box/load_cfg.lua:265: Attempt to modify a read-only table'
+- error: 'builtin/box/load_cfg.lua:<line>: Attempt to modify a read-only table'
 ...
 cfg_filter(box.cfg)
 ---
-- snapshot_count: 6
-  too_long_threshold: 0.5
-  slab_alloc_factor: 1.1
-  rows_per_wal: 50
-  background: false
-  readahead: 16320
-  sophia:
-    page_size: 131072
-    memory_limit: 0
-    compression_key: 0
-    threads: 5
-    node_size: 134217728
-    compression: none
-  primary: <uri>
-  logger_nonblock: true
-  coredump: false
-  wal_mode: write
-  panic_on_snap_error: true
-  panic_on_wal_error: true
-  snapshot_period: 0
-  slab_alloc_arena: 0.1
-  log_level: 5
-  wal_dir_rescan_delay: 2
+- - - background
+    - false
+  - - coredump
+    - false
+  - - listen
+    - <hidden>
+  - - log_level
+    - 5
+  - - logger
+    - <hidden>
+  - - logger_nonblock
+    - true
+  - - panic_on_snap_error
+    - true
+  - - panic_on_wal_error
+    - true
+  - - pid_file
+    - <hidden>
+  - - readahead
+    - 16320
+  - - rows_per_wal
+    - 50
+  - - slab_alloc_arena
+    - 0.1
+  - - slab_alloc_factor
+    - 1.1
+  - - slab_alloc_maximal
+    - <hidden>
+  - - slab_alloc_minimal
+    - <hidden>
+  - - snap_dir
+    - <hidden>
+  - - snapshot_count
+    - 6
+  - - snapshot_period
+    - 0
+  - - sophia
+    - - - compression
+        - none
+      - - compression_key
+        - 0
+      - - memory_limit
+        - 0
+      - - node_size
+        - 134217728
+      - - page_size
+        - 131072
+      - - threads
+        - 5
+  - - sophia_dir
+    - <hidden>
+  - - too_long_threshold
+    - 0.5
+  - - wal_dir
+    - <hidden>
+  - - wal_dir_rescan_delay
+    - 2
+  - - wal_mode
+    - write
 ...
 -- must be read-only
 box.cfg()
 ---
-- error: 'builtin/box/load_cfg.lua:206: bad argument #1 to ''pairs'' (table expected,
+- error: 'builtin/box/load_cfg.lua:<line>: bad argument #1 to ''pairs'' (table expected,
     got nil)'
 ...
 cfg_filter(box.cfg)
 ---
-- snapshot_count: 6
-  too_long_threshold: 0.5
-  slab_alloc_factor: 1.1
-  rows_per_wal: 50
-  background: false
-  readahead: 16320
-  sophia:
-    page_size: 131072
-    memory_limit: 0
-    compression_key: 0
-    threads: 5
-    node_size: 134217728
-    compression: none
-  primary: <uri>
-  logger_nonblock: true
-  coredump: false
-  wal_mode: write
-  panic_on_snap_error: true
-  panic_on_wal_error: true
-  snapshot_period: 0
-  slab_alloc_arena: 0.1
-  log_level: 5
-  wal_dir_rescan_delay: 2
+- - - background
+    - false
+  - - coredump
+    - false
+  - - listen
+    - <hidden>
+  - - log_level
+    - 5
+  - - logger
+    - <hidden>
+  - - logger_nonblock
+    - true
+  - - panic_on_snap_error
+    - true
+  - - panic_on_wal_error
+    - true
+  - - pid_file
+    - <hidden>
+  - - readahead
+    - 16320
+  - - rows_per_wal
+    - 50
+  - - slab_alloc_arena
+    - 0.1
+  - - slab_alloc_factor
+    - 1.1
+  - - slab_alloc_maximal
+    - <hidden>
+  - - slab_alloc_minimal
+    - <hidden>
+  - - snap_dir
+    - <hidden>
+  - - snapshot_count
+    - 6
+  - - snapshot_period
+    - 0
+  - - sophia
+    - - - compression
+        - none
+      - - compression_key
+        - 0
+      - - memory_limit
+        - 0
+      - - node_size
+        - 134217728
+      - - page_size
+        - 131072
+      - - threads
+        - 5
+  - - sophia_dir
+    - <hidden>
+  - - too_long_threshold
+    - 0.5
+  - - wal_dir
+    - <hidden>
+  - - wal_dir_rescan_delay
+    - 2
+  - - wal_mode
+    - write
 ...
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}

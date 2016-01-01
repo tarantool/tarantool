@@ -5,13 +5,11 @@ test_run:cmd('restart server default')
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary')
 
-test_run:cmd("push filter 'listen: .*' to 'listen: <uri>'")
 help()
 cfg_filter(box.cfg)
 space:insert{1, 'tuple'}
 box.snapshot()
 space:delete{1}
-test_run:cmd("clear filter")
 
 test_run:cmd("setopt delimiter ';'")
 function check_type(arg, typeof)
