@@ -30,7 +30,7 @@ User=tarantool
 Group=tarantool
 OOMScoreAdjust=-1000
 
-ExecStart=@SYSV_INITD_PATH@ start
-ExecStop=@SYSV_INITD_PATH@ stop
+ExecStart=@SYSV_INITD_DIR@/tarantool.init start
+ExecStop=@SYSV_INITD_DIR@/tarantool.init stop
 
 TimeoutSec=300

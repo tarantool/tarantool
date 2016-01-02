@@ -356,7 +356,7 @@ add_dependencies(build_bundled_libs misc)
 include(BuildSophia)
 sophia_build()
 
-option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
+option(WITH_SYSVINIT "Enable install of sysvinit scripts" OFF)
 
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X

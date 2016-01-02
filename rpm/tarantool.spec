@@ -130,18 +130,14 @@ This package provides common files
     local function cmake_key_value(key, value)
         return " -D"..key.."="..value
     end
-    local function dev_with (obj, flag)
-        local status = "OFF"
-        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
-            status = "ON"
+    local function def_init()
+        if tonumber(rpm.expand("%{with systemd}")) ~= 0 then
+            return cmake_key_value("WITH_SYSTEMD", "ON") ..
+                   cmake_key_value("SYSTEMD_SERVICES_INSTALL_DIR",
+                                   '%{_unitdir}')
+        else
+            return ' %{!?scl:-DWITH_SYSVINIT=ON}'
         end
-        return cmake_key_value(flag, status)
-    end
-    local function dev_with_kv (obj, key, value)
-        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
-            return cmake_key_value(key, value)
-        end
-        return ""
     end
     local cmd = 'cmake'
     if is_rhel_old() then
@@ -161,11 +157,8 @@ This package provides common files
         .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
-        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
-        .. ' %{!?scl:-DENABLE_RPM=ON}'
-        .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
-        .. dev_with('systemd', 'WITH_SYSTEMD')
-        .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
+        .. def_init()
+        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}')
 
     print(wrap_with_toolset(cmd))}
 %{lua:print(wrap_with_toolset('make %{?_smp_mflags}\n'))}
@@ -245,9 +238,9 @@ chkconfig --del tarantool
 %dir "%{_sysconfdir}/tarantool/instances.available"
 "%{_sysconfdir}/tarantool/instances.available/example.lua"
 %if %{with systemd}
-%dir "%{_libdir}/tarantool/"
+%dir "%{_prefix}/lib/tarantool/"
 "%{_unitdir}/tarantool.service"
-"%{_libdir}/tarantool/tarantool.init"
+"%{_prefix}/lib/tarantool/tarantool.init"
 %else
 "%{_sysconfdir}/init.d/tarantool"
 %endif
