@@ -158,7 +158,7 @@ This package provides common files
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
         .. def_init()
-        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}')
+        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
 
     print(wrap_with_toolset(cmd))}
 %{lua:print(wrap_with_toolset('make %{?_smp_mflags}\n'))}
