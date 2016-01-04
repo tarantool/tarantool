@@ -50,7 +50,7 @@ end
 
 local function local_format(status, ...)
     if not status and type(box.cfg) == 'table' then
-        pcall(box.rollback)
+        box.rollback()
     end
     return format(status, ...)
 end
