@@ -45,7 +45,7 @@ add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc
     ${CMAKE_SOURCE_DIR}/src/rmean.c)
-target_link_libraries(vclock.test core small)
+target_link_libraries(vclock.test core salad small)
 add_executable(xrow.test xrow.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/xrow.cc
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
@@ -96,7 +96,7 @@ add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/src/random.c)
 
 add_executable(guava.test guava.c)
-target_link_libraries(guava.test salad)
+target_link_libraries(guava.test salad small)
 
 add_executable(find_path.test find_path.c
     ${CMAKE_SOURCE_DIR}/src/find_path.c

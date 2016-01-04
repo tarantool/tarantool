@@ -64,6 +64,7 @@ add_library(box
     ${lua_sources}
     lua/init.c
     lua/call.c
+    lua/cfg.cc
     lua/tuple.c
     lua/slab.c
     lua/index.c
@@ -77,4 +78,5 @@ add_library(box
     lua/net_box.c
     ${bin_sources})
 
+add_dependencies(box build_bundled_libs)
 target_link_libraries(box ${sophia_lib})

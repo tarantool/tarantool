@@ -418,6 +418,14 @@ void
 tuple_delete(struct tuple *tuple);
 
 /**
+ * Check tuple data correspondence to space format;
+ * throw proper exception if smth wrong.
+ * data argument expected to be a proper msgpack array
+ */
+void
+tuple_validate_raw(struct tuple_format *format, const char *data);
+
+/**
  * Throw and exception about tuple reference counter overflow.
  */
 void
@@ -497,19 +505,6 @@ tuple_field_count(const struct tuple *tuple)
 {
 	const char *data = tuple->data;
 	return mp_decode_array(&data);
-}
-
-/**
- * @brief Validate a number of fields against format
- */
-static inline void
-tuple_field_count_validate(struct tuple_format *format, const char *data)
-{
-	uint32_t field_count = mp_decode_array(&data);
-	if (unlikely(field_count < format->field_count))
-		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
-			  (unsigned) field_count,
-			  (unsigned) format->field_count);
 }
 
 /**

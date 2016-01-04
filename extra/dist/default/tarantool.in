@@ -1,10 +1,10 @@
 -- Options for Tarantool
 default_cfg = {
-    pid_file   = "/var/run/tarantool", -- will become pid_file .. instance .. '.pid'
-    wal_dir    = "@TARANTOOL_DATADIR@", -- will become wal_dir/instance/
-    snap_dir   = "@TARANTOOL_DATADIR@", -- snap_dir/instance/
-    sophia_dir = "@TARANTOOL_DATADIR@", -- will become sophia_dir/sophia/instance/
-    logger     = "/var/log/tarantool", -- logger/instance .. '.log'
+    pid_file   = "@TARANTOOL_RUNDIR@", -- /var/run/tarantool/${INSTANCE}.pid
+    wal_dir    = "@TARANTOOL_DATADIR@", -- /var/lib/tarantool/${INSTANCE}/
+    snap_dir   = "@TARANTOOL_DATADIR@", -- /var/lib/tarantool/${INSTANCE}
+    sophia_dir = "@TARANTOOL_DATADIR@", -- /var/lib/tarantool/${INSTANCE}
+    logger     = "@TARANTOOL_LOGDIR@", -- /var/log/tarantool/${INSTANCE}.log
     username   = "tarantool",
 }
 

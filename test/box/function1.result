@@ -135,6 +135,44 @@ c:call('function1.errors')
 box.schema.func.drop("function1.errors")
 ---
 ...
+box.schema.func.create('xxx', {language = 'invalid'})
+---
+- error: Unsupported language 'INVALID' specified for function 'xxx'
+...
+-- language normalization
+function func_lang(name) return (box.space._func.index[2]:select{name}[1] or {})[5] end
+---
+...
+box.schema.func.create('f11'),                      func_lang('f11')
+---
+- null
+- LUA
+...
+box.schema.func.create('f12', {language = 'Lua'}),  func_lang('f12')
+---
+- null
+- LUA
+...
+box.schema.func.create('f13', {language = 'lua'}),  func_lang('f13')
+---
+- null
+- LUA
+...
+box.schema.func.create('f14', {language = 'lUa'}),  func_lang('f14')
+---
+- null
+- LUA
+...
+box.schema.func.create('f15', {language = 'c'}),    func_lang('f15')
+---
+- null
+- C
+...
+box.schema.func.create('f16', {language = 'C'}),    func_lang('f16')
+---
+- null
+- C
+...
 box.space.test:drop()
 ---
 ...

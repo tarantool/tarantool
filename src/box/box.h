@@ -106,12 +106,12 @@ box_check_config();
 
 void box_set_listen(void);
 void box_set_replication_source(void);
-void box_set_wal_mode(void);
 void box_set_log_level(void);
 void box_set_io_collect_interval(void);
 void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
+void box_set_panic_on_wal_error(void);
 
 #if defined(__cplusplus)
 }

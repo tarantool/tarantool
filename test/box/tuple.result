@@ -315,13 +315,11 @@ t:unpack(2, 1)
 ...
 t:totable(0)
 ---
-- error: '[string "-- tuple.lua..."]:<line>: tuple.totable: invalid second
-    argument'
+- error: 'builtin/box/tuple.lua..."]:<line>: tuple.totable: invalid second argument'
 ...
 t:totable(1, 0)
 ---
-- error: '[string "-- tuple.lua..."]:<line>: tuple.totable: invalid third
-    argument'
+- error: 'builtin/box/tuple.lua..."]:<line>: tuple.totable: invalid third argument'
 ...
 --
 -- Check that tuple:totable correctly sets serializer hints
@@ -453,8 +451,8 @@ t:next(-1)
 ...
 t:next("fdsaf")
 ---
-- error: '[string "-- tuple.lua..."]:<line>: bad argument #2 to ''box_tuple_field''
-    (cannot convert ''string'' to ''unsigned int'')'
+- error: 'builtin/box/tuple.lua..."]:<line>: bad argument #2 to ''box_tuple_field'' (cannot
+    convert ''string'' to ''unsigned int'')'
 ...
 box.tuple.new({'x', 'y', 'z'}):next()
 ---
@@ -622,7 +620,7 @@ r = {}
 ...
 for _state, val in t:pairs(10) do table.insert(r, val) end
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 r
 ---
@@ -715,19 +713,19 @@ t:findall(1, 'xxxxx')
 ...
 t:find(100, 'a')
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 t:findall(100, 'a')
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 t:find(100, 'xxxxx')
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 t:findall(100, 'xxxxx')
 ---
-- error: '[string "-- tuple.lua..."]:<line>: error: invalid key to ''next'''
+- error: 'builtin/box/tuple.lua..."]:<line>: error: invalid key to ''next'''
 ...
 ---
 -- Lua type coercion
@@ -821,13 +819,11 @@ t = box.tuple.new({'a', 'b', 'c', 'd', 'e'})
 ...
 t:update()
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:update({ {
-    op, field, arg}+ })'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
 ...
 t:update(10)
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:update({ {
-    op, field, arg}+ })'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
 ...
 t:update({})
 ---
@@ -923,27 +919,23 @@ t = box.tuple.new({1, 2, {}})
 ...
 t.bsize()
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:bsize()'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:bsize()'
 ...
 t.find(9223372036854775807LL)
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:find([offset,
-    ]val)'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:find([offset, ]val)'
 ...
 t.findall(9223372036854775807LL)
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:findall([offset,
-    ]val)'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:findall([offset, ]val)'
 ...
 t.update()
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:update({ { op,
-    field, arg}+ })'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:update({ { op, field, arg}+ })'
 ...
 t.upsert()
 ---
-- error: '[string "-- tuple.lua..."]:<line>: Usage: tuple:upsert({ { op,
-    field, arg}+ })'
+- error: 'builtin/box/tuple.lua..."]:<line>: Usage: tuple:upsert({ { op, field, arg}+ })'
 ...
 t = nil
 ---

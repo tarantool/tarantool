@@ -292,7 +292,9 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 
 	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
-	tuple_field_count_validate(space->format, request->tuple);
+	/* Check tuple fields */
+	tuple_validate_raw(space->format, request->tuple);
+
 	uint32_t part_count = pk->key_def->part_count;
 	/*
 	 * Extract the primary key from tuple.
@@ -304,7 +306,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 					      key, key_len);
 
 	/* Try to find the tuple by primary key. */
-	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL) {
@@ -588,7 +589,7 @@ recover_snap(struct recovery *r)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 	int64_t signature = vclock_sum(res);
 
-	struct xlog *snap = xlog_open(&r->snap_dir, signature);
+	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	r->server_uuid = snap->server_uuid;

@@ -731,14 +731,6 @@ local remote_methods = {
         return states[self.state] ~= nil
     end,
 
-    _is_r_state = function(self)
-        return is_state(self._r_states)
-    end,
-
-    _is_rw_state = function(self)
-        return is_state(self._rw_states)
-    end,
-
     reload_schema = function(self)
         self._schema_id = 0
         if self.state == 'closed' or self.state == 'error' then

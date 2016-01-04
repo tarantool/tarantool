@@ -496,7 +496,7 @@ box.schema.index.alter = function(space_id, index_id, options)
                       "Don't know how to update both id and" ..
                        cant_update_fields)
         end
-        ops = {}
+        local ops = {}
         local function add_op(value, field_no)
             if value then
                 table.insert(ops, {'=', field_no, value})
@@ -1134,7 +1134,8 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    opts = update_param_table(opts, { setuid = false, type = 'lua'})
+    opts = update_param_table(opts, { setuid = false, language = 'lua'})
+    opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
     _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
 end

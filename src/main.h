@@ -50,9 +50,6 @@ double tarantool_uptime(void);
 void
 load_cfg();
 
-void
-check_cfg();
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

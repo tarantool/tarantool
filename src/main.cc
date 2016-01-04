@@ -326,12 +326,6 @@ error:
 }
 
 extern "C" void
-check_cfg()
-{
-	box_check_config();
-}
-
-extern "C" void
 load_cfg()
 {
 	const char *work_dir = cfg_gets("work_dir");

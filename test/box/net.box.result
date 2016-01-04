@@ -304,8 +304,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: '[string "-- net_box.lua..."]:<line>: Use space:method(...)
-    instead space.method(...)'
+- error: 'builtin/box/net_box.lua..."]:<line>: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---

@@ -18,8 +18,7 @@ test_run:cmd("push filter ".."'\\.lua - internal file.*:[0-9]+: ' to '.lua - int
 ...
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: Attempt to modify a read-only
-    table'
+- error: 'builtin/box/load_cfg.lua:264: Attempt to modify a read-only table'
 ...
 cfg_filter(box.cfg)
 ---
@@ -50,8 +49,8 @@ cfg_filter(box.cfg)
 -- must be read-only
 box.cfg()
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:<line>: bad argument #1 to ''pairs''
-    (table expected, got nil)'
+- error: 'builtin/box/load_cfg.lua:205: bad argument #1 to ''pairs'' (table expected,
+    got nil)'
 ...
 cfg_filter(box.cfg)
 ---

@@ -209,6 +209,18 @@ recover_row(struct recovery *r, void *param, struct xrow_header *row)
 /* {{{ configuration bindings */
 
 static void
+box_check_logger(const char *logger)
+{
+	char *error_msg;
+	if (logger == NULL)
+		return;
+	if (say_check_init_str(logger, &error_msg) == -1) {
+		auto guard = make_scoped_guard([=]{ free(error_msg); });
+		tnt_raise(ClientError, ER_CFG, "logger", error_msg);
+	}
+}
+
+static void
 box_check_uri(const char *source, const char *option_name)
 {
 	if (source == NULL)
@@ -266,6 +278,7 @@ box_check_rows_per_wal(int rows_per_wal)
 void
 box_check_config()
 {
+	box_check_logger(cfg_gets("logger"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));

@@ -265,6 +265,36 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
 	}
 }
 
+
+/**
+ * Check tuple data correspondence to space format;
+ * throw proper exception if smth wrong.
+ * data argument expected to be a proper msgpack array
+ * Actually checks everything that checks tuple_init_field_map.
+ */
+void
+tuple_validate_raw(struct tuple_format *format, const char *data)
+{
+	if (format->field_count == 0)
+		return; /* Nothing to check */
+
+	/* Check to see if the tuple has a sufficient number of fields. */
+	uint32_t field_count = mp_decode_array(&data);
+	if (unlikely(field_count < format->field_count))
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->field_count);
+
+	/* Check field types */
+	enum field_type *type = format->types;
+	enum field_type *type_end = format->types + format->field_count;
+	for (uint32_t i = 0; type < type_end; type++, i++) {
+		key_mp_type_validate(*type, mp_typeof(*data),
+				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+		mp_next(&data);
+	}
+}
+
 /**
  * Incremented on every snapshot and is used to distinguish tuples
  * which were created after start of a snapshot (these tuples can
