@@ -37,7 +37,8 @@
 
     :Q: What are your development plans?
     :A: We continuously improve server performance. On the feature front, automatic
-        sharding and online upgrade are the two major goals of 2015.
+        sharding and bsync (bidirectional file synchronization)
+        and a subset of SQL are the major goals of 2016.
 
 
     :Q: Who is developing Tarantool?

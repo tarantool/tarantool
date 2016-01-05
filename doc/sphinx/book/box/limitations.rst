@@ -35,14 +35,6 @@
     specify a larger value. For example
     :code:`box.cfg{slab_alloc_maximal=2*1048576}`.
 
-which is one quarter of 1048576 -- :ref:`field_count <space-object-field-count>`.
-
-    The theoretical maximum is 2147483647 (``box.schema.FIELD_MAX``). The
-    practical maximum is whatever is specified by the space's
-    :ref:`field_count <space-object-field-count>`
-    member, or the maximum tuple length.
-
-
 .. _lim_number_of_spaces:
 
 **Number of spaces**
