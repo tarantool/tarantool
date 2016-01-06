@@ -9,12 +9,6 @@ certain events happen. Currently the main types of triggers are `connection trig
 which are executed when a session begins or ends, and `replace triggers`_ which are
 for database events.
 
-    :func:`box.session.on_connect`, |br|
-    :func:`box.session.on_disconnect`, |br|
-    :func:`box.session.on_auth`, |br|
-    :func:`space_object.on_replace`, |br|
-    :func:`space_object.run_triggers`
-
 All triggers have the following characteristics:
 
 * They associate a `function` with an `event`. The request to "define a trigger"
@@ -134,9 +128,13 @@ Here is what might appear in the log file in a typical installation:
 .. function:: box.session.on_auth(trigger-function [, old-trigger-function-name])
 
     Define a trigger for execution during authentication.
-    The on_auth trigger function is invoked after the on_connect trigger function,
+
+    The on_auth trigger function is invoked in these circumstances:
+    (1) The :func:`console.connect` function includes an authentication check for all users except 'guest';
+    for this case the on_auth trigger function is invoked after the on_connect trigger function,
     if and only if the connection has succeeded so far.
-    For this purpose, connection and authentication are considered to be separate steps.
+    (2) The binary protocol has a separate :ref:`authentication packet <iproto-authentication>` -- 
+    for this case, connection and authentication are considered to be separate steps.
 
     Unlike other trigger types, on_auth trigger functions are invoked `before`
     the event. Therefore a trigger function like :code:`function auth_function () v = box.session.user(); end`

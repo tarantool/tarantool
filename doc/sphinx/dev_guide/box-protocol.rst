@@ -168,6 +168,8 @@ may be absent in request's header, that means that there'll be no version
 checking, but it must be present in the response. If ``schema_id`` is sent in
 the header, then it'll be checked.
 
+.. _iproto-authentication:
+
 ================================================================================
                             Authentication
 ================================================================================
