@@ -38,6 +38,7 @@
 #include "xlog.h"
 #include "xrow.h"
 #include "cbus.h"
+#include "coeio.h"
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
@@ -605,6 +606,8 @@ static void
 wal_writer_f(va_list ap)
 {
 	struct wal_writer *writer = va_arg(ap, struct wal_writer *);
+	/** Initialize eio in this thread */
+	coeio_init();
 
 	writer->main_f = fiber();
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
