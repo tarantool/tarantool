@@ -49,6 +49,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <sys/types.h> /* ssize_t for rbtree */
 #if defined(DEBUG)
 #include <stdio.h> /* for dumping debug output to FILE */
 #endif /* defined(DEBUG) */
