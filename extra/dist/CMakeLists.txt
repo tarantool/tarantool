@@ -85,4 +85,4 @@ elseif (WITH_SYSVINIT)
         OWNER_READ OWNER_WRITE
         GROUP_READ
         WORLD_READ)
-endif(ENABLE_SYSVINIT)
+endif()

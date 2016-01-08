@@ -17,7 +17,7 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-add_library(box
+add_library(box STATIC
     iproto.cc
     iproto_constants.c
     iproto_port.cc

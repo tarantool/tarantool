@@ -35,6 +35,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <glob.h>
 
 /**
