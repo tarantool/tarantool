@@ -381,7 +381,7 @@ static void
 eio_warn_uninitialized()
 {
   fputs("Please initialize libeio in this thread.\n", stderr);
-  assert(false);
+  assert(0);
 }
 
 static struct etp_pool eio_pool;
