@@ -25,6 +25,9 @@ tags
 extra/txt2c
 extra/bin2c
 extra/dist/tarantoolctl.1
+extra/dist/tarantool.logrotate
+extra/dist/tarantool.service
+extra/dist/tarantool.tmpfiles.conf
 cmake_install.cmake
 config.mk
 config.guess

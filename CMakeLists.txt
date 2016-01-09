@@ -54,7 +54,6 @@ include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
 include(cmake/FindReadline.cmake)
 include(cmake/FindSphinx.cmake)
-include(cmake/systemd.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 
@@ -356,8 +355,6 @@ add_dependencies(build_bundled_libs misc)
 include(BuildSophia)
 sophia_build()
 
-option(WITH_SYSVINIT "Enable install of sysvinit scripts" OFF)
-
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
 # file names are case-insensitive)
@@ -420,6 +417,7 @@ message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
 message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
 message (STATUS "ENABLE_BUNDLED_LIBYAML: ${ENABLE_BUNDLED_LIBYAML}")
 message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
+message (STATUS "ENABLE_DIST: ${ENABLE_DIST}")
 list_optional_packages()
 if (TARGET_OS_DARWIN)
     message (STATUS "DARWIN_BUILD_TYPE: ${DARWIN_BUILD_TYPE}")
