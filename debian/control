@@ -18,7 +18,7 @@ VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
 Package: tarantool-common
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
+Architecture: i386 amd64
 Priority: optional
 Conflicts: tarantool-common (<< 1.5.3),
  tarantool-lts-common,
@@ -47,7 +47,7 @@ Description: Tarantool in-memory database - common files
  and log files.
 
 Package: tarantool
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
+Architecture: i386 amd64
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2
 Replaces: tarantool-lts
@@ -84,7 +84,7 @@ Description: In-memory database with a Lua application server
  This package provides Tarantool command line interpreter and server.
 
 Package: tarantool-dev
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64
+Architecture: i386 amd64
 Priority: optional
 Section: libdevel
 Replaces: tarantool-lts-dev
