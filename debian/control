@@ -107,5 +107,5 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - development headers
  Tarantool is an in-memory database and Lua application server.
- This package provides server develoment files needed to build pluggable
+ This package provides server development files needed to build pluggable
  modules.
