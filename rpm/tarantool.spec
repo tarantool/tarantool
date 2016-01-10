@@ -12,6 +12,9 @@
 %global _enable_debug_package %{nil}
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
+# -fPIE break backtraces
+# https://github.com/tarantool/tarantool/issues/1262
+%undefine _hardened_build
 
 Source1: VERSION
 %global build_version %(( cat %{SOURCE1} || git describe --long) | sed "s/[0-9]*\.[0-9]*\.[0-9]*-//" | sed "s/-[a-z 0-9]*//")
