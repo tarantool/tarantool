@@ -211,13 +211,10 @@ chkconfig --del tarantool
 
 %files
 %defattr(-,root,root,-)
-
 "%{_bindir}/tarantool"
-
-%dir "%{_datadir}/doc/tarantool"
-"%{_datadir}/doc/tarantool/README.md"
-"%{_datadir}/doc/tarantool/LICENSE"
-
+%doc README.md
+%{!?_licensedir:%global license %doc}
+%license LICENSE AUTHORS
 "%{_mandir}/man1/tarantool.1.gz"
 
 %files dev

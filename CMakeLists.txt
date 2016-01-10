@@ -373,9 +373,6 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
-install (FILES README.md LICENSE
-         DESTINATION share/doc/tarantool)
-
 #
 # tarantool info summary (used in server version output)
 #
