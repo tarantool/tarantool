@@ -77,12 +77,12 @@ displays each result in hexadecimal. |br|
 |nbsp| |nbsp| :codenormal:`print('array encoding:',o1)` |br|
 |nbsp| |nbsp| :codenormal:`print('map encoding:  ',o2)` |br|
 Result: |br|
-:codenormal:`array encoding: 92 a1 41 a1 42` |br|
-:codenormal:`map encoding:   82 1 a1 41 2 a1 42` |br|
+|nbsp| |nbsp| :codenormal:`array encoding: 92 a1 41 a1 42` |br|
+|nbsp| |nbsp| :codenormal:`map encoding:   82 1 a1 41 2 a1 42` |br|
 The MsgPack Specification_ page explains that
-the first string means |br|
+the first encoding means |br|
 fixarray(2), fixstr(1),"A",fixstr(1),"B" |br|
-and the second string means |br|
+and the second encoding means |br|
 fixmap(2), key(1), fixstr(1),"A",key(2),fixstr(2),"B".
 
 .. _MsgPack: http://msgpack.org/

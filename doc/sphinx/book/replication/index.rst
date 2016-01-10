@@ -65,17 +65,21 @@ file and the WAL .xlog files), then starting replication again - the replica
 will then catch up with the master by retrieving all the master's tuples.
 Again, this procedure works only if the master's WAL files are present.
 
-.. NOTE::
+NOTE:
+Replication parameters are "dynamic", which allows the replica to become
+a master and vice versa with the help of the :func:`box.cfg` statement.
 
-    Replication parameters are "dynamic", which allows the replica to become
-    a master and vice versa with the help of the :func:`box.cfg` statement.
+NOTE:
+The replica does not inherit the master's configuration parameters, such
+as the ones that cause the :ref:`snapshot daemon <book-cfg-snapshot_daemon>` to run on the master.
+To get the same behavior, one would have to set the relevant parameters explicitly
+so that they are the same on both master and replica.
 
-.. NOTE::
-
-    The replica does not inherit the master's configuration parameters, such
-    as the ones that cause the :ref:`snapshot daemon <book-cfg-snapshot_daemon>` to run on the master.
-    To get the same behavior, one would have to set the relevant parameters explicitly
-    so that they are the same on both master and replica.
+NOTE:
+Replication requires privileges. Privileges for accessing spaces could be granted directly
+to the user who will start the replica. However, it is more usual to
+grant privileges for accessing spaces to a :ref:`role <rep-role>`, and then grant the
+role to the user who will start the replica.
 
 =====================================================================
                 Recovering from a degraded state
@@ -278,7 +282,8 @@ servers will end up with different contents.
 
     :Q: What if replication causes security concerns?
     :A: Prevent unauthorized replication sources by associating a password with
-        every user that has access privileges for the relevant spaces. That way,
+        every user that has access privileges for the relevant spaces, and every
+        user that has a replication :ref:`role <rep-role>`. That way,
         the :ref:`URI` for the :confval:`replication_source` parameter will
         always have to have the long form
         ``replication_source='username:password@host:port'``
@@ -370,7 +375,8 @@ On the first shell, which we'll call Terminal #1, execute these commands:
     $ ~/tarantool/src/tarantool
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.user.create('replicator', {password = 'password'})
-    tarantool> box.schema.user.grant('replicator', 'read,write', 'universe')
+    tarantool> box.schema.role.grant('replication','read,write','universe')
+    tarantool> box.schema.user.grant('replicator','execute','role','replication')
     tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
 
 The result is that a new cluster is set up, and the server's UUID is displayed. Now the

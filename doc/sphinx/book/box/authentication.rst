@@ -370,6 +370,8 @@ privileges in a role and then grant or revoke the role. Role information is
 in the _user space but the third field - the type field - is 'role' rather
 than 'user'.
 
+.. _rep-role:
+
 If a role R1 is granted a privilege X, and user U1 is granted a privilege
 "role R1", then user U1 in effect has privilege X. Then if a role R2 is
 granted a privilege Y, and role R1 is granted a privilege "role R2",
