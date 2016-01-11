@@ -12,6 +12,9 @@
 %global _enable_debug_package %{nil}
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
+# -fPIE break backtraces
+# https://github.com/tarantool/tarantool/issues/1262
+%undefine _hardened_build
 
 Source1: VERSION
 %global build_version %(( cat %{SOURCE1} || git describe --long) | sed "s/[0-9]*\.[0-9]*\.[0-9]*-//" | sed "s/-[a-z 0-9]*//")
@@ -132,11 +135,12 @@ This package provides common files
     end
     local function def_init()
         if tonumber(rpm.expand("%{with systemd}")) ~= 0 then
-            return cmake_key_value("WITH_SYSTEMD", "ON") ..
-                   cmake_key_value("SYSTEMD_SERVICES_INSTALL_DIR",
-                                   '%{_unitdir}')
+            return cmake_key_value("ENABLE_DIST", "ON") ..
+                   cmake_key_value("WITH_SYSTEMD", "ON") ..
+                   cmake_key_value("SYSTEMD_UNIT_DIR", '%{_unitdir}') ..
+                   cmake_key_value("SYSTEMD_TMPFILES_DIR", '%{_tmpfilesdir}')
         else
-            return ' %{!?scl:-DWITH_SYSVINIT=ON}'
+            return ' %{!?scl:-DENABLE_DIST=ON}'
         end
     end
     local cmd = 'cmake'
@@ -180,14 +184,15 @@ make VERBOSE=1 DESTDIR=%{buildroot} install
 %post common
 mkdir -m 0755 -p %{_var}/run/tarantool/
 chown tarantool:tarantool %{_var}/run/tarantool/
-mkdir -m 0755 -p %{_var}/log/tarantool/
-chown tarantool:tarantool %{_var}/log/tarantool/
-mkdir -m 0755 -p %{_var}/lib/tarantool/
+mkdir -m 2750 -p %{_var}/log/tarantool/
+chown tarantool:adm %{_var}/log/tarantool/
+mkdir -m 0750 -p %{_var}/lib/tarantool/
 chown tarantool:tarantool %{_var}/lib/tarantool/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.available/
 
 %if %{with systemd}
+%tmpfiles_create tarantool.conf
 %systemd_post tarantool.service
 %else
 chkconfig --add tarantool
@@ -209,13 +214,10 @@ chkconfig --del tarantool
 
 %files
 %defattr(-,root,root,-)
-
 "%{_bindir}/tarantool"
-
-%dir "%{_datadir}/doc/tarantool"
-"%{_datadir}/doc/tarantool/README.md"
-"%{_datadir}/doc/tarantool/LICENSE"
-
+%doc README.md
+%{!?_licensedir:%global license %doc}
+%license LICENSE AUTHORS
 "%{_mandir}/man1/tarantool.1.gz"
 
 %files dev
@@ -235,12 +237,18 @@ chkconfig --del tarantool
 "%{_mandir}/man1/tarantoolctl.1.gz"
 "%{_sysconfdir}/sysconfig/tarantool"
 %dir "%{_sysconfdir}/tarantool"
+%dir "%{_sysconfdir}/tarantool/instances.enabled"
 %dir "%{_sysconfdir}/tarantool/instances.available"
-"%{_sysconfdir}/tarantool/instances.available/example.lua"
+%config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
+%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
+%attr(-,tarantool,tarantool) %dir %{_localstatedir}/log/tarantool/
+%config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
+
 %if %{with systemd}
 %dir "%{_prefix}/lib/tarantool/"
 "%{_unitdir}/tarantool.service"
 "%{_prefix}/lib/tarantool/tarantool.init"
+"%{_tmpfilesdir}/tarantool.conf"
 %else
 "%{_sysconfdir}/init.d/tarantool"
 %endif

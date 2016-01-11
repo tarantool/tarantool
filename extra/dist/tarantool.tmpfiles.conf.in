@@ -1,0 +1,1 @@
+d @TARANTOOL_RUNDIR@ 0755 tarantool tarantool -

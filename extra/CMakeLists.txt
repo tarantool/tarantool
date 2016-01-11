@@ -1,4 +1,7 @@
-add_subdirectory(dist)
+option(ENABLE_DIST "Enable install of init scripts" OFF)
+if (ENABLE_DIST)
+    add_subdirectory(dist)
+endif()
 
 if (TARGET_OS_DARWIN)
 	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool.plist
