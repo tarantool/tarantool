@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(31)
+test:plan(32)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -123,6 +123,10 @@ client:write(string.format("require('console').connect('%s')\n",
 test:ok(yaml.decode(client:read(EOL))[1], 'admin connect')
 client:write("2 + 2\n")
 test:ok(yaml.decode(client:read(EOL))[1] == 4, "admin eval")
+
+-- gh-1177: Error message for display of a net.box result
+client:write("require('net.box').new('unix/', '"..IPROTO_SOCKET.."')\n")
+test:isnil(yaml.decode(client:read(EOL))[1].error, "gh-1177 __serialize")
 -- there is no way to disconnect here
 
 -- Disconect from console

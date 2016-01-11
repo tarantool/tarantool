@@ -306,4 +306,8 @@ t = nil
 
 space:drop()
 
+-- gh-1266: luaL_convertfield crashes on ffi.typeof()
+ffi = require('ffi')
+ffi.typeof('struct tuple')
+
 test_run:cmd("clear filter")

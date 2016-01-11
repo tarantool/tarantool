@@ -244,7 +244,7 @@ ok - nil
     # table: end
 ok - table
     # ucdata
-    1..10
+    1..11
     ok - encode exception on cdata
     ok - encode exception on udata
     ok - encode_invalid_as_nil
@@ -255,6 +255,7 @@ ok - table
     ok - udata __tostring
     ok - cdata hook priority
     ok - udata  hook priority
+    ok - ctype __serialize
     # ucdata: end
 ok - ucdata
     # misc
