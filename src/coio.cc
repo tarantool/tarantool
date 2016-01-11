@@ -172,7 +172,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	evio_timeout_init(loop, &start, &delay, timeout);
 
 	assert(service != NULL);
-	if (strcmp(host, URI_HOST_UNIX) == 0) {
+	if (uri_is_unix_path(uri)) {
 		/* UNIX socket */
 		struct sockaddr_un un;
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);

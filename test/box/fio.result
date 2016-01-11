@@ -34,6 +34,55 @@ fio.pathjoin('/', '/cde')
 ---
 - /cde
 ...
+-- pathjoin2
+fio.pathjoin2()
+---
+- .
+...
+fio.pathjoin2(nil)
+---
+- .
+...
+fio.pathjoin2('a')
+---
+- a
+...
+fio.pathjoin2('/a')
+---
+- /a
+...
+fio.pathjoin2('a', 'b', 'c')
+---
+- a/b/c
+...
+fio.pathjoin2('/a', 'b', 'c')
+---
+- /a/b/c
+...
+fio.pathjoin2('a', '/b', 'c')
+---
+- /b/c
+...
+fio.pathjoin2('a/b/c', 'd')
+---
+- a/b/c/d
+...
+fio.pathjoin2('..', 'a/b/c')
+---
+- ../a/b/c
+...
+fio.pathjoin2('/', '..', 'a/b/c')
+---
+- /a/b/c
+...
+fio.pathjoin2('a/b/c', '..')
+---
+- a/b
+...
+fio.pathjoin2('a//b//c/', 'd/.')
+---
+- a/b/c/d
+...
 -- basename
 fio.basename(nil)
 ---
@@ -410,4 +459,36 @@ fio.abspath("/tmp")
 type(string.find(fio.abspath("tmp"), "tmp"))
 ---
 - number
+...
+-- chdir
+old_cwd = fio.cwd()
+---
+...
+fio.chdir(nil)
+---
+- false
+...
+fio.chdir(42)
+---
+- false
+...
+fio.chdir('/no/such/file/or/directory')
+---
+- false
+...
+fio.chdir('/')
+---
+- true
+...
+fio.cwd()
+---
+- /
+...
+fio.chdir(cwd)
+---
+- false
+...
+fio.cwd() == old_cwd
+---
+- false
 ...

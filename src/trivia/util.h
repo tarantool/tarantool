@@ -119,6 +119,9 @@ find_path(const char *argv0);
 char *
 abspath(const char *filename);
 
+int
+abspath_inplace(const char *filename, char *buf, size_t size);
+
 char *
 int2str(long long int val);
 

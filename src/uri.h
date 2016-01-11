@@ -69,6 +69,9 @@ uri_parse(struct uri *uri, const char *str);
 char *
 uri_format(const struct uri *uri);
 
+int
+uri_is_unix_path(const struct uri *uri);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

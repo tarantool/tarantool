@@ -106,7 +106,8 @@ xdir_create(struct xdir *dir, const char *dirname,
 	/* Default mode. */
 	dir->mode = 0660;
 	dir->server_uuid = server_uuid;
-	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
+	if (abspath_inplace(dirname, dir->dirname, sizeof dir->dirname) == -1)
+		panic_syserror("getcwd");
 	if (type == SNAP) {
 		strcpy(dir->open_wflags, "wxd");
 		dir->filetype = "SNAP\n";
