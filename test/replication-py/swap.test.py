@@ -42,7 +42,7 @@ os.putenv('MASTER', master.uri)
 
 # replica server
 replica = TarantoolServer()
-replica.script = "replication/replica.lua"
+replica.script = "replication-py/replica.lua"
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.deploy()
 replica.admin("while box.info.server.id == 0 do require('fiber').sleep(0.01) end")

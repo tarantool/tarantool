@@ -20,7 +20,7 @@ print 'replica test 1 (no such space)'
 print '-------------------------------------------------------------'
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
@@ -61,7 +61,7 @@ master.admin("for k = 20, 29 do box.space[42]:upsert({k}, {}) end")
 lsn = master.get_lsn(master_id)
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
