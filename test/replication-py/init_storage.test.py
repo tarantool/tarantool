@@ -23,9 +23,22 @@ replica = TarantoolServer(server.ini)
 replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir #os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
-replica.deploy()
+
+# #1075: Box.once should wait before the server enters RW mode
+#
+# We expect the replica to get blocked in box.cfg{}, hence wait = False.
+# Since xlog files on master were deleted, they aren't delivered,
+# and replica waits indefinitely.
+#
+# Note: replica waits for a log entry indicating that this very replica
+# joined the cluster. Once the entry is fetched we assume that the
+# replica is relatively up to date and enter RW mode. Never happens in
+# this particular test case.
+replica.deploy(wait = False)
 
 replica.admin('box.space.test')
+
+replica.admin('box_cfg_done') # blocked in box.cfg it should be
 
 replica.stop()
 replica.cleanup(True)

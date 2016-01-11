@@ -31,6 +31,7 @@
 #include "box/box.h"
 
 #include <say.h>
+#include "ipc.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -86,6 +87,7 @@ static struct recover_row_ctx {
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 bool is_ro = true;
+struct ipc_channel *wait_rw;
 
 void
 recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
@@ -175,6 +177,18 @@ void
 box_set_ro(bool ro)
 {
 	is_ro = ro;
+	if (ro == false && !ipc_channel_is_full(wait_rw))
+		ipc_channel_put(wait_rw, NULL);
+}
+
+static void
+box_wait_rw()
+{
+	void *msg;
+	while (is_ro) {
+		ipc_channel_get(wait_rw, &msg);
+		assert(msg == NULL);
+	}
 }
 
 bool
@@ -939,6 +953,8 @@ box_free(void)
 #endif
 		engine_shutdown();
 	}
+	if (wait_rw)
+		ipc_channel_delete(wait_rw);
 }
 
 static void
@@ -984,6 +1000,10 @@ static inline void
 box_init(void)
 {
 	error_init();
+
+	wait_rw = ipc_channel_new(1);
+	if (wait_rw == NULL)
+		diag_raise();
 
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
@@ -1086,6 +1106,8 @@ box_init(void)
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
 		box_set_ro(false);
+	else
+		box_wait_rw();
 	title("running");
 	say_info("ready to accept requests");
 

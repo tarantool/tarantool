@@ -1,4 +1,7 @@
 #!/usr/bin/env tarantool
+box_cfg_done = false
+
+require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
     listen              = os.getenv("LISTEN"),
@@ -6,4 +9,4 @@ box.cfg({
     slab_alloc_arena    = 0.1,
 })
 
-require('console').listen(os.getenv('ADMIN'))
+box_cfg_done = true
