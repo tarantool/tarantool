@@ -157,5 +157,5 @@ fio.chdir(42)
 fio.chdir('/no/such/file/or/directory')
 fio.chdir('/')
 fio.cwd()
-fio.chdir(cwd)
+fio.chdir(old_cwd)
 fio.cwd() == old_cwd

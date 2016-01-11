@@ -484,11 +484,11 @@ fio.cwd()
 ---
 - /
 ...
-fio.chdir(cwd)
+fio.chdir(old_cwd)
 ---
-- false
+- true
 ...
 fio.cwd() == old_cwd
 ---
-- false
+- true
 ...
