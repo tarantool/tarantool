@@ -102,7 +102,7 @@ lbox_tuple_new(lua_State *L)
 	struct region *gc = &fiber()->gc;
 	RegionGuard guard(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
+	mpstream_init(&stream, gc, region_reserve_xc_cb, region_alloc_xc_cb);
 
 	if (argc == 1 && (lua_istable(L, 1) || lua_istuple(L, 1))) {
 		/* New format: box.tuple.new({1, 2, 3}) */
@@ -242,7 +242,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	struct region *gc = &fiber()->gc;
 	size_t used = region_used(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
+	mpstream_init(&stream, gc, region_reserve_xc_cb, region_alloc_xc_cb);
 	luamp_encode_tuple(L, luaL_msgpack_default, &stream, idx);
 	mpstream_flush(&stream);
 	*p_len = region_used(gc) - used;
@@ -308,7 +308,7 @@ lbox_tuple_transform(struct lua_State *L)
 	struct region *gc = &fiber()->gc;
 	RegionGuard guard(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
+	mpstream_init(&stream, gc, region_reserve_xc_cb, region_alloc_xc_cb);
 	/*
 	 * Prepare UPDATE expression
 	 */
@@ -332,7 +332,7 @@ lbox_tuple_transform(struct lua_State *L)
 	size_t expr_len = region_used(gc) - guard.used;
 	const char *expr = (char *) region_join_xc(gc, expr_len);
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
-					       region_alloc_ex_cb,
+					       region_alloc_xc_cb,
 					       gc, tuple, expr,
 					       expr + expr_len, 0);
 	lbox_pushtuple(L, new_tuple);
@@ -402,7 +402,7 @@ boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end)
 	RegionGuard region_guard(&fiber()->gc);
 	try {
 		struct tuple *new_tuple = tuple_update(tuple_format_ber,
-			region_alloc_ex_cb, &fiber()->gc, tuple,
+			region_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		tuple_ref(new_tuple); /* must not throw in this case */
 		return new_tuple;
@@ -417,7 +417,7 @@ boxffi_tuple_upsert(struct tuple *tuple, const char *expr, const char *expr_end)
 	RegionGuard region_guard(&fiber()->gc);
 	try {
 		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
-			region_alloc_ex_cb, &fiber()->gc, tuple,
+			region_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		tuple_ref(new_tuple); /* must not throw in this case */
 		return new_tuple;

@@ -273,7 +273,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	struct tuple *new_tuple = tuple_update(space->format,
-					       region_alloc_ex_cb,
+					       region_alloc_xc_cb,
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end,
@@ -336,7 +336,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	} else {
 		/* Update the tuple. */
 		struct tuple *new_tuple =
-			tuple_upsert(space->format, region_alloc_ex_cb,
+			tuple_upsert(space->format, region_alloc_xc_cb,
 				     &fiber()->gc, old_tuple,
 				     request->ops, request->ops_end,
 				     request->index_base);
