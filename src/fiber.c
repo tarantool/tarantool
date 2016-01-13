@@ -40,14 +40,7 @@
 #include "trigger.h"
 #include "small/pmatomic.h"
 
-static void (*fiber_invoke)(fiber_func f, va_list ap);
-
-void
-fiber_c_invoke(fiber_func f, va_list ap)
-{
-	if (f(ap) == 0)
-		diag_clear(&fiber()->diag);
-}
+static int (*fiber_invoke)(fiber_func f, va_list ap);
 
 /*
  * Defines a handler to be executed on exit from cord's thread func,
@@ -444,14 +437,24 @@ fiber_loop(void *data __attribute__((unused)))
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		fiber_invoke(fiber->f, fiber->f_data);
-		struct error *e = diag_last_error(&fiber->diag);
-		if (e != NULL && !(fiber->flags & FIBER_IS_JOINABLE)) {
+		if (fiber_invoke(fiber->f, fiber->f_data) != 0) {
+			struct error *e = diag_last_error(&fiber->diag);
+			/* diag must not be empty on error */
+			assert(e != NULL || fiber->flags & FIBER_IS_CANCELLED);
 			/*
 			 * For joinable fibers, it's the business
 			 * of the caller to deal with the error.
 			 */
-			error_log(e);
+			if (!(fiber->flags & FIBER_IS_JOINABLE) &&
+			    !(fiber->flags & FIBER_IS_CANCELLED))
+				error_log(e);
+			/* Sic: diag is not cleared for non-joinable fibers */
+		} else {
+			/*
+			 * Make sure a leftover exception does not
+			 * propagate up to the joiner.
+			 */
+			diag_clear(&fiber()->diag);
 		}
 		fiber->flags |= FIBER_IS_DEAD;
 		while (! rlist_empty(&fiber->wake)) {
@@ -894,7 +897,7 @@ cord_slab_cache(void)
 }
 
 void
-fiber_init(void (*invoke)(fiber_func f, va_list ap))
+fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();

@@ -398,7 +398,7 @@ bool
 cord_is_main();
 
 void
-fiber_init(void (*fiber_invoke)(fiber_func f, va_list ap));
+fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));
 
 void
 fiber_free(void);
@@ -480,8 +480,12 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
-void
-fiber_c_invoke(fiber_func f, va_list ap);
+/** Useful for C unit tests */
+static inline int
+fiber_c_invoke(fiber_func f, va_list ap)
+{
+	return f(ap);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -516,18 +520,13 @@ fiber_new_xc(const char *name, fiber_func func)
 	return f;
 }
 
-inline void
+static inline int
 fiber_cxx_invoke(fiber_func f, va_list ap)
 {
 	try {
-		if (f(ap) == 0) {
-			/*
-			 * Make sure a leftover exception does not
-			 * propagate up to the joiner.
-			 */
-			diag_clear(&fiber()->diag);
-		}
+		return f(ap);
 	} catch (struct error *e) {
+		return -1;
 	}
 }
 
