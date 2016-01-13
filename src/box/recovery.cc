@@ -337,8 +337,12 @@ recovery_bootstrap(struct recovery *r)
 static void
 recover_remaining_wals(struct recovery *r)
 {
-	xdir_scan_xc(&r->wal_dir);
-
+	/*
+	 * Sic: it could be tempting to put xdir_scan() inside
+	 * this function. This would slow down relay quite a bit,
+	 * since xdir_scan() would be invoked on every relay
+	 * row.
+	 */
 	struct vclock *last = vclockset_last(&r->wal_dir.index);
 	if (last == NULL) {
 		if (r->current_wal != NULL) {
@@ -412,6 +416,7 @@ recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
 {
 	recovery_stop_local(r);
 
+	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r);
 
 	recovery_close_log(r);
@@ -554,7 +559,34 @@ recovery_follow_f(va_list ap)
 
 	while (! fiber_is_cancelled()) {
 
-		recover_remaining_wals(r);
+		/*
+		 * Recover until there is no new stuff which appeared in
+		 * the log dir while recovery was running.
+		 *
+		 * Use vclock signature to represent the current wal
+		 * since the xlog object itself may be freed in
+		 * recover_remaining_rows().
+		 */
+		int64_t start, end;
+		do {
+			start = r->current_wal ? vclock_sum(&r->current_wal->vclock) : 0;
+			/*
+			 * If there is no current WAL, or we reached
+			 * an end  of one, look for new WALs.
+			 */
+			if (r->current_wal == NULL || r->current_wal->eof_read)
+				xdir_scan_xc(&r->wal_dir);
+
+			recover_remaining_wals(r);
+
+			end = r->current_wal ? vclock_sum(&r->current_wal->vclock) : 0;
+			/*
+			 * Continue, given there's been progress *and* there is a
+			 * chance new WALs have appeared since.
+			 * Sic: end * is < start (is 0) if someone deleted all logs
+			 * on the filesystem.
+			 */
+		} while (end > start && (r->current_wal == NULL || r->current_wal->eof_read));
 
 		subscription.set_log_path(
 			r->current_wal != NULL ? r->current_wal->filename : NULL);
@@ -583,6 +615,7 @@ recovery_follow_local(struct recovery *r, const char *name,
 	 * Scan wal_dir and recover all existing at the moment xlogs.
 	 * Blocks until finished.
 	 */
+	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r);
 	recovery_close_log(r);
 
