@@ -22,7 +22,117 @@ space = box.schema.space.create('test', { id = 99999, engine = engine })
 index = space:create_index('primary', { type = index})
 ---
 ...
-for k = 1, 123 do space:insert{k, k*k} end
+box.snapshot()
+---
+- ok
+...
+-- replica join
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('wait_lsn replica default')
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space.test:select()
+---
+- []
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+_ = test_run:cmd("cleanup server replica")
+---
+...
+-- new data
+_ = box.space.test:insert{1, 1}
+---
+...
+-- replica join
+test_run:cmd("deploy server replica")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('wait_lsn replica default')
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space.test:select()
+---
+- - [1, 1]
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+_ = test_run:cmd("cleanup server replica")
+---
+...
+-- add snapshot
+box.snapshot()
+---
+- ok
+...
+-- replica join
+test_run:cmd("deploy server replica")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd('wait_lsn replica default')
+---
+- true
+...
+test_run:cmd('switch replica')
+---
+- true
+...
+box.space.test:select()
+---
+- - [1, 1]
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+_ = test_run:cmd("cleanup server replica")
+---
+...
+-- new data
+for k = 2, 123 do box.space.test:insert{k, k*k} end
 ---
 ...
 box.snapshot()
@@ -30,7 +140,7 @@ box.snapshot()
 - ok
 ...
 -- replica join
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("deploy server replica")
 ---
 - true
 ...
@@ -180,9 +290,8 @@ test_run:cmd("stop server replica")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+_ = test_run:cmd("cleanup server replica")
 ---
-- true
 ...
 space:drop()
 ---
