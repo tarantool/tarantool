@@ -111,10 +111,9 @@ This package provides common files
 ##################################################################
 
 %prep
-%setup -q -c tarantool-%{version}
+%setup -q -n tarantool-%{version}-%{build_version}-%{git_hash}-src
 
 %build
-[ -d tarantool-%{version}-%{build_version}-%{git_hash}-src ] && cd tarantool-%{version}-%{build_version}-%{git_hash}-src
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
 
 %{lua:
@@ -168,8 +167,7 @@ This package provides common files
 %{lua:print(wrap_with_toolset('make %{?_smp_mflags}\n'))}
 
 %install
-[ -d tarantool-%{version}-%{build_version}-%{git_hash}-src ] && cd tarantool-%{version}-%{build_version}-%{git_hash}-src
-make VERBOSE=1 DESTDIR=%{buildroot} install
+%make_install
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
