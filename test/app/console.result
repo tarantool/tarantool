@@ -1,5 +1,5 @@
 TAP version 13
-1..31
+1..32
 ok - console.listen started
 ok - Handshake
 ok - connect to console
@@ -24,6 +24,7 @@ ok - exception handling
 ok - remote disconnect
 ok - admin connect
 ok - admin eval
+ok - gh-1177 __serialize
 ok - console.listen stopped
 ok - console.listen uri support
 ok - console.listen uri support

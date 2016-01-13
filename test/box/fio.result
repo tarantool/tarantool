@@ -418,6 +418,22 @@ fio.unlink(nil)
 ---
 - error: 'Usage: fio.unlink(pathname)'
 ...
+-- gh-1211 use 0777 if mode omitted in open
+fh4 = fio.open('newfile', {'O_RDWR','O_CREAT','O_EXCL'})
+---
+...
+string.format('%o', bit.band(fh4:stat().mode, 0x1FF))
+---
+- '777'
+...
+fh4:close()
+---
+- true
+...
+fio.unlink('newfile')
+---
+- true
+...
 -- dirname
 fio.dirname(nil)
 ---

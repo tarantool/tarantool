@@ -120,7 +120,7 @@ fio.open = function(path, flags, mode)
         flags = { flags }
     end
     if type(mode) ~= 'table' then
-        mode = { mode }
+        mode = { mode or 0x1FF } -- 0777
     end
 
 

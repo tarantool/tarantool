@@ -135,6 +135,12 @@ fio.rmdir(tmpdir)
 fio.unlink()
 fio.unlink(nil)
 
+-- gh-1211 use 0777 if mode omitted in open
+fh4 = fio.open('newfile', {'O_RDWR','O_CREAT','O_EXCL'})
+string.format('%o', bit.band(fh4:stat().mode, 0x1FF))
+fh4:close()
+fio.unlink('newfile')
+
 -- dirname
 
 fio.dirname(nil)

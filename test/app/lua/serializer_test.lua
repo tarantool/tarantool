@@ -325,7 +325,7 @@ local function test_table(test, s, is_array, is_map)
 end
 
 local function test_ucdata(test, s)
-    test:plan(10)
+    test:plan(11)
 
     --
     -- encode_use_unpack / encode_use_tostring
@@ -368,6 +368,8 @@ local function test_ucdata(test, s)
     ss.cfg{encode_load_metatables = true, encode_use_tostring = true}
     test:is(ss.decode(ss.encode(cdata)), 'unpack', 'cdata hook priority')
     test:istable(ss.decode(ss.encode(udata)), 'udata  hook priority')
+    -- gh-1226: luaL_convertfield should ignore __serialize hook for ctypes
+    test:like(ss.decode(ss.encode(ctype)), 'ctype<struct', 'ctype __serialize')
 
     ss = nil
 end

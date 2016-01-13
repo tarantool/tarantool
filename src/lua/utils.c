@@ -350,7 +350,7 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 	lua_pushcfunction(L, lua_gettable_wrapper);
 	lua_pushvalue(L, idx);
 	lua_pushliteral(L, LUAL_SERIALIZE);
-	if (lua_pcall(L, 2, 1, 0) == 0) {
+	if (lua_pcall(L, 2, 1, 0) == 0  && !lua_isnil(L, -1)) {
 		if (!lua_isfunction(L, -1))
 			luaL_error(L, "invalid " LUAL_SERIALIZE  " value");
 		/* copy object itself */
@@ -612,11 +612,22 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
 	assert(field->type == MP_EXT); /* must be called after tofield() */
-	int type = lua_type(L, idx);
-	if (type == LUA_TUSERDATA || type == LUA_TCDATA)
-		lua_field_inspect_ucdata(L, cfg, idx, field);
 
-	type = lua_type(L, idx);
+	if (cfg->encode_load_metatables) {
+		int type = lua_type(L, idx);
+		if (type == LUA_TCDATA) {
+			/*
+			 * Don't call __serialize on primitive types
+			 * https://github.com/tarantool/tarantool/issues/1226
+			 */
+			GCcdata *cd = cdataV(L->base + idx - 1);
+			if (cd->ctypeid > CTID_CTYPEID)
+				lua_field_inspect_ucdata(L, cfg, idx, field);
+		} else if (type == LUA_TUSERDATA) {
+			lua_field_inspect_ucdata(L, cfg, idx, field);
+		}
+	}
+
 	if (field->type == MP_EXT && cfg->encode_use_tostring)
 		lua_field_tostring(L, cfg, idx, field);
 
