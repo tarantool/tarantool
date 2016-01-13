@@ -65,4 +65,27 @@ fiber.sleep(0.3)
 continue_snapshoting = false
 snap_chan:get()
 print('ok')
+
+--https://github.com/tarantool/tarantool/issues/1185
+
+s1 = box.schema.create_space('test1', { engine = 'memtx'})
+i1 = s1:create_index('test', { type = 'tree', parts = {1, 'num'} })
+
+s2 = box.schema.create_space('test2', { engine = 'memtx'})
+i2 = s2:create_index('test', { type = 'tree', parts = {1, 'num'} })
+
+for i = 1,1000 do s1:insert{i, i, i} end
+
+fiber.create(function () box.snapshot() end)
+
+fiber.sleep(0)
+
+s2:insert{1, 2, 3}
+s2:update({1}, {{'+', 2, 2}})
+
+s1:drop()
+s2:drop()
+
+print('gh-1185 test done w/o crash!.')
+
 os.exit(0)
