@@ -229,8 +229,11 @@ socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 socket_error == errno.ECONNREFUSED or socket_error == 0
 
 test_run:cmd("setopt delimiter ';'")
-socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+inf = socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
     flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
+-- musl libc https://github.com/tarantool/tarantool/issues/1249
+inf[1].canonname = nil;
+inf;
 test_run:cmd("setopt delimiter ''");
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
@@ -535,7 +538,7 @@ s:bind('unix/', path)
 s:close()
 
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
-{ s:bind('unix/', path), errno.strerror() }
+{ s:bind('unix/', path), errno() == errno.EADDRINUSE }
 s:close()
 
 s = socket.tcp_server('unix/', path, function() end)

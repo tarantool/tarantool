@@ -314,7 +314,7 @@ applier_disconnect(struct applier *applier, struct error *e,
 	fiber_gc();
 }
 
-static void
+static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
@@ -339,7 +339,7 @@ applier_f(va_list ap)
 			 * is stoppable only with fiber_cancel().
 			 */
 			assert(0);
-			return;
+			return 0;
 		} catch (ClientError *e) {
 			/* log logical error which caused replica to stop */
 			e->log();
@@ -366,6 +366,7 @@ applier_f(va_list ap)
 		*/
 		fiber_sleep(RECONNECT_DELAY);
 	}
+	return 0;
 }
 
 void

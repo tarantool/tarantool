@@ -78,11 +78,14 @@ ipc_get()
 	status = check_plan();
 }
 
-void main_f(va_list /* ap */)
+int
+main_f(va_list ap)
 {
+	(void) ap;
 	ipc_basic();
 	ipc_get();
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 int main()
