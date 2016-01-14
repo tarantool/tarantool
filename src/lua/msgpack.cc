@@ -383,7 +383,7 @@ lua_msgpack_encode(lua_State *L)
 	struct region *gc= &fiber()->gc;
 	RegionGuard guard(gc);
 	struct mpstream stream;
-	mpstream_init(&stream, gc, region_reserve_ex_cb, region_alloc_ex_cb);
+	mpstream_init(&stream, gc, region_reserve_xc_cb, region_alloc_xc_cb);
 
 	luamp_encode_r(L, cfg, &stream, 0);
 	mpstream_flush(&stream);
