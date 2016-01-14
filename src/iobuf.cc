@@ -48,13 +48,13 @@ __thread struct mempool iobuf_pool;
  * sizes, so when we ask slab cache for 16320 bytes,
  * we get a slab of size 16384, not 32768.
  */
-static int iobuf_readahead = 16320;
+static unsigned iobuf_readahead = 16320;
 
 /**
  * How big is a buffer which needs to be shrunk before it is put
  * back into buffer cache.
  */
-static int iobuf_max_size()
+static unsigned iobuf_max_size()
 {
 	return 18 * iobuf_readahead;
 }

@@ -1406,7 +1406,7 @@ user_has_data(struct user *user)
 	 */
 	uint32_t indexes[] = { 1, 1, 1, 0 };
 	uint32_t count = sizeof(spaces)/sizeof(*spaces);
-	for (int i = 0; i < count; i++) {
+	for (uint32_t i = 0; i < count; i++) {
 		if (space_has_data(spaces[i], indexes[i], uid))
 			return true;
 	}

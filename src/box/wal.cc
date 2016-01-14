@@ -259,7 +259,7 @@ wal_opt_rotate(struct xlog **wal, struct recovery *r,
 
 	ERROR_INJECT_RETURN(ERRINJ_WAL_ROTATE);
 
-	if (l != NULL && l->rows >= r->writer->rows_per_wal) {
+	if (l != NULL && l->rows >= (unsigned)r->writer->rows_per_wal) {
 		wal_to_close = l;
 		l = NULL;
 	}

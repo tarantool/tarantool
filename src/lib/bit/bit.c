@@ -119,7 +119,7 @@ bswap_u64(uint64_t x);
 	/* naive generic implementation, worst case */			\
 	type bit = 1;							\
 	int i = 0;							\
-	for (int k = 0; k < bitsize; k++) {				\
+	for (unsigned k = 0; k < bitsize; k++) {				\
 		if (x & bit) {						\
 			indexes[i++] = offset + k + 1;			\
 		}							\

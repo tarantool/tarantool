@@ -88,7 +88,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
 	int n = snprintf(def->name, sizeof(def->name), "%s", name);
-	if (n >= sizeof(def->name)) {
+	if ((unsigned)n >= sizeof(def->name)) {
 		free(def);
 		struct space *space = space_cache_find(space_id);
 		tnt_raise(LoggedError, ER_MODIFY_INDEX,
@@ -249,7 +249,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	 */
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
-	for (int i = 0; i < def->part_count; i++) {
+	for (uint32_t i = 0; i < def->part_count; i++) {
 		if (def->parts[i].type == UNKNOWN)
 			all_parts_set = false;
 	}

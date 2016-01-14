@@ -389,11 +389,11 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 			to_read = mp_decode_uint(&pos);
 	}
 
-	if (ibuf_unused(&oldbuf->in) >= to_read)
+	if ((ssize_t)ibuf_unused(&oldbuf->in) >= to_read)
 		return oldbuf;
 
 	/** All requests are processed, reuse the buffer. */
-	if (ibuf_used(&oldbuf->in) == con->parse_size) {
+	if ((ssize_t)ibuf_used(&oldbuf->in) == con->parse_size) {
 		ibuf_reserve_xc(&oldbuf->in, to_read);
 		return oldbuf;
 	}
@@ -642,7 +642,7 @@ tx_process_msg(struct cmsg *m)
 	session->sync = msg->header.sync;
 	try {
 		if (msg->header.schema_id &&
-		    msg->header.schema_id != sc_version) {
+		    msg->header.schema_id != (unsigned)sc_version) {
 			tnt_raise(ClientError, ER_WRONG_SCHEMA_VERSION,
 				  sc_version, msg->header.schema_id);
 		}

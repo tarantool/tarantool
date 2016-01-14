@@ -257,7 +257,7 @@ static void
 box_check_readahead(int readahead)
 {
 	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
-	if (readahead < READAHEAD_MIN || readahead > READAHEAD_MAX) {
+	if ((unsigned)readahead < READAHEAD_MIN || (unsigned)readahead > READAHEAD_MAX) {
 		tnt_raise(ClientError, ER_CFG, "readahead",
 			  "specified value is out of bounds");
 	}

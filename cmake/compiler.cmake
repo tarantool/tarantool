@@ -162,7 +162,6 @@ macro(enable_tnt_compile_flags)
     add_compile_flags("C;CXX"
         "-Wall"
         "-Wextra"
-        "-Wno-sign-compare"
         "-Wno-strict-aliasing"
     )
 

@@ -315,12 +315,13 @@ sio_writev_all(int fd, struct iovec *iov, int iovcnt)
 		int cnt = iovend - iov;
 		if (cnt > IOV_MAX)
 			cnt = IOV_MAX;
-		ssize_t bytes_written = writev(fd, iov, cnt);
-		if (bytes_written < 0) {
+		ssize_t write_res = writev(fd, iov, cnt);
+		if (write_res < 0) {
 			if (errno == EINTR)
 				continue;
 			tnt_raise(SocketError, fd, "writev(%d)", cnt);
 		}
+                size_t bytes_written = (size_t)write_res;
 		bytes_total += bytes_written;
 		/*
 		 * Check for iov < iovend, since otherwise
@@ -392,7 +393,7 @@ ssize_t
 sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 {
 	ssize_t send_res = sendfile(sock_fd, file_fd, offset, size);
-	if (send_res < size)
+	if (send_res < 0 || (size_t)send_res < size)
 		tnt_raise(SocketError, sock_fd, "sendfile");
 	return send_res;
 }

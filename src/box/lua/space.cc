@@ -156,7 +156,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	 * Fill space.index table with
 	 * all defined indexes.
 	 */
-	for (int k = 0; k <= space->index_id_max; k++) {
+	for (unsigned k = 0; k <= space->index_id_max; k++) {
 		Index *index = space_index(space, k);
 		if (index == NULL)
 			continue;

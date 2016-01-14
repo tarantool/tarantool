@@ -1103,7 +1103,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 			parents[i]->header.size++;
 			bps_tree_block_id_t max_size = level_child_count[i] /
 						       level_block_count[i];
-			if (parents[i]->header.size != max_size) {
+			if ((uint32_t)parents[i]->header.size != max_size) {
 				parents[i]->elems[parents[i]->header.size - 1] =
 					insert_value;
 				break;

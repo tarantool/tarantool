@@ -414,7 +414,7 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
 }
 
 static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
-   int i;
+   unsigned i;
    yaml_event_t ev;
    yaml_char_t *anchor = get_yaml_anchor(dumper);
 

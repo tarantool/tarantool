@@ -63,7 +63,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 
 	/* prepare keys */
 	int size = 0;
-	int i = 0;
+	uint32_t i = 0;
 	while (i < key_def->part_count) {
 		char partname[32];
 		int len = snprintf(partname, sizeof(partname), "key");
@@ -136,7 +136,7 @@ SophiaIndex::createDocument(const char *key, bool async, const char **keyend)
 	sp_setstring(obj, "arg", fiber(), 0);
 	if (key == NULL)
 		return obj;
-	int i = 0;
+	uint32_t i = 0;
 	while (i < key_def->part_count) {
 		char partname[32];
 		int len = snprintf(partname, sizeof(partname), "key");
@@ -185,7 +185,7 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	         key_def->space_id);
 	sp_setint(env, path, key_def->space_id);
 	/* apply space schema */
-	int i = 0;
+	uint32_t i = 0;
 	while (i < key_def->part_count)
 	{
 		char *type;
@@ -371,7 +371,7 @@ sophia_upsert_mp(char **tuple, int *tuple_size_key, struct key_def *key_def,
 {
 	/* calculate msgpack size */
 	uint32_t mp_keysize = 0;
-	int i = 0;
+	uint32_t i = 0;
 	while (i < key_def->part_count) {
 		if (key_def->parts[i].type == STRING)
 			mp_keysize += mp_sizeof_str(key_size[i]);
