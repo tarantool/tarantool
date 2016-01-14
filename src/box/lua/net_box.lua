@@ -53,6 +53,9 @@ local mapping_mt = { __serialize = 'mapping' }
 local CONSOLE_FAKESYNC  = 15121974
 local CONSOLE_DELIMITER = "$EOF$"
 
+local VSPACE_ID = 281
+local VINDEX_ID = 289
+
 ffi.cdef [[
 enum {
     /* Maximal length of protocol name in handshake */
@@ -741,14 +744,14 @@ local remote_methods = {
         self:_switch_state('schema')
 
         local resp = self:_request_internal(SELECT,
-            true, box.schema.VSPACE_ID, 0, nil, { iterator = 'ALL' })
+            true, VSPACE_ID, 0, nil, { iterator = 'ALL' })
 
         -- set new schema id after first request
         self._schema_id = resp.hdr[SCHEMA_ID]
 
         local spaces = resp.body[DATA]
         resp = self:_request_internal(SELECT,
-            true, box.schema.VINDEX_ID, 0, nil, { iterator = 'ALL' })
+            true, VINDEX_ID, 0, nil, { iterator = 'ALL' })
         local indexes = resp.body[DATA]
 
         local sl = {}
