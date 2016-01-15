@@ -5,9 +5,9 @@
 --------------------------------------------------------------------------------
 
 The ``net.box`` package contains connectors to remote database systems. One
-variant, ``box.net.sql``, is for connecting to MySQL or MariaDB or PostgreSQL —
+variant, to be discussed later, is for connecting to MySQL or MariaDB or PostgreSQL —
 that variant is the subject of the :ref:`SQL DBMS plugins <dbms-plugins>` appendix.
-In this section the subject is the built-in variant, ``box.net``. This is for
+In this section the subject is the built-in variant, ``net.box``. This is for
 connecting to tarantool servers via a network.
 
 Call ``require('net.box')`` to get a ``net.box`` object, which will be called
@@ -58,7 +58,7 @@ necessary to prioritize requests or to use different authentication ids.
         conn = net_box.new('localhost', 3301)
         conn = net_box.new('127.0.0.1', box.cfg.listen, {
           wait_connect = false,
-          user = 'guest',
+          user = 'boxer',
           password = ''
         })
 
@@ -152,6 +152,16 @@ necessary to prioritize requests or to use different authentication ids.
         stored-procedure call.
 
         Example: ``conn:call('function5')``
+
+    .. method:: eval(Lua-string)
+
+        :samp:`conn:eval({Lua-string})` evaluates and executes the expression
+        in Lua-string, which may be any statement or series of statements.
+        An :ref:`execute privilege <privileges>` is required; if the user does not have it,
+        an administrator may grant it with
+        :codenormal:`box.schema.user.grant(`:codeitalic:`username`:codenormal:`,'execute','universe')`.
+
+        Example: ``conn:eval('return 5+5')``
 
     .. method:: timeout(timeout)
 

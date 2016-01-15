@@ -58,7 +58,7 @@
           threads = *number*,
           node_size = *number*,
           memory_limit = *number*,
-        }`
+        }
 
     This method may change in the future.
 

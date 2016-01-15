@@ -77,7 +77,7 @@ The possible options which can be passed to csv functions are:
         ...
 
     Readable file :file:`./file.csv` contains two CSV records.
-    Explanation of fio is in section` :ref:`fio <fio-section>`.
+    Explanation of fio is in section :ref:`fio <fio-section>`.
     Source CSV file and example respectively:
 
     .. code-block:: tarantoolsession

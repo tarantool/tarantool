@@ -10,23 +10,22 @@ box.cfg{
 
 require('console').listen(os.getenv('ADMIN'))
 
-_to_exclude = {
-    'pid_file', 'logger', 'sophia_dir',
-    'snap_dir', 'wal_dir',
-    'slab_alloc_maximal', 'slab_alloc_minimal'
+local _hide = {
+    pid_file=1, logger=1, listen=1, sophia_dir=1,
+    snap_dir=1, wal_dir=1,
+    slab_alloc_maximal=1, slab_alloc_minimal=1
 }
 
-_exclude = {}
-for _, f in pairs(_to_exclude) do
-    _exclude[f] = 1
-end
-
 function cfg_filter(data)
+    if type(data)~='table' then return data end
+    local keys,k,_ = {}
+    for k in pairs(data) do
+        table.insert(keys, k)
+    end
+    table.sort(keys)
     local result = {}
-    for field, val in pairs(data) do
-        if _exclude[field] == nil then
-            result[field] = val
-        end
+    for _,k in pairs(keys) do
+        table.insert(result, {k, _hide[k] and '<hidden>' or cfg_filter(data[k])})
     end
     return result
 end

@@ -243,8 +243,8 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		int tree_res =
 		bps_tree_index_insert(&tree, new_tuple, &dup_tuple);
 		if (tree_res) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  BPS_TREE_EXTENT_SIZE, "MemtxTree", "replace");
+			tnt_raise(OutOfMemory, BPS_TREE_EXTENT_SIZE,
+				  "MemtxTree", "replace");
 		}
 
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
@@ -272,8 +272,7 @@ MemtxTree::allocIterator() const
 	struct tree_iterator *it = (struct tree_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct tree_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct tree_iterator),
 			  "MemtxTree", "iterator");
 	}
 

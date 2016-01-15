@@ -333,8 +333,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		} catch (OutOfMemory *) {
 			throw;
 		} catch (ClientError *e) {
-			if (e->errcode() == ER_MEMORY_ISSUE)
-				throw;
 			say_error("UPSERT failed:");
 			e->log();
 		}

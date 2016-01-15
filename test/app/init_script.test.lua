@@ -34,7 +34,7 @@ for k,v in pairs(box.cfg) do
         table.insert(t,k..':'..tostring(v))
     end
 end
-
+table.sort(t)
 print('box.cfg')
 for k,v in pairs(t) do print(k, v) end
 --
