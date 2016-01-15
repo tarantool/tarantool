@@ -199,6 +199,11 @@ relay_subscribe_f(va_list ap)
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 	}
+	/*
+	 * Avoid double wakeup: both from the on_stop and fiber
+	 * cancel events.
+	 */
+	trigger_clear(&on_follow_error);
 	recovery_stop_local(r);
 	say_crit("exiting the relay loop");
 	return 0;

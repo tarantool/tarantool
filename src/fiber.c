@@ -293,9 +293,7 @@ fiber_schedule_timeout(ev_loop *loop,
 	struct fiber_watcher_data *state =
 			(struct fiber_watcher_data *) watcher->data;
 	state->timed_out = true;
-	/* remove from cord->ready, see fiber_call for details */
-	rlist_del(&state->f->state);
-	fiber_call(state->f);
+	fiber_wakeup(state->f);
 }
 
 /**
@@ -349,8 +347,11 @@ fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 	(void) revents;
 	struct fiber *fiber = watcher->data;
 	assert(fiber() == &cord()->sched);
-	/* remove from cord->ready, see fiber_call for details */
-	rlist_del(&fiber->state);
+	/*
+	 * Assert the fiber will not be scheduled twice because
+	 * it's also on the 'ready' list.
+	 */
+	assert(rlist_empty(&fiber->state));
 	fiber_call(fiber);
 }
 
@@ -466,9 +467,9 @@ fiber_loop(void *data __attribute__((unused)))
 			 * For joinable fibers, it's the business
 			 * of the caller to deal with the error.
 			 */
-			if (!(fiber->flags & FIBER_IS_JOINABLE) &&
-			    !(fiber->flags & FIBER_IS_CANCELLED)) {
-				error_log(e);
+			if (!(fiber->flags & FIBER_IS_JOINABLE)) {
+				if (!(fiber->flags & FIBER_IS_CANCELLED))
+					error_log(e);
 				diag_clear(&fiber()->diag);
 			}
 		} else {
@@ -560,6 +561,7 @@ fiber_new(const char *name, fiber_func f)
 
 		rlist_create(&fiber->state);
 		rlist_create(&fiber->wake);
+		diag_create(&fiber->diag);
 		fiber_reset(fiber);
 
 		rlist_add_entry(&cord->alive, fiber, link);
@@ -570,7 +572,6 @@ fiber_new(const char *name, fiber_func f)
 	if (++cord->max_fid < 100)
 		cord->max_fid = 101;
 	fiber->fid = cord->max_fid;
-	diag_create(&fiber->diag);
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 
