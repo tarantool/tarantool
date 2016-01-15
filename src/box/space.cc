@@ -103,8 +103,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	struct space *space = (struct space *) calloc(1, sz);
 
 	if (space == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sz, "struct space", "malloc");
+		tnt_raise(OutOfMemory, sz, "malloc", "struct space");
 
 	rlist_create(&space->on_replace);
 	auto scoped_guard = make_scoped_guard([=]

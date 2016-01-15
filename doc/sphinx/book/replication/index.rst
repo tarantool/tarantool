@@ -36,7 +36,7 @@ not cause replication to go out of sync.
 =====================================================================
 
 To prepare the master for connections from the replica, it's only necessary
-to include "listen" in the initial ``box.cfg`` request, for example
+to include ":ref:`listen <box-cfg-listen>`" in the initial ``box.cfg`` request, for example
 ``box.cfg{listen=3301}``. A master with enabled "listen" URI can accept
 connections from as many replicas as necessary on that URI. Each replica
 has its own replication state.
@@ -65,17 +65,21 @@ file and the WAL .xlog files), then starting replication again - the replica
 will then catch up with the master by retrieving all the master's tuples.
 Again, this procedure works only if the master's WAL files are present.
 
-.. NOTE::
+NOTE:
+Replication parameters are "dynamic", which allows the replica to become
+a master and vice versa with the help of the :func:`box.cfg` statement.
 
-    Replication parameters are "dynamic", which allows the replica to become
-    a master and vice versa with the help of the :func:`box.cfg` statement.
+NOTE:
+The replica does not inherit the master's configuration parameters, such
+as the ones that cause the :ref:`snapshot daemon <book-cfg-snapshot_daemon>` to run on the master.
+To get the same behavior, one would have to set the relevant parameters explicitly
+so that they are the same on both master and replica.
 
-.. NOTE::
-
-    The replica does not inherit the master's configuration parameters, such
-    as the ones that cause the :ref:`snapshot daemon <book-cfg-snapshot_daemon>` to run on the master.
-    To get the same behavior, one would have to set the relevant parameters explicitly
-    so that they are the same on both master and replica.
+NOTE:
+Replication requires privileges. Privileges for accessing spaces could be granted directly
+to the user who will start the replica. However, it is more usual to
+grant privileges for accessing spaces to a :ref:`role <rep-role>`, and then grant the
+role to the user who will start the replica.
 
 =====================================================================
                 Recovering from a degraded state
@@ -83,12 +87,13 @@ Again, this procedure works only if the master's WAL files are present.
 
 "Degraded state" is a situation when the master becomes unavailable - due to
 hardware or network failure, or due to a programming bug. There is no automatic
-way for a replica to detect that the master is gone for good, since sources of
+way for a replica to detect that the master is gone forever, since sources of
 failure and replication environments vary significantly. So the detection of
 degraded state requires a human inspection.
 
 However, once a master failure is detected, the recovery is simple: declare
-that the replica is now the new master, by saying ``box.cfg{... listen=URI}``.
+that the replica is now the new master, by saying
+:codenormal:`box.cfg{... listen=`:codeitalic:`URI`:codenormal:`}`.
 Then, if there are updates on the old master that were not propagated before
 the old master went down, they would have to be re-applied manually.
 
@@ -141,8 +146,8 @@ or the replica for select requests).
 =====================================================================
 
 In :func:`box.info` there is a :code:`box.info.replication.status` field:
-"off", "stopped", "connecting", "connected", or "disconnected". |br|
-If a replica's status is "connected", then there will be two more fields: |br|
+"off", "stopped", "connecting", "auth", "follow", or "disconnected". |br|
+If a replica's status is "follow", then there will be two more fields: |br|
 :code:`box.info.replication.idle` = the number of seconds the replica has been idle, |br|
 :code:`box.info.replication.lag` = the number of seconds the replica is behind the master.
 
@@ -193,7 +198,7 @@ which is executed via :code:`box.once()`. For example:
 
 In the simple master-replica configuration, the master's changes are seen by
 the replica, but not vice versa, because the master was specified as the sole
-replication source. Starting with Tarantool 1.6, it's possible to go both ways.
+replication source. In the master-master configuration, it's possible to go both ways.
 Starting with the simple configuration, the first server has to say:
 
 .. cssclass:: highlight
@@ -228,8 +233,7 @@ servers will end up with different contents.
         .. parsed-literal::
 
             box.cfg{
-                replication_source = *uri#1*,
-                replication_source = *uri#2*
+                replication_source = {*uri#1*, *uri#2*}
             }
 
     :Q: What if a server should be taken out of the cluster?
@@ -259,9 +263,16 @@ servers will end up with different contents.
     :Q: What if it's necessary to know what cluster a server is in?
     :A: The identification of the cluster is a UUID which is generated when the
         first master starts for the first time. This UUID is stored in a tuple
-        of the :data:`box.space._cluster` system space, and in a tuple of the
-        :data:`box.space._schema` system space. So to see it, say:
+        of the :data:`box.space._schema` system space. So to see it, say:
         ``box.space._schema:select{'cluster'}``
+
+    :Q: What if it's necessary to know what other servers belong in the cluster?
+    :A: The universal identification of a server is a UUID in ``box.info.server.uuid``.
+        The ordinal identification of a server within a cluster is a number in ``box.info.server.id``.
+        To see all the servers in the cluster, say:
+        ``box.space._cluster:select{}``. This will return a table with all
+        {server.id, server.uuid} tuples for every server that has ever joined
+        the cluster.
 
     :Q: What if one of the server's files is corrupted or deleted?
     :A: Stop the server, destroy all the database files (the ones with extension
@@ -271,7 +282,8 @@ servers will end up with different contents.
 
     :Q: What if replication causes security concerns?
     :A: Prevent unauthorized replication sources by associating a password with
-        every user that has access privileges for the relevant spaces. That way,
+        every user that has access privileges for the relevant spaces, and every
+        user that has a replication :ref:`role <rep-role>`. That way,
         the :ref:`URI` for the :confval:`replication_source` parameter will
         always have to have the long form
         ``replication_source='username:password@host:port'``
@@ -363,10 +375,11 @@ On the first shell, which we'll call Terminal #1, execute these commands:
     $ ~/tarantool/src/tarantool
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.user.create('replicator', {password = 'password'})
-    tarantool> box.schema.user.grant('replicator', 'read,write', 'universe')
+    tarantool> box.schema.role.grant('replication','read,write','universe')
+    tarantool> box.schema.user.grant('replicator','execute','role','replication')
     tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
 
-The result is that a new cluster is set up, and the UUID is displayed. Now the
+The result is that a new cluster is set up, and the server's UUID is displayed. Now the
 screen looks like this: (except that UUID values are always different):
 
 .. container:: b-block-wrapper_doc
@@ -446,8 +459,8 @@ On the second shell, which we'll call Terminal #2, execute these commands:
 The result is that a replica is set up. Messages appear on Terminal #1
 confirming that the replica has connected and that the WAL contents have
 been shipped to the replica. Messages appear on Terminal #2 showing that
-replication is starting. Also on Terminal#2 the _cluster UUID value is
-displayed, and it is the same as the _cluster UUID value that was displayed
+replication is starting. Also on Terminal#2 the _cluster UUID values are
+displayed, and one of them is the same as the _cluster UUID value that was displayed
 on Terminal #1, because both servers are in the same cluster.
 
 .. container:: b-block-wrapper_doc
@@ -589,7 +602,7 @@ On Terminal #2, execute these requests:
     tarantool> s:select({1}, {iterator = 'GE'})
     tarantool> s:insert{2, 'Tuple inserted on Terminal #2'}
 
-Now the screen looks like this:
+Now the screen looks like this (remember to click on the "Terminal #2" tab when looking at Terminal #2 results):
 
 .. container:: b-block-wrapper_doc
 
@@ -662,8 +675,8 @@ On Terminal #1, execute these Tarantool requests and shell commands:
     $ ls -l ~/tarantool_test_node_2
 
 Now Tarantool #1 is stopped. Messages appear on Terminal #2 announcing that fact.
-The ``ls -l`` commands show that both servers have made snapshots, which have the
-same size because they both contain the same tuples.
+The ``ls -l`` commands show that both servers have made snapshots, which have
+similar sizes because they both contain the same tuples.
 
 .. container:: b-block-wrapper_doc
 

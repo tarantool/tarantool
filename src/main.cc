@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <grp.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -347,7 +348,8 @@ load_cfg()
 				}
 				exit(EX_NOUSER);
 			}
-			if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
+			if (setgid(pw->pw_gid) < 0 || setgroups(0, NULL) < 0 ||
+			    setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
 				say_syserror("setgid/setuid");
 				exit(EX_OSERR);
 			}

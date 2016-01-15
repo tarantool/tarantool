@@ -216,7 +216,7 @@ MemtxHash::MemtxHash(struct key_def *key_def)
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
 	if (hash_table == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(hash_table),
+		tnt_raise(OutOfMemory, sizeof(hash_table),
 			  "MemtxHash", "hash_table");
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
@@ -295,7 +295,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		});
 
 		if (pos == light_index_end) {
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) hash_table->count,
+			tnt_raise(OutOfMemory, (ssize_t)hash_table->count,
 				  "hash_table", "key");
 		}
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
@@ -332,8 +332,7 @@ MemtxHash::allocIterator() const
 	struct hash_iterator *it = (struct hash_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct hash_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct hash_iterator),
 			  "MemtxHash", "iterator");
 	}
 

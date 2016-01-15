@@ -522,7 +522,7 @@ public:
 	}
 };
 
-static void
+static int
 recovery_follow_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
@@ -577,6 +577,7 @@ recovery_follow_f(va_list ap)
 
 		subscription.signaled = false;
 	}
+	return 0;
 }
 
 void

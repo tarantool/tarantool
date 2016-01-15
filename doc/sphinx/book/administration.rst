@@ -9,15 +9,17 @@ reloading configuration, taking snapshots, log rotation.
                         Server signal handling
 =====================================================================
 
-The server is configured to shut down gracefully on SIGTERM and SIGINT
-(keyboard interrupt). SIGUSR1 can be used to save a snapshot. All
-other signals are blocked or ignored. The signals are processed in the main
-thread event loop. Thus, if the control flow never reaches the event loop
-(thanks to a runaway stored procedure), the server stops responding to any
-signal, and can only be killed with SIGKILL (this signal can not be ignored).
+The server processes these signals during the main thread event loop: |br|
+SIGHUP: may cause log file rotation, see :ref:`the example in section "Logging" <logging_example>`. |br|
+SIGUSR1: may cause saving of a snapshot, see the description of :func:`box.snapshot`. |br|
+SIGTERM: may cause graceful shutdown (information will be saved first). |br|
+SIGINT also known as keyboard interrupt: may cause graceful shutdown. |br|
+SIGKILL: causes shutdown. |br|
 
-SIGHUP can be used to cause a log file rotation. See
-:ref:`the example in section "Logging" <logging_example>`.
+Other signals will result in behavior defined by the operating system.
+Signals other than SIGKILL may be ignored, especially if the
+server is executing a long-running procedure which
+prevents return to the main thread event loop. 
 
 
 =====================================================================
@@ -26,7 +28,8 @@ SIGHUP can be used to cause a log file rotation. See
 
 .. program:: tarantool
 
-If ``tarantool`` is started without a Lua script to run, it automatically
+If ``tarantool`` is started without an :ref:`initialization file <init-label>`,
+or if the initialization file contains :func:`console.start()`, then ``tarantool``
 enters interactive mode. There will be a prompt ("``tarantool>``") and it will
 be possible to enter requests. When used this way, ``tarantool`` can be
 a client for a remote server.
@@ -99,10 +102,12 @@ described in `Lua documentation`_. Examples: 'Hello, world', 'A', [[A\\B!]].
 .. _Lua documentation: http://www.lua.org/pil/2.4.html
 
 Numeric literals are: Character sequences containing only digits, optionally
-preceded by + or -. Examples: 55, -. Notes: Tarantool NUM data type is
+preceded by + or -. Large or floating-point numeric
+literals may include decimal points, exponential notation, or suffixes.
+Examples: 500, -500, 5e2, 500.1, 5LL, 5ULL. Notes: Tarantool NUM data type is
 unsigned, so -1 is understood as a large unsigned number.
 
-Single-byte tokens are: * or , or ( or ). Examples: * , ( ).
+Single-byte tokens are: , or ( or ) or arithmetic operators. Examples: * , ( ).
 
 Tokens must be separated from each other by one or more spaces, except that
 spaces are not necessary around single-byte tokens or string literals.

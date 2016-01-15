@@ -17,4 +17,6 @@ print('...', ...)
 ]])
 script:close()
 
+io.flush()
+
 os.execute("tarantool ./script.lua 1 2 3")

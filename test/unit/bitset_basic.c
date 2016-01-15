@@ -116,16 +116,16 @@ void test_get_set()
 	for(size_t i = 0; i < NUM_SIZE; i++) {
 		if (nums[i] % 5 == 0) {
 			fail_if(bitset_clear(&bm, nums[i]) < 0);
-			// printf("Clear :%zu\n", nums[i]);
 			fail_if(bitset_test(&bm, nums[i]));
 		}
+		nums[i] = SIZE_MAX;
 	}
 	printf("ok\n");
 
 	printf("Checking set bits... ");
 	shuffle(nums, NUM_SIZE);
 	for(size_t i = 0; i < NUM_SIZE; i++) {
-		if (nums[i] % 5 == 0) {
+		if (nums[i] == SIZE_MAX) {
 			continue;
 		}
 

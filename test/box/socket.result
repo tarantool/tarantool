@@ -711,8 +711,15 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+inf = socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
     flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
+---
+...
+-- musl libc https://github.com/tarantool/tarantool/issues/1249
+inf[1].canonname = nil;
+---
+...
+inf;
 ---
 - - host: 127.0.0.1
     family: AF_INET
@@ -1616,10 +1623,10 @@ s:close()
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
-{ s:bind('unix/', path), errno.strerror() }
+{ s:bind('unix/', path), errno() == errno.EADDRINUSE }
 ---
 - - false
-  - Address already in use
+  - true
 ...
 s:close()
 ---

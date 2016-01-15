@@ -455,8 +455,8 @@ tarantool_lua_slab_cache()
 /**
  * Execute start-up script.
  */
-static void
-run_script(va_list ap)
+static int
+run_script_f(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
@@ -504,6 +504,7 @@ run_script(va_list ap)
 	 * return control back to tarantool_lua_run_script.
 	 */
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 void
@@ -517,7 +518,7 @@ tarantool_lua_run_script(char *path, int argc, char **argv)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	script_fiber = fiber_new(title, run_script);
+	script_fiber = fiber_new(title, run_script_f);
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);
 	fiber_start(script_fiber, tarantool_L, path, argc, argv);

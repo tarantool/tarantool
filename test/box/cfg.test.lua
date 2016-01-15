@@ -1,8 +1,6 @@
 env = require('test_run')
 test_run = env.new()
-test_run:cmd("push filter 'listen: .*' to 'primary: <uri>'")
-test_run:cmd("push filter 'admin: .*' to 'admin: <uri>'")
-test_run:cmd("push filter ".."'\\.lua - internal file.*:[0-9]+: ' to '.lua - internal file...\"]:<line>: '")
+test_run:cmd("push filter '(error: .*)\\.lua:[0-9]+: ' to '\\1.lua:<line>: '")
 box.cfg.nosuchoption = 1
 cfg_filter(box.cfg)
 -- must be read-only

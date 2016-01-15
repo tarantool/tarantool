@@ -333,8 +333,6 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		} catch (OutOfMemory *) {
 			throw;
 		} catch (ClientError *e) {
-			if (e->errcode() == ER_MEMORY_ISSUE)
-				throw;
 			say_error("UPSERT failed:");
 			e->log();
 		}
@@ -1087,7 +1085,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	pk->createReadViewForIterator(entry->iterator);
 };
 
-void
+int
 checkpoint_f(va_list ap)
 {
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
@@ -1110,6 +1108,7 @@ checkpoint_f(va_list ap)
 		}
 	}
 	say_info("done");
+	return 0;
 }
 
 int

@@ -6,15 +6,18 @@ enum {
 	FIBERS = 100
 };
 
-void yield_f(va_list ap)
+static int
+yield_f(va_list ap)
 {
 	for (int i = 0; i < ITERATIONS; i++) {
 		fiber_wakeup(fiber());
 		fiber_yield();
 	}
+	return 0;
 }
 
-void benchmark_f(va_list ap)
+static int
+benchmark_f(va_list ap)
 {
 	struct fiber *fibers[FIBERS];
 	for (int i = 0; i < FIBERS; i++) {
@@ -27,6 +30,7 @@ void benchmark_f(va_list ap)
 			fiber_sleep(0.001);
 	}
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 int main()

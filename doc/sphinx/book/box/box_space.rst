@@ -544,6 +544,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
 
+    .. _space-object-field-count:
+
     .. data:: field_count
 
         The required field count for all tuples in this space. The field_count

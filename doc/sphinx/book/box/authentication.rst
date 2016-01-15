@@ -165,6 +165,8 @@ tuple in the _user space, and then drops the user.
 
     The maximum number of users is 32.
 
+.. _privileges:
+
 ===========================================================
                Privileges and the _priv space
 ===========================================================
@@ -369,6 +371,8 @@ Instead of granting and revoking individual privileges, one can put all the
 privileges in a role and then grant or revoke the role. Role information is
 in the _user space but the third field - the type field - is 'role' rather
 than 'user'.
+
+.. _rep-role:
 
 If a role R1 is granted a privilege X, and user U1 is granted a privilege
 "role R1", then user U1 in effect has privilege X. Then if a role R2 is
