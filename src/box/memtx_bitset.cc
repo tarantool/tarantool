@@ -87,8 +87,7 @@ MemtxBitset::registerTuple(struct tuple *tuple)
 	if (pos == mh_end(m_tuple_to_id)) {
 		*(uint32_t *)tuple = m_spare_id;
 		m_spare_id = id;
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) pos,
-			  "hash", "key");
+		tnt_raise(OutOfMemory, (ssize_t) pos, "hash", "key");
 	}
 }
 
@@ -325,8 +324,7 @@ MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 #ifndef OLD_GOOD_BITSET
 			unregisterTuple(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
-				  "MemtxBitset", "insert");
+			tnt_raise(OutOfMemory, 0, "MemtxBitset", "insert");
 		}
 	}
 
@@ -384,15 +382,15 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 		}
 
 		if (rc != 0) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  0, "MemtxBitset", "iterator expression");
+			tnt_raise(OutOfMemory, 0, "MemtxBitset",
+				  "iterator expression");
 		}
 
 		if (bitset_index_init_iterator((bitset_index *) &m_index,
 					       &it->bitset_it,
 					       &expr) != 0) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  0, "MemtxBitset", "iterator state");
+			tnt_raise(OutOfMemory, 0, "MemtxBitset",
+				  "iterator state");
 		}
 
 		bitset_expr_destroy(&expr);

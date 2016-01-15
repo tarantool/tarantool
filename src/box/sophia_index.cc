@@ -99,7 +99,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	} else {
 		raw = (char *)malloc(size);
 		if (raw == NULL)
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, size, "tuple");
+			tnt_raise(OutOfMemory, size, "malloc", "tuple");
 		p = raw;
 	}
 	p = mp_encode_array(p, count);
@@ -672,9 +672,8 @@ SophiaIndex::allocIterator() const
 	struct sophia_iterator *it =
 		(struct sophia_iterator *) calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-		          sizeof(struct sophia_iterator), "Sophia Index",
-		          "iterator");
+		tnt_raise(OutOfMemory, sizeof(struct sophia_iterator),
+			  "Sophia Index", "iterator");
 	}
 	it->base.next = sophia_iterator_next;
 	it->base.free = sophia_iterator_free;

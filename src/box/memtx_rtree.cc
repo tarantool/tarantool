@@ -225,8 +225,7 @@ MemtxRTree::allocIterator() const
 	memset(it, 0, sizeof(*it));
 	rtree_iterator_init(&it->impl);
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct index_rtree_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct index_rtree_iterator),
 			  "MemtxRTree", "iterator");
 	}
 	it->base.next = index_rtree_iterator_next;

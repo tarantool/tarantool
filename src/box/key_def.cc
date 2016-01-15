@@ -85,8 +85,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	size_t sz = key_def_sizeof(part_count);
 	struct key_def *def = (struct key_def *) malloc(sz);
 	if (def == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sz, "struct key_def", "malloc");
+		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
 	int n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
@@ -116,8 +115,7 @@ key_def_dup(struct key_def *def)
 	size_t sz = key_def_sizeof(def->part_count);
 	struct key_def *dup = (struct key_def *) malloc(sz);
 	if (dup == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sz, "struct key_def", "malloc");
+		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
 	memcpy(dup, def, key_def_sizeof(def->part_count));
 	rlist_create(&dup->link);

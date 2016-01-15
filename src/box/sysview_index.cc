@@ -90,8 +90,7 @@ SysviewIndex::allocIterator() const
 	struct sysview_iterator *it = (struct sysview_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct sysview_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct sysview_iterator),
 			  "SysviewIndex", "iterator");
 	}
 	it->base.free = sysview_iterator_free;

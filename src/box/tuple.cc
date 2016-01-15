@@ -117,9 +117,9 @@ tuple_format_register(struct tuple_format *format)
 				realloc(tuple_formats, new_capacity *
 					sizeof(tuple_formats[0]));
 			if (formats == NULL)
-				tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				tnt_raise(OutOfMemory,
 					  sizeof(struct tuple_format),
-					  "tuple_formats", "malloc");
+					  "malloc", "tuple_formats");
 
 			formats_capacity = new_capacity;
 			tuple_formats = formats;
@@ -167,9 +167,8 @@ tuple_format_alloc(struct rlist *key_list)
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 
 	if (format == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sizeof(struct tuple_format),
-			  "tuple format", "malloc");
+		tnt_raise(OutOfMemory, sizeof(struct tuple_format),
+			  "malloc", "tuple format");
 	}
 
 	format->refs = 0;
@@ -310,7 +309,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 {
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
-		     tnt_raise(ClientError, ER_MEMORY_ISSUE, (unsigned) total,
+		     tnt_raise(OutOfMemory, (unsigned) total,
 			       "slab allocator", "tuple"));
 	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
@@ -326,8 +325,8 @@ tuple_alloc(struct tuple_format *format, size_t size)
 			tnt_raise(LoggedError, ER_SLAB_ALLOC_MAX,
 				  (unsigned) total);
 		} else {
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  (unsigned) total, "slab allocator", "tuple");
+			tnt_raise(OutOfMemory, (unsigned) total,
+				  "slab allocator", "tuple");
 		}
 	}
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);

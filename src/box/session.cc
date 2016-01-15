@@ -90,8 +90,7 @@ session_create(int fd)
 
 	if (k == mh_end(session_registry)) {
 		mempool_free(&session_pool, session);
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  "session hash", "new session");
+		tnt_raise(OutOfMemory, 0, "session hash", "new session");
 	}
 	return session;
 }
