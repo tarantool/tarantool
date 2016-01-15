@@ -84,6 +84,19 @@ fiber_call(struct fiber *callee)
 	struct fiber *caller = fiber();
 	struct cord *cord = cord();
 
+	/* Ensure we aren't switching to a fiber parked in fiber_loop */
+	assert(callee->f != NULL);
+
+	/* Ensure the callee was removed from cord->ready list.
+	 * If it wasn't, the callee will observe a 'spurious' wakeup
+	 * later, due to a fiber_wakeup() performed in the past.
+	 *
+	 * To put it another way, fiber_wakeup() is a 'request' to
+	 * schedule the fiber for execution, and once it is executing
+	 * a wakeup request is considered complete and it must be
+	 * removed. */
+	assert(rlist_empty(&callee->state));
+
 	assert(cord->call_stack_depth < FIBER_CALL_STACK);
 	assert(caller);
 	assert(caller != callee);
@@ -229,14 +242,14 @@ fiber_join(struct fiber *fiber)
 	}
 	assert(fiber_is_dead(fiber));
 	bool fiber_was_cancelled = fiber->flags & FIBER_IS_CANCELLED;
-	/* The fiber is already dead. */
-	fiber_recycle(fiber);
-
 	/* Move exception to the caller */
 	diag_move(&fiber->diag, &fiber()->diag);
 	/** Don't bother with propagation of FiberIsCancelled */
 	if (fiber_was_cancelled)
 		diag_clear(&fiber()->diag);
+
+	/* The fiber is already dead. */
+	fiber_recycle(fiber);
 }
 
 /**
@@ -280,7 +293,7 @@ fiber_schedule_timeout(ev_loop *loop,
 	struct fiber_watcher_data *state =
 			(struct fiber_watcher_data *) watcher->data;
 	state->timed_out = true;
-	fiber_call(state->f);
+	fiber_wakeup(state->f);
 }
 
 /**
@@ -332,8 +345,14 @@ fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 {
 	(void) loop;
 	(void) revents;
+	struct fiber *fiber = watcher->data;
 	assert(fiber() == &cord()->sched);
-	fiber_call((struct fiber *) watcher->data);
+	/*
+	 * Assert the fiber will not be scheduled twice because
+	 * it's also on the 'ready' list.
+	 */
+	assert(rlist_empty(&fiber->state));
+	fiber_call(fiber);
 }
 
 static inline void
@@ -419,8 +438,11 @@ fiber_reset(struct fiber *fiber)
 static void
 fiber_recycle(struct fiber *fiber)
 {
+	/* no exceptions are leaking */
+	assert(diag_is_empty(&fiber->diag));
+	/* no pending wakeup */
+	assert(rlist_empty(&fiber->state));
 	fiber_reset(fiber);
-	rlist_del(&fiber->state);               /* safety */
 	fiber->gc.name[0] = '\0';
 	fiber->f = NULL;
 	memset(fiber->fls, 0, sizeof(fiber->fls));
@@ -445,10 +467,11 @@ fiber_loop(void *data __attribute__((unused)))
 			 * For joinable fibers, it's the business
 			 * of the caller to deal with the error.
 			 */
-			if (!(fiber->flags & FIBER_IS_JOINABLE) &&
-			    !(fiber->flags & FIBER_IS_CANCELLED))
-				error_log(e);
-			/* Sic: diag is not cleared for non-joinable fibers */
+			if (!(fiber->flags & FIBER_IS_JOINABLE)) {
+				if (!(fiber->flags & FIBER_IS_CANCELLED))
+					error_log(e);
+				diag_clear(&fiber()->diag);
+			}
 		} else {
 			/*
 			 * Make sure a leftover exception does not
@@ -465,8 +488,15 @@ fiber_loop(void *data __attribute__((unused)))
 	        }
 		if (! rlist_empty(&fiber->on_stop))
 			trigger_run(&fiber->on_stop, fiber);
+		/* no pending wakeups */
+		assert(rlist_empty(&fiber->state));
 		if (! (fiber->flags & FIBER_IS_JOINABLE))
 			fiber_recycle(fiber);
+		/*
+		 * Crash if spurious wakeup happens, don't call the old
+		 * function again, ap is garbage by now.
+		 */
+		fiber->f = NULL;
 		fiber_yield();	/* give control back to scheduler */
 	}
 }
@@ -531,6 +561,7 @@ fiber_new(const char *name, fiber_func f)
 
 		rlist_create(&fiber->state);
 		rlist_create(&fiber->wake);
+		diag_create(&fiber->diag);
 		fiber_reset(fiber);
 
 		rlist_add_entry(&cord->alive, fiber, link);
@@ -541,7 +572,6 @@ fiber_new(const char *name, fiber_func f)
 	if (++cord->max_fid < 100)
 		cord->max_fid = 101;
 	fiber->fid = cord->max_fid;
-	diag_create(&fiber->diag);
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 
@@ -844,8 +874,9 @@ cord_costart_thread_func(void *arg)
 	 * in case of an exception.
 	 */
 	trigger_add(&f->on_stop, &break_ev_loop);
+	fiber_set_joinable(f, true);
 	fiber_start(f, ctx.arg);
-	if (f->fid > 0) {
+	if (!fiber_is_dead(f)) {
 		/* The fiber hasn't died right away at start. */
 		ev_run(loop(), 0);
 	}
@@ -853,7 +884,8 @@ cord_costart_thread_func(void *arg)
 	 * Preserve the exception with which the main fiber
 	 * terminated, if any.
 	 */
-	diag_move(&f->diag, &fiber()->diag);
+	assert(fiber_is_dead(f));
+	fiber_join(f);
 
 	return NULL;
 }
