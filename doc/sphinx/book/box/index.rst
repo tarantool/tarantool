@@ -213,7 +213,7 @@ that are specific to an index type, for example evaluating
 Boolean expressions when traversing BITSET indexes, or
 going in descending order when traversing TREE indexes.)
 
-Five examples of basic operations:
+Six examples of basic operations:
 
 .. code-block:: tarantoolsession
 
@@ -230,6 +230,11 @@ Five examples of basic operations:
     -- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
     -- will happen to field[2] with the new value.
     tarantool> box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
+
+    -- Upsert the tuple, changing field field[2] again.
+    -- The syntax of upsert is the same as the syntax of update,
+    -- but the return value will be different.
+    tarantool> box.space.tester:upsert({999}, {{'=', 2, 'Tarantism'}})
 
     -- Replace the tuple, adding a new field.
     -- This is also possible with the update() request but

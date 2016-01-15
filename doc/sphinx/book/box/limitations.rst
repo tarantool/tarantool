@@ -2,17 +2,6 @@
                             Limitations
 -------------------------------------------------------------------------------
 
-* :ref:`Number of fields in an index <lim_fields_in_index>`
-* :ref:`Number of indexes in a space <lim_indexes_in_space>`
-* :ref:`Number of fields in tuple <lim_fields_in_tuple>`
-* :ref:`Number of spaces <lim_number_of_spaces>`
-* :ref:`Number of connections <lim_number_of_connections>`
-* :ref:`Space size <lim_space_size>`
-* :ref:`Update operations count <lim_update_ops>`
-* :ref:`Number of users and roles <lim_users_and_roles>`
-* :ref:`Length of an index name or space name or user name<lim_length>`
-* :ref:`Limitations which are only applicable for the sophia storage engine<lim_sophia>`
-
 .. _lim_fields_in_index:
 
 **Number of fields in an index**
@@ -33,8 +22,18 @@
 
     The theoretical maximum is 2147483647 (``box.schema.FIELD_MAX``). The
     practical maximum is whatever is specified by the space's
-    :func:`space_object:field_count() <space_object.field_count>`
+    :ref:`field_count <space-object-field-count>`
     member, or the maximum tuple length.
+
+.. _lim_bytes_in_tuple:
+
+**Number of bytes in a tuple**
+
+    By default the value of :confval:`slab_alloc_maximal`
+    is 1048576, and the maximum tuple length is approximately one quarter of that:
+    approximately 262,000 bytes. To increase it, when starting the server,
+    specify a larger value. For example
+    :code:`box.cfg{slab_alloc_maximal=2*1048576}`.
 
 .. _lim_number_of_spaces:
 
@@ -68,7 +67,7 @@
 
 **Number of users and roles**
 
-    32
+    32 (BOX_USER_MAX).
 
 .. _lim_length:
 

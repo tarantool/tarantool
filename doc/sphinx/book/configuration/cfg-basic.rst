@@ -66,6 +66,8 @@
     Default: false |br|
     Dynamic: no |br|
 
+.. _box-cfg-listen:
+
 .. confval:: listen
 
     The read/write data port number or :ref:`URI` (Universal Resource Identifier)
