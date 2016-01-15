@@ -20,10 +20,7 @@ test:is(
 )
 
 -- check that net.box is correct without box.cfg{}
-local uri, _ = string.gsub(
-    inspector:eval('second', 'box.cfg.listen').result[1],
-    'localhost', '127.0.0.1'
-)
+local uri = inspector:eval('second', 'box.cfg.listen').result[1]
 local conn = net_box:new(uri)
 test:is(conn:is_connected(), true, 'connected to instance')
 test:is(conn.space ~= nil, true, 'space exists')
