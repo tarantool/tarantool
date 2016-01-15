@@ -165,6 +165,8 @@ tuple in the _user space, and then drops the user.
 
     The maximum number of users is 32.
 
+.. _privileges:
+
 ===========================================================
                Privileges and the _priv space
 ===========================================================
