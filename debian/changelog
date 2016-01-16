@@ -1,3 +1,13 @@
+tarantool (1.6.7.588.g76bbd9c-1) unstable; urgency=medium
+
+  * Fix `libiberty | bintuils-dev, binutils-dev` B-D
+  * Convert tarantool-common to architecture-independent package.
+  * Disable kfreebsd - produced binaries have always been broken and
+    the upstream is unable to fix it.
+  * Use Maintainer and Uploaders fields properly
+
+ -- Roman Tsisyk <roman@tarantool.org>  Sat, 16 Jan 2016 11:26:52 +0300
+
 tarantool (1.6.7.551.ga5bafc5-1) unstable; urgency=medium
 
   * Add zlib1g-dev to B-D (FTBFS), closes: #808516.
