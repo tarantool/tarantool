@@ -1,15 +1,18 @@
 Source: tarantool
 Priority: optional
-Maintainer: Dmitry E. Oboukhov <unera@debian.org>
-Uploaders: Andrey Drozdov <andrey@tarantool.org>,
-           Roman Tsisyk <roman@tarantool.org>
+Maintainer: Roman Tsisyk <roman@tarantool.org>
+Uploaders: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
  libncurses5-dev,
  libyaml-dev,
- libiberty-dev | binutils-dev,
- libbfd-dev | binutils-dev,
+# Dependecies below are needed for fiber stack traces
+# libiberty.so is provided by binutils-dev (<< 2.24) for wheezy and precise
+ libiberty-dev | binutils-dev (<< 2.24),
+# libbfd-*.so
+ binutils-dev,
+# zlib is implicitly needed by libbfd #808516
  zlib1g-dev
 Section: database
 Standards-Version: 3.9.6
@@ -18,7 +21,7 @@ VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
 Package: tarantool-common
-Architecture: i386 amd64 armhf arm64
+Architecture: all
 Priority: optional
 Conflicts: tarantool-common (<< 1.5.3),
  tarantool-lts-common,
