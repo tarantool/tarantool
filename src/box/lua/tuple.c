@@ -157,7 +157,7 @@ lbox_tuple_slice(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	uint32_t start, end;
-	int offset;
+	int32_t offset;
 
 	/*
 	 * Prepare the range. The second argument is optional.
@@ -167,11 +167,11 @@ lbox_tuple_slice(struct lua_State *L)
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
 
-	uint32_t field_count = box_tuple_field_count(tuple);
+	int32_t field_count = box_tuple_field_count(tuple);
 	offset = lua_tointeger(L, 2);
-	if (offset >= 0 && (uint32_t)offset < field_count) {
+	if (offset >= 0 && offset < field_count) {
 		start = offset;
-	} else if (offset < 0 && (uint32_t)-offset <= field_count) {
+	} else if (offset < 0 && -offset <= field_count) {
 		start = offset + field_count;
 	} else {
 		return luaL_error(L, "tuple.slice(): start >= field count");
@@ -179,9 +179,9 @@ lbox_tuple_slice(struct lua_State *L)
 
 	if (argc == 2) {
 		offset = lua_tointeger(L, 3);
-		if (offset > 0 && (uint32_t)offset <= field_count) {
+		if (offset > 0 && offset <= field_count) {
 			end = offset;
-		} else if (offset < 0 && (uint32_t)-offset < field_count) {
+		} else if (offset < 0 && -offset < field_count) {
 			end = offset + field_count;
 		} else {
 			return luaL_error(L, "tuple.slice(): end > field count");

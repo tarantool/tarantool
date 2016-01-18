@@ -440,7 +440,7 @@ skip:
 	/* Encode excessively sparse arrays as objects (if enabled) */
 	if (cfg->encode_sparse_ratio > 0 &&
 	    max > size * (uint32_t)cfg->encode_sparse_ratio &&
-	    (int)max > cfg->encode_sparse_safe) {
+	    max > (uint32_t)cfg->encode_sparse_safe) {
 		if (!cfg->encode_sparse_convert)
 			luaL_error(L, "excessively sparse array");
 		field->type = MP_MAP;

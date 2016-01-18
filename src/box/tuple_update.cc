@@ -493,7 +493,7 @@ static void
 do_op_set(struct tuple_update *update, struct update_op *op)
 {
 	/* intepret '=' for n +1 field as insert */
-	if ((unsigned)op->field_no == rope_size(update->rope))
+	if (op->field_no == (int32_t) rope_size(update->rope))
 		return do_op_insert(update, op);
 	op_adjust_field_no(update, op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
@@ -591,11 +591,11 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	const char *in = field->old;
-	uint32_t str_len;
-	in = mp_read_str(update, op, &in, &str_len);
+	int32_t str_len;
+	in = mp_read_str(update, op, &in, (uint32_t *) &str_len);
 
 	if (arg->offset < 0) {
-		if ((uint32_t)-arg->offset > str_len + 1) {
+		if (-arg->offset > str_len + 1) {
 			tnt_raise(ClientError, ER_SPLICE,
 				  update->index_base + op->field_no,
 				  "offset is out of bound");
@@ -603,7 +603,7 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 		arg->offset = arg->offset + str_len + 1;
 	} else if (arg->offset - update->index_base >= 0) {
 		arg->offset -= update->index_base;
-		if ((uint32_t)arg->offset > str_len)
+		if (arg->offset > str_len)
 			arg->offset = str_len;
 	} else /* (offset <= 0) */ {
 		tnt_raise(ClientError, ER_SPLICE,
@@ -611,18 +611,18 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 			  "offset is out of bound");
 	}
 
-	assert(arg->offset >= 0 && (uint32_t)arg->offset <= str_len);
+	assert(arg->offset >= 0 && arg->offset <= str_len);
 
 	if (arg->cut_length < 0) {
-		if ((uint32_t)-arg->cut_length > (str_len - arg->offset))
+		if (-arg->cut_length > (str_len - arg->offset))
 			arg->cut_length = 0;
 		else
 			arg->cut_length += str_len - arg->offset;
-	} else if ((uint32_t)arg->cut_length > str_len - arg->offset) {
+	} else if (arg->cut_length > str_len - arg->offset) {
 		arg->cut_length = str_len - arg->offset;
 	}
 
-	assert(arg->offset <= (int32_t)str_len);
+	assert(arg->offset <= str_len);
 
 	/* Fill tail part */
 	arg->tail_offset = arg->offset + arg->cut_length;

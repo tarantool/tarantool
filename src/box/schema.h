@@ -70,7 +70,7 @@ enum {
 #include "error.h"
 #include <stdio.h> /* snprintf */
 
-extern int sc_version;
+extern uint32_t sc_version;
 
 struct space;
 

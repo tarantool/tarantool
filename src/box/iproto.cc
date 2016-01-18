@@ -47,6 +47,7 @@
 #include "third_party/base64.h"
 #include "coio.h"
 #include "xrow.h"
+#include "schema.h" /* sc_version */
 #include "recovery.h" /* server_uuid */
 #include "iproto_constants.h"
 #include "authentication.h"
@@ -174,7 +175,7 @@ struct iproto_connection
 	 * make sure ibuf_reserve() or iobuf rotation don't make
 	 * the value meaningless.
 	 */
-	ssize_t parse_size;
+	size_t parse_size;
 	struct ev_io input;
 	struct ev_io output;
 	/** Logical session. */
@@ -380,7 +381,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 {
 	struct iobuf *oldbuf = con->iobuf[0];
 
-	ssize_t to_read = 3; /* Smallest possible valid request. */
+	size_t to_read = 3; /* Smallest possible valid request. */
 
 	/* The type code is checked in iproto_enqueue_batch() */
 	if (con->parse_size) {
@@ -389,11 +390,11 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 			to_read = mp_decode_uint(&pos);
 	}
 
-	if ((ssize_t)ibuf_unused(&oldbuf->in) >= to_read)
+	if (ibuf_unused(&oldbuf->in) >= to_read)
 		return oldbuf;
 
 	/** All requests are processed, reuse the buffer. */
-	if ((ssize_t)ibuf_used(&oldbuf->in) == con->parse_size) {
+	if (ibuf_used(&oldbuf->in) == con->parse_size) {
 		ibuf_reserve_xc(&oldbuf->in, to_read);
 		return oldbuf;
 	}
@@ -481,6 +482,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		cpipe_push_input(&tx_pipe, guard.release());
 
 		/* Request is parsed */
+		assert(reqend > reqstart);
+		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		con->parse_size -= reqend - reqstart;
 		if (con->parse_size == 0 || stop_input)
 			break;
@@ -627,8 +630,6 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
-extern int sc_version;
-
 static void
 tx_process_msg(struct cmsg *m)
 {
@@ -642,7 +643,7 @@ tx_process_msg(struct cmsg *m)
 	session->sync = msg->header.sync;
 	try {
 		if (msg->header.schema_id &&
-		    msg->header.schema_id != (unsigned)sc_version) {
+		    msg->header.schema_id != sc_version) {
 			tnt_raise(ClientError, ER_WRONG_SCHEMA_VERSION,
 				  sc_version, msg->header.schema_id);
 		}

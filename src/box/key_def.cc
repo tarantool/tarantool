@@ -87,8 +87,8 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	if (def == NULL) {
 		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
-	int n = snprintf(def->name, sizeof(def->name), "%s", name);
-	if ((unsigned)n >= sizeof(def->name)) {
+	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
+	if (n >= sizeof(def->name)) {
 		free(def);
 		struct space *space = space_cache_find(space_id);
 		tnt_raise(LoggedError, ER_MODIFY_INDEX,

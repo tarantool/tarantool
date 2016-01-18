@@ -60,7 +60,7 @@ int64_t
 wal_write(struct recovery *r, struct wal_request *req);
 
 int
-wal_writer_start(struct recovery *state, int rows_per_wal);
+wal_writer_start(struct recovery *state, size_t rows_per_wal);
 
 void
 wal_writer_stop(struct recovery *r);
