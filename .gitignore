@@ -9,6 +9,7 @@ _CPack_Packages
 *.reject
 *.so
 *~
+*.swp*
 .gitignore
 .gdb_history
 CMakeFiles
