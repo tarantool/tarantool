@@ -53,7 +53,7 @@ License: BSD
 Provides: tarantool-debuginfo
 Requires: tarantool-common
 URL: http://tarantool.org
-Source0: tarantool_%{version}.tar.bz2
+Source0: tarantool-%{version}.tar.gz
 %description
 Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
@@ -86,7 +86,7 @@ stored procedures in Lua.
 This package provides common files, admin tools and init scripts.
 
 %prep
-%setup -q -n %{name}_%{version}
+%setup -q -n %{name}-%{version}
 
 %build
 # GNUInstallDirs doesn't work properly with %%cmake macro.

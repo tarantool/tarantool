@@ -138,7 +138,9 @@ set (PACKAGE_VERSION "")
 # directories.
 #
 if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
-	execute_process (COMMAND ${GIT} describe HEAD
+    execute_process (COMMAND ${GIT} describe HEAD
+                COMMAND sed "s/-/./"
+                COMMAND sed "s/-[a-z 0-9]*//"
 		OUTPUT_VARIABLE PACKAGE_VERSION
 		OUTPUT_STRIP_TRAILING_WHITESPACE
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

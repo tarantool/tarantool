@@ -23,20 +23,28 @@ if (RPMBUILD)
 
     set (RPM_SOURCE_DIRECTORY_NAME ${CPACK_SOURCE_PACKAGE_FILE_NAME}
         CACHE STRING "" FORCE)
-    set (RPM_PACKAGE_SOURCE_FILE_NAME ${VERSION}.tar.gz
+    set (RPM_PACKAGE_SOURCE_FILE_NAME ${PACKAGE_VERSION}.tar.gz
         CACHE STRING "" FORCE)
 
     set (RPM_BUILDROOT "${PROJECT_BINARY_DIR}/RPM/BUILDROOT" CACHE STRING "" FORCE)
 
-    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/${VERSION}.tar.gz
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-        COMMAND $(MAKE) package_source && mv `ls *.tar.gz | head -n 1` ${VERSION}.tar.gz)
+        COMMAND $(MAKE) package_source && mv `ls *.tar.gz | head -n 1` ${PACKAGE_VERSION}.tar.gz)
 
     add_custom_command(OUTPUT ${RPM_BUILDROOT}
         COMMAND ${MKDIR} -p ${RPM_BUILDROOT})
 
+    add_custom_target(bump_spec
+        DEPENDS ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
+        COMMAND sed -i -e "s/Version:\([ ]*\).*/Version: ${PACKAGE_VERSION}/g" rpm/tarantool.spec
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    )
+
     add_custom_target(rpm_src
-        DEPENDS ${PROJECT_BINARY_DIR}/${VERSION}.tar.gz
+        #DEPENDS ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
+        #COMMAND sed -i -e "s/Version:\([ ]*\).*/Version: ${PACKAGE_VERSION}/g" rpm/tarantool.spec
+        DEPENDS bump_spec
         COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --define '_sourcedir ./' --define '_srcrpmdir ./' -bs ${PROJECT_SOURCE_DIR}/rpm/tarantool.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
         )
