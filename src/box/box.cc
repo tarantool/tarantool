@@ -256,7 +256,7 @@ box_check_wal_mode(const char *mode_name)
 static void
 box_check_readahead(int readahead)
 {
-	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
+	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483647 };
 	if (readahead < (int) READAHEAD_MIN ||
 	    readahead > (int) READAHEAD_MAX) {
 		tnt_raise(ClientError, ER_CFG, "readahead",
