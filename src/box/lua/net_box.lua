@@ -768,12 +768,18 @@ local remote_methods = {
                 engine          = engine,
                 field_count     = field_count,
                 enabled         = true,
-                index           = {}
+                index           = {},
+                temporary       = false
             }
-            if #space > 5 and string.match(space[6], 'temporary') then
-                s.temporary = true
-            else
-                s.temporary = false
+            if #space > 5 then
+                local opts = space[6]
+                if type(opts) == 'table' then
+                    -- Tarantool >= 1.7.0
+                    s.temporary = not not opts.temporary
+                elseif type(opts) == 'string' then
+                    -- Tarantool < 1.7.0
+                    s.temporary = string.match(opts, 'temporary') ~= nil
+                end
             end
 
             setmetatable(s, space_metatable(self))

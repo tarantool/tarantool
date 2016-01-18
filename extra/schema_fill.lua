@@ -10,6 +10,8 @@ GUEST = 0
 ADMIN = 1
 -- role 'PUBLIC' is special, it's automatically granted to every user
 PUBLIC = 2
+
+EMPTY_MAP = setmetatable({}, { __serialize = 'map' })
 --
 -- system spaces
 --
@@ -27,31 +29,31 @@ _schema:insert{'max_id', box.schema.SYSTEM_ID_MAX}
 --
 -- _schema
 --
-_space:insert{_schema.id, ADMIN, '_schema', 'memtx', 0, '', {}}
+_space:insert{_schema.id, ADMIN, '_schema', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _space
 --
-_space:insert{_space.id, ADMIN, '_space', 'memtx', 0, '', {}}
+_space:insert{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _index
 --
-_space:insert{_index.id, ADMIN, '_index', 'memtx', 0, '', {}}
+_space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _func
 --
-_space:insert{_func.id, ADMIN, '_func', 'memtx', 0, '', {}}
+_space:insert{_func.id, ADMIN, '_func', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _user
 --
-_space:insert{_user.id, ADMIN, '_user', 'memtx', 0, '', {}}
+_space:insert{_user.id, ADMIN, '_user', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _priv
 --
-_space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, '', {}}
+_space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- _cluster
 --
-_space:insert{_cluster.id, ADMIN, '_cluster', 'memtx', 0, ''}
+_space:insert{_cluster.id, ADMIN, '_cluster', 'memtx', 0, EMPTY_MAP, {}}
 
 -- define formats.
 -- stick to the following convention:

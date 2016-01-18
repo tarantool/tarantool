@@ -48,38 +48,38 @@ box.space._cluster:select{}
 ...
 box.space._space:select{}
 ---
-- - [272, 1, '_schema', 'memtx', 0, '', [{'type': 'str', 'name': 'key'}]]
-  - [280, 1, '_space', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'str', 'name': 'key'}]]
+  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
-  - [281, 1, '_vspace', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
       {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
         'name': 'format', 'type': '*'}]]
-  - [288, 1, '_index', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
-  - [289, 1, '_vindex', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
-  - [296, 1, '_func', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
-  - [297, 1, '_vfunc', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
-  - [304, 1, '_user', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'auth', 'type': '*'}]]
-  - [305, 1, '_vuser', 'sysview', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
         'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
       {'name': 'auth', 'type': '*'}]]
-  - [312, 1, '_priv', 'memtx', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
         'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
         'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
-  - [313, 1, '_vpriv', 'sysview', 0, '', [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
         'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
         'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
-  - [320, 1, '_cluster', 'memtx', 0, '', [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
+  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
         'type': 'str'}]]
 ...
 box.space._index:select{}

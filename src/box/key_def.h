@@ -87,6 +87,9 @@ schema_object_type(const char *name);
 enum field_type { UNKNOWN = 0, NUM, STRING, ARRAY, NUMBER, field_type_MAX };
 extern const char *field_type_strs[];
 
+/* MsgPack type names */
+extern const char *mp_type_strs[];
+
 /**
  * The supported language of the stored function.
  */
@@ -114,6 +117,16 @@ enum index_type {
 };
 
 extern const char *index_type_strs[];
+
+struct opt_def {
+	const char *name;
+	enum mp_type type;
+	ptrdiff_t offset;
+	uint32_t len;
+};
+
+#define OPT_DEF(key, type, opts, field) \
+	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field) }
 
 enum rtree_index_distance_type {
 	 /* Euclid distance, sqrt(dx*dx + dy*dy) */
@@ -144,10 +157,12 @@ struct key_opts {
 	/**
 	 * RTREE distance type.
 	 */
+	char distancebuf[16];
 	enum rtree_index_distance_type distance;
 };
 
 extern const struct key_opts key_opts_default;
+extern const struct opt_def key_opts_reg[];
 
 static inline int
 key_opts_cmp(const struct key_opts *o1, const struct key_opts *o2)
@@ -264,6 +279,20 @@ struct priv_def {
 	rb_node(struct priv_def) link;
 };
 
+/** Space options */
+struct space_opts {
+        /**
+	 * The space is a temporary:
+	 * - it is empty at server start
+	 * - changes are not written to WAL
+	 * - changes are not part of a snapshot
+	 */
+	bool temporary;
+};
+
+extern const struct space_opts space_opts_default;
+extern const struct opt_def space_opts_reg[];
+
 /** Space metadata. */
 struct space_def {
 	/** Space id. */
@@ -279,13 +308,7 @@ struct space_def {
 	uint32_t field_count;
 	char name[BOX_NAME_MAX + 1];
 	char engine_name[BOX_NAME_MAX + 1];
-        /**
-	 * The space is a temporary:
-	 * - it is empty at server start
-	 * - changes are not written to WAL
-	 * - changes are not part of a snapshot
-	 */
-	bool temporary;
+	struct space_opts opts;
 };
 
 /**
