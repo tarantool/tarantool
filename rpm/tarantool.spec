@@ -103,12 +103,12 @@ This package provides common files, admin tools and init scripts.
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
          -DENABLE_BACKTRACE:BOOL=ON \
-         -DENABLE_DIST:BOOL=ON \
 %if %{with systemd}
          -DWITH_SYSTEMD:BOOL=ON \
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
-         -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir}
+         -DSYSTEMD_TMPFILES_DIR:PATH=%{_tmpfilesdir} \
 %endif
+         -DENABLE_DIST:BOOL=ON
 make %{?_smp_mflags}
 
 %install
