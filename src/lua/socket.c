@@ -629,6 +629,44 @@ lbox_socket_push_addr(struct lua_State *L,
 }
 
 static int
+lbox_getaddrinfo_result_wrapper(struct lua_State *L)
+{
+	struct addrinfo *result = (struct addrinfo*)lua_topointer(L, 1);
+	lua_newtable(L);
+	int i = 1;
+	for (struct addrinfo *rp = result; rp; rp = rp->ai_next, i++) {
+		lua_pushinteger(L, i);
+
+		lbox_socket_push_addr(L, rp->ai_addr, rp->ai_addrlen);
+
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 2);
+			i--;
+			continue;
+		}
+
+		lua_pushliteral(L, "protocol");
+		lbox_socket_push_protocol(L, rp->ai_protocol);
+		lua_rawset(L, -3);
+
+		lua_pushliteral(L, "type");
+		lbox_socket_push_sotype(L, rp->ai_socktype);
+		lua_rawset(L, -3);
+
+		if (rp->ai_canonname) {
+					lua_pushliteral(L, "canonname");
+			lua_pushstring(L, rp->ai_canonname);
+			lua_rawset(L, -3);
+		}
+
+		lua_rawset(L, -3);
+
+	}
+
+	return 1;
+}
+
+static int
 lbox_socket_getaddrinfo(struct lua_State *L)
 {
 	assert(lua_gettop(L) == 4);
@@ -679,41 +717,14 @@ lbox_socket_getaddrinfo(struct lua_State *L)
 		return 1;
 	}
 
-	lua_newtable(L);
-	int i = 1;
-	for (struct addrinfo *rp = result; rp; rp = rp->ai_next, i++) {
-		lua_pushinteger(L, i);
+	lua_pushcfunction(L, lbox_getaddrinfo_result_wrapper);
+	lua_pushlightuserdata(L, result);
 
-		lbox_socket_push_addr(L, rp->ai_addr, rp->ai_addrlen);
+	int rc = lbox_call(L, 1, 1);
 
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 2);
-			i--;
-			continue;
-		}
-
-		lua_pushliteral(L, "protocol");
-		lbox_socket_push_protocol(L, rp->ai_protocol);
-		lua_rawset(L, -3);
-
-		lua_pushliteral(L, "type");
-		lbox_socket_push_sotype(L, rp->ai_socktype);
-		lua_rawset(L, -3);
-
-		if (rp->ai_canonname) {
-			lua_pushliteral(L, "canonname");
-			lua_pushstring(L, rp->ai_canonname);
-			lua_rawset(L, -3);
-		}
-
-		lua_rawset(L, -3);
-
-	}
-	/*
-	 * XXX: this leaks freeaddrinfo() if anything in the loop
-	 * above causes a Lua error.
-	 */
 	freeaddrinfo(result);
+	if (rc != 0)
+		return lbox_error(L);
 	return 1;
 }
 
@@ -780,6 +791,19 @@ lbox_socket_peername(struct lua_State *L)
 }
 
 static int
+lbox_socket_accept_wrapper(struct lua_State *L)
+{
+	int sc = lua_tointeger(L, 1);
+	struct sockaddr_storage *fa = (struct sockaddr_storage*)
+		lua_topointer(L, 2);
+	socklen_t len = lua_tointeger(L, 3);
+
+	lua_pushnumber(L, sc);
+	lbox_socket_push_addr(L, (struct sockaddr *)fa, len);
+	return 2;
+}
+
+static int
 lbox_socket_accept(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
@@ -794,9 +818,24 @@ lbox_socket_accept(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
+	lua_pushcfunction(L, lbox_socket_accept_wrapper);
 	lua_pushnumber(L, sc);
-	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
+	lua_pushlightuserdata(L, &fa);
+	lua_pushinteger(L, len);
+	if (lbox_call(L, 3, 2)) {
+		close(sc);
+		return lbox_error(L);
+	}
 	return 2;
+}
+
+static int
+lbox_socket_recvfrom_wrapper(struct lua_State *L)
+{
+	char *buf = (char *)lua_topointer(L, 1);
+	socklen_t len = lua_tointeger(L, 2);
+	lua_pushlstring(L, buf, len);
+	return 1;
 }
 
 static int
@@ -823,11 +862,14 @@ lbox_socket_recvfrom(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	lua_pushlstring(L, buf, res);
-	/*
-	 * XXX: this leaks in case of pushlstring() error.
-	 */
+
+	lua_pushcfunction(L, lbox_socket_recvfrom_wrapper);
+	lua_pushlightuserdata(L, buf);
+	lua_pushinteger(L, res);
+	int rc = lbox_call(L, 2, 1);
 	free(buf);
+	if (rc)
+		return lbox_error(L);
 	lbox_socket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
 }
