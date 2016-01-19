@@ -132,6 +132,7 @@ set (CPACK_PACKAGE_VERSION_MINOR "6")
 set (CPACK_PACKAGE_VERSION_PATCH "8")
 
 set (PACKAGE_VERSION "")
+set (TARANTOOL_VERSION "")
 
 # Get git version only if source directory has .git repository, this
 # avoids git to search .git repository in parent
@@ -142,6 +143,10 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
                 COMMAND sed "s/-/./"
                 COMMAND sed "s/-[a-z 0-9]*//"
 		OUTPUT_VARIABLE PACKAGE_VERSION
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    execute_process (COMMAND ${GIT} describe HEAD
+        OUTPUT_VARIABLE TARANTOOL_VERSION
 		OUTPUT_STRIP_TRAILING_WHITESPACE
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     if (PACKAGE_VERSION STREQUAL "")
