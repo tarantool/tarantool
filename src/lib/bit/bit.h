@@ -64,6 +64,7 @@ struct unaligned_mem
 		uint64_t u64;
 		float	 f;
 		double	 lf;
+		bool     b;
 	};
 } __attribute__((__packed__));
 /** @endcond **/
@@ -114,6 +115,13 @@ load_double(const void *p)
 	return ((const struct unaligned_mem *)p)->lf;
 }
 
+/** @copydoc load_u8 */
+inline bool
+load_bool(const void *p)
+{
+	return ((const struct unaligned_mem *)p)->b;
+}
+
 /**
  * @brief Unaligned store to memory.
  * @param p pointer
@@ -158,6 +166,13 @@ inline void
 store_double(void *p, double v)
 {
 	((struct unaligned_mem *)p)->lf = v;
+}
+
+/** @copydoc store_bool */
+inline void
+store_bool(void *p, bool b)
+{
+	((struct unaligned_mem *)p)->b = b;
 }
 
 /**

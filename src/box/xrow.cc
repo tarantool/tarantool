@@ -450,7 +450,7 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	/* Extract a version string - a string until ' ' */
 	char version[20];
 	const char *vend = (const char *) memchr(pos, ' ', end - pos);
-	if (vend == NULL || (vend - pos) >= sizeof(version))
+	if (vend == NULL || (size_t)(vend - pos) >= sizeof(version))
 		return -1;
 	memcpy(version, pos, vend - pos);
 	version[vend - pos] = '\0';
@@ -495,7 +495,7 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	greeting->salt_len = base64_decode(greetingbuf + h, h - 1,
 					   greeting->salt,
 					   sizeof(greeting->salt));
-	if (greeting->salt_len < SCRAMBLE_SIZE || greeting->salt_len >= h)
+	if (greeting->salt_len < SCRAMBLE_SIZE || greeting->salt_len >= (uint32_t)h)
 		return -1;
 
 	return 0;

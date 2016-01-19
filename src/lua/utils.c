@@ -439,8 +439,8 @@ skip:
 
 	/* Encode excessively sparse arrays as objects (if enabled) */
 	if (cfg->encode_sparse_ratio > 0 &&
-	    max > size * cfg->encode_sparse_ratio &&
-	    max > cfg->encode_sparse_safe) {
+	    max > size * (uint32_t)cfg->encode_sparse_ratio &&
+	    max > (uint32_t)cfg->encode_sparse_safe) {
 		if (!cfg->encode_sparse_convert)
 			luaL_error(L, "excessively sparse array");
 		field->type = MP_MAP;
@@ -800,7 +800,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		const char *arg = luaL_checkstring(L, idx);
 		char *arge;
 		errno = 0;
-		*result = (int64_t) (unsignd ? strtoull(arg, &arge, 10) :
+		*result = (unsignd ? (long long) strtoull(arg, &arge, 10) :
 			strtoll(arg, &arge, 10));
 		if (errno == 0 && arge != arg)
 			return 0;
@@ -862,7 +862,7 @@ luaL_iserror(struct lua_State *L, int narg)
 
 	uint32_t ctypeid;
 	void *data = luaL_checkcdata(L, narg, &ctypeid);
-	if (ctypeid != CTID_CONST_STRUCT_ERROR_REF)
+	if (ctypeid != (uint32_t) CTID_CONST_STRUCT_ERROR_REF)
 		return NULL;
 
 	struct error *e = *(struct error **) data;

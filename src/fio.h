@@ -157,7 +157,7 @@ fio_truncate(int fd, off_t offset);
 struct fio_batch
 {
 	/** Total number of bytes in batched rows. */
-	ssize_t bytes;
+	size_t bytes;
 	/** Total number of batched rows.*/
 	int iovcnt;
 	/** A cap on how many rows can be batched. Can be set to INT_MAX. */

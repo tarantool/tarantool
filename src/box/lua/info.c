@@ -175,6 +175,17 @@ lbox_info_pid(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_cluster(struct lua_State *L)
+{
+	lua_createtable(L, 0, 2);
+	lua_pushliteral(L, "uuid");
+	lua_pushlstring(L, tt_uuid_str(&cluster_id), UUID_STR_LEN);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
@@ -184,6 +195,7 @@ lbox_info_dynamic_meta [] =
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},
+	{"cluster", lbox_info_cluster},
 	{NULL, NULL}
 };
 

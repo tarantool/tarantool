@@ -96,7 +96,7 @@ test_rotl_rotr(void)
 	header();
 
 	int rots[] = { 0, 1, 15, 16, 31, 32, 63, 64 };
-	for (int r = 0; r < sizeof(rots) / sizeof(rots[0]); r++) {
+	for (unsigned r = 0; r < sizeof(rots) / sizeof(rots[0]); r++) {
 		test_rotl_rotr_one(rots[r]);
 	}
 

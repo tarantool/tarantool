@@ -164,7 +164,8 @@ struct errcode_record {
 	/*108 */_(ER_WRONG_INDEX_OPTIONS, 2, "Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION, 2, "Wrong schema version, current: %d, in request: %u") \
 	/*110 */_(ER_SLAB_ALLOC_MAX, 2, "Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.") \
-	/*111 */_(ER_SERVER_UUID_MISMATCH, 2, "Remote UUID mismatch: expected %s, got %s") \
+	/*111 */_(ER_WRONG_SPACE_OPTIONS, 2, "Wrong space options (field %u): %s") \
+	/*112 */_(ER_SERVER_UUID_MISMATCH, 2, "Remote UUID mismatch: expected %s, got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -105,7 +105,7 @@ space_name(struct space *space) { return space->def.name; }
 
 /** Return true if space is temporary. */
 static inline bool
-space_is_temporary(struct space *space) { return space->def.temporary; }
+space_is_temporary(struct space *space) { return space->def.opts.temporary; }
 
 static inline bool
 space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }

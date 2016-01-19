@@ -135,8 +135,9 @@ lbox_tuple_slice_wrapper(struct lua_State *L)
 {
 	box_tuple_iterator_t *it = (box_tuple_iterator_t *)
 		lua_topointer(L, 1);
-	int start = lua_tointeger(L, 2);
-	int end = lua_tointeger(L, 3);
+	uint32_t start = lua_tointeger(L, 2);
+	uint32_t end = lua_tointeger(L, 3);
+	assert(end >= start);
 	const char *field;
 
 	uint32_t field_no = start;
@@ -156,7 +157,7 @@ lbox_tuple_slice(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	uint32_t start, end;
-	int offset;
+	int32_t offset;
 
 	/*
 	 * Prepare the range. The second argument is optional.
@@ -166,7 +167,7 @@ lbox_tuple_slice(struct lua_State *L)
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
 
-	uint32_t field_count = box_tuple_field_count(tuple);
+	int32_t field_count = box_tuple_field_count(tuple);
 	offset = lua_tointeger(L, 2);
 	if (offset >= 0 && offset < field_count) {
 		start = offset;

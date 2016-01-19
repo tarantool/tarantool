@@ -79,9 +79,9 @@ struct recovery *recovery;
  */
 static struct recover_row_ctx {
 	/** How many rows have been recovered so far. */
-	int rows;
+	size_t rows;
 	/** Yield once per 'yield' rows. */
-	int yield;
+	size_t yield;
 } recover_row_ctx;
 
 bool snapshot_in_progress = false;
@@ -89,7 +89,7 @@ static bool box_init_done = false;
 bool is_ro = true;
 
 void
-recover_row_ctx_init(struct recover_row_ctx *ctx, int rows_per_wal)
+recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
 {
 	ctx->rows = 0;
 	/**
@@ -257,15 +257,16 @@ box_check_wal_mode(const char *mode_name)
 static void
 box_check_readahead(int readahead)
 {
-	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
-	if (readahead < READAHEAD_MIN || readahead > READAHEAD_MAX) {
+	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483647 };
+	if (readahead < (int) READAHEAD_MIN ||
+	    readahead > (int) READAHEAD_MAX) {
 		tnt_raise(ClientError, ER_CFG, "readahead",
 			  "specified value is out of bounds");
 	}
 }
 
-static int
-box_check_rows_per_wal(int rows_per_wal)
+static int64_t
+box_check_rows_per_wal(int64_t rows_per_wal)
 {
 	/* check rows_per_wal configuration */
 	if (rows_per_wal <= 1) {
@@ -282,7 +283,7 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));
-	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
@@ -1134,7 +1135,7 @@ box_init(void)
 
 	/* recovery initialization */
 	recover_row_ctx_init(&recover_row_ctx,
-			     cfg_geti("rows_per_wal"));
+			     cfg_geti64("rows_per_wal"));
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, &recover_row_ctx);
@@ -1167,7 +1168,7 @@ box_init(void)
 	iproto_init();
 	box_set_listen();
 
-	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	recovery_finalize(recovery, wal_mode, rows_per_wal);
 

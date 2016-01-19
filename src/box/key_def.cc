@@ -37,6 +37,20 @@
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 
+const char *mp_type_strs[] = {
+	/* .MP_NIL    = */ "nil",
+	/* .MP_UINT   = */ "unsigned int",
+	/* .MP_INT    = */ "int",
+	/* .MP_STR    = */ "string",
+	/* .MP_BIN    = */ "blob",
+	/* .MP_ARRAY  = */ "array",
+	/* .MP_MAP    = */ "map",
+	/* .MP_BOOL   = */ "boolean",
+	/* .MP_FLOAT  = */ "float",
+	/* .MP_DOUBLE = */ "double",
+	/* .MP_EXT    = */ "extension",
+};
+
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
 const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
@@ -52,7 +66,17 @@ const uint32_t key_mp_type[] = {
 };
 
 const struct key_opts key_opts_default = {
-	true, 2, RTREE_INDEX_DISTANCE_TYPE_EUCLID
+	/* .unique       = */ true,
+	/* .dimension    = */ 2,
+	/* .distancebuf  = */ { '\0' },
+	/* .distance     = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID
+};
+
+const struct opt_def key_opts_reg[] = {
+	OPT_DEF("unique", MP_BOOL, struct key_opts, is_unique),
+	OPT_DEF("dimension", MP_UINT, struct key_opts, dimension),
+	OPT_DEF("distance", MP_STR, struct key_opts, distancebuf),
+	{ NULL, MP_NIL, 0, 0 }
 };
 
 enum schema_object_type
@@ -87,7 +111,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	if (def == NULL) {
 		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
-	int n = snprintf(def->name, sizeof(def->name), "%s", name);
+	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
 		struct space *space = space_cache_find(space_id);
@@ -249,13 +273,22 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	 */
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
-	for (int i = 0; i < def->part_count; i++) {
+	for (uint32_t i = 0; i < def->part_count; i++) {
 		if (def->parts[i].type == UNKNOWN)
 			all_parts_set = false;
 	}
 	if (all_parts_set)
 		key_def_set_cmp(def);
 }
+
+const struct space_opts space_opts_default = {
+	/* .temporary = */ false,
+};
+
+const struct opt_def space_opts_reg[] = {
+	OPT_DEF("temporary", MP_BOOL, struct space_opts, temporary),
+	{ NULL, MP_NIL, 0, 0 }
+};
 
 void
 space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
@@ -279,7 +312,7 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 	}
 	identifier_check(def->engine_name);
 
-	if (def->temporary) {
+	if (def->opts.temporary) {
 		Engine *engine = engine_find(def->engine_name);
 		if (! engine_can_be_temporary(engine->flags))
 			tnt_raise(ClientError, ER_ALTER_SPACE,

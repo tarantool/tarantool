@@ -272,7 +272,7 @@ lbox_iterator_next(lua_State *L)
 	assert(CTID_STRUCT_ITERATOR_REF != 0);
 	uint32_t ctypeid;
 	void *data = luaL_checkcdata(L, 1, &ctypeid);
-	if (ctypeid != CTID_STRUCT_ITERATOR_REF)
+	if (ctypeid != (uint32_t) CTID_STRUCT_ITERATOR_REF)
 		return luaL_error(L, "usage: next(state)");
 
 	struct iterator *itr = *(struct iterator **) data;

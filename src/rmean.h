@@ -54,7 +54,7 @@ struct stats {
  */
 struct rmean {
 	ev_timer timer;
-	int stats_n;
+	unsigned stats_n;
 	double prev_ts;
 	struct stats stats[0];
 };

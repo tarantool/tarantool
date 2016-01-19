@@ -202,7 +202,7 @@ tuple_format_new(struct rlist *key_list)
 		throw;
 	}
 
-	int32_t i = 0;
+	uint32_t i = 0;
 	int j = 0;
 	for (; i < format->max_fieldno; i++) {
 		/*

@@ -64,7 +64,7 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
  * @return                offset of iov[0] for the next write
  */
 static inline int
-sio_move_iov(struct iovec *iov, ssize_t nwr, size_t *iov_len)
+sio_move_iov(struct iovec *iov, size_t nwr, size_t *iov_len)
 {
 	nwr += *iov_len;
 	struct iovec *begin = iov;
@@ -81,7 +81,7 @@ sio_move_iov(struct iovec *iov, ssize_t nwr, size_t *iov_len)
  * to adjust to a partial write.
  */
 static inline void
-sio_add_to_iov(struct iovec *iov, ssize_t size)
+sio_add_to_iov(struct iovec *iov, size_t size)
 {
 	iov->iov_len += size;
 	iov->iov_base = (char *) iov->iov_base - size;

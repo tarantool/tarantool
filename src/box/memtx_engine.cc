@@ -316,28 +316,29 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		 * at this point is ignored. Emulate this by
 		 * suppressing the error. It's logged and ignored.
 		 *
-		 * What sort of exception can happen here:
-		 * - the format of the default tuple is incorrect
-		 *   or not acceptable by this space.
-		 * - we're out of memory for a new tuple.
-		 * - unique key validation failure for the new tuple
+		 * Taking into account that:
+		 * 1) Default tuple fields are already fully checked
+		 *    at the beginning of the function
+		 * 2) Space with unique secondary indexes does not support
+		 *    upsert and we can't get duplicate error
+		 *
+		 * Thus we could get only OOM error, but according to
+		 *   https://github.com/tarantool/tarantool/issues/1156
+		 *   we should not suppress it
+		 *
+		 * So we have nothing to catch and suppress!
 		 */
-		try {
-			struct tuple *new_tuple = tuple_new(space->format,
-							    request->tuple,
-							    request->tuple_end);
-			TupleRef ref(new_tuple);
-			space_validate_tuple(space, new_tuple);
-			this->replace(txn, space, NULL,
-				      new_tuple, DUP_INSERT);
-		} catch (OutOfMemory *) {
-			throw;
-		} catch (ClientError *e) {
-			say_error("UPSERT failed:");
-			e->log();
-		}
+		struct tuple *new_tuple = tuple_new(space->format,
+						    request->tuple,
+						    request->tuple_end);
+		TupleRef ref(new_tuple); /* useless, for unified approach */
+		replace(txn, space, NULL, new_tuple, DUP_INSERT);
 	} else {
-		/* Update the tuple. */
+		/**
+		 * Update the tuple.
+		 * tuple_upsert throws on totally wrong tuple ops,
+		 * but ignores ops that not suitable for the tuple
+		 */
 		struct tuple *new_tuple =
 			tuple_upsert(space->format, region_aligned_alloc_xc_cb,
 				     &fiber()->gc, old_tuple,
@@ -345,11 +346,13 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 				     request->index_base);
 		TupleRef ref(new_tuple);
 
-		/** The rest must remain silent. */
+		/**
+		 * Ignore and log all client exceptions,
+		 * note that OutOfMemory is not catched.
+		 */
 		try {
 			space_validate_tuple(space, new_tuple);
-			this->replace(txn, space, old_tuple, new_tuple,
-				      DUP_REPLACE);
+			replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
 		} catch (ClientError *e) {
 			say_error("UPSERT failed:");
 			e->log();

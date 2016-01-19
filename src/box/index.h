@@ -247,7 +247,7 @@ struct iterator {
 	struct tuple *(*next)(struct iterator *);
 	void (*free)(struct iterator *);
 	/* optional parameters used in lua */
-	int sc_version;
+	uint32_t sc_version;
 	uint32_t space_id;
 	uint32_t index_id;
 	class Index *index;
@@ -308,7 +308,7 @@ public:
 	/* Description of a possibly multipart key. */
 	struct key_def *key_def;
 	/* Schema version on index construction moment */
-	int sc_version;
+	uint32_t sc_version;
 
 protected:
 	/**

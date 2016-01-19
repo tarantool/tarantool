@@ -493,7 +493,7 @@ static void
 do_op_set(struct tuple_update *update, struct update_op *op)
 {
 	/* intepret '=' for n +1 field as insert */
-	if (op->field_no == rope_size(update->rope))
+	if (op->field_no == (int32_t) rope_size(update->rope))
 		return do_op_insert(update, op);
 	op_adjust_field_no(update, op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
@@ -591,8 +591,8 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	const char *in = field->old;
-	uint32_t str_len;
-	in = mp_read_str(update, op, &in, &str_len);
+	int32_t str_len;
+	in = mp_read_str(update, op, &in, (uint32_t *) &str_len);
 
 	if (arg->offset < 0) {
 		if (-arg->offset > str_len + 1) {

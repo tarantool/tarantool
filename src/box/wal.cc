@@ -66,7 +66,7 @@ struct wal_writer
 	struct cpipe wal_pipe;
 	/* ----------------- wal ------------------- */
 	/** A setting from server configuration - rows_per_wal */
-	int rows_per_wal;
+	int64_t rows_per_wal;
 	/** Another one - wal_mode */
 	enum wal_mode wal_mode;
 	/** wal_dir, from the configuration file. */
@@ -217,7 +217,7 @@ tx_schedule_rollback(struct cmsg *msg)
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  const char *wal_dirname, const struct tt_uuid *server_uuid,
-		  struct vclock *vclock, int rows_per_wal)
+		  struct vclock *vclock, int64_t rows_per_wal)
 {
 	writer->wal_mode = wal_mode;
 	writer->rows_per_wal = rows_per_wal;
@@ -282,7 +282,7 @@ wal_writer_f(va_list ap);
 void
 wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 		 const struct tt_uuid *server_uuid, struct vclock *vclock,
-		 int rows_per_wal)
+		 int64_t rows_per_wal)
 {
 	assert(rows_per_wal > 1);
 

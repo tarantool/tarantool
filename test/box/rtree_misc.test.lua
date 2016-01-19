@@ -220,9 +220,10 @@ box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 
--- unknown args ignored
+-- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
-s.index.s:drop()
+
+-- unknown args ignored
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array', {part = 'opts'}}}})
 s.index.s:drop()
 

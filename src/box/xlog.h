@@ -174,7 +174,7 @@ struct xlog {
 	 * used in local hot standby to "follow up" on new rows
 	 * appended to the file.
 	 */
-	size_t rows;
+	int64_t rows; /* should have the same type as lsn */
 	/** Log file name. */
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */

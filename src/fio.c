@@ -68,7 +68,7 @@ fio_filename(int fd)
 ssize_t
 fio_read(int fd, void *buf, size_t count)
 {
-	ssize_t to_read = (ssize_t) count;
+	ssize_t to_read = (size_t) count;
 	while (to_read > 0) {
 		ssize_t nrd = read(fd, buf, to_read);
 		if (nrd < 0) {
@@ -77,7 +77,7 @@ fio_read(int fd, void *buf, size_t count)
 				continue;
 			}
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return count != to_read ? count - to_read : -1;
+				return (ssize_t)count != to_read ? (ssize_t)count - to_read : -1;
 			say_syserror("read, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}
@@ -102,7 +102,7 @@ fio_write(int fd, const void *buf, size_t count)
 				continue;
 			}
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				return count != to_write ? count - to_write : -1;
+				return (ssize_t)count != to_write ? (ssize_t)count - to_write : -1;
 			say_syserror("write, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}

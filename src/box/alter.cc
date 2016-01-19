@@ -57,7 +57,7 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 #define NAME             2
 #define ENGINE           3
 #define FIELD_COUNT      4
-#define FLAGS            5
+#define OPTS             5
 
 /** _index columns */
 #define INDEX_ID         1
@@ -201,6 +201,89 @@ err:
 	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
 }
 
+static void
+opt_set(void *opts, const struct opt_def *def, const char **val)
+{
+	uint64_t uval;
+	uint32_t str_len;
+	const char *str;
+	char *opt = ((char *) opts) + def->offset;
+	switch (def->type) {
+	case MP_BOOL:
+		store_bool(opt, mp_decode_bool(val));
+		break;
+	case MP_UINT:
+		uval = mp_decode_uint(val);
+		if (def->len == sizeof(uint64_t)) {
+			store_u64(opt, uval);
+		} else if (def->len == sizeof(uint32_t)) {
+			store_u32(opt, uval);
+		} else {
+			mp_unreachable();
+		}
+		break;
+	case MP_STR:
+		str = mp_decode_str(val, &str_len);
+		str_len = MIN(str_len, def->len - 1);
+		memcpy(opt, str, str_len);
+		opt[str_len + 1] = '\0';
+		break;
+	default:
+		mp_unreachable();
+	}
+}
+
+static void
+opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
+		       uint32_t errcode, uint32_t field_no)
+{
+	char errmsg[DIAG_ERRMSG_MAX];
+
+	if (mp_typeof(*map) == MP_NIL)
+		return;
+	if (mp_typeof(*map) != MP_MAP)
+		tnt_raise(ClientError, errcode, field_no,
+			  "expected a map with options");
+
+	/*
+	 * The implementation below has O(map_size * reg_size) complexity.
+	 * DDL is not performance-critical, so this is not a problem.
+	 */
+	uint32_t map_size = mp_decode_map(&map);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*map) != MP_STR) {
+			tnt_raise(ClientError, errcode, field_no,
+				  "key must be a string");
+		}
+		uint32_t key_len;
+		const char *key = mp_decode_str(&map, &key_len);
+		bool found = false;
+		for (const struct opt_def *def = reg; def->name != NULL; def++) {
+			if (key_len != strlen(def->name) ||
+			    memcmp(key, def->name, key_len) != 0)
+				continue;
+
+			if (mp_typeof(*map) != def->type) {
+				snprintf(errmsg, sizeof(errmsg),
+					"'%.*s' must be %s", key_len, key,
+					mp_type_strs[def->type]);
+				tnt_raise(ClientError, errcode, field_no,
+					  errmsg);
+			}
+
+			opt_set(opts, def, &map);
+			found = true;
+			break;
+		}
+		if (!found) {
+			snprintf(errmsg, sizeof(errmsg),
+				"unexpected option '%.*s'",
+				key_len, key);
+			tnt_raise(ClientError, errcode, field_no, errmsg);
+		}
+	}
+}
+
 /**
  * Support function for key_def_new_from_tuple(..)
  * 1.6.6+
@@ -209,10 +292,9 @@ err:
  * Throws an error if the the value does not correspond to any enum value
  */
 static enum rtree_index_distance_type
-key_opts_decode_distance(const char **field)
+key_opts_decode_distance(const char *str)
 {
-	uint32_t len;
-	const char *str = mp_decode_str(field, &len);
+	uint32_t len = strlen(str);
 	if (len == strlen("euclid") &&
 	    strncasecmp(str, "euclid", len) == 0) {
 		return RTREE_INDEX_DISTANCE_TYPE_EUCLID;
@@ -238,47 +320,10 @@ static void
 key_opts_create_from_field(struct key_opts *opts, const char *map)
 {
 	*opts = key_opts_default;
-	if (mp_typeof(*map) != MP_MAP)
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  INDEX_OPTS, "expected a map with options");
-	uint32_t map_size = mp_decode_map(&map);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*map) != MP_STR) {
-			mp_next(&map); /* skip key */
-			mp_next(&map); /* skip value */
-		}
-		uint32_t key_len;
-		const char *key = mp_decode_str(&map, &key_len);
-		if (key_len == strlen("unique") &&
-		    strncasecmp(key, "unique", key_len) == 0) {
-			if (mp_typeof(*map) != MP_BOOL) {
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "unique must be a boolean");
-			}
-			opts->is_unique = mp_decode_bool(&map);
-		} else if (key_len == strlen("dimension") &&
-			   strncasecmp(key, "dimension", key_len) == 0) {
-			if (mp_typeof(*map) != MP_UINT) {
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "dimension must be a number");
-			}
-			opts->dimension = (uint32_t) mp_decode_uint(&map);
-		} else if (key_len == strlen("distance") &&
-			   strncasecmp(key, "distance", key_len) == 0) {
-			if (mp_typeof(*map) != MP_STR)
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "distance must be a string");
-			opts->distance = key_opts_decode_distance(&map);
-		} else {
-			mp_next(&map); /* skip value */
-		}
-	}
+	opts_create_from_field(opts, key_opts_reg, map,
+			ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+	if (opts->distancebuf[0] != '\0')
+		opts->distance = key_opts_decode_distance(opts->distancebuf);
 }
 
 /**
@@ -406,25 +451,34 @@ key_def_new_from_tuple(struct tuple *tuple)
 }
 
 static void
-space_def_init_flags(struct space_def *def, struct tuple *tuple)
+space_def_init_opts(struct space_def *def, struct tuple *tuple)
 {
-	/* default values of flags */
-	def->temporary = false;
+	/* default values of opts */
+	def->opts = space_opts_default;
 
 	/* there is no property in the space */
-	if (tuple_field_count(tuple) <= FLAGS)
+	if (tuple_field_count(tuple) <= OPTS)
 		return;
 
-	const char *flags = tuple_field_cstr(tuple, FLAGS);
-	while (flags && *flags) {
-		while (isspace(*flags)) /* skip space */
-			flags++;
-		if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-			def->temporary = true;
-		flags = strchr(flags, ',');
-		if (flags)
-			flags++;
+	const char *data = tuple_field(tuple, OPTS);
+	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
+	if (!is_170_plus) {
+		/* Tarantool < 1.7.0 compatibility */
+		const char *flags = tuple_field_cstr(tuple, OPTS);
+		while (flags && *flags) {
+			while (isspace(*flags)) /* skip space */
+				flags++;
+			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
+				def->opts.temporary = true;
+			flags = strchr(flags, ',');
+			if (flags)
+				flags++;
+		}
+		return;
 	}
+
+	opts_create_from_field(&def->opts, space_opts_reg, data,
+			ER_WRONG_SPACE_OPTIONS, OPTS);
 }
 
 /**
@@ -442,7 +496,7 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
 			 "%s", tuple_field_cstr(tuple, ENGINE));
 
-	space_def_init_flags(def, tuple);
+	space_def_init_opts(def, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
 	access_check_ddl(def->uid);
 }
@@ -768,12 +822,12 @@ ModifySpace::prepare(struct alter_space *alter)
 	}
 
 	Engine *engine = alter->old_space->handler->engine;
-	if (def.temporary && !engine_can_be_temporary(engine->flags)) {
+	if (def.opts.temporary && !engine_can_be_temporary(engine->flags)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  space_name(alter->old_space),
 			  "space does not support temporary flag");
 	}
-	if (def.temporary != alter->old_space->def.temporary &&
+	if (def.opts.temporary != alter->old_space->def.opts.temporary &&
 	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -1406,7 +1460,7 @@ user_has_data(struct user *user)
 	 */
 	uint32_t indexes[] = { 1, 1, 1, 0 };
 	uint32_t count = sizeof(spaces)/sizeof(*spaces);
-	for (int i = 0; i < count; i++) {
+	for (uint32_t i = 0; i < count; i++) {
 		if (space_has_data(spaces[i], indexes[i], uid))
 			return true;
 	}

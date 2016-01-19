@@ -318,7 +318,7 @@ xdir_scan(struct xdir *dir)
 	 * appeared since the last scan.
 	 */
 	struct vclock *vclock = vclockset_first(&dir->index);
-	int i = 0;
+	unsigned i = 0;
 	while (i < s_count || vclock != NULL) {
 		int64_t s_old = vclock ? vclock_sum(vclock) : LLONG_MAX;
 		int64_t s_new = i < s_count ? signatures[i] : LLONG_MAX;

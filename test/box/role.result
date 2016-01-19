@@ -842,7 +842,7 @@ box.schema.user.create('test', { if_not_exists = true})
 ...
 box.schema.role.drop('test', { if_not_exists = true})
 ---
-- error: Illegal parameters, options parameter 'if_not_exists' is unexpected
+- error: Illegal parameters, unexpected option 'if_not_exists'
 ...
 box.schema.role.drop('test', { if_exists = true})
 ---
@@ -855,7 +855,7 @@ box.schema.role.create('test', { if_not_exists = true})
 ...
 box.schema.user.drop('test', { if_not_exists = true})
 ---
-- error: Illegal parameters, options parameter 'if_not_exists' is unexpected
+- error: Illegal parameters, unexpected option 'if_not_exists'
 ...
 -- gh-664 roles: accepting bad syntax for create
 box.schema.role.create('role', 'role')

@@ -128,7 +128,7 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 		bool is_line_end = (*p == '\n' || *p == '\r');
 		/* realloc buffer */
 		if (csv->buf == NULL ||
-		   (csv->bufp && csv->buf_len < csv->bufp - csv->buf + 1)) {
+		   (csv->bufp && csv->buf_len < (size_t)(csv->bufp - csv->buf + 1))) {
 			size_t new_size = csv->buf_len * 2;
 			if (csv->buf_len == 0 || csv->buf == NULL)
 				new_size = 256;
@@ -365,15 +365,15 @@ csv_escape_field(struct csv *csv, const char *field,
 	while (*field) {
 		/*  double-quote "" */
 		if (*field == csv->quote_char) {
-			assert(p - dst < buf_size);
+			assert((size_t)(p - dst) < buf_size);
 			*p++ = csv->quote_char;
 		}
-		assert(p - dst < buf_size);
+		assert((size_t)(p - dst) < buf_size);
 		*p++ = *field++;
 	}
 	/* adds ending quote */
 	if (inquotes) {
-		assert(p - dst < buf_size);
+		assert((size_t)(p - dst) < buf_size);
 		*p++ = csv->quote_char;
 	}
 	*p = 0;
