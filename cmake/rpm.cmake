@@ -30,20 +30,18 @@ if (RPMBUILD)
 
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-        COMMAND $(MAKE) package_source && mv `ls *.tar.gz | head -n 1` ${PACKAGE_VERSION}.tar.gz)
+        COMMAND $(MAKE) package_source && mv `ls *.tar.gz | head -n 1` tarantool-${PACKAGE_VERSION}.tar.gz)
 
     add_custom_command(OUTPUT ${RPM_BUILDROOT}
         COMMAND ${MKDIR} -p ${RPM_BUILDROOT})
 
     add_custom_target(bump_spec
-        DEPENDS ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
-        COMMAND sed -i -e "s/Version:\([ ]*\).*/Version: ${PACKAGE_VERSION}/g" rpm/tarantool.spec
+        DEPENDS ${PROJECT_BINARY_DIR}/tarantool-${PACKAGE_VERSION}.tar.gz
+        COMMAND sed -i -e "'s/Version:\\([ ]*\\).*/Version: ${PACKAGE_VERSION}/g'" rpm/tarantool.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     )
 
     add_custom_target(rpm_src
-        #DEPENDS ${PROJECT_BINARY_DIR}/${PACKAGE_VERSION}.tar.gz
-        #COMMAND sed -i -e "s/Version:\([ ]*\).*/Version: ${PACKAGE_VERSION}/g" rpm/tarantool.spec
         DEPENDS bump_spec
         COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --define '_sourcedir ./' --define '_srcrpmdir ./' -bs ${PROJECT_SOURCE_DIR}/rpm/tarantool.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
