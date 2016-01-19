@@ -412,7 +412,7 @@ recover_current_wal:
 
 void
 recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
-		  int rows_per_wal)
+		  int64_t rows_per_wal)
 {
 	recovery_stop_local(r);
 

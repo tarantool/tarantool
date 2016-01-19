@@ -264,8 +264,8 @@ box_check_readahead(int readahead)
 	}
 }
 
-static int
-box_check_rows_per_wal(int rows_per_wal)
+static int64_t
+box_check_rows_per_wal(int64_t rows_per_wal)
 {
 	/* check rows_per_wal configuration */
 	if (rows_per_wal <= 1) {
@@ -283,7 +283,7 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));
-	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
@@ -1010,7 +1010,7 @@ box_init(void)
 
 	/* recovery initialization */
 	recover_row_ctx_init(&recover_row_ctx,
-			     cfg_geti("rows_per_wal"));
+			     cfg_geti64("rows_per_wal"));
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, &recover_row_ctx);
@@ -1066,7 +1066,7 @@ box_init(void)
 	iproto_init();
 	box_set_listen();
 
-	size_t rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	recovery_finalize(recovery, wal_mode, rows_per_wal);
 

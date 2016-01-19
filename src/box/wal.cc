@@ -50,7 +50,7 @@ struct wal_writer
 	struct cpipe tx_pipe;
 	struct cpipe wal_pipe;
 	struct cbus tx_wal_bus;
-	size_t rows_per_wal;
+	int64_t rows_per_wal;
 	struct fio_batch *batch;
 	bool is_shutdown;
 	bool is_rollback;
@@ -140,7 +140,7 @@ tx_fetch_output(ev_loop * /* loop */, ev_async *watcher, int /* event */)
  */
 static void
 wal_writer_init(struct wal_writer *writer, struct vclock *vclock,
-		size_t rows_per_wal)
+		int64_t rows_per_wal)
 {
 	cbus_create(&writer->tx_wal_bus);
 
@@ -191,7 +191,7 @@ wal_writer_f(va_list ap);
  *         points to a newly created WAL writer.
  */
 int
-wal_writer_start(struct recovery *r, size_t rows_per_wal)
+wal_writer_start(struct recovery *r, int64_t rows_per_wal)
 {
 	assert(r->writer == NULL);
 	assert(r->current_wal == NULL);
