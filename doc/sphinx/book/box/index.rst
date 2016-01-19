@@ -371,23 +371,20 @@ and on the right are comments.
    Hex dump of WAL file       Comment
    --------------------       -------
    58 4c 4f 47 0a             File header: "XLOG\n"
-   30 2e 31 32 0a 0a          File header: "0.12\n\n" = version
-   ...                        (not shown = inserted tuples for LSN and system spaces)
+   30 2e 31 32 0a             File header: "0.12\n" = version
+   ...                        (not shown = more header + tuples for system spaces)
    d5 ba 0b ab                Magic row marker always = 0xab0bbad5 if version 0.12
    19 00                      Length, not including length of header, = 25 bytes
    ce 16 a4 38 6f             Record header: previous crc32, current crc32,
    a7 cc 73 7f 00 00 66 39
    84                         msgpack code meaning "Map of 4 elements" follows
-   00 02 02 01                the 4 elements, including 0x02 which is IPROTO_INSERT
-   03 04 04                   additional information
-   cb 41 d4 e2 2f 62 fd d5 d4 msgpack code meaning "Double" follows, for next 8 bytes
+   00 02                         element#1: tag=request type, value=0x02=IPROTO_INSERT
+   02 01                         element#2: tag=server id, value=0x01
+   03 04                         element#3: tag=lsn, value=0x04
+   04 cb 41 d4 e2 2f 62 fd d5 d4 element#4: tag=timestamp, value=an 8-byte "Double"
    82                         msgpack code meaning "map of 2 elements" follows
-   10                         IPROTO_SPACE_ID which is #defined as 16 (hex 10)
-   cd                         msgpack code meaning 2-digit number follows
-   02 00                      the id of "tester" which is 512, it's biggest byte first
-   21                         Flags = IPROTO_TUPLE which is #defined as hex 21
-   91                         msgpack code meaning "1-element fixed array" follows
-   01                         Tuple: field[1] value = 1
+   10 cd 02 00                   element#1: tag=space id, value=512, big byte first
+   21 91 01                      element#2: tag=tuple, value=1-element fixed array={1}
 
 Tarantool processes requests atomically: a change is either accepted and recorded
 in the WAL, or discarded completely. Let's clarify how this happens, using the
@@ -395,7 +392,7 @@ REPLACE request as an example:
 
 1. The server attempts to locate the original tuple by primary key. If found, a
    reference to the tuple is retained for later use.
-2. The new tuple is then validated. If for example it does not contain an
+2. The new tuple is validated. If for example it does not contain an
    indexed field, or it has an indexed field whose type does not match the type
    according to the index definition, the change is aborted.
 3. The new tuple replaces the old tuple in all existing indexes.
@@ -412,7 +409,7 @@ REPLACE request as an example:
 
 One advantage of the described algorithm is that complete request pipelining is
 achieved, even for requests on the same value of the primary key. As a result,
-database performance doesn't degrade even if all requests touch upon the same
+database performance doesn't degrade even if all requests refer to the same
 key in the same space.
 
 The transaction processor thread communicates with the WAL writer thread using

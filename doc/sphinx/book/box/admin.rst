@@ -14,14 +14,27 @@ A reference description also follows below:
     preserve consistency of the primary key, used to iterate over tuples, a
     copy-on-write technique is employed. If the master process changes part
     of a primary key, the corresponding process page is split, and the snapshot
-    process obtains an old copy of the page. Since a snapshot is written
+    process obtains an old copy of the page.
+    In effect, the snapshot process uses multi-version concurrency control
+    in order to avoid copying changes which are superseded while it is running.
+
+    Since a snapshot is written
     sequentially, one can expect a very high write performance (averaging to
     80MB/second on modern disks), which means an average database instance gets
-    saved in a matter of minutes. Note, that as long as there are any changes to
+    saved in a matter of minutes. Note: as long as there are any changes to
     the parent index memory through concurrent updates, there are going to be
     page splits, and therefore one needs to have some extra free memory to run
     this command. 10% of :confval:`slab_alloc_arena` is, on average, sufficient.
     This statement waits until a snapshot is taken and returns operation result.
+
+    Change Notice: prior to Tarantool version 1.6.6, the snapshot process caused
+    a fork, which could cause occasional latency spikes. Starting with
+    Tarantool version 1.6.6, the snapshot process creates a consistent
+    read view and writes this view to the snapshot file from a separate thread.
+
+    Although box.snapshot() does not cause a fork, there is a separate fiber
+    which may produce snapshots at regular intervals -- see the discussion of
+    the :ref:`snapshot daemon <book-cfg-snapshot_daemon>`.
 
     **Example:**
 
