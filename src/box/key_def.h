@@ -433,7 +433,7 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 	       int err, uint32_t field_no)
 {
 	assert(key_type < field_type_MAX);
-	assert((int) mp_type < (int) CHAR_BIT * sizeof(*key_mp_type));
+	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
 	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
 		tnt_raise(ClientError, err, field_no,
 			  field_type_strs[key_type]);

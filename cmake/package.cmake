@@ -36,7 +36,7 @@ set (CPACK_SOURCE_IGNORE_FILES "${CPACK_SOURCE_IGNORE_FILES}"
     "${CMAKE_SOURCE_DIR}/doc/man/Makefile"
 )
 
-set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}-src")
+set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}")
 
 #
 # Provide options for the binary distribution.

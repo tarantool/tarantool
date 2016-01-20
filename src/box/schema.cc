@@ -248,7 +248,7 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
+		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", {false}
 	};
 	struct key_opts opts = key_opts_default;
 	struct key_def *key_def = key_def_new(def.id,

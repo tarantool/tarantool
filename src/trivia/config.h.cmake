@@ -22,7 +22,7 @@
  * A string with major-minor-patch-commit-id identifier of the
  * release, e.g. 1.6.6-113-g8399d0e.
  */
-#define PACKAGE_VERSION "@PACKAGE_VERSION@"
+#define PACKAGE_VERSION "@TARANTOOL_VERSION@"
 
 /** \endcond public */
 

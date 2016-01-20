@@ -44,6 +44,7 @@ doc/man/tarantool.1
 doc/man/tarantool_box.1
 doc/user/tarantool_user_guide.txt
 doc/tnt.ent
+rpm/tarantool-1*.spec
 extra/rpm.spec
 extra/rpm/tarantool.rpm.spec
 extra/dist/tarantool.service
