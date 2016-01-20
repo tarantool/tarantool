@@ -281,4 +281,20 @@ c.close()
 
 admin("space:drop()")
 admin("space2:drop()")
+
+#
+# gh-1280 Segmentation fault on space.select(tuple()) or space.select([2])
+#
+admin("space = box.schema.create_space('gh1280', { engine = 'sophia' })")
+admin("index = space:create_index('primary')")
+admin("space:insert({1})")
+admin("space:insert({2, 'Music'})")
+admin("space:insert({3, 'Length', 93})")
+
+iproto.py_con.space('gh1280').select([])
+iproto.py_con.space('gh1280').select(list())
+
+
+admin("space:drop()")
+
 admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
