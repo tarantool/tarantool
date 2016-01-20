@@ -74,6 +74,10 @@ fiber_join_test()
 		note("exception propagated");
 	}
 
+	fputs("#gh-1238: log uncaught errors\n", stderr);
+	fiber = fiber_new_xc("exception", exception_f);
+	fiber_wakeup(fiber);
+
 	/*
 	 * A fiber which is using exception should not
 	 * push them up the stack.
