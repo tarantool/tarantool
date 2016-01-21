@@ -113,10 +113,9 @@ if (WITH_SYSTEMD)
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
+endif()
 
-elseif(TARGET_OS_FREEBSD)
-    message (STATUS "Skip installation of init.d scripts on FreeBSD")
-else() # sysvinit
+if(WITH_SYSVINIT)
     message (STATUS "Using scripts for sysvinit")
     install (FILES tarantool.init DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d/
         RENAME tarantool
