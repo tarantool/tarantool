@@ -393,6 +393,12 @@ cord_join(struct cord *cord);
 void
 cord_set_name(const char *name);
 
+static inline const char *
+cord_name(struct cord *cord)
+{
+	return cord->name;
+}
+
 /** True if this cord represents the process main thread. */
 bool
 cord_is_main();
