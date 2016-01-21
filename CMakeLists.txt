@@ -208,7 +208,29 @@ endforeach()
 
 list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
 list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
+foreach(dir
+	"lua/luarocks/share/lua/5.1"
+	"lua/5.1")
+    list(APPEND MODULE_LUAPATH "/usr/${CMAKE_INSTALL_LIBDIR}/${dir}/?.lua")
+    list(APPEND MODULE_LUAPATH "/usr/${CMAKE_INSTALL_LIBDIR}/${dir}/?/init.lua")
+endforeach()
+
 list(APPEND MODULE_LIBPATH "${MODULE_FULL_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr" AND
+      NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr/local")
+    list(APPEND MODULE_LIBPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+foreach(dir
+	"/usr/local"
+	"/usr")
+    foreach(lua_lib
+            "lua/luarocks/lib/lua/5.1"
+            "lua/5.1")
+        list(APPEND MODULE_LIBPATH
+        "${dir}/${CMAKE_INSTALL_LIBDIR}/${lua_lib}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+    endforeach()
+endforeach()
 
 find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
     "${MODULE_LUAPATH}")
