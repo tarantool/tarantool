@@ -19,3 +19,23 @@ t
 space:drop()
 ---
 ...
+id = box.schema.space.create('sp_1266').id
+---
+...
+s = box.schema.space.create('sp_1266')
+---
+- error: Space 'sp_1266' already exists
+...
+s = box.schema.space.create('sp_1266', { if_not_exists = true})
+---
+...
+box.schema.space.drop(id, 'sp_1266')
+---
+...
+box.schema.space.drop(id, 'sp_1266', { if_exists = true })
+---
+...
+box.schema.space.drop(id, 'sp_1266')
+---
+- error: Space 'sp_1266' does not exist
+...

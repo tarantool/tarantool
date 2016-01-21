@@ -311,9 +311,10 @@ end
 
 box.schema.create_space = box.schema.space.create
 
-box.schema.space.drop = function(space_id, space_name)
+box.schema.space.drop = function(space_id, space_name, opts)
     check_param(space_id, 'space_id', 'number')
-
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
@@ -330,7 +331,9 @@ box.schema.space.drop = function(space_id, space_name)
         if space_name == nil then
             space_name = '#'..tostring(space_id)
         end
-        box.error(box.error.NO_SUCH_SPACE, space_name)
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_SPACE, space_name)
+        end
     end
 end
 
@@ -1270,16 +1273,11 @@ local function grant(uid, name, privilege, object_type,
     local privilege_hex = checked_privilege(privilege, object_type)
 
     local oid = object_resolve(object_type, object_name)
-    if options == nil then
-        options = {}
-    end
+    options = options or {}
     if options.grantor == nil then
         options.grantor = session.uid()
     else
         options.grantor = user_or_role_resolve(options.grantor)
-    end
-    if options.if_not_exists == nil then
-        options.if_not_exists = false
     end
     local _priv = box.space[box.schema.PRIV_ID]
     -- add the granted privilege to the current set
@@ -1296,7 +1294,7 @@ local function grant(uid, name, privilege, object_type,
     -- replaces the old one, old grantor is lost
     if privilege_hex ~= old_privilege then
         _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
-    elseif options.if_not_exists == false then
+    elseif not options.if_not_exists then
             if object_type == 'role' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
@@ -1316,12 +1314,7 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     end
     local privilege_hex = checked_privilege(privilege, object_type)
 
-    if options == nil then
-        options = {}
-    end
-    if options.if_exists == nil then
-        options.if_exists = false
-    end
+    options = options or {}
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
@@ -1393,10 +1386,13 @@ box.schema.user.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_resolve(name)
-    if uid == nil then
+    if uid ~= nil then
+        return drop(uid, opts)
+    end
+    if not opts.if_exists then
         box.error(box.error.NO_SUCH_USER, name)
     end
-    return drop(uid, opts)
+    return
 end
 
 local function info(id)
