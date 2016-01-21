@@ -15,6 +15,11 @@ set(TARANTOOL_LOGDIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/log/tarantool")
 message (STATUS "tarantoolctl logdir: ${TARANTOOL_LOGDIR}")
 set(TARANTOOL_RUNDIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/run/tarantool")
 message (STATUS "tarantoolctl rundir: ${TARANTOOL_RUNDIR}")
+set(TARANTOOL_USER "tarantool")
+set(SYSCONFIG_AVAILABLEDIR "tarantool/instances.available")
+set(SYSCONFIG_ENABLEDDIR "tarantool/instances.enabled")
+set(TARANTOOL_AVAILABLEDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}")
+set(TARANTOOL_ENABLEDDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_ENABLEDDIR}")
 
 # config file for tarantoolctl
 if (TARGET_OS_FREEBSD)
@@ -44,15 +49,17 @@ install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
 
 # directories in /etc/ for tarantoolctl
 install(DIRECTORY DESTINATION
-    ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/instances.enabled
+    ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}
 )
-install(DIRECTORY DESTINATION
-    ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/instances.available
-)
+if (WITH_SYSVINIT)
+    install(DIRECTORY DESTINATION
+        ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_ENABLEDDIR}
+    )
+endif()
 
 # an example instance script for tarantoolctl
 install (FILES example.lua DESTINATION
-        ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/instances.available
+        ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}
     PERMISSIONS
     OWNER_READ OWNER_WRITE OWNER_READ
     GROUP_READ WORLD_READ
@@ -93,18 +100,13 @@ if (WITH_SYSTEMD)
     # architecture, but tarantool-common is noarch package.
     set(SYSV_INITD_DIR ${CMAKE_INSTALL_PREFIX}/lib/tarantool)
 
-    configure_file("tarantool.service.in" "tarantool.service" @ONLY)
-    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool.service
+    configure_file("tarantool@.service.in" "tarantool@.service" @ONLY)
+    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool@.service
         DESTINATION ${SYSTEMD_UNIT_DIR}
         PERMISSIONS
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
-    install (FILES tarantool.init DESTINATION ${SYSV_INITD_DIR}
-        PERMISSIONS
-        OWNER_READ OWNER_WRITE
-        GROUP_READ GROUP_EXECUTE
-        WORLD_READ WORLD_EXECUTE)
     configure_file(tarantool.tmpfiles.conf.in tarantool.tmpfiles.conf @ONLY)
     install (FILES "${PROJECT_BINARY_DIR}/extra/dist/tarantool.tmpfiles.conf"
         DESTINATION "${SYSTEMD_TMPFILES_DIR}"
@@ -115,7 +117,7 @@ if (WITH_SYSTEMD)
         WORLD_READ WORLD_READ)
 endif()
 
-if(WITH_SYSVINIT)
+if (WITH_SYSVINIT)
     message (STATUS "Using scripts for sysvinit")
     install (FILES tarantool.init DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d/
         RENAME tarantool
@@ -123,10 +125,4 @@ if(WITH_SYSVINIT)
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_EXECUTE
         WORLD_READ WORLD_EXECUTE)
-    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/default/tarantool DESTINATION
-        ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_DEFAULT}/
-        PERMISSIONS
-        OWNER_READ OWNER_WRITE
-        GROUP_READ
-        WORLD_READ)
 endif()

@@ -19,9 +19,10 @@ default_cfg = {
     snap_dir   = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
     sophia_dir = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
     logger     = "@TARANTOOL_LOGDIR@", -- @TARANTOOL_LOGDIR@/${INSTANCE}.log
-    username   = "tarantool",
+    username   = "@TARANTOOL_USER@",
 }
 
-instance_dir = "@CMAKE_INSTALL_FULL_SYSCONFDIR@/tarantool/instances.enabled"
-
+-- instances.available - all available instances
+-- instances.enabled - instances to autostart by sysvinit
+instance_dir = "@TARANTOOL_AVAILABLEDIR@"
 -- vim: set ft=lua :

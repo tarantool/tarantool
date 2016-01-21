@@ -28,6 +28,7 @@ extra/bin2c
 extra/dist/tarantoolctl.1
 extra/dist/tarantool.logrotate
 extra/dist/tarantool.service
+extra/dist/tarantool@.service
 extra/dist/tarantool.tmpfiles.conf
 cmake_install.cmake
 config.mk
@@ -47,7 +48,6 @@ doc/tnt.ent
 rpm/tarantool-1*.spec
 extra/rpm.spec
 extra/rpm/tarantool.rpm.spec
-extra/dist/tarantool.service
 include/tarantool/config.h
 src/trivia/config.h
 install_manifest.txt

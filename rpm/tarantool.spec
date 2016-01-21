@@ -129,7 +129,7 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 %post common
 %if %{with systemd}
 %tmpfiles_create tarantool.conf
-%systemd_post tarantool.service
+%systemd_post tarantool@.service
 %else
 chkconfig --add tarantool || :
 service tarantool start || :
@@ -137,7 +137,7 @@ service tarantool start || :
 
 %preun common
 %if %{with systemd}
-%systemd_preun tarantool.service
+%systemd_preun tarantool@.service
 %else
 service tarantool stop
 chkconfig --del tarantool
@@ -145,7 +145,7 @@ chkconfig --del tarantool
 
 %postun common
 %if %{with systemd}
-%systemd_postun_with_restart tarantool.service
+%systemd_postun_with_restart tarantool@.service
 %endif
 
 %files
@@ -170,7 +170,6 @@ chkconfig --del tarantool
 %{_mandir}/man1/tarantoolctl.1*
 %config(noreplace) %{_sysconfdir}/sysconfig/tarantool
 %dir %{_sysconfdir}/tarantool
-%dir %{_sysconfdir}/tarantool/instances.enabled
 %dir %{_sysconfdir}/tarantool/instances.available
 %config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
 # Use 0750 for database files
@@ -179,15 +178,18 @@ chkconfig --del tarantool
 %config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
 
 %if %{with systemd}
-%{_unitdir}/tarantool.service
-%{_prefix}/lib/tarantool/tarantool.init
+%doc README.systemd.md
+%{_unitdir}/tarantool@.service
 %{_tmpfilesdir}/tarantool.conf
 %else
 %{_sysconfdir}/init.d/tarantool
+%dir %{_sysconfdir}/tarantool/instances.enabled
 %attr(-,tarantool,tarantool) %dir %{_localstatedir}/run/tarantool/
 %endif
 
 %changelog
+* Thu Jan 21 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.376-1
+- Implement proper support of multi-instance management using systemd
 * Sat Jan 9 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.0-1
 - Change naming scheme to include a postrelease number to Version
 - Fix arch-specific paths in tarantool-common
