@@ -183,22 +183,6 @@ cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
 }
 
 /**
- * Reset the default fetch output callback with a custom one.
- */
-static inline void
-cpipe_set_flush_cb(struct cpipe *pipe, ev_async_cb flush_input_cb,
-		   void *data)
-{
-	assert(loop() == pipe->producer);
-	/*
-	 * According to libev documentation, you can set cb at
-	 * virtually any time, modulo threads.
-	 */
-	ev_set_cb(&pipe->flush_input, flush_input_cb);
-	pipe->flush_input.data = data;
-}
-
-/**
  * Pop a single message from the staged output area. If
  * the output is empty, returns NULL. There may be messages
  * in the pipe!
