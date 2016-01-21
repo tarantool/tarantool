@@ -35,24 +35,90 @@ const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"LOCKS",
 };
 
-static void
-cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
-	      int /* events */);
+/* {{{ fiber_pool */
+
+enum { FIBER_POOL_SIZE = 768, FIBER_POOL_IDLE_TIMEOUT = 3 };
+
+/** Create fibers to handle all outstanding tasks. */
+
+/**
+ * Main function of the fiber invoked to handle all outstanding
+ * tasks in a queue.
+ */
+static int
+fiber_pool_f(va_list ap)
+{
+	struct fiber_pool *pool = va_arg(ap, struct fiber_pool *);
+	struct stailq *output = va_arg(ap, struct stailq *);
+	pool->size++;
+	bool was_empty;
+restart:
+	was_empty = false;
+	while (was_empty == false) {
+		was_empty = stailq_empty(output);
+		while (! stailq_empty(output))
+			cmsg_deliver(stailq_shift_entry(output, struct cmsg, fifo));
+		/* fiber_yield_timeout() is expensive, avoid under load. */
+		fiber_sleep(0);
+	}
+
+	/** Put the current fiber into a fiber cache. */
+	rlist_add_entry(&pool->idle, fiber(), state);
+	bool timed_out = fiber_yield_timeout(pool->idle_timeout);
+	if (! timed_out)
+		goto restart;
+
+	pool->size--;
+	return 0;
+}
 
 static void
-cpipe_fetch_output_cb(ev_loop *loop, struct ev_async *watcher,
-			int events)
+fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 {
 	(void) loop;
 	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
-	struct cmsg *msg;
-	/* Force an exchange if there is nothing to do. */
-	while (cpipe_peek(pipe)) {
-		while ((msg = cpipe_pop_output(pipe)))
-			cmsg_deliver(msg);
+	struct fiber_pool *pool = &pipe->pool;
+	(void) cpipe_peek(pipe);
+	while (! stailq_empty(&pipe->output)) {
+		struct fiber *f;
+		if (! rlist_empty(&pool->idle)) {
+			f = rlist_shift_entry(&pool->idle,
+					      struct fiber, state);
+			fiber_call(f);
+		} else if (pool->size < pool->max_size) {
+			f = fiber_new(cord_name(cord()), fiber_pool_f);
+			if (f == NULL) {
+				error_log(diag_last_error(&fiber()->diag));
+				break;
+			}
+			fiber_start(f, pool, &pipe->output);
+		} else {
+			/**
+			 * No worries that this watcher may not
+			 * get scheduled again - there are enough
+			 * worker fibers already, so just leave.
+			 */
+			break;
+		}
 	}
 }
+
+void
+fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
+		  float idle_timeout)
+{
+	rlist_create(&pool->idle);
+	pool->size = 0;
+	pool->max_size = max_pool_size;
+	pool->idle_timeout = idle_timeout;
+}
+
+/** }}} fiber_pool */
+
+static void
+cbus_flush_cb(ev_loop * /* loop */, struct ev_async *watcher,
+	      int /* events */);
 
 void
 cpipe_create(struct cpipe *pipe)
@@ -67,12 +133,16 @@ cpipe_create(struct cpipe *pipe)
 	ev_async_init(&pipe->flush_input, cbus_flush_cb);
 	pipe->flush_input.data = pipe;
 
-	ev_async_init(&pipe->fetch_output, cpipe_fetch_output_cb);
+	ev_async_init(&pipe->fetch_output, fiber_pool_cb);
 	pipe->fetch_output.data = pipe;
 	/* Set in join(), which is always called by the consumer thread. */
 	pipe->consumer = NULL;
 	/* Set in join() under a mutex. */
 	pipe->producer = NULL;
+
+	fiber_pool_create(&pipe->pool, FIBER_POOL_SIZE,
+			  FIBER_POOL_IDLE_TIMEOUT);
+	cpipe_set_max_input(pipe, 2 * FIBER_POOL_SIZE);
 }
 
 void
@@ -221,14 +291,11 @@ cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 struct cmsg *
 cpipe_peek_impl(struct cpipe *pipe)
 {
-	assert(stailq_empty(&pipe->output));
-
 	struct cpipe *peer = pipe->peer;
 	assert(pipe->consumer == loop());
 	assert(peer->producer == loop());
 
 	bool peer_pipe_was_empty = false;
-
 
 	cbus_lock(pipe->bus);
 	stailq_concat(&pipe->output, &pipe->pipe);
@@ -262,93 +329,4 @@ cmsg_notify_init(struct cmsg_notify *msg)
 
 	cmsg_init(&msg->base, route);
 	msg->fiber = fiber();
-}
-
-
-/** Return true if there are too many active workers in the pool. */
-static inline bool
-cpipe_fiber_pool_needs_throttling(struct cpipe_fiber_pool *pool)
-{
-	return pool->size > pool->max_size;
-}
-
-/**
- * Main function of the fiber invoked to handle all outstanding
- * tasks in a queue.
- */
-static int
-cpipe_fiber_pool_f(va_list ap)
-{
-	struct cpipe_fiber_pool *pool = va_arg(ap, struct cpipe_fiber_pool *);
-	struct cpipe *pipe = pool->pipe;
-	struct cmsg *msg;
-	pool->size++;
-restart:
-	while ((msg = cpipe_pop_output(pipe)))
-		cmsg_deliver(msg);
-
-	if (pool->cache_size < 2 * pool->max_size) {
-		/** Put the current fiber into a fiber cache. */
-		rlist_add_entry(&pool->fiber_cache, fiber(), state);
-		pool->size--;
-		pool->cache_size++;
-		bool timed_out = fiber_yield_timeout(pool->idle_timeout);
-		pool->cache_size--;
-		pool->size++;
-		if (! timed_out)
-			goto restart;
-	}
-	pool->size--;
-	return 0;
-}
-
-
-/** Create fibers to handle all outstanding tasks. */
-static void
-cpipe_fiber_pool_cb(ev_loop *loop, struct ev_async *watcher,
-		  int events)
-{
-	(void) loop;
-	(void) events;
-	struct cpipe_fiber_pool *pool =
-		(struct cpipe_fiber_pool *) watcher->data;
-	struct cpipe *pipe = pool->pipe;
-	(void) cpipe_peek(pipe);
-	while (! stailq_empty(&pipe->output)) {
-		struct fiber *f;
-		if (! rlist_empty(&pool->fiber_cache)) {
-			f = rlist_shift_entry(&pool->fiber_cache,
-					      struct fiber, state);
-			fiber_call(f);
-		} else if (! cpipe_fiber_pool_needs_throttling(pool)) {
-			f = fiber_new(pool->name, cpipe_fiber_pool_f);
-			if (f == NULL) {
-				error_log(diag_last_error(&fiber()->diag));
-				break;
-			}
-			fiber_start(f, pool);
-		} else {
-			/**
-			 * No worries that this watcher may not
-			 * get scheduled again - there are enough
-			 * worker fibers already, so just leave.
-			 */
-			break;
-		}
-	}
-}
-
-void
-cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
-			const char *name, struct cpipe *pipe,
-			int max_pool_size, float idle_timeout)
-{
-	rlist_create(&pool->fiber_cache);
-	pool->name = name;
-	pool->pipe = pipe;
-	pool->size = 0;
-	pool->cache_size = 0;
-	pool->max_size = max_pool_size;
-	pool->idle_timeout = idle_timeout;
-	cpipe_set_fetch_cb(pipe, cpipe_fiber_pool_cb, pool);
 }

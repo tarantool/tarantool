@@ -52,8 +52,6 @@ enum cbus_stat_name {
 
 extern const char *cbus_stat_strings[CBUS_STAT_LAST];
 
-enum { CPIPE_MAX_INPUT = 2048 };
-
 /**
  * One hop in a message travel route.  A message may need to be
  * delivered to many destinations before it can be dispensed with.
@@ -99,6 +97,35 @@ cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
 	 */
 	msg->hop = msg->route = route;
 }
+
+struct cpipe;
+
+/**
+ * A pool of worker fibers to handle messages,
+ * so that each message is handled in its own fiber.
+ */
+struct fiber_pool {
+	/** Cache of fibers which work on incoming messages. */
+	struct rlist idle;
+	/** The number of fibers in the pool. */
+	int size;
+	/** The limit on the number of fibers working on tasks. */
+	int max_size;
+	/**
+	 * Fibers in leave the pool if they have nothing to do
+	 * for longer than this.
+	 */
+	float idle_timeout;
+};
+
+/**
+ * Initialize a fiber pool and connect it to a pipe. Currently
+ * must be done before the pipe is actively used by a bus.
+ */
+void
+fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
+		  float idle_timeout);
+
 
 #define CACHELINE_SIZE 64
 /** A  uni-directional FIFO queue from one cord to another. */
@@ -151,6 +178,7 @@ struct cpipe {
 		 * the pipe becomes non-empty.
 		 */
 		struct ev_async fetch_output;
+		struct fiber_pool pool;
 	} __attribute__((aligned(CACHELINE_SIZE)));
 };
 
@@ -164,23 +192,6 @@ cpipe_create(struct cpipe *pipe);
 
 void
 cpipe_destroy(struct cpipe *pipe);
-
-/**
- * Reset the default fetch output callback with a custom one.
- */
-static inline void
-cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
-		   void *data)
-{
-	/** Must be done before starting the bus. */
-	assert(pipe->consumer == NULL);
-	/*
-	 * According to libev documentation, you can set cb at
-	 * virtually any time, modulo threads.
-	 */
-	ev_set_cb(&pipe->fetch_output, fetch_output_cb);
-	pipe->fetch_output.data = data;
-}
 
 /**
  * Pop a single message from the staged output area. If
@@ -445,37 +456,6 @@ struct cmsg_notify
 
 void
 cmsg_notify_init(struct cmsg_notify *msg);
-
-/**
- * A pool of worker fibers to handle messages,
- * so that each message is handled in its own fiber.
- */
-struct cpipe_fiber_pool {
-	const char *name;
-	/** Cache of fibers which work on incoming messages. */
-	struct rlist fiber_cache;
-	/** The number of active fibers working on tasks. */
-	int size;
-	/** The number of sleeping fibers, in the cache */
-	int cache_size;
-	/** The limit on the number of fibers working on tasks. */
-	int max_size;
-	/**
-	 * Fibers in leave the pool if they have nothing to do
-	 * for longer than this.
-	 */
-	float idle_timeout;
-	struct cpipe *pipe;
-};
-
-/**
- * Initialize a fiber pool and connect it to a pipe. Currently
- * must be done before the pipe is actively used by a bus.
- */
-void
-cpipe_fiber_pool_create(struct cpipe_fiber_pool *pool,
-			const char *name, struct cpipe *pipe,
-			int max_pool_size, float idle_timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */

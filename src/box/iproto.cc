@@ -119,8 +119,6 @@ struct IprotoMsgGuard {
 	{ struct iproto_msg *tmp = msg; msg = NULL; return tmp; }
 };
 
-enum { IPROTO_FIBER_POOL_SIZE = 1024, IPROTO_FIBER_POOL_IDLE_TIMEOUT = 3 };
-
 /* }}} */
 
 /* {{{ iproto connection and requests */
@@ -917,13 +915,7 @@ iproto_init()
 	cbus_create(&net_tx_bus);
 	rmean_net_tx_bus = net_tx_bus.stats;
 	cpipe_create(&tx_pipe);
-	cpipe_set_max_input(&tx_pipe, CPIPE_MAX_INPUT);
 	cpipe_create(&net_pipe);
-	static struct cpipe_fiber_pool fiber_pool;
-
-	cpipe_fiber_pool_create(&fiber_pool, "iproto", &tx_pipe,
-				IPROTO_FIBER_POOL_SIZE,
-				IPROTO_FIBER_POOL_IDLE_TIMEOUT);
 
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))

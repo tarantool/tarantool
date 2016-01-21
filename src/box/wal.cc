@@ -230,11 +230,6 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	cpipe_create(&writer->tx_pipe);
 	cpipe_create(&writer->wal_pipe);
-	/*
-	 * This doesn't really mean anything as long as we
-	 * multiplex requests in wal_batch
-	 */
-	cpipe_set_max_input(&writer->wal_pipe, CPIPE_MAX_INPUT);
 
 	writer->batch = fio_batch_new();
 	if (writer->batch == NULL)
