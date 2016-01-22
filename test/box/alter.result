@@ -426,6 +426,10 @@ index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
 - error: Illegal parameters, options parameter 'parts' should be of type table
 ...
+index = s:create_index('test', {unique = true, parts = {1, 'NUM'}, mmap = true})
+---
+- error: 'Wrong index options (field 4): unexpected option ''mmap'''
+...
 s:drop()
 ---
 ...

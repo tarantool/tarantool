@@ -438,6 +438,11 @@ box.schema.index.create = function(space_id, name, options)
     end
     local key_opts = { dimension = options.dimension,
         unique = options.unique, distance = options.distance }
+    for k, v in pairs(options) do
+        if options_template[k] == nil then
+            key_opts[k] = v
+        end
+    end
     _index:insert{space_id, iid, name, options.type, key_opts, parts}
     return box.space[space_id].index[name]
 end
