@@ -295,9 +295,10 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		 * If no key is specified, downgrade equality
 		 * iterators to a full range.
 		 */
-		if (type < 0 || type > ITER_GT)
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "Tree index", "requested iterator type");
+		if (type < 0 || type > ITER_GT) {
+			return Index::initIterator(iterator, type, key,
+						   part_count);
+		}
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = 0;
 	}
@@ -347,8 +348,7 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		it->base.next = tree_iterator_bwd_skip_one;
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "Tree index", "requested iterator type");
+		return Index::initIterator(iterator, type, key, part_count);
 	}
 }
 

@@ -269,10 +269,12 @@ t;
   - 'box.error.NO_SUCH_INDEX : 35'
   - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
   - 'box.error.TUPLE_IS_TOO_LONG : 27'
+  - 'box.error.VIEW_IS_RO : 113'
   - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'
-  - 'box.error.NO_SUCH_FUNCTION : 51'
   - 'box.error.injection : table: <address>
+  - 'box.error.NO_SUCH_FUNCTION : 51'
+  - 'box.error.UNSUPPORTED_INDEX_FEATURE : 112'
   - 'box.error.INDEX_FIELD_COUNT : 39'
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'

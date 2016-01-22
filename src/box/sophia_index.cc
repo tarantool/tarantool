@@ -690,8 +690,8 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	assert(it->cursor == NULL);
 	if (part_count > 0) {
 		if (part_count != key_def->part_count) {
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-			          "Sophia Index iterator", "partial keys");
+			tnt_raise(UnsupportedIndexFeature, this,
+				  "partial keys");
 		}
 	} else {
 		key = NULL;
@@ -718,8 +718,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	case ITER_LT: compare = "<";
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-		          "Sophia Index", "requested iterator type");
+		return initIterator(ptr, type, key, part_count);
 	}
 	it->base.next = sophia_iterator_next;
 	it->cursor = sp_cursor(env);

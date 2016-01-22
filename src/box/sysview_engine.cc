@@ -37,7 +37,44 @@ struct SysviewSpace: public Handler {
 	SysviewSpace(Engine *e) : Handler(e) {}
 
 	virtual ~SysviewSpace() {}
+
+	virtual struct tuple *
+	executeReplace(struct txn *, struct space *, struct request *);
+	virtual struct tuple *
+	executeDelete(struct txn *, struct space *, struct request *);
+	virtual struct tuple *
+	executeUpdate(struct txn *, struct space *, struct request *);
+	virtual void
+	executeUpsert(struct txn *, struct space *, struct request *);
 };
+
+struct tuple *
+SysviewSpace::executeReplace(struct txn *, struct space *space,
+			      struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	return NULL;
+}
+
+struct tuple *
+SysviewSpace::executeDelete(struct txn*, struct space *space, struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	return NULL;
+}
+
+struct tuple *
+SysviewSpace::executeUpdate(struct txn*, struct space *space, struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	return NULL;
+}
+
+void
+SysviewSpace::executeUpsert(struct txn *, struct space *space, struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+}
 
 SysviewEngine::SysviewEngine()
 	:Engine("sysview")

@@ -193,11 +193,11 @@ s.index.spatial:count()
 ...
 s.index.spatial:min()
 ---
-- error: RTREE does not support min()
+- error: Index 'spatial' (RTREE) of space 'spatial' (memtx) does not support min()
 ...
 s.index.spatial:max()
 ---
-- error: RTREE does not support max()
+- error: Index 'spatial' (RTREE) of space 'spatial' (memtx) does not support max()
 ...
 -- seems that drop can't fail
 s.index.spatial:drop()
@@ -493,12 +493,14 @@ i = s:create_index('p')
 -- dimension too big
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 21})
 ---
-- error: RTREE index does not support dimension (21) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (21):
+    must belong to range [1, 20]'
 ...
 -- dimension too low
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 0})
 ---
-- error: RTREE index does not support dimension (0) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (0):
+    must belong to range [1, 20]'
 ...
 -- cant be unique
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, unique = true})
@@ -576,7 +578,8 @@ box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
 ---
-- error: RTREE index does not support dimension (22) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (22):
+    must belong to range [1, 20]'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 ---
