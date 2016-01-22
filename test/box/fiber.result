@@ -843,6 +843,33 @@ id == f:id()
 ---
 - true
 ...
+--
+-- gh-1238: log error if a fiber terminates due to uncaught Lua error
+--
+-- must show in the log
+_ = fiber.create(function() error('gh-1238') end)
+---
+...
+test_run:grep_log("default", "gh%-1238") ~= nil
+---
+- true
+...
+-- must NOT show in the log
+_ = fiber.create(function() fiber.self():cancel() end)
+---
+...
+test_run:grep_log("default", "FiberIsCancelled") == nil
+---
+- true
+...
+-- must show in the log
+_ = fiber.create(function() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end)
+---
+...
+test_run:grep_log("default", "ER_ILLEGAL_PARAMS:[^\n]*")
+---
+- 'ER_ILLEGAL_PARAMS: Illegal parameters, oh my'
+...
 fiber = nil
 ---
 ...

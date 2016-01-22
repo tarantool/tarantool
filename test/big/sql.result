@@ -591,11 +591,11 @@ s.index[1]:select{}
 ...
 s.index[0]:min()
 ---
-- error: HASH does not support min()
+- error: Index 'primary' (HASH) of space 'tweedledum' (memtx) does not support min()
 ...
 s.index[0]:max()
 ---
-- error: HASH does not support max()
+- error: Index 'primary' (HASH) of space 'tweedledum' (memtx) does not support max()
 ...
 s.index[1]:min()
 ---

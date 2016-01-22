@@ -366,21 +366,8 @@ _ = fiber.create(
          conn:call('no_such_function', {})
    end
 );
-while true do
-   local line = file_log:read(2048)
-   if line ~= nil then
-      if string.match(line, "ER_UNKNOWN") == nil then
-         return "Success"
-      else
-         return "Failure"
-      end
-   end
-   fiber.sleep(0.01)
-end;
-
 test_run:cmd("setopt delimiter ''");
-
-file_log:close()
+test_run:grep_log("default", "ER_NO_SUCH_PROC")
 
 -- gh-983 selecting a lot of data crashes the server or hangs the
 -- connection

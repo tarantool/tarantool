@@ -59,6 +59,18 @@ static_assert(sizeof(iterator_type_strs) / sizeof(const char *) ==
 
 /* {{{ Utilities. **********************************************/
 
+UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
+	unsigned line, const Index *index, const char *what)
+	: ClientError(file, line, ER_UNKNOWN)
+{
+	struct key_def *key_def = index->key_def;
+	struct space *space = space_cache_find(key_def->space_id);
+	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
+	error_format_msg(this, tnt_errcode_desc(m_errcode), key_def->name,
+			 index_type_strs[key_def->type],
+			 space->def.name, space->def.engine_name, what);
+}
+
 void
 key_validate_parts(struct key_def *key_def, const char *key,
 		   uint32_t part_count)
@@ -160,26 +172,21 @@ Index::~Index()
 size_t
 Index::size() const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-	          index_type_strs[key_def->type],
-	          "size()");
+	tnt_raise(UnsupportedIndexFeature, this, "size()");
+	return 0;
 }
 
 struct tuple *
 Index::min(const char* /* key */, uint32_t /* part_count */) const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "min()");
+	tnt_raise(UnsupportedIndexFeature, this, "min()");
 	return NULL;
 }
 
 struct tuple *
 Index::max(const char* /* key */, uint32_t /* part_count */) const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "max()");
+	tnt_raise(UnsupportedIndexFeature, this, "max()");
 	return NULL;
 }
 
@@ -187,9 +194,7 @@ struct tuple *
 Index::random(uint32_t rnd) const
 {
 	(void) rnd;
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "random()");
+	tnt_raise(UnsupportedIndexFeature, this, "random()");
 	return NULL;
 }
 
@@ -197,19 +202,35 @@ size_t
 Index::count(enum iterator_type /* type */, const char* /* key */,
              uint32_t /* part_count */) const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "count()");
+	tnt_raise(UnsupportedIndexFeature, this, "count()");
 	return 0;
+}
+
+struct tuple *
+Index::findByKey(const char *key, uint32_t part_count) const
+{
+	(void) key;
+	(void) part_count;
+	tnt_raise(UnsupportedIndexFeature, this, "findByKey()");
+	return NULL;
 }
 
 struct tuple *
 Index::findByTuple(struct tuple *tuple) const
 {
 	(void) tuple;
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "findByTuple()");
+	tnt_raise(UnsupportedIndexFeature, this, "findByTuple()");
+	return NULL;
+}
+
+struct tuple *
+Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+		     enum dup_replace_mode mode)
+{
+	(void) old_tuple;
+	(void) new_tuple;
+	(void) mode;
+	tnt_raise(UnsupportedIndexFeature, this, "replace()");
 	return NULL;
 }
 
@@ -217,6 +238,17 @@ size_t
 Index::bsize() const
 {
 	return 0;
+}
+
+void
+Index::initIterator(struct iterator *ptr, enum iterator_type type,
+		    const char *key, uint32_t part_count) const
+{
+	(void) ptr;
+	(void) type;
+	(void) key;
+	(void) part_count;
+	tnt_raise(UnsupportedIndexFeature, this, "requested iterator type");
 }
 
 /**
@@ -227,9 +259,7 @@ void
 Index::createReadViewForIterator(struct iterator *iterator)
 {
 	(void) iterator;
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "consistent read view");
+	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 
 /**
@@ -240,9 +270,7 @@ void
 Index::destroyReadViewForIterator(struct iterator *iterator)
 {
 	(void) iterator;
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "consistent read view");
+	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 
 static inline Index *
@@ -341,9 +369,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		Index *index = check_index(space_id, index_id, &space);
 		if (index->key_def->type != TREE) {
 			/* Show nice error messages in Lua */
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  index_type_strs[index->key_def->type],
-				  "min()");
+			tnt_raise(UnsupportedIndexFeature, index, "min()");
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_GE, key, part_count);
@@ -370,9 +396,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		Index *index = check_index(space_id, index_id, &space);
 		if (index->key_def->type != TREE) {
 			/* Show nice error messages in Lua */
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  index_type_strs[index->key_def->type],
-				  "max()");
+			tnt_raise(UnsupportedIndexFeature, index, "max()");
 		}
 		uint32_t part_count = key ? mp_decode_array(&key) : 0;
 		key_validate(index->key_def, ITER_LE, key, part_count);

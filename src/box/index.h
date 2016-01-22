@@ -330,11 +330,11 @@ public:
 	virtual struct tuple *random(uint32_t rnd) const;
 	virtual size_t count(enum iterator_type type, const char *key,
 			     uint32_t part_count) const;
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode) = 0;
+				      enum dup_replace_mode mode);
 	virtual size_t bsize() const;
 
 	/**
@@ -356,6 +356,16 @@ public:
 	 * for which createReadViewForIterator() was called.
 	 */
 	virtual void destroyReadViewForIterator(struct iterator *iterator);
+};
+
+/*
+ * A wrapper for ClientError(ER_UNSUPPORTED_INDEX_FEATURE, ...) to format
+ * nice error messages (see gh-1042). You never need to catch this class.
+ */
+class UnsupportedIndexFeature: public ClientError {
+public:
+	UnsupportedIndexFeature(const char *file, unsigned line,
+				const Index *index, const char *what);
 };
 
 struct IteratorGuard
