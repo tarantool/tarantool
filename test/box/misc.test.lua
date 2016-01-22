@@ -138,6 +138,10 @@ tonumber64(-1ULL)
 -1ULL
 tonumber64(-1.0)
 6LL - 7LL
+tostring(tonumber64('1234567890123')) == '1234567890123'
+tostring(tonumber64('12345678901234')) == '12345678901234'
+tostring(tonumber64('123456789012345')) == '123456789012345ULL'
+tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
 
 --  dostring()
 dostring('abc')

@@ -712,8 +712,8 @@ luaL_register_module(struct lua_State *L, const char *modname,
 }
 
 /* Maximum integer that fits to double (1LL<<52) */
-#define DBL_INT_MAX 4503599627370495
-#define DBL_INT_MIN -4503599627370496
+#define DBL_INT_MAX (1e14 - 1)
+#define DBL_INT_MIN (-1e14 + 1)
 
 void
 luaL_pushuint64(struct lua_State *L, uint64_t val)

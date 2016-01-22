@@ -298,8 +298,8 @@ on_encode(ffi.typeof('double'), encode_double)
 local decode_r
 
 -- See similar constants in utils.cc
-local DBL_INT_MAX = 4503599627370495
-local DBL_INT_MIN = -4503599627370496
+local DBL_INT_MAX = 1e14 - 1
+local DBL_INT_MIN = -1e14 + 1
 
 local function decode_u8(data)
     local num = ffi.cast(uint8_ptr_t, data[0])[0]

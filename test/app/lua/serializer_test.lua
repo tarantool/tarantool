@@ -75,12 +75,13 @@ local function test_unsigned(test, s)
     rt(test, s, 4294967297ULL, "number")
 
     -- 1e52 - maximum int that can be stored to double without losing precision
-    rt(test, s, 4503599627370495, "number")
-    rt(test, s, 4503599627370495LL, "number")
-    rt(test, s, 4503599627370495ULL, "number")
-    rt(test, s, 4503599627370496, "cdata")
-    rt(test, s, 4503599627370496LL, "cdata")
-    rt(test, s, 4503599627370496ULL, "cdata")
+    -- decrease double capacity to fit .14g output format
+    rt(test, s, 99999999999999, "number")
+    rt(test, s, 99999999999999LL, "number")
+    rt(test, s, 99999999999999ULL, "number")
+    rt(test, s, 100000000000000, "cdata")
+    rt(test, s, 100000000000000LL, "cdata")
+    rt(test, s, 100000000000000ULL, "cdata")
 
     rt(test, s, 9223372036854775807LL, "cdata")
     rt(test, s, 9223372036854775807ULL, "cdata")
@@ -100,7 +101,7 @@ local function test_unsigned(test, s)
 end
 
 local function test_signed(test, s)
-    test:plan(51)
+    test:plan(52)
 
     rt(test, s, -1, 'number')
     rt(test, s, -1LL, 'number')
@@ -130,10 +131,11 @@ local function test_signed(test, s)
     rt(test, s, -2147483648LL, 'number')
 
     -- 1e52 - maximum int that can be stored to double without losing precision
-    rt(test, s, -4503599627370494)
-    rt(test, s, -4503599627370494LL, "number")
-    rt(test, s, -4503599627370497, "cdata")
-    rt(test, s, -4503599627370497LL, "cdata")
+    -- decrease double capacity to fit .14g output format
+    rt(test, s, -99999999999999, "number")
+    rt(test, s, -99999999999999LL, "number")
+    rt(test, s, -100000000000000, "cdata")
+    rt(test, s, -100000000000000LL, "cdata")
 
     rt(test, s, -9223372036854775806LL, 'cdata')
 
