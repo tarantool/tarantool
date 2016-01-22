@@ -389,15 +389,7 @@ box.schema.index.create = function(space_id, name, options)
         id = 'number',
         if_not_exists = 'boolean',
         dimension = 'number',
-        distance = 'string',
-        compression = 'string',
-        compression_branch = 'string',
-        compression_key = 'number',
-        node_size = 'number',
-        page_size = 'number',
-        sync = 'number',
-        mmap = 'number',
-        amqf = 'number'
+        distance = 'string'
     }
     check_param_table(options, options_template, true)
     local options_defaults = {
