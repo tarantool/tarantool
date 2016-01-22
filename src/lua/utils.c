@@ -711,7 +711,10 @@ luaL_register_module(struct lua_State *L, const char *modname,
 	luaL_register(L, NULL, methods);
 }
 
-/* Maximum integer that fits to double (1LL<<52) */
+/*
+ * Maximum integer that doesn't lose precision on tostring() conversion.
+ * Lua uses sprintf("%.14g") to format its numbers, see gh-1279.
+ */
 #define DBL_INT_MAX (1e14 - 1)
 #define DBL_INT_MIN (-1e14 + 1)
 
