@@ -53,6 +53,8 @@ for spaces, users, roles, and function tuples.
     attached to the space objects, for example
     :func:`space_object:drop() <space_object.drop>`.
 
+    Note re storage engine: sophia does not support temporary spaces.
+
 =================================================
                     Example
 =================================================

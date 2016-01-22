@@ -296,6 +296,8 @@ all computer instructions until a yield, then switch to execute
 the instructions of a different fiber. Thus (say) the thread reads
 row#x for the sake of fiber#1, then writes row#y for the sake of fiber#2.
 
+.. _yields_must_happen:
+
 **FACT #3**: yields must happen, otherwise the transaction processor
 thread would stick permanently on the same fiber.
 There are implicit yields: every data-change operation
@@ -321,6 +323,8 @@ the function holds a consistent view of the database until the UPDATE ends.
 For the combination “UPDATE plus SELECT” the view is not consistent,
 because after the UPDATE the transaction processor thread can switch
 to another fiber, and delete the tuple that was just updated.
+Note re storage engine: sophia handles yields differently, see
+:ref:`differences between memtx and sophia <sophia_diff>`.
 
 Since locks don't exist, and disk writes only involve the write-ahead log,
 transactions are usually fast. Also the Tarantool server may not be using
@@ -581,9 +585,12 @@ The manual concentrates on memtx because it is the default and has been around
 longer. But sophia is a working key-value engine and will especially appeal to
 users who like to see data go directly to disk, so that recovery time might be
 shorter and database size might be larger. For architectural explanations and
-benchmarks, see `sphia.org`_. On the other hand, sophia lacks some functions and
+benchmarks, see `sphia.org`_ and Appendix E: :ref:`sophia <sophia>`.
+On the other hand, sophia lacks some functions and
 options that are available with memtx. Where that is the case, the relevant
-description will contain the words "only applicable for the memtx storage engine".
+description will contain a note beginning with the words
+"Note re storage engine: sophia". The end of this chapter has coverage
+for all :ref:`the differeences between memtx and sophia <sophia_diff>`.
 
 .. _sphia.org: http://sphia.org
 
@@ -603,5 +610,8 @@ description will contain the words "only applicable for the memtx storage engine
     admin
     atomic
     authentication
-    limitations
     triggers
+    limitations
+    sophia_diff
+
+
