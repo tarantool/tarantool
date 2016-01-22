@@ -503,6 +503,22 @@ tonumber64(-1.0)
 ---
 - -1
 ...
+tostring(tonumber64('1234567890123')) == '1234567890123'
+---
+- true
+...
+tostring(tonumber64('12345678901234')) == '12345678901234'
+---
+- true
+...
+tostring(tonumber64('123456789012345')) == '123456789012345ULL'
+---
+- true
+...
+tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
+---
+- true
+...
 --  dostring()
 dostring('abc')
 ---

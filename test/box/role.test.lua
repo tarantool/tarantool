@@ -366,3 +366,9 @@ box.schema.user.info('test_not_exist')
 
 box.schema.role.drop('test_role')
 box.schema.user.drop('test_user')
+
+--gh-1266 if_exists for user drop
+box.schema.user.create('test_1266')
+box.schema.user.drop('test_1266')
+box.schema.user.drop('test_1266')
+box.schema.user.drop('test_1266', { if_exists = true})

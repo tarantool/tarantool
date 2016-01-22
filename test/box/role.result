@@ -935,3 +935,17 @@ box.schema.role.drop('test_role')
 box.schema.user.drop('test_user')
 ---
 ...
+--gh-1266 if_exists for user drop
+box.schema.user.create('test_1266')
+---
+...
+box.schema.user.drop('test_1266')
+---
+...
+box.schema.user.drop('test_1266')
+---
+- error: User 'test_1266' is not found
+...
+box.schema.user.drop('test_1266', { if_exists = true})
+---
+...

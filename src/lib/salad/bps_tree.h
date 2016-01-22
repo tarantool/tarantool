@@ -1030,8 +1030,9 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 		depth++;
 	}
 
-	bps_tree_block_id_t level_block_count[BPS_TREE_MAX_DEPTH];
-	bps_tree_block_id_t level_child_count[BPS_TREE_MAX_DEPTH];
+	/* Initializing by {0} to suppress compile warnings (gh-1287) */
+	bps_tree_block_id_t level_block_count[BPS_TREE_MAX_DEPTH] = {0};
+	bps_tree_block_id_t level_child_count[BPS_TREE_MAX_DEPTH] = {0};
 	struct bps_inner *parents[BPS_TREE_MAX_DEPTH];
 	level_count = leaf_count;
 	for (bps_tree_block_id_t i = 0; i < depth - 1; i++) {

@@ -75,18 +75,18 @@ TAP version 13
     ok - encode/decode type for 4294967297LL
     ok - encode/decode for 4294967297ULL
     ok - encode/decode type for 4294967297ULL
-    ok - encode/decode for 4.5035996273705e+15
-    ok - encode/decode type for 4.5035996273705e+15
-    ok - encode/decode for 4503599627370495LL
-    ok - encode/decode type for 4503599627370495LL
-    ok - encode/decode for 4503599627370495ULL
-    ok - encode/decode type for 4503599627370495ULL
-    ok - encode/decode for 4.5035996273705e+15
-    ok - encode/decode type for 4.5035996273705e+15
-    ok - encode/decode for 4503599627370496LL
-    ok - encode/decode type for 4503599627370496LL
-    ok - encode/decode for 4503599627370496ULL
-    ok - encode/decode type for 4503599627370496ULL
+    ok - encode/decode for 99999999999999
+    ok - encode/decode type for 99999999999999
+    ok - encode/decode for 99999999999999LL
+    ok - encode/decode type for 99999999999999LL
+    ok - encode/decode for 99999999999999ULL
+    ok - encode/decode type for 99999999999999ULL
+    ok - encode/decode for 1e+14
+    ok - encode/decode type for 1e+14
+    ok - encode/decode for 100000000000000LL
+    ok - encode/decode type for 100000000000000LL
+    ok - encode/decode for 100000000000000ULL
+    ok - encode/decode type for 100000000000000ULL
     ok - encode/decode for 9223372036854775807LL
     ok - encode/decode type for 9223372036854775807LL
     ok - encode/decode for 9223372036854775807ULL
@@ -110,7 +110,7 @@ TAP version 13
     # unsigned: end
 ok - unsigned
     # signed
-    1..51
+    1..52
     ok - encode/decode for -1
     ok - encode/decode type for -1
     ok - encode/decode for -1LL
@@ -147,13 +147,14 @@ ok - unsigned
     ok - encode/decode type for -2147483648
     ok - encode/decode for -2147483648LL
     ok - encode/decode type for -2147483648LL
-    ok - encode/decode for -4.5035996273705e+15
-    ok - encode/decode for -4503599627370494LL
-    ok - encode/decode type for -4503599627370494LL
-    ok - encode/decode for -4.5035996273705e+15
-    ok - encode/decode type for -4.5035996273705e+15
-    ok - encode/decode for -4503599627370497LL
-    ok - encode/decode type for -4503599627370497LL
+    ok - encode/decode for -99999999999999
+    ok - encode/decode type for -99999999999999
+    ok - encode/decode for -99999999999999LL
+    ok - encode/decode type for -99999999999999LL
+    ok - encode/decode for -1e+14
+    ok - encode/decode type for -1e+14
+    ok - encode/decode for -100000000000000LL
+    ok - encode/decode type for -100000000000000LL
     ok - encode/decode for -9223372036854775806LL
     ok - encode/decode type for -9223372036854775806LL
     ok - encode/decode for -9223372036854775807LL
