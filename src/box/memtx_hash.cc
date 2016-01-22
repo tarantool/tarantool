@@ -375,8 +375,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "Hash index", "requested iterator type");
+		return Index::initIterator(ptr, type, key, part_count);
 	}
 }
 

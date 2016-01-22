@@ -5,7 +5,11 @@ include(systemd)
 #
 
 # Default path to data in default/tarantool
-set(TARANTOOL_DATADIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/lib/tarantool")
+if (TARGET_OS_FREEBSD)
+    set(TARANTOOL_DATADIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/db/tarantool")
+else()
+    set(TARANTOOL_DATADIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/lib/tarantool")
+endif()
 message (STATUS "tarantoolctl datadir: ${TARANTOOL_DATADIR}")
 set(TARANTOOL_LOGDIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/log/tarantool")
 message (STATUS "tarantoolctl logdir: ${TARANTOOL_LOGDIR}")
@@ -13,7 +17,9 @@ set(TARANTOOL_RUNDIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/run/tarantool")
 message (STATUS "tarantoolctl rundir: ${TARANTOOL_RUNDIR}")
 
 # config file for tarantoolctl
-if (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
+if (TARGET_OS_FREEBSD)
+    set(SYSCONFIG_DEFAULT "tarantool/default")
+elseif (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
     # Debian/Ubuntu/etc.
     set(SYSCONFIG_DEFAULT "default")
 else()
@@ -58,6 +64,7 @@ install(DIRECTORY DESTINATION ${TARANTOOL_DATADIR})
 install(DIRECTORY DESTINATION ${TARANTOOL_LOGDIR})
 install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
 
+if (NOT TARGET_OS_FREEBSD)
 # logrotate files
 configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
 install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool.logrotate
@@ -67,6 +74,7 @@ install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool.logrotate
     OWNER_READ OWNER_WRITE
     GROUP_READ
     WORLD_READ)
+endif()
 
 # man page for tarantoolctl
 pod2man (
@@ -105,8 +113,9 @@ if (WITH_SYSTEMD)
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
+endif()
 
-else() # sysvinit
+if(WITH_SYSVINIT)
     message (STATUS "Using scripts for sysvinit")
     install (FILES tarantool.init DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d/
         RENAME tarantool

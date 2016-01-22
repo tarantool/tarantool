@@ -219,7 +219,7 @@ neighbor_test()
 {
 	header();
 
-	const int test_count = 1000;
+	const unsigned int test_count = 1000;
 	struct rtree_rect arr[test_count];
 	static struct rtree_rect basis;
 

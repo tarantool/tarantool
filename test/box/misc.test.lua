@@ -195,3 +195,6 @@ test_run:cmd("restart server default")
 box.space.test:select{}
 box.space.test:drop()
 
+-- test test_run:grep_log()
+require('log').info('Incorrect password supplied')
+test_run:grep_log("default", "password")

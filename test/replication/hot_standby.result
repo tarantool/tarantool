@@ -92,9 +92,19 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
+test_run:cmd("switch replica")
+---
+- true
+...
+fiber = require('fiber')
+---
+...
 test_run:cmd("switch hot_standby")
 ---
 - true
+...
+fiber = require('fiber')
+---
 ...
 box.info.status
 ---
@@ -103,6 +113,9 @@ box.info.status
 test_run:cmd("switch default")
 ---
 - true
+...
+fiber = require('fiber')
+---
 ...
 box.info.status
 ---

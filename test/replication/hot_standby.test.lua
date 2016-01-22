@@ -58,9 +58,14 @@ do
     end
 end;
 test_run:cmd("setopt delimiter ''");
+
+test_run:cmd("switch replica")
+fiber = require('fiber')
 test_run:cmd("switch hot_standby")
+fiber = require('fiber')
 box.info.status
 test_run:cmd("switch default")
+fiber = require('fiber')
 box.info.status
 
 space = box.schema.space.create('tweedledum')

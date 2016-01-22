@@ -1,3 +1,5 @@
+#gh-1238: log uncaught errors
+(null): SystemError Failed to allocate 42 bytes in allocator for exception: Cannot allocate memory
 	*** fiber_join_test ***
 # exception propagated
 # cancel dead has started

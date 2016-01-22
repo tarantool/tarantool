@@ -129,7 +129,8 @@ space:get{1}
 ...
 index:select({1}, {iterator = box.index.GT})
 ---
-- error: Sophia Index iterator does not support partial keys
+- error: Index 'primary' (TREE) of space 'test' (sophia) does not support partial
+    keys
 ...
 space:drop()
 ---

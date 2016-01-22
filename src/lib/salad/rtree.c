@@ -615,7 +615,7 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 	struct rtree_page_branch br;
 	if (--level != 0) {
 		/* not a leaf page, minize area increase */
-		unsigned mini;
+		unsigned mini = 0;
 		char found = 0;
 		area_t min_incr = 0, best_area = 0;
 		for (unsigned i = 0; i < page->n; i++) {
@@ -638,6 +638,7 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 			}
 		}
 		assert(found);
+		(void) found;
 		struct rtree_page_branch *b;
 		b = rtree_branch_get(tree, page, mini);
 		struct rtree_page *p = b->data.page;

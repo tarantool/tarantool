@@ -153,6 +153,7 @@ s = box.schema.space.create("test")
 index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
 index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
 index = s:create_index('primary', {unique = true, parts = 'bug'})
+index = s:create_index('test', {unique = true, parts = {1, 'NUM'}, mmap = true})
 s:drop()
 
 

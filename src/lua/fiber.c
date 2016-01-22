@@ -273,10 +273,11 @@ lbox_fiber_info(struct lua_State *L)
 static int
 lua_fiber_run_f(va_list ap)
 {
+	int result;
 	int coro_ref = va_arg(ap, int);
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 
-	lua_pcall(L, lua_gettop(L) - 1, LUA_MULTRET, 0);
+	result = lbox_call(L, lua_gettop(L) - 1, 0);
 
 	/* Destroy local storage */
 	int storage_ref = (int)(intptr_t)
@@ -284,7 +285,7 @@ lua_fiber_run_f(va_list ap)
 	if (storage_ref > 0)
 		lua_unref(L, storage_ref);
 	lua_unref(L, coro_ref);
-	return 0;
+	return result;
 }
 
 /**

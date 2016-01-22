@@ -141,16 +141,6 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 	return tuple;
 }
 
-struct tuple *
-SysviewIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		     enum dup_replace_mode mode)
-{
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "SysviewIndex", "replace()");
-}
-
 static bool
 vspace_filter(struct space *source, struct tuple *tuple)
 {

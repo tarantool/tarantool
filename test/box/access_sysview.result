@@ -24,10 +24,32 @@ session = box.session
 ---
 - true
 ...
--- error: sysview does not support replace()
+-- gh-1042: bad error message for _vspace, _vuser, _vindex, etc.
+-- Space '_vspace' (sysview) does not support replace
 box.space._vspace:replace({1, 1, 'test'})
 ---
-- error: sysview does not support replace
+- error: View '_vspace' is read-only
+...
+box.space._vspace:delete(1)
+---
+- error: View '_vspace' is read-only
+...
+box.space._vspace:update(1, {{'=', 2, 48}})
+---
+- error: View '_vspace' is read-only
+...
+-- error: Index 'primary' of space '_vspace' (sysview) does not support xxx()
+box.space._vspace.index.primary:len()
+---
+- error: Index 'primary' (TREE) of space '_vspace' (sysview) does not support size()
+...
+box.space._vspace.index.primary:random(48)
+---
+- error: Index 'primary' (TREE) of space '_vspace' (sysview) does not support random()
+...
+box.space._vspace.index.primary:min()
+---
+- error: Index 'primary' (TREE) of space '_vspace' (sysview) does not support min()
 ...
 session.su('guest')
 ---

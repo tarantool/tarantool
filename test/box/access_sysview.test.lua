@@ -10,8 +10,16 @@ session = box.session
 #box.space._vpriv:select{} == #box.space._priv:select{}
 #box.space._vfunc:select{} == #box.space._func:select{}
 
--- error: sysview does not support replace()
+-- gh-1042: bad error message for _vspace, _vuser, _vindex, etc.
+-- Space '_vspace' (sysview) does not support replace
 box.space._vspace:replace({1, 1, 'test'})
+box.space._vspace:delete(1)
+box.space._vspace:update(1, {{'=', 2, 48}})
+
+-- error: Index 'primary' of space '_vspace' (sysview) does not support xxx()
+box.space._vspace.index.primary:len()
+box.space._vspace.index.primary:random(48)
+box.space._vspace.index.primary:min()
 
 session.su('guest')
 

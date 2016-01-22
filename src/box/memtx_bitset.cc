@@ -253,15 +253,6 @@ MemtxBitset::allocIterator() const
 	return (struct iterator *) it;
 }
 
-struct tuple *
-MemtxBitset::findByKey(const char *key, uint32_t part_count) const
-{
-	(void) key;
-	(void) part_count;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "MemtxBitset", "findByKey()");
-	return NULL;
-}
-
 static inline const char *
 make_key(const char *field, uint32_t *key_len)
 {
@@ -377,8 +368,7 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 						       bitset_key_size);
 			break;
 		default:
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "MemtxBitset", "requested iterator type");
+			return initIterator(iterator, type, key, part_count);
 		}
 
 		if (rc != 0) {
