@@ -84,9 +84,12 @@ A list of all ``box.space`` functions follows, then comes a list of all
             |               | types              |                             |                     |
             +---------------+--------------------+-----------------------------+---------------------+
 
-        Possible errors: too many parts. A type option other than TREE, or a
-        unique option other than unique, or a parts option with more than one
-        field component, is only applicable for the memtx storage engine.
+        Possible errors: too many parts.
+
+        Note re storage engine: sophia supports only the TREE index type,
+        and supports only one index per space,
+        and supports only the unique = true option,
+        and requires that field numbers be in order starting with 1.
 
         .. code-block:: tarantoolsession
 
@@ -109,6 +112,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: If a tuple with the same unique-key value already exists,
         returns :errcode:`ER_TUPLE_FOUND`.
+
+        Note re storage engine: sophia will return nil, rather than the inserted tuple.
 
         **Example:**
 
@@ -284,6 +289,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
 
+        Note re storage engine: sophia will return nil, rather than the inserted tuple.
+
         **Example:**
 
         .. code-block:: lua
@@ -337,6 +344,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Complexity Factors:** Index size, Index type, number of indexes accessed, WAL
         settings.
+
+        Note re storage engine: sophia will return nil, rather than the updated tuple.
 
         Thus, in the instruction:
 
@@ -502,6 +511,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         **Complexity Factors:** Index size, Index type
 
+        Note re storage engine: sophia will return nil, rather than the deleted tuple.
+
         **Example:**
 
         .. code-block:: tarantoolsession
@@ -611,6 +622,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 2
             ...
 
+    .. _space_truncate:
+
     .. method:: truncate()
 
         Deletes all tuples.
@@ -620,6 +633,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         **Complexity Factors:** Index size, Index type, Number of tuples accessed.
 
         :return: nil
+
+        Note re storage engine: sophia does not support :codenormal:`truncate`.
 
         **Example:**
 
@@ -714,12 +729,14 @@ A list of all ``box.space`` functions follows, then comes a list of all
             - 998
             ...
 
+    .. _space_auto_increment:
+
     .. method:: auto_increment{field-value [, field-value ...]}
 
         Insert a new tuple using an auto-increment primary key. The space specified
         by space_object must have a ``NUM`` primary key index of type ``TREE``. The
         primary-key field will be incremented before the insert.
-        This is only applicable for the memtx storage engine.
+        Note re storage engine: sophia does not support auto_increment.
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
         :codeitalic:`field-value(s)` (type = Lua table or scalar) = tuple's fields, other than the primary-key field.

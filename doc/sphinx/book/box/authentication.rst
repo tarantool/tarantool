@@ -47,6 +47,8 @@ client application, read the `scramble.h`_ header file.
 .. _MySQL introduced several years ago: http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html
 .. _scramble.h: https://github.com/tarantool/tarantool/blob/master/src/scramble.h
 
+.. _authentication-users:
+
 ===========================================================
                 Users and the _user space
 ===========================================================
@@ -235,8 +237,10 @@ privilege to read from a space named ``space55``, and then took the privilege aw
    Only the creator of a space can drop, alter, or truncate the space.
    Only the creator of a user can change a different user's password.
 
+.. _authentication-funcs:
+
 ===========================================================
-                Functions and _func space
+                Functions and the _func space
 ===========================================================
 
 The fields in the _func space are:
@@ -361,6 +365,8 @@ and later a guest user, who wishes to see the payroll, might say:
 
     box.session.su('manager')
     box.space.payroll:select{'Jones'}
+
+.. _authentication-roles:
 
 ===========================================================
                          Roles

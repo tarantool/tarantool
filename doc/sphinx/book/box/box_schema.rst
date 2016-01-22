@@ -6,7 +6,9 @@
 
 .. module:: box.schema
 
-The ``box.schema`` package has one data-definition function: ``space.create()``.
+The ``box.schema`` package has data-definition functions
+for spaces, users, roles, and function tuples.
+
 
 .. function:: box.schema.space.create(space-name [, {options} ])
 
@@ -14,7 +16,7 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
 
     :param string space-name: name of space, which should not be a number
                                 and should not contain special characters
-    :param table options:
+    :param table options: see "Options for box.schema.space.create" chart, below
 
     :return: space object
     :rtype: userdata
@@ -42,6 +44,17 @@ The ``box.schema`` package has one data-definition function: ``space.create()``.
         | format        | field names+types  | table   | (blank)             |
         +---------------+--------------------+---------+---------------------+
 
+    :param num space-id: the numeric identifier established by box.schema.space.create
+
+    Note: for symmetry, there are other box.schema functions targeting
+    space objects, for example
+    :codenormal:`box.schema.space.drop(`:codeitalic:`space-id`:codenormal:`)`
+    will drop a space. However, the common approach is to use functions
+    attached to the space objects, for example
+    :func:`space_object:drop() <space_object.drop>`.
+
+    Note re storage engine: sophia does not support temporary spaces.
+
 =================================================
                     Example
 =================================================
@@ -68,3 +81,238 @@ For an illustration with the :code:`format` clause, see
 After a space is created, usually the next step is to
 :func:`create an index <space_object.create_index>` for it, and then it is
 available for insert, select, and all the other :mod:`box.space` functions.
+
+
+.. function:: box.schema.user.create(user-name [, {options} ])
+
+    Create a user.
+    For explanation of how Tarantool maintains user data, see
+    section :ref:`Users and the _user space <authentication-users>`.
+
+    :param string user-name: name of user, which should not be a number
+                                and should not contain special characters
+    :param table options: if_not_exists, password
+
+    :return: nil
+
+    Examples: |br|
+    :codenormal:`box.schema.user.create('Lena')` |br|
+    :codenormal:`box.schema.user.create('Lena', {password='X'})` |br|
+    :codenormal:`box.schema.user.create('Lena', {if_not_exists=false})`
+
+.. function:: box.schema.user.drop(user-name)
+
+    Drop a user.
+    For explanation of how Tarantool maintains user data, see
+    section :ref:`Users and the _user space <authentication-users>`.
+
+    :param string user-name: the name of the user 
+
+    Example: |br|
+    :codenormal:`box.schema.user.drop('Lena')`
+
+.. function:: box.schema.user.exists(user-name)
+
+    Return true if a user exists; return false if a user does not exist.
+
+    :param string user-name: the name of the user
+    :rtype: bool
+
+    Example: |br|
+    :codenormal:`box.schema.user.exists('Lena')`
+
+.. function:: box.schema.user.grant(user-name, privileges)
+
+    Grant :ref:`privileges <privileges>` to a user.
+
+    :param string user-name: the name of the user
+    :param string privileges: either privilege,object-type,object-name
+                              or privilege,'universe' where privilege =
+                              'read' or 'write' or 'execute' or a combination
+                              and object-type = 'space' or 'function'.
+                              Or: role-name.
+
+    Examples: |br|
+    :codenormal:`box.schema.user.grant('Lena','read', 'space', 'tester')` |br|
+    :codenormal:`box.schema.user.grant('Lena','execute', 'function', 'f')` |br|
+    :codenormal:`box.schema.user.grant('Lena','read,write', 'universe')` |br|
+    :codenormal:`box.schema.user.grant('Lena', 'Accountant')`
+
+.. function:: box.schema.user.revoke(user-name, privileges)
+
+    Revoke :ref:`privileges <privileges>` from a user.
+
+    :param string user-name: the name of the user
+    :param string privileges: either privilege,object-type,object-name
+                              or privilege,'universe' where privilege =
+                              'read' or 'write' or 'execute' or a combination
+                              and object-type = 'space' or 'function'.
+                              Or: role-name.
+
+    Examples: |br|
+    :codenormal:`box.schema.user.revoke('Lena','read', 'space', 'tester')` |br|
+    :codenormal:`box.schema.user.revoke('Lena','execute', 'function', 'f')` |br|
+    :codenormal:`box.schema.user.revoke('Lena','read,write', 'universe')` |br|
+    :codenormal:`box.schema.user.revoke('Lena', 'Accountant')`
+
+.. function:: box.schema.user.password(password)
+
+    Return a hash of a password.
+
+    :param string password: password
+    :rtype: string
+
+    Example: |br|
+    :codenormal:`box.schema.user.password('ЛЕНА')`
+
+.. function:: box.schema.user.passwd([user-name,] password)
+
+    Associate a password with the user who is currently logged in.
+    or with another user.
+    Users who wish to change their own passwords should
+    use box.schema.user.passwd(password).
+    Administrators who wish to change passwords of other users should
+    use box.schema.user.passwd(user-name, password).
+
+    :param string user-name: user-name
+    :param string password: password
+
+    Examples: |br|
+    :codenormal:`box.schema.user.passwd('ЛЕНА')` |br|
+    :codenormal:`box.schema.user.passwd('Lena', 'ЛЕНА')`
+
+.. function:: box.schema.user.info([user-name])
+
+    Return a description of a user's privileges.
+
+    :param string user-name: the name of the user.
+                             This is optional; if it is not
+                             supplied, then the information
+                             will be for the user who is
+                             currently logged in.
+
+    Example: |br|
+    :codenormal:`box.schema.user.info()` |br|
+    :codenormal:`box.schema.user.info('Lena')`
+
+.. function:: box.schema.role.create(role-name [, {options} ])
+
+    Create a role.
+    For explanation of how Tarantool maintains role data, see
+    section :ref:`Roles <authentication-roles>`.
+
+    :param string role-name: name of role, which should not be a number
+                                and should not contain special characters
+    :param table options: if_not_exists
+
+    :return: nil
+
+    Examples: |br|
+    :codenormal:`box.schema.role.create('Accountant')` |br|
+    :codenormal:`box.schema.role.create('Accountant', {if_not_exists=false})`
+
+.. function:: box.schema.role.drop(role-name)
+
+    Drop a role.
+    For explanation of how Tarantool maintains role data, see
+    section :ref:`Roles <authentication-roles>`.
+
+    :param string role-name: the name of the role 
+
+    Example: |br|
+    :codenormal:`box.schema.role.drop('Accountant')`
+
+.. function:: box.schema.role.exists(role-name)
+
+    Return true if a role exists; return false if a role does not exist.
+
+    :param string role-name: the name of the role
+    :rtype: bool
+
+    Example: |br|
+    :codenormal:`box.schema.role.exists('Accountant')`
+
+.. function:: box.schema.role.grant(role-name, privileges)
+
+    Grant :ref:`privileges <privileges>` to a role.
+
+    :param string role-name: the name of the role
+    :param string privileges: either privilege,object-type,object-name
+                              or privilege,'universe' where privilege =
+                              'read' or 'write' or 'execute' or a combination
+                              and object-type = 'space' or 'function'.
+                              Or: role-name.
+
+    Examples: |br|
+    :codenormal:`box.schema.role.grant('Accountant','read', 'space', 'tester')` |br|
+    :codenormal:`box.schema.role.grant('Accountant','execute', 'function', 'f')` |br|
+    :codenormal:`box.schema.role.grant('Accountant','read,write', 'universe')` |br|
+    :codenormal:`box.schema.role.grant('public', 'Accountant')`
+
+.. function:: box.schema.role.revoke(role-name, privileges)
+
+    Revoke :ref:`privileges <privileges>` to a role.
+
+    :param string role-name: the name of the role
+    :param string privileges: either privilege,object-type,object-name
+                              or privilege,'universe' where privilege =
+                              'read' or 'write' or 'execute' or a combination
+                              and object-type = 'space' or 'function'
+
+    Examples: |br|
+    :codenormal:`box.schema.role.revoke('Accountant','read', 'space', 'tester')` |br|
+    :codenormal:`box.schema.role.revoke('Accountant','execute', 'function', 'f')` |br|
+    :codenormal:`box.schema.role.revoke('Accountant','read,write', 'universe')` |br|
+    :codenormal:`box.schema.role.revoke('public', 'Accountant')`
+
+.. function:: box.schema.role.info([role-name])
+
+    Return a description of a role's privileges.
+
+    :param string role-name: the name of the role.
+
+    Example: |br|
+    :codenormal:`box.schema.role.info('Accountant')`
+
+.. function:: box.schema.func.create(func-name [, {options} ])
+
+    Create a function tuple.
+    This does not create the function itself -- that is done with Lua --
+    but if it is necessary to grant privileges for a function,
+    box.schema.func.create must be done first.
+    For explanation of how Tarantool maintains function data, see
+    section :ref:`Functions and the _func space <authentication-funcs>`.
+
+    :param string func-name: name of function, which should not be a number
+                                and should not contain special characters
+    :param table options: if_not_exists, setuid, language
+
+    :return: nil
+
+    Examples: |br|
+    :codenormal:`box.schema.func.create('calculate')` |br|
+    :codenormal:`box.schema.func.create('calculate', {if_not_exists=false})` |br|
+    :codenormal:`box.schema.func.create('calculate', {setuid=false})` |br|
+    :codenormal:`box.schema.func.create('calculate', {language='LUA'})`
+
+.. function:: box.schema.func.drop(func-name)
+
+    Drop a function tuple.
+    For explanation of how Tarantool maintains function data, see
+    section :ref:`Functions and the _func space <authentication-funcs>`.
+
+    :param string func-name: the name of the function
+
+    Example: |br|
+    :codenormal:`box.schema.func.drop('calculate')`
+
+.. function:: box.schema.func.exists(func-name)
+
+    Return true if a function tuple exists; return false if a function tuple does not exist.
+
+    :param string func-name: the name of the function
+    :rtype: bool
+
+    Example: |br|
+    :codenormal:`box.schema.func.exists('calculate')`
+

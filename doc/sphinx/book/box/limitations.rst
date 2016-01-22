@@ -4,11 +4,14 @@
 
 .. _lim_fields_in_index:
 
-**Number of fields in an index**
+**Number of parts in an index**
 
-    For BITSET indexes, the maximum is 1. For TREE or HASH indexes, the maximum
+    For TREE or HASH indexes, the maximum
     is 255 (``box.schema.INDEX_PART_MAX``). For RTREE indexes, the
     maximum is 1 but the field is an ARRAY.
+    For BITSET indexes, the maximum is 1. 
+
+    Note re storage engine: sophia allows 8 parts in an index.
 
 .. _lim_indexes_in_space:
 
@@ -77,14 +80,7 @@
 
 .. _lim_sophia:
 
-**Limitations which are only applicable for the sophia storage engine**
-
-    The maximum number of indexes in a space is
-    always 1, that is, secondary indexes are not supported. Indexes must be
-    type=TREE, that is, the options type=HASH or type=RTREE or type=BITSET are
-    not supported. Indexes must be unique, that is, the option unique=false
-    is not supported. The ``alter()`` and ``count()`` and
-    ``min()`` and ``max()`` and ``random()`` and ``auto_increment()`` functions
-    are not supported. Temporary spaces are not supported.
-    The maximum number of fields in an index is 8.
+For additional limitations which apply only to the sophia
+storage engine, see section
+:ref:`Differences between memtx and sophia <sophia_diff>`.
 
