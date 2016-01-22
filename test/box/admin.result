@@ -59,16 +59,8 @@ cfg_filter(box.cfg)
   - - snapshot_period
     - 0
   - - sophia
-    - - - compression
-        - none
-      - - compression_key
+    - - - memory_limit
         - 0
-      - - memory_limit
-        - 0
-      - - node_size
-        - 134217728
-      - - page_size
-        - 131072
       - - threads
         - 5
   - - sophia_dir

@@ -294,12 +294,9 @@ SophiaEngine::init()
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
 	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
 	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
-	sp_setint(env, "compaction.node_size", cfg_geti("sophia.node_size"));
-	sp_setint(env, "compaction.page_size", cfg_geti("sophia.page_size"));
 	sp_setint(env, "compaction.0.async", 1);
 	sp_setint(env, "log.enable", 0);
 	sp_setint(env, "log.two_phase_recover", 1);
-	sp_setint(env, "log.commit_lsn", 1);
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_error(env);

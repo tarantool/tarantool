@@ -217,13 +217,22 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	sp_setstring(env, path, (const void *)key_def, 0);
 	/* db.compression */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
-	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
+	sp_setstring(env, path, key_def->opts.compression, 0);
 	/* db.compression_branch */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
-	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
+	sp_setstring(env, path, key_def->opts.compression_branch, 0);
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.compression_key"));
+	sp_setint(env, path, key_def->opts.compression_key);
+	/* db.node_size */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_size", key_def->space_id);
+	sp_setint(env, path, key_def->opts.node_size);
+	/* db.page_size */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".page_size", key_def->space_id);
+	sp_setint(env, path, key_def->opts.page_size);
+	/* db.mmap */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".mmap", key_def->space_id);
+	sp_setint(env, path, key_def->opts.mmap);
 	/* db.path_fail_on_drop */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".path_fail_on_drop", key_def->space_id);
 	sp_setint(env, path, 0);

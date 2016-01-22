@@ -1,12 +1,25 @@
 box.cfg.sophia
 ---
-- page_size: 131072
-  memory_limit: 0
-  compression_key: 0
+- memory_limit: 0
   threads: 3
-  node_size: 134217728
-  compression: none
 ...
 box.cfg.sophia.threads = 5
+---
+...
+space = box.schema.space.create('test', { engine = 'sophia' })
+---
+...
+index = space:create_index('primary', {type = 'tree', mmap=1, parts = {1, 'NUM'}, amqf = 1})
+---
+...
+box.sophia["db.".. tostring(space.id)..".amqf"]
+---
+- '1'
+...
+box.sophia["db.".. tostring(space.id)..".mmap"]
+---
+- '1'
+...
+space:drop()
 ---
 ...

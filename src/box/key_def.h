@@ -159,6 +159,17 @@ struct key_opts {
 	 */
 	char distancebuf[16];
 	enum rtree_index_distance_type distance;
+	/**
+	 * Sophia index options.
+	 */
+	char compression[16];
+	char compression_branch[16];
+	uint32_t compression_key;
+	uint32_t node_size;
+	uint32_t page_size;
+	uint32_t sync;
+	uint32_t mmap;
+	uint32_t amqf;
 };
 
 extern const struct key_opts key_opts_default;
