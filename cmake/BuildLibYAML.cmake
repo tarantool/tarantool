@@ -11,6 +11,11 @@ macro(libyaml_build)
         ${PROJECT_SOURCE_DIR}/third_party/libyaml/writer.c)
 
     add_library(yaml STATIC ${yaml_src})
+    set(yaml_compile_flags -Wno-unused)
+    if (CC_HAS_WNO_PARENTHESES_EQUALITY)
+        set(yaml_compile_flags "${yaml_compile_flags} -Wno-parentheses-equality")
+    endif()
+    set_target_properties(yaml PROPERTIES COMPILE_FLAGS "${yaml_compile_flags}")
 
     set(LIBYAML_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/libyaml)
     set(LIBYAML_LIBRARIES yaml)
