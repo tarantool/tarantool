@@ -103,14 +103,24 @@ unset(CC_DEBUG_OPT)
 #
 # Set flags for all include files: those maintained by us and
 # coming from third parties.
-# We must set -fno-omit-frame-pointer here, since we rely
-# on frame pointer when getting a backtrace, and it must
-# be used consistently across all object files.
-# The same reasoning applies to -fno-stack-protector switch.
 # Since we began using luajit, which uses gcc stack unwind
 # internally, we also need to make sure all code is compiled
 # with unwind info.
 #
+
+add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
+
+# We must set -fno-omit-frame-pointer here, since we rely
+# on frame pointer when getting a backtrace, and it must
+# be used consistently across all object files.
+# The same reasoning applies to -fno-stack-protector switch.
+
+if (ENABLE_BACKTRACE)
+    add_compile_flags("C;CXX"
+        "-fno-omit-frame-pointer"
+        "-fno-stack-protector")
+endif()
+
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
 # language permits multiple tentative definitions in the single
@@ -129,12 +139,7 @@ unset(CC_DEBUG_OPT)
 # are platforms lacking proper support for common symbols (osx).
 #
 
-add_compile_flags("C;CXX"
-    "-fno-common"
-    "-fno-omit-frame-pointer"
-    "-fno-stack-protector"
-    "-fexceptions"
-    "-funwind-tables")
+add_compile_flags("C;CXX" "-fno-common")
 
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 # Remove VALGRIND code and assertions in *any* type of release build.

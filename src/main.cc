@@ -179,10 +179,11 @@ sig_fatal_cb(int signo)
 
 	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
 	fdprintf(fd,
-		 "Please file a bug at http://github.com/tarantool/tarantool/issues\n"
-		 "Attempting backtrace... Note: since the server has "
-		 "already crashed, \nthis may fail as well\n");
+		 "Please file a bug at http://github.com/tarantool/tarantool/issues\n");
+
 #ifdef ENABLE_BACKTRACE
+	fdprintf(fd, "Attempting backtrace... Note: since the server has "
+		 "already crashed, \nthis may fail as well\n");
 	print_backtrace();
 #endif
 end:
