@@ -87,7 +87,7 @@ static struct recover_row_ctx {
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 bool is_ro = true;
-struct ipc_channel *wait_rw;
+struct ipc_channel wait_rw;
 
 void
 recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
@@ -177,8 +177,8 @@ void
 box_set_ro(bool ro)
 {
 	is_ro = ro;
-	if (ro == false && !ipc_channel_is_full(wait_rw))
-		ipc_channel_put(wait_rw, NULL);
+	if (ro == false && ipc_channel_has_readers(&wait_rw))
+		ipc_channel_put(&wait_rw, NULL);
 }
 
 static void
@@ -186,7 +186,7 @@ box_wait_rw()
 {
 	void *msg;
 	while (is_ro) {
-		ipc_channel_get(wait_rw, &msg);
+		ipc_channel_get(&wait_rw, &msg);
 		assert(msg == NULL);
 	}
 }
@@ -952,9 +952,8 @@ box_free(void)
 		port_free();
 #endif
 		engine_shutdown();
+		ipc_channel_destroy(&wait_rw);
 	}
-	if (wait_rw)
-		ipc_channel_delete(wait_rw);
 }
 
 static void
@@ -1001,9 +1000,7 @@ box_init(void)
 {
 	error_init();
 
-	wait_rw = ipc_channel_new(1);
-	if (wait_rw == NULL)
-		diag_raise();
+	ipc_channel_create(&wait_rw, 0);
 
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
@@ -1037,7 +1034,6 @@ box_init(void)
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
-	box_set_too_long_threshold();
 
 	/*
 	 * Initialize the cluster registry using replication_source,
