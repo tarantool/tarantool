@@ -162,6 +162,7 @@ struct key_opts {
 	/**
 	 * Sophia index options.
 	 */
+	char path[PATH_MAX];
 	char compression[16];
 	char compression_branch[16];
 	uint32_t compression_key;

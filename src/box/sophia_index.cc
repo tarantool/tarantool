@@ -209,6 +209,11 @@ sophia_configure(struct space *space, struct key_def *key_def)
 		sp_setstring(env, path, type, 0);
 		i++;
 	}
+	/* db.path */
+	if (key_def->opts.path[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".path", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.path, 0);
+	}
 	/* db.upsert */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert", key_def->space_id);
 	sp_setstring(env, path, (const void *)(uintptr_t)sophia_upsert_callback, 0);
