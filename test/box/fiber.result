@@ -610,11 +610,8 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function testfun(ch)
-    while fiber.self().storage.key == nil do
-        print('wait')
-        fiber.sleep(0)
-    end
+function testfun(mgmt, ch)
+    mgmt:get()
     ch:put(fiber.self().storage.key)
 end;
 ---
@@ -623,14 +620,21 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-ch = fiber.channel(1)
+mgmt = fiber.channel()
 ---
 ...
-f = fiber.create(testfun, ch)
+ch = fiber.channel()
+---
+...
+f = fiber.create(testfun, mgmt, ch)
 ---
 ...
 f.storage.key = 'some value'
 ---
+...
+mgmt:put("wakeup plz")
+---
+- true
 ...
 ch:get()
 ---
@@ -639,7 +643,13 @@ ch:get()
 ch:close()
 ---
 ...
+mgmt:close()
+---
+...
 ch = nil
+---
+...
+mgmt = nil
 ---
 ...
 fiber.self().storage.key -- our local storage is not affected by f

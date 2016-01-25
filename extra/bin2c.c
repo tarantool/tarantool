@@ -14,7 +14,6 @@
 int main(int argc, char** argv) {
 	const char *prefix = "";
 	const char *suffix = "\n";
-	int no_quote = 0; /* if 1, do not prepend and append quotation marks (") */
 	FILE *in = stdin;
 	FILE *out = stdout;
 

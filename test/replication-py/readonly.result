@@ -36,3 +36,7 @@ box.info.vclock[2]
 ---
 - null
 ...
+box_cfg_done
+---
+- false
+...

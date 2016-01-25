@@ -223,20 +223,21 @@ fiber.self().storage.key = 48
 fiber.self().storage.key
 
 test_run:cmd("setopt delimiter ';'")
-function testfun(ch)
-    while fiber.self().storage.key == nil do
-        print('wait')
-        fiber.sleep(0)
-    end
+function testfun(mgmt, ch)
+    mgmt:get()
     ch:put(fiber.self().storage.key)
 end;
 test_run:cmd("setopt delimiter ''");
-ch = fiber.channel(1)
-f = fiber.create(testfun, ch)
+mgmt = fiber.channel()
+ch = fiber.channel()
+f = fiber.create(testfun, mgmt, ch)
 f.storage.key = 'some value'
+mgmt:put("wakeup plz")
 ch:get()
 ch:close()
+mgmt:close()
 ch = nil
+mgmt = nil
 fiber.self().storage.key -- our local storage is not affected by f
 -- attempt to access local storage of dead fiber raises error
 pcall(function(f) return f.storage end, f)

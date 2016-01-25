@@ -139,7 +139,7 @@ master_id = master.get_param('server')['id']
 master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
@@ -275,7 +275,7 @@ master.admin("box.snapshot()")
 master.admin('box.info.vclock[%d] == 1' % replica_id)
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
