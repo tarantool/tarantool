@@ -17,12 +17,8 @@ test_run:cmd("push filter 'listen: .*' to 'listen: <uri>'")
 ...
 help()
 ---
-- - Help topics:
-    - Basics
-    - Administration
-  - To get help on a topic, type help('topic') (with quotes)
-  - To get help on a function/object, type help(function) (without quotes)
-  - To start tutorial, type tutorial()
+- - To get help, see the Tarantool manual at http://tarantool.org/doc/
+  - To start the interactive Tarantool tutorial, type 'tutorial()'
 ...
 cfg_filter(box.cfg)
 ---
