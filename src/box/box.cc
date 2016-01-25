@@ -1017,6 +1017,7 @@ box_init(void)
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
+	box_set_too_long_threshold();
 
 	/*
 	 * Initialize the cluster registry using replication_source,
