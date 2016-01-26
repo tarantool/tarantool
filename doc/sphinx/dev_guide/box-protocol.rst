@@ -70,8 +70,8 @@ IPROTO is a binary request/response protocol.
     64                  107              127
 
 The server begins the dialogue by sending a fixed-size (128 bytes) text greeting
-to the client. The greeting always contains two 64 byte lines of ascii text, each line
-ending with newline character ('\n'). The first line contains the server version and 
+to the client. The greeting always contains two 64 byte lines of ASCII text, each line
+ending with newline character ('\\n'). The first line contains the server version and 
 protocol type. The second line contains up to 44 bytes of base64-encoded 
 random string, to use in authentication packet, and ends with up to 23 spaces.
 
