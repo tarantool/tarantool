@@ -24,9 +24,14 @@ ffi.cdef[[
     extern int log_level;
 ]]
 
+local S_WARN  = ffi.C.S_WARN
+local S_INFO  = ffi.C.S_INFO
+local S_DEBUG = ffi.C.S_DEBUG
+local S_ERROR = ffi.C.S_ERROR
+
 local function say(level, fmt, ...)
     if ffi.C.log_level < level then
--- don't waste cycles on debug.getinfo()
+        -- don't waste cycles on debug.getinfo()
         return
     end
     local debug = require('debug')
@@ -35,37 +40,24 @@ local function say(level, fmt, ...)
     local line = 0
     local file = 'eval'
     if type(frame) == 'table' then
-        line = frame.currentline
-        if not line then
-            line = 0
-        end
-        file = frame.short_src
-        if not file then
-            file = frame.src
-        end
-        if not file then
-            file = 'eval'
-        end
+        line = frame.currentline or 0
+        file = frame.short_src or frame.src or 'eval'
     end
     ffi.C._say(level, file, line, nil, "%s", str)
 end
 
+local function say_closure(lvl)
+    return function (fmt, ...)
+        say(lvl, fmt, ...)
+    end
+end
+
 return {
-    warn = function (fmt, ...)
-        say(ffi.C.S_WARN, fmt, ...)
-    end,
+    warn = say_closure(S_WARN),
+    info = say_closure(S_INFO),
+    debug = say_closure(S_DEBUG),
+    error = say_closure(S_ERROR),
 
-    info = function (fmt, ...)
-        say(ffi.C.S_INFO, fmt, ...)
-    end,
-
-    debug = function (fmt, ...)
-        say(ffi.C.S_DEBUG, fmt, ...)
-    end,
-
-    error = function (fmt, ...)
-        say(ffi.C.S_ERROR, fmt, ...)
-    end,
     rotate = function()
         ffi.C.say_logrotate(0)
     end,
