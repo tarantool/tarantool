@@ -69,13 +69,8 @@ blocks :
 
           .. code-block:: bash
 
-            $ brew install http://build.tarantool.org/tarantool.rb --devel
+            $ brew install tarantool
 
-          Please upgrade ``clang`` to version 3.2 or later using
-          ``Command Line Tools for Xcode`` disk image version 4.6+
-          from `Apple Developer`_ web-site.
-
-          .. _Apple Developer: https://developer.apple.com/downloads/
     - - "Fedora 19, 20, 21, 22"
       - format : rst
         content: |
