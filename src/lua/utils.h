@@ -35,7 +35,7 @@
 #include <string.h>
 #include <math.h> /* modf, isfinite */
 
-#include "msgpuck/msgpuck.h" /* enum mp_type */
+#include <msgpuck.h> /* enum mp_type */
 
 #if defined(__cplusplus)
 extern "C" {

@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 
 int
 function1(box_function_ctx_t *ctx, const char *args, const char *args_end)

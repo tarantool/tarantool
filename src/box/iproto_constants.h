@@ -32,7 +32,8 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
-#include <msgpuck/msgpuck.h>
+
+#include <msgpuck.h>
 
 #if defined(__cplusplus)
 extern "C" {

@@ -1,6 +1,9 @@
 #include "module.h"
-#include "msgpuck/msgpuck.h"
+
 #include <sys/time.h>
+
+#include <msgpuck.h>
+
 double
 proctime(void)
 {

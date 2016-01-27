@@ -31,13 +31,13 @@
 #include "net_box.h"
 
 #include <small/ibuf.h>
+#include <msgpuck.h> /* mp_store_u32() */
 #include "scramble.h"
 
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 
 #include "lua/msgpack.h"
-#include <msgpuck/msgpuck.h> /* mp_store_u32() */
 #include "third_party/base64.h"
 
 #define cfg luaL_msgpack_default

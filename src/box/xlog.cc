@@ -38,7 +38,7 @@
 #include "fio.h"
 #include "fiob.h"
 #include "third_party/tarantool_eio.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 #include "scoped_guard.h"
 #include "xrow.h"
 #include "iproto_constants.h"

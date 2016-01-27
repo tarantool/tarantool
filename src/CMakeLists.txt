@@ -8,6 +8,7 @@ include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${READLINE_INCLUDE_DIR})
+include_directories(${MSGPUCK_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
@@ -115,6 +116,8 @@ set (server_sources
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
+     ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
+     ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/strbuf.c
 )
 
 set(api_headers
@@ -151,12 +154,11 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 target_link_libraries(server core bit)
 
-set (common_libraries server core misc bitset msgpuck csv)
+set (common_libraries server core misc bitset csv ${MSGPUCK_LIBRARIES})
 
 list(APPEND common_libraries
     ${LIBEIO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
-    ${LIBCJSON_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
     ${LUAJIT_LIB}

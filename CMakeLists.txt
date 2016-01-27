@@ -334,12 +334,21 @@ libgopt_build()
 add_dependencies(build_bundled_libs gopt)
 
 #
-# LibCJSON
+# MsgPuck
 #
 
-include(BuildLibCJSON)
-libcjson_build()
-add_dependencies(build_bundled_libs cjson)
+option(ENABLE_BUNDLED_MSGPUCK "Enable building of the bundled MsgPuck" ON)
+if (ENABLE_BUNDLED_MSGPUCK)
+    add_library(msgpuck STATIC src/lib/msgpuck/msgpuck.c)
+    set(MSGPUCK_LIBRARIES msgpuck)
+    set(MSGPUCK_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/msgpuck)
+    find_package_message(MsgPuck
+        "Using bundled MsgPuck"
+       "${MSGPUCK_LIBRARIES}:${MSGPUCK_INCLUDE_DIRS}")
+else()
+    set(MsgPuck_FIND_REQUIRED ON)
+    find_package(MsgPuck)
+endif()
 
 #
 # LibYAML
@@ -424,6 +433,7 @@ message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
 message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
 message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
 message (STATUS "ENABLE_BUNDLED_LIBYAML: ${ENABLE_BUNDLED_LIBYAML}")
+message (STATUS "ENABLE_BUNDLED_MSGPUCK: ${ENABLE_BUNDLED_MSGPUCK}")
 message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
 message (STATUS "ENABLE_DIST: ${ENABLE_DIST}")
 list_optional_packages()

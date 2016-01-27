@@ -37,11 +37,12 @@
 #endif /* defined(LUAJIT) */
 #include <lauxlib.h> /* struct luaL_error */
 
-#include <msgpuck/msgpuck.h>
-#include <iobuf.h>
-#include <fiber.h>
+#include <msgpuck.h>
 #include <small/region.h>
 #include <small/ibuf.h>
+
+#include <iobuf.h>
+#include <fiber.h>
 
 void
 luamp_error(void *error_ctx)
