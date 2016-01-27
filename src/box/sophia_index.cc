@@ -238,6 +238,9 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	/* db.mmap */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".mmap", key_def->space_id);
 	sp_setint(env, path, key_def->opts.mmap);
+	/* db.sync */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".sync", key_def->space_id);
+	sp_setint(env, path, key_def->opts.sync);
 	/* db.amqf */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".amqf", key_def->space_id);
 	sp_setint(env, path, key_def->opts.amqf);
