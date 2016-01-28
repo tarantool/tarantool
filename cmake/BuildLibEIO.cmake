@@ -37,11 +37,6 @@ macro(libeio_build)
     set(LIBEIO_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party)
     set(LIBEIO_LIBRARIES eio)
 
-    message(STATUS "Use bundled libeio includes: "
-        "${LIBEIO_INCLUDE_DIR}/tarantool_eio.h")
-    message(STATUS "Use bundled libeio library: "
-        "${LIBEIO_LIBRARIES}")
-
     unset(eio_src)
     unset(eio_compile_flags)
 endmacro(libeio_build)

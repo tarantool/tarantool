@@ -228,6 +228,8 @@ else()
     set(HAVE_BUILTIN_POPCOUNTLL 0)
     set(HAVE_BUILTIN_BSWAP32 0)
     set(HAVE_BUILTIN_BSWAP64 0)
+    find_package_message(CC_BIT "Using slow implementation of bit operations"
+        "${CMAKE_COMPILER_IS_CLANG}:${CMAKE_COMPILER_IS_GNUCC}")
 endif()
 
 if (NOT HAVE_BUILTIN_CTZ OR NOT HAVE_BUILTIN_CTZLL)

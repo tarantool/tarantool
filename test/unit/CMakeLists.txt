@@ -4,7 +4,6 @@ set_source_files_compile_flags(${all_sources})
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
-include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 add_executable(rlist.test rlist.c unit.c)
 add_executable(stailq.test stailq.c unit.c)

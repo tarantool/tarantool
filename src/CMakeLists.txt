@@ -7,7 +7,9 @@ include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
-include_directories(${READLINE_INCLUDE_DIR})
+include_directories(${LUAJIT_INCLUDE_DIRS})
+include_directories(${READLINE_INCLUDE_DIRS})
+include_directories(${LIBYAML_INCLUDE_DIRS})
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
@@ -161,7 +163,7 @@ list(APPEND common_libraries
     ${LIBGOPT_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${LUAJIT_LIB}
+    ${LUAJIT_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
