@@ -1,4 +1,4 @@
-# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=master)](https://travis-ci.org/tarantool/tarantool)
+# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=1.6)](https://travis-ci.org/tarantool/tarantool)
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
