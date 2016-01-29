@@ -6,8 +6,14 @@ local private = require('box.internal')
 
 -- see default_cfg below
 local default_sophia_cfg = {
-    memory_limit = 0,
-    threads      = 5
+    memory_limit      = 0,
+    threads           = 5,
+    compact_wm        = 2,
+    branch_prio       = 2,
+    branch_age        = 0,
+    branch_age_period = 0,
+    branch_age_wm     = 0,
+    snapshot_period   = 0
 }
 
 -- all available options
@@ -48,8 +54,14 @@ local default_cfg = {
 
 -- see template_cfg below
 local sophia_template_cfg = {
-    memory_limit    = 'number',
-    threads         = 'number'
+    memory_limit      = 'number',
+    threads           = 'number',
+    compact_wm        = 'number',
+    branch_prio       = 'number',
+    branch_age        = 'number',
+    branch_age_period = 'number',
+    branch_age_wm     = 'number',
+    snapshot_period   = 'number'
 }
 
 -- types of available options

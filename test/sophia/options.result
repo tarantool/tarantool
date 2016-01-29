@@ -1,7 +1,13 @@
 box.cfg.sophia
 ---
-- memory_limit: 0
+- branch_age: 0
+  branch_age_wm: 0
+  branch_prio: 2
+  memory_limit: 0
+  compact_wm: 2
   threads: 3
+  branch_age_period: 0
+  snapshot_period: 0
 ...
 box.cfg.sophia.threads = 5
 ---

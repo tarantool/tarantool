@@ -51,7 +51,19 @@ cfg_filter(box.cfg)
   - - snapshot_period
     - 0
   - - sophia
-    - - - memory_limit
+    - - - branch_age
+        - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
+      - - memory_limit
+        - 0
+      - - snapshot_period
         - 0
       - - threads
         - 5
@@ -111,7 +123,19 @@ cfg_filter(box.cfg)
   - - snapshot_period
     - 0
   - - sophia
-    - - - memory_limit
+    - - - branch_age
+        - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
+      - - memory_limit
+        - 0
+      - - snapshot_period
         - 0
       - - threads
         - 5
