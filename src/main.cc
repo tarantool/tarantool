@@ -632,6 +632,9 @@ main(int argc, char **argv)
 	/* main core cleanup routine */
 	atexit(tarantool_free);
 
+	if (!loop())
+		panic("%s", "can't init event loop");
+
 	try {
 		int events = ev_activecnt(loop());
 		/*

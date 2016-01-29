@@ -132,3 +132,55 @@ daemon.snapshot_count = 20
 box.cfg{ snapshot_count = 0 }
 ---
 ...
+--test for failed snapshot in case of insufficient descriptors
+f=require('ffi')
+---
+...
+test_run:cmd("setopt delimiter ';;;'")
+---
+- true
+...
+f.cdef[[
+struct rlimit {unsigned long cur; unsigned long max;};
+int getrlimit(int resource, struct rlimit *rlim);
+int setrlimit(int resource, const struct rlimit *rlim);
+
+]];;;
+---
+...
+test_run:cmd("setopt delimiter ''");;;
+---
+- true
+...
+r = f.new('struct rlimit')
+---
+...
+f.C.getrlimit(7, r)
+---
+- 0
+...
+orig_limit = r.cur;
+---
+...
+r.cur = 1
+---
+...
+f.C.setrlimit(7, r)
+---
+- 0
+...
+box.snapshot()
+---
+- error: can't save snapshot, errno 24 (Too many open files)
+...
+r.cur = orig_limit
+---
+...
+f.C.setrlimit(7, r)
+---
+- 0
+...
+box.snapshot()
+---
+- ok
+...
