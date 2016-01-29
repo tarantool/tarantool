@@ -47,8 +47,7 @@ for spaces, users, roles, and function tuples.
     :param num space-id: the numeric identifier established by box.schema.space.create
 
     Note: for symmetry, there are other box.schema functions targeting
-    space objects, for example
-    :codenormal:`box.schema.space.drop(`:codeitalic:`space-id`:codenormal:`)`
+    space objects, for example :samp:`box.schema.space.drop({space-id})`
     will drop a space. However, the common approach is to use functions
     attached to the space objects, for example
     :func:`space_object:drop() <space_object.drop>`.
@@ -95,10 +94,13 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     :return: nil
 
-    Examples: |br|
-    :codenormal:`box.schema.user.create('Lena')` |br|
-    :codenormal:`box.schema.user.create('Lena', {password='X'})` |br|
-    :codenormal:`box.schema.user.create('Lena', {if_not_exists=false})`
+    **Examples:**
+
+    .. code-block:: lua
+
+        box.schema.user.create('Lena')
+        box.schema.user.create('Lena', {password = 'X'})
+        box.schema.user.create('Lena', {if_not_exists = false})
 
 .. function:: box.schema.user.drop(user-name)
 
@@ -106,10 +108,13 @@ available for insert, select, and all the other :mod:`box.space` functions.
     For explanation of how Tarantool maintains user data, see
     section :ref:`Users and the _user space <authentication-users>`.
 
-    :param string user-name: the name of the user 
+    :param string user-name: the name of the user
 
-    Example: |br|
-    :codenormal:`box.schema.user.drop('Lena')`
+    **Example:**
+
+    .. code-block:: lua
+
+        box.schema.user.drop('Lena')
 
 .. function:: box.schema.user.exists(user-name)
 
@@ -118,8 +123,11 @@ available for insert, select, and all the other :mod:`box.space` functions.
     :param string user-name: the name of the user
     :rtype: bool
 
-    Example: |br|
-    :codenormal:`box.schema.user.exists('Lena')`
+    **Example:**
+
+    .. code-block:: lua
+
+        box.schema.user.exists('Lena')
 
 .. function:: box.schema.user.grant(user-name, privileges)
 
@@ -132,11 +140,12 @@ available for insert, select, and all the other :mod:`box.space` functions.
                               and object-type = 'space' or 'function'.
                               Or: role-name.
 
-    Examples: |br|
-    :codenormal:`box.schema.user.grant('Lena','read', 'space', 'tester')` |br|
-    :codenormal:`box.schema.user.grant('Lena','execute', 'function', 'f')` |br|
-    :codenormal:`box.schema.user.grant('Lena','read,write', 'universe')` |br|
-    :codenormal:`box.schema.user.grant('Lena', 'Accountant')`
+    **Examples:**
+
+        box.schema.user.grant('Lena', 'read', 'space', 'tester')
+        box.schema.user.grant('Lena', 'execute', 'function', 'f')
+        box.schema.user.grant('Lena', 'read,write', 'universe')
+        box.schema.user.grant('Lena', 'Accountant')
 
 .. function:: box.schema.user.revoke(user-name, privileges)
 
@@ -149,11 +158,12 @@ available for insert, select, and all the other :mod:`box.space` functions.
                               and object-type = 'space' or 'function'.
                               Or: role-name.
 
-    Examples: |br|
-    :codenormal:`box.schema.user.revoke('Lena','read', 'space', 'tester')` |br|
-    :codenormal:`box.schema.user.revoke('Lena','execute', 'function', 'f')` |br|
-    :codenormal:`box.schema.user.revoke('Lena','read,write', 'universe')` |br|
-    :codenormal:`box.schema.user.revoke('Lena', 'Accountant')`
+    **Examples:**
+
+        box.schema.user.revoke('Lena', 'read', 'space', 'tester')
+        box.schema.user.revoke('Lena', 'execute', 'function', 'f')
+        box.schema.user.revoke('Lena', 'read,write', 'universe')
+        box.schema.user.revoke('Lena', 'Accountant')
 
 .. function:: box.schema.user.password(password)
 
@@ -162,8 +172,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
     :param string password: password
     :rtype: string
 
-    Example: |br|
-    :codenormal:`box.schema.user.password('ЛЕНА')`
+    **Example:**
+
+        box.schema.user.password('ЛЕНА')
 
 .. function:: box.schema.user.passwd([user-name,] password)
 
@@ -177,9 +188,10 @@ available for insert, select, and all the other :mod:`box.space` functions.
     :param string user-name: user-name
     :param string password: password
 
-    Examples: |br|
-    :codenormal:`box.schema.user.passwd('ЛЕНА')` |br|
-    :codenormal:`box.schema.user.passwd('Lena', 'ЛЕНА')`
+    **Examples:**
+
+        box.schema.user.passwd('ЛЕНА')
+        box.schema.user.passwd('Lena', 'ЛЕНА')
 
 .. function:: box.schema.user.info([user-name])
 
@@ -191,9 +203,10 @@ available for insert, select, and all the other :mod:`box.space` functions.
                              will be for the user who is
                              currently logged in.
 
-    Example: |br|
-    :codenormal:`box.schema.user.info()` |br|
-    :codenormal:`box.schema.user.info('Lena')`
+    **Example:**
+
+        box.schema.user.info()
+        box.schema.user.info('Lena')
 
 .. function:: box.schema.role.create(role-name [, {options} ])
 
@@ -207,9 +220,10 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     :return: nil
 
-    Examples: |br|
-    :codenormal:`box.schema.role.create('Accountant')` |br|
-    :codenormal:`box.schema.role.create('Accountant', {if_not_exists=false})`
+    **Examples:**
+
+        box.schema.role.create('Accountant')
+        box.schema.role.create('Accountant', {if_not_exists = false})
 
 .. function:: box.schema.role.drop(role-name)
 
@@ -217,10 +231,11 @@ available for insert, select, and all the other :mod:`box.space` functions.
     For explanation of how Tarantool maintains role data, see
     section :ref:`Roles <authentication-roles>`.
 
-    :param string role-name: the name of the role 
+    :param string role-name: the name of the role
 
-    Example: |br|
-    :codenormal:`box.schema.role.drop('Accountant')`
+    **Example:**
+
+        box.schema.role.drop('Accountant')
 
 .. function:: box.schema.role.exists(role-name)
 
@@ -229,8 +244,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
     :param string role-name: the name of the role
     :rtype: bool
 
-    Example: |br|
-    :codenormal:`box.schema.role.exists('Accountant')`
+    **Example:**
+
+        box.schema.role.exists('Accountant')
 
 .. function:: box.schema.role.grant(role-name, privileges)
 
@@ -243,11 +259,12 @@ available for insert, select, and all the other :mod:`box.space` functions.
                               and object-type = 'space' or 'function'.
                               Or: role-name.
 
-    Examples: |br|
-    :codenormal:`box.schema.role.grant('Accountant','read', 'space', 'tester')` |br|
-    :codenormal:`box.schema.role.grant('Accountant','execute', 'function', 'f')` |br|
-    :codenormal:`box.schema.role.grant('Accountant','read,write', 'universe')` |br|
-    :codenormal:`box.schema.role.grant('public', 'Accountant')`
+    **Examples:**
+
+        box.schema.role.grant('Accountant', 'read', 'space', 'tester')
+        box.schema.role.grant('Accountant', 'execute', 'function', 'f')
+        box.schema.role.grant('Accountant', 'read,write', 'universe')
+        box.schema.role.grant('public', 'Accountant')
 
 .. function:: box.schema.role.revoke(role-name, privileges)
 
@@ -259,11 +276,12 @@ available for insert, select, and all the other :mod:`box.space` functions.
                               'read' or 'write' or 'execute' or a combination
                               and object-type = 'space' or 'function'
 
-    Examples: |br|
-    :codenormal:`box.schema.role.revoke('Accountant','read', 'space', 'tester')` |br|
-    :codenormal:`box.schema.role.revoke('Accountant','execute', 'function', 'f')` |br|
-    :codenormal:`box.schema.role.revoke('Accountant','read,write', 'universe')` |br|
-    :codenormal:`box.schema.role.revoke('public', 'Accountant')`
+    **Examples:**
+
+        box.schema.role.revoke('Accountant', 'read', 'space', 'tester')
+        box.schema.role.revoke('Accountant', 'execute', 'function', 'f')
+        box.schema.role.revoke('Accountant', 'read,write', 'universe')
+        box.schema.role.revoke('public', 'Accountant')
 
 .. function:: box.schema.role.info([role-name])
 
@@ -271,8 +289,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     :param string role-name: the name of the role.
 
-    Example: |br|
-    :codenormal:`box.schema.role.info('Accountant')`
+    **Example:**
+
+        box.schema.role.info('Accountant')
 
 .. function:: box.schema.func.create(func-name [, {options} ])
 
@@ -289,11 +308,12 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     :return: nil
 
-    Examples: |br|
-    :codenormal:`box.schema.func.create('calculate')` |br|
-    :codenormal:`box.schema.func.create('calculate', {if_not_exists=false})` |br|
-    :codenormal:`box.schema.func.create('calculate', {setuid=false})` |br|
-    :codenormal:`box.schema.func.create('calculate', {language='LUA'})`
+    **Examples:**
+
+        box.schema.func.create('calculate')
+        box.schema.func.create('calculate', {if_not_exists = false})
+        box.schema.func.create('calculate', {setuid = false})
+        box.schema.func.create('calculate', {language = 'LUA'})
 
 .. function:: box.schema.func.drop(func-name)
 
@@ -303,8 +323,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     :param string func-name: the name of the function
 
-    Example: |br|
-    :codenormal:`box.schema.func.drop('calculate')`
+    **Example:**
+
+        box.schema.func.drop('calculate')
 
 .. function:: box.schema.func.exists(func-name)
 
@@ -313,6 +334,6 @@ available for insert, select, and all the other :mod:`box.space` functions.
     :param string func-name: the name of the function
     :rtype: bool
 
-    Example: |br|
-    :codenormal:`box.schema.func.exists('calculate')`
+    **Example:**
 
+        box.schema.func.exists('calculate')

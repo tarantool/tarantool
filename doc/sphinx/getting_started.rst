@@ -194,17 +194,15 @@ Choose the package you want.
                          Mac OS X
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This is actually a “homebrew” recipe so it's not a true binary download,
-some source code is involved. First upgrade Clang (the C compiler) to version 3.2
-or later using Command Line Tools for Xcode disk image version 4.6+ from Apple
-Developer web-site. Then download the recipe file from
-`tarantool.org/dist/master/tarantool.rb`_. Make the file executable, execute it,
-and the script in the file should handle the necessary steps with cmake, make,
-and make install.
+You can install tarantool via Homebrew. It contains binaries for OS X 10.09 and higher. Simply use:
 
-.. _tarantool.org/dist/master/tarantool.rb: http://tarantool.org/dist/master/tarantool.rb
+.. code-block:: session
 
-.. _dup first database:
+    $ brew install tarantool
+    ==> Downloading https://homebrew.bintray.com/bottles/tarantool-1.6.7-593.el_capitan.bottle.tar.gz
+    Already downloaded: /Library/Caches/Homebrew/tarantool-1.6.7-593.el_capitan.bottle.tar.gz
+    ==> Pouring tarantool-1.6.7-593.el_capitan.bottle.tar.gz
+    🍺  /usr/local/Cellar/tarantool/1.6.7-593: 19 files, 2.1M
 
 =====================================================================
         Starting Tarantool and making your first database

@@ -634,7 +634,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         :return: nil
 
-        Note re storage engine: sophia does not support :codenormal:`truncate`.
+        Note re storage engine: sophia does not support ``truncate``.
 
         **Example:**
 

@@ -159,7 +159,7 @@ necessary to prioritize requests or to use different authentication ids.
         in Lua-string, which may be any statement or series of statements.
         An :ref:`execute privilege <privileges>` is required; if the user does not have it,
         an administrator may grant it with
-        :codenormal:`box.schema.user.grant(`:codeitalic:`username`:codenormal:`,'execute','universe')`.
+        :samp:`box.schema.user.grant({username}, 'execute', 'universe')`.
 
         Example: ``conn:eval('return 5+5')``
 

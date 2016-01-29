@@ -1,120 +1,87 @@
-OS X Readme
-===========
+Target OS: MacOS X "El Capitan"
 
-This manual explains how to manually build tarantool from sources.
+In the Homebrew environment, you can download the latest tarantool package
+with a single command:
 
-Supporting kinds of build with default Apple developer software and external as
-homebrew as MacPorts.
+brew install tarantool
 
-If you want to build at the Homebrew environment execute:
+This downloads an already built release version of tarantool.
 
-    brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb --devel
+If you want to manually build tarantool from sources, read the following
+instructions on how to do it using either the default Apple developer software
+(Xcode Tools), or external package managers (Homebrew or MacPorts).
 
-Possible flags are:
-
-    --devel - for installing master's branch version
-    --with-tests - for testing tarantool after building/installing
-    --with-debug - for building tarantool with -DCMAKE_BUILD_TYPE=Debug
-
-Target OS: MacOS X "Lion"
-
-First of all, make sure mac ports are available (to install packages from).
-
-1. Install necessary packages (ports):
+1. Install necessary packages
 -------------
 
-Default build depended by Developer tools by Apple and -DDARWIN_BUILD_TYPE=None:
+For the default Xcode Tools by Apple:
+sudo xcode-select --install
+sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
 
-	sudo xcode-select --install
-	sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+For Homebrew:
+brew install cmake readline
 
-To enable build type with MacPorts set up the flag -DDARWIN_BUILD_TYPE=Ports:
+For MacPorts:
+port install autoconf binutils cmake ncurses zlib readline
 
-	port install autoconf binutils cmake ncurses zlib readline
-
-2. Upgrade clang to 3.2+
+2. Install test-required packages and modules for Python 2.7
 -------------
 
-Go to http://developer.apple.com/ to download and install the latest version
-of "Command Line Tools for Xcode". This package contains /usr/bin/clang and
-/usr/bin/clang++ binaries. Check that clang version is at least 3.2.
+You need: pyYAML, python-daemon, msgpack-python, gevent, six
 
-3. Install necessary python modules: pyYAML, python-daemon
--------------
-If you use latest Mac OS X version it is recommended using easy_install or pip.
-For instance to install these packages via easy_install just type following commands
-into terminal:
+To install these packages, we recommend easy_install, pip, or setup.py.
 
+For easy_install:
 sudo easy_install pyyaml
-sudo easy_install pydaemon
-sudo easy_install daemon
+sudo easy_install python-daemon
+sudo easy_install msgpack-python
+sudo easy_install gevent
+sudo easy_install six
 
-Otherwise see following instruction
+For pip:
+sudo pip install -r test-run/requirements.txt
 
-NB: it is recommended to install python modules through setup.py,
-using the default python (which should be >= 2.6.x and < 3.x);
-
+For setup.py:
 tar -xzf module.tar.gz
 cd module-dir
 sudo python setup.py install
 
-where module is the name of the installed module and module-dir is the name of
-the directory the module's archive deflates into.
+where 'module' is the name of the installed python module and 'module-dir'
+is the name of the directory where the module's archive is deflated into.
 
-4. Download & build tarantool source code:
+3. Download & build tarantool source code
 -------------
 
-NOTE: If you want to get DMG package go to section 6.
+Download tarantool source code from the repository at GitHub:
 
-    git clone --recursive git://github.com/tarantool/tarantool.git
+git clone https://github.com/tarantool/tarantool.git --recursive
+git submodule update --init
 
-    cd tarantool
-    mkdir build && cd build
-    cmake .. \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DENABLE_CLIENT=true \
-        -DDARWIN_BUILD_TYPE=Ports
-    make
+Create a build directory and build the tarantool project manually, for example:
 
-5. Run tarantool test suite
--------------
-NB: the following tests are not runnable on MacOS X at this point:
-
-box/lua.test
-box_big/lua.test
-connector_c/xlog_rpl.test
-
-To disable those add each of them to the 'disabled' clause in suite.ini file
-in the appropriate directory; for instance, tarantool/test/box/suite.ini must
-be edited to disable any test in the 'box' suite;
-
-To run all tests then, execute:
-
-cd ~/build/tarantool/test
-./run
-
-6. Build DMG package
--------------
-
-Building DMG depended by "Auxiliary Tools for Xcode", which be able to download from:
-
-https://developer.apple.com (necessary login with Apple ID account).
-
-Execute commands to get DMG package by root (if you not root you'll get files with incorrect permissions):
-
+cd tarantool
 mkdir build && cd build
-sudo -s
-cmake ..  \
-	-DCMAKE_INSTALL_PREFIX=/usr/local \
-	-DCMAKE_BUILD_TYPE=Rel \
-	-DENABLE_BACKTRACE=OFF \
-	-DCMAKE_C_COMPILER="clang" \
-	-DCMAKE_CXX_COMPILER="clang++" \
-	-DDARWIN_BUILD_TYPE=None \
-	-DENABLE_CLIENT=ON
+cmake .. \
+-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+-DDARWIN_BUILD_TYPE=Ports
+make
 
-make package
+In this example, we are making a developer's build (-DCMAKE_BUILD_TYPE=RelWithDebInfo)
+with cmake using MacPorts (-DDARWIN_BUILD_TYPE=Ports). To build a release version,
+set -DCMAKE_BUILD_TYPE=Release.
 
+Remember also to set up the cmake's flag -DDARWIN_BUILD_TYPE depending on the package 
+manager you use ('-DDARWIN_BUILD_TYPE=None' for Xcode Tools and Homebrew, and
+'-DDARWIN_BUILD_TYPE=None' for MacPorts).
+
+4. Run tarantool test suite
+-------------
+
+To run all tests, execute:
+
+make test
 
 -- EOF
+
+
 
