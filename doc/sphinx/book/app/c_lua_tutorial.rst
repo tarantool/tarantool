@@ -505,11 +505,10 @@ that are declared in line 1, because all of them are for use only within the fun
 
 **LINE 5: WHY "PAIRS()".** Our job is to go through all the rows and there are two
 ways to do it: with :func:`box.space.space_object:pairs() <space_object.pairs>` or with
-:code:`variable = select(...)` followed by
-:codenormal:`for i,`:codeitalic:`n`:codenormal:`,1 do` :codeitalic:`some-function`:codenormal:`(variable[i]) end`.
+``variable = select(...)`` followed by :samp:`for i, {n}, 1 do {some-function}(variable[i]) end`.
 We preferred ``pairs()`` for this example.
 
-**LINE 5: START THE MAIN LOOP.** Everything inside this ":code:`for`" loop will be
+**LINE 5: START THE MAIN LOOP.** Everything inside this "``for``" loop will be
 repeated as long as there is another index key. A tuple is fetched and can be
 referenced with variable :code:`t`.
 
@@ -527,7 +526,8 @@ where the JSON string was inserted. For example, we're assuming a tuple looks li
 
 .. _protected call: http://www.lua.org/pil/8.4.html
 
-.. code-block:: json
+.. cssclass:: highlight
+.. parsed-literal::
 
     field[1]: 444
     field[2]: '{"Hello": "world", "Quantity": 15}'
