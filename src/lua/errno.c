@@ -295,20 +295,4 @@ tarantool_lua_errno_init(struct lua_State *L)
 	}
 	lua_pop(L, -1);
 
-	if (luaL_dostring(L, errno_lua))
-		panic("Error loading Lua source (internal)/errno.lua: %s",
-			      lua_tostring(L, -1));
-}
-
-int
-errno_get(void)
-{
-	return errno;
-}
-
-int
-errno_set(int new_errno)
-{
-	errno = new_errno;
-	return errno;
 }

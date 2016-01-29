@@ -454,7 +454,8 @@ socket_methods.getsockopt = function(self, level, name)
         else
             local p = ffi.C.getprotobyname(level)
             if p == nil then
-                self._errno = boxerrno(boxerrno.EINVAL)
+                boxerrno(boxerrno.EINVAL)
+                self._errno = boxerrno.EINVAL
                 return nil
             end
             level = p.p_proto
