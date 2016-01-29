@@ -221,11 +221,15 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert_arg", key_def->space_id);
 	sp_setstring(env, path, (const void *)key_def, 0);
 	/* db.compression */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
-	sp_setstring(env, path, key_def->opts.compression, 0);
+	if (key_def->opts.compression[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.compression, 0);
+	}
 	/* db.compression_branch */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
-	sp_setstring(env, path, key_def->opts.compression_branch, 0);
+	if (key_def->opts.compression_branch[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.compression_branch, 0);
+	}
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
 	sp_setint(env, path, key_def->opts.compression_key);
