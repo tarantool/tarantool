@@ -60,8 +60,10 @@
 #include "authentication.h"
 #include "rmean.h"
 
-/* {{{ iproto_msg - declaration */
+/* The number of iproto messages in flight */
+enum { IPROTO_MSG_MAX = 768 };
 
+/* {{{ iproto_msg - declaration */
 
 /**
  * A single msg from io thread. All requests
@@ -587,8 +589,10 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 
 	try {
 		/* Ensure we have sufficient space for the next round.  */
-		struct iobuf *iobuf = iproto_connection_input_iobuf(con);
-		if (iobuf == NULL) {
+		struct iobuf *iobuf;
+		if (mempool_count(&iproto_msg_pool) > IPROTO_MSG_MAX ||
+		    (iobuf = iproto_connection_input_iobuf(con)) == NULL) {
+
 			ev_io_stop(loop, &con->input);
 			return;
 		}
@@ -1041,7 +1045,6 @@ net_cord_f(va_list /* ap */)
 	fiber_yield();
 
 	rmean_delete(rmean_net);
-	cbus_leave(&net_tx_bus);
 	return 0;
 }
 

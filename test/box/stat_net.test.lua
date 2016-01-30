@@ -19,7 +19,7 @@ cn.space.tweedledum:select() --small request
 box.stat.net.SENT.total > 0
 box.stat.net.RECEIVED.total > 0
 box.stat.net.EVENTS.total > 0
-box.stat.net.LOCKS.total > 0
+-- box.stat.net.LOCKS.total > 0
 
 space:drop()
 cn:close()

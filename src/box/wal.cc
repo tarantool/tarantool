@@ -251,8 +251,6 @@ static void
 wal_writer_destroy(struct wal_writer *writer)
 {
 	xdir_destroy(&writer->wal_dir);
-	cpipe_destroy(&writer->tx_pipe);
-	cpipe_destroy(&writer->wal_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
 	fio_batch_delete(writer->batch);
 	tt_pthread_mutex_destroy(&writer->watchers_mutex);
@@ -327,7 +325,6 @@ wal_writer_stop()
 		panic_syserror("WAL writer: thread join failed");
 	}
 
-	cbus_leave(&writer->tx_wal_bus);
 	wal_writer_destroy(writer);
 
 	rmean_tx_wal_bus = NULL;
@@ -613,7 +610,6 @@ wal_writer_f(va_list ap)
 		xlog_close(writer->current_wal);
 		writer->current_wal = NULL;
 	}
-	cbus_leave(&writer->tx_wal_bus);
 	return 0;
 }
 
