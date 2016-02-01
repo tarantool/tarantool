@@ -89,17 +89,9 @@ This package provides common files, admin tools and init scripts.
 %setup -q -n %{name}-%{version}
 
 %build
-# GNUInstallDirs doesn't work properly with %%cmake macro.
+# RHBZ #1301720: SYSCONFDIR an LOCALSTATEDIR must be specified explicitly
 %cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-         -DCMAKE_INSTALL_BINDIR:PATH=%{_bindir} \
-         -DCMAKE_INSTALL_SBINDIR:PATH=%{_sbindir} \
-         -DCMAKE_INSTALL_LIBDIR:PATH=%{_libdir} \
-         -DCMAKE_INSTALL_LIBEXECDIR:PATH=%{_libexecdir} \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
-         -DCMAKE_INSTALL_SHAREDSTATEDIR:PATH=%{_sharedstatedir} \
-         -DCMAKE_INSTALL_INCLUDEDIR:PATH=%{_includedir} \
-         -DCMAKE_INSTALL_INFODIR:PATH=%{_infodir} \
-         -DCMAKE_INSTALL_MANDIR:PATH=%{_mandir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
          -DENABLE_BACKTRACE:BOOL=ON \
