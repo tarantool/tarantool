@@ -1,3 +1,21 @@
+# config file for tarantoolctl
+if (TARGET_OS_FREEBSD)
+    set(SYSCONFIG_DEFAULT "tarantool/default")
+elseif (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
+    # Debian/Ubuntu/etc.
+    set(SYSCONFIG_DEFAULT "default")
+else()
+    # RedHat/Fedora/etc.
+    set(SYSCONFIG_DEFAULT "sysconfig")
+endif()
+configure_file(tarantoolctl.in tarantoolctl @ONLY)
+
+option(ENABLE_DIST "Enable install of init scripts" OFF)
+
+if (NOT ENABLE_DIST)
+    return ()
+endif()
+
 include(systemd)
 
 #
@@ -21,18 +39,7 @@ set(SYSCONFIG_ENABLEDDIR "tarantool/instances.enabled")
 set(TARANTOOL_AVAILABLEDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}")
 set(TARANTOOL_ENABLEDDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_ENABLEDDIR}")
 
-# config file for tarantoolctl
-if (TARGET_OS_FREEBSD)
-    set(SYSCONFIG_DEFAULT "tarantool/default")
-elseif (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
-    # Debian/Ubuntu/etc.
-    set(SYSCONFIG_DEFAULT "default")
-else()
-    # RedHat/Fedora/etc.
-    set(SYSCONFIG_DEFAULT "sysconfig")
-endif()
 configure_file(default/tarantool.in default/tarantool @ONLY)
-configure_file(tarantoolctl.in tarantoolctl @ONLY)
 install (FILES ${CMAKE_CURRENT_BINARY_DIR}/default/tarantool DESTINATION
     ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_DEFAULT}/
     PERMISSIONS
