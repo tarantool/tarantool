@@ -727,28 +727,41 @@ cnc.console ~= nil
 ...
 cnc:console('return 1, 2, 3, "string", nil')
 ---
-- |
-  ---
+- '---
+
   - 1
+
   - 2
+
   - 3
+
   - string
+
   - null
+
   ...
+
+'
 ...
 cnc:console('error("test")')
 ---
-- |
-  ---
+- '---
+
   - error: test
+
   ...
+
+'
 ...
 cnc:console('a = {1, 2, 3, 4}; return a[3]')
 ---
-- |
-  ---
+- '---
+
   - 3
+
   ...
+
+'
 ...
 -- #545 user or password is not defined
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
