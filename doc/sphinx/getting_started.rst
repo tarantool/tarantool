@@ -29,14 +29,16 @@ statements. The section about sandbox is “`Starting Tarantool and making your 
             Downloading and installing a binary package
 =====================================================================
 
-The repositories for the “stable” release are at `tarantool.org/dist/stable`_.
-The repositories for the “master” release are at `tarantool.org/dist/master`_.
-Since this is the manual for the “master” release, all instructions use
-`tarantool.org/dist/master`_.
+The repositories for the “stable” 1.6.x release are at
+`tarantool.org/dist/1.6`_.
+The repositories for the “development” 1.7.x release are at
+`tarantool.org/dist/1.7`_.
+Since this is the manual for the 1.6.x release, all instructions use
+`tarantool.org/dist/1.6`_.
 
 An automatic build system creates, tests and publishes packages for every
-push into the master branch. Therefore if you looked at
-`tarantool.org/dist/master`_ you would see that there are source files and
+push into the 1.6 branch. Therefore if you looked at
+`tarantool.org/dist/1.6`_ you would see that there are source files and
 subdirectories for the packages that will be described in this section.
 
 To download and install the package that's appropriate for your environment,
@@ -50,10 +52,11 @@ More advice for binary downloads is at http://tarantool.org/download.html.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is always an up-to-date Debian repository at
-http://tarantool.org/dist/master/debian. The repository contains builds for
-Debian unstable "Sid", stable "Wheezy", forthcoming "Jessie". Add the
-tarantool.org repository to your apt sources list. $release is an environment
-variable which will contain the Debian version code e.g. "Wheezy":
+http://tarantool.org/dist/1.6/debian. The repository contains builds for
+Debian unstable "Sid", testing "Stretch", stable "Jessie" and old stable
+"Wheezy". Add the tarantool.org repository to your apt sources list.
+$release is an environment variable which will contain the Debian version code
+e.g. "Wheezy":
 
 .. code-block:: bash
 
@@ -61,9 +64,9 @@ variable which will contain the Debian version code e.g. "Wheezy":
     sudo apt-key add ./public.key
     release=`lsb_release -c -s`
     # append two lines to a list of source repositories
-    echo "deb http://tarantool.org/dist/master/debian/ $release main" | \
+    echo "deb http://tarantool.org/dist/1.6/debian/ $release main" | \
     sudo tee -a /etc/apt/sources.list.d/tarantool.list
-    echo "deb-src http://tarantool.org/dist/master/debian/ $release main" | \
+    echo "deb-src http://tarantool.org/dist/1.6/debian/ $release main" | \
     sudo tee -a /etc/apt/sources.list.d/tarantool.list
     # install
     sudo apt-get update
@@ -74,11 +77,12 @@ variable which will contain the Debian version code e.g. "Wheezy":
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is always an up-to-date Ubuntu repository at
-http://tarantool.org/dist/master/ubuntu. The repository contains builds for
-Ubuntu 12.04 "precise", 13.10 "saucy", and 14.04 "trusty". Add the tarantool.org
-repository to your apt sources list. $release is an environment variable which
-will contain the Ubuntu version code e.g. "precise". If you want the version
-that comes with Ubuntu, start with the lines that follow the '# install' comment:
+http://tarantool.org/dist/1.6/ubuntu. The repository contains builds for
+forthcoming "Xenial", stable "Wily", LTS "Trusty" and LTS "Precise".
+Add the tarantool.org repository to your apt sources list. $release is an
+environment variable which will contain the Ubuntu version code e.g. "precise".
+If you want the version that comes with Ubuntu, start with the lines that
+follow the '# install' comment:
 
 .. code-block:: bash
 
@@ -87,9 +91,9 @@ that comes with Ubuntu, start with the lines that follow the '# install' comment
     sudo apt-key add ./public.key
     release=`lsb_release -c -s`
     # append two lines to a list of source repositories
-    echo "deb http://tarantool.org/dist/master/ubuntu/ $release main" | \
+    echo "deb http://tarantool.org/dist/1.6/ubuntu/ $release main" | \
     sudo tee -a /etc/apt/sources.list.d/tarantool.list
-    echo "deb-src http://tarantool.org/dist/master/ubuntu/ $release main" | \
+    echo "deb-src http://tarantool.org/dist/1.6/ubuntu/ $release main" | \
     sudo tee -a /etc/apt/sources.list.d/tarantool.list
     # install
     sudo apt-get update
@@ -104,9 +108,9 @@ These instructions are applicable for CentOS version 6 or 7, and RHEL version
 6 or 7. Pick the CentOS repository which fits your CentOS/RHEL version and
 your x86 platform:
 
-* http://tarantool.org/dist/master/centos/6/os/i386 for version 6, x86-32
-* http://tarantool.org/dist/master/centos/6/os/x86_64 for version 6, x86-64
-* http://tarantool.org/dist/master/centos/7/os/x86_64 for version 7, x86-64
+* http://tarantool.org/dist/1.6/centos/6/os/i386 for version 6, x86-32
+* http://tarantool.org/dist/1.6/centos/6/os/x86_64 for version 6, x86-64
+* http://tarantool.org/dist/1.6/centos/7/os/x86_64 for version 7, x86-64
 
 Add the following section to your yum repository list
 (``/etc/yum.repos.d/tarantool.repo``) (in these instructions ``$releasever``
@@ -118,7 +122,7 @@ architecture must be either i386 or x86_64):
 
     # [tarantool]
     name=CentOS-$releasever - Tarantool
-    baseurl=http://tarantool.org/dist/master/centos/*$releasever*/os/*$basearch*/
+    baseurl=http://tarantool.org/dist/1.6/centos/*$releasever*/os/*$basearch*/
     enabled=1
     gpgcheck=0
 
@@ -129,7 +133,7 @@ For example, if you have CentOS version 6 and x86-64, you can add the new sectio
     echo "[tarantool]" | \
     sudo tee /etc/yum.repos.d/tarantool.repo
     echo "name=CentOS-6 - Tarantool"| sudo tee -a /etc/yum.repos.d/tarantool.repo
-    echo "baseurl=http://tarantool.org/dist/master/centos/6/os/x86_64/" | \
+    echo "baseurl=http://tarantool.org/dist/1.6/centos/6/os/x86_64/" | \
     sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "enabled=1" | sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "gpgcheck=0" | sudo tee -a /etc/yum.repos.d/tarantool.repo
@@ -140,9 +144,9 @@ Then install with :code:`sudo yum install tarantool`.
                           Fedora
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-These instructions are applicable for Fedora 19, 20 or rawhide. Pick the Fedora
-repository, for example http://tarantool.org/dist/master/fedora/20/x86_64 for
-version 20, x86-64. Add the following section to your yum repository list
+These instructions are applicable for Fedora 22, 23 or rawhide. Pick the Fedora
+repository, for example http://tarantool.org/dist/1.6/fedora/23/x86_64 for
+version 23, x86-64. Add the following section to your yum repository list
 (``/etc/yum.repos.d/tarantool.repo``) (in these instructions
 ``$releasever`` i.e. Fedora release version must be 19, 20 or rawhide and
 ``$basearch`` i.e. base architecture must be x86_64):
@@ -152,18 +156,18 @@ version 20, x86-64. Add the following section to your yum repository list
 
     [tarantool]
     name=Fedora-$releasever - Tarantool
-    baseurl=http://tarantool.org/dist/master/fedora/*$releasever*/*$basearch*/
+    baseurl=http://tarantool.org/dist/1.6/fedora/*$releasever*/*$basearch*/
     enabled=1
     gpgcheck=0
 
-For example, if you have Fedora version 20, you can add the new section thus:
+For example, if you have Fedora version 23, you can add the new section thus:
 
 .. code-block:: bash
 
     echo "[tarantool]" | \
     sudo tee /etc/yum.repos.d/tarantool.repo
-    echo "name=Fedora-20 - Tarantool"| sudo tee -a /etc/yum.repos.d/tarantool.repo
-    echo "baseurl=http://tarantool.org/dist/master/fedora/20/x86_64/" | \
+    echo "name=Fedora-23 - Tarantool"| sudo tee -a /etc/yum.repos.d/tarantool.repo
+    echo "baseurl=http://tarantool.org/dist/1.6/fedora/23/x86_64/" | \
     sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "enabled=1" | sudo tee -a /etc/yum.repos.d/tarantool.repo
     echo "gpgcheck=0" | sudo tee -a /etc/yum.repos.d/tarantool.repo
@@ -320,8 +324,8 @@ Here is how to create a simple test database after installing.
 
        tarantool> box.schema.user.grant('guest','read,write,execute','universe')
 
-.. _tarantool.org/dist/stable: http://tarantool.org/dist/stable
-.. _tarantool.org/dist/master: http://tarantool.org/dist/master
+.. _tarantool.org/dist/1.6: http://tarantool.org/dist/1.6
+.. _tarantool.org/dist/1.7: http://tarantool.org/dist/1.7
 
 =====================================================================
         Starting another Tarantool instance and connecting remotely

@@ -13,16 +13,16 @@ blocks :
         parameters and environment, it is recommended that production systems use the
         builds provided on this site.
 
-        All published releases are available at `<http://tarantool.org/dist/master>`_
+        All published releases are available at `<http://tarantool.org/dist/1.6>`_
   binarylist :
     - - "Ubuntu"
       - format : rst
         content: |
           We maintain an always up-to-date Ubuntu package repository at
-          `<http://tarantool.org/dist/master/ubuntu>`_.
+          `<http://tarantool.org/dist/1.6/ubuntu>`_.
 
           At the moment the repository contains builds for Ubuntu
-          "Precise", "Trusty", "Saucy", "Vivid". It can be added to your
+          "xenial", "wily", "trusty", "precise". It can be added to your
           apt sources list with:
 
           .. code-block:: bash
@@ -32,8 +32,8 @@ blocks :
             release=`lsb_release -c -s`
 
             cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
-            deb http://tarantool.org/dist/master/ubuntu/ $release main
-            deb-src http://tarantool.org/dist/master/ubuntu/ $release main
+            deb http://tarantool.org/dist/1.6/ubuntu/ $release main
+            deb-src http://tarantool.org/dist/1.6/ubuntu/ $release main
             EOF
 
             sudo apt-get update
@@ -43,10 +43,10 @@ blocks :
         content: |
           We maintain an always up-to-date Debian GNU/Linux
           package repository at
-          `<http://tarantool.org/dist/master/debian>`_.
+          `<http://tarantool.org/dist/1.6/debian>`_.
 
           At the moment the repository contains builds for
-          Debian "Sid", "Jessie", "Wheezy". It can be added
+          Debian "sid", "stretch", "jessie", "wheezy". It can be added
           to your apt sources list with:
 
           .. code-block:: bash
@@ -56,8 +56,8 @@ blocks :
             release=`lsb_release -c -s`
 
             cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
-            deb http://tarantool.org/dist/master/debian/ $release main
-            deb-src http://tarantool.org/dist/master/debian/ $release main
+            deb http://tarantool.org/dist/1.6/debian/ $release main
+            deb-src http://tarantool.org/dist/1.6/debian/ $release main
             EOF
 
             sudo apt-get update
@@ -71,27 +71,28 @@ blocks :
 
             $ brew install tarantool
 
-    - - "Fedora 19, 20, 21, 22"
+    - - "Fedora"
       - format : rst
         content: |
-          Fedora repository is available at
-          `<http://tarantool.org/dist/master/fedora>`_
+          We maintain an always up-to-date Fedora package repository at
+          `<http://tarantool.org/dist/1.6/fedora>`_
 
-          Add the following section to your yum repository list
-          ``/etc/yum.repos.d/tarantool.repo`` to enable it:
+          At the moment the repository contains builds for Fedora
+          22, 23, "rawhide". Add the following section to your yum
+          repository list ``/etc/yum.repos.d/tarantool.repo`` to enable it:
 
           .. code-block:: ini
 
             [tarantool]
             name=Fedora-$releasever - Tarantool
-            baseurl=http://tarantool.org/dist/master/fedora/$releasever/$basearch/
+            baseurl=http://tarantool.org/dist/1.6/fedora/$releasever/$basearch/
             enabled=1
             gpgcheck=0
-    - - "CentOS 5-7 and RHEL 5-7"
+    - - "CentOS 6-7 and RHEL 6-7"
       - format : rst
         content: |
           CentOS and RHEL repository is available at
-          `<http://tarantool.org/dist/master/centos>`_
+          `<http://tarantool.org/dist/1.6/centos>`_
 
           Add the following section to your yum repository list
           ``/etc/yum.repos.d/tarantool.repo`` to enable it:
@@ -100,7 +101,7 @@ blocks :
 
             [tarantool]
             name=CentOS-$releasever - Tarantool
-            baseurl=http://tarantool.org/dist/master/centos/$releasever/os/$basearch/
+            baseurl=http://tarantool.org/dist/1.6/centos/$releasever/os/$basearch/
             enabled=1
             gpgcheck=0
     - - "Gentoo Linux"
@@ -150,18 +151,17 @@ blocks :
     - - "Source tarball"
       - format : rst
         content: |
-          The latest source archive is `tarantool-@PACKAGE_VERSION@-src.tar.gz`_.
+          The latest source archive is `tarantool-@PACKAGE_VERSION@.tar.gz`_.
           Please consult with README for build instructions on your system.
 
-          .. _tarantool-@PACKAGE_VERSION@-src.tar.gz: http://tarantool.org/dist/master/tarantool-@PACKAGE_VERSION@-src.tar.gz
-    - - "Old master branch"
+          .. _tarantool-@PACKAGE_VERSION@.tar.gz: http://tarantool.org/dist/1.6/tarantool-@PACKAGE_VERSION@.tar.gz
+    - - "Development Version"
       - format : rst
         content: |
-          In the same manner as for `the master branch`_, every push into
-          `the old master`_ is `available online`_.
+          In the same manner as for `the 1.6 branch`_, every push into
+          `the 1.7 branch`_ is `available online`_.
 
-          .. _the master branch: http://github.com/tarantool/tarantool/tree/master
-          .. _the old master:    http://github.com/tarantool/tarantool/tree/stable
-          .. _available online:  http://tarantool.org/dist/stable
+          .. _the 1.7 branch:    http://github.com/tarantool/tarantool/tree/1.7
+          .. _available online:  http://tarantool.org/dist/1.7
 ...
 # vim: ts=2 expandtab syntax=yaml
