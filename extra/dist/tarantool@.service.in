@@ -26,10 +26,10 @@ Group=@TARANTOOL_USER@
 # Disable OOM killer
 OOMScoreAdjust=-1000
 
-ExecStart=@CMAKE_INSTALL_BINDIR@/tarantoolctl start %I
-ExecStop=@CMAKE_INSTALL_BINDIR@/tarantoolctl stop %I
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %I
+ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
 ## NYI: https://github.com/tarantool/tarantool/issues/1229
-#ExecReload=@CMAKE_INSTALL_BINDIR@/tarantoolctl reload %I
+#ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %I
 
 # Give a reasonable amount of time to close xlogs
 TimeoutStopSec=10s
