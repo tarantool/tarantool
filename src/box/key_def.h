@@ -166,6 +166,7 @@ struct key_opts {
 	char compression[16];
 	char compression_branch[16];
 	uint32_t compression_key;
+	uint32_t node_preload;
 	uint32_t node_size;
 	uint32_t page_size;
 	uint32_t sync;

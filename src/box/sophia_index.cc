@@ -233,6 +233,9 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
 	sp_setint(env, path, key_def->opts.compression_key);
+	/* db.node_preload */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_preload", key_def->space_id);
+	sp_setint(env, path, key_def->opts.node_preload);
 	/* db.node_size */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_size", key_def->space_id);
 	sp_setint(env, path, key_def->opts.node_size);
