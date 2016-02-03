@@ -72,3 +72,26 @@ daemon.snapshot_count = 20
 
 -- stop daemon
 box.cfg{ snapshot_count = 0 }
+
+-- first start daemon
+box.cfg{ snapshot_count = 2, snapshot_period = 3600}
+period_bias = daemon.snapshot_period_bias
+next_snap_interval = daemon.next_snap_interval(daemon)
+test_snap_interval = 3600 - (fiber.time() + period_bias) % 3600
+(next_snap_interval - test_snap_interval + 3600) % 3600 < 2
+
+biases = {}
+max_equals = 0
+test_run:cmd("setopt delimiter ';'")
+
+for i = 1, 20 do
+    box.cfg{ snapshot_period = 0}
+    box.cfg{ snapshot_period = 3600}
+    biases[daemon.snapshot_period_bias] = (biases[daemon.snapshot_period_bias] or 0) + 1
+    if biases[daemon.snapshot_period_bias] > max_equals then
+        max_equals = biases[daemon.snapshot_period_bias]
+    end
+end
+
+test_run:cmd("setopt delimiter ''");
+max_equals < 4
