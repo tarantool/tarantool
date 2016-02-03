@@ -1610,8 +1610,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_user->def.owner);
 		/* Can't drop guest or super user */
-		if (uid >= BOX_SYSTEM_USER_ID_MIN &&
-		    uid <= BOX_SYSTEM_USER_ID_MAX) {
+		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX) {
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->def.name,
 				  "the user or the role is a system");
