@@ -193,42 +193,50 @@ set(MODULE_SUFFIX "tarantool")
 set(MODULE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${MODULE_SUFFIX}")
 set(MODULE_LUADIR "${CMAKE_INSTALL_DATADIR}/${MODULE_SUFFIX}")
 set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LUADIR "${CMAKE_INSTALL_FULL_DATADIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${MODULE_SUFFIX}")
 
-foreach(dir
-        LIBDIR
-        LUADIR
-        INCLUDEDIR
-        )
-    if(NOT IS_ABSOLUTE ${MODULE_${dir}})
-        set(MODULE_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${MODULE_${dir}}")
-    else()
-        set(MODULE_FULL_${dir} "${MODULE_${dir}}")
-    endif()
-endforeach()
+include(cmake/multilib.cmake)
 
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
-foreach(dir
-	"lua/luarocks/share/lua/5.1"
-	"lua/5.1")
-    list(APPEND MODULE_LUAPATH "/usr/${CMAKE_INSTALL_LIBDIR}/${dir}/?.lua")
-    list(APPEND MODULE_LUAPATH "/usr/${CMAKE_INSTALL_LIBDIR}/${dir}/?/init.lua")
-endforeach()
-
-list(APPEND MODULE_LIBPATH "${MODULE_FULL_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
-if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr" AND
-      NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr/local")
-    list(APPEND MODULE_LIBPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+set(_datadirs)
+list(APPEND _datadirs "/usr/local/share") # LuaRocks
+list(APPEND _datadirs "${CMAKE_INSTALL_FULL_DATADIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _datadirs "/usr/${MULTILIB}/lua/luarocks/share")
 endif()
-
+list(APPEND _datadirs "/usr/share") # System packages
+list(REMOVE_DUPLICATES _datadirs)
+set(MODULE_LUAPATH)
 foreach(dir
-	"/usr/local"
-	"/usr")
-    foreach(lua_lib
-            "lua/luarocks/lib/lua/5.1"
-            "lua/5.1")
-        list(APPEND MODULE_LIBPATH
-        "${dir}/${CMAKE_INSTALL_LIBDIR}/${lua_lib}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _datadirs)
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?.lua")
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?/init.lua")
+    endforeach()
+endforeach()
+
+set(_libdirs)
+list(APPEND _libdirs "/usr/local/${MULTILIB}") # LuaRocks
+list(APPEND _libdirs "${CMAKE_INSTALL_FULL_LIBDIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/debian_version")
+    # gh-1085: LuaRocks on Debian uses lib instead of lib/x86_64-linux-gnu/
+    list(APPEND _libdirs "/usr/local/lib") # LuaRocks on Debian
+endif()
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
+endif()
+list(APPEND _libdirs "/usr/${MULTILIB}") # System packages
+list(REMOVE_DUPLICATES _libdirs)
+set(MODULE_LIBPATH)
+foreach(dir
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _libdirs)
+        list(APPEND MODULE_LIBPATH "${prefix}/${dir}/?${CMAKE_SHARED_MODULE_SUFFIX}")
     endforeach()
 endforeach()
 

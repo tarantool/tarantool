@@ -282,7 +282,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 		lua_pushliteral(L, "/.luarocks/share/lua/?/init.lua;");
 	}
 	lua_pushliteral(L, MODULE_LUAPATH ";");
-	lua_getfield(L, top, "path");
+	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "path");
 
@@ -294,7 +294,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 		lua_pushliteral(L, "/.luarocks/lib/lua/?." TARANTOOL_LIBEXT ";");
 	}
 	lua_pushliteral(L, MODULE_LIBPATH ";");
-	lua_getfield(L, top, "cpath");
+	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "cpath");
 
