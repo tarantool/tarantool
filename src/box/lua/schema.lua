@@ -1387,6 +1387,12 @@ box.schema.user.drop = function(name, opts)
     check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_resolve(name)
     if uid ~= nil then
+        if uid >= box.schema.SYSTEM_USER_ID_MIN and
+           uid <= box.schema.SYSTEM_USER_ID_MAX then
+            -- gh-1205: box.schema.user.info fails
+            box.error(box.error.DROP_USER, name,
+                      "the user or the role is a system")
+        end
         return drop(uid, opts)
     end
     if not opts.if_exists then
@@ -1454,6 +1460,11 @@ box.schema.role.drop = function(name, opts)
             box.error(box.error.NO_SUCH_ROLE, name)
         end
         return
+    end
+    if uid >= box.schema.SYSTEM_USER_ID_MIN and
+       uid <= box.schema.SYSTEM_USER_ID_MAX then
+        -- gh-1205: box.schema.user.info fails
+        box.error(box.error.DROP_USER, name, "the user or the role is a system")
     end
     return drop(uid)
 end

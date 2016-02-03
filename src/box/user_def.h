@@ -73,7 +73,13 @@ struct user_def {
 };
 
 /** Predefined user ids. */
-enum { GUEST = 0, ADMIN =  1, PUBLIC = 2 /* role */ };
+enum {
+	BOX_SYSTEM_USER_ID_MIN = 0,
+	GUEST = 0,
+	ADMIN =  1,
+	PUBLIC = 2, /* role */
+	BOX_SYSTEM_USER_ID_MAX = PUBLIC
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */
