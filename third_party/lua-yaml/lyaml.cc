@@ -46,7 +46,7 @@ extern "C" {
 #include "yaml.h"
 #include "b64.h"
 /* Use private header from bundled libyaml for IS_PRINTABLE() macro */
-#include "third_party/libyaml/yaml_private.h"
+#include "third_party/libyaml/src/yaml_private.h"
 } /* extern "C" */
 #include "lua/utils.h"
 
