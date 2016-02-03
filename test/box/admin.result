@@ -71,8 +71,14 @@ cfg_filter(box.cfg)
         - 2
       - - memory_limit
         - 0
+      - - mmap
+        - 1
+      - - node_preload
+        - 0
       - - snapshot_period
         - 0
+      - - sync
+        - 2
       - - threads
         - 5
   - - sophia_dir

@@ -13,7 +13,10 @@ local default_sophia_cfg = {
     branch_age        = 0,
     branch_age_period = 0,
     branch_age_wm     = 0,
-    snapshot_period   = 0
+    snapshot_period   = 0,
+    node_preload      = 0,
+    mmap              = 1,
+    sync              = 2
 }
 
 -- all available options
@@ -61,7 +64,10 @@ local sophia_template_cfg = {
     branch_age        = 'number',
     branch_age_period = 'number',
     branch_age_wm     = 'number',
-    snapshot_period   = 'number'
+    snapshot_period   = 'number',
+    node_preload      = 'number',
+    mmap              = 'number',
+    sync              = 'number'
 }
 
 -- types of available options
