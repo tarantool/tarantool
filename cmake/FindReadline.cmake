@@ -30,9 +30,14 @@ set(READLINE_INCLUDE_DIRS ${READLINE_INCLUDE_DIR})
 set(READLINE_LIBRARIES ${READLINE_LIBRARY})
 
 IF (READLINE_FOUND)
-  IF (EXISTS ${READLINE_INCLUDE_DIR}/readline/rlconf.h)
-    set(HAVE_GNU_READLINE 1)
-  ENDIF ()
+  if(EXISTS ${READLINE_INCLUDE_DIR}/readline/rlconf.h)
+      check_library_exists(${READLINE_LIBRARY} rl_catch_sigwinch ""
+          HAVE_GNU_READLINE)
+      if(HAVE_GNU_READLINE)
+          find_package_message(GNU_READLINE "Detected GNU Readline"
+              "${HAVE_GNU_READLINE}")
+      endif()
+  endif()
   IF (TERMCAP_FOUND)
     SET (READLINE_LIBRARIES ${READLINE_LIBRARIES} ${TERMCAP_LIBRARIES})
     SET (READLINE_INCLUDE_DIRS ${READLINE_INCLUDE_DIRS} ${TERMCAP_INCLUDE_DIRS})
