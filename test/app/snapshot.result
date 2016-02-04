@@ -1,2 +1,7 @@
 ok
 gh-1185 test done w/o crash!.
+TAP version 13
+# fail on descriptors
+1..1
+ok - nil
+# fail on descriptors: end

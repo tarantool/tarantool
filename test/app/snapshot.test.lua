@@ -1,6 +1,9 @@
 #!/usr/bin/env tarantool
 math = require('math')
 fiber = require('fiber')
+tap = require('tap')
+ffi = require('ffi')
+fio = require('fio')
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
@@ -87,5 +90,37 @@ s1:drop()
 s2:drop()
 
 print('gh-1185 test done w/o crash!.')
+
+
+ffi.cdef[[
+struct rlimit {unsigned long cur; unsigned long max;};
+int getrlimit(int resource, struct rlimit *rlim);
+]]
+
+r = ffi.new('struct rlimit')
+
+--test for failed snapshot in case of insufficient descriptors
+tap.test("fail on descriptors", function(test)
+    test:plan(1)
+    local r = ffi.new('struct rlimit')
+    ffi.C.getrlimit(7, r)
+    if tonumber(r.cur) > 8192 then
+        -- descriptors limit is to high, just skip test
+        test:ok(1 == 1)
+	return
+    end
+    local files = {}
+    
+    for i = 1, tonumber(r.cur) do
+        files[i] = fio.open('/dev/null')
+    end
+    local sf, mf = pcall(box.snapshot)
+    for i, f in pairs(files) do
+        f:close()
+    end
+    local ss, ms = pcall(box.snapshot)
+    test:ok(not sf and ss)
+end) 
+
 
 os.exit(0)
