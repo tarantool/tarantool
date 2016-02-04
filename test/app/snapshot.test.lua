@@ -1,16 +1,24 @@
 #!/usr/bin/env tarantool
-math = require('math')
-fiber = require('fiber')
-tap = require('tap')
-ffi = require('ffi')
-fio = require('fio')
 
---
--- Check that Tarantool creates ADMIN session for #! script
---
-continue_snapshoting = true
+local math = require('math')
+local fiber = require('fiber')
+local tap = require('tap')
+local ffi = require('ffi')
+local fio = require('fio')
 
-function noise()
+box.cfg{ logger="tarantool.log", slab_alloc_arena=0.1, rows_per_wal=5000}
+
+local test = tap.test("snapshot")
+test:plan(3)
+
+-------------------------------------------------------------------------------
+-- gh-695: Avoid overwriting tuple data with information necessary for smfree()
+-------------------------------------------------------------------------------
+
+local continue_snapshoting = true
+local snap_chan = fiber.channel()
+
+local function noise()
     fiber.name('noise-'..fiber.id())
     while continue_snapshoting do
         if box.space.test:len() < 300000 then
@@ -21,7 +29,7 @@ function noise()
     end
 end
 
-function purge()
+local function purge()
     fiber.name('purge-'..fiber.id())
     while continue_snapshoting do
         local min = box.space.test.index.primary:min()
@@ -32,7 +40,7 @@ function purge()
     end
 end
 
-function snapshot(lsn)
+local function snapshot(lsn)
     fiber.name('snapshot')
     while continue_snapshoting do
         local new_lsn = box.info.server.lsn
@@ -44,14 +52,11 @@ function snapshot(lsn)
     end
     snap_chan:put("!")
 end
-box.cfg{logger="tarantool.log", slab_alloc_arena=0.1, rows_per_wal=5000}
 
-if box.space.test == nil then
+box.once("snapshot.test", function()
     box.schema.space.create('test')
     box.space.test:create_index('primary')
-end
-
--- require('console').listen(3303)
+end)
 
 fiber.create(noise)
 fiber.create(purge)
@@ -61,21 +66,23 @@ fiber.create(noise)
 fiber.create(purge)
 fiber.create(noise)
 fiber.create(purge)
-snap_chan = fiber.channel()
-snap_fib = fiber.create(snapshot, box.info.server.lsn)
+fiber.create(snapshot, box.info.server.lsn)
 
 fiber.sleep(0.3)
 continue_snapshoting = false
 snap_chan:get()
-print('ok')
 
---https://github.com/tarantool/tarantool/issues/1185
+test:ok(true, 'gh-695: avoid overwriting tuple data necessary for smfree()')
 
-s1 = box.schema.create_space('test1', { engine = 'memtx'})
-i1 = s1:create_index('test', { type = 'tree', parts = {1, 'num'} })
+-------------------------------------------------------------------------------
+-- gh-1185: Crash in matras_touch in snapshot_daemon.test 
+-------------------------------------------------------------------------------
 
-s2 = box.schema.create_space('test2', { engine = 'memtx'})
-i2 = s2:create_index('test', { type = 'tree', parts = {1, 'num'} })
+local s1 = box.schema.create_space('test1', { engine = 'memtx'})
+local i1 = s1:create_index('test', { type = 'tree', parts = {1, 'num'} })
+
+local s2 = box.schema.create_space('test2', { engine = 'memtx'})
+local i2 = s2:create_index('test', { type = 'tree', parts = {1, 'num'} })
 
 for i = 1,1000 do s1:insert{i, i, i} end
 
@@ -89,38 +96,41 @@ s2:update({1}, {{'+', 2, 2}})
 s1:drop()
 s2:drop()
 
-print('gh-1185 test done w/o crash!.')
+test:ok(true, "gh-1185: no crash in matras_touch")
 
+-------------------------------------------------------------------------------
+-- gh-1084: box.snapshot() aborts if the server is out of file descriptors
+-------------------------------------------------------------------------------
 
-ffi.cdef[[
-struct rlimit {unsigned long cur; unsigned long max;};
-int getrlimit(int resource, struct rlimit *rlim);
-]]
+local function gh1094()
+    local msg = "gh-1094: box.snapshot() doesn't abort if out of file descriptors"
+    local nfile
+    local ulimit = io.popen('ulimit -n')
+    if ulimit then
+        nfile = tonumber(ulimit:read())
+        ulimit:close()
+    end
 
-r = ffi.new('struct rlimit')
-
---test for failed snapshot in case of insufficient descriptors
-tap.test("fail on descriptors", function(test)
-    test:plan(1)
-    local r = ffi.new('struct rlimit')
-    ffi.C.getrlimit(7, r)
-    if tonumber(r.cur) > 8192 then
+    if not nfile or nfile > 1024 then
         -- descriptors limit is to high, just skip test
-        test:ok(1 == 1)
-	return
+        test:ok(true, msg)
+        return
     end
     local files = {}
-    
-    for i = 1, tonumber(r.cur) do
+    for i = 1,nfile do
         files[i] = fio.open('/dev/null')
+        if files[i] == nil then
+            break
+        end
     end
     local sf, mf = pcall(box.snapshot)
     for i, f in pairs(files) do
         f:close()
     end
     local ss, ms = pcall(box.snapshot)
-    test:ok(not sf and ss)
-end) 
+    test:ok(not sf and ss, msg)
+end
+gh1094()
 
-
+test:check()
 os.exit(0)
