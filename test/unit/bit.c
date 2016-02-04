@@ -138,7 +138,7 @@ test_index(void)
 {
 	header();
 
-	int indexes[sizeof(int64_t) * CHAR_BIT];
+	int indexes[sizeof(int64_t) * CHAR_BIT + 1];
 
 	for (size_t i = 0; i < sizeof(vals) / sizeof(vals[0]); i++) {
 		uint64_t val64 = vals[i];
