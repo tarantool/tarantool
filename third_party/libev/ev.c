@@ -2263,11 +2263,10 @@ static int evpipe_alloc(EV_P)
   if (fds [1] < 0)
 # endif
     {
-      if (!pipe (fds))
-         fd_intern (fds [0]);
+      if (pipe(fds))
+         return -1;
+      fd_intern (fds [0]);
     }
-  if (fds [1] < 0)
-    return -1;
 
   evpipe [0] = fds [0];
 
