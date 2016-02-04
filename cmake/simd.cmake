@@ -49,7 +49,8 @@ if (ENABLE_SSE2)
         message( SEND_ERROR "SSE2 is enabled, but is not supported by compiler.")
     else()
         add_compile_flags("C;CXX" "-msse2")
-        message(STATUS "SSE2 is enabled - target CPU must support it")
+        find_package_message(SSE2 "SSE2 is enabled - target CPU must supppot it"
+            "${CC_HAS_SSE2_INTRINSICS}")
     endif()
 endif()
 
@@ -58,6 +59,7 @@ if (ENABLE_AVX)
         message(SEND_ERROR "AVX is enabled")
     else()
         add_compile_flags("C;CXX" "-mavx")
-        message(STATUS "AVX is enabled - target CPU must support it")
+        find_package_message(SSE2 "AVX is enabled - target CPU must support it"
+            "${CC_HAS_AVX_INTRINSICS}")
     endif()
 endif()

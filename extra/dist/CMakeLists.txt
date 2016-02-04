@@ -1,3 +1,21 @@
+# config file for tarantoolctl
+if (TARGET_OS_FREEBSD)
+    set(SYSCONFIG_DEFAULT "tarantool/default")
+elseif (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
+    # Debian/Ubuntu/etc.
+    set(SYSCONFIG_DEFAULT "default")
+else()
+    # RedHat/Fedora/etc.
+    set(SYSCONFIG_DEFAULT "sysconfig")
+endif()
+configure_file(tarantoolctl.in tarantoolctl @ONLY)
+
+option(ENABLE_DIST "Enable install of init scripts" OFF)
+
+if (NOT ENABLE_DIST)
+    return ()
+endif()
+
 include(systemd)
 
 #
@@ -21,18 +39,8 @@ set(SYSCONFIG_ENABLEDDIR "tarantool/instances.enabled")
 set(TARANTOOL_AVAILABLEDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}")
 set(TARANTOOL_ENABLEDDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_ENABLEDDIR}")
 
-# config file for tarantoolctl
-if (TARGET_OS_FREEBSD)
-    set(SYSCONFIG_DEFAULT "tarantool/default")
-elseif (NOT IS_DIRECTORY "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig")
-    # Debian/Ubuntu/etc.
-    set(SYSCONFIG_DEFAULT "default")
-else()
-    # RedHat/Fedora/etc.
-    set(SYSCONFIG_DEFAULT "sysconfig")
-endif()
 configure_file(default/tarantool.in default/tarantool @ONLY)
-install (FILES ${PROJECT_BINARY_DIR}/extra/dist/default/tarantool DESTINATION
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/default/tarantool DESTINATION
     ${CMAKE_INSTALL_SYSCONFDIR}/${SYSCONFIG_DEFAULT}/
     PERMISSIONS
     OWNER_READ OWNER_WRITE
@@ -40,7 +48,7 @@ install (FILES ${PROJECT_BINARY_DIR}/extra/dist/default/tarantool DESTINATION
     WORLD_READ)
 
 # tarantoolctl itself
-install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
     PERMISSIONS
     OWNER_READ OWNER_WRITE OWNER_EXECUTE
     GROUP_READ GROUP_EXECUTE
@@ -74,7 +82,7 @@ install(DIRECTORY DESTINATION ${TARANTOOL_RUNDIR})
 if (NOT TARGET_OS_FREEBSD)
 # logrotate files
 configure_file(tarantool.logrotate.in tarantool.logrotate @ONLY)
-install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool.logrotate
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool.logrotate
     DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d/
     RENAME "tarantool"
     PERMISSIONS
@@ -101,14 +109,14 @@ if (WITH_SYSTEMD)
     set(SYSV_INITD_DIR ${CMAKE_INSTALL_PREFIX}/lib/tarantool)
 
     configure_file("tarantool@.service.in" "tarantool@.service" @ONLY)
-    install (FILES ${PROJECT_BINARY_DIR}/extra/dist/tarantool@.service
+    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/tarantool@.service
         DESTINATION ${SYSTEMD_UNIT_DIR}
         PERMISSIONS
         OWNER_READ OWNER_WRITE
         GROUP_READ GROUP_READ
         WORLD_READ WORLD_READ)
     configure_file(tarantool.tmpfiles.conf.in tarantool.tmpfiles.conf @ONLY)
-    install (FILES "${PROJECT_BINARY_DIR}/extra/dist/tarantool.tmpfiles.conf"
+    install (FILES "${CMAKE_CURRENT_BINARY_DIR}/tarantool.tmpfiles.conf"
         DESTINATION "${SYSTEMD_TMPFILES_DIR}"
         RENAME "tarantool.conf"
         PERMISSIONS

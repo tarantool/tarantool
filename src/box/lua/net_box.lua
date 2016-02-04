@@ -646,14 +646,14 @@ local remote_methods = {
 
             self.s = socket.tcp_connect(self.host, self.port)
             if self.s == nil then
-                self:_fatal(errno.strerror(errno()))
+                self:_fatal(errno.strerror())
             else
 
                 -- on_connect
                 self:_switch_state('handshake')
                 local greetingbuf = self.s:read(GREETING_SIZE)
                 if greetingbuf == nil then
-                    self:_fatal(errno.strerror(errno()))
+                    self:_fatal(errno.strerror())
                 elseif #greetingbuf ~= GREETING_SIZE then
                     self:_fatal("Can't read handshake")
                 else
@@ -860,7 +860,7 @@ local remote_methods = {
                         self.rbuf:reserve(advance)
                     end
                 elseif errno_is_transient[errno()] ~= true then
-                    self:_fatal(errno.strerror(errno()))
+                    self:_fatal(errno.strerror())
                 end
             end
         end
@@ -885,7 +885,7 @@ local remote_methods = {
                         while self.s:writable(1) == 0 and self.state ~= 'closed' do
                         end
                     else
-                        self:_fatal(errno.strerror(errno()))
+                        self:_fatal(errno.strerror())
                         break
                     end
                 end

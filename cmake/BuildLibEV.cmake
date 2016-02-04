@@ -57,11 +57,6 @@ macro(libev_build)
     set(LIBEV_INCLUDE_DIR ${PROJECT_BINARY_DIR}/third_party)
     set(LIBEV_LIBRARIES ev)
 
-    message(STATUS "Use bundled libev includes: "
-        "${LIBEV_INCLUDE_DIR}/tarantool_ev.h")
-    message(STATUS "Use bundled libev library: "
-        "${LIBEV_LIBRARIES}")
-
     unset(ev_src)
     unset(ev_compile_flags)
     unset(ev_link_libraries)

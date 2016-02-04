@@ -41,6 +41,7 @@ extern "C" {
 
 #include "box/space.h"
 #include "box/schema.h"
+#include "box/user_def.h"
 #include "box/tuple.h"
 #include "box/txn.h"
 #include "box/vclock.h" /* VCLOCK_MAX */
@@ -313,6 +314,10 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);
 	lua_setfield(L, -2, "SYSTEM_ID_MAX");
+	lua_pushnumber(L, BOX_SYSTEM_USER_ID_MIN);
+	lua_setfield(L, -2, "SYSTEM_USER_ID_MIN");
+	lua_pushnumber(L, BOX_SYSTEM_USER_ID_MAX);
+	lua_setfield(L, -2, "SYSTEM_USER_ID_MAX");
 	lua_pushnumber(L, BOX_INDEX_MAX);
 	lua_setfield(L, -2, "INDEX_MAX");
 	lua_pushnumber(L, BOX_SPACE_MAX);

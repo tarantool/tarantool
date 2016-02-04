@@ -238,9 +238,7 @@ local function find_default_file()
     --
     usermode = false
     local config_list = {
-        '/etc/sysconfig/tarantool',
-        '/etc/default/tarantool',
-        '/usr/local/etc/tarantool/default/tarantool',
+        '@CMAKE_INSTALL_FULL_SYSCONFDIR@/@SYSCONFIG_DEFAULT@/tarantool'
     }
     for _, c in pairs(config_list) do
         if fio.stat(c) then

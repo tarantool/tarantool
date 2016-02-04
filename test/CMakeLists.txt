@@ -1,5 +1,8 @@
 enable_tnt_compile_flags()
 
+include_directories(${LUAJIT_INCLUDE_DIRS})
+include_directories(${MSGPUCK_INCLUDE_DIRS})
+
 function(build_module module files)
     add_library(${module} SHARED ${files})
     set_target_properties(${module} PROPERTIES PREFIX "")

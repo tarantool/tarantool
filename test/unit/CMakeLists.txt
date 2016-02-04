@@ -4,7 +4,6 @@ set_source_files_compile_flags(${all_sources})
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 add_executable(rlist.test rlist.c unit.c)
 add_executable(stailq.test stailq.c unit.c)
@@ -52,7 +51,7 @@ add_executable(xrow.test xrow.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/box/iproto_constants.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc)
-target_link_libraries(xrow.test server misc msgpuck)
+target_link_libraries(xrow.test server misc ${MSGPUCK_LIBRARIES})
 
 add_executable(fiber.test fiber.cc unit.c)
 target_link_libraries(fiber.test core)
@@ -76,18 +75,19 @@ add_executable(coio.test coio.cc unit.c
         ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
 target_link_libraries(coio.test core eio bit)
 
-set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
-add_executable(msgpack.test
-    ${MSGPUCK_DIR}/test/msgpuck.c
-    ${MSGPUCK_DIR}/test/test.c)
+if (ENABLE_BUNDLED_MSGPUCK)
+    set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
+    add_executable(msgpack.test
+        ${MSGPUCK_DIR}/test/msgpuck.c
+        ${MSGPUCK_DIR}/test/test.c)
 
-set_source_files_properties(
-    ${MSGPUCK_DIR}/test/msgpuck.c
-    ${MSGPUCK_DIR}/test/test.c
-    PROPERTIES COMPILE_FLAGS
-    "-I${MSGPUCK_DIR} -I${MSGPUCK_DIR}/test")
+    set_source_files_properties(
+        ${MSGPUCK_DIR}/test/msgpuck.c
+        ${MSGPUCK_DIR}/test/test.c
+        PROPERTIES COMPILE_FLAGS "-I${MSGPUCK_DIR}/test")
 
-target_link_libraries(msgpack.test msgpuck)
+    target_link_libraries(msgpack.test ${MSGPUCK_LIBRARIES})
+endif ()
 
 add_executable(scramble.test scramble.c
     ${CMAKE_SOURCE_DIR}/src/scramble.c

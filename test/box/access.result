@@ -117,14 +117,14 @@ session.su('admin')
 ...
 box.space['_user']:delete{uid}
 ---
-- error: 'Failed to drop user ''rich'': the user has objects'
+- error: 'Failed to drop user or role ''rich'': the user has objects'
 ...
 box.schema.func.drop('dummy')
 ---
 ...
 box.space['_user']:delete{uid}
 ---
-- error: 'Failed to drop user ''rich'': the user has objects'
+- error: 'Failed to drop user or role ''rich'': the user has objects'
 ...
 box.schema.user.revoke('rich', 'read,write', 'universe')
 ---
@@ -682,4 +682,41 @@ box.schema.func.drop('blah', 'blah')
 box.schema.user.passwd('guest', 'sesame')
 ---
 - error: Setting password for guest user has no effect
+...
+-- gh-1205 box.schema.user.info fails
+box.schema.user.drop('guest')
+---
+- error: 'Failed to drop user or role ''guest'': the user or the role is a system'
+...
+box.space._user.index.name:delete{'guest'}
+---
+- error: 'Failed to drop user or role ''guest'': the user or the role is a system'
+...
+#box.schema.user.info('guest') > 0
+---
+- true
+...
+box.schema.user.drop('admin')
+---
+- error: 'Failed to drop user or role ''admin'': the user or the role is a system'
+...
+box.space._user.index.name:delete{'admin'}
+---
+- error: 'Failed to drop user or role ''admin'': the user or the role is a system'
+...
+#box.schema.user.info('admin') > 0
+---
+- true
+...
+box.schema.role.drop('public')
+---
+- error: 'Failed to drop user or role ''public'': the user or the role is a system'
+...
+box.space._user.index.name:delete{'public'}
+---
+- error: 'Failed to drop user or role ''public'': the user or the role is a system'
+...
+#box.schema.role.info('public') > 0
+---
+- true
 ...

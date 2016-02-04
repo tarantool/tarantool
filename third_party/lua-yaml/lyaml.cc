@@ -46,11 +46,13 @@ extern "C" {
 #include "yaml.h"
 #include "b64.h"
 /* Use private header from bundled libyaml for IS_PRINTABLE() macro */
-#include "third_party/libyaml/yaml_private.h"
+#include "third_party/libyaml/src/yaml_private.h"
 } /* extern "C" */
 #include "lua/utils.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
+
+#define OOM_ERRMSG "yaml: out of memory"
 
 #define RETURN_ERRMSG(s, msg) do { \
       lua_pushstring(s->L, msg); \
@@ -342,7 +344,8 @@ static int l_load(lua_State *L) {
    lua_newtable(L);
    loader.anchortable_index = lua_gettop(L);
 
-   yaml_parser_initialize(&loader.parser);
+   if (!yaml_parser_initialize(&loader.parser))
+      luaL_error(L, OOM_ERRMSG);
    yaml_parser_set_input_string(&loader.parser,
       (const unsigned char *)lua_tostring(L, 1), lua_strlen(L, 1));
    load(&loader);
@@ -379,8 +382,10 @@ static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    } else {
       /* this is an aliased element */
       yaml_event_t ev;
-      yaml_alias_event_initialize(&ev, (yaml_char_t *)lua_tostring(dumper->L, -1));
-      yaml_emitter_emit(&dumper->emitter, &ev);
+      const char *str = lua_tostring(dumper->L, -1);
+      if (!yaml_alias_event_initialize(&ev, (yaml_char_t *) str) ||
+          !yaml_emitter_emit(&dumper->emitter, &ev))
+         luaL_error(dumper->L, OOM_ERRMSG);
       lua_pop(dumper->L, 1);
    }
    return (yaml_char_t *)s;
@@ -394,8 +399,9 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
 
    yaml_mapping_style_t yaml_style = (field->compact)
       ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
-   yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0, yaml_style) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+         luaL_error(dumper->L, OOM_ERRMSG);
 
    lua_pushnil(dumper->L);
    while (lua_next(dumper->L, -2)) {
@@ -408,8 +414,10 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       lua_pop(dumper->L, 1);
    }
 
-   yaml_mapping_end_event_initialize(&ev);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_mapping_end_event_initialize(&ev) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
+
    return 1;
 }
 
@@ -423,8 +431,9 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
 
    yaml_sequence_style_t yaml_style = (field->compact)
       ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
-   yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
 
    for (i = 0; i < field->size; i++) {
       lua_rawgeti(dumper->L, -1, i + 1);
@@ -433,207 +442,70 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       lua_pop(dumper->L, 1);
    }
 
-   yaml_sequence_end_event_initialize(&ev);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_sequence_end_event_initialize(&ev) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
 
    return 1;
 }
 
-static int dump_null(struct lua_yaml_dumper *dumper) {
-   yaml_event_t ev;
-   yaml_scalar_event_initialize(&ev, NULL, NULL,
-      (unsigned char *)"null", 4, 1, 1, YAML_PLAIN_SCALAR_STYLE);
-   return yaml_emitter_emit(&dumper->emitter, &ev);
+/* Stolen from libyaml */
+static int
+yaml_check_utf8(const yaml_char_t *start, size_t length)
+{
+    const yaml_char_t *end = start+length;
+    const yaml_char_t *pointer = start;
+
+    while (pointer < end) {
+        unsigned char octet;
+        unsigned int width;
+        unsigned int value;
+        size_t k;
+
+        octet = pointer[0];
+        width = (octet & 0x80) == 0x00 ? 1 :
+                (octet & 0xE0) == 0xC0 ? 2 :
+                (octet & 0xF0) == 0xE0 ? 3 :
+                (octet & 0xF8) == 0xF0 ? 4 : 0;
+        value = (octet & 0x80) == 0x00 ? octet & 0x7F :
+                (octet & 0xE0) == 0xC0 ? octet & 0x1F :
+                (octet & 0xF0) == 0xE0 ? octet & 0x0F :
+                (octet & 0xF8) == 0xF0 ? octet & 0x07 : 0;
+        if (!width) return 0;
+        if (pointer+width > end) return 0;
+        for (k = 1; k < width; k ++) {
+            octet = pointer[k];
+            if ((octet & 0xC0) != 0x80) return 0;
+            value = (value << 6) + (octet & 0x3F);
+        }
+        if (!((width == 1) ||
+            (width == 2 && value >= 0x80) ||
+            (width == 3 && value >= 0x800) ||
+            (width == 4 && value >= 0x10000))) return 0;
+
+        /* gh-354: yaml incorrectly escapes special characters in a string */
+        yaml_string_t ys; ys.pointer = (yaml_char_t *)pointer;
+        if (*pointer > 0x7F && !IS_PRINTABLE(ys))
+           return 0;
+
+        pointer += width;
+    }
+
+    return 1;
 }
 
-static yaml_scalar_style_t analyze_string(struct lua_yaml_dumper *dumper,
-      const char *str, size_t len, int *is_binary)
-{
-   *is_binary = 0;
-
-   /**
-    * This function ported from PyYAML implementation.
-    * PyYAML has same authors and licence as LibYAML. See License.LibYaml
-    * https://bitbucket.org/xi/pyyaml/src/ddf211a41bb231c365fece5599b7e484e6dc33fc/lib/yaml/emitter.py?at=default#cl-629
-    */
-
+static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
    /*
-    * Fast checks
+    * Tarantool-specific: always quote strings in FLOW SEQUENCE
+    * Flow: [1, 'a', 'testing']
+    * Block:
+    * - 1
+    * - a
+    * - testing
     */
-   /* Display empty scalar as plain */
-   if (len == 0)
-      return YAML_PLAIN_SCALAR_STYLE;
 
-   /* Special string values */
-   if (len <= 5 && (!strcmp(str, "true")
-            || !strcmp(str, "false")
-            || !strcmp(str, "~")
-            || !strcmp(str, "null"))) {
-      return YAML_SINGLE_QUOTED_SCALAR_STYLE;
-   }
-
-   /* Check document indicators. */
-   if (len >= 3 && (memcmp(str, "---", 3) == 0 || memcmp(str, "...", 3) == 0))
-      return YAML_LITERAL_SCALAR_STYLE;
-
-   /* Allowed styles */
-   bool allowPlain = true;
-   bool allowSingleQuoted = true;
-
-   /* Indicators and special characters. */
-   bool blockIndicators = false;
-   bool flowIndicators = false;
-   bool lineBreaks = false;
-   bool specialCharacters = false;
-
-   /* Important whitespace combinations. */
-   bool leadingSpace = false;
-   bool leadingBreak = false;
-   bool trailingSpace = false;
-   bool trailingBreak = false;
-   bool breakSpace = false;
-   bool spaceBreak = false;
-   bool emptyLines = false;
-   bool previousSpace = false;
-   bool previousBreak = false;
-
-   const unsigned char *s = (const unsigned char *) str;
-   const unsigned char *p = s;
-   const unsigned char *e = s + len;
-   while (p < e) {
-      if (*p > 0x7F) {
-         /* UTF-8 */
-
-         int continuation_bytes = 0;
-         if (*p >= 0xC0 && *p <= 0xDF) {
-            continuation_bytes = 1;
-         } else if (*p >= 0xE0 && *p <= 0xEF /*11101111*/) {
-            continuation_bytes = 2;
-         } else if (*p >= 0xF0 && *p <= 0xF4) {
-            continuation_bytes = 3;
-         } else {
-            /* Invalid UTF-8 */
-            *is_binary = 1;
-            return YAML_PLAIN_SCALAR_STYLE;
-         }
-
-         /* Truncated UTF-8 sequence? */
-         if (p + continuation_bytes >= e) {
-            *is_binary = 1;
-            return YAML_PLAIN_SCALAR_STYLE;
-         }
-
-         /*
-          * Valid non-printable UTF-8? Encode as binary since otherwise
-          * the conversion may be lossy, ex: '\xc2\x80' -> '\x80'.
-          */
-         yaml_string_t ys; ys.pointer = (yaml_char_t *)p;
-         if (!IS_PRINTABLE(ys)) {
-            *is_binary = 1;
-            return YAML_PLAIN_SCALAR_STYLE;
-         }
-
-         ++p;
-         while (continuation_bytes > 0 && *p >= 0x80 && *p <= 0xBF) {
-            ++p;
-            continuation_bytes -= 1;
-         }
-         if (continuation_bytes != 0) {
-            /* Invalid UTF-8 */
-            *is_binary = 1;
-            return YAML_PLAIN_SCALAR_STYLE;
-         } else {
-            continue;
-         }
-      }
-
-      /* ASCII */
-
-      bool preceededByWhitespace = (p > s) &&
-            strchr(" \t\r\n\x85", *(p - 1)) != NULL;
-      bool followedByWhitespace = (p + 1 >= s + len) ||
-            strchr(" \t\r\n\x85", *(p + 1)) != NULL;
-
-      /* Check for line breaks and special characters */
-      bool isLineBreak = false;
-      if (*p == '\n' || *p == 0x85) {
-         lineBreaks = isLineBreak = true;
-      } else if (*p < 0x20) {
-         specialCharacters = true;
-      }
-
-      /* Check for indicators. */
-      if (p == s) {
-         /* Leading indicators are special characters. */
-         if (strchr("#,[]{}&*!|>\'\"%@`", *p) != NULL) {
-            flowIndicators = true;
-            blockIndicators = true;
-         }
-         if (*p == '?' || *p == ':') {
-            flowIndicators = true;
-            if (followedByWhitespace)
-               blockIndicators = true;
-         }
-         if (*p == '-' && followedByWhitespace) {
-            flowIndicators = true;
-            blockIndicators = true;
-         }
-      } else {
-         if (isLineBreak && *(p - 1) == '\n')
-            emptyLines = true;
-         /* Some indicators cannot appear within a scalar as well. */
-          if (strchr(",?[]{}", *p) != NULL) {
-              flowIndicators = true;
-          }
-          if (*p == ':') {
-              flowIndicators = true;
-              if (followedByWhitespace) {
-                  blockIndicators = true;
-              }
-          }
-          if (*p == '#' && preceededByWhitespace) {
-              flowIndicators = true;
-              blockIndicators = true;
-          }
-      }
-
-      /* Detect important whitespace combinations. */
-      if (*p == ' ') {
-          if (p == s)
-              leadingSpace = true;
-          if (p == s + len - 1)
-              trailingSpace = true;
-          if (previousBreak)
-              breakSpace = true;
-          previousSpace = true;
-          previousBreak = false;
-      } else if (isLineBreak) {
-          if (p == s)
-              leadingBreak = true;
-          if (p == s + len - 1)
-              trailingBreak = true;
-          if (previousSpace)
-              spaceBreak = true;
-          previousSpace = false;
-          previousBreak = true;
-      } else {
-          previousSpace = false;
-          previousBreak = false;
-      }
-
-      ++p;
-   }
-
-   /*
-    * Tarantool-specific: use literal style for string with empty lines.
-    * Useful for tutorial().
-    */
-   if (emptyLines)
-      return YAML_LITERAL_SCALAR_STYLE;
-
-   bool flowMode = false;
    if (dumper->emitter.flow_level > 0) {
-      flowMode = true;
+      return 1;
    } else {
       yaml_event_t *evp;
       for (evp = dumper->emitter.events.head;
@@ -642,68 +514,20 @@ static yaml_scalar_style_t analyze_string(struct lua_yaml_dumper *dumper,
                   evp->data.sequence_start.style == YAML_FLOW_SEQUENCE_STYLE) ||
                (evp->type == YAML_MAPPING_START_EVENT &&
                 evp->data.mapping_start.style == YAML_FLOW_MAPPING_STYLE)) {
-            flowMode = true;
+            return 1;
             break;
          }
       }
    }
-
-   /*  Let's decide what styles are allowed. */
-
-   /*
-    * Spaces followed by breaks, as well as special character are only
-    * allowed for double quoted scalars.
-    */
-   if (spaceBreak || specialCharacters)
-      return YAML_DOUBLE_QUOTED_SCALAR_STYLE;
-
-   /*
-    * Spaces at the beginning of a new line are only acceptable for block
-    * scalars
-    */
-   if (breakSpace)
-      allowPlain = allowSingleQuoted = false;
-
-   /* Leading and trailing whitespaces are bad for plain scalars. */
-   if (leadingSpace || leadingBreak || trailingSpace || trailingBreak)
-      allowPlain = false;
-
-   if (flowMode) {
-      //if (flowMode && flowIndicators)
-      //   allowPlain = false;
-      /*
-       * Tarantool-specific: always quote strings in FLOW SEQUENCE
-       * Flow: [1, 'a', 'testing']
-       * Block:
-       * - 1
-       * - a
-       * - testing
-       */
-      allowPlain = false;
-   } else /* blockMode */ {
-       /* Block indicators are forbidden for block plain scalars. */
-      if (blockIndicators)
-         allowPlain = false;
-   }
-
-   if (allowPlain)
-      return YAML_PLAIN_SCALAR_STYLE;
-   else if (allowSingleQuoted)
-      return YAML_SINGLE_QUOTED_SCALAR_STYLE;
-   return YAML_DOUBLE_QUOTED_SCALAR_STYLE;
-
-   /* TODO: Probably causes https://github.com/tarantool/tarantool/issues/354 */
-   (void) flowIndicators;
-   (void) lineBreaks;
+   return 0;
 }
 
 static int dump_node(struct lua_yaml_dumper *dumper)
 {
-   size_t len;
-   const char *str = NULL;
+   size_t len = 0;
+   const char *str = "";
    yaml_char_t *tag = NULL;
    yaml_event_t ev;
-   //yaml_event_t *evp;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
    int is_binary = 0;
    char buf[FPCONV_G_FMT_BUFSIZE];
@@ -745,9 +569,19 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
          break;
       }
-      style = analyze_string(dumper, str, len, &is_binary);
-      if (!is_binary)
-            break;
+      style = YAML_ANY_SCALAR_STYLE; // analyze_string(dumper, str, len, &is_binary);
+      if (yaml_check_utf8((const yaml_char_t *) str, len)) {
+         if (yaml_is_flow_mode(dumper)) {
+            style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+         } else if (strstr(str, "\n\n") != NULL) {
+            /*
+             * Tarantool-specific: use literal style for string with empty lines.
+             * Useful for tutorial().
+             */
+            style = YAML_LITERAL_SCALAR_STYLE;
+         }
+         break;
+      }
       /* Fall through */
    case MP_BIN:
       is_binary = 1;
@@ -765,31 +599,39 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       }
       break;
    case MP_NIL:
-      return dump_null(dumper);
+      style = YAML_PLAIN_SCALAR_STYLE;
+      str = "null";
+      len = 4;
+      break;
    case MP_EXT:
-      assert(false);
+      assert(0); /* checked by luaL_checkfield() */
       break;
     }
 
-   yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
-                                !is_binary, !is_binary, style);
+   if (!yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
+                                     !is_binary, !is_binary, style) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
+
    if (is_binary)
       lua_pop(dumper->L, 1);
 
-   return yaml_emitter_emit(&dumper->emitter, &ev);
+   return 1;
 }
 
 static void dump_document(struct lua_yaml_dumper *dumper) {
    yaml_event_t ev;
 
-   yaml_document_start_event_initialize(&ev, NULL, NULL, NULL, 0);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_document_start_event_initialize(&ev, NULL, NULL, NULL, 0) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
 
    if (!dump_node(dumper) || dumper->error)
       return;
 
-   yaml_document_end_event_initialize(&ev, 0);
-   yaml_emitter_emit(&dumper->emitter, &ev);
+   if (!yaml_document_end_event_initialize(&ev, 0) ||
+       !yaml_emitter_emit(&dumper->emitter, &ev))
+      luaL_error(dumper->L, OOM_ERRMSG);
 }
 
 static int append_output(void *arg, unsigned char *buf, size_t len) {
@@ -839,15 +681,18 @@ static int l_dump(lua_State *L) {
    dumper.outputL = lua_newthread(L);
    luaL_buffinit(dumper.outputL, &dumper.yamlbuf);
 
-   yaml_emitter_initialize(&dumper.emitter);
+   if (!yaml_emitter_initialize(&dumper.emitter))
+      luaL_error(L, OOM_ERRMSG);
+
    yaml_emitter_set_unicode(&dumper.emitter, 1);
    yaml_emitter_set_indent(&dumper.emitter, 2);
    yaml_emitter_set_width(&dumper.emitter, 2);
    yaml_emitter_set_break(&dumper.emitter, YAML_LN_BREAK);
    yaml_emitter_set_output(&dumper.emitter, &append_output, &dumper);
 
-   yaml_stream_start_event_initialize(&ev, YAML_UTF8_ENCODING);
-   yaml_emitter_emit(&dumper.emitter, &ev);
+   if (!yaml_stream_start_event_initialize(&ev, YAML_UTF8_ENCODING) ||
+       !yaml_emitter_emit(&dumper.emitter, &ev))
+      luaL_error(L, OOM_ERRMSG);
 
    for (i = 0; i < argcount; i++) {
       lua_newtable(L);
@@ -861,10 +706,11 @@ static int l_dump(lua_State *L) {
       lua_pop(L, 2); /* pop copied arg and anchor table */
    }
 
-   yaml_stream_end_event_initialize(&ev);
-   yaml_emitter_emit(&dumper.emitter, &ev);
+   if (!yaml_stream_end_event_initialize(&ev) ||
+       !yaml_emitter_emit(&dumper.emitter, &ev) ||
+       !yaml_emitter_flush(&dumper.emitter))
+      luaL_error(L, OOM_ERRMSG);
 
-   yaml_emitter_flush(&dumper.emitter);
    yaml_emitter_delete(&dumper.emitter);
 
    /* finalize and push YAML buffer */

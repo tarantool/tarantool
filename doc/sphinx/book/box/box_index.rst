@@ -30,8 +30,6 @@ API is a direct binding to corresponding methods of index objects of type
 
         * :samp:`{index_object}` = an :ref:`object reference <object-reference>`.
 
-        :rtype: 
-
     .. data:: parts
 
         An array describing index key fields.
@@ -95,9 +93,9 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type, Number of tuples accessed.
 
-        A search-value can be a number (for example :codenormal:`1234`), a string
-        (for example :codenormal:`'abcd'`),
-        or a table of numbers and strings (for example :codenormal:`{1234,'abcd'}`).
+        A search-value can be a number (for example ``1234``), a string
+        (for example ``'abcd'``),
+        or a table of numbers and strings (for example ``{1234, 'abcd'}``).
         Each part of a search-value will be compared to each part of an index key.
 
         .. container:: table
@@ -481,7 +479,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: sophia does not support :codenormal:`min()`.
+        Note re storage engine: sophia does not support ``min()``.
 
         **Example:**
 
@@ -512,7 +510,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: sophia does not support :codenormal:`max()`.
+        Note re storage engine: sophia does not support ``max()``.
 
         **Example:**
 
@@ -541,7 +539,7 @@ API is a direct binding to corresponding methods of index objects of type
 
         Complexity Factors: Index size, Index type.
 
-        Note re storage engine: sophia does not support :codenormal:`random()`.
+        Note re storage engine: sophia does not support ``random()``.
 
         **Example:**
 
@@ -571,7 +569,7 @@ API is a direct binding to corresponding methods of index objects of type
                 is only applicable for the memtx storage engine.
         :rtype:  number
 
-        Note re storage engine: sophia does not support :codenormal:`count()`.
+        Note re storage engine: sophia does not support ``count()``.
 
         **Example:**
 
@@ -640,7 +638,7 @@ API is a direct binding to corresponding methods of index objects of type
         the first index cannot be changed to {unique = false}, or
         the alter function is only applicable for the memtx storage engine.
 
-        Note re storage engine: sophia does not support :codenormal:`alter()`.
+        Note re storage engine: sophia does not support ``alter()``.
 
         **Example:**
 

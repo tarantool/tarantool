@@ -33,7 +33,7 @@
 #include "trivia/util.h"
 #include "small/rlist.h"
 #include "error.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 #define RB_COMPACT 1
 #include "third_party/rb.h"
 #include <limits.h>

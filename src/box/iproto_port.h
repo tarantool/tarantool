@@ -53,7 +53,7 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 #include "port.h"
 #include "tuple.h"
 #include "iobuf.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 
 /**
  * struct iproto_port users need to be careful to:

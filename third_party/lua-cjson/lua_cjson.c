@@ -236,7 +236,7 @@ static void json_append_string(struct luaL_serializer *cfg, strbuf_t *json,
 {
     (void) cfg;
     const char *escstr;
-    int i;
+    size_t i;
 
     /* Worst case is len * 6 (all unicode escapes).
      * This buffer is reused constantly for small strings

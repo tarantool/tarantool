@@ -50,8 +50,9 @@ Group: Applications/Databases
 Summary: In-memory database and Lua application server
 License: BSD
 
-Provides: tarantool-debuginfo
-Requires: tarantool-common
+Provides: tarantool-debuginfo = %{version}-%{release}
+Provides: tarantool-common = %{version}-%{release}
+Obsoletes: tarantool-common < 1.6.8.434-1
 URL: http://tarantool.org
 Source0: tarantool-%{version}.tar.gz
 %description
@@ -59,7 +60,7 @@ Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
 stored procedures in Lua.
 
-This package provides the server daemon.
+This package provides the server daemon and admin tools.
 
 %package devel
 Summary: Server development files for %{name}
@@ -73,33 +74,13 @@ stored procedures in Lua.
 This package provides server development files needed to create
 C and Lua/C modules.
 
-%package common
-Summary: Common files and admin tools for %{name}
-Group: Applications/Databases
-BuildArch: noarch
-Requires: tarantool = %{version}-%{release}
-%description common
-Tarantool is a high performance in-memory NoSQL database and Lua
-application server. Tarantool supports replication, online backup and
-stored procedures in Lua.
-
-This package provides common files, admin tools and init scripts.
-
 %prep
 %setup -q -n %{name}-%{version}
 
 %build
-# GNUInstallDirs doesn't work properly with %%cmake macro.
+# RHBZ #1301720: SYSCONFDIR an LOCALSTATEDIR must be specified explicitly
 %cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-         -DCMAKE_INSTALL_BINDIR:PATH=%{_bindir} \
-         -DCMAKE_INSTALL_SBINDIR:PATH=%{_sbindir} \
-         -DCMAKE_INSTALL_LIBDIR:PATH=%{_libdir} \
-         -DCMAKE_INSTALL_LIBEXECDIR:PATH=%{_libexecdir} \
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
-         -DCMAKE_INSTALL_SHAREDSTATEDIR:PATH=%{_sharedstatedir} \
-         -DCMAKE_INSTALL_INCLUDEDIR:PATH=%{_includedir} \
-         -DCMAKE_INSTALL_INFODIR:PATH=%{_infodir} \
-         -DCMAKE_INSTALL_MANDIR:PATH=%{_mandir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
          -DENABLE_BACKTRACE:BOOL=ON \
@@ -126,7 +107,7 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
 %endif
 
-%post common
+%post
 %if %{with systemd}
 %tmpfiles_create tarantool.conf
 %systemd_post tarantool@.service
@@ -135,7 +116,7 @@ chkconfig --add tarantool || :
 service tarantool start || :
 %endif
 
-%preun common
+%preun
 %if %{with systemd}
 %systemd_preun tarantool@.service
 %else
@@ -143,7 +124,7 @@ service tarantool stop
 chkconfig --del tarantool
 %endif
 
-%postun common
+%postun
 %if %{with systemd}
 %systemd_postun_with_restart tarantool@.service
 %endif
@@ -155,17 +136,6 @@ chkconfig --del tarantool
 %{!?_licensedir:%global license %doc}
 %license LICENSE AUTHORS
 
-%files devel
-%dir %{_includedir}/tarantool
-%{_includedir}/tarantool/lauxlib.h
-%{_includedir}/tarantool/luaconf.h
-%{_includedir}/tarantool/lua.h
-%{_includedir}/tarantool/lua.hpp
-%{_includedir}/tarantool/luajit.h
-%{_includedir}/tarantool/lualib.h
-%{_includedir}/tarantool/module.h
-
-%files common
 %{_bindir}/tarantoolctl
 %{_mandir}/man1/tarantoolctl.1*
 %config(noreplace) %{_sysconfdir}/sysconfig/tarantool
@@ -187,7 +157,19 @@ chkconfig --del tarantool
 %attr(-,tarantool,tarantool) %dir %{_localstatedir}/run/tarantool/
 %endif
 
+%files devel
+%dir %{_includedir}/tarantool
+%{_includedir}/tarantool/lauxlib.h
+%{_includedir}/tarantool/luaconf.h
+%{_includedir}/tarantool/lua.h
+%{_includedir}/tarantool/lua.hpp
+%{_includedir}/tarantool/luajit.h
+%{_includedir}/tarantool/lualib.h
+%{_includedir}/tarantool/module.h
+
 %changelog
+* Wed Feb 03 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.433-1
+- Obsolete tarantool-common package
 * Thu Jan 21 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.376-1
 - Implement proper support of multi-instance management using systemd
 * Sat Jan 9 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.0-1

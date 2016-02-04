@@ -33,11 +33,11 @@
 #include <stdio.h>
 
 #include "third_party/queue.h"
-
-#include "salad/rope.h"
-#include "error.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 #include "bit/int96.h"
+#include "salad/rope.h"
+
+#include "error.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each

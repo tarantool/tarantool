@@ -16,6 +16,7 @@ include(CheckCXXSourceCompiles)
 include(TestBigEndian)
 include(CheckFunctionExists)
 include(FindOptionalPackage)
+include(FindPackageMessage)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
@@ -52,14 +53,9 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
-include(cmake/FindReadline.cmake)
 include(cmake/FindSphinx.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
-
-if (NOT READLINE_FOUND)
-    message(FATAL_ERROR "readline library not found.")
-endif()
 
 option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
 
@@ -176,7 +172,9 @@ set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_MINOR}")
 set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_PATCH}")
 set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_COMMIT}")
 
-message(STATUS "Tarantool version is ${TARANTOOL_VERSION} (${PACKAGE_VERSION})")
+find_package_message(TARANTOOL_VERSION
+    "Tarantool version is ${TARANTOOL_VERSION} (${PACKAGE_VERSION})"
+    "${PACKAGE_VERSION}")
 
 #
 # Specify where to look for include files.
@@ -195,29 +193,57 @@ set(MODULE_SUFFIX "tarantool")
 set(MODULE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${MODULE_SUFFIX}")
 set(MODULE_LUADIR "${CMAKE_INSTALL_DATADIR}/${MODULE_SUFFIX}")
 set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LUADIR "${CMAKE_INSTALL_FULL_DATADIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${MODULE_SUFFIX}")
 
+include(cmake/multilib.cmake)
+
+set(_datadirs)
+list(APPEND _datadirs "/usr/local/share") # LuaRocks
+list(APPEND _datadirs "${CMAKE_INSTALL_FULL_DATADIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _datadirs "/usr/${MULTILIB}/lua/luarocks/share")
+endif()
+list(APPEND _datadirs "/usr/share") # System packages
+list(REMOVE_DUPLICATES _datadirs)
+set(MODULE_LUAPATH)
 foreach(dir
-        LIBDIR
-        LUADIR
-        INCLUDEDIR
-        )
-    if(NOT IS_ABSOLUTE ${MODULE_${dir}})
-        set(MODULE_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${MODULE_${dir}}")
-    else()
-        set(MODULE_FULL_${dir} "${MODULE_${dir}}")
-    endif()
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _datadirs)
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?.lua")
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?/init.lua")
+    endforeach()
 endforeach()
 
-message(STATUS "Module sources:   ${MODULE_FULL_LUADIR}")
-message(STATUS "Module libraries: ${MODULE_FULL_LIBDIR}")
-message(STATUS "Module includes:  ${MODULE_FULL_INCLUDEDIR}")
+set(_libdirs)
+list(APPEND _libdirs "/usr/local/${MULTILIB}") # LuaRocks
+list(APPEND _libdirs "${CMAKE_INSTALL_FULL_LIBDIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/debian_version")
+    # gh-1085: LuaRocks on Debian uses lib instead of lib/x86_64-linux-gnu/
+    list(APPEND _libdirs "/usr/local/lib") # LuaRocks on Debian
+endif()
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
+endif()
+list(APPEND _libdirs "/usr/${MULTILIB}") # System packages
+list(REMOVE_DUPLICATES _libdirs)
+set(MODULE_LIBPATH)
+foreach(dir
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _libdirs)
+        list(APPEND MODULE_LIBPATH "${prefix}/${dir}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+    endforeach()
+endforeach()
 
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
-list(APPEND MODULE_LIBPATH "${MODULE_FULL_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
-
-message(STATUS "Module package.path: ${MODULE_LUAPATH}")
-message(STATUS "Module package.cpath: ${MODULE_LIBPATH}")
+find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
+    "${MODULE_LUAPATH}")
+find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
+    "${MODULE_LIBPATH}")
 
 #
 # Now handle all configuration options.
@@ -265,21 +291,25 @@ endif()
 add_custom_target(build_bundled_libs)
 
 #
-# LibLUAJIT
+# ReadLine
 #
-include(luajit)
 
+set(Readline_FIND_REQUIRED ON)
+find_package(Readline)
+
+#
+# LuaJIT
+#
+# Patched.
+#
+set(ENABLE_BUNDLED_LUAJIT ON)
+include(luajit)
 
 #
 # LibEV
 #
-
+# Patched.
 #
-# Currently our code uses libev with #define EV_MULTIPLICITY 0.
-# This option means that libev has a global variable with
-# struct ev_loop data.
-# Such design is not compatible with the dynamic version of libev
-# provided by distros.
 set(ENABLE_BUNDLED_LIBEV ON)
 include(BuildLibEV)
 libev_build()
@@ -288,8 +318,10 @@ add_dependencies(build_bundled_libs ev)
 #
 # LibEIO
 #
-option(ENABLE_BUNDLED_LIBEIO "Enable building of the bundled libeio" ON)
-
+# Patched.
+#
+#option(ENABLE_BUNDLED_LIBEIO "Enable building of the bundled libeio" ON)
+set(ENABLE_BUNDLED_LIBEIO ON)
 if (ENABLE_BUNDLED_LIBEIO)
     include(BuildLibEIO)
     libeio_build()
@@ -298,7 +330,6 @@ else()
     set(LIBEIO_FIND_REQUIRED ON)
     find_package(LibEIO)
 endif()
-
 
 #
 # LibCORO
@@ -316,15 +347,6 @@ include(BuildLibCORO)
 libcoro_build()
 add_dependencies(build_bundled_libs coro)
 
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
-    add_definitions("-DCORO_ASM")
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
-    add_definitions("-DCORO_ASM")
-else()
-    add_definitions("-DCORO_SJLJ")
-endif()
-
-
 #
 # LibGOPT
 #
@@ -334,12 +356,21 @@ libgopt_build()
 add_dependencies(build_bundled_libs gopt)
 
 #
-# LibCJSON
+# MsgPuck
 #
 
-include(BuildLibCJSON)
-libcjson_build()
-add_dependencies(build_bundled_libs cjson)
+option(ENABLE_BUNDLED_MSGPUCK "Enable building of the bundled MsgPuck" ON)
+if (ENABLE_BUNDLED_MSGPUCK)
+    add_library(msgpuck STATIC src/lib/msgpuck/msgpuck.c)
+    set(MSGPUCK_LIBRARIES msgpuck)
+    set(MSGPUCK_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/msgpuck)
+    find_package_message(MsgPuck
+        "Using bundled MsgPuck"
+       "${MSGPUCK_LIBRARIES}:${MSGPUCK_INCLUDE_DIRS}")
+else()
+    set(MsgPuck_FIND_REQUIRED ON)
+    find_package(MsgPuck)
+endif()
 
 #
 # LibYAML
@@ -362,6 +393,10 @@ endif()
 include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
+
+#
+# Sophia
+#
 
 include(BuildSophia)
 sophia_build()
@@ -402,34 +437,23 @@ configure_file(
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
     )
 message (STATUS "")
-message (STATUS "Tarantool configuration is complete:")
-message (STATUS "")
-message (STATUS "VERSION: ${TARANTOOL_VERSION}")
-message (STATUS "BUILD: ${TARANTOOL_BUILD}")
-message (STATUS "C_COMPILER: ${TARANTOOL_C_COMPILER}")
-message (STATUS "CXX_COMPILER: ${TARANTOOL_CXX_COMPILER}")
-message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
-message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
-message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
-message (STATUS "MODULE_DIR: ${MODULE_DIR}")
-message (STATUS "ENABLE_SSE2: ${ENABLE_SSE2}")
-message (STATUS "ENABLE_AVX: ${ENABLE_AVX}")
-message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
-message (STATUS "ENABLE_GPROF: ${ENABLE_GPROF}")
-message (STATUS "ENABLE_VALGRIND: ${ENABLE_VALGRIND}")
-message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
-message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
-message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
-message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
-message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
-message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
-message (STATUS "ENABLE_BUNDLED_LIBYAML: ${ENABLE_BUNDLED_LIBYAML}")
-message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
-message (STATUS "ENABLE_DIST: ${ENABLE_DIST}")
+
+set(PREFIX ${CMAKE_INSTALL_PREFIX})
+set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
+    ENABLE_SSE2 ENABLE_AVX
+    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_TRACE
+    ENABLE_BACKTRACE
+    ENABLE_DOC
+    ENABLE_DIST
+    ENABLE_BUNDLED_LIBYAML
+    ENABLE_BUNDLED_MSGPUCK)
+foreach(option IN LISTS options)
+    if (NOT DEFINED ${option})
+        set(value "${TARANTOOL_${option}}")
+    else ()
+        set(value "${${option}}")
+    endif ()
+    find_package_message("${option}" "${option}: ${value}" "${value}")
+endforeach(option)
 list_optional_packages()
-if (TARGET_OS_DARWIN)
-    message (STATUS "DARWIN_BUILD_TYPE: ${DARWIN_BUILD_TYPE}")
-endif()
-message (STATUS "")
-message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")

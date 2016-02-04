@@ -359,7 +359,7 @@ box.space._user:select(1)
 ...
 box.space._user:delete(testuser_uid)
 ---
-- error: 'Failed to drop user ''testuser'': the user has objects'
+- error: 'Failed to drop user or role ''testuser'': the user has objects'
 ...
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 ---

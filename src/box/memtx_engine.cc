@@ -37,7 +37,7 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 #include "small/rlist.h"
 #include "request.h"
 #include "box.h"

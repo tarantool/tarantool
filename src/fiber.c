@@ -619,8 +619,6 @@ cord_init(const char *name)
 
 	cord->id = pthread_self();
 	cord->on_exit = NULL;
-	cord->loop = cord->id == main_thread_id ?
-		ev_default_loop(EVFLAG_AUTO) : ev_loop_new(EVFLAG_AUTO);
 	slab_cache_create(&cord->slabc, &runtime);
 	mempool_create(&cord->fiber_pool, &cord->slabc,
 		       sizeof(struct fiber));
@@ -651,7 +649,8 @@ static void
 cord_destroy(struct cord *cord)
 {
 	slab_cache_set_thread(&cord->slabc);
-	ev_async_stop(cord->loop, &cord->wakeup_event);
+	if (cord->loop)
+		ev_loop_destroy(cord->loop);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
 		fiber_destroy_all(cord);
@@ -660,7 +659,6 @@ cord_destroy(struct cord *cord)
 	region_destroy(&cord->sched.gc);
 	diag_destroy(&cord->sched.diag);
 	slab_cache_destroy(&cord->slabc);
-	ev_loop_destroy(cord->loop);
 }
 
 struct cord_thread_arg
@@ -720,12 +718,20 @@ cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 	tt_pthread_mutex_lock(&ct_arg.start_mutex);
+	if (!(cord->loop = ev_loop_new(EVFLAG_AUTO | EVFLAG_ALLOCFD)))
+		goto end;
 	if (tt_pthread_create(&cord->id, NULL, cord_thread_func, &ct_arg))
 		goto end;
 	res = 0;
 	while (! ct_arg.is_started)
 		tt_pthread_cond_wait(&ct_arg.start_cond, &ct_arg.start_mutex);
 end:
+	if (res != 0) {
+		if (cord->loop) {
+			ev_loop_destroy(cord->loop);
+			cord->loop = NULL;
+		}
+	}
 	tt_pthread_mutex_unlock(&ct_arg.start_mutex);
 	tt_pthread_mutex_destroy(&ct_arg.start_mutex);
 	tt_pthread_cond_destroy(&ct_arg.start_cond);
@@ -934,6 +940,7 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
 	cord() = &main_cord;
+	cord()->loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
 	cord_init("main");
 }
 

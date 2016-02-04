@@ -30,6 +30,8 @@
  */
 #include "applier.h"
 
+#include <msgpuck.h>
+
 #include "xlog.h"
 #include "fiber.h"
 #include "scoped_guard.h"
@@ -37,7 +39,6 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "xrow.h"
-#include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
 #include "version.h"

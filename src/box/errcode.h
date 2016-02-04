@@ -97,7 +97,7 @@ struct errcode_record {
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found by get()") \
 	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		2, "Failed to create user '%s': %s") \
-	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user '%s': %s") \
+	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		2, "User '%s' is not found") \
 	/* 46 */_(ER_USER_EXISTS,		2, "User '%s' already exists") \
 	/* 47 */_(ER_PASSWORD_MISMATCH,		2, "Incorrect password supplied for user '%s'") \

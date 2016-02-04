@@ -34,18 +34,20 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "iproto_port.h"
+#include <msgpuck.h>
+#include "third_party/base64.h"
+
 #include "main.h"
 #include "fiber.h"
 #include "cbus.h"
 #include "say.h"
 #include "evio.h"
+#include "coio.h"
 #include "scoped_guard.h"
 #include "memory.h"
-#include "msgpuck/msgpuck.h"
+
+#include "iproto_port.h"
 #include "session.h"
-#include "third_party/base64.h"
-#include "coio.h"
 #include "xrow.h"
 #include "schema.h" /* sc_version */
 #include "recovery.h" /* server_uuid */

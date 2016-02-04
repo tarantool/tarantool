@@ -9,17 +9,30 @@ reloading configuration, taking snapshots, log rotation.
                         Server signal handling
 =====================================================================
 
-The server processes these signals during the main thread event loop: |br|
-SIGHUP: may cause log file rotation, see :ref:`the example in section "Logging" <logging_example>`. |br|
-SIGUSR1: may cause saving of a snapshot, see the description of :func:`box.snapshot`. |br|
-SIGTERM: may cause graceful shutdown (information will be saved first). |br|
-SIGINT also known as keyboard interrupt: may cause graceful shutdown. |br|
-SIGKILL: causes shutdown. |br|
+The server processes these signals during the main thread event loop:
 
-Other signals will result in behavior defined by the operating system.
-Signals other than SIGKILL may be ignored, especially if the
-server is executing a long-running procedure which
-prevents return to the main thread event loop. 
+.. glossary::
+
+    SIGHUP
+        may cause log file rotation, see
+        :ref:`the example in section "Logging" <logging_example>`.
+
+    SIGUSR1
+        may cause saving of a snapshot, see the description of
+        :func:`box.snapshot`.
+
+    SIGTERM
+        may cause graceful shutdown (information will be saved first).
+
+    SIGINT
+        (also known as keyboard interrupt) may cause graceful shutdown.
+
+    SIGKILL
+        causes shutdown.
+
+Other signals will result in behavior defined by the operating system. Signals
+other than SIGKILL may be ignored, especially if the server is executing a
+long-running procedure which prevents return to the main thread event loop.
 
 
 =====================================================================
@@ -313,9 +326,10 @@ A user can initiate, for boot time, an init.d set of instructions:
 
 A user can set up a further configuration file for log rotation, like this:
 
-.. code-block:: lua
+.. cssclass:: highlight
+.. parsed-literal::
 
-    /path/to/tarantool/*.log {
+    /path/to/tarantool/\*.log {
         daily
         size 512k
         missingok

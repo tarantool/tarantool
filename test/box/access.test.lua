@@ -264,3 +264,13 @@ box.schema.func.create('func', 'blah')
 box.schema.func.drop('blah', 'blah')
 -- gh-758 attempt to set password for user guest
 box.schema.user.passwd('guest', 'sesame')
+-- gh-1205 box.schema.user.info fails
+box.schema.user.drop('guest')
+box.space._user.index.name:delete{'guest'}
+#box.schema.user.info('guest') > 0
+box.schema.user.drop('admin')
+box.space._user.index.name:delete{'admin'}
+#box.schema.user.info('admin') > 0
+box.schema.role.drop('public')
+box.space._user.index.name:delete{'public'}
+#box.schema.role.info('public') > 0

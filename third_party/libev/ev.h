@@ -510,7 +510,8 @@ enum {
   EVFLAG_NOSIGFD   = 0, /* compatibility to pre-3.9 */
 #endif
   EVFLAG_SIGNALFD  = 0x00200000U, /* attempt to use signalfd */
-  EVFLAG_NOSIGMASK = 0x00400000U  /* avoid modifying the signal mask */
+  EVFLAG_NOSIGMASK = 0x00400000U,  /* avoid modifying the signal mask */
+  EVFLAG_ALLOCFD   = 0x00800000U /* preallocate event pipe descriptors */
 };
 
 /* method bits to be ored together */

@@ -23,9 +23,9 @@
 # and, in case it is not present or can not be used,
 # falls back to the bundled one.
 #
-# Adds CMake options: ENABLED_BUNDLED_LUAJIT, LUAJIT_PREFIX
-# Exports CMake defines: LUAJIT_PREFIX, LUAJIT_INCLUDE, LUAJIT_LIB
-# Modifies CMAKE_CFLAGS with -I${LUAJIT_INCLUDE}
+# LUAJIT_FOUND
+# LUAJIT_LIBRARIES
+# LUAJIT_INCLUDE_DIRS
 #
 
 #
@@ -123,10 +123,7 @@ else()
 endif()
 
 unset (LUAJIT_RUNS)
-include_directories("${LUAJIT_INCLUDE}")
-
-message (STATUS "Use LuaJIT includes: ${LUAJIT_INCLUDE}")
-message (STATUS "Use LuaJIT library: ${LUAJIT_LIB}")
+#include_directories("${LUAJIT_INCLUDE}")
 
 macro(luajit_build)
     set (luajit_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1})
@@ -214,3 +211,9 @@ endmacro()
 if (ENABLE_BUNDLED_LUAJIT)
     luajit_build()
 endif()
+
+set(LuaJIT_FIND_REQUIRED TRUE)
+find_package_handle_standard_args(LuaJIT
+    REQUIRED_VARS LUAJIT_INCLUDE LUAJIT_LIB)
+set(LUAJIT_INCLUDE_DIRS ${LUAJIT_INCLUDE})
+set(LUAJIT_LIBRARIES ${LUAJIT_LIB})

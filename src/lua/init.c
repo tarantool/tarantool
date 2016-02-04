@@ -78,6 +78,7 @@ extern char strict_lua[],
 	digest_lua[],
 	init_lua[],
 	buffer_lua[],
+	errno_lua[],
 	fiber_lua[],
 	log_lua[],
 	uri_lua[],
@@ -105,6 +106,7 @@ static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
 	"tarantool", init_lua,
+	"errno", errno_lua,
 	"fiber", fiber_lua,
 	"buffer", buffer_lua,
 	"msgpackffi", msgpackffi_lua,
@@ -280,7 +282,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 		lua_pushliteral(L, "/.luarocks/share/lua/?/init.lua;");
 	}
 	lua_pushliteral(L, MODULE_LUAPATH ";");
-	lua_getfield(L, top, "path");
+	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "path");
 
@@ -292,7 +294,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 		lua_pushliteral(L, "/.luarocks/lib/lua/?." TARANTOOL_LIBEXT ";");
 	}
 	lua_pushliteral(L, MODULE_LIBPATH ";");
-	lua_getfield(L, top, "cpath");
+	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "cpath");
 

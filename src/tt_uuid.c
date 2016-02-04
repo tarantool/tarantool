@@ -29,7 +29,8 @@
  * SUCH DAMAGE.
  */
 #include "tt_uuid.h"
-#include "msgpuck/msgpuck.h"
+
+#include <msgpuck.h>
 #include <random.h>
 #include <trivia/config.h>
 

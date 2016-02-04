@@ -1,6 +1,6 @@
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
-include_directories(${SOPHIA_INCLUDE_DIR})
+include_directories(${SOPHIA_INCLUDE_DIRS})
 
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
@@ -79,4 +79,4 @@ add_library(box STATIC
     ${bin_sources})
 
 add_dependencies(box build_bundled_libs)
-target_link_libraries(box ${sophia_lib})
+target_link_libraries(box ${SOPHIA_LIBRARIES})

@@ -289,6 +289,7 @@ SophiaEngine::init()
 	if (env == NULL)
 		panic("failed to create sophia environment");
 	sp_setint(env, "sophia.path_create", 0);
+	sp_setint(env, "sophia.recover", 2);
 	sp_setstring(env, "sophia.path", sophia_dir, 0);
 	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
@@ -298,8 +299,6 @@ SophiaEngine::init()
 	sp_setint(env, "compaction.page_size", cfg_geti("sophia.page_size"));
 	sp_setint(env, "compaction.0.async", 1);
 	sp_setint(env, "log.enable", 0);
-	sp_setint(env, "log.two_phase_recover", 1);
-	sp_setint(env, "log.commit_lsn", 1);
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_error(env);
