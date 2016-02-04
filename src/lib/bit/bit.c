@@ -163,11 +163,11 @@ bit_index_u32(uint32_t x, int *indexes, int offset)
 
 int *
 bit_index_u64(uint64_t x, int *indexes, int offset) {
-#if  defined(HAVE_CTZLL)
+#if  defined(HAVE_BUILTIN_CTZLL)
 	int prev_pos = 0;
 	int i = 0;
 
-#if defined(HAVE_POPCOUNTLL)
+#if defined(HAVE_BUILTIN_POPCOUNTLL)
 	/* fast implementation using built-in popcount function */
 	const int count = bit_count_u64(x);
 	while (i < count) {
