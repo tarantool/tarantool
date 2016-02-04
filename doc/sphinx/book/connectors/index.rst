@@ -38,6 +38,11 @@ components is in file :ref:`iproto protocol`.
 
     .. container:: table
 
+        .. rst-class:: left-align-column-1
+        .. rst-class:: right-align-column-2
+        .. rst-class:: right-align-column-3
+        .. rst-class:: right-align-column-4
+
         +---------------------------------+---------+---------+---------+---------+
         | Component                       | Byte #0 | Byte #1 | Byte #2 | Byte #3 |
         +=================================+=========+=========+=========+=========+
