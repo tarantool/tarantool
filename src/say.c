@@ -57,7 +57,7 @@ static const char *binary_filename;
 static int logger_nonblock;
 
 static int log_fd = STDERR_FILENO;
-static char log_path[PATH_MAX]; /* iff logger_type == SAY_LOGGER_FILE */
+static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -242,8 +242,9 @@ static void
 say_file_init(const char *init_str)
 {
 	int fd;
-	if (abspath_inplace(init_str, log_path, sizeof log_path) == -1)
-		panic_syserror("abspath");
+	log_path = abspath(init_str);
+	if (log_path == NULL)
+		panic("out of memory");
 	fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
 	          S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0) {

@@ -217,36 +217,20 @@ fmemopen(void *buf, size_t size, const char *mode)
 char *
 abspath(const char *filename)
 {
-	char *buf = (char *) malloc(PATH_MAX);
-	if (buf == NULL)
-		return NULL;
-	if (abspath_inplace(filename, buf, PATH_MAX) == -1) {
-		free(buf);
-		return NULL;
-	}
-	return buf;
-}
+	if (filename[0] == '/')
+		return strdup(filename);
 
-int
-abspath_inplace(const char *filename, char *buf, size_t size)
-{
-	int rc;
+	char *abspath = (char *) malloc(PATH_MAX + 1);
+	if (abspath == NULL)
+		return NULL;
 
-	if (filename[0] == '/') {
-		rc = snprintf(buf, size, "%s", filename);
-        } else {
-		if (getcwd(buf, size) == NULL) {
-			say_syserror("getcwd");
-			return -1;
-		}
-		rc = (int)strlen(buf);
-		rc += snprintf(buf + rc, size - rc, "/%s", filename);
+	if (getcwd(abspath, PATH_MAX - strlen(filename) - 1) == NULL)
+		say_syserror("getcwd");
+	else {
+		strcat(abspath, "/");
 	}
-	if ((size_t)rc >= size) {
-		errno = ERANGE;
-		return -1;
-	}
-	return 0;
+	strcat(abspath, filename);
+	return abspath;
 }
 
 char *
