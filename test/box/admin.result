@@ -39,7 +39,7 @@ cfg_filter(box.cfg)
   - - readahead
     - 16320
   - - rows_per_wal
-    - 50
+    - 500000
   - - slab_alloc_arena
     - 0.1
   - - slab_alloc_factor

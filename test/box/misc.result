@@ -66,10 +66,12 @@ t
   - rollback
   - runtime
   - schema
+  - select_all
   - session
   - slab
   - snapshot
   - sophia
+  - sort
   - space
   - stat
   - tuple
