@@ -18,7 +18,8 @@ case "$1" in
                     tarantool
         fi
 
-        install -d -o$SYSUSER -gadm -m750 /var/log/tarantool
+        # Use setgid to allow `adm` members to read logs
+        install -d -o$SYSUSER -gadm -m2750 /var/log/tarantool
         install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/tarantool
         install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool
     ;;
