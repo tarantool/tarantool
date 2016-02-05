@@ -26,7 +26,7 @@ add_custom_target(test
 add_custom_target(test-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
 
-add_subdirectory(app)
+add_subdirectory(app-tap)
 add_subdirectory(box)
 add_subdirectory(unit)
 
