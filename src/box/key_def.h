@@ -49,7 +49,7 @@ enum {
 	BOX_ENGINE_MAX = 3, /* + 1 to the actual number of engines */
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_FUNCTION_MAX = 32000,
-	BOX_INDEX_MAX = 10,
+	BOX_INDEX_MAX = 128,
 	BOX_NAME_MAX = 32,
 	BOX_FIELD_MAX = INT32_MAX,
 	BOX_USER_MAX = 32,

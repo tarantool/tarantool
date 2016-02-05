@@ -209,26 +209,6 @@ space_run_triggers(struct space *space, bool yesno)
 	space->run_triggers = yesno;
 }
 
-struct space_stat *
-space_stat(struct space *sp)
-{
-	static __thread struct space_stat space_stat;
-
-	space_stat.id = space_id(sp);
-	unsigned i = 0;
-	for (; i < sp->index_id_max; i++) {
-		Index *index = space_index(sp, i);
-		if (index) {
-			space_stat.index[i].id      = i;
-			space_stat.index[i].keys    = index->size();
-			space_stat.index[i].bsize   = index->bsize();
-		} else
-			space_stat.index[i].id = -1;
-	}
-	space_stat.index[i].id = -1;
-	return &space_stat;
-}
-
 /**
  * We do not allow changes of the primary key during
  * update.

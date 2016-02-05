@@ -217,20 +217,6 @@ index_find_system(struct space *space, uint32_t index_id)
 extern "C" void
 space_run_triggers(struct space *space, bool yesno);
 
-struct index_stat {
-	int32_t id;
-	int64_t keys;
-	int64_t bsize;
-};
-
-struct space_stat {
-	int32_t id;
-	struct index_stat index[BOX_INDEX_MAX];
-};
-
-struct space_stat *
-space_stat(struct space *space);
-
 /**
  * Checks that primary key of a tuple did not change during update,
  * otherwise throws ClientError.
