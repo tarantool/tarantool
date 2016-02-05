@@ -152,7 +152,7 @@ chkconfig --del tarantool
 %config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
 # Use 0750 for database files
 %attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
-%attr(2750,tarantool,adm) %dir %{_localstatedir}/log/tarantool/
+%attr(0750,tarantool,adm) %dir %{_localstatedir}/log/tarantool/
 %config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
 
 %if %{with systemd}
