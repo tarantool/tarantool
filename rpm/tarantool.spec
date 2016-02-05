@@ -9,9 +9,6 @@ BuildRequires: readline-devel
 BuildRequires: cmake >= 2.8
 BuildRequires: gcc >= 4.5
 BuildRequires: libyaml-devel
-# binutils and zlib are needed for stack traces in fiber.info()
-BuildRequires: binutils-devel
-BuildRequires: zlib-devel
 %if 0%{?fedora} > 0
 # pod2man is needed to build man pages
 BuildRequires: perl-podlators
@@ -31,6 +28,12 @@ Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
 
+%bcond_without backtrace # enabled by default
+
+%if %{with backtrace}
+# binutils and zlib are needed for stack traces in fiber.info()
+BuildRequires: binutils-devel
+BuildRequires: zlib-devel
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
 # in runtime. Tarantool uses the debug symbols to display fiber's stack
@@ -40,6 +43,7 @@ Requires(preun): initscripts
 # -fPIE break backtraces
 # https://github.com/tarantool/tarantool/issues/1262
 %undefine _hardened_build
+%endif
 
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
@@ -83,7 +87,11 @@ C and Lua/C modules.
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
+%if %{with backtrace}
          -DENABLE_BACKTRACE:BOOL=ON \
+%else
+         -DENABLE_BACKTRACE:BOOL=OFF \
+%endif
 %if %{with systemd}
          -DWITH_SYSTEMD:BOOL=ON \
          -DSYSTEMD_UNIT_DIR:PATH=%{_unitdir} \
@@ -144,7 +152,7 @@ chkconfig --del tarantool
 %config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
 # Use 0750 for database files
 %attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
-%attr(2750,tarantool,adm) %dir %{_localstatedir}/log/tarantool/
+%attr(0750,tarantool,adm) %dir %{_localstatedir}/log/tarantool/
 %config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
 
 %if %{with systemd}

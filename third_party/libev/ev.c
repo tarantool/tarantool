@@ -2294,7 +2294,7 @@ evpipe_init (EV_P)
   if (!ev_is_active (&pipe_w))
     {
 
-      if (evpipe [0] == -1)
+      if (evpipe [1] == -1)
         while (evpipe_alloc(loop) == -1)
           ev_syserr("(libev) error creating signal/async pipe");
       ev_io_set (&pipe_w, evpipe [0] < 0 ? evpipe [1] : evpipe [0], EV_READ);
