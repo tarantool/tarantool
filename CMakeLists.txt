@@ -140,7 +140,7 @@ endif()
 # avoids git to search .git repository in parent
 # directories.
 #
-if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
     execute_process (COMMAND ${GIT} describe --long HEAD
         OUTPUT_VARIABLE TARANTOOL_GIT_VERSION
         OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -148,8 +148,11 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
 
     if (NOT ("${TARANTOOL_GIT_VERSION}" STREQUAL "${TARANTOOL_VERSION}"))
         set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")
-        file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
         message(STATUS "Generating VERSION file")
+        file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
+
+        message(STATUS "Updating submodules")
+        execute_process(COMMAND ${GIT} submodule update --init --recursive)
     endif()
 endif()
 
