@@ -256,28 +256,6 @@ option(ENABLE_DOC "Enable building of documentation" OFF)
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
 
-option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
-fiber' administrative command. Only works on x86 architectures, if compiled
-with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
-is output with resolved function (symbol) names. Otherwise only frame
-addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
-
-set (HAVE_BFD False)
-if (ENABLE_BACKTRACE)
-    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
-        # We only know this option to work with gcc
-        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
-    endif()
-    # Use GNU bfd if present.
-    check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
-    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
-    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
-    check_include_file(bfd.h HAVE_BFD_H)
-    set(CMAKE_REQUIRED_DEFINITIONS)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
-        set (HAVE_BFD True)
-    endif()
-endif()
 
 ##
 ## Third-Party libraries
