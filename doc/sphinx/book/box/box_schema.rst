@@ -25,6 +25,11 @@ for spaces, users, roles, and function tuples.
 
         **Options for box.schema.space.create**
 
+        .. rst-class:: left-align-column-1
+        .. rst-class:: left-align-column-2
+        .. rst-class:: left-align-column-3
+        .. rst-class:: left-align-column-4
+
         +---------------+--------------------+---------+---------------------+
         | Name          | Effect             | Type    | Default             |
         +===============+====================+=========+=====================+

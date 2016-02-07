@@ -63,6 +63,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
             Options for ``space_object:create_index``:
 
+            .. rst-class:: left-align-column-1
+            .. rst-class:: left-align-column-2
+            .. rst-class:: left-align-column-3
+            .. rst-class:: left-align-column-4
+
             +---------------+--------------------+-----------------------------+---------------------+
             | Name          | Effect             | Type                        | Default             |
             +===============+====================+=============================+=====================+

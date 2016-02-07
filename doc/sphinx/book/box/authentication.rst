@@ -65,6 +65,11 @@ There are four special tuples in the _user space: 'guest', 'admin', 'public', an
 
 .. container:: table
 
+    .. rst-class:: left-align-column-1
+    .. rst-class:: right-align-column-2
+    .. rst-class:: left-align-column-3
+    .. rst-class:: left-align-column-4
+
     +-------------+----+------+--------------------------------------------------------+
     | Name        | ID | Type | Description                                            |
     +=============+====+======+========================================================+

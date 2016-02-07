@@ -540,6 +540,9 @@ introspection (inspecting contents of spaces, accessing server configuration).
     **Complexity Factors that may affect data
     manipulation functions in the box library**
 
+    .. rst-class:: left-align-column-1
+    .. rst-class:: left-align-column-2
+
     +-------------------+-----------------------------------------------------+
     | Index size        | The number of index keys is the same as the number  |
     |                   | of tuples in the data set. For a TREE index, if     |
