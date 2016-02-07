@@ -419,6 +419,22 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
+if(NOT "${PROJECT_BINARY_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}"
+        COMMENT "Removing the build directory and its content"
+    )
+elseif(IS_DIRECTORY .git AND GIT)
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${GIT} submodule foreach --recursive git clean -f -X -d
+        COMMAND ${GIT} clean -f -X -d
+        COMMENT "Removing all build files from the source directory"
+    )
+endif()
+
 #
 # tarantool info summary (used in server version output)
 #
