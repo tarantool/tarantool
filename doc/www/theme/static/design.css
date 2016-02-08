@@ -533,6 +533,14 @@ h1, h2, h3, h4, h5 {
 .i-avito:before {
     background-image:url('/theme/design/logo_avito.png');
 }
+.i-qiwi {
+    width:130px;
+    height:60px;
+}
+.i-qiwi:after,
+.i-qiwi:before {
+    background-image:url('/theme/design/logo_qiwi.png');
+}
 .b-example .b-block-wrapper {
     padding:35px 0 35px 0;
 }
