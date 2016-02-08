@@ -25,6 +25,11 @@ for spaces, users, roles, and function tuples.
 
         **Options for box.schema.space.create**
 
+        .. rst-class:: left-align-column-1
+        .. rst-class:: left-align-column-2
+        .. rst-class:: left-align-column-3
+        .. rst-class:: left-align-column-4
+
         +---------------+--------------------+---------+---------------------+
         | Name          | Effect             | Type    | Default             |
         +===============+====================+=========+=====================+
@@ -102,19 +107,21 @@ available for insert, select, and all the other :mod:`box.space` functions.
         box.schema.user.create('Lena', {password = 'X'})
         box.schema.user.create('Lena', {if_not_exists = false})
 
-.. function:: box.schema.user.drop(user-name)
+.. function:: box.schema.user.drop(user-name [, {options} ])
 
     Drop a user.
     For explanation of how Tarantool maintains user data, see
     section :ref:`Users and the _user space <authentication-users>`.
 
     :param string user-name: the name of the user
+    :param table options: if_exists
 
     **Example:**
 
     .. code-block:: lua
 
         box.schema.user.drop('Lena')
+        box.schema.user.drop('Lena',{if_exists=false})
 
 .. function:: box.schema.user.exists(user-name)
 

@@ -196,7 +196,7 @@ Choose the package you want.
 
 You can install tarantool via Homebrew. It contains binaries for OS X 10.09 and higher. Simply use:
 
-.. code-block:: session
+.. code-block:: bash
 
     $ brew install tarantool
     ==> Downloading https://homebrew.bintray.com/bottles/tarantool-1.6.7-593.el_capitan.bottle.tar.gz

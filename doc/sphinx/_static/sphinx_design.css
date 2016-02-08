@@ -519,3 +519,43 @@ ul.first.last.simple {
 .toctree-l1 li {
     list-style-type: none;
 }
+
+table.left-align-column-1 td {
+    text-align: left
+}
+
+table.left-align-column-2 td + td {
+    text-align: left
+}
+
+
+table.left-align-column-3 td + td + td {
+    text-align: left
+}
+
+
+table.left-align-column-4 td + td + td + td {
+    text-align: left
+}
+
+
+table.right-align-column-1 td {
+    text-align: right
+}
+
+table.right-align-column-2 td + td {
+    text-align: right
+}
+
+table.right-align-column-3 td + td + td {
+    text-align: right
+}
+
+table.right-align-column-4 td + td + td +td {
+    text-align: right
+}
+
+
+
+
+
