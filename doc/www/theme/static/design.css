@@ -534,13 +534,23 @@ h1, h2, h3, h4, h5 {
     background-image:url('/theme/design/logo_avito.png');
 }
 .i-qiwi {
-    width:130px;
+    width:120px;
     height:60px;
 }
 .i-qiwi:after,
 .i-qiwi:before {
     background-image:url('/theme/design/logo_qiwi.png');
 }
+
+.i-wallarm {
+    width:130px;
+    height:63px;
+}
+.i-wallarm:after,
+.i-wallarm:before {
+    background-image:url('/theme/design/logo_wallarm.png');
+}
+
 .b-example .b-block-wrapper {
     padding:35px 0 35px 0;
 }
