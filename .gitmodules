@@ -1,22 +1,29 @@
 [submodule "third_party/luajit"]
 	path = third_party/luajit
 	url = https://github.com/tarantool/luajit.git
+	ignore = dirty
 [submodule "third_party/libyaml"]
 	path = third_party/libyaml
 	url = https://github.com/tarantool/libyaml.git
+	ignore = dirty
 [submodule "src/lib/msgpuck"]
 	path = src/lib/msgpuck
 	url = https://github.com/tarantool/msgpuck.git
+	ignore = dirty
 [submodule "third_party/luafun"]
 	path = third_party/luafun
 	url = https://github.com/rtsisyk/luafun.git
+	ignore = dirty
 [submodule "sophia"]
 	path = third_party/sophia
 	url = https://github.com/tarantool/sophia.git
+	ignore = dirty
 	branch = tarantool-1.6
 [submodule "test-run"]
 	path = test-run
 	url = https://github.com/tarantool/test-run.git
+	ignore = dirty
 [submodule "src/lib/small"]
 	path = src/lib/small
 	url = https://github.com/tarantool/small.git
+	ignore = dirty
