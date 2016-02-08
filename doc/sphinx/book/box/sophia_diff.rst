@@ -55,7 +55,7 @@
     It was explained :ref:`earlier <yields_must_happen>` that memtx does not "yield" on a select request,
     it yields only on data-change requests. However, sophia does yield on a select
     request, or on an equivalent such as get() or pairs(). This has significance
-    for :ref:`cooperative multitasking <cooperative_multitasking>`. 
+    for :ref:`cooperative multitasking <cooperative_multitasking>`.
 
     For more about sophia, see Appendix E :ref:`sophia <sophia>`.
 
