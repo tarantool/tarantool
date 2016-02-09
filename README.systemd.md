@@ -160,6 +160,88 @@ place a drop-in file name.conf there that only changes the specific
 settings one is interested in. Please see systemd.unit(5) manual page for
 additional information.
 
+## Debugging
+
+`coredumpctl(1)` automatically saves coredumps and stack traces in case of
+crash. Let's see how does it work:
+
+    # tarantoolctl enter example
+    /bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    /bin/tarantoolctl: Connecting to /var/run/tarantool/example.control
+    /bin/tarantoolctl: connected to unix/:/var/run/tarantool/example.control
+    -- !!! please never do this on the production system
+    unix/:/var/run/tarantool/example.control> require('ffi').cast('char *', 0)[0] = 48
+    /bin/tarantoolctl: unix/:/var/run/tarantool/example.control: Remote host closed connection
+
+`coredump list /usr/bin/tarantool` displays last crashes of Tarantool daemon:
+
+    # coredumpctl list /usr/bin/tarantool
+    MTIME                            PID   UID   GID SIG PRESENT EXE
+    Sat 2016-01-23 15:21:24 MSK   20681  1000  1000   6   /usr/bin/tarantool
+    Sat 2016-01-23 15:51:56 MSK   21035   995   992   6   /usr/bin/tarantool
+
+`coredump info <pid>` show a stack trace and other useful information:
+
+```
+           PID: 21035 (tarantool)
+           UID: 995 (tarantool)
+           GID: 992 (tarantool)
+        Signal: 6 (ABRT)
+     Timestamp: Sat 2016-01-23 15:51:42 MSK (4h 36min ago)
+  Command Line: tarantool example.lua <running>
+    Executable: /usr/bin/tarantool
+ Control Group: /system.slice/system-tarantool.slice/tarantool@example.service
+          Unit: tarantool@example.service
+         Slice: system-tarantool.slice
+       Boot ID: 7c686e2ef4dc4e3ea59122757e3067e2
+    Machine ID: a4a878729c654c7093dc6693f6a8e5ee
+      Hostname: localhost.localdomain
+       Message: Process 21035 (tarantool) of user 995 dumped core.
+
+                Stack trace of thread 21035:
+                #0  0x00007f84993aa618 raise (libc.so.6)
+                #1  0x00007f84993ac21a abort (libc.so.6)
+                #2  0x0000560d0a9e9233 _ZL12sig_fatal_cbi (tarantool)
+                #3  0x00007f849a211220 __restore_rt (libpthread.so.0)
+                #4  0x0000560d0aaa5d9d lj_cconv_ct_ct (tarantool)
+                #5  0x0000560d0aaa687f lj_cconv_ct_tv (tarantool)
+                #6  0x0000560d0aaabe33 lj_cf_ffi_meta___newindex (tarantool)
+                #7  0x0000560d0aaae2f7 lj_BC_FUNCC (tarantool)
+                #8  0x0000560d0aa9aabd lua_pcall (tarantool)
+                #9  0x0000560d0aa71400 lbox_call (tarantool)
+                #10 0x0000560d0aa6ce36 lua_fiber_run_f (tarantool)
+                #11 0x0000560d0a9e8d0c _ZL16fiber_cxx_invokePFiP13__va_list_tagES0_ (tarantool)
+                #12 0x0000560d0aa7b255 fiber_loop (tarantool)
+                #13 0x0000560d0ab38ed1 coro_init (tarantool)
+                ...
+```
+
+`coredumpctl -o filename.core info <pid>` saves the coredump into a file.
+
+`coredumpctl gdb <pid>` starts  `gdb` on the coredump.
+
+It is highly recommended to install tarantool-debuginfo package to improve
+gdb experience (example below for Fedora):
+
+    dnf debuginfo-install tarantool
+
+gdb provides information about `debuginfo` paackages you need to install:
+
+    # gdb -p <pid>
+    ...
+    Missing separate debuginfos, use: dnf debuginfo-install
+    glibc-2.22.90-26.fc24.x86_64 krb5-libs-1.14-12.fc24.x86_64
+    libgcc-5.3.1-3.fc24.x86_64 libgomp-5.3.1-3.fc24.x86_64
+    libselinux-2.4-6.fc24.x86_64 libstdc++-5.3.1-3.fc24.x86_64
+    libyaml-0.1.6-7.fc23.x86_64 ncurses-libs-6.0-1.20150810.fc24.x86_64
+    openssl-libs-1.0.2e-3.fc24.x86_64
+
+Symbol names are present in stack traces even if you don't have
+`tarantool-debuginfo` package installed.
+
+Please refer to the documentation provided by your distribution for additional
+information.
+
 ## Precautions
 
 * Please don't use `tarantoolctl {start,stop,restart}` to control instances
