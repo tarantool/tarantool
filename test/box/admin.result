@@ -55,16 +55,26 @@ cfg_filter(box.cfg)
   - - snapshot_period
     - 0
   - - sophia
-    - - - compression
-        - none
-      - - compression_key
+    - - - branch_age
         - 0
+      - - branch_age_period
+        - 0
+      - - branch_age_wm
+        - 0
+      - - branch_prio
+        - 2
+      - - compact_wm
+        - 2
       - - memory_limit
         - 0
-      - - node_size
-        - 134217728
-      - - page_size
-        - 131072
+      - - mmap
+        - 1
+      - - node_preload
+        - 0
+      - - snapshot_period
+        - 0
+      - - sync
+        - 2
       - - threads
         - 5
   - - sophia_dir

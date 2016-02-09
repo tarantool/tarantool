@@ -209,6 +209,11 @@ sophia_configure(struct space *space, struct key_def *key_def)
 		sp_setstring(env, path, type, 0);
 		i++;
 	}
+	/* db.path */
+	if (key_def->opts.path[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".path", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.path, 0);
+	}
 	/* db.upsert */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert", key_def->space_id);
 	sp_setstring(env, path, (const void *)(uintptr_t)sophia_upsert_callback, 0);
@@ -216,14 +221,36 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".index.upsert_arg", key_def->space_id);
 	sp_setstring(env, path, (const void *)key_def, 0);
 	/* db.compression */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
-	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
+	if (key_def->opts.compression[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.compression, 0);
+	}
 	/* db.compression_branch */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
-	sp_setstring(env, path, cfg_gets("sophia.compression"), 0);
+	if (key_def->opts.compression_branch[0] != '\0') {
+		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
+		sp_setstring(env, path, key_def->opts.compression_branch, 0);
+	}
 	/* db.compression_key */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.compression_key"));
+	sp_setint(env, path, key_def->opts.compression_key);
+	/* db.node_preload */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_preload", key_def->space_id);
+	sp_setint(env, path, cfg_geti("sophia.node_preload"));
+	/* db.node_size */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_size", key_def->space_id);
+	sp_setint(env, path, key_def->opts.node_size);
+	/* db.page_size */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".page_size", key_def->space_id);
+	sp_setint(env, path, key_def->opts.page_size);
+	/* db.mmap */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".mmap", key_def->space_id);
+	sp_setint(env, path, cfg_geti("sophia.mmap"));
+	/* db.sync */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".sync", key_def->space_id);
+	sp_setint(env, path, cfg_geti("sophia.sync"));
+	/* db.amqf */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".amqf", key_def->space_id);
+	sp_setint(env, path, key_def->opts.amqf);
 	/* db.path_fail_on_drop */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".path_fail_on_drop", key_def->space_id);
 	sp_setint(env, path, 0);

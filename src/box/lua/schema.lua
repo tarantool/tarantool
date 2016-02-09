@@ -392,7 +392,7 @@ box.schema.index.create = function(space_id, name, options)
         id = 'number',
         if_not_exists = 'boolean',
         dimension = 'number',
-        distance = 'string',
+        distance = 'string'
     }
     check_param_table(options, options_template, true)
     local options_defaults = {

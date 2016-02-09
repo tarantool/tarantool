@@ -291,9 +291,13 @@ SophiaEngine::init()
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
 	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
 	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
-	sp_setint(env, "compaction.node_size", cfg_geti("sophia.node_size"));
-	sp_setint(env, "compaction.page_size", cfg_geti("sophia.page_size"));
 	sp_setint(env, "compaction.0.async", 1);
+	sp_setint(env, "compaction.0.compact_wm", cfg_geti("sophia.compact_wm"));
+	sp_setint(env, "compaction.0.branch_prio", cfg_geti("sophia.branch_prio"));
+	sp_setint(env, "compaction.0.branch_age", cfg_geti("sophia.branch_age"));
+	sp_setint(env, "compaction.0.branch_age_wm", cfg_geti("sophia.branch_age_wm"));
+	sp_setint(env, "compaction.0.branch_age_period", cfg_geti("sophia.branch_age_period"));
+	sp_setint(env, "compaction.0.snapshot_period", cfg_geti("sophia.snapshot_period"));
 	sp_setint(env, "log.enable", 0);
 	int rc = sp_open(env);
 	if (rc == -1)
