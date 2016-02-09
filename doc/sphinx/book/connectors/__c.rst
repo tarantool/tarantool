@@ -33,13 +33,6 @@ space :code:`examples` via the high-level C API.
        tnt_stream_free(tnt);
     }
 
-:ref:`SETUP <c_setup>`,|br|
-:ref:`CONNECT <c_connect>`,|br|
-:ref:`MAKE REQUEST <c_make_request>`,|br|
-:ref:`SEND REQUEST <c_send_request>`,|br|
-:ref:`GET REPLY <c_get_reply>`,|br|
-:ref:`TEARDOWN <c_teardown>`
-
 To prepare, paste the code into a file named example.c and install
 tarantool-c. One way to install tarantool-c (using Ubuntu) is:
 
@@ -70,8 +63,6 @@ If the insert fails, the program will print "Insert failed" and an error number.
 
 Here are notes corresponding to comments in the example program.
 
-.. _c_setup:
-
 **SETUP:** The setup begins by creating a stream.
 
 .. code-block:: c
@@ -93,8 +84,6 @@ Function description:
     `struct tnt_stream *tnt_net(struct tnt_stream *s)`
     `int tnt_set(struct tnt_stream *s, int option, variant option-value)`
 
-.. _c_connect:
-
 **CONNECT:** Now that the stream named ``tnt`` exists and is associated with a
 URI, this example program can connect to the server.
 
@@ -113,8 +102,6 @@ Function description:
 The connect might fail for a variety of reasons, such as:
 the server is not running, or the URI contains an invalid password.
 If the connect fails, the return value will be -1.
-
-.. _c_make_request:
 
 **MAKE REQUEST:** Most requests require passing a structured value, such as
 the contents of a tuple.
@@ -139,8 +126,6 @@ Function description:
 .. parsed-literal::
 
     ssize_t tnt_object_format(struct tnt_stream \*s, const char \*fmt, ...)
-
-.. _c_send_request:
 
 **SEND REQUEST:** The database-manipulation requests are analogous to the
 requests in the box library.
@@ -167,8 +152,6 @@ Function description:
     ssize_t tnt_update(struct tnt_stream \*s, uint32_t space, uint32_t index,
                        struct tnt_stream \*key, struct tnt_stream \*ops)
 
-.. _c_get_reply:
-
 **GET REPLY:** For most requests the client will receive a reply containing some indication
 whether the result was successful, and a set of tuples.
 
@@ -189,8 +172,6 @@ Function description:
     struct tnt_reply \*tnt_reply_init(struct tnt_reply \*r)
     tnt->read_reply(struct tnt_stream \*s, struct tnt_reply \*r)
     void tnt_reply_free(struct tnt_reply \*r)
-
-.. _c_teardown:
 
 **TEARDOWN:** When a session ends, the connection that was made with
 tnt_connect() should be closed and the objects that were made in the setup

@@ -504,8 +504,10 @@ Example, creating a function which sets each option in a separate line:
              >   local p = {}
              >   p.host = 'widgets.com'
              >   p.db = 'test'
+             >   p.user = 'postgres'
+             >   p.password = 'postgres'
              >   local conn = pg.connect(p)
-             >   return p
+             >   return conn
              > end
     ---
     ...
@@ -557,9 +559,9 @@ in the SQL statement.
 
     tarantool> conn:execute('select tablename from pg_tables')
     ---
-    - - table_name: ALL_PLUGINS
-      - table_name: pg_statistics
-      - table_name: pg_type
+    - - tablename: pg_statistic
+      - tablename: pg_type
+      - tablename: pg_authid
       <...>
     ...
 
@@ -609,7 +611,7 @@ on /usr. The PostgreSQL server is already running on the local host 127.0.0.1.
     $ # them in all places. Insert a row in database postgres, and quit.
     $ psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
     Password for user postgres:
-    psql (9.3.0, server 9.3.2)
+    psql (9.3.10)
     SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
     Type "help" for help.
 
@@ -654,15 +656,15 @@ on /usr. The PostgreSQL server is already running on the local host 127.0.0.1.
 
     $ # Change directory to a directory which can be used for
     $ # temporary tests. For this example we assume that the
-    $ # name of this directory is /home/pgulutzan/tarantool_sandbox.
-    $ # (Change "/home/pgulutzan" to whatever is the user's actual
+    $ # name of this directory is $HOME/tarantool_sandbox.
+    $ # (Change "$HOME" to whatever is the user's actual
     $ # home directory for the machine that's used for this test.)
-    cd /home/pgulutzan/tarantool_sandbox
+    cd $HOME/tarantool_sandbox
 
     $ # Start the Tarantool server. Do not use a Lua initialization file.
 
     $ tarantool
-    tarantool: version 1.6.6-222-g48b98bb
+    tarantool: version 1.6.8-412-g803b15c
     type 'help' for interactive help
     tarantool>
 
@@ -688,9 +690,9 @@ Lua tutorial earlier in the Tarantool user manual.
     tarantool> function pg_select ()
              >   local conn = pg.connect({
              >     host = '127.0.0.1',
-             >     port = 5432
-             >     user = 'postgres'
-             >     password = 'postgres'
+             >     port = 5432,
+             >     user = 'postgres',
+             >     password = 'postgres',
              >     db = 'postgres'
              >   })
              >   local test = conn:execute('SELECT * FROM test WHERE s1 = 1')

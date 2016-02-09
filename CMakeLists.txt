@@ -140,7 +140,7 @@ endif()
 # avoids git to search .git repository in parent
 # directories.
 #
-if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
     execute_process (COMMAND ${GIT} describe --long HEAD
         OUTPUT_VARIABLE TARANTOOL_GIT_VERSION
         OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -148,8 +148,11 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
 
     if (NOT ("${TARANTOOL_GIT_VERSION}" STREQUAL "${TARANTOOL_VERSION}"))
         set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")
-        file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
         message(STATUS "Generating VERSION file")
+        file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
+
+        message(STATUS "Updating submodules")
+        execute_process(COMMAND ${GIT} submodule update --init --recursive)
     endif()
 endif()
 
@@ -253,28 +256,6 @@ option(ENABLE_DOC "Enable building of documentation" OFF)
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
 
-option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
-fiber' administrative command. Only works on x86 architectures, if compiled
-with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
-is output with resolved function (symbol) names. Otherwise only frame
-addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
-
-set (HAVE_BFD False)
-if (ENABLE_BACKTRACE)
-    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
-        # We only know this option to work with gcc
-        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
-    endif()
-    # Use GNU bfd if present.
-    check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
-    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
-    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
-    check_include_file(bfd.h HAVE_BFD_H)
-    set(CMAKE_REQUIRED_DEFINITIONS)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
-        set (HAVE_BFD True)
-    endif()
-endif()
 
 ##
 ## Third-Party libraries
@@ -418,6 +399,22 @@ add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
+
+if(NOT "${PROJECT_BINARY_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}"
+        COMMENT "Removing the build directory and its content"
+    )
+elseif(IS_DIRECTORY .git AND GIT)
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${GIT} submodule foreach --recursive git clean -f -X -d
+        COMMAND ${GIT} clean -f -X -d
+        COMMENT "Removing all build files from the source directory"
+    )
+endif()
 
 #
 # tarantool info summary (used in server version output)

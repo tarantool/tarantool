@@ -26,9 +26,9 @@ ffi.cdef[[
     box_iterator_free(box_iterator_t *itr);
     /** \endcond public */
     /** \cond public */
-    size_t
+    ssize_t
     box_index_len(uint32_t space_id, uint32_t index_id);
-    size_t
+    ssize_t
     box_index_bsize(uint32_t space_id, uint32_t index_id);
     int
     box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,

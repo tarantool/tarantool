@@ -14,6 +14,8 @@
 
         **Format specifiers**
 
+        .. rst-class:: left-align-column-2
+
         +------+-------------------------------------------------+
         | b, B | converts Lua variable to a 1-byte integer,      |
         |      | and stores the integer in the resulting string  |

@@ -21,62 +21,64 @@ are ``errno``, ``error``.
 
     **Socket functions**
 
+    .. rst-class:: left-align-column-2
+
     +----------------+---------------------------------------------------------------+
     |    Purposes    |    Names                                                      |
     +================+===============================================================+
-    |                | :func:`socket() <socket.__call>`                              |
-    |                +---------------------------------------------------------------+
-    |      setup     | :func:`socket.tcp_connect() <socket.tcp_connect>`             |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket.tcp_server() <socket.tcp_server>`               |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:sysconnect() <socket_object.sysconnect>` |
+    |    setup       | :func:`socket() <socket.__call>`                              |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:send() <socket_object.send>`             |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:sendto() <socket_object.sendto>`         |
-    |    sending     +---------------------------------------------------------------+
-    |                | :func:`socket_object:write() <socket_object.write>`           |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:syswrite() <socket_object.syswrite>`     |
+    |    ""          | :func:`socket.tcp_connect() <socket.tcp_connect>`             |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:recv() <socket_object.recv>`             |
-    |                +---------------------------------------------------------------+
-    |   receiving    | :func:`socket_object:recvfrom() <socket_object.recvfrom>`     |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:read() <socket_object.read>`             |
+    |    ""          | :func:`socket.tcp_server() <socket.tcp_server>`               |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:nonblock() <socket_object.nonblock>`     |
-    |                +---------------------------------------------------------------+
-    |  flag setting  | :func:`socket_object:setsockopt() <socket_object.setsockopt>` |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:linger() <socket_object.linger>`         |
+    |    ""          | :func:`socket_object:sysconnect() <socket_object.sysconnect>` |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:listen() <socket_object.listen>`         |
-    | client/server  +---------------------------------------------------------------+
-    |                | :func:`socket_object:accept() <socket_object.accept>`         |
+    |    ""          | :func:`socket_object:send() <socket_object.send>`             |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:shutdown() <socket_object.shutdown>`     |
-    |    teardown    +---------------------------------------------------------------+
-    |                | :func:`socket_object:close() <socket_object.close>`           |
+    |   sending      | :func:`socket_object:sendto() <socket_object.sendto>`         |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:error() <socket_object.error>`           |
-    | error checking +---------------------------------------------------------------+
-    |                | :func:`socket_object:errno() <socket_object.errno>`           |
+    |    ""          | :func:`socket_object:write() <socket_object.write>`           |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket.getaddrinfo() <socket.getaddrinfo>`             |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:getsockopt() <socket_object.getsockopt>` |
-    |  information   +---------------------------------------------------------------+
-    |                | :func:`socket_object:peer() <socket_object.peer>`             |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:name() <socket_object.name>`             |
+    |    ""          | :func:`socket_object:syswrite() <socket_object.syswrite>`     |
     +----------------+---------------------------------------------------------------+
-    |                | :func:`socket_object:readable() <socket_object.readable>`     |
-    |                +---------------------------------------------------------------+
-    | state checking | :func:`socket_object:writable() <socket_object.writable>`     |
-    |                +---------------------------------------------------------------+
-    |                | :func:`socket_object:wait() <socket_object.wait>`             |
+    |   receiving    | :func:`socket_object:recv() <socket_object.recv>`             |
+    +----------------+---------------------------------------------------------------+
+    |    ""          | :func:`socket_object:recvfrom() <socket_object.recvfrom>`     |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:read() <socket_object.read>`             |
+    +----------------+---------------------------------------------------------------+
+    |  flag setting  | :func:`socket_object:nonblock() <socket_object.nonblock>`     |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:setsockopt() <socket_object.setsockopt>` |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:linger() <socket_object.linger>`         |
+    +----------------+---------------------------------------------------------------+
+    | client/server  | :func:`socket_object:listen() <socket_object.listen>`         |
+    +----------------+---------------------------------------------------------------+
+    |    ""          | :func:`socket_object:accept() <socket_object.accept>`         |
+    +----------------+---------------------------------------------------------------+
+    |    teardown    | :func:`socket_object:shutdown() <socket_object.shutdown>`     |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:close() <socket_object.close>`           |
+    +----------------+---------------------------------------------------------------+
+    | error checking | :func:`socket_object:error() <socket_object.error>`           |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:errno() <socket_object.errno>`           |
+    +----------------+---------------------------------------------------------------+
+    |  information   | :func:`socket.getaddrinfo() <socket.getaddrinfo>`             |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:getsockopt() <socket_object.getsockopt>` |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:peer() <socket_object.peer>`             |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:name() <socket_object.name>`             |
+    +----------------+---------------------------------------------------------------+
+    | state checking | :func:`socket_object:readable() <socket_object.readable>`     |
+    +----------------+---------------------------------------------------------------+
+    |   ""           | :func:`socket_object:writable() <socket_object.writable>`     |
+    +----------------+---------------------------------------------------------------+
+    |    ""          | :func:`socket_object:wait() <socket_object.wait>`             |
     +----------------+---------------------------------------------------------------+
 
 Typically a socket session will begin with the setup functions, will set one

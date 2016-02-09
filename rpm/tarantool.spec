@@ -5,10 +5,13 @@
 %bcond_with systemd
 %endif
 
-BuildRequires: readline-devel
 BuildRequires: cmake >= 2.8
 BuildRequires: gcc >= 4.5
+BuildRequires: coreutils
+BuildRequires: sed
+BuildRequires: readline-devel
 BuildRequires: libyaml-devel
+#BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
 # pod2man is needed to build man pages
 BuildRequires: perl-podlators
@@ -45,6 +48,12 @@ BuildRequires: zlib-devel
 %undefine _hardened_build
 %endif
 
+# For tests
+BuildRequires: python
+BuildRequires: python-six
+BuildRequires: python-gevent
+BuildRequires: python-yaml
+
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
@@ -58,7 +67,7 @@ Provides: tarantool-debuginfo = %{version}-%{release}
 Provides: tarantool-common = %{version}-%{release}
 Obsoletes: tarantool-common < 1.6.8.434-1
 URL: http://tarantool.org
-Source0: tarantool-%{version}.tar.gz
+Source0: http://tarantool.org/dist/1.6/tarantool-%{version}.tar.gz
 %description
 Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
@@ -69,7 +78,7 @@ This package provides the server daemon and admin tools.
 %package devel
 Summary: Server development files for %{name}
 Group: Applications/Databases
-Requires: tarantool%{?_isa} = %{version}-%{release}
+Requires: %{name}%{?_isa} = %{version}-%{release}
 %description devel
 Tarantool is a high performance in-memory NoSQL database and Lua
 application server. Tarantool supports replication, online backup and
@@ -104,6 +113,14 @@ make %{?_smp_mflags}
 %make_install
 # %%doc and %%license macroses are used instead
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
+
+%check
+# https://github.com/tarantool/tarantool/issues/1227
+echo "self.skip = True" > ./test/app/socket.skipcond
+# https://github.com/tarantool/tarantool/issues/1322
+echo "self.skip = True" > ./test/app/digest.skipcond
+# run a safe subset of the test suite
+cd test && ./test-run.py unit/ app/ app-tap/ box/ box-tap/ engine/ sophia/
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
@@ -152,7 +169,7 @@ chkconfig --del tarantool
 %config(noreplace) %{_sysconfdir}/tarantool/instances.available/example.lua
 # Use 0750 for database files
 %attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
-%attr(0750,tarantool,adm) %dir %{_localstatedir}/log/tarantool/
+%attr(0750,tarantool,tarantool) %dir %{_localstatedir}/log/tarantool/
 %config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
 
 %if %{with systemd}
@@ -176,10 +193,18 @@ chkconfig --del tarantool
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Tue Feb 09 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.462-1
+- Enable tests
+
+* Fri Feb 05 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.451-1
+- Add coreutils, make and sed to BuildRequires
+
 * Wed Feb 03 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.433-1
 - Obsolete tarantool-common package
+
 * Thu Jan 21 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.376-1
 - Implement proper support of multi-instance management using systemd
+
 * Sat Jan 9 2016 Roman Tsisyk <roman@tarantool.org> 1.6.8.0-1
 - Change naming scheme to include a postrelease number to Version
 - Fix arch-specific paths in tarantool-common
@@ -189,7 +214,7 @@ chkconfig --del tarantool
 - Remove SCL support
 - Remove devtoolkit support
 - Remove Lua scripts
-- Remove quotes from %files
+- Remove quotes from %%files
 - Disable hardening to fix backtraces
 - Fix permissions for tarantoolctl directories
 - Comply with http://fedoraproject.org/wiki/Packaging:DistTag
@@ -198,11 +223,14 @@ chkconfig --del tarantool
 - Comply with the policy for log files
 - Comply with the policy for man pages
 - Other changes according to #1293100 review
+
 * Tue Apr 28 2015 Roman Tsisyk <roman@tarantool.org> 1.6.5.0-1
 - Remove sql-module, pg-module, mysql-module
+
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.6.3.0-1
 - Add SCL support
 - Add --with support
 - Add dependencies
+
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.5.1.0-1
 - Initial version of the RPM spec

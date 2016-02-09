@@ -52,8 +52,6 @@ explain what the steps are, then on the Internet you can look at some example sc
 
      # For both test suite and documentation
      sudo apt-get install python-pip python-dev python-yaml
-     # For test suite
-     sudo apt-get install python-daemon
      # For documentation
      sudo apt-get install python-sphinx python-pelican python-beautifulsoup
 
@@ -79,16 +77,6 @@ explain what the steps are, then on the Internet you can look at some example sc
      wget http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
      tar -xzf PyYAML-3.10.tar.gz
      cd PyYAML-3.10
-     sudo python setup.py install
-
-     # python module for helping programs become daemons (daemon):
-     # For test suite: (if wget fails, check the
-     # http://pypi.python.org/pypi/python-daemon
-     # to see what the current version is.)
-     cd ~
-     wget http://pypi.python.org/packages/source/p/python-daemon/python-daemon-1.5.5.tar.gz
-     tar -xzvf python-daemon-1.5.5.tar.gz
-     cd python-daemon-1.5.5
      sudo python setup.py install
 
      # python module for HTML scraping: For documentation:
@@ -217,7 +205,7 @@ This is the end of the list of steps to take for source downloads.
 For your added convenience, github.com has README files with example scripts: |br|
 `README.CentOS <https://github.com/tarantool/tarantool/blob/master/README.CentOS>`_ for CentOS 5.8, |br|
 `README.FreeBSD <https://github.com/tarantool/tarantool/blob/master/README.FreeBSD>`_ for FreeBSD 10.1, |br|
-`README.MacOSX <https://github.com/tarantool/tarantool/blob/master/README.MacOSX>`_ for Mac OS X `Lion`, |br|
+`README.MacOSX <https://github.com/tarantool/tarantool/blob/master/README.MacOSX>`_ for Mac OS X `El Capitan`, |br|
 `README.md <https://github.com/tarantool/tarantool/blob/master/README.md>`_ for generic GNU/Linux. |br|
 These example scripts assume that the intent is to download from the master
 branch, build the server (but not the documentation), and run tests after build.

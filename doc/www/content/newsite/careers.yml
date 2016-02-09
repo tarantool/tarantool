@@ -86,8 +86,8 @@ blocks:
           This is a full-time position at Mail.Ru's Moscow headquarters, a large
           modern building near the "Airport" subway station. Duties include:
 
-          * construction and operation of a Tarantool-cluster-based public cloud
-          * construction and operation of a Tarantool-cluster-based private cloud
+          * construction and operation of a Tarantool-cluster-based public/private
+            cloud
           * ensuring trouble-free and fast operation to the satisfaction of
             customers and management
           * continuous improvement of the system as load increases and the number

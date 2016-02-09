@@ -325,6 +325,8 @@ because after the UPDATE the transaction processor thread can switch
 to another fiber, and delete the tuple that was just updated.
 Note re storage engine: sophia handles yields differently, see
 :ref:`differences between memtx and sophia <sophia_diff>`.
+Note re multi-request transactions: there is a way to delay yields,
+see :ref:`Atomic execution <atomic_execution>`.
 
 Since locks don't exist, and disk writes only involve the write-ahead log,
 transactions are usually fast. Also the Tarantool server may not be using
@@ -539,6 +541,9 @@ introspection (inspecting contents of spaces, accessing server configuration).
 
     **Complexity Factors that may affect data
     manipulation functions in the box library**
+
+    .. rst-class:: left-align-column-1
+    .. rst-class:: left-align-column-2
 
     +-------------------+-----------------------------------------------------+
     | Index size        | The number of index keys is the same as the number  |

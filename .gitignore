@@ -16,7 +16,21 @@ CMakeFiles
 CMakeCache.txt
 CPackConfig.cmake
 CPackSourceConfig.cmake
-Makefile
+./build
+/build
+# Ignore Makefile in the stupid way for `tar --exclude-vcs-ignores`
+/Makefile
+./Makefile
+src/Makefile
+src/*/Makefile
+src/*/*/Makefile
+src/*/*/*/Makefile
+doc/Makefile
+doc/*/Makefile
+extra/Makefile
+extra/*/Makefile
+test/Makefile
+test/*/Makefile
 Doxyfile.API
 RPM
 *.src.rpm
@@ -35,8 +49,8 @@ cmake_install.cmake
 config.mk
 config.guess
 config.sub
-doc/doxygen/
-doc/api/
+doc/doxygen
+doc/api
 doc/www/content/doc/dev_guide.html
 doc/www/content/doc/tnt.css
 doc/www/content/doc/user_guide.html
@@ -73,7 +87,6 @@ third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 VERSION
-!FreeBSD/databases/tarantool/Makefile
 src/00000000000000000001.snap
 doc/sphinx/_build/*
 !doc/sphinx/_build/.gitignore
@@ -98,4 +111,4 @@ debian/tarantool.debhelper.log
 debian/tarantool.substvars
 debian/tarantool/*
 debian/tmp/*
-
+*.cdbs-config_list
