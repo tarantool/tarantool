@@ -75,7 +75,7 @@ size_t
 MemtxIndex::count(enum iterator_type type, const char *key,
 		  uint32_t part_count) const
 {
-	if (type == ITER_ALL && key == NULL)
+	if (type == ITER_ALL)
 		return size(); /* optimization */
 	struct iterator *it = position();
 	initIterator(it, type, key, part_count);
