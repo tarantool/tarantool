@@ -115,6 +115,10 @@ API is a direct binding to corresponding methods of index objects of type
 
             Note re storage engine: sophia does not allow search-value-parts to be ``nil`` or missing.
 
+            .. rst-class:: left-align-column-1
+            .. rst-class:: left-align-column-2
+            .. rst-class:: left-align-column-3
+
             +---------------+-----------+---------------------------------------------+
             | Type          | Arguments | Description                                 |
             +===============+===========+=============================================+
@@ -166,6 +170,10 @@ API is a direct binding to corresponding methods of index objects of type
 
             **Iterator types for HASH indexes**
 
+            .. rst-class:: left-align-column-1
+            .. rst-class:: left-align-column-2
+            .. rst-class:: left-align-column-3
+
             +---------------+-----------+------------------------------------------------+
             | Type          | Arguments | Description                                    |
             +===============+===========+================================================+
@@ -194,6 +202,10 @@ API is a direct binding to corresponding methods of index objects of type
             +---------------+-----------+------------------------------------------------+
 
             **Iterator types for BITSET indexes**
+
+            .. rst-class:: left-align-column-1
+            .. rst-class:: left-align-column-2
+            .. rst-class:: left-align-column-3
 
             +----------------------------+-----------+----------------------------------------------+
             | Type                       | Arguments | Description                                  |
@@ -226,6 +238,10 @@ API is a direct binding to corresponding methods of index objects of type
             .. _rtree-iterator:
 
             **Iterator types for RTREE indexes**
+
+            .. rst-class:: left-align-column-1
+            .. rst-class:: left-align-column-2
+            .. rst-class:: left-align-column-3
 
             +--------------------+-----------+---------------------------------------------------------+
             | Type               | Arguments | Description                                             |

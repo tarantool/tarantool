@@ -87,6 +87,9 @@ If username:password is omitted, then 'guest' is assumed. Some examples:
 
     .. container:: table
 
+        .. rst-class:: left-align-column-1
+        .. rst-class:: left-align-column-2
+
         +-----------------------------+------------------------------+
         | URI fragment                | Example                      |
         +=============================+==============================+
