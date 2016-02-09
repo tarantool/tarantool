@@ -79,7 +79,6 @@ This will start Tarantool in interactive mode.
 
 To run Tarantool regression tests (test/test-run.py),
 a few additional Python modules are necessary:
- * python-daemon>=1.5.5
  * PyYAML==3.10
  * argparse==1.1
  * msgpack-python==0.4.6
