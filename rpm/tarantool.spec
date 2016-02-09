@@ -53,6 +53,9 @@ BuildRequires: python
 BuildRequires: python-six
 BuildRequires: python-gevent
 BuildRequires: python-yaml
+%if 0%{?rhel} < 7 && 0%{?rhel} > 0
+BuildRequires: python-argparse
+%endif
 
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
