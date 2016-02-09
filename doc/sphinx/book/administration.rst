@@ -525,3 +525,417 @@ in the search box.
 There are no known permanent issues. For transient issues, go to
 http://github.com/tarantool/tarantool/issues and enter "OS X" in
 the search box.
+
+=====================================================================
+                     Notes for systemd users
+=====================================================================
+
+The Tarantool package fully supports :program:`systemd` for managing instances and
+supervising database daemons.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                     Instance management
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tarantool package was designed to have multiple running instances of Tarantool
+on the same machine. Use :samp:`systemctl {start|stop|restart|status} tarantool@${MYAPP}`
+to manage your databases and Lua applications.
+
+******************************************************
+                 creating instances
+******************************************************
+
+Simply put your Lua configuration to :file:`/etc/tarantool/instances.available/${MYAPP}.lua`:
+
+.. code-block:: lua
+
+    box.cfg{listen = 3313}
+    require('myappcode').start()
+
+(this minimal example is sufficient).
+
+Another starting point could be the :file:`example.lua` script that ships with Tarantool
+and defines all options.
+
+******************************************************
+                starting instances
+******************************************************
+
+Use :samp:`systemctl start tarantool@${MYAPP}` to start ``${MYAPP}`` instance:
+
+.. code-block:: console
+
+    $ systemctl start tarantool@example
+    $ ps axuf|grep exampl[e]
+    taranto+  5350  1.3  0.3 1448872 7736 ?        Ssl  20:05   0:28 tarantool example.lua <running>
+
+(console examples here and further on are for Fedora).
+
+Use :samp:`systemctl enable tarantool@${MYAPP}` to enable ``${MYAPP}`` instance
+for auto-load during system startup.
+
+******************************************************
+               monitoring instances
+******************************************************
+
+Use :samp:`systemctl status tarantool@${MYAPP}` to check information about
+``${MYAPP}`` instance:
+
+.. code-block:: console
+
+    $ systemctl status tarantool@example
+    tarantool@example.service - Tarantool Database Server
+    Loaded: loaded (/etc/systemd/system/tarantool@.service; disabled; vendor preset: disabled)
+    Active: active (running)
+    Docs: man:tarantool(1)
+    Process: 5346 ExecStart=/usr/bin/tarantoolctl start %I (code=exited, status=0/SUCCESS)
+    Main PID: 5350 (tarantool)
+    Tasks: 11 (limit: 512)
+    CGroup: /system.slice/system-tarantool.slice/tarantool@example.service
+    + 5350 tarantool example.lua <running>
+
+Use :samp:`journalctl -u tarantool@${MYAPP}` to check the boot log:
+
+.. code-block:: console
+
+    $ journalctl -u tarantool@example -n 5
+    -- Logs begin at Fri 2016-01-08 12:21:53 MSK, end at Thu 2016-01-21 21:17:47 MSK. --
+    Jan 21 21:17:47 localhost.localdomain systemd[1]: Stopped Tarantool Database Server.
+    Jan 21 21:17:47 localhost.localdomain systemd[1]: Starting Tarantool Database Server...
+    Jan 21 21:17:47 localhost.localdomain tarantoolctl[5969]: /usr/bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    Jan 21 21:17:47 localhost.localdomain tarantoolctl[5969]: /usr/bin/tarantoolctl: Starting instance...
+    Jan 21 21:17:47 localhost.localdomain systemd[1]: Started Tarantool Database Server
+
+******************************************************
+                attaching to instances
+******************************************************
+
+You can attach to a running Tarantool instance and evaluate some Lua code using the
+:program:`tarantoolctl` utility:
+
+.. code-block:: console
+
+    $ tarantoolctl enter example
+    /bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    /bin/tarantoolctl: Connecting to /var/run/tarantool/example.control
+    /bin/tarantoolctl: connected to unix/:/var/run/tarantool/example.control
+    unix/:/var/run/tarantool/example.control> 1 + 1
+    ---
+    - 2
+    ...
+    unix/:/var/run/tarantool/example.control>
+
+******************************************************
+                    checking logs
+******************************************************
+
+Tarantool logs important events to :file:`/var/log/tarantool/${MYAPP}.log`.
+
+Let's write something to the log file:
+
+.. code-block:: console
+
+    $ tarantoolctl enter example
+    /bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    /bin/tarantoolctl: Connecting to /var/run/tarantool/example.control
+    /bin/tarantoolctl: connected to unix/:/var/run/tarantool/example.control
+    unix/:/var/run/tarantool/example.control> require('log').info("Hello for README.systemd readers")
+    ---
+    ...
+
+Then check the logs:
+
+.. code-block:: console
+
+    $ tail /var/log/tarantool/example.log
+    2016-01-21 21:09:45.982 [5914] iproto I> binary: started
+    2016-01-21 21:09:45.982 [5914] iproto I> binary: bound to 0.0.0.0:3301
+    2016-01-21 21:09:45.983 [5914] main/101/tarantoolctl I> ready to accept requests
+    2016-01-21 21:09:45.983 [5914] main/101/example I> Run console at /var/run/tarantool/example.control
+    2016-01-21 21:09:45.984 [5914] main/101/example I> tcp_server: remove dead UNIX socket: /var/run/tarantool/example.control
+    2016-01-21 21:09:45.984 [5914] main/104/console/unix/:/var/run/tarant I> started
+    2016-01-21 21:09:45.985 [5914] main C> entering the event loop
+    2016-01-21 21:14:43.320 [5914] main/105/console/unix/: I> client unix/: connected
+    2016-01-21 21:15:07.115 [5914] main/105/console/unix/: I> Hello for README.systemd readers
+    2016-01-21 21:15:09.250 [5914] main/105/console/unix/: I> client unix/: disconnected
+
+Log rotation is enabled by default if you have :program:`logrotate` installed. Please configure
+:file:`/etc/logrotate.d/tarantool` to change the default behavior.
+
+******************************************************
+                  stopping instances
+******************************************************
+
+Use :samp:`systemctl stop tarantool@${MYAPP}` to see information about the running
+``${MYAPP}`` instance.
+
+.. code-block:: console
+
+    $ systemctl stop tarantool@example
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                Daemon supervision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All instances are automatically restarted by :program:`systemd` in case of failure.
+
+Let's try to destroy an instance:
+
+.. code-block:: console
+
+    $ systemctl status tarantool@example|grep PID
+    Main PID: 5885 (tarantool)
+    $ tarantoolctl enter example
+    /bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    /bin/tarantoolctl: Connecting to /var/run/tarantool/example.control
+    /bin/tarantoolctl: connected to unix/:/var/run/tarantool/example.control
+    unix/:/var/run/tarantool/example.control> os.exit(-1)
+    /bin/tarantoolctl: unix/:/var/run/tarantool/example.control: Remote host closed connection
+
+Now let's make sure that :program:`systemd` has revived our Tarantool instance:
+
+.. code-block:: console
+
+    $ systemctl status tarantool@example|grep PID
+    Main PID: 5914 (tarantool)
+
+Finally, let's check the boot logs:
+
+.. code-block:: console
+
+    $ journalctl -u tarantool@example -n 8
+    -- Logs begin at Fri 2016-01-08 12:21:53 MSK, end at Thu 2016-01-21 21:09:45 MSK. --
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: tarantool@example.service: Unit entered failed state.
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: tarantool@example.service: Failed with result 'exit-code'.
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: tarantool@example.service: Service hold-off time over, scheduling restart.
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: Stopped Tarantool Database Server.
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: Starting Tarantool Database Server...
+    Jan 21 21:09:45 localhost.localdomain tarantoolctl[5910]: /usr/bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    Jan 21 21:09:45 localhost.localdomain tarantoolctl[5910]: /usr/bin/tarantoolctl: Starting instance...
+    Jan 21 21:09:45 localhost.localdomain systemd[1]: Started Tarantool Database Server.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+               Customizing the service file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Please don't modify the :file:`tarantool@.service` file in-place, because it will be
+overwritten during package upgrades. It is recommended to copy this file to
+:file:`/etc/systemd/system` and then modify the required settings. Alternatively,
+you can create a directory named :file:`unit.d/` within :file:`/etc/systemd/system` and
+put there a drop-in file :file:`name.conf` that only changes the required settings.
+Please see ``systemd.unit(5)`` manual page for additional information.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                      Debugging
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:program:`coredumpctl` automatically saves core dumps and stack traces in case of a crash.
+Here is how it works:
+
+.. code-block:: console
+
+    $ # !!! please never do this on the production system !!!
+    $ tarantoolctl enter example
+    /bin/tarantoolctl: Found example.lua in /etc/tarantool/instances.available
+    /bin/tarantoolctl: Connecting to /var/run/tarantool/example.control
+    /bin/tarantoolctl: connected to unix/:/var/run/tarantool/example.control
+    unix/:/var/run/tarantool/example.control> require('ffi').cast('char *', 0)[0] = 48
+    /bin/tarantoolctl: unix/:/var/run/tarantool/example.control: Remote host closed connection
+
+:samp:`coredumpctl list /usr/bin/tarantool` displays the latest crashes of the Tarantool daemon:
+
+.. code-block:: console
+
+    $ coredumpctl list /usr/bin/tarantool
+    MTIME                            PID   UID   GID SIG PRESENT EXE
+    Sat 2016-01-23 15:21:24 MSK   20681  1000  1000   6   /usr/bin/tarantool
+    Sat 2016-01-23 15:51:56 MSK   21035   995   992   6   /usr/bin/tarantool
+
+:samp:`coredumpctl info <pid>` shows the stack trace and other useful information:
+
+.. code-block:: console
+
+    $ coredumpctl info 21035
+              PID: 21035 (tarantool)
+              UID: 995 (tarantool)
+              GID: 992 (tarantool)
+           Signal: 6 (ABRT)
+        Timestamp: Sat 2016-01-23 15:51:42 MSK (4h 36min ago)
+     Command Line: tarantool example.lua <running>
+       Executable: /usr/bin/tarantool
+    Control Group: /system.slice/system-tarantool.slice/tarantool@example.service
+             Unit: tarantool@example.service
+            Slice: system-tarantool.slice
+          Boot ID: 7c686e2ef4dc4e3ea59122757e3067e2
+       Machine ID: a4a878729c654c7093dc6693f6a8e5ee
+         Hostname: localhost.localdomain
+          Message: Process 21035 (tarantool) of user 995 dumped core.
+
+                   Stack trace of thread 21035:
+                   #0  0x00007f84993aa618 raise (libc.so.6)
+                   #1  0x00007f84993ac21a abort (libc.so.6)
+                   #2  0x0000560d0a9e9233 _ZL12sig_fatal_cbi (tarantool)
+                   #3  0x00007f849a211220 __restore_rt (libpthread.so.0)
+                   #4  0x0000560d0aaa5d9d lj_cconv_ct_ct (tarantool)
+                   #5  0x0000560d0aaa687f lj_cconv_ct_tv (tarantool)
+                   #6  0x0000560d0aaabe33 lj_cf_ffi_meta___newindex (tarantool)
+                   #7  0x0000560d0aaae2f7 lj_BC_FUNCC (tarantool)
+                   #8  0x0000560d0aa9aabd lua_pcall (tarantool)
+                   #9  0x0000560d0aa71400 lbox_call (tarantool)
+                   #10 0x0000560d0aa6ce36 lua_fiber_run_f (tarantool)
+                   #11 0x0000560d0a9e8d0c _ZL16fiber_cxx_invokePFiP13__va_list_tagES0_ (tarantool)
+                   #12 0x0000560d0aa7b255 fiber_loop (tarantool)
+                   #13 0x0000560d0ab38ed1 coro_init (tarantool)
+                   ...
+
+:samp:`coredumpctl -o filename.core info <pid>` saves the core dump into a file.
+
+:samp:`coredumpctl gdb <pid>` starts :program:`gdb` on the core dump.
+
+It is highly recommended to install the ``tarantool-debuginfo`` package to improve
+:program:`gdb` experience. Example:
+
+.. code-block:: console
+
+    $ dnf debuginfo-install tarantool
+
+.. $ # for CentOS
+.. $ yum install tarantool-debuginfo
+
+:program:`gdb` also provides information about the ``debuginfo`` packages you need to install:
+
+.. code-block:: console
+
+    $ # gdb -p <pid>
+    ...
+    Missing separate debuginfos, use: dnf debuginfo-install
+    glibc-2.22.90-26.fc24.x86_64 krb5-libs-1.14-12.fc24.x86_64
+    libgcc-5.3.1-3.fc24.x86_64 libgomp-5.3.1-3.fc24.x86_64
+    libselinux-2.4-6.fc24.x86_64 libstdc++-5.3.1-3.fc24.x86_64
+    libyaml-0.1.6-7.fc23.x86_64 ncurses-libs-6.0-1.20150810.fc24.x86_64
+    openssl-libs-1.0.2e-3.fc24.x86_64
+
+Symbol names are present in stack traces even if you don't have the ``tarantool-debuginfo`` package installed.
+
+For additional information, please refer to the documentation provided with your Linux distribution.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                     Precautions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Please don't use ``tarantoolctl {start,stop,restart}`` to control instances
+  started by :program:`systemd`. It is still possible to use :program:`tarantoolctl` to start and
+  stop instances from your local directories (e.g. :file:`${HOME}`) without obtaining ``ROOT`` access.
+
+* :program:`tarantoolctl` is configured to work properly with ;program:`systemd`. Please don't
+  modify system-wide settings of :program:`tarantoolctl`, such as paths, directory permissions and usernames.
+  Otherwise, you have a chance to shoot yourself in the foot.
+
+* :program:`systemd` scripts are maintained by the Tarantool Team (http://tarantool.org).
+  Please file tickets directly to the upstream's bug tracker rather than to your Linux distribution.
+
+=====================================================================
+             Updating Tarantool in production
+=====================================================================
+
+First, put your application's business logic in a Tarantool-Lua module that exports its functions for CALL.
+
+For example, :file:`/usr/share/tarantool/myapp.lua`:
+
+.. code-block:: lua
+
+    local function start()
+    -- Initial version
+    box.once("myapp:.1.0", function()
+    box.schema.space.create("somedata")
+    box.space.somedata:create_index("primary")
+    ...
+    end
+
+    -- migration code from 1.0 to 1.1
+    box.once("myapp:.v1.1", function()
+    box.space.somedata.index.primary:alter(...)
+    ...
+    end
+
+    -- migration code from 1.1 to 1.2
+    box.once("myapp:.v1.2", function()
+    box.space.somedata.space:alter(...)
+    box.space.somedata:insert(...)
+    ...
+    end
+
+    -- start some background fibers if you need
+
+    local function stop()
+    -- stop all background fibers and cleanup resources
+    end
+
+    local function api_for_call(xxx)
+    -- do some business
+    end
+
+    return {
+    start = start;
+    stop = stop;
+    api_for_call = api_for_call;
+    }
+
+This file is maintained by the application's developers. On its side,
+Tarantool Team provides templates for you to `assemble deb/rpm packages`_
+and utilities to quickly `assemble packages for specific platforms`_.
+If needed, you can split applications into standalone files and/or modules.
+
+.. _assemble deb/rpm packages: https://github.com/tarantool/modulekit
+.. _assemble packages for specific platforms: https://github.com/tarantool/build
+
+
+Second, put an initialization script to the :file:`/etc/tarantool/instances.available` directory.
+
+For example, :file:`/etc/tarantool/instances.available/myappcfg.lua`:
+
+.. code-block:: lua
+
+    #!/usr/bin/env tarantool
+
+    box.cfg {
+    listen = 3301;
+    }
+
+    if myapp ~= nil then
+    -- hot code reload using tarantoolctl or dofile()
+
+    -- unload old application
+    myapp.stop()
+    -- clear cache for loaded modules and dependencies
+    package.loaded['myapp'] = nil
+    package.loaded['somedep'] = nil; -- dependency of 'myapp'
+    end
+
+    -- load a new version of app and all dependencies
+    myapp = require('myapp').start({some app options controlled by sysadmins})
+
+
+As a more detailed example, you can take the :file:`example.lua` script that ships with Tarantool
+and defines all configuration options.
+
+This initialization script is actually a configuration file and should be maintained by system
+administrators, while developers only provide a template.
+
+
+Now update your app file in :file:`/usr/share/tarantool`. Replace your application file
+(for example, :file:`/usr/share/tarantool/myapp.lua`) and manually reload
+the :file:`myappcfg.lua` initialization script using :program:`tarantoolctl`:
+
+.. code-block:: console
+
+    $ tarantoolctl eval /etc/tarantool/instance.enabled/myappcfg.lua
+
+After that, you need to manually flush the cache of ``package.loaded`` modules.
+
+For deb/rpm packages, you can add the ``tarantoolctl eval`` instruction directly into Tarantool's
+specification in :file:`RPM.spec` and the :file:`/debian` directory.
+
+Finally, clients make a CALL to ``myapp.api_for_call`` and other API functions.
+
+In case of ``tarantool-http``, there is no need to start the binary protocol at all.
