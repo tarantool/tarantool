@@ -49,12 +49,11 @@ BuildRequires: zlib-devel
 %endif
 
 # For tests
-BuildRequires: python
-BuildRequires: python-six
-BuildRequires: python-gevent
-BuildRequires: python-yaml
-%if 0%{?rhel} < 7 && 0%{?rhel} > 0
-BuildRequires: python-argparse
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
+BuildRequires: python >= 2.7
+BuildRequires: python-six >= 1.9.0
+BuildRequires: python-gevent >= 1.0
+BuildRequires: python-yaml >= 3.0.9
 %endif
 
 Name: tarantool
@@ -118,12 +117,14 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
 # https://github.com/tarantool/tarantool/issues/1227
 echo "self.skip = True" > ./test/app/socket.skipcond
 # https://github.com/tarantool/tarantool/issues/1322
 echo "self.skip = True" > ./test/app/digest.skipcond
 # run a safe subset of the test suite
 cd test && ./test-run.py unit/ app/ app-tap/ box/ box-tap/ engine/ sophia/
+%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
