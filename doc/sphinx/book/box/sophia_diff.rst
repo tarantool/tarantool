@@ -20,7 +20,7 @@
     All of these differences have been noted elsewhere in
     sentences that begin with the words "Note re storage engine: sophia".
 
-    With memtx, the maximum number of indexes per space is 10. |br|
+    With memtx, the maximum number of indexes per space is 128. |br|
     With sophia, the maximum is 1, that is, only primary indexes are supported.
     Since primary indexes are always unique, it follows that sophia indexes must be unique.
 

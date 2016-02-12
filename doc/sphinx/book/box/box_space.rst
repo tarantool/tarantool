@@ -288,8 +288,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: If a different tuple with the same unique-key
         value already exists, returns :errcode:`ER_TUPLE_FOUND`. (This
-        would only happen if there was a secondary index. By default
-        secondary indexes are unique)
+        will only happen if there is a secondary index. By default
+        secondary indexes are unique.)
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.
