@@ -463,6 +463,20 @@ div.b-cols_content_left .b-search-text {
     font-style: italic;
 }
 
+.ccodegreen, .ccodebi {
+    color: green;
+}
+
+.ccodeblue, .ccodebi {
+    color: blue;
+}
+
+.ccodered, .ccodebi {
+    color: red;
+}
+
+
+
 .leftaligned {
     text-align: left
 }

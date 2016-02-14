@@ -83,6 +83,15 @@ rst_prolog = """
 
 .. role:: codebolditalic
    :class: ccodebi
+   
+.. role:: codegreen
+   :class: ccodegreen
+   
+.. role:: codered
+   :class: ccodered
+   
+.. role:: codeblue
+   :class: ccodeblue
 
 .. |nbsp| unicode:: 0xA0
 
