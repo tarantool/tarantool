@@ -27,11 +27,10 @@ blocks :
 
           .. code-block:: bash
 
-            wget http://tarantool.org/dist/public.key
-            sudo apt-key add ./public.key
+            curl http://tarantool.org/dist/public.key | sudo apt-key add -
             release=`lsb_release -c -s`
 
-            sudo cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
+            sudo tee /etc/apt/sources.list.d/tarantool.list <<- EOF
             deb http://tarantool.org/dist/master/ubuntu/ $release main
             deb-src http://tarantool.org/dist/master/ubuntu/ $release main
             EOF
@@ -51,11 +50,10 @@ blocks :
 
           .. code-block:: bash
 
-            wget http://tarantool.org/dist/public.key
-            sudo apt-key add ./public.key
+            curl http://tarantool.org/dist/public.key | sudo apt-key add -
             release=`lsb_release -c -s`
 
-            sudo cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
+            sudo tee /etc/apt/sources.list.d/tarantool.list <<- EOF
             deb http://tarantool.org/dist/master/debian/ $release main
             deb-src http://tarantool.org/dist/master/debian/ $release main
             EOF
@@ -81,7 +79,7 @@ blocks :
 
           .. code-block:: bash
 
-            sudo cat > /etc/yum.repos.d/tarantool.repo <<- EOF
+            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
             [tarantool]
             name=Fedora-\$releasever - Tarantool
             baseurl=http://tarantool.org/dist/master/fedora/\$releasever/\$basearch/
@@ -101,7 +99,7 @@ blocks :
 
           .. code-block:: bash
 
-            sudo cat > /etc/yum.repos.d/tarantool.repo <<- EOF
+            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
             [tarantool]
             name=CentOS-\$releasever - Tarantool
             baseurl=http://tarantool.org/dist/master/centos/\$releasever/\$basearch/
@@ -122,7 +120,7 @@ blocks :
 
           .. code-block:: bash
 
-            sudo cat > /etc/yum.repos.d/tarantool.repo <<- EOF
+            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
             [tarantool]
             name=CentOS-6 - Tarantool
             baseurl=http://tarantool.org/dist/master/centos/6/os/\$basearch/
