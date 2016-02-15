@@ -60,6 +60,7 @@ private:
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
 public:
+	int thread_pool_started;
 	int recovery_complete;
 	struct cord *cord;
 	ev_async watcher;
