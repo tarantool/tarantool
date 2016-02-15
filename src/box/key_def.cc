@@ -78,7 +78,8 @@ const struct key_opts key_opts_default = {
 	/* .page_size           = */ 131072,
 	/* .sync                = */ 2,
 	/* .mmap                = */ 0,
-	/* .amqf                = */ 0
+	/* .amqf                = */ 0,
+	/* .read_oldest         = */ 0
 };
 
 const struct opt_def key_opts_reg[] = {
@@ -94,6 +95,7 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("sync", MP_UINT, struct key_opts, sync),
 	OPT_DEF("mmap", MP_UINT, struct key_opts, mmap),
 	OPT_DEF("amqf", MP_UINT, struct key_opts, amqf),
+	OPT_DEF("read_oldest", MP_UINT, struct key_opts, read_oldest),
 	{ NULL, MP_NIL, 0, 0 }
 };
 

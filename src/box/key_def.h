@@ -174,6 +174,7 @@ struct key_opts {
 	uint32_t sync;
 	uint32_t mmap;
 	uint32_t amqf;
+	uint32_t read_oldest;
 };
 
 extern const struct key_opts key_opts_default;
