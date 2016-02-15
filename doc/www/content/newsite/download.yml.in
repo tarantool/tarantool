@@ -75,7 +75,7 @@ blocks :
           We maintain an always up-to-date Fedora package repository at
           `<http://tarantool.org/dist/master/fedora>`_
 
-          It can be added to your yum repos with:
+          Copy and paste the script below to the terminal prompt:
 
           .. code-block:: bash
 
@@ -89,37 +89,21 @@ blocks :
 
             sudo dnf -y install tarantool
 
-    - - "CentOS and RHEL"
+    - - "RHEL 6 and CentOS 6"
       - format : rst
         content: |
-          We maintain an always up-to-date CentOS package repository at
-          `<http://tarantool.org/dist/master/centos>`_
+          We maintain an always up-to-date package repository for RHEL 6
+          derivatives at
+          `<http://tarantool.org/dist/master/centos/6/os>`_.
+          You may need to enable the `EPEL`_ repository for some packages.
 
-          It can be added to your yum repos with:
+          Copy and paste the script below to the terminal prompt:
 
           .. code-block:: bash
 
-            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
-            [tarantool]
-            name=CentOS-\$releasever - Tarantool
-            baseurl=http://tarantool.org/dist/master/centos/\$releasever/\$basearch/
-            enabled=1
-            gpgcheck=0
-            EOF
-
-            sudo yum -y install tarantool
-
-    - - "Amazon Linux"
-      - format : rst
-        content: |
-          Amazon Linux is based on RHEL 6 / CentOS 6.
-          We maintain an always up-to-date CentOS 6 package repository at
-          `<http://tarantool.org/dist/master/centos>`_
-
-          It can be added to your yum repos with:
-
-          .. code-block:: bash
-
+            # Enable EPEL repository
+            sudo yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+            # Add Tarantool repository
             sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
             [tarantool]
             name=CentOS-6 - Tarantool
@@ -127,8 +111,60 @@ blocks :
             enabled=1
             gpgcheck=0
             EOF
-
+            # Install Tarantool
             sudo yum -y install tarantool
+
+          .. _EPEL: https://fedoraproject.org/wiki/EPEL
+
+    - - "RHEL 7 and CentOS 7"
+      - format : rst
+        content: |
+          We maintain an always up-to-date package repository for RHEL 7
+          derivatives at
+          `<http://tarantool.org/dist/master/centos/7/os>`_
+
+          Copy and paste the script below to the terminal prompt:
+
+          .. code-block:: bash
+
+            # Add Tarantool repository
+            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
+            [tarantool]
+            name=CentOS-7 - Tarantool
+            baseurl=http://tarantool.org/dist/master/centos/7/os/\$basearch/
+            enabled=1
+            gpgcheck=0
+            EOF
+            # Install Tarantool
+            sudo yum -y install tarantool
+
+    - - "Amazon Linux"
+      - format : rst
+        content: |
+          Amazon Linux is based on RHEL 6 / CentOS 6.
+          We maintain an always up-to-date package repository for RHEL 6
+          derivatives at
+          `<http://tarantool.org/dist/master/centos/6/os>`_.
+          You may need to enable the `EPEL`_ repository for some packages.
+
+          Copy and paste the script below to the terminal prompt:
+
+          .. code-block:: bash
+
+            # Enable EPEL repository
+            sed 's/enabled=.*/enabled=1/g' -i /etc/yum.repos.d/epel.repo
+            # Add Tarantool repository
+            sudo tee /etc/yum.repos.d/tarantool.repo <<- EOF
+            [tarantool]
+            name=CentOS-6 - Tarantool
+            baseurl=http://tarantool.org/dist/master/centos/6/os/\$basearch/
+            enabled=1
+            gpgcheck=0
+            EOF
+            # Install Tarantool
+            sudo yum -y install tarantool
+
+          .. _EPEL: https://aws.amazon.com/amazon-linux-ami/faqs/#epel
 
     - - "Gentoo Linux"
       - format : rst
