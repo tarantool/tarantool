@@ -6,6 +6,11 @@ env = require('test_run')
 test_run = env.new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
+test_run:cmd("setopt delimiter ';'")
+function x_select(cn, ...) return cn:_select(...) end
+function x_fatal(cn, ...) return cn:_fatal(...) end
+test_run:cmd("setopt delimiter ''");
+
 LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.space.create('net_box_test_space')
 index = space:create_index('primary', { type = 'tree' })
@@ -13,7 +18,6 @@ index = space:create_index('primary', { type = 'tree' })
 -- low level connection
 log.info("create connection")
 cn = remote.connect(LISTEN.host, LISTEN.service)
-cn:_wait_state({active = true, error = true}, 1)
 log.info("state is %s", cn.state)
 
 cn:ping()
@@ -99,12 +103,12 @@ box.schema.user.grant('guest','read,write,execute','universe')
 cn:close()
 cn = remote.connect(box.cfg.listen)
 
-cn:_select(space.id, space.index.primary.id, 123)
+x_select(cn, space.id, space.index.primary.id, 123)
 space:insert{123, 345}
-cn:_select(space.id, space.index.primary.id, 123)
-cn:_select(space.id, space.index.primary.id, 123, { limit = 0 })
-cn:_select(space.id, space.index.primary.id, 123, { limit = 1 })
-cn:_select(space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
+x_select(cn, space.id, space.index.primary.id, 123)
+x_select(cn, space.id, space.index.primary.id, 123, { limit = 0 })
+x_select(cn, space.id, space.index.primary.id, 123, { limit = 1 })
+x_select(cn, space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
 
 cn.space[space.id]  ~= nil
 cn.space.net_box_test_space ~= nil
@@ -172,7 +176,7 @@ cn.space.net_box_test_space:get(354)
 -- reconnects after errors
 
 -- -- 1. no reconnect
-cn:_fatal('Test fatal error')
+x_fatal(cn)
 -- We expect the connection to enter 'closed' state due to 'reconnect_after'
 -- option missing, however 'error'->'closed' transition happens in some
 -- unrelated fiber, scheduling quirks bite (again) (sigh)
@@ -183,22 +187,17 @@ cn:call('test_foo')
 
 -- -- 2 reconnect
 cn = remote.connect(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
-cn:_wait_state({active = true}, 1)
 cn.space ~= nil
 
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
-cn:_fatal 'Test error'
-cn:_wait_state({active = true, activew = true}, 2)
+x_fatal(cn)
+cn:wait_connected()
 cn:ping()
 cn.state
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 
-cn:_fatal 'Test error'
-cn:_select(space.id, 0, {}, { iterator = 'ALL' })
-
--- send broken packet (remote server will close socket)
-cn.s:syswrite(msgpack.encode(1) .. msgpack.encode('abc'))
-fiber.sleep(.2)
+x_fatal(cn)
+x_select(cn, space.id, 0, {}, { iterator = 'ALL' })
 
 cn.state
 cn:ping()
@@ -206,10 +205,10 @@ cn:ping()
 -- -- dot-new-method
 
 cn1 = remote.new(LISTEN.host, LISTEN.service)
-cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
+x_select(cn1, space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- error while waiting for response
-type(fiber.create(function() fiber.sleep(.5) cn:_fatal('Test error') end))
+type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
 function pause() fiber.sleep(10) return true end
 
 cn:call('pause')
@@ -278,14 +277,6 @@ remote.self:wait_connected()
 
 -- cleanup database after tests
 space:drop()
-
-
--- admin console tests
-cnc = remote.connect(os.getenv('ADMIN'))
-cnc.console ~= nil
-cnc:console('return 1, 2, 3, "string", nil')
-cnc:console('error("test")')
-cnc:console('a = {1, 2, 3, 4}; return a[3]')
 
 -- #1545 empty password
 cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'test' })
