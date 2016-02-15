@@ -111,6 +111,27 @@ blocks :
 
             sudo yum -y install tarantool
 
+    - - "Amazon Linux"
+      - format : rst
+        content: |
+          Amazon Linux is based on RHEL 6 / CentOS 6.
+          We maintain an always up-to-date CentOS 6 package repository at
+          `<http://tarantool.org/dist/master/centos>`_
+
+          It can be added to your yum repos with:
+
+          .. code-block:: bash
+
+            sudo cat > /etc/yum.repos.d/tarantool.repo <<- EOF
+            [tarantool]
+            name=CentOS-6 - Tarantool
+            baseurl=http://tarantool.org/dist/master/centos/6/os/\$basearch/
+            enabled=1
+            gpgcheck=0
+            EOF
+
+            sudo yum -y install tarantool
+
     - - "Gentoo Linux"
       - format : rst
         content: |
