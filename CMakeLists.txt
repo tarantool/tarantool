@@ -251,7 +251,9 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 #
 # Now handle all configuration options.
 #
-option(ENABLE_DOC "Enable building of documentation" OFF)
+if (IS_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx)
+    option(ENABLE_DOC "Enable building of documentation" OFF)
+endif ()
 
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
