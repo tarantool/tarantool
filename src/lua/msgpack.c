@@ -241,7 +241,7 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 	}
 }
 
-static enum mp_type
+enum mp_type
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
 	       struct mpstream *stream, struct luaL_field *field,
 	       int level)

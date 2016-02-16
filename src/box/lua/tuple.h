@@ -60,16 +60,15 @@ struct tuple *
 lua_istuple(struct lua_State *L, int narg);
 
 void
-luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index);
-
-void
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index);
 
 void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index);
+
+void
+tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream);
 
 void
 box_lua_tuple_init(struct lua_State *L);

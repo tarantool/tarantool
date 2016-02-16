@@ -563,7 +563,9 @@ cn:call('pause')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
 ...
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
@@ -574,7 +576,9 @@ remote.self:call('test_foo', 'a', 'b', 'c')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
 ...
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end

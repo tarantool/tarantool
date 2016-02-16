@@ -156,6 +156,12 @@ void
 luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,
 		  bool val);
 
+/* low-level function needed for execute_lua_call() */
+enum mp_type
+luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
+	       struct mpstream *stream, struct luaL_field *field,
+	       int level);
+
 enum mp_type
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
 	     struct mpstream *stream, int index);
