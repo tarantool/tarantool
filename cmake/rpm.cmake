@@ -1,5 +1,5 @@
 find_program(RPMBUILD rpmbuild)
-if(NOT IS_DIRECTORY $(PROJECT_SOURCE_DIR)/rpm)
+if(NOT IS_DIRECTORY ${PROJECT_SOURCE_DIR}/rpm)
     return()
 endif()
 if (RPMBUILD)
