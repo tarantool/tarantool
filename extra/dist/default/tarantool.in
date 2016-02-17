@@ -24,5 +24,5 @@ default_cfg = {
 
 -- instances.available - all available instances
 -- instances.enabled - instances to autostart by sysvinit
-instance_dir = "@TARANTOOL_AVAILABLEDIR@"
+instance_dir = "@TARANTOOL_INSTANCEDIR@"
 -- vim: set ft=lua :

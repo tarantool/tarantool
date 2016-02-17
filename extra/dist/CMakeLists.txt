@@ -38,6 +38,12 @@ set(SYSCONFIG_AVAILABLEDIR "tarantool/instances.available")
 set(SYSCONFIG_ENABLEDDIR "tarantool/instances.enabled")
 set(TARANTOOL_AVAILABLEDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_AVAILABLEDIR}")
 set(TARANTOOL_ENABLEDDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/${SYSCONFIG_ENABLEDDIR}")
+if(WITH_SYSTEMD AND NOT WITH_SYSVINIT)
+    # Don't use instances.enabled on systemd distros
+    set(TARANTOOL_INSTANCEDIR "${TARANTOOL_AVAILABLEDIR}")
+else()
+    set(TARANTOOL_INSTANCEDIR "${TARANTOOL_ENABLEDDIR}")
+endif()
 
 configure_file(default/tarantool.in default/tarantool @ONLY)
 install (FILES ${CMAKE_CURRENT_BINARY_DIR}/default/tarantool DESTINATION
