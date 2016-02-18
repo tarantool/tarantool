@@ -1,1 +1,3 @@
 usr/bin/tarantool
+usr/lib/*/tarantool
+usr/share/tarantool

@@ -175,6 +175,9 @@ chkconfig --del tarantool
 %attr(0750,tarantool,tarantool) %dir %{_localstatedir}/lib/tarantool/
 %attr(0750,tarantool,tarantool) %dir %{_localstatedir}/log/tarantool/
 %config(noreplace) %{_sysconfdir}/logrotate.d/tarantool
+# tarantool package should own module directories
+%dir %{_libdir}/tarantool
+%dir %{_datadir}/tarantool
 
 %if %{with systemd}
 %doc README.systemd.md
