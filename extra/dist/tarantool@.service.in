@@ -5,8 +5,8 @@
 # place a drop-in file name.conf there that only changes the specific
 # settings one is interested in.
 #
-# Please see README.systemd.md for additional information.
-#
+# Please see http://tarantool.org/doc/book/administration.html
+# for additional information.
 #
 [Unit]
 Description=Tarantool Database Server

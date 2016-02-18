@@ -180,7 +180,6 @@ chkconfig --del tarantool
 %dir %{_datadir}/tarantool
 
 %if %{with systemd}
-%doc README.systemd.md
 %{_unitdir}/tarantool@.service
 %{_tmpfilesdir}/tarantool.conf
 %else
