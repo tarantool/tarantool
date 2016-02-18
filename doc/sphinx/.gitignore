@@ -2,3 +2,5 @@
 *.pyc
 _html_build
 _single_build
+_locale_build
+conf.py

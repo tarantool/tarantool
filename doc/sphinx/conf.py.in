@@ -11,8 +11,6 @@ master_doc = 'index'
 extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.ifconfig',
-    #'sphinx.ext.autodoc',
-    #'sphinx.ext.autosummary',
     'ext.custom',
     'ext.LuaDomain',
     'ext.LuaLexer',
@@ -30,7 +28,7 @@ breathe_projects = {
 }
 
 # |release| The full version, including alpha/beta/rc tags.
-release = open('../../../VERSION').read().strip()
+release = open('@CMAKE_SOURCE_DIR@/VERSION').read().strip()
 # |version| The short X.Y version.
 version = '.'.join(release.split('.')[0:2])
 
@@ -94,11 +92,7 @@ rst_epilog = """
     <br />
 """
 
-# def setup(sphinx):
-#     sys.path.insert(0, os.path.abspath('./ext'))
-#     from LuaLexer import LuaLexer
-#     sphinx.add_lexer("lua_tarantool", LuaLexer())
-#     from TarantoolSessionLexer import TarantoolSessionLexer
-#     sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
-#     from TapLexer import TAPLexer
-#     sphinx.add_lexer('tap', TAPLexer())
+# Localization options
+language = 'en'
+locale_dirs = ['./locale']
+gettext_additional_targets = ['literal-block']
