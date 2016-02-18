@@ -103,12 +103,14 @@ debian/tarantool-common.postinst.debhelper
 debian/tarantool-common.postrm.debhelper
 debian/tarantool-common.prerm.debhelper
 debian/tarantool-common.substvars
+debian/tarantool-common.manpages
 debian/tarantool-common/*
 debian/tarantool-dev.debhelper.log
 debian/tarantool-dev.substvars
 debian/tarantool-dev/*
 debian/tarantool.debhelper.log
 debian/tarantool.substvars
+debian/tarantool.manpages
 debian/tarantool/*
 debian/tmp/*
 *.cdbs-config_list
