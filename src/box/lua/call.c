@@ -125,6 +125,123 @@ lbox_call_loadproc(struct lua_State *L)
 	return box_lua_find(L, name, name + name_len);
 }
 
+/*
+ * Encode CALL result.
+ * Please read gh-291 carefully before "fixing" this code.
+ */
+static inline uint32_t
+luamp_encode_call(lua_State *L, struct luaL_serializer *cfg,
+		  struct mpstream *stream)
+{
+	int nrets = lua_gettop(L);
+	if (nrets == 0) {
+		return 0;
+	} else if (nrets > 1) {
+		/*
+		 * Multireturn:
+		 * `return 1, box.tuple.new(...), array, 3, ...`
+		 */
+		for (int i = 1; i <= nrets; ++i) {
+			struct luaL_field field;
+			luaL_tofield(L, cfg, i, &field);
+			struct tuple *tuple;
+			if (field.type == MP_EXT &&
+			    (tuple = lua_istuple(L, i)) != NULL) {
+				/* `return ..., box.tuple.new(...), ...` */
+				tuple_to_mpstream(tuple, stream);
+			} else if (field.type != MP_ARRAY) {
+				/*
+				 * `return ..., scalar, ... =>
+				 *         ..., { scalar }, ...`
+				 */
+				lua_pushvalue(L, i);
+				luamp_encode_array(cfg, stream, 1);
+				luamp_encode_r(L, cfg, stream, &field, 0);
+				lua_pop(L, 1);
+			} else {
+				/* `return ..., array, ...` */
+				luamp_encode(L, cfg, stream, i);
+			}
+		}
+		return nrets;
+	}
+	assert(nrets == 1);
+
+	/*
+	 * Inspect the first result
+	 */
+	struct luaL_field root;
+	luaL_tofield(L, cfg, 1, &root);
+	struct tuple *tuple;
+	if (root.type == MP_EXT && (tuple = lua_istuple(L, 1)) != NULL) {
+		/* `return box.tuple()` */
+		tuple_to_mpstream(tuple, stream);
+		return 1;
+	} else if (root.type != MP_ARRAY) {
+		/*
+		 * `return scalar`
+		 * `return map`
+		 */
+		luamp_encode_array(cfg, stream, 1);
+		assert(lua_gettop(L) == 1);
+		luamp_encode_r(L, cfg, stream, &root, 0);
+		return 1;
+	}
+
+	assert(root.type == MP_ARRAY);
+	if (root.size == 0) {
+		/* `return {}` => `{ box.tuple() }` */
+		luamp_encode_array(cfg, stream, 0);
+		return 1;
+	}
+
+	/* `return { tuple, scalar, tuple }` */
+	assert(root.type == MP_ARRAY && root.size > 0);
+	for (uint32_t t = 1; t <= root.size; t++) {
+		lua_rawgeti(L, 1, t);
+		struct luaL_field field;
+		luaL_tofield(L, cfg, -1, &field);
+		if (field.type == MP_EXT && (tuple = lua_istuple(L, -1))) {
+			tuple_to_mpstream(tuple, stream);
+		} else if (field.type != MP_ARRAY) {
+			/* The first member of root table is not tuple/array */
+			if (t == 1) {
+				/*
+				 * `return { scalar, ... } =>
+				 *        box.tuple.new(scalar, ...)`
+				 */
+				luamp_encode_array(cfg, stream, root.size);
+				/*
+				 * Encode the first field of tuple using
+				 * existing information from luaL_tofield
+				 */
+				luamp_encode_r(L, cfg, stream, &field, 0);
+				lua_pop(L, 1);
+				assert(lua_gettop(L) == 1);
+				/* Encode remaining fields as usual */
+				for (uint32_t f = 2; f <= root.size; f++) {
+					lua_rawgeti(L, 1, f);
+					luamp_encode(L, cfg, stream, -1);
+					lua_pop(L, 1);
+				}
+				return 1;
+			}
+			/*
+			 * `return { tuple/array, ..., scalar, ... } =>
+			 *         { tuple/array, ..., { scalar }, ... }`
+			 */
+			luamp_encode_array(cfg, stream, 1);
+			luamp_encode_r(L, cfg, stream, &field, 0);
+		} else {
+			/* `return { tuple/array, ..., tuple/array, ... }` */
+			luamp_encode_r(L, cfg, stream, &field, 0);
+		}
+		lua_pop(L, 1);
+		assert(lua_gettop(L) == 1);
+	}
+	return root.size;
+}
+
 struct lua_function_ctx {
 	struct request *request;
 	struct obuf *out;
@@ -183,46 +300,20 @@ execute_lua_call(lua_State *L)
 	 * be used, since Lua stack size is limited by 8000 elements,
 	 * while Lua table size is pretty much unlimited.
 	 */
-	uint32_t count = 0;
 	/* TODO: forbid explicit yield from __serialize or __index here */
 	if (iproto_prepare_select(out, svp) != 0)
 		lbox_error(L);
 	ctx->out_is_dirty = true;
+	struct luaL_serializer *cfg = luaL_msgpack_default;
 	struct mpstream stream;
 	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
 
-	/** Check if we deal with a table of tables. */
-	int nrets = lua_gettop(L);
-	if (nrets == 1 && luaL_isarray(L, 1)) {
-		/*
-		 * The table is not empty and consists of tables
-		 * or tuples. Treat each table element as a tuple,
-		 * and push it.
-		 */
-		lua_pushnil(L);
-		int has_keys = lua_next(L, 1);
-		if (has_keys && (luaL_isarray(L, lua_gettop(L)) || lua_istuple(L, -1))) {
-			do {
-				luamp_encode_tuple(L, luaL_msgpack_default,
-						   &stream, -1);
-				++count;
-				lua_pop(L, 1);
-			} while (lua_next(L, 1));
-			goto done;
-		} else if (has_keys) {
-			lua_pop(L, 1);
-		}
-	}
-	for (int i = 1; i <= nrets; ++i) {
-		luamp_convert_tuple(L, luaL_msgpack_default, &stream, i);
-		++count;
-	}
+	uint32_t count = luamp_encode_call(L, cfg, &stream);
 
-done:
 	mpstream_flush(&stream);
 	iproto_reply_select(out, svp, request->header->sync, count);
-	return 0;
+	return 0; /* truncate Lua stack */
 }
 
 static int

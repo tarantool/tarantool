@@ -205,26 +205,28 @@ lbox_tuple_slice(struct lua_State *L)
 }
 
 void
-luamp_convert_tuple(struct lua_State *L, struct luaL_serializer *cfg,
-		    struct mpstream *stream, int index)
-{
-	if (luaL_isarray(L, index) || lua_istuple(L, index)) {
-		luamp_encode_tuple(L, cfg, stream, index);
-	} else {
-		luamp_encode_array(cfg, stream, 1);
-		luamp_encode(L, cfg, stream, index);
-	}
-}
-
-void
 luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream, int index)
 {
 	/* Performs keyfy() logic */
-	if (lua_isnil(L, index)) {
+
+	struct tuple *tuple = lua_istuple(L, index);
+	if (tuple != NULL)
+		return tuple_to_mpstream(tuple, stream);
+
+	struct luaL_field field;
+	luaL_tofield(L, cfg, index, &field);
+	if (field.type == MP_ARRAY) {
+		lua_pushvalue(L, index);
+		luamp_encode_r(L, cfg, stream, &field, 0);
+		lua_pop(L, 1);
+	} else if (field.type == MP_NIL) {
 		luamp_encode_array(cfg, stream, 0);
 	} else {
-		return luamp_convert_tuple(L, cfg, stream, index);
+		luamp_encode_array(cfg, stream, 1);
+		lua_pushvalue(L, index);
+		luamp_encode_r(L, cfg, stream, &field, 0);
+		lua_pop(L, 1);
 	}
 }
 
@@ -232,10 +234,22 @@ void
 luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 		   struct mpstream *stream, int index)
 {
-	if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
+	struct tuple *tuple = lua_istuple(L, index);
+	if (tuple != NULL) {
+		return tuple_to_mpstream(tuple, stream);
+	} else if (luamp_encode(L, cfg, stream, index) != MP_ARRAY) {
 		diag_set(ClientError, ER_TUPLE_NOT_ARRAY);
 		lbox_error(L);
 	}
+}
+
+void
+tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream)
+{
+	size_t bsize = box_tuple_bsize(tuple);
+	char *ptr = mpstream_reserve(stream, bsize);
+	box_tuple_to_buf(tuple, ptr, bsize);
+	mpstream_advance(stream, bsize);
 }
 
 /* A MsgPack extensions handler that supports tuples */
@@ -245,10 +259,7 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 {
 	struct tuple *tuple = lua_istuple(L, idx);
 	if (tuple != NULL) {
-		size_t bsize = box_tuple_bsize(tuple);
-		char *ptr = mpstream_reserve(stream, bsize);
-		box_tuple_to_buf(tuple, ptr, bsize);
-		mpstream_advance(stream, bsize);
+		tuple_to_mpstream(tuple, stream);
 		return MP_ARRAY;
 	}
 
