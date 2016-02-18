@@ -269,6 +269,13 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg)
 	SophiaEngine *engine =
 		(SophiaEngine *)space->handler->engine;
 	env = engine->env;
+	int rc;
+	if (! engine->thread_pool_started) {
+		rc = sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
+		if (rc == -1)
+			sophia_error(env);
+		engine->thread_pool_started = 1;
+	}
 	db = sophia_configure(space, key_def);
 	if (db == NULL)
 		sophia_error(env);
@@ -276,7 +283,7 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg)
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
-	int rc = sp_open(db);
+	rc = sp_open(db);
 	if (rc == -1)
 		sophia_error(env);
 	format = space->format;
@@ -287,9 +294,15 @@ SophiaIndex::~SophiaIndex()
 {
 	if (db == NULL)
 		return;
-	int rc = sp_destroy(db);
-	if (rc == 0)
-		return;
+	/* schedule database shutdown */
+	int rc = sp_close(db);
+	if (rc == -1)
+		goto error;
+	/* unref database object */
+	rc = sp_destroy(db);
+	if (rc == -1)
+		goto error;
+error:;
 	char *error = (char *)sp_getstring(env, "sophia.error", 0);
 	say_info("sophia space %d close error: %s",
 			 key_def->space_id, error);

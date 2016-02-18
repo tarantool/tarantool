@@ -215,6 +215,7 @@ SophiaEngine::SophiaEngine()
 	 ,m_prev_commit_lsn(-1)
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
+	 ,thread_pool_started(0)
 	 ,recovery_complete(0)
 {
 	flags = 0;
@@ -289,7 +290,7 @@ SophiaEngine::init()
 	sp_setstring(env, "sophia.path", cfg_gets("sophia_dir"), 0);
 	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
-	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
+	sp_setint(env, "scheduler.threads", 0);
 	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
 	sp_setint(env, "compaction.0.async", 1);
 	sp_setint(env, "compaction.0.compact_wm", cfg_geti("sophia.compact_wm"));
@@ -459,12 +460,6 @@ SophiaEngine::dropIndex(Index *index)
 	if (rc == -1)
 		sophia_error(env);
 	/* unref db object */
-	rc = sp_destroy(i->db);
-	if (rc == -1)
-		sophia_error(env);
-	/* maybe start asynchronous database
-	 * shutdown: last snapshot might hold a
-	 * db pointer. */
 	rc = sp_destroy(i->db);
 	if (rc == -1)
 		sophia_error(env);
@@ -720,6 +715,8 @@ int
 SophiaEngine::waitCheckpoint()
 {
 	assert(m_checkpoint_lsn != -1);
+	if (! thread_pool_started)
+		return 0;
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
 		fiber_yield_timeout(.020);
 	return 0;

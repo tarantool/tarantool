@@ -1,5 +1,7 @@
 find_program(RPMBUILD rpmbuild)
-
+if(NOT IS_DIRECTORY ${PROJECT_SOURCE_DIR}/rpm)
+    return()
+endif()
 if (RPMBUILD)
     find_program(MKDIR mkdir)
     find_program(CP cp)

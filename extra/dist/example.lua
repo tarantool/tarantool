@@ -69,8 +69,8 @@ box.cfg {
     slab_alloc_arena = 1.0;
 
     -- Size of the smallest allocation unit
-    -- It can be tuned down if most of the tuples are very small
-    slab_alloc_minimal = 64;
+    -- It can be tuned up if most of the tuples are not so small
+    slab_alloc_minimal = 16;
 
     -- Size of the largest allocation unit
     -- It can be tuned up if it is necessary to store large tuples
