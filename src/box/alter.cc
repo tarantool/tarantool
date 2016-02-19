@@ -87,22 +87,22 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 /* {{{ Auxiliary functions and methods. */
 
 void
-access_check_ddl(uint32_t owner_uid)
+access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
 	struct credentials *cr = current_user();
 	/*
-	 * For privileges, only the current user can claim he's
-	 * the grantor/owner of the privilege that is being
-	 * granted.
-	 * For spaces/funcs/other objects, only the creator
-	 * of the object or admin can modify the space, since
-	 * there is no such thing in Tarantool as GRANT OPTION or
-	 * ALTER privilege.
+	 * Only the owner of the object can be the grantor
+	 * of the privilege on the object. This means that
+	 * for universe/space/func/other persistent object,
+	 * only the creator of the object can be the grantor,
+	 * since Tarantool lacks separate CREATE/DROP/GRANT OPTION
+	 * privileges.
 	 */
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
 		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", user->def.name);
+			  "Create, drop or alter", schema_object_name(type),
+			  user->def.name);
 	}
 }
 
@@ -498,7 +498,7 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 
 	space_def_init_opts(def, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
-	access_check_ddl(def->uid);
+	access_check_ddl(def->uid, SC_SPACE);
 }
 
 /* }}} */
@@ -1308,7 +1308,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				txn_alter_trigger_new(on_drop_space, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_space->def.uid);
+		access_check_ddl(old_space->def.uid, SC_SPACE);
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
@@ -1398,7 +1398,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	uint32_t iid = tuple_field_u32(old_tuple ? old_tuple : new_tuple,
 				       INDEX_ID);
 	struct space *old_space = space_cache_find(id);
-	access_check_ddl(old_space->def.uid);
+	access_check_ddl(old_space->def.uid, SC_SPACE);
 	Index *old_index = space_index(old_space, iid);
 	struct alter_space *alter = alter_space_new();
 	auto scoped_guard =
@@ -1543,7 +1543,7 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 			  user->name, "unknown user type");
 	}
 	identifier_check(name);
-	access_check_ddl(user->owner);
+	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
@@ -1608,7 +1608,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_user->def.owner);
+		access_check_ddl(old_user->def.owner, SC_USER);
 		/* Can't drop guest or super user */
 		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX) {
 			tnt_raise(ClientError, ER_DROP_USER,
@@ -1721,7 +1721,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
 		 */
-		access_check_ddl(def.uid);
+		access_check_ddl(def.uid, SC_FUNCTION);
 		/* Can only delete func if it has no grants. */
 		if (schema_find_grants("function", old_func->def.fid)) {
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
@@ -1733,7 +1733,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		txn_on_commit(txn, on_commit);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&def, new_tuple);
-		access_check_ddl(def.uid);
+		access_check_ddl(def.uid, SC_FUNCTION);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_replace_func, NULL);
 		txn_on_commit(txn, on_commit);
@@ -1778,12 +1778,12 @@ priv_def_check(struct priv_def *priv)
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
 	}
-	access_check_ddl(grantor->def.uid);
+	access_check_ddl(grantor->def.uid, priv->object_type);
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 		if (grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access),
+				  "Grant", schema_object_name(priv->object_type),
 				  grantor->def.name);
 		}
 		break;
@@ -1793,7 +1793,7 @@ priv_def_check(struct priv_def *priv)
 		if (space->def.uid != grantor->def.uid &&
 		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access),
+				  "Grant", schema_object_name(priv->object_type),
 				  grantor->def.name);
 		}
 		break;
@@ -1804,7 +1804,7 @@ priv_def_check(struct priv_def *priv)
 		if (func->def.uid != grantor->def.uid &&
 		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access),
+				  "Grant", schema_object_name(priv->object_type),
 				  grantor->def.name);
 		}
 		break;
@@ -1825,7 +1825,7 @@ priv_def_check(struct priv_def *priv)
 		    grantor->def.uid != ADMIN &&
 		    (role->def.uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  role->def.name, grantor->def.name);
+				  "Grant", role->def.name, grantor->def.name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -1916,7 +1916,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
-		access_check_ddl(priv.grantor_id);
+		access_check_ddl(priv.grantor_id, priv.object_type);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(revoke_priv, NULL);
 		txn_on_commit(txn, on_commit);

@@ -52,7 +52,7 @@ session.su('test')
 -- in future we may  introduce a separate privilege
 box.schema.space.create('test')
 ---
-- error: Write access denied for user 'test' to space '_schema'
+- error: Write access is denied for user 'test' to space '_schema'
 ...
 -- su() goes through because called from admin
 -- console, and it has no access checks
@@ -231,21 +231,21 @@ c = (require 'net.box'):new(LISTEN.host, LISTEN.service)
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
 ...
 function nosuchfunction() end
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
 ...
 nosuchfunction = nil
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
 ...
 c:close()
 ---
@@ -321,7 +321,7 @@ box.schema.user.create('grantee')
 ...
 box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
 ---
-- error: Read access denied for user 'grantor'
+- error: Grant access on universe is denied for user 'grantor'
 ...
 session.su('grantee')
 ---
@@ -329,7 +329,7 @@ session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')
 ---
-- error: Read access denied for user 'grantee' to space '_user'
+- error: Read access is denied for user 'grantee' to space '_user'
 ...
 session.su('grantor')
 ---
@@ -340,7 +340,7 @@ box.schema.user.drop('grantee')
 -- fails, can't kill oneself
 box.schema.user.drop('grantor')
 ---
-- error: Create or drop access denied for user 'grantor'
+- error: Create, drop or alter access on role is denied for user 'grantor'
 ...
 session.su('admin')
 ---
@@ -359,11 +359,11 @@ session.su('guest')
 ...
 box.space._user:select{0}
 ---
-- error: Read access denied for user 'guest' to space '_user'
+- error: Read access is denied for user 'guest' to space '_user'
 ...
 box.space._user:select{1}
 ---
-- error: Read access denied for user 'guest' to space '_user'
+- error: Read access is denied for user 'guest' to space '_user'
 ...
 session.su('admin')
 ---
@@ -413,7 +413,7 @@ session.su('user1')
 -- permission denied
 box.schema.user.passwd('admin', 'xxx')
 ---
-- error: Read access denied for user 'user1' to space '_user'
+- error: Read access is denied for user 'user1' to space '_user'
 ...
 session.su('admin')
 ---

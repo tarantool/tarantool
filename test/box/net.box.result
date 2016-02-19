@@ -64,18 +64,18 @@ cn:ping()
 -- check permissions
 cn:call('unexists_procedure')
 ---
-- error: Execute access denied for user 'guest' to function 'unexists_procedure'
+- error: Execute access is denied for user 'guest' to function 'unexists_procedure'
 ...
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 ---
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Execute access denied for user 'guest' to function 'test_foo'
+- error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
 cn:eval('return 2+2')
 ---
-- error: Execute access denied for user 'guest'
+- error: Execute access on universe is denied for user 'guest'
 ...
 box.schema.user.grant('guest','execute','universe')
 ---
@@ -88,15 +88,15 @@ cn = remote:new(box.cfg.listen)
 ...
 cn:call('unexists_procedure')
 ---
-- error: Execute access denied for user 'guest' to function 'unexists_procedure'
+- error: Execute access is denied for user 'guest' to function 'unexists_procedure'
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Execute access denied for user 'guest' to function 'test_foo'
+- error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
 cn:call(nil, 'a', 'b', 'c')
 ---
-- error: Execute access denied for user 'guest' to function 'nil'
+- error: Execute access is denied for user 'guest' to function 'nil'
 ...
 cn:eval('return 2+2')
 ---

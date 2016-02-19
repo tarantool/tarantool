@@ -79,6 +79,9 @@ const struct opt_def key_opts_reg[] = {
 	{ NULL, MP_NIL, 0, 0 }
 };
 
+static const char *object_type_strs[] = {
+	"unknown", "universe", "space", "function", "user", "role" };
+
 enum schema_object_type
 schema_object_type(const char *name)
 {
@@ -87,11 +90,15 @@ schema_object_type(const char *name)
 	 * name, and they are case-sensitive, so be case-sensitive
 	 * here too.
 	 */
-	static const char *strs[] = {
-		"unknown", "universe", "space", "function", "user", "role" };
-	int n_strs = sizeof(strs)/sizeof(*strs);
-	int index = strindex(strs, name, n_strs);
+	int n_strs = sizeof(object_type_strs)/sizeof(*object_type_strs);
+	int index = strindex(object_type_strs, name, n_strs);
 	return (enum schema_object_type) (index == n_strs ? 0 : index);
+}
+
+const char *
+schema_object_name(enum schema_object_type type)
+{
+	return object_type_strs[type];
 }
 
 static void

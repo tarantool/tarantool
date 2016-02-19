@@ -64,15 +64,15 @@ s:select(1)
 ...
 s:insert({3})
 ---
-- error: Write access denied for user 'testus' to space 'admin_space'
+- error: Write access is denied for user 'testus' to space 'admin_space'
 ...
 s:delete(1)
 ---
-- error: Write access denied for user 'testus' to space 'admin_space'
+- error: Write access is denied for user 'testus' to space 'admin_space'
 ...
 s:drop()
 ---
-- error: Read access denied for user 'testus' to space '_index'
+- error: Read access is denied for user 'testus' to space '_index'
 ...
 --
 -- Check double revoke
@@ -92,7 +92,7 @@ session.su('testus')
 ...
 s:select(1)
 ---
-- error: Read access denied for user 'testus' to space 'admin_space'
+- error: Read access is denied for user 'testus' to space 'admin_space'
 ...
 session.su('admin')
 ---
@@ -108,7 +108,7 @@ session.su('testus')
 ...
 s:select(1)
 ---
-- error: Read access denied for user 'testus' to space 'admin_space'
+- error: Read access is denied for user 'testus' to space 'admin_space'
 ...
 s:delete(1)
 ---
@@ -120,7 +120,7 @@ s:insert({3})
 ...
 s:drop()
 ---
-- error: Read access denied for user 'testus' to space '_index'
+- error: Read access is denied for user 'testus' to space '_index'
 ...
 session.su('admin')
 ---
@@ -147,31 +147,31 @@ session.uid()
 ...
 box.space._user:select(1)
 ---
-- error: Read access denied for user 'guest' to space '_user'
+- error: Read access is denied for user 'guest' to space '_user'
 ...
 s:select(1)
 ---
-- error: Read access denied for user 'guest' to space 'admin_space'
+- error: Read access is denied for user 'guest' to space 'admin_space'
 ...
 s:insert({4})
 ---
-- error: Write access denied for user 'guest' to space 'admin_space'
+- error: Write access is denied for user 'guest' to space 'admin_space'
 ...
 s:delete({3})
 ---
-- error: Write access denied for user 'guest' to space 'admin_space'
+- error: Write access is denied for user 'guest' to space 'admin_space'
 ...
 s:drop()
 ---
-- error: Read access denied for user 'guest' to space '_index'
+- error: Read access is denied for user 'guest' to space '_index'
 ...
 gs = box.schema.space.create('guest_space')
 ---
-- error: Write access denied for user 'guest' to space '_schema'
+- error: Write access is denied for user 'guest' to space '_schema'
 ...
 box.schema.func.create('guest_func')
 ---
-- error: Read access denied for user 'guest' to space '_func'
+- error: Read access is denied for user 'guest' to space '_func'
 ...
 session.su('admin')
 ---
@@ -203,7 +203,7 @@ uid = session.uid()
 --
 box.schema.user.drop('uniuser')
 ---
-- error: Create or drop access denied for user 'uniuser'
+- error: Create, drop or alter access on role is denied for user 'uniuser'
 ...
 --
 --Check create, call and drop function
@@ -281,15 +281,15 @@ session.su('someuser')
 --
 s:drop()
 ---
-- error: Create or drop access denied for user 'someuser'
+- error: Create, drop or alter access on space is denied for user 'someuser'
 ...
 us:drop()
 ---
-- error: Create or drop access denied for user 'someuser'
+- error: Create, drop or alter access on space is denied for user 'someuser'
 ...
 box.schema.func.drop('uniuser_func')
 ---
-- error: Create or drop access denied for user 'someuser'
+- error: Create, drop or alter access on function is denied for user 'someuser'
 ...
 box.schema.user.drop('uniuser_testus')
 ---
@@ -337,11 +337,11 @@ testuser_uid = session.uid()
 ...
 box.space._user:delete(2)
 ---
-- error: Create or drop access denied for user 'testuser'
+- error: Create, drop or alter access on user is denied for user 'testuser'
 ...
 box.space._user:select(1)
 ---
-- error: Read access denied for user 'testuser' to space '_user'
+- error: Read access is denied for user 'testuser' to space '_user'
 ...
 uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user'}[1]
 ---
@@ -375,7 +375,7 @@ session.su('testuser')
 ...
 box.space._user:delete(2)
 ---
-- error: Write access denied for user 'testuser' to space '_user'
+- error: Write access is denied for user 'testuser' to space '_user'
 ...
 box.space._user:select(1)
 ---
@@ -383,7 +383,7 @@ box.space._user:select(1)
 ...
 box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 ---
-- error: Write access denied for user 'testuser' to space '_user'
+- error: Write access is denied for user 'testuser' to space '_user'
 ...
 session.su('admin')
 ---
@@ -403,7 +403,7 @@ box.space._index:select(272)
 ...
 box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 ---
-- error: Write access denied for user 'testuser' to space '_index'
+- error: Write access is denied for user 'testuser' to space '_index'
 ...
 session.su('admin')
 ---
@@ -489,11 +489,11 @@ session.su('testuser')
 ...
 s:select()
 ---
-- error: Read access denied for user 'testuser' to space 'glade'
+- error: Read access is denied for user 'testuser' to space 'glade'
 ...
 for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
-- error: Read access denied for user 'testuser' to space 'glade'
+- error: Read access is denied for user 'testuser' to space 'glade'
 ...
 t
 ---
@@ -534,11 +534,11 @@ session.su('guest')
 ...
 s:select()
 ---
-- error: Read access denied for user 'guest' to space 'glade'
+- error: Read access is denied for user 'guest' to space 'glade'
 ...
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
-- error: Read access denied for user 'guest' to space 'glade'
+- error: Read access is denied for user 'guest' to space 'glade'
 ...
 t
 ---
@@ -552,11 +552,11 @@ session.su('guest')
 ...
 s:select()
 ---
-- error: Read access denied for user 'guest' to space 'glade'
+- error: Read access is denied for user 'guest' to space 'glade'
 ...
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
-- error: Read access denied for user 'guest' to space 'glade'
+- error: Read access is denied for user 'guest' to space 'glade'
 ...
 t
 ---

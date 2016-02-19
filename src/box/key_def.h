@@ -77,8 +77,11 @@ enum schema_object_type {
 };
 
 enum schema_object_type
-
 schema_object_type(const char *name);
+
+const char *
+schema_object_name(enum schema_object_type type);
+
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
  * since there is a mismatch between enum name (STRING) and type
