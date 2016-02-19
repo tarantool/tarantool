@@ -17,7 +17,9 @@
 
 **Number of indexes in a space**
 
-    10 (``box.schema.INDEX_MAX``).
+    128 (``box.schema.INDEX_MAX``).
+
+    Note re storage engine: sophia allows 1 index in a space.
 
 .. _lim_fields_in_tuple:
 

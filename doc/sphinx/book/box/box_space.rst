@@ -208,7 +208,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the index
         key, which may be multi-part.
 
-        :return: the selected tuple.
+        :return: the tuple whose index key matches :codeitalic:`key`, or null.
         :rtype:  tuple
 
         Possible errors: If space_object does not exist.
@@ -218,11 +218,11 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         The ``box.space...select`` function returns a set
         of tuples as a Lua table; the ``box.space...get``
-        function returns a single tuple. And it is possible to get
+        function returns at most a single tuple. And it is possible to get
         the first tuple in a tuple set by appending ``[1]``.
         Therefore ``box.space.tester:get{1}`` has the same
-        effect as ``box.space.tester:select{1}[1]``, and
-        may serve as a convenient shorthand.
+        effect as ``box.space.tester:select{1}[1]``,
+        if exactly one tuple is found.
 
         **Example:**
 
@@ -288,8 +288,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Possible errors: If a different tuple with the same unique-key
         value already exists, returns :errcode:`ER_TUPLE_FOUND`. (This
-        would only happen if there was a secondary index. By default
-        secondary indexes are unique)
+        will only happen if there is a secondary index. By default
+        secondary indexes are unique.)
 
         **Complexity Factors:** Index size, Index type,
         Number of indexes accessed, WAL settings.

@@ -29,6 +29,7 @@
     strict
     tap
     tarantool
+    tdb
     uuid
     yaml
     other
