@@ -346,91 +346,33 @@ in the source tree, file `doc/box-protocol.html`_.
 
 .. _doc/box-protocol.html: http://tarantool.org/doc/box-protocol.html
 
-----------------
-Data persistence
-----------------
+--------------
+Saving To Disk
+--------------
 
-To maintain data persistence, Tarantool writes each data change request (INSERT,
-UPDATE, DELETE, REPLACE) into a write-ahead log (WAL) file in the
-:confval:`wal_dir <wal_dir>` directory. A new WAL file is created for every
-:confval:`rows_per_wal <rows_per_wal>` records. Each data change request gets
-assigned a continuously growing 64-bit log sequence number. The name of the WAL
-file is based on the log sequence number of the first record in the file, plus
-an extension ``.xlog``.
+Tarantool maintains a set of write-ahead log (WAL) files.
+There is a separate thread -- the WAL writer -- which catches all
+requests that can change a database, such as box.schema.create or
+box.space.insert. Ordinarily the WAL writer writes the request,
+along with administrative fields and flags, to a WAL file immediately.
+This ensures data persistence, because, even if an in-memory database
+is lost when the power goes off, Tarantool recovers it automatically
+when it starts up again, by reading the WAL files and redoing the requests
+(this is called the "recovery process").
+Users can change the timing of the WAL writer,
+or turn it off, by setting :confval:`wal_mode <wal_mode>`.
 
-Apart from a log sequence number and the data change request (its format is the
-same as in the binary protocol and is described in `doc/box-protocol.html`_),
-each WAL record contains a header, some metadata, and then the data formatted
-according to `msgpack`_ rules. For example this is what the WAL file looks like
-after the first INSERT request ("s:insert({1})") for the introductory sandbox
-exercise ":ref:`Starting Tarantool and making your first database <first database>` “.
-On the left are the hexadecimal bytes that one would see with:
+Tarantool also maintains a set of snapshot files.
+A snapshot file is an on-disk copy of the entire data set for a given moment.
+Instead of reading every WAL file since the databases were created,
+the recovery process can load the latest snapshot and then read only
+the WAL files that were produced after the snapshot was made.
+A snapshot can be made even if there is no WAL file.
+Some snapshots are automatic, or users can make them at any time
+with the :func:`box.snapshot() <box.snapshot()>` request.
 
-.. code-block:: console
-
-    $ hexdump 00000000000000000000.xlog
-
-and on the right are comments.
-
-.. code-block:: none
-
-   Hex dump of WAL file       Comment
-   --------------------       -------
-   58 4c 4f 47 0a             File header: "XLOG\n"
-   30 2e 31 32 0a             File header: "0.12\n" = version
-   ...                        (not shown = more header + tuples for system spaces)
-   d5 ba 0b ab                Magic row marker always = 0xab0bbad5 if version 0.12
-   19 00                      Length, not including length of header, = 25 bytes
-   ce 16 a4 38 6f             Record header: previous crc32, current crc32,
-   a7 cc 73 7f 00 00 66 39
-   84                         msgpack code meaning "Map of 4 elements" follows
-   00 02                         element#1: tag=request type, value=0x02=IPROTO_INSERT
-   02 01                         element#2: tag=server id, value=0x01
-   03 04                         element#3: tag=lsn, value=0x04
-   04 cb 41 d4 e2 2f 62 fd d5 d4 element#4: tag=timestamp, value=an 8-byte "Double"
-   82                         msgpack code meaning "map of 2 elements" follows
-   10 cd 02 00                   element#1: tag=space id, value=512, big byte first
-   21 91 01                      element#2: tag=tuple, value=1-element fixed array={1}
-
-Tarantool processes requests atomically: a change is either accepted and recorded
-in the WAL, or discarded completely. Let's clarify how this happens, using the
-REPLACE request as an example:
-
-1. The server attempts to locate the original tuple by primary key. If found, a
-   reference to the tuple is retained for later use.
-2. The new tuple is validated. If for example it does not contain an
-   indexed field, or it has an indexed field whose type does not match the type
-   according to the index definition, the change is aborted.
-3. The new tuple replaces the old tuple in all existing indexes.
-4. A message is sent to WAL writer running in a separate thread, requesting that
-   the change be recorded in the WAL. The server switches to work on the next
-   request until the write is acknowledged.
-5. On success, a confirmation is sent to the client. On failure, a rollback
-   procedure is begun. During the rollback procedure, the transaction processor
-   rolls back all changes to the database which occurred after the first failed
-   change, from latest to oldest, up to the first failed change. All rolled back
-   requests are aborted with :errcode:`ER_WAL_IO <ER_WAL_IO>` error. No new
-   change is applied while rollback is in progress. When the rollback procedure
-   is finished, the server restarts the processing pipeline.
-
-One advantage of the described algorithm is that complete request pipelining is
-achieved, even for requests on the same value of the primary key. As a result,
-database performance doesn't degrade even if all requests refer to the same
-key in the same space.
-
-The transaction processor thread communicates with the WAL writer thread using
-asynchronous (yet reliable) messaging; the transaction processor thread, not
-being blocked on WAL tasks, continues to handle requests quickly even at high
-volumes of disk I/O. A response to a request is sent as soon as it is ready,
-even if there were earlier incomplete requests on the same connection. In
-particular, SELECT performance, even for SELECTs running on a connection packed
-with UPDATEs and DELETEs, remains unaffected by disk load.
-
-The WAL writer employs a number of durability modes, as defined in configuration
-variable :confval:`wal_mode <wal_mode>`. It is possible to turn the write-ahead
-log completely off, by setting :confval:`wal_mode <wal_mode>` to *none*. Even
-without the write-ahead log it's still possible to take a persistent copy of the
-entire data set with the :func:`box.snapshot() <box.snapshot()>` request.
+Details about the WAL writer and the recovery process
+are in the :ref:`Internals <box-internals>` section.
 
 -----------------
 Data manipulation
@@ -616,6 +558,7 @@ for all :ref:`the differeences between memtx and sophia <sophia_diff>`.
     atomic
     authentication
     triggers
+    internals
     limitations
     sophia_diff
 
