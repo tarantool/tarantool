@@ -61,6 +61,7 @@
     the message should go. Possible values for facility are:
     auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, security,
     syslog, user, uucp, local0, local1, local2, local3, local4, local5, local6, local7.
+    The facility setting is currently ignored but will be used in the future.
 
     When logging to a file, tarantool reopens the log on SIGHUP. When log is
     a program, its pid is saved in the :func:`log.logger_pid` variable. You need
