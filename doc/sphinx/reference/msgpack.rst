@@ -65,21 +65,21 @@ array and as a map, then displays each result in hexadecimal.
 
 .. code-block:: lua
 
-    local function hexdump(bytes)
+    function hexdump(bytes)
         local result = ''
-        for i = 1, #m do
-            result = result .. string.format("%x", string.byte(m, i)) .. ' '
+        for i = 1, #bytes do
+            result = result .. string.format("%x", string.byte(bytes, i)) .. ' '
         end
         return result
     end
 
-    local msgpack = require('msgpack')
-    local m1 = msgpack.encode(setmetatable({'A', 'B'}, {
+    msgpack = require('msgpack')
+    m1 = msgpack.encode(setmetatable({'A', 'B'}, {
                                  __serialize = "seq"
-                              }
-    local m2 = msgpack.encode(setmetatable({'A', 'B'}, {
+                              }))
+    m2 = msgpack.encode(setmetatable({'A', 'B'}, {
                                  __serialize = "map"
-                              }
+                              }))
     print('array encoding: ', hexdump(m1))
     print('map encoding: ', hexdump(m2))
 
@@ -104,6 +104,46 @@ and the second encoding means:
 .. parsed-literal::
 
     fixmap(2), key(1), fixstr(1), "A", key(2), fixstr(2), "B".
+
+Here are examples for all the common types,
+with the Lua-table representation on the left,
+with the MsgPack format name and encoding on the right.
+
+    .. container:: table
+
+        **Common Types and MsgPack Encodings**
+
+        .. rst-class:: left-align-column-1
+        .. rst-class:: left-align-column-2
+
+        +--------------+-------------------------------------------------+
+        | {}           | 'fixmap' if metatable is 'map' = 80             |
+        |              | otherwise 'fixarray' = 90                       |
+        +--------------+-------------------------------------------------+
+        | 'a'          | 'fixstr' = a1 61                                |
+        +--------------+-------------------------------------------------+
+        | false        | 'false' = c2                                    |
+        +--------------+-------------------------------------------------+
+        | true         | 'true' = c3                                     |
+        +--------------+-------------------------------------------------+
+        | 127          | 'positive fixint' = 7f                          |
+        +--------------+-------------------------------------------------+
+        | 65535        | 'uint 16' = cd ff ff                            |
+        +--------------+-------------------------------------------------+
+        | 4294967295   | 'uint 32' = ce ff ff ff ff                      |
+        +--------------+-------------------------------------------------+
+        | nil          | 'nil' = c0                                      |
+        +--------------+-------------------------------------------------+
+        | msgpack.NULL | same as nil                                     |
+        +--------------+-------------------------------------------------+
+        | [0] = 5      | 'fixmap(1)' + 'positive fixint' (for the key)   |
+        |              | + 'positive fixint' (for the value) = 81 00 05  |
+        +--------------+-------------------------------------------------+
+        | [0] = nil    | 'fixmap(0)' = 80 -- nil is not stored           |
+        |              | when it is a missing map value                  |
+        +--------------+-------------------------------------------------+
+        | 1.5          | 'float 64' = cb 3f f8 0 0 0 0 0 0               |
+        +--------------+-------------------------------------------------+
 
 .. _MsgPack: http://msgpack.org/
 .. _Specification: http://github.com/msgpack/msgpack/blob/master/spec.md
