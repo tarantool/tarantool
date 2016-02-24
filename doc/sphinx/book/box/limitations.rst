@@ -80,6 +80,12 @@
 
     32 (``box.schema.NAME_MAX``).
 
+.. _lim_replicas:
+
+**Number of replicas in a cluster**
+
+    32.
+
 .. _lim_sophia:
 
 For additional limitations which apply only to the sophia
