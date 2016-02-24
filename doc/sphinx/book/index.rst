@@ -15,7 +15,7 @@
     administration
     connectors/index
     app/a_errcodes
-    app/b_proctitle
+    box/internals
     app/c_lua_tutorial
     app/d_plugins
     app/e_sophia/index

@@ -1,7 +1,7 @@
 .. _box-internals:
 
 -------------------------------------------------------------------------------
-                            Internals
+                            Appendix B - Internals
 -------------------------------------------------------------------------------
 
 This section is for advanced users or users who wish to
@@ -9,9 +9,9 @@ know more about how the Tarantool program works. The
 discussion here is technical but generalized.
 The ultimate authority is the code.
 
-----------------------------------------
+========================================
 Data persistence and the WAL file format
-----------------------------------------
+========================================
 
 To maintain data persistence, Tarantool writes each data change request (INSERT,
 UPDATE, DELETE, REPLACE) into a write-ahead log (WAL) file in the
@@ -103,9 +103,9 @@ An .xlog file always contains changes based on the primary key.
 Even if the client requested an update or delete using
 a secondary key, the record in the .xlog file will contain the primary key.
 
-------------------------
+========================
 The snapshot file format
-------------------------
+========================
 
 The format of a snapshot .snap file is nearly the same as the format of a WAL .xlog file.
 However, the snapshot header differs: it contains the server's global unique identifier
@@ -121,9 +121,9 @@ that were created by users.
 
 Secondarily, the .snap file's records are ordered by primary key within space id.
 
---------------------
+====================
 The Recovery Process
---------------------
+====================
 
 The recovery process begins when box.cfg{} happens for the
 first time after the Tarantool server starts.

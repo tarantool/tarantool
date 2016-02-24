@@ -558,7 +558,6 @@ for all :ref:`the differeences between memtx and sophia <sophia_diff>`.
     atomic
     authentication
     triggers
-    internals
     limitations
     sophia_diff
 
