@@ -671,6 +671,9 @@ sophia_iterator_next_sync(struct iterator *ptr)
 	if (obj == NULL) {
 		ptr->next = sophia_iterator_last;
 		it->current = NULL;
+		/* immediately close the cursor */
+		sp_destroy(it->cursor);
+		it->cursor = NULL;
 		return NULL;
 	}
 	it->current = obj;
