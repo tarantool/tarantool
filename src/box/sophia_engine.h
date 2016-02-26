@@ -32,6 +32,8 @@
  */
 #include "engine.h"
 #include "third_party/tarantool_ev.h"
+#include "small/mempool.h"
+#include "small/region.h"
 
 struct SophiaEngine: public Engine {
 	SophiaEngine();
@@ -63,14 +65,13 @@ public:
 	int thread_pool_started;
 	int recovery_complete;
 	struct cord *cord;
-	ev_async watcher;
-	ev_idle idle;
 };
 
 extern "C" {
 typedef void (*sophia_info_f)(const char*, const char*, void*);
-int  sophia_info(const char*, sophia_info_f, void*);
+int   sophia_info(const char*, sophia_info_f, void*);
 }
-void sophia_error(void*);
+void  sophia_error(void*);
+void *sophia_read(void*, void*);
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */
