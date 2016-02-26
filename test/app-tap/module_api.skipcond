@@ -1,0 +1,6 @@
+import os
+
+# skip test if .so is not found
+if not os.path.exists('app-tap/module_api.so') and \
+   not os.path.exists('app-tap/module_api.dylib'):
+    self.skip=1

@@ -102,7 +102,7 @@ struct fiber;
  * Fiber - contains information about fiber
  */
 
-typedef void (*fiber_func)(va_list);
+typedef int (*fiber_func)(va_list);
 
 /**
  * Create a new fiber.
@@ -228,8 +228,6 @@ API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
 /** \endcond public */
-
-typedef void (*fiber_func)(va_list);
 
 struct fiber {
 	struct tarantool_coro coro;
@@ -400,7 +398,7 @@ bool
 cord_is_main();
 
 void
-fiber_init(void (*fiber_invoke)(fiber_func f, va_list ap));
+fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));
 
 void
 fiber_free(void);
@@ -482,7 +480,8 @@ typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 int
 fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
-inline void
+/** Useful for C unit tests */
+static inline int
 fiber_c_invoke(fiber_func f, va_list ap)
 {
 	return f(ap);
@@ -510,14 +509,6 @@ fiber_testcancel(void)
 		tnt_raise(FiberIsCancelled);
 }
 
-static inline void
-diag_raise(void)
-{
-	struct error *e = diag_last_error(&fiber()->diag);
-	if (e)
-		error_raise(e);
-}
-
 static inline struct fiber *
 fiber_new_xc(const char *name, fiber_func func)
 {
@@ -529,17 +520,13 @@ fiber_new_xc(const char *name, fiber_func func)
 	return f;
 }
 
-inline void
+static inline int
 fiber_cxx_invoke(fiber_func f, va_list ap)
 {
 	try {
-		f(ap);
-		/*
-		 * Make sure a leftover exception does not
-		 * propagate up to the joiner.
-		 */
-		diag_clear(&fiber()->diag);
+		return f(ap);
 	} catch (struct error *e) {
+		return -1;
 	}
 }
 

@@ -31,10 +31,14 @@
 #include "tuple.h"
 #include "iobuf.h"
 
-void
+int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
-	obuf_dup_xc(buf, tuple->data, tuple->bsize);
+	if (obuf_dup(buf, tuple->data, tuple->bsize) != tuple->bsize) {
+		diag_set(OutOfMemory, tuple->bsize, "tuple_to_obuf", "dup");
+		return -1;
+	}
+	return 0;
 }
 
 ssize_t

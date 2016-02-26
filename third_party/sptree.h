@@ -588,7 +588,7 @@ sptree_##name##_walk_cb(sptree_##name *t, int (*cb)(void*, void*), void *cb_arg 
 typedef struct sptree_##name##_iterator {                                                 \
     const sptree_##name        *t;                                                        \
     int                  level;                                                           \
-    int                  max_depth;                                                       \
+    spnode_t             max_depth;                                                       \
     spnode_t             stack[0];                                                        \
 } sptree_##name##_iterator;                                                               \
                                                                                           \

@@ -81,7 +81,7 @@ relay_set_cord_name(int fd)
 	cord_set_name(name);
 }
 
-void
+int
 relay_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
@@ -92,6 +92,7 @@ relay_join_f(va_list ap)
 	engine_join(relay);
 
 	say_info("snapshot sent");
+	return 0;
 }
 
 void
@@ -146,7 +147,7 @@ feed_event_f(struct trigger *trigger, void * /* event */)
  * for read. This currently only happens when the client closes
  * its socket, and we get an EOF.
  */
-static void
+static int
 relay_subscribe_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
@@ -198,8 +199,14 @@ relay_subscribe_f(va_list ap)
 		    errno != EWOULDBLOCK)
 			say_syserror("recv");
 	}
+	/*
+	 * Avoid double wakeup: both from the on_stop and fiber
+	 * cancel events.
+	 */
+	trigger_clear(&on_follow_error);
 	recovery_stop_local(r);
 	say_crit("exiting the relay loop");
+	return 0;
 }
 
 /** Replication acceptor fiber handler. */

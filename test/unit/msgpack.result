@@ -315,16 +315,16 @@ ok 1 - subtests
     ok 142 - len(mp_check_int(-0x7fffffffffffffffLL))
     ok 143 - mp_sizeof_int(-0x7fffffffffffffffLL)
     ok 144 - mp_encode(-0x7fffffffffffffffLL) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x01"
-    # int -0x8000000000000000LL
-    ok 145 - mp_check_int(-0x8000000000000000LL) == 0
-    ok 146 - mp_decode(mp_encode(-0x8000000000000000LL)) == -0x8000000000000000LL
-    ok 147 - mp_check(-0x8000000000000000LL)
-    ok 148 - len(mp_encode_int(-0x8000000000000000LL)
-    ok 149 - len(mp_decode_int(-0x8000000000000000LL))
-    ok 150 - len(mp_next_int(-0x8000000000000000LL))
-    ok 151 - len(mp_check_int(-0x8000000000000000LL))
-    ok 152 - mp_sizeof_int(-0x8000000000000000LL)
-    ok 153 - mp_encode(-0x8000000000000000LL) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x00"
+    # int (int64_t)-0x8000000000000000LL
+    ok 145 - mp_check_int((int64_t)-0x8000000000000000LL) == 0
+    ok 146 - mp_decode(mp_encode((int64_t)-0x8000000000000000LL)) == (int64_t)-0x8000000000000000LL
+    ok 147 - mp_check((int64_t)-0x8000000000000000LL)
+    ok 148 - len(mp_encode_int((int64_t)-0x8000000000000000LL)
+    ok 149 - len(mp_decode_int((int64_t)-0x8000000000000000LL))
+    ok 150 - len(mp_next_int((int64_t)-0x8000000000000000LL))
+    ok 151 - len(mp_check_int((int64_t)-0x8000000000000000LL))
+    ok 152 - mp_sizeof_int((int64_t)-0x8000000000000000LL)
+    ok 153 - mp_encode((int64_t)-0x8000000000000000LL) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x00"
     # *** test_ints: done ***
 ok 2 - subtests
     1..18

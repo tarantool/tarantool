@@ -193,11 +193,11 @@ s.index.spatial:count()
 ...
 s.index.spatial:min()
 ---
-- error: RTREE does not support min()
+- error: Index 'spatial' (RTREE) of space 'spatial' (memtx) does not support min()
 ...
 s.index.spatial:max()
 ---
-- error: RTREE does not support max()
+- error: Index 'spatial' (RTREE) of space 'spatial' (memtx) does not support max()
 ...
 -- seems that drop can't fail
 s.index.spatial:drop()
@@ -493,12 +493,14 @@ i = s:create_index('p')
 -- dimension too big
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 21})
 ---
-- error: RTREE index does not support dimension (21) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (21):
+    must belong to range [1, 20]'
 ...
 -- dimension too low
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, dimension = 0})
 ---
-- error: RTREE index does not support dimension (0) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (0):
+    must belong to range [1, 20]'
 ...
 -- cant be unique
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}, unique = true})
@@ -576,11 +578,12 @@ box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
 ---
-- error: RTREE index does not support dimension (22) must belong to range [1, 20]
+- error: 'Index ''s'' (RTREE) of space ''s'' (memtx) does not support dimension (22):
+    must belong to range [1, 20]'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4): dimension must be a number'
+- error: 'Wrong index options (field 4): ''dimension'' must be unsigned int'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'num'}}}
 ---
@@ -624,14 +627,12 @@ box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 ---
 - error: 'Can''t create or modify index ''s'' in space ''s'': part count must be positive'
 ...
--- unknown args ignored
+-- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
 ---
-- [0, 2, 's', 'rtree', {'unique': false, 'holy': 'cow'}, [[2, 'array']]]
+- error: 'Wrong index options (field 4): unexpected option ''holy'''
 ...
-s.index.s:drop()
----
-...
+-- unknown args ignored
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array', {part = 'opts'}}}})
 ---
 - [0, 2, 's', 'rtree', {'unique': false}, [[2, 'array', {'part': 'opts'}]]]

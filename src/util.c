@@ -56,7 +56,7 @@
 uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax)
 {
-	for (int index = 0; index != hmax && haystack[index]; index++)
+	for (unsigned index = 0; index != hmax && haystack[index]; index++)
 		if (strcasecmp(haystack[index], needle) == 0)
 			return index;
 	return hmax;
@@ -65,20 +65,20 @@ strindex(const char **haystack, const char *needle, uint32_t hmax)
 void
 close_all_xcpt(int fdc, ...)
 {
-	int keep[fdc];
+	unsigned keep[fdc];
 	va_list ap;
 	struct rlimit nofile;
 
 	va_start(ap, fdc);
 	for (int j = 0; j < fdc; j++) {
-		keep[j] = va_arg(ap, int);
+		keep[j] = va_arg(ap, unsigned);
 	}
 	va_end(ap);
 
 	if (getrlimit(RLIMIT_NOFILE, &nofile) != 0)
 		nofile.rlim_cur = 10000;
 
-	for (int i = 3; i < nofile.rlim_cur; i++) {
+	for (unsigned i = 3; i < nofile.rlim_cur; i++) {
 		bool found = false;
 		for (int j = 0; j < fdc; j++) {
 			if (keep[j] == i) {

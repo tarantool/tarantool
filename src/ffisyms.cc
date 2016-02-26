@@ -29,15 +29,13 @@
  * SUCH DAMAGE.
  */
 
+#include <msgpuck.h>
 #include <bit/bit.h>
-#include <lib/msgpuck/msgpuck.h>
 #include "scramble.h"
 #include <box/box.h>
 #include <box/tuple.h>
 #include <box/index.h>
 #include <box/func.h>
-#include <box/lua/tuple.h>
-#include <box/lua/call.h>
 #include <box/sophia_engine.h>
 #include <box/request.h>
 #include <box/port.h>
@@ -87,16 +85,9 @@ void *ffi_symbols[] = {
 	(void *) box_index_count,
 	(void *) box_index_iterator,
 	(void *) box_iterator_next,
-	(void *) boxffi_tuple_update,
+	(void *) box_tuple_update,
+	(void *) box_tuple_upsert,
 	(void *) password_prepare,
-	(void *) load_cfg,
-	(void *) box_set_listen,
-	(void *) box_set_replication_source,
-	(void *) box_set_wal_mode,
-	(void *) box_set_log_level,
-	(void *) box_set_io_collect_interval,
-	(void *) box_set_snap_io_rate_limit,
-	(void *) box_set_too_long_threshold,
 	(void *) lbox_socket_local_resolve,
 	(void *) lbox_socket_nonblock,
 	(void *) base64_decode,
@@ -151,5 +142,4 @@ void *ffi_symbols[] = {
 	(void *) title_get_custom,
 	(void *) title_set_status,
 	(void *) title_get_status,
-	(void *) say_check_init_str,
 };

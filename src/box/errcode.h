@@ -95,9 +95,9 @@ struct errcode_record {
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found by get()") \
-	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \
+	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access on %s is denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		2, "Failed to create user '%s': %s") \
-	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user '%s': %s") \
+	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		2, "User '%s' is not found") \
 	/* 46 */_(ER_USER_EXISTS,		2, "User '%s' already exists") \
 	/* 47 */_(ER_PASSWORD_MISMATCH,		2, "Incorrect password supplied for user '%s'") \
@@ -106,9 +106,9 @@ struct errcode_record {
 	/* 50 */_(ER_CREATE_FUNCTION,		2, "Failed to create function '%s': %s") \
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		2, "Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		2, "Function '%s' already exists") \
-	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access denied for user '%s' to function '%s'") \
+	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access is denied for user '%s' to function '%s'") \
 	/* 54 */_(ER_FUNCTION_MAX,		2, "A limit on the total number of functions has been reached: %u") \
-	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access denied for user '%s' to space '%s'") \
+	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access is denied for user '%s' to space '%s'") \
 	/* 56 */_(ER_USER_MAX,			2, "A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		2, "Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
@@ -164,6 +164,10 @@ struct errcode_record {
 	/*108 */_(ER_WRONG_INDEX_OPTIONS, 2, "Wrong index options (field %u): %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION, 2, "Wrong schema version, current: %d, in request: %u") \
 	/*110 */_(ER_SLAB_ALLOC_MAX, 2, "Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.") \
+	/*111 */_(ER_WRONG_SPACE_OPTIONS, 2, "Wrong space options (field %u): %s") \
+	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	2, "Index '%s' (%s) of space '%s' (%s) does not support %s") \
+	/*113 */_(ER_VIEW_IS_RO,		2, "View '%s' is read-only") \
+
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -35,6 +35,7 @@
 #include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
+#include "xrow.h"
 
 double too_long_threshold;
 
@@ -336,7 +337,7 @@ box_txn_commit()
 		return 0;
 	try {
 		txn_commit(txn);
-	} catch (...) {
+	} catch (Exception *e) {
 		txn_rollback();
 		return -1;
 	}

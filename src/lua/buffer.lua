@@ -7,6 +7,7 @@ ffi.cdef[[
 struct slab_cache;
 struct slab_cache *
 tarantool_lua_slab_cache();
+extern struct ibuf *tarantool_lua_ibuf;
 
 struct ibuf
 {
@@ -175,6 +176,6 @@ end
 
 return {
     ibuf = ibuf_new;
-    IBUF_SHARED = ibuf_new();
+    IBUF_SHARED = ffi.C.tarantool_lua_ibuf;
     READAHEAD = READAHEAD;
 }

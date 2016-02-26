@@ -1,0 +1,12 @@
+@TARANTOOL_LOGDIR@/*.log {
+    daily
+    size 512k
+    missingok
+    rotate 10
+    compress
+    delaycompress
+    create 0640 @TARANTOOL_USER@ adm
+    postrotate
+        @CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl logrotate `basename ${1%%.*}`
+    endscript
+}

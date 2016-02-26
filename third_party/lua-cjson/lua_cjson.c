@@ -236,7 +236,7 @@ static void json_append_string(struct luaL_serializer *cfg, strbuf_t *json,
 {
     (void) cfg;
     const char *escstr;
-    int i;
+    size_t i;
 
     /* Worst case is len * 6 (all unicode escapes).
      * This buffer is reused constantly for small strings
@@ -330,7 +330,7 @@ static void json_append_number(struct luaL_serializer *cfg, strbuf_t *json,
 static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
                                int current_depth, strbuf_t *json)
 {
-    int comma, keytype;
+    int comma;
 
     /* Object */
     strbuf_append_char(json, '{');
@@ -344,8 +344,6 @@ static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
         else
             comma = 1;
 
-        /* table, key, value */
-        keytype = lua_type(l, -2);
     struct luaL_field field;
     luaL_checkfield(l, cfg, -2, &field);
     if (field.type == MP_UINT) {
@@ -420,7 +418,6 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
 static int json_encode(lua_State *l)
 {
     struct luaL_serializer *cfg = luaL_checkserializer(l);
-    strbuf_t local_encode_buf;
     char *json;
     int len;
 

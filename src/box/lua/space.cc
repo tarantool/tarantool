@@ -41,6 +41,7 @@ extern "C" {
 
 #include "box/space.h"
 #include "box/schema.h"
+#include "box/user_def.h"
 #include "box/tuple.h"
 #include "box/txn.h"
 #include "box/vclock.h" /* VCLOCK_MAX */
@@ -48,14 +49,10 @@ extern "C" {
 /**
  * Trigger function for all spaces
  */
-static void
-lbox_space_on_replace_trigger(struct trigger *trigger, void *event)
+static int
+lbox_push_on_replace_event(struct lua_State *L, void *event)
 {
 	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
-	lua_State *L = lua_newthread(tarantool_L);
-	LuarefGuard coro_guard(tarantool_L);
-
-	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
 
 	if (stmt->old_tuple) {
 		lbox_pushtuple(L, stmt->old_tuple);
@@ -69,8 +66,7 @@ lbox_space_on_replace_trigger(struct trigger *trigger, void *event)
 	}
 	/* @todo: maybe the space object has to be here */
 	lua_pushstring(L, stmt->space->def.name);
-
-	lbox_call(L, 3, 0);
+	return 3;
 }
 
 /**
@@ -90,9 +86,8 @@ lbox_space_on_replace(struct lua_State *L)
 	struct space *space = space_cache_find(id);
 	lua_pop(L, 1);
 
-	return lbox_trigger_reset(L, 3,
-				  &space->on_replace,
-				  lbox_space_on_replace_trigger);
+	return lbox_trigger_reset(L, 3, &space->on_replace,
+				  lbox_push_on_replace_event);
 }
 
 /**
@@ -162,7 +157,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	 * Fill space.index table with
 	 * all defined indexes.
 	 */
-	for (int k = 0; k <= space->index_id_max; k++) {
+	for (unsigned k = 0; k <= space->index_id_max; k++) {
 		Index *index = space_index(space, k);
 		if (index == NULL)
 			continue;
@@ -319,6 +314,10 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);
 	lua_setfield(L, -2, "SYSTEM_ID_MAX");
+	lua_pushnumber(L, BOX_SYSTEM_USER_ID_MIN);
+	lua_setfield(L, -2, "SYSTEM_USER_ID_MIN");
+	lua_pushnumber(L, BOX_SYSTEM_USER_ID_MAX);
+	lua_setfield(L, -2, "SYSTEM_USER_ID_MAX");
 	lua_pushnumber(L, BOX_INDEX_MAX);
 	lua_setfield(L, -2, "INDEX_MAX");
 	lua_pushnumber(L, BOX_SPACE_MAX);

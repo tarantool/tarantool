@@ -5,27 +5,17 @@ VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
 DEB_CMAKE_EXTRA_FLAGS := \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+	-DCMAKE_INSTALL_SYSCONFDIR=/etc \
+	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \
+	-DENABLE_BUNDLED_LIBYAML=OFF \
+	-DENABLE_DIST=ON \
+	-DWITH_SYSVINIT=ON \
+	-DWITH_SYSTEMD=OFF
 
 DEB_DH_INSTALLINIT_ARGS := --name=tarantool
 
-DEB_CMAKE_INSTALL_PREFIX := /usr
-DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
-	-DCMAKE_SKIP_RPATH=ON \
-	-DCMAKE_VERBOSE_MAKEFILE=ON \
-	-DCMAKE_INSTALL_SYSCONFDIR=/etc \
-	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \
-	-DCMAKE_INSTALL_LIBDIR=/usr/lib \
-	-DENABLE_BUNDLED_LIBYAML=OFF
-#     -DCMAKE_C_FLAGS="$(CFLAGS)" \
-#     -DCMAKE_LD_FLAGS="$(LDFLAGS)" \
-#     -DENABLE_STATIC=ON
-#     -DCMAKE_CXX_FLAGS="$(CXXFLAGS)" \
-#     -DCMAKE_CPP_FLAGS="$(CPPFLAGS)" \
-#    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
-#    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
-
-DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
 export DEB_BUILD_MAINT_OPTIONS = hardening=-stackprotector,-pie
@@ -35,7 +25,10 @@ include /usr/share/dpkg/buildflags.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
 
-DEB_BUILDDIR := build-area
+debian/%.manpages: debian/%.manpages.in
+	sed 's/@DEB_BUILDDIR@/$(DEB_BUILDDIR)/g' $< > $@
+
+build-indep: debian/tarantool.manpages debian/tarantool-common.manpages
 
 tarball: clean
 	git describe --long --always > VERSION

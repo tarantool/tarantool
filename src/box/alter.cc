@@ -30,7 +30,6 @@
  */
 #include "alter.h"
 #include "schema.h"
-#include "user_def.h"
 #include "user.h"
 #include "space.h"
 #include "memtx_index.h"
@@ -58,7 +57,7 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 #define NAME             2
 #define ENGINE           3
 #define FIELD_COUNT      4
-#define FLAGS            5
+#define OPTS             5
 
 /** _index columns */
 #define INDEX_ID         1
@@ -88,22 +87,22 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 /* {{{ Auxiliary functions and methods. */
 
 void
-access_check_ddl(uint32_t owner_uid)
+access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
 	struct credentials *cr = current_user();
 	/*
-	 * For privileges, only the current user can claim he's
-	 * the grantor/owner of the privilege that is being
-	 * granted.
-	 * For spaces/funcs/other objects, only the creator
-	 * of the object or admin can modify the space, since
-	 * there is no such thing in Tarantool as GRANT OPTION or
-	 * ALTER privilege.
+	 * Only the owner of the object can be the grantor
+	 * of the privilege on the object. This means that
+	 * for universe/space/func/other persistent object,
+	 * only the creator of the object can be the grantor,
+	 * since Tarantool lacks separate CREATE/DROP/GRANT OPTION
+	 * privileges.
 	 */
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
-		struct user *user = user_cache_find(cr->uid);
+		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", user->name);
+			  "Create, drop or alter", schema_object_name(type),
+			  user->def.name);
 	}
 }
 
@@ -202,6 +201,89 @@ err:
 	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
 }
 
+static void
+opt_set(void *opts, const struct opt_def *def, const char **val)
+{
+	uint64_t uval;
+	uint32_t str_len;
+	const char *str;
+	char *opt = ((char *) opts) + def->offset;
+	switch (def->type) {
+	case MP_BOOL:
+		store_bool(opt, mp_decode_bool(val));
+		break;
+	case MP_UINT:
+		uval = mp_decode_uint(val);
+		if (def->len == sizeof(uint64_t)) {
+			store_u64(opt, uval);
+		} else if (def->len == sizeof(uint32_t)) {
+			store_u32(opt, uval);
+		} else {
+			mp_unreachable();
+		}
+		break;
+	case MP_STR:
+		str = mp_decode_str(val, &str_len);
+		str_len = MIN(str_len, def->len - 1);
+		memcpy(opt, str, str_len);
+		opt[str_len + 1] = '\0';
+		break;
+	default:
+		mp_unreachable();
+	}
+}
+
+static void
+opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
+		       uint32_t errcode, uint32_t field_no)
+{
+	char errmsg[DIAG_ERRMSG_MAX];
+
+	if (mp_typeof(*map) == MP_NIL)
+		return;
+	if (mp_typeof(*map) != MP_MAP)
+		tnt_raise(ClientError, errcode, field_no,
+			  "expected a map with options");
+
+	/*
+	 * The implementation below has O(map_size * reg_size) complexity.
+	 * DDL is not performance-critical, so this is not a problem.
+	 */
+	uint32_t map_size = mp_decode_map(&map);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*map) != MP_STR) {
+			tnt_raise(ClientError, errcode, field_no,
+				  "key must be a string");
+		}
+		uint32_t key_len;
+		const char *key = mp_decode_str(&map, &key_len);
+		bool found = false;
+		for (const struct opt_def *def = reg; def->name != NULL; def++) {
+			if (key_len != strlen(def->name) ||
+			    memcmp(key, def->name, key_len) != 0)
+				continue;
+
+			if (mp_typeof(*map) != def->type) {
+				snprintf(errmsg, sizeof(errmsg),
+					"'%.*s' must be %s", key_len, key,
+					mp_type_strs[def->type]);
+				tnt_raise(ClientError, errcode, field_no,
+					  errmsg);
+			}
+
+			opt_set(opts, def, &map);
+			found = true;
+			break;
+		}
+		if (!found) {
+			snprintf(errmsg, sizeof(errmsg),
+				"unexpected option '%.*s'",
+				key_len, key);
+			tnt_raise(ClientError, errcode, field_no, errmsg);
+		}
+	}
+}
+
 /**
  * Support function for key_def_new_from_tuple(..)
  * 1.6.6+
@@ -210,10 +292,9 @@ err:
  * Throws an error if the the value does not correspond to any enum value
  */
 static enum rtree_index_distance_type
-key_opts_decode_distance(const char **field)
+key_opts_decode_distance(const char *str)
 {
-	uint32_t len;
-	const char *str = mp_decode_str(field, &len);
+	uint32_t len = strlen(str);
 	if (len == strlen("euclid") &&
 	    strncasecmp(str, "euclid", len) == 0) {
 		return RTREE_INDEX_DISTANCE_TYPE_EUCLID;
@@ -239,47 +320,10 @@ static void
 key_opts_create_from_field(struct key_opts *opts, const char *map)
 {
 	*opts = key_opts_default;
-	if (mp_typeof(*map) != MP_MAP)
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  INDEX_OPTS, "expected a map with options");
-	uint32_t map_size = mp_decode_map(&map);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*map) != MP_STR) {
-			mp_next(&map); /* skip key */
-			mp_next(&map); /* skip value */
-		}
-		uint32_t key_len;
-		const char *key = mp_decode_str(&map, &key_len);
-		if (key_len == strlen("unique") &&
-		    strncasecmp(key, "unique", key_len) == 0) {
-			if (mp_typeof(*map) != MP_BOOL) {
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "unique must be a boolean");
-			}
-			opts->is_unique = mp_decode_bool(&map);
-		} else if (key_len == strlen("dimension") &&
-			   strncasecmp(key, "dimension", key_len) == 0) {
-			if (mp_typeof(*map) != MP_UINT) {
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "dimension must be a number");
-			}
-			opts->dimension = (uint32_t) mp_decode_uint(&map);
-		} else if (key_len == strlen("distance") &&
-			   strncasecmp(key, "distance", key_len) == 0) {
-			if (mp_typeof(*map) != MP_STR)
-				tnt_raise(ClientError,
-					  ER_WRONG_INDEX_OPTIONS,
-					  INDEX_OPTS,
-					  "distance must be a string");
-			opts->distance = key_opts_decode_distance(&map);
-		} else {
-			mp_next(&map); /* skip value */
-		}
-	}
+	opts_create_from_field(opts, key_opts_reg, map,
+			ER_WRONG_INDEX_OPTIONS, INDEX_OPTS);
+	if (opts->distancebuf[0] != '\0')
+		opts->distance = key_opts_decode_distance(opts->distancebuf);
 }
 
 /**
@@ -407,25 +451,34 @@ key_def_new_from_tuple(struct tuple *tuple)
 }
 
 static void
-space_def_init_flags(struct space_def *def, struct tuple *tuple)
+space_def_init_opts(struct space_def *def, struct tuple *tuple)
 {
-	/* default values of flags */
-	def->temporary = false;
+	/* default values of opts */
+	def->opts = space_opts_default;
 
 	/* there is no property in the space */
-	if (tuple_field_count(tuple) <= FLAGS)
+	if (tuple_field_count(tuple) <= OPTS)
 		return;
 
-	const char *flags = tuple_field_cstr(tuple, FLAGS);
-	while (flags && *flags) {
-		while (isspace(*flags)) /* skip space */
-			flags++;
-		if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-			def->temporary = true;
-		flags = strchr(flags, ',');
-		if (flags)
-			flags++;
+	const char *data = tuple_field(tuple, OPTS);
+	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
+	if (!is_170_plus) {
+		/* Tarantool < 1.7.0 compatibility */
+		const char *flags = tuple_field_cstr(tuple, OPTS);
+		while (flags && *flags) {
+			while (isspace(*flags)) /* skip space */
+				flags++;
+			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
+				def->opts.temporary = true;
+			flags = strchr(flags, ',');
+			if (flags)
+				flags++;
+		}
+		return;
 	}
+
+	opts_create_from_field(&def->opts, space_opts_reg, data,
+			ER_WRONG_SPACE_OPTIONS, OPTS);
 }
 
 /**
@@ -443,9 +496,9 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
 			 "%s", tuple_field_cstr(tuple, ENGINE));
 
-	space_def_init_flags(def, tuple);
+	space_def_init_opts(def, tuple);
 	space_def_check(def, namelen, engine_namelen, errcode);
-	access_check_ddl(def->uid);
+	access_check_ddl(def->uid, SC_SPACE);
 }
 
 /* }}} */
@@ -769,12 +822,12 @@ ModifySpace::prepare(struct alter_space *alter)
 	}
 
 	Engine *engine = alter->old_space->handler->engine;
-	if (def.temporary && !engine_can_be_temporary(engine->flags)) {
+	if (def.opts.temporary && !engine_can_be_temporary(engine->flags)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  space_name(alter->old_space),
 			  "space does not support temporary flag");
 	}
-	if (def.temporary != alter->old_space->def.temporary &&
+	if (def.opts.temporary != alter->old_space->def.opts.temporary &&
 	    space_index(alter->old_space, 0) != NULL &&
 	    space_size(alter->old_space) > 0) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -1255,7 +1308,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				txn_alter_trigger_new(on_drop_space, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_space->def.uid);
+		access_check_ddl(old_space->def.uid, SC_SPACE);
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
@@ -1345,7 +1398,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	uint32_t iid = tuple_field_u32(old_tuple ? old_tuple : new_tuple,
 				       INDEX_ID);
 	struct space *old_space = space_cache_find(id);
-	access_check_ddl(old_space->def.uid);
+	access_check_ddl(old_space->def.uid, SC_SPACE);
 	Index *old_index = space_index(old_space, iid);
 	struct alter_space *alter = alter_space_new();
 	auto scoped_guard =
@@ -1399,7 +1452,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 bool
 user_has_data(struct user *user)
 {
-	uint32_t uid = user->uid;
+	uint32_t uid = user->def.uid;
 	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
@@ -1407,7 +1460,7 @@ user_has_data(struct user *user)
 	 */
 	uint32_t indexes[] = { 1, 1, 1, 0 };
 	uint32_t count = sizeof(spaces)/sizeof(*spaces);
-	for (int i = 0; i < count; i++) {
+	for (uint32_t i = 0; i < count; i++) {
 		if (space_has_data(spaces[i], indexes[i], uid))
 			return true;
 	}
@@ -1490,7 +1543,7 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 			  user->name, "unknown user type");
 	}
 	identifier_check(name);
-	access_check_ddl(user->owner);
+	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
@@ -1555,12 +1608,12 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_user->owner);
+		access_check_ddl(old_user->def.owner, SC_USER);
 		/* Can't drop guest or super user */
-		if (uid == GUEST || uid == ADMIN || uid == PUBLIC) {
+		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name,
-				  "the user is a system user");
+				  old_user->def.name,
+				  "the user or the role is a system");
 		}
 		/*
 		 * Can only delete user if it has no spaces,
@@ -1568,7 +1621,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 */
 		if (user_has_data(old_user)) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->name, "the user has objects");
+				  old_user->def.name, "the user has objects");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
@@ -1668,7 +1721,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
 		 */
-		access_check_ddl(def.uid);
+		access_check_ddl(def.uid, SC_FUNCTION);
 		/* Can only delete func if it has no grants. */
 		if (schema_find_grants("function", old_func->def.fid)) {
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
@@ -1680,7 +1733,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		txn_on_commit(txn, on_commit);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&def, new_tuple);
-		access_check_ddl(def.uid);
+		access_check_ddl(def.uid, SC_FUNCTION);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_replace_func, NULL);
 		txn_on_commit(txn, on_commit);
@@ -1718,55 +1771,61 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user *grantor = user_cache_find(priv->grantor_id);
+	struct user *grantor = user_find_xc(priv->grantor_id);
 	/* May be a role */
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
 	}
-	access_check_ddl(grantor->uid);
+	access_check_ddl(grantor->def.uid, priv->object_type);
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		if (grantor->uid != ADMIN) {
+		if (grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  "Grant", schema_object_name(priv->object_type),
+				  grantor->def.name);
 		}
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (space->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  "Grant", schema_object_name(priv->object_type),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func *func = func_cache_find(priv->object_id);
-		if (func->def.uid != grantor->uid && grantor->uid != ADMIN) {
+		if (func->def.uid != grantor->def.uid &&
+		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  priv_name(priv->access), grantor->name);
+				  "Grant", schema_object_name(priv->object_type),
+				  grantor->def.name);
 		}
 		break;
 	}
 	case SC_ROLE:
 	{
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE) {
+		if (role == NULL || role->def.type != SC_ROLE) {
 			tnt_raise(ClientError, ER_NO_SUCH_ROLE,
-				  role ? role->name :
+				  role ? role->def.name :
 				  int2str(priv->object_id));
 		}
 		/*
 		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
-		if (role->owner != grantor->uid && grantor->uid != ADMIN &&
-		    (role->uid != PUBLIC || priv->access < PRIV_X)) {
+		if (role->def.owner != grantor->def.uid &&
+		    grantor->def.uid != ADMIN &&
+		    (role->def.uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  role->name, grantor->name);
+				  "Grant", role->def.name, grantor->def.name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -1792,7 +1851,7 @@ grant_or_revoke(struct priv_def *priv)
 		return;
 	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->type != SC_ROLE)
+		if (role == NULL || role->def.type != SC_ROLE)
 			return;
 		if (priv->access)
 			role_grant(grantee, role);
@@ -1857,7 +1916,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
-		access_check_ddl(priv.grantor_id);
+		access_check_ddl(priv.grantor_id, priv.object_type);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(revoke_priv, NULL);
 		txn_on_commit(txn, on_commit);

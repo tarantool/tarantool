@@ -1030,8 +1030,9 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 		depth++;
 	}
 
-	bps_tree_block_id_t level_block_count[BPS_TREE_MAX_DEPTH];
-	bps_tree_block_id_t level_child_count[BPS_TREE_MAX_DEPTH];
+	/* Initializing by {0} to suppress compile warnings (gh-1287) */
+	bps_tree_block_id_t level_block_count[BPS_TREE_MAX_DEPTH] = {0};
+	bps_tree_block_id_t level_child_count[BPS_TREE_MAX_DEPTH] = {0};
 	struct bps_inner *parents[BPS_TREE_MAX_DEPTH];
 	level_count = leaf_count;
 	for (bps_tree_block_id_t i = 0; i < depth - 1; i++) {
@@ -1103,7 +1104,7 @@ bps_tree_build(struct bps_tree *tree, bps_tree_elem_t *sorted_array,
 			parents[i]->header.size++;
 			bps_tree_block_id_t max_size = level_child_count[i] /
 						       level_block_count[i];
-			if (parents[i]->header.size != max_size) {
+			if ((uint32_t)parents[i]->header.size != max_size) {
 				parents[i]->elems[parents[i]->header.size - 1] =
 					insert_value;
 				break;
@@ -4412,7 +4413,7 @@ bps_tree_debug_check_insert_into_leaf(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 0; i < szlim; i++) {
 		for (unsigned int j = 0; j <= i; j++) {
 			tree->size = 0;
@@ -4473,7 +4474,7 @@ bps_tree_debug_check_delete_from_leaf(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 1; i <= szlim; i++) {
 		for (unsigned int j = 0; j < i; j++) {
 			tree->size = 1;
@@ -4530,7 +4531,7 @@ bps_tree_debug_check_move_to_right_leaf(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move = i < szlim - j ? i : szlim - j;
@@ -4626,7 +4627,7 @@ bps_tree_debug_check_move_to_left_leaf(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move = j < szlim - i ? j : szlim - i;
@@ -4724,7 +4725,7 @@ bps_tree_debug_check_insert_and_move_to_right_leaf(struct bps_tree *tree,
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move =
@@ -4842,7 +4843,7 @@ bps_tree_debug_check_insert_and_move_to_left_leaf(struct bps_tree *tree,
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move =
@@ -4957,7 +4958,7 @@ bps_tree_debug_check_insert_into_inner(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 0; i < szlim; i++) {
 		for (unsigned int j = 0; j <= i; j++) {
 			tree->size = 0;
@@ -5027,7 +5028,7 @@ bps_tree_debug_check_delete_from_inner(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 1; i <= szlim; i++) {
 		for (unsigned int j = 0; j < i; j++) {
 			struct bps_inner block;
@@ -5081,7 +5082,7 @@ bps_tree_debug_check_move_to_right_inner(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move = i < szlim - j ? i : szlim - j;
@@ -5181,7 +5182,7 @@ bps_tree_debug_check_move_to_left_inner(struct bps_tree *tree, bool assertme)
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move = j < szlim - i ? j : szlim - i;
@@ -5282,7 +5283,7 @@ bps_tree_debug_check_insert_and_move_to_right_inner(struct bps_tree *tree,
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move =
@@ -5414,7 +5415,7 @@ bps_tree_debug_check_insert_and_move_to_left_inner(struct bps_tree *tree,
 {
 	(void) assertme;
 	int result = 0;
-	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	const unsigned int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
 	for (unsigned int i = 0; i <= szlim; i++) {
 		for (unsigned int j = 0; j <= szlim; j++) {
 			unsigned int max_move =

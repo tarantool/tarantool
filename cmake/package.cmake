@@ -13,14 +13,16 @@ set (CPACK_SOURCE_IGNORE_FILES
     "CMakeCache.txt" "CPackSourceConfig.cmake" "CPackConfig.cmake"
     "CMakeFiles" "\\\\.gz" "\\\\.Z" "\\\\.zip"
     "x86_64\\\\.rpm" "i386\\\\.rpm" "i686\\\\.rpm"
-    "\\\\.o" "\\\\.so" "\\\\.a"
+    "\\\\.o" "\\\\.so" "\\\\.a" "\\\\.pyc"
+    "~$"
     "src/tarantool$"
     "src/00000000000000000001.snap"
     "install_manifest.txt"
     "cmake_install.cmake" "test/var/"
-)
-
-set (CPACK_SOURCE_IGNORE_FILES "${CPACK_SOURCE_IGNORE_FILES}"
+    "${CMAKE_SOURCE_DIR}/.travis.yml"
+    "${CMAKE_SOURCE_DIR}/.appveyor.yml"
+    "${CMAKE_SOURCE_DIR}/.build.mk"
+    "${CMAKE_SOURCE_DIR}/test.sh"
     "${CMAKE_SOURCE_DIR}/Makefile"
     "${CMAKE_SOURCE_DIR}/test/Makefile"
     "${CMAKE_SOURCE_DIR}/test/lib/Makefile"
@@ -34,9 +36,16 @@ set (CPACK_SOURCE_IGNORE_FILES "${CPACK_SOURCE_IGNORE_FILES}"
     "${CMAKE_SOURCE_DIR}/doc/user/Makefile"
     "${CMAKE_SOURCE_DIR}/doc/developer/Makefile"
     "${CMAKE_SOURCE_DIR}/doc/man/Makefile"
+    "${CMAKE_SOURCE_DIR}/doc/sphinx/"
+    "${CMAKE_SOURCE_DIR}/doc/www/"
+    "${CMAKE_SOURCE_DIR}/third_party/luajit/doc/"
+    "${CMAKE_SOURCE_DIR}.*/CVS/"
+    "${CMAKE_SOURCE_DIR}/.*debian/"
+    "${CMAKE_SOURCE_DIR}/.*rpm/"
+    "${CMAKE_SOURCE_DIR}/.*FreeBSD/"
 )
 
-set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}-src")
+set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}")
 
 #
 # Provide options for the binary distribution.

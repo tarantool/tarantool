@@ -30,6 +30,8 @@
  */
 #include "applier.h"
 
+#include <msgpuck.h>
+
 #include "xlog.h"
 #include "fiber.h"
 #include "scoped_guard.h"
@@ -37,7 +39,6 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "xrow.h"
-#include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
 #include "version.h"
@@ -312,7 +313,7 @@ applier_disconnect(struct applier *applier, struct error *e,
 	fiber_gc();
 }
 
-static void
+static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
@@ -341,7 +342,7 @@ applier_f(va_list ap)
 			ev_io_stop(loop(), &applier->io);
 			iobuf_reset(applier->iobuf);
 			/* Don't close the socket */
-			return;
+			return 0;
 		} catch (ClientError *e) {
 			applier_disconnect(applier, e, APPLIER_STOPPED);
 			throw;
@@ -368,6 +369,7 @@ applier_f(va_list ap)
 		fiber_sleep(RECONNECT_DELAY);
 		fiber_testcancel();
 	}
+	return 0;
 }
 
 void

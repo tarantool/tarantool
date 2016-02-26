@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $FreeBSD$
+# $FreeBSD: head/databases/tarantool/files/tarantool.in 391515 2015-07-07 16:59:55Z vg $
 
 # PROVIDE: tarantool
 # REQUIRE: LOGIN

@@ -39,6 +39,7 @@ s = box.space.t
 s:len()
 s.temporary
 
+-- <!-- Tarantool < 1.7.0 compatibility
 _ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 s.temporary
 _ = _space:update(s.id, {{'=', FLAGS, ',:asfda:temporary'}})
@@ -58,5 +59,7 @@ s.temporary
 
 s:delete{1}
 _ = _space:update(s.id, {{'=', FLAGS, 'no-temporary'}})
+-- Tarantool < 1.7.0 compatibility //-->
+
 s:drop()
 s = nil

@@ -61,7 +61,7 @@
 static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
-int sc_version;
+uint32_t sc_version;
 
 bool
 space_is_system(struct space *space)
@@ -248,7 +248,7 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
+		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", {false}
 	};
 	struct key_opts opts = key_opts_default;
 	struct key_def *key_def = key_def_new(def.id,

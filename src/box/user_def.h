@@ -33,6 +33,10 @@
 #include "key_def.h" /* for SCHEMA_OBJECT_TYPE */
 #include "scramble.h" /* for SCRAMBLE_SIZE */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum {
 	/* SELECT */
 	PRIV_R = 1,
@@ -69,6 +73,16 @@ struct user_def {
 };
 
 /** Predefined user ids. */
-enum { GUEST = 0, ADMIN =  1, PUBLIC = 2 /* role */ };
+enum {
+	BOX_SYSTEM_USER_ID_MIN = 0,
+	GUEST = 0,
+	ADMIN =  1,
+	PUBLIC = 2, /* role */
+	BOX_SYSTEM_USER_ID_MAX = PUBLIC
+};
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_USER_DEF_H_INCLUDED */

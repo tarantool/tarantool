@@ -10,7 +10,7 @@ print '-------------------------------------------------------------'
 env = require('test_run')
 ---
 ...
-test_run = env.new('127.0.0.1', 8080)
+test_run = env.new()
 ---
 ...
 replica_set = require('fast_replica')
@@ -71,7 +71,7 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
-#box.info.vclock == 1
+#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
@@ -104,7 +104,7 @@ box.space._cluster:len() == 2
 ---
 - true
 ...
-#box.info.vclock == 2
+#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
@@ -116,7 +116,7 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
-#box.info.vclock == 1
+#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...

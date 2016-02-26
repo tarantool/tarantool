@@ -71,7 +71,7 @@ rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 		}
 
 		/* Reallocate buffer */
-		size_t cap = (*end - *buf) > 0 ? (*end - *buf) : 32;
+		ptrdiff_t cap = (*end - *buf) > 0 ? (*end - *buf) : 32;
 		while (cap <= *pos - *buf + n)
 			cap *= 2;
 		char *chunk = (char *) realloc(*buf, cap);

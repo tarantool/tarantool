@@ -32,6 +32,7 @@
  */
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
 #include "say.h"
@@ -221,10 +222,23 @@ struct error_factory {
 				  unsigned line);
 	struct error *(*ChannelIsClosed)(const char *file,
 					 unsigned line);
+	struct error *(*LuajitError)(const char *file,
+				     unsigned line, const char *msg);
+	struct error *(*ClientError)(const char *file, unsigned line,
+				     uint32_t errcode, ...);
 };
 
 struct diag *
 diag_get();
+
+static inline void
+diag_raise(void)
+{
+	struct error *e = diag_last_error(diag_get());
+	if (e)
+		error_raise(e);
+}
+
 
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\

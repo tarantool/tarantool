@@ -42,15 +42,6 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
-int
-lbox_error(lua_State *L)
-{
-	(void) L;
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
-	e->raise();
-	return 0;
-}
-
 static int
 lbox_error_raise(lua_State *L)
 {
@@ -64,7 +55,7 @@ lbox_error_raise(lua_State *L)
 	int top = lua_gettop(L);
 	if (top <= 1) {
 		/* re-throw saved exceptions (if any) */
-		if (diag_last_error(&fiber()->diag))
+		if (box_error_last())
 			lbox_error(L);
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
@@ -109,12 +100,9 @@ raise:
 		}
 		line = info.currentline;
 	}
-
-	/* see tnt_raise() */
-	say_debug("ClientError at %s:%i", file, line);
-	ClientError *e = new ClientError(file, line, reason, code);
-	diag_add_error(&fiber()->diag, e);
-	throw e;
+	say_debug("box.error() at %s:%i", file, line);
+	box_error_set(file, line, code, reason);
+	lbox_error(L);
 	return 0;
 }
 
@@ -124,11 +112,16 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	Exception *e = (Exception *) diag_last_error(&fiber()->diag);
+	/* TODO: use struct error here */
+	Exception *e = (Exception *) box_error_last();
 
 	if (e == NULL) {
 		lua_pushnil(L);
 	} else {
+		/*
+		 * TODO: use luaL_pusherror here, move type_foreach_method
+		 * to error_unpack() in Lua.
+		 */
 		lua_newtable(L);
 
 		lua_pushstring(L, "type");
@@ -158,7 +151,7 @@ lbox_error_clear(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.clear(): bad arguments");
 
-	diag_clear(&fiber()->diag);
+	box_error_clear();
 	return 0;
 }
 

@@ -37,7 +37,7 @@
  * Globally unique identifier of this cluster.
  * A cluster is a set of connected appliers.
  */
-tt_uuid cluster_id;
+struct tt_uuid cluster_id;
 
 typedef rb_tree(struct applier) applierset_t;
 rb_proto(, applierset_, applierset_t, struct applier)

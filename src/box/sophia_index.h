@@ -61,8 +61,7 @@ public:
 	                       const char *tuple_end,
 	                       enum dup_replace_mode mode);
 	void remove(const char *key);
-	void upsert(const char *key,
-	            const char *ops,
+	void upsert(const char *ops,
 	            const char *ops_end,
 	            const char *tuple,
 	            const char *tuple_end,
@@ -71,7 +70,7 @@ public:
 	void *db;
 
 private:
-	void *createObject(const char *key, bool async, const char **keyend);
+	void *createDocument(const char *key, bool async, const char **keyend);
 	struct tuple_format *format;
 };
 

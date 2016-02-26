@@ -23,23 +23,23 @@ box.cfg {
 
     -- UNIX user name to switch to after start
     -- by default: tarantool
-    username = nil;
+    -- username = nil;
 
     -- A directory where database working files will be stored
-    -- If not specified, defaults to the current directory
-    work_dir = nil;
+    -- If not specified, defaults to /var/lib/tarantool/${INSTANCE}
+    -- work_dir = nil;
 
     -- A directory where write-ahead log (.xlog) files are stored
     -- If not specified, defaults to work_dir
-    wal_dir = ".";
+    -- wal_dir = nil;
 
     -- A directory where snapshot (.snap) files will be stored
     -- If not specified, defaults to work_dir
-    snap_dir = ".";
+    -- snap_dir = nil;
 
     -- A directory where sophia files will be stored
     -- If not specified, defaults to work_dir
-    sophia_dir = ".";
+    -- sophia_dir = nil;
 
     -- The read/write data port number or URI
     -- Has no default value, so must be specified if
@@ -50,15 +50,15 @@ box.cfg {
     -- Store the process id in this file.
     -- Can be relative to work_dir. 
     -- Default value is nil.
-    pid_file = "example.pid";
+    -- pid_file = "example.pid";
 
     -- Inject the given string into server process title
     -- custom_proc_title = 'example';
 
     -- Run the server as a background task
-    -- The logger and pid_file parameters 
+    -- The logger and pid_file parameters
     -- must be non-null for this to work
-    background = true;
+    -- background = true;
 
     -------------------------
     -- Storage configuration
@@ -69,8 +69,8 @@ box.cfg {
     slab_alloc_arena = 1.0;
 
     -- Size of the smallest allocation unit
-    -- It can be tuned down if most of the tuples are very small
-    slab_alloc_minimal = 64;
+    -- It can be tuned up if most of the tuples are not so small
+    slab_alloc_minimal = 16;
 
     -- Size of the largest allocation unit
     -- It can be tuned up if it is necessary to store large tuples

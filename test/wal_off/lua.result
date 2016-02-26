@@ -96,3 +96,46 @@ mktuple(100000)
 space:drop()
 ---
 ...
+-- https://github.com/tarantool/tarantool/issues/1323
+-- index:count() works too long
+fiber = require('fiber')
+---
+...
+s = box.schema.create_space('test')
+---
+...
+i1 = s:create_index('test', {parts = {1, 'num'}})
+---
+...
+for i = 1,10000 do s:insert{i} end
+---
+...
+count = 0
+---
+...
+done = false
+---
+...
+function test1() for i = 1,100 do count = count + i1:count() end end
+---
+...
+function test2() for j = 1,100 do test1() fiber.sleep(0) end done = true  end
+---
+...
+fib = fiber.create(test2)
+---
+...
+for i = 1,100 do if done then break end fiber.sleep(0.01) end
+---
+...
+done and "count was calculated fast enough" or "count took too long to calculate"
+---
+- count was calculated fast enough
+...
+count
+---
+- 100000000
+...
+box.space.test:drop()
+---
+...

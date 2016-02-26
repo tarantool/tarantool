@@ -36,7 +36,22 @@
 #include "scoped_guard.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
-STRS(index_type, ENUM_INDEX_TYPE);
+
+const char *mp_type_strs[] = {
+	/* .MP_NIL    = */ "nil",
+	/* .MP_UINT   = */ "unsigned int",
+	/* .MP_INT    = */ "int",
+	/* .MP_STR    = */ "string",
+	/* .MP_BIN    = */ "blob",
+	/* .MP_ARRAY  = */ "array",
+	/* .MP_MAP    = */ "map",
+	/* .MP_BOOL   = */ "boolean",
+	/* .MP_FLOAT  = */ "float",
+	/* .MP_DOUBLE = */ "double",
+	/* .MP_EXT    = */ "extension",
+};
+
+const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
 const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 
@@ -51,8 +66,21 @@ const uint32_t key_mp_type[] = {
 };
 
 const struct key_opts key_opts_default = {
-	true, 2, RTREE_INDEX_DISTANCE_TYPE_EUCLID
+	/* .unique       = */ true,
+	/* .dimension    = */ 2,
+	/* .distancebuf  = */ { '\0' },
+	/* .distance     = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID
 };
+
+const struct opt_def key_opts_reg[] = {
+	OPT_DEF("unique", MP_BOOL, struct key_opts, is_unique),
+	OPT_DEF("dimension", MP_UINT, struct key_opts, dimension),
+	OPT_DEF("distance", MP_STR, struct key_opts, distancebuf),
+	{ NULL, MP_NIL, 0, 0 }
+};
+
+static const char *object_type_strs[] = {
+	"unknown", "universe", "space", "function", "user", "role" };
 
 enum schema_object_type
 schema_object_type(const char *name)
@@ -62,11 +90,22 @@ schema_object_type(const char *name)
 	 * name, and they are case-sensitive, so be case-sensitive
 	 * here too.
 	 */
-	static const char *strs[] = {
-		"unknown", "universe", "space", "function", "user", "role" };
-	int n_strs = sizeof(strs)/sizeof(*strs);
-	int index = strindex(strs, name, n_strs);
+	int n_strs = sizeof(object_type_strs)/sizeof(*object_type_strs);
+	int index = strindex(object_type_strs, name, n_strs);
 	return (enum schema_object_type) (index == n_strs ? 0 : index);
+}
+
+const char *
+schema_object_name(enum schema_object_type type)
+{
+	return object_type_strs[type];
+}
+
+static void
+key_def_set_cmp(struct key_def *def)
+{
+	def->tuple_compare = tuple_compare_create(def);
+	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
 }
 
 struct key_def *
@@ -74,14 +113,12 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, struct key_opts *opts,
 	    uint32_t part_count)
 {
-	uint32_t parts_size = sizeof(struct key_part) * part_count;
-	size_t sz = parts_size + sizeof(struct key_def);
+	size_t sz = key_def_sizeof(part_count);
 	struct key_def *def = (struct key_def *) malloc(sz);
 	if (def == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sz, "struct key_def", "malloc");
+		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
 	}
-	int n = snprintf(def->name, sizeof(def->name), "%s", name);
+	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
 		struct space *space = space_cache_find(space_id);
@@ -99,8 +136,21 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->opts = *opts;
 	def->part_count = part_count;
 
-	memset(def->parts, 0, parts_size);
+	memset(def->parts, 0, part_count * sizeof(struct key_part));
 	return def;
+}
+
+struct key_def *
+key_def_dup(struct key_def *def)
+{
+	size_t sz = key_def_sizeof(def->part_count);
+	struct key_def *dup = (struct key_def *) malloc(sz);
+	if (dup == NULL) {
+		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
+	}
+	memcpy(dup, def, key_def_sizeof(def->part_count));
+	rlist_create(&dup->link);
+	return dup;
 }
 
 /** Free a key definition. */
@@ -218,6 +268,36 @@ key_def_check(struct key_def *key_def)
 }
 
 void
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type)
+{
+	assert(part_no < def->part_count);
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
+	/**
+	 * When all parts are set, initialize the tuple
+	 * comparator function.
+	 */
+	/* Last part is set, initialize the comparators. */
+	bool all_parts_set = true;
+	for (uint32_t i = 0; i < def->part_count; i++) {
+		if (def->parts[i].type == UNKNOWN)
+			all_parts_set = false;
+	}
+	if (all_parts_set)
+		key_def_set_cmp(def);
+}
+
+const struct space_opts space_opts_default = {
+	/* .temporary = */ false,
+};
+
+const struct opt_def space_opts_reg[] = {
+	OPT_DEF("temporary", MP_BOOL, struct space_opts, temporary),
+	{ NULL, MP_NIL, 0, 0 }
+};
+
+void
 space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
                 int32_t errcode)
 {
@@ -239,7 +319,7 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 	}
 	identifier_check(def->engine_name);
 
-	if (def->temporary) {
+	if (def->opts.temporary) {
 		Engine *engine = engine_find(def->engine_name);
 		if (! engine_can_be_temporary(engine->flags))
 			tnt_raise(ClientError, ER_ALTER_SPACE,

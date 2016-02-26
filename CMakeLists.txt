@@ -16,6 +16,7 @@ include(CheckCXXSourceCompiles)
 include(TestBigEndian)
 include(CheckFunctionExists)
 include(FindOptionalPackage)
+include(FindPackageMessage)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
@@ -52,15 +53,9 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
-include(cmake/FindReadline.cmake)
 include(cmake/FindSphinx.cmake)
-include(cmake/systemd.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
-
-if (NOT READLINE_FOUND)
-    message(FATAL_ERROR "readline library not found.")
-endif()
 
 option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
 
@@ -126,47 +121,63 @@ add_custom_target(tags COMMAND ${CTAGS} -R -f tags
 add_custom_target(ctags DEPENDS tags)
 
 #
-# Define PACKAGE_VERSION -- a string constant with tarantool version.
+# Get version
 #
-set (CPACK_PACKAGE_VERSION_MAJOR "1")
-set (CPACK_PACKAGE_VERSION_MINOR "6")
-set (CPACK_PACKAGE_VERSION_PATCH "7")
 
 set (PACKAGE_VERSION "")
+set (TARANTOOL_VERSION "")
+
+# Try to get version from VERSION file
+set(VERSION_FILE_ORIG "${PROJECT_SOURCE_DIR}/VERSION")
+set(VERSION_FILE "${PROJECT_BINARY_DIR}/VERSION")
+if (EXISTS "${VERSION_FILE_ORIG}")
+    file (STRINGS "${VERSION_FILE_ORIG}" TARANTOOL_VERSION)
+elseif (EXISTS "${VERSION_FILE}")
+    file (STRINGS "${VERSION_FILE}" TARANTOOL_VERSION)
+endif()
 
 # Get git version only if source directory has .git repository, this
 # avoids git to search .git repository in parent
 # directories.
 #
-if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
-	execute_process (COMMAND ${GIT} describe HEAD
-		OUTPUT_VARIABLE PACKAGE_VERSION
-		OUTPUT_STRIP_TRAILING_WHITESPACE
+if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
+    execute_process (COMMAND ${GIT} describe --long HEAD
+        OUTPUT_VARIABLE TARANTOOL_GIT_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    if (PACKAGE_VERSION STREQUAL "")
-        message (FATAL_ERROR "Failed to retrive git version.")
+
+    if (NOT ("${TARANTOOL_GIT_VERSION}" STREQUAL "${TARANTOOL_VERSION}"))
+        set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")
+        message(STATUS "Generating VERSION file")
+        file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
+
+        message(STATUS "Updating submodules")
+        execute_process(COMMAND ${GIT} submodule update --init --recursive)
     endif()
 endif()
 
-set (VERSION_FILE "${CMAKE_SOURCE_DIR}/VERSION")
+if (NOT TARANTOOL_VERSION)
+    message (FATAL_ERROR "Unable to retrive version from git or ${VERSION_FILE} file.")
+endif()
 
-# Update version file or use it when there is no git
-# repository within sources (source tarballs).
 #
-if (PACKAGE_VERSION STREQUAL "")
-    if (NOT EXISTS "${VERSION_FILE}")
-        message (FATAL_ERROR "Version file ${VERSION_FILE} does not exists.")
-    endif()
-    message (WARNING "Using version from version file ${VERSION_FILE}")
-	execute_process (COMMAND ${CAT} ${VERSION_FILE}
-		OUTPUT_VARIABLE PACKAGE_VERSION
-		OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if (PACKAGE_VERSION STREQUAL "")
-        message (FATAL_ERROR "Unable to retrive version from git or ${VERSION_FILE} file.")
-    endif()
-else()
-	file(WRITE ${VERSION_FILE} "${PACKAGE_VERSION}\n")
-endif()
+# Split full version (git describe --long) to get components
+#
+string(REPLACE "-" "." TARANTOOL_VERSION_LIST ${TARANTOOL_VERSION})
+string(REPLACE "." ";" TARANTOOL_VERSION_LIST ${TARANTOOL_VERSION_LIST})
+LIST(GET TARANTOOL_VERSION_LIST 0 CPACK_PACKAGE_VERSION_MAJOR)
+LIST(GET TARANTOOL_VERSION_LIST 1 CPACK_PACKAGE_VERSION_MINOR)
+LIST(GET TARANTOOL_VERSION_LIST 2 CPACK_PACKAGE_VERSION_PATCH)
+LIST(GET TARANTOOL_VERSION_LIST 3 CPACK_PACKAGE_VERSION_COMMIT)
+
+set(PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}")
+set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_MINOR}")
+set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_PATCH}")
+set(PACKAGE_VERSION "${PACKAGE_VERSION}.${CPACK_PACKAGE_VERSION_COMMIT}")
+
+find_package_message(TARANTOOL_VERSION
+    "Tarantool version is ${TARANTOOL_VERSION} (${PACKAGE_VERSION})"
+    "${PACKAGE_VERSION}")
 
 #
 # Specify where to look for include files.
@@ -185,60 +196,71 @@ set(MODULE_SUFFIX "tarantool")
 set(MODULE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${MODULE_SUFFIX}")
 set(MODULE_LUADIR "${CMAKE_INSTALL_DATADIR}/${MODULE_SUFFIX}")
 set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_LUADIR "${CMAKE_INSTALL_FULL_DATADIR}/${MODULE_SUFFIX}")
+set(MODULE_FULL_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${MODULE_SUFFIX}")
 
+install(DIRECTORY DESTINATION ${MODULE_LUADIR})
+install(DIRECTORY DESTINATION ${MODULE_LIBDIR})
+
+include(cmake/multilib.cmake)
+
+set(_datadirs)
+list(APPEND _datadirs "/usr/local/share") # LuaRocks
+list(APPEND _datadirs "${CMAKE_INSTALL_FULL_DATADIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _datadirs "/usr/${MULTILIB}/lua/luarocks/share")
+endif()
+list(APPEND _datadirs "/usr/share") # System packages
+list(REMOVE_DUPLICATES _datadirs)
+set(MODULE_LUAPATH)
 foreach(dir
-        LIBDIR
-        LUADIR
-        INCLUDEDIR
-        )
-    if(NOT IS_ABSOLUTE ${MODULE_${dir}})
-        set(MODULE_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${MODULE_${dir}}")
-    else()
-        set(MODULE_FULL_${dir} "${MODULE_${dir}}")
-    endif()
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _datadirs)
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?.lua")
+        list(APPEND MODULE_LUAPATH "${prefix}/${dir}/?/init.lua")
+    endforeach()
 endforeach()
 
-message(STATUS "Module sources:   ${MODULE_FULL_LUADIR}")
-message(STATUS "Module libraries: ${MODULE_FULL_LIBDIR}")
-message(STATUS "Module includes:  ${MODULE_FULL_INCLUDEDIR}")
+set(_libdirs)
+list(APPEND _libdirs "/usr/local/${MULTILIB}") # LuaRocks
+list(APPEND _libdirs "${CMAKE_INSTALL_FULL_LIBDIR}") # Install prefix
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/debian_version")
+    # gh-1085: LuaRocks on Debian uses lib instead of lib/x86_64-linux-gnu/
+    list(APPEND _libdirs "/usr/local/lib") # LuaRocks on Debian
+endif()
+if(NOT CMAKE_CROSSCOMPILING AND EXISTS "/etc/gentoo-release")
+    # LuaRocks on Gentoo
+    list(APPEND _libdirs "/usr/${MULTILIB}/lua/luarocks/lib")
+endif()
+list(APPEND _libdirs "/usr/${MULTILIB}") # System packages
+list(REMOVE_DUPLICATES _libdirs)
+set(MODULE_LIBPATH)
+foreach(dir
+        "${MODULE_SUFFIX}"
+        "lua/5.1")
+    foreach(prefix IN LISTS _libdirs)
+        list(APPEND MODULE_LIBPATH "${prefix}/${dir}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+    endforeach()
+endforeach()
 
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
-list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
-list(APPEND MODULE_LIBPATH "${MODULE_FULL_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
-
-message(STATUS "Module package.path: ${MODULE_LUAPATH}")
-message(STATUS "Module package.cpath: ${MODULE_LIBPATH}")
+find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
+    "${MODULE_LUAPATH}")
+find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
+    "${MODULE_LIBPATH}")
 
 #
 # Now handle all configuration options.
 #
-option(ENABLE_DOC "Enable building of documentation" OFF)
+if (IS_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx)
+    option(ENABLE_DOC "Enable building of documentation" OFF)
+endif ()
 
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
 
-option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
-fiber' administrative command. Only works on x86 architectures, if compiled
-with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
-is output with resolved function (symbol) names. Otherwise only frame
-addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
-
-set (HAVE_BFD False)
-if (ENABLE_BACKTRACE)
-    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
-        # We only know this option to work with gcc
-        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
-    endif()
-    # Use GNU bfd if present.
-    check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
-    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
-    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
-    check_include_file(bfd.h HAVE_BFD_H)
-    set(CMAKE_REQUIRED_DEFINITIONS)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
-        set (HAVE_BFD True)
-    endif()
-endif()
 
 ##
 ## Third-Party libraries
@@ -255,21 +277,25 @@ endif()
 add_custom_target(build_bundled_libs)
 
 #
-# LibLUAJIT
+# ReadLine
 #
-include(luajit)
 
+set(Readline_FIND_REQUIRED ON)
+find_package(Readline)
+
+#
+# LuaJIT
+#
+# Patched.
+#
+set(ENABLE_BUNDLED_LUAJIT ON)
+include(luajit)
 
 #
 # LibEV
 #
-
+# Patched.
 #
-# Currently our code uses libev with #define EV_MULTIPLICITY 0.
-# This option means that libev has a global variable with
-# struct ev_loop data.
-# Such design is not compatible with the dynamic version of libev
-# provided by distros.
 set(ENABLE_BUNDLED_LIBEV ON)
 include(BuildLibEV)
 libev_build()
@@ -278,8 +304,10 @@ add_dependencies(build_bundled_libs ev)
 #
 # LibEIO
 #
-option(ENABLE_BUNDLED_LIBEIO "Enable building of the bundled libeio" ON)
-
+# Patched.
+#
+#option(ENABLE_BUNDLED_LIBEIO "Enable building of the bundled libeio" ON)
+set(ENABLE_BUNDLED_LIBEIO ON)
 if (ENABLE_BUNDLED_LIBEIO)
     include(BuildLibEIO)
     libeio_build()
@@ -288,7 +316,6 @@ else()
     set(LIBEIO_FIND_REQUIRED ON)
     find_package(LibEIO)
 endif()
-
 
 #
 # LibCORO
@@ -306,15 +333,6 @@ include(BuildLibCORO)
 libcoro_build()
 add_dependencies(build_bundled_libs coro)
 
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
-    add_definitions("-DCORO_ASM")
-elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
-    add_definitions("-DCORO_UCONTEXT")
-else()
-    add_definitions("-DCORO_SJLJ")
-endif()
-
-
 #
 # LibGOPT
 #
@@ -324,12 +342,21 @@ libgopt_build()
 add_dependencies(build_bundled_libs gopt)
 
 #
-# LibCJSON
+# MsgPuck
 #
 
-include(BuildLibCJSON)
-libcjson_build()
-add_dependencies(build_bundled_libs cjson)
+option(ENABLE_BUNDLED_MSGPUCK "Enable building of the bundled MsgPuck" ON)
+if (ENABLE_BUNDLED_MSGPUCK)
+    add_library(msgpuck STATIC src/lib/msgpuck/msgpuck.c)
+    set(MSGPUCK_LIBRARIES msgpuck)
+    set(MSGPUCK_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/msgpuck)
+    find_package_message(MsgPuck
+        "Using bundled MsgPuck"
+       "${MSGPUCK_LIBRARIES}:${MSGPUCK_INCLUDE_DIRS}")
+else()
+    set(MsgPuck_FIND_REQUIRED ON)
+    find_package(MsgPuck)
+endif()
 
 #
 # LibYAML
@@ -353,10 +380,12 @@ include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
 
+#
+# Sophia
+#
+
 include(BuildSophia)
 sophia_build()
-
-option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
@@ -376,8 +405,21 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
-install (FILES README.md LICENSE
-         DESTINATION share/doc/tarantool)
+if(NOT "${PROJECT_BINARY_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}"
+        COMMENT "Removing the build directory and its content"
+    )
+elseif(IS_DIRECTORY .git AND GIT)
+    add_custom_target(distclean)
+    add_custom_command(TARGET distclean
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${GIT} submodule foreach --recursive git clean -f -X -d
+        COMMAND ${GIT} clean -f -X -d
+        COMMENT "Removing all build files from the source directory"
+    )
+endif()
 
 #
 # tarantool info summary (used in server version output)
@@ -397,33 +439,23 @@ configure_file(
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
     )
 message (STATUS "")
-message (STATUS "Tarantool configuration is complete:")
-message (STATUS "")
-message (STATUS "VERSION: ${PACKAGE_VERSION}")
-message (STATUS "BUILD: ${TARANTOOL_BUILD}")
-message (STATUS "C_COMPILER: ${TARANTOOL_C_COMPILER}")
-message (STATUS "CXX_COMPILER: ${TARANTOOL_CXX_COMPILER}")
-message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
-message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
-message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
-message (STATUS "MODULE_DIR: ${MODULE_DIR}")
-message (STATUS "ENABLE_SSE2: ${ENABLE_SSE2}")
-message (STATUS "ENABLE_AVX: ${ENABLE_AVX}")
-message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
-message (STATUS "ENABLE_GPROF: ${ENABLE_GPROF}")
-message (STATUS "ENABLE_VALGRIND: ${ENABLE_VALGRIND}")
-message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
-message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
-message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
-message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
-message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
-message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
-message (STATUS "ENABLE_BUNDLED_LIBYAML: ${ENABLE_BUNDLED_LIBYAML}")
-message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
+
+set(PREFIX ${CMAKE_INSTALL_PREFIX})
+set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
+    ENABLE_SSE2 ENABLE_AVX
+    ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_TRACE
+    ENABLE_BACKTRACE
+    ENABLE_DOC
+    ENABLE_DIST
+    ENABLE_BUNDLED_LIBYAML
+    ENABLE_BUNDLED_MSGPUCK)
+foreach(option IN LISTS options)
+    if (NOT DEFINED ${option})
+        set(value "${TARANTOOL_${option}}")
+    else ()
+        set(value "${${option}}")
+    endif ()
+    find_package_message("${option}" "${option}: ${value}" "${value}")
+endforeach(option)
 list_optional_packages()
-if (TARGET_OS_DARWIN)
-    message (STATUS "DARWIN_BUILD_TYPE: ${DARWIN_BUILD_TYPE}")
-endif()
-message (STATUS "")
-message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")

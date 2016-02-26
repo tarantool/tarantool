@@ -1,7 +1,5 @@
 add_subdirectory(dist)
 
-configure_file(rpm/tarantool.rpm.spec.in rpm/tarantool.rpm.spec @ONLY)
-
 if (TARGET_OS_DARWIN)
 	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool.plist
 	# to check syntax of plist file.

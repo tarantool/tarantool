@@ -2250,45 +2250,52 @@ static ANSIG signals [EV_NSIG - 1];
 
 #if EV_SIGNAL_ENABLE || EV_ASYNC_ENABLE
 
+static int evpipe_alloc(EV_P)
+{
+  int fds [2];
+
+# if EV_USE_EVENTFD
+  fds [0] = -1;
+  fds [1] = eventfd (0, EFD_NONBLOCK | EFD_CLOEXEC);
+  if (fds [1] < 0 && errno == EINVAL)
+    fds [1] = eventfd (0, 0);
+
+  if (fds [1] < 0)
+# endif
+    {
+      if (pipe(fds))
+         return -1;
+      fd_intern (fds [0]);
+    }
+
+  evpipe [0] = fds [0];
+
+  if (evpipe [1] < 0)
+    evpipe [1] = fds [1]; /* first call, set write fd */
+  else
+    {
+      /* on subsequent calls, do not change evpipe [1] */
+      /* so that evpipe_write can always rely on its value. */
+      /* this branch does not do anything sensible on windows, */
+      /* so must not be executed on windows */
+
+      dup2 (fds [1], evpipe [1]);
+      close (fds [1]);
+    }
+
+  fd_intern (evpipe [1]);
+  return 1;
+}
+
+
 static void noinline ecb_cold
 evpipe_init (EV_P)
 {
   if (!ev_is_active (&pipe_w))
     {
-      int fds [2];
 
-# if EV_USE_EVENTFD
-      fds [0] = -1;
-      fds [1] = eventfd (0, EFD_NONBLOCK | EFD_CLOEXEC);
-      if (fds [1] < 0 && errno == EINVAL)
-        fds [1] = eventfd (0, 0);
-
-      if (fds [1] < 0)
-# endif
-        {
-          while (pipe (fds))
-            ev_syserr ("(libev) error creating signal/async pipe");
-
-          fd_intern (fds [0]);
-        }
-
-      evpipe [0] = fds [0];
-
-      if (evpipe [1] < 0)
-        evpipe [1] = fds [1]; /* first call, set write fd */
-      else
-        {
-          /* on subsequent calls, do not change evpipe [1] */
-          /* so that evpipe_write can always rely on its value. */
-          /* this branch does not do anything sensible on windows, */
-          /* so must not be executed on windows */
-
-          dup2 (fds [1], evpipe [1]);
-          close (fds [1]);
-        }
-
-      fd_intern (evpipe [1]);
-
+      while (evpipe_alloc(loop) == -1)
+        ev_syserr("(libev) error creating signal/async pipe");
       ev_io_set (&pipe_w, evpipe [0] < 0 ? evpipe [1] : evpipe [0], EV_READ);
       ev_io_start (EV_A_ &pipe_w);
       ev_unref (EV_A); /* watcher should not keep loop alive */
@@ -2763,6 +2770,9 @@ loop_init (EV_P_ unsigned int flags) EV_THROW
       if (!(flags & EVBACKEND_MASK))
         flags |= ev_recommended_backends ();
 
+      if (flags & EVFLAG_ALLOCFD)
+        if (evpipe_alloc(EV_A) < 0)
+          return;
 #if EV_USE_IOCP
       if (!backend && (flags & EVBACKEND_IOCP  )) backend = iocp_init   (EV_A_ flags);
 #endif
@@ -2787,6 +2797,12 @@ loop_init (EV_P_ unsigned int flags) EV_THROW
 #if EV_SIGNAL_ENABLE || EV_ASYNC_ENABLE
       ev_init (&pipe_w, pipecb);
       ev_set_priority (&pipe_w, EV_MAXPRI);
+      if (flags & EVFLAG_ALLOCFD)
+        {
+          ev_io_set (&pipe_w, evpipe [0] < 0 ? evpipe [1] : evpipe [0], EV_READ);
+          ev_io_start (EV_A_ &pipe_w);
+          ev_unref (EV_A);
+        }
 #endif
     }
 }

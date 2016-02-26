@@ -62,7 +62,7 @@ struct CBox {
 	void Randomize()
 	{
 		coord_t widths[DIMENSION] = {0};
-		if (rand() % 100 >= BOX_POINT_CHANCE_PERCENT)
+		if (rand() % 100 >= (int)BOX_POINT_CHANCE_PERCENT)
 			for (unsigned i = 0; i < DIMENSION; i++)
 				widths[i] = rand(BOX_LIMIT);
 		for (unsigned i = 0; i < DIMENSION; i++) {

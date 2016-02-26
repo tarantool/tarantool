@@ -315,7 +315,7 @@ errinj.set("ERRINJ_TUPLE_ALLOC", true)
 ...
 s:auto_increment{}
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{}
 ---
@@ -323,7 +323,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{}
 ---
@@ -331,7 +331,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{}
 ---
@@ -345,7 +345,7 @@ box.begin()
     s:insert{1}
 box.commit();
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{};
 ---
@@ -356,7 +356,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{};
 ---
@@ -367,7 +367,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{};
 ---
@@ -383,7 +383,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Error injection 'ERRINJ_TUPLE_ALLOC'
+- error: Failed to allocate 14 bytes in slab allocator for tuple
 ...
 s:select{};
 ---
@@ -412,45 +412,10 @@ errinj.set("ERRINJ_TUPLE_ALLOC", false)
 ---
 - ok
 ...
--- gh-881 iproto request with wal IO error
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
----
-...
-test = box.schema.create_space('test')
----
-...
-_ = test:create_index('primary')
----
-...
-for i=1, box.cfg.rows_per_wal do test:insert{i, 'test'} end
----
-...
-c = net_box:new(box.cfg.listen)
----
-...
--- try to write xlog without permission to write to disk
-errinj.set('ERRINJ_WAL_WRITE', true)
----
-- ok
-...
-c.space.test:insert({box.cfg.rows_per_wal + 1,1,2,3})
----
-- error: Failed to write to disk
-...
-errinj.set('ERRINJ_WAL_WRITE', false)
----
-- ok
-...
 -- Cleanup
 s:drop()
 ---
 ...
-test:drop()
----
-...
 errinj = nil
----
-...
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...

@@ -37,8 +37,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct tbuf;
-
 const char *tarantool_version(void);
 /**
  * Get version (defined in PACKAGE_VERSION), packed into uint32_t
@@ -51,9 +49,6 @@ double tarantool_uptime(void);
 
 void
 load_cfg();
-
-void
-check_cfg();
 
 #if defined(__cplusplus)
 } /* extern "C" */

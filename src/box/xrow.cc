@@ -29,13 +29,16 @@
  * SUCH DAMAGE.
  */
 #include "xrow.h"
-#include "msgpuck/msgpuck.h"
+
+#include <msgpuck.h>
+#include "third_party/base64.h"
+
 #include "fiber.h"
+#include "version.h"
+
 #include "vclock.h"
 #include "scramble.h"
-#include "third_party/base64.h"
 #include "iproto_constants.h"
-#include "version.h"
 
 enum { HEADER_LEN_MAX = 40, BODY_LEN_MAX = 128 };
 
@@ -256,7 +259,8 @@ xrow_decode_error(struct xrow_header *row)
 	}
 
 raise:
-	tnt_raise(ClientError, error, code);
+	box_error_set(__FILE__, __LINE__, code, error);
+	diag_raise();
 }
 
 void
@@ -447,7 +451,7 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	/* Extract a version string - a string until ' ' */
 	char version[20];
 	const char *vend = (const char *) memchr(pos, ' ', end - pos);
-	if (vend == NULL || (vend - pos) >= sizeof(version))
+	if (vend == NULL || (size_t)(vend - pos) >= sizeof(version))
 		return -1;
 	memcpy(version, pos, vend - pos);
 	version[vend - pos] = '\0';
@@ -492,7 +496,7 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	greeting->salt_len = base64_decode(greetingbuf + h, h - 1,
 					   greeting->salt,
 					   sizeof(greeting->salt));
-	if (greeting->salt_len < SCRAMBLE_SIZE || greeting->salt_len >= h)
+	if (greeting->salt_len < SCRAMBLE_SIZE || greeting->salt_len >= (uint32_t)h)
 		return -1;
 
 	return 0;

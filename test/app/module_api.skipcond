@@ -1,5 +1,0 @@
-import os
-
-# skip test if .so is not found
-if not os.path.exists('app/module_api.so'):
-    self.skip=1

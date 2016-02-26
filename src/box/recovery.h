@@ -44,6 +44,7 @@ extern "C" {
 struct recovery;
 extern struct recovery *recovery;
 
+struct xrow_header;
 typedef void (apply_row_f)(struct recovery *, void *,
 			   struct xrow_header *packet);
 
@@ -121,7 +122,7 @@ recovery_stop_local(struct recovery *r);
 
 void
 recovery_finalize(struct recovery *r, enum wal_mode mode,
-		  int rows_per_wal);
+		  int64_t rows_per_wal);
 
 void
 recovery_fill_lsn(struct recovery *r, struct xrow_header *row);

@@ -84,12 +84,12 @@ simple_check()
 {
 	header();
 
-	const int rounds = 2000;
+	const unsigned int rounds = 2000;
 	bps_tree_test tree;
 	bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
 
 	printf("Insert 1..X, remove 1..X\n");
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = i;
 		if (bps_tree_test_find(&tree, v) != NULL)
 			fail("element already in tree (1)", "true");
@@ -102,7 +102,7 @@ simple_check()
 	if (bps_tree_test_size(&tree) != rounds)
 		fail("Tree count mismatch (1)", "true");
 
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = i;
 		if (bps_tree_test_find(&tree, v) == NULL)
 			fail("element in tree (1)", "false");
@@ -116,7 +116,7 @@ simple_check()
 		fail("Tree count mismatch (2)", "true");
 
 	printf("Insert 1..X, remove X..1\n");
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = i;
 		if (bps_tree_test_find(&tree, v) != NULL)
 			fail("element already in tree (2)", "true");
@@ -129,7 +129,7 @@ simple_check()
 	if (bps_tree_test_size(&tree) != rounds)
 		fail("Tree count mismatch (3)", "true");
 
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = rounds - 1 - i;
 		if (bps_tree_test_find(&tree, v) == NULL)
 			fail("element in tree (2)", "false");
@@ -143,7 +143,7 @@ simple_check()
 		fail("Tree count mismatch (4)", "true");
 
 	printf("Insert X..1, remove 1..X\n");
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = rounds - 1 - i;
 		if (bps_tree_test_find(&tree, v) != NULL)
 			fail("element already in tree (3)", "true");
@@ -156,7 +156,7 @@ simple_check()
 	if (bps_tree_test_size(&tree) != rounds)
 		fail("Tree count mismatch (5)", "true");
 
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = i;
 		if (bps_tree_test_find(&tree, v) == NULL)
 			fail("element in tree (3)", "false");
@@ -170,7 +170,7 @@ simple_check()
 		fail("Tree count mismatch (6)", "true");
 
 	printf("Insert X..1, remove X..1\n");
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = rounds - 1 - i;
 		if (bps_tree_test_find(&tree, v) != NULL)
 			fail("element already in tree (4)", "true");
@@ -183,7 +183,7 @@ simple_check()
 	if (bps_tree_test_size(&tree) != rounds)
 		fail("Tree count mismatch (7)", "true");
 
-	for (int i = 0; i < rounds; i++) {
+	for (unsigned int i = 0; i < rounds; i++) {
 		type_t v = rounds - 1 - i;
 		if (bps_tree_test_find(&tree, v) == NULL)
 			fail("element in tree (4)", "false");

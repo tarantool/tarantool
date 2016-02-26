@@ -52,9 +52,15 @@ access_check_space(struct space *space, uint8_t access)
 	access &= ~cr->universal_access;
 	if (access && space->def.uid != cr->uid &&
 	    access & ~space->access[cr->auth_token].effective) {
-		struct user *user = user_cache_find(cr->uid);
+		/*
+		 * Report access violation. Throw "no such user"
+		 * error if there is  no user with this id.
+		 * It is possible that the user was dropped
+		 * from a different connection.
+		 */
+		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->name, space->def.name);
+			  priv_name(access), user->def.name, space->def.name);
 	}
 }
 
@@ -97,8 +103,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	struct space *space = (struct space *) calloc(1, sz);
 
 	if (space == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sz, "struct space", "malloc");
+		tnt_raise(OutOfMemory, sz, "malloc", "struct space");
 
 	rlist_create(&space->on_replace);
 	auto scoped_guard = make_scoped_guard([=]
@@ -160,6 +165,9 @@ space_validate_field_count(struct space *sp, uint32_t field_count)
 	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
 		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
 		          field_count, space_name(sp), sp->def.field_count);
+	if (field_count < sp->format->field_count)
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  field_count, sp->format->field_count);
 }
 
 void
@@ -181,7 +189,7 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 {
 	rlist_create(key_list);
 
-	for (int j = 0; j < space->index_count; j++)
+	for (unsigned j = 0; j < space->index_count; j++)
 		rlist_add_tail_entry(key_list, space->index[j]->key_def,
 				     link);
 }
@@ -199,26 +207,6 @@ extern "C" void
 space_run_triggers(struct space *space, bool yesno)
 {
 	space->run_triggers = yesno;
-}
-
-struct space_stat *
-space_stat(struct space *sp)
-{
-	static __thread struct space_stat space_stat;
-
-	space_stat.id = space_id(sp);
-	int i = 0;
-	for (; i < sp->index_id_max; i++) {
-		Index *index = space_index(sp, i);
-		if (index) {
-			space_stat.index[i].id      = i;
-			space_stat.index[i].keys    = index->size();
-			space_stat.index[i].bsize   = index->bsize();
-		} else
-			space_stat.index[i].id = -1;
-	}
-	space_stat.index[i].id = -1;
-	return &space_stat;
 }
 
 /**

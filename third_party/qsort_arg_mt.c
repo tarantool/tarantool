@@ -60,6 +60,26 @@ static char *med3(char *a, char *b, char *c,
 	 int (*cmp)(const void *a, const void *b, void *arg), void *arg);
 static void swapfunc(char *, char *, size_t, int);
 
+/**
+ * @brief Reduce the current number of threads in the thread pool to the
+ * bare minimum. Doesn't prevent the pool from spawning new threads later
+ * if demand mounts.
+ */
+static void
+thread_pool_trim()
+{
+	/*
+	 * Trim OpenMP thread pool.
+	 * Though we lack the direct control the workaround below works for
+	 * GNU OpenMP library. The library stops surplus threads on entering
+	 * a parallel region. Can't go below 2 threads due to the
+	 * implementation quirk.
+	 */
+#pragma omp parallel num_threads(2)
+	;
+}
+
+
 /*
  * Qsort routine based on J. L. Bentley and M. D. McIlroy,
  * "Engineering a sort function",
@@ -206,6 +226,7 @@ qsort_arg(void *a, size_t n, size_t es,
 #pragma omp single
 		qsort_arg_mt_internal(a, n, es, cmp, arg);
 	}
+	thread_pool_trim();
 }
 
 #if defined(__cplusplus)

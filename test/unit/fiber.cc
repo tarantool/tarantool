@@ -2,13 +2,13 @@
 #include "fiber.h"
 #include "unit.h"
 
-static void
+static int
 noop_f(va_list ap)
 {
-	return;
+	return 0;
 }
 
-static void
+static int
 cancel_f(va_list ap)
 {
 	fiber_set_cancellable(true);
@@ -16,15 +16,17 @@ cancel_f(va_list ap)
 		fiber_sleep(0.001);
 		fiber_testcancel();
 	}
+	return 0;
 }
 
-static void
+static int
 exception_f(va_list ap)
 {
 	tnt_raise(OutOfMemory, 42, "allocator", "exception");
+	return 0;
 }
 
-static void
+static int
 no_exception_f(va_list ap)
 {
 	try {
@@ -32,14 +34,16 @@ no_exception_f(va_list ap)
 	} catch (Exception *e) {
 		;
 	}
+	return 0;
 }
 
-static void
+static int
 cancel_dead_f(va_list ap)
 {
 	note("cancel dead has started");
 	fiber_set_cancellable(true);
 	tnt_raise(OutOfMemory, 42, "allocator", "exception");
+	return 0;
 }
 
 static void
@@ -70,6 +74,10 @@ fiber_join_test()
 		note("exception propagated");
 	}
 
+	fputs("#gh-1238: log uncaught errors\n", stderr);
+	fiber = fiber_new_xc("exception", exception_f);
+	fiber_wakeup(fiber);
+
 	/*
 	 * A fiber which is using exception should not
 	 * push them up the stack.
@@ -95,11 +103,12 @@ fiber_join_test()
 	footer();
 }
 
-static void
+static int
 main_f(va_list ap)
 {
 	fiber_join_test();
 	ev_break(loop(), EVBREAK_ALL);
+	return 0;
 }
 
 int main()

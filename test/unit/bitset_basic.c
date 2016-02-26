@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <bitset/bitset.h>
 
@@ -96,10 +97,23 @@ void test_get_set()
 	for(size_t i = 0; i < NUM_SIZE; i++) {
 		nums[i] = rand();
 	}
+	/* Remove dups */
+	qsort(nums, NUM_SIZE, sizeof(size_t), size_compator);
+	size_t prev = nums[0];
+	for(size_t i = 1; i < NUM_SIZE; i++) {
+		if (nums[i] == prev) {
+			nums[i] = SIZE_MAX;
+		} else {
+			 prev = nums[i];
+		}
+	}
+	shuffle(nums, NUM_SIZE);
 	printf("ok\n");
 
 	printf("Settings bits... ");
 	for(size_t i = 0; i < NUM_SIZE; i++) {
+		if (nums[i] == SIZE_MAX)
+			continue;
 		fail_if(bitset_set(&bm, nums[i]) < 0);
 	}
 	printf("ok\n");
@@ -107,25 +121,27 @@ void test_get_set()
 	printf("Checking bits... ");
 	shuffle(nums, NUM_SIZE);
 	for(size_t i = 0; i < NUM_SIZE; i++) {
+		if (nums[i] == SIZE_MAX)
+			continue;
 		fail_unless(bitset_test(&bm, nums[i]));
 	}
 	printf("ok\n");
 
 	printf("Unsetting random bits... ");
-	shuffle(nums, NUM_SIZE);
-	for(size_t i = 0; i < NUM_SIZE; i++) {
-		if (nums[i] % 5 == 0) {
-			fail_if(bitset_clear(&bm, nums[i]) < 0);
-			// printf("Clear :%zu\n", nums[i]);
-			fail_if(bitset_test(&bm, nums[i]));
-		}
+	for(size_t k = 0; k < (NUM_SIZE >> 3); k++) {
+		size_t i = rand() % NUM_SIZE;
+		if (nums[i] == SIZE_MAX)
+			continue;
+		fail_if(bitset_clear(&bm, nums[i]) < 0);
+		fail_if(bitset_test(&bm, nums[i]));
+		nums[i] = SIZE_MAX;
 	}
 	printf("ok\n");
 
 	printf("Checking set bits... ");
 	shuffle(nums, NUM_SIZE);
 	for(size_t i = 0; i < NUM_SIZE; i++) {
-		if (nums[i] % 5 == 0) {
+		if (nums[i] == SIZE_MAX) {
 			continue;
 		}
 
@@ -185,6 +201,7 @@ void test_get_set()
 int main(int argc, char *argv[])
 {
 	setbuf(stdout, NULL);
+	srand(time(NULL));
 	test_cardinality();
 	test_get_set();
 

@@ -100,7 +100,7 @@ fiob_read(void *cookie, char *buf, size_t count)
 	off_t skip = 0;
 	while (to_read > 0) {
 		/* Align `to_read' FIOB_ALIGN to be <= size of f->buf */
-		ssize_t to_read_al = MIN(fiob_ceil(to_read), f->bsize);
+		ssize_t to_read_al = MIN((size_t)fiob_ceil(to_read), f->bsize);
 		/*
 		 * Optimistically try to read aligned size into the aligned
 		 * buffer. If the current file position is not aligned then
@@ -232,11 +232,11 @@ fiob_write(void *cookie, const char *buf, size_t len)
 	if (len == 0)
 		return 0;
 
-	ssize_t bytes_left = len;
-	ssize_t tocopy;
+	size_t bytes_left = len;
+	size_t tocopy;
 
 	if (f->bfill < f->bsize) {
-		ssize_t available_buf_size = f->bsize - f->bfill;
+		size_t available_buf_size = f->bsize - f->bfill;
 		tocopy = available_buf_size > bytes_left ?
 			bytes_left : available_buf_size;
 

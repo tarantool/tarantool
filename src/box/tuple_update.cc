@@ -33,11 +33,11 @@
 #include <stdio.h>
 
 #include "third_party/queue.h"
-
-#include "salad/rope.h"
-#include "error.h"
-#include "msgpuck/msgpuck.h"
+#include <msgpuck.h>
 #include "bit/int96.h"
+#include "salad/rope.h"
+
+#include "error.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
@@ -493,7 +493,7 @@ static void
 do_op_set(struct tuple_update *update, struct update_op *op)
 {
 	/* intepret '=' for n +1 field as insert */
-	if (op->field_no == rope_size(update->rope))
+	if (op->field_no == (int32_t) rope_size(update->rope))
 		return do_op_insert(update, op);
 	op_adjust_field_no(update, op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
@@ -591,8 +591,8 @@ do_op_splice(struct tuple_update *update, struct update_op *op)
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	const char *in = field->old;
-	uint32_t str_len;
-	in = mp_read_str(update, op, &in, &str_len);
+	int32_t str_len;
+	in = mp_read_str(update, op, &in, (uint32_t *) &str_len);
 
 	if (arg->offset < 0) {
 		if (-arg->offset > str_len + 1) {
@@ -907,8 +907,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		if (mp_typeof(*expr) != MP_INT && mp_typeof(*expr) != MP_UINT)
-			tnt_raise(IllegalParams,
-				  "update fieldno option name must be numeric");
+			tnt_raise(IllegalParams, "field id must be a number");
 		int32_t field_no = mp_read_int(update, op, &expr);
 		if (field_no - update->index_base >= 0) {
 			op->field_no = field_no - update->index_base;

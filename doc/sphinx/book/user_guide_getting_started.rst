@@ -128,8 +128,8 @@ Now, to prepare for the example in the next section, try this:
 
     tarantool> box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
-.. _tarantool.org/dist/stable: http://tarantool.org/dist/stable
-.. _tarantool.org/dist/master: http://tarantool.org/dist/master
+.. _tarantool.org/dist/1.6: http://tarantool.org/dist/1.6
+.. _tarantool.org/dist/1.7: http://tarantool.org/dist/1.7
 
 
 =====================================================================

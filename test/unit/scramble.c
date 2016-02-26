@@ -10,7 +10,7 @@ void
 test_scramble()
 {
 	int salt[SCRAMBLE_SIZE/sizeof(int)];
-	for (int i = 0; i < sizeof(salt)/sizeof(int); i++)
+	for (unsigned i = 0; i < sizeof(salt)/sizeof(int); i++)
 		salt[i] = rand();
 
 	char *password = "lechododilikraskaloh";
@@ -47,7 +47,7 @@ test_password_prepare()
 {
 	char buf[SCRAMBLE_BASE64_SIZE * 2];
 	int password[5];
-	for (int i = 0; i < sizeof(password)/sizeof(int); i++)
+	for (unsigned i = 0; i < sizeof(password)/sizeof(int); i++)
 		password[i] = rand();
 	password_prepare((char *) password, sizeof(password),
 			 buf, sizeof(buf));

@@ -1,6 +1,6 @@
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
-include_directories(${SOPHIA_INCLUDE_DIR})
+include_directories(${SOPHIA_INCLUDE_DIRS})
 
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
@@ -17,7 +17,7 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-add_library(box
+add_library(box STATIC
     iproto.cc
     iproto_constants.c
     iproto_port.cc
@@ -28,6 +28,7 @@ add_library(box
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
+    tuple_compare.cc
     key_def.cc
     index.cc
     memtx_index.cc
@@ -50,7 +51,7 @@ add_library(box
     request.cc
     txn.cc
     box.cc
-    user_def.cc
+    user_def.c
     user.cc
     authentication.cc
     vclock.c
@@ -60,17 +61,21 @@ add_library(box
     relay.cc
     wal.cc
     ${lua_sources}
-    lua/call.cc
-    lua/tuple.cc
-    lua/slab.cc
-    lua/index.cc
+    lua/init.c
+    lua/call.c
+    lua/cfg.cc
+    lua/tuple.c
+    lua/slab.c
+    lua/index.c
     lua/space.cc
-    lua/info.cc
-    lua/stat.cc
-    lua/sophia.cc
+    lua/misc.cc
+    lua/info.c
+    lua/stat.c
+    lua/sophia.c
     lua/error.cc
-    lua/session.cc
-    lua/net_box.cc
+    lua/session.c
+    lua/net_box.c
     ${bin_sources})
 
-target_link_libraries(box ${sophia_lib})
+add_dependencies(box build_bundled_libs)
+target_link_libraries(box ${SOPHIA_LIBRARIES})

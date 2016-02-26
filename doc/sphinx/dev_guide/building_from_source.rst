@@ -52,8 +52,6 @@ explain what the steps are, then on the Internet you can look at some example sc
 
      # For both test suite and documentation
      sudo apt-get install python-pip python-dev python-yaml
-     # For test suite
-     sudo apt-get install python-daemon
      # For documentation
      sudo apt-get install python-sphinx python-pelican python-beautifulsoup
 
@@ -79,16 +77,6 @@ explain what the steps are, then on the Internet you can look at some example sc
      wget http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
      tar -xzf PyYAML-3.10.tar.gz
      cd PyYAML-3.10
-     sudo python setup.py install
-
-     # python module for helping programs become daemons (daemon):
-     # For test suite: (if wget fails, check the
-     # http://pypi.python.org/pypi/python-daemon
-     # to see what the current version is.)
-     cd ~
-     wget http://pypi.python.org/packages/source/p/python-daemon/python-daemon-1.5.5.tar.gz
-     tar -xzvf python-daemon-1.5.5.tar.gz
-     cd python-daemon-1.5.5
      sudo python setup.py install
 
      # python module for HTML scraping: For documentation:

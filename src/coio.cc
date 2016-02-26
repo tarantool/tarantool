@@ -201,8 +201,10 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0)
+	    if (rc != 0) {
+		    diag_raise();
 		    tnt_raise(SocketError, -1, "getaddrinfo");
+	    }
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (!uri->host_hint) freeaddrinfo(ai);
@@ -344,7 +346,7 @@ ssize_t
 coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 {
 	ssize_t nrd = coio_read_ahead(coio, buf, sz, bufsiz);
-	if (nrd < sz) {
+	if (nrd < (ssize_t)sz) {
 		errno = EPIPE;
 		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
 			  "from socket");
@@ -364,7 +366,7 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
 		         ev_tstamp timeout)
 {
 	ssize_t nrd = coio_read_ahead_timeout(coio, buf, sz, bufsiz, timeout);
-	if (nrd < sz && errno == 0) { /* EOF. */
+	if (nrd < (ssize_t)sz && errno == 0) { /* EOF. */
 		errno = EPIPE;
 		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
 			  "from socket");
@@ -386,7 +388,7 @@ ssize_t
 coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 	   ev_tstamp timeout)
 {
-	size_t towrite = sz;
+	ssize_t towrite = sz;
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, timeout);
 
@@ -449,7 +451,7 @@ ssize_t
 coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
 		    size_t size_hint, ev_tstamp timeout)
 {
-	ssize_t total = 0;
+	size_t total = 0;
 	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
 	ev_tstamp start, delay;
@@ -726,6 +728,8 @@ coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
 int
 coio_wait(int fd, int events, double timeout)
 {
+	if (fiber_is_cancelled())
+		return 0;
 	struct ev_io io;
 	coio_init(&io, fd);
 	ev_io_init(&io, coio_wait_cb, fd, events);

@@ -97,7 +97,7 @@ print 'gh-434: Assertion if replace _cluster tuple for local server'
 print '-------------------------------------------------------------'
 server.stop()
 script = server.script
-server.script = "replication/panic.lua"
+server.script = "replication-py/panic.lua"
 server.deploy()
 
 new_uuid = '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
@@ -158,7 +158,7 @@ master_id = master.get_param('server')['id']
 master.admin("box.schema.user.grant('guest', 'replication')")
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
@@ -294,7 +294,7 @@ master.admin("box.snapshot()")
 master.admin('box.info.vclock[%d] == 1' % replica_id)
 
 replica = TarantoolServer(server.ini)
-replica.script = 'replication/replica.lua'
+replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()

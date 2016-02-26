@@ -6,11 +6,14 @@ do
     local fio = require 'fio'
     local yaml = require 'yaml'
     local errno = require 'errno'
+    local digest = require 'digest'
+    local pickle = require 'pickle'
 
     local PREFIX = 'snapshot_daemon'
 
     local daemon = {
         snapshot_period = 0;
+        snapshot_period_bias = 0;
         snapshot_count = 6;
     }
 
@@ -61,11 +64,11 @@ do
 
         local snstat = fio.stat(last_snap)
         if snstat == nil then
-            log.error("can't stat %s: %s", snaps[#snaps], errno.strerror())
+            log.error("can't stat %s: %s", last_snap, errno.strerror())
             return false
         end
         if snstat.mtime <= fiber.time() + daemon.snapshot_period then
-            return snapshot(snaps)
+            return snapshot()
         end
     end
 
@@ -145,7 +148,7 @@ do
 
 
     local function next_snap_interval(self)
-        
+
         -- don't do anything in hot_standby mode
         if box.info.status ~= 'running' or
             self.snapshot_period == nil or
@@ -153,34 +156,8 @@ do
             return nil
         end
 
-        local interval = self.snapshot_period / 10
-
-        local time = fiber.time()
-        local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
-        if snaps == nil or #snaps == 0 then
-            return interval
-        end
-
-        local last_snap = snaps[ #snaps ]
-        local stat = fio.stat(last_snap)
-
-        if stat == nil then
-            return interval
-        end
-
-
-        -- there is no activity in xlogs
-        if self.snapshot_period * 2 + stat.mtime < time then
-            return interval
-        end
-
-        local time_left = self.snapshot_period + stat.mtime - time
-        if time_left > 0 then
-            return time_left
-        end
-
-        return interval
-
+        return self.snapshot_period -
+            (fiber.time() + self.snapshot_period_bias) % self.snapshot_period
     end
 
     local function daemon_fiber(self)
@@ -221,6 +198,12 @@ do
         __index = {
             set_snapshot_period = function()
                 daemon.snapshot_period = box.cfg.snapshot_period
+                if daemon.snapshot_period > 0 then
+                    local rnd = pickle.unpack('i', digest.urandom(4))
+                    daemon.snapshot_period_bias = rnd % daemon.snapshot_period
+                else
+                    daemon.snapshot_period_bias = 0
+                end
                 reload(daemon)
                 return
             end,
@@ -232,7 +215,9 @@ do
                 end
                 daemon.snapshot_count = box.cfg.snapshot_count
                 reload(daemon)
-           end
+            end,
+
+            next_snap_interval = next_snap_interval
         }
     })
 

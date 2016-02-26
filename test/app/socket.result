@@ -1,0 +1,1690 @@
+json = require 'json'
+---
+...
+yaml = require 'yaml'
+---
+...
+pickle = require 'pickle'
+---
+...
+socket = require 'socket'
+---
+...
+fiber = require 'fiber'
+---
+...
+msgpack = require 'msgpack'
+---
+...
+log = require 'log'
+---
+...
+errno = require 'errno'
+---
+...
+fio = require 'fio'
+---
+...
+ffi = require('ffi')
+---
+...
+type(socket)
+---
+- table
+...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+---
+- null
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+type(s)
+---
+- table
+...
+-- Invalid arguments
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for k in pairs(getmetatable(s).__index) do
+    local r, msg = pcall(s[k])
+    if not msg:match('Usage:') then
+        error("Arguments is not checked for "..k)
+    end
+end;
+---
+...
+s:close();
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
+---
+- true
+...
+s = socket.tcp_connect(LISTEN.host, LISTEN.service)
+---
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(false)
+---
+- false
+...
+s:nonblock()
+---
+- false
+...
+s:nonblock(true)
+---
+- true
+...
+s:readable(.01)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+socket.iowait(s:fd(), 'RW')
+---
+- RW
+...
+socket.iowait(s:fd(), 3)
+---
+- 3
+...
+socket.iowait(s:fd(), 'R')
+---
+- R
+...
+socket.iowait(s:fd(), 'r')
+---
+- R
+...
+socket.iowait(s:fd(), 1)
+---
+- 1
+...
+socket.iowait(s:fd(), 'W')
+---
+- W
+...
+socket.iowait(s:fd(), 'w')
+---
+- W
+...
+socket.iowait(s:fd(), 2)
+---
+- 2
+...
+socket.iowait(s:fd(), '')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(s:fd(), -1)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(s:fd(), 'RW')
+---
+- RW
+...
+socket.iowait(s:fd(), 'RW', -100500)
+---
+- RW
+...
+s:readable(0)
+---
+- true
+...
+s:errno() > 0
+---
+- false
+...
+s:error()
+---
+- null
+...
+s:writable(.00000000000001)
+---
+- true
+...
+s:writable(0)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+socket.iowait(nil, nil, -1)
+---
+...
+socket.iowait(nil, nil, 0.0001)
+---
+...
+socket.iowait(-1, nil, 0.0001)
+---
+...
+socket.iowait(nil, 'RW')
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+socket.iowait(0, nil)
+---
+- error: 'Usage: iowait(fd, 1 | ''r'' | 2 | ''w'' | 3 | ''rw'' [, timeout])'
+...
+handshake = ffi.new('char[128]')
+---
+...
+-- test sysread with char *
+s:sysread(handshake, 128)
+---
+- 128
+...
+ffi.string(handshake, 9)
+---
+- Tarantool
+...
+ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+---
+...
+ping = msgpack.encode(string.len(ping)) .. ping
+---
+...
+-- test syswrite with char *
+s:syswrite(ffi.cast('const char *', ping), #ping)
+---
+- 7
+...
+s:readable(1)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+pong = s:sysread()
+---
+...
+string.len(pong)
+---
+- 29
+...
+msgpack.decode(pong)
+---
+- 24
+- 6
+...
+function remove_schema_id(t, x) if t[5] then t[5] = 'XXX' end return t, x end
+---
+...
+remove_schema_id(msgpack.decode(pong, 6))
+---
+- {0: 0, 1: 0, 5: 'XXX'}
+- 29
+...
+s:close()
+---
+- true
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('127.0.0.1', 3457)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+sevres = {}
+---
+...
+type(require('fiber').create(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+---
+- userdata
+...
+#sevres
+---
+- 0
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:nonblock(false)
+---
+- false
+...
+sc:sysconnect('127.0.0.1', 3457)
+---
+- true
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:readable(.5)
+---
+- true
+...
+sc:sysread()
+---
+- ok
+...
+string.match(tostring(sc), ', peer') ~= nil
+---
+- true
+...
+#sevres
+---
+- 1
+...
+sevres[1].host
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+---
+- 1
+...
+s:error()
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+---
+- 0
+...
+s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
+---
+- error: 'builtin/socket.lua:384: Socket option SO_ACCEPTCONN is read only'
+...
+s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:linger()
+---
+- false
+- 0
+...
+s:linger(true, 1)
+---
+- true
+- 1
+...
+s:linger()
+---
+- true
+- 1
+...
+s:linger(false, 1)
+---
+- false
+- 1
+...
+s:linger()
+---
+- false
+- 1
+...
+s:close()
+---
+- true
+...
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:bind('127.0.0.1', 3457)
+---
+- true
+...
+s:listen(128)
+---
+- true
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
+---
+- true
+...
+sc:writable(10)
+---
+- true
+...
+sc:write('Hello, world')
+---
+- 12
+...
+sa, addr = s:accept()
+---
+...
+addr2 = sa:name()
+---
+...
+addr2.host == addr.host
+---
+- true
+...
+addr2.family == addr.family
+---
+- true
+...
+sa:nonblock(1)
+---
+- true
+...
+sa:read(8)
+---
+- Hello, w
+...
+sa:read(3)
+---
+- orl
+...
+sc:writable()
+---
+- true
+...
+sc:write(', again')
+---
+- 7
+...
+sa:read(8)
+---
+- d, again
+...
+sa:error()
+---
+- null
+...
+string.len(sa:read(0))
+---
+- 0
+...
+type(sa:read(0))
+---
+- string
+...
+sa:read(1, .01)
+---
+- null
+...
+sc:writable()
+---
+- true
+...
+sc:send('abc')
+---
+- 3
+...
+sa:read(3)
+---
+- abc
+...
+sc:send('Hello')
+---
+- 5
+...
+sa:readable()
+---
+- true
+...
+sa:recv()
+---
+- Hello
+...
+sa:recv()
+---
+- null
+...
+sc:send('Hello')
+---
+- 5
+...
+sc:send(', world')
+---
+- 7
+...
+sc:send("\\nnew line")
+---
+- 10
+...
+sa:read('\\n', 1)
+---
+- Hello, world\n
+...
+sa:read({ chunk = 1, delimiter = 'ine'}, 1)
+---
+- n
+...
+sa:read('ine', 1)
+---
+- ew line
+...
+sa:read('ine', 0.1)
+---
+- null
+...
+sc:send('Hello, world')
+---
+- 12
+...
+sa:read(',', 1)
+---
+- Hello,
+...
+sc:shutdown('W')
+---
+- true
+...
+sa:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s ~= nil
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+os.remove('/tmp/tarantool-test-socket')
+---
+- null
+- '/tmp/tarantool-test-socket: No such file or directory'
+- 2
+...
+s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+- true
+...
+sc ~= nil
+---
+- true
+...
+s:listen(1234)
+---
+- true
+...
+sc = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
+---
+- true
+...
+sc:error()
+---
+- null
+...
+s:readable()
+---
+- true
+...
+sa = s:accept()
+---
+...
+sa:nonblock(true)
+---
+- true
+...
+sa:send('Hello, world')
+---
+- 12
+...
+sc:recv()
+---
+- Hello, world
+...
+sc:close()
+---
+- true
+...
+sa:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+os.remove('/tmp/tarantool-test-socket')
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function aexitst(ai, hostnames, port)
+    for i, a in pairs(ai) do
+        for j, host in pairs(hostnames) do
+            if a.host == host and a.port == port then
+                return true
+            end
+        end
+    end
+    return ai
+end;
+---
+...
+aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+    type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+#(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
+---
+- true
+...
+wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
+---
+...
+wrong_addr == nil or #wrong_addr == 0
+---
+- true
+...
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc ~= nil
+---
+- true
+...
+sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+- 0
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS or errno() == errno.ECONNREFUSED
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+sc:writable()
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+socket_error = sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+...
+socket_error == errno.ECONNREFUSED or socket_error == 0
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+inf = socket.getaddrinfo('127.0.0.1', '80', { type = 'SOCK_DGRAM',
+    flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } });
+---
+...
+-- musl libc https://github.com/tarantool/tarantool/issues/1249
+inf[1].canonname = nil;
+---
+...
+inf;
+---
+- - host: 127.0.0.1
+    family: AF_INET
+    type: SOCK_DGRAM
+    protocol: udp
+    port: 80
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+json.encode(sc:name())
+---
+- '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
+...
+sc:name()
+---
+- host: 0.0.0.0
+  family: AF_INET
+  type: SOCK_STREAM
+  protocol: tcp
+  port: 0
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:bind('127.0.0.1', 3548)
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:sendto('127.0.0.1', 3548, 'Hello, world')
+---
+- 12
+...
+s:readable(10)
+---
+- true
+...
+s:recv()
+---
+- Hello, world
+...
+sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
+---
+- 15
+...
+s:readable(10)
+---
+- true
+...
+d, from = s:recvfrom()
+---
+...
+from.port > 0
+---
+- true
+...
+from.port = 'Random port'
+---
+...
+json.encode{d, from}
+---
+- '["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]'
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:nonblock(true)
+---
+- true
+...
+s:bind('127.0.0.1')
+---
+- true
+...
+s:name().port > 0
+---
+- true
+...
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
+---
+- 13
+...
+s:readable(1)
+---
+- true
+...
+data, from = s:recvfrom(10)
+---
+...
+data
+---
+- Hello, Wor
+...
+s:sendto(from.host, from.port, 'Hello, hello!')
+---
+- 13
+...
+sc:readable(1)
+---
+- true
+...
+data_r, from_r = sc:recvfrom()
+---
+...
+data_r
+---
+- Hello, hello!
+...
+from_r.host
+---
+- 127.0.0.1
+...
+from_r.port == s:name().port
+---
+- true
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+-- tcp_connect
+s = socket.tcp_connect('tarantool.org', 80)
+---
+...
+string.match(tostring(s), ', aka') ~= nil
+---
+- true
+...
+string.match(tostring(s), ', peer') ~= nil
+---
+- true
+...
+s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
+---
+- 40
+...
+header = s:read({chunk = 4000, delimiter = {"\n\n", "\r\n\r\n" }}, 1)
+---
+...
+string.match(header, "\r\n\r\n$") ~= nil
+---
+- true
+...
+string.match(header, "200 [Oo][Kk]") ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
+---
+- null
+...
+-- AF_INET
+port = 35490
+---
+...
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:bind('127.0.0.1', port)
+---
+- true
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('127.0.0.1', port), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e == 0
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+-- AF_UNIX
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('unix/', path), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e
+---
+- 0
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+os.remove(path)
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ENOENT
+---
+- null
+- true
+...
+-- invalid fd
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:read(9)
+---
+- null
+...
+s:close()
+---
+- true
+...
+s.socket.fd = 512
+---
+...
+tostring(s)
+---
+- fd 512
+...
+s:readable(0)
+---
+- true
+...
+s:writable(0)
+---
+- true
+...
+s = nil
+---
+...
+-- close
+port = 65454
+---
+...
+serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+serv:bind('127.0.0.1', port)
+---
+- true
+...
+serv:listen()
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+f = fiber.create(function(serv)
+    serv:readable()
+    sc = serv:accept()
+    sc:write("Tarantool test server")
+    sc:shutdown()
+    sc:close()
+    serv:close()
+end, serv);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s = socket.tcp_connect('127.0.0.1', port)
+---
+...
+ch = fiber.channel()
+---
+...
+f = fiber.create(function() s:read(12) ch:put(true) end)
+---
+...
+s:close()
+---
+- true
+...
+ch:get(1)
+---
+- true
+...
+s:error()
+---
+- error: 'builtin/socket.lua:86: attempt to use closed socket'
+...
+-- random port
+master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+port = 32768 + math.random(32768)
+---
+...
+attempt = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+while attempt < 10 do
+    if not master:bind('127.0.0.1', port)  then
+        port = 32768 + math.random(32768)
+        attempt = attempt + 1
+    else
+        break
+    end
+end;
+---
+...
+master:listen();
+---
+- true
+...
+function gh361()
+    local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+    s:sysconnect('127.0.0.1', port)
+    s:wait()
+    res = s:read(1200)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+f = fiber.create(gh361)
+---
+...
+fiber.cancel(f)
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+---
+...
+master:close()
+---
+- true
+...
+f = nil
+---
+...
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+f = fiber.create(function()
+    for i=1,2 do
+        s:readable()
+        local sc = s:accept()
+        sc:write('ok!')
+        sc:shutdown()
+        sc:close()
+    end
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read('!')
+---
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read(3)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:sysread(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+os.remove(path)
+---
+- true
+...
+server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+---
+...
+type(addr)
+---
+- table
+...
+server ~= nil
+---
+- true
+...
+fiber.sleep(.5)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client ~= nil
+---
+- true
+...
+client:read(123)
+---
+- Hello, world
+...
+server:close()
+---
+- true
+...
+-- unix socket automatically removed
+collectgarbage('collect')
+---
+- 0
+...
+fio.stat(path) == nil
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
+    s:read(2)
+    s:write('Hello, world')
+end, name = 'testserv'});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+type(addr)
+---
+- table
+...
+server ~= nil
+---
+- true
+...
+addr2 = server:name()
+---
+...
+addr.host == addr2.host
+---
+- true
+...
+addr.family == addr2.family
+---
+- true
+...
+fiber.sleep(.5)
+---
+...
+client = socket.tcp_connect(addr2.host, addr2.port)
+---
+...
+client ~= nil
+---
+- true
+...
+-- Check that listen and client fibers have appropriate names
+cnt = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for _, f in pairs(fiber.info()) do
+    if f.name:match('^testserv/') then
+        cnt = cnt + 1
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+cnt
+---
+- 2
+...
+client:write('hi')
+---
+- 2
+...
+client:read(123)
+---
+- Hello, world
+...
+client:close()
+---
+- true
+...
+server:close()
+---
+- true
+...
+longstring = string.rep("abc", 65535)
+---
+...
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring + 1) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+---
+- true
+...
+longstring = "Hello\r\n\r\nworld\n\n"
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+---
+- "Hello\r\n\r\n"
+...
+server:close()
+---
+- true
+...
+-- gh-658: socket:read() incorrectly handles size and delimiter together
+body = "a 10\nb 15\nabc"
+---
+...
+remaining = #body
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+server = socket.tcp_server('unix/', path, function(s)
+    s:write(body)
+    s:read(100500)
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "a 10\n"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "b 15\n"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == "abc"
+---
+- true
+...
+remaining = remaining - #buf
+---
+...
+remaining == 0
+---
+- true
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == ""
+---
+- true
+...
+buf = client:read({ size = remaining, delimiter = "\n"})
+---
+...
+buf == ""
+---
+- true
+...
+client:close()
+---
+- true
+...
+server:close()
+---
+- true
+...
+-- Test that socket is closed on GC
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:listen()
+---
+- true
+...
+s = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+collectgarbage('collect')
+---
+- 0
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+os.remove(path)
+---
+- true
+...
+-- Test serializers with sockets
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+-- check __serialize hook
+json.decode(json.encode(s)).fd == s:fd()
+---
+- true
+...
+yaml.decode(yaml.encode(s)).fd == s:fd()
+---
+- true
+...
+s = nil
+---
+...
+-- start AF_UNIX server with dead socket exists
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:close()
+---
+- true
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+{ s:bind('unix/', path), errno() == errno.EADDRINUSE }
+---
+- - false
+  - true
+...
+s:close()
+---
+- true
+...
+s = socket.tcp_server('unix/', path, function() end)
+---
+...
+s ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+fio.stat(path) == nil
+---
+- true
+...
+{ socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
+---
+- - true
+  - Invalid argument
+...
+-- wrong options for getaddrinfo
+socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
+---
+- true
+...
+-- gh-574: check that fiber with getaddrinfo can be safely cancelled
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+f = fiber.create(function()
+    while true do
+        local result = socket.getaddrinfo('localhost', '80')
+        fiber.sleep(0)
+    end
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+f:cancel()
+---
+...

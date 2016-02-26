@@ -156,10 +156,9 @@ MemtxRTree::MemtxRTree(struct key_def *key_def)
 	m_dimension = key_def->opts.dimension;
 	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
 		char message[64];
-		snprintf(message, 64, "dimension (%u) must belong to range "
+		snprintf(message, 64, "dimension (%u): must belong to range "
 			 "[%u, %u]", m_dimension, 1, RTREE_MAX_DIMENSION);
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "RTREE index", message);
+		tnt_raise(UnsupportedIndexFeature, this, message);
 	}
 
 	memtx_index_arena_init();
@@ -225,8 +224,7 @@ MemtxRTree::allocIterator() const
 	memset(it, 0, sizeof(*it));
 	rtree_iterator_init(&it->impl);
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct index_rtree_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct index_rtree_iterator),
 			  "MemtxRTree", "iterator");
 	}
 	it->base.next = index_rtree_iterator_next;
@@ -243,10 +241,8 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree index",
-				  "It is possible to omit "
-				  "key only for ITER_ALL");
+			tnt_raise(UnsupportedIndexFeature, this,
+				  "empty keys for requested iterator type");
 		}
 	} else if (mp_decode_rect_from_key(&rect, m_dimension,
 					   key, part_count)) {
@@ -281,8 +277,7 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "RTREE index", "Unsupported search operation for RTREE");
+		return initIterator(iterator, type, key, part_count);
 	}
 	rtree_search(&m_tree, &rect, op, &it->impl);
 }

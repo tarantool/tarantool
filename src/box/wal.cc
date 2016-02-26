@@ -50,7 +50,7 @@ struct wal_writer
 	struct cpipe tx_pipe;
 	struct cpipe wal_pipe;
 	struct cbus tx_wal_bus;
-	int rows_per_wal;
+	int64_t rows_per_wal;
 	struct fio_batch *batch;
 	bool is_shutdown;
 	bool is_rollback;
@@ -140,11 +140,12 @@ tx_fetch_output(ev_loop * /* loop */, ev_async *watcher, int /* event */)
  */
 static void
 wal_writer_init(struct wal_writer *writer, struct vclock *vclock,
-		int rows_per_wal)
+		int64_t rows_per_wal)
 {
 	cbus_create(&writer->tx_wal_bus);
 
 	cpipe_create(&writer->tx_pipe);
+	cpipe_create(&writer->wal_pipe);
 	cpipe_set_fetch_cb(&writer->tx_pipe, tx_fetch_output, writer);
 
 	writer->rows_per_wal = rows_per_wal;
@@ -167,13 +168,15 @@ static void
 wal_writer_destroy(struct wal_writer *writer)
 {
 	cpipe_destroy(&writer->tx_pipe);
+	cpipe_destroy(&writer->wal_pipe);
 	cbus_destroy(&writer->tx_wal_bus);
 	fio_batch_delete(writer->batch);
 	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
 /** WAL writer thread routine. */
-static void wal_writer_f(va_list ap);
+static int
+wal_writer_f(va_list ap);
 
 /**
  * Initialize WAL writer, start the thread.
@@ -188,7 +191,7 @@ static void wal_writer_f(va_list ap);
  *         points to a newly created WAL writer.
  */
 int
-wal_writer_start(struct recovery *r, int rows_per_wal)
+wal_writer_start(struct recovery *r, int64_t rows_per_wal)
 {
 	assert(r->writer == NULL);
 	assert(r->current_wal == NULL);
@@ -232,6 +235,7 @@ wal_writer_stop(struct recovery *r)
 		panic_syserror("WAL writer: thread join failed");
 	}
 
+	cbus_leave(&writer->tx_wal_bus);
 	wal_writer_destroy(writer);
 
 	r->writer = NULL;
@@ -469,14 +473,13 @@ done:
 }
 
 /** WAL writer thread main loop.  */
-static void
+static int
 wal_writer_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct wal_writer *writer = r->writer;
 	struct wal_watcher *watcher;
 
-	cpipe_create(&writer->wal_pipe);
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);
 
 	struct stailq commit;
@@ -520,7 +523,8 @@ wal_writer_f(va_list ap)
 		xlog_close(r->current_wal);
 		r->current_wal = NULL;
 	}
-	cpipe_destroy(&writer->wal_pipe);
+	cbus_leave(&writer->tx_wal_bus);
+	return 0;
 }
 
 /**

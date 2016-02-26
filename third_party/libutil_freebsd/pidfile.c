@@ -29,7 +29,7 @@
 #define _GNU_SOURCE
 #endif
 
-#include <sys/cdefs.h>
+#include <sys/types.h>
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -44,6 +44,7 @@
 #include <err.h>
 #include <errno.h>
 #include <libutil.h>
+#include <assert.h>
 
 #ifndef EDOOFUS
 #define EDOOFUS EINVAL
@@ -101,10 +102,6 @@ pidfile_read(const char *path, pid_t *pidptr)
 	return (0);
 }
 
-#if defined(__GLIBC__)
-#define getprogname() program_invocation_name
-#endif
-
 struct pidfh *
 pidfile_open(const char *path, mode_t mode, pid_t *pidptr)
 {
@@ -117,12 +114,8 @@ pidfile_open(const char *path, mode_t mode, pid_t *pidptr)
 	if (pfh == NULL)
 		return (NULL);
 
-	if (path == NULL)
-		len = snprintf(pfh->pf_path, sizeof(pfh->pf_path),
-		    "/var/run/%s.pid", getprogname());
-	else
-		len = snprintf(pfh->pf_path, sizeof(pfh->pf_path),
-		    "%s", path);
+	assert(path != NULL);
+	len = snprintf(pfh->pf_path, sizeof(pfh->pf_path), "%s", path);
 	if (len >= (int)sizeof(pfh->pf_path)) {
 		free(pfh);
 		errno = ENAMETOOLONG;

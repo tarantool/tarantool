@@ -60,7 +60,7 @@ enum {
 
 struct rtree_page {
 	/* number of branches at page */
-	int n;
+	unsigned n;
 	/* branches */
 	struct rtree_page_branch data[];
 };
@@ -404,7 +404,7 @@ rtree_page_cover(const struct rtree *tree, const struct rtree_page *page,
 {
 	rtree_rect_copy(res, &rtree_branch_get(tree, page, 0)->rect,
 			tree->dimension);
-	for (int i = 1; i < page->n; i++) {
+	for (unsigned i = 1; i < page->n; i++) {
 		rtree_rect_add(res, &rtree_branch_get(tree, page, i)->rect,
 			       tree->dimension);
 	}
@@ -526,11 +526,11 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 		/* unsigned k2 = n - k1; */
 		struct rtree_rect rt1, rt2, over_rt;
 		rtree_rect_copy(&rt1, rects[ids[0]], d);
-		for (int i = 1; i < k1; i++) {
+		for (unsigned i = 1; i < k1; i++) {
 			rtree_rect_add(&rt1, rects[ids[i]], d);
 		}
 		rtree_rect_copy(&rt2, rects[ids[k1]], d);
-		for (int i = k1 + 1; i < n; i++) {
+		for (unsigned i = k1 + 1; i < n; i++) {
 			rtree_rect_add(&rt2, rects[ids[i]], d);
 		}
 		rtree_rect_intersection(&rt1, &rt2, &over_rt, d);
@@ -600,7 +600,7 @@ static void
 rtree_page_remove_branch(struct rtree *tree, struct rtree_page *page, int i)
 {
 	page->n--;
-	for (int j = i; j < page->n; j++) {
+	for (unsigned j = i; j < page->n; j++) {
 		struct rtree_page_branch *to, *from;
 		to = rtree_branch_get(tree, page, j);
 		from = rtree_branch_get(tree, page, j + 1);
@@ -615,9 +615,10 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 	struct rtree_page_branch br;
 	if (--level != 0) {
 		/* not a leaf page, minize area increase */
-		int mini = -1;
+		unsigned mini = 0;
+		char found = 0;
 		area_t min_incr = 0, best_area = 0;
-		for (int i = 0; i < page->n; i++) {
+		for (unsigned i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(tree, page, i);
 			area_t r_area = rtree_rect_area(&b->rect,
@@ -629,21 +630,15 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 						      tree->dimension);
 			incr -= r_area;
 			assert(incr >= 0);
-			if (i == 0) {
+			if (i == 0 || incr < min_incr || (incr == min_incr && r_area < best_area)) {
 				best_area = r_area;
 				min_incr = incr;
 				mini = i;
-			} else if (incr < min_incr) {
-				best_area = r_area;
-				min_incr = incr;
-				mini = i;
-			} else if (incr == min_incr &&
-				   r_area < best_area) {
-				best_area = r_area;
-				mini = i;
+				found = 1;
 			}
 		}
-		assert(mini >= 0);
+		assert(found);
+		(void) found;
 		struct rtree_page_branch *b;
 		b = rtree_branch_get(tree, page, mini);
 		struct rtree_page *p = b->data.page;
@@ -712,7 +707,7 @@ static void
 rtree_page_purge(struct rtree *tree, struct rtree_page *page, int level)
 {
 	if (--level != 0) { /* this is an internal node in the tree */
-		for (int i = 0; i < page->n; i++) {
+		for (unsigned i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(tree, page, i);
 			rtree_page_purge(tree, b->data.page, level);
@@ -726,12 +721,12 @@ rtree_page_purge(struct rtree *tree, struct rtree_page *page, int level)
 /*------------------------------------------------------------------------- */
 
 static bool
-rtree_iterator_goto_first(struct rtree_iterator *itr, int sp,
+rtree_iterator_goto_first(struct rtree_iterator *itr, unsigned sp,
 			  struct rtree_page* pg)
 {
 	unsigned d = itr->tree->dimension;
 	if (sp + 1 == itr->tree->height) {
-		for (int i = 0, n = pg->n; i < n; i++) {
+		for (unsigned i = 0, n = pg->n; i < n; i++) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->leaf_cmp(&itr->rect, &b->rect, d)) {
@@ -741,7 +736,7 @@ rtree_iterator_goto_first(struct rtree_iterator *itr, int sp,
 			}
 		}
 	} else {
-		for (int i = 0, n = pg->n; i < n; i++) {
+		for (unsigned i = 0, n = pg->n; i < n; i++) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->intr_cmp(&itr->rect, &b->rect, d)
@@ -759,12 +754,12 @@ rtree_iterator_goto_first(struct rtree_iterator *itr, int sp,
 
 
 static bool
-rtree_iterator_goto_next(struct rtree_iterator *itr, int sp)
+rtree_iterator_goto_next(struct rtree_iterator *itr, unsigned sp)
 {
 	unsigned d = itr->tree->dimension;
 	struct rtree_page *pg = itr->stack[sp].page;
 	if (sp + 1 == itr->tree->height) {
-		for (int i = itr->stack[sp].pos, n = pg->n; ++i < n;) {
+		for (unsigned i = itr->stack[sp].pos, n = pg->n; ++i < n;) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(itr->tree, pg, i);
 			if (itr->leaf_cmp(&itr->rect, &b->rect, d)) {

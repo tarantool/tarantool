@@ -31,6 +31,42 @@
 
 #include "bit/bit.h"
 
+extern inline uint8_t
+load_u8(const void *p);
+
+extern inline uint16_t
+load_u16(const void *p);
+
+extern inline uint32_t
+load_u32(const void *p);
+
+extern inline uint64_t
+load_u64(const void *p);
+
+extern inline float
+load_float(const void *p);
+
+extern inline double
+load_double(const void *p);
+
+extern inline void
+store_u8(void *p, uint8_t v);
+
+extern inline void
+store_u16(void *p, uint16_t v);
+
+extern inline void
+store_u32(void *p, uint32_t v);
+
+extern inline void
+store_u64(void *p, uint64_t v);
+
+extern inline void
+store_float(void *p, float v);
+
+extern inline void
+store_double(void *p, double v);
+
 extern inline bool
 bit_test(const void *data, size_t pos);
 
@@ -83,7 +119,7 @@ bswap_u64(uint64_t x);
 	/* naive generic implementation, worst case */			\
 	type bit = 1;							\
 	int i = 0;							\
-	for (int k = 0; k < bitsize; k++) {				\
+	for (unsigned k = 0; k < bitsize; k++) {				\
 		if (x & bit) {						\
 			indexes[i++] = offset + k + 1;			\
 		}							\
@@ -127,11 +163,11 @@ bit_index_u32(uint32_t x, int *indexes, int offset)
 
 int *
 bit_index_u64(uint64_t x, int *indexes, int offset) {
-#if  defined(HAVE_CTZLL)
+#if  defined(HAVE_BUILTIN_CTZLL)
 	int prev_pos = 0;
 	int i = 0;
 
-#if defined(HAVE_POPCOUNTLL)
+#if defined(HAVE_BUILTIN_POPCOUNTLL)
 	/* fast implementation using built-in popcount function */
 	const int count = bit_count_u64(x);
 	while (i < count) {

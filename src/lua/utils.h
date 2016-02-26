@@ -35,7 +35,7 @@
 #include <string.h>
 #include <math.h> /* modf, isfinite */
 
-#include "msgpuck/msgpuck.h" /* enum mp_type */
+#include <msgpuck.h> /* enum mp_type */
 
 #if defined(__cplusplus)
 extern "C" {
@@ -53,6 +53,7 @@ extern "C" {
 #include <lj_tab.h>
 
 struct lua_State;
+struct ibuf;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -61,6 +62,7 @@ struct lua_State;
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
 extern struct lua_State *tarantool_L;
+extern struct ibuf *tarantool_lua_ibuf;
 
 /** \cond public */
 
@@ -428,28 +430,8 @@ luaL_toint64(struct lua_State *L, int idx);
 
 /** \endcond public */
 
-/**
- * A quick approximation if a Lua table is an array.
- *
- * JSON can only have strings as keys, so if the first
- * table key is 1, it's definitely not a json map,
- * and very likely an array.
- */
-static inline bool
-luaL_isarray(struct lua_State *L, int idx)
-{
-	if (!lua_istable(L, idx))
-		return false;
-	if (idx < 0)
-		idx = lua_gettop(L) + idx + 1;
-	lua_pushnil(L);
-	if (lua_next(L, idx) == 0) /* the table is empty */
-		return true;
-	bool index_starts_at_1 = lua_isnumber(L, -2) &&
-		lua_tonumber(L, -2) == 1;
-	lua_pop(L, 2);
-	return index_starts_at_1;
-}
+struct error *
+luaL_iserror(struct lua_State *L, int narg);
 
 /**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
@@ -505,32 +487,27 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 int
 tarantool_lua_utils_init(struct lua_State *L);
 
+int
+lbox_error(lua_State *L);
+
+int
+lbox_call(lua_State *L, int nargs, int nreturns);
+
+int
+lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 #include "exception.h"
-extern const struct type type_LuajitError;
-class LuajitError: public Exception {
-public:
-	LuajitError(const char *file, unsigned line,
-		    struct lua_State *L);
-	virtual void raise() { throw this; }
-};
+#include <fiber.h>
 
 static inline void
-lbox_call(struct lua_State *L, int nargs, int nreturns)
+lbox_call_xc(lua_State *L, int nargs, int nreturns)
 {
-	try {
-		lua_call(L, nargs, nreturns);
-	} catch (Exception *e) {
-		/* Let all well-behaved exceptions pass through. */
-		throw;
-	} catch (...) {
-		/* Convert Lua error to a Tarantool exception. */
-		tnt_raise(LuajitError, L);
-	}
+	if (lbox_call(L, nargs, nreturns) != 0)
+		diag_raise();
 }
-
 
 /**
  * Make a reference to an object on top of the Lua stack and

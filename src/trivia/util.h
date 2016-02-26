@@ -165,9 +165,9 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #endif /* defined(__cplusplus) */
 
 #if defined(__cplusplus)
-#define API_EXPORT extern "C" __attribute__ ((visibility ("default")))
+#define API_EXPORT extern "C" __attribute__ ((nothrow, visibility ("default")))
 #else /* defined(__cplusplus) */
-#define API_EXPORT extern __attribute__ ((visibility ("default")))
+#define API_EXPORT extern __attribute__ ((nothrow, visibility ("default")))
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

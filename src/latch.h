@@ -34,6 +34,10 @@
 #include "small/rlist.h"
 #include "fiber.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** Latch of cooperative multitasking environment. */
 
 struct latch
@@ -162,14 +166,14 @@ typedef struct box_latch box_latch_t;
  * Allocate and initialize the new latch.
  * \returns latch
  */
-API_EXPORT box_latch_t*
+box_latch_t*
 box_latch_new(void);
 
 /**
  * Destroy and free the latch.
  * \param latch latch
  */
-API_EXPORT void
+void
 box_latch_delete(box_latch_t *latch);
 
 /**
@@ -178,7 +182,7 @@ box_latch_delete(box_latch_t *latch);
 *
 * \param latch a latch
 */
-API_EXPORT void
+void
 box_latch_lock(box_latch_t *latch);
 
 /**
@@ -187,7 +191,7 @@ box_latch_lock(box_latch_t *latch);
  * \retval 0 - success
  * \retval 1 - the latch is locked.
  */
-API_EXPORT int
+int
 box_latch_trylock(box_latch_t *latch);
 
 /**
@@ -196,9 +200,13 @@ box_latch_trylock(box_latch_t *latch);
  *
  * \param latch a ltach
  */
-API_EXPORT void
+void
 box_latch_unlock(box_latch_t *latch);
 
 /** \endcond public */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LATCH_H_INCLUDED */

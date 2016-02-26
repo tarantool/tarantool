@@ -33,7 +33,7 @@ box.schema.SPACE_ID
 ...
 box.schema.INDEX_MAX
 ---
-- 10
+- 128
 ...
 box.schema.SPACE_MAX
 ---

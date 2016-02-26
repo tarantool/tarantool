@@ -166,7 +166,7 @@ struct rtree_iterator
 	/* Flag that means that no more values left */
 	bool eof;
 	/* A verion of a tree when the iterator was created */
-	int version;
+	unsigned version;
 
 	/* Special rb tree of closest neqighbors
 	 * Used only for iteration with op = SOP_NEIGHBOR
@@ -180,7 +180,7 @@ struct rtree_iterator
 	/* List of tree pages, allocated for list entries */
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
-	int page_pos;
+	unsigned page_pos;
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,

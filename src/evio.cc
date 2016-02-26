@@ -251,7 +251,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
+	hints.ai_flags = AI_PASSIVE|AI_ADDRCONFIG;
 
 	/* make no difference between empty string and NULL for host */
 	if (getaddrinfo(*service->host ? service->host : NULL, service->serv,

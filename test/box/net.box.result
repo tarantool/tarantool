@@ -16,6 +16,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
 LISTEN = require('uri').parse(box.cfg.listen)
 ---
 ...
@@ -60,18 +64,18 @@ cn:ping()
 -- check permissions
 cn:call('unexists_procedure')
 ---
-- error: Procedure 'unexists_procedure' is not defined
+- error: Execute access is denied for user 'guest' to function 'unexists_procedure'
 ...
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 ---
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Execute access denied for user 'guest' to function 'test_foo'
+- error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
 cn:eval('return 2+2')
 ---
-- error: Execute access denied for user 'guest'
+- error: Execute access on universe is denied for user 'guest'
 ...
 box.schema.user.grant('guest','execute','universe')
 ---
@@ -84,15 +88,15 @@ cn = remote:new(box.cfg.listen)
 ...
 cn:call('unexists_procedure')
 ---
-- error: Procedure 'unexists_procedure' is not defined
+- error: Execute access is denied for user 'guest' to function 'unexists_procedure'
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- error: Execute access is denied for user 'guest' to function 'test_foo'
 ...
 cn:call(nil, 'a', 'b', 'c')
 ---
-- error: Procedure 'nil' is not defined
+- error: Execute access is denied for user 'guest' to function 'nil'
 ...
 cn:eval('return 2+2')
 ---
@@ -300,8 +304,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: '[string "-- net_box.lua (internal file)..."]:155: Use space:method(...)
-    instead space.method(...)'
+- error: 'builtin/box/net_box.lua..."]:<line>: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -560,7 +563,9 @@ cn:call('pause')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
 ...
 -- call
 remote.self:call('test_foo', 'a', 'b', 'c')
@@ -571,7 +576,9 @@ remote.self:call('test_foo', 'a', 'b', 'c')
 ...
 cn:call('test_foo', 'a', 'b', 'c')
 ---
-- error: Tuple/Key must be MsgPack array
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
 ...
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
@@ -601,6 +608,31 @@ res[1][1] == 1
 res[1][2] == string.rep('a', 50000)
 ---
 - true
+...
+-- a.b.c.d
+u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'
+---
+...
+X = {}
+---
+...
+X.X = X
+---
+...
+function X.fn(x,y) return y or x end
+---
+...
+cn:call('X.fn', u)
+---
+- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
+...
+cn:call('X.X.X.X.X.X.X.fn', u)
+---
+- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
+...
+cn:call('X.X.X.X:fn', u)
+---
+- - ['84F7BCFA-079C-46CC-98B4-F0C821BE833E']
 ...
 -- auth
 cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
@@ -699,28 +731,41 @@ cnc.console ~= nil
 ...
 cnc:console('return 1, 2, 3, "string", nil')
 ---
-- |
-  ---
+- '---
+
   - 1
+
   - 2
+
   - 3
+
   - string
+
   - null
+
   ...
+
+'
 ...
 cnc:console('error("test")')
 ---
-- |
-  ---
+- '---
+
   - error: test
+
   ...
+
+'
 ...
 cnc:console('a = {1, 2, 3, 4}; return a[3]')
 ---
-- |
-  ---
+- '---
+
   - 3
+
   ...
+
+'
 ...
 -- #545 user or password is not defined
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
@@ -893,27 +938,13 @@ _ = fiber.create(
 );
 ---
 ...
-while true do
-   local line = file_log:read(2048)
-   if line ~= nil then
-      if string.match(line, "ER_UNKNOWN") == nil then
-         return "Success"
-      else
-         return "Failure"
-      end
-   end
-   fiber.sleep(0.01)
-end;
----
-- Success
-...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-file_log:close()
+test_run:grep_log("default", "ER_NO_SUCH_PROC")
 ---
-- true
+- ER_NO_SUCH_PROC
 ...
 -- gh-983 selecting a lot of data crashes the server or hangs the
 -- connection
@@ -987,4 +1018,8 @@ box.space.test:drop()
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

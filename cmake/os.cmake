@@ -10,17 +10,18 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # On 32-bit systems, support files larger than 2GB
 # (see man page for feature_test_macros).
     add_definitions("-D_FILE_OFFSET_BITS=64")
-    message(STATUS "Building for Linux")
+    find_package_message(PLATFORM "Building for Linux" "${CMAKE_SYSTEM_NAME}")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
     set(TARGET_OS_FREEBSD 1)
     set(TARGET_OS_DEBIAN_FREEBSD 1)
 # Debian/kFreeBSD uses GNU glibc.
     add_definitions("-D_GNU_SOURCE")
     add_definitions("-D_FILE_OFFSET_BITS=64")
-    message(STATUS "Building for Debian/kFreeBSD")
+    find_package_message(PLATFORM "Building for Debian/kFreeBSD"
+        "${CMAKE_SYSTEM_NAME}")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     set(TARGET_OS_FREEBSD 1)
-    message(STATUS "Building for FreeBSD")
+    find_package_message(PLATFORM "Building for FreeBSD" "${CMAKE_SYSTEM_NAME}")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(TARGET_OS_DARWIN 1)
 
@@ -40,7 +41,9 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/local/lib")
     endif()
 
-    message(STATUS "Building for Mac OS X")
+    find_package_message(PLATFORM "Building for OS X" "${CMAKE_SYSTEM_NAME}")
+    find_package_message(DARWIN_BUILD_TYPE
+        "DARWIN_BUILD_TYPE: ${DARWIN_BUILD_TYPE}" "${DARWIN_BUILD_TYPE}")
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()

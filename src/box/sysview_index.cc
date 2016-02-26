@@ -90,8 +90,7 @@ SysviewIndex::allocIterator() const
 	struct sysview_iterator *it = (struct sysview_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct sysview_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct sysview_iterator),
 			  "SysviewIndex", "iterator");
 	}
 	it->base.free = sysview_iterator_free;
@@ -140,16 +139,6 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count) const
 	if (tuple == NULL || !filter(source, tuple))
 		return NULL;
 	return tuple;
-}
-
-struct tuple *
-SysviewIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		     enum dup_replace_mode mode)
-{
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "SysviewIndex", "replace()");
 }
 
 static bool

@@ -100,17 +100,52 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 
 unset(CC_DEBUG_OPT)
 
+option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
+fiber' administrative command. Only works on x86 architectures, if compiled
+with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
+is output with resolved function (symbol) names. Otherwise only frame
+addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
+
+set (HAVE_BFD False)
+if (ENABLE_BACKTRACE)
+    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
+        # We only know this option to work with gcc
+        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system
+                is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler
+                is not GNU GCC (${CMAKE_C_COMPILER}).")
+    endif()
+    # Use GNU bfd if present.
+    check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
+    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
+    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
+    check_include_file(bfd.h HAVE_BFD_H)
+    set(CMAKE_REQUIRED_DEFINITIONS)
+    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
+        set (HAVE_BFD True)
+    endif()
+endif()
+
 #
 # Set flags for all include files: those maintained by us and
 # coming from third parties.
-# We must set -fno-omit-frame-pointer here, since we rely
-# on frame pointer when getting a backtrace, and it must
-# be used consistently across all object files.
-# The same reasoning applies to -fno-stack-protector switch.
 # Since we began using luajit, which uses gcc stack unwind
 # internally, we also need to make sure all code is compiled
 # with unwind info.
 #
+
+add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
+
+# We must set -fno-omit-frame-pointer here, since we rely
+# on frame pointer when getting a backtrace, and it must
+# be used consistently across all object files.
+# The same reasoning applies to -fno-stack-protector switch.
+
+if (ENABLE_BACKTRACE)
+    add_compile_flags("C;CXX"
+        "-fno-omit-frame-pointer"
+        "-fno-stack-protector")
+endif()
+
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
 # language permits multiple tentative definitions in the single
@@ -129,12 +164,7 @@ unset(CC_DEBUG_OPT)
 # are platforms lacking proper support for common symbols (osx).
 #
 
-add_compile_flags("C;CXX"
-    "-fno-common"
-    "-fno-omit-frame-pointer"
-    "-fno-stack-protector"
-    "-fexceptions"
-    "-funwind-tables")
+add_compile_flags("C;CXX" "-fno-common")
 
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 # Remove VALGRIND code and assertions in *any* type of release build.
@@ -162,7 +192,6 @@ macro(enable_tnt_compile_flags)
     add_compile_flags("C;CXX"
         "-Wall"
         "-Wextra"
-        "-Wno-sign-compare"
         "-Wno-strict-aliasing"
     )
 
@@ -203,10 +232,13 @@ endif()
 check_c_compiler_flag("-Wno-unused-const-variable" CC_HAS_WNO_UNUSED_CONST_VARIABLE)
 check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
 check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
+check_c_compiler_flag("-Wno-unused-function" CC_HAS_WNO_UNUSED_FUNCTION)
 check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
 check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
 check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
+check_c_compiler_flag("-Wno-parentheses-equality" CC_HAS_WNO_PARENTHESES_EQUALITY)
 check_c_compiler_flag("-Wno-undefined-inline" CC_HAS_WNO_UNDEFINED_INLINE)
+check_c_compiler_flag("-Wno-dangling-else" CC_HAS_WNO_DANGLING_ELSE)
 
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
@@ -226,6 +258,8 @@ else()
     set(HAVE_BUILTIN_POPCOUNTLL 0)
     set(HAVE_BUILTIN_BSWAP32 0)
     set(HAVE_BUILTIN_BSWAP64 0)
+    find_package_message(CC_BIT "Using slow implementation of bit operations"
+        "${CMAKE_COMPILER_IS_CLANG}:${CMAKE_COMPILER_IS_GNUCC}")
 endif()
 
 if (NOT HAVE_BUILTIN_CTZ OR NOT HAVE_BUILTIN_CTZLL)

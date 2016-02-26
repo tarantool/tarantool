@@ -30,8 +30,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <glob.h>
 
 /**
@@ -76,5 +80,9 @@ int     coeio_fsync(int fd);
 int     coeio_fdatasync(int fd);
 
 int	coeio_tempdir(char *path, size_t path_len);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_COEIO_FILE_H */

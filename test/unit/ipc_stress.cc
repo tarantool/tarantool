@@ -7,16 +7,17 @@ enum {
 	ITERATIONS = 100000,
 };
 
-void
+static int
 push_f(va_list ap)
 {
 	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
 
 	for (int i = 0; i < ITERATIONS; i++)
 		ipc_channel_put(channel, NULL);
+	return 0;
 }
 
-void
+static int
 pop_f(va_list ap)
 {
 	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
@@ -25,9 +26,11 @@ pop_f(va_list ap)
 		void *ptr;
 		ipc_channel_get(channel, &ptr);
 	}
+	return 0;
 }
 
-void main_f(va_list ap)
+static int
+main_f(va_list ap)
 {
 	header();
 	struct fiber *push = fiber_new_xc("push_f", push_f);
@@ -42,6 +45,7 @@ void main_f(va_list ap)
 	ipc_channel_delete(channel);
 	ev_break(loop(), EVBREAK_ALL);
 	footer();
+	return 0;
 }
 
 int main()

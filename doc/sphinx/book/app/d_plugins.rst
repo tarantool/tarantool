@@ -303,8 +303,8 @@ on ~/mysql-5.5. The mysqld server is already running on the local host 127.0.0.1
     $ # master repository. The resultant display is normal for Ubuntu
     $ # 12.04 precise
     $ cat /etc/apt/sources.list.d/tarantool.list
-    deb http://tarantool.org/dist/master/ubuntu/ precise main
-    deb-src http://tarantool.org/dist/master/ubuntu/ precise main
+    deb http://tarantool.org/dist/1.6/ubuntu/ precise main
+    deb-src http://tarantool.org/dist/1.6/ubuntu/ precise main
 
     $ # Install tarantool-dev. The displayed line should show version = 1.6
     $ sudo apt-get -y install tarantool-dev | grep -E "Setting up|already"
@@ -635,8 +635,8 @@ on /usr. The PostgreSQL server is already running on the local host 127.0.0.1.
     $ # Ensure that the next "install" will get files from Tarantool master
     $ # repository. The resultant display is normal for Ubuntu 12.04 precise
     $ cat /etc/apt/sources.list.d/tarantool.list
-    deb http://tarantool.org/dist/master/ubuntu/ precise main
-    deb-src http://tarantool.org/dist/master/ubuntu/ precise main
+    deb http://tarantool.org/dist/1.6/ubuntu/ precise main
+    deb-src http://tarantool.org/dist/1.6/ubuntu/ precise main
 
     $ # Install tarantool-dev. The displayed line should show version = 1.6
     $ sudo apt-get -y install tarantool-dev | grep -E "Setting up|already"

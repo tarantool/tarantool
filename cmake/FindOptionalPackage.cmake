@@ -33,5 +33,5 @@ endmacro (find_optional_package)
 
 macro(list_optional_packages)
     file(READ ${_OptionalPackagesFile} _message)
-    message(STATUS "\n${_message}")
+    find_package_message(OPTIONAL_PACKAGES "${_message}" "${_message}")
 endmacro()

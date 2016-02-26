@@ -66,10 +66,12 @@ t
   - rollback
   - runtime
   - schema
+  - select_all
   - session
   - slab
   - snapshot
   - sophia
+  - sort
   - space
   - stat
   - tuple
@@ -269,10 +271,13 @@ t;
   - 'box.error.NO_SUCH_INDEX : 35'
   - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
   - 'box.error.TUPLE_IS_TOO_LONG : 27'
+  - 'box.error.VIEW_IS_RO : 113'
   - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'
-  - 'box.error.NO_SUCH_FUNCTION : 51'
   - 'box.error.injection : table: <address>
+  - 'box.error.NO_SUCH_FUNCTION : 51'
+  - 'box.error.UNSUPPORTED_INDEX_FEATURE : 112'
+  - 'box.error.INDEX_FIELD_COUNT : 39'
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
   - 'box.error.ROLE_EXISTS : 83'
@@ -354,7 +359,7 @@ t;
   - 'box.error.INDEX_EXISTS : 85'
   - 'box.error.UPDATE_FIELD : 29'
   - 'box.error.ARG_TYPE : 26'
-  - 'box.error.INDEX_FIELD_COUNT : 39'
+  - 'box.error.WRONG_SPACE_OPTIONS : 111'
   - 'box.error.READONLY : 7'
   - 'box.error.ROLE_NOT_GRANTED : 92'
   - 'box.error.DROP_SPACE : 11'
@@ -497,6 +502,22 @@ tonumber64(-1.0)
 6LL - 7LL
 ---
 - -1
+...
+tostring(tonumber64('1234567890123')) == '1234567890123'
+---
+- true
+...
+tostring(tonumber64('12345678901234')) == '12345678901234'
+---
+- true
+...
+tostring(tonumber64('123456789012345')) == '123456789012345ULL'
+---
+- true
+...
+tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
+---
+- true
 ...
 --  dostring()
 dostring('abc')
@@ -672,4 +693,12 @@ box.space.test:select{}
 ...
 box.space.test:drop()
 ---
+...
+-- test test_run:grep_log()
+require('log').info('Incorrect password supplied')
+---
+...
+test_run:grep_log("default", "password")
+---
+- password
 ...

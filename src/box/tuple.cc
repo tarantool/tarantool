@@ -117,9 +117,9 @@ tuple_format_register(struct tuple_format *format)
 				realloc(tuple_formats, new_capacity *
 					sizeof(tuple_formats[0]));
 			if (formats == NULL)
-				tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				tnt_raise(OutOfMemory,
 					  sizeof(struct tuple_format),
-					  "tuple_formats", "malloc");
+					  "malloc", "tuple_formats");
 
 			formats_capacity = new_capacity;
 			tuple_formats = formats;
@@ -167,9 +167,8 @@ tuple_format_alloc(struct rlist *key_list)
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 
 	if (format == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  sizeof(struct tuple_format),
-			  "tuple format", "malloc");
+		tnt_raise(OutOfMemory, sizeof(struct tuple_format),
+			  "malloc", "tuple format");
 	}
 
 	format->refs = 0;
@@ -198,12 +197,12 @@ tuple_format_new(struct rlist *key_list)
 		tuple_format_register(format);
 		field_type_create(format->types, format->field_count,
 				  key_list);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_format_delete(format);
 		throw;
 	}
 
-	int32_t i = 0;
+	uint32_t i = 0;
 	int j = 0;
 	for (; i < format->max_fieldno; i++) {
 		/*
@@ -265,6 +264,36 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
 	}
 }
 
+
+/**
+ * Check tuple data correspondence to space format;
+ * throw proper exception if smth wrong.
+ * data argument expected to be a proper msgpack array
+ * Actually checks everything that checks tuple_init_field_map.
+ */
+void
+tuple_validate_raw(struct tuple_format *format, const char *data)
+{
+	if (format->field_count == 0)
+		return; /* Nothing to check */
+
+	/* Check to see if the tuple has a sufficient number of fields. */
+	uint32_t field_count = mp_decode_array(&data);
+	if (unlikely(field_count < format->field_count))
+		tnt_raise(ClientError, ER_INDEX_FIELD_COUNT,
+			  (unsigned) field_count,
+			  (unsigned) format->field_count);
+
+	/* Check field types */
+	enum field_type *type = format->types;
+	enum field_type *type_end = format->types + format->field_count;
+	for (uint32_t i = 0; type < type_end; type++, i++) {
+		key_mp_type_validate(*type, mp_typeof(*data),
+				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+		mp_next(&data);
+	}
+}
+
 /**
  * Incremented on every snapshot and is used to distinguish tuples
  * which were created after start of a snapshot (these tuples can
@@ -278,8 +307,10 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
-	ERROR_INJECT_EXCEPTION(ERRINJ_TUPLE_ALLOC);
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
+	ERROR_INJECT(ERRINJ_TUPLE_ALLOC,
+		     tnt_raise(OutOfMemory, (unsigned) total,
+			       "slab allocator", "tuple"));
 	char *ptr = (char *) smalloc(&memtx_alloc, total);
 	/**
 	 * Use a nothrow version and throw an exception here,
@@ -294,8 +325,8 @@ tuple_alloc(struct tuple_format *format, size_t size)
 			tnt_raise(LoggedError, ER_SLAB_ALLOC_MAX,
 				  (unsigned) total);
 		} else {
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  (unsigned) total, "slab allocator", "tuple");
+			tnt_raise(OutOfMemory, (unsigned) total,
+				  "slab allocator", "tuple");
 		}
 	}
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
@@ -542,7 +573,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	memcpy(new_tuple->data, data, tuple_len);
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
-	} catch (...) {
+	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;
 	}
@@ -586,7 +617,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 }
 
 int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_default(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def)
 {
 	if (key_def->part_count == 1 && key_def->parts[0].fieldno == 0) {
@@ -619,7 +650,7 @@ int
 tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		  const struct key_def *key_def)
 {
-	int r = tuple_compare(tuple_a, tuple_b, key_def);
+	int r = key_def->tuple_compare(tuple_a, tuple_b, key_def);
 	if (r == 0)
 		r = tuple_a < tuple_b ? -1 : tuple_a > tuple_b;
 
@@ -627,7 +658,7 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 }
 
 int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
+tuple_compare_with_key_default(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
 {
 	assert(key != NULL || part_count == 0);
@@ -879,4 +910,32 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
+}
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_end)
+{
+	try {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tuple *new_tuple = tuple_update(tuple_format_ber,
+			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
+			expr, expr_end, 1);
+		return tuple_bless(new_tuple);
+	} catch (ClientError *e) {
+		return NULL;
+	}
+}
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_end)
+{
+	try {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
+			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
+			expr, expr_end, 1);
+		return tuple_bless(new_tuple);
+	} catch (ClientError *e) {
+		return NULL;
+	}
 }

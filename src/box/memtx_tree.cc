@@ -57,8 +57,8 @@ int
 tree_index_compare_key(const tuple *a, const struct key_data *key_data,
 		       struct key_def *key_def)
 {
-	return tuple_compare_with_key(a, key_data->key, key_data->part_count,
-				      key_def);
+	return tuple_compare_with_key(a, key_data->key,
+				      key_data->part_count, key_def);
 }
 int tree_index_qcompare(const void* a, const void *b, void *c)
 {
@@ -243,8 +243,8 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		int tree_res =
 		bps_tree_index_insert(&tree, new_tuple, &dup_tuple);
 		if (tree_res) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  BPS_TREE_EXTENT_SIZE, "MemtxTree", "replace");
+			tnt_raise(OutOfMemory, BPS_TREE_EXTENT_SIZE,
+				  "MemtxTree", "replace");
 		}
 
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
@@ -272,8 +272,7 @@ MemtxTree::allocIterator() const
 	struct tree_iterator *it = (struct tree_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(struct tree_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct tree_iterator),
 			  "MemtxTree", "iterator");
 	}
 
@@ -296,9 +295,10 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		 * If no key is specified, downgrade equality
 		 * iterators to a full range.
 		 */
-		if (type < 0 || type > ITER_GT)
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "Tree index", "requested iterator type");
+		if (type < 0 || type > ITER_GT) {
+			return Index::initIterator(iterator, type, key,
+						   part_count);
+		}
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = 0;
 	}
@@ -348,8 +348,7 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		it->base.next = tree_iterator_bwd_skip_one;
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "Tree index", "requested iterator type");
+		return Index::initIterator(iterator, type, key, part_count);
 	}
 }
 

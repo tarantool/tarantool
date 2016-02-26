@@ -1,3 +1,4 @@
 /etc/tarantool/instances.available
 /etc/tarantool/instances.enabled
-/usr/lib/tarantool
+/var/log/tarantool
+/var/lib/tarantool

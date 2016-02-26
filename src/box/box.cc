@@ -31,6 +31,7 @@
 #include "box/box.h"
 
 #include <say.h>
+#include "ipc.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -39,8 +40,8 @@
 #include <rmean.h>
 #include "main.h"
 #include "tuple.h"
-#include "lua/call.h"
 #include "session.h"
+#include "func.h"
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
@@ -57,6 +58,10 @@
 #include "coio.h"
 #include "cluster.h" /* replica */
 #include "title.h"
+#include "lua/call.h" /* box_lua_call */
+#include "iproto_port.h"
+#include "xrow.h"
+#include "scoped_guard.h"
 
 static char status[64] = "unknown";
 
@@ -74,17 +79,18 @@ struct recovery *recovery;
  */
 static struct recover_row_ctx {
 	/** How many rows have been recovered so far. */
-	int rows;
+	size_t rows;
 	/** Yield once per 'yield' rows. */
-	int yield;
+	size_t yield;
 } recover_row_ctx;
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
 bool is_ro = true;
+struct ipc_channel wait_rw;
 
 void
-recover_row_ctx_init(struct recover_row_ctx *ctx, int rows_per_wal)
+recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
 {
 	ctx->rows = 0;
 	/**
@@ -171,6 +177,18 @@ void
 box_set_ro(bool ro)
 {
 	is_ro = ro;
+	if (ro == false && ipc_channel_has_readers(&wait_rw))
+		ipc_channel_put(&wait_rw, NULL);
+}
+
+static void
+box_wait_rw()
+{
+	void *msg;
+	while (is_ro) {
+		ipc_channel_get(&wait_rw, &msg);
+		assert(msg == NULL);
+	}
 }
 
 bool
@@ -202,6 +220,18 @@ recover_row(struct recovery *r, void *param, struct xrow_header *row)
 }
 
 /* {{{ configuration bindings */
+
+static void
+box_check_logger(const char *logger)
+{
+	char *error_msg;
+	if (logger == NULL)
+		return;
+	if (say_check_init_str(logger, &error_msg) == -1) {
+		auto guard = make_scoped_guard([=]{ free(error_msg); });
+		tnt_raise(ClientError, ER_CFG, "logger", error_msg);
+	}
+}
 
 static void
 box_check_uri(const char *source, const char *option_name)
@@ -240,15 +270,16 @@ box_check_wal_mode(const char *mode_name)
 static void
 box_check_readahead(int readahead)
 {
-	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483648 };
-	if (readahead < READAHEAD_MIN || readahead > READAHEAD_MAX) {
+	enum { READAHEAD_MIN = 128, READAHEAD_MAX = 2147483647 };
+	if (readahead < (int) READAHEAD_MIN ||
+	    readahead > (int) READAHEAD_MAX) {
 		tnt_raise(ClientError, ER_CFG, "readahead",
 			  "specified value is out of bounds");
 	}
 }
 
-static int
-box_check_rows_per_wal(int rows_per_wal)
+static int64_t
+box_check_rows_per_wal(int64_t rows_per_wal)
 {
 	/* check rows_per_wal configuration */
 	if (rows_per_wal <= 1) {
@@ -261,11 +292,12 @@ box_check_rows_per_wal(int rows_per_wal)
 void
 box_check_config()
 {
+	box_check_logger(cfg_gets("logger"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication_source();
 	box_check_readahead(cfg_geti("readahead"));
-	box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 }
 
@@ -669,6 +701,161 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
 
+static inline struct func *
+access_check_func(const char *name, uint32_t name_len)
+{
+	struct func *func = func_by_name(name, name_len);
+	struct credentials *credentials = current_user();
+	/*
+	 * If the user has universal access, don't bother with checks.
+	 * No special check for ADMIN user is necessary
+	 * since ADMIN has universal access.
+	 */
+	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
+		return func;
+	uint8_t access = PRIV_X & ~credentials->universal_access;
+	if (func == NULL || (func->def.uid != credentials->uid &&
+	     access & ~func->access[credentials->auth_token].effective)) {
+		/* Access violation, report error. */
+		char name_buf[BOX_NAME_MAX + 1];
+		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
+		struct user *user = user_find_xc(credentials->uid);
+		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
+			  priv_name(access), user->def.name, name_buf);
+	}
+
+	return func;
+}
+
+int
+func_call(struct func *func, struct request *request, struct obuf *out)
+{
+	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	if (func->func == NULL)
+		func_load(func);
+
+	/* Create a call context */
+	struct port_buf port_buf;
+	port_buf_create(&port_buf);
+	box_function_ctx_t ctx = { request, &port_buf.base };
+
+	/* Clear all previous errors */
+	diag_clear(&fiber()->diag);
+	assert(!in_txn()); /* transaction is not started */
+	/* Call function from the shared library */
+	int rc = func->func(&ctx, request->tuple, request->tuple_end);
+	if (rc != 0) {
+		if (diag_last_error(&fiber()->diag) == NULL) {
+			/* Stored procedure forget to set diag  */
+			diag_set(ClientError, ER_PROC_C, "unknown error");
+		}
+		goto error;
+	}
+
+	/* Push results to obuf */
+	struct obuf_svp svp;
+	if (iproto_prepare_select(out, &svp) != 0)
+		goto error;
+
+	for (struct port_buf_entry *entry = port_buf.first;
+	     entry != NULL; entry = entry->next) {
+		if (tuple_to_obuf(entry->tuple, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
+		}
+	}
+	iproto_reply_select(out, &svp, request->header->sync,
+			    port_buf.size);
+
+	port_buf_destroy(&port_buf);
+
+	return 0;
+
+error:
+	port_buf_destroy(&port_buf);
+	txn_rollback();
+	return -1;
+}
+
+void
+box_process_call(struct request *request, struct obuf *out)
+{
+	/**
+	 * Find the function definition and check access.
+	 */
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
+	struct func *func = access_check_func(name, name_len);
+	/*
+	 * Sic: func == NULL means that perhaps the user has a global
+	 * "EXECUTE" privilege, so no specific grant to a function.
+	 */
+
+	/**
+	 * Change the current user id if the function is
+	 * a set-definer-uid one. If the function is not
+	 * defined, it's obviously not a setuid one.
+	 */
+	struct credentials *orig_credentials = NULL;
+	if (func && func->def.setuid) {
+		orig_credentials = current_user();
+		/* Remember and change the current user id. */
+		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
+			/*
+			 * Fill the cache upon first access, since
+			 * when func is created, no user may
+			 * be around to fill it (recovery of
+			 * system spaces from a snapshot).
+			 */
+			struct user *owner = user_find_xc(func->def.uid);
+			credentials_init(&func->owner_credentials, owner);
+		}
+		fiber_set_user(fiber(), &func->owner_credentials);
+	}
+
+	int rc;
+	if (func && func->def.language == FUNC_LANGUAGE_C) {
+		rc = func_call(func, request, out);
+	} else {
+		rc = box_lua_call(request, out);
+	}
+	/* Restore the original user */
+	if (orig_credentials)
+		fiber_set_user(fiber(), orig_credentials);
+
+	if (rc != 0) {
+		txn_rollback();
+		diag_raise();
+	}
+
+	if (in_txn()) {
+		/* The procedure forgot to call box.commit() */
+		say_warn("a transaction is active at return from '%.*s'",
+			name_len, name);
+		txn_rollback();
+	}
+}
+
+void
+box_process_eval(struct request *request, struct obuf *out)
+{
+	/* Check permissions */
+	access_check_universe(PRIV_X);
+	if (box_lua_eval(request, out) != 0) {
+		txn_rollback();
+		diag_raise();
+	}
+
+	if (in_txn()) {
+		/* The procedure forgot to call box.commit() */
+		const char *expr = request->key;
+		uint32_t expr_len = mp_decode_strl(&expr);
+		say_warn("a transaction is active at return from EVAL '%.*s'",
+			expr_len, expr);
+		txn_rollback();
+	}
+}
+
 void
 box_process_join(int fd, struct xrow_header *header)
 {
@@ -763,10 +950,9 @@ box_free(void)
 		schema_free();
 		tuple_free();
 		port_free();
-		rmean_delete(rmean_error);
-		rmean_delete(rmean_box);
 #endif
 		engine_shutdown();
+		ipc_channel_destroy(&wait_rw);
 	}
 }
 
@@ -790,28 +976,13 @@ engine_init()
 	engine_register(sophia);
 }
 
-/**
- * @brief Reduce the current number of threads in the thread pool to the
- * bare minimum. Doesn't prevent the pool from spawning new threads later
- * if demand mounts.
- */
-static void
-thread_pool_trim()
-{
-	/*
-	 * Trim OpenMP thread pool.
-	 * Though we lack the direct control the workaround below works for
-	 * GNU OpenMP library. The library stops surplus threads on entering
-	 * a parallel region. Can't go below 2 threads due to the
-	 * implementation quirk.
-	 */
-#pragma omp parallel num_threads(2)
-	;
-}
-
 static inline void
 box_init(void)
 {
+	error_init();
+
+	ipc_channel_create(&wait_rw, 0);
+
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
 		   cfg_geti("slab_alloc_maximal"),
@@ -837,13 +1008,14 @@ box_init(void)
 
 	/* recovery initialization */
 	recover_row_ctx_init(&recover_row_ctx,
-			     cfg_geti("rows_per_wal"));
+			     cfg_geti64("rows_per_wal"));
 	recovery = recovery_new(cfg_gets("snap_dir"),
 				cfg_gets("wal_dir"),
 				recover_row, &recover_row_ctx);
 	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
+	box_set_too_long_threshold();
 
 	/*
 	 * Initialize the cluster registry using replication_source,
@@ -893,16 +1065,11 @@ box_init(void)
 	iproto_init();
 	box_set_listen();
 
-	int rows_per_wal = box_check_rows_per_wal(cfg_geti("rows_per_wal"));
+	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	recovery_finalize(recovery, wal_mode, rows_per_wal);
 
 	engine_end_recovery();
-
-	/*
-	 * Recovery inflates the thread pool quite a bit (due to parallel sort).
-	 */
-	thread_pool_trim();
 
 	rmean_cleanup(rmean_box);
 
@@ -912,6 +1079,8 @@ box_init(void)
 	/* Enter read-write mode. */
 	if (recovery->server_id > 0)
 		box_set_ro(false);
+	else
+		box_wait_rw();
 	title("running");
 	say_info("ready to accept requests");
 

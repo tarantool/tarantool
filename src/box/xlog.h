@@ -35,29 +35,12 @@
 #include "tt_uuid.h"
 #include "vclock.h"
 
-/**
- * XlogError is raised when there is an error with contents
- * of the data directory or a log file. A special subclass
- * of exception is introduced to gracefully skip such errors
- * in panic_if_error = false mode.
- */
-struct XlogError: public Exception
-{
-	XlogError(const char *file, unsigned line,
-		  const char *format, ...);
-	virtual void raise() { throw this; }
-protected:
-	XlogError(const struct type *type, const char *file, unsigned line,
-		  const char *format, ...);
-};
+struct iovec;
+struct xrow_header;
 
-struct XlogGapError: public XlogError
-{
-	XlogGapError(const char *file, unsigned line,
-		  const struct vclock *from,
-		  const struct vclock *to);
-	virtual void raise() { throw this; }
-};
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /* {{{ log dir */
 
@@ -157,13 +140,13 @@ xdir_destroy(struct xdir *dir);
  * Must be used if it is necessary to find the last log/
  * snapshot or scan through all logs.
  */
-void
+int
 xdir_scan(struct xdir *dir);
 
 /**
  * Check that a directory exists and is writable.
  */
-void
+int
 xdir_check(struct xdir *dir);
 
 /* }}} */
@@ -191,7 +174,7 @@ struct xlog {
 	 * used in local hot standby to "follow up" on new rows
 	 * appended to the file.
 	 */
-	size_t rows;
+	int64_t rows; /* should have the same type as lsn */
 	/** Log file name. */
 	char filename[PATH_MAX + 1];
 	/** Whether this file has .inprogress suffix. */
@@ -204,7 +187,7 @@ struct xlog {
 	 * when a DBA has manually moved a few logs around
 	 * and messed the data directory up.
 	 */
-	tt_uuid server_uuid;
+	struct tt_uuid server_uuid;
 	/**
 	 * Text file header: vector clock taken at the time
 	 * this file was created. For WALs, this is vector
@@ -235,7 +218,7 @@ xlog_open(struct xdir *dir, int64_t signature);
  * The caller must free the created xlog object with
  * xlog_close().
  *
- * Throws an exception in case of error.
+ * Return NULL in case of error.
  */
 
 struct xlog *
@@ -319,5 +302,78 @@ int
 xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
 /** }}} */
+
+#if defined(__cplusplus)
+} /* extern C */
+
+#include "exception.h"
+
+/**
+ * XlogError is raised when there is an error with contents
+ * of the data directory or a log file. A special subclass
+ * of exception is introduced to gracefully skip such errors
+ * in panic_if_error = false mode.
+ */
+struct XlogError: public Exception
+{
+	XlogError(const char *file, unsigned line,
+		  const char *format, ...);
+	virtual void raise() { throw this; }
+protected:
+	XlogError(const struct type *type, const char *file, unsigned line,
+		  const char *format, ...);
+};
+
+struct XlogGapError: public XlogError
+{
+	XlogGapError(const char *file, unsigned line,
+		  const struct vclock *from,
+		  const struct vclock *to);
+	virtual void raise() { throw this; }
+};
+
+static inline void
+xdir_scan_xc(struct xdir *dir)
+{
+	if (xdir_scan(dir) == -1)
+		diag_raise();
+}
+
+static inline void
+xdir_check_xc(struct xdir *dir)
+{
+	if (xdir_check(dir) == -1)
+		diag_raise();
+}
+
+static inline int
+xlog_cursor_next_xc(struct xlog_cursor *i, struct xrow_header *row)
+{
+	int rv = xlog_cursor_next(i, row);
+	if (rv == -1)
+		diag_raise();
+	return rv;
+}
+
+static inline struct xlog *
+xlog_open_stream_xc(struct xdir *dir, int64_t signature, FILE *file,
+		    const char *filename)
+{
+	struct xlog *rv = xlog_open_stream(dir, signature, file, filename);
+	if (rv == NULL)
+		diag_raise();
+	return rv;
+}
+
+static inline struct xlog *
+xlog_open_xc(struct xdir *dir, int64_t signature)
+{
+	struct xlog *rv = xlog_open(dir, signature);
+	if (rv == NULL)
+		diag_raise();
+	return rv;
+}
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_XLOG_H_INCLUDED */

@@ -1,0 +1,44 @@
+# Please don't modify this file in-place, because it will be overwrriten
+# during package upgrades. It is recommended to copy this file to
+# /etc/systemd/system and then modify the chosen settings. Alternatively,
+# one can create a directory named unit.d/ within /etc/systemd/system and
+# place a drop-in file name.conf there that only changes the specific
+# settings one is interested in.
+#
+# Please see http://tarantool.org/doc/book/administration.html
+# for additional information.
+#
+[Unit]
+Description=Tarantool Database Server
+After=network.target
+Documentation=man:tarantool(1)
+
+# Created by package
+AssertPathIsDirectory=@TARANTOOL_AVAILABLEDIR@
+AssertPathIsReadWrite=@TARANTOOL_DATADIR@
+AssertPathIsReadWrite=@TARANTOOL_LOGDIR@
+# Created by systemd-tmpfiles
+AssertPathIsReadWrite=@TARANTOOL_RUNDIR@
+# Instance file
+ConditionPathExists=@TARANTOOL_AVAILABLEDIR@/%I.lua
+
+[Service]
+Type=forking
+User=@TARANTOOL_USER@
+Group=@TARANTOOL_USER@
+# Disable OOM killer
+OOMScoreAdjust=-1000
+
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %I
+ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
+## NYI: https://github.com/tarantool/tarantool/issues/1229
+#ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %I
+
+# Give a reasonable amount of time to close xlogs
+TimeoutStopSec=10s
+Restart=on-failure
+RestartSec=100ms
+
+[Install]
+WantedBy=multi-user.target
+DefaultInstance=example

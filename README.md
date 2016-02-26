@@ -1,4 +1,4 @@
-# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=master)](https://travis-ci.org/tarantool/tarantool)
+# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=1.6)](https://travis-ci.org/tarantool/tarantool)
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
@@ -79,7 +79,6 @@ This will start Tarantool in interactive mode.
 
 To run Tarantool regression tests (test/test-run.py),
 a few additional Python modules are necessary:
- * python-daemon>=1.5.5
  * PyYAML==3.10
  * argparse==1.1
  * msgpack-python==0.4.6

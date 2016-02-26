@@ -31,8 +31,8 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
-#include "rmean.h"
 #include "salad/stailq.h"
+#include "rmean.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -44,19 +44,13 @@ struct cmsg;
 struct cpipe;
 typedef void (*cmsg_f)(struct cmsg *);
 
-/** rmean_net - network statistics (iproto & cbus) */
-extern struct rmean *rmean_net;
-
-enum rmean_net_name {
-	RMEAN_NET_EVENTS,
-	RMEAN_NET_LOCKS,
-	RMEAN_NET_RECEIVED,
-	RMEAN_NET_SENT,
-
-	RMEAN_NET_LAST
+enum cbus_stat_name {
+	CBUS_STAT_EVENTS,
+	CBUS_STAT_LOCKS,
+	CBUS_STAT_LAST,
 };
 
-extern const char *rmean_net_strings[RMEAN_NET_LAST];
+extern const char *cbus_stat_strings[CBUS_STAT_LAST];
 
 /**
  * One hop in a message travel route.  A message may need to be
@@ -177,7 +171,8 @@ static inline void
 cpipe_set_fetch_cb(struct cpipe *pipe, ev_async_cb fetch_output_cb,
 		   void *data)
 {
-	assert(loop() == pipe->consumer);
+	/** Must be done before starting the bus. */
+	assert(pipe->consumer == NULL);
 	/*
 	 * According to libev documentation, you can set cb at
 	 * virtually any time, modulo threads.
@@ -334,6 +329,8 @@ cpipe_push(struct cpipe *pipe, struct cmsg *msg)
 struct cbus {
 	/** Two pipes for two directions between two cords. */
 	struct cpipe *pipe[2];
+	/** cbus statistics */
+	struct rmean *stats;
 	/**
 	 * A single mutex to protect all exchanges around the
 	 * two pipes involved in the bus.
@@ -373,6 +370,12 @@ struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe);
 
 /**
+ * Stop listening for events on the bus.
+ */
+void
+cbus_leave(struct cbus *bus);
+
+/**
  * Lock the bus. Ideally should never be used
  * outside cbus code.
  */
@@ -380,8 +383,8 @@ static inline void
 cbus_lock(struct cbus *bus)
 {
 	/* Count statistics */
-	if (rmean_net)
-		rmean_collect(rmean_net, RMEAN_NET_LOCKS, 1);
+	if (bus->stats)
+		rmean_collect(bus->stats, CBUS_STAT_LOCKS, 1);
 
 	tt_pthread_mutex_lock(&bus->mutex);
 }

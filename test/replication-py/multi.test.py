@@ -24,7 +24,7 @@ master_lsn = master.get_lsn(master.id)
 cluster = [ master ]
 for i in range(REPLICA_N - 1):
     server = TarantoolServer(server.ini)
-    server.script = 'replication/replica.lua'
+    server.script = 'replication-py/replica.lua'
     server.vardir = os.path.join(server.vardir, 'replica', str(master.id + i))
     server.rpl_master = master
     server.deploy()

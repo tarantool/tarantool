@@ -1,0 +1,5 @@
+Hello, World!
+arg[-1]	tarantool
+arg[0] 	./script.lua
+arg	1	2	3
+...	1	2	3

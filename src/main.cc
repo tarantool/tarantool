@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <grp.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -71,6 +72,7 @@
 #include <readline/history.h>
 #include "title.h"
 #include <libutil.h>
+#include "box/lua/init.h" /* box_lua_init() */
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -177,10 +179,11 @@ sig_fatal_cb(int signo)
 
 	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
 	fdprintf(fd,
-		 "Please file a bug at http://github.com/tarantool/tarantool/issues\n"
-		 "Attempting backtrace... Note: since the server has "
-		 "already crashed, \nthis may fail as well\n");
+		 "Please file a bug at http://github.com/tarantool/tarantool/issues\n");
+
 #ifdef ENABLE_BACKTRACE
+	fdprintf(fd, "Attempting backtrace... Note: since the server has "
+		 "already crashed, \nthis may fail as well\n");
 	print_backtrace();
 #endif
 end:
@@ -328,12 +331,6 @@ error:
 }
 
 extern "C" void
-check_cfg()
-{
-	box_check_config();
-}
-
-extern "C" void
 load_cfg()
 {
 	const char *work_dir = cfg_gets("work_dir");
@@ -355,7 +352,8 @@ load_cfg()
 				}
 				exit(EX_NOUSER);
 			}
-			if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
+			if (setgid(pw->pw_gid) < 0 || setgroups(0, NULL) < 0 ||
+			    setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
 				say_syserror("setgid/setuid");
 				exit(EX_OSERR);
 			}
@@ -630,9 +628,13 @@ main(int argc, char **argv)
 	coeio_init();
 	signal_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+	box_lua_init(tarantool_L);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);
+
+	if (!loop())
+		panic("%s", "can't init event loop");
 
 	try {
 		int events = ev_activecnt(loop());

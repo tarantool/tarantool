@@ -112,7 +112,7 @@ testset_create(vclockset_t *set, int64_t *files, int files_n, int node_n)
 		struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 		vclock_create(vclock);
 		int64_t signature = 0;
-		for (uint32_t node_id = 0; node_id < node_n; node_id++) {
+		for (int32_t node_id = 0; node_id < node_n; node_id++) {
 			int64_t lsn = *(files + f * node_n + node_id);
 			if (lsn <= 0)
 				continue;

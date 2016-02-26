@@ -208,7 +208,7 @@ simple_check()
 static void
 rtree_test_build(struct rtree *tree, struct rtree_rect *arr, int count)
 {
-	for (size_t i = 0; i < count; i++) {
+	for (ssize_t i = 0; i < count; i++) {
 		record_t rec = (record_t)(i + 1);
 		rtree_insert(tree, &arr[i], rec);
 	}
@@ -219,7 +219,7 @@ neighbor_test()
 {
 	header();
 
-	const int test_count = 1000;
+	const unsigned int test_count = 1000;
 	struct rtree_rect arr[test_count];
 	static struct rtree_rect basis;
 

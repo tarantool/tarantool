@@ -25,14 +25,14 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
+#include <sys/types.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 
 #include <errno.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <libutil.h>
 

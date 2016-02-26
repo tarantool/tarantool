@@ -23,7 +23,7 @@ space:update({1}, {{'=', 1, 101}})
 ...
 space:upsert({1}, {{'+', 1, 10}})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected STR'
+- error: 'Tuple field 1 type does not match one required by operation: expected STR'
 ...
 space:get{1}
 ---
@@ -61,7 +61,7 @@ space:update({'A'}, {{'=', 1, 101}})
 ...
 space:upsert({'A'}, {{'+', 1, 10}})
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 space:get{'A'}
 ---
@@ -129,7 +129,8 @@ space:get{1}
 ...
 index:select({1}, {iterator = box.index.GT})
 ---
-- error: Sophia Index iterator does not support uncomplete keys
+- error: Index 'primary' (TREE) of space 'test' (sophia) does not support partial
+    keys
 ...
 space:drop()
 ---

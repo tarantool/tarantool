@@ -34,6 +34,10 @@
 #include "user_def.h"
 #include "small/region.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** Global grants. */
 struct universe {
 	/** Global privileges this user has on the universe. */
@@ -66,8 +70,9 @@ user_map_is_empty(struct user_map *map)
 typedef rb_tree(struct priv_def) privset_t;
 rb_proto(, privset_, privset_t, struct priv_def);
 
-struct user: public user_def
+struct user
 {
+	struct user_def def;
 	/**
 	 * An id in privileges array to quickly find a
 	 * respective privilege.
@@ -84,6 +89,20 @@ struct user: public user_def
 	/** Memory pool for privs */
 	struct region pool;
 };
+
+/** Find user by id. */
+struct user *
+user_by_id(uint32_t uid);
+
+struct user *
+user_find_by_name(const char *name, uint32_t len);
+
+/* Find a user by name. Used by authentication. */
+struct user *
+user_find(uint32_t uid);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * For best performance, all users are maintained in this array.
@@ -120,16 +139,24 @@ user_cache_replace(struct user_def *user);
 void
 user_cache_delete(uint32_t uid);
 
-/** Find user by id. */
-struct user *
-user_by_id(uint32_t uid);
-
 /* Find a user by name. Used by authentication. */
-struct user *
-user_cache_find(uint32_t uid);
+static inline struct user *
+user_find_xc(uint32_t uid)
+{
+	struct user *user = user_find(uid);
+	if (user == NULL)
+		diag_raise();
+	return user;
+}
 
-struct user *
-user_cache_find_by_name(const char *name, uint32_t len);
+static inline struct user *
+user_find_by_name_xc(const char *name, uint32_t len)
+{
+	struct user *user = user_find_by_name(name, len);
+	if (user == NULL)
+		diag_raise();
+	return user;
+}
 
 /** Initialize the user cache and access control subsystem. */
 void
@@ -173,5 +200,7 @@ void
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
 
 /* }}} */
+
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_USER_H */

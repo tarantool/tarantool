@@ -30,12 +30,9 @@
  */
 #include "cbus.h"
 
-struct rmean *rmean_net = NULL;
-const char *rmean_net_strings[RMEAN_NET_LAST] = {
+const char *cbus_stat_strings[CBUS_STAT_LAST] = {
 	"EVENTS",
 	"LOCKS",
-	"RECEIVED",
-	"SENT"
 };
 
 static void
@@ -72,16 +69,16 @@ cpipe_create(struct cpipe *pipe)
 
 	ev_async_init(&pipe->fetch_output, cpipe_fetch_output_cb);
 	pipe->fetch_output.data = pipe;
-	pipe->consumer = loop();
-	pipe->producer = NULL; /* set in join() under a mutex */
-	ev_async_start(pipe->consumer, &pipe->fetch_output);
+	/* Set in join(), which is always called by the consumer thread. */
+	pipe->consumer = NULL;
+	/* Set in join() under a mutex. */
+	pipe->producer = NULL;
 }
 
 void
 cpipe_destroy(struct cpipe *pipe)
 {
-	assert(loop() == pipe->consumer);
-	ev_async_stop(pipe->consumer, &pipe->fetch_output);
+	(void) pipe;
 }
 
 static void
@@ -97,6 +94,9 @@ void
 cbus_create(struct cbus *bus)
 {
 	bus->pipe[0] = bus->pipe[1] = NULL;
+	bus->stats = rmean_new(cbus_stat_strings, CBUS_STAT_LAST);
+	if (bus->stats == NULL)
+		panic_syserror("cbus_create");
 
 	pthread_mutexattr_t errorcheck;
 
@@ -118,6 +118,7 @@ cbus_destroy(struct cbus *bus)
 {
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
 	(void) tt_pthread_cond_destroy(&bus->cond);
+	rmean_delete(bus->stats);
 }
 
 /**
@@ -127,6 +128,8 @@ cbus_destroy(struct cbus *bus)
 struct cpipe *
 cbus_join(struct cbus *bus, struct cpipe *pipe)
 {
+	pipe->consumer = loop();
+	ev_async_start(pipe->consumer, &pipe->fetch_output);
 	/*
 	 * We can't let one or the other thread go off and
 	 * produce events/send ev_async callback messages
@@ -164,6 +167,15 @@ cbus_join(struct cbus *bus, struct cpipe *pipe)
 	return bus->pipe[peer_idx];
 }
 
+void
+cbus_leave(struct cbus *bus)
+{
+	struct cpipe *pipe = bus->pipe[bus->pipe[0]->consumer != cord()->loop];
+
+	assert(loop() == pipe->consumer);
+	ev_async_stop(pipe->consumer, &pipe->fetch_output);
+}
+
 static void
 cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 	      int events)
@@ -198,7 +210,7 @@ cbus_flush_cb(ev_loop *loop, struct ev_async *watcher,
 	pipe->n_input = 0;
 	if (pipe_was_empty) {
 		/* Count statistics */
-		rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
 
 		ev_async_send(pipe->consumer, &pipe->fetch_output);
 	}
@@ -229,7 +241,7 @@ cpipe_peek_impl(struct cpipe *pipe)
 
 	if (peer_pipe_was_empty) {
 		/* Count statistics */
-		rmean_collect(rmean_net, RMEAN_NET_EVENTS, 1);
+		rmean_collect(pipe->bus->stats, CBUS_STAT_EVENTS, 1);
 
 		ev_async_send(peer->consumer, &peer->fetch_output);
 	}
@@ -264,7 +276,7 @@ cpipe_fiber_pool_needs_throttling(struct cpipe_fiber_pool *pool)
  * Main function of the fiber invoked to handle all outstanding
  * tasks in a queue.
  */
-static void
+static int
 cpipe_fiber_pool_f(va_list ap)
 {
 	struct cpipe_fiber_pool *pool = va_arg(ap, struct cpipe_fiber_pool *);
@@ -287,6 +299,7 @@ restart:
 			goto restart;
 	}
 	pool->size--;
+	return 0;
 }
 
 

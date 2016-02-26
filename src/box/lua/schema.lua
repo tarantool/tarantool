@@ -26,9 +26,9 @@ ffi.cdef[[
     box_iterator_free(box_iterator_t *itr);
     /** \endcond public */
     /** \cond public */
-    size_t
+    ssize_t
     box_index_len(uint32_t space_id, uint32_t index_id);
-    size_t
+    ssize_t
     box_index_bsize(uint32_t space_id, uint32_t index_id);
     int
     box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
@@ -148,9 +148,10 @@ end
  @example
  check_param_table(options, { user = 'string',
                               port = 'string, number',
-                              data = 'any' } )
+                              data = 'any',
+                              allow_unexpected = false } )
 --]]
-local function check_param_table(table, template)
+local function check_param_table(table, template, allow_unexpected)
     if table == nil then
         return
     end
@@ -164,8 +165,12 @@ local function check_param_table(table, template)
     end
     for k,v in pairs(table) do
         if template[k] == nil then
-            box.error(box.error.ILLEGAL_PARAMS,
-                      "options parameter '" .. k .. "' is unexpected")
+            if not allow_unexpected then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "unexpected option '" .. k .. "'")
+            else
+                -- option will be checked by C code
+            end
         elseif template[k] == 'any' then
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
@@ -230,7 +235,7 @@ box.begin = function()
         box.error()
     end
 end
--- box.commit yields, so it's defined in call.cc
+-- box.commit yields, so it's defined as Lua/C binding
 
 box.rollback = builtin.box_txn_rollback;
 
@@ -239,7 +244,6 @@ box.schema.space.create = function(name, options)
     check_param(name, 'name', 'string')
     local options_template = {
         if_not_exists = 'boolean',
-        temporary = 'boolean',
         engine = 'string',
         id = 'number',
         field_count = 'number',
@@ -250,7 +254,7 @@ box.schema.space.create = function(name, options)
         engine = 'memtx',
         field_count = 0,
     }
-    check_param_table(options, options_template)
+    check_param_table(options, options_template, true)
     options = update_param_table(options, options_defaults)
 
     local _space = box.space[box.schema.SPACE_ID]
@@ -281,9 +285,15 @@ box.schema.space.create = function(name, options)
     if uid == nil then
         uid = session.uid()
     end
-    local temporary = options.temporary and "temporary" or ""
     local format = options.format and options.format or {}
-    _space:insert{id, uid, name, options.engine, options.field_count, temporary, format}
+    local extra_options = setmetatable({}, { __serialize = 'mapping' })
+    for k, v in pairs(options) do
+        if options_template[k] == nil then
+            extra_options[k] = v
+        end
+    end
+    _space:insert{id, uid, name, options.engine, options.field_count,
+        extra_options, format}
     return box.space[id], "created"
 end
 
@@ -301,9 +311,10 @@ end
 
 box.schema.create_space = box.schema.space.create
 
-box.schema.space.drop = function(space_id, space_name)
+box.schema.space.drop = function(space_id, space_name, opts)
     check_param(space_id, 'space_id', 'number')
-
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
@@ -320,7 +331,9 @@ box.schema.space.drop = function(space_id, space_name)
         if space_name == nil then
             space_name = '#'..tostring(space_id)
         end
-        box.error(box.error.NO_SUCH_SPACE, space_name)
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_SPACE, space_name)
+        end
     end
 end
 
@@ -381,7 +394,7 @@ box.schema.index.create = function(space_id, name, options)
         dimension = 'number',
         distance = 'string',
     }
-    check_param_table(options, options_template)
+    check_param_table(options, options_template, true)
     local options_defaults = {
         type = 'tree',
     }
@@ -428,6 +441,11 @@ box.schema.index.create = function(space_id, name, options)
     end
     local key_opts = { dimension = options.dimension,
         unique = options.unique, distance = options.distance }
+    for k, v in pairs(options) do
+        if options_template[k] == nil then
+            key_opts[k] = v
+        end
+    end
     _index:insert{space_id, iid, name, options.type, key_opts, parts}
     return box.space[space_id].index[name]
 end
@@ -496,7 +514,7 @@ box.schema.index.alter = function(space_id, index_id, options)
                       "Don't know how to update both id and" ..
                        cant_update_fields)
         end
-        ops = {}
+        local ops = {}
         local function add_op(value, field_no)
             if value then
                 table.insert(ops, {'=', field_no, value})
@@ -1134,7 +1152,8 @@ box.schema.func.create = function(name, opts)
         end
         return
     end
-    opts = update_param_table(opts, { setuid = false, type = 'lua'})
+    opts = update_param_table(opts, { setuid = false, language = 'lua'})
+    opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
     _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
 end
@@ -1254,16 +1273,11 @@ local function grant(uid, name, privilege, object_type,
     local privilege_hex = checked_privilege(privilege, object_type)
 
     local oid = object_resolve(object_type, object_name)
-    if options == nil then
-        options = {}
-    end
+    options = options or {}
     if options.grantor == nil then
         options.grantor = session.uid()
     else
         options.grantor = user_or_role_resolve(options.grantor)
-    end
-    if options.if_not_exists == nil then
-        options.if_not_exists = false
     end
     local _priv = box.space[box.schema.PRIV_ID]
     -- add the granted privilege to the current set
@@ -1280,7 +1294,7 @@ local function grant(uid, name, privilege, object_type,
     -- replaces the old one, old grantor is lost
     if privilege_hex ~= old_privilege then
         _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
-    elseif options.if_not_exists == false then
+    elseif not options.if_not_exists then
             if object_type == 'role' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
@@ -1300,12 +1314,7 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     end
     local privilege_hex = checked_privilege(privilege, object_type)
 
-    if options == nil then
-        options = {}
-    end
-    if options.if_exists == nil then
-        options.if_exists = false
-    end
+    options = options or {}
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
@@ -1377,10 +1386,19 @@ box.schema.user.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local uid = user_resolve(name)
-    if uid == nil then
+    if uid ~= nil then
+        if uid >= box.schema.SYSTEM_USER_ID_MIN and
+           uid <= box.schema.SYSTEM_USER_ID_MAX then
+            -- gh-1205: box.schema.user.info fails
+            box.error(box.error.DROP_USER, name,
+                      "the user or the role is a system")
+        end
+        return drop(uid, opts)
+    end
+    if not opts.if_exists then
         box.error(box.error.NO_SUCH_USER, name)
     end
-    return drop(uid, opts)
+    return
 end
 
 local function info(id)
@@ -1442,6 +1460,11 @@ box.schema.role.drop = function(name, opts)
             box.error(box.error.NO_SUCH_ROLE, name)
         end
         return
+    end
+    if uid >= box.schema.SYSTEM_USER_ID_MIN and
+       uid <= box.schema.SYSTEM_USER_ID_MAX then
+        -- gh-1205: box.schema.user.info fails
+        box.error(box.error.DROP_USER, name, "the user or the role is a system")
     end
     return drop(uid)
 end

@@ -113,7 +113,6 @@ SophiaSpace::executeReplace(struct txn *txn, struct space *space,
 	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 
 	space_validate_tuple_raw(space, request->tuple);
-	tuple_field_count_validate(space->format, request->tuple);
 
 	int size = request->tuple_end - request->tuple;
 	const char *key =
@@ -171,7 +170,7 @@ SophiaSpace::executeUpdate(struct txn *txn, struct space *space,
 	/* Do tuple update */
 	struct tuple *new_tuple =
 		tuple_update(space->format,
-		             region_alloc_xc_cb,
+		             region_aligned_alloc_xc_cb,
 		             &fiber()->gc,
 		             old_tuple, request->tuple,
 		             request->tuple_end,
@@ -196,20 +195,10 @@ SophiaSpace::executeUpsert(struct txn *txn, struct space *space,
 
 	/* Check field count in tuple */
 	space_validate_tuple_raw(space, request->tuple);
-	tuple_field_count_validate(space->format, request->tuple);
+	/* Check tuple fields */
+	tuple_validate_raw(space->format, request->tuple);
 
-	/* Extract key from tuple */
-	uint32_t key_len = request->tuple_end - request->tuple;
-	char *key = (char *) region_alloc_xc(&fiber()->gc, key_len);
-	key_len = key_parts_create_from_tuple(index->key_def, request->tuple,
-					      key, key_len);
-
-	/* validate upsert key */
-	uint32_t part_count = index->key_def->part_count;
-	primary_key_validate(index->key_def, key, part_count);
-
-	index->upsert(key,
-	              request->ops,
+	index->upsert(request->ops,
 	              request->ops_end,
 	              request->tuple,
 	              request->tuple_end,
@@ -226,6 +215,7 @@ SophiaEngine::SophiaEngine()
 	 ,m_prev_commit_lsn(-1)
 	 ,m_prev_checkpoint_lsn(-1)
 	 ,m_checkpoint_lsn(-1)
+	 ,thread_pool_started(0)
 	 ,recovery_complete(0)
 {
 	flags = 0;
@@ -296,17 +286,14 @@ SophiaEngine::init()
 	if (env == NULL)
 		panic("failed to create sophia environment");
 	sp_setint(env, "sophia.path_create", 0);
+	sp_setint(env, "sophia.recover", 2);
 	sp_setstring(env, "sophia.path", cfg_gets("sophia_dir"), 0);
 	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
 	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
-	sp_setint(env, "scheduler.threads", cfg_geti("sophia.threads"));
+	sp_setint(env, "scheduler.threads", 0);
 	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
-	sp_setint(env, "compaction.node_size", cfg_geti("sophia.node_size"));
-	sp_setint(env, "compaction.page_size", cfg_geti("sophia.page_size"));
 	sp_setint(env, "compaction.0.async", 1);
 	sp_setint(env, "log.enable", 0);
-	sp_setint(env, "log.two_phase_recover", 1);
-	sp_setint(env, "log.commit_lsn", 1);
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_error(env);
@@ -361,7 +348,7 @@ sophia_join_key_def(void *env, void *db)
 	struct key_def *key_def;
 	struct key_opts key_opts = key_opts_default;
 	key_def = key_def_new(id, 0, "sophia_join", TREE, &key_opts, count);
-	int i = 0;
+	unsigned i = 0;
 	while (i < count) {
 		char path[64];
 		int len = snprintf(path, sizeof(path), "db.%d.index.key", id);
@@ -396,14 +383,14 @@ SophiaEngine::join(struct relay *relay)
 
 	/* get snapshot object */
 	char id[128];
-	snprintf(id, sizeof(id), "snapshot.%" PRIu64, signt);
+	snprintf(id, sizeof(id), "view.%" PRIu64, signt);
 	void *snapshot = sp_getobject(env, id);
 	assert(snapshot != NULL);
 
 	/* iterate through a list of databases which took a
 	 * part in the snapshot */
 	void *db;
-	void *db_cursor = sp_getobject(snapshot, "db-cursor");
+	void *db_cursor = sp_getobject(snapshot, "db");
 	if (db_cursor == NULL)
 		sophia_error(env);
 
@@ -413,7 +400,7 @@ SophiaEngine::join(struct relay *relay)
 		struct key_def *key_def;
 		try {
 			key_def = sophia_join_key_def(env, db);
-		} catch (...) {
+		} catch (Exception *e) {
 			sp_destroy(db_cursor);
 			throw;
 		}
@@ -424,14 +411,14 @@ SophiaEngine::join(struct relay *relay)
 			key_def_delete(key_def);
 			sophia_error(env);
 		}
-		void *obj = sp_object(db);
+		void *obj = sp_document(db);
 		while ((obj = sp_get(cursor, obj)))
 		{
 			uint32_t tuple_size;
 			char *tuple = (char *)sophia_tuple_new(obj, key_def, NULL, &tuple_size);
 			try {
 				sophia_send_row(relay, key_def->space_id, tuple, tuple_size);
-			} catch (...) {
+			} catch (Exception *e) {
 				key_def_delete(key_def);
 				free(tuple);
 				sp_destroy(obj);
@@ -470,12 +457,6 @@ SophiaEngine::dropIndex(Index *index)
 	rc = sp_destroy(i->db);
 	if (rc == -1)
 		sophia_error(env);
-	/* maybe start asynchronous database
-	 * shutdown: last snapshot might hold a
-	 * db pointer. */
-	rc = sp_destroy(i->db);
-	if (rc == -1)
-		sophia_error(env);
 	i->db  = NULL;
 	i->env = NULL;
 }
@@ -497,14 +478,14 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "Sophia TREE secondary indexes are not supported");
 		}
-		const int keypart_limit = 8;
+		const uint32_t keypart_limit = 8;
 		if (key_def->part_count > keypart_limit) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 			          key_def->name,
 			          space_name(space),
 			          "Sophia TREE index too many key-parts (8 max)");
 		}
-		int i = 0;
+		unsigned i = 0;
 		while (i < key_def->part_count) {
 			struct key_part *part = &key_def->parts[i];
 			if (part->type != NUM && part->type != STRING) {
@@ -627,14 +608,14 @@ sophia_snapshot(void *env, int64_t lsn)
 	if (rc == -1)
 		sophia_error(env);
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	/* ensure snapshot is not already exists */
 	void *o = sp_getobject(env, snapshot);
 	if (o) {
 		return;
 	}
 	snprintf(snapshot, sizeof(snapshot), "%" PRIu64, lsn);
-	rc = sp_setstring(env, "snapshot", snapshot, 0);
+	rc = sp_setstring(env, "view", snapshot, 0);
 	if (rc == -1)
 		sophia_error(env);
 }
@@ -646,11 +627,12 @@ sophia_reference_checkpoint(void *env, int64_t lsn)
 	 * engine lsn */
 	char checkpoint_id[32];
 	snprintf(checkpoint_id, sizeof(checkpoint_id), "%" PRIu64, lsn);
-	int rc = sp_setstring(env, "snapshot", checkpoint_id, 0);
+	int rc = sp_setstring(env, "view", checkpoint_id, 0);
 	if (rc == -1)
 		sophia_error(env);
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	/* update lsn */
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64 ".lsn", lsn);
 	rc = sp_setint(env, snapshot, lsn);
 	if (rc == -1)
 		sophia_error(env);
@@ -661,7 +643,7 @@ sophia_snapshot_ready(void *env, int64_t lsn)
 {
 	/* get sophia lsn associated with snapshot */
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64 ".lsn", lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64 ".lsn", lsn);
 	int64_t snapshot_start_lsn = sp_getint(env, snapshot);
 	if (snapshot_start_lsn == -1) {
 		if (sp_error(env))
@@ -677,7 +659,7 @@ static inline void
 sophia_delete_checkpoint(void *env, int64_t lsn)
 {
 	char snapshot[128];
-	snprintf(snapshot, sizeof(snapshot), "snapshot.%" PRIu64, lsn);
+	snprintf(snapshot, sizeof(snapshot), "view.%" PRIu64, lsn);
 	void *s = sp_getobject(env, snapshot);
 	if (s == NULL) {
 		if (sp_error(env))
@@ -727,6 +709,8 @@ int
 SophiaEngine::waitCheckpoint()
 {
 	assert(m_checkpoint_lsn != -1);
+	if (! thread_pool_started)
+		return 0;
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
 		fiber_yield_timeout(.020);
 	return 0;

@@ -58,12 +58,65 @@ struct xrow_header {
 	int bodycnt;
 	uint32_t schema_id;
 	struct iovec body[XROW_BODY_IOVMAX];
+
 };
+
+enum {
+	/* Maximal length of protocol name in handshake */
+	GREETING_PROTOCOL_LEN_MAX = 32,
+	/* Maximal length of salt in handshake */
+	GREETING_SALT_LEN_MAX = 44,
+};
+
+struct greeting {
+	uint32_t version_id;
+	uint32_t salt_len;
+	char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
+	struct tt_uuid uuid;
+	char salt[GREETING_SALT_LEN_MAX];
+};
+
+/**
+ * \brief Format a text greeting sent by the server during handshake.
+ * This function encodes greeting for binary protocol (adds "(Binary)"
+ * after version signature).
+ *
+ * \param[out] greetingbuf buffer to store result. Exactly
+ * IPROTO_GREETING_SIZE bytes will be written.
+ * \param version_id server version_id created by version_id()
+ * \param uuid server UUID
+ * \param salt random bytes that client should use to sign passwords.
+ * \param salt_len size of \a salt. Up to GREETING_SALT_LEN_MAX bytes.
+ *
+ * \sa greeting_decode()
+ */
+
+void
+greeting_encode(char *greetingbuf, uint32_t version_id, const
+		struct tt_uuid *uuid, const char *salt,
+		uint32_t salt_len);
+
+/**
+ * \brief Parse a text greeting send by the server during handshake.
+ * This function supports both binary and console protocol.
+ *
+ * \param greetingbuf a text greeting
+ * \param[out] greeting parsed struct greeting.
+ * \retval 0 on success
+ * \retval -1 on failure due to mailformed greeting
+ *
+ * \sa greeting_encode()
+ */
+int
+greeting_decode(const char *greetingbuf, struct greeting *greeting);
+
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 void
 xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
-struct tt_uuid;
 
 void
 xrow_decode_uuid(const char **pos, struct tt_uuid *out);
@@ -162,55 +215,6 @@ xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 	return xrow_decode_subscribe(row, NULL, NULL, vclock);
 }
 
-enum {
-	/* Maximal length of protocol name in handshake */
-	GREETING_PROTOCOL_LEN_MAX = 32,
-	/* Maximal length of salt in handshake */
-	GREETING_SALT_LEN_MAX = 44,
-};
-
-struct greeting {
-	uint32_t version_id;
-	uint32_t salt_len;
-	char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
-	struct tt_uuid uuid;
-	char salt[GREETING_SALT_LEN_MAX];
-};
-
-/**
- * \brief Format a text greeting sent by the server during handshake.
- * This function encodes greeting for binary protocol (adds "(Binary)"
- * after version signature).
- *
- * \param[out] greetingbuf buffer to store result. Exactly
- * IPROTO_GREETING_SIZE bytes will be written.
- * \param version_id server version_id created by version_id()
- * \param uuid server UUID
- * \param salt random bytes that client should use to sign passwords.
- * \param salt_len size of \a salt. Up to GREETING_SALT_LEN_MAX bytes.
- *
- * \sa greeting_decode()
- */
-void
-greeting_encode(char *greetingbuf, uint32_t version_id, const tt_uuid *uuid,
-		const char *salt, uint32_t salt_len);
-
-/**
- * \brief Parse a text greeting send by the server during handshake.
- * This function supports both binary and console protocol.
- *
- * \param greetingbuf a text greeting
- * \param[out] greeting parsed struct greeting.
- * \retval 0 on success
- * \retval -1 on failure due to mailformed greeting
- *
- * \sa greeting_encode()
- */
-int
-greeting_decode(const char *greetingbuf, struct greeting *greeting);
-
-#if defined(__cplusplus)
-} /* extern "C" */
 #endif
 
 #endif /* TARANTOOL_XROW_H_INCLUDED */

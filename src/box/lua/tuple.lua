@@ -62,10 +62,10 @@ box_tuple_next(box_tuple_iterator_t *it);
 /** \endcond public */
 
 box_tuple_t *
-boxffi_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
+box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 box_tuple_t *
-boxffi_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
+box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 ]])
 
 local builtin = ffi.C
@@ -213,7 +213,7 @@ local function tuple_update(tuple, expr)
         error("Usage: tuple:update({ { op, field, arg}+ })")
     end
     local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
-    local tuple = builtin.boxffi_tuple_update(tuple, pexpr, pexpr_end)
+    local tuple = builtin.box_tuple_update(tuple, pexpr, pexpr_end)
     if tuple == nil then
         return box.error()
     end
@@ -226,7 +226,7 @@ local function tuple_upsert(tuple, expr)
         error("Usage: tuple:upsert({ { op, field, arg}+ })")
     end
     local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
-    local tuple = builtin.boxffi_tuple_upsert(tuple, pexpr, pexpr_end)
+    local tuple = builtin.box_tuple_upsert(tuple, pexpr, pexpr_end)
     if tuple == nil then
         return box.error()
     end
