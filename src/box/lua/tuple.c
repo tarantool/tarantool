@@ -288,7 +288,7 @@ lbox_tuple_transform(struct lua_State *L)
 	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
 	lua_Integer len = lua_tointeger(L, 3);
 
-	uint32_t field_count = box_tuple_field_count(tuple);
+	lua_Integer field_count = box_tuple_field_count(tuple);
 	/* validate offset and len */
 	if (offset == 0) {
 		luaL_error(L, "tuple.transform(): offset is out of bound");
