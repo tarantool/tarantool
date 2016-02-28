@@ -395,11 +395,11 @@ Create a directory named /tarantool_test:
     $ sudo mkdir /tarantool_test
 
 Copy tarantoolctl to /tarantool_test. If you made a source
-download to ~/tarantool-master, then
+download to ~/tarantool-1.6, then
 
 .. code-block:: console
 
-    $ sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
+    $ sudo cp ~/tarantool-1.6/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
 
 If the file was named tarantoolctl and placed on :file:`/usr/bin/tarantoolctl`, then
 
@@ -415,12 +415,12 @@ Initially it says
     #!/usr/bin/env tarantool
 
 If that is not correct, edit tarantoolctl and change the line. For example,
-if the Tarantool server is actually on :file:`/home/user/tarantool-master/src/tarantool`,
+if the Tarantool server is actually on :file:`/home/user/tarantool-1.6/src/tarantool`,
 change the line to
 
 .. code-block:: bash
 
-    #!/usr/bin/env /home/user/tarantool-master/src/tarantool
+    #!/usr/bin/env /home/user/tarantool-1.6/src/tarantool
 
 Save a copy of :file:`/etc/sysconfig/tarantool`, if it exists.
 

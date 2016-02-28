@@ -9,6 +9,7 @@
 The ``box.schema`` package has data-definition functions
 for spaces, users, roles, and function tuples.
 
+.. _schema-space-create:
 
 .. function:: box.schema.space.create(space-name [, {options} ])
 
