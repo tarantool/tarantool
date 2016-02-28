@@ -489,8 +489,8 @@ rand_test()
 	rtree_init(&tree, DIMENSION, extent_size, extent_alloc, extent_free,
 		   RTREE_EUCLID);
 
-	printf("\tDIMENSION: %u, page size: %u, max fill: %u\n",
-	       DIMENSION, tree.page_size, tree.page_max_fill);
+	printf("\tDIMENSION: %u, page size: %u, max fill good: %d\n",
+	       DIMENSION, tree.page_size, tree.page_max_fill >= 10);
 
 	for (unsigned i = 0; i < TEST_ROUNDS; i++) {
 		bool insert;

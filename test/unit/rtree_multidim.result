@@ -1,15 +1,15 @@
 	*** rand_test ***
-	DIMENSION: 1, page size: 512, max fill: 21
+	DIMENSION: 1, page size: 512, max fill good: 1
 	*** rand_test: done ***
 	*** rand_test ***
-	DIMENSION: 2, page size: 1024, max fill: 25
+	DIMENSION: 2, page size: 1024, max fill good: 1
 	*** rand_test: done ***
 	*** rand_test ***
-	DIMENSION: 3, page size: 1024, max fill: 18
+	DIMENSION: 3, page size: 1024, max fill good: 1
 	*** rand_test: done ***
 	*** rand_test ***
-	DIMENSION: 8, page size: 4096, max fill: 30
+	DIMENSION: 8, page size: 4096, max fill good: 1
 	*** rand_test: done ***
 	*** rand_test ***
-	DIMENSION: 16, page size: 8192, max fill: 31
+	DIMENSION: 16, page size: 8192, max fill good: 1
 	*** rand_test: done ***
