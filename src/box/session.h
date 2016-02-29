@@ -228,7 +228,8 @@ access_check_universe(uint8_t access)
 		 */
 		struct user *user = user_find_xc(credentials->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  priv_name(access), user->def.name);
+			  priv_name(access), schema_object_name(SC_UNIVERSE),
+			  user->def.name);
 	}
 }
 

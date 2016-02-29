@@ -614,7 +614,6 @@ struct sophia_iterator {
 	const char *keyend;
 	struct space *space;
 	struct key_def *key_def;
-	int open;
 	void *env;
 	void *db;
 	void *cursor;
@@ -638,70 +637,96 @@ sophia_iterator_free(struct iterator *ptr)
 }
 
 struct tuple *
-sophia_iterator_next(struct iterator *ptr)
-{
-	assert(ptr->next == sophia_iterator_next);
-	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
-	assert(it->cursor != NULL);
-	if (it->open) {
-		it->open = 0;
-		if (it->current) {
-			return (struct tuple *)
-				sophia_tuple_new(it->current, it->key_def,
-				                 it->space->format,
-				                 NULL);
-		} else {
-			return NULL;
-		}
-	}
-	/* try to read next key from cache */
-	sp_setint(it->current, "async", 0);
-	sp_setint(it->current, "cache_only", 1);
-	sp_setint(it->current, "immutable", 1);
-	void *obj = sp_get(it->cursor, it->current);
-	sp_setint(it->current, "async", 1);
-	sp_setint(it->current, "cache_only", 0);
-	sp_setint(it->current, "immutable", 0);
-	/* key found in cache */
-	if (obj) {
-		sp_destroy(it->current);
-		it->current = obj;
-		return (struct tuple *)
-			sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
-	}
-
-	/* retry search, but use disk this time */
-	obj = sp_get(it->cursor, it->current);
-	it->current = NULL;
-	if (obj == NULL)
-		return NULL;
-	sp_destroy(obj);
-	fiber_yield();
-	obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
-	if (obj == NULL)
-		return NULL;
-	int rc = sp_getint(obj, "status");
-	if (rc <= 0) {
-		sp_destroy(obj);
-		return NULL;
-	}
-	it->current = obj;
-	return (struct tuple *)
-		sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
-}
-
-struct tuple *
 sophia_iterator_last(struct iterator *ptr __attribute__((unused)))
 {
 	return NULL;
 }
 
+static inline void
+sophia_iterator_mode(struct sophia_iterator *it,
+                     bool async,
+                     bool cache_only,
+                     bool immutable)
+{
+	void *obj = it->current;
+	sp_setint(obj, "async", async);
+	sp_setint(obj, "cache_only", cache_only);
+	sp_setint(obj, "immutable", immutable);
+}
+
+static inline void*
+sophia_iterator_next_async(void *dest, void *key)
+{
+	key = sp_get(dest, key);
+	if (key == NULL)
+		return NULL;
+	sp_destroy(key);
+	fiber_yield();
+	key = fiber_get_key(fiber(), FIBER_KEY_MSG);
+	if (key == NULL)
+		return NULL;
+	int rc = sp_getint(key, "status");
+	if (rc <= 0) {
+		sp_destroy(key);
+		return NULL;
+	}
+	return key;
+}
+
+struct tuple *
+sophia_iterator_next_sync(struct iterator *ptr)
+{
+	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
+	assert(it->cursor != NULL);
+
+	/* read from cache */
+	void *obj;
+	obj = sp_get(it->cursor, it->current);
+	if (likely(obj != NULL)) {
+		sp_setint(it->current, "immutable", 0);
+		sp_destroy(it->current);
+		it->current = obj;
+		sp_setint(it->current, "immutable", 1);
+		return (struct tuple *)
+			sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
+
+	}
+	/* switch to asynchronous mode (read from disk) */
+	sophia_iterator_mode(it, true, false, false);
+
+	obj = sophia_iterator_next_async(it->cursor, it->current);
+	if (obj == NULL) {
+		ptr->next = sophia_iterator_last;
+		it->current = NULL;
+		/* immediately close the cursor */
+		sp_destroy(it->cursor);
+		it->cursor = NULL;
+		return NULL;
+	}
+	it->current = obj;
+
+	/* switch back to synchronous mode */
+	sophia_iterator_mode(it, false, true, true);
+	return (struct tuple *)
+		sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
+}
+
+struct tuple *
+sophia_iterator_first(struct iterator *ptr)
+{
+	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
+	ptr->next = sophia_iterator_next_sync;
+	return (struct tuple *)
+		sophia_tuple_new(it->current, it->key_def,
+		                 it->space->format,
+		                 NULL);
+}
+
 struct tuple *
 sophia_iterator_eq(struct iterator *ptr)
 {
-	ptr->next = sophia_iterator_last;
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
-	assert(it->cursor == NULL);
+	ptr->next = sophia_iterator_last;
 	SophiaIndex *index = (SophiaIndex *)index_find(it->space, 0);
 	return index->findByKey(it->key);
 }
@@ -715,9 +740,8 @@ SophiaIndex::allocIterator() const
 		tnt_raise(OutOfMemory, sizeof(struct sophia_iterator),
 			  "Sophia Index", "iterator");
 	}
-	it->base.next = sophia_iterator_next;
+	it->base.next = sophia_iterator_last;
 	it->base.free = sophia_iterator_free;
-	it->cursor = NULL;
 	return (struct iterator *) it;
 }
 
@@ -736,18 +760,20 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	} else {
 		key = NULL;
 	}
-	it->key = key;
-	it->key_def = key_def;
-	it->env = env;
-	it->db = db;
 	it->space = space_cache_find(key_def->space_id);
+	it->key_def = key_def;
+	it->key = key;
+	it->env = env;
+	it->db  = db;
 	it->current = NULL;
-	it->open = 1;
 	const char *compare;
-	switch (type) {
-	case ITER_EQ:
-		it->base.next = sophia_iterator_eq;
+	/* point-lookup iterator */
+	if (type == ITER_EQ) {
+		ptr->next = sophia_iterator_eq;
 		return;
+	}
+	/* prepare for the range scan */
+	switch (type) {
 	case ITER_ALL:
 	case ITER_GE: compare = ">=";
 		break;
@@ -760,35 +786,25 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	default:
 		return initIterator(ptr, type, key, part_count);
 	}
-	it->base.next = sophia_iterator_next;
 	it->cursor = sp_cursor(env);
 	if (it->cursor == NULL)
 		sophia_error(env);
-	void *obj = ((SophiaIndex *)this)->createDocument(key, true, &it->keyend);
-	sp_setstring(obj, "order", compare, 0);
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *
 	 * Read from disk and fill cursor cache.
 	 */
-	obj = sp_get(it->cursor, obj);
+	SophiaIndex *index = (SophiaIndex *)this;
+	void *obj = index->createDocument(key, true, &it->keyend);
+	sp_setstring(obj, "order", compare, 0);
+	obj = sophia_iterator_next_async(it->cursor, obj);
 	if (obj == NULL) {
 		sp_destroy(it->cursor);
 		it->cursor = NULL;
 		return;
 	}
-	sp_destroy(obj);
-	fiber_yield();
-	obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
-	if (obj == NULL) {
-		it->current = NULL;
-		return;
-	}
-	int rc = sp_getint(obj, "status");
-	if (rc <= 0) {
-		it->current = NULL;
-		sp_destroy(obj);
-		return;
-	}
 	it->current = obj;
+	/* switch to sync mode (cache read) */
+	sophia_iterator_mode(it, false, true, true);
+	ptr->next = sophia_iterator_first;
 }

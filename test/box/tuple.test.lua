@@ -310,4 +310,10 @@ space:drop()
 ffi = require('ffi')
 ffi.typeof('struct tuple')
 
+-- gh-1345: Segmentation fault with small slab_alloc_arena
+-- lbox_tuple_new() didn't check result of box_tuple_new() for NULL
+-- try to allocate 100Mb tuple and checked that server won't crash
+box.tuple.new(string.rep('x', 100 * 1024 * 1024)) == nil
+collectgarbage('collect') -- collect huge string
+
 test_run:cmd("clear filter")

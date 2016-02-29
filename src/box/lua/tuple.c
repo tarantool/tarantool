@@ -116,6 +116,8 @@ lbox_tuple_new(lua_State *L)
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	struct tuple *tuple = box_tuple_new(fmt, buf->buf,
 					   buf->buf + ibuf_used(buf));
+	if (tuple == NULL)
+		lbox_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	lbox_pushtuple(L, tuple);
 	ibuf_reinit(tarantool_lua_ibuf);
@@ -286,7 +288,7 @@ lbox_tuple_transform(struct lua_State *L)
 	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
 	lua_Integer len = lua_tointeger(L, 3);
 
-	uint32_t field_count = box_tuple_field_count(tuple);
+	lua_Integer field_count = box_tuple_field_count(tuple);
 	/* validate offset and len */
 	if (offset == 0) {
 		luaL_error(L, "tuple.transform(): offset is out of bound");

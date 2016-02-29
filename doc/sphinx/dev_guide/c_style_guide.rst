@@ -1002,12 +1002,12 @@ work correctly.
                   Appendix I: References
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* `The C Programming Language, Second Edition <http://cm.bell-labs.com/cm/cs/cbook/>`_
+* `The C Programming Language, Second Edition <https://en.wikipedia.org/wiki/The_C_Programming_Language>`_
   by Brian W. Kernighan and Dennis M. Ritchie. |br|
   Prentice Hall, Inc., 1988. |br|
   ISBN 0-13-110362-8 (paperback), 0-13-110370-9 (hardback).
 
-* `The Practice of Programming <http://cm.bell-labs.com/cm/cs/tpop/>`_
+* `The Practice of Programming <https://en.wikipedia.org/wiki/The_Practice_of_Programming>`_
   by Brian W. Kernighan and Rob Pike. |br|
   Addison-Wesley, Inc., 1999. |br|
   ISBN 0-201-61586-X.

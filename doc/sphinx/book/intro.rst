@@ -109,31 +109,6 @@ both handle the loads and receive what others have handled, for the same data
 sets.
 
 ===============================================================================
-                            Conventions
-===============================================================================
-
-This manual is written with `Sphinx`_ markup and uses
-standard formatting conventions:
-
-UNIX shell command input is prefixed with '``$``' and is in a fixed-width font:
-
-.. code-block:: console
-
-  $ tarantool --help
-
-File names are also in a fixed-width font:
-
-  :codenormal:`/path/to/var/dir` 
-
-Text that represents user input is in boldface:
-
-  :codebold:`$ your input here` 
-
-Within user input, replaceable items are in italics:
-
-  :codebold:`$ tarantool` :codebolditalic:`--option` 
-
-===============================================================================
                             How to read the documentation
 ===============================================================================
 

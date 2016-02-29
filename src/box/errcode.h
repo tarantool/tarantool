@@ -95,7 +95,7 @@ struct errcode_record {
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found by get()") \
-	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \
+	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access on %s is denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		2, "Failed to create user '%s': %s") \
 	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		2, "User '%s' is not found") \
@@ -106,9 +106,9 @@ struct errcode_record {
 	/* 50 */_(ER_CREATE_FUNCTION,		2, "Failed to create function '%s': %s") \
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		2, "Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		2, "Function '%s' already exists") \
-	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access denied for user '%s' to function '%s'") \
+	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access is denied for user '%s' to function '%s'") \
 	/* 54 */_(ER_FUNCTION_MAX,		2, "A limit on the total number of functions has been reached: %u") \
-	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access denied for user '%s' to space '%s'") \
+	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access is denied for user '%s' to space '%s'") \
 	/* 56 */_(ER_USER_MAX,			2, "A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		2, "Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
