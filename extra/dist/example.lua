@@ -171,8 +171,9 @@ box.cfg {
 local function bootstrap()
     local space = box.schema.create_space('example')
     space:create_index('primary')
-    -- Comment this if you don't need grants
-    box.schema.user.grant('guest', 'read,write', 'space', 'example')
+    -- Comment this if you need fine grained access control (without it, guest
+    -- will have access to everything)
+    box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
     -- Keep things safe by default
     --  box.schema.user.create('example', { password = 'secret' })
