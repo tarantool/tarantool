@@ -77,6 +77,10 @@ struct coio_task {
 	int complete;
 };
 
+ssize_t
+coio_task(struct coio_task *task, coio_task_cb func,
+          coio_task_cb on_timeout, double timeout);
+
 /** \cond public */
 
 /**

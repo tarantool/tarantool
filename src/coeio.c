@@ -162,7 +162,7 @@ coio_on_finish(eio_req *req)
  *            code in task->rc and free the task.
  */
 
-static ssize_t
+ssize_t
 coio_task(struct coio_task *task, coio_task_cb func,
 	  coio_task_cb on_timeout, double timeout)
 {

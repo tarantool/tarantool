@@ -55,4 +55,4 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-#include <lua.h>  /* does not have extern C wrappers */
+#include "lua.h"  /* does not have extern C wrappers */

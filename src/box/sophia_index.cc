@@ -125,14 +125,12 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 static uint64_t num_parts[8];
 
 void*
-SophiaIndex::createDocument(const char *key, bool async, const char **keyend)
+SophiaIndex::createDocument(const char *key, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
 	void *obj = sp_document(db);
 	if (obj == NULL)
 		sophia_error(env);
-	if (async)
-		sp_setint(obj, "async", 1);
 	sp_setstring(obj, "arg", fiber(), 0);
 	if (key == NULL)
 		return obj;
@@ -334,32 +332,19 @@ struct tuple *
 SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 {
 	(void)part_count;
-	void *obj = ((SophiaIndex *)this)->createDocument(key, true, NULL);
+	void *obj = ((SophiaIndex *)this)->createDocument(key, NULL);
 	void *transaction = db;
 	/* engine_tx might be empty, even if we are in txn context.
 	 *
 	 * This can happen on a first-read statement. */
 	if (in_txn())
 		transaction = in_txn()->engine_tx;
-	obj = sp_get(transaction, obj);
-	if (obj == NULL)
+	void *result = sophia_read(transaction, obj);
+	if (result == NULL)
 		return NULL;
-	int rc = sp_getint(obj, "status");
-	if (rc == 0) {
-		sp_destroy(obj);
-		fiber_yield();
-		obj = fiber_get_key(fiber(), FIBER_KEY_MSG);
-		if (obj == NULL)
-			return NULL;
-		rc = sp_getint(obj, "status");
-		if (rc <= 0 || rc == 2) {
-			sp_destroy(obj);
-			return NULL;
-		}
-	}
 	struct tuple *tuple =
-		(struct tuple *)sophia_tuple_new(obj, key_def, format, NULL);
-	sp_destroy(obj);
+		(struct tuple *)sophia_tuple_new(result, key_def, format, NULL);
+	sp_destroy(result);
 	return tuple;
 }
 
@@ -546,7 +531,7 @@ SophiaIndex::upsert(const char *expr,
 	uint32_t tuple_size = tuple_end - tuple;
 	uint32_t tuple_value_size;
 	const char *tuple_value;
-	void *obj = createDocument(tuple, false, &tuple_value);
+	void *obj = createDocument(tuple, &tuple_value);
 	tuple_value_size = tuple_size - (tuple_value - tuple);
 	uint32_t value_size =
 		sizeof(uint8_t) + sizeof(uint32_t) + tuple_value_size + expr_size;
@@ -591,7 +576,7 @@ SophiaIndex::replace_or_insert(const char *tuple,
 	void *transaction = in_txn()->engine_tx;
 	const char *value;
 	size_t valuesize;
-	void *obj = createDocument(key, false, &value);
+	void *obj = createDocument(key, &value);
 	valuesize = size - (value - tuple);
 	if (valuesize > 0)
 		sp_setstring(obj, "value", value, valuesize);
@@ -604,7 +589,7 @@ SophiaIndex::replace_or_insert(const char *tuple,
 void
 SophiaIndex::remove(const char *key)
 {
-	void *obj = createDocument(key, false, NULL);
+	void *obj = createDocument(key, NULL);
 	void *transaction = in_txn()->engine_tx;
 	int rc = sp_delete(transaction, obj);
 	if (rc == -1)
@@ -647,37 +632,16 @@ sophia_iterator_last(struct iterator *ptr __attribute__((unused)))
 
 static inline void
 sophia_iterator_mode(struct sophia_iterator *it,
-                     bool async,
                      bool cache_only,
                      bool immutable)
 {
 	void *obj = it->current;
-	sp_setint(obj, "async", async);
 	sp_setint(obj, "cache_only", cache_only);
 	sp_setint(obj, "immutable", immutable);
 }
 
-static inline void*
-sophia_iterator_next_async(void *dest, void *key)
-{
-	key = sp_get(dest, key);
-	if (key == NULL)
-		return NULL;
-	sp_destroy(key);
-	fiber_yield();
-	key = fiber_get_key(fiber(), FIBER_KEY_MSG);
-	if (key == NULL)
-		return NULL;
-	int rc = sp_getint(key, "status");
-	if (rc <= 0) {
-		sp_destroy(key);
-		return NULL;
-	}
-	return key;
-}
-
 struct tuple *
-sophia_iterator_next_sync(struct iterator *ptr)
+sophia_iterator_next(struct iterator *ptr)
 {
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor != NULL);
@@ -695,9 +659,9 @@ sophia_iterator_next_sync(struct iterator *ptr)
 
 	}
 	/* switch to asynchronous mode (read from disk) */
-	sophia_iterator_mode(it, true, false, false);
+	sophia_iterator_mode(it, false, false);
 
-	obj = sophia_iterator_next_async(it->cursor, it->current);
+	obj = sophia_read(it->cursor, it->current);
 	if (obj == NULL) {
 		ptr->next = sophia_iterator_last;
 		it->current = NULL;
@@ -709,7 +673,7 @@ sophia_iterator_next_sync(struct iterator *ptr)
 	it->current = obj;
 
 	/* switch back to synchronous mode */
-	sophia_iterator_mode(it, false, true, true);
+	sophia_iterator_mode(it, true, true);
 	return (struct tuple *)
 		sophia_tuple_new(obj, it->key_def, it->space->format, NULL);
 }
@@ -718,7 +682,7 @@ struct tuple *
 sophia_iterator_first(struct iterator *ptr)
 {
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
-	ptr->next = sophia_iterator_next_sync;
+	ptr->next = sophia_iterator_next;
 	return (struct tuple *)
 		sophia_tuple_new(it->current, it->key_def,
 		                 it->space->format,
@@ -798,9 +762,9 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	 * Read from disk and fill cursor cache.
 	 */
 	SophiaIndex *index = (SophiaIndex *)this;
-	void *obj = index->createDocument(key, true, &it->keyend);
+	void *obj = index->createDocument(key, &it->keyend);
 	sp_setstring(obj, "order", compare, 0);
-	obj = sophia_iterator_next_async(it->cursor, obj);
+	obj = sophia_read(it->cursor, obj);
 	if (obj == NULL) {
 		sp_destroy(it->cursor);
 		it->cursor = NULL;
@@ -808,6 +772,6 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	}
 	it->current = obj;
 	/* switch to sync mode (cache read) */
-	sophia_iterator_mode(it, false, true, true);
+	sophia_iterator_mode(it, true, true);
 	ptr->next = sophia_iterator_first;
 }
