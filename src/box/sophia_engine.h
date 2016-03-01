@@ -62,9 +62,7 @@ private:
 	int64_t m_prev_checkpoint_lsn;
 	int64_t m_checkpoint_lsn;
 public:
-	int thread_pool_started;
 	int recovery_complete;
-	struct cord *cord;
 };
 
 extern "C" {
@@ -73,5 +71,6 @@ int   sophia_info(const char*, sophia_info_f, void*);
 }
 void  sophia_error(void*);
 void *sophia_read(void*, void*);
+void  sophia_workers_start(void*);
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */
