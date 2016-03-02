@@ -231,6 +231,16 @@ fiber_time64(void)
 	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
 }
 
+/**
+ * Move current fiber to the end of ready fibers list and switch to next
+ */
+void
+fiber_reschedule(void)
+{
+	fiber_wakeup(fiber());
+	fiber_yield();
+}
+
 void
 fiber_join(struct fiber *fiber)
 {
