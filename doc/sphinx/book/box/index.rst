@@ -336,7 +336,7 @@ may be able to start a second Tarantool server on the same processor without ill
 Additional examples of requests can be found in the `Tarantool regression test suite`_.
 A complete grammar of supported data-manipulation functions will come later in this chapter.
 
-.. _Tarantool regression test suite: https://github.com/tarantool/tarantool/tree/master/test/box
+.. _Tarantool regression test suite: https://github.com/tarantool/tarantool/tree/1.6/test/box
 
 Since not all Tarantool operations can be expressed with the data-manipulation
 functions, or with Lua, to gain complete access to data manipulation
