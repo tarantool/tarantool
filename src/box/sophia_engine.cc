@@ -278,20 +278,6 @@ SophiaEngine::~SophiaEngine()
 		sp_destroy(env);
 }
 
-static inline int
-sophia_poll(SophiaEngine *e)
-{
-	void *req = sp_poll(e->env);
-	if (req == NULL)
-		return 0;
-	struct fiber *fiber =
-		(struct fiber *)sp_getstring(req, "arg", NULL);
-	assert(fiber != NULL);
-	fiber_set_key(fiber, FIBER_KEY_MSG, req);
-	fiber_call(fiber);
-	return 1;
-}
-
 void
 SophiaEngine::init()
 {
