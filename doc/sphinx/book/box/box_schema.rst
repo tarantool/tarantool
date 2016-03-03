@@ -104,7 +104,7 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     .. code-block:: lua
 
-        box.schema.user.create('Lena')
+        box.schema.user.create('Lena') 
         box.schema.user.create('Lena', {password = 'X'})
         box.schema.user.create('Lena', {if_not_exists = false})
 
@@ -150,9 +150,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.user.grant('Lena', 'read', 'space', 'tester')
-        box.schema.user.grant('Lena', 'execute', 'function', 'f')
-        box.schema.user.grant('Lena', 'read,write', 'universe')
+        box.schema.user.grant('Lena', 'read', 'space', 'tester') |br|
+        box.schema.user.grant('Lena', 'execute', 'function', 'f') |br|
+        box.schema.user.grant('Lena', 'read,write', 'universe') |br|
         box.schema.user.grant('Lena', 'Accountant')
 
 .. function:: box.schema.user.revoke(user-name, privileges)
@@ -168,9 +168,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.user.revoke('Lena', 'read', 'space', 'tester')
-        box.schema.user.revoke('Lena', 'execute', 'function', 'f')
-        box.schema.user.revoke('Lena', 'read,write', 'universe')
+        box.schema.user.revoke('Lena', 'read', 'space', 'tester') |br|
+        box.schema.user.revoke('Lena', 'execute', 'function', 'f') |br|
+        box.schema.user.revoke('Lena', 'read,write', 'universe') |br|
         box.schema.user.revoke('Lena', 'Accountant')
 
 .. function:: box.schema.user.password(password)
@@ -198,7 +198,7 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.user.passwd('ЛЕНА')
+        box.schema.user.passwd('ЛЕНА') |br|
         box.schema.user.passwd('Lena', 'ЛЕНА')
 
 .. function:: box.schema.user.info([user-name])
@@ -213,7 +213,7 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Example:**
 
-        box.schema.user.info()
+        box.schema.user.info() |br|
         box.schema.user.info('Lena')
 
 .. function:: box.schema.role.create(role-name [, {options} ])
@@ -230,7 +230,7 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.role.create('Accountant')
+        box.schema.role.create('Accountant') |br|
         box.schema.role.create('Accountant', {if_not_exists = false})
 
 .. function:: box.schema.role.drop(role-name)
@@ -269,9 +269,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.role.grant('Accountant', 'read', 'space', 'tester')
-        box.schema.role.grant('Accountant', 'execute', 'function', 'f')
-        box.schema.role.grant('Accountant', 'read,write', 'universe')
+        box.schema.role.grant('Accountant', 'read', 'space', 'tester') |br|
+        box.schema.role.grant('Accountant', 'execute', 'function', 'f') |br|
+        box.schema.role.grant('Accountant', 'read,write', 'universe') |br|
         box.schema.role.grant('public', 'Accountant')
 
 .. function:: box.schema.role.revoke(role-name, privileges)
@@ -286,9 +286,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.role.revoke('Accountant', 'read', 'space', 'tester')
-        box.schema.role.revoke('Accountant', 'execute', 'function', 'f')
-        box.schema.role.revoke('Accountant', 'read,write', 'universe')
+        box.schema.role.revoke('Accountant', 'read', 'space', 'tester') |br|
+        box.schema.role.revoke('Accountant', 'execute', 'function', 'f') |br|
+        box.schema.role.revoke('Accountant', 'read,write', 'universe') |br|
         box.schema.role.revoke('public', 'Accountant')
 
 .. function:: box.schema.role.info([role-name])
@@ -318,9 +318,9 @@ available for insert, select, and all the other :mod:`box.space` functions.
 
     **Examples:**
 
-        box.schema.func.create('calculate')
-        box.schema.func.create('calculate', {if_not_exists = false})
-        box.schema.func.create('calculate', {setuid = false})
+        box.schema.func.create('calculate') |br|
+        box.schema.func.create('calculate', {if_not_exists = false}) |br|
+        box.schema.func.create('calculate', {setuid = false}) |br|
         box.schema.func.create('calculate', {language = 'LUA'})
 
 .. function:: box.schema.func.drop(func-name)

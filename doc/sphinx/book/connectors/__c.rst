@@ -8,6 +8,7 @@ space :code:`examples` via the high-level C API.
 .. code-block:: c
 
     #include <stdio.h>
+    #include <stdlib.h>
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
@@ -260,7 +261,7 @@ To display the results the program uses functions in the
         tnt_stream_free(tnt);
     }
 
-The example programs only shows two requests and do not show all that's
+The example programs only show a few requests and do not show all that's
 necessary for good practice. For that, see http://github.com/tarantool/tarantool-c.
 
 .. _MsgPuck: http://rtsisyk.github.io/msgpuck/
