@@ -309,9 +309,20 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	 * This can happen on a first-read statement. */
 	if (in_txn())
 		transaction = in_txn()->engine_tx;
-	void *result = sophia_read(transaction, obj);
-	if (result == NULL)
-		return NULL;
+	/* try to read from cache first, if nothing is found
+	 * retry using disk */
+	sp_setint(obj, "cache_only", 1);
+	sp_setint(obj, "immutable", 1);
+	void *result = sp_get(transaction, obj);
+	sp_setint(obj, "immutable", 0);
+	if (result == NULL) {
+		sp_setint(obj, "cache_only", 0);
+		result = sophia_read(transaction, obj);
+		if (result == NULL)
+			return NULL;
+	} else {
+		sp_destroy(obj);
+	}
 	struct tuple *tuple =
 		(struct tuple *)sophia_tuple_new(result, key_def, format, NULL);
 	sp_destroy(result);
