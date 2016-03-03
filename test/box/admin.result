@@ -36,6 +36,8 @@ cfg_filter(box.cfg)
     - true
   - - pid_file
     - <hidden>
+  - - read_only
+    - false
   - - readahead
     - 16320
   - - rows_per_wal

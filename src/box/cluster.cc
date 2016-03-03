@@ -28,8 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box.h"
+
 #include "cluster.h"
+
+#include "ipc.h"
+
+#include "box.h"
 #include "recovery.h"
 #include "applier.h"
 
@@ -52,23 +56,35 @@ rb_gen(, applierset_, applierset_t, struct applier, link,
        applier_compare_by_source);
 
 static applierset_t applierset; /* zeroed by linker */
+static struct ipc_channel wait_for_id;
 
 void
 cluster_init(void)
 {
 	applierset_new(&applierset);
+	ipc_channel_create(&wait_for_id, 0);
 }
 
 void
 cluster_free(void)
 {
-
+	ipc_channel_destroy(&wait_for_id);
 }
 
 extern "C" struct vclock *
 cluster_clock()
 {
         return &recovery->vclock;
+}
+
+void
+cluster_wait_for_id()
+{
+	void *msg;
+	while (recovery->server_id == 0) {
+		ipc_channel_get(&wait_for_id, &msg);
+		assert(msg == NULL);
+	}
 }
 
 void
@@ -98,8 +114,8 @@ cluster_add_server(uint32_t server_id, const struct tt_uuid *server_uuid)
 		 * Otherwise, read only is switched
 		 * off after recovery_finalize().
 		 */
-		if (r->writer)
-			box_set_ro(false);
+		if (r->writer && ipc_channel_has_readers(&wait_for_id))
+			ipc_channel_put(&wait_for_id, NULL);
 	}
 }
 
@@ -135,10 +151,8 @@ cluster_del_server(uint32_t server_id)
 	 * Some records may arrive later on due to asynchronus nature of
 	 * replication.
 	 */
-	if (r->server_id == server_id) {
+	if (r->server_id == server_id)
 		r->server_id = 0;
-		box_set_ro(true);
-	}
 }
 
 void
