@@ -12,20 +12,21 @@ box.cfg
 7	panic_on_snap_error:true
 8	panic_on_wal_error:true
 9	pid_file:box.pid
-10	readahead:16320
-11	rows_per_wal:500000
-12	slab_alloc_arena:0.1
-13	slab_alloc_factor:1.1
-14	slab_alloc_maximal:1048576
-15	slab_alloc_minimal:16
-16	snap_dir:.
-17	snapshot_count:6
-18	snapshot_period:0
-19	sophia_dir:.
-20	too_long_threshold:0.5
-21	wal_dir:.
-22	wal_dir_rescan_delay:2
-23	wal_mode:write
+10	read_only:false
+11	readahead:16320
+12	rows_per_wal:500000
+13	slab_alloc_arena:0.1
+14	slab_alloc_factor:1.1
+15	slab_alloc_maximal:1048576
+16	slab_alloc_minimal:16
+17	snap_dir:.
+18	snapshot_count:6
+19	snapshot_period:0
+20	sophia_dir:.
+21	too_long_threshold:0.5
+22	wal_dir:.
+23	wal_dir_rescan_delay:2
+24	wal_mode:write
 --
 -- Test insert from detached fiber
 --

@@ -31,7 +31,6 @@
 #include "box/box.h"
 
 #include <say.h>
-#include "ipc.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -86,8 +85,7 @@ static struct recover_row_ctx {
 
 bool snapshot_in_progress = false;
 static bool box_init_done = false;
-bool is_ro = true;
-struct ipc_channel wait_rw;
+static bool is_ro = true;
 
 void
 recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
@@ -100,6 +98,18 @@ recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
 	 * so we can't afford many of them during recovery.
 	 */
 	ctx->yield = (rows_per_wal >> 4)  + 1;
+}
+
+static void
+box_check_writable(void)
+{
+	/*
+	 * box is only writable if
+	 *   box.cfg.read_only == false and
+	 *   server id is registered in _cluster table
+	 */
+	if (is_ro || recovery->server_id == 0)
+		tnt_raise(LoggedError, ER_READONLY);
 }
 
 void
@@ -177,18 +187,6 @@ void
 box_set_ro(bool ro)
 {
 	is_ro = ro;
-	if (ro == false && ipc_channel_has_readers(&wait_rw))
-		ipc_channel_put(&wait_rw, NULL);
-}
-
-static void
-box_wait_rw()
-{
-	void *msg;
-	while (is_ro) {
-		ipc_channel_get(&wait_rw, &msg);
-		assert(msg == NULL);
-	}
 }
 
 bool
@@ -560,8 +558,7 @@ int
 box_process1(struct request *request, box_tuple_t **result)
 {
 	try {
-		if (is_ro)
-			tnt_raise(LoggedError, ER_READONLY);
+		box_check_writable();
 		process_rw(request, result);
 		return 0;
 	} catch (Exception *e) {
@@ -681,8 +678,7 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 static void
 box_on_cluster_join(const tt_uuid *server_uuid)
 {
-	if (is_ro)
-		tnt_raise(LoggedError, ER_READONLY);
+	box_check_writable();
 
 	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
@@ -866,8 +862,7 @@ box_process_join(int fd, struct xrow_header *header)
 	access_check_space(space_cache_find(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
-	if (is_ro)
-		tnt_raise(LoggedError, ER_READONLY);
+	box_check_writable();
 
 	/* Process JOIN request via a replication relay */
 	relay_join(fd, header, recovery->server_id,
@@ -952,7 +947,6 @@ box_free(void)
 		port_free();
 #endif
 		engine_shutdown();
-		ipc_channel_destroy(&wait_rw);
 	}
 }
 
@@ -981,7 +975,6 @@ box_init(void)
 {
 	error_init();
 
-	ipc_channel_create(&wait_rw, 0);
 
 	tuple_init(cfg_getd("slab_alloc_arena"),
 		   cfg_geti("slab_alloc_minimal"),
@@ -1077,10 +1070,8 @@ box_init(void)
 	box_set_replication_source();
 
 	/* Enter read-write mode. */
-	if (recovery->server_id > 0)
-		box_set_ro(false);
-	else
-		box_wait_rw();
+	cluster_wait_for_id();
+
 	title("running");
 	say_info("ready to accept requests");
 

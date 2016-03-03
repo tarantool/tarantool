@@ -45,5 +45,5 @@ To comply with the writing and formatting style, use guidelines provided in the 
 
 Note that if you suggest creating a new documentation section (i.e., a whole new page), it has to be saved to the relevant section at GitHub.  
 
-* Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx.
-* Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/master/doc/sphinx/dev_guide. 
+* Root folder for documentation source files is located at https://github.com/tarantool/tarantool/tree/1.6/doc/sphinx.
+* Source files for the developers' guide are located at https://github.com/tarantool/tarantool/tree/1.6/doc/sphinx/dev_guide. 

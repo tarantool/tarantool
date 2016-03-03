@@ -30,6 +30,8 @@
  */
 #include "sophia_index.h"
 #include "sophia_engine.h"
+#include "coeio.h"
+#include "coio.h"
 #include "cfg.h"
 #include "xrow.h"
 #include "tuple.h"
@@ -86,6 +88,54 @@ int sophia_info(const char *name, sophia_info_f cb, void *arg)
 	}
 	sp_destroy(cursor);
 	return 0;
+}
+
+static struct mempool sophia_read_pool;
+
+struct sophia_read_task {
+	struct coio_task base;
+	void *dest;
+	void *key;
+	void *result;
+};
+
+static ssize_t
+sophia_read_cb(struct coio_task *ptr)
+{
+	struct sophia_read_task *task =
+		(struct sophia_read_task *) ptr;
+	task->result = sp_get(task->dest, task->key);
+	return 0;
+}
+
+static ssize_t
+sophia_read_free_cb(struct coio_task *ptr)
+{
+	struct sophia_read_task *task =
+		(struct sophia_read_task *) ptr;
+	if (task->result != NULL)
+		sp_destroy(task->result);
+	mempool_free(&sophia_read_pool, task);
+	return 0;
+}
+
+void *
+sophia_read(void *dest, void *key)
+{
+	struct sophia_read_task *task =
+		(struct sophia_read_task *) mempool_alloc(&sophia_read_pool);
+	if (task == NULL)
+		return NULL;
+	task->dest = dest;
+	task->key = key;
+	task->result = NULL;
+	if (coio_task(&task->base, sophia_read_cb, sophia_read_free_cb,
+	              TIMEOUT_INFINITY) == -1) {
+		return NULL;
+	}
+	void *result = task->result;
+	mempool_free(&sophia_read_pool, task);
+	return result;
 }
 
 struct SophiaSpace: public Handler {
@@ -228,68 +278,19 @@ SophiaEngine::~SophiaEngine()
 		sp_destroy(env);
 }
 
-static inline int
-sophia_poll(SophiaEngine *e)
-{
-	void *req = sp_poll(e->env);
-	if (req == NULL)
-		return 0;
-	struct fiber *fiber =
-		(struct fiber *)sp_getstring(req, "arg", NULL);
-	assert(fiber != NULL);
-	fiber_set_key(fiber, FIBER_KEY_MSG, req);
-	fiber_call(fiber);
-	return 1;
-}
-
-static inline int
-sophia_queue(SophiaEngine *e)
-{
-	return sp_getint(e->env, "performance.reqs");
-}
-
-static inline void
-sophia_on_event(void *arg)
-{
-	SophiaEngine *engine = (SophiaEngine *)arg;
-	ev_async_send(engine->cord->loop, &engine->watcher);
-}
-
-static void
-sophia_idle_cb(ev_loop *loop, struct ev_idle *w, int /* events */)
-{
-	SophiaEngine *engine = (SophiaEngine *)w->data;
-	sophia_poll(engine);
-	if (sophia_queue(engine) == 0)
-		ev_idle_stop(loop, w);
-}
-
-static void
-sophia_async_schedule(ev_loop *loop, struct ev_async *w, int /* events */)
-{
-	SophiaEngine *engine = (SophiaEngine *)w->data;
-	sophia_poll(engine);
-	if (sophia_queue(engine))
-		ev_idle_start(loop, &engine->idle);
-}
-
 void
 SophiaEngine::init()
 {
 	cord = cord();
-	ev_idle_init(&idle, sophia_idle_cb);
-	ev_async_init(&watcher, sophia_async_schedule);
-	ev_async_start(cord->loop, &watcher);
-	watcher.data = this;
-	idle.data = this;
+	/* Destroyed with cord() */
+	mempool_create(&sophia_read_pool, &cord()->slabc,
+	               sizeof(struct sophia_read_task));
 	env = sp_env();
 	if (env == NULL)
 		panic("failed to create sophia environment");
 	sp_setint(env, "sophia.path_create", 0);
 	sp_setint(env, "sophia.recover", 2);
 	sp_setstring(env, "sophia.path", cfg_gets("sophia_dir"), 0);
-	sp_setstring(env, "scheduler.on_event", (const void *)sophia_on_event, 0);
-	sp_setstring(env, "scheduler.on_event_arg", (const void *)this, 0);
 	sp_setint(env, "scheduler.threads", 0);
 	sp_setint(env, "memory.limit", cfg_geti64("sophia.memory_limit"));
 	sp_setint(env, "compaction.0.async", 1);

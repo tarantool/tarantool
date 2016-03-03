@@ -111,6 +111,13 @@ cserver_id_is_reserved(uint32_t id)
 } /* extern "C" */
 
 /**
+ * Wait until local server uuid will be registered in _cluster table.
+ * Used by box_init().
+ */
+void
+cluster_wait_for_id();
+
+/**
  * Register the universally unique identifier of a remote server and
  * a matching cluster-local identifier in the  cluster registry.
  * Called when a remote master joins the cluster.

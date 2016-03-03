@@ -66,7 +66,7 @@ box.cfg {
 
     -- How much memory Tarantool allocates
     -- to actually store tuples, in gigabytes
-    slab_alloc_arena = 1.0;
+    slab_alloc_arena = 0.5;
 
     -- Size of the smallest allocation unit
     -- It can be tuned up if most of the tuples are not so small
@@ -103,7 +103,7 @@ box.cfg {
     panic_on_wal_error = true;
 
     -- How many log records to store in a single write-ahead log file
-    rows_per_wal = 500000;
+    rows_per_wal = 5000000;
 
     -- Reduce the throttling effect of box.snapshot() on
     -- INSERT/UPDATE/DELETE performance by setting a limit
@@ -171,14 +171,14 @@ box.cfg {
 local function bootstrap()
     local space = box.schema.create_space('example')
     space:create_index('primary')
--- -- Uncomment this if you don't need grants
---    box.schema.user.grant('guest', 'read,write,execute', 'universe')
+    -- Comment this if you need fine grained access control (without it, guest
+    -- will have access to everything)
+    box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
--- -- Keep things safe by default
---    box.schema.user.create('example', { password = 'secret' })
---    box.schema.user.grant('example', 'replication')
---    box.schema.user.grant('example', 'read,write,execute', 'space', 'example')
---
+    -- Keep things safe by default
+    --  box.schema.user.create('example', { password = 'secret' })
+    --  box.schema.user.grant('example', 'replication')
+    --  box.schema.user.grant('example', 'read,write,execute', 'space', 'example')
 end
 
 -- for first run create a space and add set up grants

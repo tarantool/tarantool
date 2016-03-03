@@ -10,4 +10,5 @@ print(inspector:cmd("create server replica with rpl_master=default, script='box/
 
 print('start instance')
 print(inspector:cmd('start server replica'))
+inspector:cmd('stop server replica')
 os.exit(0)

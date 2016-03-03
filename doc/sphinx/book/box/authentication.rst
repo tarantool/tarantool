@@ -45,7 +45,7 @@ client application, read the `scramble.h`_ header file.
 .. _Cryptographic hash function: https://en.wikipedia.org/wiki/Cryptographic_hash
 .. _Salt Value: https://en.wikipedia.org/wiki/Salt_%28cryptography%29
 .. _MySQL introduced several years ago: http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html
-.. _scramble.h: https://github.com/tarantool/tarantool/blob/master/src/scramble.h
+.. _scramble.h: https://github.com/tarantool/tarantool/blob/1.6/src/scramble.h
 
 .. _authentication-users:
 

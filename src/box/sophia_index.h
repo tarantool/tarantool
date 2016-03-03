@@ -70,7 +70,7 @@ public:
 	void *db;
 
 private:
-	void *createDocument(const char *key, bool async, const char **keyend);
+	void *createDocument(const char *key, const char **keyend);
 	struct tuple_format *format;
 };
 
