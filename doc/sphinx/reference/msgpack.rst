@@ -109,6 +109,8 @@ Here are examples for all the common types,
 with the Lua-table representation on the left,
 with the MsgPack format name and encoding on the right.
 
+.. _common-types-and-msgpack-encodings:
+
     .. container:: table
 
         **Common Types and MsgPack Encodings**

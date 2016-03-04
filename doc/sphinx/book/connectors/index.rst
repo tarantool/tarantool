@@ -104,3 +104,6 @@ script:
 .. include:: __python.rst
 
 .. include:: __c.rst
+
+.. include:: __results.rst
+
