@@ -129,10 +129,6 @@ box.info.server.id ~= 2
 ---
 - true
 ...
-box.info.server.ro
----
-- true
-...
 box.info.server.lsn == -1
 ---
 - true
@@ -141,6 +137,24 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
+not box.info.server.ro
+---
+- true
+...
+box.space._schema:replace{"test", 48}
+---
+- error: Can't modify data because this server is in read-only mode.
+...
+box.cfg { read_only = true }
+---
+...
+box.space._schema:replace{"test", 48}
+---
+- error: Can't modify data because this server is in read-only mode.
+...
+box.cfg { read_only = false }
+---
+...
 box.space._schema:replace{"test", 48}
 ---
 - error: Can't modify data because this server is in read-only mode.
@@ -148,15 +162,14 @@ box.space._schema:replace{"test", 48}
 -------------------------------------------------------------
 Re-register replica with the same server_id
 -------------------------------------------------------------
+box.cfg { read_only = true }
+---
+...
 box.space._cluster:insert{2, "<replica uuid>"} ~= nil
 ---
 - true
 ...
 box.info.server.id == 2
----
-- true
-...
-not box.info.server.ro
 ---
 - true
 ...
@@ -167,6 +180,17 @@ box.info.server.lsn == 1
 box.info.vclock[2] == 1
 ---
 - true
+...
+box.info.server.ro == true
+---
+- true
+...
+box.space._schema:replace{"test", 48}
+---
+- error: Can't modify data because this server is in read-only mode.
+...
+box.cfg { read_only = false }
+---
 ...
 -------------------------------------------------------------
 Re-register replica with a new server_id
@@ -239,10 +263,6 @@ box.space._cluster:delete{10} ~= nil
 - true
 ...
 box.info.server.id ~= 2
----
-- true
-...
-box.info.server.ro
 ---
 - true
 ...

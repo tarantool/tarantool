@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(30)
+test:plan(34)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -81,6 +81,24 @@ test:is(box.cfg.wal_dir_rescan_delay, 0.2, "wal_dir_rescan_delay new value")
 test:is(box.cfg.too_long_threshold, 0.5, "too_long_threshold default value")
 box.cfg{too_long_threshold=0.1}
 test:is(box.cfg.too_long_threshold , 0.1, "too_long_threshold new value")
+
+--------------------------------------------------------------------------------
+-- gh-246: Read only mode
+--------------------------------------------------------------------------------
+
+test:is(box.cfg.read_only, false, "read_only default value")
+box.cfg{read_only = true}
+test:is(box.cfg.read_only, true, "read_only new value")
+local status, reason = pcall(function()
+    box.space._schema:insert({'read_only', 'test'})
+end)
+test:ok(not status and box.error.last().code == box.error.READONLY,
+    "read_only = true")
+box.cfg{read_only = false}
+local status, reason = pcall(function()
+    box.space._schema:insert({'read_only', 'test'})
+end)
+test:ok(status, "read_only = false")
 
 local tarantool_bin = arg[-1]
 local PANIC = 256

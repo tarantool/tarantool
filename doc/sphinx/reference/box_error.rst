@@ -26,7 +26,7 @@ be presented to the client as :errcode:`ER_PROC_LUA`.
 
     Emulate a request error, with text based on one of the pre-defined Tarantool
     errors defined in the file `errcode.h
-    <https://github.com/tarantool/tarantool/blob/master/src/box/errcode.h>`_ in
+    <https://github.com/tarantool/tarantool/blob/1.6/src/box/errcode.h>`_ in
     the source tree. Lua constants which correspond to those Tarantool errors are
     defined as members of ``box.error``, for example ``box.error.NO_SUCH_USER == 45``.
 

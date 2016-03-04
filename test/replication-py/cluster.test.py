@@ -167,24 +167,41 @@ print '-------------------------------------------------------------'
 master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id ~= %d' % replica_id)
-replica.admin('box.info.server.ro')
 # Backward-compatibility: box.info.server.lsn is -1 instead of nil
 replica.admin('box.info.server.lsn == -1')
 # gh-1219: LSN must not be removed from vclock on unregister
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
+# gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx }
+# unregistration doesn't change box.info.server.ro
+replica.admin('not box.info.server.ro')
+# actually box is read-only if id is not registered
+replica.admin('box.space._schema:replace{"test", 48}')
+replica.admin('box.cfg { read_only = true }')
+replica.admin('box.space._schema:replace{"test", 48}')
+replica.admin('box.cfg { read_only = false }')
 replica.admin('box.space._schema:replace{"test", 48}')
 
 print '-------------------------------------------------------------'
 print 'Re-register replica with the same server_id'
 print '-------------------------------------------------------------'
+
+replica.admin('box.cfg { read_only = true }')
 master.admin('box.space._cluster:insert{%d, "%s"} ~= nil' %
     (replica_id, replica_uuid))
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id == %d' % replica_id)
-replica.admin('not box.info.server.ro')
 # gh-1219: LSN must not be removed from vclock on unregister
 replica.admin('box.info.server.lsn == 1')
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
+
+# gh-246: box.info.server.ro is controlled by box.cfg { read_only = xx  }
+# registration doesn't change box.info.server.ro
+replica.admin('box.info.server.ro == true')
+# is ro
+replica.admin('box.space._schema:replace{"test", 48}')
+replica.admin('box.cfg { read_only = false }')
+# is not ro
+#replica.admin('box.space._schema:replace{"test", 48}')
 
 print '-------------------------------------------------------------'
 print 'Re-register replica with a new server_id'
@@ -222,7 +239,6 @@ print '-------------------------------------------------------------'
 master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id2)
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id ~= %d' % replica_id)
-replica.admin('box.info.server.ro')
 # Backward-compatibility: box.info.server.lsn is -1 instead of nil
 replica.admin('box.info.server.lsn == -1')
 replica.admin('box.info.vclock[%d] == 0' % replica_id2)

@@ -221,6 +221,12 @@ API_EXPORT uint64_t
 fiber_time64(void);
 
 /**
+ * Reschedule fiber to end of event loop cycle.
+ */
+API_EXPORT void
+fiber_reschedule(void);
+
+/**
  * Return slab_cache suitable to use with tarantool/small library
  */
 struct slab_cache;

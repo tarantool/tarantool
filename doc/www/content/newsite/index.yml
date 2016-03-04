@@ -32,6 +32,11 @@ blocks  :
     - "authentication and access control"
   news:
     -
+      - "Tarantool 1.6.8 is released"
+      - "https://groups.google.com/forum/#!topic/tarantool/j82aeZTtCgw"
+      - "25.02"
+      - "2016"
+    -
       - "Tarantool 1.6.7 is released"
       - "https://groups.google.com/forum/#!topic/tarantool/kN60cpRRAyE"
       - "17.11"

@@ -298,6 +298,11 @@ txn_rollback()
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
+	/*
+	 * Move fiber to end of event loop to avoid execution of
+	 * any new requests before all pending rollbacks will processed
+	 */
+	fiber_reschedule();
 }
 
 void

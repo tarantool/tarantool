@@ -41,7 +41,8 @@
     {{- breadcrumbs.breadcrumbs() -}}
         <article class="b-article">
           {% if render_sidebar == false and title != 'Documentation' %}
-            {{ toctree(maxdepth=2, collapse=false) }}
+{#            {{ toctree(maxdepth=2, collapse=false) }} #}
+            {{ toc }}
           {% endif %}
           {% block body %} {% endblock %}
         </article>

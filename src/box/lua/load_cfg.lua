@@ -49,6 +49,7 @@ local default_cfg = {
     background          = false,
     username            = nil,
     coredump            = false,
+    read_only           = false,
 
     -- snapshot_daemon
     snapshot_period     = 0,        -- 0 = disabled
@@ -103,6 +104,7 @@ local template_cfg = {
     coredump            = 'boolean',
     snapshot_period     = 'number',
     snapshot_count      = 'number',
+    read_only           = 'boolean'
 }
 
 local function normalize_uri(port)
@@ -128,6 +130,7 @@ local dynamic_cfg = {
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     panic_on_wal_error      = private.cfg_set_panic_on_wal_error,
+    read_only               = private.cfg_set_read_only,
     -- snapshot_daemon
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
     snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,

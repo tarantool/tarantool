@@ -28,13 +28,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box.h"
+
 #include "cluster.h"
+
+#include <ipc.h>
+#include <fiber.h> /* &cord->slabc */
+#include <scoped_guard.h>
+#include <small/mempool.h>
+
+#include "box.h"
 #include "recovery.h"
 #include "applier.h"
-#include <scoped_guard.h>
-#include <fiber.h> /* &cord->slabc */
-#include <small/mempool.h>
 
 /**
  * Globally unique identifier of this cluster.
@@ -61,6 +65,7 @@ rb_gen(, serverset_, serverset_t, struct server, link,
 
 static struct mempool server_pool;
 static serverset_t serverset;
+static struct ipc_channel wait_for_id;
 
 void
 cluster_init(void)
@@ -68,12 +73,14 @@ cluster_init(void)
 	mempool_create(&server_pool, &cord()->slabc,
 		       sizeof(struct server));
 	serverset_new(&serverset);
+	ipc_channel_create(&wait_for_id, 0);
 }
 
 void
 cluster_free(void)
 {
 	mempool_destroy(&server_pool);
+	ipc_channel_destroy(&wait_for_id);
 }
 
 extern "C" struct vclock *
@@ -109,6 +116,16 @@ server_delete(struct server *server)
 {
 	assert(server_is_orphan(server));
 	mempool_free(&server_pool, server);
+}
+
+void
+cluster_wait_for_id()
+{
+	void *msg;
+	while (recovery->server_id == 0) {
+		ipc_channel_get(&wait_for_id, &msg);
+		assert(msg == NULL);
+	}
 }
 
 struct server *
@@ -152,8 +169,8 @@ server_set_id(struct server *server, uint32_t server_id)
 		 * Otherwise, read only is switched
 		 * off after recovery_finalize().
 		 */
-		if (wal)
-			box_set_ro(false);
+		if (wal && ipc_channel_has_readers(&wait_for_id))
+			ipc_channel_put(&wait_for_id, NULL);
 	}
 }
 
@@ -172,10 +189,8 @@ server_clear_id(struct server *server)
 	 * Some records may arrive later on due to asynchronus nature of
 	 * replication.
 	 */
-	if (r->server_id == server->id) {
+	if (r->server_id == server->id)
 		r->server_id = SERVER_ID_NIL;
-		box_set_ro(true);
-	}
 	server->id = SERVER_ID_NIL;
 	if (server_is_orphan(server)) {
 		serverset_remove(&serverset, server);

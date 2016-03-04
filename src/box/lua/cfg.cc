@@ -30,10 +30,13 @@
  */
 
 #include "cfg.h"
+
 #include "exception.h"
-#include "box/box.h"
-#include "lua/utils.h"
+#include <cfg.h>
 #include "main.h"
+#include "lua/utils.h"
+
+#include "box/box.h"
 
 extern "C" {
 	#include <lua.h>
@@ -149,6 +152,17 @@ lbox_cfg_set_panic_on_wal_error(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_read_only(struct lua_State *L)
+{
+	try {
+		box_set_ro(cfg_geti("read_only") != 0);
+	} catch (Exception *) {
+		lbox_error(L);
+	}
+	return 0;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -163,6 +177,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_too_long_threshold", lbox_cfg_set_too_long_threshold},
 		{"cfg_set_snap_io_rate_limit", lbox_cfg_set_snap_io_rate_limit},
 		{"cfg_set_panic_on_wal_error", lbox_cfg_set_panic_on_wal_error},
+		{"cfg_set_read_only", lbox_cfg_set_read_only},
 		{NULL, NULL}
 	};
 
