@@ -26,7 +26,7 @@ are ``errno``, ``error``.
     +----------------+---------------------------------------------------------------+
     |    Purposes    |    Names                                                      |
     +================+===============================================================+
-    |    setup       | :func:`socket() <socket.__call>`                              |
+    |    setup       | :ref:`socket() <socket-socket>`                               |
     +----------------+---------------------------------------------------------------+
     |    ""          | :func:`socket.tcp_connect() <socket.tcp_connect>`             |
     +----------------+---------------------------------------------------------------+
@@ -94,16 +94,18 @@ the function invocations will look like ``sock:function_name(...)``.
 
 .. module:: socket
 
-.. function:: __call(domain, type, protocol)
+.. _socket-socket:
+
+:codebold:`socket`:codenormal:`(`:codeitalic:`domain, type, protocol`:codenormal:`)`
 
     Create a new TCP or UDP socket. The argument values
     are the same as in the `Linux socket(2) man page <http://man7.org/linux/man-pages/man2/socket.2.html>`_.
 
-    :param domain:
-    :param type:
-    :param protocol:
-    :return: a new socket, or nil.
+    :return: an unconnected socket, or nil.
     :rtype:  userdata
+
+    Example: |br|
+    :codenormal:`socket('AF_INET', 'SOCK_STREAM', 'tcp')`
 
 .. function:: tcp_connect(host[, port])
 
@@ -114,6 +116,10 @@ the function invocations will look like ``sock:function_name(...)``.
     :return: a connected socket, if no error.
     :rtype: userdata
 
+    Example: |br|
+    :codenormal:`tcp_connect('127.0.0.1', 3301)`
+
+
 .. function:: getaddrinfo(host, type, [, {option-list}])
 
     The ``socket.getaddrinfo()`` function is useful for finding information
@@ -123,12 +129,8 @@ the function invocations will look like ``sock:function_name(...)``.
     :return: A table containing these fields: "host", "family", "type", "protocol", "port".
     :rtype:  table
 
-    Example:
-
-    .. code-block:: tarantoolsession
-
-        tarantool> socket.getaddrinfo('tarantool.org', 'http')
-
+    Example: |br|
+    :codenormal:`socket.getaddrinfo('tarantool.org', 'http')` |br|
     will return variable information such as
 
     .. code-block:: tarantoolsession
@@ -152,16 +154,15 @@ the function invocations will look like ``sock:function_name(...)``.
     can accept connections. Usually the same objective
     is accomplished with ``box.cfg{listen=...)``.
 
-    .. code-block:: lua
-
-        socket.tcp_server('localhost', 3302, function () end)
+    Example: |br|
+    :codenormal:`socket.tcp_server('localhost', 3302, function () end)`
 
 .. class:: socket_object
 
     .. method:: sysconnect(host, port)
 
-        Connect a socket to a remote host. The argument values are the same as
-        in the `Linux connect(2) man page <http://man7.org/linux/man-pages/man2/connect.2.html>`_.
+        Connect an existing socket to a remote host. The argument values are the same as
+        in tcp_connect().
         The host must be an IP address.
 
         Parameters:
@@ -179,12 +180,13 @@ the function invocations will look like ``sock:function_name(...)``.
                  the socket will be bound to a random local port.
 
 
-        :return: a connected socket, if no error.
-        :rtype:  userdata
+        :return: the socket object value may change if sysconnect() succeeds.
+        :rtype:  boolean
 
-        .. code-block:: lua
-
-            sock:sysconnect('127.0.0.1', 80)
+        Example: |br|
+        :codenormal:`socket = require('socket')` |br|
+        :codenormal:`sock = socket('AF_INET', 'SOCK_STREAM', 'tcp')` |br|
+        :codenormal:`sock:sysconnect(0, 3301)`
 
     .. method:: send(data)
                 write(data)
@@ -306,12 +308,9 @@ the function invocations will look like ``sock:function_name(...)``.
 
         Possible errors: on error, returns status, errno, errstr.
 
-        After
-
-        .. code-block:: lua
-
-            message_content, message_sender = recvfrom(1)
-
+        Example: |br|
+        After |br|
+        :codenormal:`message_content, message_sender = recvfrom(1)` |br|
         the value of ``message_content`` might be a string containing 'X' and
         the value of ``message_sender`` might be a table containing
         ``message_sender.host = '18.44.0.1'``,
