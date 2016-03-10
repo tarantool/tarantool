@@ -416,9 +416,17 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	 * won't be recycled when all parsed requests are processed.
 	 */
 	oldbuf->in.wpos -= con->parse_size;
-	/* Move the cached request prefix to the new buffer. */
-	memcpy(newbuf->in.rpos, oldbuf->in.wpos, con->parse_size);
-	newbuf->in.wpos += con->parse_size;
+	if (con->parse_size != 0) {
+		/* Move the cached request prefix to the new buffer. */
+		memcpy(newbuf->in.rpos, oldbuf->in.wpos, con->parse_size);
+		newbuf->in.wpos += con->parse_size;
+		/*
+		 * We made ibuf idle. If obuf was already idle it makes the whole
+		 * iobuf idle, time to trim buffers.
+		 */
+		if (iobuf_is_idle(oldbuf))
+			iobuf_reset(oldbuf);
+	}
 	/*
 	 * Rotate buffers. Not strictly necessary, but
 	 * helps preserve response order.
