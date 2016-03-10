@@ -1,9 +1,3 @@
-    :confval:`slab_alloc_arena`, |br|
-    :confval:`slab_alloc_minimal`, |br|
-    :confval:`slab_alloc_maximal`, |br|
-    :confval:`slab_alloc_factor`, |br|
-    :confval:`sophia` |br|
-
 .. confval:: slab_alloc_arena
 
     How much memory Tarantool allocates to actually store tuples, in gigabytes.
@@ -17,24 +11,6 @@
     Default: 1.0 |br|
     Dynamic: no |br|
 
-.. confval:: slab_alloc_minimal
-
-    Size of the smallest allocation unit. It can be tuned down if most
-    of the tuples are very small
-
-    Type: integer |br|
-    Default: 64 |br|
-    Dynamic: no |br|
-
-.. confval:: slab_alloc_maximal
-
-    Size of the largest allocation unit. It can be tuned up if it
-    is necessary to store large tuples.
-
-    Type: integer |br|
-    Default: 1048576 |br|
-    Dynamic: no |br|
-
 .. confval:: slab_alloc_factor
 
     Use slab_alloc_factor as the multiplier for computing the sizes of memory
@@ -44,6 +20,24 @@
 
     Type: float |br|
     Default: 1.1 |br|
+    Dynamic: no |br|
+
+.. confval:: slab_alloc_maximal
+
+    Size of the largest allocation unit. It can be increased if it
+    is necessary to store large tuples.
+
+    Type: integer |br|
+    Default: 1048576 |br|
+    Dynamic: no |br|
+
+.. confval:: slab_alloc_minimal
+
+    Size of the smallest allocation unit. It can be decreased if most
+    of the tuples are very small.
+
+    Type: integer |br|
+    Default: 16 |br|
     Dynamic: no |br|
 
 .. confval:: sophia
@@ -63,5 +57,5 @@
     This method may change in the future.
 
     Type: table |br|
-    Default: (see above) |br|
+    Default: {page_size=131072,threads=5,node_size=134217728,memory_limit=0} |br|
     Dynamic: no |br|

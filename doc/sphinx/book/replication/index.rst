@@ -139,7 +139,8 @@ visible on the replica. A simple two-server cluster with the master on one
 computer and the replica on a different computer is very common and provides
 two benefits: FAILOVER (because if the master goes down then the replica can
 take over), or LOAD BALANCING (because clients can connect to either the master
-or the replica for select requests).
+or the replica for select requests). Sometimes the replica may be configured with
+the additional parameter :ref:`read_only = true <box-cfg-read-only>`.
 
 =====================================================================
                     Monitoring a Replica's Actions
@@ -198,7 +199,9 @@ which is executed via :code:`box.once()`. For example:
 
 In the simple master-replica configuration, the master's changes are seen by
 the replica, but not vice versa, because the master was specified as the sole
-replication source. In the master-master configuration, it's possible to go both ways.
+replication source. In the master-master configuration,
+also sometimes called multi-master configuration,
+it's possible to go both ways.
 Starting with the simple configuration, the first server has to say:
 
 .. cssclass:: highlight
@@ -206,7 +209,8 @@ Starting with the simple configuration, the first server has to say:
 
     box.cfg{ replication_source = *uri#2* }
 
-This request can be performed at any time.
+This request can be performed at any time --
+:ref:`replication_source <box-cfg-replication-source> is a dynamic parameter.
 
 In this configuration, both servers are "masters" and both servers are
 "replicas". Henceforth every change that happens on either server will
