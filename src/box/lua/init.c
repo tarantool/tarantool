@@ -55,8 +55,8 @@
 
 
 extern char session_lua[],
-	schema_lua[],
 	tuple_lua[],
+	schema_lua[],
 	load_cfg_lua[],
 	snapshot_daemon_lua[],
 	net_box_lua[],
@@ -64,8 +64,8 @@ extern char session_lua[],
 
 static const char *lua_sources[] = {
 	"box/session", session_lua,
-	"box/schema", schema_lua,
 	"box/tuple", tuple_lua,
+	"box/schema", schema_lua,
 	"box/snapshot_daemon", snapshot_daemon_lua,
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,

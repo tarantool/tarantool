@@ -572,28 +572,6 @@ local function decode_unchecked(str, offset)
 end
 
 --------------------------------------------------------------------------------
--- box-specific optimized API
---------------------------------------------------------------------------------
-
-local function encode_tuple(obj)
-    local tmpbuf = buffer.IBUF_SHARED
-    tmpbuf:reset()
-    if obj == nil then
-        encode_fix(tmpbuf, 0x90, 0)  -- empty array
-    elseif type(obj) == "table" then
-        encode_array(tmpbuf, #obj)
-        local i
-        for i=1,#obj,1 do
-            encode_r(tmpbuf, obj[i], 1)
-        end
-    else
-        encode_fix(tmpbuf, 0x90, 1)  -- array of one element
-        encode_r(tmpbuf, obj, 1)
-    end
-    return tmpbuf.rpos, tmpbuf.wpos
-end
-
---------------------------------------------------------------------------------
 -- exports
 --------------------------------------------------------------------------------
 
@@ -605,9 +583,9 @@ return {
     on_encode = on_encode;
     decode_unchecked = decode_unchecked;
     decode = decode_unchecked; -- just for tests
-    encode_tuple = encode_tuple;
-    encode_ibuf = encode_ibuf;
-    encode_map = encode_map;
-    encode_int = encode_int;
-    encode_array = encode_array;
+    internal = {
+        encode_fix = encode_fix;
+        encode_array = encode_array;
+        encode_r = encode_r;
+    }
 }
