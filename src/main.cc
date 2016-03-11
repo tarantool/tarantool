@@ -495,13 +495,6 @@ tarantool_free(void)
 	}
 	if (script)
 		free(script);
-	/* tarantool_lua_free() was formerly reponsible for terminal reset,
-	 * but it is no longer called
-	 */
-	if (isatty(STDIN_FILENO)) {
-		/* See comments in readline_cb() */
-		rl_cleanup_after_signal();
-	}
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
