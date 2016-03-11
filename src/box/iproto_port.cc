@@ -89,7 +89,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync)
 	obuf_dup_xc(out, &empty_map, sizeof(empty_map));
 }
 
-void
+int
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg);
@@ -105,10 +105,31 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync)
 	header.v_schema_id = mp_bswap_u32(sc_version);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
+	/* Malformed packet appears to be a lesser evil than abort. */
+	return obuf_dup(out, &header, sizeof(header)) != sizeof(header) ||
+		obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
+		obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
 
-	obuf_dup_xc(out, &header, sizeof(header));
-	obuf_dup_xc(out, &body, sizeof(body));
-	obuf_dup_xc(out, e->errmsg, msg_len);
+}
+
+void
+iproto_write_error(int fd, const struct error *e)
+{
+	uint32_t msg_len = strlen(e->errmsg);
+	uint32_t errcode = ClientError::get_errcode(e);
+
+	struct iproto_header_bin header = iproto_header_bin;
+	struct iproto_body_bin body = iproto_error_bin;
+
+	uint32_t len = sizeof(header) - 5 + sizeof(body) + msg_len;
+	header.v_len = mp_bswap_u32(len);
+	header.v_code = mp_bswap_u32(iproto_encode_error(errcode));
+
+	body.v_data_len = mp_bswap_u32(msg_len);
+	ssize_t r = write(fd, &header, sizeof(header));
+	r = write(fd, &body, sizeof(body));
+	r = write(fd, e->errmsg, msg_len);
+	(void) r;
 }
 
 static inline struct iproto_port *

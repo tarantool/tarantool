@@ -298,3 +298,34 @@ iproto.py_con.space('gh1280').select(list())
 admin("space:drop()")
 
 admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
+
+#
+# gh-272 if the packet was incorrect, respond with an error code before closing
+# connection
+#
+print """
+# Test bug gh-272 if the packet was incorrect, respond with an error code
+"""
+
+c = Connection('localhost', server.iproto.port)
+c.connect()
+header = { "hello": "world"}
+body = { "bug": 272 }
+header = msgpack.dumps(header)
+body = msgpack.dumps(body)
+query = msgpack.dumps(len(header) + len(body)) + header + body
+# Send raw request using connectred socket
+s = c._socket
+try:
+    s.send(query)
+    resp_len = s.recv(5)
+    resp_len = msgpack.loads(resp_len)
+    headerbody = s.recv(resp_len)
+    unpacker = msgpack.Unpacker(use_list = True)
+    unpacker.feed(headerbody)
+    header = unpacker.unpack()
+    body = unpacker.unpack()
+    print(body)
+except OSError as e:
+    print '   => ', 'Failed to send request'
+c.close()

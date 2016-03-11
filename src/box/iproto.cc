@@ -534,6 +534,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		/* Enqueue all requests which are fully read up. */
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
+		/* Best effort at sending the error message to the client. */
+		iproto_write_error(fd, e);
 		e->log();
 		iproto_connection_close(con);
 	}
@@ -641,105 +643,112 @@ tx_process_msg(struct cmsg *m)
 	fiber_set_user(fiber(), &session->credentials);
 
 	session->sync = msg->header.sync;
-	try {
-		if (msg->header.schema_id &&
-		    msg->header.schema_id != sc_version) {
-			tnt_raise(ClientError, ER_WRONG_SCHEMA_VERSION,
-				  sc_version, msg->header.schema_id);
-		}
 
-		switch (msg->header.type) {
-		case IPROTO_SELECT:
-		{
-			struct iproto_port port;
-			iproto_port_init(&port, out, msg->header.sync);
-			struct request *req = &msg->request;
-			int rc = box_select((struct port *) &port,
-					    req->space_id, req->index_id,
-					    req->iterator,
-					    req->offset, req->limit,
-					    req->key, req->key_end);
-			if (rc < 0) {
+	if (msg->header.schema_id &&
+	    msg->header.schema_id != sc_version) {
+		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
+			 sc_version, msg->header.schema_id);
+error:
+		iproto_reply_error(out, diag_last_error(&fiber()->diag),
+				   msg->header.sync);
+		msg->write_end = obuf_create_svp(out);
+		return;
+	}
+	switch (msg->header.type) {
+	case IPROTO_SELECT:
+	{
+		struct iproto_port port;
+		iproto_port_init(&port, out, msg->header.sync);
+		struct request *req = &msg->request;
+		int rc = box_select((struct port *) &port,
+				    req->space_id, req->index_id,
+				    req->iterator,
+				    req->offset, req->limit,
+				    req->key, req->key_end);
+		if (rc < 0) {
+			/*
+			 * This only works if there are no yields
+			 * between the moment the port is first
+			 * used for output and is flushed/an error
+			 * occurs.
+			 */
+			if (port.found)
+				obuf_rollback_to_svp(out, &port.svp);
+			goto error;
+		}
+		break;
+	}
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPDATE:
+	case IPROTO_DELETE:
+	case IPROTO_UPSERT:
+	{
+		assert(msg->request.type == msg->header.type);
+		struct tuple *tuple;
+		struct obuf_svp svp;
+		if (box_process1(&msg->request, &tuple) ||
+		    iproto_prepare_select(out, &svp))
+			goto error;
+		if (tuple && tuple_to_obuf(tuple, out))
+			goto error;
+		iproto_reply_select(out, &svp, msg->header.sync,
+				    tuple != 0);
+		break;
+	}
+	default:
+		try {
+			switch (msg->header.type) {
+			case IPROTO_CALL:
+				assert(msg->request.type == msg->header.type);
+				rmean_collect(rmean_box, msg->request.type, 1);
+				box_process_call(&msg->request, out);
+				break;
+			case IPROTO_EVAL:
+				assert(msg->request.type == msg->header.type);
+				rmean_collect(rmean_box, msg->request.type, 1);
+				box_process_eval(&msg->request, out);
+				break;
+			case IPROTO_AUTH:
+			{
+				assert(msg->request.type == msg->header.type);
+				const char *user = msg->request.key;
+				uint32_t len = mp_decode_strl(&user);
+				authenticate(user, len, msg->request.tuple,
+					     msg->request.tuple_end);
+				iproto_reply_ok(out, msg->header.sync);
+				break;
+			}
+			case IPROTO_PING:
+				iproto_reply_ok(out, msg->header.sync);
+				break;
+			case IPROTO_JOIN:
 				/*
-				 * This only works if there are no
-				 * yields between the moment the
-				 * port is first used for
-				 * output and is flushed/an error
-				 * occurs.
+				 * As soon as box_process_subscribe() returns
+				 * the lambda in the beginning of the block
+				 * will re-activate the watchers for us.
 				 */
-				if (port.found)
-					obuf_rollback_to_svp(out, &port.svp);
-				diag_raise();
+				box_process_join(&con->input,
+						 &msg->header);
+				break;
+			case IPROTO_SUBSCRIBE:
+				/*
+				 * Subscribe never returns - unless there
+				 * is an error/exception. In that case
+				 * the write watcher will be re-activated
+				 * the same way as for JOIN.
+				 */
+				box_process_subscribe(&con->input,
+						      &msg->header);
+				break;
+			default:
+				tnt_raise(ClientError,
+					  ER_UNKNOWN_REQUEST_TYPE,
+					  (uint32_t) msg->header.type);
 			}
-			break;
+		} catch (Exception *e) {
+			goto error;
 		}
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-		case IPROTO_UPDATE:
-		case IPROTO_DELETE:
-		case IPROTO_UPSERT:
-		{
-			assert(msg->request.type == msg->header.type);
-			struct tuple *tuple;
-			if (box_process1(&msg->request, &tuple) < 0)
-				diag_raise();
-			struct obuf_svp svp;
-			if (iproto_prepare_select(out, &svp) != 0)
-				diag_raise();
-			if (tuple) {
-				if (tuple_to_obuf(tuple, out) != 0)
-					diag_raise();
-			}
-			iproto_reply_select(out, &svp, msg->header.sync,
-					    tuple != 0);
-			break;
-		}
-		case IPROTO_CALL:
-			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
-			box_process_call(&msg->request, out);
-			break;
-		case IPROTO_EVAL:
-			assert(msg->request.type == msg->header.type);
-			rmean_collect(rmean_box, msg->request.type, 1);
-			box_process_eval(&msg->request, out);
-			break;
-		case IPROTO_AUTH:
-		{
-			assert(msg->request.type == msg->header.type);
-			const char *user = msg->request.key;
-			uint32_t len = mp_decode_strl(&user);
-			authenticate(user, len, msg->request.tuple,
-				     msg->request.tuple_end);
-			iproto_reply_ok(out, msg->header.sync);
-			break;
-		}
-		case IPROTO_PING:
-			iproto_reply_ok(out, msg->header.sync);
-			break;
-		case IPROTO_JOIN:
-			/*
-			 * As soon as box_process_subscribe() returns the
-			 * lambda in the beginning of the block
-			 * will re-activate the watchers for us.
-			 */
-			box_process_join(&con->input, &msg->header);
-			break;
-		case IPROTO_SUBSCRIBE:
-			/*
-			 * Subscribe never returns - unless there
-			 * is an error/exception. In that case
-			 * the write watcher will be re-activated
-			 * the same way as for JOIN.
-			 */
-			box_process_subscribe(&con->input, &msg->header);
-			break;
-		default:
-			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				   (uint32_t) msg->header.type);
-		}
-	} catch (Exception *e) {
-		iproto_reply_error(out, e, msg->header.sync);
 	}
 	msg->write_end = obuf_create_svp(out);
 }

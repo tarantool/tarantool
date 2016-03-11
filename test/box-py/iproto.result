@@ -164,3 +164,7 @@ space:drop()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...
+
+# Test bug gh-272 if the packet was incorrect, respond with an error code
+
+{49: 'Invalid MsgPack - packet header'}
