@@ -129,7 +129,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      cd ~/tarantool
      make clean         # unnecessary, added for good luck
      rm CMakeCache.txt  # unnecessary, added for good luck
-     cmake .            # Start build with build type=Release, no doc
+     cmake .            # Start build with build type=Debug, no doc
 
    On some platforms it may be necessary to specify the C and C++ versions,
    for example |br|
@@ -137,7 +137,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    The option for specifying build type is :samp:`-DCMAKE_BUILD_TYPE={type}` where
    :samp:`{type} = Debug | Release | RelWithDebInfo` and a
    reasonable choice for production is ``-DCMAKE_BUILD_TYPE=RelWithDebInfo``
-   (``Debug`` is used by project maintainers and ``Release`` is used
+   (``Debug`` is a default used by project maintainers and ``Release`` is used
    when the highest performance is required).
 
    The option for asking to build documentation is :code:`-DENABLE_DOC={true}|{false}`,
