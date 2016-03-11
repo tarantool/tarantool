@@ -1,20 +1,11 @@
 -- digest.lua (internal file)
 
 local ffi = require 'ffi'
+local crypto = require('crypto')
 
 ffi.cdef[[
-    /* from openssl/sha.h */
-    unsigned char *SHA(const unsigned char *d, size_t n, unsigned char *md);
-    unsigned char *SHA1(const unsigned char *d, size_t n, unsigned char *md);
-    unsigned char *SHA224(const unsigned char *d, size_t n,unsigned char *md);
-    unsigned char *SHA256(const unsigned char *d, size_t n,unsigned char *md);
-    unsigned char *SHA384(const unsigned char *d, size_t n,unsigned char *md);
-    unsigned char *SHA512(const unsigned char *d, size_t n,unsigned char *md);
-    unsigned char *MD4(const unsigned char *d, size_t n, unsigned char *md);
+    /* internal implementation */
     unsigned char *SHA1internal(const unsigned char *d, size_t n, unsigned char *md);
-
-    /* from openssl/md5.h */
-    unsigned char *MD5(const unsigned char *d, size_t n, unsigned char *md);
 
     /* from libc */
     int snprintf(char *str, size_t size, const char *format, ...);
@@ -38,42 +29,24 @@ ffi.cdef[[
     uint32_t PMurHash32(uint32_t seed, const void *key, int len);
 ]]
 
-local ssl
-if ssl == nil then
-    local variants = {
-        'libssl.so.10',
-        'libssl.so.1.0.0',
-        'libssl.so.0.9.8',
-        'libssl.so',
-        'ssl',
-    }
-
-    for _, libname in pairs(variants) do
-        pcall(function() ssl = ffi.load(libname) end)
-        if ssl ~= nil then
-            break
-        end
-    end
-end
-
-local def = {
-    sha     = { 'SHA',    20 },
-    sha224  = { 'SHA224', 28 },
-    sha256  = { 'SHA256', 32 },
-    sha384  = { 'SHA384', 48 },
-    sha512  = { 'SHA512', 64 },
-    md5     = { 'MD5',    16 },
-    md4     = { 'MD4',    16 },
+local digest_shortcuts = {
+    sha     = 'SHA',
+    sha224  = 'SHA224',
+    sha256  = 'SHA256',
+    sha384  = 'SHA384',
+    sha512  = 'SHA512',
+    md5     = 'MD5',
+    md4     = 'MD4',
 }
 
 local hexres = ffi.new('char[129]')
 
-local function tohex(r, size)
-    for i = 0, size - 1 do
+local function str_to_hex(r)
+    for i = 0, r:len() - 1 do
         ffi.C.snprintf(hexres + i * 2, 3, "%02x",
-            ffi.cast('unsigned int', r[i]))
+            ffi.cast('unsigned char', r:byte(i + 1)))
     end
-    return ffi.string(hexres, size * 2)
+    return ffi.string(hexres, r:len() * 2)
 end
 
 local PMurHash
@@ -211,7 +184,7 @@ local m = {
             str = tostring(str)
         end
         local r = ffi.C.SHA1internal(str, #str, nil)
-        return tohex(r, 20)
+        return str_to_hex(ffi.string(r, 20))
     end,
 
     guava = function(state, buckets)
@@ -230,40 +203,22 @@ local m = {
     murmur = PMurHash
 }
 
-if ssl ~= nil then
-
-    for pname, df in pairs(def) do
-        local hfunction = df[1]
-        local hsize = df[2]
-
-        m[ pname ] = function(str)
-            if str == nil then
-                str = ''
-            else
-                str = tostring(str)
-            end
-            local r = ssl[hfunction](str, string.len(str), nil)
-            return ffi.string(r, hsize)
-        end
-
-        m[ pname .. '_hex' ] = function(str)
-            if str == nil then
-                str = ''
-            else
-                str = tostring(str)
-            end
-            local r = ssl[hfunction](str, string.len(str), nil)
-            return tohex(r, hsize)
-        end
+for digest, name in pairs(digest_shortcuts) do
+    m[digest] = function (str)
+        return crypto.digest[digest](str)
     end
-else
-    local function errorf()
-        error("libSSL was not loaded")
-    end
-    for pname, df in pairs(def) do
-        m[ pname ] = errorf
-        m[ pname .. '_hex' ] = errorf
+    m[digest .. '_hex'] = function (str)
+        return str_to_hex(crypto.digest[digest](str))
     end
 end
+
+m['aes256cbc'] = {
+    encrypt = function (str, key, iv)
+        return crypto.cipher.aes256.cbc.encrypt(str, key, iv)
+    end,
+    decrypt = function (str, key, iv)
+        return crypto.cipher.aes256.cbc.decrypt(str, key, iv)
+    end
+}
 
 return m
