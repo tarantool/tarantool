@@ -56,12 +56,14 @@ if ssl == nil then
 end
 
 local digests = {}
-for class, name in pairs({
-    md2 = 'MD2', md4 = 'MD4', md5 = 'MD5',
-    sha = 'SHA', sha1 = 'SHA1', sha224 = 'SHA224',
-    sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
-    dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
-    digests[class] = ssl.EVP_get_digestbyname(class)
+if ssl then
+  for class, name in pairs({
+      md2 = 'MD2', md4 = 'MD4', md5 = 'MD5',
+      sha = 'SHA', sha1 = 'SHA1', sha224 = 'SHA224',
+      sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
+      dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
+      digests[class] = ssl.EVP_get_digestbyname(class)
+  end
 end
 
 local digest_mt = {}
@@ -134,17 +136,19 @@ digest_mt = {
 }
 
 local ciphers = {}
-for algo, algo_name in pairs({des = 'DES', aes128 = 'AES-128',
-    aes192 = 'AES-192', aes256 = 'AES-256'}) do
-    local algo_api = {}
-    for mode, mode_name in pairs({cfb = 'CFB', ofb = 'OFB',
-        cbc = 'CBC', ecb = 'ECB'}) do
-            algo_api[mode] =
-                ssl.EVP_get_cipherbyname(algo_name .. '-' .. mode_name)
-    end
-    if algo_api ~= {} then
-        ciphers[algo] = algo_api
-    end
+if ssl then
+  for algo, algo_name in pairs({des = 'DES', aes128 = 'AES-128',
+      aes192 = 'AES-192', aes256 = 'AES-256'}) do
+      local algo_api = {}
+      for mode, mode_name in pairs({cfb = 'CFB', ofb = 'OFB',
+          cbc = 'CBC', ecb = 'ECB'}) do
+              algo_api[mode] =
+                  ssl.EVP_get_cipherbyname(algo_name .. '-' .. mode_name)
+      end
+      if algo_api ~= {} then
+          ciphers[algo] = algo_api
+      end
+  end
 end
 
 local cipher_mt = {}
@@ -245,9 +249,17 @@ for class, digest in pairs(digests) do
     })
 end
 
+digest_api = setmetatable(digest_api,
+  {__index = function(self, digest) error('Digest method ' .. digest ..
+    ' is not supported or SSL library not found') end })
+
+local function cipher_mode_error(self, mode)
+  error('Cipher mode' .. mode .. ' is not supported')
+end
+
 local cipher_api = {}
 for class, subclass in pairs(ciphers) do
-    class_api = {}
+    local class_api = {}
     for subclass, cipher in pairs(subclass) do
         class_api[subclass] = {}
         for direction, param in pairs({encrypt = 1, decrypt = 0}) do
@@ -266,10 +278,15 @@ for class, subclass in pairs(ciphers) do
             })
         end
     end
+    class_api = setmetatable(class_api, {__index = cipher_mode_error})
     if class_api ~= {} then
         cipher_api[class] = class_api
     end
 end
+
+cipher_api = setmetatable(cipher_api,
+  {__index = function(self, cipher) error('Cipher method ' .. cipher ..
+    ' is not supported or SSL library not found') end })
 
 return {
     digest = digest_api,
