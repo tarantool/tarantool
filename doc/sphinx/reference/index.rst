@@ -11,6 +11,7 @@
     box_error
     clock
     console
+    crypto
     csv
     digest
     expirationd
