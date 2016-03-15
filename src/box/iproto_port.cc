@@ -138,12 +138,19 @@ enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };
 int
 iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
-	*svp = obuf_create_svp(buf);
-	void *ptr = obuf_alloc(buf, SVP_SIZE);
+	/**
+	 * Reserve memory before taking a savepoint.
+	 * This ensures that we get a contiguous chunk of memory
+	 * and the savepoint is pointing at the beginning of it.
+	 */
+	void *ptr = obuf_reserve(buf, SVP_SIZE);
 	if (ptr == NULL) {
 		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
 		return -1;
 	}
+	*svp = obuf_create_svp(buf);
+	ptr = obuf_alloc(buf, SVP_SIZE);
+	assert(ptr !=  NULL);
 	return 0;
 }
 
