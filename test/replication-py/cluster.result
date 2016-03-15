@@ -2,8 +2,8 @@ ok - cluster uuid
 -------------------------------------------------------------
  gh-696: Check global READ permissions for replication
 -------------------------------------------------------------
-ok - join without read permissions to universe
-ok - subscribe without read permissions to universe
+ok - join without read permissions on universe
+ok - subscribe without read permissions on universe
 box.schema.user.grant('guest', 'read', 'universe')
 ---
 ...
@@ -27,7 +27,7 @@ gh-707: Master crashes on JOIN if it does not have snapshot files
 gh-480: If socket is closed while JOIN, replica wont reconnect
 -------------------------------------------------------------
 ok - join without snapshots
-ok - _cluster does not changed after unsuccessful JOIN
+ok - _cluster did not change after unsuccessful JOIN
 box.schema.user.revoke('guest', 'replication')
 ---
 ...

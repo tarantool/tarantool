@@ -26,10 +26,10 @@ replica_uuid = str(uuid.uuid4())
 ## Universal read permission is required to perform JOIN/SUBSCRIBE
 rows = list(server.iproto.py_con.join(replica_uuid))
 print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
-    'ok' or 'not ok', '-', 'join without read permissions to universe'
+    'ok' or 'not ok', '-', 'join without read permissions on universe'
 rows = list(server.iproto.py_con.subscribe(cluster_uuid, replica_uuid))
 print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
-    'ok' or 'not ok', '-', 'subscribe without read permissions to universe'
+    'ok' or 'not ok', '-', 'subscribe without read permissions on universe'
 
 ## Write permission to space `_cluster` is required to perform JOIN
 server.admin("box.schema.user.grant('guest', 'read', 'universe')")
@@ -87,7 +87,7 @@ print len(rows) == 1 and rows[0].return_message.find('snapshot') >= 0 and \
     'ok' or 'not ok', '-', 'join without snapshots'
 
 print server_count == len(server.iproto.py_con.space('_cluster').select(())) and\
-    'ok' or 'not ok', '-', '_cluster does not changed after unsuccessful JOIN'
+    'ok' or 'not ok', '-', '_cluster did not change after unsuccessful JOIN'
 
 server.admin("box.schema.user.revoke('guest', 'replication')")
 server.admin('box.snapshot()')
