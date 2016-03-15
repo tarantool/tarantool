@@ -16,9 +16,11 @@ try:
 except Exception as e:
     print 'not ok - invalid cluster uuid', e
 
+server.iproto.reconnect() # re-connect with new permissions
 print '-------------------------------------------------------------'
 print ' gh-696: Check global READ permissions for replication'
 print '-------------------------------------------------------------'
+
 
 # Generate replica cluster UUID
 replica_uuid = str(uuid.uuid4())
@@ -33,7 +35,7 @@ print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
 
 ## Write permission to space `_cluster` is required to perform JOIN
 server.admin("box.schema.user.grant('guest', 'read', 'universe')")
-server.iproto.py_con.close() # re-connect with new permissions
+server.iproto.reconnect() # re-connect with new permissions
 rows = list(server.iproto.py_con.join(replica_uuid))
 print len(rows) == 1 and rows[0].return_message.find('Write access') >= 0 and \
     'ok' or 'not ok', '-', 'join without write permissions to _cluster'
@@ -45,7 +47,7 @@ def check_join(msg):
             print 'not ok', '-', msg, resp.return_message
             ok = False
 
-    server.iproto.py_con.close() # JOIN brokes protocol
+    server.iproto.reconnect() # the only way to stop JOIN
     if not ok:
         return
     tuples = server.iproto.py_con.space('_cluster').select(replica_uuid, index = 1)
@@ -58,7 +60,7 @@ def check_join(msg):
 
 ## JOIN with permissions
 server.admin("box.schema.user.grant('guest', 'write', 'space', '_cluster')")
-server.iproto.py_con.close() # re-connect with new permissions
+server.iproto.reconnect() # re-connect with new permissions
 server_id = check_join('join with granted permissions')
 server.iproto.py_con.space('_cluster').delete(server_id)
 
@@ -66,7 +68,7 @@ server.iproto.py_con.space('_cluster').delete(server_id)
 server.admin("box.schema.user.revoke('guest', 'read', 'universe')")
 server.admin("box.schema.user.revoke('guest', 'write', 'space', '_cluster')")
 server.admin("box.schema.user.grant('guest', 'replication')")
-server.iproto.py_con.close() # re-connect with new permissions
+server.iproto.reconnect() # re-connect with new permissions
 server_id = check_join('join with granted role')
 server.iproto.py_con.space('_cluster').delete(server_id)
 
@@ -128,6 +130,10 @@ server.admin("box.space._cluster:update(5, {{'=', 3, 'test'}})")
 server.admin("box.space._cluster:delete(5)")
 # gh-1219: LSN must not be removed from vclock on unregister
 server.admin("box.info.vclock[5] == 0")
+
+# Cleanup
+server.stop()
+server.deploy()
 
 print '-------------------------------------------------------------'
 print 'Start a new replica and check box.info on the start'
