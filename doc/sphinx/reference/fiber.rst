@@ -99,6 +99,8 @@ can be reused when another fiber is created.
           id: 101
         ...
 
+.. _fiber-sleep:
+
 .. function:: sleep(time)
 
     Yield control to the scheduler and sleep for the specified number
@@ -341,6 +343,8 @@ can be reused when another fiber is created.
             ---
             - error: '[string "return fiber_function.storage[''str1'']"]:1: the fiber is dead'
             ...
+
+.. _fiber-time:
 
 .. function:: time()
 

@@ -219,19 +219,19 @@ digest.base64_decode(b) == s
 ...
 digest.base64_decode(nil)
 ---
-- error: 'builtin/digest.lua:181: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:154: Usage: digest.base64_decode(string)'
 ...
 digest.base64_encode(nil)
 ---
-- error: 'builtin/digest.lua:170: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:143: Usage: digest.base64_encode(string)'
 ...
 digest.base64_encode(123)
 ---
-- error: 'builtin/digest.lua:170: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:143: Usage: digest.base64_encode(string)'
 ...
 digest.base64_decode(123)
 ---
-- error: 'builtin/digest.lua:181: Usage: digest.base64_decode(string)'
+- error: 'builtin/digest.lua:154: Usage: digest.base64_decode(string)'
 ...
 digest.guava('hello', 0)
 ---
@@ -255,7 +255,7 @@ digest.guava(1673758223894951030, 11)
 ...
 digest.urandom()
 ---
-- error: 'builtin/digest.lua:223: Usage: digest.urandom(len)'
+- error: 'builtin/digest.lua:196: Usage: digest.urandom(len)'
 ...
 #digest.urandom(0)
 ---
@@ -315,6 +315,18 @@ mur:result()
 ...
 mur, mur_new, nulldigest = nil, nil, nil
 ---
+...
+digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
+---
+- !!binary ynO0qTTrTLNpNm3GrTnjng==
+...
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
+---
+- test123
+...
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
+---
+- error: 'builtin/crypto.lua:274: Can''t finalize cipher'
 ...
 digest = nil
 ---

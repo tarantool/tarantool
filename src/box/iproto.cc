@@ -414,9 +414,17 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	 * won't be recycled when all parsed requests are processed.
 	 */
 	oldbuf->in.wpos -= con->parse_size;
-	/* Move the cached request prefix to the new buffer. */
-	memcpy(newbuf->in.rpos, oldbuf->in.wpos, con->parse_size);
-	newbuf->in.wpos += con->parse_size;
+	if (con->parse_size != 0) {
+		/* Move the cached request prefix to the new buffer. */
+		memcpy(newbuf->in.rpos, oldbuf->in.wpos, con->parse_size);
+		newbuf->in.wpos += con->parse_size;
+		/*
+		 * We made ibuf idle. If obuf was already idle it makes the whole
+		 * iobuf idle, time to trim buffers.
+		 */
+		if (iobuf_is_idle(oldbuf))
+			iobuf_reset(oldbuf);
+	}
 	/*
 	 * Rotate buffers. Not strictly necessary, but
 	 * helps preserve response order.
@@ -472,10 +480,15 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			   msg->header.type == IPROTO_JOIN) {
 			/**
 			 * Don't mess with the file descriptor
-			 * while join is running.
+			 * while join is running. Clear the
+			 * pending events as well, since their
+			 * invocation may re-start the watcher,
+			 * ruining our efforts.
 			 */
 			ev_io_stop(con->loop, &con->output);
+			ev_clear_pending(con->loop, &con->output);
 			ev_io_stop(con->loop, &con->input);
+			ev_clear_pending(con->loop, &con->input);
 			stop_input = true;
 		}
 		msg->request.header = &msg->header;

@@ -34,6 +34,41 @@ Other signals will result in behavior defined by the operating system. Signals
 other than SIGKILL may be ignored, especially if the server is executing a
 long-running procedure which prevents return to the main thread event loop.
 
+.. _book-proctitle:
+
+=====================================================================
+                        Process title
+=====================================================================
+
+Linux and FreeBSD operating systems allow a running process to modify its title,
+which otherwise contains the program name. Tarantool uses this feature to help
+meet the needs of system administration, such as figuring out what services are
+running on a host, their status, and so on.
+
+A Tarantool server's process title has these components:
+
+.. cssclass:: highlight
+.. parsed-literal::
+
+    **program_name** [**initialization_file_name**] **<role_name>** [**custom_proc_title**]
+
+* **program_name** is typically "tarantool".
+* **initialization_file_name** is the name of an :ref:`initialization file <init-label>` if one was specified.
+* **role_name** is:
+  - "running" (ordinary node "ready to accept requests"),
+  - "loading" (ordinary node recovering from old snap and wal files),
+  - "orphan" (not in a cluster),
+  - "hot_standby" (see section :ref:`local hot standby <book-cfg-local_hot_standy>`), or
+  - "dumper" + process-id (saving a snapshot).
+* **custom_proc_title** is taken from the :confval:`custom_proc_title` configuration parameter, if one was specified.
+
+For example:
+
+.. code-block:: console
+
+    $ ps -AF | grep tarantool
+    1000     17337 16716  1 91362  6916   0 11:07 pts/5    00:00:13 tarantool script.lua <running>
+
 
 =====================================================================
                         Using ``tarantool`` as a client
@@ -360,11 +395,11 @@ Create a directory named /tarantool_test:
     $ sudo mkdir /tarantool_test
 
 Copy tarantoolctl to /tarantool_test. If you made a source
-download to ~/tarantool-master, then
+download to ~/tarantool-1.6, then
 
 .. code-block:: console
 
-    $ sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
+    $ sudo cp ~/tarantool-1.6/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
 
 If the file was named tarantoolctl and placed on :file:`/usr/bin/tarantoolctl`, then
 
@@ -380,12 +415,12 @@ Initially it says
     #!/usr/bin/env tarantool
 
 If that is not correct, edit tarantoolctl and change the line. For example,
-if the Tarantool server is actually on :file:`/home/user/tarantool-master/src/tarantool`,
+if the Tarantool server is actually on :file:`/home/user/tarantool-1.6/src/tarantool`,
 change the line to
 
 .. code-block:: bash
 
-    #!/usr/bin/env /home/user/tarantool-master/src/tarantool
+    #!/usr/bin/env /home/user/tarantool-1.6/src/tarantool
 
 Save a copy of :file:`/etc/sysconfig/tarantool`, if it exists.
 

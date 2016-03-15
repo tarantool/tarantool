@@ -188,7 +188,7 @@ could duplicate in a minute or two with the magic of cut-and-paste.
     $ cd ~/tarantool_sandbox_1
     $ rm -r *.snap
     $ rm -r *.xlog
-    $ ~/tarantool-master/src/tarantool
+    $ ~/tarantool-1.6/src/tarantool
 
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.space.create('tester')
@@ -256,7 +256,7 @@ On Terminal #1, say:
     $ cd ~/tarantool_sandbox_1
     $ rm -r *.snap
     $ rm -r *.xlog
-    $ ~/tarantool-master/src/tarantool
+    $ ~/tarantool-1.6/src/tarantool
 
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.space.create('tester')
@@ -286,7 +286,7 @@ On Terminal #2, say:
     $ cd ~/tarantool_sandbox_2
     $ rm -r *.snap
     $ rm -r *.xlog
-    $ ~/tarantool-master/src/tarantool
+    $ ~/tarantool-1.6/src/tarantool
 
     tarantool> box.cfg{listen = 3302}
     tarantool> box.schema.space.create('tester')
