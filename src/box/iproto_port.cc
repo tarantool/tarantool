@@ -31,6 +31,7 @@
 #include "iproto_port.h"
 #include "iproto_constants.h"
 #include "schema.h" /* sc_version */
+#include "small/obuf.h"
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
 struct iproto_header_bin {
@@ -132,44 +133,23 @@ iproto_write_error(int fd, const struct error *e)
 	(void) r;
 }
 
-static inline struct iproto_port *
-iproto_port(struct port *port)
-{
-	return (struct iproto_port *) port;
-}
-
 enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };
-
-extern "C" void
-iproto_port_eof(struct port *ptr)
-{
-	struct iproto_port *port = iproto_port(ptr);
-	/* found == 0 means add_tuple wasn't called at all. */
-	if (port->found == 0) {
-		if (iproto_prepare_select(port->buf, &port->svp) != 0)
-			diag_raise();
-	}
-
-	iproto_reply_select(port->buf, &port->svp, port->sync, port->found);
-}
 
 int
 iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
-	void *ptr = obuf_reserve(buf, SVP_SIZE);
+	*svp = obuf_create_svp(buf);
+	void *ptr = obuf_alloc(buf, SVP_SIZE);
 	if (ptr == NULL) {
 		diag_set(OutOfMemory, SVP_SIZE, "obuf", "reserve");
 		return -1;
 	}
-	*svp = obuf_create_svp(buf);
-	ptr = obuf_alloc(buf, SVP_SIZE);
-	assert(ptr !=  NULL);
 	return 0;
 }
 
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-			uint32_t count)
+		    uint32_t count)
 {
 	uint32_t len = obuf_size(buf) - svp->used - 5;
 
@@ -185,21 +165,3 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos, &header, sizeof(header));
 	memcpy(pos + sizeof(header), &body, sizeof(body));
 }
-
-extern "C" void
-iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
-{
-	struct iproto_port *port = iproto_port(ptr);
-	if (port->found == 0) {
-		/* Found the first tuple, add header. */
-		if (iproto_prepare_select(port->buf, &port->svp) != 0)
-			diag_raise();
-	}
-	port->found++;
-	tuple_to_obuf(tuple, port->buf);
-}
-
-struct port_vtab iproto_port_vtab = {
-	iproto_port_add_tuple,
-	iproto_port_eof,
-};

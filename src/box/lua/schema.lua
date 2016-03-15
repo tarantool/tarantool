@@ -53,35 +53,26 @@ ffi.cdef[[
     box_txn_rollback();
     /** \endcond public */
 
-    struct port
-    {
-        struct port_vtab *vtab;
-    };
-
-    struct port_buf_entry {
-        struct port_buf_entry *next;
+    struct port_entry {
+        struct port_entry *next;
         struct tuple *tuple;
     };
 
-    struct port_buf {
-        struct port base;
+    struct port {
         size_t size;
-        struct port_buf_entry *first;
-        struct port_buf_entry *last;
-        struct port_buf_entry first_entry;
+        struct port_entry *first;
+        struct port_entry *last;
+        struct port_entry first_entry;
     };
 
     void
-    port_buf_create(struct port_buf *port_buf);
+    port_create(struct port *port);
 
     void
-    port_buf_destroy(struct port_buf *port_buf);
-
-    void
-    port_buf_transfer(struct port_buf *port_buf);
+    port_destroy(struct port *port);
 
     int
-    box_select(struct port_buf *port, uint32_t space_id, uint32_t index_id,
+    box_select(struct port *port, uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
                const char *key, const char *key_end);
     void password_prepare(const char *password, int len,
@@ -635,8 +626,8 @@ local iterator_gen_luac = function(param, state)
 end
 
 -- global struct port instance to use by select()/get()
-local port_buf = ffi.new('struct port_buf')
-local port_buf_entry_t = ffi.typeof('struct port_buf_entry')
+local port = ffi.new('struct port')
+local port_entry_t = ffi.typeof('struct port_entry')
 
 -- Helper function for nicer error messages
 -- in some cases when space object is misused
@@ -824,20 +815,20 @@ function box.schema.space.bless(space)
         local key, key_end = msgpackffi.encode_tuple(key)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
-        builtin.port_buf_create(port_buf)
-        if builtin.box_select(port_buf, index.space_id,
+        builtin.port_create(port)
+        if builtin.box_select(port, index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
-            builtin.port_buf_destroy(port_buf);
+            builtin.port_destroy(port);
             return box.error()
         end
 
         local ret = {}
-        local entry = port_buf.first
-        for i=1,tonumber(port_buf.size),1 do
+        local entry = port.first
+        for i=1,tonumber(port.size),1 do
             ret[i] = box.tuple.bless(entry.tuple)
             entry = entry.next
         end
-        builtin.port_buf_destroy(port_buf);
+        builtin.port_destroy(port);
         return ret
     end
 

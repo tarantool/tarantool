@@ -46,7 +46,12 @@
 #include "scoped_guard.h"
 #include "memory.h"
 
+#include "port.h"
 #include "iproto_port.h"
+#include "iobuf.h"
+#include "request.h"
+#include "box.h"
+#include "tuple.h"
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* sc_version */
@@ -670,25 +675,21 @@ error:
 	switch (msg->header.type) {
 	case IPROTO_SELECT:
 	{
-		struct iproto_port port;
-		iproto_port_init(&port, out, msg->header.sync);
+		struct obuf_svp svp;
+		struct port port;
+		port_create(&port);
 		struct request *req = &msg->request;
 		int rc = box_select((struct port *) &port,
 				    req->space_id, req->index_id,
 				    req->iterator,
 				    req->offset, req->limit,
 				    req->key, req->key_end);
-		if (rc < 0) {
-			/*
-			 * This only works if there are no yields
-			 * between the moment the port is first
-			 * used for output and is flushed/an error
-			 * occurs.
-			 */
-			if (port.found)
-				obuf_rollback_to_svp(out, &port.svp);
+		if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
+			port_destroy(&port);
 			goto error;
 		}
+		port_dump(&port, out);
+		iproto_reply_select(out, &svp, msg->header.sync, port.size);
 		break;
 	}
 	case IPROTO_INSERT:

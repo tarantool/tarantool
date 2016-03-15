@@ -34,107 +34,84 @@
 #include <small/mempool.h>
 #include <fiber.h>
 
+static struct mempool port_entry_pool;
+
 void
-null_port_eof(struct port *port __attribute__((unused)))
+port_add_tuple(struct port *port, struct tuple *tuple)
 {
-}
-
-static void
-null_port_add_tuple(struct port *port __attribute__((unused)),
-		    struct tuple *tuple __attribute__((unused)))
-{
-}
-
-static struct port_vtab null_port_vtab = {
-	null_port_add_tuple,
-	null_port_eof,
-};
-
-struct port null_port = {
-	/* .vtab = */ &null_port_vtab,
-};
-
-static struct mempool port_buf_entry_pool;
-
-static void
-port_buf_add_tuple(struct port *port, struct tuple *tuple)
-{
-	struct port_buf *port_buf = (struct port_buf *) port;
-	struct port_buf_entry *e;
-	if (port_buf->size == 0) {
+	struct port_entry *e;
+	if (port->size == 0) {
 		tuple_ref(tuple); /* throws */
-		e = &port_buf->first_entry;
-		port_buf->first = port_buf->last = e;
+		e = &port->first_entry;
+		port->first = port->last = e;
 	} else {
-		e = (struct port_buf_entry *)
-			mempool_alloc_xc(&port_buf_entry_pool); /* throws */
+		e = (struct port_entry *)
+			mempool_alloc_xc(&port_entry_pool); /* throws */
 		try {
 			tuple_ref(tuple); /* throws */
 		} catch (Exception *) {
-			mempool_free(&port_buf_entry_pool, e);
+			mempool_free(&port_entry_pool, e);
 			throw;
 		}
-		port_buf->last->next = e;
-		port_buf->last = e;
+		port->last->next = e;
+		port->last = e;
 	}
 	e->tuple = tuple;
 	e->next = NULL;
-	++port_buf->size;
-}
-
-static struct port_vtab port_buf_vtab = {
-	port_buf_add_tuple,
-	null_port_eof,
-};
-
-void
-port_buf_create(struct port_buf *port_buf)
-{
-	port_buf->base.vtab = &port_buf_vtab;
-	port_buf->size = 0;
-	port_buf->first = NULL;
-	port_buf->last = NULL;
+	++port->size;
 }
 
 void
-port_buf_destroy(struct port_buf *port_buf)
+port_create(struct port *port)
 {
-	struct port_buf_entry *e = port_buf->first;
+	port->size = 0;
+	port->first = NULL;
+	port->last = NULL;
+}
+
+void
+port_destroy(struct port *port)
+{
+	struct port_entry *e = port->first;
 	if (e == NULL)
 		return;
 	tuple_unref(e->tuple);
 	e = e->next;
 	while (e != NULL) {
-		struct port_buf_entry *cur = e;
+		struct port_entry *cur = e;
 		e = e->next;
 		tuple_unref(cur->tuple);
-		mempool_free(&port_buf_entry_pool, cur);
+		mempool_free(&port_entry_pool, cur);
 	}
 }
 
 void
-port_buf_transfer(struct port_buf *port_buf)
+port_dump(struct port *port, struct obuf *out)
 {
-	struct port_buf_entry *e = port_buf->first;
+	struct port_entry *e = port->first;
 	if (e == NULL)
 		return;
+	tuple_to_obuf(e->tuple, out);
+	tuple_unref(e->tuple);
 	e = e->next;
 	while (e != NULL) {
-		struct port_buf_entry *cur = e;
+		struct port_entry *cur = e;
+		tuple_to_obuf(e->tuple, out);
 		e = e->next;
-		mempool_free(&port_buf_entry_pool, cur);
+		tuple_unref(cur->tuple);
+		mempool_free(&port_entry_pool, cur);
 	}
 }
 
 void
 port_init(void)
 {
-	mempool_create(&port_buf_entry_pool, &cord()->slabc,
-		       sizeof(struct port_buf_entry));
+	mempool_create(&port_entry_pool, &cord()->slabc,
+		       sizeof(struct port_entry));
 }
 
 void
 port_free(void)
 {
-	mempool_destroy(&port_buf_entry_pool);
+	mempool_destroy(&port_entry_pool);
 }

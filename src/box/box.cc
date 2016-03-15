@@ -570,7 +570,6 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 		struct txn *txn = txn_begin_ro_stmt(space);
 		space->handler->executeSelect(txn, space, index_id, iterator,
 					      offset, limit, key, key_end, port);
-		port_eof(port);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	} catch (Exception *e) {
@@ -722,9 +721,9 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 		func_load(func);
 
 	/* Create a call context */
-	struct port_buf port_buf;
-	port_buf_create(&port_buf);
-	box_function_ctx_t ctx = { request, &port_buf.base };
+	struct port port;
+	port_create(&port);
+	box_function_ctx_t ctx = { request, &port };
 
 	/* Clear all previous errors */
 	diag_clear(&fiber()->diag);
@@ -744,22 +743,21 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 	if (iproto_prepare_select(out, &svp) != 0)
 		goto error;
 
-	for (struct port_buf_entry *entry = port_buf.first;
+	for (struct port_entry *entry = port.first;
 	     entry != NULL; entry = entry->next) {
 		if (tuple_to_obuf(entry->tuple, out) != 0) {
 			obuf_rollback_to_svp(out, &svp);
 			goto error;
 		}
 	}
-	iproto_reply_select(out, &svp, request->header->sync,
-			    port_buf.size);
+	iproto_reply_select(out, &svp, request->header->sync, port.size);
 
-	port_buf_destroy(&port_buf);
+	port_destroy(&port);
 
 	return 0;
 
 error:
-	port_buf_destroy(&port_buf);
+	port_destroy(&port);
 	txn_rollback();
 	return -1;
 }
