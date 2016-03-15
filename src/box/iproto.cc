@@ -482,10 +482,15 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			   msg->header.type == IPROTO_JOIN) {
 			/**
 			 * Don't mess with the file descriptor
-			 * while join is running.
+			 * while join is running. Clear the
+			 * pending events as well, since their
+			 * invocation may re-start the watcher,
+			 * ruining our efforts.
 			 */
 			ev_io_stop(con->loop, &con->output);
+			ev_clear_pending(con->loop, &con->output);
 			ev_io_stop(con->loop, &con->input);
+			ev_clear_pending(con->loop, &con->input);
 			stop_input = true;
 		}
 		msg->request.header = &msg->header;
