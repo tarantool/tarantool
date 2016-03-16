@@ -88,8 +88,12 @@ rows = list(server.iproto.py_con.join(replica_uuid))
 print len(rows) == 1 and rows[0].return_message.find('snapshot') >= 0 and \
     'ok' or 'not ok', '-', 'join without snapshots'
 
-print server_count == len(server.iproto.py_con.space('_cluster').select(())) and\
-    'ok' or 'not ok', '-', '_cluster did not change after unsuccessful JOIN'
+res = server.iproto.py_con.space('_cluster').select(())
+if server_count <= len(res):
+    print 'ok - _cluster did not change after unsuccessful JOIN'
+else:
+    print 'not ok - _cluster did change after unsuccessful JOIN'
+    print res
 
 server.admin("box.schema.user.revoke('guest', 'replication')")
 server.admin('box.snapshot()')
