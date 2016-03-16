@@ -991,21 +991,7 @@ function box.schema.space.bless(space)
     end
     space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
-    space_mt.truncate = function(space)
-        if space.index[0] == nil then
-            return -- empty space without indexes, nothing to truncate
-        end
-        local _index = box.space[box.schema.INDEX_ID]
-        -- drop and create all indexes
-        local keys = _index:select(space.id)
-        for i = #keys, 1, -1 do
-            local v = keys[i]
-            _index:delete{v[1], v[2]}
-        end
-        for i = 1, #keys, 1 do
-            _index:insert(keys[i])
-        end
-    end
+    space_mt.truncate = internal.truncate
     space_mt.format = function(space, format)
         return box.schema.space.format(space.id, format)
     end

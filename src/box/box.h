@@ -270,6 +270,14 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	   const char *tuple_end, const char *ops, const char *ops_end,
 	   int index_base, box_tuple_t **result);
 
+/**
+ * Truncate space.
+ *
+ * \param space_id space identifier
+ */
+API_EXPORT int
+box_truncate(uint32_t space_id);
+
 /** \endcond public */
 
 /**

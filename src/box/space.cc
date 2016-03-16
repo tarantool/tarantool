@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "space.h"
+#include "index.h"
 #include <stdlib.h>
 #include <string.h>
 #include "tuple.h"
@@ -37,6 +38,8 @@
 #include "user_def.h"
 #include "user.h"
 #include "session.h"
+#include "schema.h"
+#include "box.h"
 
 void
 access_check_space(struct space *space, uint8_t access)
@@ -230,6 +233,77 @@ space_check_update(struct space *space,
 	if (tuple_compare(old_tuple, new_tuple, index->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			  index_name(index), space_name(space));
+}
+
+int
+space_truncate(struct space *space)
+{
+	assert(space);
+
+	if (!space_index(space, 0)) {
+		/* empty space without indexes, nothing to truncate */
+		return 0;
+	}
+
+	char key_buf_begin[20];
+	char *key_buf_end = key_buf_begin;
+	const char *key_curr, *record_end, *record_begin;
+	int rc = 0;
+	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+
+	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
+	struct space *space_index = space_cache_find(BOX_INDEX_ID);
+	Index *index = index_find(space_index, 0);
+	struct iterator *it = index->allocIterator();
+	auto guard_it_free = make_scoped_guard([=]{
+		it->free(it);
+	});
+	index->initIterator(it, ITER_EQ, key_buf_begin, 1);
+	it->space_id = BOX_INDEX_ID;
+	it->index_id = 0;
+	it->index = index;
+	it->sc_version = sc_version;
+	int cp = 0;
+	struct tuple *tpl[BOX_INDEX_MAX], *tmp_tpl; /* max count of idexes*/
+	memset(tpl, 0, sizeof(tpl));
+	/* select all indexes of given space */
+	auto guard_tpl_unref = make_scoped_guard([=]{
+		for (int cp = BOX_INDEX_MAX - 1; cp >= 0; --cp) {
+			if (tpl[cp]) {
+				box_tuple_unref(tpl[cp]);
+			}
+		}
+	});
+	while (cp < BOX_INDEX_MAX && (tmp_tpl = it->next(it))) {
+		box_tuple_ref(tmp_tpl);
+		tpl[cp] = tmp_tpl;
+		cp++;
+	}
+
+	/* drop all selected indexes */
+	for (int i = cp - 1; i >= 0; --i) {
+		key_curr = tpl[i]->data;
+		mp_decode_array(&key_curr);
+		key_buf_end = mp_encode_array(key_buf_begin, 2);
+		key_buf_end = mp_encode_uint(key_buf_end, mp_decode_uint(&key_curr));
+		key_buf_end = mp_encode_uint(key_buf_end, mp_decode_uint(&key_curr));
+
+		rc = box_delete(BOX_INDEX_ID, 0, key_buf_begin, key_buf_end, NULL);
+		if (rc != 0) {
+			return rc;
+		}
+	}
+
+	/* create all indexes again, now they are empty */
+	for (int i = 0; i < cp; ++i) {
+		record_begin = tpl[i]->data;
+		record_end = tpl[i]->data + tpl[i]->bsize;
+		rc = box_insert(BOX_INDEX_ID, record_begin, record_end, NULL);
+		if (rc != 0) {
+			return rc;
+		}
+	}
+	return rc;
 }
 
 /* vim: set fm=marker */

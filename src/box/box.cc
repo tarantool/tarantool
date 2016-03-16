@@ -659,6 +659,22 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	return box_process1(request, result);
 }
 
+
+int
+box_truncate(uint32_t space_id) {
+	try {
+		struct space *space = space_cache_find(space_id);
+		int rc = 0;
+		if (space) {
+			rc = space_truncate(space);
+		}
+		return rc;
+	}
+	catch (Exception *exc) {
+		return -1;
+	}
+}
+
 int
 box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, box_tuple_t **result)
