@@ -32,6 +32,8 @@
 #include "iproto_constants.h"
 #include "schema.h" /* sc_version */
 #include "small/obuf.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
 struct iproto_header_bin {
@@ -127,9 +129,16 @@ iproto_write_error(int fd, const struct error *e)
 	header.v_code = mp_bswap_u32(iproto_encode_error(errcode));
 
 	body.v_data_len = mp_bswap_u32(msg_len);
+
+	/* Set to blocking to write the error. */
+	int flags = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
 	ssize_t r = write(fd, &header, sizeof(header));
 	r = write(fd, &body, sizeof(body));
 	r = write(fd, e->errmsg, msg_len);
+
+	fcntl(fd, F_SETFL, flags);
 	(void) r;
 }
 

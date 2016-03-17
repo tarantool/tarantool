@@ -209,7 +209,7 @@ ffi.string(handshake, 9)
 ---
 - Tarantool
 ...
-ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+ping = msgpack.encode({ [0] = 64, [1] = 0 })
 ---
 ...
 ping = msgpack.encode(string.len(ping)) .. ping
@@ -218,7 +218,7 @@ ping = msgpack.encode(string.len(ping)) .. ping
 -- test syswrite with char *
 s:syswrite(ffi.cast('const char *', ping), #ping)
 ---
-- 7
+- 6
 ...
 s:readable(1)
 ---

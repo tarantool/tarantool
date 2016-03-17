@@ -102,11 +102,10 @@ struct iproto_msg: public cmsg
 static struct mempool iproto_msg_pool;
 
 static struct iproto_msg *
-iproto_msg_new(struct iproto_connection *con, struct cmsg_hop *route)
+iproto_msg_new(struct iproto_connection *con)
 {
 	struct iproto_msg *msg =
 		(struct iproto_msg *) mempool_alloc_xc(&iproto_msg_pool);
-	cmsg_init(msg, route);
 	msg->connection = con;
 	return msg;
 }
@@ -241,10 +240,18 @@ iproto_connection_delete(struct iproto_connection *con)
 }
 
 static void
-tx_process_msg(struct cmsg *msg);
-
+tx_process_misc(struct cmsg *msg);
+static void
+tx_process1(struct cmsg *msg);
+static void
+tx_process_select(struct cmsg *msg);
 static void
 net_send_msg(struct cmsg *msg);
+
+static void
+tx_process_join_subscribe(struct cmsg *msg);
+static void
+net_end_join_subscribe(struct cmsg *msg);
 
 /**
  * Fire on_disconnect triggers in the tx
@@ -283,15 +290,42 @@ net_finish_disconnect(struct cmsg *m)
 	iproto_msg_delete(msg);
 }
 
-static struct cmsg_hop disconnect_route[] = {
+static const struct cmsg_hop disconnect_route[] = {
 	{ tx_process_disconnect, &net_pipe },
 	{ net_finish_disconnect, NULL },
 };
 
-
-static struct cmsg_hop request_route[] = {
-	{ tx_process_msg, &net_pipe },
+static const struct cmsg_hop misc_route[] = {
+	{ tx_process_misc, &net_pipe },
 	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop select_route[] = {
+	{ tx_process_select, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop process1_route[] = {
+	{ tx_process1, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
+static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
+	NULL,                                   /* IPROTO_OK */
+	select_route,                           /* IPROTO_SELECT */
+	process1_route,                         /* IPROTO_INSERT */
+	process1_route,                         /* IPROTO_REPLACE */
+	process1_route,                         /* IPROTO_UPDATE */
+	process1_route,                         /* IPROTO_DELETE */
+	misc_route,                             /* IPROTO_CALL */
+	misc_route,                             /* IPROTO_AUTH */
+	misc_route,                             /* IPROTO_EVAL */
+	process1_route                          /* IPROTO_UPSERT */
+};
+
+static const struct cmsg_hop sync_route[] = {
+	{ tx_process_join_subscribe, &net_pipe },
+	{ net_end_join_subscribe, NULL },
 };
 
 static struct iproto_connection *
@@ -309,7 +343,8 @@ iproto_connection_new(const char *name, int fd)
 	con->parse_size = 0;
 	con->session = NULL;
 	/* It may be very awkward to allocate at close. */
-	con->disconnect = iproto_msg_new(con, disconnect_route);
+	con->disconnect = iproto_msg_new(con);
+	cmsg_init(con->disconnect, disconnect_route);
 	return con;
 }
 
@@ -444,7 +479,7 @@ static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
 	bool stop_input = false;
-	while (true) {
+	while (con->parse_size && stop_input == false) {
 		const char *reqstart = in->wpos - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
@@ -458,60 +493,87 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *reqend = pos + len;
 		if (reqend > in->wpos)
 			break;
-		struct iproto_msg *msg = iproto_msg_new(con, request_route);
+		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->iobuf = con->iobuf[0];
 		IprotoMsgGuard guard(msg);
 
 		xrow_header_decode(&msg->header, &pos, reqend);
 		assert(pos == reqend);
 		msg->len = reqend - reqstart; /* total request length */
+		request_create(&msg->request, msg->header.type);
+		msg->request.header = &msg->header;
+
+		switch (msg->header.type) {
+		case IPROTO_SELECT:
+		case IPROTO_INSERT:
+		case IPROTO_REPLACE:
+		case IPROTO_UPDATE:
+		case IPROTO_DELETE:
+		case IPROTO_CALL:
+		case IPROTO_AUTH:
+		case IPROTO_EVAL:
+		case IPROTO_UPSERT:
+			/*
+			 * This is a common  request which can be
+			 * parsed with request_decode(). Parse it
+			 * before  putting it into the queue to
+			 * save tx some CPU. More complicated
+			 * requests are parsed in tx thread into
+			 * request type- specific objects.
+			 */
+			if (msg->header.bodycnt == 0) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "missing request body");
+			}
+			request_decode(&msg->request,
+				       (const char *) msg->header.body[0].iov_base,
+				       msg->header.body[0].iov_len);
+			assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
+			cmsg_init(msg, dml_route[msg->header.type]);
+			break;
+		case IPROTO_PING:
+			cmsg_init(msg, misc_route);
+			break;
+		case IPROTO_JOIN:
+		case IPROTO_SUBSCRIBE:
+			cmsg_init(msg, sync_route);
+			stop_input = true;
+			break;
+		default:
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				  (uint32_t) msg->header.type);
+			break;
+		}
+		cpipe_push_input(&tx_pipe, guard.release());
+		/* Request is parsed */
+		assert(reqend > reqstart);
+		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		/*
 		 * sic: in case of exception con->parse_size
 		 * must not be advanced to stay in sync with
 		 * in->rpos.
 		 */
-		if (msg->header.type >= IPROTO_SELECT &&
-		    msg->header.type <= IPROTO_UPSERT) {
-			/* Pre-parse request before putting it into the queue */
-			if (msg->header.bodycnt == 0) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "request type");
-			}
-			request_create(&msg->request, msg->header.type);
-			pos = (const char *) msg->header.body[0].iov_base;
-			request_decode(&msg->request, pos,
-				       msg->header.body[0].iov_len);
-		} else if (msg->header.type == IPROTO_SUBSCRIBE ||
-			   msg->header.type == IPROTO_JOIN) {
-			/**
-			 * Don't mess with the file descriptor
-			 * while join is running. ev_io_stop()
-			 * also clears any pending events, which
-			 * is good, since their invocation may
-			 * re-start the watcher, ruining our
-			 * efforts.
-			 */
-			ev_io_stop(con->loop, &con->output);
-			ev_io_stop(con->loop, &con->input);
-			stop_input = true;
-		}
-		msg->request.header = &msg->header;
-		cpipe_push_input(&tx_pipe, guard.release());
-
-		/* Request is parsed */
-		assert(reqend > reqstart);
-		assert(con->parse_size >= (size_t) (reqend - reqstart));
 		con->parse_size -= reqend - reqstart;
-		if (con->parse_size == 0 || stop_input)
-			break;
+	}
+	if (stop_input) {
+		/**
+		 * Don't mess with the file descriptor
+		 * while join is running. ev_io_stop()
+		 * also clears any pending events, which
+		 * is good, since their invocation may
+		 * re-start the watcher, ruining our
+		 * efforts.
+		 */
+		ev_io_stop(con->loop, &con->output);
+		ev_io_stop(con->loop, &con->input);
+	} else {
+		/*
+		 * Keep reading input, as long as the socket
+		 * supplies data.
+		 */
+		ev_feed_event(con->loop, &con->input, EV_READ);
 	}
 	cpipe_flush_input(&tx_pipe);
-	/*
-	 * Keep reading input, as long as the socket
-	 * supplies data.
-	 */
-	if (!stop_input && !ev_is_active(&con->input))
-		ev_feed_event(con->loop, &con->input, EV_READ);
 }
 
 static void
@@ -650,79 +712,106 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 }
 
 static void
-tx_process_msg(struct cmsg *m)
+tx_fiber_init(struct session *session, uint64_t sync)
+{
+	session->sync = sync;
+	fiber_set_session(fiber(), session);
+	fiber_set_user(fiber(), &session->credentials);
+}
+
+static int
+tx_check_schema(uint32_t schema_id)
+{
+	if (schema_id && schema_id != sc_version) {
+		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
+			 sc_version, schema_id);
+		return -1;
+	}
+	return 0;
+}
+
+static void
+tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct obuf *out = &msg->iobuf->out;
-	struct iproto_connection *con = msg->connection;
-	struct session *session = msg->connection->session;
-	fiber_set_session(fiber(), session);
-	fiber_set_user(fiber(), &session->credentials);
 
-	session->sync = msg->header.sync;
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
 
-	if (msg->header.schema_id &&
-	    msg->header.schema_id != sc_version) {
-		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
-			 sc_version, msg->header.schema_id);
+	struct tuple *tuple;
+	struct obuf_svp svp;
+	if (box_process1(&msg->request, &tuple) ||
+	    iproto_prepare_select(out, &svp))
+		goto error;
+	if (tuple && tuple_to_obuf(tuple, out))
+		goto error;
+	iproto_reply_select(out, &svp, msg->header.sync,
+			    tuple != 0);
+	msg->write_end = obuf_create_svp(out);
+	return;
 error:
-		iproto_reply_error(out, diag_last_error(&fiber()->diag),
-				   msg->header.sync);
-		msg->write_end = obuf_create_svp(out);
-		return;
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_select(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct obuf *out = &msg->iobuf->out;
+	struct obuf_svp svp;
+	struct port port;
+	int rc;
+	struct request *req = &msg->request;
+
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+
+	if (tx_check_schema(msg->header.schema_id))
+		goto error;
+
+	port_create(&port);
+	rc = box_select((struct port *) &port,
+			req->space_id, req->index_id,
+			req->iterator, req->offset, req->limit,
+			req->key, req->key_end);
+	if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
+		port_destroy(&port);
+		goto error;
 	}
-	switch (msg->header.type) {
-	case IPROTO_SELECT:
-	{
-		struct obuf_svp svp;
-		struct port port;
-		port_create(&port);
-		struct request *req = &msg->request;
-		int rc = box_select((struct port *) &port,
-				    req->space_id, req->index_id,
-				    req->iterator,
-				    req->offset, req->limit,
-				    req->key, req->key_end);
-		if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
-			port_destroy(&port);
-			goto error;
-		}
-		port_dump(&port, out);
-		iproto_reply_select(out, &svp, msg->header.sync, port.size);
-		break;
-	}
-	case IPROTO_INSERT:
-	case IPROTO_REPLACE:
-	case IPROTO_UPDATE:
-	case IPROTO_DELETE:
-	case IPROTO_UPSERT:
-	{
-		assert(msg->request.type == msg->header.type);
-		struct tuple *tuple;
-		struct obuf_svp svp;
-		if (box_process1(&msg->request, &tuple) ||
-		    iproto_prepare_select(out, &svp))
-			goto error;
-		if (tuple && tuple_to_obuf(tuple, out))
-			goto error;
-		iproto_reply_select(out, &svp, msg->header.sync,
-				    tuple != 0);
-		break;
-	}
-	default:
-		try {
-			switch (msg->header.type) {
-			case IPROTO_CALL:
-				assert(msg->request.type == msg->header.type);
-				rmean_collect(rmean_box, msg->request.type, 1);
-				box_process_call(&msg->request, out);
-				break;
-			case IPROTO_EVAL:
-				assert(msg->request.type == msg->header.type);
-				rmean_collect(rmean_box, msg->request.type, 1);
-				box_process_eval(&msg->request, out);
-				break;
-			case IPROTO_AUTH:
+	port_dump(&port, out);
+	iproto_reply_select(out, &svp, msg->header.sync, port.size);
+	msg->write_end = obuf_create_svp(out);
+	return;
+error:
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync);
+	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_misc(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct obuf *out = &msg->iobuf->out;
+
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+
+	try {
+		switch (msg->header.type) {
+		case IPROTO_CALL:
+			assert(msg->request.type == msg->header.type);
+			rmean_collect(rmean_box, msg->request.type, 1);
+			box_process_call(&msg->request, out);
+			break;
+		case IPROTO_EVAL:
+			assert(msg->request.type == msg->header.type);
+			rmean_collect(rmean_box, msg->request.type, 1);
+			box_process_eval(&msg->request, out);
+			break;
+		case IPROTO_AUTH:
 			{
 				assert(msg->request.type == msg->header.type);
 				const char *user = msg->request.key;
@@ -732,38 +821,52 @@ error:
 				iproto_reply_ok(out, msg->header.sync);
 				break;
 			}
-			case IPROTO_PING:
-				iproto_reply_ok(out, msg->header.sync);
-				break;
-			case IPROTO_JOIN:
-				/*
-				 * As soon as box_process_subscribe() returns
-				 * the lambda in the beginning of the block
-				 * will re-activate the watchers for us.
-				 */
-				box_process_join(&con->input,
-						 &msg->header);
-				break;
-			case IPROTO_SUBSCRIBE:
-				/*
-				 * Subscribe never returns - unless there
-				 * is an error/exception. In that case
-				 * the write watcher will be re-activated
-				 * the same way as for JOIN.
-				 */
-				box_process_subscribe(&con->input,
-						      &msg->header);
-				break;
-			default:
-				tnt_raise(ClientError,
-					  ER_UNKNOWN_REQUEST_TYPE,
-					  (uint32_t) msg->header.type);
-			}
-		} catch (Exception *e) {
-			goto error;
+		case IPROTO_PING:
+			iproto_reply_ok(out, msg->header.sync);
+			break;
+		default:
+			assert(false);
 		}
+	} catch (Exception *e) {
+		iproto_reply_error(out, diag_last_error(&fiber()->diag),
+				   msg->header.sync);
 	}
 	msg->write_end = obuf_create_svp(out);
+}
+
+static void
+tx_process_join_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+
+	tx_fiber_init(con->session, msg->header.sync);
+
+	try {
+		switch (msg->header.type) {
+		case IPROTO_JOIN:
+			/*
+			 * As soon as box_process_subscribe() returns
+			 * the lambda in the beginning of the block
+			 * will re-activate the watchers for us.
+			 */
+			box_process_join(&con->input, &msg->header);
+			break;
+		case IPROTO_SUBSCRIBE:
+			/*
+			 * Subscribe never returns - unless there
+			 * is an error/exception. In that case
+			 * the write watcher will be re-activated
+			 * the same way as for JOIN.
+			 */
+			box_process_subscribe(&con->input, &msg->header);
+			break;
+		default:
+			assert(false);
+		}
+	} catch (Exception *e) {
+		iproto_write_error(con->input.fd, e);
+	}
 }
 
 static void
@@ -775,11 +878,6 @@ net_send_msg(struct cmsg *m)
 	/* Discard request (see iproto_enqueue_batch()) */
 	iobuf->in.rpos += msg->len;
 	iobuf->out.wend = msg->write_end;
-	if ((msg->header.type == IPROTO_SUBSCRIBE ||
-	    msg->header.type == IPROTO_JOIN)) {
-		assert(! ev_is_active(&con->input));
-		ev_io_start(con->loop, &con->input);
-	}
 
 	if (evio_has_fd(&con->output)) {
 		if (! ev_is_active(&con->output))
@@ -788,6 +886,24 @@ net_send_msg(struct cmsg *m)
 		iproto_connection_close(con);
 	}
 	iproto_msg_delete(msg);
+}
+
+static void
+net_end_join_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+	struct iobuf *iobuf = msg->iobuf;
+
+	iobuf->in.rpos += msg->len;
+	iproto_msg_delete(msg);
+
+	assert(! ev_is_active(&con->input));
+	/*
+	 * Enqueue any messages if they are in the readahead
+	 * queue. Will simply start input otherwise.
+	 */
+	iproto_enqueue_batch(con, &iobuf->in);
 }
 
 /**
@@ -855,7 +971,7 @@ net_send_greeting(struct cmsg *m)
 	iproto_msg_delete(msg);
 }
 
-static struct cmsg_hop connect_route[] = {
+static const struct cmsg_hop connect_route[] = {
 	{ tx_process_connect, &net_pipe },
 	{ net_send_greeting, NULL },
 };
@@ -881,7 +997,8 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	 * fixed so there is a limited number of msgs in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
-	struct iproto_msg *msg = iproto_msg_new(con, connect_route);
+	struct iproto_msg *msg = iproto_msg_new(con);
+	cmsg_init(msg, connect_route);
 	msg->iobuf = con->iobuf[0];
 	msg->close_connection = false;
 	cpipe_push(&tx_pipe, msg);
@@ -915,9 +1032,7 @@ net_cord_f(va_list /* ap */)
 			  "rmean", "struct rmean");
 	}
 
-
 	cbus_join(&net_tx_bus, &net_pipe);
-
 	/*
 	 * Nothing to do in the fiber so far, the service
 	 * will take care of creating events for incoming

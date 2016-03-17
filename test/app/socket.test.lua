@@ -67,7 +67,7 @@ handshake = ffi.new('char[128]')
 s:sysread(handshake, 128)
 ffi.string(handshake, 9)
 
-ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+ping = msgpack.encode({ [0] = 64, [1] = 0 })
 ping = msgpack.encode(string.len(ping)) .. ping
 
 -- test syswrite with char *

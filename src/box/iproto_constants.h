@@ -153,12 +153,36 @@ iproto_type_name(uint32_t type)
 	return iproto_type_strs[type];
 }
 
+/**
+ * A read only request, CALL is included since it
+ * may be read-only, and there are separate checks
+ * for all database requests issues from CALL.
+ */
 static inline bool
 iproto_type_is_select(uint32_t type)
 {
-	return type <= IPROTO_SELECT || type == IPROTO_CALL;
+	return type <= IPROTO_SELECT || type == IPROTO_CALL || type == IPROTO_EVAL;
 }
 
+/** A common request with a mandatory and simple body (key, tuple, ops)  */
+static inline bool
+iproto_type_is_request(uint32_t type)
+{
+	return type > IPROTO_OK && type <= IPROTO_UPSERT;
+}
+
+/**
+ * The request is "synchronous": no other requests
+ * on this connection should be taken before this one
+ * ends.
+ */
+static inline bool
+iproto_type_is_sync(uint32_t type)
+{
+	return type == IPROTO_JOIN || type == IPROTO_SUBSCRIBE;
+}
+
+/** A data manipulation request. */
 static inline bool
 iproto_type_is_dml(uint32_t type)
 {
@@ -166,6 +190,7 @@ iproto_type_is_dml(uint32_t type)
 		type == IPROTO_UPSERT;
 }
 
+/** This is an error. */
 static inline bool
 iproto_type_is_error(uint32_t type)
 {

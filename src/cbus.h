@@ -83,13 +83,13 @@ struct cmsg {
 	 */
 	struct stailq_entry fifo;
 	/** The message routing path. */
-	struct cmsg_hop *route;
+	const struct cmsg_hop *route;
 	/** The current hop the message is at. */
-	struct cmsg_hop *hop;
+	const struct cmsg_hop *hop;
 };
 
 static inline void
-cmsg_init(struct cmsg *msg, struct cmsg_hop *route)
+cmsg_init(struct cmsg *msg, const struct cmsg_hop *route)
 {
 	/**
 	 * The first hop can be done explicitly with cbus_push(),
