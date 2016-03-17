@@ -917,12 +917,6 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 			  tt_uuid_str(&replica_uuid));
 	}
 
-	/* Don't allow multiple relays for the same server */
-	if (server->relay != NULL) {
-		tnt_error(ClientError, ER_CFG, "replication_source",
-			  "duplicate connection with the same replica UUID");
-	}
-
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,

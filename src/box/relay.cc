@@ -191,7 +191,11 @@ relay_subscribe(int fd, uint64_t sync, struct server *server,
 		struct vclock *replica_clock)
 {
 	assert(server->id != SERVER_ID_NIL);
-	assert(server->relay == NULL);
+	/* Don't allow multiple relays for the same server */
+	if (server->relay != NULL) {
+		tnt_raise(ClientError, ER_CFG, "replication_source",
+			  "duplicate connection with the same replica UUID");
+	}
 
 	struct relay relay;
 	relay_create(&relay, fd, sync);
