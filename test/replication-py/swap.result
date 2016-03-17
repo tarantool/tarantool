@@ -25,34 +25,44 @@ index = s:create_index('primary', {type = 'tree'})
 test 0 iteration
 box.space.memtx:insert{0, "tuple 0"}
 -
-None
+- [0, tuple 0]
+
 box.space.memtx:insert{1, "tuple 1"}
 -
-None
+- [1, tuple 1]
+
 box.space.memtx:insert{2, "tuple 2"}
 -
-None
+- [2, tuple 2]
+
 box.space.memtx:insert{3, "tuple 3"}
 -
-None
+- [3, tuple 3]
+
 box.space.memtx:insert{4, "tuple 4"}
 -
-None
+- [4, tuple 4]
+
 box.space.sophia:insert{0, "tuple 0"}
 -
-None
+[]
+
 box.space.sophia:insert{1, "tuple 1"}
 -
-None
+[]
+
 box.space.sophia:insert{2, "tuple 2"}
 -
-None
+[]
+
 box.space.sophia:insert{3, "tuple 3"}
 -
-None
+[]
+
 box.space.sophia:insert{4, "tuple 4"}
 -
-None
+[]
+
 box.space.memtx:select{0}
 -
 - [0, tuple 0]
@@ -95,34 +105,44 @@ box.space.sophia:select{4}
 
 box.space.memtx:insert{5, "tuple 5"}
 -
-None
+- [5, tuple 5]
+
 box.space.memtx:insert{6, "tuple 6"}
 -
-None
+- [6, tuple 6]
+
 box.space.memtx:insert{7, "tuple 7"}
 -
-None
+- [7, tuple 7]
+
 box.space.memtx:insert{8, "tuple 8"}
 -
-None
+- [8, tuple 8]
+
 box.space.memtx:insert{9, "tuple 9"}
 -
-None
+- [9, tuple 9]
+
 box.space.sophia:insert{5, "tuple 5"}
 -
-None
+[]
+
 box.space.sophia:insert{6, "tuple 6"}
 -
-None
+[]
+
 box.space.sophia:insert{7, "tuple 7"}
 -
-None
+[]
+
 box.space.sophia:insert{8, "tuple 8"}
 -
-None
+[]
+
 box.space.sophia:insert{9, "tuple 9"}
 -
-None
+[]
+
 box.space.memtx:select{5}
 -
 - [5, tuple 5]
@@ -171,34 +191,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{10, "tuple 10"}
 -
-None
+- [10, tuple 10]
+
 box.space.memtx:insert{11, "tuple 11"}
 -
-None
+- [11, tuple 11]
+
 box.space.memtx:insert{12, "tuple 12"}
 -
-None
+- [12, tuple 12]
+
 box.space.memtx:insert{13, "tuple 13"}
 -
-None
+- [13, tuple 13]
+
 box.space.memtx:insert{14, "tuple 14"}
 -
-None
+- [14, tuple 14]
+
 box.space.sophia:insert{10, "tuple 10"}
 -
-None
+[]
+
 box.space.sophia:insert{11, "tuple 11"}
 -
-None
+[]
+
 box.space.sophia:insert{12, "tuple 12"}
 -
-None
+[]
+
 box.space.sophia:insert{13, "tuple 13"}
 -
-None
+[]
+
 box.space.sophia:insert{14, "tuple 14"}
 -
-None
+[]
+
 box.space.memtx:select{10}
 -
 - [10, tuple 10]
@@ -241,34 +271,44 @@ box.space.sophia:select{14}
 
 box.space.memtx:insert{15, "tuple 15"}
 -
-None
+- [15, tuple 15]
+
 box.space.memtx:insert{16, "tuple 16"}
 -
-None
+- [16, tuple 16]
+
 box.space.memtx:insert{17, "tuple 17"}
 -
-None
+- [17, tuple 17]
+
 box.space.memtx:insert{18, "tuple 18"}
 -
-None
+- [18, tuple 18]
+
 box.space.memtx:insert{19, "tuple 19"}
 -
-None
+- [19, tuple 19]
+
 box.space.sophia:insert{15, "tuple 15"}
 -
-None
+[]
+
 box.space.sophia:insert{16, "tuple 16"}
 -
-None
+[]
+
 box.space.sophia:insert{17, "tuple 17"}
 -
-None
+[]
+
 box.space.sophia:insert{18, "tuple 18"}
 -
-None
+[]
+
 box.space.sophia:insert{19, "tuple 19"}
 -
-None
+[]
+
 box.space.memtx:select{15}
 -
 - [15, tuple 15]
@@ -318,34 +358,44 @@ switch replica to replica
 test 1 iteration
 box.space.memtx:insert{20, "tuple 20"}
 -
-None
+- [20, tuple 20]
+
 box.space.memtx:insert{21, "tuple 21"}
 -
-None
+- [21, tuple 21]
+
 box.space.memtx:insert{22, "tuple 22"}
 -
-None
+- [22, tuple 22]
+
 box.space.memtx:insert{23, "tuple 23"}
 -
-None
+- [23, tuple 23]
+
 box.space.memtx:insert{24, "tuple 24"}
 -
-None
+- [24, tuple 24]
+
 box.space.sophia:insert{20, "tuple 20"}
 -
-None
+[]
+
 box.space.sophia:insert{21, "tuple 21"}
 -
-None
+[]
+
 box.space.sophia:insert{22, "tuple 22"}
 -
-None
+[]
+
 box.space.sophia:insert{23, "tuple 23"}
 -
-None
+[]
+
 box.space.sophia:insert{24, "tuple 24"}
 -
-None
+[]
+
 box.space.memtx:select{20}
 -
 - [20, tuple 20]
@@ -388,34 +438,44 @@ box.space.sophia:select{24}
 
 box.space.memtx:insert{25, "tuple 25"}
 -
-None
+- [25, tuple 25]
+
 box.space.memtx:insert{26, "tuple 26"}
 -
-None
+- [26, tuple 26]
+
 box.space.memtx:insert{27, "tuple 27"}
 -
-None
+- [27, tuple 27]
+
 box.space.memtx:insert{28, "tuple 28"}
 -
-None
+- [28, tuple 28]
+
 box.space.memtx:insert{29, "tuple 29"}
 -
-None
+- [29, tuple 29]
+
 box.space.sophia:insert{25, "tuple 25"}
 -
-None
+[]
+
 box.space.sophia:insert{26, "tuple 26"}
 -
-None
+[]
+
 box.space.sophia:insert{27, "tuple 27"}
 -
-None
+[]
+
 box.space.sophia:insert{28, "tuple 28"}
 -
-None
+[]
+
 box.space.sophia:insert{29, "tuple 29"}
 -
-None
+[]
+
 box.space.memtx:select{25}
 -
 - [25, tuple 25]
@@ -464,34 +524,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{30, "tuple 30"}
 -
-None
+- [30, tuple 30]
+
 box.space.memtx:insert{31, "tuple 31"}
 -
-None
+- [31, tuple 31]
+
 box.space.memtx:insert{32, "tuple 32"}
 -
-None
+- [32, tuple 32]
+
 box.space.memtx:insert{33, "tuple 33"}
 -
-None
+- [33, tuple 33]
+
 box.space.memtx:insert{34, "tuple 34"}
 -
-None
+- [34, tuple 34]
+
 box.space.sophia:insert{30, "tuple 30"}
 -
-None
+[]
+
 box.space.sophia:insert{31, "tuple 31"}
 -
-None
+[]
+
 box.space.sophia:insert{32, "tuple 32"}
 -
-None
+[]
+
 box.space.sophia:insert{33, "tuple 33"}
 -
-None
+[]
+
 box.space.sophia:insert{34, "tuple 34"}
 -
-None
+[]
+
 box.space.memtx:select{30}
 -
 - [30, tuple 30]
@@ -534,34 +604,44 @@ box.space.sophia:select{34}
 
 box.space.memtx:insert{35, "tuple 35"}
 -
-None
+- [35, tuple 35]
+
 box.space.memtx:insert{36, "tuple 36"}
 -
-None
+- [36, tuple 36]
+
 box.space.memtx:insert{37, "tuple 37"}
 -
-None
+- [37, tuple 37]
+
 box.space.memtx:insert{38, "tuple 38"}
 -
-None
+- [38, tuple 38]
+
 box.space.memtx:insert{39, "tuple 39"}
 -
-None
+- [39, tuple 39]
+
 box.space.sophia:insert{35, "tuple 35"}
 -
-None
+[]
+
 box.space.sophia:insert{36, "tuple 36"}
 -
-None
+[]
+
 box.space.sophia:insert{37, "tuple 37"}
 -
-None
+[]
+
 box.space.sophia:insert{38, "tuple 38"}
 -
-None
+[]
+
 box.space.sophia:insert{39, "tuple 39"}
 -
-None
+[]
+
 box.space.memtx:select{35}
 -
 - [35, tuple 35]
@@ -611,34 +691,44 @@ switch replica to replica
 test 2 iteration
 box.space.memtx:insert{40, "tuple 40"}
 -
-None
+- [40, tuple 40]
+
 box.space.memtx:insert{41, "tuple 41"}
 -
-None
+- [41, tuple 41]
+
 box.space.memtx:insert{42, "tuple 42"}
 -
-None
+- [42, tuple 42]
+
 box.space.memtx:insert{43, "tuple 43"}
 -
-None
+- [43, tuple 43]
+
 box.space.memtx:insert{44, "tuple 44"}
 -
-None
+- [44, tuple 44]
+
 box.space.sophia:insert{40, "tuple 40"}
 -
-None
+[]
+
 box.space.sophia:insert{41, "tuple 41"}
 -
-None
+[]
+
 box.space.sophia:insert{42, "tuple 42"}
 -
-None
+[]
+
 box.space.sophia:insert{43, "tuple 43"}
 -
-None
+[]
+
 box.space.sophia:insert{44, "tuple 44"}
 -
-None
+[]
+
 box.space.memtx:select{40}
 -
 - [40, tuple 40]
@@ -681,34 +771,44 @@ box.space.sophia:select{44}
 
 box.space.memtx:insert{45, "tuple 45"}
 -
-None
+- [45, tuple 45]
+
 box.space.memtx:insert{46, "tuple 46"}
 -
-None
+- [46, tuple 46]
+
 box.space.memtx:insert{47, "tuple 47"}
 -
-None
+- [47, tuple 47]
+
 box.space.memtx:insert{48, "tuple 48"}
 -
-None
+- [48, tuple 48]
+
 box.space.memtx:insert{49, "tuple 49"}
 -
-None
+- [49, tuple 49]
+
 box.space.sophia:insert{45, "tuple 45"}
 -
-None
+[]
+
 box.space.sophia:insert{46, "tuple 46"}
 -
-None
+[]
+
 box.space.sophia:insert{47, "tuple 47"}
 -
-None
+[]
+
 box.space.sophia:insert{48, "tuple 48"}
 -
-None
+[]
+
 box.space.sophia:insert{49, "tuple 49"}
 -
-None
+[]
+
 box.space.memtx:select{45}
 -
 - [45, tuple 45]
@@ -757,34 +857,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{50, "tuple 50"}
 -
-None
+- [50, tuple 50]
+
 box.space.memtx:insert{51, "tuple 51"}
 -
-None
+- [51, tuple 51]
+
 box.space.memtx:insert{52, "tuple 52"}
 -
-None
+- [52, tuple 52]
+
 box.space.memtx:insert{53, "tuple 53"}
 -
-None
+- [53, tuple 53]
+
 box.space.memtx:insert{54, "tuple 54"}
 -
-None
+- [54, tuple 54]
+
 box.space.sophia:insert{50, "tuple 50"}
 -
-None
+[]
+
 box.space.sophia:insert{51, "tuple 51"}
 -
-None
+[]
+
 box.space.sophia:insert{52, "tuple 52"}
 -
-None
+[]
+
 box.space.sophia:insert{53, "tuple 53"}
 -
-None
+[]
+
 box.space.sophia:insert{54, "tuple 54"}
 -
-None
+[]
+
 box.space.memtx:select{50}
 -
 - [50, tuple 50]
@@ -827,34 +937,44 @@ box.space.sophia:select{54}
 
 box.space.memtx:insert{55, "tuple 55"}
 -
-None
+- [55, tuple 55]
+
 box.space.memtx:insert{56, "tuple 56"}
 -
-None
+- [56, tuple 56]
+
 box.space.memtx:insert{57, "tuple 57"}
 -
-None
+- [57, tuple 57]
+
 box.space.memtx:insert{58, "tuple 58"}
 -
-None
+- [58, tuple 58]
+
 box.space.memtx:insert{59, "tuple 59"}
 -
-None
+- [59, tuple 59]
+
 box.space.sophia:insert{55, "tuple 55"}
 -
-None
+[]
+
 box.space.sophia:insert{56, "tuple 56"}
 -
-None
+[]
+
 box.space.sophia:insert{57, "tuple 57"}
 -
-None
+[]
+
 box.space.sophia:insert{58, "tuple 58"}
 -
-None
+[]
+
 box.space.sophia:insert{59, "tuple 59"}
 -
-None
+[]
+
 box.space.memtx:select{55}
 -
 - [55, tuple 55]
@@ -904,34 +1024,44 @@ switch replica to replica
 test 3 iteration
 box.space.memtx:insert{60, "tuple 60"}
 -
-None
+- [60, tuple 60]
+
 box.space.memtx:insert{61, "tuple 61"}
 -
-None
+- [61, tuple 61]
+
 box.space.memtx:insert{62, "tuple 62"}
 -
-None
+- [62, tuple 62]
+
 box.space.memtx:insert{63, "tuple 63"}
 -
-None
+- [63, tuple 63]
+
 box.space.memtx:insert{64, "tuple 64"}
 -
-None
+- [64, tuple 64]
+
 box.space.sophia:insert{60, "tuple 60"}
 -
-None
+[]
+
 box.space.sophia:insert{61, "tuple 61"}
 -
-None
+[]
+
 box.space.sophia:insert{62, "tuple 62"}
 -
-None
+[]
+
 box.space.sophia:insert{63, "tuple 63"}
 -
-None
+[]
+
 box.space.sophia:insert{64, "tuple 64"}
 -
-None
+[]
+
 box.space.memtx:select{60}
 -
 - [60, tuple 60]
@@ -974,34 +1104,44 @@ box.space.sophia:select{64}
 
 box.space.memtx:insert{65, "tuple 65"}
 -
-None
+- [65, tuple 65]
+
 box.space.memtx:insert{66, "tuple 66"}
 -
-None
+- [66, tuple 66]
+
 box.space.memtx:insert{67, "tuple 67"}
 -
-None
+- [67, tuple 67]
+
 box.space.memtx:insert{68, "tuple 68"}
 -
-None
+- [68, tuple 68]
+
 box.space.memtx:insert{69, "tuple 69"}
 -
-None
+- [69, tuple 69]
+
 box.space.sophia:insert{65, "tuple 65"}
 -
-None
+[]
+
 box.space.sophia:insert{66, "tuple 66"}
 -
-None
+[]
+
 box.space.sophia:insert{67, "tuple 67"}
 -
-None
+[]
+
 box.space.sophia:insert{68, "tuple 68"}
 -
-None
+[]
+
 box.space.sophia:insert{69, "tuple 69"}
 -
-None
+[]
+
 box.space.memtx:select{65}
 -
 - [65, tuple 65]
@@ -1050,34 +1190,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{70, "tuple 70"}
 -
-None
+- [70, tuple 70]
+
 box.space.memtx:insert{71, "tuple 71"}
 -
-None
+- [71, tuple 71]
+
 box.space.memtx:insert{72, "tuple 72"}
 -
-None
+- [72, tuple 72]
+
 box.space.memtx:insert{73, "tuple 73"}
 -
-None
+- [73, tuple 73]
+
 box.space.memtx:insert{74, "tuple 74"}
 -
-None
+- [74, tuple 74]
+
 box.space.sophia:insert{70, "tuple 70"}
 -
-None
+[]
+
 box.space.sophia:insert{71, "tuple 71"}
 -
-None
+[]
+
 box.space.sophia:insert{72, "tuple 72"}
 -
-None
+[]
+
 box.space.sophia:insert{73, "tuple 73"}
 -
-None
+[]
+
 box.space.sophia:insert{74, "tuple 74"}
 -
-None
+[]
+
 box.space.memtx:select{70}
 -
 - [70, tuple 70]
@@ -1120,34 +1270,44 @@ box.space.sophia:select{74}
 
 box.space.memtx:insert{75, "tuple 75"}
 -
-None
+- [75, tuple 75]
+
 box.space.memtx:insert{76, "tuple 76"}
 -
-None
+- [76, tuple 76]
+
 box.space.memtx:insert{77, "tuple 77"}
 -
-None
+- [77, tuple 77]
+
 box.space.memtx:insert{78, "tuple 78"}
 -
-None
+- [78, tuple 78]
+
 box.space.memtx:insert{79, "tuple 79"}
 -
-None
+- [79, tuple 79]
+
 box.space.sophia:insert{75, "tuple 75"}
 -
-None
+[]
+
 box.space.sophia:insert{76, "tuple 76"}
 -
-None
+[]
+
 box.space.sophia:insert{77, "tuple 77"}
 -
-None
+[]
+
 box.space.sophia:insert{78, "tuple 78"}
 -
-None
+[]
+
 box.space.sophia:insert{79, "tuple 79"}
 -
-None
+[]
+
 box.space.memtx:select{75}
 -
 - [75, tuple 75]
@@ -1197,34 +1357,44 @@ switch replica to replica
 test 4 iteration
 box.space.memtx:insert{80, "tuple 80"}
 -
-None
+- [80, tuple 80]
+
 box.space.memtx:insert{81, "tuple 81"}
 -
-None
+- [81, tuple 81]
+
 box.space.memtx:insert{82, "tuple 82"}
 -
-None
+- [82, tuple 82]
+
 box.space.memtx:insert{83, "tuple 83"}
 -
-None
+- [83, tuple 83]
+
 box.space.memtx:insert{84, "tuple 84"}
 -
-None
+- [84, tuple 84]
+
 box.space.sophia:insert{80, "tuple 80"}
 -
-None
+[]
+
 box.space.sophia:insert{81, "tuple 81"}
 -
-None
+[]
+
 box.space.sophia:insert{82, "tuple 82"}
 -
-None
+[]
+
 box.space.sophia:insert{83, "tuple 83"}
 -
-None
+[]
+
 box.space.sophia:insert{84, "tuple 84"}
 -
-None
+[]
+
 box.space.memtx:select{80}
 -
 - [80, tuple 80]
@@ -1267,34 +1437,44 @@ box.space.sophia:select{84}
 
 box.space.memtx:insert{85, "tuple 85"}
 -
-None
+- [85, tuple 85]
+
 box.space.memtx:insert{86, "tuple 86"}
 -
-None
+- [86, tuple 86]
+
 box.space.memtx:insert{87, "tuple 87"}
 -
-None
+- [87, tuple 87]
+
 box.space.memtx:insert{88, "tuple 88"}
 -
-None
+- [88, tuple 88]
+
 box.space.memtx:insert{89, "tuple 89"}
 -
-None
+- [89, tuple 89]
+
 box.space.sophia:insert{85, "tuple 85"}
 -
-None
+[]
+
 box.space.sophia:insert{86, "tuple 86"}
 -
-None
+[]
+
 box.space.sophia:insert{87, "tuple 87"}
 -
-None
+[]
+
 box.space.sophia:insert{88, "tuple 88"}
 -
-None
+[]
+
 box.space.sophia:insert{89, "tuple 89"}
 -
-None
+[]
+
 box.space.memtx:select{85}
 -
 - [85, tuple 85]
@@ -1343,34 +1523,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{90, "tuple 90"}
 -
-None
+- [90, tuple 90]
+
 box.space.memtx:insert{91, "tuple 91"}
 -
-None
+- [91, tuple 91]
+
 box.space.memtx:insert{92, "tuple 92"}
 -
-None
+- [92, tuple 92]
+
 box.space.memtx:insert{93, "tuple 93"}
 -
-None
+- [93, tuple 93]
+
 box.space.memtx:insert{94, "tuple 94"}
 -
-None
+- [94, tuple 94]
+
 box.space.sophia:insert{90, "tuple 90"}
 -
-None
+[]
+
 box.space.sophia:insert{91, "tuple 91"}
 -
-None
+[]
+
 box.space.sophia:insert{92, "tuple 92"}
 -
-None
+[]
+
 box.space.sophia:insert{93, "tuple 93"}
 -
-None
+[]
+
 box.space.sophia:insert{94, "tuple 94"}
 -
-None
+[]
+
 box.space.memtx:select{90}
 -
 - [90, tuple 90]
@@ -1413,34 +1603,44 @@ box.space.sophia:select{94}
 
 box.space.memtx:insert{95, "tuple 95"}
 -
-None
+- [95, tuple 95]
+
 box.space.memtx:insert{96, "tuple 96"}
 -
-None
+- [96, tuple 96]
+
 box.space.memtx:insert{97, "tuple 97"}
 -
-None
+- [97, tuple 97]
+
 box.space.memtx:insert{98, "tuple 98"}
 -
-None
+- [98, tuple 98]
+
 box.space.memtx:insert{99, "tuple 99"}
 -
-None
+- [99, tuple 99]
+
 box.space.sophia:insert{95, "tuple 95"}
 -
-None
+[]
+
 box.space.sophia:insert{96, "tuple 96"}
 -
-None
+[]
+
 box.space.sophia:insert{97, "tuple 97"}
 -
-None
+[]
+
 box.space.sophia:insert{98, "tuple 98"}
 -
-None
+[]
+
 box.space.sophia:insert{99, "tuple 99"}
 -
-None
+[]
+
 box.space.memtx:select{95}
 -
 - [95, tuple 95]
@@ -1490,34 +1690,44 @@ switch replica to replica
 test 5 iteration
 box.space.memtx:insert{100, "tuple 100"}
 -
-None
+- [100, tuple 100]
+
 box.space.memtx:insert{101, "tuple 101"}
 -
-None
+- [101, tuple 101]
+
 box.space.memtx:insert{102, "tuple 102"}
 -
-None
+- [102, tuple 102]
+
 box.space.memtx:insert{103, "tuple 103"}
 -
-None
+- [103, tuple 103]
+
 box.space.memtx:insert{104, "tuple 104"}
 -
-None
+- [104, tuple 104]
+
 box.space.sophia:insert{100, "tuple 100"}
 -
-None
+[]
+
 box.space.sophia:insert{101, "tuple 101"}
 -
-None
+[]
+
 box.space.sophia:insert{102, "tuple 102"}
 -
-None
+[]
+
 box.space.sophia:insert{103, "tuple 103"}
 -
-None
+[]
+
 box.space.sophia:insert{104, "tuple 104"}
 -
-None
+[]
+
 box.space.memtx:select{100}
 -
 - [100, tuple 100]
@@ -1560,34 +1770,44 @@ box.space.sophia:select{104}
 
 box.space.memtx:insert{105, "tuple 105"}
 -
-None
+- [105, tuple 105]
+
 box.space.memtx:insert{106, "tuple 106"}
 -
-None
+- [106, tuple 106]
+
 box.space.memtx:insert{107, "tuple 107"}
 -
-None
+- [107, tuple 107]
+
 box.space.memtx:insert{108, "tuple 108"}
 -
-None
+- [108, tuple 108]
+
 box.space.memtx:insert{109, "tuple 109"}
 -
-None
+- [109, tuple 109]
+
 box.space.sophia:insert{105, "tuple 105"}
 -
-None
+[]
+
 box.space.sophia:insert{106, "tuple 106"}
 -
-None
+[]
+
 box.space.sophia:insert{107, "tuple 107"}
 -
-None
+[]
+
 box.space.sophia:insert{108, "tuple 108"}
 -
-None
+[]
+
 box.space.sophia:insert{109, "tuple 109"}
 -
-None
+[]
+
 box.space.memtx:select{105}
 -
 - [105, tuple 105]
@@ -1636,34 +1856,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{110, "tuple 110"}
 -
-None
+- [110, tuple 110]
+
 box.space.memtx:insert{111, "tuple 111"}
 -
-None
+- [111, tuple 111]
+
 box.space.memtx:insert{112, "tuple 112"}
 -
-None
+- [112, tuple 112]
+
 box.space.memtx:insert{113, "tuple 113"}
 -
-None
+- [113, tuple 113]
+
 box.space.memtx:insert{114, "tuple 114"}
 -
-None
+- [114, tuple 114]
+
 box.space.sophia:insert{110, "tuple 110"}
 -
-None
+[]
+
 box.space.sophia:insert{111, "tuple 111"}
 -
-None
+[]
+
 box.space.sophia:insert{112, "tuple 112"}
 -
-None
+[]
+
 box.space.sophia:insert{113, "tuple 113"}
 -
-None
+[]
+
 box.space.sophia:insert{114, "tuple 114"}
 -
-None
+[]
+
 box.space.memtx:select{110}
 -
 - [110, tuple 110]
@@ -1706,34 +1936,44 @@ box.space.sophia:select{114}
 
 box.space.memtx:insert{115, "tuple 115"}
 -
-None
+- [115, tuple 115]
+
 box.space.memtx:insert{116, "tuple 116"}
 -
-None
+- [116, tuple 116]
+
 box.space.memtx:insert{117, "tuple 117"}
 -
-None
+- [117, tuple 117]
+
 box.space.memtx:insert{118, "tuple 118"}
 -
-None
+- [118, tuple 118]
+
 box.space.memtx:insert{119, "tuple 119"}
 -
-None
+- [119, tuple 119]
+
 box.space.sophia:insert{115, "tuple 115"}
 -
-None
+[]
+
 box.space.sophia:insert{116, "tuple 116"}
 -
-None
+[]
+
 box.space.sophia:insert{117, "tuple 117"}
 -
-None
+[]
+
 box.space.sophia:insert{118, "tuple 118"}
 -
-None
+[]
+
 box.space.sophia:insert{119, "tuple 119"}
 -
-None
+[]
+
 box.space.memtx:select{115}
 -
 - [115, tuple 115]
@@ -1783,34 +2023,44 @@ switch replica to replica
 test 6 iteration
 box.space.memtx:insert{120, "tuple 120"}
 -
-None
+- [120, tuple 120]
+
 box.space.memtx:insert{121, "tuple 121"}
 -
-None
+- [121, tuple 121]
+
 box.space.memtx:insert{122, "tuple 122"}
 -
-None
+- [122, tuple 122]
+
 box.space.memtx:insert{123, "tuple 123"}
 -
-None
+- [123, tuple 123]
+
 box.space.memtx:insert{124, "tuple 124"}
 -
-None
+- [124, tuple 124]
+
 box.space.sophia:insert{120, "tuple 120"}
 -
-None
+[]
+
 box.space.sophia:insert{121, "tuple 121"}
 -
-None
+[]
+
 box.space.sophia:insert{122, "tuple 122"}
 -
-None
+[]
+
 box.space.sophia:insert{123, "tuple 123"}
 -
-None
+[]
+
 box.space.sophia:insert{124, "tuple 124"}
 -
-None
+[]
+
 box.space.memtx:select{120}
 -
 - [120, tuple 120]
@@ -1853,34 +2103,44 @@ box.space.sophia:select{124}
 
 box.space.memtx:insert{125, "tuple 125"}
 -
-None
+- [125, tuple 125]
+
 box.space.memtx:insert{126, "tuple 126"}
 -
-None
+- [126, tuple 126]
+
 box.space.memtx:insert{127, "tuple 127"}
 -
-None
+- [127, tuple 127]
+
 box.space.memtx:insert{128, "tuple 128"}
 -
-None
+- [128, tuple 128]
+
 box.space.memtx:insert{129, "tuple 129"}
 -
-None
+- [129, tuple 129]
+
 box.space.sophia:insert{125, "tuple 125"}
 -
-None
+[]
+
 box.space.sophia:insert{126, "tuple 126"}
 -
-None
+[]
+
 box.space.sophia:insert{127, "tuple 127"}
 -
-None
+[]
+
 box.space.sophia:insert{128, "tuple 128"}
 -
-None
+[]
+
 box.space.sophia:insert{129, "tuple 129"}
 -
-None
+[]
+
 box.space.memtx:select{125}
 -
 - [125, tuple 125]
@@ -1929,34 +2189,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{130, "tuple 130"}
 -
-None
+- [130, tuple 130]
+
 box.space.memtx:insert{131, "tuple 131"}
 -
-None
+- [131, tuple 131]
+
 box.space.memtx:insert{132, "tuple 132"}
 -
-None
+- [132, tuple 132]
+
 box.space.memtx:insert{133, "tuple 133"}
 -
-None
+- [133, tuple 133]
+
 box.space.memtx:insert{134, "tuple 134"}
 -
-None
+- [134, tuple 134]
+
 box.space.sophia:insert{130, "tuple 130"}
 -
-None
+[]
+
 box.space.sophia:insert{131, "tuple 131"}
 -
-None
+[]
+
 box.space.sophia:insert{132, "tuple 132"}
 -
-None
+[]
+
 box.space.sophia:insert{133, "tuple 133"}
 -
-None
+[]
+
 box.space.sophia:insert{134, "tuple 134"}
 -
-None
+[]
+
 box.space.memtx:select{130}
 -
 - [130, tuple 130]
@@ -1999,34 +2269,44 @@ box.space.sophia:select{134}
 
 box.space.memtx:insert{135, "tuple 135"}
 -
-None
+- [135, tuple 135]
+
 box.space.memtx:insert{136, "tuple 136"}
 -
-None
+- [136, tuple 136]
+
 box.space.memtx:insert{137, "tuple 137"}
 -
-None
+- [137, tuple 137]
+
 box.space.memtx:insert{138, "tuple 138"}
 -
-None
+- [138, tuple 138]
+
 box.space.memtx:insert{139, "tuple 139"}
 -
-None
+- [139, tuple 139]
+
 box.space.sophia:insert{135, "tuple 135"}
 -
-None
+[]
+
 box.space.sophia:insert{136, "tuple 136"}
 -
-None
+[]
+
 box.space.sophia:insert{137, "tuple 137"}
 -
-None
+[]
+
 box.space.sophia:insert{138, "tuple 138"}
 -
-None
+[]
+
 box.space.sophia:insert{139, "tuple 139"}
 -
-None
+[]
+
 box.space.memtx:select{135}
 -
 - [135, tuple 135]
@@ -2076,34 +2356,44 @@ switch replica to replica
 test 7 iteration
 box.space.memtx:insert{140, "tuple 140"}
 -
-None
+- [140, tuple 140]
+
 box.space.memtx:insert{141, "tuple 141"}
 -
-None
+- [141, tuple 141]
+
 box.space.memtx:insert{142, "tuple 142"}
 -
-None
+- [142, tuple 142]
+
 box.space.memtx:insert{143, "tuple 143"}
 -
-None
+- [143, tuple 143]
+
 box.space.memtx:insert{144, "tuple 144"}
 -
-None
+- [144, tuple 144]
+
 box.space.sophia:insert{140, "tuple 140"}
 -
-None
+[]
+
 box.space.sophia:insert{141, "tuple 141"}
 -
-None
+[]
+
 box.space.sophia:insert{142, "tuple 142"}
 -
-None
+[]
+
 box.space.sophia:insert{143, "tuple 143"}
 -
-None
+[]
+
 box.space.sophia:insert{144, "tuple 144"}
 -
-None
+[]
+
 box.space.memtx:select{140}
 -
 - [140, tuple 140]
@@ -2146,34 +2436,44 @@ box.space.sophia:select{144}
 
 box.space.memtx:insert{145, "tuple 145"}
 -
-None
+- [145, tuple 145]
+
 box.space.memtx:insert{146, "tuple 146"}
 -
-None
+- [146, tuple 146]
+
 box.space.memtx:insert{147, "tuple 147"}
 -
-None
+- [147, tuple 147]
+
 box.space.memtx:insert{148, "tuple 148"}
 -
-None
+- [148, tuple 148]
+
 box.space.memtx:insert{149, "tuple 149"}
 -
-None
+- [149, tuple 149]
+
 box.space.sophia:insert{145, "tuple 145"}
 -
-None
+[]
+
 box.space.sophia:insert{146, "tuple 146"}
 -
-None
+[]
+
 box.space.sophia:insert{147, "tuple 147"}
 -
-None
+[]
+
 box.space.sophia:insert{148, "tuple 148"}
 -
-None
+[]
+
 box.space.sophia:insert{149, "tuple 149"}
 -
-None
+[]
+
 box.space.memtx:select{145}
 -
 - [145, tuple 145]
@@ -2222,34 +2522,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{150, "tuple 150"}
 -
-None
+- [150, tuple 150]
+
 box.space.memtx:insert{151, "tuple 151"}
 -
-None
+- [151, tuple 151]
+
 box.space.memtx:insert{152, "tuple 152"}
 -
-None
+- [152, tuple 152]
+
 box.space.memtx:insert{153, "tuple 153"}
 -
-None
+- [153, tuple 153]
+
 box.space.memtx:insert{154, "tuple 154"}
 -
-None
+- [154, tuple 154]
+
 box.space.sophia:insert{150, "tuple 150"}
 -
-None
+[]
+
 box.space.sophia:insert{151, "tuple 151"}
 -
-None
+[]
+
 box.space.sophia:insert{152, "tuple 152"}
 -
-None
+[]
+
 box.space.sophia:insert{153, "tuple 153"}
 -
-None
+[]
+
 box.space.sophia:insert{154, "tuple 154"}
 -
-None
+[]
+
 box.space.memtx:select{150}
 -
 - [150, tuple 150]
@@ -2292,34 +2602,44 @@ box.space.sophia:select{154}
 
 box.space.memtx:insert{155, "tuple 155"}
 -
-None
+- [155, tuple 155]
+
 box.space.memtx:insert{156, "tuple 156"}
 -
-None
+- [156, tuple 156]
+
 box.space.memtx:insert{157, "tuple 157"}
 -
-None
+- [157, tuple 157]
+
 box.space.memtx:insert{158, "tuple 158"}
 -
-None
+- [158, tuple 158]
+
 box.space.memtx:insert{159, "tuple 159"}
 -
-None
+- [159, tuple 159]
+
 box.space.sophia:insert{155, "tuple 155"}
 -
-None
+[]
+
 box.space.sophia:insert{156, "tuple 156"}
 -
-None
+[]
+
 box.space.sophia:insert{157, "tuple 157"}
 -
-None
+[]
+
 box.space.sophia:insert{158, "tuple 158"}
 -
-None
+[]
+
 box.space.sophia:insert{159, "tuple 159"}
 -
-None
+[]
+
 box.space.memtx:select{155}
 -
 - [155, tuple 155]
@@ -2369,34 +2689,44 @@ switch replica to replica
 test 8 iteration
 box.space.memtx:insert{160, "tuple 160"}
 -
-None
+- [160, tuple 160]
+
 box.space.memtx:insert{161, "tuple 161"}
 -
-None
+- [161, tuple 161]
+
 box.space.memtx:insert{162, "tuple 162"}
 -
-None
+- [162, tuple 162]
+
 box.space.memtx:insert{163, "tuple 163"}
 -
-None
+- [163, tuple 163]
+
 box.space.memtx:insert{164, "tuple 164"}
 -
-None
+- [164, tuple 164]
+
 box.space.sophia:insert{160, "tuple 160"}
 -
-None
+[]
+
 box.space.sophia:insert{161, "tuple 161"}
 -
-None
+[]
+
 box.space.sophia:insert{162, "tuple 162"}
 -
-None
+[]
+
 box.space.sophia:insert{163, "tuple 163"}
 -
-None
+[]
+
 box.space.sophia:insert{164, "tuple 164"}
 -
-None
+[]
+
 box.space.memtx:select{160}
 -
 - [160, tuple 160]
@@ -2439,34 +2769,44 @@ box.space.sophia:select{164}
 
 box.space.memtx:insert{165, "tuple 165"}
 -
-None
+- [165, tuple 165]
+
 box.space.memtx:insert{166, "tuple 166"}
 -
-None
+- [166, tuple 166]
+
 box.space.memtx:insert{167, "tuple 167"}
 -
-None
+- [167, tuple 167]
+
 box.space.memtx:insert{168, "tuple 168"}
 -
-None
+- [168, tuple 168]
+
 box.space.memtx:insert{169, "tuple 169"}
 -
-None
+- [169, tuple 169]
+
 box.space.sophia:insert{165, "tuple 165"}
 -
-None
+[]
+
 box.space.sophia:insert{166, "tuple 166"}
 -
-None
+[]
+
 box.space.sophia:insert{167, "tuple 167"}
 -
-None
+[]
+
 box.space.sophia:insert{168, "tuple 168"}
 -
-None
+[]
+
 box.space.sophia:insert{169, "tuple 169"}
 -
-None
+[]
+
 box.space.memtx:select{165}
 -
 - [165, tuple 165]
@@ -2515,34 +2855,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{170, "tuple 170"}
 -
-None
+- [170, tuple 170]
+
 box.space.memtx:insert{171, "tuple 171"}
 -
-None
+- [171, tuple 171]
+
 box.space.memtx:insert{172, "tuple 172"}
 -
-None
+- [172, tuple 172]
+
 box.space.memtx:insert{173, "tuple 173"}
 -
-None
+- [173, tuple 173]
+
 box.space.memtx:insert{174, "tuple 174"}
 -
-None
+- [174, tuple 174]
+
 box.space.sophia:insert{170, "tuple 170"}
 -
-None
+[]
+
 box.space.sophia:insert{171, "tuple 171"}
 -
-None
+[]
+
 box.space.sophia:insert{172, "tuple 172"}
 -
-None
+[]
+
 box.space.sophia:insert{173, "tuple 173"}
 -
-None
+[]
+
 box.space.sophia:insert{174, "tuple 174"}
 -
-None
+[]
+
 box.space.memtx:select{170}
 -
 - [170, tuple 170]
@@ -2585,34 +2935,44 @@ box.space.sophia:select{174}
 
 box.space.memtx:insert{175, "tuple 175"}
 -
-None
+- [175, tuple 175]
+
 box.space.memtx:insert{176, "tuple 176"}
 -
-None
+- [176, tuple 176]
+
 box.space.memtx:insert{177, "tuple 177"}
 -
-None
+- [177, tuple 177]
+
 box.space.memtx:insert{178, "tuple 178"}
 -
-None
+- [178, tuple 178]
+
 box.space.memtx:insert{179, "tuple 179"}
 -
-None
+- [179, tuple 179]
+
 box.space.sophia:insert{175, "tuple 175"}
 -
-None
+[]
+
 box.space.sophia:insert{176, "tuple 176"}
 -
-None
+[]
+
 box.space.sophia:insert{177, "tuple 177"}
 -
-None
+[]
+
 box.space.sophia:insert{178, "tuple 178"}
 -
-None
+[]
+
 box.space.sophia:insert{179, "tuple 179"}
 -
-None
+[]
+
 box.space.memtx:select{175}
 -
 - [175, tuple 175]
@@ -2662,34 +3022,44 @@ switch replica to replica
 test 9 iteration
 box.space.memtx:insert{180, "tuple 180"}
 -
-None
+- [180, tuple 180]
+
 box.space.memtx:insert{181, "tuple 181"}
 -
-None
+- [181, tuple 181]
+
 box.space.memtx:insert{182, "tuple 182"}
 -
-None
+- [182, tuple 182]
+
 box.space.memtx:insert{183, "tuple 183"}
 -
-None
+- [183, tuple 183]
+
 box.space.memtx:insert{184, "tuple 184"}
 -
-None
+- [184, tuple 184]
+
 box.space.sophia:insert{180, "tuple 180"}
 -
-None
+[]
+
 box.space.sophia:insert{181, "tuple 181"}
 -
-None
+[]
+
 box.space.sophia:insert{182, "tuple 182"}
 -
-None
+[]
+
 box.space.sophia:insert{183, "tuple 183"}
 -
-None
+[]
+
 box.space.sophia:insert{184, "tuple 184"}
 -
-None
+[]
+
 box.space.memtx:select{180}
 -
 - [180, tuple 180]
@@ -2732,34 +3102,44 @@ box.space.sophia:select{184}
 
 box.space.memtx:insert{185, "tuple 185"}
 -
-None
+- [185, tuple 185]
+
 box.space.memtx:insert{186, "tuple 186"}
 -
-None
+- [186, tuple 186]
+
 box.space.memtx:insert{187, "tuple 187"}
 -
-None
+- [187, tuple 187]
+
 box.space.memtx:insert{188, "tuple 188"}
 -
-None
+- [188, tuple 188]
+
 box.space.memtx:insert{189, "tuple 189"}
 -
-None
+- [189, tuple 189]
+
 box.space.sophia:insert{185, "tuple 185"}
 -
-None
+[]
+
 box.space.sophia:insert{186, "tuple 186"}
 -
-None
+[]
+
 box.space.sophia:insert{187, "tuple 187"}
 -
-None
+[]
+
 box.space.sophia:insert{188, "tuple 188"}
 -
-None
+[]
+
 box.space.sophia:insert{189, "tuple 189"}
 -
-None
+[]
+
 box.space.memtx:select{185}
 -
 - [185, tuple 185]
@@ -2808,34 +3188,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{190, "tuple 190"}
 -
-None
+- [190, tuple 190]
+
 box.space.memtx:insert{191, "tuple 191"}
 -
-None
+- [191, tuple 191]
+
 box.space.memtx:insert{192, "tuple 192"}
 -
-None
+- [192, tuple 192]
+
 box.space.memtx:insert{193, "tuple 193"}
 -
-None
+- [193, tuple 193]
+
 box.space.memtx:insert{194, "tuple 194"}
 -
-None
+- [194, tuple 194]
+
 box.space.sophia:insert{190, "tuple 190"}
 -
-None
+[]
+
 box.space.sophia:insert{191, "tuple 191"}
 -
-None
+[]
+
 box.space.sophia:insert{192, "tuple 192"}
 -
-None
+[]
+
 box.space.sophia:insert{193, "tuple 193"}
 -
-None
+[]
+
 box.space.sophia:insert{194, "tuple 194"}
 -
-None
+[]
+
 box.space.memtx:select{190}
 -
 - [190, tuple 190]
@@ -2878,34 +3268,44 @@ box.space.sophia:select{194}
 
 box.space.memtx:insert{195, "tuple 195"}
 -
-None
+- [195, tuple 195]
+
 box.space.memtx:insert{196, "tuple 196"}
 -
-None
+- [196, tuple 196]
+
 box.space.memtx:insert{197, "tuple 197"}
 -
-None
+- [197, tuple 197]
+
 box.space.memtx:insert{198, "tuple 198"}
 -
-None
+- [198, tuple 198]
+
 box.space.memtx:insert{199, "tuple 199"}
 -
-None
+- [199, tuple 199]
+
 box.space.sophia:insert{195, "tuple 195"}
 -
-None
+[]
+
 box.space.sophia:insert{196, "tuple 196"}
 -
-None
+[]
+
 box.space.sophia:insert{197, "tuple 197"}
 -
-None
+[]
+
 box.space.sophia:insert{198, "tuple 198"}
 -
-None
+[]
+
 box.space.sophia:insert{199, "tuple 199"}
 -
-None
+[]
+
 box.space.memtx:select{195}
 -
 - [195, tuple 195]
@@ -2955,34 +3355,44 @@ switch replica to replica
 test 10 iteration
 box.space.memtx:insert{200, "tuple 200"}
 -
-None
+- [200, tuple 200]
+
 box.space.memtx:insert{201, "tuple 201"}
 -
-None
+- [201, tuple 201]
+
 box.space.memtx:insert{202, "tuple 202"}
 -
-None
+- [202, tuple 202]
+
 box.space.memtx:insert{203, "tuple 203"}
 -
-None
+- [203, tuple 203]
+
 box.space.memtx:insert{204, "tuple 204"}
 -
-None
+- [204, tuple 204]
+
 box.space.sophia:insert{200, "tuple 200"}
 -
-None
+[]
+
 box.space.sophia:insert{201, "tuple 201"}
 -
-None
+[]
+
 box.space.sophia:insert{202, "tuple 202"}
 -
-None
+[]
+
 box.space.sophia:insert{203, "tuple 203"}
 -
-None
+[]
+
 box.space.sophia:insert{204, "tuple 204"}
 -
-None
+[]
+
 box.space.memtx:select{200}
 -
 - [200, tuple 200]
@@ -3025,34 +3435,44 @@ box.space.sophia:select{204}
 
 box.space.memtx:insert{205, "tuple 205"}
 -
-None
+- [205, tuple 205]
+
 box.space.memtx:insert{206, "tuple 206"}
 -
-None
+- [206, tuple 206]
+
 box.space.memtx:insert{207, "tuple 207"}
 -
-None
+- [207, tuple 207]
+
 box.space.memtx:insert{208, "tuple 208"}
 -
-None
+- [208, tuple 208]
+
 box.space.memtx:insert{209, "tuple 209"}
 -
-None
+- [209, tuple 209]
+
 box.space.sophia:insert{205, "tuple 205"}
 -
-None
+[]
+
 box.space.sophia:insert{206, "tuple 206"}
 -
-None
+[]
+
 box.space.sophia:insert{207, "tuple 207"}
 -
-None
+[]
+
 box.space.sophia:insert{208, "tuple 208"}
 -
-None
+[]
+
 box.space.sophia:insert{209, "tuple 209"}
 -
-None
+[]
+
 box.space.memtx:select{205}
 -
 - [205, tuple 205]
@@ -3101,34 +3521,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{210, "tuple 210"}
 -
-None
+- [210, tuple 210]
+
 box.space.memtx:insert{211, "tuple 211"}
 -
-None
+- [211, tuple 211]
+
 box.space.memtx:insert{212, "tuple 212"}
 -
-None
+- [212, tuple 212]
+
 box.space.memtx:insert{213, "tuple 213"}
 -
-None
+- [213, tuple 213]
+
 box.space.memtx:insert{214, "tuple 214"}
 -
-None
+- [214, tuple 214]
+
 box.space.sophia:insert{210, "tuple 210"}
 -
-None
+[]
+
 box.space.sophia:insert{211, "tuple 211"}
 -
-None
+[]
+
 box.space.sophia:insert{212, "tuple 212"}
 -
-None
+[]
+
 box.space.sophia:insert{213, "tuple 213"}
 -
-None
+[]
+
 box.space.sophia:insert{214, "tuple 214"}
 -
-None
+[]
+
 box.space.memtx:select{210}
 -
 - [210, tuple 210]
@@ -3171,34 +3601,44 @@ box.space.sophia:select{214}
 
 box.space.memtx:insert{215, "tuple 215"}
 -
-None
+- [215, tuple 215]
+
 box.space.memtx:insert{216, "tuple 216"}
 -
-None
+- [216, tuple 216]
+
 box.space.memtx:insert{217, "tuple 217"}
 -
-None
+- [217, tuple 217]
+
 box.space.memtx:insert{218, "tuple 218"}
 -
-None
+- [218, tuple 218]
+
 box.space.memtx:insert{219, "tuple 219"}
 -
-None
+- [219, tuple 219]
+
 box.space.sophia:insert{215, "tuple 215"}
 -
-None
+[]
+
 box.space.sophia:insert{216, "tuple 216"}
 -
-None
+[]
+
 box.space.sophia:insert{217, "tuple 217"}
 -
-None
+[]
+
 box.space.sophia:insert{218, "tuple 218"}
 -
-None
+[]
+
 box.space.sophia:insert{219, "tuple 219"}
 -
-None
+[]
+
 box.space.memtx:select{215}
 -
 - [215, tuple 215]
@@ -3248,34 +3688,44 @@ switch replica to replica
 test 11 iteration
 box.space.memtx:insert{220, "tuple 220"}
 -
-None
+- [220, tuple 220]
+
 box.space.memtx:insert{221, "tuple 221"}
 -
-None
+- [221, tuple 221]
+
 box.space.memtx:insert{222, "tuple 222"}
 -
-None
+- [222, tuple 222]
+
 box.space.memtx:insert{223, "tuple 223"}
 -
-None
+- [223, tuple 223]
+
 box.space.memtx:insert{224, "tuple 224"}
 -
-None
+- [224, tuple 224]
+
 box.space.sophia:insert{220, "tuple 220"}
 -
-None
+[]
+
 box.space.sophia:insert{221, "tuple 221"}
 -
-None
+[]
+
 box.space.sophia:insert{222, "tuple 222"}
 -
-None
+[]
+
 box.space.sophia:insert{223, "tuple 223"}
 -
-None
+[]
+
 box.space.sophia:insert{224, "tuple 224"}
 -
-None
+[]
+
 box.space.memtx:select{220}
 -
 - [220, tuple 220]
@@ -3318,34 +3768,44 @@ box.space.sophia:select{224}
 
 box.space.memtx:insert{225, "tuple 225"}
 -
-None
+- [225, tuple 225]
+
 box.space.memtx:insert{226, "tuple 226"}
 -
-None
+- [226, tuple 226]
+
 box.space.memtx:insert{227, "tuple 227"}
 -
-None
+- [227, tuple 227]
+
 box.space.memtx:insert{228, "tuple 228"}
 -
-None
+- [228, tuple 228]
+
 box.space.memtx:insert{229, "tuple 229"}
 -
-None
+- [229, tuple 229]
+
 box.space.sophia:insert{225, "tuple 225"}
 -
-None
+[]
+
 box.space.sophia:insert{226, "tuple 226"}
 -
-None
+[]
+
 box.space.sophia:insert{227, "tuple 227"}
 -
-None
+[]
+
 box.space.sophia:insert{228, "tuple 228"}
 -
-None
+[]
+
 box.space.sophia:insert{229, "tuple 229"}
 -
-None
+[]
+
 box.space.memtx:select{225}
 -
 - [225, tuple 225]
@@ -3394,34 +3854,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{230, "tuple 230"}
 -
-None
+- [230, tuple 230]
+
 box.space.memtx:insert{231, "tuple 231"}
 -
-None
+- [231, tuple 231]
+
 box.space.memtx:insert{232, "tuple 232"}
 -
-None
+- [232, tuple 232]
+
 box.space.memtx:insert{233, "tuple 233"}
 -
-None
+- [233, tuple 233]
+
 box.space.memtx:insert{234, "tuple 234"}
 -
-None
+- [234, tuple 234]
+
 box.space.sophia:insert{230, "tuple 230"}
 -
-None
+[]
+
 box.space.sophia:insert{231, "tuple 231"}
 -
-None
+[]
+
 box.space.sophia:insert{232, "tuple 232"}
 -
-None
+[]
+
 box.space.sophia:insert{233, "tuple 233"}
 -
-None
+[]
+
 box.space.sophia:insert{234, "tuple 234"}
 -
-None
+[]
+
 box.space.memtx:select{230}
 -
 - [230, tuple 230]
@@ -3464,34 +3934,44 @@ box.space.sophia:select{234}
 
 box.space.memtx:insert{235, "tuple 235"}
 -
-None
+- [235, tuple 235]
+
 box.space.memtx:insert{236, "tuple 236"}
 -
-None
+- [236, tuple 236]
+
 box.space.memtx:insert{237, "tuple 237"}
 -
-None
+- [237, tuple 237]
+
 box.space.memtx:insert{238, "tuple 238"}
 -
-None
+- [238, tuple 238]
+
 box.space.memtx:insert{239, "tuple 239"}
 -
-None
+- [239, tuple 239]
+
 box.space.sophia:insert{235, "tuple 235"}
 -
-None
+[]
+
 box.space.sophia:insert{236, "tuple 236"}
 -
-None
+[]
+
 box.space.sophia:insert{237, "tuple 237"}
 -
-None
+[]
+
 box.space.sophia:insert{238, "tuple 238"}
 -
-None
+[]
+
 box.space.sophia:insert{239, "tuple 239"}
 -
-None
+[]
+
 box.space.memtx:select{235}
 -
 - [235, tuple 235]
@@ -3541,34 +4021,44 @@ switch replica to replica
 test 12 iteration
 box.space.memtx:insert{240, "tuple 240"}
 -
-None
+- [240, tuple 240]
+
 box.space.memtx:insert{241, "tuple 241"}
 -
-None
+- [241, tuple 241]
+
 box.space.memtx:insert{242, "tuple 242"}
 -
-None
+- [242, tuple 242]
+
 box.space.memtx:insert{243, "tuple 243"}
 -
-None
+- [243, tuple 243]
+
 box.space.memtx:insert{244, "tuple 244"}
 -
-None
+- [244, tuple 244]
+
 box.space.sophia:insert{240, "tuple 240"}
 -
-None
+[]
+
 box.space.sophia:insert{241, "tuple 241"}
 -
-None
+[]
+
 box.space.sophia:insert{242, "tuple 242"}
 -
-None
+[]
+
 box.space.sophia:insert{243, "tuple 243"}
 -
-None
+[]
+
 box.space.sophia:insert{244, "tuple 244"}
 -
-None
+[]
+
 box.space.memtx:select{240}
 -
 - [240, tuple 240]
@@ -3611,34 +4101,44 @@ box.space.sophia:select{244}
 
 box.space.memtx:insert{245, "tuple 245"}
 -
-None
+- [245, tuple 245]
+
 box.space.memtx:insert{246, "tuple 246"}
 -
-None
+- [246, tuple 246]
+
 box.space.memtx:insert{247, "tuple 247"}
 -
-None
+- [247, tuple 247]
+
 box.space.memtx:insert{248, "tuple 248"}
 -
-None
+- [248, tuple 248]
+
 box.space.memtx:insert{249, "tuple 249"}
 -
-None
+- [249, tuple 249]
+
 box.space.sophia:insert{245, "tuple 245"}
 -
-None
+[]
+
 box.space.sophia:insert{246, "tuple 246"}
 -
-None
+[]
+
 box.space.sophia:insert{247, "tuple 247"}
 -
-None
+[]
+
 box.space.sophia:insert{248, "tuple 248"}
 -
-None
+[]
+
 box.space.sophia:insert{249, "tuple 249"}
 -
-None
+[]
+
 box.space.memtx:select{245}
 -
 - [245, tuple 245]
@@ -3687,34 +4187,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{250, "tuple 250"}
 -
-None
+- [250, tuple 250]
+
 box.space.memtx:insert{251, "tuple 251"}
 -
-None
+- [251, tuple 251]
+
 box.space.memtx:insert{252, "tuple 252"}
 -
-None
+- [252, tuple 252]
+
 box.space.memtx:insert{253, "tuple 253"}
 -
-None
+- [253, tuple 253]
+
 box.space.memtx:insert{254, "tuple 254"}
 -
-None
+- [254, tuple 254]
+
 box.space.sophia:insert{250, "tuple 250"}
 -
-None
+[]
+
 box.space.sophia:insert{251, "tuple 251"}
 -
-None
+[]
+
 box.space.sophia:insert{252, "tuple 252"}
 -
-None
+[]
+
 box.space.sophia:insert{253, "tuple 253"}
 -
-None
+[]
+
 box.space.sophia:insert{254, "tuple 254"}
 -
-None
+[]
+
 box.space.memtx:select{250}
 -
 - [250, tuple 250]
@@ -3757,34 +4267,44 @@ box.space.sophia:select{254}
 
 box.space.memtx:insert{255, "tuple 255"}
 -
-None
+- [255, tuple 255]
+
 box.space.memtx:insert{256, "tuple 256"}
 -
-None
+- [256, tuple 256]
+
 box.space.memtx:insert{257, "tuple 257"}
 -
-None
+- [257, tuple 257]
+
 box.space.memtx:insert{258, "tuple 258"}
 -
-None
+- [258, tuple 258]
+
 box.space.memtx:insert{259, "tuple 259"}
 -
-None
+- [259, tuple 259]
+
 box.space.sophia:insert{255, "tuple 255"}
 -
-None
+[]
+
 box.space.sophia:insert{256, "tuple 256"}
 -
-None
+[]
+
 box.space.sophia:insert{257, "tuple 257"}
 -
-None
+[]
+
 box.space.sophia:insert{258, "tuple 258"}
 -
-None
+[]
+
 box.space.sophia:insert{259, "tuple 259"}
 -
-None
+[]
+
 box.space.memtx:select{255}
 -
 - [255, tuple 255]
@@ -3834,34 +4354,44 @@ switch replica to replica
 test 13 iteration
 box.space.memtx:insert{260, "tuple 260"}
 -
-None
+- [260, tuple 260]
+
 box.space.memtx:insert{261, "tuple 261"}
 -
-None
+- [261, tuple 261]
+
 box.space.memtx:insert{262, "tuple 262"}
 -
-None
+- [262, tuple 262]
+
 box.space.memtx:insert{263, "tuple 263"}
 -
-None
+- [263, tuple 263]
+
 box.space.memtx:insert{264, "tuple 264"}
 -
-None
+- [264, tuple 264]
+
 box.space.sophia:insert{260, "tuple 260"}
 -
-None
+[]
+
 box.space.sophia:insert{261, "tuple 261"}
 -
-None
+[]
+
 box.space.sophia:insert{262, "tuple 262"}
 -
-None
+[]
+
 box.space.sophia:insert{263, "tuple 263"}
 -
-None
+[]
+
 box.space.sophia:insert{264, "tuple 264"}
 -
-None
+[]
+
 box.space.memtx:select{260}
 -
 - [260, tuple 260]
@@ -3904,34 +4434,44 @@ box.space.sophia:select{264}
 
 box.space.memtx:insert{265, "tuple 265"}
 -
-None
+- [265, tuple 265]
+
 box.space.memtx:insert{266, "tuple 266"}
 -
-None
+- [266, tuple 266]
+
 box.space.memtx:insert{267, "tuple 267"}
 -
-None
+- [267, tuple 267]
+
 box.space.memtx:insert{268, "tuple 268"}
 -
-None
+- [268, tuple 268]
+
 box.space.memtx:insert{269, "tuple 269"}
 -
-None
+- [269, tuple 269]
+
 box.space.sophia:insert{265, "tuple 265"}
 -
-None
+[]
+
 box.space.sophia:insert{266, "tuple 266"}
 -
-None
+[]
+
 box.space.sophia:insert{267, "tuple 267"}
 -
-None
+[]
+
 box.space.sophia:insert{268, "tuple 268"}
 -
-None
+[]
+
 box.space.sophia:insert{269, "tuple 269"}
 -
-None
+[]
+
 box.space.memtx:select{265}
 -
 - [265, tuple 265]
@@ -3980,34 +4520,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{270, "tuple 270"}
 -
-None
+- [270, tuple 270]
+
 box.space.memtx:insert{271, "tuple 271"}
 -
-None
+- [271, tuple 271]
+
 box.space.memtx:insert{272, "tuple 272"}
 -
-None
+- [272, tuple 272]
+
 box.space.memtx:insert{273, "tuple 273"}
 -
-None
+- [273, tuple 273]
+
 box.space.memtx:insert{274, "tuple 274"}
 -
-None
+- [274, tuple 274]
+
 box.space.sophia:insert{270, "tuple 270"}
 -
-None
+[]
+
 box.space.sophia:insert{271, "tuple 271"}
 -
-None
+[]
+
 box.space.sophia:insert{272, "tuple 272"}
 -
-None
+[]
+
 box.space.sophia:insert{273, "tuple 273"}
 -
-None
+[]
+
 box.space.sophia:insert{274, "tuple 274"}
 -
-None
+[]
+
 box.space.memtx:select{270}
 -
 - [270, tuple 270]
@@ -4050,34 +4600,44 @@ box.space.sophia:select{274}
 
 box.space.memtx:insert{275, "tuple 275"}
 -
-None
+- [275, tuple 275]
+
 box.space.memtx:insert{276, "tuple 276"}
 -
-None
+- [276, tuple 276]
+
 box.space.memtx:insert{277, "tuple 277"}
 -
-None
+- [277, tuple 277]
+
 box.space.memtx:insert{278, "tuple 278"}
 -
-None
+- [278, tuple 278]
+
 box.space.memtx:insert{279, "tuple 279"}
 -
-None
+- [279, tuple 279]
+
 box.space.sophia:insert{275, "tuple 275"}
 -
-None
+[]
+
 box.space.sophia:insert{276, "tuple 276"}
 -
-None
+[]
+
 box.space.sophia:insert{277, "tuple 277"}
 -
-None
+[]
+
 box.space.sophia:insert{278, "tuple 278"}
 -
-None
+[]
+
 box.space.sophia:insert{279, "tuple 279"}
 -
-None
+[]
+
 box.space.memtx:select{275}
 -
 - [275, tuple 275]
@@ -4127,34 +4687,44 @@ switch replica to replica
 test 14 iteration
 box.space.memtx:insert{280, "tuple 280"}
 -
-None
+- [280, tuple 280]
+
 box.space.memtx:insert{281, "tuple 281"}
 -
-None
+- [281, tuple 281]
+
 box.space.memtx:insert{282, "tuple 282"}
 -
-None
+- [282, tuple 282]
+
 box.space.memtx:insert{283, "tuple 283"}
 -
-None
+- [283, tuple 283]
+
 box.space.memtx:insert{284, "tuple 284"}
 -
-None
+- [284, tuple 284]
+
 box.space.sophia:insert{280, "tuple 280"}
 -
-None
+[]
+
 box.space.sophia:insert{281, "tuple 281"}
 -
-None
+[]
+
 box.space.sophia:insert{282, "tuple 282"}
 -
-None
+[]
+
 box.space.sophia:insert{283, "tuple 283"}
 -
-None
+[]
+
 box.space.sophia:insert{284, "tuple 284"}
 -
-None
+[]
+
 box.space.memtx:select{280}
 -
 - [280, tuple 280]
@@ -4197,34 +4767,44 @@ box.space.sophia:select{284}
 
 box.space.memtx:insert{285, "tuple 285"}
 -
-None
+- [285, tuple 285]
+
 box.space.memtx:insert{286, "tuple 286"}
 -
-None
+- [286, tuple 286]
+
 box.space.memtx:insert{287, "tuple 287"}
 -
-None
+- [287, tuple 287]
+
 box.space.memtx:insert{288, "tuple 288"}
 -
-None
+- [288, tuple 288]
+
 box.space.memtx:insert{289, "tuple 289"}
 -
-None
+- [289, tuple 289]
+
 box.space.sophia:insert{285, "tuple 285"}
 -
-None
+[]
+
 box.space.sophia:insert{286, "tuple 286"}
 -
-None
+[]
+
 box.space.sophia:insert{287, "tuple 287"}
 -
-None
+[]
+
 box.space.sophia:insert{288, "tuple 288"}
 -
-None
+[]
+
 box.space.sophia:insert{289, "tuple 289"}
 -
-None
+[]
+
 box.space.memtx:select{285}
 -
 - [285, tuple 285]
@@ -4273,34 +4853,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{290, "tuple 290"}
 -
-None
+- [290, tuple 290]
+
 box.space.memtx:insert{291, "tuple 291"}
 -
-None
+- [291, tuple 291]
+
 box.space.memtx:insert{292, "tuple 292"}
 -
-None
+- [292, tuple 292]
+
 box.space.memtx:insert{293, "tuple 293"}
 -
-None
+- [293, tuple 293]
+
 box.space.memtx:insert{294, "tuple 294"}
 -
-None
+- [294, tuple 294]
+
 box.space.sophia:insert{290, "tuple 290"}
 -
-None
+[]
+
 box.space.sophia:insert{291, "tuple 291"}
 -
-None
+[]
+
 box.space.sophia:insert{292, "tuple 292"}
 -
-None
+[]
+
 box.space.sophia:insert{293, "tuple 293"}
 -
-None
+[]
+
 box.space.sophia:insert{294, "tuple 294"}
 -
-None
+[]
+
 box.space.memtx:select{290}
 -
 - [290, tuple 290]
@@ -4343,34 +4933,44 @@ box.space.sophia:select{294}
 
 box.space.memtx:insert{295, "tuple 295"}
 -
-None
+- [295, tuple 295]
+
 box.space.memtx:insert{296, "tuple 296"}
 -
-None
+- [296, tuple 296]
+
 box.space.memtx:insert{297, "tuple 297"}
 -
-None
+- [297, tuple 297]
+
 box.space.memtx:insert{298, "tuple 298"}
 -
-None
+- [298, tuple 298]
+
 box.space.memtx:insert{299, "tuple 299"}
 -
-None
+- [299, tuple 299]
+
 box.space.sophia:insert{295, "tuple 295"}
 -
-None
+[]
+
 box.space.sophia:insert{296, "tuple 296"}
 -
-None
+[]
+
 box.space.sophia:insert{297, "tuple 297"}
 -
-None
+[]
+
 box.space.sophia:insert{298, "tuple 298"}
 -
-None
+[]
+
 box.space.sophia:insert{299, "tuple 299"}
 -
-None
+[]
+
 box.space.memtx:select{295}
 -
 - [295, tuple 295]
@@ -4420,34 +5020,44 @@ switch replica to replica
 test 15 iteration
 box.space.memtx:insert{300, "tuple 300"}
 -
-None
+- [300, tuple 300]
+
 box.space.memtx:insert{301, "tuple 301"}
 -
-None
+- [301, tuple 301]
+
 box.space.memtx:insert{302, "tuple 302"}
 -
-None
+- [302, tuple 302]
+
 box.space.memtx:insert{303, "tuple 303"}
 -
-None
+- [303, tuple 303]
+
 box.space.memtx:insert{304, "tuple 304"}
 -
-None
+- [304, tuple 304]
+
 box.space.sophia:insert{300, "tuple 300"}
 -
-None
+[]
+
 box.space.sophia:insert{301, "tuple 301"}
 -
-None
+[]
+
 box.space.sophia:insert{302, "tuple 302"}
 -
-None
+[]
+
 box.space.sophia:insert{303, "tuple 303"}
 -
-None
+[]
+
 box.space.sophia:insert{304, "tuple 304"}
 -
-None
+[]
+
 box.space.memtx:select{300}
 -
 - [300, tuple 300]
@@ -4490,34 +5100,44 @@ box.space.sophia:select{304}
 
 box.space.memtx:insert{305, "tuple 305"}
 -
-None
+- [305, tuple 305]
+
 box.space.memtx:insert{306, "tuple 306"}
 -
-None
+- [306, tuple 306]
+
 box.space.memtx:insert{307, "tuple 307"}
 -
-None
+- [307, tuple 307]
+
 box.space.memtx:insert{308, "tuple 308"}
 -
-None
+- [308, tuple 308]
+
 box.space.memtx:insert{309, "tuple 309"}
 -
-None
+- [309, tuple 309]
+
 box.space.sophia:insert{305, "tuple 305"}
 -
-None
+[]
+
 box.space.sophia:insert{306, "tuple 306"}
 -
-None
+[]
+
 box.space.sophia:insert{307, "tuple 307"}
 -
-None
+[]
+
 box.space.sophia:insert{308, "tuple 308"}
 -
-None
+[]
+
 box.space.sophia:insert{309, "tuple 309"}
 -
-None
+[]
+
 box.space.memtx:select{305}
 -
 - [305, tuple 305]
@@ -4566,34 +5186,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{310, "tuple 310"}
 -
-None
+- [310, tuple 310]
+
 box.space.memtx:insert{311, "tuple 311"}
 -
-None
+- [311, tuple 311]
+
 box.space.memtx:insert{312, "tuple 312"}
 -
-None
+- [312, tuple 312]
+
 box.space.memtx:insert{313, "tuple 313"}
 -
-None
+- [313, tuple 313]
+
 box.space.memtx:insert{314, "tuple 314"}
 -
-None
+- [314, tuple 314]
+
 box.space.sophia:insert{310, "tuple 310"}
 -
-None
+[]
+
 box.space.sophia:insert{311, "tuple 311"}
 -
-None
+[]
+
 box.space.sophia:insert{312, "tuple 312"}
 -
-None
+[]
+
 box.space.sophia:insert{313, "tuple 313"}
 -
-None
+[]
+
 box.space.sophia:insert{314, "tuple 314"}
 -
-None
+[]
+
 box.space.memtx:select{310}
 -
 - [310, tuple 310]
@@ -4636,34 +5266,44 @@ box.space.sophia:select{314}
 
 box.space.memtx:insert{315, "tuple 315"}
 -
-None
+- [315, tuple 315]
+
 box.space.memtx:insert{316, "tuple 316"}
 -
-None
+- [316, tuple 316]
+
 box.space.memtx:insert{317, "tuple 317"}
 -
-None
+- [317, tuple 317]
+
 box.space.memtx:insert{318, "tuple 318"}
 -
-None
+- [318, tuple 318]
+
 box.space.memtx:insert{319, "tuple 319"}
 -
-None
+- [319, tuple 319]
+
 box.space.sophia:insert{315, "tuple 315"}
 -
-None
+[]
+
 box.space.sophia:insert{316, "tuple 316"}
 -
-None
+[]
+
 box.space.sophia:insert{317, "tuple 317"}
 -
-None
+[]
+
 box.space.sophia:insert{318, "tuple 318"}
 -
-None
+[]
+
 box.space.sophia:insert{319, "tuple 319"}
 -
-None
+[]
+
 box.space.memtx:select{315}
 -
 - [315, tuple 315]
@@ -4713,34 +5353,44 @@ switch replica to replica
 test 16 iteration
 box.space.memtx:insert{320, "tuple 320"}
 -
-None
+- [320, tuple 320]
+
 box.space.memtx:insert{321, "tuple 321"}
 -
-None
+- [321, tuple 321]
+
 box.space.memtx:insert{322, "tuple 322"}
 -
-None
+- [322, tuple 322]
+
 box.space.memtx:insert{323, "tuple 323"}
 -
-None
+- [323, tuple 323]
+
 box.space.memtx:insert{324, "tuple 324"}
 -
-None
+- [324, tuple 324]
+
 box.space.sophia:insert{320, "tuple 320"}
 -
-None
+[]
+
 box.space.sophia:insert{321, "tuple 321"}
 -
-None
+[]
+
 box.space.sophia:insert{322, "tuple 322"}
 -
-None
+[]
+
 box.space.sophia:insert{323, "tuple 323"}
 -
-None
+[]
+
 box.space.sophia:insert{324, "tuple 324"}
 -
-None
+[]
+
 box.space.memtx:select{320}
 -
 - [320, tuple 320]
@@ -4783,34 +5433,44 @@ box.space.sophia:select{324}
 
 box.space.memtx:insert{325, "tuple 325"}
 -
-None
+- [325, tuple 325]
+
 box.space.memtx:insert{326, "tuple 326"}
 -
-None
+- [326, tuple 326]
+
 box.space.memtx:insert{327, "tuple 327"}
 -
-None
+- [327, tuple 327]
+
 box.space.memtx:insert{328, "tuple 328"}
 -
-None
+- [328, tuple 328]
+
 box.space.memtx:insert{329, "tuple 329"}
 -
-None
+- [329, tuple 329]
+
 box.space.sophia:insert{325, "tuple 325"}
 -
-None
+[]
+
 box.space.sophia:insert{326, "tuple 326"}
 -
-None
+[]
+
 box.space.sophia:insert{327, "tuple 327"}
 -
-None
+[]
+
 box.space.sophia:insert{328, "tuple 328"}
 -
-None
+[]
+
 box.space.sophia:insert{329, "tuple 329"}
 -
-None
+[]
+
 box.space.memtx:select{325}
 -
 - [325, tuple 325]
@@ -4859,34 +5519,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{330, "tuple 330"}
 -
-None
+- [330, tuple 330]
+
 box.space.memtx:insert{331, "tuple 331"}
 -
-None
+- [331, tuple 331]
+
 box.space.memtx:insert{332, "tuple 332"}
 -
-None
+- [332, tuple 332]
+
 box.space.memtx:insert{333, "tuple 333"}
 -
-None
+- [333, tuple 333]
+
 box.space.memtx:insert{334, "tuple 334"}
 -
-None
+- [334, tuple 334]
+
 box.space.sophia:insert{330, "tuple 330"}
 -
-None
+[]
+
 box.space.sophia:insert{331, "tuple 331"}
 -
-None
+[]
+
 box.space.sophia:insert{332, "tuple 332"}
 -
-None
+[]
+
 box.space.sophia:insert{333, "tuple 333"}
 -
-None
+[]
+
 box.space.sophia:insert{334, "tuple 334"}
 -
-None
+[]
+
 box.space.memtx:select{330}
 -
 - [330, tuple 330]
@@ -4929,34 +5599,44 @@ box.space.sophia:select{334}
 
 box.space.memtx:insert{335, "tuple 335"}
 -
-None
+- [335, tuple 335]
+
 box.space.memtx:insert{336, "tuple 336"}
 -
-None
+- [336, tuple 336]
+
 box.space.memtx:insert{337, "tuple 337"}
 -
-None
+- [337, tuple 337]
+
 box.space.memtx:insert{338, "tuple 338"}
 -
-None
+- [338, tuple 338]
+
 box.space.memtx:insert{339, "tuple 339"}
 -
-None
+- [339, tuple 339]
+
 box.space.sophia:insert{335, "tuple 335"}
 -
-None
+[]
+
 box.space.sophia:insert{336, "tuple 336"}
 -
-None
+[]
+
 box.space.sophia:insert{337, "tuple 337"}
 -
-None
+[]
+
 box.space.sophia:insert{338, "tuple 338"}
 -
-None
+[]
+
 box.space.sophia:insert{339, "tuple 339"}
 -
-None
+[]
+
 box.space.memtx:select{335}
 -
 - [335, tuple 335]
@@ -5006,34 +5686,44 @@ switch replica to replica
 test 17 iteration
 box.space.memtx:insert{340, "tuple 340"}
 -
-None
+- [340, tuple 340]
+
 box.space.memtx:insert{341, "tuple 341"}
 -
-None
+- [341, tuple 341]
+
 box.space.memtx:insert{342, "tuple 342"}
 -
-None
+- [342, tuple 342]
+
 box.space.memtx:insert{343, "tuple 343"}
 -
-None
+- [343, tuple 343]
+
 box.space.memtx:insert{344, "tuple 344"}
 -
-None
+- [344, tuple 344]
+
 box.space.sophia:insert{340, "tuple 340"}
 -
-None
+[]
+
 box.space.sophia:insert{341, "tuple 341"}
 -
-None
+[]
+
 box.space.sophia:insert{342, "tuple 342"}
 -
-None
+[]
+
 box.space.sophia:insert{343, "tuple 343"}
 -
-None
+[]
+
 box.space.sophia:insert{344, "tuple 344"}
 -
-None
+[]
+
 box.space.memtx:select{340}
 -
 - [340, tuple 340]
@@ -5076,34 +5766,44 @@ box.space.sophia:select{344}
 
 box.space.memtx:insert{345, "tuple 345"}
 -
-None
+- [345, tuple 345]
+
 box.space.memtx:insert{346, "tuple 346"}
 -
-None
+- [346, tuple 346]
+
 box.space.memtx:insert{347, "tuple 347"}
 -
-None
+- [347, tuple 347]
+
 box.space.memtx:insert{348, "tuple 348"}
 -
-None
+- [348, tuple 348]
+
 box.space.memtx:insert{349, "tuple 349"}
 -
-None
+- [349, tuple 349]
+
 box.space.sophia:insert{345, "tuple 345"}
 -
-None
+[]
+
 box.space.sophia:insert{346, "tuple 346"}
 -
-None
+[]
+
 box.space.sophia:insert{347, "tuple 347"}
 -
-None
+[]
+
 box.space.sophia:insert{348, "tuple 348"}
 -
-None
+[]
+
 box.space.sophia:insert{349, "tuple 349"}
 -
-None
+[]
+
 box.space.memtx:select{345}
 -
 - [345, tuple 345]
@@ -5152,34 +5852,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{350, "tuple 350"}
 -
-None
+- [350, tuple 350]
+
 box.space.memtx:insert{351, "tuple 351"}
 -
-None
+- [351, tuple 351]
+
 box.space.memtx:insert{352, "tuple 352"}
 -
-None
+- [352, tuple 352]
+
 box.space.memtx:insert{353, "tuple 353"}
 -
-None
+- [353, tuple 353]
+
 box.space.memtx:insert{354, "tuple 354"}
 -
-None
+- [354, tuple 354]
+
 box.space.sophia:insert{350, "tuple 350"}
 -
-None
+[]
+
 box.space.sophia:insert{351, "tuple 351"}
 -
-None
+[]
+
 box.space.sophia:insert{352, "tuple 352"}
 -
-None
+[]
+
 box.space.sophia:insert{353, "tuple 353"}
 -
-None
+[]
+
 box.space.sophia:insert{354, "tuple 354"}
 -
-None
+[]
+
 box.space.memtx:select{350}
 -
 - [350, tuple 350]
@@ -5222,34 +5932,44 @@ box.space.sophia:select{354}
 
 box.space.memtx:insert{355, "tuple 355"}
 -
-None
+- [355, tuple 355]
+
 box.space.memtx:insert{356, "tuple 356"}
 -
-None
+- [356, tuple 356]
+
 box.space.memtx:insert{357, "tuple 357"}
 -
-None
+- [357, tuple 357]
+
 box.space.memtx:insert{358, "tuple 358"}
 -
-None
+- [358, tuple 358]
+
 box.space.memtx:insert{359, "tuple 359"}
 -
-None
+- [359, tuple 359]
+
 box.space.sophia:insert{355, "tuple 355"}
 -
-None
+[]
+
 box.space.sophia:insert{356, "tuple 356"}
 -
-None
+[]
+
 box.space.sophia:insert{357, "tuple 357"}
 -
-None
+[]
+
 box.space.sophia:insert{358, "tuple 358"}
 -
-None
+[]
+
 box.space.sophia:insert{359, "tuple 359"}
 -
-None
+[]
+
 box.space.memtx:select{355}
 -
 - [355, tuple 355]
@@ -5299,34 +6019,44 @@ switch replica to replica
 test 18 iteration
 box.space.memtx:insert{360, "tuple 360"}
 -
-None
+- [360, tuple 360]
+
 box.space.memtx:insert{361, "tuple 361"}
 -
-None
+- [361, tuple 361]
+
 box.space.memtx:insert{362, "tuple 362"}
 -
-None
+- [362, tuple 362]
+
 box.space.memtx:insert{363, "tuple 363"}
 -
-None
+- [363, tuple 363]
+
 box.space.memtx:insert{364, "tuple 364"}
 -
-None
+- [364, tuple 364]
+
 box.space.sophia:insert{360, "tuple 360"}
 -
-None
+[]
+
 box.space.sophia:insert{361, "tuple 361"}
 -
-None
+[]
+
 box.space.sophia:insert{362, "tuple 362"}
 -
-None
+[]
+
 box.space.sophia:insert{363, "tuple 363"}
 -
-None
+[]
+
 box.space.sophia:insert{364, "tuple 364"}
 -
-None
+[]
+
 box.space.memtx:select{360}
 -
 - [360, tuple 360]
@@ -5369,34 +6099,44 @@ box.space.sophia:select{364}
 
 box.space.memtx:insert{365, "tuple 365"}
 -
-None
+- [365, tuple 365]
+
 box.space.memtx:insert{366, "tuple 366"}
 -
-None
+- [366, tuple 366]
+
 box.space.memtx:insert{367, "tuple 367"}
 -
-None
+- [367, tuple 367]
+
 box.space.memtx:insert{368, "tuple 368"}
 -
-None
+- [368, tuple 368]
+
 box.space.memtx:insert{369, "tuple 369"}
 -
-None
+- [369, tuple 369]
+
 box.space.sophia:insert{365, "tuple 365"}
 -
-None
+[]
+
 box.space.sophia:insert{366, "tuple 366"}
 -
-None
+[]
+
 box.space.sophia:insert{367, "tuple 367"}
 -
-None
+[]
+
 box.space.sophia:insert{368, "tuple 368"}
 -
-None
+[]
+
 box.space.sophia:insert{369, "tuple 369"}
 -
-None
+[]
+
 box.space.memtx:select{365}
 -
 - [365, tuple 365]
@@ -5445,34 +6185,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{370, "tuple 370"}
 -
-None
+- [370, tuple 370]
+
 box.space.memtx:insert{371, "tuple 371"}
 -
-None
+- [371, tuple 371]
+
 box.space.memtx:insert{372, "tuple 372"}
 -
-None
+- [372, tuple 372]
+
 box.space.memtx:insert{373, "tuple 373"}
 -
-None
+- [373, tuple 373]
+
 box.space.memtx:insert{374, "tuple 374"}
 -
-None
+- [374, tuple 374]
+
 box.space.sophia:insert{370, "tuple 370"}
 -
-None
+[]
+
 box.space.sophia:insert{371, "tuple 371"}
 -
-None
+[]
+
 box.space.sophia:insert{372, "tuple 372"}
 -
-None
+[]
+
 box.space.sophia:insert{373, "tuple 373"}
 -
-None
+[]
+
 box.space.sophia:insert{374, "tuple 374"}
 -
-None
+[]
+
 box.space.memtx:select{370}
 -
 - [370, tuple 370]
@@ -5515,34 +6265,44 @@ box.space.sophia:select{374}
 
 box.space.memtx:insert{375, "tuple 375"}
 -
-None
+- [375, tuple 375]
+
 box.space.memtx:insert{376, "tuple 376"}
 -
-None
+- [376, tuple 376]
+
 box.space.memtx:insert{377, "tuple 377"}
 -
-None
+- [377, tuple 377]
+
 box.space.memtx:insert{378, "tuple 378"}
 -
-None
+- [378, tuple 378]
+
 box.space.memtx:insert{379, "tuple 379"}
 -
-None
+- [379, tuple 379]
+
 box.space.sophia:insert{375, "tuple 375"}
 -
-None
+[]
+
 box.space.sophia:insert{376, "tuple 376"}
 -
-None
+[]
+
 box.space.sophia:insert{377, "tuple 377"}
 -
-None
+[]
+
 box.space.sophia:insert{378, "tuple 378"}
 -
-None
+[]
+
 box.space.sophia:insert{379, "tuple 379"}
 -
-None
+[]
+
 box.space.memtx:select{375}
 -
 - [375, tuple 375]
@@ -5592,34 +6352,44 @@ switch replica to replica
 test 19 iteration
 box.space.memtx:insert{380, "tuple 380"}
 -
-None
+- [380, tuple 380]
+
 box.space.memtx:insert{381, "tuple 381"}
 -
-None
+- [381, tuple 381]
+
 box.space.memtx:insert{382, "tuple 382"}
 -
-None
+- [382, tuple 382]
+
 box.space.memtx:insert{383, "tuple 383"}
 -
-None
+- [383, tuple 383]
+
 box.space.memtx:insert{384, "tuple 384"}
 -
-None
+- [384, tuple 384]
+
 box.space.sophia:insert{380, "tuple 380"}
 -
-None
+[]
+
 box.space.sophia:insert{381, "tuple 381"}
 -
-None
+[]
+
 box.space.sophia:insert{382, "tuple 382"}
 -
-None
+[]
+
 box.space.sophia:insert{383, "tuple 383"}
 -
-None
+[]
+
 box.space.sophia:insert{384, "tuple 384"}
 -
-None
+[]
+
 box.space.memtx:select{380}
 -
 - [380, tuple 380]
@@ -5662,34 +6432,44 @@ box.space.sophia:select{384}
 
 box.space.memtx:insert{385, "tuple 385"}
 -
-None
+- [385, tuple 385]
+
 box.space.memtx:insert{386, "tuple 386"}
 -
-None
+- [386, tuple 386]
+
 box.space.memtx:insert{387, "tuple 387"}
 -
-None
+- [387, tuple 387]
+
 box.space.memtx:insert{388, "tuple 388"}
 -
-None
+- [388, tuple 388]
+
 box.space.memtx:insert{389, "tuple 389"}
 -
-None
+- [389, tuple 389]
+
 box.space.sophia:insert{385, "tuple 385"}
 -
-None
+[]
+
 box.space.sophia:insert{386, "tuple 386"}
 -
-None
+[]
+
 box.space.sophia:insert{387, "tuple 387"}
 -
-None
+[]
+
 box.space.sophia:insert{388, "tuple 388"}
 -
-None
+[]
+
 box.space.sophia:insert{389, "tuple 389"}
 -
-None
+[]
+
 box.space.memtx:select{385}
 -
 - [385, tuple 385]
@@ -5738,34 +6518,44 @@ box.cfg{replication_source=''}
 switch master to replica
 box.space.memtx:insert{390, "tuple 390"}
 -
-None
+- [390, tuple 390]
+
 box.space.memtx:insert{391, "tuple 391"}
 -
-None
+- [391, tuple 391]
+
 box.space.memtx:insert{392, "tuple 392"}
 -
-None
+- [392, tuple 392]
+
 box.space.memtx:insert{393, "tuple 393"}
 -
-None
+- [393, tuple 393]
+
 box.space.memtx:insert{394, "tuple 394"}
 -
-None
+- [394, tuple 394]
+
 box.space.sophia:insert{390, "tuple 390"}
 -
-None
+[]
+
 box.space.sophia:insert{391, "tuple 391"}
 -
-None
+[]
+
 box.space.sophia:insert{392, "tuple 392"}
 -
-None
+[]
+
 box.space.sophia:insert{393, "tuple 393"}
 -
-None
+[]
+
 box.space.sophia:insert{394, "tuple 394"}
 -
-None
+[]
+
 box.space.memtx:select{390}
 -
 - [390, tuple 390]
@@ -5808,34 +6598,44 @@ box.space.sophia:select{394}
 
 box.space.memtx:insert{395, "tuple 395"}
 -
-None
+- [395, tuple 395]
+
 box.space.memtx:insert{396, "tuple 396"}
 -
-None
+- [396, tuple 396]
+
 box.space.memtx:insert{397, "tuple 397"}
 -
-None
+- [397, tuple 397]
+
 box.space.memtx:insert{398, "tuple 398"}
 -
-None
+- [398, tuple 398]
+
 box.space.memtx:insert{399, "tuple 399"}
 -
-None
+- [399, tuple 399]
+
 box.space.sophia:insert{395, "tuple 395"}
 -
-None
+[]
+
 box.space.sophia:insert{396, "tuple 396"}
 -
-None
+[]
+
 box.space.sophia:insert{397, "tuple 397"}
 -
-None
+[]
+
 box.space.sophia:insert{398, "tuple 398"}
 -
-None
+[]
+
 box.space.sophia:insert{399, "tuple 399"}
 -
-None
+[]
+
 box.space.memtx:select{395}
 -
 - [395, tuple 395]

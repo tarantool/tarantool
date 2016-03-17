@@ -428,7 +428,7 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 		 * iobuf idle, time to trim buffers.
 		 */
 		if (iobuf_is_idle(oldbuf))
-			iobuf_reset(oldbuf);
+			iobuf_reset_mt(oldbuf);
 	}
 	/*
 	 * Rotate buffers. Not strictly necessary, but
@@ -485,15 +485,14 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			   msg->header.type == IPROTO_JOIN) {
 			/**
 			 * Don't mess with the file descriptor
-			 * while join is running. Clear the
-			 * pending events as well, since their
-			 * invocation may re-start the watcher,
-			 * ruining our efforts.
+			 * while join is running. ev_io_stop()
+			 * also clears any pending events, which
+			 * is good, since their invocation may
+			 * re-start the watcher, ruining our
+			 * efforts.
 			 */
 			ev_io_stop(con->loop, &con->output);
-			ev_clear_pending(con->loop, &con->output);
 			ev_io_stop(con->loop, &con->input);
-			ev_clear_pending(con->loop, &con->input);
 			stop_input = true;
 		}
 		msg->request.header = &msg->header;
@@ -608,7 +607,7 @@ iproto_flush(struct iobuf *iobuf, struct iproto_connection *con)
 				/* Quickly recycle the buffer if it's idle. */
 				assert(end->used == obuf_size(&iobuf->out));
 				/* resets wpos and wpend to zero pos */
-				iobuf_reset(iobuf);
+				iobuf_reset_mt(iobuf);
 			} else { /* Avoid assignment reordering. */
 				/* Advance write position. */
 				*begin = *end;

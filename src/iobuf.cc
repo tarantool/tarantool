@@ -121,6 +121,31 @@ iobuf_reset(struct iobuf *iobuf)
 }
 
 void
+iobuf_reset_mt(struct iobuf *iobuf)
+{
+	/*
+	 * If we happen to have fully processed the input,
+	 * move the pos to the start of the input buffer.
+	 */
+	if (ibuf_used(&iobuf->in) == 0) {
+		if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
+			ibuf_reset(&iobuf->in);
+		} else {
+			struct slab_cache *slabc = iobuf->in.slabc;
+			ibuf_destroy(&iobuf->in);
+			ibuf_create(&iobuf->in, slabc, iobuf_readahead);
+		}
+	}
+	/*
+	 * We can't re-create the output buffer in iproto thread,
+	 * since obuf->slabc is from tx thread.
+	 * FIXME: send a message to tx thread to garbage-collect
+	 * the buffer when it's too big.
+	 */
+	obuf_reset(&iobuf->out);
+}
+
+void
 iobuf_init()
 {
 	mempool_create(&iobuf_pool, &cord()->slabc, sizeof(struct iobuf));
