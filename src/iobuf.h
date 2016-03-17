@@ -80,6 +80,9 @@ iobuf_delete_mt(struct iobuf *iobuf);
 void
 iobuf_reset(struct iobuf *iobuf);
 
+void
+iobuf_reset_mt(struct iobuf *iobuf);
+
 /** Return true if there is no input and no output and
  * no one has pinned the buffer - i.e. it's safe to
  * destroy it.
