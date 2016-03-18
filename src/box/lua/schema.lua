@@ -898,6 +898,12 @@ function box.schema.space.bless(space)
         end
         return space.index[0]:len()
     end
+    space_mt.count = function(space, key, opts)
+        if space.index[0] == nil then
+            return 0 -- empty space without indexes, return 0
+        end
+        return space.index[0]:count(key, opts)
+    end
     space_mt.__newindex = index_mt.__newindex
 
     space_mt.get = function(space, key)

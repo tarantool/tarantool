@@ -193,10 +193,13 @@ space:insert{4, 3, 0}
 space:insert{5, 3, 1}
 space:insert{6, 3, 2}
 space.index['i1']:count()
+space:count()
 space.index['i1']:count(1)
+space:count(1)
 space.index['i1']:count(1)
 space.index['i1']:count(2, { iterator = 'LE' })
 space.index['i1']:count(2, { iterator = 'GE' })
+space:count(2, { iterator = 'GE' })
 space.index['i1']:count({2, 0}, { iterator = 'LE' })
 space.index['i1']:count({2, 1}, { iterator = 'GE' })
 

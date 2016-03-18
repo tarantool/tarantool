@@ -543,7 +543,15 @@ space.index['i1']:count()
 ---
 - 6
 ...
+space:count()
+---
+- 6
+...
 space.index['i1']:count(1)
+---
+- 1
+...
+space:count(1)
 ---
 - 1
 ...
@@ -558,6 +566,11 @@ space.index['i1']:count(2, { iterator = 'LE' })
 space.index['i1']:count(2, { iterator = 'GE' })
 ---
 - 5
+...
+space:count(2, { iterator = 'GE' })
+---
+- error: Index 'primary' (HASH) of space 'tweedledum' (memtx) does not support requested
+    iterator type
 ...
 space.index['i1']:count({2, 0}, { iterator = 'LE' })
 ---
