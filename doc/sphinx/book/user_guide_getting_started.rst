@@ -2,11 +2,40 @@
                         Getting started
 -------------------------------------------------------------------------------
 
+This chapter shows how to download, how to install, and how to start Tarantool
+for the first time.
+
+For production, if possible, you should download a binary (executable) package.
+This will ensure that you have the same build of the same version that the
+developers have. That makes analysis easier if later you need to report a problem,
+and avoids subtle problems that might happen if you used different tools or
+different parameters when building from source. The section about binaries is
+“`Downloading and installing a binary package`_”.
+
+For development, you will want to download a source package and make the binary
+by yourself using a C/C++ compiler and common tools. Although this is a bit harder,
+it gives more control. And the source packages include additional files, for example
+the Tarantool test suite. The section about source is “:ref:`building-from-source`”.
 
 If the installation has already been done, then you should try it out. So we've
 provided some instructions that you can use to make a temporary “sandbox”. In a
 few minutes you can start the server and type in some database-manipulation
-statements. The section about sandbox is “`Starting Tarantool and making your first database`_”.
+statements. The section about the sandbox is “`Starting Tarantool and making your first database`_”.
+
+.. _downloading-and-installing-a-binary-package:
+
+=====================================================================
+            Downloading and installing a binary package
+=====================================================================
+
+Binary packages for the stable 1.6.x release are provided at
+http://tarantool.org/download.html. An automatic build system creates,
+tests and publishes packages for every push into the 1.6 branch.
+
+To download and install the package that's appropriate for your OS,
+start a shell (terminal) and enter the command-line instructions provided
+for your OS at http://tarantool.org/download.html.
+
 
 .. _first database:
 
@@ -22,6 +51,8 @@ Create a new directory. It's just for tests, you can delete it when the tests ar
 
     $ mkdir ~/tarantool_sandbox
     $ cd ~/tarantool_sandbox
+
+Here is how to create a simple test database after installing.
 
 Start the server. The server name is tarantool.
 
