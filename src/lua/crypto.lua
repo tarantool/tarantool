@@ -4,6 +4,12 @@ local ffi = require 'ffi'
 local buffer = require('buffer')
 
 ffi.cdef[[
+    /* from openssl/err.h */
+    unsigned long ERR_get_error(void);
+    char *ERR_error_string(unsigned long e, char *buf);
+    void ERR_load_ERR_strings(void);
+    void ERR_load_crypto_strings(void);
+
     /* from openssl/evp.h */
     void OpenSSL_add_all_digests();
     void OpenSSL_add_all_ciphers();
@@ -50,9 +56,14 @@ if ssl == nil then
         if ssl ~= nil then
             ssl.OpenSSL_add_all_digests()
             ssl.OpenSSL_add_all_ciphers()
+            ssl.ERR_load_crypto_strings()
             break
         end
     end
+end
+
+local function openssl_err_str()
+  return ffi.string(ssl.ERR_error_string(ssl.ERR_get_error(), nil))
 end
 
 local digests = {}
@@ -62,7 +73,10 @@ if ssl then
       sha = 'SHA', sha1 = 'SHA1', sha224 = 'SHA224',
       sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
       dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
-      digests[class] = ssl.EVP_get_digestbyname(class)
+      local digest = ssl.EVP_get_digestbyname(class)
+      if digest ~= nil then
+          digests[class] = digest
+      end
   end
 end
 
@@ -75,7 +89,7 @@ end
 local function digest_new(digest)
     local ctx = ssl.EVP_MD_CTX_create()
     if ctx == nil then
-        return error('Can\'t create digest ctx')
+        return error('Can\'t create digest ctx: ' .. openssl_err_str())
     end
     ffi.gc(ctx, digest_gc)
     local self = setmetatable({
@@ -94,7 +108,7 @@ local function digest_init(self)
         return error('Digest context isn\'t usable')
     end
     if ssl.EVP_DigestInit_ex(self.ctx, self.digest, nil) ~= 1 then
-        return error('Can\'t init digest')
+        return error('Can\'t init digest: ' .. openssl_err_str())
     end
     self.initialized = true
 end
@@ -104,7 +118,7 @@ local function digest_update(self, input)
         return error('Digest not initialized')
     end
     if ssl.EVP_DigestUpdate(self.ctx, input, input:len()) ~= 1 then
-        return error('Can\'t update digest')
+        return error('Can\'t update digest: ' .. openssl_err_str())
     end
 end
 
@@ -114,7 +128,7 @@ local function digest_final(self)
     end
     self.initialized = false
     if ssl.EVP_DigestFinal_ex(self.ctx, self.buf.wpos, self.outl) ~= 1 then
-        return error('Can\'t finalize digest')
+        return error('Can\'t finalize digest: ' .. openssl_err_str())
     end
     return ffi.string(self.buf.wpos, self.outl[0])
 end
@@ -142,8 +156,11 @@ if ssl then
       local algo_api = {}
       for mode, mode_name in pairs({cfb = 'CFB', ofb = 'OFB',
           cbc = 'CBC', ecb = 'ECB'}) do
-              algo_api[mode] =
+              local cipher =
                   ssl.EVP_get_cipherbyname(algo_name .. '-' .. mode_name)
+              if cipher ~= nil then
+                  algo_api[mode] = cipher
+              end
       end
       if algo_api ~= {} then
           ciphers[algo] = algo_api
@@ -158,15 +175,24 @@ local function cipher_gc(ctx)
 end
 
 local function cipher_new(cipher, key, iv, direction)
+    local block_size = ssl.EVP_CIPHER_block_size(cipher)
+    if key == nil or key:len() < block_size then
+      return error('Key length should be equal cipher block size ('
+        .. tostring(block_size) .. ')')
+    end
+    if iv == nil or iv:len() < block_size then
+      return error('Initial vector length should be equal cipher block size ('
+        .. tostring(block_size) .. ')')
+    end
     local ctx = ssl.EVP_CIPHER_CTX_new()
     if ctx == nil then
-        return error('Can\'t create cipher ctx')
+        return error('Can\'t create cipher ctx: ' .. openssl_err_str())
     end
     ffi.gc(ctx, cipher_gc)
     local self = setmetatable({
         ctx = ctx,
         cipher = cipher,
-        block_size = ssl.EVP_CIPHER_block_size(cipher),
+        block_size = block_size,
         direction = direction,
         buf = buffer.ibuf(),
         initialized = false,
@@ -180,9 +206,9 @@ local function cipher_init(self, key, iv)
     if self.ctx == nil then
         return error('Cipher context isn\'t usable')
     end
-    if ssl.EVP_CipherInit_ex(self.ctx, self.cipher, nil, 
+    if ssl.EVP_CipherInit_ex(self.ctx, self.cipher, nil,
         key, iv, self.direction) ~= 1 then
-        return error('Can\'t init cipher')
+        return error('Can\'t init cipher:' .. openssl_err_str())
     end
     self.initialized = true
 end
@@ -191,9 +217,13 @@ local function cipher_update(self, input)
     if not self.initialized then
         return error('Cipher not initialized')
     end
+    if input == nil then
+      return ''
+    end
+    input = tostring(input)
     local wpos = self.buf:reserve(input:len() + self.block_size - 1)
     if ssl.EVP_CipherUpdate(self.ctx, wpos, self.outl, input, input:len()) ~= 1 then
-        return error('Can\'t update cipher')
+        return error('Can\'t update cipher:' .. openssl_err_str())
     end
     return ffi.string(wpos, self.outl[0])
 end
@@ -205,7 +235,7 @@ local function cipher_final(self)
     self.initialized = false
     local wpos = self.buf:reserve(self.block_size - 1)
     if ssl.EVP_CipherFinal_ex(self.ctx, wpos, self.outl) ~= 1 then
-        return error('Can\'t finalize cipher')
+        return error('Can\'t finalize cipher:' .. openssl_err_str())
     end
     self.initialized = false
     return ffi.string(wpos, self.outl[0])
@@ -254,7 +284,7 @@ digest_api = setmetatable(digest_api,
     ' is not supported or SSL library not found') end })
 
 local function cipher_mode_error(self, mode)
-  error('Cipher mode' .. mode .. ' is not supported')
+  error('Cipher mode ' .. mode .. ' is not supported')
 end
 
 local cipher_api = {}
