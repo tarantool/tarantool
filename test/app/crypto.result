@@ -1,0 +1,110 @@
+crypto = require('crypto')
+---
+...
+type(crypto)
+---
+- table
+...
+ciph = crypto.cipher.aes128.cbc
+---
+...
+pass = '12345678876543211234567887654321'
+---
+...
+iv = 'abcdefghijklmnopqrstuvwxyz123456'
+---
+...
+enc = ciph.encrypt('test', pass, iv)
+---
+...
+enc
+---
+- !!binary WpJJu6l6oziZcyvND8KueA==
+...
+ciph.decrypt(enc, pass, iv)
+---
+- test
+...
+--Failing scenaries
+crypto.cipher.aes128.cbc.encrypt('a')
+---
+- error: 'builtin/crypto.lua:302: Key length should be equal cipher block size (16)'
+...
+crypto.cipher.aes128.cbc.encrypt('a', '123456', '435')
+---
+- error: 'builtin/crypto.lua:302: Key length should be equal cipher block size (16)'
+...
+crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321')
+---
+- error: 'builtin/crypto.lua:302: Initial vector length should be equal cipher block
+    size (16)'
+...
+crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321', '12')
+---
+- error: 'builtin/crypto.lua:302: Initial vector length should be equal cipher block
+    size (16)'
+...
+crypto.cipher.aes256.cbc.decrypt('a')
+---
+- error: 'builtin/crypto.lua:302: Key length should be equal cipher block size (16)'
+...
+crypto.cipher.aes256.cbc.decrypt('a', '123456', '435')
+---
+- error: 'builtin/crypto.lua:302: Key length should be equal cipher block size (16)'
+...
+crypto.cipher.aes256.cbc.decrypt('a', '12345678876543211234567887654321')
+---
+- error: 'builtin/crypto.lua:302: Initial vector length should be equal cipher block
+    size (16)'
+...
+crypto.cipher.aes256.cbc.decrypt('12', '12345678876543211234567887654321', '12')
+---
+- error: 'builtin/crypto.lua:302: Initial vector length should be equal cipher block
+    size (16)'
+...
+crypto.cipher.aes192.cbc.encrypt.new()
+---
+- error: Key length should be equal cipher block size (16)
+...
+crypto.cipher.aes192.cbc.encrypt.new('123321')
+---
+- error: Key length should be equal cipher block size (16)
+...
+crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678')
+---
+- error: Initial vector length should be equal cipher block size (16)
+...
+crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678', '12345')
+---
+- error: Initial vector length should be equal cipher block size (16)
+...
+crypto.cipher.aes100.efb
+---
+- error: 'builtin/crypto.lua:318: Cipher method aes100 is not supported or SSL library
+    not found'
+...
+crypto.cipher.aes256.nomode
+---
+- error: 'builtin/crypto.lua:287: Cipher mode nomode is not supported'
+...
+crypto.digest.nodigest
+---
+- error: 'builtin/crypto.lua:283: Digest method nodigest is not supported or SSL library
+    not found'
+...
+bad_pass = '87654321123456788765432112345678'
+---
+...
+bad_iv = '123456abcdefghijklmnopqrstuvwxyz'
+---
+...
+ciph.decrypt(enc, bad_pass, iv)
+---
+- error: 'builtin/crypto.lua:304: Can''t finalize cipher:error:06065064:digital envelope
+    routines:EVP_DecryptFinal_ex:bad decrypt'
+...
+ciph.decrypt(enc, pass, bad_iv)
+---
+- error: 'builtin/crypto.lua:304: Can''t finalize cipher:error:06065064:digital envelope
+    routines:EVP_DecryptFinal_ex:bad decrypt'
+...

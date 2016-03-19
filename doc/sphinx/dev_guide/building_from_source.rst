@@ -99,6 +99,7 @@ explain what the steps are, then on the Internet you can look at some example sc
      # For documentation
      sudo pip install pelican
      sudo pip install breathe
+     sudo pip install gevent
      sudo pip install -U sphinx
 
 3. Use :code:`git` to download the latest source code from the
@@ -139,7 +140,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    (``Debug`` is a default used by project maintainers and ``Release`` is used
    when the highest performance is required).
 
-   The option for asking to build documentation is :code:`-DENABLE_DOC=true|false`,
+   The option for asking to build documentation is :code:`-DENABLE_DOC={true}|{false}`,
    which outputs HTML documentation (such as what you're reading now) to the
    subdirectory doc/www/output/doc. Tarantool uses the `Sphinx <http://sphinx-doc.org/>`_
    simplified markup system.
@@ -153,7 +154,7 @@ explain what the steps are, then on the Internet you can look at some example sc
 
      make
 
-   It's possible to say ``make install`` too, but that's not generally done.
+   It's possible to say ``make install`` too, but that isn't always done.
 
 7. Run the test suite. This step is optional. |br| Tarantool's developers always
    run the test suite before they publish new versions. You should run the test

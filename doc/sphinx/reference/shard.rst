@@ -23,7 +23,7 @@ First some terminology:
         decide which shard the tuple belongs to. The hash function is `consistent`_
         so that changing the number of servers will not affect results for many
         keys. The specific hash function that the shard package uses is
-        :func:`digest.guava` in the :codeitalic:`digest` package.
+        :ref:`digest.guava <digest-guava>` in the :codeitalic:`digest` package.
 
     **Queue**
         A temporary list of recent update requests. Sometimes called "batching".

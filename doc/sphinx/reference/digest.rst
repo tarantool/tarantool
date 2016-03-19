@@ -1,3 +1,5 @@
+.. _digest:
+
 -------------------------------------------------------------------------------
                             Package `digest`
 -------------------------------------------------------------------------------
@@ -5,123 +7,78 @@
 .. module:: digest
 
 A "digest" is a value which is returned by a function (usually a
-`Cryptographic hash function`_), applied against a string. Tarantool supports
-five types of cryptographic hash functions (SHA-0_, SHA-1_, SHA-2_, MD4_, MD5)
+`Cryptographic hash function`_), applied against a string.
+Tarantool's digest package supports
+five types of cryptographic hash functions (AES_, MD4_, MD5_, SHA-0_, SHA-1_, SHA-2_)
 as well as a checksum function (CRC32_), two functions for base64_, and two
-non-cryptographic hash functions (guava_, murmur_). The functions in digest are:
+non-cryptographic hash functions (guava_, murmur_).
+Some of the digest functionality is also present in the :ref:`crypto <crypto>` package.
+The functions in digest are:
 
-    :func:`digest.sha() <digest.sha>`, |br|
-    :func:`digest.sha_hex() <digest.sha_hex>`, |br|
-    :func:`digest.sha1() <digest.sha1>`, |br|
-    :func:`digest.sha1_hex() <digest.sha1_hex>`, |br|
-    :func:`digest.sha224() <digest.sha224>`, |br|
-    :func:`digest.sha224_hex() <digest.sha224_hex>`, |br|
-    :func:`digest.sha256() <digest.sha256>`, |br|
-    :func:`digest.sha256_hex() <digest.sha256_hex>`, |br|
-    :func:`digest.sha384() <digest.sha384>`, |br|
-    :func:`digest.sha384_hex() <digest.sha384_hex>`, |br|
-    :func:`digest.sha512() <digest.sha512>`, |br|
-    :func:`digest.sha512_hex() <digest.sha512_hex>`, |br|
-    :func:`digest.md4() <digest.md4>`, |br|
-    :func:`digest.md4_hex() <digest.md4_hex>`, |br|
-    :func:`digest.md5() <digest.md5>`, |br|
-    :func:`digest.md5_hex() <digest.md5_hex>`, |br|
-    :func:`digest.crc32() <digest.crc32>`, |br|
-    :func:`digest.crc32.update() <digest.crc32.update>`, |br|
-    :func:`digest.crc32.new() <digest.crc32.new>`, |br|
-    :func:`digest.base64_encode() <digest.base64_encode>`, |br|
-    :func:`digest.base64_decode() <digest.base64_decode>`, |br|
-    :func:`digest.urandom() <digest.urandom>`, |br|
-    :func:`digest.guava() <digest.guava>`, |br|
-    :func:`digest.murmur() <digest.murmur>`, |br|
-    :func:`digest.murmur.new() <digest.murmur.new>` |br|
+:codebold:`digest.aes256cbc.encrypt(`:codeitalic:`string`, :codeitalic:`key`) |br|
+Returns 256-bit binary string = digest made with AES.
 
+:codebold:`digest.md4(`:codeitalic:`string`) |br|
+Returns 128-bit binary string = digest made with MD4. |br|
 
-.. function:: digest.sha({string})
+:codebold:`digest.md4_hex(`:codeitalic:`string`) |br|
+Returns 32-byte string = hexadecimal of a digest calculated with md4.
 
-    Returns 160-bit digest made with SHA-0. Not recommended.
+:codebold:`digest.md5(`:codeitalic:`string`) |br|
+Returns 128-bit binary string = digest made with MD5.
 
+:codebold:`digest.md5_hex(`:codeitalic:`string`) |br|
+Returns 32-byte string = hexadecimal of a digest calculated with md5.
 
-.. function:: digest.sha_hex({string})
+:codebold:`digest.sha(`:codeitalic:`string`) |br|
+Returns 160-bit binary string = digest made with SHA-0. Not recommended.
 
-    Returns hexadecimal of a digest calculated with sha.
+:codebold:`digest.sha_hex(`:codeitalic:`string`) |br|
+Returns 40-byte string = hexadecimal of a digest calculated with sha.
 
+:codebold:`digest.sha1(`:codeitalic:`string`) |br|
+Returns 160-bit binary string = digest made with SHA-1.
 
-.. function:: digest.sha1({string})
+:codebold:`digest.sha1_hex(`:codeitalic:`string`) |br|
+Returns 40-byte string = hexadecimal of a digest calculated with sha1.
 
-    Returns 160-bit digest made with SHA-1.
+:codebold:`digest.sha224(`:codeitalic:`string`) |br|
+Returns 224-bit binary string = digest made with SHA-2.
 
+:codebold:`digest.sha224_hex(`:codeitalic:`string`) |br|
+Returns 56-byte string = hexadecimal of a digest calculated with sha224.
 
-.. function:: digest.sha1_hex({string})
+:codebold:`digest.sha256(`:codeitalic:`string`) |br|
+Returns 256-bit binary string =  digest made with SHA-2.
 
-    Returns hexadecimal of a digest calculated with sha1.
+:codebold:`digest.sha256_hex(`:codeitalic:`string`) |br|
+Returns 64-byte string = hexadecimal of a digest calculated with sha256.
 
+:codebold:`digest.sha384(`:codeitalic:`string`) |br|
+Returns 384-bit binary string =  digest made with SHA-2.
 
-.. function:: digest.sha224({string})
+:codebold:`digest.sha384_hex(`:codeitalic:`string`) |br|
+Returns 96-byte string = hexadecimal of a digest calculated with sha384.
 
-    Returns 224-bit digest made with SHA-2.
+:codebold:`digest.sha512(`:codeitalic:`string`) |br|
+Returns 512-bit binary tring = digest made with SHA-2.
 
+:codebold:`digest.sha512_hex(`:codeitalic:`string`) |br|
+Returns 128-byte string = hexadecimal of a digest calculated with sha512.
 
-.. function:: digest.sha224_hex({string})
+:codebold:`digest.base64_encode(`:codeitalic:`string`) |br|
+Returns base64 encoding from a regular string.
 
-    Returns hexadecimal of a digest calculated with sha224.
+:codebold:`digest.base64_decode(`:codeitalic:`string`) |br|
+Returns a regular string from a base64 encoding.
 
+:codebold:`digest.urandom(`:codeitalic:`integer`) |br|
+Returns array of random bytes with length = integer.
 
-.. function:: digest.sha256({string})
+:codebold:`digest.crc32(`:codeitalic:`string`) |br|
+Returns 32-bit checksum made with CRC32.
 
-    Returns 256-bit digest made with SHA-2.
-
-
-.. function:: digest.sha256_hex({string})
-
-    Returns hexadecimal of a digest calculated with sha256.
-
-
-.. function:: digest.sha384({string})
-
-    Returns 384-bit digest made with SHA-2.
-
-
-.. function:: digest.sha384_hex({string})
-
-    Returns hexadecimal of a digest calculated with sha384.
-
-
-.. function:: digest.sha512({string})
-
-    Returns 512-bit digest made with SHA-2.
-
-
-.. function:: digest.sha512_hex({string})
-
-    Returns hexadecimal of a digest calculated with sha512.
-
-
-.. function:: digest.md4({string})
-
-    Returns 128-bit digest made with MD4.
-
-
-.. function:: digest.md4_hex({string})
-
-    Returns hexadecimal of a digest calculated with md4.
-
-
-.. function:: digest.md5({string})
-
-    Returns 256-bit digest made with MD5.
-
-
-.. function:: digest.md5_hex({string})
-
-    Returns hexadecimal of a digest calculated with md5.
-
-
-.. function:: digest.crc32({string})
-
-    Returns 32-bit checksum made with CRC32.
-
-    The crc32 and crc32_update function use the `CRC-32C (Castagnoli)`_ polynomial
+    The crc32 and crc32_update functions use the `CRC-32C (Castagnoli)`_ polynomial
     value: 0x11EDC6F41 / 4812730177. If it is necessary to be
     compatible with other checksum functions in other
     programming languages, ensure that the other functions use
@@ -137,35 +94,14 @@ non-cryptographic hash functions (guava_, murmur_). The functions in digest are:
 
     .. _CRC-32C (Castagnoli): https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use
 
+:codebold:`digest.crc32.new()` |br|
+Initiates incremental crc32.
+See :ref:`incremental methods <incremental-digests>` notes.
 
-.. function:: digest.crc32.update({number, string})
+.. _digest-guava:
 
-    Returns update of a checksum calculated with CRC32. See :func:`digest.crc32() <digest.crc32>` notes.
-
-
-.. function:: digest.crc32.new()
-
-    Initiates incremental crc32. See :func:`incremental digests <digest.murmur.new>` notes.
-
-
-.. function:: digest.base64_encode({string})
-
-    Returns base64 encoding from a regular string.
-
-
-.. function:: digest.base64_decode({string})
-
-    Returns a regular string from a base64 encoding.
-
-
-.. function:: digest.urandom({integer})
-
-    Returns array of random bytes with length = integer.
-
-
-.. function:: digest.guava({integer}, {integer})
-
-    Returns a number made with consistent hash.
+:codebold:`digest.guava(`:codeitalic:`integer, integer`) |br|
+Returns a number made with consistent hash.
 
     The guava function uses the `Consistent Hashing`_ algorithm of
     the Google guava library. The first parameter should be a
@@ -173,22 +109,23 @@ non-cryptographic hash functions (guava_, murmur_). The functions in digest are:
     buckets; the returned value will be an integer between 0
     and the number of buckets. For example,
 
-    .. code-block:: tarantoolsession
+    :codenormal:`tarantool>` :codebold:`digest.guava(10863919174838991, 11)` |br|
+    :codenormal:`---` |br|
+    :codenormal:`- 8` |br|
+    :codenormal:`...` |br|
 
-        tarantool> digest.guava(10863919174838991, 11)
-        ---
-        - 8
-        ...
+:codebold:`digest.murmur(`:codeitalic:`string`) |br|
+Returns 32-bit binary string = digest made with MurmurHash.
 
+:codebold:`digest.murmur.new([`:codeitalic:`seed`]) |br|
+Initiates incremental MurmurHash.
+See :ref:`incremental methods <incremental-digests>` notes.
 
-.. function:: digest.murmur({string})
+.. _incremental-digests:
 
-    Returns 32-bit digest made with MurmurHash.
-
-
-.. function:: digest.murmur.new([{seed}])
-
-    Initiates incremental MurmurHash.
+=========================================
+Incremental methods in the digest package
+=========================================
 
     Suppose that a digest is done for a string 'A',
     then a new part 'B' is appended to the string,
@@ -225,43 +162,40 @@ In the following example, the user creates two functions, ``password_insert()``
 which inserts a SHA-1_ digest of the word "**^S^e^c^ret Wordpass**" into a tuple
 set, and ``password_check()`` which requires input of a password.
 
-.. code-block:: tarantoolsession
-
-    tarantool> digest = require('diges')
-    ---
-    ...
-    tarantool> function password_insert()
-             >   box.space.tester:insert{12345, digest.sha1('^S^e^c^ret Wordpass')}
-             >   return 'OK'
-             > end
-    ---
-    ...
-    tarantool> function password_check(password)
-             >   local t
-             >   local t = box.space.tester:select{12345}
-             >   if digest.sha1(password) == t[2] then
-             >     print('Password is valid')
-             >   else
-             >     print('Password is not valid')
-             >   end
-             > end
-    ---
-    ...
-    tarantool> password_insert()
-    ---
-    - 'OK'
-    ...
+    :codenormal:`tarantool>` :codebold:`digest = require('digest')` |br|
+    :codenormal:`---` |br|
+    :codenormal:`...` |br|
+    :codenormal:`tarantool>` :codebold:`function password_insert()` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>`   :codebold:`box.space.tester:insert{12345, digest.sha1('^S^e^c^ret Wordpass')}` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>`   :codebold:`return 'OK'` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end` |br|
+    :codenormal:`---` |br|
+    :codenormal:`...` |br|
+    :codenormal:`tarantool>` :codebold:`function password_check(password)` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| :codebold:`local t` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| :codebold:`local t = box.space.tester:select{12345}` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| :codebold:`if digest.sha1(password) == t[2] then` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| |nbsp| |nbsp| :codebold:`print('Password is valid')` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| :codebold:`else` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| |nbsp| |nbsp| :codebold:`print('Password is not valid')` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` |nbsp| :codebold:`end` |br|
+    |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`>` :codebold:`end` |br|
+    :codenormal:`---` |br|
+    :codenormal:`...` |br|
+    :codenormal:`tarantool>` :codebold:`password_insert()` |br|
+    :codenormal:`---` |br|
+    :codenormal:`- 'OK'` |br|
+    :codenormal:`...` |br|
 
 If a later user calls the ``password_check()`` function and enters
 the wrong password, the result is an error.
 
-.. code-block:: tarantoolsession
+    :codenormal:`tarantool>` :codebold:`password_check('Secret Password')` |br|
+    :codenormal:`Password is not valid` |br|
+    :codenormal:`---` |br|
+    :codenormal:`...` |br|
 
-    tarantool> password_check('Secret Password')
-    Password is not valid
-    ---
-    ...
-
+.. _AES: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 .. _SHA-0: https://en.wikipedia.org/wiki/Sha-0
 .. _SHA-1: https://en.wikipedia.org/wiki/Sha-1
 .. _SHA-2: https://en.wikipedia.org/wiki/Sha-2

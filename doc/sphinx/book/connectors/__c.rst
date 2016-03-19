@@ -5,7 +5,7 @@
 Here is a complete C program that inserts :code:`[99999,'B']` into
 space :code:`examples` via the high-level C API.
 
-.. code-block:: c
+.. code-block
 
     #include <stdio.h>
     #include <stdlib.h>
