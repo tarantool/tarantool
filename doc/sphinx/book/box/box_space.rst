@@ -11,34 +11,73 @@ source code is available in file
 A list of all ``box.space`` functions follows, then comes a list of all
 ``box.space`` members.
 
-    :func:`space_object:create_index() <space_object.create_index>` |br|
-    :func:`space_object:insert() <space_object.insert>` |br|
-    :func:`space_object:select() <space_object.select>` |br|
-    :func:`space_object:get() <space_object.get>` |br|
-    :func:`space_object:drop() <space_object.drop>` |br|
-    :func:`space_object:rename() <space_object.rename>` |br|
-    :func:`space_object:replace() <space_object.replace>` |br|
-    :func:`space_object:put() <space_object.replace>` |br|
-    :func:`space_object:update() <space_object.update>` |br|
-    :func:`space_object:upsert() <space_object.upsert>` |br|
-    :func:`space_object:delete() <space_object.delete>` |br|
-    :func:`space_object:len() <space_object.len>` |br|
-    :func:`space_object:truncate() <space_object.truncate>` |br|
-    :func:`space_object:inc{} <space_object.inc>` |br|
-    :func:`space_object:dec{} <space_object.dec>` |br|
-    :func:`space_object:auto_increment{} <space_object.auto_increment>` |br|
-    :func:`space_object:pairs() <space_object.pairs>`
-    :func:`space_object.id <space_object.id>` |br|
-    :func:`space_object.enabled <space_object.enabled>` |br|
-    :func:`space_object.field_count <space_object.field_count>` |br|
-    :func:`space_object.index <space_object.index>` |br|
+    .. container:: table
 
-    :class:`box.space._schema` |br|
-    :class:`box.space._space` |br|
-    :class:`box.space._index` |br|
-    :class:`box.space._user` |br|
-    :class:`box.space._priv` |br|
-    :class:`box.space._cluster`  |br|
+        **The functions and members of box.space**
+
+        .. rst-class:: left-align-column-1
+        .. rst-class:: left-align-column-2
+
+        +---------------------------------------------------------------------+---------------------------------+
+        | Name                                                                | Use                             |
+        +=====================================================================+=================================+
+        | :func:`space_object:create_index() <space_object.create_index>`     | Create an index                 |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:insert() <space_object.insert>`                 | Insert a tuple                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:select() <space_object.select>`                 | Select one or more tuples       |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:get() <space_object.get>`                       | Select a tuple                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:drop() <space_object.drop>`                     | Destroy a space                 |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:rename() <space_object.rename>`                 | Rename a space                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:replace() <space_object.replace>`               | Insert or replace a tuple       |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:put() <space_object.replace>`                   | Insert or replace a tuple       |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:update() <space_object.update>`                 | Update a tuple                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:upsert() <space_object.upsert>`                 | Update a tuple                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:delete() <space_object.delete>`                 | Delete a tuple                  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:count() <space_object.count>`                   | Get count of tuples             |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:len() <space_object.len>`                       | Get count of tuples             |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:truncate() <space_object.truncate>`             | Delete all tuples               |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:inc{} <space_object.inc>`                       | Increment a tuple's counter     |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:dec{} <space_object.dec>`                       | Decrement a tuple's counter     |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:auto_increment{} <space_object.auto_increment>` | Generate key + Insert a tuple   |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object:pairs() <space_object.pairs>`                   | Prepare for iterating           |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object.id <space_object.id>`                           | .Numeric identifier of space    |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object.enabled <space_object.enabled>`                 | .Flag, true if space is enabled |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object.field_count <space_object.field_count>`         | .Required number of fields      |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :func:`space_object.index <space_object.index>`                     | .Container of space's indexes   |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._schema`                                          | .(Metadata) List of schemas     |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._space`                                           | .(Metadata) List of spaces      |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._index`                                           | .(Metadata) List of indexes     |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._user`                                            | .(Metadata) List of users       |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._priv`                                            | .(Metadata) List of privileges  |
+        +---------------------------------------------------------------------+---------------------------------+
+        | :class:`box.space._cluster`                                         | .(Metadata) List of clusters    |
+        +---------------------------------------------------------------------+---------------------------------+
+
 
 .. module:: box.space
 
@@ -611,6 +650,27 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             - TREE
             ...
+
+    .. method:: count([key], [iterator])
+
+        Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
+        :codeitalic:`key` (type = Lua table or scalar) = key to be matched against the primary index
+        key, which may be multi-part; :codeitalic:`iterator` = comparison method.
+
+        :return: Number of tuples.
+
+        **Example:**
+
+        .. code-block:: tarantoolsession
+
+            tarantool> box.space.tester:count(2, {iterator='GE'})
+            ---
+            - 1
+            ...
+
+    Note re storage engine: sophia does not support :codenormal:`count(...)`.
+    One possible workaround is to say :codenormal:`#select(...)`.
+
 
     .. method:: len()
 
