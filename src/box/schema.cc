@@ -31,7 +31,6 @@
 #include "schema.h"
 #include "user_def.h"
 #include "engine.h"
-#include "space.h"
 #include "memtx_index.h"
 #include "func.h"
 #include "tuple.h"

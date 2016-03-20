@@ -50,6 +50,8 @@ fiber_pool_f(va_list ap)
 {
 	struct fiber_pool *pool = va_arg(ap, struct fiber_pool *);
 	struct stailq *output = va_arg(ap, struct stailq *);
+	struct ev_loop *loop = va_arg(ap, struct ev_loop *);
+	struct ev_async *watcher = va_arg(ap, struct ev_async *);
 	pool->size++;
 	bool was_empty;
 restart:
@@ -59,7 +61,13 @@ restart:
 		while (! stailq_empty(output))
 			cmsg_deliver(stailq_shift_entry(output, struct cmsg, fifo));
 		/* fiber_yield_timeout() is expensive, avoid under load. */
-		fiber_sleep(0);
+		if (ev_is_pending(watcher)) {
+			struct cpipe *pipe = (struct cpipe *) watcher->data;
+			(void) cpipe_peek(pipe);
+			ev_clear_pending(loop, watcher);
+		} else {
+			fiber_reschedule();
+		}
 	}
 
 	/** Put the current fiber into a fiber cache. */
@@ -75,7 +83,6 @@ restart:
 static void
 fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 {
-	(void) loop;
 	(void) events;
 	struct cpipe *pipe = (struct cpipe *) watcher->data;
 	struct fiber_pool *pool = &pipe->pool;
@@ -92,7 +99,7 @@ fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 				error_log(diag_last_error(&fiber()->diag));
 				break;
 			}
-			fiber_start(f, pool, &pipe->output);
+			fiber_start(f, pool, &pipe->output, loop, watcher);
 		} else {
 			/**
 			 * No worries that this watcher may not

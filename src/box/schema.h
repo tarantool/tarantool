@@ -69,6 +69,7 @@ enum {
 
 #include "error.h"
 #include <stdio.h> /* snprintf */
+#include "space.h"
 
 extern uint32_t sc_version;
 
@@ -94,9 +95,16 @@ space_name_by_id(uint32_t id);
 static inline struct space *
 space_cache_find(uint32_t id)
 {
-	struct space *space = space_by_id(id);
-	if (space)
+	static uint32_t scv = 0;
+	static struct space *space = NULL;
+	if (scv != sc_version)
+		space = NULL;
+	if (space && space->def.id == id)
 		return space;
+	if ((space = space_by_id(id))) {
+		scv = sc_version;
+		return space;
+	}
 	tnt_raise(ClientError, ER_NO_SUCH_SPACE, int2str(id));
 }
 
