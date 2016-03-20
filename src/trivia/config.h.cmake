@@ -51,11 +51,6 @@
  */
 #cmakedefine ENABLE_GCOV 1
 /*
- * Defined if configured with ENABLE_TRACE (debug trace into
- * a file specified by TARANTOOL_TRACE environment variable.
- */
-#cmakedefine ENABLE_TRACE 1
-/*
  * Defined if configured with ENABLE_BACKTRACE ('show fiber'
  * showing fiber call stack.
  */
