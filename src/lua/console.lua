@@ -94,6 +94,7 @@ local function remote_eval(self, line)
         self.remote = nil
         self.eval = nil
         self.prompt = nil
+        self.completion = nil
         return ""
     end
     --
@@ -123,7 +124,10 @@ local function local_read(self)
     local prompt = self.prompt
     while true do
         local delim = self.delimiter
-        local line = internal.readline(prompt.. "> ")
+        local line = internal.readline({
+            prompt = prompt.. "> ",
+            completion = self.completion
+        })
         if not line then
             return nil
         end
@@ -207,6 +211,7 @@ local repl_mt = {
         read = local_read;
         eval = local_eval;
         print = local_print;
+        completion = internal.completion_handler;
     };
 }
 
@@ -319,6 +324,7 @@ local function connect(uri)
     self.remote = remote
     self.eval = remote_eval
     self.prompt = string.format("%s:%s", self.remote.host, self.remote.port)
+    self.completion = function () end -- no completion for remote console
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
     return true
 end

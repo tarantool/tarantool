@@ -104,6 +104,7 @@ set (server_sources
      backtrace.cc
      proc_title.c
      coeio_file.c
+     lua/console.c
      lua/digest.c
      lua/init.c
      lua/fiber.c
