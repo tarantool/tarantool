@@ -3,15 +3,14 @@
 -------------------------------------------------------------------------------
 
 The ``fiber-ipc`` package allows sending and receiving messages between
-different processes. The words "different processes" in this context
-mean different connections, different sessions, or different fibers.
+different processes. The words "different processes" in this context mean
+different connections, different sessions, or different fibers.
 
-Call ``fiber.channel()`` to allocate space and get a channel object,
-which will be called channel for examples in this section. Call the
-other ``fiber-ipc`` routines, via channel, to send messages, receive
-messages, or check ipc status. Message exchange is synchronous. The
-channel is garbage collected when no one is using it, as with any
-other Lua object. Use object-oriented syntax, for example
+Call ``fiber.channel()`` to allocate space and get a channel object, which will
+be called channel for examples in this section. Call the other ``fiber-ipc``
+routines, via channel, to send messages, receive messages, or check ipc status.
+Message exchange is synchronous. The channel is garbage collected when no one is
+using it, as with any other Lua object. Use object-oriented syntax, for example
 ``channel:put(message)`` rather than ``fiber.channel.put(message)``.
 
 .. module:: fiber

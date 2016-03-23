@@ -6,8 +6,8 @@
     Resource Identifier), for example :samp:`{konstantin}:{secret_password}@{tarantool.org}:{3301}`.
 
     If there is more than one replication source in a cluster, specify an
-    array of URIs, for example |br|
-    :codenormal:`box.cfg{replication_source = {`:codeitalic:`uri#1,uri#2`:codenormal:`}}` |br|
+    array of URIs, for example: |br|
+    :codenormal:`box.cfg{replication_source = {`:codeitalic:`uri#1, uri#2`:codenormal:`}}` |br|
 
     If one of the URIs is "self" -- that is, if one of
     the URIs is for the same server that :codenormal:`box.cfg{}` is being executed on --
