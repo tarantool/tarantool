@@ -486,7 +486,7 @@ usage:
 	if (top >= 2)
 		mode = lua_tointeger(L, 2);
 	else
-		mode = 0;
+		mode = 0777;
 	lua_pushboolean(L, coeio_mkdir(pathname, mode) == 0);
 	return 1;
 }
