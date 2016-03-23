@@ -109,7 +109,7 @@ functions in digest are:
 
 .. _digest-guava:
 
-.. function:: guaava(integer, integer)
+.. function:: guava(integer, integer)
 
     Returns a number made with consistent hash.
 
