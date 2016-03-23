@@ -29,7 +29,7 @@ For example:
     tarantool> fun = require('fun')
     ---
     ...
-    tarantool> for _k, a in fun_range(3) do
+    tarantool> for _k, a in fun.range(3) do
              >   print(a)
              > end
     1

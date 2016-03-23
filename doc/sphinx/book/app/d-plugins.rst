@@ -595,7 +595,6 @@ on /usr. The PostgreSQL server is already running on the local host 127.0.0.1.
 
 .. code-block:: console
 
-
     $ # Check that the include subdirectory exists
     $ # by looking for /usr/include/postgresql/libpq-fe-h.
     $ [ -f /usr/include/postgresql/libpq-fe.h ] && echo "OK" || echo "Error"

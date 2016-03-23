@@ -647,9 +647,12 @@ cord_init(const char *name)
 	cord->fiber = &cord->sched;
 
 	cord->max_fid = 100;
-
+	/*
+	 * No need to start this event since it's only used for
+	 * ev_feed_event(). Saves a few cycles on every
+	 * event loop iteration.
+	 */
 	ev_async_init(&cord->wakeup_event, fiber_schedule_wakeup);
-	ev_async_start(cord->loop, &cord->wakeup_event);
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 	cord_set_name(name);
