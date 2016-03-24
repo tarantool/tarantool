@@ -568,10 +568,10 @@ API is a direct binding to corresponding methods of index objects of type
 
     .. _index_count:
 
-    .. method:: count(key-value, options)
+    .. method:: count([key], [iterator])
 
         Iterate over an index, counting the number of
-        tuples which equal the provided search criteria.
+        tuples which match the key-value.
 
         Parameters:
 
@@ -579,13 +579,14 @@ API is a direct binding to corresponding methods of index objects of type
         * :samp:`{key-value}` (type = Lua table or scalar) =
           the value which must match the key(s) in the specified index. The type
           may be a list of field-values, or a tuple containing only the
-          field-values; :samp:`{options}`.
+          field-values;  :codeitalic:`iterator` = comparison method.
 
-        :return: the number of matching index keys. The ``count`` function
-                is only applicable for the memtx storage engine.
+        :return: the number of matching index keys.
         :rtype:  number
 
-        Note re storage engine: sophia does not support ``count()``.
+        Note re storage engine: sophia does not support :codenormal:`count(...)`.
+        One possible workaround is to say :codenormal:`#select(...)`.
+
 
         **Example:**
 

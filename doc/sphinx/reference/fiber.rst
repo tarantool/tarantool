@@ -312,7 +312,7 @@ can be reused when another fiber is created.
         See also :data:`box.session.storage <box.session.storage>`.
 
         **Example:**
- 
+
         .. code-block:: tarantoolsession
 
             tarantool> fiber = require('fiber')
@@ -453,4 +453,3 @@ the status is dead because the cancel worked.
     # 102 .  dead . gvar= 421
     ---
     ...
-

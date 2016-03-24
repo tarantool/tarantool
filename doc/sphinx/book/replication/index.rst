@@ -228,69 +228,75 @@ servers will end up with different contents.
                 All the "What If?" Questions
 =====================================================================
 
+.. container:: faq
 
-Q: What if there are more than two servers with master-master? |br|
-A: On each server, specify the :confval:`replication_source` for all the
-others. For example, server #3 would have a request: |br|
-:codenormal:`box.cfg{` |br|
-|nbsp| |nbsp| |nbsp| :codenormal:`replication_source = {`:codeitalic:`uri#1, uri#2`:codenormal:`}` |br|
-:codenormal:`}`
+    :Q: What if there are more than two servers with master-master?
+    :A: On each server, specify the :confval:`replication_source` for all the
+        others. For example, server #3 would have a request:
 
-Q: What if a server should be taken out of the cluster? |br|
-A: Run ``box.cfg{}`` again specifying a blank replication source: |br|
-``box.cfg{replication_source=''}``
+        .. cssclass:: highlight
+        .. parsed-literal::
 
-Q: What if a server leaves the cluster? |br|
-A: The other servers carry on. If the wayward server rejoins, it will
-receive all the updates that the other servers made while it was away.
+            box.cfg{
+                replication_source = { *uri#1*, *uri#2* }
+            }
 
-Q: What if two servers both change the same tuple? |br|
-A: The last changer wins. For example, suppose that server#1 changes the
-tuple, then server#2 changes the tuple. In that case server#2's change
-overrides whatever server#1 did. In order to keep track of who came last,
-Tarantool implements a `vector clock`_.
 
-Q: What if two servers both insert the same tuple? |br|
-A: If a master tries to insert a tuple which a replica has inserted
-already, this is an example of a severe error. Replication stops.
-It will have to be restarted manually.
+    :Q: What if a server should be taken out of the cluster?
+    :A: Run ``box.cfg{}`` again specifying a blank replication source: |br|
+        ``box.cfg{replication_source=''}``
 
-Q: What if a master disappears and the replica must take over? |br|
-A: A message will appear on the replica stating that the connection is
-lost. The replica must now become independent, which can be done by
-saying ``box.cfg{replication_source=''}``.
+    :Q: What if a server leaves the cluster?
+    :A: The other servers carry on. If the wayward server rejoins, it will
+        receive all the updates that the other servers made while it was away.
 
-Q: What if it's necessary to know what cluster a server is in? |br|
-A: The identification of the cluster is a UUID which is generated when the
-first master starts for the first time. This UUID is stored in a tuple
-of the :data:`box.space._schema` system space. So to see it, say:
-``box.space._schema:select{'cluster'}``
+    :Q: What if two servers both change the same tuple?
+    :A: The last changer wins. For example, suppose that server#1 changes the
+        tuple, then server#2 changes the tuple. In that case server#2's change
+        overrides whatever server#1 did. In order to keep track of who came last,
+        Tarantool implements a `vector clock`_.
 
-Q: What if it's necessary to know what other servers belong in the cluster? |br|
-A: The universal identification of a server is a UUID in ``box.info.server.uuid``.
-The ordinal identification of a server within a cluster is a number in ``box.info.server.id``.
-To see all the servers in the cluster, say:
-``box.space._cluster:select{}``. This will return a table with all
-{server.id, server.uuid} tuples for every server that has ever joined
-the cluster.
+    :Q: What if two servers both insert the same tuple?
+    :A: If a master tries to insert a tuple which a replica has inserted
+        already, this is an example of a severe error. Replication stops.
+        It will have to be restarted manually.
 
-Q: What if one of the server's files is corrupted or deleted? |br|
-A: Stop the server, destroy all the database files (the ones with extension
-"snap" or "xlog" or ".inprogress"), restart the server, and catch up
-with the master by contacting it again (just say
-``box.cfg{...replication_source=...}``).
+    :Q: What if a master disappears and the replica must take over?
+    :A: A message will appear on the replica stating that the connection is
+        lost. The replica must now become independent, which can be done by
+        saying ``box.cfg{replication_source=''}``.
 
-Q: What if replication causes security concerns? |br|
-A: Prevent unauthorized replication sources by associating a password with
-every user that has access privileges for the relevant spaces, and every
-user that has a replication :ref:`role <rep-role>`. That way,
-the :ref:`URI` for the :confval:`replication_source` parameter will
-always have to have the long form |br|
-``replication_source='username:password@host:port'``
+    :Q: What if it's necessary to know what cluster a server is in?
+    :A: The identification of the cluster is a UUID which is generated when the
+        first master starts for the first time. This UUID is stored in a tuple
+        of the :data:`box.space._schema` system space. So to see it, say:
+        ``box.space._schema:select{'cluster'}``
 
-Q: What if advanced users want to understand better how it all works? |br|
-A: See the description of server startup with replication in the
-:ref:`Internals <internals-replication>` appendix.
+    :Q: What if it's necessary to know what other servers belong in the cluster?
+    :A: The universal identification of a server is a UUID in ``box.info.server.uuid``.
+        The ordinal identification of a server within a cluster is a number in
+        ``box.info.server.id``. To see all the servers in the cluster, say:
+        ``box.space._cluster:select{}``. This will return a table with all
+        {server.id, server.uuid} tuples for every server that has ever joined
+        the cluster.
+
+    :Q: What if one of the server's files is corrupted or deleted?
+    :A: Stop the server, destroy all the database files (the ones with extension
+        "snap" or "xlog" or ".inprogress"), restart the server, and catch up
+        with the master by contacting it again (just say
+        ``box.cfg{...replication_source=...}``).
+
+    :Q: What if replication causes security concerns?
+    :A: Prevent unauthorized replication sources by associating a password with
+        every user that has access privileges for the relevant spaces, and every
+        user that has a replication :ref:`role <rep-role>`. That way, the
+        :ref:`URI` for the :confval:`replication_source` parameter will always
+        have to have the long form |br|
+        ``replication_source='username:password@host:port'``
+
+    :Q: What if advanced users want to understand better how it all works?
+    :A: See the description of server startup with replication in the
+        :ref:`Internals <internals-replication>` appendix.
 
 .. _vector clock: https://en.wikipedia.org/wiki/Vector_clock
 
