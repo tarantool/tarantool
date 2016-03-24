@@ -485,4 +485,17 @@ tarantool_lua_free()
 		lua_close(tarantool_L);
 	}
 	tarantool_L = NULL;
+
+#if 0
+	/* Temporarily moved to tarantool_free(), tarantool_lua_free() not
+	 * being called due to cleanup order issues
+	 */
+	if (isatty(STDIN_FILENO)) {
+		/*
+		 * Restore terminal state. Doesn't hurt if exiting not
+		 * due to a signal.
+		 */
+		rl_cleanup_after_signal();
+	}
+#endif
 }
