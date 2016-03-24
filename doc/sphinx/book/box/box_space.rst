@@ -78,6 +78,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :class:`box.space._cluster`                                         | .(Metadata) List of clusters    |
         +---------------------------------------------------------------------+---------------------------------+
 
+
 .. module:: box.space
 
 .. class:: space_object
@@ -548,6 +549,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
         :return: null.
 
         Possible errors: it is illegal to modify a primary-key field.
+        It is illegal to use upsert with a space that has a unique secondary index.
 
         **Complexity factors:** Index size, Index type, number of indexes accessed, WAL
         settings.

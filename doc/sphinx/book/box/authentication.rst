@@ -193,7 +193,7 @@ The function for granting a privilege is:
 .. cssclass:: highlight
 .. parsed-literal::
 
-    box.schema.user.grant(*grantee*, *operation*, *object-type*, *obejct-name*[, *options*])
+    box.schema.user.grant(*grantee*, *operation*, *object-type*, *object-name*[, *options*])
     -- OR
     box.schema.user.grant(*grantee*, *operation*, 'universe' [, nil, *options*])
 
