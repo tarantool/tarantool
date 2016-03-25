@@ -142,5 +142,3 @@ end)
 --
 test:check() -- call check() explicitly
 os.exit(0)
-
-

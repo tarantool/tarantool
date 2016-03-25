@@ -1,0 +1,7 @@
+-------------------------------------------------------------------------------
+-- gh-1293: permission denied on tarantoolctl enter
+-------------------------------------------------------------------------------
+
+-- test-run uses tarantoolctl under the hood
+
+string.format("%o", require('fio').stat('app.control').mode)
