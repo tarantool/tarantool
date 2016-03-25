@@ -97,9 +97,9 @@ The shard package will conclude that there is only one shard.
 
     tarantool> cfg = {
              >   servers = {
-             >     { uri = 'loclhost:33131', zone = '1' },
-             >     { uri = 'loclhost:33132', zone = '2' },
-             >     { uri = 'loclhost:33133', zone = '3' },1
+             >     { uri = 'localhost:33131', zone = '1' },
+             >     { uri = 'localhost:33132', zone = '2' },
+             >     { uri = 'localhost:33133', zone = '3' },1
              >   },
              >   login = 'tester',
              >   password = 'pass',
@@ -125,13 +125,13 @@ necessarily an error, because perhaps one of the servers in the list is not aliv
 
     tarantool> cfg = {
              >   servers = {
-             >     { uri = 'loclhost:33131', zone = '1' },
-             >     { uri = 'loclhost:33131', zone = '2' },
-             >     { uri = 'loclhost:33132', zone = '1' },
-             >     { uri = 'loclhost:33133', zone = '2' },
-             >     { uri = 'loclhost:33131', zone = '1' },
-             >     { uri = 'loclhost:33132', zone = '2' },
-             >     { uri = 'loclhost:33133', zone = '1' },
+             >     { uri = 'localhost:33131', zone = '1' },
+             >     { uri = 'localhost:33131', zone = '2' },
+             >     { uri = 'localhost:33132', zone = '1' },
+             >     { uri = 'localhost:33133', zone = '2' },
+             >     { uri = 'localhost:33131', zone = '1' },
+             >     { uri = 'localhost:33132', zone = '2' },
+             >     { uri = 'localhost:33133', zone = '1' },
              >   },
              >   login = 'tester',
              >   password = 'pass',

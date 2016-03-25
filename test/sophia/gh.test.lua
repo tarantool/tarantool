@@ -88,3 +88,31 @@ s:insert{'1','2','3'}
 s:insert{'1','2','0'}
 i:select({'1','2',nil},{iterator='GT'})
 s:drop()
+
+
+-- gh-1407: upsert generate garbage data
+email_space_id = 'email'
+email_space = box.schema.space.create(email_space_id, { engine = 'sophia', if_not_exists = true })
+i = email_space:create_index('primary', { parts = {1, 'STR'} })
+
+time = 1234
+email = "test@domain.com"
+email_hash_index = "asdfasdfs"
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
+box.space.email:select{email}
+box.space.email:drop()

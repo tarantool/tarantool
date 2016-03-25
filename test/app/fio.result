@@ -309,13 +309,31 @@ bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
 ---
 - true
 ...
+dir1 = fio.pathjoin(tmpdir, 'dir1')
+---
+...
+dir2 = fio.pathjoin(tmpdir, 'dir2')
+---
+...
 fio.mkdir(nil)
 ---
 - error: Usage fio.mkdir(pathname[, mode])
 ...
-fio.mkdir(fio.pathjoin(tmpdir, "dir"))
+fio.mkdir(dir1) -- standard mode
 ---
 - true
+...
+fio.mkdir(dir2, 1) -- custom mode
+---
+- true
+...
+string.format('%04o', bit.band(fio.stat(dir1).mode, 0x1FF))
+---
+- '0777'
+...
+string.format('%04o', bit.band(fio.stat(dir2).mode, 0x1FF))
+---
+- '0001'
 ...
 -- cleanup directories
 { fh1:close(), fh3:close() }
@@ -334,7 +352,11 @@ fio.rmdir(nil)
 ---
 - error: 'Usage: fio.rmdir(pathname)'
 ...
-fio.rmdir(fio.pathjoin(tmpdir, "dir"))
+fio.rmdir(dir1)
+---
+- true
+...
+fio.rmdir(dir2)
 ---
 - true
 ...

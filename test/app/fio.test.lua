@@ -103,15 +103,21 @@ bit.band(fh3:stat().mode, 0x1FF) == 0x1F8
 bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
 
 
+dir1 = fio.pathjoin(tmpdir, 'dir1')
+dir2 = fio.pathjoin(tmpdir, 'dir2')
 fio.mkdir(nil)
-fio.mkdir(fio.pathjoin(tmpdir, "dir"))
+fio.mkdir(dir1) -- standard mode
+fio.mkdir(dir2, 1) -- custom mode
+string.format('%04o', bit.band(fio.stat(dir1).mode, 0x1FF))
+string.format('%04o', bit.band(fio.stat(dir2).mode, 0x1FF))
 
 -- cleanup directories
 { fh1:close(), fh3:close() }
 { fh1:close(), errno.strerror(), fh3:close(), errno.strerror() }
 
 fio.rmdir(nil)
-fio.rmdir(fio.pathjoin(tmpdir, "dir"))
+fio.rmdir(dir1)
+fio.rmdir(dir2)
 
 { fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
 { fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }

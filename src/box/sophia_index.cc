@@ -413,7 +413,7 @@ sophia_upsert_mp(char **tuple, int *tuple_size_key, struct key_def *key_def,
 			mp_keysize += mp_sizeof_uint(load_u64(key[i]));
 		i++;
 	}
-	*tuple_size_key = mp_keysize + mp_sizeof_array(key_def->part_count);
+	*tuple_size_key = mp_keysize;
 
 	/* count fields */
 	int count = key_def->part_count;
@@ -474,14 +474,20 @@ sophia_upsert(char **result,
 		sophia_mempool_free(&alloc);
 		return -1;
 	}
+
+	/* skip array size and key */
+	const char *ptr = up;
+	mp_decode_array(&ptr);
+	ptr += tuple_size_key;
+
 	/* get new value */
-	int size = up_size - tuple_size_key;
+	int size = (int)((up + up_size) -  ptr);
 	*result = (char *)malloc(size);
 	if (! *result) {
 		sophia_mempool_free(&alloc);
 		return -1;
 	}
-	memcpy(*result, up + tuple_size_key, size);
+	memcpy(*result, ptr, size);
 	sophia_mempool_free(&alloc);
 	return size;
 }

@@ -7,6 +7,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+-- channel methods ignore extra arguments, as regular Lua functions do
+ignored_args = {'Extra', 'arguments', 'are', 'ignored'}
+---
+...
 ch = fiber.channel(1)
 ---
 ...
@@ -26,7 +30,31 @@ ch:is_empty()
 ---
 - true
 ...
+ch:size(unpack(ignored_args))
+---
+- 1
+...
+ch:count(unpack(ignored_args))
+---
+- 0
+...
+ch:is_full(unpack(ignored_args))
+---
+- false
+...
+ch:is_empty(unpack(ignored_args))
+---
+- true
+...
 ch:get(.1)
+---
+- null
+...
+ch:get(.1, nil)
+---
+- null
+...
+ch:get(.1, nil, unpack(ignored_args))
 ---
 - null
 ...
@@ -44,6 +72,16 @@ ch:put('test')
 ...
 ch:get()
 ---
+- test
+...
+ch:put('test', nil), ch:get()
+---
+- true
+- test
+...
+ch:put('test', nil, unpack(ignored_args)), ch:get()
+---
+- true
 - test
 ...
 ch:get('wrong timeout')
