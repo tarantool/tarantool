@@ -230,6 +230,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	cpipe_create(&writer->tx_pipe);
 	cpipe_create(&writer->wal_pipe);
+	cpipe_set_max_input(&writer->wal_pipe, IOV_MAX);
 
 	writer->batch = fio_batch_new();
 	if (writer->batch == NULL)
@@ -655,6 +656,8 @@ wal_write(struct wal_writer *writer, struct wal_request *req)
 		stailq_add_tail_entry(&batch->commit, req, fifo);
 		cpipe_push(&writer->wal_pipe, batch);
 	}
+	writer->wal_pipe.n_input += req->n_rows * XROW_IOVMAX;
+	cpipe_flush_input(&writer->wal_pipe);
 	/**
 	 * It's not safe to spuriously wakeup this fiber
 	 * since in that case it will ignore a possible
