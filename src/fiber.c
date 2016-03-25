@@ -351,12 +351,7 @@ fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 	(void) revents;
 	struct fiber *fiber = watcher->data;
 	assert(fiber() == &cord()->sched);
-	/*
-	 * Assert the fiber will not be scheduled twice because
-	 * it's also on the 'ready' list.
-	 */
-	assert(rlist_empty(&fiber->state));
-	fiber_call(fiber);
+	fiber_wakeup(fiber);
 }
 
 static inline void

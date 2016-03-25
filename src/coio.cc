@@ -722,7 +722,7 @@ coio_wait_cb(struct ev_loop *loop, ev_io *watcher, int revents)
 	(void) loop;
 	struct coio_wdata *wdata = (struct coio_wdata *) watcher->data;
 	wdata->revents = revents;
-	fiber_call(wdata->fiber);
+	fiber_wakeup(wdata->fiber);
 }
 
 int

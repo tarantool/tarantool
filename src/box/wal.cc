@@ -160,12 +160,12 @@ static void
 tx_schedule_queue(struct stailq *queue)
 {
 	/*
-	 * Can't use stailq_foreach since fiber_call()
-	 * destroys the list entry.
+	 * fiber_wakeup() is faster than fiber_call() when there
+	 * are many ready fibers.
 	 */
-	struct wal_request *req, *tmp;
-	stailq_foreach_entry_safe(req, tmp, queue, fifo)
-		fiber_call(req->fiber);
+	struct wal_request *req;
+	stailq_foreach_entry(req, queue, fifo)
+		fiber_wakeup(req->fiber);
 }
 
 /**
