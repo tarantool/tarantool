@@ -294,8 +294,6 @@ struct cord {
 	/** The fiber that is currently being executed. */
 	struct fiber *fiber;
 	struct ev_loop *loop;
-	/** Depth of the fiber call stack. */
-	int call_stack_depth;
 	/**
 	 * Every new fiber gets a new monotonic id. Ids 1-100 are
 	 * reserved.

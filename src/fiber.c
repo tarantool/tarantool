@@ -97,11 +97,9 @@ fiber_call(struct fiber *callee)
 	 * removed. */
 	assert(rlist_empty(&callee->state));
 
-	assert(cord->call_stack_depth < FIBER_CALL_STACK);
 	assert(caller);
 	assert(caller != callee);
 
-	cord->call_stack_depth++;
 	cord->fiber = callee;
 	callee->caller = caller;
 
@@ -122,8 +120,6 @@ fiber_start(struct fiber *callee, ...)
 bool
 fiber_checkstack()
 {
-	if (cord()->call_stack_depth + 1 >= FIBER_CALL_STACK)
-		return true;
 	return false;
 }
 
@@ -273,7 +269,6 @@ fiber_yield(void)
 	struct cord *cord = cord();
 	struct fiber *caller = cord->fiber;
 	struct fiber *callee = caller->caller;
-	cord->call_stack_depth--;
 	caller->caller = &cord->sched;
 
 	/** By convention, these triggers must not throw. */
@@ -638,7 +633,6 @@ cord_init(const char *name)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
-	cord->call_stack_depth = 0;
 	cord->sched.fid = 1;
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);

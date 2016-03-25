@@ -128,8 +128,16 @@ result
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
-f = function() fiber.create(f) end
-f()
+--
+--  2016-03-25 kostja
+--
+--  fiber call stack depth was removed, we should
+--  use runtime memory limit control instead; the
+--  old limit was easy to circument with only
+--  slightly more complicated fork bomb code
+--
+-- f = function() fiber.create(f) end
+-- f()
 -- 
 -- Test argument passing
 -- 
