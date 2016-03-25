@@ -621,8 +621,7 @@ introspection (inspecting contents of spaces, accessing server configuration).
 
 .. container:: table
 
-    **Complexity Factors that may affect data manipulation functions in the box
-      library**
+    **Complexity Factors that may affect data manipulation functions in the box library**
 
     .. rst-class:: left-align-column-1
     .. rst-class:: left-align-column-2
