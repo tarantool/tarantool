@@ -123,16 +123,14 @@ fiber_checkstack()
 	return false;
 }
 
-/** Interrupt a synchronous wait of a fiber inside the event loop.
+/**
+ * Interrupt a synchronous wait of a fiber inside the event loop.
  * We do so by keeping an "async" event in every fiber, solely
  * for this purpose, and raising this event here.
  */
-
 void
 fiber_wakeup(struct fiber *f)
 {
-	/** Remove the fiber from whatever wait list it is on. */
-	rlist_del(&f->state);
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
 		/*
@@ -144,6 +142,7 @@ fiber_wakeup(struct fiber *f)
 		 */
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
 	}
+	/** Removes the fiber from whatever wait list it is on. */
 	rlist_move_tail_entry(&cord->ready, f, state);
 }
 
