@@ -69,8 +69,8 @@ restart:
 		cmsg_deliver(stailq_shift_entry(output, struct cmsg, fifo));
 	/* fiber_yield_timeout() is expensive, avoid under load. */
 	if (ev_is_pending(watcher)) {
-		(void) fiber_pool_fetch_output(pool);
 		ev_clear_pending(loop, watcher);
+		(void) fiber_pool_fetch_output(pool);
 		goto restart;
 	}
 
@@ -269,7 +269,7 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	bool pipe_was_empty;
 
 	tt_pthread_mutex_lock(&pool->mutex);
-	pipe_was_empty = !ev_async_pending(&pool->fetch_output);
+	pipe_was_empty = stailq_empty(&pool->pipe);
 	/** Flush input */
 	stailq_concat(&pool->pipe, &pipe->input);
 	tt_pthread_mutex_unlock(&pool->mutex);

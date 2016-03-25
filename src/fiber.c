@@ -78,8 +78,8 @@ update_last_stack_frame(struct fiber *fiber)
 static void
 fiber_recycle(struct fiber *fiber);
 
-void
-fiber_call(struct fiber *callee)
+static void
+fiber_call_impl(struct fiber *callee)
 {
 	struct fiber *caller = fiber();
 	struct cord *cord = cord();
@@ -101,12 +101,18 @@ fiber_call(struct fiber *callee)
 	assert(caller != callee);
 
 	cord->fiber = callee;
-	callee->caller = caller;
 
 	update_last_stack_frame(caller);
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+}
+
+void
+fiber_call(struct fiber *callee)
+{
+	callee->caller = fiber();
+	fiber_call_impl(callee);
 }
 
 void
@@ -357,15 +363,19 @@ fiber_schedule_cb(ev_loop *loop, ev_watcher *watcher, int revents)
 static inline void
 fiber_schedule_list(struct rlist *list)
 {
-	/** Don't schedule both lists at the same time. */
-	struct rlist copy;
-	rlist_create(&copy);
-	rlist_swap(list, &copy);
-	while (! rlist_empty(&copy)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&copy, struct fiber, state);
-		fiber_call(f);
+	struct fiber *first;
+	struct fiber *last;
+
+	assert(! rlist_empty(list));
+
+	first = last = rlist_shift_entry(list, struct fiber, state);
+
+	while (! rlist_empty(list)) {
+		last->caller = rlist_shift_entry(list, struct fiber, state);
+		last = last->caller;
 	}
+	last->caller = fiber();
+	fiber_call_impl(first);
 }
 
 static void

@@ -1057,6 +1057,7 @@ iproto_init()
 	cbus_create(&net_tx_bus);
 	rmean_net_tx_bus = net_tx_bus.stats;
 	cpipe_create(&tx_pipe);
+	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	cpipe_create(&net_pipe);
 
 	static struct cord net_cord;
