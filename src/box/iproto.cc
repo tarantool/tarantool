@@ -1059,6 +1059,7 @@ iproto_init()
 	cpipe_create(&tx_pipe);
 	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
 	cpipe_create(&net_pipe);
+	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
 
 	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
