@@ -873,8 +873,11 @@ static inline void
 mp_tuple_assert(const char *tuple, const char *tuple_end)
 {
 	assert(mp_typeof(*tuple) == MP_ARRAY);
+#ifndef NDEBUG
 	mp_next(&tuple);
+#endif
 	assert(tuple == tuple_end);
+	(void) tuple;
 	(void) tuple_end;
 }
 
