@@ -223,6 +223,29 @@ test_cord(lua_State *L)
 	return 1;
 }
 
+static int
+test_pushcdata(lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "invalid arguments");
+	uint32_t ctypeid = lua_tointeger(L, 1);
+	void *data = luaL_pushcdata(L, ctypeid);
+	lua_pushlightuserdata(L, data);
+	return 2;
+}
+
+static int
+test_checkcdata(lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "invalid arguments");
+	uint32_t ctypeid = 0;
+	void *data = luaL_checkcdata(L, 1, &ctypeid);
+	lua_pushinteger(L, ctypeid);
+	lua_pushlightuserdata(L, data);
+	return 2;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -240,6 +263,8 @@ luaopen_module_api(lua_State *L)
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
 		{"test_cord", test_cord },
+		{"pushcdata", test_pushcdata },
+		{"checkcdata", test_checkcdata },
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

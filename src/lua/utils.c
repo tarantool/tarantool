@@ -56,10 +56,6 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 	CTSize size;
 	CTState *cts = ctype_cts(L);
 	CTInfo info = lj_ctype_info(cts, ctypeid, &size);
-
-	/* Only numbers and pointers are implemented */
-	assert(ctype_isnum(info) || ctype_isptr(info));
-	(void) info;
 	assert(size != CTSIZE_INVALID);
 
 	/* Allocate a new cdata */
@@ -71,15 +67,27 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 	incr_top(L);
 
 	/*
-	 * lj_cconv_ct_init is omitted because it actually does memset()
+	 * lj_cconv_ct_init is omitted for non-structs because it actually
+	 * does memset()
 	 * Caveats: cdata memory is returned uninitialized
 	 */
-
-	/*
-	 * __gc is omitted because it is only needed for structs.
-	 * Caveats: struct are not supported by this function.
-	 * Please set finalizer using luaL_setcdatagc() if you need.
-	 */
+	if (ctype_isstruct(info)) {
+		/* Initialize cdata. */
+		CType *ct = ctype_raw(cts, ctypeid);
+		lj_cconv_ct_init(cts, ct, size, cdataptr(cd), o,
+				 (MSize)(L->top - o));
+		/* Handle ctype __gc metamethod. Use the fast lookup here. */
+		cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)ctypeid);
+		if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
+			GCtab *t = cts->finalizer;
+			if (gcref(t->metatable)) {
+				/* Add to finalizer table, if still enabled. */
+				copyTV(L, lj_tab_set(L, t, o), tv);
+				lj_gc_anybarriert(L, t);
+				cd->marked |= LJ_GC_CDATA_FIN;
+			}
+		}
+	}
 
 	lj_gc_check(L);
 	return cdataptr(cd);

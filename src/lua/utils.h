@@ -51,6 +51,7 @@ extern "C" {
 #include <lj_cconv.h>
 #include <lj_lib.h>
 #include <lj_tab.h>
+#include <lj_meta.h>
 
 struct lua_State;
 struct ibuf;

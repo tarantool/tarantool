@@ -1,6 +1,6 @@
 TAP version 13
 # module_api
-1..13
+1..14
 ok - module is loaded
 ok - test_touint64 is ok
 ok - test_checkint64 is ok
@@ -14,4 +14,14 @@ ok - test_toint64 is ok
 ok - test_pushint64 is ok
 ok - test_pushcheck_cdata is ok
 ok - test_coio_getaddrinfo is ok
+    # pushcdata
+    1..6
+    ok - pushcdata typeof
+    ok - pushcdata metatable
+    ok - checkcdata type
+    ok - checkcdata value
+    ok - pushcdata gc
+    ok - pushcdata gc
+    # pushcdata: end
+ok - pushcdata
 # module_api: end
