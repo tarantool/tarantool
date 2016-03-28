@@ -342,3 +342,104 @@ cmsg_notify_init(struct cmsg_notify *msg)
 }
 
 /* }}} cmsg */
+
+/**
+ * The state of a synchronous cross-thread call. Only func and free_cb
+ * (if needed) are significant to the caller, other fields are
+ * initialized during the call preparation internally.
+ */
+struct cbus_call_msg
+{
+	struct cmsg msg;
+	struct cbus *bus;
+	struct cmsg_hop route[2];
+	struct diag diag;
+	struct fiber *caller;
+	bool complete;
+	int rc;
+	/** The callback to invoke in the peer thread. */
+	cbus_call_f func;
+	/**
+	 * A callback to free affiliated resources if the call
+	 * times out or the caller is canceled.
+	 */
+	cbus_call_f free_cb;
+	/** Callback state. */
+	void *data;
+};
+
+/**
+ * Call the target function and store the results (diag, rc) in
+ * struct cbus_call_msg.
+ */
+void
+cbus_call_perform(struct cmsg *m)
+{
+	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
+	msg->rc = msg->func(msg->data);
+	if (msg->rc)
+		diag_move(&fiber()->diag, &msg->diag);
+}
+
+/**
+ * Wake up the caller fiber to reap call results.
+ * If the fiber is gone, e.g. in case of call timeout
+ * or cancellation, invoke free_cb to free message state.
+ */
+void
+cbus_call_done(struct cmsg *m)
+{
+	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
+	if (msg->caller == NULL) {
+		if (msg->free_cb)
+			msg->free_cb(msg->data);
+		free(msg);
+		return;
+	}
+	msg->complete = true;
+	fiber_wakeup(msg->caller);
+}
+
+/**
+ * Execute a synchronous call over cbus.
+ */
+int
+cbus_call(struct cbus *bus, cbus_call_f func, cbus_call_f free_cb,
+	  void *data, double timeout)
+{
+	int rc;
+	struct cbus_call_msg *msg = (struct cbus_call_msg *)
+		malloc(sizeof(*msg));
+
+	msg->bus = bus;
+	diag_create(&msg->diag);
+	msg->caller = fiber();
+	int peer_idx = bus->pipe[0]->producer != cord()->loop;
+	msg->complete = false;
+	msg->route[0].f = cbus_call_perform;
+	msg->route[0].pipe = bus->pipe[!peer_idx];
+	msg->route[1].f = cbus_call_done;
+	msg->route[1].pipe = NULL;
+	cmsg_init(cmsg(msg), msg->route);
+
+	msg->func = func;
+	msg->free_cb = free_cb;
+	msg->data = data;
+	msg->rc = 0;
+
+	cpipe_push(bus->pipe[peer_idx], cmsg(msg));
+
+	fiber_yield_timeout(timeout);
+	if (msg->complete == false) {           /* timed out or cancelled */
+		msg->caller = NULL;
+		if (fiber_is_cancelled())
+			diag_set(FiberIsCancelled);
+		else
+			diag_set(TimedOut);
+		return -1;
+	}
+	if ((rc = msg->rc))
+		diag_move(&msg->diag, &fiber()->diag);
+	free(msg);
+	return rc;
+}
