@@ -141,16 +141,30 @@ coio_on_finish(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	if (task->fiber == NULL) {
-		/* timed out (only coio_task() )*/
-		if (task->timeout_cb != NULL) {
-			task->timeout_cb(task);
-		}
+		/*
+		 * Timed out. Resources will be freed by coio_on_destroy.
+		 * NOTE: it is not safe to run timeout_cb handler here.
+		 */
 		return 0;
 	}
 
 	task->complete = 1;
+	/* Reset on_timeout hook - resources will be freed by coio_task user */
+	task->base.destroy = NULL;
 	fiber_wakeup(task->fiber);
 	return 0;
+}
+
+/*
+ * Free resources on timeout.
+ */
+static void
+coio_on_destroy(eio_req *req)
+{
+	struct coio_task *task = (struct coio_task *) req;
+	assert(task->fiber == NULL && task->complete == 0);
+	if (task->timeout_cb != NULL)
+		task->timeout_cb(task);
 }
 
 /**
@@ -171,7 +185,7 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	task->base.type = EIO_CUSTOM;
 	task->base.feed = coio_on_exec;
 	task->base.finish = coio_on_finish;
-	/* task->base.destroy = NULL; */
+	task->base.destroy = coio_on_destroy;
 	/* task->base.pri = 0; */
 
 	task->fiber = fiber();
