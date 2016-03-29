@@ -126,7 +126,7 @@ local function local_read(self)
         local delim = self.delimiter
         local line = internal.readline({
             prompt = prompt.. "> ",
-            completion = self.completion
+            completion = self.ac and self.completion or nil
         })
         if not line then
             return nil
@@ -212,6 +212,7 @@ local repl_mt = {
         eval = local_eval;
         print = local_print;
         completion = internal.completion_handler;
+        ac = true;
     };
 }
 
@@ -264,6 +265,17 @@ local function delimiter(delim)
     else
         error('invalid delimiter')
     end
+end
+
+--
+--
+--
+local function ac(yes_no)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.ac(): need existing console")
+    end
+    self.ac = not not yes_no
 end
 
 --
@@ -374,6 +386,7 @@ return {
     start = start;
     eval = eval;
     delimiter = delimiter;
+    ac = ac;
     connect = connect;
     listen = listen;
     on_start = on_start;
