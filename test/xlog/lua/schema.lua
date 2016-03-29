@@ -1,1 +1,0 @@
-../../../extra/schema.lua
