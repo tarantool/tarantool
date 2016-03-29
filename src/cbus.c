@@ -42,7 +42,7 @@ static __thread struct fiber_pool fiber_pool;
 
 /* {{{ fiber_pool */
 
-enum { FIBER_POOL_SIZE = 4096, FIBER_POOL_IDLE_TIMEOUT = 3 };
+enum { FIBER_POOL_SIZE = 4096, FIBER_POOL_IDLE_TIMEOUT = 1 };
 
 static void
 fiber_pool_fetch_output(struct fiber_pool *pool)
@@ -60,28 +60,56 @@ static int
 fiber_pool_f(va_list ap)
 {
 	struct fiber_pool *pool = va_arg(ap, struct fiber_pool *);
-	struct stailq *output = &pool->output;
+	struct fiber *f = fiber();
 	struct ev_loop *loop = pool->consumer;
-	struct ev_async *watcher = &pool->fetch_output;
+	struct stailq *output = &pool->output;
+	struct cord *cord = cord();
+	struct cmsg *msg;
 	pool->size++;
+	ev_tstamp last_active_at = ev_now(loop);
+	say_info("starting, called from %d", f->caller->fid);
 restart:
-	while (! stailq_empty(output))
-		cmsg_deliver(stailq_shift_entry(output, struct cmsg, fifo));
-	/* fiber_yield_timeout() is expensive, avoid under load. */
-	if (ev_is_pending(watcher)) {
-		ev_clear_pending(loop, watcher);
-		(void) fiber_pool_fetch_output(pool);
+	msg = NULL;
+	while (! stailq_empty(output)) {
+		 msg = stailq_shift_entry(output, struct cmsg, fifo);
+
+		if (f->caller == &cord->sched && ! stailq_empty(output) &&
+		    ! rlist_empty(&pool->idle)) {
+			/*
+			 * Activate a "backup" fiber for the next
+			 * message in the queue.
+			 */
+			f->caller = rlist_shift_entry(&pool->idle,
+						      struct fiber,
+						      state);
+			assert(f->caller->caller = &cord->sched);
+		}
+		cmsg_deliver(msg);
+	}
+	/** Put the current fiber into a fiber cache. */
+	if (msg != NULL || ev_now(loop) - last_active_at < pool->idle_timeout) {
+		if (msg != NULL)
+			last_active_at = ev_now(loop);
+		rlist_add_entry(&pool->idle, fiber(), state);
+		fiber_yield();
 		goto restart;
 	}
 
-	/** Put the current fiber into a fiber cache. */
-	rlist_add_entry(&pool->idle, fiber(), state);
-	bool timed_out = fiber_yield_timeout(pool->idle_timeout);
-	if (! timed_out)
-		goto restart;
-
 	pool->size--;
 	return 0;
+}
+
+static void
+fiber_pool_idle_cb(ev_loop *loop, struct ev_timer *watcher, int events)
+{
+	(void) events;
+	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
+	if (! rlist_empty(&pool->idle)) {
+		struct fiber *f;
+		f = rlist_shift_tail_entry(&pool->idle, struct fiber, state);
+		fiber_call(f);
+	}
+	ev_timer_again(loop, watcher);
 }
 
 /** Create fibers to handle all outstanding tasks. */
@@ -97,8 +125,7 @@ fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	while (! stailq_empty(output)) {
 		struct fiber *f;
 		if (! rlist_empty(&pool->idle)) {
-			f = rlist_shift_entry(&pool->idle,
-					      struct fiber, state);
+			f = rlist_shift_entry(&pool->idle, struct fiber, state);
 			fiber_call(f);
 		} else if (pool->size < pool->max_size) {
 			f = fiber_new(cord_name(cord()), fiber_pool_f);
@@ -124,6 +151,10 @@ fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
 {
 	pool->consumer = loop();
 	rlist_create(&pool->idle);
+	ev_timer_init(&pool->idle_timer, fiber_pool_idle_cb, 0,
+		      FIBER_POOL_IDLE_TIMEOUT);
+	pool->idle_timer.data = pool;
+	ev_timer_again(loop(), &pool->idle_timer);
 	pool->size = 0;
 	pool->max_size = max_pool_size;
 	pool->idle_timeout = idle_timeout;
