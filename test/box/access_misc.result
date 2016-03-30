@@ -616,7 +616,7 @@ box.space._space:select()
 ...
 box.space._func:select()
 ---
-- - [1, 1, 'box.schema.user.info', 1]
+- - [1, 1, 'box.schema.user.info', 1, 'LUA']
 ...
 session = nil
 ---

@@ -77,6 +77,11 @@ console_completion_handler(const char *text, int start, int end)
 	char **res;
 
 	/*
+	 * Don't falback to builtin filename completion, ever.
+	 */
+	rl_attempted_completion_over = 1;
+
+	/*
 	 * The lbox_console_readline() frame is still on the top of Lua
 	 * stack. We can reach the function arguments. Assuming arg#1 is
 	 * the options table.
@@ -161,8 +166,7 @@ lbox_console_readline(struct lua_State *L)
 {
 	const char *prompt = NULL;
 	int top;
-
-	rl_attempted_completion_function = NULL;
+	int completion = 0;
 
 	if (lua_gettop(L) > 0) {
 		switch (lua_type(L, 1)) {
@@ -173,9 +177,10 @@ lbox_console_readline(struct lua_State *L)
 			lua_getfield(L, 1, "prompt");
 			prompt = lua_tostring(L, -1);
 			lua_pop(L, 1);
-			/* the handler assumes arg #1 is a table */
-			rl_attempted_completion_function =
-				console_completion_handler;
+			lua_getfield(L, 1, "completion");
+			if (!lua_isnil(L, -1))
+				completion = 1;
+			lua_pop(L, 1);
 			break;
 		default:
 			luaL_error(L, "readline([prompt])");
@@ -189,12 +194,21 @@ lbox_console_readline(struct lua_State *L)
 		luaL_error(L, "readline(): earlier call didn't complete yet");
 
 	readline_L = L;
-	rl_completer_word_break_characters =
-		"\t\r\n !\"#$%&'()*+,-/;<=>?@[\\]^`{|}~";
-	rl_completer_quote_characters = "\"'";
+
+	if (completion) {
+		rl_inhibit_completion = 0;
+		rl_attempted_completion_function = console_completion_handler;
+		rl_completer_word_break_characters =
+			"\t\r\n !\"#$%&'()*+,-/;<=>?@[\\]^`{|}~";
+		rl_completer_quote_characters = "\"'";
 #if RL_READLINE_VERSION < 0x0600
-	rl_completion_append_character = '\0';
+		rl_completion_append_character = '\0';
 #endif
+	} else {
+		rl_inhibit_completion = 1;
+		rl_attempted_completion_function = NULL;
+	}
+
 	/*
 	 * Readline library provides eventloop-friendly API; repeat
 	 * until console_push_line() manages to capture the result.

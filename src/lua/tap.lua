@@ -27,7 +27,7 @@ local function traceback(level)
             what = info.what;
             name = info.name;
             namewhat = info.namewhat;
-            filename = info.source:sub(1, 1) == "@" and info.source:sub(2) or 
+            filename = info.source:sub(1, 1) == "@" and info.source:sub(2) or
                 'eval'
         }
         table.insert(trace, frame)
@@ -252,7 +252,6 @@ local function check(test)
                 failed = test.failed;
                 planned = test.planned;
             })
-            return false
         else
             diag(test, "failed subtest: %d", test.failed)
         end
@@ -261,7 +260,7 @@ local function check(test)
             ok(test.parent, true, test.name)
         end
     end
-    return true
+    return test.planned == test.total and test.failed == 0
 end
 
 test_mt = {

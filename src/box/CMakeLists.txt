@@ -9,6 +9,7 @@ lua_source(lua_sources lua/tuple.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/snapshot_daemon.lua)
 lua_source(lua_sources lua/net_box.lua)
+lua_source(lua_sources lua/upgrade.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
