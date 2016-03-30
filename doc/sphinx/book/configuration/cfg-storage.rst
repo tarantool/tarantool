@@ -49,13 +49,15 @@
 
         sophia = {
           page_size = *number*,
+          memory_limit = *number*,
+          compression_key = *number*,
           threads = *number*,
           node_size = *number*,
-          memory_limit = *number*,
+          compression = *enum*,
         }
 
     This method may change in the future.
 
     Type: table |br|
-    Default: {page_size=131072,threads=5,node_size=134217728,memory_limit=0} |br|
+    Default: {page_size=131072,memory_limit=0,compression_key=0,threads=5,node_size=134217728,compression=none} |br|
     Dynamic: no |br|
