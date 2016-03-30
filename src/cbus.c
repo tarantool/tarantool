@@ -67,7 +67,6 @@ fiber_pool_f(va_list ap)
 	struct cmsg *msg;
 	pool->size++;
 	ev_tstamp last_active_at = ev_now(loop);
-	say_info("starting, called from %d", f->caller->fid);
 restart:
 	msg = NULL;
 	while (! stailq_empty(output)) {
