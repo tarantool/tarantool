@@ -67,6 +67,10 @@ cfg_filter(box.cfg)
         - 2
       - - compact_wm
         - 2
+      - - expire_period
+        - 0
+      - - expire_prio
+        - 0
       - - memory_limit
         - 0
       - - mmap

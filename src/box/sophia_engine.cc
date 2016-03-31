@@ -352,6 +352,8 @@ SophiaEngine::init()
 	sp_setint(env, "compaction.0.branch_age_wm", cfg_geti("sophia.branch_age_wm"));
 	sp_setint(env, "compaction.0.branch_age_period", cfg_geti("sophia.branch_age_period"));
 	sp_setint(env, "compaction.0.snapshot_period", cfg_geti("sophia.snapshot_period"));
+	sp_setint(env, "compaction.0.expire_period", cfg_geti("sophia.expire_period"));
+	sp_setint(env, "compaction.0.expire_prio", cfg_geti("sophia.expire_prio"));
 	sp_setint(env, "log.enable", 0);
 	int rc = sp_open(env);
 	if (rc == -1)

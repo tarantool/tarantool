@@ -252,6 +252,9 @@ sophia_configure(struct space *space, struct key_def *key_def)
 	/* db.read_oldest */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".read_oldest", key_def->space_id);
 	sp_setint(env, path, key_def->opts.read_oldest);
+	/* db.expire */
+	snprintf(path, sizeof(path), "db.%" PRIu32 ".expire", key_def->space_id);
+	sp_setint(env, path, key_def->opts.expire);
 	/* db.path_fail_on_drop */
 	snprintf(path, sizeof(path), "db.%" PRIu32 ".path_fail_on_drop", key_def->space_id);
 	sp_setint(env, path, 0);
