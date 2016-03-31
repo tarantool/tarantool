@@ -133,6 +133,10 @@ fiber_checkstack()
  * Interrupt a synchronous wait of a fiber inside the event loop.
  * We do so by keeping an "async" event in every fiber, solely
  * for this purpose, and raising this event here.
+ *
+ * @note: if this is sent to self, followed by a fiber_yield()
+ * call, it simply reschedules the fiber after other ready
+ * fibers in the same event loop iteration.
  */
 void
 fiber_wakeup(struct fiber *f)
@@ -140,15 +144,23 @@ fiber_wakeup(struct fiber *f)
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready)) {
 		/*
-		 * ev_feed_event() is possibly faster,
-		 * but EV_CUSTOM event gets scheduled in the
-		 * same event loop iteration, which can
-		 * produce unfair scheduling, (see the case of
-		 * fiber_sleep(0))
+		 * ev_feed_event(EV_CUSTOM) gets scheduled in the
+		 * same event loop iteration, and we rely on this
+		 * for quick scheduling. For a wakeup which
+		 * actually can invoke a poll() in libev,
+		 * use fiber_sleep(0)
 		 */
 		ev_feed_event(cord->loop, &cord->wakeup_event, EV_CUSTOM);
 	}
-	/** Removes the fiber from whatever wait list it is on. */
+	/**
+	 * Removes the fiber from whatever wait list it is on.
+	 *
+	 * It's critical that the newly scheduled fiber is
+	 * added to the tail of the list, to preserve correct
+	 * transaction commit order after a successful WAL write.
+	 * (see tx_schedule_commit()/tx_schedule_rollback() in
+	 * box/wal.cc)
+	 */
 	rlist_move_tail_entry(&cord->ready, f, state);
 }
 
@@ -324,7 +336,7 @@ fiber_yield_timeout(ev_tstamp delay)
 }
 
 /**
- * @note: this is a cancellation point (@sa fiber_testcancel())
+ * Yield the current fiber to events in the event loop.
  */
 void
 fiber_sleep(double delay)
@@ -332,9 +344,9 @@ fiber_sleep(double delay)
 	/*
 	 * libev sleeps at least backend_mintime, which is 1 ms in
 	 * case of poll()/Linux, unless there are idle watchers.
-	 * This is a special hack to speed up fiber_sleep(0),
-	 * i.e. a sleep with a zero timeout, to ensure that there
-	 * is no 1 ms delay in case of zero sleep timeout.
+	 * So, to properly implement fiber_sleep(0), i.e. a sleep
+	 * with a zero timeout, we set up an idle watcher, and
+	 * it triggers libev to poll() with zero timeout.
 	 */
 	if (delay == 0) {
 		ev_idle_start(loop(), &cord()->idle_event);

@@ -60,13 +60,13 @@ static int
 fiber_pool_f(va_list ap)
 {
 	struct fiber_pool *pool = va_arg(ap, struct fiber_pool *);
+	struct cord *cord = cord();
 	struct fiber *f = fiber();
 	struct ev_loop *loop = pool->consumer;
 	struct stailq *output = &pool->output;
-	struct cord *cord = cord();
 	struct cmsg *msg;
-	pool->size++;
 	ev_tstamp last_active_at = ev_now(loop);
+	pool->size++;
 restart:
 	msg = NULL;
 	while (! stailq_empty(output)) {
@@ -89,6 +89,10 @@ restart:
 	if (msg != NULL || ev_now(loop) - last_active_at < pool->idle_timeout) {
 		if (msg != NULL)
 			last_active_at = ev_now(loop);
+		/*
+		 * Add the fiber to the front of the list, so that
+		 * it is most likely to get scheduled again.
+		 */
 		rlist_add_entry(&pool->idle, fiber(), state);
 		fiber_yield();
 		goto restart;
@@ -105,6 +109,11 @@ fiber_pool_idle_cb(ev_loop *loop, struct ev_timer *watcher, int events)
 	struct fiber_pool *pool = (struct fiber_pool *) watcher->data;
 	if (! rlist_empty(&pool->idle)) {
 		struct fiber *f;
+		/*
+		 * Schedule the fiber at the tail of the list,
+		 * it's the one most likely to have not been
+		 * scheduled lately.
+		 */
 		f = rlist_shift_tail_entry(&pool->idle, struct fiber, state);
 		fiber_call(f);
 	}
@@ -143,6 +152,17 @@ fiber_pool_cb(ev_loop *loop, struct ev_async *watcher, int events)
 		}
 	}
 }
+void
+fiber_pool_destroy(struct fiber_pool *pool)
+{
+	/*
+	 * Do not destroy async or idle timers, or fibers:
+	 * events are destroyed along with the event loop,
+	 * and fibers are freed at once when thread runtime
+	 * pool is destroyed.
+         */
+	(void) tt_pthread_mutex_destroy(&pool->mutex);
+}
 
 void
 fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
@@ -171,13 +191,6 @@ fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
 #endif
 	(void) tt_pthread_mutex_init(&pool->mutex, &errorcheck);
 	(void) tt_pthread_mutexattr_destroy(&errorcheck);
-}
-
-void
-fiber_pool_destroy(struct fiber_pool *pool)
-{
-	ev_async_stop(pool->consumer, &pool->fetch_output);
-	(void) tt_pthread_mutex_destroy(&pool->mutex);
 }
 
 /** }}} fiber_pool */

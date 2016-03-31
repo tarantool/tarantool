@@ -101,8 +101,8 @@ cmsg_init(struct cmsg *msg, const struct cmsg_hop *route)
 	msg->hop = msg->route = route;
 }
 
-#define CACHELINE_SIZE 64
 
+#define CACHELINE_SIZE 64
 /**
  * A pool of worker fibers to handle messages,
  * so that each message is handled in its own fiber.
@@ -124,19 +124,22 @@ struct fiber_pool {
 		struct stailq output;
 		struct ev_timer idle_timer;
 	} __attribute__((aligned(CACHELINE_SIZE)));
+	struct {
 
-	/** The consumer thread loop. */
-	struct ev_loop *consumer;
-	/**
-	 * Used to trigger task processing when
-	 * the pipe becomes non-empty.
-	 */
-	struct ev_async fetch_output;
-	/** The lock around the pipe. */
-	pthread_mutex_t mutex;
-	/** The pipe with incoming messages. */
-	struct stailq pipe;
+		/** The consumer thread loop. */
+		struct ev_loop *consumer;
+		/**
+		 * Used to trigger task processing when
+		 * the pipe becomes non-empty.
+		 */
+		struct ev_async fetch_output;
+		/** The lock around the pipe. */
+		pthread_mutex_t mutex;
+		/** The pipe with incoming messages. */
+		struct stailq pipe;
+	} __attribute__((aligned(CACHELINE_SIZE)));
 };
+#undef CACHELINE_SIZE
 
 struct cpipe;
 /**
@@ -148,7 +151,6 @@ fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
 		  float idle_timeout);
 
 
-#define CACHELINE_SIZE 64
 /** A  uni-directional FIFO queue from one cord to another. */
 struct cpipe {
 	/** Staging area for pushed messages */
@@ -169,10 +171,12 @@ struct cpipe {
 	struct ev_async flush_input;
 	struct ev_loop *producer;
 	struct cbus *bus;
+	/**
+	 * The fiber pool at destination to handle flushed
+	 * messages.
+	 */
 	struct fiber_pool *pool;
-} __attribute__((aligned(CACHELINE_SIZE)));
-
-#undef CACHELINE_SIZE
+};
 
 /**
  * Initialize a pipe. Must be called by the consumer.
@@ -268,9 +272,7 @@ struct cbus {
 	struct cpipe *pipe[2];
 	/** cbus statistics */
 	struct rmean *stats;
-	/**
-	 * A single mutex to protect bus join.
-	 */
+	/** A mutex to protect bus join. */
 	pthread_mutex_t mutex;
 	/** Condition for synchronized start of the bus. */
 	pthread_cond_t cond;
