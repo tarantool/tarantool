@@ -26,42 +26,55 @@
     ``logger`` is specified, the log is sent to a file, or to a pipe, or to
     the system logger.
 
-    Example setting: |br|
-    box.cfg{logger = 'tarantool.log' } |br|
-    or |br|
-    box.cfg{logger = 'file: tarantool.log' } |br|
+    Example setting:
+
+    .. code-block:: lua
+
+        box.cfg{logger = 'tarantool.log'}
+        -- or
+        box.cfg{logger = 'file: tarantool.log'}
+
     This will open the file ``tarantool.log`` for output on the server’s default
-    directory.
-    If the ``logger`` string has no prefix or has the prefix "file:",
+    directory. If the ``logger`` string has no prefix or has the prefix "file:",
     then the string is interpreted as a file path.
 
-    Example setting: |br|
-    box.cfg{logger = '| cronolog tarantool.log' } |br|
-    or |br|
-    box.cfg{logger = 'pipe: cronolog tarantool.log' } |br|
+    Example setting:
+
+    .. code-block:: lua
+
+        box.cfg{logger = '| cronolog tarantool.log'}
+        -- or
+        box.cfg{logger = 'pipe: cronolog tarantool.log'}'
+
     This will start the program ``cronolog`` when the server starts, and
     will send all log messages to the standard input (``stdin``) of cronolog.
     If the ``logger`` string begins with '|' or has the prefix "pipe:",
     then the string is interpreted as a Unix `pipeline`_.
 
-    Example setting: |br|
-    box.cfg{logger = 'syslog:identifier=tarantool'} |br|
-    or |br|
-    box.cfg{logger = 'syslog:facility=user'} |br|
-    or |br|
-    box.cfg{logger = 'syslog:identifier=tarantool,facility=user'} |br|
-    If the ``logger`` string has the prefix "syslog:",
-    then the string is interpreted as a message for the `syslogd`_ program
-    which normally is running in the background of any Unix-like platform.
-    One can optionally specify an identifier, a facility, or both.
-    The identifier is an arbitrary string, default value = tarantool, which
-    will be placed at the beginning of all messages.
-    The facility is an abbreviation for the name of one of the
-    `syslog`_ facilities, default value = user, which tell syslogd where
-    the message should go. Possible values for facility are:
-    auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, security,
-    syslog, user, uucp, local0, local1, local2, local3, local4, local5, local6, local7.
-    The facility setting is currently ignored but will be used in the future.
+    Example setting:
+
+    .. code-block:: lua
+
+        box.cfg{logger = 'syslog:identity=tarantool'}
+        -- or
+        box.cfg{logger = 'syslog:facility=user'}
+        -- or
+        box.cfg{logger = 'syslog:identity=tarantool,facility=user'}
+
+    If the ``logger`` string has the prefix "syslog:", then the string is
+    interpreted as a message for the `syslogd`_ program which normally is
+    running in the background of any Unix-like platform. One can optionally
+    specify an ``identity``, a ``facility``, or both. The ``identity`` is an
+    arbitrary string, default value = ``tarantool``, which will be placed at
+    the beginning of all messages. The facility is an abbreviation for the
+    name of one of the `syslog`_ facilities, default value = ``user``, which
+    tell syslogd where the message should go.
+
+    Possible values for ``facility`` are: auth, authpriv, cron, daemon, ftp,
+    kern, lpr, mail, news, security, syslog, user, uucp, local0, local1, local2,
+    local3, local4, local5, local6, local7.
+
+    The ``facility`` setting is currently ignored but will be used in the future.
 
     When logging to a file, tarantool reopens the log on SIGHUP. When log is
     a program, its pid is saved in the :func:`log.logger_pid` variable. You need

@@ -14,8 +14,6 @@ two non-cryptographic hash functions (guava_, murmur_). Some of the digest
 functionality is also present in the :ref:`crypto <crypto>` package. The
 functions in digest are:
 
-.. module:: digest
-
 .. function:: md4(string)
               md4_hex(string)
 

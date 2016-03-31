@@ -123,13 +123,20 @@ access the same file simultaneously.
           blocks: 24
         ...
 
-.. function:: mkdir(path-name)
+.. The following is a workaround for a Sphinx bug.
+
+.. fio-mkdir:
+
+.. function:: mkdir(path-name[, mode])
               rmdir(path-name)
 
     Create or delete a directory. For details type
     "man 2 mkdir" or "man 2 rmdir".
 
     :param string path-name: path of directory.
+    :param number mode: Mode bits can be passed as a number or as string
+                        constants, for example ''`S_IWUSR`". Mode bits can be
+                        combined by enclosing them in braces.
     :return: true if success, false if failure.
     :rtype:  boolean
 
@@ -296,7 +303,12 @@ access the same file simultaneously.
         - true
         ...
 
-.. function:: open(path-name [, flags])
+
+.. The following is a workaround for a Sphinx bug.
+
+.. fio-open:
+
+..function:: open(path-name[, flags[, mode]])
 
     Open a file in preparation for reading or writing or seeking.
 
@@ -305,6 +317,11 @@ access the same file simultaneously.
                          constants, for example '``O_RDONLY``',
                          '``O_WRONLY``', '``O_RDWR``'. Flags can be
                          combined by enclosing them in braces.
+    :param number mode: Mode bits can be passed as a number or as string
+                        constants, for example ''`S_IWUSR`". Mode bits
+                        are significant if flags include `O_CREATE` or
+                        `O_TMPFILE`. Mode bits can be
+                        combined by enclosing them in braces.
     :return: file handle (later - fh)
     :rtype:  userdata
 
