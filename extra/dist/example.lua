@@ -3,14 +3,15 @@
 -- replication, sharding and all major features
 -- Complete documentation available in:  http://tarantool.org/doc/
 --
--- To start this example just run "sudo tarantoolctl start example"
+-- To start this example just run "sudo tarantoolctl start example" or
+-- use init scripts provided by binary packages.
 -- To connect to the instance, use "sudo tarantoolctl enter example"
 -- Features:
 -- 1. Database configuration
 -- 2. Binary logging and snapshots
 -- 3. Replication
 -- 4. Automatinc sharding
--- 5. Message queue 
+-- 5. Message queue
 -- 6. Data expiration
 
 -----------------
@@ -21,24 +22,16 @@ box.cfg {
     -- Basic parameters
     --------------------
 
-    -- UNIX user name to switch to after start
-    -- by default: tarantool
-    -- username = nil;
-
-    -- A directory where database working files will be stored
-    -- If not specified, defaults to /var/lib/tarantool/${INSTANCE}
-    -- work_dir = nil;
-
-    -- A directory where write-ahead log (.xlog) files are stored
-    -- If not specified, defaults to work_dir
+    -- An absolute path to directory where write-ahead log (.xlog) files are
+    -- stored. If not specified, defaults to /var/lib/tarantool/INSTANCE
     -- wal_dir = nil;
 
-    -- A directory where snapshot (.snap) files will be stored
-    -- If not specified, defaults to work_dir
+    -- An absolute path to directory where snapshot (.snap) files are stored.
+    -- If not specified, defaults to /var/lib/tarantool/INSTANCE
     -- snap_dir = nil;
 
-    -- A directory where sophia files will be stored
-    -- If not specified, defaults to work_dir
+    -- An absolute path to directory where sophia files are stored.
+    -- If not specified, defaults to /var/lib/tarantool/INSTANCE
     -- sophia_dir = nil;
 
     -- The read/write data port number or URI
@@ -47,18 +40,8 @@ box.cfg {
     -- that do not use “admin address”
     listen = 3301;
 
-    -- Store the process id in this file.
-    -- Can be relative to work_dir. 
-    -- Default value is nil.
-    -- pid_file = "example.pid";
-
     -- Inject the given string into server process title
     -- custom_proc_title = 'example';
-
-    -- Run the server as a background task
-    -- The logger and pid_file parameters
-    -- must be non-null for this to work
-    -- background = true;
 
     -------------------------
     -- Storage configuration
@@ -155,7 +138,7 @@ box.cfg {
     -- 6 – DEBUG
     log_level = 5;
 
-    -- By default, the log is sent to the standard error stream (stderr)
+    -- By default, the log is sent to /var/log/tarantool/INSTANCE.log
     -- If logger is specified, the log is sent to the file named in the string
     -- logger = "example.log";
 
