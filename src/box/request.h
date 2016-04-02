@@ -97,7 +97,7 @@ request_encode(struct request *request, struct iovec *iov);
 
 /**
  * Convert secondary key of request to primary key by given tuple.
- * Also flush iproto header of request to be recontructed in future.
+ * Flush iproto header of the request to be reconstructed in the future.
  * @param request - request to fix
  * @param space - space corresponding to request
  * @param found_tuple - tuple found by secondary key

@@ -203,13 +203,13 @@ recover_row(struct recovery *r, void *param, struct xrow_header *row)
 	assert(r == ::recovery);
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) r;
-
-	struct request request;
-	request_create(&request, row->type);
-	request_decode(&request, (const char *) row->body[0].iov_base,
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, row->type);
+	request_decode(request, (const char *) row->body[0].iov_base,
 		row->body[0].iov_len);
-	request.header = row;
-	process_rw(&request, NULL);
+	request->header = row;
+	process_rw(request, NULL);
 	/**
 	 * Yield once in a while, but not too often,
 	 * mostly to allow signal handling to take place.
@@ -459,10 +459,11 @@ box_set_panic_on_wal_error(void)
 static void
 boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 {
-	struct request req;
 	va_list ap;
-	request_create(&req, type);
-	req.space_id = space_id;
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, type);
+	request->space_id = space_id;
 	char buf[128];
 	char *data = buf;
 	data = mp_encode_array(data, strlen(format)/2);
@@ -484,9 +485,9 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	}
 	va_end(ap);
 	assert(data <= buf + sizeof(buf));
-	req.tuple = req.key = buf;
-	req.tuple_end = req.key_end = data;
-	process_rw(&req, NULL);
+	request->tuple = request->key = buf;
+	request->tuple_end = request->key_end = data;
+	process_rw(request, NULL);
 }
 
 int
@@ -584,12 +585,13 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	   box_tuple_t **result)
 {
 	mp_tuple_assert(tuple, tuple_end);
-	struct request request;
-	request_create(&request, IPROTO_INSERT);
-	request.space_id = space_id;
-	request.tuple = tuple;
-	request.tuple_end = tuple_end;
-	return box_process1(&request, result);
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, IPROTO_INSERT);
+	request->space_id = space_id;
+	request->tuple = tuple;
+	request->tuple_end = tuple_end;
+	return box_process1(request, result);
 }
 
 int
@@ -597,12 +599,13 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	    box_tuple_t **result)
 {
 	mp_tuple_assert(tuple, tuple_end);
-	struct request request;
-	request_create(&request, IPROTO_REPLACE);
-	request.space_id = space_id;
-	request.tuple = tuple;
-	request.tuple_end = tuple_end;
-	return box_process1(&request, result);
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, IPROTO_REPLACE);
+	request->space_id = space_id;
+	request->tuple = tuple;
+	request->tuple_end = tuple_end;
+	return box_process1(request, result);
 }
 
 int
@@ -610,13 +613,14 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, box_tuple_t **result)
 {
 	mp_tuple_assert(key, key_end);
-	struct request request;
-	request_create(&request, IPROTO_DELETE);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.key = key;
-	request.key_end = key_end;
-	return box_process1(&request, result);
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, IPROTO_DELETE);
+	request->space_id = space_id;
+	request->index_id = index_id;
+	request->key = key;
+	request->key_end = key_end;
+	return box_process1(request, result);
 }
 
 int
@@ -626,17 +630,18 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	mp_tuple_assert(key, key_end);
 	mp_tuple_assert(ops, ops_end);
-	struct request request;
-	request_create(&request, IPROTO_UPDATE);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.key = key;
-	request.key_end = key_end;
-	request.index_base = index_base;
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, IPROTO_UPDATE);
+	request->space_id = space_id;
+	request->index_id = index_id;
+	request->key = key;
+	request->key_end = key_end;
+	request->index_base = index_base;
 	/** Legacy: in case of update, ops are passed in in request tuple */
-	request.tuple = ops;
-	request.tuple_end = ops_end;
-	return box_process1(&request, result);
+	request->tuple = ops;
+	request->tuple_end = ops_end;
+	return box_process1(request, result);
 }
 
 int
@@ -646,16 +651,17 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 {
 	mp_tuple_assert(ops, ops_end);
 	mp_tuple_assert(tuple, tuple_end);
-	struct request request;
-	request_create(&request, IPROTO_UPSERT);
-	request.space_id = space_id;
-	request.index_id = index_id;
-	request.ops = ops;
-	request.ops_end = ops_end;
-	request.tuple = tuple;
-	request.tuple_end = tuple_end;
-	request.index_base = index_base;
-	return box_process1(&request, result);
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, IPROTO_UPSERT);
+	request->space_id = space_id;
+	request->index_id = index_id;
+	request->ops = ops;
+	request->ops_end = ops_end;
+	request->tuple = tuple;
+	request->tuple_end = tuple_end;
+	request->index_base = index_base;
+	return box_process1(request, result);
 }
 
 /**
