@@ -45,7 +45,6 @@
 
 RLIST_HEAD(engines);
 
-extern bool snapshot_in_progress;
 extern struct latch schema_lock;
 
 Engine::Engine(const char *engine_name)
@@ -290,31 +289,23 @@ engine_end_recovery()
 int
 engine_checkpoint(int64_t checkpoint_id)
 {
-	if (snapshot_in_progress)
-		return EINPROGRESS;
-
-	snapshot_in_progress = true;
 	latch_lock(&schema_lock);
-
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
 		if (engine->beginCheckpoint(checkpoint_id))
 			goto error;
 	}
-
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
 		if (engine->waitCheckpoint())
 			goto error;
 	}
-
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
 		engine->commitCheckpoint();
 	}
 	latch_unlock(&schema_lock);
-	snapshot_in_progress = false;
 	return 0;
 error:
 	int save_errno = errno;
@@ -322,7 +313,6 @@ error:
 	engine_foreach(engine)
 		engine->abortCheckpoint();
 	latch_unlock(&schema_lock);
-	snapshot_in_progress = false;
 	return save_errno;
 }
 

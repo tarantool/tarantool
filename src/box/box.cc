@@ -84,7 +84,7 @@ static struct recover_row_ctx {
 	size_t yield;
 } recover_row_ctx;
 
-bool snapshot_in_progress = false;
+bool box_snapshot_is_in_progress = false;
 static bool box_init_done = false;
 static bool is_ro = true;
 
@@ -1200,9 +1200,14 @@ box_atfork()
 int
 box_snapshot()
 {
+	if (box_snapshot_is_in_progress)
+		return EINPROGRESS;
+	box_snapshot_is_in_progress = true;
 	/* create snapshot file */
 	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
-	return engine_checkpoint(checkpoint_id);
+	int rc = engine_checkpoint(checkpoint_id);
+	box_snapshot_is_in_progress = false;
+	return rc;
 }
 
 const char *

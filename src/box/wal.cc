@@ -109,7 +109,7 @@ struct wal_writer
 	pthread_mutex_t watchers_mutex;
 };
 
-struct wal_batch: public cmsg {
+struct wal_msg: public cmsg {
 	/** Input queue, on output contains all committed requests. */
 	struct stailq commit;
 	/**
@@ -136,17 +136,17 @@ static struct cmsg_hop wal_request_route[] = {
 };
 
 static void
-wal_batch_create(struct wal_batch *batch)
+wal_msg_create(struct wal_msg *batch)
 {
 	cmsg_init(batch, wal_request_route);
 	stailq_create(&batch->commit);
 	stailq_create(&batch->rollback);
 }
 
-static struct wal_batch *
-wal_batch_cast(struct cmsg *msg)
+static struct wal_msg *
+wal_msg(struct cmsg *msg)
 {
-	return msg->route == wal_request_route ? (struct wal_batch *) msg : NULL;
+	return msg->route == wal_request_route ? (struct wal_msg *) msg : NULL;
 }
 
 /**
@@ -177,10 +177,10 @@ tx_schedule_queue(struct stailq *queue)
 static void
 tx_schedule_commit(struct cmsg *msg)
 {
-	struct wal_batch *batch = (struct wal_batch *) msg;
+	struct wal_msg *batch = (struct wal_msg *) msg;
 	/*
 	 * Move the rollback list to the writer first, since
-	 * wal_batch memory disappears after the first
+	 * wal_msg memory disappears after the first
 	 * iteration of tx_schedule_queue loop.
 	 */
 	if (! stailq_empty(&batch->rollback)) {
@@ -444,17 +444,17 @@ static void
 wal_write_to_disk(struct cmsg *msg)
 {
 	struct wal_writer *writer = wal;
-	struct wal_batch *wal_batch = (struct wal_batch *) msg;
+	struct wal_msg *wal_msg = (struct wal_msg *) msg;
 
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
-		stailq_concat(&wal_batch->rollback, &wal_batch->commit);
+		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		return;
 	}
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
-		stailq_concat(&wal_batch->rollback, &wal_batch->commit);
+		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		return wal_writer_begin_rollback(writer);
 	}
 
@@ -492,7 +492,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 * Iterate over requests (transactions)
 	 */
 	struct wal_request *req;
-	stailq_foreach_entry(req, &wal_batch->commit, fifo) {
+	stailq_foreach_entry(req, &wal_msg->commit, fifo) {
 		/* Save relative offset of request start */
 		req->start_offset = batched_bytes;
 		req->end_offset = -1;
@@ -545,7 +545,7 @@ done:
 	 * `commit` queue and all other to `rollback` queue.
 	 */
 	struct wal_request *reqend = req;
-	for (req = stailq_first_entry(&wal_batch->commit, struct wal_request, fifo);
+	for (req = stailq_first_entry(&wal_msg->commit, struct wal_request, fifo);
 	     req != reqend;
 	     req = stailq_next_entry(req, fifo)) {
 		/*
@@ -575,7 +575,7 @@ done:
 			written_bytes = req->start_offset;
 
 			/* Move tail to `rollback` queue. */
-			stailq_splice(&wal_batch->commit, &req->fifo, &wal_batch->rollback);
+			stailq_splice(&wal_msg->commit, &req->fifo, &wal_msg->rollback);
 			wal_writer_begin_rollback(writer);
 			break;
 		}
@@ -637,17 +637,17 @@ wal_write(struct wal_writer *writer, struct wal_request *req)
 	req->fiber = fiber();
 	req->res = -1;
 
-	struct wal_batch *batch;
+	struct wal_msg *batch;
 	if (!stailq_empty(&writer->wal_pipe.input) &&
-	    (batch = wal_batch_cast(stailq_first_entry(&writer->wal_pipe.input,
-						       struct cmsg, fifo)))) {
+	    (batch = wal_msg(stailq_first_entry(&writer->wal_pipe.input,
+						struct cmsg, fifo)))) {
 
 		stailq_add_tail_entry(&batch->commit, req, fifo);
 	} else {
-		batch = (struct wal_batch *)
+		batch = (struct wal_msg *)
 			region_alloc_xc(&fiber()->gc,
-					sizeof(struct wal_batch));
-		wal_batch_create(batch);
+					sizeof(struct wal_msg));
+		wal_msg_create(batch);
 		/*
 		 * Sic: first add a request, then push the batch,
 		 * since cpipe_push() may pass the batch to WAL

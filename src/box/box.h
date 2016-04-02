@@ -67,7 +67,7 @@ bool
 box_is_ro(void);
 
 /** True if snapshot is in progress. */
-extern bool snapshot_in_progress;
+extern bool box_snapshot_is_in_progress;
 /** Incremented with each next snapshot. */
 extern uint32_t snapshot_version;
 
