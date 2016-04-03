@@ -659,6 +659,8 @@ introspection (inspecting contents of spaces, accessing server configuration).
 In the discussion of each data-manipulation function there will be a note about
 which Complexity Factors might affect the function's resource usage.
 
+.. _two-storage-engines:
+
 =====================================================================
             The two storage engines: memtx and sophia
 =====================================================================

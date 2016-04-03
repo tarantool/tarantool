@@ -31,24 +31,26 @@ for spaces, users, roles, and function tuples.
         .. rst-class:: left-align-column-3
         .. rst-class:: left-align-column-4
 
-        +---------------+--------------------+---------+---------------------+
-        | Name          | Effect             | Type    | Default             |
-        +===============+====================+=========+=====================+
-        | temporary     | space is temporary | boolean | false               |
-        +---------------+--------------------+---------+---------------------+
-        | id            | unique identifier  | number  | last space's id, +1 |
-        +---------------+--------------------+---------+---------------------+
-        | field_count   | fixed field count  | number  | 0 i.e. not fixed    |
-        +---------------+--------------------+---------+---------------------+
-        | if_not_exists | no error if        | boolean | false               |
-        |               | duplicate name     |         |                     |
-        +---------------+--------------------+---------+---------------------+
-        | engine        | storage package    | string  | 'memtx'             |
-        +---------------+--------------------+---------+---------------------+
-        | user          | user name          | string  | current user's name |
-        +---------------+--------------------+---------+---------------------+
-        | format        | field names+types  | table   | (blank)             |
-        +---------------+--------------------+---------+---------------------+
+        +---------------+--------------------------------+---------+---------------------+
+        | Name          | Effect                         | Type    | Default             |
+        +===============+================================+=========+=====================+
+        | temporary     | space is temporary             | boolean | false               |
+        +---------------+--------------------------------+---------+---------------------+
+        | id            | unique identifier              | number  | last space's id, +1 |
+        +---------------+--------------------------------+---------+---------------------+
+        | field_count   | fixed field count              | number  | 0 i.e. not fixed    |
+        +---------------+--------------------------------+---------+---------------------+
+        | if_not_exists | no error if                    | boolean | false               |
+        |               | duplicate name                 |         |                     |
+        +---------------+--------------------------------+---------+---------------------+
+        | engine        | storage engine =               | string  | 'memtx'             |
+        |               | :ref:`'memtx' or 'sophia'      |         |                     |
+        |               | <two-storage-engines>`         |         |                     |
+        +---------------+--------------------------------+---------+---------------------+
+        | user          | user name                      | string  | current user's name |
+        +---------------+--------------------------------+---------+---------------------+
+        | format        | field names+types              | table   | (blank)             |
+        +---------------+--------------------------------+---------+---------------------+
 
     :param num space-id: the numeric identifier established by box.schema.space.create
 

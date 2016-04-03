@@ -18,65 +18,87 @@ A list of all ``box.space`` functions follows, then comes a list of all
         .. rst-class:: left-align-column-1
         .. rst-class:: left-align-column-2
 
-        +---------------------------------------------------------------------+---------------------------------+
-        | Name                                                                | Use                             |
-        +=====================================================================+=================================+
-        | :func:`space_object:create_index() <space_object.create_index>`     | Create an index                 |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:insert() <space_object.insert>`                 | Insert a tuple                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:select() <space_object.select>`                 | Select one or more tuples       |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:get() <space_object.get>`                       | Select a tuple                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:drop() <space_object.drop>`                     | Destroy a space                 |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:rename() <space_object.rename>`                 | Rename a space                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:replace() <space_object.replace>`               | Insert or replace a tuple       |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:put() <space_object.replace>`                   | Insert or replace a tuple       |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:update() <space_object.update>`                 | Update a tuple                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:upsert() <space_object.upsert>`                 | Update a tuple                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:delete() <space_object.delete>`                 | Delete a tuple                  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:count() <space_object.count>`                   | Get count of tuples             |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:len() <space_object.len>`                       | Get count of tuples             |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:truncate() <space_object.truncate>`             | Delete all tuples               |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:inc{} <space_object.inc>`                       | Increment a tuple's counter     |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:dec{} <space_object.dec>`                       | Decrement a tuple's counter     |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:auto_increment{} <space_object.auto_increment>` | Generate key + Insert a tuple   |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object:pairs() <space_object.pairs>`                   | Prepare for iterating           |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object.id <space_object.id>`                           | .Numeric identifier of space    |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object.enabled <space_object.enabled>`                 | .Flag, true if space is enabled |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object.field_count <space_object.field_count>`         | .Required number of fields      |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :func:`space_object.index <space_object.index>`                     | .Container of space's indexes   |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._schema`                                          | .(Metadata) List of schemas     |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._space`                                           | .(Metadata) List of spaces      |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._index`                                           | .(Metadata) List of indexes     |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._user`                                            | .(Metadata) List of users       |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._priv`                                            | .(Metadata) List of privileges  |
-        +---------------------------------------------------------------------+---------------------------------+
-        | :class:`box.space._cluster`                                         | .(Metadata) List of clusters    |
-        +---------------------------------------------------------------------+---------------------------------+
+        +--------------------------------------+---------------------------------+
+        | Name                                 | Use                             |
+        +======================================+=================================+
+        | :func:`space_object:create_index()   | Create an index                 |
+        | <space_object.create_index>`         |                                 | 
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:insert()         | Insert a tuple                  |
+        | <space_object.insert>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:select()         | Select one or more tuples       |
+        | <space_object.select>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:get()            | Select a tuple                  |
+        | <space_object.get>`                  |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:drop()           | Destroy a space                 |
+        | <space_object.drop>`                 |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:rename()         | Rename a space                  |
+        | <space_object.rename>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:replace()        | Insert or replace a tuple       |
+        | <space_object.replace>`              |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:put()            | Insert or replace a tuple       |
+        | <space_object.replace>`              |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:update()         | Update a tuple                  |
+        | <space_object.update>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:upsert()         | Update a tuple                  |
+        | <space_object.upsert>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:delete()         | Delete a tuple                  |
+        | <space_object.delete>`               |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:count()          | Get count of tuples             |
+        | <space_object.count>`                |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:len()            | Get count of tuples             |
+        | <space_object.len>`                  |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:truncate()       | Delete all tuples               |
+        | <space_object.truncate>`             |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:inc{}            | Increment a tuple's counter     |
+        | <space_object.inc>`                  |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:dec{}            | Decrement a tuple's counter     |
+        | <space_object.dec>`                  |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:auto_increment{} | Generate key + Insert a tuple   |
+        | <space_object.auto_increment>`       |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object:pairs()          | Prepare for iterating           |
+        | <space_object.pairs>`                |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object.id               | .Numeric identifier of space    |
+        | <space_object.id>`                   |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object.enabled          | .Flag, true if space is enabled |
+        | <space_object.enabled>`              |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object.field_count      | .Required number of fields      |
+        | <space_object.field_count>`          |                                 |
+        +--------------------------------------+---------------------------------+
+        | :func:`space_object.index            | .Container of space's indexes   |
+        | <space_object.field_count>`          |                                 |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._schema`           | .(Metadata) List of schemas     |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._space`            | .(Metadata) List of spaces      |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._index`            | .(Metadata) List of indexes     |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._user`             | .(Metadata) List of users       |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._priv`             | .(Metadata) List of privileges  |
+        +--------------------------------------+---------------------------------+
+        | :class:`box.space._cluster`          | .(Metadata) List of clusters    |
+        +--------------------------------------+---------------------------------+
 
 
 .. module:: box.space
@@ -130,7 +152,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
             |               | types              |                             |                     |
             +---------------+--------------------+-----------------------------+---------------------+
 
-        Possible errors: too many parts.
+        Possible errors: too many parts. Index '...' already exists. Primary key must be unique.
 
         Note re storage engine: sophia supports only the TREE index type,
         and supports only one index per space,
