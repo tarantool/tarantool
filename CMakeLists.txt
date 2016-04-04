@@ -369,6 +369,9 @@ else()
     find_package(LibYAML)
 endif()
 
+set(OpenSSL_FIND_REQUIRED ON)
+find_package(OpenSSL)
+
 #
 # Third-Party misc
 #
