@@ -150,7 +150,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
-	r->snap_io_rate_limit = UINT64_MAX;
 
 	xdir_create(&r->snap_dir, snap_dirname, SNAP, &r->server_uuid);
 
@@ -172,14 +171,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	guard.is_active = false;
 	return r;
-}
-
-void
-recovery_update_io_rate_limit(struct recovery *r, double new_limit)
-{
-	r->snap_io_rate_limit = new_limit * 1024 * 1024;
-	if (r->snap_io_rate_limit == 0)
-		r->snap_io_rate_limit = UINT64_MAX;
 }
 
 void
@@ -283,7 +274,6 @@ recover_xlog(struct recovery *r, struct xlog *l)
 	    i.eof_read == false) {
 		panic("snapshot `%s' has no EOF marker", l->filename);
 	}
-
 }
 
 void
@@ -291,12 +281,15 @@ recovery_bootstrap(struct recovery *r)
 {
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
+	struct xdir dir;
+	xdir_create(&dir, "", SNAP, &uuid_nil);
 	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream_xc(&r->snap_dir, 0, f, filename);
-	auto guard = make_scoped_guard([=]{
+	struct xlog *snap = xlog_open_stream_xc(&dir, 0, f, filename);
+	auto guard = make_scoped_guard([&]{
 		xlog_close(snap);
+		xdir_destroy(&dir);
 	});
 	/** The snapshot must have a EOF marker. */
 	recover_xlog(r, snap);

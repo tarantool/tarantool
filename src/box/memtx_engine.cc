@@ -558,7 +558,8 @@ memtx_build_secondary_keys(struct space *space, void *param)
 MemtxEngine::MemtxEngine()
 	:Engine("memtx"),
 	m_checkpoint(0),
-	m_state(MEMTX_INITIALIZED)
+	m_state(MEMTX_INITIALIZED),
+	m_snap_io_rate_limit(UINT64_MAX)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY;
 }
@@ -1041,7 +1042,7 @@ struct checkpoint {
 
 static void
 checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
-		int64_t lsn_arg)
+		uint64_t snap_io_rate_limit, int64_t lsn_arg)
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
@@ -1049,7 +1050,7 @@ checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
 	vclock_copy(&ckpt->vclock, &recovery->vclock);
 	xdir_create(&ckpt->dir, recovery->snap_dir.dirname, SNAP,
 		    &recovery->server_uuid);
-	ckpt->snap_io_rate_limit = recovery->snap_io_rate_limit;
+	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 }
 
 static void
@@ -1121,7 +1122,7 @@ MemtxEngine::beginCheckpoint(int64_t lsn)
 
 	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
-	checkpoint_init(m_checkpoint, ::recovery, lsn);
+	checkpoint_init(m_checkpoint, ::recovery, m_snap_io_rate_limit, lsn);
 	space_foreach(checkpoint_add_space, m_checkpoint);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",

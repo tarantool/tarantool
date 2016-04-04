@@ -133,7 +133,7 @@ local dynamic_cfg = {
     readahead               = private.cfg_set_readahead,
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
-    panic_on_wal_error      = private.cfg_set_panic_on_wal_error,
+    panic_on_wal_error      = function() end,
     read_only               = private.cfg_set_read_only,
     -- snapshot_daemon
     snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,

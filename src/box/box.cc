@@ -419,7 +419,9 @@ box_set_io_collect_interval(void)
 extern "C" void
 box_set_snap_io_rate_limit(void)
 {
-	recovery_update_io_rate_limit(recovery, cfg_getd("snap_io_rate_limit"));
+	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+	if (memtx)
+		memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
 }
 
 extern "C" void
@@ -434,14 +436,6 @@ box_set_readahead(void)
 	int readahead = cfg_geti("readahead");
 	box_check_readahead(readahead);
 	iobuf_set_readahead(readahead);
-}
-
-extern "C" void
-box_set_panic_on_wal_error(void)
-{
-	recovery_setup_panic(recovery,
-			     cfg_geti("panic_on_snap_error"),
-			     cfg_geti("panic_on_wal_error"));
 }
 
 /* }}} configuration bindings */

@@ -66,7 +66,6 @@ struct recovery {
 	 */
 	apply_row_f *apply_row;
 	void *apply_row_param;
-	uint64_t snap_io_rate_limit;
 	struct tt_uuid server_uuid;
 	uint32_t server_id;
 };
@@ -81,9 +80,6 @@ recovery_delete(struct recovery *r);
 /* to be called at exit */
 void
 recovery_exit(struct recovery *r);
-
-void
-recovery_update_io_rate_limit(struct recovery *r, double new_limit);
 
 void
 recovery_setup_panic(struct recovery *r, bool on_snap_error, bool on_wal_error);

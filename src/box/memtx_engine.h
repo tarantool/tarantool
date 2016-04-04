@@ -65,10 +65,19 @@ struct MemtxEngine: public Engine {
 	virtual void commitCheckpoint();
 	virtual void abortCheckpoint();
 	virtual void initSystemSpace(struct space *space);
+	/* Update snap_io_rate_limit. */
+	void setSnapIoRateLimit(double new_limit)
+	{
+		m_snap_io_rate_limit = new_limit * 1024 * 1024;
+		if (m_snap_io_rate_limit == 0)
+			m_snap_io_rate_limit = UINT64_MAX;
+	}
 private:
 	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
 	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
+	/** Limit disk usage of checkpointing (bytes per second). */
+	uint64_t m_snap_io_rate_limit;
 };
 
 enum {
