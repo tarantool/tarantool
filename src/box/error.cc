@@ -146,6 +146,8 @@ ClientError::get_errcode(const struct error *e)
 		return client_error->errcode();
 	if (type_cast(OutOfMemory, e))
 		return ER_MEMORY_ISSUE;
+	if (type_cast(SystemError, e))
+		return ER_SYSTEM;
 	return ER_PROC_LUA;
 }
 

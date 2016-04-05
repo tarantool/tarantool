@@ -129,9 +129,10 @@ Engine::recoverToCheckpoint(int64_t /* lsn */)
 }
 
 void
-Engine::join(struct relay *relay)
+Engine::join(struct relay *relay, struct vclock *vclock)
 {
 	(void) relay;
+	(void) vclock;
 }
 
 void
@@ -317,10 +318,10 @@ error:
 }
 
 void
-engine_join(struct relay *relay)
+engine_join(struct relay *relay, struct vclock *vclock)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(relay);
+		engine->join(relay, vclock);
 	}
 }

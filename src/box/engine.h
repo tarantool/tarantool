@@ -97,7 +97,7 @@ public:
 	 */
 	virtual bool needToBuildSecondaryKey(struct space *space);
 
-	virtual void join(struct relay *);
+	virtual void join(struct relay *, struct vclock *vclock);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -238,7 +238,8 @@ void
 engine_recover_to_checkpoint(int64_t checkpoint_id);
 
 /**
- * Called at the start of JOIN routine.
+ * Called at the start of JOIN routine
+ * on the replica.
  */
 void
 engine_begin_join();
@@ -257,9 +258,10 @@ int
 engine_checkpoint(int64_t checkpoint_id);
 
 /**
- * Send a snapshot.
+ * Feed snapshot data as join events to the replicas.
+ * (called on the master).
  */
 void
-engine_join(struct relay *);
+engine_join(struct relay *, struct vclock *vclock);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

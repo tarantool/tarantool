@@ -52,7 +52,6 @@ struct recovery {
 	struct vclock vclock;
 	/** The WAL we're currently reading/writing from/to. */
 	struct xlog *current_wal;
-	struct xdir snap_dir;
 	struct xdir wal_dir;
 	/**
 	 * This is used in local hot standby or replication
@@ -70,7 +69,7 @@ struct recovery {
 };
 
 struct recovery *
-recovery_new(const char *snap_dirname, const char *wal_dirname,
+recovery_new(const char *wal_dirname, bool panic_on_wal_error,
 	     apply_row_f apply_row, void *apply_row_param);
 
 void
@@ -79,16 +78,6 @@ recovery_delete(struct recovery *r);
 /* to be called at exit */
 void
 recovery_exit(struct recovery *r);
-
-void
-recovery_setup_panic(struct recovery *r, bool on_snap_error, bool on_wal_error);
-
-static inline bool
-recovery_has_data(struct recovery *r)
-{
-	return vclockset_first(&r->snap_dir.index) != NULL ||
-	       vclockset_first(&r->wal_dir.index) != NULL;
-}
 
 void
 recovery_bootstrap(struct recovery *r);
@@ -114,11 +103,19 @@ void
 recovery_apply_row(struct recovery *r, struct xrow_header *packet);
 
 /**
- * Return LSN of the most recent snapshot or -1 if there is
- * no snapshot.
+ * The write ahead log doesn't store the last checkpoint:
+ * it is represented by the last valid snapshot of memtx engine.
+ * This is legacy from the time the entire box was single-engine.
+ *
+ * @param[out] vclock vclock of the last checkpoint
+ * @retval         signature of the last checkpoint, or -1
+ *                 in case of fresh boot
+ *
+ * The function may throw XlogError exception.
+ * It is implemented in memtx_engine.cc
  */
-int64_t
-recovery_last_checkpoint(struct recovery *r);
+int
+recovery_last_checkpoint(struct vclock *vclock);
 
 #if defined(__cplusplus)
 } /* extern "C" */

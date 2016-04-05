@@ -556,19 +556,42 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	handler->replace = memtx_replace_all_keys;
 }
 
-MemtxEngine::MemtxEngine()
+MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error)
 	:Engine("memtx"),
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
 	m_snap_io_rate_limit(UINT64_MAX)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY;
+	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_ID);
+	m_snap_dir.panic_if_error = panic_on_snap_error;
+	xdir_scan_xc(&m_snap_dir);
+	struct vclock *vclock = vclockset_last(&m_snap_dir.index);
+	if (vclock) {
+		vclock_copy(&m_last_checkpoint, vclock);
+	} else {
+		vclock_create(&m_last_checkpoint);
+	}
+}
+
+MemtxEngine::~MemtxEngine()
+{
+	xdir_destroy(&m_snap_dir);
 }
 
 
+int64_t
+MemtxEngine::lastCheckpoint(struct vclock *vclock)
+{
+	if (vclock)
+		vclock_copy(vclock, &m_last_checkpoint);
+	/* Return the lsn of the last checkpoint. */
+	return vclock_size(&m_last_checkpoint) ? vclock_sum(&m_last_checkpoint) : -1;
+}
+
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
+MemtxEngine::recoverToCheckpoint(int64_t lsn)
 {
 	struct recovery *r = ::recovery;
 	assert(m_state == MEMTX_INITIALIZED);
@@ -581,28 +604,12 @@ MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 	 * recovery mode. Enable all keys on start, to detect and
 	 * discard duplicates in the snapshot.
 	 */
-	m_state = (r->snap_dir.panic_if_error ?
+	m_state = (m_snap_dir.panic_if_error ?
 		   MEMTX_READING_SNAPSHOT : MEMTX_OK);
 
 	/* Process existing snapshot */
-	/* There's no current_wal during initial recover. */
-	assert(r->current_wal == NULL);
 	say_info("recovery start");
-	/**
-	 * Don't rescan the directory, it's done when
-	 * recovery is initialized.
-	 */
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such case.
-	 */
-	if (res == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signature = vclock_sum(res);
-
-	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
+	struct xlog *snap = xlog_open_xc(&m_snap_dir, lsn);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	SERVER_ID = snap->server_uuid;
@@ -613,7 +620,7 @@ MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 	say_info("recovering from `%s'", snap->filename);
 	recover_xlog(r, snap);
 	/* Replace server vclock using the data from snapshot */
-	vclock_copy(&r->vclock, vclockset_last(&r->snap_dir.index));
+	vclock_copy(&r->vclock, &snap->vclock);
 
 	if (m_state == MEMTX_READING_SNAPSHOT) {
 		/* End of the fast path: loaded the primary key. */
@@ -1020,25 +1027,22 @@ struct checkpoint {
 	 * read view iterators.
 	 */
 	struct rlist entries;
-	/** The signature of the snapshot file (lsn sum) */
-	int64_t lsn;
 	uint64_t snap_io_rate_limit;
 	struct cord cord;
 	bool waiting_for_snap_thread;
+	/** The vclock of the snapshot file. */
 	struct vclock vclock;
 	struct xdir dir;
 };
 
 static void
 checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
-		uint64_t snap_io_rate_limit, int64_t lsn_arg)
+		const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	ckpt->lsn = lsn_arg;
 	vclock_copy(&ckpt->vclock, &recovery->vclock);
-	xdir_create(&ckpt->dir, recovery->snap_dir.dirname, SNAP,
-		    &SERVER_ID);
+	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_ID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 }
 
@@ -1108,10 +1112,12 @@ int
 MemtxEngine::beginCheckpoint(int64_t lsn)
 {
 	assert(m_checkpoint == 0);
+	(void) lsn;
 
 	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
-	checkpoint_init(m_checkpoint, ::recovery, m_snap_io_rate_limit, lsn);
+	checkpoint_init(m_checkpoint, ::recovery, m_snap_dir.dirname,
+			m_snap_io_rate_limit);
 	space_foreach(checkpoint_add_space, m_checkpoint);
 
 	if (cord_costart(&m_checkpoint->cord, "snapshot",
@@ -1157,16 +1163,18 @@ MemtxEngine::commitCheckpoint()
 
 	tuple_end_snapshot();
 
+	int64_t lsn = vclock_sum(&m_checkpoint->vclock);
 	struct xdir *dir = &m_checkpoint->dir;
 	/* rename snapshot on completion */
 	char to[PATH_MAX];
 	snprintf(to, sizeof(to), "%s",
-		 format_filename(dir, m_checkpoint->lsn, NONE));
-	char *from = format_filename(dir, m_checkpoint->lsn, INPROGRESS);
+		 format_filename(dir, lsn, NONE));
+	char *from = format_filename(dir, lsn, INPROGRESS);
 	int rc = coeio_rename(from, to);
 	if (rc != 0)
 		panic("can't rename .snap.inprogress");
 
+	vclock_copy(&m_last_checkpoint, &m_checkpoint->vclock);
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
@@ -1191,7 +1199,7 @@ MemtxEngine::abortCheckpoint()
 
 	/** Remove garbage .inprogress file. */
 	char *filename = format_filename(&m_checkpoint->dir,
-					 m_checkpoint->lsn,
+					 vclock_sum(&m_checkpoint->vclock),
 					 INPROGRESS);
 	(void) coeio_unlink(filename);
 
@@ -1199,22 +1207,35 @@ MemtxEngine::abortCheckpoint()
 	m_checkpoint = 0;
 }
 
+/**
+ * Invoked from relay thread to feed snapshot rows
+ * to the replica, hence should not use engine state.
+ */
 void
-MemtxEngine::join(struct relay *relay)
+MemtxEngine::join(struct relay *relay, struct vclock *last)
 {
-	struct recovery *r = relay->r;
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	struct xdir dir;
+	struct xlog *snap = NULL;
+	/*
+	 * snap_dirname and SERVER_ID don't change after start,
+	 * safe to use in another thread.
+	 */
+	xdir_create(&dir, m_snap_dir.dirname, SNAP, &SERVER_ID);
+
+	auto guard = make_scoped_guard([&]{
+		xdir_destroy(&dir);
+		if (snap)
+			xlog_close(snap);
+	});
 	/*
 	 * The only case when the directory index is empty is
 	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such case.
+	 * as a replica. Our best effort is to not crash in such
+	 * case: xlog_open_xc will throw "file not found" error.
 	 */
-	if (res == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signature = vclock_sum(res);
-	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
-	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
-	recover_xlog(r, snap);
+	assert(vclock_size(last));
+	snap = xlog_open_xc(&dir, vclock_sum(last));
+	recover_xlog(relay->r, snap);
 }
 
 /**
@@ -1292,4 +1313,10 @@ memtx_index_extent_reserve(int num)
 		memtx_index_reserved_extents = ext;
 		memtx_index_num_reserved_extents++;
 	}
+}
+
+int
+recovery_last_checkpoint(struct vclock *vclock)
+{
+	return ((MemtxEngine *)engine_find("memtx"))->lastCheckpoint(vclock);
 }

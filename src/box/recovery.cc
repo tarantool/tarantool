@@ -117,14 +117,6 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
 	}
 }
 
-int64_t
-recovery_last_checkpoint(struct recovery *r)
-{
-	/* recover last snapshot lsn */
-	struct vclock *vclock = vclockset_last(&r->snap_dir.index);
-	return vclock ? vclock_sum(vclock) : -1;
-}
-
 /* }}} */
 
 /* {{{ Initial recovery */
@@ -133,8 +125,9 @@ recovery_last_checkpoint(struct recovery *r)
  * Throws an exception in  case of error.
  */
 struct recovery *
-recovery_new(const char *snap_dirname, const char *wal_dirname,
-	     apply_row_f apply_row, void *apply_row_param)
+recovery_new(const char *wal_dirname,
+	     bool panic_on_wal_error, apply_row_f apply_row,
+	     void *apply_row_param)
 {
 	struct recovery *r = (struct recovery *)
 			calloc(1, sizeof(*r));
@@ -151,13 +144,12 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
 
-	xdir_create(&r->snap_dir, snap_dirname, SNAP, &SERVER_ID);
 
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &SERVER_ID);
+	r->wal_dir.panic_if_error = panic_on_wal_error;
 
 	vclock_create(&r->vclock);
 
-	xdir_scan_xc(&r->snap_dir);
 	/**
 	 * Avoid scanning WAL dir before we recovered
 	 * the snapshot and know server UUID - this will
@@ -171,14 +163,6 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 
 	guard.is_active = false;
 	return r;
-}
-
-void
-recovery_setup_panic(struct recovery *r, bool on_snap_error,
-		     bool on_wal_error)
-{
-	r->wal_dir.panic_if_error = on_wal_error;
-	r->snap_dir.panic_if_error = on_snap_error;
 }
 
 static inline void
@@ -201,7 +185,6 @@ recovery_delete(struct recovery *r)
 {
 	recovery_stop_local(r);
 
-	xdir_destroy(&r->snap_dir);
 	xdir_destroy(&r->wal_dir);
 	if (r->current_wal) {
 		/*

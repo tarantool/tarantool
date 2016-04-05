@@ -435,16 +435,13 @@ sophia_join_key_def(void *env, void *db)
  * to the replica.
  */
 void
-SophiaEngine::join(struct relay *relay)
+SophiaEngine::join(struct relay *relay, struct vclock *vclock)
 {
-	struct vclock *res = vclockset_last(&relay->r->snap_dir.index);
-	if (res == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signt = vclock_sum(res);
+	int64_t lsn = vclock_sum(vclock);
 
 	/* get snapshot object */
 	char id[128];
-	snprintf(id, sizeof(id), "view.%" PRIu64, signt);
+	snprintf(id, sizeof(id), "view.%" PRIu64, lsn);
 	void *snapshot = sp_getobject(env, id);
 	assert(snapshot != NULL);
 

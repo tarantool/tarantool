@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
+#include "xlog.h"
 
 enum memtx_recovery_state {
 	MEMTX_INITIALIZED,
@@ -43,7 +44,8 @@ enum memtx_recovery_state {
 extern struct mempool memtx_index_extent_pool;
 
 struct MemtxEngine: public Engine {
-	MemtxEngine();
+	MemtxEngine(const char *snap_dirname, bool panic_on_snap_error);
+	~MemtxEngine();
 	virtual Handler *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void addPrimaryKey(struct space *space);
@@ -59,7 +61,7 @@ struct MemtxEngine: public Engine {
 	virtual void beginJoin();
 	virtual void recoverToCheckpoint(int64_t lsn);
 	virtual void endRecovery();
-	virtual void join(struct relay *relay);
+	virtual void join(struct relay *relay, struct vclock *last);
 	virtual int beginCheckpoint(int64_t);
 	virtual int waitCheckpoint();
 	virtual void commitCheckpoint();
@@ -72,12 +74,20 @@ struct MemtxEngine: public Engine {
 		if (m_snap_io_rate_limit == 0)
 			m_snap_io_rate_limit = UINT64_MAX;
 	}
+	/**
+	 * Return LSN of the most recent snapshot or -1 if there is
+	 * no snapshot.
+	 */
+	int64_t lastCheckpoint(struct vclock *vclock);
 private:
-	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
+	/** Non-zero if there is a checkpoint (snapshot) in progress. */
 	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;
+	/** The directory where to store snapshots. */
+	struct xdir m_snap_dir;
 	/** Limit disk usage of checkpointing (bytes per second). */
 	uint64_t m_snap_io_rate_limit;
+	struct vclock m_last_checkpoint;
 };
 
 enum {

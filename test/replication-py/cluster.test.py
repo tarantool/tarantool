@@ -85,7 +85,7 @@ for k in glob.glob(os.path.join(data_dir, '*.snap')):
 server_count = len(server.iproto.py_con.space('_cluster').select(()))
 
 rows = list(server.iproto.py_con.join(replica_uuid))
-print len(rows) == 1 and rows[0].return_message.find('snapshot') >= 0 and \
+print len(rows) == 1 and rows[0].return_message.find('.snap') >= 0 and \
     'ok' or 'not ok', '-', 'join without snapshots'
 
 res = server.iproto.py_con.space('_cluster').select(())

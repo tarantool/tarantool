@@ -32,9 +32,9 @@
  */
 #include "evio.h"
 #include "fiber.h"
+#include "vclock.h"
 
 struct server;
-struct vclock;
 struct tt_uuid;
 
 /** State of a replication relay. */
@@ -46,6 +46,7 @@ struct relay {
 	/* Request sync */
 	uint64_t sync;
 	struct recovery *r;
+	struct vclock join_vclock;
 	ev_tstamp wal_dir_rescan_delay;
 };
 

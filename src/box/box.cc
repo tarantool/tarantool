@@ -857,7 +857,6 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	xrow_decode_join(header, &server_uuid);
 
 	struct vclock join_vclock;
-	vclock_create(&join_vclock);
 
 	/* Process JOIN request via a replication relay */
 	relay_join(io->fd, header->sync, &join_vclock);
@@ -1015,7 +1014,8 @@ engine_init()
 	 * in snapshotting (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxEngine *memtx = new MemtxEngine();
+	MemtxEngine *memtx = new MemtxEngine(cfg_gets("snap_dir"),
+					     cfg_geti("panic_on_snap_error"));
 	engine_register(memtx);
 
 	SysviewEngine *sysview = new SysviewEngine();
@@ -1118,25 +1118,20 @@ box_init(void)
 	/* recovery initialization */
 	recover_row_ctx_init(&recover_row_ctx,
 			     cfg_geti64("rows_per_wal"));
-	recovery = recovery_new(cfg_gets("snap_dir"),
-				cfg_gets("wal_dir"),
+	recovery = recovery_new(cfg_gets("wal_dir"),
+				cfg_geti("panic_on_wal_error"),
 				recover_row, &recover_row_ctx);
-	recovery_setup_panic(recovery,
-			     cfg_geti("panic_on_snap_error"),
-			     cfg_geti("panic_on_wal_error"));
 	box_set_too_long_threshold();
-
 	/*
 	 * Initialize the cluster registry using replication_source,
 	 * but don't start replication right now.
 	 */
 	box_sync_replication_source();
 
-	if (recovery_has_data(recovery)) {
+	int64_t lsn = recovery_last_checkpoint(NULL);
+	if (lsn != -1) {
 		/* Tell Sophia engine LSN it must recover to. */
-		int64_t checkpoint_id =
-			recovery_last_checkpoint(recovery);
-		engine_recover_to_checkpoint(checkpoint_id);
+		engine_recover_to_checkpoint(lsn);
 	} else {
 		 bootstrap();
 	}

@@ -53,10 +53,9 @@ static inline void
 relay_create(struct relay *relay, int fd, uint64_t sync)
 {
 	memset(relay, 0, sizeof(*relay));
-	relay->r = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-			 relay_send_row, relay);
-	recovery_setup_panic(relay->r, cfg_geti("panic_on_snap_error"),
-			     cfg_geti("panic_on_wal_error"));
+	relay->r = recovery_new(cfg_gets("wal_dir"),
+				cfg_geti("panic_on_wal_error"),
+				relay_send_row, relay);
 
 	coio_init(&relay->io, fd);
 	relay->sync = sync;
@@ -89,7 +88,7 @@ relay_join_f(va_list ap)
 	relay_set_cord_name(relay->io.fd);
 
 	/* Send snapshot */
-	engine_join(relay);
+	engine_join(relay, &relay->join_vclock);
 
 	say_info("snapshot sent");
 	return 0;
@@ -103,13 +102,13 @@ relay_join(int fd, uint64_t sync, struct vclock *join_vclock)
 	auto scope_guard = make_scoped_guard([&]{
 		relay_destroy(&relay);
 	});
-	struct recovery *r = relay.r;
+	(void) recovery_last_checkpoint(&relay.join_vclock);
 
 	cord_costart(&relay.cord, "join", relay_join_f, &relay);
 	cord_cojoin(&relay.cord);
 	diag_raise();
 
-	vclock_copy(join_vclock, vclockset_last(&r->snap_dir.index));
+	vclock_copy(join_vclock, &relay.join_vclock);
 }
 
 static void

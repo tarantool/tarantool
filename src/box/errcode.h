@@ -168,6 +168,7 @@ struct errcode_record {
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	2, "Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		2, "View '%s' is read-only") \
 	/*114 */_(ER_SERVER_UUID_MISMATCH, 2, "Remote UUID mismatch: expected %s, got %s") \
+	/*115 */_(ER_SYSTEM, 2, "%s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
