@@ -162,7 +162,7 @@ applier_join(struct applier *applier, struct recovery *r)
 	struct ev_io *coio = &applier->io;
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
-	xrow_encode_join(&row, &r->server_uuid);
+	xrow_encode_join(&row, &SERVER_ID);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_BOOTSTRAP);
 
@@ -202,7 +202,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 
-	xrow_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
+	xrow_encode_subscribe(&row, &CLUSTER_ID, &SERVER_ID, &r->vclock);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
 	/* Re-enable warnings after successful execution of SUBSCRIBE */

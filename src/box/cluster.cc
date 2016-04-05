@@ -44,7 +44,11 @@
  * Globally unique identifier of this cluster.
  * A cluster is a set of connected appliers.
  */
-struct tt_uuid cluster_id;
+struct tt_uuid CLUSTER_ID;
+/**
+ * Globally unique identifier of this server.
+ */
+struct tt_uuid SERVER_ID;
 
 typedef rb_tree(struct server) serverset_t;
 rb_proto(, serverset_, serverset_t, struct server)
@@ -159,7 +163,7 @@ server_set_id(struct server *server, uint32_t server_id)
 	if (!vclock_has(&r->vclock, server_id))
 		vclock_add_server_nothrow(&r->vclock, server_id);
 
-	if (tt_uuid_is_equal(&r->server_uuid, &server->uuid)) {
+	if (tt_uuid_is_equal(&SERVER_ID, &server->uuid)) {
 		/* Assign local server id */
 		assert(r->server_id == SERVER_ID_NIL);
 		r->server_id = server_id;

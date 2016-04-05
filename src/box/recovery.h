@@ -66,7 +66,6 @@ struct recovery {
 	 */
 	apply_row_f *apply_row;
 	void *apply_row_param;
-	struct tt_uuid server_uuid;
 	uint32_t server_id;
 };
 

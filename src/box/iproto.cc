@@ -55,7 +55,7 @@
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* sc_version */
-#include "recovery.h" /* server_uuid */
+#include "cluster.h" /* server_uuid */
 #include "iproto_constants.h"
 #include "authentication.h"
 #include "rmean.h"
@@ -925,7 +925,7 @@ tx_process_connect(struct cmsg *m)
 		con->session = session_create(con->input.fd);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
-		struct tt_uuid uuid = ::recovery->server_uuid;
+		struct tt_uuid uuid = SERVER_ID;
 		greeting_encode(greeting, tarantool_version_id(),
 				&uuid, con->session->salt, SESSION_SEED_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);

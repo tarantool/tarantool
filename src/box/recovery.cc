@@ -151,9 +151,9 @@ recovery_new(const char *snap_dirname, const char *wal_dirname,
 	r->apply_row = apply_row;
 	r->apply_row_param = apply_row_param;
 
-	xdir_create(&r->snap_dir, snap_dirname, SNAP, &r->server_uuid);
+	xdir_create(&r->snap_dir, snap_dirname, SNAP, &SERVER_ID);
 
-	xdir_create(&r->wal_dir, wal_dirname, XLOG, &r->server_uuid);
+	xdir_create(&r->wal_dir, wal_dirname, XLOG, &SERVER_ID);
 
 	vclock_create(&r->vclock);
 
@@ -402,7 +402,7 @@ recovery_finalize(struct recovery *r, enum wal_mode wal_mode,
 	}
 	if (wal_mode != WAL_NONE) {
 		wal_writer_start(wal_mode, r->wal_dir.dirname,
-				 &r->server_uuid, &r->vclock, rows_per_wal);
+				 &SERVER_ID, &r->vclock, rows_per_wal);
 	}
 }
 

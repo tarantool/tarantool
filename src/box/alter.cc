@@ -1970,7 +1970,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		if (new_tuple == NULL)
 			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
 		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
-		cluster_id = uu;
+		CLUSTER_ID = uu;
 	}
 }
 

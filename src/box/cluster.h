@@ -95,7 +95,9 @@ cluster_free(void);
 /** {{{ Global cluster identifier API **/
 
 /** UUID of the cluster. */
-extern struct tt_uuid cluster_id;
+extern struct tt_uuid CLUSTER_ID;
+/** UUID of the instance. */
+extern struct tt_uuid SERVER_ID;
 
 struct vclock *
 cluster_clock();

@@ -44,6 +44,7 @@
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "recovery.h"
+#include "cluster.h"
 #include "relay.h"
 #include "schema.h"
 #include "port.h"
@@ -564,44 +565,6 @@ MemtxEngine::MemtxEngine()
 	flags = ENGINE_CAN_BE_TEMPORARY;
 }
 
-/**
- * Read a snapshot and call apply_row for every snapshot row.
- * Panic in case of error.
- *
- * @pre there is an existing snapshot. Otherwise
- * recovery_bootstrap() should be used instead.
- */
-void
-recover_snap(struct recovery *r)
-{
-	/* There's no current_wal during initial recover. */
-	assert(r->current_wal == NULL);
-	say_info("recovery start");
-	/**
-	 * Don't rescan the directory, it's done when
-	 * recovery is initialized.
-	 */
-	struct vclock *res = vclockset_last(&r->snap_dir.index);
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such case.
-	 */
-	if (res == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
-	int64_t signature = vclock_sum(res);
-
-	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
-	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
-	/* Save server UUID */
-	r->server_uuid = snap->server_uuid;
-
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&r->vclock, 0);
-
-	say_info("recovering from `%s'", snap->filename);
-	recover_xlog(r, snap);
-}
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
@@ -622,7 +585,33 @@ MemtxEngine::recoverToCheckpoint(int64_t /* lsn */)
 		   MEMTX_READING_SNAPSHOT : MEMTX_OK);
 
 	/* Process existing snapshot */
-	recover_snap(r);
+	/* There's no current_wal during initial recover. */
+	assert(r->current_wal == NULL);
+	say_info("recovery start");
+	/**
+	 * Don't rescan the directory, it's done when
+	 * recovery is initialized.
+	 */
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such case.
+	 */
+	if (res == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	int64_t signature = vclock_sum(res);
+
+	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
+	/* Save server UUID */
+	SERVER_ID = snap->server_uuid;
+
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
+
+	say_info("recovering from `%s'", snap->filename);
+	recover_xlog(r, snap);
 	/* Replace server vclock using the data from snapshot */
 	vclock_copy(&r->vclock, vclockset_last(&r->snap_dir.index));
 
@@ -1049,7 +1038,7 @@ checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
 	ckpt->lsn = lsn_arg;
 	vclock_copy(&ckpt->vclock, &recovery->vclock);
 	xdir_create(&ckpt->dir, recovery->snap_dir.dirname, SNAP,
-		    &recovery->server_uuid);
+		    &SERVER_ID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 }
 
@@ -1213,7 +1202,19 @@ MemtxEngine::abortCheckpoint()
 void
 MemtxEngine::join(struct relay *relay)
 {
-	recover_snap(relay->r);
+	struct recovery *r = relay->r;
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such case.
+	 */
+	if (res == NULL)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	int64_t signature = vclock_sum(res);
+	struct xlog *snap = xlog_open_xc(&r->snap_dir, signature);
+	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
+	recover_xlog(r, snap);
 }
 
 /**
