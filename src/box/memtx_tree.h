@@ -57,36 +57,37 @@ tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_de
 class MemtxTree: public MemtxIndex {
 public:
 	MemtxTree(struct key_def *key_def);
-	virtual ~MemtxTree();
+	virtual ~MemtxTree() override;
 
-	virtual void beginBuild();
-	virtual void reserve(uint32_t size_hint);
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-	virtual size_t size() const;
-	virtual struct tuple *random(uint32_t rnd) const;
+	virtual void beginBuild() override;
+	virtual void reserve(uint32_t size_hint) override;
+	virtual void buildNext(struct tuple *tuple) override;
+	virtual void endBuild() override;
+	virtual size_t size() const override;
+	virtual struct tuple *random(uint32_t rnd) const override;
 	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const;
+					uint32_t part_count) const override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
+				      enum dup_replace_mode mode) override;
 
-	virtual size_t bsize() const;
-	virtual struct iterator *allocIterator() const;
+	virtual size_t bsize() const override;
+	virtual struct iterator *allocIterator() const override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+				  const char *key,
+				  uint32_t part_count) const override;
 
 	/**
 	 * Create a read view for iterator so further index modifications
 	 * will not affect the iterator iteration.
 	 */
-	virtual void createReadViewForIterator(struct iterator *iterator);
+	virtual void createReadViewForIterator(struct iterator *iterator) override;
 	/**
 	 * Destroy a read view of an iterator. Must be called for iterators,
 	 * for which createReadViewForIterator was called.
 	 */
-	virtual void destroyReadViewForIterator(struct iterator *iterator);
+	virtual void destroyReadViewForIterator(struct iterator *iterator) override;
 
 // protected:
 	struct bps_tree_index tree;

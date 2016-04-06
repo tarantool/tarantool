@@ -37,14 +37,16 @@ public:
 	MemtxIndex(struct key_def *key_def)
 		:Index(key_def), m_position(NULL)
 	{ }
-	virtual ~MemtxIndex() {
+	virtual ~MemtxIndex() override {
 		if (m_position != NULL)
 			m_position->free(m_position);
 	}
-	virtual struct tuple *min(const char *key, uint32_t part_count) const;
-	virtual struct tuple *max(const char *key, uint32_t part_count) const;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const;
+			     uint32_t part_count) const override;
 
 	inline struct iterator *position() const
 	{

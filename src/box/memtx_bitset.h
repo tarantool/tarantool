@@ -46,19 +46,20 @@ struct mh_bitset_index_t;
 class MemtxBitset: public MemtxIndex {
 public:
 	MemtxBitset(struct key_def *key_def);
-	virtual ~MemtxBitset();
-	virtual size_t size() const;
+	virtual ~MemtxBitset() override;
+	virtual size_t size() const override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const;
+			     uint32_t part_count) const override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
+				      enum dup_replace_mode mode) override;
 
-	virtual size_t bsize() const;
-	virtual struct iterator *allocIterator() const;
+	virtual size_t bsize() const override;
+	virtual struct iterator *allocIterator() const override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+				  const char *key,
+				  uint32_t part_count) const override;
 #ifndef OLD_GOOD_BITSET
 	void registerTuple(struct tuple *tuple);
 	void unregisterTuple(struct tuple *tuple);
