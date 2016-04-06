@@ -1036,12 +1036,12 @@ struct checkpoint {
 };
 
 static void
-checkpoint_init(struct checkpoint *ckpt, struct recovery *recovery,
+checkpoint_init(struct checkpoint *ckpt, struct vclock *vclock,
 		const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	vclock_copy(&ckpt->vclock, &recovery->vclock);
+	vclock_copy(&ckpt->vclock, vclock);
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_ID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 }
@@ -1109,14 +1109,13 @@ checkpoint_f(va_list ap)
 }
 
 int
-MemtxEngine::beginCheckpoint(int64_t lsn)
+MemtxEngine::beginCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint == 0);
-	(void) lsn;
 
 	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
-	checkpoint_init(m_checkpoint, ::recovery, m_snap_dir.dirname,
+	checkpoint_init(m_checkpoint, vclock, m_snap_dir.dirname,
 			m_snap_io_rate_limit);
 	space_foreach(checkpoint_add_space, m_checkpoint);
 

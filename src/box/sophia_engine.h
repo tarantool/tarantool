@@ -52,7 +52,7 @@ struct SophiaEngine: public Engine {
 	virtual void recoverToCheckpoint(int64_t);
 	virtual void endRecovery();
 	virtual void join(struct relay *relay, struct vclock *vclock);
-	virtual int beginCheckpoint(int64_t);
+	virtual int beginCheckpoint(struct vclock *vclock);
 	virtual int waitCheckpoint();
 	virtual void commitCheckpoint();
 	virtual void abortCheckpoint();

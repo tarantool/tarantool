@@ -1081,9 +1081,7 @@ bootstrap(void)
 	} else {
 		bootstrap_cluster();
 	}
-
-	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
-	engine_checkpoint(checkpoint_id);
+	engine_checkpoint(&recovery->vclock);
 }
 
 static inline void
@@ -1198,8 +1196,7 @@ box_snapshot()
 		return EINPROGRESS;
 	box_snapshot_is_in_progress = true;
 	/* create snapshot file */
-	int64_t checkpoint_id = vclock_sum(&recovery->vclock);
-	int rc = engine_checkpoint(checkpoint_id);
+	int rc = engine_checkpoint(&recovery->vclock);
 	box_snapshot_is_in_progress = false;
 	return rc;
 }

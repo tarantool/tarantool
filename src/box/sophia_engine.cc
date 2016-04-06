@@ -751,9 +751,10 @@ SophiaEngine::recoverToCheckpoint(int64_t checkpoint_id)
 }
 
 int
-SophiaEngine::beginCheckpoint(int64_t lsn)
+SophiaEngine::beginCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint_lsn == -1);
+	int64_t lsn = vclock_sum(vclock);
 	if (lsn != m_prev_checkpoint_lsn) {
 		sophia_snapshot(env, lsn);
 		m_checkpoint_lsn = lsn;

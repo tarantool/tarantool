@@ -96,9 +96,9 @@ Engine::beginJoin()
 }
 
 int
-Engine::beginCheckpoint(int64_t lsn)
+Engine::beginCheckpoint(struct vclock *vclock)
 {
-	(void) lsn;
+	(void) vclock;
 	return 0;
 }
 
@@ -288,13 +288,13 @@ engine_end_recovery()
 }
 
 int
-engine_checkpoint(int64_t checkpoint_id)
+engine_checkpoint(struct vclock *vclock)
 {
 	latch_lock(&schema_lock);
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->beginCheckpoint(checkpoint_id))
+		if (engine->beginCheckpoint(vclock))
 			goto error;
 	}
 	/* wait for engine snapshot completion */
