@@ -11,6 +11,7 @@ BuildRequires: coreutils
 BuildRequires: sed
 BuildRequires: readline-devel
 BuildRequires: libyaml-devel
+BuildRequires: openssl-devel
 #BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
 # pod2man is needed to build man pages

@@ -54,6 +54,9 @@
 #include <lua/clock.h>
 #include "title.h"
 
+#include <openssl/err.h>
+#include <openssl/evp.h>
+
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
  * Please add your symbols to this array if you plan to use it from
@@ -142,4 +145,7 @@ void *ffi_symbols[] = {
 	(void *) title_get_custom,
 	(void *) title_set_status,
 	(void *) title_get_status,
+	(void *) OpenSSL_add_all_digests,
+	(void *) OpenSSL_add_all_ciphers,
+	(void *) ERR_load_crypto_strings,
 };

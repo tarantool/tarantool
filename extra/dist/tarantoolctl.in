@@ -259,6 +259,8 @@ local function load_default_file(default_file)
     d.sophia_dir = fio.pathjoin(d.sophia_dir, instance_name)
     d.logger     = fio.pathjoin(d.logger,     instance_name .. '.log')
 
+    default_cfg = d
+
     if not usermode then
         -- change user name only if not running locally
         d.username = d.username or "tarantool"

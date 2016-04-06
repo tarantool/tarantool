@@ -195,6 +195,27 @@ lbox_coredump(struct lua_State *L __attribute__((unused)))
 /* }}} */
 
 /**
+ * Original LuaJIT/Lua logic: <luajit/src/lib_package.c - function setpath>
+ *
+ * 1) If environment variable 'envname' is empty, it uses only <default value>
+ * 2) Otherwise:
+ *    - If it contains ';;', then ';;' is replaced with ';'<default value>';'
+ *    - Otherwise is uses only what's inside this value.
+ **/
+static void
+tarantool_lua_pushpath_env(struct lua_State *L, const char *envname)
+{
+	const char *path = getenv(envname);
+	if (path != NULL) {
+		const char *def = lua_tostring(L, -1);
+		path = luaL_gsub(L, path, ";;", ";\1;");
+		luaL_gsub(L, path, "\1", def);
+		lua_remove(L, -2);
+		lua_remove(L, -2);
+	}
+}
+
+/**
  * Prepend the variable list of arguments to the Lua
  * package search path
  */
@@ -219,6 +240,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pushliteral(L, MODULE_LUAPATH ";");
 	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
+	tarantool_lua_pushpath_env(L, "LUA_PATH");
 	lua_setfield(L, top, "path");
 
 	lua_pushliteral(L, "./?." TARANTOOL_LIBEXT ";");
@@ -231,6 +253,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pushliteral(L, MODULE_LIBPATH ";");
 	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
+	tarantool_lua_pushpath_env(L, "LUA_CPATH");
 	lua_setfield(L, top, "cpath");
 
 	assert(lua_gettop(L) == top);

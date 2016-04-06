@@ -369,6 +369,13 @@ else()
     find_package(LibYAML)
 endif()
 
+find_package(OpenSSL)
+if (OPENSSL_FOUND)
+    message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
+else()
+    message(FATAL_ERROR "Could NOT find OpenSSL development files (libssl-dev/openssl-devel package)")
+endif()
+
 #
 # Third-Party misc
 #
