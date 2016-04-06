@@ -38,24 +38,25 @@
 struct SophiaEngine: public Engine {
 	SophiaEngine();
 	~SophiaEngine();
-	virtual void init();
-	virtual Handler *open();
-	virtual Index *createIndex(struct key_def *);
-	virtual void dropIndex(Index*);
-	virtual void keydefCheck(struct space *space, struct key_def *f);
-	virtual void begin(struct txn *txn);
-	virtual void prepare(struct txn *txn);
-	virtual void commit(struct txn *txn, int64_t signature);
-	virtual void rollbackStatement(struct txn_stmt *stmt);
-	virtual void rollback(struct txn *txn);
-	virtual void beginJoin();
-	virtual void recoverToCheckpoint(int64_t);
-	virtual void endRecovery();
-	virtual void join(struct relay *relay);
-	virtual int beginCheckpoint(int64_t);
-	virtual int waitCheckpoint();
-	virtual void commitCheckpoint();
-	virtual void abortCheckpoint();
+	virtual void init() override;
+	virtual Handler *open() override;
+	virtual Index *createIndex(struct key_def *) override;
+	virtual void dropIndex(Index*) override;
+	virtual void keydefCheck(struct space *space,
+				 struct key_def *f) override;
+	virtual void begin(struct txn *txn) override;
+	virtual void prepare(struct txn *txn) override;
+	virtual void commit(struct txn *txn, int64_t signature) override;
+	virtual void rollbackStatement(struct txn_stmt *stmt) override;
+	virtual void rollback(struct txn *txn) override;
+	virtual void beginJoin() override;
+	virtual void recoverToCheckpoint(int64_t) override;
+	virtual void endRecovery() override;
+	virtual void join(struct relay *relay) override;
+	virtual int beginCheckpoint(int64_t) override;
+	virtual int waitCheckpoint() override;
+	virtual void commitCheckpoint() override;
+	virtual void abortCheckpoint() override;
 	void *env;
 private:
 	int64_t m_prev_commit_lsn;

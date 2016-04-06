@@ -187,6 +187,7 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX" "-std=c++11")
     else()
         add_compile_flags("CXX" "-std=gnu++0x")
+        add_definitions("-Doverride=")
     endif()
 
     add_compile_flags("C;CXX"

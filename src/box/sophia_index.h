@@ -36,14 +36,14 @@
 class SophiaIndex: public Index {
 public:
 	SophiaIndex(struct key_def *key_def);
-	~SophiaIndex();
+	virtual ~SophiaIndex() override;
 
 	virtual struct tuple*
 	replace(struct tuple*,
-	        struct tuple*, enum dup_replace_mode);
+	        struct tuple*, enum dup_replace_mode) override;
 
 	virtual struct tuple*
-	findByKey(const char *key, uint32_t) const;
+	findByKey(const char *key, uint32_t) const override;
 
 	virtual struct iterator*
 	allocIterator() const;
@@ -51,10 +51,10 @@ public:
 	virtual void
 	initIterator(struct iterator *iterator,
 	             enum iterator_type type,
-	             const char *key, uint32_t part_count) const;
+	             const char *key, uint32_t part_count) const override;
 
-	virtual size_t  size() const;
-	virtual size_t bsize() const;
+	virtual size_t  size() const override;
+	virtual size_t bsize() const override;
 
 public:
 	void replace_or_insert(const char *tuple,

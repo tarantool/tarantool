@@ -44,27 +44,28 @@ extern struct mempool memtx_index_extent_pool;
 
 struct MemtxEngine: public Engine {
 	MemtxEngine();
-	virtual Handler *open();
-	virtual Index *createIndex(struct key_def *key_def);
-	virtual void addPrimaryKey(struct space *space);
-	virtual void dropIndex(Index *index);
-	virtual void dropPrimaryKey(struct space *space);
-	virtual bool needToBuildSecondaryKey(struct space *space);
-	virtual void keydefCheck(struct space *space, struct key_def *key_def);
-	virtual void begin(struct txn *txn);
-	virtual void rollbackStatement(struct txn_stmt *stmt);
-	virtual void rollback(struct txn *txn);
-	virtual void prepare(struct txn *txn);
-	virtual void commit(struct txn *txn, int64_t signature);
-	virtual void beginJoin();
-	virtual void recoverToCheckpoint(int64_t lsn);
-	virtual void endRecovery();
-	virtual void join(struct relay *relay);
-	virtual int beginCheckpoint(int64_t);
-	virtual int waitCheckpoint();
-	virtual void commitCheckpoint();
-	virtual void abortCheckpoint();
-	virtual void initSystemSpace(struct space *space);
+	virtual Handler *open() override;
+	virtual Index *createIndex(struct key_def *key_def) override;
+	virtual void addPrimaryKey(struct space *space) override;
+	virtual void dropIndex(Index *index) override;
+	virtual void dropPrimaryKey(struct space *space) override;
+	virtual bool needToBuildSecondaryKey(struct space *space) override;
+	virtual void keydefCheck(struct space *space,
+				 struct key_def *key_def) override;
+	virtual void begin(struct txn *txn) override;
+	virtual void rollbackStatement(struct txn_stmt *stmt) override;
+	virtual void rollback(struct txn *txn) override;
+	virtual void prepare(struct txn *txn) override;
+	virtual void commit(struct txn *txn, int64_t signature) override;
+	virtual void beginJoin() override;
+	virtual void recoverToCheckpoint(int64_t lsn) override;
+	virtual void endRecovery() override;
+	virtual void join(struct relay *relay) override;
+	virtual int beginCheckpoint(int64_t) override;
+	virtual int waitCheckpoint() override;
+	virtual void commitCheckpoint() override;
+	virtual void abortCheckpoint() override;
+	virtual void initSystemSpace(struct space *space) override;
 private:
 	/** Non-zero if there is a checkpoint (snapshot) in * progress. */
 	struct checkpoint *m_checkpoint;

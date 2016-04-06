@@ -41,13 +41,15 @@ class SysviewIndex: public Index {
 public:
 	SysviewIndex(struct key_def *key_def, uint32_t source_space_id,
 		     uint32_t source_index_id, sysview_filter_f filter);
-	virtual ~SysviewIndex();
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
+	virtual ~SysviewIndex() override;
+	virtual struct tuple *findByKey(const char *key,
+					uint32_t part_count) const override;
 
-	virtual struct iterator *allocIterator() const;
+	virtual struct iterator *allocIterator() const override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const;
+				  const char *key,
+				  uint32_t part_count) const override;
 
 	uint32_t source_space_id;
 	uint32_t source_index_id;
