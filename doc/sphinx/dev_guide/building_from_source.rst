@@ -33,6 +33,7 @@ explain what the steps are, then on the Internet you can look at some example sc
    * **git**                                  # see above
    * **cmake**                                # see above
    * **libreadline-dev or libreadline6-dev or readline-devel**  # for interactive mode
+   * **libssl-dev**                           # for `digest` module
    * **autoconf**                             # optional, only in Mac OS scripts
    * **zlib1g** or **zlib**                   # optional, only in Mac OS scripts
    * **doxygen**                              # optional, only for documentation
