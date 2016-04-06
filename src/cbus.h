@@ -341,11 +341,35 @@ cmsg_notify_init(struct cmsg_notify *msg);
  * error is safely transferred to the caller cord's diagnostics
  * area.
 */
-typedef int (*cbus_call_f)(void *);
+struct cbus_call_msg;
+typedef int (*cbus_call_f)(struct cbus_call_msg *);
+
+/**
+ * The state of a synchronous cross-thread call. Only func and free_cb
+ * (if needed) are significant to the caller, other fields are
+ * initialized during the call preparation internally.
+ */
+struct cbus_call_msg
+{
+	struct cmsg msg;
+	struct cbus *bus;
+	struct cmsg_hop route[2];
+	struct diag diag;
+	struct fiber *caller;
+	bool complete;
+	int rc;
+	/** The callback to invoke in the peer thread. */
+	cbus_call_f func;
+	/**
+	 * A callback to free affiliated resources if the call
+	 * times out or the caller is canceled.
+	 */
+	cbus_call_f free_cb;
+};
 
 int
-cbus_call(struct cbus *bus, cbus_call_f func, cbus_call_f free_cb,
-	  void *data, double timeout);
+cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
+	cbus_call_f func, cbus_call_f free_cb, double timeout);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -387,31 +387,6 @@ cmsg_notify_init(struct cmsg_notify *msg)
 /* }}} cmsg */
 
 /**
- * The state of a synchronous cross-thread call. Only func and free_cb
- * (if needed) are significant to the caller, other fields are
- * initialized during the call preparation internally.
- */
-struct cbus_call_msg
-{
-	struct cmsg msg;
-	struct cbus *bus;
-	struct cmsg_hop route[2];
-	struct diag diag;
-	struct fiber *caller;
-	bool complete;
-	int rc;
-	/** The callback to invoke in the peer thread. */
-	cbus_call_f func;
-	/**
-	 * A callback to free affiliated resources if the call
-	 * times out or the caller is canceled.
-	 */
-	cbus_call_f free_cb;
-	/** Callback state. */
-	void *data;
-};
-
-/**
  * Call the target function and store the results (diag, rc) in
  * struct cbus_call_msg.
  */
@@ -419,7 +394,7 @@ void
 cbus_call_perform(struct cmsg *m)
 {
 	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
-	msg->rc = msg->func(msg->data);
+	msg->rc = msg->func(msg);
 	if (msg->rc)
 		diag_move(&fiber()->diag, &msg->diag);
 }
@@ -435,8 +410,7 @@ cbus_call_done(struct cmsg *m)
 	struct cbus_call_msg *msg = (struct cbus_call_msg *)m;
 	if (msg->caller == NULL) {
 		if (msg->free_cb)
-			msg->free_cb(msg->data);
-		free(msg);
+			msg->free_cb(msg);
 		return;
 	}
 	msg->complete = true;
@@ -447,12 +421,10 @@ cbus_call_done(struct cmsg *m)
  * Execute a synchronous call over cbus.
  */
 int
-cbus_call(struct cbus *bus, cbus_call_f func, cbus_call_f free_cb,
-	  void *data, double timeout)
+cbus_call(struct cbus *bus, struct cbus_call_msg *msg,
+	cbus_call_f func, cbus_call_f free_cb, double timeout)
 {
 	int rc;
-	struct cbus_call_msg *msg = (struct cbus_call_msg *)
-		malloc(sizeof(*msg));
 
 	msg->bus = bus;
 	diag_create(&msg->diag);
@@ -467,7 +439,6 @@ cbus_call(struct cbus *bus, cbus_call_f func, cbus_call_f free_cb,
 
 	msg->func = func;
 	msg->free_cb = free_cb;
-	msg->data = data;
 	msg->rc = 0;
 
 	cpipe_push(bus->pipe[peer_idx], cmsg(msg));
@@ -483,6 +454,6 @@ cbus_call(struct cbus *bus, cbus_call_f func, cbus_call_f free_cb,
 	}
 	if ((rc = msg->rc))
 		diag_move(&msg->diag, &fiber()->diag);
-	free(msg);
 	return rc;
 }
+
