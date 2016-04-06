@@ -77,7 +77,8 @@ static int
 lbox_index_update(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
+	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL) ||
+	    (lua_type(L, 4) != LUA_TTABLE && lua_istuple(L, 4) == NULL))
 		return luaL_error(L, "Usage index:update(key, ops)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
@@ -98,7 +99,8 @@ static int
 lbox_index_upsert(lua_State *L)
 {
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE || lua_type(L, 4) != LUA_TTABLE)
+	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL) ||
+	    (lua_type(L, 4) != LUA_TTABLE && lua_istuple(L, 4) == NULL))
 		return luaL_error(L, "Usage index:upsert(tuple_key, ops)");
 
 	uint32_t space_id = lua_tointeger(L, 1);
@@ -119,7 +121,7 @@ static int
 lbox_index_delete(lua_State *L)
 {
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    lua_type(L, 3) != LUA_TTABLE)
+	    (lua_type(L, 3) != LUA_TTABLE && lua_istuple(L, 3) == NULL))
 		return luaL_error(L, "Usage space:delete(key)");
 
 	uint32_t space_id = lua_tointeger(L, 1);

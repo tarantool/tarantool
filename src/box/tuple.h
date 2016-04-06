@@ -391,14 +391,6 @@ struct tuple
 	char data[0];
 } __attribute__((packed));
 
-/** Allocate a tuple
- *
- * @param size  tuple->bsize
- * @post tuple->refs = 1
- */
-struct tuple *
-tuple_alloc(struct tuple_format *format, size_t size);
-
 /**
  * Create a new tuple from a sequence of MsgPack encoded fields.
  * tuple->refs is 0.
@@ -409,6 +401,28 @@ tuple_alloc(struct tuple_format *format, size_t size);
  */
 struct tuple *
 tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/**
+ * Allocate a tuple
+ * It's similar to tuple_new, but does not set tuple data and thus does not
+ * initialize field offsets.
+ *
+ * After tuple_alloc and filling tuple data the tuple_init_field_map must be
+ * called!
+ *
+ * @param size  tuple->bsize
+ */
+struct tuple *
+tuple_alloc(struct tuple_format *format, size_t size);
+
+/**
+ * Fill field map of tuple by the data in it
+ * Used after tuple_alloc call and filling tuple data.
+ * Throws an error if tuple data does not match the format.
+ */
+void
+tuple_init_field_map(struct tuple_format *format,
+		     struct tuple *tuple, uint32_t *field_map);
 
 /**
  * Free the tuple.
@@ -709,11 +723,6 @@ tuple_next_u32(struct tuple_iterator *it)
  */
 const char *
 tuple_next_cstr(struct tuple_iterator *it);
-
-void
-tuple_init_field_map(struct tuple_format *format,
-		     struct tuple *tuple, uint32_t *field_map);
-
 
 /**
  * Extract msgpacked key parts from tuple data.

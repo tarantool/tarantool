@@ -40,3 +40,16 @@ for key = 1, 100 do space:delete({key, key}) end
 for key = 1, 100 do assert(space:get({key, key}) == nil) end
 space:delete({7, 7})
 space:drop()
+
+-- delete (str)
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'str'} })
+for key = 1, 100 do space:replace({tostring(key)}) end
+t = {}
+for key = 1, 100 do table.insert(t, space:get({tostring(key)})) end
+t
+for key = 1, 100 do space:delete(box.tuple.new{tostring(key)}) end
+for key = 1, 100 do assert(space:get({tostring(key)}) == nil) end
+
+space:delete(box.tuple.new{tostring(7)})
+space:drop()

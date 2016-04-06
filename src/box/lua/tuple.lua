@@ -4,9 +4,10 @@ local ffi = require('ffi')
 local yaml = require('yaml')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
+local buffer = require('buffer')
 local internal = require('box.internal')
 
-ffi.cdef([[
+ffi.cdef[[
 /** \cond public */
 typedef struct tuple_format box_tuple_format_t;
 
@@ -66,12 +67,40 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 box_tuple_t *
 box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
-]])
+]]
 
 local builtin = ffi.C
 
 local tuple_t = ffi.typeof('box_tuple_t')
 local const_tuple_ref_t = ffi.typeof('const box_tuple_t&')
+
+local is_tuple = function(tuple)
+    return tuple ~= nil and type(tuple) == 'cdata' and ffi.istype(const_tuple_ref_t, tuple)
+end
+
+local encode_fix = msgpackffi.internal.encode_fix
+local encode_array = msgpackffi.internal.encode_array
+local encode_r = msgpackffi.internal.encode_r
+
+tuple_encode = function(obj)
+    local tmpbuf = buffer.IBUF_SHARED
+    tmpbuf:reset()
+    if obj == nil then
+        encode_fix(tmpbuf, 0x90, 0)  -- empty array
+    elseif is_tuple(obj) then
+        encode_r(tmpbuf, obj, 1)
+    elseif type(obj) == "table" then
+        encode_array(tmpbuf, #obj)
+        local i
+        for i = 1, #obj, 1 do
+            encode_r(tmpbuf, obj[i], 1)
+        end
+    else
+        encode_fix(tmpbuf, 0x90, 1)  -- array of one element
+        encode_r(tmpbuf, obj, 1)
+    end
+    return tmpbuf.rpos, tmpbuf.wpos
+end
 
 local tuple_gc = function(tuple)
     builtin.box_tuple_unref(tuple)
@@ -85,7 +114,7 @@ local tuple_bless = function(tuple)
 end
 
 local tuple_check = function(tuple, usage)
-    if not ffi.istype(tuple_t, tuple) then
+    if not is_tuple(tuple) then
         error('Usage: ' .. usage)
     end
 end
@@ -212,7 +241,7 @@ local function tuple_update(tuple, expr)
     if type(expr) ~= 'table' then
         error("Usage: tuple:update({ { op, field, arg}+ })")
     end
-    local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
+    local pexpr, pexpr_end = tuple_encode(expr)
     local tuple = builtin.box_tuple_update(tuple, pexpr, pexpr_end)
     if tuple == nil then
         return box.error()
@@ -225,7 +254,7 @@ local function tuple_upsert(tuple, expr)
     if type(expr) ~= 'table' then
         error("Usage: tuple:upsert({ { op, field, arg}+ })")
     end
-    local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
+    local pexpr, pexpr_end = tuple_encode(expr)
     local tuple = builtin.box_tuple_upsert(tuple, pexpr, pexpr_end)
     if tuple == nil then
         return box.error()
@@ -311,3 +340,5 @@ cfuncs = nil
 
 -- internal api for box.select and iterators
 box.tuple.bless = tuple_bless
+box.tuple.encode = tuple_encode
+box.tuple.is = is_tuple

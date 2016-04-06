@@ -13,7 +13,8 @@ Build-Depends: cdbs, debhelper (>= 8),
 # libbfd-*.so
  binutils-dev,
 # zlib is implicitly needed by libbfd #808516
- zlib1g-dev
+ zlib1g-dev,
+ libssl-dev
 Section: database
 Standards-Version: 3.9.6
 Homepage: http://tarantool.org/
@@ -52,7 +53,8 @@ Description: Tarantool in-memory database - common files
 Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2
+Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2,
+ openssl
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
  tarantool-lts,

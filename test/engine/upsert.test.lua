@@ -73,3 +73,21 @@ index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 space:upsert({0, 0}, {{'+', 1, 1}, {'+', 2, 1}})
 space:get({0})
 space:drop()
+
+-- upsert with box.tuple.new
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+for key = 1, 100 do space:upsert(box.tuple.new{key, key, 0}, box.tuple.new{{'+', 3, 1}}) end
+t = {}
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+t
+for key = 1, 100 do space:upsert(box.tuple.new{key, key, 0}, box.tuple.new{{'+', 3, 10}}) end
+t = {}
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+t
+for key = 1, 100 do space:delete({key, key}) end
+for key = 1, 100 do space:upsert(box.tuple.new{key, key, 0}, box.tuple.new{{'+', 3, 1}, {'=', 4, key}}) end
+t = {}
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+t
+space:drop()

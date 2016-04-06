@@ -1,46 +1,11 @@
-dofile("<sourcedir>/extra/schema_erase.lua")
+box.internal.bootstrap()
 ---
-...
-box.space._schema:select{}
----
-- - ['cluster', '<cluster uuid>']
-...
-box.space._cluster:select{}
----
-- - [1, '<server uuid>']
-...
-box.space._space:select{}
----
-- []
-...
-box.space._index:select{}
----
-- []
-...
-box.space._user:select{}
----
-- []
-...
-box.space._func:select{}
----
-- []
-...
-box.space._priv:select{}
----
-- []
-...
-dofile("<sourcedir>/extra/schema_fill.lua")
----
-...
-box.snapshot()
----
-- ok
 ...
 box.space._schema:select{}
 ---
 - - ['cluster', '<cluster uuid>']
   - ['max_id', 511]
-  - ['version', 1, 6]
+  - ['version', 1, 6, 8]
 ...
 box.space._cluster:select{}
 ---
@@ -125,7 +90,7 @@ box.space._user:select{}
 ...
 box.space._func:select{}
 ---
-- - [1, 1, 'box.schema.user.info', 1]
+- - [1, 1, 'box.schema.user.info', 1, 'LUA']
 ...
 box.space._priv:select{}
 ---

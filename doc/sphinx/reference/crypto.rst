@@ -17,17 +17,17 @@ SHA-0_, SHA-1_, SHA-2_). Some of the crypto functionality is also present in the
 .. parsed-literal::
 
     -- aes-128 (with 192-bit binary strings using AES)
-    crypto.cypher.aes128. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
-    crypto.cypher.aes128. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*)
+    crypto.cipher.aes128. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
+    crypto.cipher.aes128. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*, *init-vector*)
     -- aes-192 (with 192-bit binary strings using AES)
-    crypto.cypher.aes192. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
-    crypto.cypher.aes192. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*)
+    crypto.cipher.aes192. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
+    crypto.cipher.aes192. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*, *init-vector*)
     -- aes-256 (with 256-bit binary strings using AES)
-    crypto.cypher.aes256. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
-    crypto.cypher.aes256. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*)
+    crypto.cipher.aes256. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
+    crypto.cipher.aes256. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*, *init-vector*)
     -- des (with 56-bit binary strings using DES, though DES is not recommended)
-    crypto.cypher.des. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*, *init-vector*)
-    crypto.cypher.des. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*)
+    crypto.cipher.des. *{cbc|cfg|ecb|pfb}*.encrypt(*string*, *key*, *init-vector*)
+    crypto.cipher.des. *{cbc|cfg|ecb|pfb}*.decrypt(*string*, *key*, *init-vector*)
 
 Pass or return a cipher derived from the string, key, and (optionally, sometimes)
 initialization vector.

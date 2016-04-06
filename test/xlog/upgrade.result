@@ -1,0 +1,196 @@
+test_run = require('test_run').new()
+---
+...
+version = test_run:get_cfg('version')
+---
+...
+work_dir = "xlog/upgrade/"..version
+---
+...
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", workdir="'..work_dir..'"')
+---
+- true
+...
+test_run:cmd("start server upgrade")
+---
+- true
+...
+test_run:switch('upgrade')
+---
+- true
+...
+test_run:cmd(string.format("push filter '%s' to '<server_uuid>'", box.info.cluster.uuid))
+---
+- true
+...
+--
+-- Upgrade
+--
+box.schema.upgrade()
+---
+...
+--
+-- Migrated data
+--
+box.space._schema:select()
+---
+- - ['cluster', '<server_uuid>']
+  - ['max_id', 513]
+  - ['version', 1, 6, 8]
+...
+box.space._space:select()
+---
+- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'str', 'name': 'key'}]]
+  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
+      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
+        'name': 'format', 'type': '*'}]]
+  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
+      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
+        'name': 'format', 'type': '*'}]]
+  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
+  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
+  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
+  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
+  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'auth', 'type': '*'}]]
+  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
+        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
+      {'name': 'auth', 'type': '*'}]]
+  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
+        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
+  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
+        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
+        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
+  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
+        'type': 'str'}]]
+  - [512, 1, 'distro', 'memtx', 0, {}, [{'name': 'os', 'type': 'str'}, {'name': 'dist',
+        'type': 'str'}, {'name': 'version', 'type': 'num'}, {'name': 'time', 'type': 'num'}]]
+  - [513, 1, 'temporary', 'memtx', 0, {'temporary': true}, []]
+...
+box.space._index:select()
+---
+- - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'str']]]
+  - [280, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'num'], [1, 'num']]]
+  - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'num'], [2, 'str']]]
+  - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'num'], [1, 'num']]]
+  - [289, 2, 'name', 'tree', {'unique': true}, [[0, 'num'], [2, 'str']]]
+  - [296, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [296, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [296, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [297, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [297, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [297, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [304, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [304, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [304, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [305, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'num']]]
+  - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'str']]]
+  - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'num'], [2, 'str'], [3, 'num']]]
+  - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'num']]]
+  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'str'], [3, 'num']]]
+  - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'num'], [2, 'str'], [3, 'num']]]
+  - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'num']]]
+  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'str'], [3, 'num']]]
+  - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'num']]]
+  - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'str']]]
+  - [512, 0, 'primary', 'hash', {'unique': true}, [[0, 'str'], [1, 'str'], [2, 'num']]]
+  - [512, 1, 'codename', 'hash', {'unique': true}, [[1, 'str']]]
+  - [512, 2, 'time', 'tree', {'unique': false}, [[3, 'num']]]
+...
+box.space._user:select()
+---
+- - [0, 1, 'guest', 'user']
+  - [1, 1, 'admin', 'user']
+  - [2, 1, 'public', 'role']
+  - [3, 1, 'replication', 'role']
+  - [4, 1, 'someuser', 'user', {'chap-sha1': '2qvbQIHM4zMWhAmm2xGeGNjqoHM='}]
+  - [5, 1, 'somerole', 'role']
+...
+box.space._func:select()
+---
+- - [1, 1, 'box.schema.user.info', 1, 'LUA']
+  - [2, 4, 'somefunc', 1, 'LUA']
+  - [3, 1, 'someotherfunc', 0, 'LUA']
+...
+box.space._priv:select()
+---
+- - [1, 0, 'role', 2, 4]
+  - [1, 1, 'universe', 0, 7]
+  - [1, 2, 'function', 1, 4]
+  - [1, 2, 'function', 2, 4]
+  - [1, 2, 'space', 281, 1]
+  - [1, 2, 'space', 289, 1]
+  - [1, 2, 'space', 297, 1]
+  - [1, 2, 'space', 305, 1]
+  - [1, 2, 'space', 313, 1]
+  - [1, 3, 'space', 320, 2]
+  - [1, 3, 'universe', 0, 1]
+  - [1, 4, 'function', 3, 4]
+  - [1, 4, 'role', 2, 4]
+  - [1, 4, 'role', 5, 4]
+  - [1, 4, 'space', 513, 3]
+  - [1, 5, 'space', 512, 3]
+...
+box.space._vspace ~= nil
+---
+- true
+...
+box.space._vindex ~= nil
+---
+- true
+...
+box.space._vuser ~= nil
+---
+- true
+...
+box.space._vpriv ~= nil
+---
+- true
+...
+-- a test space
+box.space.distro:select{}
+---
+- - ['debian', 'lenny', 50, 1234602000]
+  - ['debian', 'etch', 40, 1176019200]
+  - ['debian', 'sarge', 31, 1118044800]
+  - ['ubuntu', 'trusty', 1404, 1397721600]
+  - ['ubuntu', 'vivid', 1504, 1429779600]
+  - ['ubuntu', 'wily', 1510, 1445504400]
+  - ['debian', 'wheezy', 70, 1367654400]
+  - ['debian', 'squeeze', 60, 1296896400]
+  - ['debian', 'jessie', 80, 1430038800]
+  - ['ubuntu', 'precise', 1510, 1335427200]
+  - ['debian', 'woody', 30, 1027065600]
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+test_run:switch('default')
+---
+- true
+...
+test_run:cmd('stop server upgrade')
+---
+- true
+...
+test_run = nil
+---
+...

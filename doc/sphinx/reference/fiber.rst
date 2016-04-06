@@ -22,7 +22,7 @@ as :func:`box.space...delete() <space_object.delete>` or
 :func:`box.space...update() <space_object.update>`, do call
 :func:`fiber.testcancel()` but :func:`box.space...select{} <space_object.select>`
 does not. In practice, a runaway fiber can only become unresponsive if it does
-many computations and does not check whether it has been canceled.
+many computations and does not check whether it has been cancelled.
 
 The other potential problem comes from fibers which never get scheduled,
 because they are not subscribed to any events, or because no relevant
@@ -35,6 +35,13 @@ Like all Lua objects, dead fibers are garbage collected. The garbage collector
 frees pool allocator memory owned by the fiber, resets all fiber data, and
 returns the fiber (now called a fiber carcass) to the fiber pool. The carcass
 can be reused when another fiber is created.
+
+A fiber has all the features of a Lua coroutine_ and all the programming
+concepts that apply for Lua coroutines will apply for fibers as well. However,
+Tarantool has made some enhancements for fibers and has used fibers internally.
+So, although use of coroutines is possible and supported, use of fibers is
+recommended.
+
 
 .. module:: fiber
 
@@ -174,7 +181,7 @@ can be reused when another fiber is created.
     :func:`fiber.kill()` combines :func:`fiber.find()` and
     :func:`fiber_object:cancel() <fiber_object.cancel>`.
 
-    :param id: the id of the fiber to be canceled.
+    :param id: the id of the fiber to be cancelled.
     :Exception: the specified fiber does not exist or cancel is not permitted.
 
     **Example:**
@@ -188,7 +195,7 @@ can be reused when another fiber is created.
 
 .. function:: testcancel()
 
-    Check if the current fiber has been canceled
+    Check if the current fiber has been cancelled
     and throw an exception if this is the case.
 
     **Example:**
@@ -280,8 +287,8 @@ can be reused when another fiber is created.
 
     .. method:: cancel()
 
-        Cancel a fiber. Running and suspended fibers can be canceled.
-        After a fiber has been canceled, attempts to operate on it will
+        Cancel a fiber. Running and suspended fibers can be cancelled.
+        After a fiber has been cancelled, attempts to operate on it will
         cause errors, for example :func:`fiber_object:id() <fiber_object.id>`
         will cause ``error: the fiber is dead``.
 
@@ -399,7 +406,7 @@ of the loop adds 1 to a global variable named gvar, then goes to sleep for
     tarantool> fiber = require('fiber')
     tarantool> function function_x()
              >   gvar = 0
-             >   while true do
+             >   while 0 == 0 do
              >     gvar = gvar + 1
              >     fiber.sleep(2)
              >   end
@@ -411,6 +418,8 @@ Make a fiber, associate function_x with the fiber, and start function_x.
 It will immediately "detach" so it will be running independently of the caller.
 
 .. code-block:: tarantoolsession
+
+    tarantool> gvar = 0
 
     tarantool> fiber_of_x = fiber.create(function_x)
     ---
@@ -431,7 +440,7 @@ its time sleeping or yielding.
 
 .. code-block:: tarantoolsession
 
-    tarantool> printf('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)
+    tarantool> print('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)
     # 102 .  suspended . gvar= 399
     ---
     ...
@@ -444,12 +453,12 @@ the status is dead because the cancel worked.
 .. code-block:: tarantoolsession
 
     tarantool> fiber_of_x:cancel()
-    ... fiber `lua` has been cancelled
-    ... fiber `lua` exiting
     ---
-    - error:
     ...
-    tarantool> printf('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)
+    tarantool> print('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)
     # 102 .  dead . gvar= 421
     ---
     ...
+
+.. _coroutine:  http://www.lua.org/pil/contents.html#9
+

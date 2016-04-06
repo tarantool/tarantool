@@ -39,3 +39,15 @@ t
 _ = space:update({101, 101}, {{'=', 3, 101}})
 space:get({101, 101})
 space:drop()
+
+-- update with box.tuple.new
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num', 2, 'num'} })
+for key = 1, 100 do space:replace({key, key}) end
+for key = 1, 100 do space:update(box.tuple.new{key, key}, box.tuple.new{{'=', 3, key}}) end
+t = {}
+for key = 1, 100 do table.insert(t, space:get({key, key})) end
+t
+_ = space:update({101, 101}, {{'=', 3, 101}})
+space:get({101, 101})
+space:drop()

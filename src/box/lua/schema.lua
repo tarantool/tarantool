@@ -9,6 +9,12 @@ local internal = require('box.internal')
 
 local builtin = ffi.C
 
+-- performance fixup for hot functions
+local tuple_encode = box.tuple.encode
+local tuple_bless = box.tuple.bless
+local is_tuple = box.tuple.is
+assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
+
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
@@ -462,9 +468,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
-	if box.space[space_id].engine == 'sophia' then
-		box.error(box.error.SOPHIA, 'alter is not supported for a Sophia index')
-	end
+    if box.space[space_id].engine == 'sophia' then
+        box.error(box.error.SOPHIA, 'alter is not supported for a Sophia index')
+    end
     if box.space[space_id].index[index_id] == nil then
         box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
     end
@@ -567,8 +573,7 @@ local ptuple = ffi.new('box_tuple_t *[1]')
 local function keify(key)
     if key == nil then
         return {}
-    end
-    if type(key) == "table" then
+    elseif type(key) == "table" or is_tuple(key) then
         return key
     end
     return {key}
@@ -610,7 +615,7 @@ local iterator_gen = function(param, state)
     if builtin.box_iterator_next(state, ptuple) ~= 0 then
         return box.error() -- error
     elseif ptuple[0] ~= nil then
-        return state, box.tuple.bless(ptuple[0]) -- new state, value
+        return state, tuple_bless(ptuple[0]) -- new state, value
     else
         return nil
     end
@@ -688,12 +693,12 @@ function box.schema.space.bless(space)
     index_mt.__index = index_mt
     -- min and max
     index_mt.min_ffi = function(index, key)
-        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        local pkey, pkey_end = tuple_encode(key)
         if builtin.box_index_min(index.space_id, index.id,
                                  pkey, pkey_end, ptuple) ~= 0 then
             box.error() -- error
         elseif ptuple[0] ~= nil then
-            return box.tuple.bless(ptuple[0])
+            return tuple_bless(ptuple[0])
         else
             return
         end
@@ -703,12 +708,12 @@ function box.schema.space.bless(space)
         return internal.min(index.space_id, index.id, key);
     end
     index_mt.max_ffi = function(index, key)
-        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        local pkey, pkey_end = tuple_encode(key)
         if builtin.box_index_max(index.space_id, index.id,
                                  pkey, pkey_end, ptuple) ~= 0 then
             box.error() -- error
         elseif ptuple[0] ~= nil then
-            return box.tuple.bless(ptuple[0])
+            return tuple_bless(ptuple[0])
         else
             return
         end
@@ -723,7 +728,7 @@ function box.schema.space.bless(space)
                                     ptuple) ~= 0 then
             box.error() -- error
         elseif ptuple[0] ~= nil then
-            return box.tuple.bless(ptuple[0])
+            return tuple_bless(ptuple[0])
         else
             return
         end
@@ -734,7 +739,7 @@ function box.schema.space.bless(space)
     end
     -- iteration
     index_mt.pairs_ffi = function(index, key, opts)
-        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        local pkey, pkey_end = tuple_encode(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
 
         local keybuf = ffi.string(pkey, pkey_end - pkey)
@@ -759,7 +764,7 @@ function box.schema.space.bless(space)
 
     -- index subtree size
     index_mt.count_ffi = function(index, key, opts)
-        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        local pkey, pkey_end = tuple_encode(key)
         local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
         local count = builtin.box_index_count(index.space_id, index.id,
             itype, pkey, pkey_end);
@@ -781,12 +786,12 @@ function box.schema.space.bless(space)
     end
 
     index_mt.get_ffi = function(index, key)
-        local key, key_end = msgpackffi.encode_tuple(key)
+        local key, key_end = tuple_encode(key)
         if builtin.box_index_get(index.space_id, index.id,
                                  key, key_end, ptuple) ~= 0 then
             return box.error() -- error
         elseif ptuple[0] ~= nil then
-            return box.tuple.bless(ptuple[0])
+            return tuple_bless(ptuple[0])
         else
             return
         end
@@ -812,7 +817,7 @@ function box.schema.space.bless(space)
     end
 
     index_mt.select_ffi = function(index, key, opts)
-        local key, key_end = msgpackffi.encode_tuple(key)
+        local key, key_end = tuple_encode(key)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
         builtin.port_create(port)
@@ -825,7 +830,7 @@ function box.schema.space.bless(space)
         local ret = {}
         local entry = port.first
         for i=1,tonumber(port.size),1 do
-            ret[i] = box.tuple.bless(entry.tuple)
+            ret[i] = tuple_bless(entry.tuple)
             entry = entry.next
         end
         builtin.port_destroy(port);

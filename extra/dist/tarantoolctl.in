@@ -94,78 +94,72 @@ please see AUTHORS file.
 
 ]]
 
-local fio = require 'fio'
-local log = require 'log'
-local errno = require 'errno'
-local yaml = require 'yaml'
-local console = require 'console'
-local socket = require 'socket'
-local ffi = require 'ffi'
 local os = require 'os'
+local ffi = require 'ffi'
+local fio = require 'fio'
+local fun = require 'fun'
+local log = require 'log'
+local uri = require 'uri'
+local yaml = require 'yaml'
+local errno = require 'errno'
 local fiber = require 'fiber'
 local digest = require 'digest'
-local urilib = require 'uri'
+local netbox = require 'net.box'
+local socket = require 'socket'
+local console = require 'console'
 
 ffi.cdef[[
-int kill(int pid, int sig);
 struct passwd {
-               char   *pw_name;       /* username */
-               char   *pw_passwd;     /* user password */
-               int   pw_uid;          /* user ID */
-               int   pw_gid;          /* group ID */
-               char   *pw_gecos;      /* user information */
-               char   *pw_dir;        /* home directory */
-               char   *pw_shell;      /* shell program */
+  char *pw_name;   /* username */
+  char *pw_passwd; /* user password */
+  int   pw_uid;    /* user ID */
+  int   pw_gid;    /* group ID */
+  char *pw_gecos;  /* user information */
+  char *pw_dir;    /* home directory */
+  char *pw_shell;  /* shell program */
 };
+
 struct group{
   char *gr_name;
   char *gr_passwd;
-  int gr_gid;
+  int   gr_gid;
   char **gr_mem;
 };
+
+int kill(int pid, int sig);
 struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
 ]]
-
-local available_commands = {
-    'start',
-    'stop',
-    'logrotate',
-    'status',
-    'enter',
-    'restart',
-    'reload',
-    'eval'
-}
-
+--
+-- table with all available commands
+--
+local available_commands
 --
 -- true if we're running in HOME directory of a user
 --
-local usermode
+local usermode = false
 --
 -- a file with system-wide settings
 --
 local default_file
---
--- instance name
---
 local instance_name
---
---
---
 local instance_path
---
--- console socket
---
 local console_sock
+local group_name
+--
+-- overrides for defaults files
+--
+-- local instance_dir
+-- local default_cfg
 
 --
 -- print usage and exit
 --
-
 local function usage()
-    log.error("Usage: %s {%s} instance_name",
-        arg[0], table.concat(available_commands, '|'))
+    local tbl = fun.map(function(name, cmd) return name end, available_commands)
+    tbl = tbl:totable();
+    table.sort(tbl)
+    log.error("Usage: %s {%s} instance_name", arg[0], table.concat(tbl, '|'))
     log.error("Config file: %s", default_file)
     os.exit(1)
 end
@@ -182,115 +176,98 @@ local function shift_argv(arg, argno, argcount)
     end
 end
 
---
--- Check if the requested action is among
--- supported ones, and return it in this case
--- Otherwise print help and exit.
---
-local function check_cmd(cmd)
-    for _, vcmd in pairs(available_commands) do
-        if cmd == vcmd then
-            return cmd
-        end
-    end
-    usage()
-end
-
 local function check_user_level()
     local uid = os.getenv('UID')
+    local udir = nil
     if uid == 0 then
         return nil
     end
     -- local dir configuration
     local pwd = os.getenv('PWD')
-    if pwd ~= nil then
-        local local_dir = pwd .. '/.tarantoolctl'
-        if fio.stat(local_dir) then
-            usermode = true
-            return local_dir
-        end
+    udir = pwd and pwd .. '/.tarantoolctl'
+    udir = udir and fio.stat(udir) and udir or nil
+    -- or home dir configuration
+    local homedir = os.getenv('HOME')
+    udir = udir or homedir and homedir .. '/.config/tarantool/tarantool'
+    udir = udir and fio.stat(udir) and udir or nil
+    -- if one of previous is not nil
+    if udir ~= nil then
+        usermode = true
+        return udir
     end
 
-    -- home dir configuration
-    if os.getenv('HOME') then
-        local c = os.getenv('HOME') .. '/.config/tarantool/tarantool'
-        if fio.stat(c) then
-            usermode = true
-            return c
-        end
-    end
     return nil
 end
 
 --
--- Find if we're running under a user, and this
--- user has a default file in his home directory.
--- If present, use it. Otherwise assume a system-
--- wide default. If it's missing, it's OK as well.
+-- Find if we're running under a user, and this user has a default file in his
+-- home directory. If present, use it. Otherwise assume a system-wide default.
+-- If it's missing, it's OK as well.
 --
 local function find_default_file()
-    --
     -- try to find local dir or user config
-    --
     local user_level = check_user_level()
     if user_level ~= nil then
         return user_level
     end
 
-    --
     -- no user-level defaults, use a system-wide one
-    --
-    usermode = false
-    local config_list = {
-        '@CMAKE_INSTALL_FULL_SYSCONFDIR@/@SYSCONFIG_DEFAULT@/tarantool'
-    }
-    for _, c in pairs(config_list) do
-        if fio.stat(c) then
-            return c
-        end
+    local cfg = '@CMAKE_INSTALL_FULL_SYSCONFDIR@/@SYSCONFIG_DEFAULT@/tarantool'
+    if fio.stat(cfg) then
+        return cfg
     end
-    -- It's OK if there is no default file -
-    --  load_default_file() will assume some defaults
+    -- It's OK if there is no default file - load_default_file() will assume
+    -- some defaults
+    return nil
+end
+
+local function check_file(path)
+    local rv, err = loadfile(path)
+    if rv == nil then
+        log.error("Failed to check %s", err)
+        return err
+    end
     return nil
 end
 
 --
--- System-wide default file may be missing, this is OK,
--- we'll assume built-in defaults
+-- System-wide default file may be missing, this is OK, we'll assume built-in
+-- defaults
 --
-local group_name
-function load_default_file(default_file)
+local function load_default_file(default_file)
     if default_file then
-        dofile(default_file)
+        local success, data = pcall(dofile, default_file)
+        -- if load fails - show last 10 lines of the log file
+        if not success then
+            log.error("Failed to load defaults file: %s", data)
+            if fio.stat(default_cfg.logger) then
+                os.execute('tail -n 10 ' .. default_cfg.logger)
+            end
+        end
     end
-    if default_cfg == nil then
-        default_cfg = {}
-    end
-    local d = default_cfg
+    local d = default_cfg or {}
 
-    d.pid_file   = d.pid_file and d.pid_file or "/var/run/tarantool"
-    d.wal_dir    = d.wal_dir  and d.wal_dir or "/var/lib/tarantool"
-    d.snap_dir   = d.snap_dir and d.snap_dir or "/var/lib/tarantool"
-    d.logger     = d.logger   and d.logger or "/var/log/tarantool"
-    d.sophia_dir = d.sophia_dir and d.sophia_dir or "/var/lib/tarantool"
+    d.pid_file   = d.pid_file    or "/var/run/tarantool"
+    d.wal_dir    = d.wal_dir     or "/var/lib/tarantool"
+    d.snap_dir   = d.snap_dir    or "/var/lib/tarantool"
+    d.logger     = d.logger      or "/var/log/tarantool"
+    d.sophia_dir = d.sophia_dir  or "/var/lib/tarantool"
 
-    d.pid_file   = fio.pathjoin(d.pid_file, instance_name .. '.pid')
-    d.wal_dir    = fio.pathjoin(d.wal_dir, instance_name)
-    d.snap_dir   = fio.pathjoin(d.snap_dir, instance_name)
+    d.pid_file   = fio.pathjoin(d.pid_file,   instance_name .. '.pid')
+    d.wal_dir    = fio.pathjoin(d.wal_dir,    instance_name)
+    d.snap_dir   = fio.pathjoin(d.snap_dir,   instance_name)
     d.sophia_dir = fio.pathjoin(d.sophia_dir, instance_name)
-    d.logger     = fio.pathjoin(d.logger, instance_name .. '.log')
+    d.logger     = fio.pathjoin(d.logger,     instance_name .. '.log')
+
+    default_cfg = d
 
     if not usermode then
         -- change user name only if not running locally
-        d.username = d.username and d.username or "tarantool"
-        --
-        -- instance_dir must be set in the defaults file,
-        -- but don't try to set it to the  global instance dir
-        -- if the user-local defaults file is in use
-        --
-        if not instance_dir then
-            instance_dir = '/etc/tarantool/instances.enabled'
-        end
+        d.username = d.username or "tarantool"
+        -- instance_dir must be set in the defaults file, but don't try to set
+        -- it to the  global instance dir if the user-local defaults file is in
+        -- use
+        instance_dir = instance_dir or '/etc/tarantool/instances.enabled'
         -- get user data
         local user_data = ffi.C.getpwnam(ffi.cast('const char*', d.username))
         if user_data == nil then
@@ -301,8 +278,7 @@ function load_default_file(default_file)
         -- get group data
         local group = ffi.C.getgrgid(user_data.pw_gid)
         if group == nil then
-            log.error('Group lookup by gid failed: %d',
-                      user_data.pw_gid)
+            log.error('Group lookup by gid failed: %d', user_data.pw_gid)
             os.exit(-1)
         end
         group_name = ffi.string(group.gr_name)
@@ -320,10 +296,8 @@ function load_default_file(default_file)
 end
 
 --
--- In case there is no explicit instance name,
--- check whether arg[0] is a symlink. In that
--- case, the name of the symlink is the instance
--- name.
+-- In case there is no explicit instance name, check whether arg[0] is a
+-- symlink. In that case, the name of the symlink is the instance name.
 --
 local function find_instance_name(arg0, arg2)
     if arg2 ~= nil then
@@ -340,7 +314,6 @@ local function find_instance_name(arg0, arg2)
     return fio.basename(arg0, '.lua')
 end
 
-
 local function mkdir(dirname)
     log.info("mkdir %s", dirname)
     if not fio.mkdir(dirname, tonumber('0750', 8)) then
@@ -348,9 +321,10 @@ local function mkdir(dirname)
         os.exit(-1)
     end
 
-    if not usermode and not fio.chown(dirname, default_cfg.username, group_name) then
-        log.error("Can't chown(%s, %s, %s): %s",
-            default_cfg.username, group_name, dirname, errno.strerror())
+    if not usermode and
+       not fio.chown(dirname, default_cfg.username, group_name) then
+        log.error("Can't chown(%s, %s, %s): %s", default_cfg.username,
+                  group_name, dirname, errno.strerror())
     end
 end
 
@@ -369,28 +343,21 @@ local function read_file(filename)
     return table.concat(buf)
 end
 
-function mk_default_dirs(cfg)
-    -- create pid_dir
-    local pid_dir = fio.dirname(cfg.pid_file)
-    if fio.stat(pid_dir) == nil then
-        mkdir(pid_dir)
-    end
-    -- create wal_dir
-    if fio.stat(cfg.wal_dir) == nil then
-        mkdir(cfg.wal_dir)
-    end
-    -- create snap_dir
-    if fio.stat(cfg.snap_dir) == nil then
-        mkdir(cfg.snap_dir)
-    end
-    -- create sophia_dir
-    if fio.stat(cfg.sophia_dir) == nil then
-        mkdir(cfg.sophia_dir)
-    end
-    -- create log_dir
+local function mk_default_dirs(cfg)
+    local init_dirs = {
+        fio.dirname(cfg.pid_file),
+        cfg.wal_dir,
+        cfg.snap_dir,
+        cfg.sophia_dir,
+    }
     local log_dir = fio.dirname(cfg.logger)
-    if log_dir:find('|') == nil and fio.stat(log_dir) == nil then
-        mkdir(log_dir)
+    if log_dir:find('|') == nil then
+        table.insert(init_dirs, log_dir)
+    end
+    for _, dir in ipairs(init_dirs) do
+        if fio.stat(dir) == nil then
+            mkdir(dir)
+        end
     end
 end
 
@@ -402,9 +369,7 @@ local function wrapper_cfg(cfg)
             cfg[i] = v
         end
     end
-    --
     -- force these startup options
-    --
     cfg.pid_file = default_cfg.pid_file
     if os.getenv('USER') ~= default_cfg.username then
         cfg.username = default_cfg.username
@@ -416,52 +381,36 @@ local function wrapper_cfg(cfg)
     end
 
     mk_default_dirs(cfg)
-    local res = orig_cfg(cfg)
+    local success, data = pcall(orig_cfg, cfg)
+    if not success then
+        log.error("Configuration failed: %s", data)
+        if fio.stat(default_cfg.logger) then
+            os.execute('tail -n 10 ' .. default_cfg.logger)
+        end
+        os.exit(1)
+    end
 
-    require('fiber').name(instance_name)
+    fiber.name(instance_name)
     log.info('Run console at %s', console_sock)
     console.listen(console_sock)
     -- gh-1293: members of `tarantool` group should be able to do `enter`
-    fio.chmod(console_sock, tonumber('0664', 8))
+    local console_sock = uri.parse(console_sock).service
+    local mode = '0664'
+    if not fio.chmod(console_sock, tonumber(mode, 8)) then
+        log.error("Can't chmod(%s, %s) [%d]: %s", console_sock, mode, errno(),
+                  errno.strerror())
+    end
 
-    return res
+    return data
 end
 
-function stop()
-    log.info("Stopping instance...")
-    local pid_file = default_cfg.pid_file
-    if fio.stat(pid_file) == nil then
-        log.error("Process is not running (pid: %s)", pid_file)
-        return 0
-    end
-
-    local f = fio.open(pid_file, 'O_RDONLY')
-    if f == nil then
-        log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
-        return -1
-    end
-
-    local str = f:read(64)
-    f:close()
-
-    local pid = tonumber(str)
-
-    if pid == nil or pid <= 0 then
-        log.error("Broken pid file %s", pid_file)
-        fio.unlink(pid_file)
-        return -1
-    end
-
-    if ffi.C.kill(pid, 15) < 0 then
-        log.error("Can't kill process %d: %s", pid, errno.strerror())
-        fio.unlink(pid_file)
-        return -1
-    end
-    return 0
-end
-
-function start()
+local function start()
     log.info("Starting instance...")
+    local stat = check_file(instance_path)
+    if stat ~= nil then
+        log.error("Error, while checking syntax: halting")
+        return 1
+    end
     box.cfg = wrapper_cfg
     require('title').update{
         script_name = instance_path,
@@ -470,61 +419,88 @@ function start()
     local success, data = pcall(dofile, instance_path)
     -- if load fails - show last 10 lines of the log file
     if not success then
-        print('Start failed: ' .. data)
+        log.error("Start failed: %s", data)
         if fio.stat(default_cfg.logger) then
             os.execute('tail -n 10 ' .. default_cfg.logger)
         end
     end
+    return 0
 end
 
-default_file = find_default_file()
+local function stop()
+    local pid_file = default_cfg.pid_file
 
-instance_name = find_instance_name(arg[0], arg[2])
+    local function base_stop()
+        log.info("Stopping instance...")
+        if fio.stat(pid_file) == nil then
+            log.error("Process is not running (pid: %s)", pid_file)
+            return 0
+        end
 
-local cmd = check_cmd(arg[1])
+        local f = fio.open(pid_file, 'O_RDONLY')
+        if f == nil then
+            log.error("Can't read pid file %s: %s", pid_file, errno.strerror())
+            return -1
+        end
 
-load_default_file(default_file)
+        local pid = tonumber(f:read(64))
+        f:close()
 
---
--- Pass the rest of command line arguments to the
--- instsance
---
-shift_argv(arg, 0, 2)
+        if pid == nil or pid <= 0 then
+            log.error("Broken pid file %s", pid_file)
+            return -1
+        end
 
-instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
+        if ffi.C.kill(pid, 15) < 0 then
+            log.error("Can't kill process %d: %s", pid, errno.strerror())
+            return -1
+        end
+        return 0
+    end
 
-if not fio.stat(instance_path) then
-    log.error('Instance %s is not found in %s', instance_name, instance_dir)
-    os.exit(-1)
+    local rv = base_stop()
+    if fio.stat(pid_file) then
+        fio.unlink(pid_file)
+    end
+    local console_sock = uri.parse(console_sock).service
+    if fio.stat(console_sock) then
+        fio.unlink(console_sock)
+    end
+    return rv
 end
 
-log.info('Found %s.lua in %s', instance_name, instance_dir)
+local function check()
+    local rv = check_file(instance_path)
+    if rv ~= nil then
+        return 1
+    end
+    log.info("File '%s' is OK", instance_path)
+    return 0
+end
 
--- create  a path to the control socket (admin console)
-console_sock = fio.pathjoin(fio.dirname(default_cfg.pid_file),
-                            instance_name .. '.control')
-
-if cmd == 'start' then
-    start()
-
-elseif cmd == 'stop' then
-    os.exit(stop())
-
-elseif cmd == 'restart' then
+local function restart()
+    local stat = check_file(instance_path)
+    if stat ~= nil then
+        log.error("Error, while checking syntax: halting")
+        return 1
+    end
     stop()
     fiber.sleep(1)
     start()
+    return 0
+end
 
-elseif cmd == 'logrotate' then
+local function logrotate()
+    local console_sock = uri.parse(console_sock).service
     if fio.stat(console_sock) == nil then
         -- process is not running, do nothing
-        os.exit(0)
+        return 0
     end
 
     local s = socket.tcp_connect('unix/', console_sock)
     if s == nil then
         -- socket is not opened, do nothing
-        os.exit(0)
+        return 0
     end
 
     s:write[[
@@ -534,81 +510,85 @@ elseif cmd == 'logrotate' then
 
     s:read({ '[.][.][.]' }, 2)
 
-    os.exit(0)
+    return 0
+end
 
-elseif cmd == 'enter' then
-    if fio.stat(console_sock) == nil then
-        local e = errno()
-        log.error("Can't connect to %s (%s)", console_sock, errno.strerror())
-        if not usermode and e == errno.EACCES then
+local function enter()
+    local console_sock_path = uri.parse(console_sock).service
+    if fio.stat(console_sock_path) == nil then
+        log.error("Can't connect to %s (%s)", console_sock_path, errno.strerror())
+        if not usermode and errno() == errno.EACCES then
             log.error("Please add $USER to group '%s': useradd -a -G %s $USER",
                       group_name, group_name)
         end
-        os.exit(-1)
+        return -1
     end
 
-    log.info('Connecting to %s', console_sock)
+    local cmd = string.format("require('console').connect('%s')", console_sock)
 
-    local cmd = string.format(
-        "require('console').connect('%s')", console_sock)
-
-    console.on_start( function(self) self:eval(cmd) end )
-    console.on_client_disconnect( function(self) self.running = false end )
+    console.on_start(function(self) self:eval(cmd) end)
+    console.on_client_disconnect(function(self) self.running = false end)
     console.start()
-    os.exit(0)
-elseif cmd == 'status' then
+    return 0
+end
+
+local function status()
     local pid_file = default_cfg.pid_file
+    local console_sock = uri.parse(console_sock).service
+
     if fio.stat(pid_file) == nil then
         if errno() == errno.ENOENT then
-            print(instance_name .. ' is stopped (pid file does not exist)')
-            os.exit(1)
+            log.info('%s is stopped (pid file does not exist)', instance_name)
+            return 1
         end
-        log.error("Cant access pidfile %s: %s", pid_file, errno.strerror())
+        log.error("Can't access pidfile %s: %s", pid_file, errno.strerror())
     end
 
-    if fio.stat(console_sock) == nil then
-        if errno() == errno.ENOENT then
-            log.warn("pid file exists, but the control socket (%s) doesn't",
-                console_sock)
-            os.exit(2)
-        end
+    if fio.stat(console_sock) == nil and errno() == errno.ENOENT then
+        log.error("Pid file exists, but the control socket (%s) doesn't",
+                  console_sock)
+        return 2
     end
 
     local s = socket.tcp_connect('unix/', console_sock)
     if s == nil then
         if errno() ~= errno.EACCES then
-            log.warn("Can't access control socket %s: %s", console_sock,
-                errno.strerror())
-            os.exit(3)
-        else
-            os.exit(0)
+            log.warn("Can't access control socket '%s' [%d]: %s", console_sock,
+                errno(), errno.strerror())
+            return 2
         end
+        return 0
     end
 
     s:close()
-    print(instance_name .. ' is running (pid:' .. default_cfg.pid_file .. ')')
-    os.exit(0)
-elseif cmd == 'reload' or cmd == 'eval' then
+    log.info('%s is running (pid: %s)', instance_name, default_cfg.pid_file)
+    return 0
+end
+
+local function eval()
+    local console_sock_path = uri.parse(console_sock).service
     local filename = arg[1]
     if filename == nil then
         log.error("Usage: tarantoolctl eval instance_name file.lua")
-        os.exit(1)
+        return 1
     end
-    if fio.stat(filename) == nil then
-        if errno() == errno.ENOENT then
-            print(filename .. ': file not found')
-            os.exit(1)
-        end
+    if fio.stat(filename) == nil and errno() == errno.ENOENT then
+        log.error("%s: file not found", filename)
+        return 1
     end
-    content = digest.base64_encode(read_file(filename))
+    if check_file(filename) ~= nil then
+        log.error("Error, while checking syntax: halting")
+        return 1
+    end
+    local content = digest.base64_encode(read_file(filename))
 
-    if fio.stat(console_sock) == nil then
+    if fio.stat(console_sock_path) == nil then
         log.warn("pid file exists, but the control socket (%s) doesn't",
-                console_sock)
-        os.exit(2)
+                 console_sock_path)
+        return 2
     end
 
-    local u = urilib.parse(console_sock)
+    local u = uri.parse(console_sock)
     local remote = require('net.box'):new(u.host, u.service,
         { user = u.login, password = u.password })
     local code = string.format(
@@ -617,10 +597,55 @@ elseif cmd == 'reload' or cmd == 'eval' then
     )
     remote:console(code)
 
-    os.exit(0)
-else
-    log.error("Unknown command '%s'", cmd)
+    return 0
+end
+
+local function exit_wrapper(func)
+    return function() os.exit(func()) end
+end
+
+available_commands = setmetatable({
+    start     = start,
+    stop      = exit_wrapper(stop),
+    logrotate = exit_wrapper(logrotate),
+    status    = exit_wrapper(status),
+    enter     = exit_wrapper(enter),
+    restart   = restart,
+    reload    = exit_wrapper(eval),
+    eval      = exit_wrapper(eval),
+    check     = exit_wrapper(check)
+}, {
+    __index = function(table, cmd)
+        log.error("Unknown command '%s'", cmd)
+        usage()
+    end
+})
+
+default_file = find_default_file()
+
+instance_name = find_instance_name(arg[0], arg[2])
+
+-- Check if the requested action is among supported ones, and return it in this
+-- case. Otherwise print help and exit.
+local cmd_function = available_commands[arg[1]]
+
+load_default_file(default_file)
+
+-- Pass the rest of command line arguments to the instance
+shift_argv(arg, 0, 2)
+
+instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
+
+if not fio.stat(instance_path) then
+    log.error('Instance %s is not found in %s', instance_name, instance_dir)
     os.exit(-1)
 end
+
+-- create a path to the control socket (admin console)
+console_sock = instance_name .. '.control'
+console_sock = fio.pathjoin(fio.dirname(default_cfg.pid_file), console_sock)
+console_sock = 'unix/:' .. console_sock
+
+cmd_function()
 
 -- vim: syntax=lua
