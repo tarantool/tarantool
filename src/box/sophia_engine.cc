@@ -758,10 +758,8 @@ SophiaEngine::beginCheckpoint(struct vclock *vclock)
 	if (lsn != m_prev_checkpoint_lsn) {
 		sophia_snapshot(env, lsn);
 		m_checkpoint_lsn = lsn;
-		return 0;
 	}
-	errno = EEXIST;
-	return -1;
+	return 0;
 }
 
 int
