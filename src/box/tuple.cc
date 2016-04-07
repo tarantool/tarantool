@@ -30,15 +30,9 @@
  */
 #include "tuple.h"
 
-#include <stdio.h>
-
 #include "small/small.h"
-#include "small/mempool.h"
 #include "small/quota.h"
 
-#include "key_def.h"
-#include "tuple_update.h"
-#include "errinj.h"
 #include "fiber.h"
 
 /** Global table of tuple formats */
@@ -74,34 +68,35 @@ static struct mempool tuple_iterator_pool;
 struct tuple *box_tuple_last;
 
 /** Extract all available type info from keys. */
-void
-field_type_create(enum field_type *types, uint32_t field_count,
-		  struct rlist *key_list)
+static void
+field_type_create(struct tuple_format *format, struct rlist *key_list)
 {
 	/* There may be fields between indexed fields (gaps). */
-	memset(types, 0, sizeof(*types) * field_count);
+	for (uint32_t i = 0; i < format->field_count; i++)
+		format->fields[i].type = UNKNOWN;
 
 	struct key_def *key_def;
 	/* extract field type info */
 	rlist_foreach_entry(key_def, key_list, link) {
-		struct key_part *part = key_def->parts;
-		struct key_part *pend = part + key_def->part_count;
-		for (; part < pend; part++) {
-			enum field_type *ptype = &types[part->fieldno];
-			if (*ptype != UNKNOWN && *ptype != part->type) {
+		for (uint32_t i = 0; i < key_def->part_count; i++) {
+			assert(key_def->parts[i].fieldno < format->field_count);
+			enum field_type set_type = key_def->parts[i].type;
+			enum field_type *fmt_type =
+				&format->fields[key_def->parts[i].fieldno].type;
+			if (*fmt_type != UNKNOWN && *fmt_type != set_type) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE_MISMATCH,
 					  key_def->name,
-					  part - key_def->parts + INDEX_OFFSET,
-					  field_type_strs[part->type],
-					  field_type_strs[*ptype]);
+					  i + INDEX_OFFSET,
+					  field_type_strs[set_type],
+					  field_type_strs[*fmt_type]);
 			}
-			*ptype = part->type;
+			*fmt_type = set_type;
 		}
 	}
 }
 
-void
+static void
 tuple_format_register(struct tuple_format *format)
 {
 	if (recycled_format_ids != FORMAT_ID_NIL) {
@@ -133,7 +128,7 @@ tuple_format_register(struct tuple_format *format)
 	tuple_formats[format->id] = format;
 }
 
-void
+static void
 tuple_format_deregister(struct tuple_format *format)
 {
 	if (format->id == FORMAT_ID_NIL)
@@ -161,23 +156,17 @@ tuple_format_alloc(struct rlist *key_list)
 	uint32_t field_count = key_count > 0 ? max_fieldno + 1 : 0;
 
 	uint32_t total = sizeof(struct tuple_format) +
-		field_count * sizeof(int32_t) +
-		field_count * sizeof(enum field_type);
+		field_count * sizeof(struct tuple_field_format);
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 
-	if (format == NULL) {
+	if (format == NULL)
 		tnt_raise(OutOfMemory, sizeof(struct tuple_format),
 			  "malloc", "tuple format");
-	}
 
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
-	format->max_fieldno = max_fieldno;
 	format->field_count = field_count;
-	format->types = (enum field_type *)
-		((char *) format + sizeof(*format) +
-		field_count * sizeof(int32_t));
 	return format;
 }
 
@@ -195,34 +184,36 @@ tuple_format_new(struct rlist *key_list)
 
 	try {
 		tuple_format_register(format);
-		field_type_create(format->types, format->field_count,
-				  key_list);
+		field_type_create(format, key_list);
 	} catch (Exception *e) {
 		tuple_format_delete(format);
 		throw;
 	}
 
-	uint32_t i = 0;
-	int j = 0;
-	for (; i < format->max_fieldno; i++) {
+	/* Set up offset slots */
+	if (format->field_count == 0) {
+		/* Nothing to store */
+		format->field_map_size = 0;
+		return format;
+	}
+	/**
+	 * First field is always simply accessible,
+	 * so we don't store offset for it
+	 */
+	format->fields[0].offset_slot = INT32_MAX;
+
+	int current_slot = 0;
+	for (uint32_t i = 1; i < format->field_count; i++) {
 		/*
 		 * In the tuple, store only offsets necessary to
-		 * quickly access indexed fields. Start from
-		 * field 1, not field 0, field 0 offset is 0.
+		 * quickly access indexed fields.
 		 */
-		if (format->types[i + 1] == UNKNOWN)
-			format->offset[i] = INT32_MIN;
+		if (format->fields[i].type == UNKNOWN)
+			format->fields[i].offset_slot = INT32_MAX;
 		else
-			format->offset[i] = --j;
+			format->fields[i].offset_slot = --current_slot;
 	}
-	if (format->field_count > 0) {
-		/*
-		 * The last offset is always there and is unused,
-		 * to simplify the loop in tuple_init_field_map()
-		 */
-		format->offset[format->field_count - 1] = INT32_MIN;
-	}
-	format->field_map_size = -j * sizeof(uint32_t);
+	format->field_map_size = -current_slot * sizeof(uint32_t);
 	return format;
 }
 
@@ -246,21 +237,20 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
 			  (unsigned) field_count,
 			  (unsigned) format->field_count);
 
-	int32_t *offset = format->offset;
-	enum field_type *type = format->types;
-	enum field_type *type_end = format->types + format->field_count;
-	uint32_t i = 0;
-
-	for (; type < type_end; offset++, type++, i++) {
-		const char *d = pos;
-		enum mp_type mp_type = mp_typeof(*pos);
+	/* first field is simply accessible, so we do not store offset to it */
+	enum mp_type mp_type = mp_typeof(*pos);
+	key_mp_type_validate(format->fields[0].type, mp_type,
+			     ER_FIELD_TYPE, INDEX_OFFSET);
+	mp_next(&pos);
+	/* other fields...*/
+	for (uint32_t i = 1; i < format->field_count; i++) {
+		mp_type = mp_typeof(*pos);
+		key_mp_type_validate(format->fields[i].type, mp_type,
+				     ER_FIELD_TYPE, i + INDEX_OFFSET);
+		if (format->fields[i].offset_slot < 0)
+			field_map[format->fields[i].offset_slot] =
+				(uint32_t) (pos - tuple->data);
 		mp_next(&pos);
-
-		key_mp_type_validate(*type, mp_type, ER_FIELD_TYPE,
-				     i + INDEX_OFFSET);
-
-		if (*offset < 0 && *offset != INT32_MIN)
-			field_map[*offset] = d - tuple->data;
 	}
 }
 
@@ -285,10 +275,8 @@ tuple_validate_raw(struct tuple_format *format, const char *data)
 			  (unsigned) format->field_count);
 
 	/* Check field types */
-	enum field_type *type = format->types;
-	enum field_type *type_end = format->types + format->field_count;
-	for (uint32_t i = 0; type < type_end; type++, i++) {
-		key_mp_type_validate(*type, mp_typeof(*data),
+	for (uint32_t i = 0; i < format->field_count; i++) {
+		key_mp_type_validate(format->fields[i].type, mp_typeof(*data),
 				     ER_FIELD_TYPE, i + INDEX_OFFSET);
 		mp_next(&data);
 	}
