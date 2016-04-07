@@ -392,9 +392,9 @@ tuple_next_u32(struct tuple_iterator *it);
 const char *
 tuple_field_to_cstr(const char *field, uint32_t len)
 {
-	enum { MAX_STR_BUFS = 3, MAX_BUF_LEN = 256 };
+	enum { MAX_STR_BUFS = 4, MAX_BUF_LEN = 256 };
 	static __thread char bufs[MAX_STR_BUFS][MAX_BUF_LEN];
-	static __thread int i = 0;
+	static __thread unsigned i = 0;
 	char *buf = bufs[i];
 	i = (i + 1) % MAX_STR_BUFS;
 	len = MIN(len, MAX_BUF_LEN - 1);
