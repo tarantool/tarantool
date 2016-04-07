@@ -775,10 +775,12 @@ SophiaEngine::waitCheckpoint()
 void
 SophiaEngine::commitCheckpoint()
 {
-	if (m_prev_checkpoint_lsn >= 0)
-		sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
-	m_prev_checkpoint_lsn = m_checkpoint_lsn;
-	m_checkpoint_lsn = -1;
+	if (m_checkpoint_lsn >= 0) {
+		if (m_prev_checkpoint_lsn >= 0)
+			sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
+		m_prev_checkpoint_lsn = m_checkpoint_lsn;
+		m_checkpoint_lsn = -1;
+	}
 }
 
 void
