@@ -46,11 +46,6 @@
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
 
-/**
- * Lock of scheme modification
- */
-struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
-
 /** _space columns */
 #define ID               0
 #define UID              1

@@ -67,6 +67,18 @@ struct wal_request {
 int64_t
 wal_write(struct wal_writer *writer, struct wal_request *req);
 
+/**
+ * Wait till all pending changes to the WAL are flushed.
+ * Rotates the WAL.
+ *
+ * @param[out] vclock WAL vclock
+ *
+ * @retval -1  error
+ * @retval lsn  success
+ */
+int64_t
+wal_checkpoint(struct wal_writer *writer, struct vclock *vclock);
+
 void
 wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
 		 const struct tt_uuid *server_uuid, struct vclock *vclock,

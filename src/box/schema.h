@@ -70,6 +70,12 @@ enum {
 #include "error.h"
 #include <stdio.h> /* snprintf */
 #include "space.h"
+#include "latch.h"
+
+/**
+ * Lock of schema modification
+ */
+extern struct latch schema_lock;
 
 extern uint32_t sc_version;
 
@@ -171,7 +177,6 @@ func_by_name(const char *name, uint32_t name_len);
  */
 bool
 schema_find_grants(const char *type, uint32_t id);
-
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

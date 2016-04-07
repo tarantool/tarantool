@@ -1127,7 +1127,9 @@ bootstrap(void)
 	} else {
 		bootstrap_cluster();
 	}
-	engine_checkpoint(&recovery->vclock);
+	if (engine_begin_checkpoint() ||
+	    engine_commit_checkpoint(&recovery->vclock))
+		panic_syserror("failed to save a snapshot");
 }
 
 static inline void
@@ -1239,11 +1241,27 @@ box_atfork()
 int
 box_snapshot()
 {
+	int rc = 0;
 	if (box_snapshot_is_in_progress)
 		return EINPROGRESS;
 	box_snapshot_is_in_progress = true;
 	/* create snapshot file */
-	int rc = engine_checkpoint(&recovery->vclock);
+	latch_lock(&schema_lock);
+	if ((rc = engine_begin_checkpoint()))
+		goto end;
+
+	struct vclock vclock;
+	if (wal == NULL) {
+		vclock_copy(&vclock, &recovery->vclock);
+	} else if (wal_checkpoint(wal, &vclock) == -1) {
+		rc = EIO;
+		goto end;
+	}
+	rc = engine_commit_checkpoint(&vclock);
+end:
+	if (rc)
+		engine_abort_checkpoint();
+	latch_unlock(&schema_lock);
 	box_snapshot_is_in_progress = false;
 	return rc;
 }

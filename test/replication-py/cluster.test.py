@@ -311,7 +311,7 @@ replica.admin('box.info.server.id == %d' % replica_id)
 replica.admin('not box.info.server.ro')
 # All records were succesfully recovered.
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 
 print '-------------------------------------------------------------'
 print 'Cleanup'

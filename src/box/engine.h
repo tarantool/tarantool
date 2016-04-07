@@ -142,11 +142,11 @@ public:
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 */
-	virtual int beginCheckpoint(struct vclock *vclock);
+	virtual int beginCheckpoint();
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
-	virtual int waitCheckpoint();
+	virtual int waitCheckpoint(struct vclock *vclock);
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
@@ -248,11 +248,17 @@ engine_begin_join();
 void
 engine_end_recovery();
 
+int
+engine_begin_checkpoint();
+
 /**
  * Save a snapshot.
  */
 int
-engine_checkpoint(struct vclock *vclock);
+engine_commit_checkpoint(struct vclock *vclock);
+
+void
+engine_abort_checkpoint();
 
 /**
  * Feed snapshot data as join events to the replicas.

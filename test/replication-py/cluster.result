@@ -322,7 +322,7 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...

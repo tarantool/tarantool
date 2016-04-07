@@ -261,6 +261,10 @@ wal_writer_destroy(struct wal_writer *writer)
 static int
 wal_writer_f(va_list ap);
 
+/* Rotate the WAL. */
+static int
+wal_opt_rotate(struct wal_writer *writer);
+
 /**
  * Initialize WAL writer, start the thread.
  *
@@ -330,6 +334,58 @@ wal_writer_stop()
 
 	rmean_tx_wal_bus = NULL;
 	wal = NULL;
+}
+
+struct wal_checkpoint: public cmsg
+{
+	struct vclock *vclock;
+	struct fiber *fiber;
+};
+
+void
+wal_checkpoint_f(struct cmsg *data)
+{
+	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
+	struct wal_writer *writer = wal;
+	/*
+	 * Avoid closing the current WAL if it has no rows (empty).
+	 */
+	if (writer->current_wal != NULL &&
+	    vclock_sum(&writer->current_wal->vclock) !=
+	    vclock_sum(&writer->vclock)) {
+
+		xlog_close(writer->current_wal);
+		writer->current_wal = NULL;
+		/*
+		 * Avoid creating an empty xlog if this is the
+		 * last snapshot before shutdown.
+		 */
+	}
+	vclock_copy(msg->vclock, &writer->vclock);
+}
+
+void
+wal_checkpoint_done_f(struct cmsg *data)
+{
+	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
+	fiber_wakeup(msg->fiber);
+}
+
+int64_t
+wal_checkpoint(struct wal_writer *writer, struct vclock *vclock)
+{
+	static struct cmsg_hop wal_checkpoint_route[] = {
+		wal_checkpoint_f, &wal_writer_singleton.tx_pipe,
+		wal_checkpoint_done_f, NULL,
+	};
+	vclock_create(vclock);
+	struct wal_checkpoint msg;
+	cmsg_init(&msg, wal_checkpoint_route);
+	msg.vclock = vclock;
+	msg.fiber = fiber();
+	cpipe_push(&writer->wal_pipe, &msg);
+	fiber_yield();
+	return vclock_size(vclock) ? vclock_sum(vclock) : -1;
 }
 
 /**

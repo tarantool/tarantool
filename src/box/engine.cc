@@ -40,12 +40,9 @@
 #include "scoped_guard.h"
 #include <stdlib.h>
 #include <string.h>
-#include <latch.h>
 #include <errinj.h>
 
 RLIST_HEAD(engines);
-
-extern struct latch schema_lock;
 
 Engine::Engine(const char *engine_name)
 	:name(engine_name),
@@ -96,15 +93,15 @@ Engine::beginJoin()
 }
 
 int
-Engine::beginCheckpoint(struct vclock *vclock)
+Engine::beginCheckpoint()
 {
-	(void) vclock;
 	return 0;
 }
 
 int
-Engine::waitCheckpoint()
+Engine::waitCheckpoint(struct vclock *vclock)
 {
+	(void) vclock;
 	return 0;
 }
 
@@ -295,33 +292,40 @@ engine_end_recovery()
 }
 
 int
-engine_checkpoint(struct vclock *vclock)
+engine_begin_checkpoint()
 {
-	latch_lock(&schema_lock);
 	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		if (engine->beginCheckpoint(vclock))
-			goto error;
+		if (engine->beginCheckpoint())
+			return errno;
 	}
+	return 0;
+}
+
+int
+engine_commit_checkpoint(struct vclock *vclock)
+{
+	Engine *engine;
 	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
-		if (engine->waitCheckpoint())
-			goto error;
+		if (engine->waitCheckpoint(vclock))
+			return errno;
 	}
 	/* remove previous snapshot reference */
 	engine_foreach(engine) {
 		engine->commitCheckpoint();
 	}
-	latch_unlock(&schema_lock);
 	return 0;
-error:
-	int save_errno = errno;
+}
+
+void
+engine_abort_checkpoint()
+{
+	Engine *engine;
 	/* rollback snapshot creation */
 	engine_foreach(engine)
 		engine->abortCheckpoint();
-	latch_unlock(&schema_lock);
-	return save_errno;
 }
 
 void

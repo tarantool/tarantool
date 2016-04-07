@@ -61,6 +61,10 @@ static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
 uint32_t sc_version;
+/**
+ * Lock of scheme modification
+ */
+struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 
 bool
 space_is_system(struct space *space)

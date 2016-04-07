@@ -803,24 +803,24 @@ SophiaEngine::recoverToCheckpoint(int64_t checkpoint_id)
 }
 
 int
-SophiaEngine::beginCheckpoint(struct vclock *vclock)
+SophiaEngine::beginCheckpoint()
 {
-	assert(m_checkpoint_lsn == -1);
-	int64_t lsn = vclock_sum(vclock);
-	if (lsn != m_prev_checkpoint_lsn) {
-		sophia_snapshot(env, lsn);
-		m_checkpoint_lsn = lsn;
-	}
 	return 0;
 }
 
 int
-SophiaEngine::waitCheckpoint()
+SophiaEngine::waitCheckpoint(struct vclock *vclock)
 {
-	if (m_checkpoint_lsn == -1 || ! worker_pool_run)
-		return 0;
-	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
-		fiber_yield_timeout(.020);
+	assert(m_checkpoint_lsn == -1);
+	int64_t lsn = vclock_sum(vclock);
+	if (lsn != m_prev_checkpoint_lsn) {
+		m_checkpoint_lsn = lsn;
+		sophia_snapshot(env, m_checkpoint_lsn);
+		if (worker_pool_run) {
+			while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
+				fiber_yield_timeout(.020);
+		}
+	}
 	return 0;
 }
 

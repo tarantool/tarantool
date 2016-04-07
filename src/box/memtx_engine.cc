@@ -1130,14 +1130,15 @@ struct checkpoint {
 };
 
 static void
-checkpoint_init(struct checkpoint *ckpt, struct vclock *vclock,
-		const char *snap_dirname, uint64_t snap_io_rate_limit)
+checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
+		uint64_t snap_io_rate_limit)
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	vclock_copy(&ckpt->vclock, vclock);
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_ID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
+	/* May be used in abortCheckpoint() */
+	vclock_create(&ckpt->vclock);
 }
 
 static void
@@ -1203,21 +1204,14 @@ checkpoint_f(va_list ap)
 }
 
 int
-MemtxEngine::beginCheckpoint(struct vclock *vclock)
+MemtxEngine::beginCheckpoint()
 {
 	assert(m_checkpoint == 0);
 
 	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
-	checkpoint_init(m_checkpoint, vclock, m_snap_dir.dirname,
-			m_snap_io_rate_limit);
+	checkpoint_init(m_checkpoint, m_snap_dir.dirname, m_snap_io_rate_limit);
 	space_foreach(checkpoint_add_space, m_checkpoint);
-
-	if (cord_costart(&m_checkpoint->cord, "snapshot",
-			 checkpoint_f, m_checkpoint)) {
-		return -1;
-	}
-	m_checkpoint->waiting_for_snap_thread = true;
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
 	tuple_begin_snapshot();
@@ -1225,10 +1219,17 @@ MemtxEngine::beginCheckpoint(struct vclock *vclock)
 }
 
 int
-MemtxEngine::waitCheckpoint()
+MemtxEngine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
-	assert(m_checkpoint->waiting_for_snap_thread);
+
+	vclock_copy(&m_checkpoint->vclock, vclock);
+
+	if (cord_costart(&m_checkpoint->cord, "snapshot",
+			 checkpoint_f, m_checkpoint)) {
+		return -1;
+	}
+	m_checkpoint->waiting_for_snap_thread = true;
 
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&m_checkpoint->cord);
