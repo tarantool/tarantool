@@ -765,8 +765,7 @@ SophiaEngine::beginCheckpoint(struct vclock *vclock)
 int
 SophiaEngine::waitCheckpoint()
 {
-	assert(m_checkpoint_lsn != -1);
-	if (! worker_pool_run)
+	if (m_checkpoint_lsn == -1 || ! worker_pool_run)
 		return 0;
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
 		fiber_yield_timeout(.020);
