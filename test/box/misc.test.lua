@@ -34,11 +34,17 @@ box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
 box.error.raise()
-box.error.last()
+e
+e = box.error.last()
+e:unpack()
+e.type
+e.code
+e.message
+tostring(e)
+e = nil
 box.error.clear()
 box.error.last()
 box.error.raise()
-
 space = box.space.tweedledum
 
 ----------------

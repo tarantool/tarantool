@@ -53,6 +53,7 @@
 #include <lib/csv/csv.h>
 #include <lua/clock.h>
 #include "title.h"
+#include "exception.h"
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -147,4 +148,6 @@ void *ffi_symbols[] = {
 	(void *) OpenSSL_add_all_digests,
 	(void *) OpenSSL_add_all_ciphers,
 	(void *) ERR_load_crypto_strings,
+	(void *) exception_get_string,
+	(void *) exception_get_int,
 };

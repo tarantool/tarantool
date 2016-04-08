@@ -1,5 +1,7 @@
 #!/usr/bin/env tarantool
 
+local ffi = require('ffi')
+
 print[[
 --------------------------------------------------------------------------------
 -- #267: Bad exception catching
@@ -32,6 +34,12 @@ local status, msg = pcall(function()
     box.error(box.error.ILLEGAL_PARAMS, 'some message')
 end)
 print('pcall with box.error():', status, msg)
+print('pcall with box.error(): typeof', ffi.typeof(msg))
+print('pcall with box.error(): .type', msg.type)
+print('pcall with box.error(): .code', msg.code)
+print('pcall with box.error(): .message', msg.message)
+-- Tarantool 1.6 backward compatibility
+print('pcall with box.error(): .match()', msg:match('some'))
 
 print('pcall with no return:', select('#', pcall(function() end)))
 print('pcall with multireturn:', pcall(function() return 1, 2, 3 end))

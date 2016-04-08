@@ -900,7 +900,7 @@ luaL_error_gc(struct lua_State *L)
 	return 0;
 }
 
-static void
+void
 luaL_pusherror(struct lua_State *L, struct error *e)
 {
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);

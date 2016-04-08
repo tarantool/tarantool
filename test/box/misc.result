@@ -109,13 +109,40 @@ box.error.raise()
 ---
 - error: Illegal parameters, bla bla
 ...
-box.error.last()
+e
 ---
-- line: -1
+- error: '[string "return e "]:1: variable ''e'' is not declared'
+...
+e = box.error.last()
+---
+...
+e:unpack()
+---
+- type: ClientError
   code: 1
-  type: ClientError
   message: Illegal parameters, bla bla
-  file: '[C]'
+  trace:
+  - file: '[C]'
+    line: 4294967295
+...
+e.type
+---
+- ClientError
+...
+e.code
+---
+- 1
+...
+e.message
+---
+- Illegal parameters, bla bla
+...
+tostring(e)
+---
+- Illegal parameters, bla bla
+...
+e = nil
+---
 ...
 box.error.clear()
 ---

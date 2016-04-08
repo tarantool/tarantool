@@ -112,37 +112,14 @@ lbox_error_last(lua_State *L)
 	if (lua_gettop(L) >= 1)
 		luaL_error(L, "box.error.last(): bad arguments");
 
-	/* TODO: use struct error here */
-	Exception *e = (Exception *) box_error_last();
-
+	struct error *e = box_error_last();
 	if (e == NULL) {
 		lua_pushnil(L);
-	} else {
-		/*
-		 * TODO: use luaL_pusherror here, move type_foreach_method
-		 * to error_unpack() in Lua.
-		 */
-		lua_newtable(L);
+		return 1;
+	}
 
-		lua_pushstring(L, "type");
-		lua_pushstring(L, e->type->name);
-		lua_settable(L, -3);
-
-		type_foreach_method(e->type, method) {
-			if (method_invokable<const char *>(method, e)) {
-				const char *s = method_invoke<const char *>(method, e);
-				lua_pushstring(L, method->name);
-				lua_pushstring(L, s);
-				lua_settable(L, -3);
-			} else if (method_invokable<int>(method, e)) {
-				int code = method_invoke<int>(method, e);
-				lua_pushstring(L, method->name);
-				lua_pushinteger(L, code);
-				lua_settable(L, -3);
-			}
-		}
-       }
-       return 1;
+	luaL_pusherror(L, e);
+	return 1;
 }
 
 static int

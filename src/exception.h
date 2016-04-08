@@ -137,4 +137,9 @@ exception_init();
 	throw tnt_error(__VA_ARGS__);					\
 } while (0)
 
+extern "C" const char *
+exception_get_string(struct error *e, const struct method *method);
+extern "C" int
+exception_get_int(struct error *e, const struct method *method);
+
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

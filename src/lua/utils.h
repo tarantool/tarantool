@@ -497,6 +497,9 @@ lbox_call(lua_State *L, int nargs, int nreturns);
 int
 lbox_cpcall(lua_State *L, lua_CFunction func, void *ud);
 
+void
+luaL_pusherror(struct lua_State *L, struct error *e);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
