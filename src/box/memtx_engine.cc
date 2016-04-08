@@ -280,9 +280,9 @@ MemtxSpace::applySnapshotRow(struct space *space, struct request *request)
 			txn_rollback_stmt();
 			throw;
 		}
-		return;
+	} else {
+		this->replace(space, NULL, new_tuple, DUP_INSERT);
 	}
-	this->replace(space, NULL, new_tuple, DUP_INSERT);
 	/** The new tuple is referenced by the primary key. */
 }
 
