@@ -42,7 +42,7 @@
 #include "vclock.h"
 #include "ipc.h"
 
-struct recovery;
+struct xstream;
 
 enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
@@ -86,6 +86,8 @@ struct applier {
 	struct rlist on_state;
 	/* Channel used by applier_connect_all() and applier_resume() */
 	struct ipc_channel pause;
+	struct xstream *join_stream;
+	struct xstream *subscribe_stream;
 };
 
 /**
@@ -101,7 +103,7 @@ struct applier {
  * \sa fiber_start()
  */
 void
-applier_start(struct applier *applier, struct recovery *r);
+applier_start(struct applier *applier);
 
 /**
  * Stop a client.
@@ -117,7 +119,8 @@ applier_stop(struct applier *applier);
  * @error   throws OutOfMemory exception if out of memory.
  */
 struct applier *
-applier_new(const char *uri);
+applier_new(const char *uri, struct xstream *join_stream,
+	    struct xstream *subscribe_stream);
 
 /**
  * Destroy and delete a applier.
@@ -131,8 +134,7 @@ applier_delete(struct applier *applier);
  * Use applier_resume(applier) to resume applier.
  */
 void
-applier_connect_all(struct applier **appliers, int count,
-		   struct recovery *recovery);
+applier_connect_all(struct applier **appliers, int count);
 
 /*
  * Download and process the data snapshot from master.

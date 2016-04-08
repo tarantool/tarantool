@@ -1,7 +1,8 @@
-#ifndef TARANTOOL_REPLICATION_RELAY_H_INCLUDED
-#define TARANTOOL_REPLICATION_RELAY_H_INCLUDED
+#ifndef TARANTOOL_XSTREAM_H_INCLUDED
+#define TARANTOOL_XSTREAM_H_INCLUDED
+
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -16,7 +17,7 @@
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -30,46 +31,29 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "evio.h"
-#include "fiber.h"
-#include "vclock.h"
-#include "xstream.h"
 
-struct server;
-struct tt_uuid;
+#include <assert.h>
 
-/** State of a replication relay. */
-struct relay {
-	/** The thread in which we relay data to the replica. */
-	struct cord cord;
-	/** Replica connection */
-	struct ev_io io;
-	/* Request sync */
-	uint64_t sync;
-	struct recovery *r;
-	struct xstream stream;
-	struct vclock join_vclock;
-	ev_tstamp wal_dir_rescan_delay;
+struct xrow_header;
+struct xstream;
+
+typedef void (*xstream_write_f)(struct xstream *, struct xrow_header *);
+
+struct xstream {
+	xstream_write_f write;
 };
 
-/**
- * Send an initial snapshot to the replica
- *
- * @param fd        client connection
- * @param sync      sync from incoming JOIN request
- * @param uuid      server UUID of replica
- * @param[out] join_vclock vclock of initial snapshot
- */
-void
-relay_join(int fd, uint64_t sync, struct vclock *join_vclock);
+static inline void
+xstream_create(struct xstream *xstream, xstream_write_f write)
+{
+	xstream->write = write;
+}
 
-/**
- * Subscribe a replica to updates.
- *
- * @return none.
- */
-void
-relay_subscribe(int fd, uint64_t sync, struct server *server,
-		struct vclock *server_vclock);
+static inline void
+xstream_write(struct xstream *stream, struct xrow_header *row)
+{
+	assert(stream->write != NULL);
+	return stream->write(stream, row);
+}
 
-#endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */
+#endif /* TARANTOOL_XSTREAM_H_INCLUDED */

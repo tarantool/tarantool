@@ -37,6 +37,7 @@
 #include "scoped_guard.h"
 #include "coio.h"
 #include "coio_buf.h"
+#include "xstream.h"
 #include "recovery.h"
 #include "xrow.h"
 #include "box/cluster.h"
@@ -153,8 +154,10 @@ applier_connect(struct applier *applier)
  * Execute and process JOIN request (bootstrap the server).
  */
 static void
-applier_join(struct applier *applier, struct recovery *r)
+applier_join(struct applier *applier)
 {
+	assert(applier->join_stream != NULL);
+
 	say_info("downloading a snapshot from %s",
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
@@ -166,8 +169,6 @@ applier_join(struct applier *applier, struct recovery *r)
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_BOOTSTRAP);
 
-	assert(vclock_has(&r->vclock, 0)); /* check for surrogate server_id */
-
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
@@ -177,7 +178,7 @@ applier_join(struct applier *applier, struct recovery *r)
 			break;
 		} else if (iproto_type_is_dml(row.type)) {
 			/* Regular snapshot row  (IPROTO_INSERT) */
-			recovery_apply_row(r, &row);
+			xstream_write(applier->join_stream, &row);
 		} else /* error or unexpected packet */ {
 			xrow_decode_error(&row);  /* rethrow error */
 		}
@@ -195,13 +196,17 @@ applier_join(struct applier *applier, struct recovery *r)
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
-applier_subscribe(struct applier *applier, struct recovery *r)
+applier_subscribe(struct applier *applier)
 {
+	assert(applier->subscribe_stream != NULL);
+
 	/* Send SUBSCRIBE request */
 	struct ev_io *coio = &applier->io;
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 
+	/* TODO: don't use struct recovery here */
+	struct recovery *r = ::recovery;
 	xrow_encode_subscribe(&row, &CLUSTER_ID, &SERVER_ID, &r->vclock);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
@@ -263,7 +268,7 @@ applier_subscribe(struct applier *applier, struct recovery *r)
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error(&row);  /* error */
-		recovery_apply_row(r, &row);
+		xstream_write(applier->subscribe_stream, &row);
 
 		iobuf_reset(iobuf);
 		fiber_gc();
@@ -319,7 +324,6 @@ static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
-	struct recovery *r = va_arg(ap, struct recovery *);
 
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
@@ -332,9 +336,9 @@ applier_f(va_list ap)
 				 * join will pause the applier
 				 * until WAL is created.
 				 */
-				applier_join(applier, r);
+				applier_join(applier);
 			}
-			applier_subscribe(applier, r);
+			applier_subscribe(applier);
 			/*
 			 * subscribe() has an infinite loop which
 			 * is stoppable only with fiber_cancel().
@@ -371,7 +375,7 @@ applier_f(va_list ap)
 }
 
 void
-applier_start(struct applier *applier, struct recovery *r)
+applier_start(struct applier *applier)
 {
 	char name[FIBER_NAME_MAX];
 	assert(applier->reader == NULL);
@@ -386,7 +390,7 @@ applier_start(struct applier *applier, struct recovery *r)
 	 */
 	fiber_set_joinable(f, true);
 	applier->reader = f;
-	fiber_start(f, applier, r);
+	fiber_start(f, applier);
 }
 
 void
@@ -402,7 +406,8 @@ applier_stop(struct applier *applier)
 }
 
 struct applier *
-applier_new(const char *uri)
+applier_new(const char *uri, struct xstream *join_stream,
+	    struct xstream *subscribe_stream)
 {
 	struct applier *applier = (struct applier *)
 		calloc(1, sizeof(struct applier));
@@ -422,6 +427,8 @@ applier_new(const char *uri)
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 
+	applier->join_stream = join_stream;
+	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_now(loop());
 	rlist_create(&applier->on_state);
 	ipc_channel_create(&applier->pause, 0);
@@ -488,8 +495,7 @@ applier_on_bootstrap(struct trigger *trigger, void *event)
 }
 
 void
-applier_connect_all(struct applier **appliers, int count,
-		    struct recovery *recovery)
+applier_connect_all(struct applier **appliers, int count)
 {
 	if (count == 0)
 		return; /* nothing to do */
@@ -524,7 +530,7 @@ applier_connect_all(struct applier **appliers, int count,
 		trigger_add(&appliers[i]->on_state, &triggers[i]);
 
 		/* Start background connection */
-		applier_start(appliers[i], recovery);
+		applier_start(appliers[i]);
 	}
 
 	/* Wait `count` messages from channel */

@@ -96,6 +96,12 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #define __offsetof offsetof
 #endif
 
+#ifndef containerof
+#define container_of(ptr, type, member) ({ \
+	const typeof( ((type *)0)->member  ) *__mptr = (ptr); \
+	(type *)( (char *)__mptr - offsetof(type,member)  );})
+#endif
+
 #ifndef lengthof
 #define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
 #endif

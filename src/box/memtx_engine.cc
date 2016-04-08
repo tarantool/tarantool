@@ -43,6 +43,7 @@
 #include "box.h"
 #include "iproto_constants.h"
 #include "xrow.h"
+#include "xstream.h"
 #include "recovery.h"
 #include "cluster.h"
 #include "relay.h"
@@ -589,6 +590,36 @@ MemtxEngine::lastCheckpoint(struct vclock *vclock)
 	return vclock_size(&m_last_checkpoint) ? vclock_sum(&m_last_checkpoint) : -1;
 }
 
+void
+MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
+{
+	assert(row->bodycnt == 1); /* always 1 for read */
+	if (row->type != IPROTO_INSERT) {
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) row->type);
+	}
+
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, row->type);
+	request_decode(request, (const char *) row->body[0].iov_base,
+		row->body[0].iov_len);
+	request->header = row;
+
+	struct space *space = space_cache_find(request->space_id);
+	/* memtx snapshot must contain only memtx spaces */
+	if (space->handler->engine != this)
+		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	struct txn *txn = txn_begin_stmt(space);
+	try {
+		space->handler->executeReplace(txn, space, request);
+		txn_commit_stmt(txn, request);
+	} catch (Exception *e) {
+		txn_rollback_stmt();
+		throw;
+	}
+}
+
 /** Called at start to tell memtx to recover to a given LSN. */
 void
 MemtxEngine::recoverToCheckpoint(int64_t lsn)
@@ -618,7 +649,32 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	vclock_add_server(&r->vclock, 0);
 
 	say_info("recovering from `%s'", snap->filename);
-	recover_xlog(r, snap);
+	struct xlog_cursor cursor;
+	xlog_cursor_open(&cursor, snap);
+	auto reader_guard = make_scoped_guard([&]{
+		xlog_cursor_close(&cursor);
+	});
+
+	struct xrow_header row;
+	while (xlog_cursor_next_xc(&cursor, &row) == 0) {
+		try {
+			recoverSnapshotRow(&row);
+		} catch (ClientError *e) {
+			if (m_snap_dir.panic_if_error)
+				throw;
+			say_error("can't apply row: ");
+			e->log();
+		}
+	}
+
+	/**
+	 * We should never try to read snapshots with no EOF
+	 * marker - such snapshots are very likely corrupted and
+	 * should not be trusted.
+	 */
+	if (!cursor.eof_read)
+		panic("snapshot `%s' has no EOF marker", snap->filename);
+
 	/* Replace server vclock using the data from snapshot */
 	vclock_copy(&r->vclock, &snap->vclock);
 
@@ -1211,7 +1267,7 @@ MemtxEngine::abortCheckpoint()
  * to the replica, hence should not use engine state.
  */
 void
-MemtxEngine::join(struct relay *relay, struct vclock *last)
+MemtxEngine::join(struct xstream *stream, struct vclock *last)
 {
 	struct xdir dir;
 	struct xlog *snap = NULL;
@@ -1234,7 +1290,24 @@ MemtxEngine::join(struct relay *relay, struct vclock *last)
 	 */
 	assert(vclock_size(last));
 	snap = xlog_open_xc(&dir, vclock_sum(last));
-	recover_xlog(relay->r, snap);
+	struct xlog_cursor cursor;
+	xlog_cursor_open(&cursor, snap);
+	auto reader_guard = make_scoped_guard([&]{
+		xlog_cursor_close(&cursor);
+	});
+
+	struct xrow_header row;
+	while (xlog_cursor_next_xc(&cursor, &row) == 0)
+		xstream_write(stream, &row);
+
+	/**
+	 * We should never try to read snapshots with no EOF
+	 * marker - such snapshots are very likely corrupted and
+	 * should not be trusted.
+	 */
+	/* TODO: replace panic with tnt_raise() */
+	if (!cursor.eof_read)
+		panic("snapshot `%s' has no EOF marker", snap->filename);
 }
 
 /**

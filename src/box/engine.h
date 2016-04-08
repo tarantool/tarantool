@@ -97,7 +97,7 @@ public:
 	 */
 	virtual bool needToBuildSecondaryKey(struct space *space);
 
-	virtual void join(struct relay *, struct vclock *vclock);
+	virtual void join(struct xstream *, struct vclock *vclock);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -261,6 +261,6 @@ engine_checkpoint(struct vclock *vclock);
  * (called on the master).
  */
 void
-engine_join(struct relay *, struct vclock *vclock);
+engine_join(struct xstream *stream, struct vclock *vclock);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

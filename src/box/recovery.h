@@ -45,8 +45,7 @@ struct recovery;
 extern struct recovery *recovery;
 
 struct xrow_header;
-typedef void (apply_row_f)(struct recovery *, void *,
-			   struct xrow_header *packet);
+struct xstream;
 
 struct recovery {
 	struct vclock vclock;
@@ -59,18 +58,11 @@ struct recovery {
 	 * locally or send to the replica.
 	 */
 	struct fiber *watcher;
-	/**
-	 * apply_row is a module callback invoked during initial
-	 * recovery and when reading rows from the master.
-	 */
-	apply_row_f *apply_row;
-	void *apply_row_param;
 	uint32_t server_id;
 };
 
 struct recovery *
-recovery_new(const char *wal_dirname, bool panic_on_wal_error,
-	     apply_row_f apply_row, void *apply_row_param);
+recovery_new(const char *wal_dirname, bool panic_on_wal_error);
 
 void
 recovery_delete(struct recovery *r);
@@ -80,27 +72,21 @@ void
 recovery_exit(struct recovery *r);
 
 void
-recovery_bootstrap(struct recovery *r);
+recovery_bootstrap(struct recovery *r, struct xstream *stream);
 
 void
-recover_xlog(struct recovery *r, struct xlog *l);
-
-void
-recovery_follow_local(struct recovery *r, const char *name,
-		      ev_tstamp wal_dir_rescan_delay);
+recovery_follow_local(struct recovery *r, struct xstream *stream,
+		      const char *name, ev_tstamp wal_dir_rescan_delay);
 
 void
 recovery_stop_local(struct recovery *r);
 
 void
-recovery_finalize(struct recovery *r, enum wal_mode mode,
-		  int64_t rows_per_wal);
+recovery_finalize(struct recovery *r, struct xstream *stream,
+		  enum wal_mode mode, int64_t rows_per_wal);
 
 void
 recovery_fill_lsn(struct recovery *r, struct xrow_header *row);
-
-void
-recovery_apply_row(struct recovery *r, struct xrow_header *packet);
 
 /**
  * The write ahead log doesn't store the last checkpoint:

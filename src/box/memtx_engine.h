@@ -61,7 +61,7 @@ struct MemtxEngine: public Engine {
 	virtual void beginJoin() override;
 	virtual void recoverToCheckpoint(int64_t lsn) override;
 	virtual void endRecovery() override;
-	virtual void join(struct relay *relay, struct vclock *last) override;
+	virtual void join(struct xstream *stream, struct vclock *last) override;
 	virtual int beginCheckpoint(struct vclock *vclock) override;
 	virtual int waitCheckpoint() override;
 	virtual void commitCheckpoint() override;
@@ -80,6 +80,8 @@ struct MemtxEngine: public Engine {
 	 */
 	int64_t lastCheckpoint(struct vclock *vclock);
 private:
+	void
+	recoverSnapshotRow(struct xrow_header *row);
 	/** Non-zero if there is a checkpoint (snapshot) in progress. */
 	struct checkpoint *m_checkpoint;
 	enum memtx_recovery_state m_state;

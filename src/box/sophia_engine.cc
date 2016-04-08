@@ -38,7 +38,6 @@
 #include "scoped_guard.h"
 #include "txn.h"
 #include "index.h"
-#include "recovery.h"
 #include "relay.h"
 #include "space.h"
 #include "schema.h"
@@ -379,10 +378,9 @@ SophiaEngine::open()
 }
 
 static inline void
-sophia_send_row(struct relay *relay, uint32_t space_id, char *tuple,
+sophia_send_row(struct xstream *stream, uint32_t space_id, char *tuple,
                 uint32_t tuple_size)
 {
-	struct recovery *r = relay->r;
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
@@ -392,13 +390,13 @@ sophia_send_row(struct relay *relay, uint32_t space_id, char *tuple,
 	struct xrow_header row;
 	row.type = IPROTO_INSERT;
 	row.server_id = 0;
-	row.lsn = vclock_inc(&r->vclock, row.server_id);
+	row.lsn = 0;
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = tuple;
 	row.body[1].iov_len = tuple_size;
-	relay_send(relay, &row);
+	xstream_write(stream, &row);
 }
 
 static inline struct key_def *
@@ -435,7 +433,7 @@ sophia_join_key_def(void *env, void *db)
  * to the replica.
  */
 void
-SophiaEngine::join(struct relay *relay, struct vclock *vclock)
+SophiaEngine::join(struct xstream *stream, struct vclock *vclock)
 {
 	int64_t lsn = vclock_sum(vclock);
 
@@ -475,7 +473,7 @@ SophiaEngine::join(struct relay *relay, struct vclock *vclock)
 			uint32_t tuple_size;
 			char *tuple = (char *)sophia_tuple_new(obj, key_def, NULL, &tuple_size);
 			try {
-				sophia_send_row(relay, key_def->space_id, tuple, tuple_size);
+				sophia_send_row(stream, key_def->space_id, tuple, tuple_size);
 			} catch (Exception *e) {
 				key_def_delete(key_def);
 				free(tuple);

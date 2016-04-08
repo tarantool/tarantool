@@ -74,32 +74,13 @@ static void title(const char *new_status)
 
 struct recovery *recovery;
 
-/**
- * The context of initial recovery.
- */
-static struct recover_row_ctx {
-	/** How many rows have been recovered so far. */
-	size_t rows;
-	/** Yield once per 'yield' rows. */
-	size_t yield;
-} recover_row_ctx;
-
 bool box_snapshot_is_in_progress = false;
 static bool box_init_done = false;
 static bool is_ro = true;
 
-void
-recover_row_ctx_init(struct recover_row_ctx *ctx, size_t rows_per_wal)
-{
-	ctx->rows = 0;
-	/**
-	 * Make the yield logic covered by the functional test
-	 * suite, which has a small setting for rows_per_wal.
-	 * Each yield can take up to 1ms if there are no events,
-	 * so we can't afford many of them during recovery.
-	 */
-	ctx->yield = (rows_per_wal >> 4)  + 1;
-}
+/* Use the shared instance of xstream for all appliers */
+static struct xstream join_stream;
+static struct xstream subscribe_stream;
 
 static void
 box_check_writable(void)
@@ -196,13 +177,11 @@ box_is_ro(void)
 	return is_ro;
 }
 
-static void
-recover_row(struct recovery *r, void *param, struct xrow_header *row)
+static inline void
+apply_row(struct xstream *stream, struct xrow_header *row)
 {
-	struct recover_row_ctx *ctx = (struct recover_row_ctx *) param;
-	assert(r == ::recovery);
 	assert(row->bodycnt == 1); /* always 1 for read */
-	(void) r;
+	(void) stream;
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
 	request_create(request, row->type);
@@ -210,12 +189,62 @@ recover_row(struct recovery *r, void *param, struct xrow_header *row)
 		row->body[0].iov_len);
 	request->header = row;
 	process_rw(request, NULL);
+}
+
+struct wal_stream {
+	struct xstream base;
+	/** How many rows have been recovered so far. */
+	size_t rows;
+	/** Yield once per 'yield' rows. */
+	size_t yield;
+};
+
+static void
+apply_wal_row(struct xstream *stream, struct xrow_header *row)
+{
+	apply_row(stream, row);
+
+	struct wal_stream *xstream =
+		container_of(stream, struct wal_stream, base);
 	/**
 	 * Yield once in a while, but not too often,
 	 * mostly to allow signal handling to take place.
 	 */
-	if (++ctx->rows % ctx->yield == 0)
+	if (++xstream->rows % xstream->yield == 0)
 		fiber_sleep(0);
+}
+
+static void
+wal_stream_create(struct wal_stream *ctx, size_t rows_per_wal)
+{
+	xstream_create(&ctx->base, apply_wal_row);
+	ctx->rows = 0;
+	/**
+	 * Make the yield logic covered by the functional test
+	 * suite, which has a small setting for rows_per_wal.
+	 * Each yield can take up to 1ms if there are no events,
+	 * so we can't afford many of them during recovery.
+	 */
+	ctx->yield = (rows_per_wal >> 4)  + 1;
+}
+
+static void
+apply_join_row(struct xstream *stream, struct xrow_header *row)
+{
+	/* TODO: a temporary workaround for broken sophia JOIN #1134 */
+	row->lsn = vclock_get(&recovery->vclock, 0) + 1;
+	row->server_id = 0;
+	apply_row(stream, row);
+}
+
+static void
+apply_subscribe_row(struct xstream *stream, struct xrow_header *row)
+{
+	/* Check lsn */
+	int64_t current_lsn = vclock_get(&recovery->vclock, row->server_id);
+	if (row->lsn <= current_lsn)
+		return;
+	apply_row(stream, row);
 }
 
 /* {{{ configuration bindings */
@@ -305,6 +334,7 @@ box_check_config()
 static struct applier **
 cfg_get_replication_source(int *p_count)
 {
+
 	/* Use static buffer for result */
 	static struct applier *appliers[VCLOCK_MAX];
 
@@ -316,7 +346,9 @@ cfg_get_replication_source(int *p_count)
 
 	for (int i = 0; i < count; i++) {
 		const char *source = cfg_getarr_elem("replication_source", i);
-		struct applier *applier = applier_new(source);
+		struct applier *applier = applier_new(source,
+						      &join_stream,
+						      &subscribe_stream);
 		if (applier == NULL) {
 			/* Delete created appliers */
 			while (--i >= 0)
@@ -348,7 +380,7 @@ box_sync_replication_source(void)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	applier_connect_all(appliers, count, recovery);
+	applier_connect_all(appliers, count);
 	cluster_set_appliers(appliers, count);
 
 	guard.is_active = false;
@@ -1036,7 +1068,9 @@ bootstrap_cluster(void)
 	vclock_add_server(&recovery->vclock, 0);
 
 	/* Process bootstrap.bin */
-	recovery_bootstrap(recovery);
+	struct xstream bootstrap_stream;
+	xstream_create(&bootstrap_stream, apply_row);
+	recovery_bootstrap(recovery, &bootstrap_stream);
 
 	/* Generate UUID of a new cluster */
 	box_set_cluster_uuid();
@@ -1114,16 +1148,15 @@ box_init(void)
 	title("loading");
 
 	/* recovery initialization */
-	recover_row_ctx_init(&recover_row_ctx,
-			     cfg_geti64("rows_per_wal"));
 	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("panic_on_wal_error"),
-				recover_row, &recover_row_ctx);
+				cfg_geti("panic_on_wal_error"));
 	box_set_too_long_threshold();
 	/*
 	 * Initialize the cluster registry using replication_source,
 	 * but don't start replication right now.
 	 */
+	xstream_create(&join_stream, apply_join_row);
+	xstream_create(&subscribe_stream, apply_subscribe_row);
 	box_sync_replication_source();
 
 	int64_t lsn = recovery_last_checkpoint(NULL);
@@ -1136,7 +1169,9 @@ box_init(void)
 	fiber_gc();
 
 	title("orphan");
-	recovery_follow_local(recovery, "hot_standby",
+	struct wal_stream wal_stream;
+	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
+	recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby");
 
@@ -1146,7 +1181,7 @@ box_init(void)
 
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	recovery_finalize(recovery, wal_mode, rows_per_wal);
+	recovery_finalize(recovery, &wal_stream.base, wal_mode, rows_per_wal);
 
 	engine_end_recovery();
 

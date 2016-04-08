@@ -129,9 +129,9 @@ Engine::recoverToCheckpoint(int64_t /* lsn */)
 }
 
 void
-Engine::join(struct relay *relay, struct vclock *vclock)
+Engine::join(struct xstream *stream, struct vclock *vclock)
 {
-	(void) relay;
+	(void) stream;
 	(void) vclock;
 }
 
@@ -318,10 +318,10 @@ error:
 }
 
 void
-engine_join(struct relay *relay, struct vclock *vclock)
+engine_join(struct xstream *stream, struct vclock *vclock)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(relay, vclock);
+		engine->join(stream, vclock);
 	}
 }

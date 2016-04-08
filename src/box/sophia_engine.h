@@ -51,7 +51,7 @@ struct SophiaEngine: public Engine {
 	virtual void beginJoin() override;
 	virtual void recoverToCheckpoint(int64_t) override;
 	virtual void endRecovery() override;
-	virtual void join(struct relay *relay, struct vclock *vclock) override;
+	virtual void join(struct xstream *stream, struct vclock *vclock) override;
 	virtual int beginCheckpoint(struct vclock *vclock) override;
 	virtual int waitCheckpoint() override;
 	virtual void commitCheckpoint() override;
