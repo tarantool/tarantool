@@ -74,4 +74,7 @@ private:
 	struct tuple_format *format;
 };
 
+char *
+sophia_tuple_data_new(void *obj, struct key_def *key_def, uint32_t *bsize);
+
 #endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */

@@ -482,65 +482,6 @@ sophia_join_key_def(void *env, void *db)
 	return key_def;
 }
 
-static char *
-sophia_tuple_new_surrogate(void *obj, struct key_def *key_def, uint32_t *bsize)
-{
-	int valuesize = 0;
-	char *value = (char *)sp_getstring(obj, "value", &valuesize);
-	char *valueend = value + valuesize;
-
-	assert(key_def->part_count <= 8);
-	struct {
-		const char *part;
-		int size;
-	} parts[8];
-
-	/* prepare keys */
-	int size = 0;
-	uint32_t i = 0;
-	while (i < key_def->part_count) {
-		char partname[32];
-		int len = snprintf(partname, sizeof(partname), "key");
-		if (i > 0)
-			snprintf(partname + len, sizeof(partname) - len, "_%d", i);
-		parts[i].part = (const char *)sp_getstring(obj, partname, &parts[i].size);
-		assert(parts[i].part != NULL);
-		if (key_def->parts[i].type == STRING) {
-			size += mp_sizeof_str(parts[i].size);
-		} else {
-			size += mp_sizeof_uint(load_u64(parts[i].part));
-		}
-		i++;
-	}
-	int count = key_def->part_count;
-	char *p = value;
-	while (p < valueend) {
-		count++;
-		mp_next((const char **)&p);
-	}
-	size += mp_sizeof_array(count);
-	size += valuesize;
-	if (bsize) {
-		*bsize = size;
-	}
-
-	/* build tuple */
-	char *raw = NULL;
-	raw = (char *)malloc(size);
-	if (raw == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "tuple");
-	p = raw;
-	p = mp_encode_array(p, count);
-	for (i = 0; i < key_def->part_count; i++) {
-		if (key_def->parts[i].type == STRING)
-			p = mp_encode_str(p, parts[i].part, parts[i].size);
-		else
-			p = mp_encode_uint(p, load_u64(parts[i].part));
-	}
-	memcpy(p, value, valuesize);
-	return raw;
-}
-
 /**
  * Relay all data that should be present in the snapshot
  * to the replica.
@@ -584,7 +525,7 @@ SophiaEngine::join(struct xstream *stream, struct vclock *vclock)
 		while ((obj = sp_get(cursor, obj)))
 		{
 			uint32_t tuple_size;
-			char *tuple = sophia_tuple_new_surrogate(obj, key_def,
+			char *tuple = sophia_tuple_data_new(obj, key_def,
 								 &tuple_size);
 			try {
 				sophia_send_row(stream, key_def->space_id,
