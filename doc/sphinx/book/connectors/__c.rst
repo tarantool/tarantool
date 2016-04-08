@@ -5,7 +5,7 @@
 Here is a complete C program that inserts :code:`[99999,'B']` into
 space :code:`examples` via the high-level C API.
 
-.. code-block
+.. code-block:: c
 
     #include <stdio.h>
     #include <stdlib.h>
@@ -201,6 +201,7 @@ To display the results the program uses functions in the
 .. code-block:: c
 
     #include <stdio.h>
+    #include <stdlib.h>
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
