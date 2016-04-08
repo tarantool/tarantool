@@ -231,10 +231,22 @@ wal_stream_create(struct wal_stream *ctx, size_t rows_per_wal)
 static void
 apply_join_row(struct xstream *stream, struct xrow_header *row)
 {
-	/* TODO: a temporary workaround for broken sophia JOIN #1134 */
-	row->lsn = vclock_get(&recovery->vclock, 0) + 1;
-	row->server_id = 0;
-	apply_row(stream, row);
+	if (row->type != IPROTO_INSERT) {
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				(uint32_t) row->type);
+	}
+
+	(void) stream;
+	struct request *request;
+	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	request_create(request, row->type);
+	assert(row->bodycnt == 1); /* always 1 for read */
+	request_decode(request, (const char *) row->body[0].iov_base,
+			row->body[0].iov_len);
+	request->header = row;
+	struct space *space = space_cache_find(request->space_id);
+	/* no access checks here - applier always works with admin privs */
+	space->handler->applySnapshotRow(space, request);
 }
 
 static void

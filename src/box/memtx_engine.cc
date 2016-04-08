@@ -92,8 +92,8 @@ enum {
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
  */
-static void
-memtx_replace_no_keys(struct txn * /* txn */, struct space *space,
+static struct tuple *
+memtx_replace_no_keys(struct space *space,
 		      struct tuple * /* old_tuple */,
 		      struct tuple * /* new_tuple */,
 		      enum dup_replace_mode /* mode */)
@@ -101,7 +101,13 @@ memtx_replace_no_keys(struct txn * /* txn */, struct space *space,
 	Index *index = index_find(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
+	return NULL;
 }
+
+typedef struct tuple *
+(*engine_replace_f)(struct space *, struct tuple *, struct tuple *,
+		    enum dup_replace_mode);
+
 
 struct MemtxSpace: public Handler {
 	MemtxSpace(Engine *e)
@@ -114,6 +120,8 @@ struct MemtxSpace: public Handler {
 		/* do nothing */
 		/* engine->close(this); */
 	}
+	virtual void
+	applySnapshotRow(struct space *space, struct request *request);
 	virtual struct tuple *
 	executeReplace(struct txn *txn, struct space *space,
 		       struct request *request);
@@ -227,6 +235,57 @@ dup_replace_mode(uint32_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
+/**
+ * Do the plumbing necessary for correct statement-level
+ * and transaction rollback.
+ */
+static inline void
+memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
+		   struct tuple *new_tuple)
+{
+	/*
+	 * Remember the old tuple only if we replaced it
+	 * successfully, to not remove a tuple inserted by
+	 * another transaction in rollback().
+	 */
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt->space);
+	stmt->old_tuple = old_tuple;
+	stmt->new_tuple = new_tuple;
+}
+
+void
+MemtxSpace::applySnapshotRow(struct space *space, struct request *request)
+{
+	assert(request->type == IPROTO_INSERT);
+	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
+					    request->tuple_end);
+	/* GC the new tuple if there is an exception below. */
+	TupleRef ref(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	if (!rlist_empty(&space->on_replace)) {
+		/*
+		 * Emulate transactions for system spaces with triggers
+		 */
+		assert(in_txn() == NULL);
+		request->header->server_id = 0;
+		struct txn *txn = txn_begin_stmt(space);
+		try {
+			struct tuple *old_tuple = this->replace(space, NULL,
+				new_tuple, DUP_INSERT);
+			memtx_txn_add_undo(txn, old_tuple, new_tuple);
+			txn_commit_stmt(txn, request);
+		} catch (Exception *e) {
+			say_error("rollback: %s", e->errmsg);
+			txn_rollback_stmt();
+			throw;
+		}
+		return;
+	}
+	this->replace(space, NULL, new_tuple, DUP_INSERT);
+	/** The new tuple is referenced by the primary key. */
+}
+
 struct tuple *
 MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 			   struct request *request)
@@ -237,7 +296,8 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 	TupleRef ref(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	this->replace(txn, space, NULL, new_tuple, mode);
+	struct tuple *old_tuple = this->replace(space, NULL, new_tuple, mode);
+	memtx_txn_add_undo(txn, old_tuple, new_tuple);
 	/** The new tuple is referenced by the primary key. */
 	return new_tuple;
 }
@@ -255,7 +315,8 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	if (old_tuple == NULL)
 		return NULL;
 
-	this->replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	this->replace(space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	memtx_txn_add_undo(txn, old_tuple, NULL);
 	return old_tuple;
 }
 
@@ -282,7 +343,8 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					       request->index_base);
 	TupleRef ref(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	this->replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+	this->replace(space, old_tuple, new_tuple, DUP_REPLACE);
+	memtx_txn_add_undo(txn, old_tuple, new_tuple);
 	return new_tuple;
 }
 
@@ -334,7 +396,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 						    request->tuple,
 						    request->tuple_end);
 		TupleRef ref(new_tuple); /* useless, for unified approach */
-		replace(txn, space, NULL, new_tuple, DUP_INSERT);
+		old_tuple = replace(space, NULL, new_tuple, DUP_INSERT);
+		memtx_txn_add_undo(txn, old_tuple, new_tuple);
 	} else {
 		/**
 		 * Update the tuple.
@@ -354,7 +417,8 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 		 */
 		try {
 			space_validate_tuple(space, new_tuple);
-			replace(txn, space, old_tuple, new_tuple, DUP_REPLACE);
+			replace(space, old_tuple, new_tuple, DUP_REPLACE);
+			memtx_txn_add_undo(txn, old_tuple, new_tuple);
 		} catch (ClientError *e) {
 			say_error("UPSERT failed:");
 			e->log();
@@ -411,30 +475,11 @@ txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
 }
 
 /**
- * Do the plumbing necessary for correct statement-level
- * and transaction rollback.
- */
-static void
-memtx_txn_add_undo(struct txn *txn, struct tuple *old_tuple,
-		   struct tuple *new_tuple)
-{
-	/*
-	 * Remember the old tuple only if we replaced it
-	 * successfully, to not remove a tuple inserted by
-	 * another transaction in rollback().
-	 */
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt->space);
-	stmt->old_tuple = old_tuple;
-	stmt->new_tuple = new_tuple;
-}
-
-/**
  * A short-cut version of replace() used during bulk load
  * from snapshot.
  */
-void
-memtx_replace_build_next(struct txn * /* txn */, struct space *space,
+static struct tuple *
+memtx_replace_build_next(struct space *space,
 			 struct tuple *old_tuple, struct tuple *new_tuple,
 			 enum dup_replace_mode mode)
 {
@@ -452,27 +497,26 @@ memtx_replace_build_next(struct txn * /* txn */, struct space *space,
 	}
 	((MemtxIndex *) space->index[0])->buildNext(new_tuple);
 	tuple_ref(new_tuple);
+	return NULL;
 }
 
 /**
  * A short-cut version of replace() used when loading
  * data from XLOG files.
  */
-void
-memtx_replace_primary_key(struct txn *txn, struct space *space,
-			  struct tuple *old_tuple, struct tuple *new_tuple,
-			  enum dup_replace_mode mode)
+static struct tuple *
+memtx_replace_primary_key(struct space *space, struct tuple *old_tuple,
+			  struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	old_tuple = space->index[0]->replace(old_tuple, new_tuple, mode);
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	memtx_txn_add_undo(txn, old_tuple, new_tuple);
+	return old_tuple;
 }
 
-static void
-memtx_replace_all_keys(struct txn *txn, struct space *space,
-		       struct tuple *old_tuple, struct tuple *new_tuple,
-		       enum dup_replace_mode mode)
+static struct tuple *
+memtx_replace_all_keys(struct space *space, struct tuple *old_tuple,
+		       struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	/*
 	 * Ensure we have enough slack memory to guarantee
@@ -509,7 +553,7 @@ memtx_replace_all_keys(struct txn *txn, struct space *space,
 	}
 	if (new_tuple)
 		tuple_ref(new_tuple);
-	memtx_txn_add_undo(txn, old_tuple, new_tuple);
+	return old_tuple;
 }
 
 static void
@@ -610,14 +654,8 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	/* memtx snapshot must contain only memtx spaces */
 	if (space->handler->engine != this)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-	struct txn *txn = txn_begin_stmt(space);
-	try {
-		space->handler->executeReplace(txn, space, request);
-		txn_commit_stmt(txn, request);
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		throw;
-	}
+	/* no access checks here - applier always works with admin privs */
+	space->handler->applySnapshotRow(space, request);
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */

@@ -69,8 +69,8 @@ public:
 	void *env;
 	void *db;
 
-private:
 	void *createDocument(const char *key, const char **keyend);
+private:
 	struct tuple_format *format;
 };
 

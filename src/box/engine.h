@@ -44,10 +44,6 @@ enum engine_flags {
 
 extern struct rlist engines;
 
-typedef void
-(*engine_replace_f)(struct txn *txn, struct space *,
-		    struct tuple *, struct tuple *, enum dup_replace_mode);
-
 class Handler;
 
 /** Engine instance */
@@ -181,6 +177,8 @@ public:
 	Handler(const Handler &) = delete;
 	Handler& operator=(const Handler&) = delete;
 
+	virtual void
+	applySnapshotRow(struct space *space, struct request *);
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *,
 		       struct request *);

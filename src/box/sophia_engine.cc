@@ -187,6 +187,8 @@ sophia_read(void *dest, void *key)
 
 struct SophiaSpace: public Handler {
 	SophiaSpace(Engine*);
+	virtual void
+	applySnapshotRow(struct space *space, struct request *request);
 	virtual struct tuple *
 	executeReplace(struct txn*, struct space *space,
 	               struct request *request);
@@ -200,6 +202,58 @@ struct SophiaSpace: public Handler {
 	executeUpsert(struct txn*, struct space *space,
 	              struct request *request);
 };
+
+void
+SophiaSpace::applySnapshotRow(struct space *space, struct request *request)
+{
+	assert(request->type == IPROTO_INSERT);
+	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+
+	space_validate_tuple_raw(space, request->tuple);
+	int size = request->tuple_end - request->tuple;
+	const char *key = tuple_field_raw(request->tuple, size,
+					  index->key_def->parts[0].fieldno);
+	primary_key_validate(index->key_def, key, index->key_def->part_count);
+
+	const char *value;
+	void *obj = index->createDocument(key, &value);
+	size_t valuesize = size - (value - request->tuple);
+	if (valuesize > 0)
+		sp_setstring(obj, "value", value, valuesize);
+
+	assert(request->header != NULL);
+
+	void *tx = sp_begin(index->env);
+	if (tx == NULL) {
+		sp_destroy(obj);
+		sophia_error(index->env);
+	}
+
+#if 0
+	int64_t signature = request->header->lsn;
+	sp_setint(tx, "lsn", signature);
+#endif
+	if (sp_set(tx, obj) != 0)
+		sophia_error(index->env); /* obj destroyed by sp_set() */
+
+	int rc = sp_commit(tx);
+	switch (rc) {
+	case 0:
+		return;
+	case 1: /* rollback */
+		return;
+	case 2: /* lock */
+		sp_destroy(tx);
+		/* must never happen during JOIN */
+		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
+		return;
+	case -1:
+		sophia_error(index->env);
+		return;
+	default:
+		assert(0);
+	}
+}
 
 struct tuple *
 SophiaSpace::executeReplace(struct txn *txn, struct space *space,
