@@ -131,6 +131,26 @@ s:select{};
 test_run:cmd("setopt delimiter ''");
 errinj.set("ERRINJ_TUPLE_ALLOC", false)
 
+s:drop()
+s = box.schema.space.create('test')
+_ = s:create_index('test', {parts = {1, 'NUM', 3, 'NUM', 5, 'NUM'}})
+s:insert{1, 2, 3, 4, 5, 6}
+t = s:select{}[1]
+errinj.set("ERRINJ_TUPLE_FIELD", true)
+tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(t[5]) .. tostring(t[6])
+errinj.set("ERRINJ_TUPLE_FIELD", false)
+tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(t[5]) .. tostring(t[6])
+
+s:drop()
+s = box.schema.space.create('test')
+_ = s:create_index('test', {parts = {2, 'NUM', 4, 'NUM', 6, 'NUM'}})
+s:insert{1, 2, 3, 4, 5, 6}
+t = s:select{}[1]
+errinj.set("ERRINJ_TUPLE_FIELD", true)
+tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(t[5]) .. tostring(t[6])
+errinj.set("ERRINJ_TUPLE_FIELD", false)
+tostring(t[1]) .. tostring(t[2]) ..tostring(t[3]) .. tostring(t[4]) .. tostring(t[5]) .. tostring(t[6])
+
 -- Cleanup
 s:drop()
 errinj = nil
