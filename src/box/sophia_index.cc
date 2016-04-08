@@ -46,11 +46,12 @@
 #include <inttypes.h>
 #include <bit/bit.h> /* load/store */
 
-void*
+static struct tuple *
 sophia_tuple_new(void *obj, struct key_def *key_def,
                  struct tuple_format *format,
                  uint32_t *bsize)
 {
+	assert(format);
 	int valuesize = 0;
 	char *value = (char *)sp_getstring(obj, "value", &valuesize);
 	char *valueend = value + valuesize;
@@ -91,17 +92,8 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	}
 
 	/* build tuple */
-	struct tuple *tuple;
-	char *raw = NULL;
-	if (format) {
-		tuple = tuple_alloc(format, size);
-		p = tuple->data;
-	} else {
-		raw = (char *)malloc(size);
-		if (raw == NULL)
-			tnt_raise(OutOfMemory, size, "malloc", "tuple");
-		p = raw;
-	}
+	struct tuple *tuple = tuple_alloc(format, size);
+	p = tuple->data;
 	p = mp_encode_array(p, count);
 	for (i = 0; i < key_def->part_count; i++) {
 		if (key_def->parts[i].type == STRING)
@@ -110,16 +102,13 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 			p = mp_encode_uint(p, load_u64(parts[i].part));
 	}
 	memcpy(p, value, valuesize);
-	if (format) {
-		try {
-			tuple_init_field_map(format, tuple, (uint32_t *)tuple);
-		} catch (Exception *e) {
-			tuple_delete(tuple);
-			throw;
-		}
-		return tuple;
+	try {
+		tuple_init_field_map(format, tuple, (uint32_t *)tuple);
+	} catch (Exception *e) {
+		tuple_delete(tuple);
+		throw;
 	}
-	return raw;
+	return tuple;
 }
 
 static uint64_t num_parts[8];
