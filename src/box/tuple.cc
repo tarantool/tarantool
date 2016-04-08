@@ -37,7 +37,7 @@
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
-struct tuple_format *tuple_format_ber;
+struct tuple_format *tuple_format_default;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size, formats_capacity;
@@ -222,13 +222,13 @@ tuple_format_new(struct rlist *key_list)
  * format data.
  */
 void
-tuple_init_field_map(struct tuple_format *format, struct tuple *tuple,
-		     uint32_t *field_map)
+tuple_init_field_map(struct tuple_format *format, struct tuple *tuple)
 {
 	if (format->field_count == 0)
 		return; /* Nothing to initialize */
 
 	const char *pos = tuple->data;
+	uint32_t *field_map = (uint32_t *) tuple;
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&pos);
@@ -280,6 +280,16 @@ tuple_validate_raw(struct tuple_format *format, const char *data)
 				     ER_FIELD_TYPE, i + INDEX_OFFSET);
 		mp_next(&data);
 	}
+}
+
+/**
+ * Check tuple data correspondence to space format;
+ * throw proper exception if smth wrong.
+ */
+void
+tuple_validate(struct tuple_format *format, struct tuple *tuple)
+{
+	tuple_validate_raw(format, tuple->data);
 }
 
 /**
@@ -541,7 +551,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	memcpy(new_tuple->data, data, tuple_len);
 	try {
-		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
+		tuple_init_field_map(format, new_tuple);
 	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;
@@ -659,9 +669,9 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	   uint32_t objsize_max, float alloc_factor)
 {
 	RLIST_HEAD(empty_list);
-	tuple_format_ber = tuple_format_new(&empty_list);
+	tuple_format_default = tuple_format_new(&empty_list);
 	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_ber, 1);
+	tuple_format_ref(tuple_format_default, 1);
 
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
@@ -765,7 +775,7 @@ double mp_decode_num(const char **data, uint32_t i)
 box_tuple_format_t *
 box_tuple_format_default(void)
 {
-	return tuple_format_ber;
+	return tuple_format_default;
 }
 
 box_tuple_t *
@@ -886,7 +896,7 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr, const char *expr_en
 {
 	try {
 		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_update(tuple_format_ber,
+		struct tuple *new_tuple = tuple_update(tuple_format_default,
 			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		return tuple_bless(new_tuple);
@@ -900,7 +910,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const char *expr_en
 {
 	try {
 		RegionGuard region_guard(&fiber()->gc);
-		struct tuple *new_tuple = tuple_upsert(tuple_format_ber,
+		struct tuple *new_tuple = tuple_upsert(tuple_format_default,
 			region_aligned_alloc_xc_cb, &fiber()->gc, tuple,
 			expr, expr_end, 1);
 		return tuple_bless(new_tuple);

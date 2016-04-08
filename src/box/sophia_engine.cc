@@ -141,7 +141,7 @@ sophia_tuple_new(void *obj, struct key_def *key_def,
 	d = sophia_write_parts(key_def, value, valuesize, parts, d);
 	assert(tuple->data + size == d);
 	try {
-		tuple_init_field_map(format, tuple, (uint32_t *)tuple);
+		tuple_init_field_map(format, tuple);
 	} catch (Exception *e) {
 		tuple_delete(tuple);
 		throw;

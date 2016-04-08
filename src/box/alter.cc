@@ -1151,15 +1151,12 @@ AddIndex::alter(struct alter_space *alter)
 	/* Build the new index. */
 	struct tuple *tuple;
 	struct tuple_format *format = alter->new_space->format;
-	char *field_map = ((char *) region_alloc_xc(&fiber()->gc,
-						    format->field_map_size) +
-			   format->field_map_size);
 	while ((tuple = it->next(it))) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		tuple_init_field_map(format, tuple, (uint32_t *) field_map);
+		tuple_validate(format, tuple);
 		/*
 		 * @todo: better message if there is a duplicate.
 		 */

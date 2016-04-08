@@ -334,7 +334,7 @@ extern struct tuple_format **tuple_formats;
  * Default format for a tuple which does not belong
  * to any space and is stored in memory.
  */
-extern struct tuple_format *tuple_format_ber;
+extern struct tuple_format *tuple_format_default;
 
 static inline uint32_t
 tuple_format_id(struct tuple_format *format)
@@ -426,8 +426,7 @@ tuple_alloc(struct tuple_format *format, size_t size);
  * Throws an error if tuple data does not match the format.
  */
 void
-tuple_init_field_map(struct tuple_format *format,
-		     struct tuple *tuple, uint32_t *field_map);
+tuple_init_field_map(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Free the tuple.
@@ -435,6 +434,13 @@ tuple_init_field_map(struct tuple_format *format,
  */
 void
 tuple_delete(struct tuple *tuple);
+
+/**
+ * Check tuple data correspondence to space format;
+ * throw proper exception if smth wrong.
+ */
+void
+tuple_validate(struct tuple_format *format, struct tuple *tuple);
 
 /**
  * Check tuple data correspondence to space format;
