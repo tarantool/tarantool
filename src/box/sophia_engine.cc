@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 #include "sophia_index.h"
+
+#include <sys/uio.h> /* struct iovec */
+
 #include "sophia_engine.h"
 #include "coeio.h"
 #include "coio.h"
@@ -59,6 +62,114 @@
 struct cord *worker_pool;
 static int worker_pool_size;
 static volatile int worker_pool_run;
+
+static inline uint32_t
+sophia_get_parts(struct key_def *key_def, void *obj, void *value, int valuesize,
+		 struct iovec *parts, uint32_t *field_count)
+{
+	/* prepare keys */
+	int size = 0;
+	assert(key_def->part_count <= 8);
+	static const char *PARTNAMES[] = {
+		"key", "key_1", "key_2", "key_3",
+		"key_4", "key_5", "key_6", "key_7"
+	};
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		int len = 0;
+		parts[i].iov_base = sp_getstring(obj, PARTNAMES[i], &len);
+		parts[i].iov_len = len;
+		assert(parts[i].iov_base != NULL);
+		switch (key_def->parts[i].type) {
+		case STRING:
+			size += mp_sizeof_str(len);
+			break;
+		case NUM:
+			size += mp_sizeof_uint(load_u64(parts[i].iov_base));
+			break;
+		default:
+			assert(0);
+		}
+	}
+	int count = key_def->part_count;
+	void *valueend = (char *) value + valuesize;
+	while (value < valueend) {
+		count++;
+		mp_next((const char **)&value);
+	}
+	size += mp_sizeof_array(count);
+	size += valuesize;
+	*field_count = count;
+	return size;
+}
+
+static inline char *
+sophia_write_parts(struct key_def *key_def, void *value, int valuesize,
+		   struct iovec *parts, char *p)
+{
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		switch (key_def->parts[i].type) {
+		case STRING:
+			p = mp_encode_str(p, (const char *) parts[i].iov_base,
+					  parts[i].iov_len);
+			break;
+		case NUM:
+			p = mp_encode_uint(p, load_u64(parts[i].iov_base));
+			break;
+		default:
+			assert(0);
+		}
+	}
+	memcpy(p, value, valuesize);
+	return p + valuesize;
+}
+
+struct tuple *
+sophia_tuple_new(void *obj, struct key_def *key_def,
+		 struct tuple_format *format)
+{
+	assert(format);
+	assert(key_def->part_count <= 8);
+	struct iovec parts[8];
+	int valuesize = 0;
+	void *value = sp_getstring(obj, "value", &valuesize);
+	uint32_t field_count = 0;
+	size_t size = sophia_get_parts(key_def, obj, value, valuesize, parts,
+				       &field_count);
+	struct tuple *tuple = tuple_alloc(format, size);
+	char *d = tuple->data;
+	d = mp_encode_array(d, field_count);
+	d = sophia_write_parts(key_def, value, valuesize, parts, d);
+	assert(tuple->data + size == d);
+	try {
+		tuple_init_field_map(format, tuple, (uint32_t *)tuple);
+	} catch (Exception *e) {
+		tuple_delete(tuple);
+		throw;
+	}
+	return tuple;
+}
+
+static char *
+sophia_tuple_data_new(void *obj, struct key_def *key_def, uint32_t *bsize)
+{
+	assert(key_def->part_count <= 8);
+	struct iovec parts[8];
+	int valuesize = 0;
+	void *value = sp_getstring(obj, "value", &valuesize);
+	uint32_t field_count = 0;
+	size_t size = sophia_get_parts(key_def, obj, value, valuesize, parts,
+				       &field_count);
+	char *tuple_data = (char *) malloc(size);
+	if (tuple_data == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "tuple");
+	char *d = tuple_data;
+	d = mp_encode_array(d, field_count);
+	d = sophia_write_parts(key_def, value, valuesize, parts, d);
+	assert(tuple_data + size == d);
+	sophia_write_parts(key_def, value, valuesize, parts, d);
+	*bsize = size;
+	return tuple_data;
+}
 
 static void*
 sophia_worker(void *env)
