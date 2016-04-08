@@ -751,17 +751,14 @@ SophiaEngine::beginCheckpoint(int64_t lsn)
 	if (lsn != m_prev_checkpoint_lsn) {
 		sophia_snapshot(env, lsn);
 		m_checkpoint_lsn = lsn;
-		return 0;
 	}
-	errno = EEXIST;
-	return -1;
+	return 0;
 }
 
 int
 SophiaEngine::waitCheckpoint()
 {
-	assert(m_checkpoint_lsn != -1);
-	if (! worker_pool_run)
+	if (m_checkpoint_lsn == -1 || ! worker_pool_run)
 		return 0;
 	while (! sophia_snapshot_ready(env, m_checkpoint_lsn))
 		fiber_yield_timeout(.020);
@@ -771,10 +768,12 @@ SophiaEngine::waitCheckpoint()
 void
 SophiaEngine::commitCheckpoint()
 {
-	if (m_prev_checkpoint_lsn >= 0)
-		sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
-	m_prev_checkpoint_lsn = m_checkpoint_lsn;
-	m_checkpoint_lsn = -1;
+	if (m_checkpoint_lsn >= 0) {
+		if (m_prev_checkpoint_lsn >= 0)
+			sophia_delete_checkpoint(env, m_prev_checkpoint_lsn);
+		m_prev_checkpoint_lsn = m_checkpoint_lsn;
+		m_checkpoint_lsn = -1;
+	}
 }
 
 void

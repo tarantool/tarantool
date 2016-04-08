@@ -255,6 +255,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 
 #include "key_def.h" /* for enum field_type */
 #include "tuple_update.h"
+#include "errinj.h"
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
@@ -275,53 +276,57 @@ extern struct slab_arena memtx_arena;
 /**
  * @brief In-memory tuple format
  */
+
+/**
+ * @brief Tuple field format
+ * Support structure for struct tuple_format.
+ * Contains information of one field.
+ */
+struct tuple_field_format {
+	/**
+	 * Field type of an indexed field.
+	 * If a field participates in at least one of space indexes
+	 * then its type is stored in this member.
+	 * If a field does not participate in an index
+	 * then UNKNOWN is stored for it.
+	 */
+	enum field_type type;
+	/**
+	 * Offset slot in field map in tuple.
+	 * Normally tuple stores field map - offsets of all fields
+	 * participating in indexes. This allows quick access to most
+	 * used fields without parsing entire mspack.
+	 * This member stores position in the field map of tuple
+	 * for current field.
+	 * If the field does not participate in indexes then it has
+	 * no offset in field map and INT_MAX is stored in this member.
+	 * Due to specific field map in tuple (it is stored before tuple),
+	 * the positions in field map is negative.
+	 * Thus if this member is negative, smth like
+	 * tuple->data[((uint32_t *)tuple)[format->offset_slot[fieldno]]]
+	 * gives the start of the field
+	 */
+	int32_t offset_slot;
+};
+
+/**
+ * @brief Tuple format
+ * Tuple format describes how tuple is stored and information about its fields
+ */
 struct tuple_format {
 	uint16_t id;
 	/* Format objects are reference counted. */
 	int refs;
-	/**
-	 * Max field no which participates in any of the space
-	 * indexes. Each tuple of this format must have,
-	 * therefore, at least max_fieldno fields.
-	 *
-	 */
-	uint32_t max_fieldno;
-	/* Length of 'types' and 'offset' arrays. */
+	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/**
-	 * Field types of indexed fields. This is an array of size
-	 * field_count. If there are gaps, i.e. fields that do not
-	 * participate in any index and thus we cannot infer their
-	 * type, then respective array members have value UNKNOWN.
-	 */
-	enum field_type *types;
-	/**
-	 * Each tuple has an area with field offsets. This area
-	 * is located in front of the tuple. It is used to quickly
-	 * find field start inside tuple data. This area only
-	 * stores offsets of fields preceded with fields of
-	 * dynamic length. If preceding fields have a fixed
-	 * length, field offset can be calculated once for all
-	 * tuples and thus is stored directly in the format object.
-	 * The variable below stores the size of field map in the
-	 * tuple, *in bytes*.
+	 * Size of field map of tuple in bytes.
+	 * See tuple_field_format::ofset for details//
 	 */
 	uint32_t field_map_size;
-	/**
-	 * For each field participating in an index, the format
-	 * may either store the fixed offset of the field
-	 * (identical in all tuples with this format), or an
-	 * offset in the dynamic offset map (field_map), which,
-	 * in turn, stores the offset of the field (such offset is
-	 * varying between different tuples of the same format).
-	 * If an offset is fixed, it's positive, so that
-	 * tuple->data[format->offset[fieldno] gives the
-	 * start of the field.
-	 * If it is varying, it's negative, so that
-	 * tuple->data[((uint32_t *) * tuple)[format->offset[fieldno]]]
-	 * gives the start of the field.
-	 */
-	int32_t offset[0];
+
+	/* Formats of the fields */
+	struct tuple_field_format fields[];
 };
 
 extern struct tuple_format **tuple_formats;
@@ -562,12 +567,13 @@ tuple_field_old(const struct tuple_format *format,
 			return pos;
 		}
 
-		if (format->offset[i] != INT32_MIN) {
+		if (format->fields[i].offset_slot != INT32_MAX) {
 			uint32_t *field_map = (uint32_t *) tuple;
-			int32_t idx = format->offset[i];
-			return tuple->data + field_map[idx];
+			int32_t slot = format->fields[i].offset_slot;
+			return tuple->data + field_map[slot];
 		}
 	}
+	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
 	return tuple_field_raw(tuple->data, tuple->bsize, i);
 }
 
