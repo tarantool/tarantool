@@ -80,7 +80,9 @@ for login, a password, a host name or host IP address, and a port number. Only
 the port number is always mandatory. The password is mandatory if the user
 name is specified, unless the user name is 'guest'. So, formally, the URI
 syntax is ``[host:]port`` or ``[username:password@]host:port``.
-If host is omitted, then 'localhost' is assumed.
+If host is omitted, then '0.0.0.0' or '[::]' is assumed,
+meaning respectively any IPv4 address or any IPv6 address,
+on the local machine.
 If username:password is omitted, then 'guest' is assumed. Some examples:
 
 .. _generic syntax for a URI schema: http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax
