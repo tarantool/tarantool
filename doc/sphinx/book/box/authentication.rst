@@ -342,8 +342,8 @@ purposes are:
 .. cssclass:: highlight
 .. parsed-literal::
 
-    box.session.uid()           -- returns the id of the current user
-    box.session.user()          -- returns the name of the current user
+    box.session.uid()         -- returns the id of the current user
+    box.session.user()        -- returns the name of the current user
     box.session.su(*user-name*) -- allows changing current user to 'user-name'
 
 If a user types requests directly on the Tarantool server in its interactive

@@ -74,8 +74,12 @@ array and as a map, then displays each result in hexadecimal.
     end
 
     msgpack = require('msgpack')
-    m1 = msgpack.encode(setmetatable({'A', 'B'}, { __serialize = "seq" }))
-    m2 = msgpack.encode(setmetatable({'A', 'B'}, { __serialize = "map" }))
+    m1 = msgpack.encode(setmetatable({'A', 'B'}, {
+                                 __serialize = "seq"
+                              }))
+    m2 = msgpack.encode(setmetatable({'A', 'B'}, {
+                                 __serialize = "map"
+                              }))
     print('array encoding: ', hexdump(m1))
     print('map encoding: ', hexdump(m2))
 
