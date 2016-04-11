@@ -167,6 +167,8 @@ If a primary server is started with:
 then there will be lines in the log file, containing the word "relay",
 when a replica connects or disconnects.
 
+.. _preventing-duplicate-actions:
+
 =====================================================================
                     Preventing Duplicate Actions
 =====================================================================

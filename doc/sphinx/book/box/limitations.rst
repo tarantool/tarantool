@@ -84,7 +84,7 @@
 
 **Number of replicas in a cluster**
 
-    32.
+    32 (``box.schema.REPLICA_MAX``).
 
 .. _lim_sophia:
 

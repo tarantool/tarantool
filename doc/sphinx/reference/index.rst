@@ -8,12 +8,12 @@
     :maxdepth: 1
 
     box
-    box_error
     clock
     console
     crypto
     csv
     digest
+    box_error
     expirationd
     fiber
     fiber-ipc
@@ -24,6 +24,7 @@
     log
     msgpack
     net_box
+    box_once
     pickle
     shard
     socket
