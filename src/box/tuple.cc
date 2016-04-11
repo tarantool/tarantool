@@ -35,13 +35,6 @@
 
 #include "fiber.h"
 
-/** Global table of tuple formats */
-struct tuple_format **tuple_formats;
-struct tuple_format *tuple_format_ber;
-static intptr_t recycled_format_ids = FORMAT_ID_NIL;
-
-static uint32_t formats_size, formats_capacity;
-
 uint32_t snapshot_version;
 
 struct quota memtx_quota;
@@ -66,156 +59,6 @@ static struct mempool tuple_iterator_pool;
  * \sa tuple_bless()
  */
 struct tuple *box_tuple_last;
-
-/** Extract all available type info from keys. */
-static void
-field_type_create(struct tuple_format *format, struct rlist *key_list)
-{
-	/* There may be fields between indexed fields (gaps). */
-	for (uint32_t i = 0; i < format->field_count; i++)
-		format->fields[i].type = UNKNOWN;
-
-	struct key_def *key_def;
-	/* extract field type info */
-	rlist_foreach_entry(key_def, key_list, link) {
-		for (uint32_t i = 0; i < key_def->part_count; i++) {
-			assert(key_def->parts[i].fieldno < format->field_count);
-			enum field_type set_type = key_def->parts[i].type;
-			enum field_type *fmt_type =
-				&format->fields[key_def->parts[i].fieldno].type;
-			if (*fmt_type != UNKNOWN && *fmt_type != set_type) {
-				tnt_raise(ClientError,
-					  ER_FIELD_TYPE_MISMATCH,
-					  key_def->name,
-					  i + INDEX_OFFSET,
-					  field_type_strs[set_type],
-					  field_type_strs[*fmt_type]);
-			}
-			*fmt_type = set_type;
-		}
-	}
-}
-
-static void
-tuple_format_register(struct tuple_format *format)
-{
-	if (recycled_format_ids != FORMAT_ID_NIL) {
-
-		format->id = (uint16_t) recycled_format_ids;
-		recycled_format_ids = (intptr_t) tuple_formats[recycled_format_ids];
-	} else {
-		if (formats_size == formats_capacity) {
-			uint32_t new_capacity = formats_capacity ?
-				formats_capacity * 2 : 16;
-			struct tuple_format **formats;
-			formats = (struct tuple_format **)
-				realloc(tuple_formats, new_capacity *
-					sizeof(tuple_formats[0]));
-			if (formats == NULL)
-				tnt_raise(OutOfMemory,
-					  sizeof(struct tuple_format),
-					  "malloc", "tuple_formats");
-
-			formats_capacity = new_capacity;
-			tuple_formats = formats;
-		}
-		if (formats_size == FORMAT_ID_MAX + 1) {
-			tnt_raise(LoggedError, ER_TUPLE_FORMAT_LIMIT,
-				  (unsigned) formats_capacity);
-		}
-		format->id = formats_size++;
-	}
-	tuple_formats[format->id] = format;
-}
-
-static void
-tuple_format_deregister(struct tuple_format *format)
-{
-	if (format->id == FORMAT_ID_NIL)
-		return;
-	tuple_formats[format->id] = (struct tuple_format *) recycled_format_ids;
-	recycled_format_ids = format->id;
-	format->id = FORMAT_ID_NIL;
-}
-
-static struct tuple_format *
-tuple_format_alloc(struct rlist *key_list)
-{
-	struct key_def *key_def;
-	uint32_t max_fieldno = 0;
-	uint32_t key_count = 0;
-
-	/* find max max field no */
-	rlist_foreach_entry(key_def, key_list, link) {
-		struct key_part *part = key_def->parts;
-		struct key_part *pend = part + key_def->part_count;
-		key_count++;
-		for (; part < pend; part++)
-			max_fieldno = MAX(max_fieldno, part->fieldno);
-	}
-	uint32_t field_count = key_count > 0 ? max_fieldno + 1 : 0;
-
-	uint32_t total = sizeof(struct tuple_format) +
-		field_count * sizeof(struct tuple_field_format);
-
-	struct tuple_format *format = (struct tuple_format *) malloc(total);
-
-	if (format == NULL)
-		tnt_raise(OutOfMemory, sizeof(struct tuple_format),
-			  "malloc", "tuple format");
-
-	format->refs = 0;
-	format->id = FORMAT_ID_NIL;
-	format->field_count = field_count;
-	return format;
-}
-
-void
-tuple_format_delete(struct tuple_format *format)
-{
-	tuple_format_deregister(format);
-	free(format);
-}
-
-struct tuple_format *
-tuple_format_new(struct rlist *key_list)
-{
-	struct tuple_format *format = tuple_format_alloc(key_list);
-
-	try {
-		tuple_format_register(format);
-		field_type_create(format, key_list);
-	} catch (Exception *e) {
-		tuple_format_delete(format);
-		throw;
-	}
-
-	/* Set up offset slots */
-	if (format->field_count == 0) {
-		/* Nothing to store */
-		format->field_map_size = 0;
-		return format;
-	}
-	/**
-	 * First field is always simply accessible,
-	 * so we don't store offset for it
-	 */
-	format->fields[0].offset_slot = INT32_MAX;
-
-	int current_slot = 0;
-	for (uint32_t i = 1; i < format->field_count; i++) {
-		/*
-		 * In the tuple, store only offsets necessary to
-		 * quickly access indexed fields.
-		 */
-		if (format->fields[i].type == UNKNOWN)
-			format->fields[i].offset_slot = INT32_MAX;
-		else
-			format->fields[i].offset_slot = --current_slot;
-	}
-	format->field_map_size = -current_slot * sizeof(uint32_t);
-	return format;
-}
 
 /*
  * Validate a new tuple format and initialize tuple-local
@@ -658,10 +501,7 @@ void
 tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	   uint32_t objsize_max, float alloc_factor)
 {
-	RLIST_HEAD(empty_list);
-	tuple_format_ber = tuple_format_new(&empty_list);
-	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_ber, 1);
+	tuple_format_init();
 
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
@@ -711,19 +551,6 @@ tuple_free()
 	}
 
 	mempool_destroy(&tuple_iterator_pool);
-
-	/* Clear recycled ids. */
-	while (recycled_format_ids != FORMAT_ID_NIL) {
-
-		uint16_t id = (uint16_t) recycled_format_ids;
-		recycled_format_ids = (intptr_t) tuple_formats[id];
-		tuple_formats[id] = NULL;
-	}
-	for (struct tuple_format **format = tuple_formats;
-	     format < tuple_formats + formats_size;
-	     format++)
-		free(*format); /* ignore the reference count. */
-	free(tuple_formats);
 }
 
 void
