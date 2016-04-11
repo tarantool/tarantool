@@ -30,7 +30,7 @@ blocks  :
       and multiplexed I/O produces an order of magnitude
       better results, when compared with traditional
       multi-threaded workloads. A tool we developed for our
-      own use, `nosqlbench <http://github.com/mailru/nosqlbench>`_,
+      own use, `nosqlbench <http://github.com/tarantool/nosqlbench>`_,
       utilizes this approach at full.
 
       However, to compare with the rest of the world,
@@ -61,7 +61,7 @@ blocks  :
       There are 6 major workload types in YCSB:
 
       - workload **A**, 50/50 update/read ratio, size of the \
-        data set is 200 000 key/value pairs,
+        data set is 2 000 000 key/value pairs,
       - workload **B**, 5/95 update/read ratio, the same size \
         of the data set,
       - workload **C** is 100% read-only,
@@ -74,9 +74,9 @@ blocks  :
       For additional information on YCSB and workload types, please visit
       `YCSB official page on Github <http://github.com/brianfrankcooper/YCSB>`_.
 
-      All charts below were measured using 1M queries per test,
+      All charts below were measured using 5M queries per test,
       averaged over 8 consecutive test runs.
 
       Configuration files for the tested systems can be found
-      `on its Github page <https://github.com/bigbes/ycsb-expand-db/tree/master/confs>`_.
+      `on its Github page <https://github.com/bigbes/autoycsb/tree/master/configs>`_.
 ...

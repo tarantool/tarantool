@@ -518,7 +518,7 @@ local function enter()
     if fio.stat(console_sock_path) == nil then
         log.error("Can't connect to %s (%s)", console_sock_path, errno.strerror())
         if not usermode and errno() == errno.EACCES then
-            log.error("Please add $USER to group '%s': useradd -a -G %s $USER",
+            log.error("Please add $USER to group '%s': usermod -a -G %s $USER",
                       group_name, group_name)
         end
         return -1
