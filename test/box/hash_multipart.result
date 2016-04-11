@@ -1,4 +1,4 @@
-dofile('utils.lua')
+utils = dofile('utils.lua')
 ---
 ...
 hash = box.schema.space.create('tweedledum')
@@ -59,7 +59,7 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-function box.select_all()
+function select_all()
     local result = {}
     local tuple, v
     for tuple, v in hash:pairs() do
@@ -73,7 +73,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-box.sort(box.select_all())
+utils.sort(select_all())
 ---
 - - [0, 'bar', 0, '', 3]
   - [0, 'bar', 1, '', 3]
@@ -83,6 +83,9 @@ box.sort(box.select_all())
   - [1, 'bar', 1, '', 4]
   - [1, 'foo', 0, '', 2]
   - [1, 'foo', 1, '', 2]
+...
+select_all = nil
+---
 ...
 -- primary index select
 hash.index['primary']:get{1, 'foo', 0}

@@ -34,8 +34,8 @@ box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
 box.error.raise()
-e
 e = box.error.last()
+e
 e:unpack()
 e.type
 e.code

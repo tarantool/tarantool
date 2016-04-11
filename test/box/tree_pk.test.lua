@@ -1,4 +1,4 @@
-dofile('utils.lua')
+utils = dofile('utils.lua')
 
 s0 = box.schema.space.create('tweedledum')
 i0 = s0:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
@@ -102,7 +102,7 @@ s1:insert{'abcdb__'}
 s1:insert{'abcdb___'}
 s1:insert{'abcdc'}
 s1:insert{'abcdc_'}
-box.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
+utils.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
 s1:drop()
 s1 = nil
 s2:drop()
@@ -195,9 +195,9 @@ s0:insert{4, 4, 0, 4}
 s0:insert{5, 5, 0, 5}
 s0:insert{6, 6, 0, 6}
 s0:replace{5, 5, 0, 5}
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 s0:delete{5}
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 
 s0:drop()
 s0 = nil

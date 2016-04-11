@@ -1,6 +1,3 @@
-dofile('utils.lua')
----
-...
 dofile('bitset.lua')
 ---
 ...

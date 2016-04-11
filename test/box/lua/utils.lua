@@ -61,7 +61,7 @@ function arithmetic(d, count)
 	end
 end
 
-function table.shuffle(t)
+function table_shuffle(t)
 	local n = #t
 	while n >= 2 do
 		local k = math.random(n)
@@ -70,7 +70,7 @@ function table.shuffle(t)
 	end
 end
 
-function table.generate(iter)
+function table_generate(iter)
 	local t = {};
 	for k in iter do
 		table.insert(t, k);
@@ -80,7 +80,7 @@ function table.generate(iter)
 end
 
 -- sort all rows as strings(not for tables);
-function box.sort(tuples)
+function sort(tuples)
     local function compare_tables(t1, t2)
         return (tostring(t1) < tostring(t2))
     end
@@ -89,7 +89,7 @@ function box.sort(tuples)
 end;
 
 -- return string tuple
-function box.tuple.to_string(tuple, yaml)
+function tuple_to_string(tuple, yaml)
     ans = '['
     for i = 0, #tuple - 1 do
         if #i == 4 then
@@ -110,3 +110,12 @@ function box.tuple.to_string(tuple, yaml)
     return ans
 end;
 
+return {
+    space_field_types = space_field_types;
+    iterate = iterate;
+    arithmetic = arithmetic;
+    table_generate = table_generate;
+    table_shuffle = table_shuffle;
+    sort = sort;
+    tuple_to_string = tuple_to_string;
+};

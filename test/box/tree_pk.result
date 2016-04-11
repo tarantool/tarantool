@@ -1,4 +1,4 @@
-dofile('utils.lua')
+utils = dofile('utils.lua')
 ---
 ...
 s0 = box.schema.space.create('tweedledum')
@@ -267,7 +267,7 @@ s1:insert{'abcdc_'}
 ---
 - ['abcdc_']
 ...
-box.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
+utils.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
 ---
 - - ['abcdb']
   - ['abcdb_']
@@ -542,7 +542,7 @@ s0:replace{5, 5, 0, 5}
 ---
 - [5, 5, 0, 5]
 ...
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 ---
 - - [0, 0, 0, 0]
   - [4, 4, 0, 4]
@@ -553,7 +553,7 @@ s0:delete{5}
 ---
 - [5, 5, 0, 5]
 ...
-box.sort(s0.index['i2']:select(0))
+utils.sort(s0.index['i2']:select(0))
 ---
 - - [0, 0, 0, 0]
   - [4, 4, 0, 4]

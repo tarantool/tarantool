@@ -66,12 +66,10 @@ t
   - rollback
   - runtime
   - schema
-  - select_all
   - session
   - slab
   - snapshot
   - sophia
-  - sort
   - space
   - stat
   - tuple
@@ -109,12 +107,12 @@ box.error.raise()
 ---
 - error: Illegal parameters, bla bla
 ...
-e
----
-- error: '[string "return e "]:1: variable ''e'' is not declared'
-...
 e = box.error.last()
 ---
+...
+e
+---
+- Illegal parameters, bla bla
 ...
 e:unpack()
 ---

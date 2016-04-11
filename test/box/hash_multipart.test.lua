@@ -1,4 +1,4 @@
-dofile('utils.lua')
+utils = dofile('utils.lua')
 
 hash = box.schema.space.create('tweedledum')
 tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'num', 2, 'str', 3, 'num'}, unique = true })
@@ -21,7 +21,7 @@ hash:insert{1, 'bar', 1, '', 5}
 env = require('test_run')
 test_run = env.new()
 test_run:cmd("setopt delimiter ';'")
-function box.select_all()
+function select_all()
     local result = {}
     local tuple, v
     for tuple, v in hash:pairs() do
@@ -30,7 +30,8 @@ function box.select_all()
     return result
 end;
 test_run:cmd("setopt delimiter ''");
-box.sort(box.select_all())
+utils.sort(select_all())
+select_all = nil
 
 -- primary index select
 hash.index['primary']:get{1, 'foo', 0}

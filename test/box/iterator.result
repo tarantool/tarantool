@@ -1,4 +1,4 @@
-dofile('utils.lua')
+iterate = dofile('utils.lua').iterate
 ---
 ...
 test_run = require('test_run').new()
@@ -1123,5 +1123,8 @@ l
 - []
 ...
 space:drop()
+---
+...
+iterate = nil
 ---
 ...

@@ -1,4 +1,4 @@
-dofile('utils.lua')
+iterate = dofile('utils.lua').iterate
 
 test_run = require('test_run').new()
 test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
@@ -253,3 +253,4 @@ l
 l = space:select(l[#l][1], {limit=2, iterator="GT"})
 l
 space:drop()
+iterate = nil

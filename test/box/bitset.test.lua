@@ -1,4 +1,3 @@
-dofile('utils.lua')
 dofile('bitset.lua')
 
 create_space()
