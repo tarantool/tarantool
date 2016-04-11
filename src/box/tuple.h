@@ -32,6 +32,8 @@
  */
 #include "trivia/util.h"
 
+#include "tuple_format.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -257,14 +259,7 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 #include "tuple_update.h"
 #include "errinj.h"
 
-enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
-enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
-/*
- * We don't pass INDEX_OFFSET around dynamically all the time,
- * at least hard code it so that in most cases it's a nice error
- * message
- */
-enum { INDEX_OFFSET = 1 };
+enum { TUPLE_REF_MAX = UINT16_MAX };
 
 /** Common quota for tuples and indexes */
 extern struct quota memtx_quota;
@@ -272,102 +267,6 @@ extern struct quota memtx_quota;
 extern struct small_alloc memtx_alloc;
 /** Tuple slab arena */
 extern struct slab_arena memtx_arena;
-
-/**
- * @brief In-memory tuple format
- */
-
-/**
- * @brief Tuple field format
- * Support structure for struct tuple_format.
- * Contains information of one field.
- */
-struct tuple_field_format {
-	/**
-	 * Field type of an indexed field.
-	 * If a field participates in at least one of space indexes
-	 * then its type is stored in this member.
-	 * If a field does not participate in an index
-	 * then UNKNOWN is stored for it.
-	 */
-	enum field_type type;
-	/**
-	 * Offset slot in field map in tuple.
-	 * Normally tuple stores field map - offsets of all fields
-	 * participating in indexes. This allows quick access to most
-	 * used fields without parsing entire mspack.
-	 * This member stores position in the field map of tuple
-	 * for current field.
-	 * If the field does not participate in indexes then it has
-	 * no offset in field map and INT_MAX is stored in this member.
-	 * Due to specific field map in tuple (it is stored before tuple),
-	 * the positions in field map is negative.
-	 * Thus if this member is negative, smth like
-	 * tuple->data[((uint32_t *)tuple)[format->offset_slot[fieldno]]]
-	 * gives the start of the field
-	 */
-	int32_t offset_slot;
-};
-
-/**
- * @brief Tuple format
- * Tuple format describes how tuple is stored and information about its fields
- */
-struct tuple_format {
-	uint16_t id;
-	/* Format objects are reference counted. */
-	int refs;
-	/* Length of 'fields' array. */
-	uint32_t field_count;
-	/**
-	 * Size of field map of tuple in bytes.
-	 * See tuple_field_format::ofset for details//
-	 */
-	uint32_t field_map_size;
-
-	/* Formats of the fields */
-	struct tuple_field_format fields[];
-};
-
-extern struct tuple_format **tuple_formats;
-/**
- * Default format for a tuple which does not belong
- * to any space and is stored in memory.
- */
-extern struct tuple_format *tuple_format_ber;
-
-static inline uint32_t
-tuple_format_id(struct tuple_format *format)
-{
-	assert(tuple_formats[format->id] == format);
-	return format->id;
-}
-
-/**
- * @brief Allocate, construct and register a new in-memory tuple
- *	 format.
- * @param space description
- *
- * @return tuple format or raise an exception on error
- */
-struct tuple_format *
-tuple_format_new(struct rlist *key_list);
-
-/** Delete a format with zero ref count. */
-void
-tuple_format_delete(struct tuple_format *format);
-
-static inline void
-tuple_format_ref(struct tuple_format *format, int count)
-{
-	assert(format->refs + count >= 0);
-	assert((uint64_t)format->refs + count <= FORMAT_REF_MAX);
-
-	format->refs += count;
-	if (format->refs == 0)
-		tuple_format_delete(format);
-
-};
 
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
@@ -509,7 +408,7 @@ struct TupleRefNil {
 static inline struct tuple_format *
 tuple_format(const struct tuple *tuple)
 {
-	struct tuple_format *format = tuple_formats[tuple->format_id];
+	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
 	assert(tuple_format_id(format) == tuple->format_id);
 	return format;
 }
