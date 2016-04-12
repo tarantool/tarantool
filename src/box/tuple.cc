@@ -561,6 +561,8 @@ tuple_free()
 	}
 
 	mempool_destroy(&tuple_iterator_pool);
+
+	tuple_format_free();
 }
 
 void
