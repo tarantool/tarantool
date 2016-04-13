@@ -235,21 +235,18 @@ space_check_update(struct space *space,
 			  index_name(index), space_name(space));
 }
 
-int
+void
 space_truncate(struct space *space)
 {
-	assert(space);
-
 	if (!space_index(space, 0)) {
 		/* empty space without indexes, nothing to truncate */
-		return 0;
+		return;
 	}
 
-	char key_buf_begin[20];
-	char *key_buf_end = key_buf_begin;
-	const char *key_curr, *record_end, *record_begin;
-	int rc = 0;
-	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+	char key_buf[20];
+	char *key_buf_end;
+	key_buf_end = mp_encode_uint(key_buf, space_id(space));
+	assert(key_buf_end <= key_buf + sizeof(key_buf));
 
 	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
 	struct space *space_index = space_cache_find(BOX_INDEX_ID);
@@ -258,52 +255,41 @@ space_truncate(struct space *space)
 	auto guard_it_free = make_scoped_guard([=]{
 		it->free(it);
 	});
-	index->initIterator(it, ITER_EQ, key_buf_begin, 1);
-	it->space_id = BOX_INDEX_ID;
-	it->index_id = 0;
-	it->index = index;
-	it->sc_version = sc_version;
-	int cp = 0;
-	struct tuple *tpl[BOX_INDEX_MAX], *tmp_tpl; /* max count of idexes*/
-	memset(tpl, 0, sizeof(tpl));
+	index->initIterator(it, ITER_EQ, key_buf, 1);
+	int index_count = 0;
+	struct tuple *indexes[BOX_INDEX_MAX]; /* max count of idexes*/
+	struct tuple *tuple;
+
 	/* select all indexes of given space */
-	auto guard_tpl_unref = make_scoped_guard([=]{
-		for (int cp = BOX_INDEX_MAX - 1; cp >= 0; --cp) {
-			if (tpl[cp]) {
-				box_tuple_unref(tpl[cp]);
-			}
-		}
+	auto guard_indexes_unref = make_scoped_guard([=]{
+		for (int i = 0; i < index_count; i++)
+			tuple_unref(indexes[i]);
 	});
-	while (cp < BOX_INDEX_MAX && (tmp_tpl = it->next(it))) {
-		box_tuple_ref(tmp_tpl);
-		tpl[cp] = tmp_tpl;
-		cp++;
+	while ((tuple = it->next(it)) != NULL) {
+		tuple_ref(tuple);
+		indexes[index_count++] = tuple;
 	}
+	assert(index_count <= BOX_INDEX_MAX);
 
 	/* drop all selected indexes */
-	for (int i = cp - 1; i >= 0; --i) {
-		key_curr = tpl[i]->data;
-		mp_decode_array(&key_curr);
-		key_buf_end = mp_encode_array(key_buf_begin, 2);
-		key_buf_end = mp_encode_uint(key_buf_end, mp_decode_uint(&key_curr));
-		key_buf_end = mp_encode_uint(key_buf_end, mp_decode_uint(&key_curr));
-
-		rc = box_delete(BOX_INDEX_ID, 0, key_buf_begin, key_buf_end, NULL);
-		if (rc != 0) {
-			return rc;
-		}
+	for (int i = index_count - 1; i >= 0; --i) {
+		uint32_t index_id = tuple_field_u32(indexes[i], 1);
+		key_buf_end = mp_encode_array(key_buf, 2);
+		key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+		key_buf_end = mp_encode_uint(key_buf_end, index_id);
+		assert(key_buf_end <= key_buf + sizeof(key_buf));
+		if (box_delete(BOX_INDEX_ID, 0, key_buf, key_buf_end, NULL))
+			diag_raise();
 	}
 
 	/* create all indexes again, now they are empty */
-	for (int i = 0; i < cp; ++i) {
-		record_begin = tpl[i]->data;
-		record_end = tpl[i]->data + tpl[i]->bsize;
-		rc = box_insert(BOX_INDEX_ID, record_begin, record_end, NULL);
-		if (rc != 0) {
-			return rc;
+	for (int i = 0; i < index_count; i++) {
+		tuple = indexes[i];
+		if (box_insert(BOX_INDEX_ID, tuple->data,
+			       tuple->data + tuple->bsize, NULL)) {
+			diag_raise();
 		}
 	}
-	return rc;
 }
 
 /* vim: set fm=marker */

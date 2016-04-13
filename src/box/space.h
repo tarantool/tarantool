@@ -229,7 +229,7 @@ space_check_update(struct space *space,
 		   struct tuple *new_tuple);
 
 /** Truncate given index. **/
-int
+void
 space_truncate(struct space *space);
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */
