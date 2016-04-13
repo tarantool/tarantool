@@ -1,5 +1,5 @@
 TAP version 13
-1..39
+1..40
 ok - box is not started
 ok - invalid replication_source
 ok - invalid wal_mode
@@ -39,3 +39,4 @@ ok - logger_nonblock default value
 ok - logger_nonblock new value
 ok - dynamic listen
 ok - dynamic listen
+ok - reuse unix socket
