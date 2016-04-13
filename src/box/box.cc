@@ -523,8 +523,19 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	}
 	va_end(ap);
 	assert(data <= buf + sizeof(buf));
-	request->tuple = request->key = buf;
-	request->tuple_end = request->key_end = data;
+	switch (type) {
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+		request->tuple = buf;
+		request->tuple_end = data;
+		break;
+	case IPROTO_DELETE:
+		request->key = buf;
+		request->key_end = data;
+		break;
+	default:
+		assert(0);
+	}
 	process_rw(request, NULL);
 }
 
