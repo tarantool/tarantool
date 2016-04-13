@@ -916,6 +916,8 @@ net_cord_f(va_list /* ap */)
 	 * connections.
 	 */
 	fiber_yield();
+	if (evio_service_is_active(&binary))
+		evio_service_stop(&binary);
 
 	rmean_delete(rmean_net);
 	cbus_leave(&net_tx_bus);

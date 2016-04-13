@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(40)
+test:plan(41)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -181,6 +181,10 @@ test:isnt(s, nil, "reuse unix socket")
 if s then s:close() end
 box.cfg{ listen = '' }
 os.remove(path2)
+
+code = " box.cfg{ listen='unix/:'" .. path .. "' } "
+run_script(code)
+test:isnil(fio.stat(path), "delete socket at exit")
 
 test:check()
 os.exit(0)
