@@ -49,9 +49,10 @@ struct SophiaEngine: public Engine {
 	virtual void rollbackStatement(struct txn_stmt *stmt) override;
 	virtual void rollback(struct txn *txn) override;
 	virtual void beginJoin() override;
+	virtual void beginWalRecovery() override;
 	virtual void recoverToCheckpoint(int64_t) override;
 	virtual void endRecovery() override;
-	virtual void join(struct xstream *stream, struct vclock *vclock) override;
+	virtual void join(struct xstream *stream) override;
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 	virtual void commitCheckpoint() override;

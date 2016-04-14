@@ -1,6 +1,9 @@
 box.schema.user.grant('guest', 'replication')
 ---
 ...
+-------------------------------------------------------------
+gh-484: JOIN doesn't save data to snapshot with TREE index
+-------------------------------------------------------------
 space = box.schema.space.create('test', {id =  42})
 ---
 ...
@@ -9,24 +12,6 @@ index = space:create_index('primary', { type = 'tree'})
 ...
 for k = 1, 9 do space:insert{k, k*k} end
 ---
-...
--------------------------------------------------------------
-replica test 1 (no such space)
--------------------------------------------------------------
-box.space.test
----
-- null
-...
-box_cfg_done
----
-- false
-...
--------------------------------------------------------------
-replica JOIN
--------------------------------------------------------------
-box.snapshot()
----
-- ok
 ...
 box.space.test:select()
 ---

@@ -62,7 +62,8 @@ struct recovery {
 };
 
 struct recovery *
-recovery_new(const char *wal_dirname, bool panic_on_wal_error);
+recovery_new(const char *wal_dirname, bool panic_on_wal_error,
+	     struct vclock *vclock);
 
 void
 recovery_delete(struct recovery *r);
@@ -102,6 +103,20 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row);
  */
 int
 recovery_last_checkpoint(struct vclock *vclock);
+
+/**
+ * Find out if there are new .xlog files since the current
+ * vclock, and read them all up.
+ *
+ * Reading will be stopped on reaching stop_vclock.
+ * Use NULL for boundless recover
+ *
+ * This function will not close r->current_wal if
+ * recovery was successful.
+ */
+void
+recover_remaining_wals(struct recovery *r, struct xstream *stream,
+		       struct vclock *stop_vclock);
 
 #if defined(__cplusplus)
 } /* extern "C" */

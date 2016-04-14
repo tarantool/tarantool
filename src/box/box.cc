@@ -79,7 +79,8 @@ static bool box_init_done = false;
 static bool is_ro = true;
 
 /* Use the shared instance of xstream for all appliers */
-static struct xstream join_stream;
+static struct xstream initial_join_stream;
+static struct xstream final_join_stream;
 static struct xstream subscribe_stream;
 
 static void
@@ -229,7 +230,7 @@ wal_stream_create(struct wal_stream *ctx, size_t rows_per_wal)
 }
 
 static void
-apply_join_row(struct xstream *stream, struct xrow_header *row)
+apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	if (row->type != IPROTO_INSERT) {
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -359,7 +360,8 @@ cfg_get_replication_source(int *p_count)
 	for (int i = 0; i < count; i++) {
 		const char *source = cfg_getarr_elem("replication_source", i);
 		struct applier *applier = applier_new(source,
-						      &join_stream,
+						      &initial_join_stream,
+						      &final_join_stream,
 						      &subscribe_stream);
 		if (applier == NULL) {
 			/* Delete created appliers */
@@ -899,6 +901,45 @@ box_process_eval(struct request *request, struct obuf *out)
 void
 box_process_join(struct ev_io *io, struct xrow_header *header)
 {
+	/*
+	 * Tarantool 1.7 JOIN protocol diagram (gh-1113)
+	 * =============================================
+	 *
+	 * Replica => Master
+	 *
+	 * => JOIN { SERVER_UUID: replica_uuid }
+	 * <= OK { VCLOCK: start_vclock }
+	 *    Replica has enough permissions and master is ready for JOIN.
+	 *     - start_vclock - vclock of the latest master's checkpoint.
+	 *
+	 * <= INSERT
+	 *    ...
+	 *    Initial data: a stream of engine-specifc rows, e.g. snapshot
+	 *    rows for memtx or dirty cursor data for Sophia. Engine can
+	 *    use SERVER_ID, LSN and other fields for internal purposes.
+	 *    ...
+	 * <= INSERT
+	 * <= OK { VCLOCK: stop_vclock } - end of initial JOIN stage.
+	 *     - `stop_vclock` - master's vclock after initial stage.
+	 *
+	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { SERVER_ID, LSN }
+	 *    ...
+	 *    Final data: a stream of WAL rows from `start_vclock` to
+	 *    `stop_vclock`, inclusive. SERVER_ID and LSN fields are
+	 *    original values from WAL and master-master replication.
+	 *    ...
+	 * <= INSERT/REPLACE/UPDATE/UPSERT/DELETE { SERVER_ID, LSN }
+	 * <= OK { VCLOCK: current_vclock } - end of final JOIN stage.
+	 *      - `current_vclock` - master's vclock after final stage.
+	 *
+	 * All packets must have the same SYNC value as initial JOIN request.
+	 * Master can send ERROR at any time. Replica doesn't confirm rows
+	 * by OKs. Either initial or final stream includes:
+	 *  - Cluster UUID in _schema space
+	 *  - Registration of master in _cluster space
+	 *  - Registration of the new replica in _cluster space
+	 */
+
 	assert(header->type == IPROTO_JOIN);
 
 	/* Check permissions */
@@ -908,13 +949,25 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Check that we actually can register a new replica */
 	box_check_writable();
 
+	/* Decode JOIN request */
 	struct tt_uuid server_uuid = uuid_nil;
 	xrow_decode_join(header, &server_uuid);
 
-	struct vclock join_vclock;
+	/* Remember start vclock. */
+	struct vclock start_vclock;
+	recovery_last_checkpoint(&start_vclock);
 
-	/* Process JOIN request via a replication relay */
-	relay_join(io->fd, header->sync, &join_vclock);
+	/* Respond to JOIN request with start_vclock. */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &start_vclock);
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
+
+	/*
+	 * Initial stream: feed replica with dirty data from engines.
+	 */
+	relay_initial_join(io->fd, header->sync);
+	say_info("initial data sent.");
 
 	/**
 	 * Call the server-side hook which stores the replica uuid
@@ -924,18 +977,25 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 */
 	box_on_cluster_join(&server_uuid);
 
+	/* Remember master's vclock after the last request */
+	struct vclock stop_vclock;
+	/* TODO: use WAL vclock instead of TX vclock */
+	vclock_copy(&stop_vclock, &recovery->vclock);
+
+	/* Send end of initial stage data marker */
+	xrow_encode_vclock(&row, &stop_vclock);
+	row.sync = header->sync;
+	coio_write_xrow(io, &row);
+
 	/*
-	 * Send a response to JOIN request, an indicator of the
-	 * end of the stream of snapshot rows.
+	 * Final stage: feed replica with WALs in range
+	 * (start_vclock, stop_vclock).
 	 */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, &join_vclock);
-	/*
-	 * Identify the message with the server id of this
-	 * server, this is the only way for a replica to find
-	 * out the id of the server it has connected to.
-	 */
-	row.server_id = recovery->server_id;
+	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	say_info("final data sent.");
+
+	/* Send end of WAL stream marker */
+	xrow_encode_vclock(&row, &recovery->vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -1104,26 +1164,51 @@ bootstrap_cluster(void)
 
 /**
  * Bootstrap from the remote master
+ * \pre  master->applier->state == APPLIER_CONNECTED
+ * \post master->applier->state == APPLIER_CONNECTED
  */
 static void
 bootstrap_from_master(struct server *master)
 {
-	assert(master->applier != NULL);
+	struct applier *applier = master->applier;
+	assert(applier != NULL);
+	assert(applier->state == APPLIER_CONNECTED);
+
+	/*
+	 * Send JOIN request to master
+	 * See box_process_join().
+	 */
 
 	/* Generate Server-UUID */
 	tt_uuid_create(&SERVER_ID);
+	applier_resume_to_state(applier, APPLIER_INITIAL_JOIN, TIMEOUT_INFINITY);
 
-	/* Initialize a new replica */
+	/*
+	 * Process initial data (snapshot or dirty disk data).
+	 */
 	engine_begin_join();
 
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&recovery->vclock, 0);
 
-	/* Download and process a data snapshot from master */
-	applier_bootstrap(master->applier);
+	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+
+	/*
+	 * Process final data (WALs).
+	 */
+	engine_begin_wal_recovery();
+
+	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
 	/* Replace server vclock using master's vclock */
-	vclock_copy(&recovery->vclock, &master->applier->vclock);
+	vclock_copy(&recovery->vclock, &applier->vclock);
+
+	/* Finalize the new replica */
+	engine_end_join();
+
+	/* Switch applier to initial state */
+	applier_resume_to_state(applier, APPLIER_CONNECTED, TIMEOUT_INFINITY);
+	assert(applier->state == APPLIER_CONNECTED);
 }
 
 static void
@@ -1172,24 +1257,33 @@ box_init(void)
 
 	title("loading");
 
-	/* recovery initialization */
-	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("panic_on_wal_error"));
 	box_set_too_long_threshold();
+
 	/*
 	 * Initialize the cluster registry using replication_source,
 	 * but don't start replication right now.
 	 */
-	xstream_create(&join_stream, apply_join_row);
+	xstream_create(&initial_join_stream, apply_initial_join_row);
+	xstream_create(&final_join_stream, apply_row);
 	xstream_create(&subscribe_stream, apply_subscribe_row);
 	box_sync_replication_source();
 
-	int64_t lsn = recovery_last_checkpoint(NULL);
+	struct vclock checkpoint_vclock;
+	int64_t lsn = recovery_last_checkpoint(&checkpoint_vclock);
 	if (lsn != -1) {
+		recovery = recovery_new(cfg_gets("wal_dir"),
+					cfg_geti("panic_on_wal_error"),
+					&checkpoint_vclock);
 		/* Tell Sophia engine LSN it must recover to. */
 		engine_recover_to_checkpoint(lsn);
+		engine_begin_wal_recovery();
 	} else {
-		 bootstrap();
+		/* TODO: don't create recovery for this case */
+		vclock_create(&checkpoint_vclock);
+		recovery = recovery_new(cfg_gets("wal_dir"),
+					cfg_geti("panic_on_wal_error"),
+					&checkpoint_vclock);
+		bootstrap();
 	}
 	fiber_gc();
 

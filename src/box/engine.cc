@@ -126,10 +126,9 @@ Engine::recoverToCheckpoint(int64_t /* lsn */)
 }
 
 void
-Engine::join(struct xstream *stream, struct vclock *vclock)
+Engine::join(struct xstream *stream)
 {
 	(void) stream;
-	(void) vclock;
 }
 
 void
@@ -280,6 +279,20 @@ engine_begin_join()
 }
 
 void
+engine_begin_wal_recovery()
+{
+	Engine *engine;
+	engine_foreach(engine)
+		engine->beginWalRecovery();
+}
+
+void
+engine_end_join()
+{
+	/* just for symmetry with engine_begin_join() */
+}
+
+void
 engine_end_recovery()
 {
 	/*
@@ -329,10 +342,10 @@ engine_abort_checkpoint()
 }
 
 void
-engine_join(struct xstream *stream, struct vclock *vclock)
+engine_join(struct xstream *stream)
 {
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->join(stream, vclock);
+		engine->join(stream);
 	}
 }

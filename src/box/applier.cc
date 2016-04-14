@@ -156,9 +156,7 @@ applier_connect(struct applier *applier)
 static void
 applier_join(struct applier *applier)
 {
-	assert(applier->join_stream != NULL);
-
-	say_info("downloading a snapshot from %s",
+	say_info("bootstraping replica from %s",
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/* Send JOIN request */
@@ -167,28 +165,65 @@ applier_join(struct applier *applier)
 	struct xrow_header row;
 	xrow_encode_join(&row, &SERVER_ID);
 	coio_write_xrow(coio, &row);
-	applier_set_state(applier, APPLIER_BOOTSTRAP);
 
+	/* Decode JOIN response */
+	coio_read_xrow(coio, &iobuf->in, &row);
+	if (iproto_type_is_error(row.type)) {
+		return xrow_decode_error(&row); /* re-throw error */
+	} else if (row.type != IPROTO_OK) {
+		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			  (uint32_t) row.type);
+	}
+
+	applier_set_state(applier, APPLIER_INITIAL_JOIN);
+
+	/*
+	 * Receive initial data.
+	 */
+	assert(applier->initial_join_stream != NULL);
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->last_row_time = ev_now(loop());
-		if (row.type == IPROTO_OK) {
-			/* End of stream */
-			say_info("done");
-			break;
-		} else if (iproto_type_is_dml(row.type)) {
-			/* Regular snapshot row  (IPROTO_INSERT) */
-			xstream_write(applier->join_stream, &row);
-		} else /* error or unexpected packet */ {
+		if (iproto_type_is_dml(row.type)) {
+			xstream_write(applier->initial_join_stream, &row);
+		} else if (row.type == IPROTO_OK) {
+			break; /* end of stream */
+		} else if (iproto_type_is_error(row.type)) {
 			xrow_decode_error(&row);  /* rethrow error */
+		} else {
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				  (uint32_t) row.type);
 		}
 	}
+	say_info("initial data received");
 
+	applier_set_state(applier, APPLIER_FINAL_JOIN);
+
+	/*
+	 * Receive final data.
+	 */
+	assert(applier->final_join_stream != NULL);
+	while (true) {
+		coio_read_xrow(coio, &iobuf->in, &row);
+		applier->last_row_time = ev_now(loop());
+		if (iproto_type_is_dml(row.type)) {
+			xstream_write(applier->final_join_stream, &row);
+		} else if (row.type == IPROTO_OK) {
+			break; /* end of stream */
+		} else if (iproto_type_is_error(row.type)) {
+			xrow_decode_error(&row);  /* rethrow error */
+		} else {
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				  (uint32_t) row.type);
+		}
+	}
 	/* Decode end of stream packet */
 	vclock_create(&applier->vclock);
 	assert(row.type == IPROTO_OK);
 	xrow_decode_vclock(&row, &applier->vclock);
+	say_info("final data received");
 
+	applier_set_state(applier, APPLIER_JOINED);
 	applier_set_state(applier, APPLIER_CONNECTED);
 }
 
@@ -297,7 +332,8 @@ applier_log_error(struct applier *applier, struct error *e)
 		say_info("failed to authenticate");
 		break;
 	case APPLIER_FOLLOW:
-	case APPLIER_BOOTSTRAP:
+	case APPLIER_INITIAL_JOIN:
+	case APPLIER_FINAL_JOIN:
 		say_info("can't read row");
 		break;
 	default:
@@ -406,7 +442,8 @@ applier_stop(struct applier *applier)
 }
 
 struct applier *
-applier_new(const char *uri, struct xstream *join_stream,
+applier_new(const char *uri, struct xstream *initial_join_stream,
+	    struct xstream *final_join_stream,
 	    struct xstream *subscribe_stream)
 {
 	struct applier *applier = (struct applier *)
@@ -427,7 +464,8 @@ applier_new(const char *uri, struct xstream *join_stream,
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
 
-	applier->join_stream = join_stream;
+	applier->initial_join_stream = initial_join_stream;
+	applier->final_join_stream = final_join_stream;
 	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_now(loop());
 	rlist_create(&applier->on_state);
@@ -451,7 +489,6 @@ void
 applier_resume(struct applier *applier)
 {
 	assert(!fiber_is_dead(applier->reader));
-	assert(applier->state == APPLIER_CONNECTED);
 	void *data = NULL;
 	ipc_channel_put_xc(&applier->pause, data);
 }
@@ -464,34 +501,70 @@ applier_pause(struct applier *applier)
 	ipc_channel_get_xc(&applier->pause, &data);
 }
 
+struct applier_on_state {
+	struct trigger base;
+	struct applier *applier;
+	enum applier_state desired_state;
+	struct ipc_channel wakeup;
+};
+
 /** Used by applier_connect_all() */
 static void
-applier_on_connect(struct trigger *trigger, void *event)
+applier_on_state_f(struct trigger *trigger, void *event)
 {
-	struct applier *applier = (struct applier *) event;
-	if (applier->state != APPLIER_CONNECTED)
+	(void) event;
+	struct applier_on_state *on_state =
+		container_of(trigger, struct applier_on_state, base);
+
+	struct applier *applier = on_state->applier;
+
+	if (applier->state != APPLIER_OFF &&
+	    applier->state != APPLIER_STOPPED &&
+	    applier->state != on_state->desired_state)
 		return;
 
-	/* Wake up applier_connect_all() fiber */
-	struct ipc_channel *ch = (struct ipc_channel *) trigger->data;
-	ipc_channel_put_xc(ch, applier);
+	/* Wake up waiter */
+	ipc_channel_put_xc(&on_state->wakeup, applier);
 
 	applier_pause(applier);
 }
 
-/* Used by applier_bootstrap() */
-static void
-applier_on_bootstrap(struct trigger *trigger, void *event)
+static inline void
+applier_add_on_state(struct applier *applier,
+		     struct applier_on_state *trigger,
+		     enum applier_state desired_state)
 {
-	struct applier *applier = (struct applier *) event;
-	if (applier->state == APPLIER_BOOTSTRAP)
-		return;
+	trigger_create(&trigger->base, applier_on_state_f, NULL, NULL);
+	trigger->applier = applier;
+	ipc_channel_create(&trigger->wakeup, 0);
+	trigger->desired_state = desired_state;
+	trigger_add(&applier->on_state, &trigger->base);
+}
 
-	/* Wake up applier_bootstrap() fiber */
-	struct ipc_channel *ch = (struct ipc_channel *) trigger->data;
-	ipc_channel_put_xc(ch, applier);
+static inline void
+applier_clear_on_state(struct applier_on_state *trigger)
+{
+	ipc_channel_destroy(&trigger->wakeup);
+	trigger_clear(&trigger->base);
+}
 
-	applier_pause(applier);
+static inline int
+applier_wait_for_state(struct applier_on_state *trigger, double timeout)
+{
+	void *data = NULL;
+	if (ipc_channel_get_timeout(&trigger->wakeup, &data, timeout) != 0)
+		return -1; /* ER_TIMEOUT */
+
+	struct applier *applier = trigger->applier;
+	if (applier->state != trigger->desired_state) {
+		assert(applier->state == APPLIER_OFF ||
+		       applier->state == APPLIER_STOPPED);
+		/* Re-throw the original error */
+		assert(!diag_is_empty(&applier->reader->diag));
+		diag_move(&applier->reader->diag, &fiber()->diag);
+		return -1;
+	}
+	return 0;
 }
 
 void
@@ -518,120 +591,59 @@ applier_connect_all(struct applier **appliers, int count)
 	/* A channel from applier's on_state trigger is used to wake us up */
 	IpcChannelGuard wakeup(count);
 	/* Memory for on_state triggers registered in appliers */
-	struct trigger triggers[VCLOCK_MAX]; /* actually need `count' */
+	struct applier_on_state triggers[VCLOCK_MAX];
 	/* Wait results until this time */
 	double deadline = fiber_time() + CONNECT_TIMEOUT;
 
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
 		/* Register a trigger to wake us up when peer is connected */
-		trigger_create(&triggers[i], applier_on_connect, wakeup.ch,
-			       NULL);
-		trigger_add(&appliers[i]->on_state, &triggers[i]);
-
+		applier_add_on_state(appliers[i], &triggers[i],
+				     APPLIER_CONNECTED);
 		/* Start background connection */
 		applier_start(appliers[i]);
 	}
 
-	/* Wait `count` messages from channel */
-	for (int connected = 0; connected < count; connected++) {
-		void *data = NULL;
+	/* Wait for all appliers */
+	for (int i = 0; i < count; i++) {
 		double wait = deadline - fiber_time();
-		/* Stop on timeout or channel error (doesn't matter here) */
 		if (wait < 0.0 ||
-		    ipc_channel_get_timeout(wakeup.ch, &data, wait) != 0) {
-			tnt_error(ClientError, ER_CFG, "replication_source",
-				  "failed to connect to one or more servers");
+		    applier_wait_for_state(&triggers[i], wait) != 0) {
 			goto error;
 		}
 	}
 
+
 	for (int i = 0; i < count; i++) {
 		assert(appliers[i]->state == APPLIER_CONNECTED);
-
 		/* Unregister the temporary trigger used to wake us up */
-		trigger_clear(&triggers[i]);
+		applier_clear_on_state(&triggers[i]);
 	}
 
 	/* Now all the appliers are connected, finish. */
 	return;
 error:
-	/*
-	 * Preserve the original error which can be overwritten by
-	 * fiber_join()
-	 */
-	struct diag diag;
-	diag_create(&diag);
-	diag_move(&fiber()->diag, &diag);
-	assert(diag_last_error(&diag) != NULL);
-
 	/* Destroy appliers */
 	for (int i = 0; i < count; i++) {
-		trigger_clear(&triggers[i]);
+		applier_clear_on_state(&triggers[i]);
 		applier_stop(appliers[i]);
 	}
 
-	/* Restore original error */
-	diag_move(&diag, &fiber()->diag);
-	diag_destroy(&diag);
-	diag_raise();
+	/* ignore original error */
+	tnt_raise(ClientError, ER_CFG, "replication_source",
+		  "failed to connect to one or more servers");
 }
 
-/** Download and process the data snapshot from master. */
 void
-applier_bootstrap(struct applier *master)
+applier_resume_to_state(struct applier *applier, enum applier_state state,
+			double timeout)
 {
-	/* cfg_get_replication_source() post condition */
-	assert(master->state == APPLIER_CONNECTED);
-
-	/*
-	 * - create a channel to synchronize with the applier fiber;
-	 * - register a trigger in the applier that puts a message to
-	 *   this channel when the bootstrap is finished.
-	 * - wait for a message from this channel and then check
-	 *   applier state;
-	 * - in case the applier state is not APPLIER_CONNECTED, as
-	 *   we expect: re-throw the original exception and abort
-	 *   the bootstrap process (panic() is called by box_cfg());
-	 * - on success, remove the trigger and leave the
-	 *   applier in CONNECTED state.
-	 */
-
-	/* A channel is used to wake us up from on_bootstrap trigger. */
-	IpcChannelGuard wakeup(0);
-	/* A trigger that wakes us up when the bootstrap is finished. */
-	struct trigger on_bootstrap;
-	trigger_create(&on_bootstrap, applier_on_bootstrap, wakeup.ch, NULL);
-	trigger_add(&master->on_state, &on_bootstrap);
-
-	/*
-	 * Resume the applier and let it bootstrap (see
-	 * cfg_get_replication_source().
-	 */
-	void *data = NULL;
-	ipc_channel_put_xc(&master->pause, &data);
-
-	/* Wait while the applier downloads and processes the snapshot. */
-	ipc_channel_get_xc(wakeup.ch, &data);
-
-	/* Unregister the temporary trigger */
-	trigger_clear(&on_bootstrap);
-
-	/*
-	 * The trigger wakes us up in two cases:
-	 *
-	 * - the applier downloaded and processed the snapshot
-	 *   and  then switched back to CONNECTED state;
-	 * - the applier failed, and switched to STOPPED or
-	 *   DISCONNECTED state.
-	 */
-	if (master->state != APPLIER_CONNECTED) {
-		/* Re-throw the original error */
-		assert(!diag_is_empty(&master->reader->diag));
-		diag_move(&master->reader->diag, &fiber()->diag);
+	struct applier_on_state trigger;
+	applier_add_on_state(applier, &trigger, state);
+	applier_resume(applier);
+	int rc = applier_wait_for_state(&trigger, timeout);
+	applier_clear_on_state(&trigger);
+	if (rc != 0)
 		diag_raise();
-	}
-
-	/* Leave the applier in CONNECTED state */
-	assert(master->state == APPLIER_CONNECTED);
+	assert(applier->state == state);
 }

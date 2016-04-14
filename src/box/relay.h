@@ -48,20 +48,28 @@ struct relay {
 	uint64_t sync;
 	struct recovery *r;
 	struct xstream stream;
-	struct vclock join_vclock;
+	struct vclock stop_vclock;
 	ev_tstamp wal_dir_rescan_delay;
 };
 
 /**
- * Send an initial snapshot to the replica
+ * Send initial JOIN rows to the replica
  *
  * @param fd        client connection
  * @param sync      sync from incoming JOIN request
- * @param uuid      server UUID of replica
- * @param[out] join_vclock vclock of initial snapshot
  */
 void
-relay_join(int fd, uint64_t sync, struct vclock *join_vclock);
+relay_initial_join(int fd, uint64_t sync);
+
+/**
+ * Send final JOIN rows to the replica.
+ *
+ * @param fd        client connection
+ * @param sync      sync from incoming JOIN request
+ */
+void
+relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
+	         struct vclock *stop_vclock);
 
 /**
  * Subscribe a replica to updates.

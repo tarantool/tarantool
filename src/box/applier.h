@@ -51,10 +51,12 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 	_(APPLIER_CONNECT, 1)                                        \
 	_(APPLIER_AUTH, 2)                                           \
 	_(APPLIER_CONNECTED, 3)                                      \
-	_(APPLIER_BOOTSTRAP, 4)                                      \
-	_(APPLIER_FOLLOW, 5)                                         \
-	_(APPLIER_STOPPED, 6)                                        \
-	_(APPLIER_DISCONNECTED, 7)                                   \
+	_(APPLIER_INITIAL_JOIN, 4)                                   \
+	_(APPLIER_FINAL_JOIN, 5)                                     \
+	_(APPLIER_JOINED, 6)                                         \
+	_(APPLIER_FOLLOW, 7)                                         \
+	_(APPLIER_STOPPED, 8)                                        \
+	_(APPLIER_DISCONNECTED, 9)                                   \
 
 /** States for the applier */
 ENUM(applier_state, applier_STATE);
@@ -86,7 +88,8 @@ struct applier {
 	struct rlist on_state;
 	/* Channel used by applier_connect_all() and applier_resume() */
 	struct ipc_channel pause;
-	struct xstream *join_stream;
+	struct xstream *initial_join_stream;
+	struct xstream *final_join_stream;
 	struct xstream *subscribe_stream;
 };
 
@@ -119,7 +122,8 @@ applier_stop(struct applier *applier);
  * @error   throws OutOfMemory exception if out of memory.
  */
 struct applier *
-applier_new(const char *uri, struct xstream *join_stream,
+applier_new(const char *uri, struct xstream *initial_join_stream,
+	    struct xstream *final_join_stream,
 	    struct xstream *subscribe_stream);
 
 /**
@@ -137,17 +141,14 @@ void
 applier_connect_all(struct applier **appliers, int count);
 
 /*
- * Download and process the data snapshot from master.
- * \pre applier is paused && applier->state == APPLIER_CONNECTED
- * \post applier is paused && applier->state == APPLIER_CONNECTED
- * \sa applier_connect_all
+ * Resume execution of applier until \a state.
  */
 void
-applier_bootstrap(struct applier *master);
+applier_resume_to_state(struct applier *applier, enum applier_state state,
+			double timeout);
 
 /*
- * Resume execution of applier returned by applier_connect_all() or
- * applier_bootstrap().
+ * Resume execution of applier.
  */
 void
 applier_resume(struct applier *applier);

@@ -126,8 +126,8 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
  * Throws an exception in  case of error.
  */
 struct recovery *
-recovery_new(const char *wal_dirname,
-	     bool panic_on_wal_error)
+recovery_new(const char *wal_dirname, bool panic_on_wal_error,
+	     struct vclock *vclock)
 {
 	struct recovery *r = (struct recovery *)
 			calloc(1, sizeof(*r));
@@ -144,7 +144,7 @@ recovery_new(const char *wal_dirname,
 	xdir_create(&r->wal_dir, wal_dirname, XLOG, &SERVER_ID);
 	r->wal_dir.panic_if_error = panic_on_wal_error;
 
-	vclock_create(&r->vclock);
+	vclock_copy(&r->vclock, vclock);
 
 	/**
 	 * Avoid scanning WAL dir before we recovered
@@ -206,9 +206,12 @@ recovery_exit(struct recovery *r)
  * Read all rows in a file starting from the last position.
  * Advance the position. If end of file is reached,
  * set l.eof_read.
+ * The reading will be stopped on reaching stop_vclock.
+ * Use NULL for boundless recover
  */
 static void
-recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l)
+recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
+	     struct vclock *stop_vclock)
 {
 	struct xlog_cursor i;
 
@@ -226,6 +229,9 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l)
 	 * when EOF marker has been read, see i.eof_read
 	 */
 	while (xlog_cursor_next_xc(&i, &row) == 0) {
+		if (stop_vclock != NULL &&
+		    r->vclock.signature >= stop_vclock->signature)
+			return;
 		try {
 			int64_t current_lsn = vclock_get(&r->vclock,
 							 row.server_id);
@@ -257,18 +263,23 @@ recovery_bootstrap(struct recovery *r, struct xstream *stream)
 		xdir_destroy(&dir);
 	});
 	/** The snapshot must have a EOF marker. */
-	recover_xlog(r, stream, snap);
+	recover_xlog(r, stream, snap, NULL);
 }
 
 /**
  * Find out if there are new .xlog files since the current
  * LSN, and read them all up.
  *
+ * Reading will be stopped on reaching recovery
+ * vclock signature > to_checkpoint (after playing to_checkpoint record)
+ * use NULL for boundless recover
+ *
  * This function will not close r->current_wal if
  * recovery was successful.
  */
-static void
-recover_remaining_wals(struct recovery *r, struct xstream *stream)
+void
+recover_remaining_wals(struct recovery *r, struct xstream *stream,
+		       struct vclock *stop_vclock)
 {
 	/*
 	 * Sic: it could be tempting to put xdir_scan() inside
@@ -308,6 +319,10 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream)
 	for (clock = vclockset_match(&r->wal_dir.index, &r->vclock);
 	     clock != NULL;
 	     clock = vclockset_next(&r->wal_dir.index, clock)) {
+		if (stop_vclock != NULL &&
+		    clock->signature >= stop_vclock->signature) {
+			break;
+		}
 
 		if (vclock_compare(clock, &r->vclock) > 0) {
 			/**
@@ -332,7 +347,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream)
 
 recover_current_wal:
 		if (r->current_wal->eof_read == false)
-			recover_xlog(r, stream, r->current_wal);
+			recover_xlog(r, stream, r->current_wal, stop_vclock);
 		/**
 		 * Keep the last log open to remember recovery
 		 * position. This speeds up recovery in local hot
@@ -340,6 +355,10 @@ recover_current_wal:
 		 * and re-scan the last log in recovery_finalize().
 		 */
 	}
+
+	if (stop_vclock != NULL && vclock_compare(&r->vclock, stop_vclock) != 0)
+		tnt_raise(XlogGapError, &r->vclock, stop_vclock);
+
 	region_free(&fiber()->gc);
 }
 
@@ -350,7 +369,7 @@ recovery_finalize(struct recovery *r, struct xstream *stream,
 	recovery_stop_local(r);
 
 	xdir_scan_xc(&r->wal_dir);
-	recover_remaining_wals(r, stream);
+	recover_remaining_wals(r, stream, NULL);
 
 	recovery_close_log(r);
 
@@ -510,7 +529,7 @@ recovery_follow_f(va_list ap)
 			if (r->current_wal == NULL || r->current_wal->eof_read)
 				xdir_scan_xc(&r->wal_dir);
 
-			recover_remaining_wals(r, stream);
+			recover_remaining_wals(r, stream, NULL);
 
 			end = r->current_wal ? vclock_sum(&r->current_wal->vclock) : 0;
 			/*
@@ -548,7 +567,7 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 * Blocks until finished.
 	 */
 	xdir_scan_xc(&r->wal_dir);
-	recover_remaining_wals(r, stream);
+	recover_remaining_wals(r, stream, NULL);
 	recovery_close_log(r);
 
 	/*

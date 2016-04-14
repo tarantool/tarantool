@@ -61,7 +61,7 @@ struct MemtxEngine: public Engine {
 	virtual void beginJoin() override;
 	virtual void recoverToCheckpoint(int64_t lsn) override;
 	virtual void endRecovery() override;
-	virtual void join(struct xstream *stream, struct vclock *last) override;
+	virtual void join(struct xstream *stream) override;
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 	virtual void commitCheckpoint() override;

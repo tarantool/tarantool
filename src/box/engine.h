@@ -93,7 +93,7 @@ public:
 	 */
 	virtual bool needToBuildSecondaryKey(struct space *space);
 
-	virtual void join(struct xstream *, struct vclock *vclock);
+	virtual void join(struct xstream *);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -138,6 +138,12 @@ public:
 	 * Notify engine about a JOIN start (slave-side)
 	 */
 	virtual void beginJoin();
+	/**
+	 * Notify engine about a start of recovering from WALs
+	 * that could be local WALs during local recovery
+	 * of WAL catch up durin join on slave side
+	 */
+	virtual void beginWalRecovery() {}
 	/**
 	 * Begin a two-phase snapshot creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
@@ -242,6 +248,19 @@ void
 engine_begin_join();
 
 /**
+ * Called in the middle of JOIN stage,
+ * when xlog catch-up process is started
+ */
+void
+engine_begin_wal_recovery();
+
+/**
+ * Called at the end of JOIN routine.
+ */
+void
+engine_end_join();
+
+/**
  * Called at the end of recovery.
  * Build secondary keys in all spaces.
  */
@@ -265,6 +284,6 @@ engine_abort_checkpoint();
  * (called on the master).
  */
 void
-engine_join(struct xstream *stream, struct vclock *vclock);
+engine_join(struct xstream *stream);
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

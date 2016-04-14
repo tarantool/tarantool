@@ -1306,7 +1306,7 @@ MemtxEngine::abortCheckpoint()
  * to the replica, hence should not use engine state.
  */
 void
-MemtxEngine::join(struct xstream *stream, struct vclock *last)
+MemtxEngine::join(struct xstream *stream)
 {
 	struct xdir dir;
 	struct xlog *snap = NULL;
@@ -1327,6 +1327,7 @@ MemtxEngine::join(struct xstream *stream, struct vclock *last)
 	 * as a replica. Our best effort is to not crash in such
 	 * case: xlog_open_xc will throw "file not found" error.
 	 */
+	struct vclock *last = &m_last_checkpoint;
 	assert(vclock_size(last));
 	snap = xlog_open_xc(&dir, vclock_sum(last));
 	struct xlog_cursor cursor;

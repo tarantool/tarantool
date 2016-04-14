@@ -32,7 +32,6 @@ print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
 rows = list(server.iproto.py_con.subscribe(cluster_uuid, replica_uuid))
 print len(rows) == 1 and rows[0].return_message.find('Read access') >= 0 and \
     'ok' or 'not ok', '-', 'subscribe without read permissions on universe'
-
 ## Write permission to space `_cluster` is required to perform JOIN
 server.admin("box.schema.user.grant('guest', 'read', 'universe')")
 server.iproto.reconnect() # re-connect with new permissions
@@ -85,9 +84,8 @@ for k in glob.glob(os.path.join(data_dir, '*.snap')):
 server_count = len(server.iproto.py_con.space('_cluster').select(()))
 
 rows = list(server.iproto.py_con.join(replica_uuid))
-print len(rows) == 1 and rows[0].return_message.find('.snap') >= 0 and \
+print len(rows) > 0 and rows[-1].return_message.find('.snap') >= 0 and \
     'ok' or 'not ok', '-', 'join without snapshots'
-
 res = server.iproto.py_con.space('_cluster').select(())
 if server_count <= len(res):
     print 'ok - _cluster did not change after unsuccessful JOIN'
@@ -153,7 +151,6 @@ replica.script = 'replication-py/replica.lua'
 replica.vardir = server.vardir
 replica.rpl_master = master
 replica.deploy()
-replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica_id = replica.get_param('server')['id']
 replica_uuid = replica.get_param('server')['uuid']
 sys.stdout.push_filter(replica_uuid, '<replica uuid>')
@@ -310,8 +307,13 @@ replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id == %d' % replica_id)
 replica.admin('not box.info.server.ro')
 # All records were succesfully recovered.
+# Replica should have the same vclock as master.
+master.admin('box.info.vclock[%d] == 1' % replica_id)
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == nil' % replica_id2)
+master.admin('box.info.vclock[%d] == 0' % replica_id2)
+replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+master.admin('box.info.vclock[%d] == nil' % replica_id3)
+replica.admin('box.info.vclock[%d] == nil' % replica_id3)
 
 print '-------------------------------------------------------------'
 print 'Cleanup'
