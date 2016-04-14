@@ -263,7 +263,7 @@ s:error()
 ---
 - null
 ...
-s:bind('127.0.0.1', 3457)
+s:bind('127.0.0.1', 0)
 ---
 - true
 ...
@@ -293,7 +293,7 @@ sc:nonblock(false)
 ---
 - false
 ...
-sc:sysconnect('127.0.0.1', 3457)
+sc:sysconnect('127.0.0.1', s:name().port)
 ---
 - true
 ...
@@ -389,7 +389,7 @@ s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 ---
 - true
 ...
-s:bind('127.0.0.1', 3457)
+s:bind('127.0.0.1', 0)
 ---
 - true
 ...
@@ -400,7 +400,7 @@ s:listen(128)
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
+sc:sysconnect('127.0.0.1', s:name().port) or errno() == errno.EINPROGRESS
 ---
 - true
 ...
@@ -757,14 +757,14 @@ sc:close()
 s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
-s:bind('127.0.0.1', 3548)
+s:bind('127.0.0.1', 0)
 ---
 - true
 ...
 sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
-sc:sendto('127.0.0.1', 3548, 'Hello, world')
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world')
 ---
 - 12
 ...
@@ -776,7 +776,7 @@ s:recv()
 ---
 - Hello, world
 ...
-sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world, 2')
 ---
 - 15
 ...
@@ -914,15 +914,15 @@ socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 - null
 ...
 -- AF_INET
-port = 35490
----
-...
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-s:bind('127.0.0.1', port)
+s:bind('127.0.0.1', 0)
 ---
 - true
+...
+port = s:name().port
+---
 ...
 s:listen()
 ---
@@ -1036,9 +1036,6 @@ s = nil
 ---
 ...
 -- close
-port = 65454
----
-...
 serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
@@ -1049,6 +1046,9 @@ serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 serv:bind('127.0.0.1', port)
 ---
 - true
+...
+port = serv:name().port
+---
 ...
 serv:listen()
 ---
