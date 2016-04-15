@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "space.h"
-#include "index.h"
 #include <stdlib.h>
 #include <string.h>
 #include "tuple.h"
@@ -38,8 +37,6 @@
 #include "user_def.h"
 #include "user.h"
 #include "session.h"
-#include "schema.h"
-#include "box.h"
 
 void
 access_check_space(struct space *space, uint8_t access)
@@ -233,63 +230,6 @@ space_check_update(struct space *space,
 	if (tuple_compare(old_tuple, new_tuple, index->key_def))
 		tnt_raise(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			  index_name(index), space_name(space));
-}
-
-void
-space_truncate(struct space *space)
-{
-	if (!space_index(space, 0)) {
-		/* empty space without indexes, nothing to truncate */
-		return;
-	}
-
-	char key_buf[20];
-	char *key_buf_end;
-	key_buf_end = mp_encode_uint(key_buf, space_id(space));
-	assert(key_buf_end <= key_buf + sizeof(key_buf));
-
-	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
-	struct space *space_index = space_cache_find(BOX_INDEX_ID);
-	Index *index = index_find(space_index, 0);
-	struct iterator *it = index->allocIterator();
-	auto guard_it_free = make_scoped_guard([=]{
-		it->free(it);
-	});
-	index->initIterator(it, ITER_EQ, key_buf, 1);
-	int index_count = 0;
-	struct tuple *indexes[BOX_INDEX_MAX]; /* max count of idexes*/
-	struct tuple *tuple;
-
-	/* select all indexes of given space */
-	auto guard_indexes_unref = make_scoped_guard([=]{
-		for (int i = 0; i < index_count; i++)
-			tuple_unref(indexes[i]);
-	});
-	while ((tuple = it->next(it)) != NULL) {
-		tuple_ref(tuple);
-		indexes[index_count++] = tuple;
-	}
-	assert(index_count <= BOX_INDEX_MAX);
-
-	/* drop all selected indexes */
-	for (int i = index_count - 1; i >= 0; --i) {
-		uint32_t index_id = tuple_field_u32(indexes[i], 1);
-		key_buf_end = mp_encode_array(key_buf, 2);
-		key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
-		key_buf_end = mp_encode_uint(key_buf_end, index_id);
-		assert(key_buf_end <= key_buf + sizeof(key_buf));
-		if (box_delete(BOX_INDEX_ID, 0, key_buf, key_buf_end, NULL))
-			diag_raise();
-	}
-
-	/* create all indexes again, now they are empty */
-	for (int i = 0; i < index_count; i++) {
-		tuple = indexes[i];
-		if (box_insert(BOX_INDEX_ID, tuple->data,
-			       tuple->data + tuple->bsize, NULL)) {
-			diag_raise();
-		}
-	}
 }
 
 /* vim: set fm=marker */
