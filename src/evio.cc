@@ -194,6 +194,32 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 	}
 }
 
+static bool
+evio_service_reuse_addr(struct evio_service *service)
+{
+	if ((service->addr.sa_family != AF_UNIX) || (errno != EADDRINUSE))
+		return false;
+	int save_errno = errno;
+	int cl_fd = sio_socket(service->addr.sa_family,
+		SOCK_STREAM, 0);
+
+	if (connect(cl_fd, &service->addr, service->addr_len) == 0)
+		goto err;
+
+	if (errno != ECONNREFUSED)
+		goto err;
+
+	if (unlink(((struct sockaddr_un *)(&service->addr))->sun_path))
+		goto err;
+	close(cl_fd);
+
+	return true;
+err:
+	errno = save_errno;
+	close(cl_fd);
+	return false;
+}
+
 /** Try to bind and listen on the configured port.
  *
  * Throws an exception if error.
@@ -213,12 +239,18 @@ evio_service_bind_addr(struct evio_service *service)
 
 	evio_setsockopt_server(fd, service->addr.sa_family, SOCK_STREAM);
 
-	if (sio_bind(fd, &service->addr, service->addr_len) ||
-	    sio_listen(fd)) {
+	if (sio_bind(fd, &service->addr, service->addr_len)) {
 		assert(errno == EADDRINUSE);
-		close(fd);
+		if (!evio_service_reuse_addr(service) ||
+			sio_bind(fd, &service->addr, service->addr_len)) {
+			return -1;
+		}
+	}
+
+	if (sio_listen(fd)) {
 		return -1;
 	}
+
 	say_info("%s: bound to %s", evio_service_name(service),
 		 sio_strfaddr(&service->addr, service->addr_len));
 

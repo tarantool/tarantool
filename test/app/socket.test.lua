@@ -86,7 +86,7 @@ s:close()
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s:error()
-s:bind('127.0.0.1', 3457)
+s:bind('127.0.0.1', 0)
 s:error()
 s:listen(128)
 sevres = {}
@@ -95,7 +95,7 @@ type(require('fiber').create(function() s:readable() do local sc = s:accept() ta
 
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc:nonblock(false)
-sc:sysconnect('127.0.0.1', 3457)
+sc:sysconnect('127.0.0.1', s:name().port)
 sc:nonblock(true)
 sc:readable(.5)
 sc:sysread()
@@ -121,12 +121,12 @@ s:close()
 
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-s:bind('127.0.0.1', 3457)
+s:bind('127.0.0.1', 0)
 s:listen(128)
 
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 
-sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
+sc:sysconnect('127.0.0.1', s:name().port) or errno() == errno.EINPROGRESS
 sc:writable(10)
 sc:write('Hello, world')
 
@@ -243,13 +243,13 @@ sc:nonblock(true)
 sc:close()
 
 s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
-s:bind('127.0.0.1', 3548)
+s:bind('127.0.0.1', 0)
 sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
-sc:sendto('127.0.0.1', 3548, 'Hello, world')
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world')
 s:readable(10)
 s:recv()
 
-sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
+sc:sendto('127.0.0.1', s:name().port, 'Hello, world, 2')
 s:readable(10)
 d, from = s:recvfrom()
 from.port > 0
@@ -292,9 +292,9 @@ s:close()
 socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 
 -- AF_INET
-port = 35490
 s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
-s:bind('127.0.0.1', port)
+s:bind('127.0.0.1', 0)
+port = s:name().port
 s:listen()
 sc, e = socket.tcp_connect('127.0.0.1', port), errno()
 sc ~= nil
@@ -329,10 +329,10 @@ s:writable(0)
 s = nil
 
 -- close
-port = 65454
 serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 serv:bind('127.0.0.1', port)
+port = serv:name().port
 serv:listen()
 test_run:cmd("setopt delimiter ';'")
 f = fiber.create(function(serv)
