@@ -510,7 +510,7 @@ the maximum number of returned tuples will be: one.
 
 These variations exist: |br|
 (1) The search can use comparisons other than equality. |br|
-:codenormal:`box.space.`:codeitalic:`space-name`:codenormal:`:select('value', {iterator='GT'})`
+:codenormal:`box.space.`:codeitalic:`space-name`:codenormal:`:select('value', {iterator='GT'})` |br|
 The comparison operators are LT LE EQ REQ REQ GE GT for
 "less than" "less than or equal" " "reversed
 equal" "greater than or equal" "greater than" respectively.

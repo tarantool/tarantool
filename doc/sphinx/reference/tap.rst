@@ -136,7 +136,7 @@ one can run tests and then use the results for statistics, decision-making, and 
         :param number expected: expected result
         :param string test-name: name of test
 
-        :return: true of false.
+        :return: true or false.
         :rtype:  boolean
 
     .. method:: isnil(value, test-name)
@@ -153,15 +153,15 @@ one can run tests and then use the results for statistics, decision-making, and 
         :param lua-value value:
         :param string test-name: name of test
 
-        :return: true of false.
+        :return: true or false.
         :rtype:  boolean
 
     .. method:: is_deeply(got, expected, test-name)
 
-        Recursive version of ``tap-test:is(...)``, which can be be used to
+        Recursive version of ``taptest:is(...)``, which can be be used to
         compare tables as well as scalar values.
 
-        :return: true of false.
+        :return: true or false.
         :rtype:  boolean
 
         :param lua-value got: actual result
