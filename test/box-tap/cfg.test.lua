@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(39)
+test:plan(41)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -161,7 +161,7 @@ test:is(run_script(code), 0, "logger_nonblock new value")
 local path = './tarantool.sock'
 os.remove(path)
 box.cfg{ listen = 'unix/:'..path }
-s = socket.tcp_connect('unix/', path)
+local s = socket.tcp_connect('unix/', path)
 test:isnt(s, nil, "dynamic listen")
 if s then s:close() end
 box.cfg{ listen = '' }
@@ -169,6 +169,22 @@ s = socket.tcp_connect('unix/', path)
 test:isnil(s, 'dynamic listen')
 if s then s:close() end
 os.remove(path)
+
+path = './tarantool.sock'
+local path2 = './tarantool2.sock'
+local s = socket.tcp_server('unix/', path, function () end)
+os.execute('ln ' .. path .. ' ' .. path2)
+s:close()
+box.cfg{ listen = 'unix/:'.. path2}
+s = socket.tcp_connect('unix/', path2)
+test:isnt(s, nil, "reuse unix socket")
+if s then s:close() end
+box.cfg{ listen = '' }
+os.remove(path2)
+
+code = " box.cfg{ listen='unix/:'" .. path .. "' } "
+run_script(code)
+test:isnil(fio.stat(path), "delete socket at exit")
 
 test:check()
 os.exit(0)
