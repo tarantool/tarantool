@@ -166,7 +166,6 @@ sophia_tuple_data_new(void *obj, struct key_def *key_def, uint32_t *bsize)
 	d = mp_encode_array(d, field_count);
 	d = sophia_write_parts(key_def, value, valuesize, parts, d);
 	assert(tuple_data + size == d);
-	sophia_write_parts(key_def, value, valuesize, parts, d);
 	*bsize = size;
 	return tuple_data;
 }
