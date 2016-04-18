@@ -44,7 +44,6 @@
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "xstream.h"
-#include "recovery.h"
 #include "cluster.h"
 #include "relay.h"
 #include "schema.h"
@@ -601,11 +600,13 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	handler->replace = memtx_replace_all_keys;
 }
 
-MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error)
+MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
+			 bool panic_on_wal_error)
 	:Engine("memtx"),
 	m_checkpoint(0),
 	m_state(MEMTX_INITIALIZED),
-	m_snap_io_rate_limit(UINT64_MAX)
+	m_snap_io_rate_limit(UINT64_MAX),
+	m_panic_on_wal_error(panic_on_wal_error)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY;
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_ID);
@@ -662,7 +663,6 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 void
 MemtxEngine::recoverToCheckpoint(int64_t lsn)
 {
-	struct recovery *r = ::recovery;
 	assert(m_state == MEMTX_INITIALIZED);
 	/*
 	 * By default, enable fast start: bulk read of tuples
@@ -682,9 +682,6 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	SERVER_ID = snap->server_uuid;
-
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&r->vclock, 0);
 
 	say_info("recovering from `%s'", snap->filename);
 	struct xlog_cursor cursor;
@@ -713,14 +710,11 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	if (!cursor.eof_read)
 		panic("snapshot `%s' has no EOF marker", snap->filename);
 
-	/* Replace server vclock using the data from snapshot */
-	vclock_copy(&r->vclock, &snap->vclock);
-
 	if (m_state == MEMTX_READING_SNAPSHOT) {
 		/* End of the fast path: loaded the primary key. */
 		space_foreach(memtx_end_build_primary_key, this);
 
-		if (r->wal_dir.panic_if_error) {
+		if (m_panic_on_wal_error) {
 			/*
 			 * Fast start path: "play out" WAL
 			 * records using the primary key only,

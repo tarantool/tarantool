@@ -44,7 +44,8 @@ enum memtx_recovery_state {
 extern struct mempool memtx_index_extent_pool;
 
 struct MemtxEngine: public Engine {
-	MemtxEngine(const char *snap_dirname, bool panic_on_snap_error);
+	MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
+					      bool panic_on_wal_error);
 	~MemtxEngine();
 	virtual Handler *open() override;
 	virtual Index *createIndex(struct key_def *key_def) override;
@@ -90,6 +91,7 @@ private:
 	/** Limit disk usage of checkpointing (bytes per second). */
 	uint64_t m_snap_io_rate_limit;
 	struct vclock m_last_checkpoint;
+	bool m_panic_on_wal_error;
 };
 
 enum {

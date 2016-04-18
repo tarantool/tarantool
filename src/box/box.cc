@@ -1200,7 +1200,8 @@ engine_init()
 	 * so it must be registered first.
 	 */
 	MemtxEngine *memtx = new MemtxEngine(cfg_gets("snap_dir"),
-					     cfg_geti("panic_on_snap_error"));
+					     cfg_geti("panic_on_snap_error"),
+					     cfg_geti("panic_on_wal_error"));
 	engine_register(memtx);
 
 	SysviewEngine *sysview = new SysviewEngine();
@@ -1344,8 +1345,12 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
+		/* Add a surrogate server id for snapshot rows */
+		vclock_add_server(&recovery->vclock, 0);
 		/* Tell Sophia engine LSN it must recover to. */
 		engine_recover_to_checkpoint(lsn);
+		/* Replace server vclock using the data from snapshot */
+		vclock_copy(&recovery->vclock, &checkpoint_vclock);
 		engine_begin_wal_recovery();
 	} else {
 		/* TODO: don't create recovery for this case */

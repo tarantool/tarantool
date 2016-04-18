@@ -89,6 +89,10 @@ recovery_finalize(struct recovery *r, struct xstream *stream,
 void
 recovery_fill_lsn(struct recovery *r, struct xrow_header *row);
 
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
 /**
  * The write ahead log doesn't store the last checkpoint:
  * it is represented by the last valid snapshot of memtx engine.
@@ -117,9 +121,5 @@ recovery_last_checkpoint(struct vclock *vclock);
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		       struct vclock *stop_vclock);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */
