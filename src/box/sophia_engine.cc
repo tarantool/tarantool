@@ -339,10 +339,9 @@ SophiaSpace::applySnapshotRow(struct space *space, struct request *request)
 		sophia_error(index->env);
 	}
 
-#if 0
 	int64_t signature = request->header->lsn;
 	sp_setint(tx, "lsn", signature);
-#endif
+
 	if (sp_set(tx, obj) != 0)
 		sophia_error(index->env); /* obj destroyed by sp_set() */
 
