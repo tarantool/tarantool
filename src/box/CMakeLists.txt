@@ -44,6 +44,7 @@ add_library(box STATIC
     sysview_engine.cc
     sysview_index.cc
     sophia_engine.cc
+    sophia_space.cc
     sophia_index.cc
     space.cc
     func.cc

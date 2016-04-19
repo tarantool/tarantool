@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_SOPHIA_SPACE_H_INCLUDED
+#define TARANTOOL_BOX_SOPHIA_SPACE_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,38 +31,29 @@
  * SUCH DAMAGE.
  */
 
-#include "index.h"
-
-class SophiaIndex: public Index {
-public:
-	SophiaIndex(struct key_def *key_def);
-	virtual ~SophiaIndex() override;
-
-	virtual struct tuple*
-	replace(struct tuple*,
-	        struct tuple*, enum dup_replace_mode) override;
-
-	virtual struct tuple*
-	findByKey(const char *key, uint32_t) const override;
-
-	virtual struct iterator*
-	allocIterator() const;
-
+struct SophiaSpace: public Handler {
+	SophiaSpace(Engine*);
 	virtual void
-	initIterator(struct iterator *iterator,
-	             enum iterator_type type,
-	             const char *key, uint32_t part_count) const override;
-
-	virtual size_t  size() const override;
-	virtual size_t bsize() const override;
-
-public:
-	void *env;
-	void *db;
-
-	void *createDocument(const char *key, const char **keyend);
-private:
-	struct tuple_format *format;
+	applySnapshotRow(struct space *space, struct request *request);
+	virtual struct tuple *
+	executeReplace(struct txn*, struct space *space,
+	               struct request *request);
+	virtual struct tuple *
+	executeDelete(struct txn*, struct space *space,
+	              struct request *request);
+	virtual struct tuple *
+	executeUpdate(struct txn*, struct space *space,
+	              struct request *request);
+	virtual void
+	executeUpsert(struct txn*, struct space *space,
+	              struct request *request);
 };
 
-#endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */
+int
+sophia_upsert_cb(int count,
+                 char **src,    uint32_t *src_size,
+                 char **upsert, uint32_t *upsert_size,
+                 char **result, uint32_t *result_size,
+                 void *arg);
+
+#endif /* TARANTOOL_BOX_SOPHIA_SPACE_H_INCLUDED */
