@@ -90,8 +90,8 @@ space = box.schema.space.create('test', { engine = 'sophia' })
 ...
 index = space:create_index('primary', { type = 'tree', parts = {1,'num',2,'num',3,'num',4,'num',5,'num',6,'num',7,'num',8,'num', 9, 'num'} })
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
-    index too many key-parts (8 max)'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia index
+    key has too many parts (8 max)'
 ...
 space:drop()
 ---

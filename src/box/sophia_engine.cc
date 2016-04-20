@@ -389,7 +389,7 @@ sophia_join_key_def(void *env, void *db)
 	unsigned i = 0;
 	while (i < count) {
 		char path[64];
-		snprintf(path, sizeof(path), "db.%d.scheme.key_%d", id, i);
+		snprintf(path, sizeof(path), "db.%d:0.scheme.key_%d", id, i);
 		char *type = (char *)sp_getstring(env, path, NULL);
 		assert(type != NULL);
 		if (strncmp(type, "string", 6) == 0)
@@ -504,20 +504,20 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  key_def->name,
 			  space_name(space),
-			  "Sophia TREE index must be unique");
+			  "Sophia index must be unique");
 	}
 	if (key_def->iid != 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  key_def->name,
 			  space_name(space),
-			  "Sophia TREE secondary indexes are not supported");
+			  "Sophia secondary indexes are not supported");
 	}
 	const uint32_t keypart_limit = 8;
 	if (key_def->part_count > keypart_limit) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  key_def->name,
 				  space_name(space),
-				  "Sophia TREE index too many key-parts (8 max)");
+				  "Sophia index key has too many parts (8 max)");
 	}
 	unsigned i = 0;
 	while (i < key_def->part_count) {
@@ -526,13 +526,13 @@ SophiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  key_def->name,
 					  space_name(space),
-					  "Sophia TREE index field type must be STR or NUM");
+					  "Sophia index field type must be STR or NUM");
 		}
 		if (part->fieldno != i) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  key_def->name,
 					  space_name(space),
-					  "Sophia TREE key-parts must follow first and cannot be sparse");
+					  "Sophia key parts must follow first and cannot be sparse");
 		}
 		i++;
 	}

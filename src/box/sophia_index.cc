@@ -59,7 +59,7 @@ SophiaIndex::createDocument(const char *key, const char **keyend)
 	uint32_t i = 0;
 	while (i < key_def->part_count) {
 		char partname[32];
-		snprintf(partname, sizeof(partname), "key_%d", i);
+		snprintf(partname, sizeof(partname), "key_%" PRIu32, i);
 		const char *part;
 		uint32_t partsize;
 		if (key_def->parts[i].type == STRING) {
@@ -82,100 +82,116 @@ SophiaIndex::createDocument(const char *key, const char **keyend)
 }
 
 static inline void*
-sophia_configure(struct space *space, struct key_def *key_def)
+sophia_configure_storage(struct space *space, struct key_def *key_def)
 {
 	SophiaEngine *engine =
 		(SophiaEngine *)space->handler->engine;
 	void *env = engine->env;
 	/* create database */
-	char path[128];
-	snprintf(path, sizeof(path), "%" PRIu32, key_def->space_id);
-	sp_setstring(env, "db", path, 0);
-	/* db.id */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".id",
-	         key_def->space_id);
-	sp_setint(env, path, key_def->space_id);
-	/* apply space schema */
+	char c[128];
+	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,
+	         key_def->space_id, key_def->iid);
+	sp_setstring(env, "db", c, 0);
+	/* define storage scheme */
 	uint32_t i = 0;
 	while (i < key_def->part_count)
 	{
 		/* create key field */
 		char part[32];
-		snprintf(path, sizeof(path), "db.%" PRIu32 ".scheme",
-		         key_def->space_id);
-		snprintf(part, sizeof(part), "key_%d", i);
-		sp_setstring(env, path, part, 0);
-		/* set fields type */
+		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
+		         key_def->space_id, key_def->iid);
+		snprintf(part, sizeof(part), "key_%" PRIu32, i);
+		sp_setstring(env, c, part, 0);
+		/* set field type */
 		char type[32];
-		snprintf(type, sizeof(type), "%s,key(%d)",
+		snprintf(type, sizeof(type), "%s,key(%" PRIu32 ")",
 		         (key_def->parts[i].type == NUM ? "u64" : "string"),
 		         i);
-		snprintf(path, sizeof(path), "db.%" PRIu32 ".scheme.%s",
-		         key_def->space_id, part);
-		sp_setstring(env, path, type, 0);
+		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme.%s",
+		         key_def->space_id, key_def->iid, part);
+		sp_setstring(env, c, type, 0);
 		i++;
 	}
-	/* value field */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".scheme",
-	         key_def->space_id);
-	sp_setstring(env, path, "value", 0);
-
-	/* db.path */
-	if (key_def->opts.path[0] != '\0') {
-		snprintf(path, sizeof(path), "db.%" PRIu32 ".path", key_def->space_id);
-		sp_setstring(env, path, key_def->opts.path, 0);
-	}
-	/* db.upsert */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".upsert", key_def->space_id);
-	sp_setstring(env, path, (const void *)(uintptr_t)sophia_upsert_cb, 0);
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".upsert_arg", key_def->space_id);
-	sp_setstring(env, path, (const void *)key_def, 0);
-	/* db.compression */
-	if (key_def->opts.compression[0] != '\0') {
-		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression", key_def->space_id);
-		sp_setstring(env, path, key_def->opts.compression, 0);
-	}
-	/* db.compression_branch */
-	if (key_def->opts.compression_branch[0] != '\0') {
-		snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_branch", key_def->space_id);
-		sp_setstring(env, path, key_def->opts.compression_branch, 0);
-	}
-	/* db.compression_key */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".compression_key", key_def->space_id);
-	sp_setint(env, path, key_def->opts.compression_key);
-	/* db.node_preload */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_preload", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.node_preload"));
-	/* db.node_size */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".node_size", key_def->space_id);
-	sp_setint(env, path, key_def->opts.node_size);
-	/* db.page_size */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".page_size", key_def->space_id);
-	sp_setint(env, path, key_def->opts.page_size);
-	/* db.mmap */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".mmap", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.mmap"));
-	/* db.sync */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".sync", key_def->space_id);
-	sp_setint(env, path, cfg_geti("sophia.sync"));
-	/* db.amqf */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".amqf", key_def->space_id);
-	sp_setint(env, path, key_def->opts.amqf);
-	/* db.read_oldest */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".read_oldest", key_def->space_id);
-	sp_setint(env, path, key_def->opts.read_oldest);
-	/* db.expire */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".expire", key_def->space_id);
-	sp_setint(env, path, key_def->opts.expire);
-	/* db.path_fail_on_drop */
-	snprintf(path, sizeof(path), "db.%" PRIu32 ".path_fail_on_drop", key_def->space_id);
-	sp_setint(env, path, 0);
-	/* db */
-	snprintf(path, sizeof(path), "db.%" PRIu32, key_def->space_id);
-	void *db = sp_getobject(env, path);
+	/* create value field */
+	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
+	         key_def->space_id, key_def->iid);
+	sp_setstring(env, c, "value", 0);
+	/* get database object */
+	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32,
+	         key_def->space_id, key_def->iid);
+	void *db = sp_getobject(env, c);
 	if (db == NULL)
 		sophia_error(env);
 	return db;
+}
+
+static inline void
+sophia_ctl(char *path, int size, struct key_def *key_def, const char *name)
+{
+	snprintf(path, size, "db.%" PRIu32 ":%" PRIu32 ".%s",
+	         key_def->space_id, key_def->iid, name);
+}
+
+static inline void
+sophia_configure(struct space *space, struct key_def *key_def)
+{
+	SophiaEngine *engine =
+		(SophiaEngine *)space->handler->engine;
+	void *env = engine->env;
+	char c[128];
+	/* db.id */
+	sophia_ctl(c, sizeof(c), key_def, "id");
+	sp_setint(env, c, key_def->space_id);
+	/* db.path */
+	if (key_def->opts.path[0] != '\0') {
+		sophia_ctl(c, sizeof(c), key_def, "path");
+		sp_setstring(env, c, key_def->opts.path, 0);
+	}
+	/* db.upsert */
+	sophia_ctl(c, sizeof(c), key_def, "upsert");
+	sp_setstring(env, c, (const void *)(uintptr_t)sophia_upsert_cb, 0);
+	sophia_ctl(c, sizeof(c), key_def, "upsert_arg");
+	sp_setstring(env, c, (const void *)key_def, 0);
+	/* db.compression */
+	if (key_def->opts.compression[0] != '\0') {
+		sophia_ctl(c, sizeof(c), key_def, "compression");
+		sp_setstring(env, c, key_def->opts.compression, 0);
+	}
+	/* db.compression_branch */
+	if (key_def->opts.compression_branch[0] != '\0') {
+		sophia_ctl(c, sizeof(c), key_def, "compression_branch");
+		sp_setstring(env, c, key_def->opts.compression_branch, 0);
+	}
+	/* db.compression_key */
+	sophia_ctl(c, sizeof(c), key_def, "compression_key");
+	sp_setint(env, c, key_def->opts.compression_key);
+	/* db.node_preload */
+	sophia_ctl(c, sizeof(c), key_def, "node_preload");
+	sp_setint(env, c, cfg_geti("sophia.node_preload"));
+	/* db.node_size */
+	sophia_ctl(c, sizeof(c), key_def, "node_size");
+	sp_setint(env, c, key_def->opts.node_size);
+	/* db.page_size */
+	sophia_ctl(c, sizeof(c), key_def, "page_size");
+	sp_setint(env, c, key_def->opts.page_size);
+	/* db.mmap */
+	sophia_ctl(c, sizeof(c), key_def, "mmap");
+	sp_setint(env, c, cfg_geti("sophia.mmap"));
+	/* db.sync */
+	sophia_ctl(c, sizeof(c), key_def, "sync");
+	sp_setint(env, c, cfg_geti("sophia.sync"));
+	/* db.amqf */
+	sophia_ctl(c, sizeof(c), key_def, "amqf");
+	sp_setint(env, c, key_def->opts.amqf);
+	/* db.read_oldest */
+	sophia_ctl(c, sizeof(c), key_def, "read_oldest");
+	sp_setint(env, c, key_def->opts.read_oldest);
+	/* db.expire */
+	sophia_ctl(c, sizeof(c), key_def, "expire");
+	sp_setint(env, c, key_def->opts.expire);
+	/* db.path_fail_on_drop */
+	sophia_ctl(c, sizeof(c), key_def, "path_fail_on_drop");
+	sp_setint(env, c, 0);
 }
 
 SophiaIndex::SophiaIndex(struct key_def *key_def_arg)
@@ -187,9 +203,10 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg)
 	env = engine->env;
 	int rc;
 	sophia_workers_start(env);
-	db = sophia_configure(space, key_def);
+	db = sophia_configure_storage(space, key_def);
 	if (db == NULL)
 		sophia_error(env);
+	sophia_configure(space, key_def);
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
@@ -215,7 +232,7 @@ SophiaIndex::~SophiaIndex()
 		goto error;
 error:;
 	char *error = (char *)sp_getstring(env, "sophia.error", 0);
-	say_info("sophia space %d close error: %s",
+	say_info("sophia space %" PRIu32 " close error: %s",
 			 key_def->space_id, error);
 	free(error);
 }
@@ -223,19 +240,17 @@ error:;
 size_t
 SophiaIndex::size() const
 {
-	char name[128];
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.count",
-	         key_def->space_id);
-	return sp_getint(env, name);
+	char c[128];
+	sophia_ctl(c, sizeof(c), key_def, "index.count");
+	return sp_getint(env, c);
 }
 
 size_t
 SophiaIndex::bsize() const
 {
-	char name[128];
-	snprintf(name, sizeof(name), "db.%" PRIu32 ".index.memory_used",
-	         key_def->space_id);
-	return sp_getint(env, name);
+	char c[128];
+	sophia_ctl(c, sizeof(c), key_def, "index.memory_used");
+	return sp_getint(env, c);
 }
 
 struct tuple *

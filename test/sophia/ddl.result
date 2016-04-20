@@ -4,8 +4,8 @@ space = box.schema.space.create('test', { engine = 'sophia' })
 ...
 index = space:create_index('primary', {type = 'tree', parts = {3, 'num'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
-    key-parts must follow first and cannot be sparse'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia key
+    parts must follow first and cannot be sparse'
 ...
 space:drop()
 ---
@@ -16,8 +16,8 @@ space = box.schema.space.create('test', { engine = 'sophia' })
 ...
 index = space:create_index('primary', {type = 'tree', parts = {1, 'num', 3, 'num'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia TREE
-    key-parts must follow first and cannot be sparse'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': Sophia key
+    parts must follow first and cannot be sparse'
 ...
 space:drop()
 ---
@@ -31,8 +31,8 @@ index1 = space:create_index('primary')
 ...
 index2 = space:create_index('secondary')
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': Sophia TREE
-    secondary indexes are not supported'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': Sophia secondary
+    indexes are not supported'
 ...
 space:drop()
 ---
