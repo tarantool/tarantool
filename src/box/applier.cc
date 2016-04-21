@@ -39,6 +39,7 @@
 #include "coio_buf.h"
 #include "xstream.h"
 #include "recovery.h"
+#include "wal.h"
 #include "xrow.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"

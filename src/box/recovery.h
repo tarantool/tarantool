@@ -35,7 +35,6 @@
 #include "xlog.h"
 #include "vclock.h"
 #include "tt_uuid.h"
-#include "wal.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -83,8 +82,7 @@ void
 recovery_stop_local(struct recovery *r);
 
 void
-recovery_finalize(struct recovery *r, struct xstream *stream,
-		  enum wal_mode mode, int64_t rows_per_wal);
+recovery_finalize(struct recovery *r, struct xstream *stream);
 
 void
 recovery_fill_lsn(struct recovery *r, struct xrow_header *row);

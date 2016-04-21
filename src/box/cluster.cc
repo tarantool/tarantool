@@ -38,6 +38,7 @@
 
 #include "box.h"
 #include "recovery.h"
+#include "wal.h"
 #include "applier.h"
 
 /**

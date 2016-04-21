@@ -35,6 +35,7 @@
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
+#include "wal.h"
 #include "relay.h"
 #include "applier.h"
 #include <rmean.h>
@@ -1175,6 +1176,8 @@ box_free(void)
 	if (recovery) {
 		recovery_exit(recovery);
 		recovery = NULL;
+		if (wal)
+			wal_writer_stop();
 	}
 	/*
 	 * See gh-584 "box_free() is called even if box is not
@@ -1385,6 +1388,8 @@ box_init(void)
 		port_init();
 		iproto_init();
 		box_set_listen();
+		recovery_finalize(recovery, &wal_stream.base);
+
 		box_sync_replication_source();
 	} else {
 		/* TODO: don't create recovery for this case */
@@ -1407,8 +1412,10 @@ box_init(void)
 
 	int64_t rows_per_wal = box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	recovery_finalize(recovery, &wal_stream.base, wal_mode, rows_per_wal);
-
+	if (wal_mode != WAL_NONE) {
+		wal_writer_start(wal_mode, cfg_gets("wal_dir"), &SERVER_UUID,
+				 &recovery->vclock, rows_per_wal);
+	}
 	engine_end_recovery();
 
 	rmean_cleanup(rmean_box);
