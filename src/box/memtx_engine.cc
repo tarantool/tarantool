@@ -44,6 +44,7 @@
 #include "iproto_constants.h"
 #include "xrow.h"
 #include "xstream.h"
+#include "bootstrap.h"
 #include "cluster.h"
 #include "relay.h"
 #include "schema.h"
@@ -995,6 +996,29 @@ MemtxEngine::commit(struct txn *txn, int64_t signature)
 		if (stmt->old_tuple)
 			tuple_unref(stmt->old_tuple);
 	}
+}
+
+void
+MemtxEngine::bootstrap()
+{
+	/* Recover from bootstrap.snap */
+	say_info("initializing an empty data directory");
+	struct xdir dir;
+	xdir_create(&dir, "", SNAP, &uuid_nil);
+	FILE *f = fmemopen((void *) &bootstrap_bin,
+			   sizeof(bootstrap_bin), "r");
+	struct xlog *snap = xlog_open_stream_xc(&dir, 0, f, "bootstrap.snap");
+	struct xlog_cursor cursor;
+	xlog_cursor_open(&cursor, snap);
+	auto guard = make_scoped_guard([&]{
+		xlog_cursor_close(&cursor);
+		xlog_close(snap);
+		xdir_destroy(&dir);
+	});
+
+	struct xrow_header row;
+	while (xlog_cursor_next_xc(&cursor, &row) == 0)
+		recoverSnapshotRow(&row);
 }
 
 void

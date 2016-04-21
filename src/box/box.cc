@@ -1224,10 +1224,7 @@ bootstrap_cluster(void)
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&recovery->vclock, 0);
 
-	/* Process bootstrap.bin */
-	struct xstream bootstrap_stream;
-	xstream_create(&bootstrap_stream, apply_row);
-	recovery_bootstrap(recovery, &bootstrap_stream);
+	engine_bootstrap();
 
 	uint32_t server_id = 1;
 
