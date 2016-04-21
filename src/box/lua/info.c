@@ -135,7 +135,7 @@ lbox_info_server(struct lua_State *L)
 	lua_pushinteger(L, recovery->server_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&SERVER_ID), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&SERVER_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
 	luaL_pushint64(L, vclock_get(&recovery->vclock, recovery->server_id));
@@ -180,7 +180,7 @@ lbox_info_cluster(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&CLUSTER_ID), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&CLUSTER_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 
 	return 1;

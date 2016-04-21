@@ -141,7 +141,7 @@ recovery_new(const char *wal_dirname, bool panic_on_wal_error,
 		free(r);
 	});
 
-	xdir_create(&r->wal_dir, wal_dirname, XLOG, &SERVER_ID);
+	xdir_create(&r->wal_dir, wal_dirname, XLOG, &SERVER_UUID);
 	r->wal_dir.panic_if_error = panic_on_wal_error;
 
 	vclock_copy(&r->vclock, vclock);
@@ -386,7 +386,7 @@ recovery_finalize(struct recovery *r, struct xstream *stream,
 	}
 	if (wal_mode != WAL_NONE) {
 		wal_writer_start(wal_mode, r->wal_dir.dirname,
-				 &SERVER_ID, &r->vclock, rows_per_wal);
+				 &SERVER_UUID, &r->vclock, rows_per_wal);
 	}
 }
 

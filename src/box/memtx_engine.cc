@@ -609,7 +609,7 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 	m_panic_on_wal_error(panic_on_wal_error)
 {
 	flags = ENGINE_CAN_BE_TEMPORARY;
-	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_ID);
+	xdir_create(&m_snap_dir, snap_dirname, SNAP, &SERVER_UUID);
 	m_snap_dir.panic_if_error = panic_on_snap_error;
 	xdir_scan_xc(&m_snap_dir);
 	struct vclock *vclock = vclockset_last(&m_snap_dir.index);
@@ -681,7 +681,7 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	struct xlog *snap = xlog_open_xc(&m_snap_dir, lsn);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
-	SERVER_ID = snap->server_uuid;
+	SERVER_UUID = snap->server_uuid;
 
 	say_info("recovering from `%s'", snap->filename);
 	struct xlog_cursor cursor;
@@ -1129,7 +1129,7 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 {
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_ID);
+	xdir_create(&ckpt->dir, snap_dirname, SNAP, &SERVER_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
 	vclock_create(&ckpt->vclock);
@@ -1305,10 +1305,10 @@ MemtxEngine::join(struct xstream *stream)
 	struct xdir dir;
 	struct xlog *snap = NULL;
 	/*
-	 * snap_dirname and SERVER_ID don't change after start,
+	 * snap_dirname and SERVER_UUID don't change after start,
 	 * safe to use in another thread.
 	 */
-	xdir_create(&dir, m_snap_dir.dirname, SNAP, &SERVER_ID);
+	xdir_create(&dir, m_snap_dir.dirname, SNAP, &SERVER_UUID);
 
 	auto guard = make_scoped_guard([&]{
 		xdir_destroy(&dir);

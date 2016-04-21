@@ -1088,10 +1088,10 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * replica connect, and refuse a connection from a replica
 	 * which belongs to a different cluster.
 	 */
-	if (!tt_uuid_is_equal(&cluster_uuid, &CLUSTER_ID)) {
+	if (!tt_uuid_is_equal(&cluster_uuid, &CLUSTER_UUID)) {
 		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
 			  tt_uuid_str(&cluster_uuid),
-			  tt_uuid_str(&CLUSTER_ID));
+			  tt_uuid_str(&CLUSTER_UUID));
 	}
 
 	/* Check server uuid */
@@ -1144,8 +1144,9 @@ box_set_server_uuid()
 	boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "%u", 1);
 
 	/* Register local server */
-	tt_uuid_create(&SERVER_ID);
-	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s", 1, tt_uuid_str(&SERVER_ID));
+	tt_uuid_create(&SERVER_UUID);
+	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s", 1,
+	     tt_uuid_str(&SERVER_UUID));
 	assert(r->server_id == 1);
 
 	/* Ugly hack: bootstrap always starts from scratch */
@@ -1251,7 +1252,7 @@ bootstrap_from_master(struct server *master)
 	 */
 
 	/* Generate Server-UUID */
-	tt_uuid_create(&SERVER_ID);
+	tt_uuid_create(&SERVER_UUID);
 	applier_resume_to_state(applier, APPLIER_INITIAL_JOIN, TIMEOUT_INFINITY);
 
 	/*
