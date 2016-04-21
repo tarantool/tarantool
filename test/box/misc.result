@@ -293,11 +293,13 @@ t;
   - 'box.error.KEY_PART_TYPE : 18'
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.SOPHIA : 60'
+  - 'box.error.injection : table: <address>
+  - 'box.error.CONNECTION_TO_SELF : 117'
   - 'box.error.NO_SUCH_INDEX : 35'
   - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
   - 'box.error.TUPLE_IS_TOO_LONG : 27'
   - 'box.error.VIEW_IS_RO : 113'
-  - 'box.error.injection : table: <address>
+  - 'box.error.WRONG_SCHEMA_VERSION : 109'
   - 'box.error.ROLE_GRANTED : 90'
   - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'
@@ -308,7 +310,7 @@ t;
   - 'box.error.WRONG_INDEX_PARTS : 107'
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
-  - 'box.error.WRONG_SCHEMA_VERSION : 109'
+  - 'box.error.LOADING : 116'
   - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.SLAB_ALLOC_MAX : 110'
   - 'box.error.WRONG_INDEX_RECORD : 106'

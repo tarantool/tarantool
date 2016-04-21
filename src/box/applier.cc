@@ -127,11 +127,15 @@ applier_connect(struct applier *applier)
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&fiber()->diag);
 
+	applier_set_state(applier, APPLIER_CONNECTED);
+
+	/* Detect connection to itself */
+	if (tt_uuid_is_equal(&applier->uuid, &SERVER_UUID))
+		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
+
 	/* Perform authentication if user provided at least login */
-	if (!uri->login) {
-		applier_set_state(applier, APPLIER_CONNECTED);
+	if (!uri->login)
 		return;
-	}
 
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
@@ -156,9 +160,6 @@ applier_connect(struct applier *applier)
 static void
 applier_join(struct applier *applier)
 {
-	say_info("bootstraping replica from %s",
-		 sio_strfaddr(&applier->addr, applier->addr_len));
-
 	/* Send JOIN request */
 	struct ev_io *coio = &applier->io;
 	struct iobuf *iobuf = applier->iobuf;
@@ -317,8 +318,6 @@ applier_subscribe(struct applier *applier)
 static inline void
 applier_log_error(struct applier *applier, struct error *e)
 {
-	if (type_cast(FiberIsCancelled, e))
-		return;
 	if (applier->warning_said)
 		return;
 	switch (applier->state) {
@@ -346,10 +345,8 @@ applier_log_error(struct applier *applier, struct error *e)
 }
 
 static inline void
-applier_disconnect(struct applier *applier, struct error *e,
-		   enum applier_state state)
+applier_disconnect(struct applier *applier, enum applier_state state)
 {
-	applier_log_error(applier, e);
 	coio_close(loop(), &applier->io);
 	iobuf_reset(applier->iobuf);
 	applier_set_state(applier, state);
@@ -382,15 +379,32 @@ applier_f(va_list ap)
 			assert(0);
 			return 0;
 		} catch (ClientError *e) {
-			/* log logical error which caused replica to stop */
-			e->log();
-			applier_disconnect(applier, e, APPLIER_STOPPED);
-			throw;
+			if (e->errcode() == ER_CONNECTION_TO_SELF &&
+			    tt_uuid_is_equal(&applier->uuid, &SERVER_UUID)) {
+				/* Connection to itself, stop applier */
+				applier_disconnect(applier, APPLIER_OFF);
+				return 0;
+			} else if (e->errcode() != ER_LOADING) {
+				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_STOPPED);
+				throw;
+			}
+			assert(e->errcode() == ER_LOADING);
+			/*
+			 * Ignore ER_LOADING
+			 */
+			if (!applier->warning_said) {
+				say_info("bootstrap in progress...");
+				applier->warning_said = true;
+			}
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
+			/* fall through, try again later */
 		} catch (FiberIsCancelled *e) {
-			applier_disconnect(applier, e, APPLIER_OFF);
+			applier_disconnect(applier, APPLIER_OFF);
 			throw;
 		} catch (SocketError *e) {
-			applier_disconnect(applier, e, APPLIER_DISCONNECTED);
+			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			/* fall through */
 		}
 		/* Put fiber_sleep() out of catch block.

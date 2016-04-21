@@ -83,7 +83,7 @@ int box_snapshot(void);
 const char *box_status(void);
 
 void
-box_process_auth(struct request *request);
+box_process_auth(struct request *request, struct obuf *out);
 
 void
 box_process_call(struct request *request, struct obuf *out);
