@@ -2,6 +2,7 @@
 	path = third_party/luajit
 	url = https://github.com/tarantool/luajit.git
 	ignore = dirty
+	branch = tarantool-1.7
 [submodule "third_party/libyaml"]
 	path = third_party/libyaml
 	url = https://github.com/tarantool/libyaml.git
