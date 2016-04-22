@@ -131,8 +131,8 @@ static void
 tx_schedule_commit(struct cmsg *msg);
 
 static struct cmsg_hop wal_request_route[] = {
-	wal_write_to_disk, &wal_writer_singleton.tx_pipe,
-	tx_schedule_commit, NULL,
+	{wal_write_to_disk, &wal_writer_singleton.tx_pipe},
+	{tx_schedule_commit, NULL},
 };
 
 static void
@@ -318,7 +318,9 @@ wal_writer_stop()
 
 	/* Stop the worker thread. */
 	struct cmsg wakeup;
-	struct cmsg_hop route[1] = { wal_writer_stop_f, NULL };
+	struct cmsg_hop route[1] = {
+		{wal_writer_stop_f, NULL}
+	};
 	cmsg_init(&wakeup, route);
 
 	cpipe_push(&writer->wal_pipe, &wakeup);
@@ -375,8 +377,8 @@ int64_t
 wal_checkpoint(struct wal_writer *writer, struct vclock *vclock)
 {
 	static struct cmsg_hop wal_checkpoint_route[] = {
-		wal_checkpoint_f, &wal_writer_singleton.tx_pipe,
-		wal_checkpoint_done_f, NULL,
+		{wal_checkpoint_f, &wal_writer_singleton.tx_pipe},
+		{wal_checkpoint_done_f, NULL},
 	};
 	vclock_create(vclock);
 	struct wal_checkpoint msg;
