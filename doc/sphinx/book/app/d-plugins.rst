@@ -581,8 +581,8 @@ To end a session that began with :code:`pg.connect`, the request is:
 
 **Example:**
 
-    tarantool> conn:close()
-    ---
+    tarantool> conn:close() |br|
+    --- |br|
     ...
 
 For further information, including examples of rarely-used requests, see the

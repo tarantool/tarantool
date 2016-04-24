@@ -25,6 +25,7 @@
     msgpack
     net_box
     box_once
+    os
     pickle
     shard
     socket
