@@ -58,9 +58,13 @@ do
 
         local snap_name = sprintf('%020d.snap', tonumber(lsn))
         if fio.basename(last_snap) == snap_name then
-            log.debug('snapshot file %s already exists', last_snap)
+            if daemon.last_snap_name ~= snap_name then
+                daemon.last_snap_name = snap_name
+                log.debug('snapshot file %s already exists', last_snap)
+            end
             return false
         end
+        daemon.last_snap_name = snap_name
 
         local snstat = fio.stat(last_snap)
         if snstat == nil then
