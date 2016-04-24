@@ -308,7 +308,7 @@ access the same file simultaneously.
 
 .. fio-open:
 
-..function:: open(path-name[, flags[, mode]])
+.. function:: open(path-name[, flags[, mode]])
 
     Open a file in preparation for reading or writing or seeking.
 

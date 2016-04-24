@@ -1077,9 +1077,9 @@ A list of all ``box.space`` functions follows, then comes a list of all
     ``_cluster`` is a system tuple set
     for support of the :ref:`replication feature <box-replication>`.
 
-===================================================================
-          Example showing use of the box.space functions
-===================================================================
+=============================================================================
+          Example: use box.space functions to read _space tuples
+=============================================================================
 
 This function will illustrate how to look at all the spaces, and for each
 display: approximately how many tuples it contains, and the first field of
@@ -1134,3 +1134,61 @@ And here is what happens when one invokes the function:
       - _vpriv tuple_count =1 or more. first field in first tuple = 1
       - _cluster tuple_count =1 or more. first field in first tuple = 1
     ...
+
+===========================================================================
+          Example: use box.space functions to organize a _space tuple
+===========================================================================
+
+The objective is to display field names and field types of a system space --
+using metadata to find metadata.
+
+To begin: how can one select the _space tuple that describes _space?
+
+A simple way is to look at the constants in box.schema,
+which tell us that there is an item named SPACE_ID == 288,
+so these statements will retrieve the correct tuple: |br|
+:codenormal:`box.space._space:select{288}` |br|
+or |br|
+:codenormal:`box.space._space:select{box.schema.SPACE_ID}` |br|
+
+Another way is to look at the tuples in box.space._index,
+which tell us that there is a secondary index named 'name' for space
+number 288, so this statement also will retrieve the correct tuple: |br|
+:codenormal:`box.space._space.index.name:select{'_space'}`
+
+However, the retrieved tuple is not easy to read: |br|
+:codenormal:`tarantool>` :codebold:`box.space._space.index.name:select{'_space'}` |br|
+:codenormal:`---` |br|
+:codenormal:`- - [280, 1, '_space', 'memtx', 0, '', [{'name': 'id',` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`'type': 'num'}, {'name': 'owner','type': 'num'},` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`{'name': 'name','type': 'str'}, {'name': 'engine',` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`'type': 'str'},{'name': 'field_count', 'type': 'num'},` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`{'name': 'flags','type': 'str'}, {'name': 'format',` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`'type': '*'}]]` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`...`
+
+It looks disorganized because field number 7
+has been formatted with recommended names and data types.
+How can one get those specific sub-fields?
+Since it's visible that field number 7 is an array of maps,
+this `for` loop will do the organizing: |br|
+:codenormal:`local tuple_of_space, field_name, field_type` |br|
+:codenormal:`tuple_of_space = box.space._space.index.name:select{'_space'}[1]` |br|
+:codenormal:`for i = 1, #tuple_of_space[7], 1` |br|
+:codenormal:`do` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`field_name = tuple_of_space[7][i]['name']` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`field_type = tuple_of_space[7][i]['type']` |br|
+|nbsp| |nbsp| |nbsp| :codenormal:`print(field_name .. ',' ..field_type)` |br|
+:codenormal:`end`
+
+And here is what happens when one executes the `for` loop: |br|
+:codenormal:`id,num` |br|
+:codenormal:`owner,num` |br|
+:codenormal:`name,str` |br|
+:codenormal:`engine,str` |br|
+:codenormal:`field_count,num` |br|
+:codenormal:`flags,str` |br|
+:codenormal:`format,*`
+
+
+

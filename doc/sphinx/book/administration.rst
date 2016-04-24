@@ -496,6 +496,7 @@ Stop. The only clean way to stop my_app is with tarantoolctl, thus:
     $ sudo ./tarantoolctl stop my_app
 
 Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
+
 .. code-block:: console
 
     $ cd /
