@@ -590,7 +590,10 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	try {
 		/* Ensure we have sufficient space for the next round.  */
 		struct iobuf *iobuf;
-		if (mempool_count(&iproto_msg_pool) > IPROTO_MSG_MAX ||
+		if ((mempool_count(&iproto_msg_pool) > IPROTO_MSG_MAX &&
+			/* Don't stop connection if there is no pending requests */
+			(ibuf_used(&con->iobuf[0]->in) > con->parse_size ||
+			 ibuf_used(&con->iobuf[1]->in))) ||
 		    (iobuf = iproto_connection_input_iobuf(con)) == NULL) {
 
 			ev_io_stop(loop, &con->input);
