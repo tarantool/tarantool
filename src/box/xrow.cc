@@ -36,6 +36,7 @@
 #include "fiber.h"
 #include "version.h"
 
+#include "error.h"
 #include "vclock.h"
 #include "scramble.h"
 #include "iproto_constants.h"
@@ -359,7 +360,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *cluster_uuid,
 		if (mp_typeof(*d) != MP_UINT)
 			goto map_error;
 		int64_t lsn = (int64_t) mp_decode_uint(&d);
-		vclock_add_server(vclock, id);
 		if (lsn > 0)
 			vclock_follow(vclock, id, lsn);
 	}

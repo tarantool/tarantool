@@ -91,6 +91,7 @@ private:
 	/** Limit disk usage of checkpointing (bytes per second). */
 	uint64_t m_snap_io_rate_limit;
 	struct vclock m_last_checkpoint;
+	bool m_has_checkpoint;
 	bool m_panic_on_wal_error;
 };
 

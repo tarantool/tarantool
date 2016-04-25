@@ -119,7 +119,7 @@ print '-------------------------------------------------------------'
 # Test that insert is OK
 new_uuid = '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'
 server.admin("box.space._cluster:insert{{5, '{0}'}}".format(new_uuid))
-server.admin("box.info.vclock[5] == 0")
+server.admin("box.info.vclock[5] == nil")
 
 # Replace with the same UUID is OK
 server.admin("box.space._cluster:replace{{5, '{0}'}}".format(new_uuid))
@@ -131,7 +131,7 @@ server.admin("box.space._cluster:update(5, {{'=', 3, 'test'}})")
 # Delete is OK
 server.admin("box.space._cluster:delete(5)")
 # gh-1219: LSN must not be removed from vclock on unregister
-server.admin("box.info.vclock[5] == 0")
+server.admin("box.info.vclock[5] == nil")
 
 # Cleanup
 server.stop()
@@ -158,7 +158,7 @@ sys.stdout.push_filter(replica_uuid, '<replica uuid>')
 replica.admin('box.info.server.id == %d' % replica_id)
 replica.admin('not box.info.server.ro')
 replica.admin('box.info.server.lsn == 0')
-replica.admin('box.info.vclock[%d] == 0' % replica_id)
+replica.admin('box.info.vclock[%d] == nil' % replica_id)
 
 print '-------------------------------------------------------------'
 print 'Modify data to change LSN and check box.info'
@@ -174,7 +174,6 @@ print '-------------------------------------------------------------'
 master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id ~= %d' % replica_id)
-# Backward-compatibility: box.info.server.lsn is -1 instead of nil
 replica.admin('box.info.server.lsn == -1')
 # gh-1219: LSN must not be removed from vclock on unregister
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
@@ -223,7 +222,7 @@ replica.admin('box.info.server.id == %d' % replica_id2)
 replica.admin('not box.info.server.ro')
 replica.admin('box.info.server.lsn == 0')
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 
 print '-------------------------------------------------------------'
 print 'Check that server_id can\'t be changed by UPDATE'
@@ -236,7 +235,7 @@ replica.admin('box.info.server.id == %d' % replica_id2)
 replica.admin('not box.info.server.ro')
 replica.admin('box.info.server.lsn == 0')
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
-replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 replica.admin('box.info.vclock[%d] == nil' % replica_id3)
 
 print '-------------------------------------------------------------'
@@ -248,7 +247,7 @@ replica.wait_lsn(master_id, master.get_lsn(master_id))
 replica.admin('box.info.server.id ~= %d' % replica_id)
 # Backward-compatibility: box.info.server.lsn is -1 instead of nil
 replica.admin('box.info.server.lsn == -1')
-replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 
 print '-------------------------------------------------------------'
 print 'JOIN replica to read-only master'
@@ -278,7 +277,7 @@ master.admin("box.cfg{ replication_source = '%s' }" % replication_source)
 
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
 master.admin('box.info.vclock[%d] == 1' % replica_id)
-master.admin('box.info.vclock[%d] == 0' % replica_id2)
+master.admin('box.info.vclock[%d] == nil' % replica_id2)
 master.admin('box.info.vclock[%d] == nil' % replica_id3)
 
 master.admin("box.cfg{ replication_source = '' }")
@@ -310,8 +309,8 @@ replica.admin('not box.info.server.ro')
 # Replica should have the same vclock as master.
 master.admin('box.info.vclock[%d] == 1' % replica_id)
 replica.admin('box.info.vclock[%d] == 1' % replica_id)
-master.admin('box.info.vclock[%d] == 0' % replica_id2)
-replica.admin('box.info.vclock[%d] == 0' % replica_id2)
+master.admin('box.info.vclock[%d] == nil' % replica_id2)
+replica.admin('box.info.vclock[%d] == nil' % replica_id2)
 master.admin('box.info.vclock[%d] == nil' % replica_id3)
 replica.admin('box.info.vclock[%d] == nil' % replica_id3)
 

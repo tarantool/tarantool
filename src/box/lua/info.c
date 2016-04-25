@@ -138,7 +138,12 @@ lbox_info_server(struct lua_State *L)
 	lua_pushlstring(L, tt_uuid_str(&SERVER_UUID), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
-	luaL_pushint64(L, vclock_get(&recovery->vclock, recovery->server_id));
+	if (recovery->server_id != SERVER_ID_NIL) {
+		luaL_pushint64(L, vclock_get(&recovery->vclock,
+					     recovery->server_id));
+	} else {
+		luaL_pushint64(L, -1);
+	}
 	lua_settable(L, -3);
 	lua_pushliteral(L, "ro");
 	lua_pushboolean(L, box_is_ro());

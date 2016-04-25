@@ -768,7 +768,7 @@ box_register_server(uint32_t id, const struct tt_uuid *uuid)
 {
 	boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "%u%s",
 	     (unsigned) id, tt_uuid_str(uuid));
-	assert(vclock_has(&recovery->vclock, id));
+	assert(server_by_uuid(uuid) != NULL);
 }
 
 /**
@@ -1224,9 +1224,6 @@ engine_init()
 static void
 bootstrap_cluster(void)
 {
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&recovery->vclock, 0);
-
 	/* Process bootstrap.bin */
 	struct xstream bootstrap_stream;
 	xstream_create(&bootstrap_stream, apply_row);
@@ -1256,9 +1253,6 @@ bootstrap_cluster(void)
 
 	/* Ugly hack: bootstrap always starts from scratch */
 	vclock_create(&recovery->vclock);
-	server_foreach(server)
-		vclock_add_server(&recovery->vclock, server->id);
-	assert(vclock_sum(&recovery->vclock) == 0);
 }
 
 /**
@@ -1288,9 +1282,6 @@ bootstrap_from_master(struct server *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_join();
-
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&recovery->vclock, 0);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 
@@ -1371,8 +1362,6 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
-		/* Add a surrogate server id for snapshot rows */
-		vclock_add_server(&recovery->vclock, 0);
 		/* Tell Sophia engine LSN it must recover to. */
 		engine_recover_to_checkpoint(lsn);
 		/* Replace server vclock using the data from snapshot */

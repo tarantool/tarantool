@@ -100,22 +100,19 @@ vclock_create(struct vclock *vclock)
 	memset(vclock, 0, sizeof(*vclock));
 }
 
-static inline bool
-vclock_has(const struct vclock *vclock, uint32_t server_id)
-{
-	return server_id < VCLOCK_MAX && (vclock->map & (1 << server_id));
-}
-
 static inline int64_t
 vclock_get(const struct vclock *vclock, uint32_t server_id)
 {
-	return vclock_has(vclock, server_id) ? vclock->lsn[server_id] : -1;
+	if (server_id >= VCLOCK_MAX)
+		return 0;
+	return vclock->lsn[server_id];
 }
 
 static inline int64_t
 vclock_inc(struct vclock *vclock, uint32_t server_id)
 {
-	assert(vclock_has(vclock, server_id));
+	/* Easier add each time than check. */
+	vclock->map |= 1 << server_id;
 	vclock->signature++;
 	return ++vclock->lsn[server_id];
 }
@@ -147,20 +144,6 @@ static inline int64_t
 vclock_sum(const struct vclock *vclock)
 {
 	return vclock->signature;
-}
-
-/**
- * Add a new server to vclock.
- *
- * Please never, ever, ever remove servers with LSN > 0 from vclock!
- * The vclock_sum() must always grow, it is a core invariant of the recovery
- * subsystem!
- */
-static inline void
-vclock_add_server_nothrow(struct vclock *vclock, uint32_t server_id)
-{
-	assert(server_id < VCLOCK_MAX);
-	vclock->map |= 1 << server_id;
 }
 
 int64_t
@@ -266,18 +249,6 @@ vclockset_match(vclockset_t *set, struct vclock *key)
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "error.h"
-
-static inline void
-vclock_add_server(struct vclock *vclock, uint32_t server_id)
-{
-	if (server_id >= VCLOCK_MAX)
-		tnt_raise(LoggedError, ER_REPLICA_MAX, server_id);
-	assert(! vclock_has(vclock, server_id));
-	vclock_add_server_nothrow(vclock, server_id);
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_VCLOCK_H */

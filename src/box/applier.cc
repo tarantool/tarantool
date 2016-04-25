@@ -46,6 +46,7 @@
 #include "version.h"
 #include "trigger.h"
 #include "xrow_io.h"
+#include "error.h"
 
 /* TODO: add configuration options */
 static const int RECONNECT_DELAY = 1;

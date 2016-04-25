@@ -45,7 +45,7 @@ r.vclock[1] > 0
 ---
 - true
 ...
-r.vclock[2] == 0
+r.vclock[2] == nil
 ---
 - true
 ...

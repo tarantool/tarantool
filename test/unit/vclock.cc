@@ -49,12 +49,10 @@ test_compare_one(uint32_t a_count, const int64_t *lsns_a,
 	vclock_create(&a);
 	vclock_create(&b);
 	for (uint32_t node_id = 0; node_id < a_count; node_id++) {
-		vclock_add_server(&a, node_id);
 		if (lsns_a[node_id] > 0)
 			vclock_follow(&a, node_id, lsns_a[node_id]);
 	}
 	for (uint32_t node_id = 0; node_id < b_count; node_id++) {
-		vclock_add_server(&b, node_id);
 		if (lsns_b[node_id] > 0)
 			vclock_follow(&b, node_id, lsns_b[node_id]);
 	}
@@ -227,7 +225,6 @@ test_isearch()
 			if (lsn <= 0)
 				continue;
 
-			vclock_add_server(&vclock, node_id);
 			vclock_follow(&vclock, node_id, lsn);
 		}
 
@@ -249,8 +246,6 @@ test_tostring_one(uint32_t count, const int64_t *lsns, const char *res)
 	struct vclock vclock;
 	vclock_create(&vclock);
 	for (uint32_t node_id = 0; node_id < count; node_id++) {
-		if (lsns[node_id] >= 0)
-			vclock_add_server(&vclock, node_id);
 		if (lsns[node_id] > 0)
 			vclock_follow(&vclock, node_id, lsns[node_id]);
 	}
@@ -279,7 +274,7 @@ test_tostring()
 	test(arg(10, 15, 20), "{0: 10, 1: 15, 2: 20}");
 	test(arg(10, -1, 15, -1, 20), "{0: 10, 2: 15, 4: 20}");
 	test(arg(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
-	     "{0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, "
+	     "{1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, "
 	      "9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15}");
 	test(arg(9223372036854775000, 9223372036854775001, 9223372036854775002,
 		 9223372036854775003, 9223372036854775004, 9223372036854775005,

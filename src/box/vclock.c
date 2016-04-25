@@ -48,7 +48,7 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 		      (long long) prev_lsn, (long long) lsn);
 	}
 	/* Easier add each time than check. */
-	vclock_add_server_nothrow(vclock, server_id);
+	vclock->map |= 1 << server_id;
 	vclock->lsn[server_id] = lsn;
 	vclock->signature += lsn - prev_lsn;
 	return prev_lsn;
@@ -162,9 +162,9 @@ vclock_from_string(struct vclock *vclock, const char *str)
 			errno = 0;
 			lsn = strtoll(p, (char **)  &p, 10);
 			if (errno != 0 || lsn < 0 || lsn > INT64_MAX ||
-			    vclock_has(vclock, server_id))
+			    server_id >= VCLOCK_MAX || vclock->lsn[server_id] > 0)
 				goto error;
-			vclock_add_server_nothrow(vclock, server_id);
+			vclock->map |= 1 << server_id;
 			vclock->lsn[server_id] = lsn;
 			goto comma;
 		}

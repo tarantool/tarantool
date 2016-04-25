@@ -57,7 +57,7 @@ box.space._cluster:insert{5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'}
 ---
 - [5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95']
 ...
-box.info.vclock[5] == 0
+box.info.vclock[5] == nil
 ---
 - true
 ...
@@ -77,7 +77,7 @@ box.space._cluster:delete(5)
 ---
 - [5, '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95', 'test']
 ...
-box.info.vclock[5] == 0
+box.info.vclock[5] == nil
 ---
 - true
 ...
@@ -99,7 +99,7 @@ box.info.server.lsn == 0
 ---
 - true
 ...
-box.info.vclock[2] == 0
+box.info.vclock[2] == nil
 ---
 - true
 ...
@@ -219,7 +219,7 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...
@@ -247,7 +247,7 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...
@@ -270,7 +270,7 @@ box.info.server.lsn == -1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...
@@ -288,7 +288,7 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...
@@ -326,11 +326,11 @@ box.info.vclock[2] == 1
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...
-box.info.vclock[10] == 0
+box.info.vclock[10] == nil
 ---
 - true
 ...

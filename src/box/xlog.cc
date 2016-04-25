@@ -40,6 +40,8 @@
 #include "third_party/tarantool_eio.h"
 #include <msgpuck.h>
 #include "scoped_guard.h"
+
+#include "error.h"
 #include "xrow.h"
 #include "iproto_constants.h"
 

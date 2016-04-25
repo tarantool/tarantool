@@ -12,7 +12,7 @@ r.status == "follow"
 r.lag < 1
 r.idle < 1
 r.vclock[1] > 0
-r.vclock[2] == 0
+r.vclock[2] == nil
 r.uuid ~= nil
 
 box.space._schema:insert({'dup'})

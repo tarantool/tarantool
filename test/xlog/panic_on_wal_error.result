@@ -156,7 +156,7 @@ box.info.replication[1].status
 ...
 box.info.replication[1].message
 ---
-- 'Missing .xlog file between LSN 6 {1: 6, 2: 0} and 8 {1: 8}'
+- 'Missing .xlog file between LSN 6 {1: 6} and 8 {1: 8}'
 ...
 box.space.test:select{}
 ---

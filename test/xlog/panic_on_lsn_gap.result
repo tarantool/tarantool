@@ -26,7 +26,7 @@ test_run:cmd("switch panic")
 ...
 box.info.vclock
 ---
-- {1: 0}
+- {}
 ...
 s = box.space._schema
 ---

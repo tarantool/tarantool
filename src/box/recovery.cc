@@ -106,7 +106,8 @@ recovery_fill_lsn(struct recovery *r, struct xrow_header *row)
 		row->lsn = vclock_inc(&r->vclock, r->server_id);
 	} else {
 		/* Replication request. */
-		if (!vclock_has(&r->vclock, row->server_id)) {
+		if (server_id_is_reserved(row->server_id) ||
+		    row->server_id >= VCLOCK_MAX) {
 			/*
 			 * A safety net, this can only occur
 			 * if we're fed a strangely broken xlog.

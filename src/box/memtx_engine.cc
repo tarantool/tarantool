@@ -615,8 +615,10 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool panic_on_snap_error,
 	struct vclock *vclock = vclockset_last(&m_snap_dir.index);
 	if (vclock) {
 		vclock_copy(&m_last_checkpoint, vclock);
+		m_has_checkpoint = true;
 	} else {
 		vclock_create(&m_last_checkpoint);
+		m_has_checkpoint = false;
 	}
 }
 
@@ -629,10 +631,12 @@ MemtxEngine::~MemtxEngine()
 int64_t
 MemtxEngine::lastCheckpoint(struct vclock *vclock)
 {
-	if (vclock)
-		vclock_copy(vclock, &m_last_checkpoint);
+	if (!m_has_checkpoint)
+		return -1;
+	assert(vclock);
+	vclock_copy(vclock, &m_last_checkpoint);
 	/* Return the lsn of the last checkpoint. */
-	return vclock_size(&m_last_checkpoint) ? vclock_sum(&m_last_checkpoint) : -1;
+	return vclock->signature;
 }
 
 void
@@ -1263,6 +1267,7 @@ MemtxEngine::commitCheckpoint()
 		panic("can't rename .snap.inprogress");
 
 	vclock_copy(&m_last_checkpoint, &m_checkpoint->vclock);
+	m_has_checkpoint = true;
 	checkpoint_destroy(m_checkpoint);
 	m_checkpoint = 0;
 }
@@ -1302,6 +1307,15 @@ MemtxEngine::abortCheckpoint()
 void
 MemtxEngine::join(struct xstream *stream)
 {
+	/*
+	 * The only case when the directory index is empty is
+	 * when someone has deleted a snapshot and tries to join
+	 * as a replica. Our best effort is to not crash in such
+	 * case: raise ER_MISSING_SNAPSHOT.
+	 */
+	if (!m_has_checkpoint)
+		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+
 	struct xdir dir;
 	struct xlog *snap = NULL;
 	/*
@@ -1309,20 +1323,12 @@ MemtxEngine::join(struct xstream *stream)
 	 * safe to use in another thread.
 	 */
 	xdir_create(&dir, m_snap_dir.dirname, SNAP, &SERVER_UUID);
-
 	auto guard = make_scoped_guard([&]{
 		xdir_destroy(&dir);
 		if (snap)
 			xlog_close(snap);
 	});
-	/*
-	 * The only case when the directory index is empty is
-	 * when someone has deleted a snapshot and tries to join
-	 * as a replica. Our best effort is to not crash in such
-	 * case: xlog_open_xc will throw "file not found" error.
-	 */
 	struct vclock *last = &m_last_checkpoint;
-	assert(vclock_size(last));
 	snap = xlog_open_xc(&dir, vclock_sum(last));
 	struct xlog_cursor cursor;
 	xlog_cursor_open(&cursor, snap);
