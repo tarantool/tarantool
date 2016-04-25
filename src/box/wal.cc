@@ -342,6 +342,7 @@ struct wal_checkpoint: public cmsg
 {
 	struct vclock *vclock;
 	struct fiber *fiber;
+	bool rotate;
 };
 
 void
@@ -352,7 +353,7 @@ wal_checkpoint_f(struct cmsg *data)
 	/*
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
-	if (writer->current_wal != NULL &&
+	if (msg->rotate && writer->current_wal != NULL &&
 	    vclock_sum(&writer->current_wal->vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
@@ -373,8 +374,8 @@ wal_checkpoint_done_f(struct cmsg *data)
 	fiber_wakeup(msg->fiber);
 }
 
-int64_t
-wal_checkpoint(struct wal_writer *writer, struct vclock *vclock)
+void
+wal_checkpoint(struct wal_writer *writer, struct vclock *vclock, bool rotate)
 {
 	static struct cmsg_hop wal_checkpoint_route[] = {
 		{wal_checkpoint_f, &wal_writer_singleton.tx_pipe},
@@ -385,9 +386,11 @@ wal_checkpoint(struct wal_writer *writer, struct vclock *vclock)
 	cmsg_init(&msg, wal_checkpoint_route);
 	msg.vclock = vclock;
 	msg.fiber = fiber();
+	msg.rotate = rotate;
 	cpipe_push(&writer->wal_pipe, &msg);
+	fiber_set_cancellable(false);
 	fiber_yield();
-	return vclock_size(vclock) ? vclock_sum(vclock) : -1;
+	fiber_set_cancellable(true);
 }
 
 /**
