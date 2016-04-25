@@ -24,9 +24,6 @@ _ = test_run:cmd("switch autobootstrap3")
 box.info.vclock
 _ = test_run:cmd("switch default")
 
-vclock = test_run:get_vclock('autobootstrap1')
-vclock
-
 --
 -- Insert rows on each server
 --
@@ -42,9 +39,8 @@ _ = test_run:cmd("switch default")
 -- Synchronize
 --
 
-for i, v in ipairs(vclock) do vclock[i] = v + 1 end
-vclock
-for _, name in pairs(SERVERS) do test_run:wait_vclock(name, vclock) end
+vclock = test_run:get_cluster_vclock(SERVERS)
+test_run:wait_cluster_vclock(SERVERS, vclock)
 
 --
 -- Check result
