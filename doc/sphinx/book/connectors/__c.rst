@@ -2,13 +2,20 @@
                             C
 =====================================================================
 
+Here follow two examples of using Tarantool's high-level C API.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                         Example 1
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Here is a complete C program that inserts :code:`[99999,'B']` into
 space :code:`examples` via the high-level C API.
 
-.. code-block
+.. code-block:: c
 
     #include <stdio.h>
     #include <stdlib.h>
+    
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
@@ -34,8 +41,8 @@ space :code:`examples` via the high-level C API.
        tnt_stream_free(tnt);
     }
 
-To prepare, paste the code into a file named example.c and install
-tarantool-c. One way to install tarantool-c (using Ubuntu) is:
+Paste the code into a file named :file:`example.c` and install ``tarantool-c``.
+One way to install ``tarantool-c`` (using Ubuntu) is:
 
 .. code-block:: console
 
@@ -53,14 +60,18 @@ To compile and link the program, say:
 
     $ # sometimes this is necessary:
     $ export LD_LIBRARY_PATH=/usr/local/lib
-    $ gcc -o example example.c -ltarantool -ltarantoolnet
+    $ gcc -o example example.c -ltarantool
 
 Before trying to run,
-check that the server is listening and that :code:`examples` exists, as :ref:`described earlier <connector-setting>`.
+check that the server is listening and that the space :code:`examples` exists, as 
+:ref:`described earlier <connector-setting>`.
 To run the program, say :code:`./example`. The program will connect
 to the server, and will send the request.
-If tarantool is not running on localhost with listen address = 3301, the program will print “Connection refused”.
-If the insert fails, the program will print "Insert failed" and an error number.
+If Tarantool is not running on localhost with listen address = 3301, the program
+will print “Connection refused”.
+If the insert fails, the program will print "Insert failed" and an error number
+(see all error codes in the file 
+`/src/box/errcode.h <https://github.com/tarantool/tarantool/blob/1.6/src/box/errcode.h>`_).
 
 Here are notes corresponding to comments in the example program.
 
@@ -71,10 +82,10 @@ Here are notes corresponding to comments in the example program.
     struct tnt_stream *tnt = tnt_net(NULL);
     tnt_set(tnt, TNT_OPT_URI, "localhost:3301");
 
-In this program the stream will be named :code:`tnt`.
-Before connecting on the tnt stream, some options may have to be set.
+In this program, the stream will be named :code:`tnt`.
+Before connecting on the :code:`tnt` stream, some options may have to be set.
 The most important option is TNT_OPT_URI.
-In this program the URI is ``localhost:3301``, since that is where the
+In this program, the URI is ``localhost:3301``, since that is where the
 Tarantool server is supposed to be listening.
 
 Function description:
@@ -100,7 +111,7 @@ Function description:
 
     int tnt_connect(struct tnt_stream \*s)
 
-The connect might fail for a variety of reasons, such as:
+The connection might fail for a variety of reasons, such as:
 the server is not running, or the URI contains an invalid password.
 If the connect fails, the return value will be -1.
 
@@ -112,8 +123,8 @@ the contents of a tuple.
     struct tnt_stream *tuple = tnt_object(NULL);
     tnt_object_format(tuple, "[%d%s]", 99999, "B");
 
-In this program the request will
-be an insert, and the tuple contents will be an integer
+In this program, the request will
+be an INSERT, and the tuple contents will be an integer
 and a string. This is a simple serial set of values, that
 is, there are no sub-structures or arrays. Therefore it
 is easy in this case to format what will be passed using
@@ -136,9 +147,10 @@ requests in the box library.
     tnt_insert(tnt, 999, tuple);
     tnt_flush(tnt);
 
-In this program the choice is to do an insert request, so
-the program passes the tnt_stream that was used for connection
-(:code:`tnt`) and the stream that was set up with tnt_object_format (:code:`tuple`).
+In this program, the choice is to do an INSERT request, so
+the program passes the ``tnt_stream`` that was used for connection
+(:code:`tnt`) and the stream that was set up with :func:`tnt_object_format`
+(:code:`tuple`).
 
 Function description:
 
@@ -153,8 +165,8 @@ Function description:
     ssize_t tnt_update(struct tnt_stream \*s, uint32_t space, uint32_t index,
                        struct tnt_stream \*key, struct tnt_stream \*ops)
 
-**GET REPLY:** For most requests the client will receive a reply containing some indication
-whether the result was successful, and a set of tuples.
+**GET REPLY:** For most requests, the client will receive a reply containing some
+indication whether the result was successful, and a set of tuples.
 
 .. code-block:: c
 
@@ -175,7 +187,7 @@ Function description:
     void tnt_reply_free(struct tnt_reply \*r)
 
 **TEARDOWN:** When a session ends, the connection that was made with
-tnt_connect() should be closed and the objects that were made in the setup
+:func:`tnt_connect()` should be closed, and the objects that were made in the setup
 should be destroyed.
 
 .. code-block:: c
@@ -192,18 +204,25 @@ Function description:
     void tnt_close(struct tnt_stream \*s)
     void tnt_stream_free(struct tnt_stream \*s)
 
-A second example.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                         Example 2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Here is a complete C program that selects, using index key :code:`[99999]`, from
 space :code:`examples` via the high-level C API.
-To display the results the program uses functions in the
+To display the results, the program uses functions in the
 `MsgPuck`_ library which allow decoding of `MessagePack`_  arrays.
 
 .. code-block:: c
 
     #include <stdio.h>
+    
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
+
+    #define MP_SOURCE 1
+    #include <msgpuck.h>
 
     void main() {
         struct tnt_stream *tnt = tnt_net(NULL);
@@ -261,8 +280,20 @@ To display the results the program uses functions in the
         tnt_stream_free(tnt);
     }
 
-The example programs only show a few requests and do not show all that's
-necessary for good practice. For that, see http://github.com/tarantool/tarantool-c.
+Similarly to the first example, paste the code into a file named 
+:file:`example2.c`.
+
+To compile and link the program, say:
+
+.. code-block:: console
+
+    $ gcc -o example2 example2.c -ltarantool
+
+To run the program, say :code:`./example2`.
+
+The two example programs only show a few requests and do not show all that's
+necessary for good practice. See more in the ``tarantool-c`` documentation at 
+http://github.com/tarantool/tarantool-c.
 
 .. _MsgPuck: http://rtsisyk.github.io/msgpuck/
 .. _MessagePack: https://en.wikipedia.org/wiki/MessagePack
