@@ -172,29 +172,29 @@ do
             if interval == nil then
                 break
             end
-            if self.control:get(interval) == nil then
+            fiber.sleep(interval)
+            if self.reloaded ~= true then
                 local s, e = pcall(process, self)
 
                 if not s then
                     log.error(e)
                 end
             else
+                self.reloaded = false
                 log.info("reloaded")
             end
         end
         log.info("stopped")
-        self.control:close()
-        self.control = nil
         self.fiber = nil
     end
 
     local function reload(self)
         if self.snapshot_period > 0 and self.fiber == nil then
-            self.control = fiber.channel(5)
             self.fiber = fiber.create(daemon_fiber, self)
         elseif self.fiber ~= nil then
             -- wake up daemon
-            self.control:put(true)
+            self.reloaded = true
+            fiber.wakeup(self.fiber)
         end
     end
 
