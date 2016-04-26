@@ -130,13 +130,11 @@ Here is what might appear in the log file in a typical installation:
     Define a trigger for execution during authentication.
 
     The on_auth trigger function is invoked in these circumstances:
-    (1) The :func:`console.connect` function includes an authentication check
-        for all users except 'guest'; for this case the on_auth trigger function
-        is invoked after the on_connect trigger function, if and only if the
-        connection has succeeded so far.
-    (2) The binary protocol has a separate
-        :ref:`authentication packet <iproto-authentication>` -- for this case,
-        connection and authentication are considered to be separate steps.
+    (1) The :func:`console.connect` function includes an authentication check for all users except 'guest';
+    for this case the on_auth trigger function is invoked after the on_connect trigger function,
+    if and only if the connection has succeeded so far.
+    (2) The binary protocol has a separate :ref:`authentication packet <iproto-authentication>` --
+    for this case, connection and authentication are considered to be separate steps.
 
     Unlike other trigger types, on_auth trigger functions are invoked `before`
     the event. Therefore a trigger function like :code:`function auth_function () v = box.session.user(); end`
@@ -252,13 +250,16 @@ each trigger by replacing with ``nil``.
                     Getting a list of triggers
 ===========================================================
 
-The code :code:`on_connect()` -- with no arguments -- returns a table of all
-connect-trigger functions; :code:`on_auth()` returns all authentication-trigger
-functions; :code:`on_disconnect()` returns all disconnect-trigger functions;
-:code:`on_replace()` returns all replace-trigger functions. In the following
-example a user finds that there are three functions associated with
-:code:`on_connect` triggers, and executes the third function, which happens to
-contain the line "print('function #3')". Then it deletes the third trigger.
+The code :code:`on_connect()` -- with no arguments --
+returns a table of all connect-trigger functions;
+:code:`on_auth()` returns all authentication-trigger functions;
+:code:`on_disconnect()` returns all disconnect-trigger functions;
+:code:`on_replace()` returns all replace-trigger functions.
+In the following example a user finds that there are
+three functions associated with :code:`on_connect`
+triggers, and executes the third function, which happens to
+contain the line "print('function #3')".
+Then it deletes the third trigger.
 
 .. code-block:: tarantoolsession
 

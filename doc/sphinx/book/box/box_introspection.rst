@@ -161,7 +161,7 @@ requests since startup, broken down by request type and network events statistic
 
 .. code-block:: tarantoolsession
 
-    tarantool> type(box.stat), type(box.stat.net) -- a virtual tables
+    tarantool> type(box.stat), type(box.stat.net) -- virtual tables
     ---
     - table
     - table

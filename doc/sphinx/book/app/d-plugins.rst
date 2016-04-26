@@ -40,6 +40,7 @@ From a user's point of view the MySQL and PostgreSQL rocks are
 very similar, so the following sections -- "MySQL Example" and
 "PostgreSQL Example" -- contain some redundancy.
 
+.. _d-plugins-mysql-example:
 
 ===========================================================
                   MySQL Example
@@ -379,6 +380,8 @@ Lua tutorial earlier in the Tarantool user manual.
 Observe the result. It contains "MySQL row". So this is the row that was inserted
 into the MySQL database. And now it's been selected with the Tarantool client.
 
+.. _d-plugins-postgresql-example:
+
 ===========================================================
                   PostgreSQL Example
 ===========================================================
@@ -578,8 +581,8 @@ To end a session that began with :code:`pg.connect`, the request is:
 
 **Example:**
 
-    tarantool> conn:close()
-    ---
+    tarantool> conn:close() |br|
+    --- |br|
     ...
 
 For further information, including examples of rarely-used requests, see the

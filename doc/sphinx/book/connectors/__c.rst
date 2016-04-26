@@ -216,7 +216,7 @@ To display the results, the program uses functions in the
 .. code-block:: c
 
     #include <stdio.h>
-    
+    #include <stdlib.h>
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>

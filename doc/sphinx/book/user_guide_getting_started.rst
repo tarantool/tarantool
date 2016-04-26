@@ -227,7 +227,7 @@ You can repeat :code:`box.space...:insert{}` and :code:`box.space...:select{}`
 indefinitely, on either Tarantool instance.
 When the testing is over: To drop the space: :code:`s:drop()`.
 To stop tarantool: Ctrl+C. To stop tarantool (an alternative):
-:code:`os.exit()`. To stop tarantool (from another terminal):
+:ref:`os.exit() <os-exit>`. To stop tarantool (from another terminal):
 :code:`sudo pkill -f tarantool`.
 To destroy the test: :code:`rm -r ~/tarantool_sandbox`.
 
