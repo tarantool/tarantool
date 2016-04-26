@@ -887,7 +887,7 @@ ss_bufinit_reserve(ssbuf *b, void *buf, int size)
 {
 	b->reserve = buf;
 	b->s = buf;
-	b->p = b->s; 
+	b->p = b->s;
 	b->e = b->s + size;
 }
 
@@ -1912,7 +1912,7 @@ ssiterif ss_bufiterref =
  * Copyright (c) 2008-2010 Massachusetts Institute of Technology
  * Copyright (c) 2004-2006 Intel Corporation
  *
- * This software program is licensed subject to the BSD License, 
+ * This software program is licensed subject to the BSD License,
  * available at http://www.opensource.org/licenses/bsd-license.html
 */
 
@@ -7791,7 +7791,7 @@ ssaif ss_ooma =
 	.malloc  = ss_oomamalloc,
 	.ensure  = ss_oomaensure,
 	.realloc = ss_oomarealloc,
-	.free    = ss_oomafree 
+	.free    = ss_oomafree
 };
 
 /*
@@ -8503,7 +8503,7 @@ ssaif ss_stda =
 	.malloc  = ss_stdamalloc,
 	.ensure  = NULL,
 	.realloc = ss_stdarealloc,
-	.free    = ss_stdafree 
+	.free    = ss_stdafree
 };
 
 static inline int
@@ -14697,7 +14697,7 @@ int sr_conf_read(srconf *m, srconfstmt *s)
 		char *string = m->value;
 		if (string == NULL)
 			break;
-		int size = strlen(string) + 1; 
+		int size = strlen(string) + 1;
 		s->valuesize = size;
 		*result = malloc(size);
 		if (ssunlikely(*result == NULL))
