@@ -219,6 +219,7 @@ sophia_upsert_prepare(char **src, uint32_t *src_size,
 {
 	/* calculate msgpack size */
 	uint32_t i = 0;
+	*mp_size_key = 0;
 	while (i < key_def->part_count) {
 		if (key_def->parts[i].type == STRING)
 			*mp_size_key += mp_sizeof_str(src_size[i]);
