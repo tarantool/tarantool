@@ -39,7 +39,7 @@
 #include "space.h"
 #include "txn.h"
 #include "cfg.h"
-#include <sophia.h>
+#include "sophia.h"
 #include <stdio.h>
 #include <inttypes.h>
 #include <bit/bit.h> /* load/store */

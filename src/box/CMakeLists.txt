@@ -46,6 +46,7 @@ add_library(box STATIC
     sophia_engine.cc
     sophia_space.cc
     sophia_index.cc
+    sophia.c
     space.cc
     func.cc
     alter.cc

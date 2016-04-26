@@ -41,7 +41,7 @@
 #include "port.h"
 #include "request.h"
 #include "iproto_constants.h"
-#include <sophia.h>
+#include "sophia.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
