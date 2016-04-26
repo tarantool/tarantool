@@ -1061,8 +1061,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	/* TODO: use WAL vclock instead of TX vclock */
-	vclock_copy(&stop_vclock, &recovery->vclock);
+	wal_checkpoint(wal, &stop_vclock, false);
 
 	/* Send end of initial stage data marker */
 	xrow_encode_vclock(&row, &stop_vclock);
@@ -1077,7 +1076,9 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
-	xrow_encode_vclock(&row, &recovery->vclock);
+	struct vclock current_vclock;
+	wal_checkpoint(wal, &current_vclock, false);
+	xrow_encode_vclock(&row, &current_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -1133,7 +1134,9 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * and identify ourselves with our own server id.
 	 */
 	struct xrow_header row;
-	xrow_encode_vclock(&row, &recovery->vclock);
+	struct vclock current_vclock;
+	wal_checkpoint(wal, &current_vclock, true);
+	xrow_encode_vclock(&row, &current_vclock);
 	/*
 	 * Identify the message with the server id of this
 	 * server, this is the only way for a replica to find
@@ -1458,9 +1461,8 @@ box_snapshot()
 	struct vclock vclock;
 	if (wal == NULL) {
 		vclock_copy(&vclock, &recovery->vclock);
-	} else if (wal_checkpoint(wal, &vclock) == -1) {
-		rc = EIO;
-		goto end;
+	} else {
+		wal_checkpoint(wal, &vclock, true);
 	}
 	rc = engine_commit_checkpoint(&vclock);
 end:

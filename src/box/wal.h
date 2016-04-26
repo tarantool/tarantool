@@ -67,17 +67,6 @@ struct wal_request {
 int64_t
 wal_write(struct wal_writer *writer, struct wal_request *req);
 
-/**
- * Wait till all pending changes to the WAL are flushed.
- * Rotates the WAL.
- *
- * @param[out] vclock WAL vclock
- *
- * @retval -1  error
- * @retval lsn  success
- */
-int64_t
-wal_checkpoint(struct wal_writer *writer, struct vclock *vclock);
 
 void
 wal_writer_start(enum wal_mode wal_mode, const char *wal_dirname,
@@ -109,6 +98,22 @@ wal_clear_watcher(struct wal_writer *, struct wal_watcher *);
 void
 wal_atfork();
 
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+ * Wait till all pending changes to the WAL are flushed.
+ * Rotates the WAL.
+ *
+ * @param[out] vclock WAL vclock
+ *
+ */
+void
+wal_checkpoint(struct wal_writer *writer, struct vclock *vclock,
+	       bool rotate);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_WAL_WRITER_H_INCLUDED */
