@@ -30,29 +30,7 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - pid_file
-    - <hidden>
-  - - read_only
-    - false
-  - - readahead
-    - 16320
-  - - rows_per_wal
-    - 500000
-  - - slab_alloc_arena
-    - 0.1
-  - - slab_alloc_factor
-    - 1.1
-  - - slab_alloc_maximal
-    - <hidden>
-  - - slab_alloc_minimal
-    - <hidden>
-  - - snap_dir
-    - <hidden>
-  - - snapshot_count
-    - 6
-  - - snapshot_period
-    - 0
-  - - sophia
+  - - phia
     - - - branch_age
         - 0
       - - branch_age_period
@@ -79,8 +57,30 @@ cfg_filter(box.cfg)
         - 2
       - - threads
         - 5
-  - - sophia_dir
+  - - phia_dir
     - <hidden>
+  - - pid_file
+    - <hidden>
+  - - read_only
+    - false
+  - - readahead
+    - 16320
+  - - rows_per_wal
+    - 500000
+  - - slab_alloc_arena
+    - 0.1
+  - - slab_alloc_factor
+    - 1.1
+  - - slab_alloc_maximal
+    - <hidden>
+  - - slab_alloc_minimal
+    - <hidden>
+  - - snap_dir
+    - <hidden>
+  - - snapshot_count
+    - 6
+  - - snapshot_period
+    - 0
   - - too_long_threshold
     - 0.5
   - - wal_dir
@@ -114,29 +114,7 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - pid_file
-    - <hidden>
-  - - read_only
-    - false
-  - - readahead
-    - 16320
-  - - rows_per_wal
-    - 500000
-  - - slab_alloc_arena
-    - 0.1
-  - - slab_alloc_factor
-    - 1.1
-  - - slab_alloc_maximal
-    - <hidden>
-  - - slab_alloc_minimal
-    - <hidden>
-  - - snap_dir
-    - <hidden>
-  - - snapshot_count
-    - 6
-  - - snapshot_period
-    - 0
-  - - sophia
+  - - phia
     - - - branch_age
         - 0
       - - branch_age_period
@@ -163,8 +141,30 @@ cfg_filter(box.cfg)
         - 2
       - - threads
         - 5
-  - - sophia_dir
+  - - phia_dir
     - <hidden>
+  - - pid_file
+    - <hidden>
+  - - read_only
+    - false
+  - - readahead
+    - 16320
+  - - rows_per_wal
+    - 500000
+  - - slab_alloc_arena
+    - 0.1
+  - - slab_alloc_factor
+    - 1.1
+  - - slab_alloc_maximal
+    - <hidden>
+  - - slab_alloc_minimal
+    - <hidden>
+  - - snap_dir
+    - <hidden>
+  - - snapshot_count
+    - 6
+  - - snapshot_period
+    - 0
   - - too_long_threshold
     - 0.5
   - - wal_dir
@@ -199,13 +199,13 @@ box.cfg{slab_alloc_arena = "100500"}
 ---
 - error: 'Incorrect value for option ''slab_alloc_arena'': should be of type number'
 ...
-box.cfg{sophia = "sophia"}
+box.cfg{phia = "phia"}
 ---
-- error: 'Incorrect value for option ''sophia'': should be a table'
+- error: 'Incorrect value for option ''phia'': should be a table'
 ...
-box.cfg{sophia = {threads = "threads"}}
+box.cfg{phia = {threads = "threads"}}
 ---
-- error: 'Incorrect value for option ''sophia.threads'': should be of type number'
+- error: 'Incorrect value for option ''phia.threads'': should be of type number'
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options
@@ -222,7 +222,7 @@ test_run:cmd('switch cfg_tester1')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
 ---
 - 1
 - 1.1
@@ -252,7 +252,7 @@ test_run:cmd('switch cfg_tester2')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
 ---
 - 0.2
 - 1.1
@@ -282,7 +282,7 @@ test_run:cmd('switch cfg_tester3')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
 ---
 - 0.2
 - 1.1
@@ -312,7 +312,7 @@ test_run:cmd('switch cfg_tester4')
 ---
 - true
 ...
-box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.sophia.threads
+box.cfg.slab_alloc_arena, box.cfg.slab_alloc_factor, box.cfg.phia.threads
 ---
 - 1
 - 3.14

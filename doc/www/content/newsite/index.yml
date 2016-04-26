@@ -25,8 +25,8 @@ blocks  :
     - format: rst
       content: >
         a built-in database with two data engines: 100% in-memory
-        with optional persistence and a `2-level disk-based B-tree
-        <http://sphia.org>`_, to use with large data sets
+        with optional persistence and a 2-level disk-based B-tree
+        to use with large data sets
     - "secondary key and index iterators support"
     - "asynchronous master-master replication"
     - "authentication and access control"

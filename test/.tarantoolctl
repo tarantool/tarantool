@@ -5,7 +5,7 @@ default_cfg = {
     pid_file   = workdir,
     wal_dir    = workdir,
     snap_dir   = workdir,
-    sophia_dir = workdir,
+    phia_dir   = workdir,
     logger     = workdir,
     background = false,
 }

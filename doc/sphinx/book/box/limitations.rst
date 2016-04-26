@@ -11,7 +11,7 @@
     maximum is 1 but the field is an ARRAY.
     For BITSET indexes, the maximum is 1. 
 
-    Note re storage engine: sophia allows 8 parts in an index.
+    Note re storage engine: phia allows 8 parts in an index.
 
 .. _lim_indexes_in_space:
 
@@ -19,7 +19,7 @@
 
     128 (``box.schema.INDEX_MAX``).
 
-    Note re storage engine: sophia allows 1 index in a space.
+    Note re storage engine: phia allows 1 index in a space.
 
 .. _lim_fields_in_tuple:
 
@@ -86,9 +86,9 @@
 
     32 (``box.schema.REPLICA_MAX``).
 
-.. _lim_sophia:
+.. _lim_phia:
 
-For additional limitations which apply only to the sophia
+For additional limitations which apply only to the phia
 storage engine, see section
-:ref:`Differences between memtx and sophia <sophia_diff>`.
+:ref:`Differences between memtx and phia <phia_diff>`.
 

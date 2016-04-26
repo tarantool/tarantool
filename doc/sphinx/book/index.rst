@@ -18,4 +18,4 @@
     app/b-internals
     app/c-lua_tutorial
     app/d-plugins
-    app/e-sophia/index
+    app/e-phia/index

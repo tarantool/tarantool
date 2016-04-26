@@ -133,22 +133,22 @@ as of the moment when the server was last shut down. For this it may
 use the latest snapshot file and any WAL files that were written
 after the snapshot. One complicating factor is that Tarantool
 has two engines -- the memtx data must be reconstructed entirely
-from the snapshot and the WAL files, while the sophia data will
+from the snapshot and the WAL files, while the phia data will
 be on disk but might require updating around the time of a checkpoint.
-(When a snapshot happens, Tarantool tells the sophia engine to
+(When a snapshot happens, Tarantool tells the phia engine to
 make a checkpoint, and the snapshot operation is rolled back if
-anything goes wrong, so sophia's checkpoint is at least as fresh
+anything goes wrong, so phia's checkpoint is at least as fresh
 as the snapshot file.)
 
 Step 1
     Read the configuration parameters in the ``box.cfg{}`` request.
     Parameters which affect recovery may include :confval:`work_dir`,
-    :confval:`wal_dir`, :confval:`snap_dir`, :confval:`sophia_dir`,
+    :confval:`wal_dir`, :confval:`snap_dir`, :confval:`phia_dir`,
     :confval:`panic_on_snap_error`, and :confval:`panic_on_wal_error`.
 
 Step 2
     Find the latest snapshot file. Use its data to reconstruct the in-memory
-    databases. Instruct the sophia engine to recover to the latest checkpoint.
+    databases. Instruct the phia engine to recover to the latest checkpoint.
 
 There are actually two variations of the reconstruction procedure for the memtx
 databases, depending whether the recovery process is "default".
@@ -169,7 +169,7 @@ are only made if an error has occurred.
 Step 2
     Find the WAL file that was made at the time of, or after, the snapshot file.
     Read its log entries until the log-entry LSN is greater than the LSN of the
-    snapshot, or greater than the LSN of the sophia checkpoint. This is the
+    snapshot, or greater than the LSN of the phia checkpoint. This is the
     recovery process's "start position"; it matches the current state of the engines.
 
 Step 3

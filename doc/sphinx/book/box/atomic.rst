@@ -41,7 +41,7 @@ most of the box calls, including the data-change requests
 :func:`box.space...delete <space_object.delete>`, are yield points;
 however, :func:`box.space...select <space_object.select>` is not.
 
-Note re storage engine: sophia has different rules: insert or update or delete
+Note re storage engine: phia has different rules: insert or update or delete
 will very rarely cause a yield, but select can cause a yield.
 
 In the absence of transactions, any function that contains yield points may see
@@ -82,7 +82,7 @@ To ensure they are sent as a single block: put them in a function, or put them a
 on one line, or use a delimiter so that multi-line requests are handled together.
 
 **All database operations in a transaction should use the same storage engine**.
-It is not safe to access tuple sets that are defined with ``{engine='sophia'}``
+It is not safe to access tuple sets that are defined with ``{engine='phia'}``
 and also access tuple sets that are defined with ``{engine='memtx'}``,
 in the same transaction.
 

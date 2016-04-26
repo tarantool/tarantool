@@ -12,7 +12,7 @@ tempdir = fio.tempdir()
 box.cfg {
     wal_dir = tempdir,
     snap_dir = tempdir,
-    sophia_dir = tempdir,
+    phia_dir = tempdir,
     logger      = fio.pathjoin(tempdir, 'tarantool.log'),
     slab_alloc_arena=0.1 -- for small systems
 }

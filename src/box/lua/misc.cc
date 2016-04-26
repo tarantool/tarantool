@@ -57,7 +57,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 
 /* }}} */
 
-/** {{{ Lua/C implementation of index:select(): used only by Sophia **/
+/** {{{ Lua/C implementation of index:select(): used only by Phia **/
 
 static inline void
 lbox_port_to_table(lua_State *L, struct port *port)

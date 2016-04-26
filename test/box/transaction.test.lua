@@ -84,7 +84,7 @@ s:truncate();
 -- Test admin console
 box.begin();
 -- should be ok - active transaction, and we don't
--- know, maybe it will use sophia engine, which
+-- know, maybe it will use phia engine, which
 -- may support yield() in the future, so we don't roll
 -- back a transction with no statements.
 box.commit();

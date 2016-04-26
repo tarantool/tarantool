@@ -110,9 +110,9 @@ space_is_temporary(struct space *space) { return space->def.opts.temporary; }
 static inline bool
 space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }
 
-/** Return true if space is run under sophia engine. */
+/** Return true if space is run under phia engine. */
 static inline bool
-space_is_sophia(struct space *space) { return strcmp(space->handler->engine->name, "sophia") == 0; }
+space_is_phia(struct space *space) { return strcmp(space->handler->engine->name, "phia") == 0; }
 
 void space_noop(struct space *space);
 

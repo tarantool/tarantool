@@ -93,9 +93,9 @@
     Default: "." |br|
     Dynamic: no |br|
 
-.. confval:: sophia_dir
+.. confval:: phia_dir
 
-    A directory where sophia files or sub-directories will be stored. Can be relative to
+    A directory where phia files or sub-directories will be stored. Can be relative to
     :ref:`work_dir <box-cfg-work-dir>`. If not specified, defaults to work_dir.
 
     Type: string |br|

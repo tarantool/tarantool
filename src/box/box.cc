@@ -48,7 +48,7 @@
 #include "memtx_engine.h"
 #include "memtx_index.h"
 #include "sysview_engine.h"
-#include "sophia_engine.h"
+#include "phia_engine.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -989,7 +989,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * <= INSERT
 	 *    ...
 	 *    Initial data: a stream of engine-specifc rows, e.g. snapshot
-	 *    rows for memtx or dirty cursor data for Sophia. Engine can
+	 *    rows for memtx or dirty cursor data for Phia. Engine can
 	 *    use SERVER_ID, LSN and other fields for internal purposes.
 	 *    ...
 	 * <= INSERT
@@ -1216,9 +1216,9 @@ engine_init()
 	SysviewEngine *sysview = new SysviewEngine();
 	engine_register(sysview);
 
-	SophiaEngine *sophia = new SophiaEngine();
-	sophia->init();
-	engine_register(sophia);
+	PhiaEngine *phia = new PhiaEngine();
+	phia->init();
+	engine_register(phia);
 }
 
 /**
@@ -1362,7 +1362,7 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
-		/* Tell Sophia engine LSN it must recover to. */
+		/* Tell Phia engine LSN it must recover to. */
 		engine_recover_to_checkpoint(lsn);
 		/* Replace server vclock using the data from snapshot */
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);

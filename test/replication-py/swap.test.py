@@ -10,7 +10,7 @@ ID_STEP = 5
 LOGIN = 'test'
 PASSWORD = 'pass123456'
 
-engines = ['memtx', 'sophia']
+engines = ['memtx', 'phia']
 
 def insert_tuples(_server, begin, end, msg = "tuple"):
     for engine in engines:
@@ -30,7 +30,7 @@ def select_tuples(_server, begin, end):
 
 # master server
 master = server
-# Re-deploy server to cleanup Sophia data
+# Re-deploy server to cleanup Phia data
 master.stop()
 master.cleanup()
 master.deploy()

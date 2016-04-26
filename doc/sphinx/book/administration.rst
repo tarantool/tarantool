@@ -269,7 +269,7 @@ would look like this:
         pid_file   = "/var/run/tarantool",
         wal_dir    = "/var/lib/tarantool",
         snap_dir   = "/var/lib/tarantool",
-        sophia_dir = "/var/lib/tarantool",
+        phia_dir = "/var/lib/tarantool",
         logger     = "/var/log/tarantool",
         username   = "tarantool",
     }
@@ -289,9 +289,9 @@ The settings in the above script are:
     The directory for the snapshot :file:`*.snap` files. The script
     will add ":samp:`/{instance-name}`" to the directory-name.
 
-``sophia_dir``
-    The directory for the sophia-storage-engine files. The script
-    will add ":samp:`/sophia/{instance-name}`" to the directory-name.
+``phia_dir``
+    The directory for the phia-storage-engine files. The script
+    will add ":samp:`/phia/{instance-name}`" to the directory-name.
 
 ``logger``
     The place where the application log will go. The script will
@@ -432,7 +432,7 @@ Edit /etc/sysconfig/tarantool. It might be necessary to say sudo mkdir /etc/sysc
         pid_file = "/tarantool_test/my_app.pid",
         wal_dir = "/tarantool_test",
         snap_dir = "/tarantool_test",
-        sophia_dir = "/tarantool_test",
+        phia_dir = "/tarantool_test",
         logger = "/tarantool_test/log",
         username = "tarantool",
     }
@@ -469,7 +469,7 @@ Tell tarantoolctl to start the application ...
 
     $ ls -l /tarantool_test/my_app
 
-... expect to see the .snap file, .xlog file, and sophia directory. Then ...
+... expect to see the .snap file, .xlog file, and phia directory. Then ...
 
 .. code-block:: console
 

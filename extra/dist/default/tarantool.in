@@ -17,7 +17,7 @@ default_cfg = {
     pid_file   = "@TARANTOOL_RUNDIR@", -- @TARANTOOL_RUNDIR@/${INSTANCE}.pid
     wal_dir    = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}/
     snap_dir   = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
-    sophia_dir = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
+    phia_dir = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
     logger     = "@TARANTOOL_LOGDIR@", -- @TARANTOOL_LOGDIR@/${INSTANCE}.log
     username   = "@TARANTOOL_USER@",
 }

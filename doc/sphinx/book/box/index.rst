@@ -323,8 +323,8 @@ the function holds a consistent view of the database until the UPDATE ends.
 For the combination “UPDATE plus SELECT” the view is not consistent,
 because after the UPDATE the transaction processor thread can switch
 to another fiber, and delete the tuple that was just updated.
-Note re storage engine: sophia handles yields differently, see
-:ref:`differences between memtx and sophia <sophia_diff>`.
+Note re storage engine: phia handles yields differently, see
+:ref:`differences between memtx and phia <phia_diff>`.
 Note re multi-request transactions: there is a way to delay yields,
 see :ref:`Atomic execution <atomic_execution>`.
 
@@ -520,7 +520,7 @@ This type of search may return more than one tuple;
 if so, the tuples will be in descending order by key
 when the comparison operator is LT or LE or REQ,
 otherwise in ascending order. |br|
-Note re storage engines: sophia does not allow REQ. |br|
+Note re storage engines: phia does not allow REQ. |br|
 (2) The search can use a secondary index. |br|
 :samp:`box.space.{space-name}.index.{index-name}:select('value')` |br|
 For a primary-key search, it is optional to specify
@@ -536,7 +536,7 @@ in the second case, the result will be two tuples:
 {1, 'A'} and {1, 'B'}. It's even possible to specify zero
 fields, causing all three tuples to be
 returned.
-Note re storage engines: sophia requires that all fields, or none, be specified.
+Note re storage engines: phia requires that all fields, or none, be specified.
 
 (1) BITSET example: |br|
 :codenormal:`box.schema.space.create('bitset_example')` |br|
@@ -639,25 +639,23 @@ which Complexity Factors might affect the function's resource usage.
 .. _two-storage-engines:
 
 =====================================================================
-            The two storage engines: memtx and sophia
+            The two storage engines: memtx and phia
 =====================================================================
 
 A storage engine is a set of very-low-level routines which actually store and
 retrieve tuple values. Tarantool offers a choice of two storage engines: memtx
-(the in-memory storage engine) and sophia (the on-disk storage engine).
-To specify that the engine should be sophia, add a clause: ``engine = 'sophia'``.
+(the in-memory storage engine) and phia (the on-disk storage engine).
+To specify that the engine should be phia, add a clause: ``engine = 'phia'``.
 The manual concentrates on memtx because it is the default and has been around
-longer. But sophia is a working key-value engine and will especially appeal to
+longer. But phia is a working key-value engine and will especially appeal to
 users who like to see data go directly to disk, so that recovery time might be
 shorter and database size might be larger. For architectural explanations and
-benchmarks, see `sphia.org`_ and Appendix E: :ref:`sophia <sophia>`.
-On the other hand, sophia lacks some functions and
+benchmarks, see Appendix E: :ref:`phia <phia>`.
+On the other hand, phia lacks some functions and
 options that are available with memtx. Where that is the case, the relevant
 description will contain a note beginning with the words
-"Note re storage engine: sophia". The end of this chapter has coverage
-for all :ref:`the differences between memtx and sophia <sophia_diff>`.
-
-.. _sphia.org: http://sphia.org
+"Note re storage engine: phia". The end of this chapter has coverage
+for all :ref:`the differences between memtx and phia <phia_diff>`.
 
 =====================================================================
                         Library Reference
@@ -677,6 +675,6 @@ for all :ref:`the differences between memtx and sophia <sophia_diff>`.
     authentication
     triggers
     limitations
-    sophia_diff
+    phia_diff
 
 

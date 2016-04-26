@@ -214,7 +214,7 @@ Handler::executeSelect(struct txn *, struct space *space,
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
 		/*
-		 * This is for Sophia, which returns a tuple
+		 * This is for Phia, which returns a tuple
 		 * with zero refs from the iterator, expecting
 		 * the caller to GC it after use.
 		 */

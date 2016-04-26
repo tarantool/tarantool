@@ -2,10 +2,10 @@
 
 require('suite')
 
-os.execute("rm -rf sophia_test")
-os.execute("mkdir -p sophia_test")
+os.execute("rm -rf phia_test")
+os.execute("mkdir -p phia_test")
 
-local sophia = {
+local phia = {
 	threads = 5
 }
 
@@ -14,8 +14,8 @@ box.cfg {
     slab_alloc_arena  = 0.1,
     pid_file          = "tarantool.pid",
     rows_per_wal      = 500000,
-    sophia_dir        = "./sophia_test",
-    sophia            = sophia,
+    phia_dir        = "./phia_test",
+    phia            = phia,
 }
 
 require('console').listen(os.getenv('ADMIN'))

@@ -40,14 +40,14 @@
     Default: 16 |br|
     Dynamic: no |br|
 
-.. confval:: sophia
+.. confval:: phia
 
-    The default sophia configuration can be changed with
+    The default phia configuration can be changed with
 
     .. cssclass:: highlight
     .. parsed-literal::
 
-        sophia = {
+        phia = {
           page_size = *number*,
           memory_limit = *number*,
           compression_key = *number*,
@@ -71,7 +71,7 @@
         .. cssclass:: highlight
         .. parsed-literal::
 
-            sophia = {
+            phia = {
                 page_size = 131072,
                 memory_limit = 0,
                 compression_key = 0,

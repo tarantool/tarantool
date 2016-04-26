@@ -38,7 +38,6 @@ tarball: clean
 		--exclude=src/lib/small/debian		\
 		--exclude=src/lib/msgpuck/debian    \
 		--exclude=test-run/lib/tarantool-python/debian \
-		--exclude=third_party/sophia/debian \
 		--exclude=third_party/luafun/debian \
 		--exclude=FreeBSD \
 		--transform='s,^\.,tarantool_$(UVERSION),S' \

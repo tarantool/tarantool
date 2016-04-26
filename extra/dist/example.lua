@@ -30,9 +30,9 @@ box.cfg {
     -- If not specified, defaults to /var/lib/tarantool/INSTANCE
     -- snap_dir = nil;
 
-    -- An absolute path to directory where sophia files are stored.
+    -- An absolute path to directory where phia files are stored.
     -- If not specified, defaults to /var/lib/tarantool/INSTANCE
-    -- sophia_dir = nil;
+    -- phia_dir = nil;
 
     -- The read/write data port number or URI
     -- Has no default value, so must be specified if

@@ -294,7 +294,7 @@ box_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {
 		struct space *space;
-		/* no tx management, len is approximate in sophia anyway. */
+		/* no tx management, len is approximate in phia anyway. */
 		return check_index(space_id, index_id, &space)->size();
 	} catch (Exception *) {
 		return (size_t) -1; /* handled by box.error() in Lua */
@@ -460,7 +460,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		/*
 		 * No transaction management: iterators are
 		 * "dirty" in tarantool now, they exist in
-		 * their own read view in sophia or access dirty
+		 * their own read view in phia or access dirty
 		 * data in memtx.
 		 */
 		return it;

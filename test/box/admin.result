@@ -34,29 +34,7 @@ cfg_filter(box.cfg)
     - true
   - - panic_on_wal_error
     - true
-  - - pid_file
-    - <hidden>
-  - - read_only
-    - false
-  - - readahead
-    - 16320
-  - - rows_per_wal
-    - 500000
-  - - slab_alloc_arena
-    - 0.1
-  - - slab_alloc_factor
-    - 1.1
-  - - slab_alloc_maximal
-    - <hidden>
-  - - slab_alloc_minimal
-    - <hidden>
-  - - snap_dir
-    - <hidden>
-  - - snapshot_count
-    - 6
-  - - snapshot_period
-    - 0
-  - - sophia
+  - - phia
     - - - branch_age
         - 0
       - - branch_age_period
@@ -83,8 +61,30 @@ cfg_filter(box.cfg)
         - 2
       - - threads
         - 5
-  - - sophia_dir
+  - - phia_dir
     - <hidden>
+  - - pid_file
+    - <hidden>
+  - - read_only
+    - false
+  - - readahead
+    - 16320
+  - - rows_per_wal
+    - 500000
+  - - slab_alloc_arena
+    - 0.1
+  - - slab_alloc_factor
+    - 1.1
+  - - slab_alloc_maximal
+    - <hidden>
+  - - slab_alloc_minimal
+    - <hidden>
+  - - snap_dir
+    - <hidden>
+  - - snapshot_count
+    - 6
+  - - snapshot_period
+    - 0
   - - too_long_threshold
     - 0.5
   - - wal_dir

@@ -11,7 +11,7 @@ box.cfg{
 require('console').listen(os.getenv('ADMIN'))
 
 _to_exclude = {
-    'pid_file', 'logger', 'sophia_dir',
+    'pid_file', 'logger', 'phia_dir',
     'snap_dir', 'wal_dir',
     'slab_alloc_maximal', 'slab_alloc_minimal'
 }

@@ -7,7 +7,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 s = box.schema.create_space('engine', {engine=engine})
 i = s:create_index('primary')
 
---test example for memtx and sophia
+--test example for memtx and phia
 _ = box.space.engine:insert{1,2,3}
 box.space.engine:select{}
 
