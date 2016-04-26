@@ -108,41 +108,6 @@ void     ss_sleep(uint64_t);
 uint64_t ss_utime(void);
 uint32_t ss_timestamp(void);
 
-#ifndef SS_LOCK_H_
-#define SS_LOCK_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-#if 0
-typedef pthread_spinlock_t ssspinlock;
-
-static inline void
-ss_spinlockinit(ssspinlock *l) {
-	pthread_spin_init(l, 0);
-}
-
-static inline void
-ss_spinlockfree(ssspinlock *l) {
-	pthread_spin_destroy(l);
-}
-
-static inline void
-ss_spinlock(ssspinlock *l) {
-	pthread_spin_lock(l);
-}
-
-static inline void
-ss_spinunlock(ssspinlock *l) {
-	pthread_spin_unlock(l);
-}
-#endif
-
 typedef uint8_t ssspinlock;
 
 #if defined(__x86_64__) || defined(__i386) || defined(_X86_)
@@ -181,18 +146,6 @@ static inline void
 ss_spinunlock(ssspinlock *l) {
 	__sync_lock_release(l);
 }
-
-#endif
-#ifndef SS_LIST_H_
-#define SS_LIST_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sslist sslist;
 
@@ -273,18 +226,6 @@ ss_listreplace(sslist *o, sslist *n) {
 #define ss_listforeach_reverse(H, I) \
 	for (I = (H)->prev; I != H; I = (I)->prev)
 
-#endif
-#ifndef SS_PATH_H_
-#define SS_PATH_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sspath sspath;
 
 struct sspath {
@@ -328,18 +269,6 @@ ss_pathis_set(sspath *p) {
 	return p->path[0] != 0;
 }
 
-#endif
-#ifndef SS_IOV_H_
-#define SS_IOV_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssiov ssiov;
 
 struct ssiov {
@@ -380,18 +309,6 @@ ss_iovadd(ssiov *v, void *ptr, size_t size)
 	v->iovc++;
 }
 
-#endif
-#ifndef SS_MMAP_H_
-#define SS_MMAP_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssmmap ssmmap;
 
 struct ssmmap {
@@ -404,18 +321,6 @@ ss_mmapinit(ssmmap *m) {
 	m->p = NULL;
 	m->size = 0;
 }
-
-#endif
-#ifndef SS_VFS_H_
-#define SS_VFS_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssvfsif ssvfsif;
 typedef struct ssvfs ssvfs;
@@ -488,45 +393,7 @@ ss_vfsfree(ssvfs *f)
 #define ss_vfsmremap(fs, m, size)            (fs)->i->mremap(fs, m, size)
 #define ss_vfsmunmap(fs, m)                  (fs)->i->munmap(fs, m)
 
-#endif
-#ifndef SS_STDVFS_H_
-#define SS_STDVFS_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern ssvfsif ss_stdvfs;
-
-#endif
-#ifndef SS_TESTVFS_H_
-#define SS_TESTVFS_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-extern ssvfsif ss_testvfs;
-
-#endif
-#ifndef SS_FILE_H_
-#define SS_FILE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssfile ssfile;
 
@@ -689,18 +556,6 @@ ss_filerlb(ssfile *f, uint64_t svp)
 	return 0;
 }
 
-#endif
-#ifndef SS_A_H_
-#define SS_A_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssaif ssaif;
 typedef struct ssa ssa;
 
@@ -772,45 +627,9 @@ ss_memdup(ssa *a, void *ptr, size_t size) {
 	return s;
 }
 
-#endif
-#ifndef SS_STDA_H_
-#define SS_STDA_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern ssaif ss_stda;
 
-#endif
-#ifndef SS_OOMA_H_
-#define SS_OOMA_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern ssaif ss_ooma;
-
-#endif
-#ifndef SS_TRACE_H_
-#define SS_TRACE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sstrace sstrace;
 
@@ -873,18 +692,6 @@ ss_traceset(sstrace *t,
 
 #define ss_trace(t, fmt, ...) \
 	ss_traceset(t, __FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
-
-#endif
-#ifndef SS_GC_H_
-#define SS_GC_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssgc ssgc;
 
@@ -982,18 +789,6 @@ ss_gcgarbage(ssgc *gc)
 	return rc;
 }
 
-#endif
-#ifndef SS_ORDER_H_
-#define SS_ORDER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef enum {
 	SS_LT,
 	SS_LTE,
@@ -1035,18 +830,6 @@ ss_ordername(ssorder o)
 	return NULL;
 }
 
-#endif
-#ifndef SS_TRIGGER_H_
-#define SS_TRIGGER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef int (*sstriggerf)(void *arg);
 
 typedef struct sstrigger sstrigger;
@@ -1082,18 +865,6 @@ ss_triggerrun(sstrigger *t)
 		return;
 	t->function(t->arg);
 }
-
-#endif
-#ifndef SS_BUF_H_
-#define SS_BUF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssbuf ssbuf;
 
@@ -1241,18 +1012,6 @@ ss_bufset(ssbuf *b, int size, int i, char *buf, int bufsize)
 	memcpy(b->s + size * i, buf, bufsize);
 }
 
-#endif
-#ifndef SS_INJECTION_H_
-#define SS_INJECTION_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssinjection ssinjection;
 
 #define SS_INJECTION_SD_BUILD_0      0
@@ -1283,18 +1042,6 @@ struct ssinjection {
 	#define SS_INJECTION(E, ID, X)
 #endif
 
-#endif
-#ifndef SS_CRC_H_
-#define SS_CRC_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef uint32_t (*sscrcf)(uint32_t, const void*, int);
 
 sscrcf ss_crc32c_function(void);
@@ -1304,18 +1051,6 @@ sscrcf ss_crc32c_function(void);
 
 #define ss_crcs(F, p, size, crc) \
 	F(crc, (char*)p + sizeof(uint32_t), size - sizeof(uint32_t))
-
-#endif
-#ifndef SS_TYPE_H_
-#define SS_TYPE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef enum {
 	SS_UNDEF,
@@ -1347,18 +1082,6 @@ ss_typeof(sstype type) {
 	return NULL;
 }
 
-#endif
-#ifndef SS_MUTEX_H_
-#define SS_MUTEX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssmutex ssmutex;
 
 struct ssmutex {
@@ -1384,18 +1107,6 @@ static inline void
 ss_mutexunlock(ssmutex *m) {
 	pthread_mutex_unlock(&m->m);
 }
-
-#endif
-#ifndef SS_COND_H_
-#define SS_COND_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sscond sscond;
 
@@ -1423,18 +1134,6 @@ ss_condwait(sscond *c, ssmutex *m) {
 	pthread_cond_wait(&c->c, &m->m);
 }
 
-#endif
-#ifndef SS_THREAD_H_
-#define SS_THREAD_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssthread ssthread;
 typedef struct ssthreadpool ssthreadpool;
 
@@ -1455,18 +1154,6 @@ struct ssthreadpool {
 int ss_threadpool_init(ssthreadpool*);
 int ss_threadpool_shutdown(ssthreadpool*, ssa*);
 int ss_threadpool_new(ssthreadpool*, ssa*, int, ssthreadf, void*);
-
-#endif
-#ifndef SS_QUOTA_H_
-#define SS_QUOTA_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssquota ssquota;
 
@@ -1513,18 +1200,6 @@ ss_quotaused_percent(ssquota *q)
 	ss_mutexunlock(&q->lock);
 	return percent;
 }
-
-#endif
-#ifndef SS_RB_H_
-#define SS_RB_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssrbnode ssrbnode;
 typedef struct ssrb  ssrb;
@@ -1596,18 +1271,6 @@ void ss_rbset(ssrb*, ssrbnode*, int, ssrbnode*);
 void ss_rbreplace(ssrb*, ssrbnode*, ssrbnode*);
 void ss_rbremove(ssrb*, ssrbnode*);
 
-#endif
-#ifndef SS_QF_H_
-#define SS_QF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssqf ssqf;
 
 struct ssqf {
@@ -1634,10 +1297,6 @@ void ss_qfrecover(ssqf*, int, int, uint32_t, uint64_t*);
 void ss_qfadd(ssqf*, uint64_t);
 int  ss_qfhas(ssqf*, uint64_t);
 
-#endif
-#ifndef SS_HASH_H_
-#define SS_HASH_H_
-
 /*
  * sophia database
  * sphia.org
@@ -1659,7 +1318,6 @@ ss_fnv(char *key, int len)
 	return h;
 }
 
-#endif
 typedef struct sshtnode sshtnode;
 typedef struct ssht ssht;
 
@@ -1771,17 +1429,6 @@ ss_htset(ssht *t, int pos, sshtnode *node)
 		t->count++;
 	t->i[pos] = node;
 }
-
-#ifndef SS_RQ_H_
-#define SS_RQ_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 /* range queue */
 
@@ -1918,18 +1565,6 @@ ss_rqprev(ssrq *q, ssrqnode *n)
 	return NULL;
 }
 
-#endif
-#ifndef SS_FILTER_H_
-#define SS_FILTER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssfilterif ssfilterif;
 typedef struct ssfilter ssfilter;
 
@@ -1998,59 +1633,11 @@ ss_filtercomplete(ssfilter *c, ssbuf *dest)
 	return c->i->complete(c, dest);
 }
 
-#endif
-#ifndef SS_NONEFILTER_H_
-#define SS_NONEFILTER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern ssfilterif ss_nonefilter;
-
-#endif
-#ifndef SS_LZ4FILTER_H_
-#define SS_LZ4FILTER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 extern ssfilterif ss_lz4filter;
 
-#endif
-#ifndef SS_ZSTDFILTER_H_
-#define SS_ZSTDFILTER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern ssfilterif ss_zstdfilter;
-
-#endif
-#ifndef SS_FILTEROF_H_
-#define SS_FILTEROF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 static inline ssfilterif*
 ss_filterof(char *name)
@@ -2063,18 +1650,6 @@ ss_filterof(char *name)
 		return &ss_zstdfilter;
 	return NULL;
 }
-
-#endif
-#ifndef SS_ITER_H_
-#define SS_ITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssiterif ssiterif;
 typedef struct ssiter ssiter;
@@ -2106,18 +1681,6 @@ do { \
 #define ss_iteratorhas(i) (i)->vif->has(i)
 #define ss_iteratorof(i) (i)->vif->of(i)
 #define ss_iteratornext(i) (i)->vif->next(i)
-
-#endif
-#ifndef SS_BUFITER_H_
-#define SS_BUFITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 extern ssiterif ss_bufiter;
 extern ssiterif ss_bufiterref;
@@ -2202,18 +1765,6 @@ static inline void
 ss_bufiterref_next(ssiter *i) {
 	ss_bufiter_next(i);
 }
-
-#endif
-#ifndef SS_BLOB_H_
-#define SS_BLOB_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct ssblob ssblob;
 
@@ -2310,18 +1861,6 @@ ss_blobadd(ssblob *b, void *buf, int size)
 	return 0;
 }
 
-#endif
-#ifndef SS_AVG_H_
-#define SS_AVG_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct ssavg ssavg;
 
 struct ssavg {
@@ -2361,18 +1900,6 @@ ss_avgprepare(ssavg *a)
 	         a->min, a->max, a->avg);
 }
 
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 ssiterif ss_bufiter =
 {
 	.close   = ss_bufiter_close,
@@ -2390,22 +1917,12 @@ ssiterif ss_bufiterref =
 };
 
 /*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-/*
  * Copyright (c) 2008-2010 Massachusetts Institute of Technology
  * Copyright (c) 2004-2006 Intel Corporation
  *
  * This software program is licensed subject to the BSD License, 
  * available at http://www.opensource.org/licenses/bsd-license.html
 */
-
-
 
 static const uint32_t crc_tableil8_o32[256] =
 {
@@ -2709,7 +2226,7 @@ ss_crc32c_sw(uint32_t crc, const void *buf, int len)
 
 	len -= initial_bytes;
 	int running_len = len & ~(sizeof(uint64_t) - 1);
-	int end_bytes = len - running_len; 
+	int end_bytes = len - running_len;
 
 	for (li = 0; li < running_len / 8; li++) {
 		crc ^= sscastu32(p_buf);
@@ -2718,7 +2235,7 @@ ss_crc32c_sw(uint32_t crc, const void *buf, int len)
 		                 crc_tableil8_o80[(crc >> 8) & 0x000000FF];
 		uint32_t term2 = crc >> 16;
 		crc = term1 ^
-		      crc_tableil8_o72[term2 & 0x000000FF] ^ 
+		      crc_tableil8_o72[term2 & 0x000000FF] ^
 		      crc_tableil8_o64[(term2 >> 8) & 0x000000FF];
 		term1 = crc_tableil8_o56[sscastu32(p_buf) & 0x000000FF] ^
 		        crc_tableil8_o48[(sscastu32(p_buf) >> 8) & 0x000000FF];
@@ -2802,16 +2319,6 @@ sscrcf ss_crc32c_function(void)
 #endif
 	return ss_crc32c_sw;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
 
 /*  lz4 git commit: 2d4fed5ed2a8e0231f98d79699d28af0142d0099 */
 
@@ -8167,16 +7674,6 @@ ssfilterif ss_lz4filter =
 	.complete = ss_lz4filter_complete
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 static int
 ss_nonefilter_init(ssfilter *f ssunused, va_list args ssunused)
 {
@@ -8225,16 +7722,6 @@ ssfilterif ss_nonefilter =
 	.next     = ss_nonefilter_next,
 	.complete = ss_nonefilter_complete
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
 
 typedef struct ssooma ssooma;
 
@@ -8316,20 +7803,10 @@ ssaif ss_ooma =
 };
 
 /*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-/*
  * Quotient Filter.
  *
  * Based on implementation made by Vedant Kumar <vsk@berkeley.edu>
 */
-
-
 
 #define ss_qflmask(n) ((1ULL << (n)) - 1ULL)
 
@@ -8628,16 +8105,6 @@ int ss_qfhas(ssqf *f, uint64_t h)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 int ss_quotainit(ssquota *q)
 {
 	q->enable = 0;
@@ -8697,16 +8164,6 @@ int ss_quota(ssquota *q, ssquotaop op, uint64_t v)
 	ss_mutexunlock(&q->lock);
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
 
 #define SS_RBBLACK 0
 #define SS_RBRED   1
@@ -9021,16 +8478,6 @@ void ss_rbremove(ssrb *t, ssrbnode *n)
 		n->color = SS_RBBLACK;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 static inline int
 ss_stdaopen(ssa *a ssunused, va_list args ssunused) {
 	return 0;
@@ -9066,16 +8513,6 @@ ssaif ss_stda =
 	.realloc = ss_stdarealloc,
 	.free    = ss_stdafree 
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
 
 static inline int
 ss_stdvfs_init(ssvfs *f ssunused, va_list args ssunused)
@@ -9356,16 +8793,6 @@ ssvfsif ss_stdvfs =
 	.munmap        = ss_stdvfs_munmap
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 typedef struct {
 	ssspinlock lock;
 	uint32_t fail_from;
@@ -9586,16 +9013,6 @@ ssvfsif ss_testvfs =
 	.munmap        = ss_testvfs_munmap
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 static inline void
 ss_threadinit(ssthread *t)
 {
@@ -9659,16 +9076,6 @@ error:
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 void ss_sleep(uint64_t ns)
 {
 	struct timespec ts;
@@ -9694,26 +9101,6 @@ uint32_t ss_timestamp(void)
 {
 	return time(NULL);
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
 
 /* zstd git commit: 765207c54934d478488c236749b01c7d6fc63d70 */
 
@@ -13728,16 +13115,6 @@ ssfilterif ss_zstdfilter =
 	.next     = ss_zstdfilter_next,
 	.complete = ss_zstdfilter_complete
 };
-#ifndef SF_SCHEME_H_
-#define SF_SCHEME_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sffield sffield;
 typedef struct sfscheme sfscheme;
@@ -13855,18 +13232,6 @@ sf_schemeeq(sfscheme *a, sfscheme *b)
 	}
 	return 1;
 }
-
-#endif
-#ifndef SF_H_
-#define SF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sfvar sfvar;
 typedef struct sfv sfv;
@@ -14015,18 +13380,6 @@ sf_comparable_write(sfscheme *s, char *src, char *dest)
 	}
 }
 
-#endif
-#ifndef SF_LIMIT_H_
-#define SF_LIMIT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sflimit sflimit;
 
 struct sflimit {
@@ -14138,18 +13491,6 @@ sf_limitset(sflimit *b, sfscheme *s, sfv *fields, ssorder order)
 	}
 }
 
-#endif
-#ifndef SF_UPSERT_H_
-#define SF_UPSERT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef int (*sfupsertf)(int count,
                          char **src,    uint32_t *src_size,
                          char **upsert, uint32_t *upsert_size,
@@ -14183,19 +13524,6 @@ static inline int
 sf_upserthas(sfupsert *u) {
 	return u->function != NULL;
 }
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
 
 static inline sshot int
 sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
@@ -14544,16 +13872,6 @@ sf_schemefind(sfscheme *s, char *name)
 			return s->fields[i];
 	return NULL;
 }
-#ifndef SR_VERSION_H_
-#define SR_VERSION_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 #define SR_VERSION_MAGIC      8529643324614668147ULL
 
@@ -14623,18 +13941,6 @@ sr_versionstorage_check(srversion *v)
 		return 0;
 	return 1;
 }
-
-#endif
-#ifndef SR_ERROR_H_
-#define SR_ERROR_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct srerror srerror;
 
@@ -14759,18 +14065,6 @@ sr_errorset(srerror *e, int type,
 #define sr_oom_malfunction(e) \
 	sr_e(e, SR_ERROR_MALFUNCTION, "%s", "memory allocation failed")
 
-#endif
-#ifndef SR_STATUS_H_
-#define SR_STATUS_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 enum {
 	SR_OFFLINE,
 	SR_ONLINE,
@@ -14877,18 +14171,6 @@ static inline int
 sr_online(srstatus *s) {
 	return sr_status(s) == SR_ONLINE;
 }
-
-#endif
-#ifndef SR_STAT_H_
-#define SR_STAT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct srstat srstat;
 
@@ -15051,18 +14333,6 @@ sr_statcursor(srstat *s, uint64_t start, int read_disk, int read_cache, int ops)
 	ss_spinunlock(&s->lock);
 }
 
-#endif
-#ifndef SR_SEQ_H_
-#define SR_SEQ_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef enum {
 	SR_DSN,
 	SR_DSNNEXT,
@@ -15166,18 +14436,6 @@ sr_seq(srseq *n, srseqop op)
 	return v;
 }
 
-#endif
-#ifndef SR_ZONE_H_
-#define SR_ZONE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct srzone srzone;
 typedef struct srzonemap srzonemap;
 
@@ -15251,18 +14509,6 @@ sr_zonemap(srzonemap *m, uint32_t percent)
 	return z;
 }
 
-#endif
-#ifndef SR_H_
-#define SR_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sr sr;
 
 struct sr {
@@ -15320,18 +14566,6 @@ static inline srzone *sr_zoneof(sr *r)
 	int p = ss_quotaused_percent(r->quota);
 	return sr_zonemap(r->zonemap, p);
 }
-
-#endif
-#ifndef SR_CONF_H_
-#define SR_CONF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct srconf srconf;
 typedef struct srconfdump srconfdump;
@@ -15430,20 +14664,6 @@ static inline void*
 sr_confnext(srconfdump *v) {
 	return sr_confvalue(v) + v->valuesize;
 }
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
 
 int sr_conf_read(srconf *m, srconfstmt *s)
 {
@@ -15777,16 +14997,6 @@ bad_type:
 	                ss_typeof(s->valuetype),
 	                ss_typeof(c->type), s->path);
 }
-#ifndef SO_H_
-#define SO_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct soif soif;
 typedef struct sotype sotype;
@@ -15893,18 +15103,6 @@ so_cast_dynamic(void *ptr, sotype *type,
 #define so_getint(o, path) \
 	(o)->i->getnumber(o, path)
 
-#endif
-#ifndef SO_LIST_H_
-#define SO_LIST_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct solist solist;
 
 struct solist {
@@ -15968,18 +15166,6 @@ so_listfirst(solist *i)
 	assert(i->n > 0);
 	return sscast(i->list.next, so, link);
 }
-
-#endif
-#ifndef SO_POOL_H_
-#define SO_POOL_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sopool sopool;
 
@@ -16053,31 +15239,6 @@ so_poolpop(sopool *p)
 	ss_spinunlock(&p->lock);
 	return o;
 }
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-#ifndef SV_H_
-#define SV_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 #define SVNONE       0
 #define SVDELETE     1
@@ -16160,18 +15321,6 @@ static inline uint64_t
 sv_hash(sv *v, sr *r) {
 	return sf_hash(r->scheme, sv_pointer(v));
 }
-
-#endif
-#ifndef SV_V_H_
-#define SV_V_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct svv svv;
 
@@ -16275,18 +15424,6 @@ sv_vunref(sr *r, svv *v)
 	return 0;
 }
 
-#endif
-#ifndef SV_REF_H_
-#define SV_REF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct svref svref;
 
 struct svref {
@@ -16339,31 +15476,7 @@ sv_refvisible_gte(svref *v, uint64_t vlsn) {
 	return 0;
 }
 
-#endif
-#ifndef SV_UPSERTV_H_
-#define SV_UPSERTV_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 extern svif sv_upsertvif;
-
-#endif
-#ifndef SV_UPSERT_H_
-#define SV_UPSERT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct svupsertnode svupsertnode;
 typedef struct svupsert svupsert;
@@ -16613,18 +15726,6 @@ done:
 	return 0;
 }
 
-#endif
-#ifndef SV_LOG_H_
-#define SV_LOG_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct svlogindex svlogindex;
 typedef struct svlogv svlogv;
 typedef struct svlog svlog;
@@ -16745,18 +15846,6 @@ sv_logreplace(svlog *l, int n, svlogv *v)
 	ss_bufset(&l->buf, sizeof(svlogv), n, (char*)v, sizeof(svlogv));
 }
 
-#endif
-#ifndef SV_MERGE_H_
-#define SV_MERGE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct svmergesrc svmergesrc;
 typedef struct svmerge svmerge;
 
@@ -16817,18 +15906,6 @@ sv_mergeadd(svmerge *m, ssiter *i)
 	ss_bufadvance(&m->buf, sizeof(svmergesrc));
 	return s;
 }
-
-#endif
-#ifndef SV_MERGEITER_H_
-#define SV_MERGEITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 /*
  * Merge serveral sorted streams into one.
@@ -17014,18 +16091,6 @@ sv_mergeisdup(ssiter *i)
 
 extern ssiterif sv_mergeiter;
 
-#endif
-#ifndef SV_READITER_H_
-#define SV_READITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct svreaditer svreaditer;
 
 struct svreaditer {
@@ -17173,18 +16238,6 @@ sv_readiter_of(ssiter *i)
 }
 
 extern ssiterif sv_readiter;
-
-#endif
-#ifndef SV_WRITEITER_H_
-#define SV_WRITEITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct svwriteiter svwriteiter;
 
@@ -17409,18 +16462,6 @@ sv_writeiter_is_duplicate(ssiter *i)
 
 extern ssiterif sv_writeiter;
 
-#endif
-#ifndef SC_INDEX_H_
-#define SC_INDEX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct svindexpos svindexpos;
 typedef struct svindex svindex;
 
@@ -17459,18 +16500,6 @@ static inline uint32_t
 sv_indexused(svindex *i) {
 	return i->count * sizeof(svv) + i->used;
 }
-
-#endif
-#ifndef SV_INDEXITER_H_
-#define SV_INDEXITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct svindexiter svindexiter;
 
@@ -17598,22 +16627,6 @@ sv_indexiter_next(ssiter *i)
 
 extern ssiterif sv_indexiter;
 
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ss_rbtruncate(sv_indextruncate,
               sv_reffree((sr*)arg, sscast(n, svref, node)))
 
@@ -17687,19 +16700,6 @@ int sv_indexupdate(svindex *i, svindexpos *p, svref *v)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 ssiterif sv_indexiter =
 {
 	.close   = sv_indexiter_close,
@@ -17707,19 +16707,6 @@ ssiterif sv_indexiter =
 	.of      = sv_indexiter_of,
 	.next    = sv_indexiter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
 
 ssiterif sv_mergeiter =
 {
@@ -17729,19 +16716,6 @@ ssiterif sv_mergeiter =
 	.next  = sv_mergeiter_next
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 ssiterif sv_readiter =
 {
 	.close   = sv_readiter_close,
@@ -17749,19 +16723,6 @@ ssiterif sv_readiter =
 	.of      = sv_readiter_of,
 	.next    = sv_readiter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
 
 static uint8_t
 sv_refifflags(sv *v) {
@@ -17803,20 +16764,6 @@ svif sv_refif =
 	.pointer   = sv_refifpointer,
 	.size      = sv_refifsize
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 static uint8_t
 sv_upsertvifflags(sv *v) {
@@ -17863,19 +16810,6 @@ svif sv_upsertvif =
 	.size      = sv_upsertvifsize
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 static uint8_t
 sv_vifflags(sv *v) {
 	return ((svv*)v->v)->flags;
@@ -17916,19 +16850,6 @@ svif sv_vif =
 	.size      = sv_vifsize
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 ssiterif sv_writeiter =
 {
 	.close   = sv_writeiter_close,
@@ -17936,16 +16857,6 @@ ssiterif sv_writeiter =
 	.of      = sv_writeiter_of,
 	.next    = sv_writeiter_next
 };
-#ifndef SX_V_H_
-#define SX_V_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sxv sxv;
 typedef struct sxvpool sxvpool;
@@ -18129,18 +17040,6 @@ sx_vaborted(sxv *v)
 
 extern svif sx_vif;
 
-#endif
-#ifndef SX_H_
-#define SX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sxmanager sxmanager;
 typedef struct sxindex sxindex;
 typedef struct sx sx;
@@ -18216,36 +17115,7 @@ uint64_t  sx_vlsn(sxmanager*);
 sxstate   sx_set_autocommit(sxmanager*, sxindex*, sx*, svlog*, svv*);
 sxstate   sx_get_autocommit(sxmanager*, sxindex*);
 
-#endif
-#ifndef SX_DEADLOCK_H_
-#define SX_DEADLOCK_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sx_deadlock(sx*);
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 
 static inline int
 sx_count(sxmanager *m) {
@@ -18803,21 +17673,6 @@ sxstate sx_get_autocommit(sxmanager *m, sxindex *index ssunused)
 	return SXCOMMIT;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 static inline int
 sx_deadlock_in(sxmanager *m, sslist *mark, sx *t, sx *p)
 {
@@ -18886,21 +17741,6 @@ int sx_deadlock(sx *t)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 static uint8_t
 sx_vifflags(sv *v) {
 	return ((sxv*)v->v)->v->flags;
@@ -18940,16 +17780,6 @@ svif sx_vif =
 	.pointer   = sx_vifpointer,
 	.size      = sx_vifsize
 };
-#ifndef SL_CONF_H_
-#define SL_CONF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct slconf slconf;
 
@@ -18960,18 +17790,6 @@ struct slconf {
 	int   sync_on_write;
 	int   rotatewm;
 };
-
-#endif
-#ifndef SL_DIR_H_
-#define SL_DIR_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sldirtype sldirtype;
 typedef struct sldirid sldirid;
@@ -18988,18 +17806,6 @@ struct sldirid {
 };
 
 int sl_dirread(ssbuf*, ssa*, sldirtype*, char*);
-
-#endif
-#ifndef SL_V_H_
-#define SL_V_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct slv slv;
 
@@ -19023,18 +17829,6 @@ static inline uint32_t
 sl_vtimestamp(sv *v) {
 	return ((slv*)v->v)->timestamp;
 }
-
-#endif
-#ifndef SL_H_
-#define SL_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sl sl;
 typedef struct slpool slpool;
@@ -19083,39 +17877,11 @@ int sl_commit(sltx*);
 int sl_rollback(sltx*);
 int sl_write(sltx*, svlog*);
 
-#endif
-#ifndef SL_ITER_H_
-#define SL_ITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sl_iter_open(ssiter *i, sr*, ssfile*, int);
 int sl_iter_error(ssiter*);
 int sl_iter_continue(ssiter*);
 
 extern ssiterif sl_iter;
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 static inline sl*
 sl_alloc(slpool *p, uint64_t id)
@@ -19674,20 +18440,6 @@ int sl_write(sltx *t, svlog *vlog)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 static inline ssize_t sl_diridof(char *s)
 {
 	size_t v = 0;
@@ -19784,20 +18536,6 @@ error:
 	closedir(d);
 	return -1;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 typedef struct sliter sliter;
 
@@ -20001,20 +18739,6 @@ int sl_iter_continue(ssiter *i)
 	return sl_itercontinue_of(li);
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 static uint8_t
 sl_vifflags(sv *v) {
 	return ((slv*)v->v)->flags;
@@ -20049,16 +18773,6 @@ svif sl_vif =
 	.pointer   = sl_vifpointer,
 	.size      = sl_vifsize
 };
-#ifndef SD_ID_H_
-#define SD_ID_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdid sdid;
 
@@ -20078,18 +18792,6 @@ sd_idinit(sdid *i, uint64_t id, uint64_t parent, uint8_t flags)
 	i->flags  = flags;
 }
 
-#endif
-#ifndef SD_V_H_
-#define SD_V_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sdv sdv;
 
 struct sdv {
@@ -20102,18 +18804,6 @@ struct sdv {
 
 extern svif sd_vif;
 extern svif sd_vrawif;
-
-#endif
-#ifndef SD_PAGE_H_
-#define SD_PAGE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdpageheader sdpageheader;
 typedef struct sdpage sdpage;
@@ -20165,18 +18855,6 @@ sd_pagepointer(sdpage *p, sdv *v) {
 	         sizeof(sdv) * p->h->count) + v->offset;
 }
 
-#endif
-#ifndef SD_PAGESPARSE_H_
-#define SD_PAGESPARSE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 static inline char*
 sd_pagesparse_keyread(sdpage *p, uint32_t offset, uint32_t *size)
 {
@@ -20208,18 +18886,6 @@ sd_pagesparse_convert(sdpage *p, sr *r, sdv *v, char *dest)
 	}
 	sf_write(r->scheme, fields, ptr);
 }
-
-#endif
-#ifndef SD_PAGEITER_H_
-#define SD_PAGEITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdpageiter sdpageiter;
 
@@ -20483,18 +19149,6 @@ sd_pageiter_next(ssiter *i)
 
 extern ssiterif sd_pageiter;
 
-#endif
-#ifndef SD_BUILD_H_
-#define SD_BUILD_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sdbuildref sdbuildref;
 typedef struct sdbuild sdbuild;
 
@@ -20569,18 +19223,6 @@ int sd_buildbegin(sdbuild*, sr*, int, int, int, int, ssfilterif*);
 int sd_buildend(sdbuild*, sr*);
 int sd_buildcommit(sdbuild*, sr*);
 int sd_buildadd(sdbuild*, sr*, sv*, uint32_t);
-
-#endif
-#ifndef SD_INDEX_H_
-#define SD_INDEX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdindexheader sdindexheader;
 typedef struct sdindexamqf sdindexamqf;
@@ -20714,18 +19356,6 @@ int sd_indexbegin(sdindex*, sr*);
 int sd_indexcommit(sdindex*, sr*, sdid*, ssqf*, uint64_t);
 int sd_indexadd(sdindex*, sr*, sdbuild*, uint64_t);
 int sd_indexcopy(sdindex*, sr*, sdindexheader*);
-
-#endif
-#ifndef SD_INDEXITER_H_
-#define SD_INDEXITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdindexiter sdindexiter;
 
@@ -20868,18 +19498,6 @@ sd_indexiter_next(ssiter *i)
 
 extern ssiterif sd_indexiter;
 
-#endif
-#ifndef SD_SEAL_H_
-#define SD_SEAL_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sdseal sdseal;
 
 #define SD_SEALED 1
@@ -20928,18 +19546,6 @@ sd_sealvalidate(sdseal *s, sr *r, sdindexheader *h)
 		return -1;
 	return 0;
 }
-
-#endif
-#ifndef SD_C_H_
-#define SD_C_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdcbuf sdcbuf;
 typedef struct sdcgc sdcgc;
@@ -21054,18 +19660,6 @@ sd_censure(sdc *c, sr *r, int count)
 	return 0;
 }
 
-#endif
-#ifndef SD_MERGE_H_
-#define SD_MERGE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sdmergeconf sdmergeconf;
 typedef struct sdmerge sdmerge;
 
@@ -21108,18 +19702,6 @@ int sd_mergefree(sdmerge*);
 int sd_merge(sdmerge*);
 int sd_mergepage(sdmerge*, uint64_t);
 int sd_mergecommit(sdmerge*, sdid*, uint64_t);
-
-#endif
-#ifndef SD_READ_H_
-#define SD_READ_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdread sdread;
 typedef struct sdreadarg sdreadarg;
@@ -21358,36 +19940,12 @@ sd_read_stat(ssiter *iptr)
 
 extern ssiterif sd_read;
 
-#endif
-#ifndef SD_WRITE_H_
-#define SD_WRITE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sd_commitpage(sdbuild*, sr*, ssbuf*);
 
 int sd_writeseal(sr*, ssfile*, ssblob*);
 int sd_writepage(sr*, ssfile*, ssblob*, sdbuild*);
 int sd_writeindex(sr*, ssfile*, ssblob*, sdindex*);
 int sd_seal(sr*, ssfile*, ssblob*, sdindex*, uint64_t);
-
-#endif
-#ifndef SD_ITER_H_
-#define SD_ITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sditer sditer;
 
@@ -21561,34 +20119,10 @@ sd_iter_next(ssiter *i)
 
 extern ssiterif sd_iter;
 
-#endif
-#ifndef SD_RECOVER_H_
-#define SD_RECOVER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sd_recover_open(ssiter*, sr*, ssfile*);
 int sd_recover_complete(ssiter*);
 
 extern ssiterif sd_recover;
-
-#endif
-#ifndef SD_SCHEME_H_
-#define SD_SCHEME_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdschemeheader sdschemeheader;
 typedef struct sdschemeopt sdschemeopt;
@@ -21643,18 +20177,6 @@ int sd_schemeadd(sdscheme*, sr*, uint8_t, sstype, void*, uint32_t);
 int sd_schemecommit(sdscheme*, sr*);
 int sd_schemewrite(sdscheme*, sr*, char*, int);
 int sd_schemerecover(sdscheme*, sr*, char*);
-
-#endif
-#ifndef SD_SCHEMEITER_H_
-#define SD_SCHEMEITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdschemeiter sdschemeiter;
 
@@ -21715,18 +20237,6 @@ sd_schemeiter_next(ssiter *i)
 }
 
 extern ssiterif sd_schemeiter;
-
-#endif
-#ifndef SD_SNAPSHOT_H_
-#define SD_SNAPSHOT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdsnapshotheader sdsnapshotheader;
 typedef struct sdsnapshotnode sdsnapshotnode;
@@ -21789,18 +20299,6 @@ int sd_snapshot_add(sdsnapshot*, sr*, uint64_t, uint64_t, uint32_t, uint64_t);
 int sd_snapshot_addbranch(sdsnapshot*, sr*, sdindexheader*);
 int sd_snapshot_commit(sdsnapshot*, sr*, uint64_t, uint64_t, uint64_t, uint64_t,
                        uint64_t, uint64_t);
-
-#endif
-#ifndef SD_SNAPSHOTITER_H_
-#define SD_SNAPSHOTITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sdsnapshotiter sdsnapshotiter;
 
@@ -21869,7 +20367,6 @@ sd_snapshotiter_next(ssiter *i)
 
 extern ssiterif sd_snapshotiter;
 
-#endif
 void sd_buildinit(sdbuild *b)
 {
 	memset(&b->tracker, 0, sizeof(b->tracker));
@@ -22209,20 +20706,6 @@ int sd_buildcommit(sdbuild *b, sr *r)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 int sd_indexbegin(sdindex *i, sr *r)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(sdindexheader));
@@ -22441,20 +20924,6 @@ int sd_indexcopy(sdindex *i, sr *r, sdindexheader *h)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_indexiter =
 {
 	.close = sd_indexiter_close,
@@ -22463,20 +20932,6 @@ ssiterif sd_indexiter =
 	.next  = sd_indexiter_next
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_iter =
 {
 	.close   = sd_iter_close,
@@ -22484,20 +20939,6 @@ ssiterif sd_iter =
 	.of      = sd_iter_of,
 	.next    = sd_iter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 int sd_mergeinit(sdmerge *m, sr *r, ssiter *i, sdbuild *build, ssqf *qf,
                  svupsert *upsert, sdmergeconf *conf)
@@ -22624,20 +21065,6 @@ int sd_mergecommit(sdmerge *m, sdid *id, uint64_t offset)
 	return sd_indexcommit(&m->index, m->r, id, qf, offset);
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_pageiter =
 {
 	.close   = sd_pageiter_close,
@@ -22646,20 +21073,6 @@ ssiterif sd_pageiter =
 	.next    = sd_pageiter_next
 };
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_read =
 {
 	.close = sd_read_close,
@@ -22667,20 +21080,6 @@ ssiterif sd_read =
 	.of    = sd_read_of,
 	.next  = sd_read_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 typedef struct sdrecover sdrecover;
 
@@ -22855,20 +21254,6 @@ int sd_recover_complete(ssiter *i)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 int sd_schemebegin(sdscheme *c, sr *r)
 {
 	int rc = ss_bufensure(&c->buf, r->a, sizeof(sdschemeheader));
@@ -22968,20 +21353,6 @@ error:
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_schemeiter =
 {
 	.close   = sd_schemeiter_close,
@@ -22989,20 +21360,6 @@ ssiterif sd_schemeiter =
 	.of      = sd_schemeiter_of,
 	.next    = sd_schemeiter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 int sd_snapshot_begin(sdsnapshot *s, sr *r)
 {
@@ -23074,20 +21431,6 @@ int sd_snapshot_commit(sdsnapshot *s, sr *r,
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 ssiterif sd_snapshotiter =
 {
 	.close   = sd_snapshotiter_close,
@@ -23095,20 +21438,6 @@ ssiterif sd_snapshotiter =
 	.of      = sd_snapshotiter_of,
 	.next    = sd_snapshotiter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 static uint8_t
 sd_vifflags(sv *v)
@@ -23168,20 +21497,6 @@ svif sd_vrawif =
 	.pointer   = sd_vrawifpointer,
 	.size      = sd_vifsize
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
 
 int sd_commitpage(sdbuild *b, sr *r, ssbuf *buf)
 {
@@ -23309,16 +21624,6 @@ int sd_seal(sr *r, ssfile *file, ssblob *blob, sdindex *index, uint64_t offset)
 	}
 	return 0;
 }
-#ifndef SI_SCHEME_H_
-#define SI_SCHEME_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sischeme sischeme;
 
@@ -23367,18 +21672,6 @@ void si_schemeinit(sischeme*);
 void si_schemefree(sischeme*, sr*);
 int  si_schemedeploy(sischeme*, sr*);
 int  si_schemerecover(sischeme*, sr*);
-
-#endif
-#ifndef SI_BRANCH_H_
-#define SI_BRANCH_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sibranch sibranch;
 
@@ -23453,18 +21746,6 @@ si_branchload(sibranch *b, sr *r, ssfile *file)
 	ss_blobadvance(&b->copy, size);
 	return 0;
 }
-
-#endif
-#ifndef SI_NODE_H_
-#define SI_NODE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sinode sinode;
 
@@ -23632,18 +21913,6 @@ si_nodesize(sinode *n)
 	return size;
 }
 
-#endif
-#ifndef SI_NODEVIEW_H_
-#define SI_NODEVIEW_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sinodeview sinodeview;
 
 struct sinodeview {
@@ -23673,18 +21942,6 @@ si_nodeview_close(sinodeview *v)
 	si_nodeunref(v->node);
 	v->node = NULL;
 }
-
-#endif
-#ifndef SI_PLANNER_H_
-#define SI_PLANNER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct siplanner siplanner;
 typedef struct siplan siplan;
@@ -23767,18 +22024,6 @@ int si_plannerupdate(siplanner*, int, sinode*);
 int si_plannerremove(siplanner*, int, sinode*);
 int si_planner(siplanner*, siplan*);
 
-#endif
-#ifndef SI_AMQF_H_
-#define SI_AMQF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 static inline int
 si_amqfhas_branch(sr *r, sibranch *b, char *key)
 {
@@ -23800,18 +22045,6 @@ si_amqfhas(sr *r, sinode *node, char *key)
 	}
 	return 0;
 }
-
-#endif
-#ifndef SI_H_
-#define SI_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct si si;
 
@@ -23889,18 +22122,6 @@ int si_unref(si*, siref);
 int si_plan(si*, siplan*);
 int si_execute(si*, sdc*, siplan*, uint64_t, uint64_t);
 
-#endif
-#ifndef SI_LRU_H_
-#define SI_LRU_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 static inline void
 si_lru_add(si *i, svref *ref)
 {
@@ -23942,32 +22163,8 @@ si_lru_vlsn(si *i)
 	return rc;
 }
 
-#endif
-#ifndef SI_GC_H_
-#define SI_GC_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 uint32_t si_gcv(sr*, svv*);
 uint32_t si_gcref(sr*, svref*);
-
-#endif
-#ifndef SI_CACHE_H_
-#define SI_CACHE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sicachebranch sicachebranch;
 typedef struct sicache sicache;
@@ -24217,18 +22414,6 @@ si_cachepool_push(sicache *c)
 	p->n++;
 }
 
-#endif
-#ifndef SI_TX_H_
-#define SI_TX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sitx sitx;
 
 struct sitx {
@@ -24246,31 +22431,7 @@ si_txtrack(sitx *x, sinode *n) {
 		ss_listappend(&x->nodelist, &n->commit);
 }
 
-#endif
-#ifndef SI_WRITE_H_
-#define SI_WRITE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 void si_write(sitx*, svlog*, svlogindex*, uint64_t, int);
-
-#endif
-#ifndef SI_READ_H_
-#define SI_READ_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct siread siread;
 
@@ -24306,18 +22467,6 @@ void si_readhas(siread*);
 void si_readupsert(siread*, sv*, int);
 int  si_read(siread*);
 int  si_readcommited(si*, sr*, sv*, int);
-
-#endif
-#ifndef SI_ITER_H_
-#define SI_ITER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct siiter siiter;
 
@@ -24424,105 +22573,21 @@ si_iter_next(ssiter *i)
 
 extern ssiterif si_iter;
 
-#endif
-#ifndef SI_DROP_H_
-#define SI_DROP_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int si_drop(si*);
 int si_dropmark(si*);
 int si_droprepository(sr*, char*, int);
 
-#endif
-#ifndef SI_ANTICACHE_H_
-#define SI_ANTICACHE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int si_anticache(si*, siplan*);
-
-#endif
-#ifndef SI_SNAPSHOT_H_
-#define SI_SNAPSHOT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 int si_snapshot(si*, siplan*);
 
-#endif
-#ifndef SI_BACKUP_H_
-#define SI_BACKUP_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int si_backup(si*, sdc*, siplan*);
 
-#endif
-#ifndef SI_MERGE_H_
-#define SI_MERGE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int si_merge(si*, sdc*, sinode*, uint64_t, uint64_t, ssiter*, uint64_t, uint32_t);
-
-#endif
-#ifndef SI_COMPACTION_H_
-#define SI_COMPACTION_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 int si_branch(si*, sdc*, siplan*, uint64_t);
 int si_compact(si*, sdc*, siplan*, uint64_t, uint64_t, ssiter*, uint64_t);
 int si_compact_index(si*, sdc*, siplan*, uint64_t, uint64_t);
-
-#endif
-#ifndef SI_TRACK_H_
-#define SI_TRACK_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sitrack sitrack;
 
@@ -24611,32 +22676,8 @@ si_trackremove(sitrack *t, sinode *n)
 	t->count--;
 }
 
-#endif
-#ifndef SI_RECOVER_H_
-#define SI_RECOVER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 sinode *si_bootstrap(si*, uint64_t);
 int si_recover(si*);
-
-#endif
-#ifndef SI_PROFILER_H_
-#define SI_PROFILER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct siprofiler siprofiler;
 
@@ -24670,24 +22711,6 @@ struct siprofiler {
 int si_profilerbegin(siprofiler*, si*);
 int si_profilerend(siprofiler*);
 int si_profiler(siprofiler*);
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 int si_anticache(si *index, siplan *plan)
 {
@@ -24729,22 +22752,6 @@ int si_anticache(si *index, siplan *plan)
 	si_unlock(index);
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 static inline int
 si_backupend(si *index, sdc *c, siplan *plan)
@@ -24869,22 +22876,6 @@ int si_backup(si *index, sdc *c, siplan *plan)
 	si_unlock(index);
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 si *si_init(sr *r, so *object)
 {
@@ -25097,22 +23088,6 @@ int si_execute(si *i, sdc *c, siplan *plan,
 	}
 	return rc;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 static inline int
 si_branchcreate(si *index, sdc *c, sinode *parent, svindex *vindex, uint64_t vlsn,
@@ -25472,22 +23447,6 @@ int si_compact_index(si *index, sdc *c, siplan *plan,
 	return si_compact(index, c, plan, vlsn, vlsn_lru, &i, size_stream);
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 int si_droprepository(sr *r, char *repo, int drop_directory)
 {
 	DIR *dir = opendir(repo);
@@ -25567,23 +23526,6 @@ int si_drop(si *i)
 	return rc;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
 uint32_t si_gcv(sr *r, svv *v)
 {
 	uint32_t size = sv_vsize(v);
@@ -25611,22 +23553,6 @@ uint32_t si_gcref(sr *r, svref *gc)
 	return used;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 ssiterif si_iter =
 {
 	.close = si_iter_close,
@@ -25634,22 +23560,6 @@ ssiterif si_iter =
 	.of    = si_iter_of,
 	.next  = si_iter_next
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 static int
 si_redistribute(si *index, sr *r, sdc *c, sinode *node, ssbuf *result)
@@ -26083,23 +23993,6 @@ int si_merge(si *index, sdc *c, sinode *node,
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
 sinode *si_nodenew(sr *r)
 {
 	sinode *n = (sinode*)ss_malloc(r->a, sizeof(sinode));
@@ -26438,22 +24331,6 @@ int si_nodegc(sinode *n, sr *r, sischeme *scheme)
 	}
 	return rc;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 int si_planinit(siplan *p)
 {
@@ -26976,22 +24853,6 @@ int si_planner(siplanner *p, siplan *plan)
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 int si_profilerbegin(siprofiler *p, si *i)
 {
 	memset(p, 0, sizeof(*p));
@@ -27135,22 +24996,6 @@ int si_profiler(siprofiler *p)
 	si_profiler_histogram_temperature(p);
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
 
 int si_readopen(siread *q, si *i, sicache *c, ssorder o,
                 uint64_t vlsn,
@@ -27670,14 +25515,6 @@ int si_readcommited(si *index, sr *r, sv *v, int recover)
 }
 
 /*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-/*
 	repository recover states
 	-------------------------
 
@@ -27703,14 +25540,6 @@ int si_readcommited(si *index, sr *r, sv *v, int recover)
 	see: scheme recover
 	see: test/crash/durability.test.c
 */
-
-
-
-
-
-
-
-
 
 sinode *si_bootstrap(si *i, uint64_t parent)
 {
@@ -28320,22 +26149,6 @@ deploy:
 	return si_deploy(i, r, !exist);
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 enum {
 	SI_SCHEME_NONE,
 	SI_SCHEME_VERSION,
@@ -28590,22 +26403,6 @@ error:
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 int si_snapshot(si *index, siplan *plan)
 {
 	sr *r = &index->r;
@@ -28739,23 +26536,6 @@ error:
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
 void si_begin(sitx *x, si *index)
 {
 	x->index = index;
@@ -28774,23 +26554,6 @@ void si_commit(sitx *x)
 	}
 	si_unlock(x->index);
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
 
 static inline int si_set(sitx *x, svv *v, uint64_t time)
 {
@@ -28855,16 +26618,6 @@ struct syconf {
 	char *path_backup;
 	int   sync;
 };
-#ifndef SY_H_
-#define SY_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sy sy;
 
@@ -28875,23 +26628,6 @@ struct sy {
 int sy_init(sy*);
 int sy_open(sy*, sr*, syconf*);
 int sy_close(sy*, sr*);
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
 
 int sy_init(sy *e)
 {
@@ -29008,16 +26744,6 @@ int sy_close(sy *e, sr *r)
 	(void)r;
 	return 0;
 }
-#ifndef SC_WORKER_H_
-#define SC_WORKER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct scworkerpool scworkerpool;
 typedef struct scworker scworker;
@@ -29071,18 +26797,6 @@ sc_workerpool_push(scworkerpool *p, scworker *w)
 	p->idle++;
 	ss_spinunlock(&p->lock);
 }
-
-#endif
-#ifndef SC_H_
-#define SC_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct scdb scdb;
 typedef struct sctask sctask;
@@ -29184,18 +26898,6 @@ sc_end(sc *s, scdb *db, int task)
 	}
 	return complete;
 }
-
-#endif
-#ifndef SC_STEP_H_
-#define SC_STEP_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 static inline void
 sc_task_checkpoint(sc *s)
@@ -29308,18 +27010,6 @@ sc_task_age_done(sc *s, uint64_t now)
 
 int sc_step(sc*, scworker*, uint64_t);
 
-#endif
-#ifndef SC_CTL_H_
-#define SC_CTL_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sc_ctl_call(sc*, uint64_t);
 int sc_ctl_branch(sc*, uint64_t, si*);
 int sc_ctl_compact(sc*, uint64_t, si*);
@@ -29333,18 +27023,6 @@ int sc_ctl_lru(sc*);
 int sc_ctl_backup(sc*);
 int sc_ctl_backup_event(sc*);
 int sc_ctl_shutdown(sc*, si*);
-
-#endif
-#ifndef SC_READ_H_
-#define SC_READ_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct screadarg screadarg;
 typedef struct scread scread;
@@ -29382,57 +27060,12 @@ void sc_readopen(scread*, sr*, so*, si*);
 void sc_readclose(scread*);
 int  sc_read(scread*, sc*);
 
-#endif
-#ifndef SC_WRITE_H_
-#define SC_WRITE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 int sc_write(sc*, svlog*, uint64_t, int);
-
-#endif
-#ifndef SC_BACKUP_H_
-#define SC_BACKUP_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 int sc_backupstart(sc*);
 int sc_backupbegin(sc*);
 int sc_backupend(sc*, scworker*);
 int sc_backuperror(sc*);
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
 
 int sc_backupstart(sc *s)
 {
@@ -29561,25 +27194,6 @@ int sc_backuperror(sc *s)
 	s->backup_bsn_last_complete = 0;
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
 
 int sc_init(sc *s, sr *r, sstrigger *on_event, slpool *lp)
 {
@@ -29744,25 +27358,6 @@ free:
 	ss_free(s->r->a, db);
 	return 0;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
 
 int sc_ctl_call(sc *s, uint64_t vlsn)
 {
@@ -29944,25 +27539,6 @@ int sc_ctl_shutdown(sc *s, si *i)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
 void sc_readclose(scread *r)
 {
 	sr *rt = r->r;
@@ -30021,25 +27597,6 @@ int sc_read(scread *r, sc *s)
 	si_readclose(&q);
 	return r->rc;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
 
 static inline int
 sc_rotate(sc*s, scworker *w)
@@ -30631,25 +28188,6 @@ error:
 	return -1;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
 static inline scworker*
 sc_workernew(sr *r, int id)
 {
@@ -30707,25 +28245,6 @@ int sc_workerpool_new(scworkerpool *p, sr *r)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
 int sc_write(sc *s, svlog *log, uint64_t lsn, int recover)
 {
 	/* write-ahead log */
@@ -30752,16 +28271,6 @@ int sc_write(sc *s, svlog *log, uint64_t lsn, int recover)
 	}
 	return 0;
 }
-#ifndef SE_O_H_
-#define SE_O_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 enum {
 	SEUNDEF,
@@ -30792,18 +28301,6 @@ se_cast_validate(void *ptr)
 		return ptr;
 	return NULL;
 }
-
-#endif
-#ifndef SE_CONF_H_
-#define SE_CONF_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct seconfrt seconfrt;
 typedef struct seconf seconf;
@@ -30894,18 +28391,6 @@ void    *se_confget_object(so*, const char*);
 void    *se_confget_string(so*, const char*, int*);
 int64_t  se_confget_int(so*, const char*);
 
-#endif
-#ifndef SE_CONFCURSOR_H_
-#define SE_CONFCURSOR_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct seconfkv seconfkv;
 typedef struct seconfcursor seconfcursor;
 
@@ -30923,18 +28408,6 @@ struct seconfcursor {
 };
 
 so *se_confcursor_new(so*);
-
-#endif
-#ifndef SE_H_
-#define SE_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct se se;
 
@@ -30993,18 +28466,6 @@ static inline se *se_of(so *o) {
 so  *se_new(void);
 int  se_service_threads(se*, int);
 int  se_service(so*);
-
-#endif
-#ifndef SE_DOCUMENT_H_
-#define SE_DOCUMENT_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct sedocument sedocument;
 
@@ -31077,18 +28538,6 @@ se_document_validate(sedocument *o, so *dest, uint8_t flags)
 	return 0;
 }
 
-#endif
-#ifndef SE_DB_H_
-#define SE_DB_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct sedb sedb;
 
 struct sedb {
@@ -31117,18 +28566,6 @@ int   se_dbvisible(sedb*, uint64_t);
 void  se_dbbind(se*);
 void  se_dbunbind(se*, uint64_t);
 
-#endif
-#ifndef SE_TX_H_
-#define SE_TX_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct setx setx;
 
 struct setx {
@@ -31142,18 +28579,6 @@ struct setx {
 
 so *se_txnew(se*);
 
-#endif
-#ifndef SE_VIEWDB_H_
-#define SE_VIEWDB_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 typedef struct seviewdb seviewdb;
 
 struct seviewdb {
@@ -31166,18 +28591,6 @@ struct seviewdb {
 } sspacked;
 
 so *se_viewdb_new(se*, uint64_t);
-
-#endif
-#ifndef SE_VIEW_H_
-#define SE_VIEW_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct seview seview;
 
@@ -31193,18 +28606,6 @@ struct seview {
 
 so  *se_viewnew(se*, uint64_t, char*, int);
 int  se_viewupdate(seview*);
-
-#endif
-#ifndef SE_CURSOR_H_
-#define SE_CURSOR_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
 
 typedef struct secursor secursor;
 
@@ -31222,18 +28623,6 @@ struct secursor {
 
 so *se_cursornew(se*, uint64_t);
 
-#endif
-#ifndef SE_RECOVER_H_
-#define SE_RECOVER_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
 enum {
 	SE_RECOVER_1P = 1,
 	SE_RECOVER_2P = 2,
@@ -31244,29 +28633,6 @@ int se_recoverbegin(sedb*);
 int se_recoverend(sedb*);
 int se_recover(se*);
 int se_recover_repository(se*);
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static void*
 se_worker(void *arg)
@@ -31559,27 +28925,6 @@ error:
 	free(e);
 	return NULL;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static inline int
 se_confv(srconf *c, srconfstmt *s)
@@ -32786,27 +30131,6 @@ int se_confvalidate(seconf *c)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static void
 se_confkv_free(so *o)
 {
@@ -33018,27 +30342,6 @@ so *se_confcursor_new(so *o)
 	return &c->o;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static void
 se_cursorfree(so *o)
 {
@@ -33158,27 +30461,6 @@ so *se_cursornew(se *e, uint64_t vlsn)
 	so_pooladd(&e->cursor, &c->o);
 	return &c->o;
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static int
 se_dbscheme_init(sedb *db, char *name, int size)
@@ -33859,27 +31141,6 @@ void se_dbunbind(se *e, uint64_t txn)
 	}
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 enum {
 	SE_DOCUMENT_FIELD,
 	SE_DOCUMENT_ORDER,
@@ -34302,27 +31563,6 @@ so *se_document_new(se *e, so *parent, sv *vp)
 	return &v->o;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 sotype se_o[] =
 {
 	{ 0L,          "undefined"         },
@@ -34339,27 +31579,6 @@ sotype se_o[] =
 	{ 0x22FA0348L, "view"              },
 	{ 0x45ABCDFAL, "cursor"            }
 };
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static inline void
 se_recoverf(se *e, char *fmt, ...)
@@ -34540,27 +31759,6 @@ int se_recover_repository(se *e)
 	se_recoverf(e, "recovering repository '%s'", e->conf.path);
 	return sy_open(&e->rep, &e->r, rc);
 }
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static inline int
 se_txwrite(setx *t, sedocument *o, uint8_t flags)
@@ -34881,27 +32079,6 @@ so *se_txnew(se *e)
 	return &t->o;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static void
 se_viewfree(so *o)
 {
@@ -35060,27 +32237,6 @@ int se_viewupdate(seview *s)
 	return 0;
 }
 
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static void
 se_viewdb_free(so *o)
 {
@@ -35206,81 +32362,6 @@ so *se_viewdb_new(se *e, uint64_t txn_id)
 	so_pooladd(&e->viewdb, &c->o);
 	return &c->o;
 }
-#ifndef SOPHIA_H_
-#define SOPHIA_H_
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <stdlib.h>
-#include <stdint.h>
-
-#if __GNUC__ >= 4
-#  define SP_API __attribute__((visibility("default")))
-#else
-#  define SP_API
-#endif
-
-SP_API void    *sp_env(void);
-SP_API void    *sp_document(void*);
-SP_API int      sp_setstring(void*, const char*, const void*, int);
-SP_API int      sp_setint(void*, const char*, int64_t);
-SP_API int      sp_setobject(void*, const char*, void*);
-SP_API void    *sp_getobject(void*, const char*);
-SP_API void    *sp_getstring(void*, const char*, int*);
-SP_API int64_t  sp_getint(void*, const char*);
-SP_API int      sp_open(void*);
-SP_API int      sp_close(void*);
-SP_API int      sp_drop(void*);
-SP_API int      sp_destroy(void*);
-SP_API int      sp_error(void*);
-SP_API int      sp_service(void*);
-SP_API void    *sp_poll(void*);
-SP_API int      sp_set(void*, void*);
-SP_API int      sp_upsert(void*, void*);
-SP_API int      sp_delete(void*, void*);
-SP_API void    *sp_get(void*, void*);
-SP_API void    *sp_cursor(void*);
-SP_API void    *sp_begin(void*);
-SP_API int      sp_prepare(void*);
-SP_API int      sp_commit(void*);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
-
-/*
- * sophia database
- * sphia.org
- *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static inline void
 sp_unsupported(so *o, const char *method)
@@ -35306,12 +32387,12 @@ sp_cast(void *ptr, const char *method)
 	return o;
 }
 
-SP_API void *sp_env(void)
+void *sp_env(void)
 {
 	return se_new();
 }
 
-SP_API void *sp_document(void *ptr)
+void *sp_document(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->document == NULL)) {
@@ -35325,7 +32406,7 @@ SP_API void *sp_document(void *ptr)
 	return h;
 }
 
-SP_API int sp_open(void *ptr)
+int sp_open(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->open == NULL)) {
@@ -35339,7 +32420,7 @@ SP_API int sp_open(void *ptr)
 	return rc;
 }
 
-SP_API int sp_close(void *ptr)
+int sp_close(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->close == NULL)) {
@@ -35353,7 +32434,7 @@ SP_API int sp_close(void *ptr)
 	return rc;
 }
 
-SP_API int sp_drop(void *ptr)
+int sp_drop(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->drop == NULL)) {
@@ -35367,7 +32448,7 @@ SP_API int sp_drop(void *ptr)
 	return rc;
 }
 
-SP_API int sp_destroy(void *ptr)
+int sp_destroy(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->destroy == NULL)) {
@@ -35386,7 +32467,7 @@ SP_API int sp_destroy(void *ptr)
 	return rc;
 }
 
-SP_API int sp_error(void *ptr)
+int sp_error(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->error == NULL)) {
@@ -35400,13 +32481,13 @@ SP_API int sp_error(void *ptr)
 	return rc;
 }
 
-SP_API int sp_service(void *ptr)
+int sp_service(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	return se_service(o->env);
 }
 
-SP_API void *sp_poll(void *ptr)
+void *sp_poll(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->poll == NULL)) {
@@ -35420,7 +32501,7 @@ SP_API void *sp_poll(void *ptr)
 	return h;
 }
 
-SP_API int sp_setstring(void *ptr, const char *path, const void *pointer, int size)
+int sp_setstring(void *ptr, const char *path, const void *pointer, int size)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setstring == NULL)) {
@@ -35434,7 +32515,7 @@ SP_API int sp_setstring(void *ptr, const char *path, const void *pointer, int si
 	return rc;
 }
 
-SP_API int sp_setint(void *ptr, const char *path, int64_t v)
+int sp_setint(void *ptr, const char *path, int64_t v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setint == NULL)) {
@@ -35448,7 +32529,7 @@ SP_API int sp_setint(void *ptr, const char *path, int64_t v)
 	return rc;
 }
 
-SP_API int sp_setobject(void *ptr, const char *path, void *v)
+int sp_setobject(void *ptr, const char *path, void *v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setobject == NULL)) {
@@ -35462,7 +32543,7 @@ SP_API int sp_setobject(void *ptr, const char *path, void *v)
 	return rc;
 }
 
-SP_API void *sp_getobject(void *ptr, const char *path)
+void *sp_getobject(void *ptr, const char *path)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getobject == NULL)) {
@@ -35476,7 +32557,7 @@ SP_API void *sp_getobject(void *ptr, const char *path)
 	return h;
 }
 
-SP_API void *sp_getstring(void *ptr, const char *path, int *size)
+void *sp_getstring(void *ptr, const char *path, int *size)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getstring == NULL)) {
@@ -35490,7 +32571,7 @@ SP_API void *sp_getstring(void *ptr, const char *path, int *size)
 	return h;
 }
 
-SP_API int64_t sp_getint(void *ptr, const char *path)
+int64_t sp_getint(void *ptr, const char *path)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getint == NULL)) {
@@ -35504,7 +32585,7 @@ SP_API int64_t sp_getint(void *ptr, const char *path)
 	return rc;
 }
 
-SP_API int sp_set(void *ptr, void *v)
+int sp_set(void *ptr, void *v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->set == NULL)) {
@@ -35518,7 +32599,7 @@ SP_API int sp_set(void *ptr, void *v)
 	return rc;
 }
 
-SP_API int sp_upsert(void *ptr, void *v)
+int sp_upsert(void *ptr, void *v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->upsert == NULL)) {
@@ -35532,7 +32613,7 @@ SP_API int sp_upsert(void *ptr, void *v)
 	return rc;
 }
 
-SP_API int sp_delete(void *ptr, void *v)
+int sp_delete(void *ptr, void *v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->del == NULL)) {
@@ -35546,7 +32627,7 @@ SP_API int sp_delete(void *ptr, void *v)
 	return rc;
 }
 
-SP_API void *sp_get(void *ptr, void *v)
+void *sp_get(void *ptr, void *v)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->get == NULL)) {
@@ -35560,7 +32641,7 @@ SP_API void *sp_get(void *ptr, void *v)
 	return h;
 }
 
-SP_API void *sp_cursor(void *ptr)
+void *sp_cursor(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->cursor == NULL)) {
@@ -35574,7 +32655,7 @@ SP_API void *sp_cursor(void *ptr)
 	return h;
 }
 
-SP_API void *sp_begin(void *ptr)
+void *sp_begin(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->begin == NULL)) {
@@ -35588,7 +32669,7 @@ SP_API void *sp_begin(void *ptr)
 	return h;
 }
 
-SP_API int sp_prepare(void *ptr)
+int sp_prepare(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->prepare == NULL)) {
@@ -35602,7 +32683,7 @@ SP_API int sp_prepare(void *ptr)
 	return rc;
 }
 
-SP_API int sp_commit(void *ptr)
+int sp_commit(void *ptr)
 {
 	so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->commit == NULL)) {
@@ -35615,6 +32696,3 @@ SP_API int sp_commit(void *ptr)
 	se_apiunlock(e);
 	return rc;
 }
-/* vim: foldmethod=marker
-*/
-/* }}} */
