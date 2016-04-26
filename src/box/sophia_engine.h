@@ -46,29 +46,22 @@ struct SophiaEngine: public Engine {
 	virtual void begin(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;
 	virtual void commit(struct txn *txn, int64_t signature) override;
-	virtual void rollbackStatement(struct txn_stmt *stmt) override;
 	virtual void rollback(struct txn *txn) override;
-	virtual void beginJoin() override;
 	virtual void beginWalRecovery() override;
-	virtual void recoverToCheckpoint(int64_t) override;
 	virtual void endRecovery() override;
 	virtual void join(struct xstream *stream) override;
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
-	virtual void commitCheckpoint() override;
-	virtual void abortCheckpoint() override;
-	void *env;
 private:
 	int64_t m_prev_commit_lsn;
-	int64_t m_prev_checkpoint_lsn;
-	int64_t m_checkpoint_lsn;
 public:
+	void *env;
 	int recovery_complete;
 };
 
 extern "C" {
 typedef void (*sophia_info_f)(const char*, const char*, void*);
-int   sophia_info(const char*, sophia_info_f, void*);
+int sophia_info(const char*, sophia_info_f, void*);
 }
 void  sophia_error(void*);
 void *sophia_read(void*, void*);
@@ -76,6 +69,6 @@ void  sophia_workers_start(void*);
 
 struct tuple *
 sophia_tuple_new(void *obj, struct key_def *key_def,
-		 struct tuple_format *format);
+                 struct tuple_format *format);
 
 #endif /* TARANTOOL_BOX_SOPHIA_ENGINE_H_INCLUDED */
