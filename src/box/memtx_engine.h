@@ -59,6 +59,7 @@ struct MemtxEngine: public Engine {
 	virtual void rollback(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;
 	virtual void commit(struct txn *txn, int64_t signature) override;
+	virtual void bootstrap() override;
 	virtual void beginJoin() override;
 	virtual void recoverToCheckpoint(int64_t lsn) override;
 	virtual void endRecovery() override;

@@ -32,7 +32,6 @@
 
 #include "scoped_guard.h"
 #include "fiber.h"
-#include "bootstrap.h"
 #include "xlog.h"
 #include "xrow.h"
 #include "xstream.h"
@@ -244,25 +243,6 @@ recover_xlog(struct recovery *r, struct xstream *stream, struct xlog *l,
 			e->log();
 		}
 	}
-}
-
-void
-recovery_bootstrap(struct recovery *r, struct xstream *stream)
-{
-	/* Recover from bootstrap.snap */
-	say_info("initializing an empty data directory");
-	struct xdir dir;
-	xdir_create(&dir, "", SNAP, &uuid_nil);
-	const char *filename = "bootstrap.snap";
-	FILE *f = fmemopen((void *) &bootstrap_bin,
-			   sizeof(bootstrap_bin), "r");
-	struct xlog *snap = xlog_open_stream_xc(&dir, 0, f, filename);
-	auto guard = make_scoped_guard([&]{
-		xlog_close(snap);
-		xdir_destroy(&dir);
-	});
-	/** The snapshot must have a EOF marker. */
-	recover_xlog(r, stream, snap, NULL);
 }
 
 /**

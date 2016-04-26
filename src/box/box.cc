@@ -1224,10 +1224,7 @@ engine_init()
 static void
 bootstrap_cluster(void)
 {
-	/* Process bootstrap.bin */
-	struct xstream bootstrap_stream;
-	xstream_create(&bootstrap_stream, apply_row);
-	recovery_bootstrap(recovery, &bootstrap_stream);
+	engine_bootstrap();
 
 	uint32_t server_id = 1;
 

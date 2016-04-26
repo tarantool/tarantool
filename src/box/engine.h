@@ -135,6 +135,10 @@ public:
 	 */
 	virtual void endRecovery();
 	/**
+	 * Bootstrap an empty data directory
+	 */
+	virtual void bootstrap() {}
+	/**
 	 * Notify engine about a JOIN start (slave-side)
 	 */
 	virtual void beginJoin();
@@ -239,6 +243,12 @@ engine_id(Handler *space)
  */
 void
 engine_recover_to_checkpoint(int64_t checkpoint_id);
+
+/**
+ * Initialize an empty data directory
+ */
+void
+engine_bootstrap();
 
 /**
  * Called at the start of JOIN routine

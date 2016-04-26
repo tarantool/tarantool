@@ -269,6 +269,15 @@ engine_recover_to_checkpoint(int64_t checkpoint_id)
 }
 
 void
+engine_bootstrap()
+{
+	Engine *engine;
+	engine_foreach(engine) {
+		engine->bootstrap();
+	}
+}
+
+void
 engine_begin_join()
 {
 	/* recover engine snapshot */

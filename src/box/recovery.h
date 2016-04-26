@@ -72,9 +72,6 @@ void
 recovery_exit(struct recovery *r);
 
 void
-recovery_bootstrap(struct recovery *r, struct xstream *stream);
-
-void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
 		      const char *name, ev_tstamp wal_dir_rescan_delay);
 
