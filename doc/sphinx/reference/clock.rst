@@ -15,10 +15,9 @@ functions whose names end in "64" return a 64-bit number of nanoseconds.
               realtime64()
 
     The wall clock time. Derived from C function clock_gettime(CLOCK_REALTIME).
-    Approximately the same as os.clock().
     This is the best function for knowing what the official time is,
     as determined by the system administrator. |br|
-    See also :func:`fiber.time64 <fiber.time64>`.
+    See also :func:`fiber.time64 <fiber.time64>` and :ref:`os.clock() <os-clock>`.
 
     :return: seconds or nanoseconds since epoch (1970-01-01 00:00:00), adjusted.
     :rtype: number or number64

@@ -4,21 +4,22 @@
         Differences between memtx and sophia storage engines
 -------------------------------------------------------------------------------
 
-    The primary difference between memtx and sophia is that memtx is an
-    "in-memory" engine while sophia is an "on-disk" engine. An in-memory storage
-    engine is generally faster, and the memtx engine is justifiably the default
-    for Tarantool, but there are two situations where an on-disk engine such as
+    The primary difference between memtx and sophia is that
+    memtx is an "in-memory" engine while sophia is an "on-disk"
+    engine. An in-memory storage engine is generally fastr,
+    and the memtx engine is justifiably the default for Tarantool,
+    but there are two situations where an on-disk engine such as
     sophia would be preferable:
 
-    (1) when the database is larger than the available memory and adding more
-        memory is not a realistic option;
-    (2) when the server frequently goes down due to errors or a simple desire to
-        save power -- bringing the server back up and restoring a memtx database
-        into memory takes time.
+    (1) when the database is larger than the available memory and
+    adding more memory is not a realistic option;
+    (2) when the server frequently goes down due to errors
+    or a simple desire to save power -- bringing the server
+    back up and restoring a memtx database into memory takes time.
 
-    Here are behavior differences which affect programmers. All of these
-    differences have been noted elsewhere in sentences that begin with the words
-    "Note re storage engine: sophia".
+    Here are behavior differences which affect programmers.
+    All of these differences have been noted elsewhere in
+    sentences that begin with the words "Note re storage engine: sophia".
 
     With memtx, the maximum number of indexes per space is 128. |br|
     With sophia, the maximum is 1, that is, only primary indexes are supported.

@@ -374,7 +374,7 @@ wrinkle that we add here is a timing function.
     end_time = os.clock()
     'insert done in ' .. end_time - start_time .. ' seconds'
 
-The Lua ``os.clock()`` function will return the number of seconds since the
+The :ref:`os.clock() <os-clock>` function will return the number of CPU seconds since the
 start. Therefore, by getting start_time = number of seconds just before the
 inserting, and then getting end_time = number of seconds just after the
 inserting, we can calculate (end_time - start_time) = elapsed time in seconds.
