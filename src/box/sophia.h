@@ -1,14 +1,35 @@
-#ifndef SOPHIA_H_
-#define SOPHIA_H_
-
+#ifndef INCLUDES_TARANTOOL_BOX_SOPHIA_H
+#define INCLUDES_TARANTOOL_BOX_SOPHIA_H
 /*
- * sophia database
- * sphia.org
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
- * Copyright (c) Dmitry Simonenko
- * BSD License
-*/
-
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,38 +37,32 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 
-#if __GNUC__ >= 4
-#  define SP_API __attribute__((visibility("default")))
-#else
-#  define SP_API
-#endif
-
-SP_API void    *sp_env(void);
-SP_API void    *sp_document(void*);
-SP_API int      sp_setstring(void*, const char*, const void*, int);
-SP_API int      sp_setint(void*, const char*, int64_t);
-SP_API int      sp_setobject(void*, const char*, void*);
-SP_API void    *sp_getobject(void*, const char*);
-SP_API void    *sp_getstring(void*, const char*, int*);
-SP_API int64_t  sp_getint(void*, const char*);
-SP_API int      sp_open(void*);
-SP_API int      sp_close(void*);
-SP_API int      sp_drop(void*);
-SP_API int      sp_destroy(void*);
-SP_API int      sp_error(void*);
-SP_API int      sp_service(void*);
-SP_API void    *sp_poll(void*);
-SP_API int      sp_set(void*, void*);
-SP_API int      sp_upsert(void*, void*);
-SP_API int      sp_delete(void*, void*);
-SP_API void    *sp_get(void*, void*);
-SP_API void    *sp_cursor(void*);
-SP_API void    *sp_begin(void*);
-SP_API int      sp_prepare(void*);
-SP_API int      sp_commit(void*);
+void    *sp_env(void);
+void    *sp_document(void*);
+int      sp_setstring(void*, const char*, const void*, int);
+int      sp_setint(void*, const char*, int64_t);
+int      sp_setobject(void*, const char*, void*);
+void    *sp_getobject(void*, const char*);
+void    *sp_getstring(void*, const char*, int*);
+int64_t  sp_getint(void*, const char*);
+int      sp_open(void*);
+int      sp_close(void*);
+int      sp_drop(void*);
+int      sp_destroy(void*);
+int      sp_error(void*);
+int      sp_service(void*);
+void    *sp_poll(void*);
+int      sp_set(void*, void*);
+int      sp_upsert(void*, void*);
+int      sp_delete(void*, void*);
+void    *sp_get(void*, void*);
+void    *sp_cursor(void*);
+void    *sp_begin(void*);
+int      sp_prepare(void*);
+int      sp_commit(void*);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* INCLUDES_TARANTOOL_BOX_SOPHIA_H */
