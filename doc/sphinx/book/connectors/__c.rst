@@ -2,6 +2,10 @@
                             C
 =====================================================================
 
+:func:`tarantoolc:tnt_connect`
+
+:func:`tarantoolc:tnt_connect()`
+
 Here follow two examples of using Tarantool's high-level C API.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

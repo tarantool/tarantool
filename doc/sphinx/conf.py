@@ -18,7 +18,8 @@ extensions = [
     'ext.LuaLexer',
     'ext.TapLexer',
     'ext.TarantoolSessionLexer',
-    'breathe'
+    'breathe',
+    'sphinx.ext.intersphinx',
 ]
 primary_domain = 'lua'
 templates_path = ['../_templates']
@@ -111,3 +112,9 @@ rst_epilog = """
 #     sphinx.add_lexer("tarantoolsession", TarantoolSessionLexer())
 #     from TapLexer import TAPLexer
 #     sphinx.add_lexer('tap', TAPLexer())
+
+intersphinx_mapping = {
+'tarantoolc': ('http://tarantool.github.io/tarantool-c/', None)
+}
+
+intersphinx_cache_limit = 0
