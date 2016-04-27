@@ -16,6 +16,8 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
+include_directories(${LZ4_INCLUDE_DIRS})
+
 add_library(box STATIC
     iproto.cc
     iproto_constants.c
@@ -80,4 +82,5 @@ add_library(box STATIC
     lua/net_box.c
     ${bin_sources})
 
+target_link_libraries(box ${LZ4_LIBRARIES})
 add_dependencies(box build_bundled_libs)

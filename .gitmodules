@@ -23,3 +23,6 @@
 	path = src/lib/small
 	url = https://github.com/tarantool/small.git
 	ignore = dirty
+[submodule "third_party/lz4"]
+	path = third_party/lz4
+	url = https://github.com/Cyan4973/lz4.git

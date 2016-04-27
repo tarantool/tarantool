@@ -369,6 +369,32 @@ else()
     find_package(LibYAML)
 endif()
 
+#
+# LZ4
+#
+
+option(ENABLE_BUNDLED_LZ4 "Enable building of the bundled MsgPuck" OFF)
+if (ENABLE_BUNDLED_LZ4)
+    add_library(lz4 STATIC
+        third_party/lz4/lib/lz4.c
+        third_party/lz4/lib/lz4frame.c
+        third_party/lz4/lib/lz4hc.c
+        third_party/lz4/lib/xxhash.c
+    )
+    set(LZ4_LIBRARIES lz4)
+    set(LZ4_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lz4/lib)
+    find_package_message(LZ4 "Using bundled LZ4"
+        "${LZ4_LIBRARIES}:${LZ4_INCLUDE_DIRS}")
+    add_dependencies(build_bundled_libs lz4)
+else()
+    set(LZ4_FIND_REQUIRED ON)
+    find_package(LZ4)
+endif()
+
+#
+# OpenSSL
+#
+
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
     message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
