@@ -2,9 +2,7 @@
                             C
 =====================================================================
 
-:func:`tarantoolc:tnt_connect`
-
-:func:`tarantoolc:tnt_connect()`
+:c:func:`tarantoolc:tnt_connect`
 
 Here follow two examples of using Tarantool's high-level C API.
 
@@ -19,7 +17,7 @@ space :code:`examples` via the high-level C API.
 
     #include <stdio.h>
     #include <stdlib.h>
-    
+
     #include <tarantool/tarantool.h>
     #include <tarantool/tnt_net.h>
     #include <tarantool/tnt_opt.h>
@@ -153,7 +151,7 @@ requests in the box library.
 
 In this program, the choice is to do an INSERT request, so
 the program passes the ``tnt_stream`` that was used for connection
-(:code:`tnt`) and the stream that was set up with :func:`tnt_object_format`
+(:code:`tnt`) and the stream that was set up with :c:func:`tarantoolc:tnt_object_format`
 (:code:`tuple`).
 
 Function description:
@@ -191,7 +189,7 @@ Function description:
     void tnt_reply_free(struct tnt_reply \*r)
 
 **TEARDOWN:** When a session ends, the connection that was made with
-:func:`tnt_connect()` should be closed, and the objects that were made in the setup
+:c:func:`tarantoolc:tnt_connect()` should be closed, and the objects that were made in the setup
 should be destroyed.
 
 .. code-block:: c
