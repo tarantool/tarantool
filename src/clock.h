@@ -38,6 +38,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 double clock_realtime(void);
 double clock_monotonic(void);
 double clock_process(void);
@@ -47,6 +49,8 @@ uint64_t clock_realtime64(void);
 uint64_t clock_monotonic64(void);
 uint64_t clock_process64(void);
 uint64_t clock_thread64(void);
+
+/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -5,7 +5,7 @@ box.cfg{logger = "tarantool.log"}
 package.cpath = '../app-tap/?.so;../app-tap/?.dylib;'
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(13)
+    test:plan(14)
     local status, module = pcall(require, 'module_api')
     test:ok(status, "module is loaded")
     if not status then
