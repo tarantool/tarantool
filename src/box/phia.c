@@ -61,6 +61,8 @@
 #include <zstd_static.h>
 
 #include "crc32.h"
+#include "clock.h"
+#include "trivia/config.h"
 
 #if __GNUC__ >= 4 && __GNUC_MINOR__ >= 3
 #  define sshot __attribute__((hot))
@@ -103,8 +105,6 @@ struct ssaligni64 {
 #define ss_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
 void     ss_sleep(uint64_t);
-uint64_t ss_utime(void);
-uint32_t ss_timestamp(void);
 
 typedef uint8_t ssspinlock;
 
@@ -2879,23 +2879,14 @@ ss_stdvfs_close(ssvfs *f ssunused, int fd)
 static int
 ss_stdvfs_sync(ssvfs *f ssunused, int fd)
 {
-#if defined(__APPLE__)
-	return fcntl(fd, F_FULLFSYNC);
-#elif defined(__FreeBSD__) || defined(__DragonFly__)
-	return fsync(fd);
-#else
 	return fdatasync(fd);
-#endif
 }
 
 static int
 ss_stdvfs_advise(ssvfs *f ssunused, int fd, int hint, uint64_t off, uint64_t len)
 {
 	(void)hint;
-#if  defined(__APPLE__) || \
-     defined(__FreeBSD__) || \
-    (defined(__FreeBSD_kernel__) && defined(__GLIBC__)) || \
-     defined(__DragonFly__)
+#if !defined(HAVE_POSIX_FADVISE)
 	(void)fd;
 	(void)off;
 	(void)len;
@@ -3032,10 +3023,7 @@ ss_stdvfs_mremap(ssvfs *f ssunused, ssmmap *m, uint64_t size)
 	if (ssunlikely(m->p == NULL))
 		return ss_stdvfs_mmap_allocate(f, m, size);
 	void *p;
-#if  defined(__APPLE__) || \
-     defined(__FreeBSD__) || \
-    (defined(__FreeBSD_kernel__) && defined(__GLIBC__)) || \
-     defined(__DragonFly__)
+#if !defined(HAVE_MREMAP)
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE,
 	         MAP_PRIVATE|MAP_ANON, -1, 0);
 	if (p == MAP_FAILED)
@@ -3372,24 +3360,6 @@ void ss_sleep(uint64_t ns)
 	ts.tv_sec  = 0;
 	ts.tv_nsec = ns;
 	nanosleep(&ts, NULL);
-}
-
-uint64_t ss_utime(void)
-{
-#if defined(__APPLE__)
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	return t.tv_sec * 1000000ULL + t.tv_usec;
-#else
-	struct timespec t;
-	clock_gettime(CLOCK_MONOTONIC, &t);
-	return t.tv_sec * 1000000ULL + t.tv_nsec / 1000;
-#endif
-}
-
-uint32_t ss_timestamp(void)
-{
-	return time(NULL);
 }
 
 typedef struct sszstdfilter sszstdfilter;
@@ -4613,7 +4583,7 @@ sr_statkey(srstat *s, int size)
 static inline void
 sr_statset(srstat *s, uint64_t start)
 {
-	uint64_t diff = ss_utime() - start;
+	uint64_t diff = clock_monotonic64() - start;
 	ss_spinlock(&s->lock);
 	s->set++;
 	ss_avgupdate(&s->set_latency, diff);
@@ -4623,7 +4593,7 @@ sr_statset(srstat *s, uint64_t start)
 static inline void
 sr_statdelete(srstat *s, uint64_t start)
 {
-	uint64_t diff = ss_utime() - start;
+	uint64_t diff = clock_monotonic64() - start;
 	ss_spinlock(&s->lock);
 	s->del++;
 	ss_avgupdate(&s->del_latency, diff);
@@ -4633,7 +4603,7 @@ sr_statdelete(srstat *s, uint64_t start)
 static inline void
 sr_statupsert(srstat *s, uint64_t start)
 {
-	uint64_t diff = ss_utime() - start;
+	uint64_t diff = clock_monotonic64() - start;
 	ss_spinlock(&s->lock);
 	s->upsert++;
 	ss_avgupdate(&s->upsert_latency, diff);
@@ -4655,7 +4625,7 @@ static inline void
 sr_stattx(srstat *s, uint64_t start, uint32_t count,
           int rlb, int conflict)
 {
-	uint64_t diff = ss_utime() - start;
+	uint64_t diff = clock_monotonic64() - start;
 	ss_spinlock(&s->lock);
 	s->tx++;
 	s->tx_rlb += rlb;
@@ -4676,7 +4646,7 @@ sr_stattx_lock(srstat *s)
 static inline void
 sr_statcursor(srstat *s, uint64_t start, int read_disk, int read_cache, int ops)
 {
-	uint64_t diff = ss_utime() - start;
+	uint64_t diff = clock_monotonic64() - start;
 	ss_spinlock(&s->lock);
 	s->cursor++;
 	ss_avgupdate(&s->cursor_read_disk, read_disk);
@@ -13212,7 +13182,7 @@ si_branchcreate(si *index, sdc *c, sinode *parent, svindex *vindex, uint64_t vls
 	ss_iteropen(sv_mergeiter, &i, r, &vmerge, SS_GTE);
 
 	/* merge iter is not used */
-	uint32_t timestamp = ss_timestamp();
+	uint32_t timestamp = time(NULL);
 	sdmergeconf mergeconf = {
 		.stream          = vindex->count,
 		.size_stream     = UINT32_MAX,
@@ -13748,7 +13718,7 @@ si_redistribute_index(si *index, sr *r, sdc *c, sinode *node)
 	}
 	if (ssunlikely(ss_bufused(&c->b) == 0))
 		return 0;
-	uint64_t now = ss_utime();
+	uint64_t now = clock_monotonic64();
 	ss_iterinit(ss_bufiterref, &i);
 	ss_iteropen(ss_bufiterref, &i, &c->b, sizeof(svref*));
 	while (ss_iterhas(ss_bufiterref, &i)) {
@@ -13786,7 +13756,7 @@ si_split(si *index, sdc *c, ssbuf *result,
          uint64_t  vlsn_lru)
 {
 	sr *r = &index->r;
-	uint32_t timestamp = ss_timestamp();
+	uint32_t timestamp = time(NULL);
 	int rc;
 	sdmergeconf mergeconf = {
 		.stream          = stream,
@@ -14641,7 +14611,7 @@ si_plannerpeek_age(siplanner *p, siplan *plan)
 	 * index size >= b */
 
 	/* full scan */
-	uint64_t now = ss_utime();
+	uint64_t now = clock_monotonic64();
 	sinode *n = NULL;
 	ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
@@ -14742,7 +14712,7 @@ si_plannerpeek_expire(siplanner *p, siplan *plan)
 {
 	/* full scan */
 	int rc_inprogress = 0;
-	uint32_t now = ss_timestamp();
+	uint32_t now = time(NULL);
 	sinode *n = NULL;
 	ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
@@ -17289,7 +17259,7 @@ int sc_backuperror(sc *s)
 
 int sc_init(sc *s, sr *r, sstrigger *on_event, slpool *lp)
 {
-	uint64_t now = ss_utime();
+	uint64_t now = clock_monotonic64();
 	ss_mutexinit(&s->lock);
 	s->checkpoint_lsn           = 0;
 	s->checkpoint_lsn_last      = 0;
@@ -18161,7 +18131,7 @@ sc_periodic(sc *s, sctask *task, srzone *zone, uint64_t now)
 static int
 sc_schedule(sc *s, sctask *task, scworker *w, uint64_t vlsn)
 {
-	uint64_t now = ss_utime();
+	uint64_t now = clock_monotonic64();
 	srzone *zone = sr_zoneof(s->r);
 	int rc;
 	ss_mutexlock(&s->lock);
@@ -18350,7 +18320,7 @@ int sc_write(sc *s, svlog *log, uint64_t lsn, int recover)
 	sl_commit(&tl);
 
 	/* index */
-	uint64_t now = ss_utime();
+	uint64_t now = clock_monotonic64();
 	svlogindex *i   = (svlogindex*)log->index.s;
 	svlogindex *end = (svlogindex*)log->index.p;
 	while (i < end) {
@@ -20534,7 +20504,7 @@ so *se_cursornew(se *e, uint64_t vlsn)
 	so_init(&c->o, &se_o[SECURSOR], &secursorif, &e->o, &e->o);
 	sv_loginit(&c->log);
 	sx_init(&e->xm, &c->t, &c->log);
-	c->start = ss_utime();
+	c->start = clock_monotonic64();
 	c->ops = 0;
 	c->read_disk = 0;
 	c->read_cache = 0;
@@ -20850,7 +20820,7 @@ so *se_dbresult(se *e, scread *r)
 	v->read_cache   = r->read_cache;
 	v->read_latency = 0;
 	if (result.v) {
-		v->read_latency = ss_utime() - r->start;
+		v->read_latency = clock_monotonic64() - r->start;
 		sr_statget(&e->stat,
 		           v->read_latency,
 		           v->read_disk,
@@ -20884,7 +20854,7 @@ se_dbread(sedb *db, sedocument *o, sx *x, int x_search,
           sicache *cache)
 {
 	se *e = se_of(&db->o);
-	uint64_t start  = ss_utime();
+	uint64_t start  = clock_monotonic64();
 
 	/* prepare the key */
 	int auto_close = !o->created;
@@ -21051,7 +21021,7 @@ se_dbset(so *o, so *v)
 	sedb *db = se_cast(o, sedb*, SEDB);
 	sedocument *key = se_cast(v, sedocument*, SEDOCUMENT);
 	se *e = se_of(&db->o);
-	uint64_t start = ss_utime();
+	uint64_t start = clock_monotonic64();
 	int rc = se_dbwrite(db, key, 0);
 	sr_statset(&e->stat, start);
 	return rc;
@@ -21063,7 +21033,7 @@ se_dbupsert(so *o, so *v)
 	sedb *db = se_cast(o, sedb*, SEDB);
 	sedocument *key = se_cast(v, sedocument*, SEDOCUMENT);
 	se *e = se_of(&db->o);
-	uint64_t start = ss_utime();
+	uint64_t start = clock_monotonic64();
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
 	int rc = se_dbwrite(db, key, SVUPSERT);
@@ -21077,7 +21047,7 @@ se_dbdel(so *o, so *v)
 	sedb *db = se_cast(o, sedb*, SEDB);
 	sedocument *key = se_cast(v, sedocument*, SEDOCUMENT);
 	se *e = se_of(&db->o);
-	uint64_t start = ss_utime();
+	uint64_t start = clock_monotonic64();
 	int rc = se_dbwrite(db, key, SVDELETE);
 	sr_statdelete(&e->stat, start);
 	return rc;
@@ -21308,7 +21278,7 @@ se_document_create(sedocument *o)
 		if (ssunlikely(o->timestamp > 0))
 			timestamp = o->timestamp;
 		else
-			timestamp = ss_timestamp();
+			timestamp = time(NULL);
 	}
 
 	/* create document from raw data */
@@ -22161,7 +22131,7 @@ so *se_txnew(se *e)
 	if (! cache)
 		sv_loginit(&t->log);
 	sx_init(&e->xm, &t->t, &t->log);
-	t->start = ss_utime();
+	t->start = clock_monotonic64();
 	t->lsn = 0;
 	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
