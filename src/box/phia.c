@@ -193,26 +193,6 @@ ss_listempty(sslist *l) {
 	return l->next == l && l->prev == l;
 }
 
-static inline void
-ss_listmerge(sslist *a, sslist *b) {
-	if (ssunlikely(ss_listempty(b)))
-		return;
-	register sslist *first = b->next;
-	register sslist *last = b->prev;
-	first->prev = a->prev;
-	a->prev->next = first;
-	last->next = a;
-	a->prev = last;
-}
-
-static inline void
-ss_listreplace(sslist *o, sslist *n) {
-	n->next = o->next;
-	n->next->prev = n;
-	n->prev = o->prev;
-	n->prev->next = n;
-}
-
 #define ss_listlast(H, N) ((H) == (N))
 
 #define ss_listforeach(H, I) \
@@ -604,11 +584,6 @@ ss_free(ssa *a, void *ptr) {
 	a->i->free(a, ptr);
 }
 
-static inline int
-ss_ensure(ssa *a, int n, int size) {
-	return a->i->ensure(a, n, size);
-}
-
 static inline char*
 ss_strdup(ssa *a, char *str) {
 	int sz = strlen(str) + 1;
@@ -616,15 +591,6 @@ ss_strdup(ssa *a, char *str) {
 	if (ssunlikely(s == NULL))
 		return NULL;
 	memcpy(s, str, sz);
-	return s;
-}
-
-static inline char*
-ss_memdup(ssa *a, void *ptr, size_t size) {
-	char *s = ss_malloc(a, size);
-	if (ssunlikely(s == NULL))
-		return NULL;
-	memcpy(s, ptr, size);
 	return s;
 }
 
@@ -713,16 +679,6 @@ ss_gcinit(ssgc *gc)
 }
 
 static inline void
-ss_gclock(ssgc *gc) {
-	ss_spinlock(&gc->lock);
-}
-
-static inline void
-ss_gcunlock(ssgc *gc) {
-	ss_spinunlock(&gc->lock);
-}
-
-static inline void
 ss_gcfree(ssgc *gc)
 {
 	ss_spinlockfree(&gc->lock);
@@ -759,16 +715,6 @@ ss_gcinprogress(ssgc *gc)
 	int v = gc->complete;
 	ss_spinunlock(&gc->lock);
 	return !v;
-}
-
-static inline int
-ss_gcready(ssgc *gc, float factor)
-{
-	ss_spinlock(&gc->lock);
-	int ready = gc->sweep >= (gc->mark * factor);
-	int rc = ready && gc->complete;
-	ss_spinunlock(&gc->lock);
-	return rc;
 }
 
 static inline int
@@ -959,22 +905,6 @@ ss_bufensure(ssbuf *b, ssa *a, int size)
 	b->e = p + sz;
 	b->s = p;
 	assert((b->e - b->p) >= size);
-	return 0;
-}
-
-static inline int
-ss_buftruncate(ssbuf *b, ssa *a, int size)
-{
-	assert(size <= (b->p - b->s));
-	char *p = b->reserve;
-	if (b->s != b->reserve) {
-		p = ss_realloc(a, b->s, size);
-		if (ssunlikely(p == NULL))
-			return -1;
-	}
-	b->p = p + (b->p - b->s);
-	b->e = p + size;
-	b->s = p;
 	return 0;
 }
 
@@ -1599,12 +1529,6 @@ ss_filterfree(ssfilter *c)
 }
 
 static inline int
-ss_filterreset(ssfilter *c)
-{
-	return c->i->reset(c);
-}
-
-static inline int
 ss_filterstart(ssfilter *c, ssbuf *dest)
 {
 	return c->i->start(c, dest);
@@ -1778,12 +1702,6 @@ ss_blobfree(ssblob *b)
 {
 	return ss_vfsmunmap(b->vfs, &b->map);
 }
-
-static inline void
-ss_blobreset(ssblob *b) {
-	b->p = b->s;
-}
-
 static inline int
 ss_blobsize(ssblob *b) {
 	return b->e - b->s;
@@ -1859,16 +1777,6 @@ struct ssavg {
 	double   avg;
 	char sz[32];
 };
-
-static inline void
-ss_avginit(ssavg *a)
-{
-	a->count = 0;
-	a->total = 0;
-	a->min = 0;
-	a->max = 0;
-	a->avg = 0;
-}
 
 static inline void
 ss_avgupdate(ssavg *a, uint32_t v)
@@ -2349,11 +2257,6 @@ ss_qfshifted_is(uint64_t elt) {
 static inline uint64_t
 ss_qfshifted_set(uint64_t elt) {
 	return elt | 4;
-}
-
-static inline uint64_t
-ss_qfshifted_clr(uint64_t elt) {
-	return elt & ~4;
 }
 
 static inline int
@@ -3433,14 +3336,6 @@ ssvfsif ss_testvfs =
 	.mremap        = ss_testvfs_mremap,
 	.munmap        = ss_testvfs_munmap
 };
-
-static inline void
-ss_threadinit(ssthread *t)
-{
-	ss_listinit(&t->link);
-	t->f = NULL;
-	memset(&t->id, 0, sizeof(t->id));
-}
 
 static inline int
 ss_threadnew(ssthread *t, ssthreadf f, void *arg)
@@ -7638,22 +7533,6 @@ sf_compareprefix(sfscheme *s, char *a, int asize, char *b, int bsize ssunused)
 	return sf_schemecompare_prefix(s, a, asize, b);
 }
 
-static inline int
-sf_schemeeq(sfscheme *a, sfscheme *b)
-{
-	if (a->fields_count != b->fields_count)
-		return 0;
-	int i = 0;
-	while (i < a->fields_count) {
-		sffield *key_a = a->fields[i];
-		sffield *key_b = b->fields[i];
-		if (key_a->type != key_b->type)
-			return 0;
-		i++;
-	}
-	return 1;
-}
-
 typedef struct sfvar sfvar;
 typedef struct sfv sfv;
 
@@ -8326,20 +8205,6 @@ sr_version(srversion *v)
 	v->c = SR_VERSION_C;
 }
 
-static inline int
-sr_version_check(srversion *v)
-{
-	if (v->magic != SR_VERSION_MAGIC)
-		return 0;
-	if (v->a != SR_VERSION_STORAGE_A)
-		return 0;
-	if (v->b != SR_VERSION_STORAGE_B)
-		return 0;
-	if (v->c != SR_VERSION_STORAGE_C)
-		return 0;
-	return 1;
-}
-
 static inline void
 sr_version_storage(srversion *v)
 {
@@ -8390,7 +8255,8 @@ sr_errorinit(srerror *e) {
 	ss_spinlockinit(&e->lock);
 }
 
-static inline void
+/* TODO: where is se_delete() ? */
+static inline __attribute__((unused)) void
 sr_errorfree(srerror *e) {
 	ss_spinlockfree(&e->lock);
 }
@@ -8515,16 +8381,6 @@ static inline void
 sr_statusfree(srstatus *s)
 {
 	ss_spinlockfree(&s->lock);
-}
-
-static inline void
-sr_statuslock(srstatus *s) {
-	ss_spinlock(&s->lock);
-}
-
-static inline void
-sr_statusunlock(srstatus *s) {
-	ss_spinunlock(&s->lock);
 }
 
 static inline int
@@ -8667,14 +8523,6 @@ sr_statkey(srstat *s, int size)
 {
 	ss_spinlock(&s->lock);
 	ss_avgupdate(&s->key, size);
-	ss_spinunlock(&s->lock);
-}
-
-static inline void
-sr_statvalue(srstat *s, int size)
-{
-	ss_spinlock(&s->lock);
-	ss_avgupdate(&s->value, size);
 	ss_spinunlock(&s->lock);
 }
 
@@ -8893,12 +8741,6 @@ struct srzonemap {
 	srzone zones[11];
 };
 
-static inline int
-sr_zonemap_init(srzonemap *m) {
-	memset(m->zones, 0, sizeof(m->zones));
-	return 0;
-}
-
 static inline void
 sr_zonemap_set(srzonemap *m, uint32_t percent, srzone *z)
 {
@@ -9076,11 +8918,6 @@ sr_confkey(srconfdump *v) {
 static inline char*
 sr_confvalue(srconfdump *v) {
 	return sr_confkey(v) + v->keysize;
-}
-
-static inline void*
-sr_confnext(srconfdump *v) {
-	return sr_confvalue(v) + v->valuesize;
 }
 
 int sr_conf_read(srconf *m, srconfstmt *s)
@@ -10168,15 +10005,6 @@ struct svlog {
 	ssbuf index;
 	ssbuf buf;
 };
-
-static inline void
-sv_logvinit(svlogv *v, uint32_t id)
-{
-	v->id   = id;
-	v->next = UINT32_MAX;
-	v->v.v  = NULL;
-	v->v.i  = NULL;
-}
 
 static inline void
 sv_loginit(svlog *l)
@@ -13256,16 +13084,6 @@ sd_pagev(sdpage *p, uint32_t pos) {
 	return (sdv*)((char*)p->h + sizeof(sdpageheader) + sizeof(sdv) * pos);
 }
 
-static inline sdv*
-sd_pagemin(sdpage *p) {
-	return sd_pagev(p, 0);
-}
-
-static inline sdv*
-sd_pagemax(sdpage *p) {
-	return sd_pagev(p, p->h->count - 1);
-}
-
 static inline void*
 sd_pagepointer(sdpage *p, sdv *v) {
 	assert((sizeof(sdv) * p->h->count) + v->offset <= p->h->sizeorigin);
@@ -13602,16 +13420,6 @@ sd_buildref(sdbuild *b) {
 static inline sdpageheader*
 sd_buildheader(sdbuild *b) {
 	return (sdpageheader*)(b->m.s + sd_buildref(b)->m);
-}
-
-static inline uint64_t
-sd_buildoffset(sdbuild *b)
-{
-	sdbuildref *r = sd_buildref(b);
-	if (b->compress)
-		return r->c;
-	return r->m + (ss_bufused(&b->v) - (ss_bufused(&b->v) - r->v)) +
-	              (ss_bufused(&b->k) - (ss_bufused(&b->k) - r->k));
 }
 
 static inline sdv*
@@ -14042,24 +13850,6 @@ sd_cgc(sdc *sc, sr *r, int wm)
 	}
 }
 
-static inline void
-sd_creset(sdc *sc, sr *r)
-{
-	sd_buildreset(&sc->build, r);
-	ss_qfreset(&sc->qf);
-	sv_upsertreset(&sc->upsert);
-	ss_bufreset(&sc->a);
-	ss_bufreset(&sc->b);
-	ss_bufreset(&sc->c);
-	ss_bufreset(&sc->d);
-	sdcbuf *b = sc->head;
-	while (b) {
-		ss_bufreset(&b->a);
-		ss_bufreset(&b->b);
-		b = b->next;
-	}
-}
-
 static inline int
 sd_censure(sdc *c, sr *r, int count)
 {
@@ -14364,178 +14154,6 @@ int sd_writeseal(sr*, ssfile*, ssblob*);
 int sd_writepage(sr*, ssfile*, ssblob*, sdbuild*);
 int sd_writeindex(sr*, ssfile*, ssblob*, sdindex*);
 int sd_seal(sr*, ssfile*, ssblob*, sdindex*, uint64_t);
-
-typedef struct sditer sditer;
-
-struct sditer {
-	int validate;
-	int compression;
-	ssfilterif *compression_if;
-	ssbuf *compression_buf;
-	ssbuf *transform_buf;
-	sdindex *index;
-	char *start, *end;
-	char *page;
-	char *pagesrc;
-	sdpage pagev;
-	uint32_t pos;
-	sdv *dv;
-	sv v;
-	sr *r;
-} sspacked;
-
-static inline void
-sd_iterresult(sditer *i, int pos)
-{
-	i->dv = sd_pagev(&i->pagev, pos);
-	if (sslikely(i->r->fmt_storage == SF_RAW)) {
-		sv_init(&i->v, &sd_vif, i->dv, i->pagev.h);
-		return;
-	}
-	sd_pagesparse_convert(&i->pagev, i->r, i->dv, i->transform_buf->s);
-	sv_init(&i->v, &sd_vrawif, i->transform_buf->s, NULL);
-}
-
-static inline int
-sd_iternextpage(sditer *i)
-{
-	char *page = NULL;
-	if (ssunlikely(i->page == NULL))
-	{
-		sdindexheader *h = i->index->h;
-		page = i->start + (i->index->h->offset - i->index->h->total);
-		i->end = page + h->total;
-	} else {
-		page = i->pagesrc + sizeof(sdpageheader) + i->pagev.h->size;
-	}
-	if (ssunlikely(page >= i->end)) {
-		i->page = NULL;
-		return 0;
-	}
-	i->pagesrc = page;
-	i->page = i->pagesrc;
-
-	/* decompression */
-	if (i->compression) {
-		ss_bufreset(i->compression_buf);
-
-		/* prepare decompression buffer */
-		sdpageheader *h = (sdpageheader*)i->page;
-		int rc = ss_bufensure(i->compression_buf, i->r->a, h->sizeorigin + sizeof(sdpageheader));
-		if (ssunlikely(rc == -1)) {
-			i->page = NULL;
-			return sr_oom_malfunction(i->r->e);
-		}
-
-		/* copy page header */
-		memcpy(i->compression_buf->s, i->page, sizeof(sdpageheader));
-		ss_bufadvance(i->compression_buf, sizeof(sdpageheader));
-
-		/* decompression */
-		ssfilter f;
-		rc = ss_filterinit(&f, (ssfilterif*)i->compression_if, i->r->a, SS_FOUTPUT);
-		if (ssunlikely(rc == -1)) {
-			i->page = NULL;
-			sr_malfunction(i->r->e, "%s", "page decompression error");
-			return -1;
-		}
-		rc = ss_filternext(&f, i->compression_buf, i->page + sizeof(sdpageheader), h->size);
-		if (ssunlikely(rc == -1)) {
-			ss_filterfree(&f);
-			i->page = NULL;
-			sr_malfunction(i->r->e, "%s", "page decompression error");
-			return -1;
-		}
-		ss_filterfree(&f);
-
-		/* switch to decompressed page */
-		i->page = i->compression_buf->s;
-	}
-
-	/* checksum */
-	if (i->validate) {
-		sdpageheader *h = (sdpageheader*)i->page;
-		uint32_t crc = ss_crcs(h, sizeof(sdpageheader), 0);
-		if (ssunlikely(crc != h->crc)) {
-			i->page = NULL;
-			sr_malfunction(i->r->e, "%s", "bad page header crc");
-			return -1;
-		}
-	}
-	sd_pageinit(&i->pagev, (void*)i->page);
-	i->pos = 0;
-	if (ssunlikely(i->pagev.h->count == 0)) {
-		i->page = NULL;
-		i->dv = NULL;
-		return 0;
-	}
-	sd_iterresult(i, 0);
-	return 1;
-}
-
-static inline int
-sd_iter_open(ssiter *i, sr *r, sdindex *index, char *start, int validate,
-             int compression,
-             ssbuf *compression_buf,
-             ssbuf *transform_buf)
-{
-	sditer *ii = (sditer*)i->priv;
-	ii->r           = r;
-	ii->index       = index;
-	ii->start       = start;
-	ii->end         = NULL;
-	ii->page        = NULL;
-	ii->pagesrc     = NULL;
-	ii->pos         = 0;
-	ii->dv          = NULL;
-	ii->validate    = validate;
-	ii->compression = compression;
-	ii->compression_buf = compression_buf;
-	ii->transform_buf = transform_buf;
-	memset(&ii->v, 0, sizeof(ii->v));
-	return sd_iternextpage(ii);
-}
-
-static inline void
-sd_iter_close(ssiter *i ssunused)
-{
-	sditer *ii = (sditer*)i->priv;
-	(void)ii;
-}
-
-static inline int
-sd_iter_has(ssiter *i)
-{
-	sditer *ii = (sditer*)i->priv;
-	return ii->page != NULL;
-}
-
-static inline void*
-sd_iter_of(ssiter *i)
-{
-	sditer *ii = (sditer*)i->priv;
-	if (ssunlikely(ii->page == NULL))
-		return NULL;
-	assert(ii->dv != NULL);
-	return &ii->v;
-}
-
-static inline void
-sd_iter_next(ssiter *i)
-{
-	sditer *ii = (sditer*)i->priv;
-	if (ssunlikely(ii->page == NULL))
-		return;
-	ii->pos++;
-	if (sslikely(ii->pos < ii->pagev.h->count)) {
-		sd_iterresult(ii, ii->pos);
-	} else {
-		ii->dv = NULL;
-		sd_iternextpage(ii);
-	}
-}
-
-extern ssiterif sd_iter;
 
 int sd_recover_open(ssiter*, sr*, ssfile*);
 int sd_recover_complete(ssiter*);
@@ -15348,14 +14966,6 @@ ssiterif sd_indexiter =
 	.has   = sd_indexiter_has,
 	.of    = sd_indexiter_of,
 	.next  = sd_indexiter_next
-};
-
-ssiterif sd_iter =
-{
-	.close   = sd_iter_close,
-	.has     = sd_iter_has,
-	.of      = sd_iter_of,
-	.next    = sd_iter_next
 };
 
 int sd_mergeinit(sdmerge *m, sr *r, ssiter *i, sdbuild *build, ssqf *qf,
@@ -16451,19 +16061,6 @@ si_amqfhas_branch(sr *r, sibranch *b, char *key)
 	return ss_qfhas(&qf, sf_hash(r->scheme, key));
 }
 
-static inline int
-si_amqfhas(sr *r, sinode *node, char *key)
-{
-	sibranch *b = node->branch;
-	while (b) {
-		int rc = si_amqfhas_branch(r, b, key);
-		if (rc)
-			return rc;
-		b = b->next;
-	}
-	return 0;
-}
-
 typedef struct si si;
 
 typedef enum {
@@ -17085,13 +16682,6 @@ static inline void
 si_trackreplace(sitrack *t, sinode *o, sinode *n)
 {
 	ss_rbreplace(&t->i, &o->node, &n->node);
-}
-
-static inline void
-si_trackremove(sitrack *t, sinode *n)
-{
-	ss_rbremove(&t->i, &n->node);
-	t->count--;
 }
 
 sinode *si_bootstrap(si*, uint64_t);
