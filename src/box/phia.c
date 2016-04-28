@@ -2412,11 +2412,14 @@ ss_lz4filter_next(ssfilter *f, ssbuf *dest, char *buf, int size)
 	int rc;
 	switch (f->op) {
 	case SS_FINPUT:;
-		size_t block = LZ4F_compressBound(size, NULL);
-		rc = ss_bufensure(dest, f->a, block);
+		/* See comments in ss_lz4filter_complete() */
+		int capacity = LZ4F_compressBound(z->total_size + size, NULL);
+		assert(capacity >= ss_bufused(dest));
+		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
 		if (ssunlikely(rc == -1))
 			return -1;
-		size_t sz = LZ4F_compressUpdate(z->compress, dest->p, block,
+		size_t sz = LZ4F_compressUpdate(z->compress, dest->p,
+						ss_bufunused(dest),
 						buf, size, NULL);
 		if (ssunlikely(LZ4F_isError(sz)))
 			return -1;
@@ -2467,19 +2470,19 @@ ss_lz4filter_complete(ssfilter *f, ssbuf *dest)
 		 * It is not efficient to pre-allocate, say, 4MB every time.
 		 * This filter calculates the total size of input and then
 		 * calls LZ4F_compressBound() to determine the total size
-		 * of output (compressedSize).
+		 * of output (capacity).
 		 */
 #if 0
 		LZ4F_cctx_internal_t* cctxPtr = z->compress;
 		size_t block = (cctxPtr->tmpInSize + 16);
 #endif
-		int compressedSize = LZ4F_compressBound(z->total_size, NULL);
-		assert(compressedSize >= ss_bufused(dest));
-		int block = compressedSize - ss_bufused(dest);
-		rc = ss_bufensure(dest, f->a, block);
+		int capacity = LZ4F_compressBound(z->total_size, NULL);
+		assert(capacity >= ss_bufused(dest));
+		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
 		if (ssunlikely(rc == -1))
 			return -1;
-		size_t sz = LZ4F_compressEnd(z->compress, dest->p, block, NULL);
+		size_t sz = LZ4F_compressEnd(z->compress, dest->p,
+					     ss_bufunused(dest), NULL);
 		if (ssunlikely(LZ4F_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);

@@ -14,7 +14,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  binutils-dev,
 # zlib is implicitly needed by libbfd #808516
  zlib1g-dev,
- liblz4-dev,
+# liblz4-dev (>= r131),
  libssl-dev
 Section: database
 Standards-Version: 3.9.6

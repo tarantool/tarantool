@@ -12,7 +12,9 @@ BuildRequires: sed
 BuildRequires: readline-devel
 BuildRequires: libyaml-devel
 BuildRequires: openssl-devel
+%if 0%{?fedora} >= 22
 BuildRequires: lz4-devel >= r131
+%endif
 #BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
 # pod2man is needed to build man pages
@@ -100,7 +102,9 @@ C and Lua/C modules.
          -DCMAKE_INSTALL_LOCALSTATEDIR:PATH=%{_localstatedir} \
          -DCMAKE_INSTALL_SYSCONFDIR:PATH=%{_sysconfdir} \
          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
+%if 0%{?fedora} >= 22
          -DENABLE_BUNDLED_LZ4:BOOL=OFF \
+%endif
 %if %{with backtrace}
          -DENABLE_BACKTRACE:BOOL=ON \
 %else

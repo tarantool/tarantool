@@ -373,7 +373,7 @@ endif()
 # LZ4
 #
 
-option(ENABLE_BUNDLED_LZ4 "Enable building of the bundled MsgPuck" OFF)
+option(ENABLE_BUNDLED_LZ4 "Enable building of the bundled LZ4" ON)
 if (ENABLE_BUNDLED_LZ4)
     add_library(lz4 STATIC
         third_party/lz4/lib/lz4.c
