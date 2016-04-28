@@ -51,7 +51,7 @@
 #include <lib/salad/guava.h>
 #include "latch.h"
 #include <lib/csv/csv.h>
-#include <lua/clock.h>
+#include "clock.h"
 #include "title.h"
 #include "exception.h"
 

@@ -246,6 +246,24 @@ test_checkcdata(lua_State *L)
 	return 2;
 }
 
+static int
+test_clock(lua_State *L)
+{
+	/* Test compilation */
+	clock_realtime();
+	clock_monotonic();
+	clock_process();
+	clock_thread();
+
+	clock_realtime64();
+	clock_monotonic64();
+	clock_process64();
+	clock_thread64();
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -265,6 +283,7 @@ luaopen_module_api(lua_State *L)
 		{"test_cord", test_cord },
 		{"pushcdata", test_pushcdata },
 		{"checkcdata", test_checkcdata },
+		{"test_clock", test_clock },
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
