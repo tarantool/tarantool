@@ -392,6 +392,16 @@ else()
 endif()
 
 #
+# zstd
+#
+
+# Debian: missing zstd_static.h in libzstd-dev
+# Fedora: not found
+# => always use bundled version
+include(BuildZSTD)
+zstd_build()
+
+#
 # OpenSSL
 #
 
