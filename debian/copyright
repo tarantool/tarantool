@@ -255,10 +255,12 @@ Copyright: 2013 Advanced Computing Technologies LLC,
  Written by: John H. Baldwin <jhb@FreeBSD.org>
 License: BSD-2-Clause
 
-Files: src/box/phia.c
-Copyright: 2008-2010 Massachusetts Institute of Technology
-           2004-2006 Intel Corporation
-           2014-2015, Yann Collet
+Files: third_party/lz4/*
+Copyright: 2011-2014, Yann Collet
+License: BSD-2-Clause
+
+Files: third_party/zstd/*
+Copyright: 2014-2015, Yann Collet
 License: BSD-2-Clause
 
 Files: src/proc_title.c
