@@ -320,7 +320,6 @@ PhiaEngine::init()
 	sp_setint(env, "phia.path_create", 0);
 	sp_setint(env, "phia.recover", 2);
 	sp_setstring(env, "phia.path", cfg_gets("phia_dir"), 0);
-	sp_setint(env, "scheduler.threads", 0);
 	sp_setint(env, "memory.limit", cfg_geti64("phia.memory_limit"));
 	sp_setint(env, "compaction.0.async", 1);
 	sp_setint(env, "compaction.0.compact_wm", cfg_geti("phia.compact_wm"));

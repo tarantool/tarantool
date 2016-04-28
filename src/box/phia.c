@@ -104,7 +104,6 @@ struct ssaligni64 {
 
 #define ss_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
-void     ss_sleep(uint64_t);
 
 typedef uint8_t ssspinlock;
 
@@ -3298,69 +3297,6 @@ ssvfsif ss_testvfs =
 	.mremap        = ss_testvfs_mremap,
 	.munmap        = ss_testvfs_munmap
 };
-
-static inline int
-ss_threadnew(ssthread *t, ssthreadf f, void *arg)
-{
-	t->arg = arg;
-	t->f = f;
-	return pthread_create(&t->id, NULL, f, t);
-}
-
-static inline int
-ss_threadjoin(ssthread *t)
-{
-	return pthread_join(t->id, NULL);
-}
-
-int ss_threadpool_init(ssthreadpool *p)
-{
-	ss_listinit(&p->list);
-	p->n = 0;
-	return 0;
-}
-
-int ss_threadpool_shutdown(ssthreadpool *p, ssa *a)
-{
-	int rcret = 0;
-	int rc;
-	sslist *i, *n;
-	ss_listforeach_safe(&p->list, i, n) {
-		ssthread *t = sscast(i, ssthread, link);
-		rc = ss_threadjoin(t);
-		if (ssunlikely(rc == -1))
-			rcret = -1;
-		ss_free(a, t);
-	}
-	return rcret;
-}
-
-int ss_threadpool_new(ssthreadpool *p, ssa *a, int n, ssthreadf f, void *arg)
-{
-	int i;
-	for (i = 0; i < n; i++) {
-		ssthread *t = ss_malloc(a, sizeof(*t));
-		if (ssunlikely(t == NULL))
-			goto error;
-		ss_listappend(&p->list, &t->link);
-		p->n++;
-		int rc = ss_threadnew(t, f, arg);
-		if (ssunlikely(rc == -1))
-			goto error;
-	}
-	return 0;
-error:
-	ss_threadpool_shutdown(p, a);
-	return -1;
-}
-
-void ss_sleep(uint64_t ns)
-{
-	struct timespec ts;
-	ts.tv_sec  = 0;
-	ts.tv_nsec = ns;
-	nanosleep(&ts, NULL);
-}
 
 typedef struct sszstdfilter sszstdfilter;
 
@@ -16922,7 +16858,6 @@ struct sc {
 	scdb         **i;
 	sslist         shutdown;
 	int            shutdown_pending;
-	ssthreadpool   tp;
 	scworkerpool   wp;
 	slpool        *lp;
 	char          *backup_path;
@@ -16932,8 +16867,6 @@ struct sc {
 
 int sc_init(sc*, sr*, sstrigger*, slpool*);
 int sc_set(sc *s, uint64_t, char*);
-int sc_create(sc *s, ssthreadf, void*, int);
-int sc_shutdown(sc*);
 int sc_add(sc*, si*);
 int sc_del(sc*, si*, int);
 
@@ -17295,7 +17228,6 @@ int sc_init(sc *s, sr *r, sstrigger *on_event, slpool *lp)
 	s->on_event                 = on_event;
 	s->backup_path              = NULL;
 	s->lp                       = lp;
-	ss_threadpool_init(&s->tp);
 	sc_workerpool_init(&s->wp);
 	ss_listinit(&s->shutdown);
 	s->shutdown_pending = 0;
@@ -17307,43 +17239,6 @@ int sc_set(sc *s, uint64_t anticache, char *backup_path)
 	s->anticache_limit = anticache;
 	s->backup_path = backup_path;
 	return 0;
-}
-
-int sc_create(sc *s, ssthreadf function, void *arg, int n)
-{
-	return ss_threadpool_new(&s->tp, s->r->a, n, function, arg);
-}
-
-int sc_shutdown(sc *s)
-{
-	sr *r = s->r;
-	int rcret = 0;
-	int rc = ss_threadpool_shutdown(&s->tp, r->a);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = sc_workerpool_free(&s->wp, r);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	/* destroy databases which are ready for
-	 * shutdown or drop */
-	sslist *p, *n;
-	ss_listforeach_safe(&s->shutdown, p, n) {
-		si *index = sscast(p, si, link);
-		rc = si_close(index);
-		if (ssunlikely(rc == -1))
-			rcret = -1;
-	}
-	if (s->i) {
-		int j = 0;
-		while (j < s->count) {
-			ss_free(r->a, s->i[j]);
-			j++;
-		}
-		ss_free(r->a, s->i);
-		s->i = NULL;
-	}
-	ss_mutexfree(&s->lock);
-	return rcret;
 }
 
 int sc_add(sc *s, si *index)
@@ -18424,7 +18319,6 @@ struct seconf {
 	/* compaction */
 	srzonemap     zones;
 	/* scheduler */
-	uint32_t      threads;
 	serecovercb   on_recover;
 	sstrigger     on_event;
 	uint32_t      event_on_backup;
@@ -18506,11 +18400,6 @@ struct se {
 	sr          r;
 };
 
-static inline int
-se_active(se *e) {
-	return sr_statusactive(&e->status);
-}
-
 static inline void
 se_apilock(so *o) {
 	ss_mutexlock(&((se*)o)->apilock);
@@ -18526,7 +18415,6 @@ static inline se *se_of(so *o) {
 }
 
 so  *se_new(void);
-int  se_service_threads(se*, int);
 int  se_service(so*);
 
 typedef struct sedocument sedocument;
@@ -18696,35 +18584,6 @@ int se_recoverend(sedb*);
 int se_recover(se*);
 int se_recover_repository(se*);
 
-static void*
-se_worker(void *arg)
-{
-	ssthread *self = arg;
-	se *e = self->arg;
-	scworker *w = sc_workerpool_pop(&e->scheduler.wp, &e->r);
-	if (ssunlikely(w == NULL))
-		return NULL;
-	for (;;)
-	{
-		int rc = se_active(e);
-		if (ssunlikely(rc == 0))
-			break;
-		rc = sc_step(&e->scheduler, w, sx_vlsn(&e->xm));
-		if (ssunlikely(rc == -1))
-			break;
-		if (ssunlikely(rc == 0))
-			ss_sleep(10000000); /* 10ms */
-	}
-	sc_workerpool_push(&e->scheduler.wp, w);
-	return NULL;
-}
-
-int se_service_threads(se *e, int n)
-{
-	/* run more threads */
-	return sc_create(&e->scheduler, se_worker, e, n);
-}
-
 static int
 se_open(so *o)
 {
@@ -18796,9 +18655,6 @@ online:
 	/* run thread-pool and scheduler */
 	sc_set(&e->scheduler, e->conf.anticache,
 	        e->conf.backup_path);
-	rc = se_service_threads(e, e->conf.threads);
-	if (ssunlikely(rc == -1))
-		return -1;
 	return 0;
 }
 
@@ -18809,9 +18665,6 @@ se_destroy(so *o)
 	int rcret = 0;
 	int rc;
 	sr_statusset(&e->status, SR_SHUTDOWN);
-	rc = sc_shutdown(&e->scheduler);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
 	rc = so_pooldestroy(&e->cursor);
 	if (ssunlikely(rc == -1))
 		rcret = -1;
@@ -19270,33 +19123,12 @@ se_confscheduler_run(srconf *c, srconfstmt *s)
 	return sc_ctl_call(&e->scheduler, vlsn);
 }
 
-static inline int
-se_confscheduler_threads(srconf *c, srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	se *e = s->ptr;
-	uint32_t threads = e->conf.threads;
-	if (ssunlikely(se_confv(c, s) == -1))
-		return -1;
-	if (sslikely(! sr_online(&e->status)))
-		return 0;
-	/* run more threads during run-time */
-	if (e->conf.threads <= threads) {
-		e->conf.threads = threads;
-		return 0;
-	}
-	int n_more = e->conf.threads - threads;
-	return se_service_threads(e, n_more);
-}
-
 static inline srconf*
 se_confscheduler(se *e, seconfrt *rt, srconf **pc)
 {
 	srconf *scheduler = *pc;
 	srconf *prev;
 	srconf *p = NULL;
-	sr_c(&p, pc, se_confscheduler_threads, "threads", SS_U32, &e->conf.threads);
 	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "checkpoint_active", SS_U32, &rt->checkpoint_active, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "checkpoint_lsn", SS_U64, &rt->checkpoint_lsn, SR_RO, NULL);
@@ -19943,8 +19775,7 @@ static inline int
 se_confensure(seconf *c)
 {
 	se *e = (se*)c->env;
-	int confmax = 2048 + (e->db.n * 100) + (e->view.list.n * 10) +
-	              c->threads;
+	int confmax = 2048 + (e->db.n * 100) + (e->view.list.n * 10);
 	confmax *= sizeof(srconf);
 	if (sslikely(confmax <= c->confmax))
 		return 0;
@@ -20077,7 +19908,6 @@ int se_confinit(seconf *c, so *e)
 	c->recover             = 1;
 	c->memory_limit        = 0;
 	c->anticache           = 0;
-	c->threads             = 6;
 	c->log_enable          = 1;
 	c->log_path            = NULL;
 	c->log_rotate_wm       = 500000;
