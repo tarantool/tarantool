@@ -1496,7 +1496,6 @@ struct ssfilterif {
 	char *name;
 	int (*init)(ssfilter*, va_list);
 	int (*free)(ssfilter*);
-	int (*reset)(ssfilter*);
 	int (*start)(ssfilter*, ssbuf*);
 	int (*next)(ssfilter*, ssbuf*, char*, int);
 	int (*complete)(ssfilter*, ssbuf*);
@@ -1857,20 +1856,6 @@ ss_lz4filter_free(ssfilter *f)
 	return 0;
 }
 
-static int
-ss_lz4filter_reset(ssfilter *f)
-{
-	sslz4filter *z = (sslz4filter*)f->priv;
-	(void)z;
-	switch (f->op) {
-	case SS_FINPUT:
-		break;	
-	case SS_FOUTPUT:
-		break;
-	}
-	return 0;
-}
-
 #ifndef LZ4F_MAXHEADERFRAME_SIZE
 /* Defined in lz4frame.c file */
 #define LZ4F_MAXHEADERFRAME_SIZE 15
@@ -1997,7 +1982,6 @@ ssfilterif ss_lz4filter =
 	.name     = "lz4",
 	.init     = ss_lz4filter_init,
 	.free     = ss_lz4filter_free,
-	.reset    = ss_lz4filter_reset,
 	.start    = ss_lz4filter_start,
 	.next     = ss_lz4filter_next,
 	.complete = ss_lz4filter_complete
@@ -2011,12 +1995,6 @@ ss_nonefilter_init(ssfilter *f ssunused, va_list args ssunused)
 
 static int
 ss_nonefilter_free(ssfilter *f ssunused)
-{
-	return 0;
-}
-
-static int
-ss_nonefilter_reset(ssfilter *f ssunused)
 {
 	return 0;
 }
@@ -2046,7 +2024,6 @@ ssfilterif ss_nonefilter =
 	.name     = "none",
 	.init     = ss_nonefilter_init,
 	.free     = ss_nonefilter_free,
-	.reset    = ss_nonefilter_reset,
 	.start    = ss_nonefilter_start,
 	.next     = ss_nonefilter_next,
 	.complete = ss_nonefilter_complete
@@ -7328,20 +7305,6 @@ ss_zstdfilter_free(ssfilter *f)
 }
 
 static int
-ss_zstdfilter_reset(ssfilter *f)
-{
-	sszstdfilter *z = (sszstdfilter*)f->priv;
-	switch (f->op) {
-	case SS_FINPUT:
-		ZSTD_resetCCtx(z->ctx);
-		break;	
-	case SS_FOUTPUT:
-		break;
-	}
-	return 0;
-}
-
-static int
 ss_zstdfilter_start(ssfilter *f, ssbuf *dest)
 {
 	sszstdfilter *z = (sszstdfilter*)f->priv;
@@ -7426,7 +7389,6 @@ ssfilterif ss_zstdfilter =
 	.name     = "zstd",
 	.init     = ss_zstdfilter_init,
 	.free     = ss_zstdfilter_free,
-	.reset    = ss_zstdfilter_reset,
 	.start    = ss_zstdfilter_start,
 	.next     = ss_zstdfilter_next,
 	.complete = ss_zstdfilter_complete
