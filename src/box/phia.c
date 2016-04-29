@@ -60,6 +60,9 @@
 #include <lz4frame.h>
 #include <zstd_static.h>
 
+#include <bit/bit.h>
+#include <small/rlist.h>
+
 #include "crc32.h"
 #include "clock.h"
 #include "trivia/config.h"
@@ -70,34 +73,13 @@
 #  define sshot
 #endif
 
-#include "small/rlist.h"
-
 #define sspacked __attribute__((packed))
 #define ssunused __attribute__((unused))
 #define ssinline __attribute__((always_inline))
 
-typedef struct ssalignu32 ssalignu32;
-typedef struct ssalignu64 ssalignu64;
-typedef struct ssaligni64 ssaligni64;
-
-struct ssalignu32 {
-	uint32_t __v;
-} sspacked;
-
-struct ssalignu64 {
-	uint64_t __v;
-} sspacked;
-
-struct ssaligni64 {
-	int64_t __v;
-} sspacked;
-
 #define sslikely(e)   __builtin_expect(!! (e), 1)
 #define ssunlikely(e) __builtin_expect(!! (e), 0)
 
-#define sscastu32(ptr) ((ssalignu32*)(ptr))->__v
-#define sscastu64(ptr) ((ssalignu64*)(ptr))->__v
-#define sscasti64(ptr) ((ssaligni64*)(ptr))->__v
 #define sscast(ptr, t, f) \
 	((t*)((char*)(ptr) - __builtin_offsetof(t, f)))
 
@@ -3774,8 +3756,8 @@ sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 static inline sshot int
 sf_cmpu32(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
 {
-	uint32_t av = sscastu32(a);
-	uint32_t bv = sscastu32(b);
+	uint32_t av = load_u32(a);
+	uint32_t bv = load_u32(b);
 	if (av == bv)
 		return 0;
 	return (av > bv) ? 1 : -1;
@@ -3784,8 +3766,8 @@ sf_cmpu32(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunus
 static inline sshot int
 sf_cmpu32_reverse(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
 {
-	uint32_t av = sscastu32(a);
-	uint32_t bv = sscastu32(b);
+	uint32_t av = load_u32(a);
+	uint32_t bv = load_u32(b);
 	if (av == bv)
 		return 0;
 	return (av > bv) ? -1 : 1;
@@ -3795,8 +3777,8 @@ static inline sshot int
 sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
               void *arg ssunused)
 {
-	uint64_t av = sscastu64(a);
-	uint64_t bv = sscastu64(b);
+	uint64_t av = load_u64(a);
+	uint64_t bv = load_u64(b);
 	if (av == bv)
 		return 0;
 	return (av > bv) ? 1 : -1;
@@ -3806,8 +3788,8 @@ static inline sshot int
 sf_cmpu64_reverse(char *a, int asz ssunused, char *b, int bsz ssunused,
               void *arg ssunused)
 {
-	uint64_t av = sscastu64(a);
-	uint64_t bv = sscastu64(b);
+	uint64_t av = load_u64(a);
+	uint64_t bv = load_u64(b);
 	if (av == bv)
 		return 0;
 	return (av > bv) ? -1 : 1;
@@ -4062,20 +4044,20 @@ int sf_schemeload(sfscheme *s, ssa *a, char *buf, int size ssunused)
 {
 	/* count */
 	char *p = buf;
-	uint32_t v = sscastu32(p);
+	uint32_t v = load_u32(p);
 	p += sizeof(uint32_t);
 	int count = v;
 	int i = 0;
 	while (i < count) {
 		/* name */
-		v = sscastu32(p);
+		v = load_u32(p);
 		p += sizeof(uint32_t);
 		sffield *field = sf_fieldnew(a, p);
 		if (ssunlikely(field == NULL))
 			goto error;
 		p += v;
 		/* options */
-		v = sscastu32(p);
+		v = load_u32(p);
 		p += sizeof(uint32_t);
 		int rc = sf_fieldoptions(field, a, p);
 		if (ssunlikely(rc == -1)) {
@@ -4859,13 +4841,13 @@ int sr_conf_read(srconf *m, srconfstmt *s)
 	case SS_U32:
 		s->valuesize = sizeof(uint32_t);
 		if (s->valuetype == SS_I64) {
-			sscasti64(s->value) = sscastu32(m->value);
+			store_u64(s->value, (int64_t)load_u32(m->value));
 		} else
 		if (s->valuetype == SS_U32) {
-			sscastu32(s->value) = sscastu32(m->value);
+			store_u32(s->value, load_u32(m->value));
 		} else
 		if (s->valuetype == SS_U64) {
-			sscastu64(s->value) = sscastu32(m->value);
+			store_u64(s->value, load_u32(m->value));
 		} else {
 			goto bad_type;
 		}
@@ -4873,13 +4855,13 @@ int sr_conf_read(srconf *m, srconfstmt *s)
 	case SS_U64:
 		s->valuesize = sizeof(uint64_t);
 		if (s->valuetype == SS_I64) {
-			sscasti64(s->value) = sscastu64(m->value);
+			store_u64(s->value, load_u64(m->value));
 		} else
 		if (s->valuetype == SS_U32) {
-			sscastu32(s->value) = sscastu64(m->value);
+			store_u32(s->value, load_u64(m->value));
 		} else
 		if (s->valuetype == SS_U64) {
-			sscastu64(s->value) = sscastu64(m->value);
+			store_u64(s->value, load_u64(m->value));
 		} else {
 			goto bad_type;
 		}
@@ -4945,26 +4927,26 @@ int sr_conf_write(srconf *m, srconfstmt *s)
 	switch (m->type) {
 	case SS_U32:
 		if (s->valuetype == SS_I64) {
-			sscastu32(m->value) = sscasti64(s->value);
+			store_u32(m->value, load_u64(s->value));
 		} else
 		if (s->valuetype == SS_U32) {
-			sscastu32(m->value) = sscastu32(s->value);
+			store_u32(m->value, load_u32(s->value));
 		} else
 		if (s->valuetype == SS_U64) {
-			sscastu32(m->value) = sscastu64(s->value);
+			store_u32(m->value, load_u64(s->value));
 		} else {
 			goto bad_type;
 		}
 		break;
 	case SS_U64:
 		if (s->valuetype == SS_I64) {
-			sscastu64(m->value) = sscasti64(s->value);
+			store_u64(m->value, load_u64(s->value));
 		} else
 		if (s->valuetype == SS_U32) {
-			sscastu64(m->value) = sscastu32(s->value);
+			store_u64(m->value, load_u32(s->value));
 		} else
 		if (s->valuetype == SS_U64) {
-			sscastu64(m->value) = sscastu64(s->value);
+			store_u64(m->value, load_u64(s->value));
 		} else {
 			goto bad_type;
 		}
@@ -5046,17 +5028,17 @@ int sr_conf_serialize(srconf *m, srconfstmt *s)
 	};
 	switch (m->type) {
 	case SS_U32:
-		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIu32, sscastu32(m->value));
+		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIu32, load_u32(m->value));
 		v.valuesize += 1;
 		value = buf;
 		break;
 	case SS_U64:
-		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIu64, sscastu64(m->value));
+		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIu64, load_u64(m->value));
 		v.valuesize += 1;
 		value = buf;
 		break;
 	case SS_I64:
-		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIi64, sscasti64(m->value));
+		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIi64, load_u64(m->value));
 		v.valuesize += 1;
 		value = buf;
 		break;
@@ -7399,7 +7381,7 @@ uint64_t sx_vlsn(sxmanager *m)
 	return vlsn;
 }
 
-ss_rbget(sx_matchtx, ss_cmp((sscast(n, sx, node))->id, sscastu64(key)))
+ss_rbget(sx_matchtx, ss_cmp((sscast(n, sx, node))->id, load_u64(key)))
 
 sx *sx_find(sxmanager *m, uint64_t id)
 {
@@ -10124,13 +10106,13 @@ sd_schemesz(sdschemeopt *o) {
 static inline uint32_t
 sd_schemeu32(sdschemeopt *o) {
 	assert(o->type == SS_U32);
-	return sscastu32((char*)o + sizeof(sdschemeopt));
+	return load_u32((char*)o + sizeof(sdschemeopt));
 }
 
 static inline uint64_t
 sd_schemeu64(sdschemeopt *o) {
 	assert(o->type == SS_U64);
-	return sscastu64((char*)o + sizeof(sdschemeopt));
+	return load_u64((char*)o + sizeof(sdschemeopt));
 }
 
 int sd_schemebegin(sdscheme*, sr*);
@@ -12580,7 +12562,7 @@ si_tracknsn(sitrack *t, uint64_t nsn)
 		t->nsn = nsn;
 }
 
-ss_rbget(si_trackmatch, ss_cmp((sscast(n, sinode, node))->self.id.id, sscastu64(key)))
+ss_rbget(si_trackmatch, ss_cmp((sscast(n, sinode, node))->self.id.id, load_u64(key)))
 
 static inline void
 si_trackset(sitrack *t, sinode *n)
@@ -18855,7 +18837,7 @@ se_confcompaction_set(srconf *c ssunused, srconfstmt *s)
 		return -1;
 	}
 	/* validate argument */
-	uint32_t percent = sscastu32(s->value);
+	uint32_t percent = load_u32(s->value);
 	if (percent > 100) {
 		sr_error(&e->error, "%s", "bad argument");
 		return -1;
