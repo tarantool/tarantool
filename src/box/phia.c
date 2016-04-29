@@ -70,6 +70,8 @@
 #  define sshot
 #endif
 
+#include "small/rlist.h"
+
 #define sspacked __attribute__((packed))
 #define ssunused __attribute__((unused))
 #define ssinline __attribute__((always_inline))
@@ -143,65 +145,6 @@ static inline void
 ss_spinunlock(ssspinlock *l) {
 	__sync_lock_release(l);
 }
-
-typedef struct sslist sslist;
-
-struct sslist {
-	sslist *next, *prev;
-};
-
-static inline void
-ss_listinit(sslist *h) {
-	h->next = h->prev = h;
-}
-
-static inline void
-ss_listappend(sslist *h, sslist *n) {
-	n->next = h;
-	n->prev = h->prev;
-	n->prev->next = n;
-	n->next->prev = n;
-}
-
-static inline void
-ss_listunlink(sslist *n) {
-	n->prev->next = n->next;
-	n->next->prev = n->prev;
-}
-
-static inline void
-ss_listpush(sslist *h, sslist *n) {
-	n->next = h->next;
-	n->prev = h;
-	n->prev->next = n;
-	n->next->prev = n;
-}
-
-static inline sslist*
-ss_listpop(sslist *h) {
-	register sslist *pop = h->next;
-	ss_listunlink(pop);
-	return pop;
-}
-
-static inline int
-ss_listempty(sslist *l) {
-	return l->next == l && l->prev == l;
-}
-
-#define ss_listlast(H, N) ((H) == (N))
-
-#define ss_listforeach(H, I) \
-	for (I = (H)->next; I != H; I = (I)->next)
-
-#define ss_listforeach_continue(H, I) \
-	for (; I != H; I = (I)->next)
-
-#define ss_listforeach_safe(H, I, N) \
-	for (I = (H)->next; I != H && (N = I->next); I = N)
-
-#define ss_listforeach_reverse(H, I) \
-	for (I = (H)->prev; I != H; I = (I)->prev)
 
 typedef struct sspath sspath;
 
@@ -1066,11 +1009,11 @@ struct ssthread {
 	pthread_t id;
 	ssthreadf f;
 	void *arg;
-	sslist link;
+	struct rlist link;
 };
 
 struct ssthreadpool {
-	sslist list;
+	struct rlist list;
 	int n;
 };
 
@@ -1353,13 +1296,13 @@ typedef struct ssrq ssrq;
 
 struct ssrqnode {
 	uint32_t q, v;
-	sslist link;
+	struct rlist link;
 };
 
 struct ssrqq {
 	uint32_t count;
 	uint32_t q;
-	sslist list;
+	struct rlist list;
 };
 
 struct ssrq {
@@ -1371,7 +1314,7 @@ struct ssrq {
 
 static inline void
 ss_rqinitnode(ssrqnode *n) {
-	ss_listinit(&n->link);
+	rlist_create(&n->link);
 	n->q = UINT32_MAX;
 	n->v = 0;
 }
@@ -1387,7 +1330,7 @@ ss_rqinit(ssrq *q, ssa *a, uint32_t range, uint32_t count)
 	uint32_t i = 0;
 	while (i < q->range_count) {
 		ssrqq *p = &q->q[i];
-		ss_listinit(&p->list);
+		rlist_create(&p->list);
 		p->count = 0;
 		p->q = i;
 		i++;
@@ -1417,10 +1360,10 @@ ss_rqadd(ssrq *q, ssrqnode *n, uint32_t v)
 			pos = q->range_count - 1;
 	}
 	ssrqq *p = &q->q[pos];
-	ss_listinit(&n->link);
+	rlist_create(&n->link);
 	n->v = v;
 	n->q = pos;
-	ss_listappend(&p->list, &n->link);
+	rlist_add(&p->list, &n->link);
 	if (ssunlikely(p->count == 0)) {
 		if (pos > q->last)
 			q->last = pos;
@@ -1433,7 +1376,7 @@ ss_rqdelete(ssrq *q, ssrqnode *n)
 {
 	ssrqq *p = &q->q[n->q];
 	p->count--;
-	ss_listunlink(&n->link);
+	rlist_del(&n->link);
 	if (ssunlikely(p->count == 0 && q->last == n->q))
 	{
 		int i = n->q - 1;
@@ -5283,7 +5226,7 @@ struct so {
 	so *parent;
 	so *env;
 	uint8_t destroyed;
-	sslist link;
+	struct rlist link;
 };
 
 static inline void
@@ -5294,7 +5237,7 @@ so_init(so *o, sotype *type, soif *i, so *parent, so *env)
 	o->parent    = parent;
 	o->env       = env;
 	o->destroyed = 0;
-	ss_listinit(&o->link);
+	rlist_create(&o->link);
 }
 
 static inline void
@@ -5351,14 +5294,14 @@ so_cast_dynamic(void *ptr, sotype *type,
 typedef struct solist solist;
 
 struct solist {
-	sslist list;
+	struct rlist list;
 	int n;
 };
 
 static inline void
 so_listinit(solist *i)
 {
-	ss_listinit(&i->list);
+	rlist_create(&i->list);
 	i->n = 0;
 }
 
@@ -5367,41 +5310,39 @@ so_listdestroy(solist *i)
 {
 	int rcret = 0;
 	int rc;
-	sslist *p, *n;
-	ss_listforeach_safe(&i->list, p, n) {
-		so *o = sscast(p, so, link);
+	so *o, *n;
+	rlist_foreach_entry_safe(o, &i->list, link, n) {
 		rc = so_destroy(o);
 		if (ssunlikely(rc == -1))
 			rcret = -1;
 	}
 	i->n = 0;
-	ss_listinit(&i->list);
+	rlist_create(&i->list);
 	return rcret;
 }
 
 static inline void
 so_listfree(solist *i)
 {
-	sslist *p, *n;
-	ss_listforeach_safe(&i->list, p, n) {
-		so *o = sscast(p, so, link);
+	so *o, *n;
+	rlist_foreach_entry_safe(o, &i->list, link, n) {
 		so_free(o);
 	}
 	i->n = 0;
-	ss_listinit(&i->list);
+	rlist_create(&i->list);
 }
 
 static inline void
 so_listadd(solist *i, so *o)
 {
-	ss_listappend(&i->list, &o->link);
+	rlist_add(&i->list, &o->link);
 	i->n++;
 }
 
 static inline void
 so_listdel(solist *i, so *o)
 {
-	ss_listunlink(&o->link);
+	rlist_del(&o->link);
 	i->n--;
 }
 
@@ -7300,7 +7241,7 @@ struct sxindex {
 	so       *object;
 	void     *ptr;
 	sr       *r;
-	sslist    link;
+	struct rlist    link;
 };
 
 typedef int (*sxpreparef)(sx*, sv*, so*, void*);
@@ -7313,14 +7254,14 @@ struct sx {
 	uint64_t   csn;
 	int        log_read;
 	svlog     *log;
-	sslist     deadlock;
+	struct rlist     deadlock;
 	ssrbnode   node;
 	sxmanager *manager;
 };
 
 struct sxmanager {
 	ssspinlock  lock;
-	sslist      indexes;
+	struct rlist      indexes;
 	ssrb        i;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
@@ -7367,7 +7308,7 @@ int sx_managerinit(sxmanager *m, sr *r)
 	m->csn = 0;
 	m->gc  = NULL;
 	ss_spinlockinit(&m->lock);
-	ss_listinit(&m->indexes);
+	rlist_create(&m->indexes);
 	sx_vpool_init(&m->pool, r);
 	m->r = r;
 	return 0;
@@ -7384,12 +7325,12 @@ int sx_managerfree(sxmanager *m)
 int sx_indexinit(sxindex *i, sxmanager *m, sr *r, so *object, void *ptr)
 {
 	ss_rbinit(&i->i);
-	ss_listinit(&i->link);
+	rlist_create(&i->link);
 	i->dsn = 0;
 	i->object = object;
 	i->ptr = ptr;
 	i->r = r;
-	ss_listappend(&m->indexes, &i->link);
+	rlist_add(&m->indexes, &i->link);
 	return 0;
 }
 
@@ -7413,7 +7354,7 @@ sx_indextruncate(sxindex *i, sxmanager *m)
 int sx_indexfree(sxindex *i, sxmanager *m)
 {
 	sx_indextruncate(i, m);
-	ss_listunlink(&i->link);
+	rlist_del(&i->link);
 	return 0;
 }
 
@@ -7473,7 +7414,7 @@ void sx_init(sxmanager *m, sx *x, svlog *log)
 {
 	x->manager = m;
 	x->log = log;
-	ss_listinit(&x->deadlock);
+	rlist_create(&x->deadlock);
 }
 
 static inline sxstate
@@ -7910,11 +7851,11 @@ sxstate sx_get_autocommit(sxmanager *m, sxindex *index ssunused)
 }
 
 static inline int
-sx_deadlock_in(sxmanager *m, sslist *mark, sx *t, sx *p)
+sx_deadlock_in(sxmanager *m, struct rlist *mark, sx *t, sx *p)
 {
 	if (p->deadlock.next != &p->deadlock)
 		return 0;
-	ss_listappend(mark, &p->deadlock);
+	rlist_add(mark, &p->deadlock);
 	ssiter i;
 	ss_iterinit(ss_bufiter, &i);
 	ss_iteropen(ss_bufiter, &i, &p->log->buf, sizeof(svlogv));
@@ -7939,20 +7880,19 @@ sx_deadlock_in(sxmanager *m, sslist *mark, sx *t, sx *p)
 }
 
 static inline void
-sx_deadlock_unmark(sslist *mark)
+sx_deadlock_unmark(struct rlist *mark)
 {
-	sslist *i, *n;
-	ss_listforeach_safe(mark, i, n) {
-		sx *t = sscast(i, sx, deadlock);
-		ss_listinit(&t->deadlock);
+	sx *t, *n;
+	rlist_foreach_entry_safe(t, mark, deadlock, n) {
+		rlist_create(&t->deadlock);
 	}
 }
 
 int sx_deadlock(sx *t)
 {
 	sxmanager *m = t->manager;
-	sslist mark;
-	ss_listinit(&mark);
+	struct rlist mark;
+	rlist_create(&mark);
 	ssiter i;
 	ss_iterinit(ss_bufiter, &i);
 	ss_iteropen(ss_bufiter, &i, &t->log->buf, sizeof(svlogv));
@@ -8076,14 +8016,14 @@ struct sl {
 	ssmutex filelock;
 	ssfile file;
 	slpool *p;
-	sslist link;
-	sslist linkcopy;
+	struct rlist link;
+	struct rlist linkcopy;
 };
 
 struct slpool {
 	ssspinlock lock;
 	slconf *conf;
-	sslist list;
+	struct rlist list;
 	int gc;
 	int n;
 	ssiov iov;
@@ -8132,8 +8072,8 @@ sl_alloc(slpool *p, uint64_t id)
 	ss_gcinit(&l->gc);
 	ss_mutexinit(&l->filelock);
 	ss_fileinit(&l->file, p->r->vfs);
-	ss_listinit(&l->link);
-	ss_listinit(&l->linkcopy);
+	rlist_create(&l->link);
+	rlist_create(&l->linkcopy);
 	return l;
 }
 
@@ -8205,7 +8145,7 @@ error:
 int sl_poolinit(slpool *p, sr *r)
 {
 	ss_spinlockinit(&p->lock);
-	ss_listinit(&p->list);
+	rlist_create(&p->list);
 	p->n    = 0;
 	p->r    = r;
 	p->gc   = 1;
@@ -8253,7 +8193,7 @@ sl_poolrecover(slpool *p)
 			ss_buffree(&list, p->r->a);
 			return -1;
 		}
-		ss_listappend(&p->list, &l->link);
+		rlist_add(&p->list, &l->link);
 		p->n++;
 		ss_iternext(ss_bufiter, &i);
 	}
@@ -8294,7 +8234,7 @@ int sl_poolrotate(slpool *p)
 	ss_spinlock(&p->lock);
 	if (p->n)
 		log = sscast(p->list.prev, sl, link);
-	ss_listappend(&p->list, &l->link);
+	rlist_add(&p->list, &l->link);
 	p->n++;
 	ss_spinunlock(&p->lock);
 	if (log) {
@@ -8331,9 +8271,8 @@ int sl_poolshutdown(slpool *p)
 	int rcret = 0;
 	int rc;
 	if (p->n) {
-		sslist *i, *n;
-		ss_listforeach_safe(&p->list, i, n) {
-			sl *l = sscast(i, sl, link);
+		sl *l, *n;
+		rlist_foreach_entry_safe(l, &p->list, link, n) {
 			rc = sl_close(p, l);
 			if (ssunlikely(rc == -1))
 				rcret = -1;
@@ -8379,13 +8318,11 @@ int sl_poolgc(slpool *p)
 			ss_spinunlock(&p->lock);
 			return 0;
 		}
-		sl *current = NULL;
-		sslist *i;
-		ss_listforeach(&p->list, i) {
-			sl *l = sscast(i, sl, link);
+		sl *current = NULL, *l;
+		rlist_foreach_entry(l, &p->list, link) {
 			if (sslikely(! ss_gcgarbage(&l->gc)))
 				continue;
-			ss_listunlink(&l->link);
+			rlist_del(&l->link);
 			p->n--;
 			current = l;
 			break;
@@ -8412,24 +8349,22 @@ int sl_poolfiles(slpool *p)
 
 int sl_poolcopy(slpool *p, char *dest, ssbuf *buf)
 {
-	sslist list;
-	ss_listinit(&list);
+	struct rlist list;
+	rlist_create(&list);
 	ss_spinlock(&p->lock);
-	sslist *i;
-	ss_listforeach(&p->list, i) {
-		sl *l = sscast(i, sl, link);
+	sl *l;
+	rlist_foreach_entry(l, &p->list, link) {
 		if (ss_gcinprogress(&l->gc))
 			break;
-		ss_listappend(&list, &l->linkcopy);
+		rlist_add(&list, &l->linkcopy);
 	}
 	ss_spinunlock(&p->lock);
 
 	ss_bufreset(buf);
-	sslist *n;
-	ss_listforeach_safe(&list, i, n)
+	sl *n;
+	rlist_foreach_entry_safe(l, &list, link, n)
 	{
-		sl *l = sscast(i, sl, linkcopy);
-		ss_listinit(&l->linkcopy);
+		rlist_create(&l->linkcopy);
 		sspath path;
 		ss_path(&path, dest, l->id, ".log");
 		ssfile file;
@@ -11802,8 +11737,8 @@ struct sinode {
 	ssrqnode   nodecompact;
 	ssrqnode   nodebranch;
 	ssrqnode   nodetemp;
-	sslist     gc;
-	sslist     commit;
+	struct rlist     gc;
+	struct rlist     commit;
 } sspacked;
 
 sinode *si_nodenew(sr*);
@@ -12080,13 +12015,13 @@ struct si {
 	uint32_t   ref_fe;
 	uint32_t   ref_be;
 	uint32_t   gc_count;
-	sslist     gc;
+	struct rlist     gc;
 	ssbuf      readbuf;
 	svupsert   u;
 	sischeme   scheme;
 	so        *object;
 	sr         r;
-	sslist     link;
+	struct rlist     link;
 };
 
 static inline int
@@ -12423,7 +12358,7 @@ typedef struct sitx sitx;
 
 struct sitx {
 	int ro;
-	sslist nodelist;
+	struct rlist nodelist;
 	si *index;
 };
 
@@ -12432,8 +12367,8 @@ void si_commit(sitx*);
 
 static inline void
 si_txtrack(sitx *x, sinode *n) {
-	if (ss_listempty(&n->commit))
-		ss_listappend(&x->nodelist, &n->commit);
+	if (rlist_empty(&n->commit))
+		rlist_add(&x->nodelist, &n->commit);
 }
 
 void si_write(sitx*, svlog*, svlogindex*, uint64_t, int);
@@ -12892,8 +12827,8 @@ si *si_init(sr *r, so *object)
 	ss_rbinit(&i->i);
 	ss_mutexinit(&i->lock);
 	si_schemeinit(&i->scheme);
-	ss_listinit(&i->link);
-	ss_listinit(&i->gc);
+	rlist_create(&i->link);
+	rlist_create(&i->gc);
 	i->gc_count     = 0;
 	i->update_time  = 0;
 	i->lru_run_lsn  = 0;
@@ -12927,14 +12862,13 @@ int si_close(si *i)
 {
 	int rc_ret = 0;
 	int rc = 0;
-	sslist *p, *n;
-	ss_listforeach_safe(&i->gc, p, n) {
-		sinode *node = sscast(p, sinode, gc);
+	sinode *node, *n;
+	rlist_foreach_entry_safe(node, &i->gc, gc, n) {
 		rc = si_nodefree(node, &i->r, 1);
 		if (ssunlikely(rc == -1))
 			rc_ret = -1;
 	}
-	ss_listinit(&i->gc);
+	rlist_create(&i->gc);
 	i->gc_count = 0;
 	if (i->i.root)
 		si_truncate(i->i.root, &i->r);
@@ -13953,7 +13887,7 @@ int si_merge(si *index, sdc *c, sinode *node,
 		 * delayed removal */
 		si_nodegc(node, r, &index->scheme);
 		si_lock(index);
-		ss_listappend(&index->gc, &node->gc);
+		rlist_add(&index->gc, &node->gc);
 		index->gc_count++;
 		si_unlock(index);
 	}
@@ -14022,8 +13956,8 @@ sinode *si_nodenew(sr *r)
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodebranch);
 	ss_rqinitnode(&n->nodetemp);
-	ss_listinit(&n->gc);
-	ss_listinit(&n->commit);
+	rlist_create(&n->gc);
+	rlist_create(&n->commit);
 	return n;
 }
 
@@ -14800,11 +14734,10 @@ si_plannerpeek_nodegc(siplanner *p, siplan *plan)
 	if (sslikely(index->gc_count == 0))
 		return 0;
 	int rc_inprogress = 0;
-	sslist *i;
-	ss_listforeach(&index->gc, i) {
-		sinode *n = sscast(i, sinode, gc);
+	sinode *n;
+	rlist_foreach_entry(n, &index->gc, gc) {
 		if (sslikely(si_noderefof(n) == 0)) {
-			ss_listunlink(&n->gc);
+			rlist_del(&n->gc);
 			index->gc_count--;
 			plan->explain = SI_ENONE;
 			plan->node = n;
@@ -16537,17 +16470,16 @@ error:
 void si_begin(sitx *x, si *index)
 {
 	x->index = index;
-	ss_listinit(&x->nodelist);
+	rlist_create(&x->nodelist);
 	si_lock(index);
 }
 
 void si_commit(sitx *x)
 {
 	/* reschedule nodes */
-	sslist *i, *n;
-	ss_listforeach_safe(&x->nodelist, i, n) {
-		sinode *node = sscast(i, sinode, commit);
-		ss_listinit(&node->commit);
+	sinode *node, *n;
+	rlist_foreach_entry_safe(node, &x->nodelist, commit, n) {
+		rlist_create(&node->commit);
 		si_plannerupdate(&x->index->p, SI_BRANCH, node);
 	}
 	si_unlock(x->index);
@@ -16750,14 +16682,14 @@ struct scworker {
 	char name[16];
 	sstrace trace;
 	sdc dc;
-	sslist link;
-	sslist linkidle;
+	struct rlist link;
+	struct rlist linkidle;
 } sspacked;
 
 struct scworkerpool {
 	ssspinlock lock;
-	sslist list;
-	sslist listidle;
+	struct rlist list;
+	struct rlist listidle;
 	int total;
 	int idle;
 };
@@ -16780,8 +16712,7 @@ sc_workerpool_pop(scworkerpool *p, sr *r)
 	assert(p->idle >= 1);
 pop_idle:;
 	scworker *w =
-		sscast(ss_listpop(&p->listidle),
-		       scworker, linkidle);
+		rlist_shift_tail_entry(&p->listidle, scworker, linkidle);
 	p->idle--;
 	ss_spinunlock(&p->lock);
 	return w;
@@ -16791,7 +16722,7 @@ static inline void
 sc_workerpool_push(scworkerpool *p, scworker *w)
 {
 	ss_spinlock(&p->lock);
-	ss_listpush(&p->listidle, &w->linkidle);
+	rlist_add_tail(&p->listidle, &w->linkidle);
 	p->idle++;
 	ss_spinunlock(&p->lock);
 }
@@ -16856,7 +16787,7 @@ struct sc {
 	int            rr;
 	int            count;
 	scdb         **i;
-	sslist         shutdown;
+	struct rlist   shutdown;
 	int            shutdown_pending;
 	scworkerpool   wp;
 	slpool        *lp;
@@ -17229,7 +17160,7 @@ int sc_init(sc *s, sr *r, sstrigger *on_event, slpool *lp)
 	s->backup_path              = NULL;
 	s->lp                       = lp;
 	sc_workerpool_init(&s->wp);
-	ss_listinit(&s->shutdown);
+	rlist_create(&s->shutdown);
 	s->shutdown_pending = 0;
 	return 0;
 }
@@ -17491,7 +17422,7 @@ int sc_ctl_shutdown(sc *s, si *i)
 {
 	ss_mutexlock(&s->lock);
 	s->shutdown_pending++;
-	ss_listappend(&s->shutdown, &i->link);
+	rlist_add(&s->shutdown, &i->link);
 	ss_mutexunlock(&s->lock);
 	return 0;
 }
@@ -17650,15 +17581,14 @@ sc_do_shutdown(sc *s, sctask *task)
 {
 	if (sslikely(s->shutdown_pending == 0))
 		return 0;
-	sslist *p, *n;
-	ss_listforeach_safe(&s->shutdown, p, n) {
-		si *index = sscast(p, si, link);
+	si *index, *n;
+	rlist_foreach_entry_safe(index, &s->shutdown, link, n) {
 		task->plan.plan = SI_SHUTDOWN;
 		int rc;
 		rc = si_plan(index, &task->plan);
 		if (rc == 1) {
 			s->shutdown_pending--;
-			ss_listunlink(&index->link);
+			rlist_del(&index->link);
 			sc_del(s, index, 0);
 			task->shutdown = index;
 			task->db = NULL;
@@ -18155,8 +18085,8 @@ sc_workernew(sr *r, int id)
 	}
 	snprintf(w->name, sizeof(w->name), "%d", id);
 	sd_cinit(&w->dc);
-	ss_listinit(&w->link);
-	ss_listinit(&w->linkidle);
+	rlist_create(&w->link);
+	rlist_create(&w->linkidle);
 	ss_traceinit(&w->trace);
 	ss_trace(&w->trace, "%s", "init");
 	return w;
@@ -18173,8 +18103,8 @@ sc_workerfree(scworker *w, sr *r)
 int sc_workerpool_init(scworkerpool *p)
 {
 	ss_spinlockinit(&p->lock);
-	ss_listinit(&p->list);
-	ss_listinit(&p->listidle);
+	rlist_create(&p->list);
+	rlist_create(&p->listidle);
 	p->total = 0;
 	p->idle = 0;
 	return 0;
@@ -18182,9 +18112,8 @@ int sc_workerpool_init(scworkerpool *p)
 
 int sc_workerpool_free(scworkerpool *p, sr *r)
 {
-	sslist *i, *n;
-	ss_listforeach_safe(&p->list, i, n) {
-		scworker *w = sscast(i, scworker, link);
+	scworker *w, *n;
+	rlist_foreach_entry_safe(w, &p->list, link, n) {
 		sc_workerfree(w, r);
 	}
 	return 0;
@@ -18195,8 +18124,8 @@ int sc_workerpool_new(scworkerpool *p, sr *r)
 	scworker *w = sc_workernew(r, p->total);
 	if (ssunlikely(w == NULL))
 		return -1;
-	ss_listappend(&p->list, &w->link);
-	ss_listappend(&p->listidle, &w->linkidle);
+	rlist_add(&p->list, &w->link);
+	rlist_add(&p->listidle, &w->linkidle);
 	p->total++;
 	p->idle++;
 	return 0;
@@ -18626,10 +18555,9 @@ se_open(so *o)
 	if (ssunlikely(rc == -1))
 		return -1;
 	/* databases recover */
-	sslist *i, *n;
-	ss_listforeach_safe(&e->db.list, i, n) {
-		so *o = sscast(i, so, link);
-		rc = so_open(o);
+	so *item, *n;
+	rlist_foreach_entry_safe(item, &e->db.list, link, n) {
+		rc = so_open(item);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -18642,9 +18570,8 @@ se_open(so *o)
 
 online:
 	/* complete */
-	ss_listforeach_safe(&e->db.list, i, n) {
-		so *o = sscast(i, so, link);
-		rc = so_open(o);
+	rlist_foreach_entry_safe(item, &e->db.list, link, n) {
+		rc = so_open(item);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -19155,9 +19082,8 @@ se_confscheduler(se *e, seconfrt *rt, srconf **pc)
 	sr_c(&p, pc, se_confscheduler_lru, "lru", SS_FUNCTION, NULL);
 	sr_c(&p, pc, se_confscheduler_run, "run", SS_FUNCTION, NULL);
 	prev = p;
-	sslist *i;
-	ss_listforeach(&e->scheduler.wp.list, i) {
-		scworker *w = sscast(i, scworker, link);
+	scworker *w;
+	rlist_foreach_entry(w, &e->scheduler.wp.list, link) {
 		srconf *worker = *pc;
 		p = NULL;
 		sr_C(&p, pc, se_confscheduler_trace, "trace", SS_STRING, w, SR_RO, NULL);
@@ -19466,10 +19392,10 @@ se_confdb(se *e, seconfrt *rt ssunused, srconf **pc)
 	srconf *db = NULL;
 	srconf *prev = NULL;
 	srconf *p;
-	sslist *i;
-	ss_listforeach(&e->db.list, i)
+	so *item;
+	rlist_foreach_entry(item, &e->db.list, link)
 	{
-		sedb *o = (sedb*)sscast(i, so, link);
+		sedb *o = (sedb *)item;
 		si_profilerbegin(&o->rtp, o->index);
 		si_profiler(&o->rtp);
 		si_profilerend(&o->rtp);
@@ -19588,10 +19514,10 @@ se_confview(se *e, seconfrt *rt ssunused, srconf **pc)
 {
 	srconf *view = NULL;
 	srconf *prev = NULL;
-	sslist *i;
-	ss_listforeach(&e->view.list.list, i)
+	so *item;
+	rlist_foreach_entry(item, &e->view.list.list, link)
 	{
-		seview *s = (seview*)sscast(i, so, link);
+		seview *s = (seview *)item;
 		srconf *p = sr_C(NULL, pc, se_confview_lsn, "lsn", SS_U64, &s->vlsn, 0, s);
 		sr_C(&prev, pc, se_confview_get, s->name.s, SS_STRING, p, SR_NS, s);
 		if (view == NULL)
@@ -20986,9 +20912,9 @@ so *se_dbnew(se *e, char *name, int size)
 
 so *se_dbmatch(se *e, char *name)
 {
-	sslist *i;
-	ss_listforeach(&e->db.list, i) {
-		sedb *db = (sedb*)sscast(i, so, link);
+	so *item;
+	rlist_foreach_entry(item, &e->db.list, link) {
+		sedb *db = (sedb*)item;
 		if (strcmp(db->scheme->name, name) == 0)
 			return &db->o;
 	}
@@ -20997,9 +20923,9 @@ so *se_dbmatch(se *e, char *name)
 
 so *se_dbmatch_id(se *e, uint32_t id)
 {
-	sslist *i;
-	ss_listforeach(&e->db.list, i) {
-		sedb *db = (sedb*)sscast(i, so, link);
+	so *item;
+	rlist_foreach_entry(item, &e->db.list, link) {
+		sedb *db = (sedb*)item;
 		if (db->scheme->id == id)
 			return &db->o;
 	}
@@ -21013,9 +20939,9 @@ int se_dbvisible(sedb *db, uint64_t txn)
 
 void se_dbbind(se *e)
 {
-	sslist *i;
-	ss_listforeach(&e->db.list, i) {
-		sedb *db = (sedb*)sscast(i, so, link);
+	so *item;
+	rlist_foreach_entry(item, &e->db.list, link) {
+		sedb *db = (sedb*)item;
 		int status = sr_status(&db->index->status);
 		if (sr_statusactive_is(status))
 			si_ref(db->index, SI_REFFE);
@@ -21024,9 +20950,9 @@ void se_dbbind(se *e)
 
 void se_dbunbind(se *e, uint64_t txn)
 {
-	sslist *i, *n;
-	ss_listforeach_safe(&e->db.list, i, n) {
-		sedb *db = (sedb*)sscast(i, so, link);
+	so *i, *n;
+	rlist_foreach_entry_safe(i, &e->db.list, link, n) {
+		sedb *db = (sedb*)i;
 		if (se_dbvisible(db, txn))
 			se_dbunref(db);
 	}
@@ -21557,7 +21483,7 @@ se_recoverlog(se *e, sl *log)
 			so_setstring(o, "raw", sv_pointer(v), sv_size(v));
 			so_setstring(o, "log", log, 0);
 			so_setint(o, "timestamp", timestamp);
-			
+
 			int flags = sv_flags(v);
 			if (flags == SVDELETE) {
 				rc = so_delete(tx, o);
@@ -21601,9 +21527,8 @@ error:
 static inline int
 se_recoverlogpool(se *e)
 {
-	sslist *i;
-	ss_listforeach(&e->lp.list, i) {
-		sl *log = sscast(i, sl, link);
+	sl *log;
+	rlist_foreach_entry(log, &e->lp.list, link) {
 		char *path = ss_pathof(&log->file.path);
 		se_recoverf(e, "loading journal '%s'", path);
 		int rc = se_recoverlog(e, log);
@@ -22071,9 +21996,9 @@ static soif seviewif =
 
 so *se_viewnew(se *e, uint64_t vlsn, char *name, int size)
 {
-	sslist *i;
-	ss_listforeach(&e->view.list.list, i) {
-		seview *s = (seview*)sscast(i, so, link);
+	so *i;
+	rlist_foreach_entry(i, &e->view.list.list, link) {
+		seview *s = (seview*)i;
 		if (ssunlikely(strcmp(s->name.s, name) == 0)) {
 			sr_error(&e->error, "view '%s' already exists", name);
 			return NULL;
@@ -22199,9 +22124,9 @@ se_viewdb_open(seviewdb *c)
 {
 	se *e = se_of(&c->o);
 	int rc;
-	sslist *i;
-	ss_listforeach(&e->db.list, i) {
-		sedb *db = (sedb*)sscast(i, so, link);
+	so *i;
+	rlist_foreach_entry(i, &e->db.list, link) {
+		sedb *db = (sedb*)i;
 		int status = sr_status(&db->index->status);
 		if (status != SR_ONLINE)
 			continue;
