@@ -37,29 +37,25 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 
-void    *sp_env(void);
-void    *sp_document(void*);
-int      sp_setstring(void*, const char*, const void*, int);
-int      sp_setint(void*, const char*, int64_t);
-int      sp_setobject(void*, const char*, void*);
-void    *sp_getobject(void*, const char*);
-void    *sp_getstring(void*, const char*, int*);
-int64_t  sp_getint(void*, const char*);
-int      sp_open(void*);
-int      sp_close(void*);
-int      sp_drop(void*);
-int      sp_destroy(void*);
-int      sp_error(void*);
-int      sp_service(void*);
-void    *sp_poll(void*);
-int      sp_set(void*, void*);
-int      sp_upsert(void*, void*);
-int      sp_delete(void*, void*);
-void    *sp_get(void*, void*);
-void    *sp_cursor(void*);
-void    *sp_begin(void*);
-int      sp_prepare(void*);
-int      sp_commit(void*);
+void    *phia_env(void);
+void    *phia_document(void*);
+int      phia_setstring(void*, const char*, const void*, int);
+int      phia_setint(void*, const char*, int64_t);
+void    *phia_getobject(void*, const char*);
+void    *phia_getstring(void*, const char*, int*);
+int64_t  phia_getint(void*, const char*);
+int      phia_open(void*);
+int      phia_close(void*);
+int      phia_drop(void*);
+int      phia_destroy(void*);
+int      phia_service(void*);
+int      phia_set(void*, void*);
+int      phia_upsert(void*, void*);
+int      phia_delete(void*, void*);
+void    *phia_get(void*, void*);
+void    *phia_cursor(void*);
+void    *phia_begin(void*);
+int      phia_commit(void*);
 
 #ifdef __cplusplus
 }

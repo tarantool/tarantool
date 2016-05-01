@@ -50,10 +50,10 @@ void*
 PhiaIndex::createDocument(const char *key, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
-	void *obj = sp_document(db);
+	void *obj = phia_document(db);
 	if (obj == NULL)
 		phia_error(env);
-	sp_setstring(obj, "arg", fiber(), 0);
+	phia_setstring(obj, "arg", fiber(), 0);
 	if (key == NULL)
 		return obj;
 	uint32_t i = 0;
@@ -71,7 +71,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 		}
 		if (partsize == 0)
 			part = "";
-		if (sp_setstring(obj, partname, part, partsize) == -1)
+		if (phia_setstring(obj, partname, part, partsize) == -1)
 			phia_error(env);
 		i++;
 	}
@@ -91,7 +91,7 @@ phia_configure_storage(struct space *space, struct key_def *key_def)
 	char c[128];
 	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,
 	         key_def->space_id, key_def->iid);
-	sp_setstring(env, "db", c, 0);
+	phia_setstring(env, "db", c, 0);
 	/* define storage scheme */
 	uint32_t i = 0;
 	while (i < key_def->part_count)
@@ -101,7 +101,7 @@ phia_configure_storage(struct space *space, struct key_def *key_def)
 		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
 		         key_def->space_id, key_def->iid);
 		snprintf(part, sizeof(part), "key_%" PRIu32, i);
-		sp_setstring(env, c, part, 0);
+		phia_setstring(env, c, part, 0);
 		/* set field type */
 		char type[32];
 		snprintf(type, sizeof(type), "%s,key(%" PRIu32 ")",
@@ -109,17 +109,17 @@ phia_configure_storage(struct space *space, struct key_def *key_def)
 		         i);
 		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme.%s",
 		         key_def->space_id, key_def->iid, part);
-		sp_setstring(env, c, type, 0);
+		phia_setstring(env, c, type, 0);
 		i++;
 	}
 	/* create value field */
 	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
 	         key_def->space_id, key_def->iid);
-	sp_setstring(env, c, "value", 0);
+	phia_setstring(env, c, "value", 0);
 	/* get database object */
 	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32,
 	         key_def->space_id, key_def->iid);
-	void *db = sp_getobject(env, c);
+	void *db = phia_getobject(env, c);
 	if (db == NULL)
 		phia_error(env);
 	return db;
@@ -141,57 +141,57 @@ phia_configure(struct space *space, struct key_def *key_def)
 	char c[128];
 	/* db.id */
 	phia_ctl(c, sizeof(c), key_def, "id");
-	sp_setint(env, c, key_def->space_id);
+	phia_setint(env, c, key_def->space_id);
 	/* db.path */
 	if (key_def->opts.path[0] != '\0') {
 		phia_ctl(c, sizeof(c), key_def, "path");
-		sp_setstring(env, c, key_def->opts.path, 0);
+		phia_setstring(env, c, key_def->opts.path, 0);
 	}
 	/* db.upsert */
 	phia_ctl(c, sizeof(c), key_def, "upsert");
-	sp_setstring(env, c, (const void *)(uintptr_t)phia_upsert_cb, 0);
+	phia_setstring(env, c, (const void *)(uintptr_t)phia_upsert_cb, 0);
 	phia_ctl(c, sizeof(c), key_def, "upsert_arg");
-	sp_setstring(env, c, (const void *)key_def, 0);
+	phia_setstring(env, c, (const void *)key_def, 0);
 	/* db.compression */
 	if (key_def->opts.compression[0] != '\0') {
 		phia_ctl(c, sizeof(c), key_def, "compression");
-		sp_setstring(env, c, key_def->opts.compression, 0);
+		phia_setstring(env, c, key_def->opts.compression, 0);
 	}
 	/* db.compression_branch */
 	if (key_def->opts.compression_branch[0] != '\0') {
 		phia_ctl(c, sizeof(c), key_def, "compression_branch");
-		sp_setstring(env, c, key_def->opts.compression_branch, 0);
+		phia_setstring(env, c, key_def->opts.compression_branch, 0);
 	}
 	/* db.compression_key */
 	phia_ctl(c, sizeof(c), key_def, "compression_key");
-	sp_setint(env, c, key_def->opts.compression_key);
+	phia_setint(env, c, key_def->opts.compression_key);
 	/* db.node_preload */
 	phia_ctl(c, sizeof(c), key_def, "node_preload");
-	sp_setint(env, c, cfg_geti("phia.node_preload"));
+	phia_setint(env, c, cfg_geti("phia.node_preload"));
 	/* db.node_size */
 	phia_ctl(c, sizeof(c), key_def, "node_size");
-	sp_setint(env, c, key_def->opts.node_size);
+	phia_setint(env, c, key_def->opts.node_size);
 	/* db.page_size */
 	phia_ctl(c, sizeof(c), key_def, "page_size");
-	sp_setint(env, c, key_def->opts.page_size);
+	phia_setint(env, c, key_def->opts.page_size);
 	/* db.mmap */
 	phia_ctl(c, sizeof(c), key_def, "mmap");
-	sp_setint(env, c, cfg_geti("phia.mmap"));
+	phia_setint(env, c, cfg_geti("phia.mmap"));
 	/* db.sync */
 	phia_ctl(c, sizeof(c), key_def, "sync");
-	sp_setint(env, c, cfg_geti("phia.sync"));
+	phia_setint(env, c, cfg_geti("phia.sync"));
 	/* db.amqf */
 	phia_ctl(c, sizeof(c), key_def, "amqf");
-	sp_setint(env, c, key_def->opts.amqf);
+	phia_setint(env, c, key_def->opts.amqf);
 	/* db.read_oldest */
 	phia_ctl(c, sizeof(c), key_def, "read_oldest");
-	sp_setint(env, c, key_def->opts.read_oldest);
+	phia_setint(env, c, key_def->opts.read_oldest);
 	/* db.expire */
 	phia_ctl(c, sizeof(c), key_def, "expire");
-	sp_setint(env, c, key_def->opts.expire);
+	phia_setint(env, c, key_def->opts.expire);
 	/* db.path_fail_on_drop */
 	phia_ctl(c, sizeof(c), key_def, "path_fail_on_drop");
-	sp_setint(env, c, 0);
+	phia_setint(env, c, 0);
 }
 
 PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
@@ -211,7 +211,7 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
-	rc = sp_open(db);
+	rc = phia_open(db);
 	if (rc == -1)
 		phia_error(env);
 	format = space->format;
@@ -223,15 +223,15 @@ PhiaIndex::~PhiaIndex()
 	if (db == NULL)
 		return;
 	/* schedule database shutdown */
-	int rc = sp_close(db);
+	int rc = phia_close(db);
 	if (rc == -1)
 		goto error;
 	/* unref database object */
-	rc = sp_destroy(db);
+	rc = phia_destroy(db);
 	if (rc == -1)
 		goto error;
 error:;
-	char *error = (char *)sp_getstring(env, "phia.error", 0);
+	char *error = (char *)phia_getstring(env, "phia.error", 0);
 	say_info("phia space %" PRIu32 " close error: %s",
 			 key_def->space_id, error);
 	free(error);
@@ -242,7 +242,7 @@ PhiaIndex::size() const
 {
 	char c[128];
 	phia_ctl(c, sizeof(c), key_def, "index.count");
-	return sp_getint(env, c);
+	return phia_getint(env, c);
 }
 
 size_t
@@ -250,7 +250,7 @@ PhiaIndex::bsize() const
 {
 	char c[128];
 	phia_ctl(c, sizeof(c), key_def, "index.memory_used");
-	return sp_getint(env, c);
+	return phia_getint(env, c);
 }
 
 struct tuple *
@@ -266,25 +266,25 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 		transaction = in_txn()->engine_tx;
 	/* try to read from cache first, if nothing is found
 	 * retry using disk */
-	sp_setint(obj, "cache_only", 1);
+	phia_setint(obj, "cache_only", 1);
 	int rc;
-	rc = sp_open(obj);
+	rc = phia_open(obj);
 	if (rc == -1) {
-		sp_destroy(obj);
+		phia_destroy(obj);
 		phia_error(env);
 	}
-	void *result = sp_get(transaction, obj);
+	void *result = phia_get(transaction, obj);
 	if (result == NULL) {
-		sp_setint(obj, "cache_only", 0);
+		phia_setint(obj, "cache_only", 0);
 		result = phia_read(transaction, obj);
-		sp_destroy(obj);
+		phia_destroy(obj);
 		if (result == NULL)
 			return NULL;
 	} else {
-		sp_destroy(obj);
+		phia_destroy(obj);
 	}
 	struct tuple *tuple = phia_tuple_new(result, key_def, format);
-	sp_destroy(result);
+	phia_destroy(result);
 	return tuple;
 }
 
@@ -317,11 +317,11 @@ phia_iterator_free(struct iterator *ptr)
 	assert(ptr->free == phia_iterator_free);
 	struct phia_iterator *it = (struct phia_iterator *) ptr;
 	if (it->current) {
-		sp_destroy(it->current);
+		phia_destroy(it->current);
 		it->current = NULL;
 	}
 	if (it->cursor) {
-		sp_destroy(it->cursor);
+		phia_destroy(it->cursor);
 		it->cursor = NULL;
 	}
 	free(ptr);
@@ -341,31 +341,31 @@ phia_iterator_next(struct iterator *ptr)
 
 	/* read from cache */
 	void *obj;
-	obj = sp_get(it->cursor, it->current);
+	obj = phia_get(it->cursor, it->current);
 	if (likely(obj != NULL)) {
-		sp_destroy(it->current);
+		phia_destroy(it->current);
 		it->current = obj;
 		return phia_tuple_new(obj, it->key_def, it->space->format);
 
 	}
 	/* switch to asynchronous mode (read from disk) */
-	sp_setint(it->current, "cache_only", 0);
+	phia_setint(it->current, "cache_only", 0);
 
 	obj = phia_read(it->cursor, it->current);
 	if (obj == NULL) {
 		ptr->next = phia_iterator_last;
 		/* immediately close the cursor */
-		sp_destroy(it->cursor);
-		sp_destroy(it->current);
+		phia_destroy(it->cursor);
+		phia_destroy(it->current);
 		it->current = NULL;
 		it->cursor = NULL;
 		return NULL;
 	}
-	sp_destroy(it->current);
+	phia_destroy(it->current);
 	it->current = obj;
 
 	/* switch back to synchronous mode */
-	sp_setint(obj, "cache_only", 1);
+	phia_setint(obj, "cache_only", 1);
 	return phia_tuple_new(obj, it->key_def, it->space->format);
 }
 
@@ -440,7 +440,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	default:
 		return initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = sp_cursor(env);
+	it->cursor = phia_cursor(env);
 	if (it->cursor == NULL)
 		phia_error(env);
 	/* Position first key here, since key pointer might be
@@ -450,15 +450,15 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	 */
 	PhiaIndex *index = (PhiaIndex *)this;
 	void *obj = index->createDocument(key, &it->keyend);
-	sp_setstring(obj, "order", compare, 0);
+	phia_setstring(obj, "order", compare, 0);
 	obj = phia_read(it->cursor, obj);
 	if (obj == NULL) {
-		sp_destroy(it->cursor);
+		phia_destroy(it->cursor);
 		it->cursor = NULL;
 		return;
 	}
 	it->current = obj;
 	/* switch to sync mode (cache read) */
-	sp_setint(obj, "cache_only", 1);
+	phia_setint(obj, "cache_only", 1);
 	ptr->next = phia_iterator_first;
 }

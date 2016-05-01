@@ -5094,9 +5094,7 @@ struct soif {
 	int      (*close)(struct so*);
 	int      (*destroy)(struct so*);
 	void     (*free)(struct so*);
-	int      (*error)(struct so*);
 	void    *(*document)(struct so*);
-	void    *(*poll)(struct so*);
 	int      (*drop)(struct so*);
 	int      (*setstring)(struct so*, const char*, void*, int);
 	int      (*setint)(struct so*, const char*, int64_t);
@@ -5109,7 +5107,6 @@ struct soif {
 	int      (*del)(struct so*, struct so*);
 	void    *(*get)(struct so*, struct so*);
 	void    *(*begin)(struct so*);
-	int      (*prepare)(struct so*);
 	int      (*commit)(struct so*);
 	void    *(*cursor)(struct so*);
 };
@@ -5166,16 +5163,13 @@ so_cast_dynamic(void *ptr, struct sotype *type,
 #define so_close(o)     (o)->i->close(o)
 #define so_destroy(o)   (o)->i->destroy(o)
 #define so_free(o)      (o)->i->free(o)
-#define so_error(o)     (o)->i->error(o)
 #define so_document(o)  (o)->i->document(o)
-#define so_poll(o)      (o)->i->poll(o)
 #define so_drop(o)      (o)->i->drop(o)
 #define so_set(o, v)    (o)->i->set(o, v)
 #define so_upsert(o, v) (o)->i->upsert(o, v)
 #define so_delete(o, v) (o)->i->del(o, v)
 #define so_get(o, v)    (o)->i->get(o, v)
 #define so_begin(o)     (o)->i->begin(o)
-#define so_prepare(o)   (o)->i->prepare(o)
 #define so_commit(o)    (o)->i->commit(o)
 #define so_cursor(o)    (o)->i->cursor(o)
 
@@ -18406,39 +18400,6 @@ se_begin(struct so *o)
 }
 
 static void*
-se_poll(struct so *o)
-{
-	struct se *e = se_cast(o, struct se*, SE);
-	struct so *result;
-	if (e->conf.event_on_backup) {
-		int event = sc_ctl_backup_event(&e->scheduler);
-		if (event) {
-			struct sedocument *doc;
-			result = se_document_new(e, &e->o, NULL);
-			if (ssunlikely(result == NULL))
-				return NULL;
-			doc = (struct sedocument*)result;
-			doc->event = 1;
-			return result;
-		}
-	}
-	return NULL;
-}
-
-static int
-se_error(struct so *o)
-{
-	struct se *e = se_cast(o, struct se*, SE);
-	int status = sr_errorof(&e->error);
-	if (status == SR_ERROR_MALFUNCTION)
-		return 1;
-	status = sr_status(&e->status);
-	if (status == SR_MALFUNCTION)
-		return 1;
-	return 0;
-}
-
-static void*
 se_cursor(struct so *o)
 {
 	struct se *e = se_cast(o, struct se*, SE);
@@ -18451,9 +18412,7 @@ static struct soif seif =
 	.close        = se_close,
 	.destroy      = se_destroy,
 	.free         = NULL,
-	.error        = se_error,
 	.document     = NULL,
-	.poll         = se_poll,
 	.drop         = NULL,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
@@ -18466,7 +18425,6 @@ static struct soif seif =
 	.del          = NULL,
 	.get          = NULL,
 	.begin        = se_begin,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = se_cursor,
 };
@@ -19752,9 +19710,7 @@ static struct soif seconfkvif =
 	.close        = NULL,
 	.destroy      = se_confkv_destroy,
 	.free         = se_confkv_free,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -19767,7 +19723,6 @@ static struct soif seconfkvif =
 	.del          = NULL,
 	.get          = NULL,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -19863,9 +19818,7 @@ static struct soif seconfcursorif =
 	.open         = NULL,
 	.destroy      = se_confcursor_destroy,
 	.free         = se_confcursor_free,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -19878,7 +19831,6 @@ static struct soif seconfcursorif =
 	.del          = NULL,
 	.get          = se_confcursor_get,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -19983,9 +19935,7 @@ static struct soif secursorif =
 	.close        = NULL,
 	.destroy      = se_cursordestroy,
 	.free         = se_cursorfree,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = se_cursorset_int,
@@ -19998,7 +19948,6 @@ static struct soif secursorif =
 	.del          = NULL,
 	.get          = se_cursorget,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -20615,9 +20564,7 @@ static struct soif sedbif =
 	.close        = se_dbclose,
 	.destroy      = se_dbdestroy,
 	.free         = NULL,
-	.error        = NULL,
 	.document     = se_dbdocument,
-	.poll         = NULL,
 	.drop         = se_dbdrop,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -20630,7 +20577,6 @@ static struct soif sedbif =
 	.del          = se_dbdel,
 	.get          = se_dbget,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -21096,9 +21042,7 @@ static struct soif sedocumentif =
 	.close        = NULL,
 	.destroy      = se_document_destroy,
 	.free         = se_document_free,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = se_document_setstring,
 	.setint       = se_document_setint,
@@ -21111,7 +21055,6 @@ static struct soif sedocumentif =
 	.del          = NULL,
 	.get          = NULL,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -21603,9 +21546,7 @@ static struct soif setxif =
 	.close        = NULL,
 	.destroy      = se_txrollback,
 	.free         = se_txfree,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = se_txset_int,
@@ -21618,7 +21559,6 @@ static struct soif setxif =
 	.del          = se_txdelete,
 	.get          = se_txget,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = se_txcommit,
 	.cursor       = NULL
 };
@@ -21729,9 +21669,7 @@ static struct soif seviewif =
 	.close        = NULL,
 	.destroy      = se_viewdestroy,
 	.free         = se_viewfree,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = se_viewset_int,
@@ -21744,7 +21682,6 @@ static struct soif seviewif =
 	.del          = NULL,
 	.get          = se_viewget,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = se_viewcursor
 };
@@ -21854,9 +21791,7 @@ static struct soif seviewdbif =
 	.close        = NULL,
 	.destroy      = se_viewdb_destroy,
 	.free         = se_viewdb_free,
-	.error        = NULL,
 	.document     = NULL,
-	.poll         = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -21869,7 +21804,6 @@ static struct soif seviewdbif =
 	.del          = NULL,
 	.get          = se_viewdb_get,
 	.begin        = NULL,
-	.prepare      = NULL,
 	.commit       = NULL,
 	.cursor       = NULL,
 };
@@ -21958,12 +21892,12 @@ sp_cast(void *ptr, const char *method)
 	return o;
 }
 
-void *sp_env(void)
+void *phia_env(void)
 {
 	return se_new();
 }
 
-void *sp_document(void *ptr)
+void *phia_document(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->document == NULL)) {
@@ -21977,7 +21911,7 @@ void *sp_document(void *ptr)
 	return h;
 }
 
-int sp_open(void *ptr)
+int phia_open(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->open == NULL)) {
@@ -21991,7 +21925,7 @@ int sp_open(void *ptr)
 	return rc;
 }
 
-int sp_close(void *ptr)
+int phia_close(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->close == NULL)) {
@@ -22005,7 +21939,7 @@ int sp_close(void *ptr)
 	return rc;
 }
 
-int sp_drop(void *ptr)
+int phia_drop(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->drop == NULL)) {
@@ -22019,7 +21953,7 @@ int sp_drop(void *ptr)
 	return rc;
 }
 
-int sp_destroy(void *ptr)
+int phia_destroy(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->destroy == NULL)) {
@@ -22038,41 +21972,13 @@ int sp_destroy(void *ptr)
 	return rc;
 }
 
-int sp_error(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->error == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->error(o);
-	se_apiunlock(e);
-	return rc;
-}
-
-int sp_service(void *ptr)
+int phia_service(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	return se_service(o->env);
 }
 
-void *sp_poll(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->poll == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	void *h = o->i->poll(o);
-	se_apiunlock(e);
-	return h;
-}
-
-int sp_setstring(void *ptr, const char *path, const void *pointer, int size)
+int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setstring == NULL)) {
@@ -22086,7 +21992,7 @@ int sp_setstring(void *ptr, const char *path, const void *pointer, int size)
 	return rc;
 }
 
-int sp_setint(void *ptr, const char *path, int64_t v)
+int phia_setint(void *ptr, const char *path, int64_t v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setint == NULL)) {
@@ -22100,7 +22006,7 @@ int sp_setint(void *ptr, const char *path, int64_t v)
 	return rc;
 }
 
-int sp_setobject(void *ptr, const char *path, void *v)
+int phia_setobject(void *ptr, const char *path, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->setobject == NULL)) {
@@ -22114,7 +22020,7 @@ int sp_setobject(void *ptr, const char *path, void *v)
 	return rc;
 }
 
-void *sp_getobject(void *ptr, const char *path)
+void *phia_getobject(void *ptr, const char *path)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getobject == NULL)) {
@@ -22128,7 +22034,7 @@ void *sp_getobject(void *ptr, const char *path)
 	return h;
 }
 
-void *sp_getstring(void *ptr, const char *path, int *size)
+void *phia_getstring(void *ptr, const char *path, int *size)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getstring == NULL)) {
@@ -22142,7 +22048,7 @@ void *sp_getstring(void *ptr, const char *path, int *size)
 	return h;
 }
 
-int64_t sp_getint(void *ptr, const char *path)
+int64_t phia_getint(void *ptr, const char *path)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->getint == NULL)) {
@@ -22156,7 +22062,7 @@ int64_t sp_getint(void *ptr, const char *path)
 	return rc;
 }
 
-int sp_set(void *ptr, void *v)
+int phia_set(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->set == NULL)) {
@@ -22170,7 +22076,7 @@ int sp_set(void *ptr, void *v)
 	return rc;
 }
 
-int sp_upsert(void *ptr, void *v)
+int phia_upsert(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->upsert == NULL)) {
@@ -22184,7 +22090,7 @@ int sp_upsert(void *ptr, void *v)
 	return rc;
 }
 
-int sp_delete(void *ptr, void *v)
+int phia_delete(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->del == NULL)) {
@@ -22198,7 +22104,7 @@ int sp_delete(void *ptr, void *v)
 	return rc;
 }
 
-void *sp_get(void *ptr, void *v)
+void *phia_get(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->get == NULL)) {
@@ -22212,7 +22118,7 @@ void *sp_get(void *ptr, void *v)
 	return h;
 }
 
-void *sp_cursor(void *ptr)
+void *phia_cursor(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->cursor == NULL)) {
@@ -22226,7 +22132,7 @@ void *sp_cursor(void *ptr)
 	return h;
 }
 
-void *sp_begin(void *ptr)
+void *phia_begin(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->begin == NULL)) {
@@ -22240,21 +22146,7 @@ void *sp_begin(void *ptr)
 	return h;
 }
 
-int sp_prepare(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->prepare == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->prepare(o);
-	se_apiunlock(e);
-	return rc;
-}
-
-int sp_commit(void *ptr)
+int phia_commit(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
 	if (ssunlikely(o->i->commit == NULL)) {

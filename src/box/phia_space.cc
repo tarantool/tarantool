@@ -66,30 +66,30 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	void *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
-		sp_setstring(obj, "value", value, valuesize);
+		phia_setstring(obj, "value", value, valuesize);
 
 	assert(request->header != NULL);
 
-	void *tx = sp_begin(index->env);
+	void *tx = phia_begin(index->env);
 	if (tx == NULL) {
-		sp_destroy(obj);
+		phia_destroy(obj);
 		phia_error(index->env);
 	}
 
 	int64_t signature = request->header->lsn;
-	sp_setint(tx, "lsn", signature);
+	phia_setint(tx, "lsn", signature);
 
-	if (sp_set(tx, obj) != 0)
-		phia_error(index->env); /* obj destroyed by sp_set() */
+	if (phia_set(tx, obj) != 0)
+		phia_error(index->env); /* obj destroyed by phia_set() */
 
-	int rc = sp_commit(tx);
+	int rc = phia_commit(tx);
 	switch (rc) {
 	case 0:
 		return;
 	case 1: /* rollback */
 		return;
 	case 2: /* lock */
-		sp_destroy(tx);
+		phia_destroy(tx);
 		/* must never happen during JOIN */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		return;
@@ -139,9 +139,9 @@ PhiaSpace::executeReplace(struct txn*,
 	void *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
-		sp_setstring(obj, "value", value, valuesize);
+		phia_setstring(obj, "value", value, valuesize);
 	int rc;
-	rc = sp_set(transaction, obj);
+	rc = phia_set(transaction, obj);
 	if (rc == -1)
 		phia_error(index->env);
 
@@ -160,7 +160,7 @@ PhiaSpace::executeDelete(struct txn*, struct space *space,
 	/* remove */
 	void *obj = index->createDocument(key, NULL);
 	void *transaction = in_txn()->engine_tx;
-	int rc = sp_delete(transaction, obj);
+	int rc = phia_delete(transaction, obj);
 	if (rc == -1)
 		phia_error(index->env);
 	return NULL;
@@ -204,9 +204,9 @@ PhiaSpace::executeUpdate(struct txn*, struct space *space,
 	void *obj = index->createDocument(key, &value);
 	size_t valuesize = new_tuple->bsize - (value - new_tuple->data);
 	if (valuesize > 0)
-		sp_setstring(obj, "value", value, valuesize);
+		phia_setstring(obj, "value", value, valuesize);
 	int rc;
-	rc = sp_set(transaction, obj);
+	rc = phia_set(transaction, obj);
 	if (rc == -1)
 		phia_error(index->env);
 	return NULL;
@@ -423,7 +423,7 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 		sizeof(uint8_t) + sizeof(uint32_t) + tuple_value_size + expr_size;
 	char *value = (char *)malloc(value_size);
 	if (value == NULL) {
-		sp_destroy(obj);
+		phia_destroy(obj);
 		tnt_raise(OutOfMemory, sizeof(value_size), "Phia Space",
 		          "executeUpsert");
 	}
@@ -435,9 +435,9 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 	memcpy(p, tuple_value, tuple_value_size);
 	p += tuple_value_size;
 	memcpy(p, expr, expr_size);
-	sp_setstring(obj, "value", value, value_size);
+	phia_setstring(obj, "value", value, value_size);
 	void *transaction = in_txn()->engine_tx;
-	int rc = sp_upsert(transaction, obj);
+	int rc = phia_upsert(transaction, obj);
 	free(value);
 	if (rc == -1)
 		phia_error(index->env);
