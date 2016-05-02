@@ -37,8 +37,11 @@ extern "C" {
 #include <stdlib.h>
 #include <stdint.h>
 
-void    *phia_env(void);
-void    *phia_document(void*);
+struct phia_env;
+
+struct phia_env *phia_env(void);
+
+void    *phia_document(void *);
 int      phia_setstring(void*, const char*, const void*, int);
 int      phia_setint(void*, const char*, int64_t);
 void    *phia_getobject(void*, const char*);
@@ -48,7 +51,7 @@ int      phia_open(void*);
 int      phia_close(void*);
 int      phia_drop(void*);
 int      phia_destroy(void*);
-int      phia_service(void*);
+int      phia_service(struct phia_env *env);
 int      phia_set(void*, void*);
 int      phia_upsert(void*, void*);
 int      phia_delete(void*, void*);

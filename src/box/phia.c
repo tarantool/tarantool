@@ -283,7 +283,7 @@ ss_vfsfree(struct ssvfs *f)
 #define ss_vfsmremap(fs, m, size)            (fs)->i->mremap(fs, m, size)
 #define ss_vfsmunmap(fs, m)                  (fs)->i->munmap(fs, m)
 
-extern struct ssvfsif ss_stdvfs;
+static struct ssvfsif ss_stdvfs;
 
 struct ssfile {
 	int fd;
@@ -500,9 +500,9 @@ ss_strdup(struct ssa *a, char *str) {
 	return s;
 }
 
-extern struct ssaif ss_stda;
+static struct ssaif ss_stda;
 
-extern struct ssaif ss_ooma;
+static struct ssaif ss_ooma;
 
 struct sstrace {
 	ssspinlock lock;
@@ -967,10 +967,6 @@ struct ssthreadpool {
 	int n;
 };
 
-int ss_threadpool_init(struct ssthreadpool*);
-int ss_threadpool_shutdown(struct ssthreadpool*, struct ssa*);
-int ss_threadpool_new(struct ssthreadpool*, struct ssa*, int, ssthreadf, void*);
-
 enum ssquotaop {
 	SS_QGROW,
 	SS_QADD,
@@ -986,11 +982,11 @@ struct ssquota {
 	struct sscond cond;
 };
 
-int ss_quotainit(struct ssquota*);
-int ss_quotaset(struct ssquota*, uint64_t);
-int ss_quotaenable(struct ssquota*, int);
-int ss_quotafree(struct ssquota*);
-int ss_quota(struct ssquota*, enum ssquotaop, uint64_t);
+static int ss_quotainit(struct ssquota*);
+static int ss_quotaset(struct ssquota*, uint64_t);
+static int ss_quotaenable(struct ssquota*, int);
+static int ss_quotafree(struct ssquota*);
+static int ss_quota(struct ssquota*, enum ssquotaop, uint64_t);
 
 static inline uint64_t
 ss_quotaused(struct ssquota *q)
@@ -1073,14 +1069,14 @@ name(struct ssrbnode *n, void *arg) \
 	executable; \
 }
 
-struct ssrbnode *ss_rbmin(struct ssrb*);
-struct ssrbnode *ss_rbmax(struct ssrb*);
-struct ssrbnode *ss_rbnext(struct ssrb*, struct ssrbnode*);
-struct ssrbnode *ss_rbprev(struct ssrb*, struct ssrbnode*);
+static struct ssrbnode *ss_rbmin(struct ssrb*);
+static struct ssrbnode *ss_rbmax(struct ssrb*);
+static struct ssrbnode *ss_rbnext(struct ssrb*, struct ssrbnode*);
+static struct ssrbnode *ss_rbprev(struct ssrb*, struct ssrbnode*);
 
-void ss_rbset(struct ssrb*, struct ssrbnode*, int, struct ssrbnode*);
-void ss_rbreplace(struct ssrb*, struct ssrbnode*, struct ssrbnode*);
-void ss_rbremove(struct ssrb*, struct ssrbnode*);
+static void ss_rbset(struct ssrb*, struct ssrbnode*, int, struct ssrbnode*);
+static void ss_rbreplace(struct ssrb*, struct ssrbnode*, struct ssrbnode*);
+static void ss_rbremove(struct ssrb*, struct ssrbnode*);
 
 struct ssqf {
 	uint8_t   qf_qbits;
@@ -1096,15 +1092,14 @@ struct ssqf {
 	struct ssbuf     qf_buf;
 };
 
-int  ss_qfinit(struct ssqf*);
-int  ss_qfinit_from(struct ssqf*, int, int, uint32_t, char*);
-int  ss_qfensure(struct ssqf*, struct ssa*, uint32_t);
-void ss_qffree(struct ssqf*, struct ssa*);
-void ss_qfgc(struct ssqf*, struct ssa*, int);
-void ss_qfreset(struct ssqf*);
-void ss_qfrecover(struct ssqf*, int, int, uint32_t, uint64_t*);
-void ss_qfadd(struct ssqf*, uint64_t);
-int  ss_qfhas(struct ssqf*, uint64_t);
+static int  ss_qfinit(struct ssqf*);
+static int  ss_qfensure(struct ssqf*, struct ssa*, uint32_t);
+static void ss_qffree(struct ssqf*, struct ssa*);
+static void ss_qfgc(struct ssqf*, struct ssa*, int);
+static void ss_qfreset(struct ssqf*);
+static void ss_qfrecover(struct ssqf*, int, int, uint32_t, uint64_t*);
+static void ss_qfadd(struct ssqf*, uint64_t);
+static int  ss_qfhas(struct ssqf*, uint64_t);
 
 static inline unsigned int
 ss_fnv(char *key, int len)
@@ -1419,11 +1414,11 @@ ss_filtercomplete(struct ssfilter *c, struct ssbuf *dest)
 	return c->i->complete(c, dest);
 }
 
-extern struct ssfilterif ss_nonefilter;
+static struct ssfilterif ss_nonefilter;
 
-extern struct ssfilterif ss_lz4filter;
+static struct ssfilterif ss_lz4filter;
 
-extern struct ssfilterif ss_zstdfilter;
+static struct ssfilterif ss_zstdfilter;
 
 static inline struct ssfilterif*
 ss_filterof(char *name)
@@ -1467,8 +1462,8 @@ do { \
 #define ss_iteratorof(i) (i)->vif->of(i)
 #define ss_iteratornext(i) (i)->vif->next(i)
 
-extern struct ssiterif ss_bufiter;
-extern struct ssiterif ss_bufiterref;
+static struct ssiterif ss_bufiter;
+static struct ssiterif ss_bufiterref;
 
 struct ssbufiter {
 	struct ssbuf *buf;
@@ -1663,7 +1658,7 @@ ss_avgprepare(struct ssavg *a)
 	         a->min, a->max, a->avg);
 }
 
-struct ssiterif ss_bufiter =
+static struct ssiterif ss_bufiter =
 {
 	.close   = ss_bufiter_close,
 	.has     = ss_bufiter_has,
@@ -1671,7 +1666,7 @@ struct ssiterif ss_bufiter =
 	.next    = ss_bufiter_next
 };
 
-struct ssiterif ss_bufiterref =
+static struct ssiterif ss_bufiterref =
 {
 	.close   = ss_bufiterref_close,
 	.has     = ss_bufiterref_has,
@@ -1694,11 +1689,11 @@ ss_lz4filter_init(struct ssfilter *f, va_list args ssunused)
 	case SS_FINPUT:
 		rc = LZ4F_createCompressionContext(&z->compress, LZ4F_VERSION);
 		z->total_size = 0;
-		break;	
+		break;
 	case SS_FOUTPUT:
 		rc = LZ4F_createDecompressionContext(&z->decompress,
 						     LZ4F_VERSION);
-		break;	
+		break;
 	}
 	if (ssunlikely(rc != 0))
 		return -1;
@@ -1713,10 +1708,10 @@ ss_lz4filter_free(struct ssfilter *f)
 	switch (f->op) {
 	case SS_FINPUT:
 		LZ4F_freeCompressionContext(z->compress);
-		break;	
+		break;
 	case SS_FOUTPUT:
 		LZ4F_freeDecompressionContext(z->decompress);
-		break;	
+		break;
 	}
 	return 0;
 }
@@ -1842,7 +1837,7 @@ ss_lz4filter_complete(struct ssfilter *f, struct ssbuf *dest)
 	return 0;
 }
 
-struct ssfilterif ss_lz4filter =
+static struct ssfilterif ss_lz4filter =
 {
 	.name     = "lz4",
 	.init     = ss_lz4filter_init,
@@ -1884,7 +1879,7 @@ ss_nonefilter_complete(struct ssfilter *f ssunused, struct ssbuf *dest ssunused)
 	return 0;
 }
 
-struct ssfilterif ss_nonefilter =
+static struct ssfilterif ss_nonefilter =
 {
 	.name     = "none",
 	.init     = ss_nonefilter_init,
@@ -1961,7 +1956,7 @@ ss_oomafree(struct ssa *a ssunused, void *ptr)
 	free(ptr);
 }
 
-struct ssaif ss_ooma =
+static struct ssaif ss_ooma =
 {
 	.open    = ss_oomaopen,
 	.close   = ss_oomaclose,
@@ -1979,7 +1974,8 @@ struct ssaif ss_ooma =
 
 #define ss_qflmask(n) ((1ULL << (n)) - 1ULL)
 
-void ss_qfrecover(struct ssqf *f, int q, int r, uint32_t size, uint64_t *table)
+static void
+ss_qfrecover(struct ssqf *f, int q, int r, uint32_t size, uint64_t *table)
 {
 	f->qf_qbits      = q;
 	f->qf_rbits      = r;
@@ -1993,14 +1989,16 @@ void ss_qfrecover(struct ssqf *f, int q, int r, uint32_t size, uint64_t *table)
 	f->qf_table      = table;
 }
 
-int ss_qfinit(struct ssqf *f)
+static int
+ss_qfinit(struct ssqf *f)
 {
 	memset(f, 0, sizeof(*f));
 	ss_bufinit(&f->qf_buf);
 	return 0;
 }
 
-int ss_qfensure(struct ssqf *f, struct ssa *a, uint32_t count)
+static int
+ss_qfensure(struct ssqf *f, struct ssa *a, uint32_t count)
 {
 	int q = 6;
 	int r = 1;
@@ -2029,7 +2027,8 @@ int ss_qfensure(struct ssqf *f, struct ssa *a, uint32_t count)
 	return 0;
 }
 
-void ss_qffree(struct ssqf *f, struct ssa *a)
+static void
+ss_qffree(struct ssqf *f, struct ssa *a)
 {
 	if (f->qf_table) {
 		ss_buffree(&f->qf_buf, a);
@@ -2037,7 +2036,8 @@ void ss_qffree(struct ssqf *f, struct ssa *a)
 	}
 }
 
-void ss_qfgc(struct ssqf *f, struct ssa *a, int wm)
+static void
+ss_qfgc(struct ssqf *f, struct ssa *a, int wm)
 {
 	if (ssunlikely(ss_bufsize(&f->qf_buf) >= wm)) {
 		ss_buffree(&f->qf_buf, a);
@@ -2047,7 +2047,8 @@ void ss_qfgc(struct ssqf *f, struct ssa *a, int wm)
 	ss_bufreset(&f->qf_buf);
 }
 
-void ss_qfreset(struct ssqf *f)
+static void
+ss_qfreset(struct ssqf *f)
 {
 	memset(f->qf_table, 0, f->qf_table_size);
 	ss_bufreset(&f->qf_buf);
@@ -2198,7 +2199,8 @@ ss_qffull(struct ssqf *f) {
 	return f->qf_entries >= f->qf_max_size;
 }
 
-void ss_qfadd(struct ssqf *f, uint64_t h)
+static void
+ss_qfadd(struct ssqf *f, uint64_t h)
 {
 	if (ssunlikely(ss_qffull(f)))
 		return;
@@ -2246,7 +2248,8 @@ void ss_qfadd(struct ssqf *f, uint64_t h)
 	f->qf_entries++;
 }
 
-int ss_qfhas(struct ssqf *f, uint64_t h)
+static int
+ss_qfhas(struct ssqf *f, uint64_t h)
 {
 	uint64_t fq   = ss_qfhash_to_q(f, h);
 	uint64_t fr   = ss_qfhash_to_r(f, h);
@@ -2269,7 +2272,8 @@ int ss_qfhas(struct ssqf *f, uint64_t h)
 	return 0;
 }
 
-int ss_quotainit(struct ssquota *q)
+static int
+ss_quotainit(struct ssquota *q)
 {
 	q->enable = 0;
 	q->wait   = 0;
@@ -2280,26 +2284,30 @@ int ss_quotainit(struct ssquota *q)
 	return 0;
 }
 
-int ss_quotaset(struct ssquota *q, uint64_t limit)
+static int
+ss_quotaset(struct ssquota *q, uint64_t limit)
 {
 	q->limit = limit;
 	return 0;
 }
 
-int ss_quotaenable(struct ssquota *q, int v)
+static int
+ss_quotaenable(struct ssquota *q, int v)
 {
 	q->enable = v;
 	return 0;
 }
 
-int ss_quotafree(struct ssquota *q)
+static int
+ss_quotafree(struct ssquota *q)
 {
 	ss_mutexfree(&q->lock);
 	ss_condfree(&q->cond);
 	return 0;
 }
 
-int ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
+static int
+ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 {
 	if (sslikely(v == 0))
 		return 0;
@@ -2333,7 +2341,8 @@ int ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 #define SS_RBRED   1
 #define SS_RBUNDEF 2
 
-struct ssrbnode *ss_rbmin(struct ssrb *t)
+static struct ssrbnode *
+ss_rbmin(struct ssrb *t)
 {
 	struct ssrbnode *n = t->root;
 	if (ssunlikely(n == NULL))
@@ -2343,7 +2352,8 @@ struct ssrbnode *ss_rbmin(struct ssrb *t)
 	return n;
 }
 
-struct ssrbnode *ss_rbmax(struct ssrb *t)
+static struct ssrbnode *
+ss_rbmax(struct ssrb *t)
 {
 	struct ssrbnode *n = t->root;
 	if (ssunlikely(n == NULL))
@@ -2353,7 +2363,8 @@ struct ssrbnode *ss_rbmax(struct ssrb *t)
 	return n;
 }
 
-struct ssrbnode *ss_rbnext(struct ssrb *t, struct ssrbnode *n)
+static struct ssrbnode *
+ss_rbnext(struct ssrb *t, struct ssrbnode *n)
 {
 	if (ssunlikely(n == NULL))
 		return ss_rbmin(t);
@@ -2369,7 +2380,8 @@ struct ssrbnode *ss_rbnext(struct ssrb *t, struct ssrbnode *n)
 	return p;
 }
 
-struct ssrbnode *ss_rbprev(struct ssrb *t, struct ssrbnode *n)
+static struct ssrbnode *
+ss_rbprev(struct ssrb *t, struct ssrbnode *n)
 {
 	if (ssunlikely(n == NULL))
 		return ss_rbmax(t);
@@ -2475,7 +2487,8 @@ ss_rbset_fixup(struct ssrb *t, struct ssrbnode *n)
 	t->root->color = SS_RBBLACK;
 }
 
-void ss_rbset(struct ssrb *t, struct ssrbnode *p, int prel, struct ssrbnode *n)
+static void
+ss_rbset(struct ssrb *t, struct ssrbnode *p, int prel, struct ssrbnode *n)
 {
 	n->color = SS_RBRED;
 	n->p     = p;
@@ -2493,7 +2506,8 @@ void ss_rbset(struct ssrb *t, struct ssrbnode *p, int prel, struct ssrbnode *n)
 	ss_rbset_fixup(t, n);
 }
 
-void ss_rbreplace(struct ssrb *t, struct ssrbnode *o, struct ssrbnode *n)
+static void
+ss_rbreplace(struct ssrb *t, struct ssrbnode *o, struct ssrbnode *n)
 {
 	struct ssrbnode *p = o->p;
 	if (p) {
@@ -2512,7 +2526,8 @@ void ss_rbreplace(struct ssrb *t, struct ssrbnode *o, struct ssrbnode *n)
 	*n = *o;
 }
 
-void ss_rbremove(struct ssrb *t, struct ssrbnode *n)
+static void
+ss_rbremove(struct ssrb *t, struct ssrbnode *n)
 {
 	if (ssunlikely(n->color == SS_RBUNDEF))
 		return;
@@ -2668,7 +2683,7 @@ ss_stdafree(struct ssa *a ssunused, void *ptr) {
 	free(ptr);
 }
 
-struct ssaif ss_stda =
+static struct ssaif ss_stda =
 {
 	.open    = ss_stdaopen,
 	.close   = ss_stdaclose,
@@ -2919,7 +2934,7 @@ ss_stdvfs_munmap(struct ssvfs *f ssunused, struct ssmmap *m)
 	return rc;
 }
 
-struct ssvfsif ss_stdvfs =
+static struct ssvfsif ss_stdvfs =
 {
 	.init          = ss_stdvfs_init,
 	.free          = ss_stdvfs_free,
@@ -3139,7 +3154,7 @@ ss_testvfs_munmap(struct ssvfs *f, struct ssmmap *m)
 	return ss_stdvfs.munmap(f, m);
 }
 
-struct ssvfsif ss_testvfs =
+static struct ssvfsif ss_testvfs =
 {
 	.init          = ss_testvfs_init,
 	.free          = ss_testvfs_free,
@@ -3269,7 +3284,7 @@ ss_zstdfilter_complete(struct ssfilter *f, struct ssbuf *dest)
 		if (ssunlikely(ZSTD_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
-		break;	
+		break;
 	case SS_FOUTPUT:
 		/* do nothing */
 		break;
@@ -3277,7 +3292,7 @@ ss_zstdfilter_complete(struct ssfilter *f, struct ssbuf *dest)
 	return 0;
 }
 
-struct ssfilterif ss_zstdfilter =
+static struct ssfilterif ss_zstdfilter =
 {
 	.name     = "zstd",
 	.init     = ss_zstdfilter_init,
@@ -3361,17 +3376,17 @@ sf_fieldoptions(struct sffield *f, struct ssa *a, char *options)
 	return 0;
 }
 
-void sf_schemeinit(struct sfscheme*);
-void sf_schemefree(struct sfscheme*, struct ssa*);
-int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
-int  sf_schemevalidate(struct sfscheme*, struct ssa*);
-int  sf_schemesave(struct sfscheme*, struct ssa*, struct ssbuf*);
-int  sf_schemeload(struct sfscheme*, struct ssa*, char*, int);
-struct sffield*
+static void sf_schemeinit(struct sfscheme*);
+static void sf_schemefree(struct sfscheme*, struct ssa*);
+static int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
+static int  sf_schemevalidate(struct sfscheme*, struct ssa*);
+static int  sf_schemesave(struct sfscheme*, struct ssa*, struct ssbuf*);
+static int  sf_schemeload(struct sfscheme*, struct ssa*, char*, int);
+static struct sffield*
 sf_schemefind(struct sfscheme*, char *);
 
-int  sf_schemecompare_prefix(struct sfscheme*, char*, uint32_t, char*);
-int  sf_schemecompare(char*, int, char*, int, void*);
+static int  sf_schemecompare_prefix(struct sfscheme*, char*, uint32_t, char*);
+static int  sf_schemecompare(char*, int, char*, int, void*);
 
 static inline int
 sf_compare(struct sfscheme *s, char *a, int asize, char *b, int bsize)
@@ -3727,7 +3742,7 @@ sf_cmpu64_reverse(char *a, int asz ssunused, char *b, int bsz ssunused,
 	return (av > bv) ? -1 : 1;
 }
 
-sshot int
+static int
 sf_schemecompare(char *a, int asize ssunused, char *b, int bsize ssunused, void *arg)
 {
 	struct sfscheme *s = arg;
@@ -3748,7 +3763,7 @@ sf_schemecompare(char *a, int asize ssunused, char *b, int bsize ssunused, void 
 	return 0;
 }
 
-sshot int
+static int
 sf_schemecompare_prefix(struct sfscheme *s, char *prefix, uint32_t prefixsize, char *key)
 {
 	uint32_t keysize;
@@ -3758,7 +3773,8 @@ sf_schemecompare_prefix(struct sfscheme *s, char *prefix, uint32_t prefixsize, c
 	return (memcmp(prefix, key, prefixsize) == 0) ? 1 : 0;
 }
 
-void sf_schemeinit(struct sfscheme *s)
+static void
+sf_schemeinit(struct sfscheme *s)
 {
 	s->fields = NULL;
 	s->fields_count = 0;
@@ -3770,7 +3786,8 @@ void sf_schemeinit(struct sfscheme *s)
 	s->cmparg = s;
 }
 
-void sf_schemefree(struct sfscheme *s, struct ssa *a)
+static void
+sf_schemefree(struct sfscheme *s, struct ssa *a)
 {
 	if (s->fields) {
 		int i = 0;
@@ -3787,7 +3804,8 @@ void sf_schemefree(struct sfscheme *s, struct ssa *a)
 	}
 }
 
-int sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
+static int
+sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
 {
 	int size = sizeof(struct sffield*) * (s->fields_count + 1);
 	struct sffield **fields = ss_malloc(a, size);
@@ -3856,7 +3874,7 @@ sf_schemeset(struct sfscheme *s, struct sffield *f, char *opt)
 	return 0;
 }
 
-int
+static int
 sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 {
 	/* validate fields */
@@ -3936,7 +3954,8 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 	return 0;
 }
 
-int sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
+static int
+sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
 {
 	/* fields count */
 	uint32_t v = s->fields_count;
@@ -3972,7 +3991,8 @@ error:
 	return -1;
 }
 
-int sf_schemeload(struct sfscheme *s, struct ssa *a, char *buf, int size ssunused)
+static int
+sf_schemeload(struct sfscheme *s, struct ssa *a, char *buf, int size ssunused)
 {
 	/* count */
 	char *p = buf;
@@ -4010,7 +4030,7 @@ error:
 	return -1;
 }
 
-struct sffield*
+static struct sffield*
 sf_schemefind(struct sfscheme *s, char *name)
 {
 	int i;
@@ -4609,7 +4629,7 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 	return z;
 }
 
-struct phia_runtime {
+struct runtime {
 	struct srstatus *status;
 	struct srerror *e;
 	struct sfupsert *fmt_upsert;
@@ -4626,7 +4646,7 @@ struct phia_runtime {
 };
 
 static inline void
-sr_init(struct phia_runtime *r,
+sr_init(struct runtime *r,
         struct srstatus *status,
         struct srerror *e,
         struct ssa *a,
@@ -4656,7 +4676,7 @@ sr_init(struct phia_runtime *r,
 	r->stat        = stat;
 }
 
-static inline struct srzone *sr_zoneof(struct phia_runtime *r)
+static inline struct srzone *sr_zoneof(struct runtime *r)
 {
 	int p = ss_quotaused_percent(r->quota);
 	return sr_zonemap(r->zonemap, p);
@@ -4703,13 +4723,13 @@ struct srconfstmt {
 	struct srconf     *match;
 	struct ssbuf      *serialize;
 	void       *ptr;
-	struct phia_runtime         *r;
+	struct runtime         *r;
 };
 
-int sr_confexec(struct srconf*, struct srconfstmt*);
-int sr_conf_read(struct srconf*, struct srconfstmt*);
-int sr_conf_write(struct srconf*, struct srconfstmt*);
-int sr_conf_serialize(struct srconf*, struct srconfstmt*);
+static int sr_confexec(struct srconf*, struct srconfstmt*);
+static int sr_conf_read(struct srconf*, struct srconfstmt*);
+static int sr_conf_write(struct srconf*, struct srconfstmt*);
+static int sr_conf_serialize(struct srconf*, struct srconfstmt*);
 
 static inline struct srconf*
 sr_c(struct srconf **link, struct srconf **cp, srconff func,
@@ -4754,7 +4774,7 @@ sr_confvalue(struct srconfdump *v) {
 	return sr_confkey(v) + v->keysize;
 }
 
-int sr_conf_read(struct srconf *m, struct srconfstmt *s)
+static int sr_conf_read(struct srconf *m, struct srconfstmt *s)
 {
 	switch (m->type) {
 	case SS_U32:
@@ -4837,7 +4857,8 @@ bad_type:
 	                ss_typeof(m->type), s->path);
 }
 
-int sr_conf_write(struct srconf *m, struct srconfstmt *s)
+static int
+sr_conf_write(struct srconf *m, struct srconfstmt *s)
 {
 	if (m->flags & SR_RO) {
 		sr_error(s->r->e, "%s is read-only", s->path);
@@ -4936,7 +4957,8 @@ sr_conf_write_cast(enum sstype a, enum sstype b)
 	return 0;
 }
 
-int sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
+static int
+sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 {
 	char buf[128];
 	char name_function[] = "function";
@@ -5036,7 +5058,7 @@ sr_confexec_serialize(struct srconf *c, struct srconfstmt *stmt, char *root)
 	return 0;
 }
 
-int sr_confexec(struct srconf *start, struct srconfstmt *s)
+static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 {
 	if (s->op == SR_SERIALIZE)
 		return sr_confexec_serialize(start, s, NULL);
@@ -5387,12 +5409,12 @@ sv_size(struct sv *v) {
 }
 
 static inline char*
-sv_field(struct sv *v, struct phia_runtime *r, int pos, uint32_t *size) {
+sv_field(struct sv *v, struct runtime *r, int pos, uint32_t *size) {
 	return sf_fieldof(r->scheme, pos, v->i->pointer(v), size);
 }
 
 static inline uint64_t
-sv_hash(struct sv *v, struct phia_runtime *r) {
+sv_hash(struct sv *v, struct runtime *r) {
 	return sf_hash(r->scheme, sv_pointer(v));
 }
 
@@ -5406,7 +5428,7 @@ struct svv {
 	void *log;
 } sspacked;
 
-extern struct svif sv_vif;
+static struct svif sv_vif;
 
 static inline char*
 sv_vpointer(struct svv *v) {
@@ -5419,7 +5441,7 @@ sv_vsize(struct svv *v) {
 }
 
 static inline struct svv*
-sv_vbuild(struct phia_runtime *r, struct sfv *fields, uint32_t ts)
+sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
 {
 	int size = sf_writesize(r->scheme, fields);
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
@@ -5442,7 +5464,7 @@ sv_vbuild(struct phia_runtime *r, struct sfv *fields, uint32_t ts)
 }
 
 static inline struct svv*
-sv_vbuildraw(struct phia_runtime *r, char *src, int size, uint64_t ts)
+sv_vbuildraw(struct runtime *r, char *src, int size, uint64_t ts)
 {
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
 	if (ssunlikely(v == NULL))
@@ -5463,7 +5485,7 @@ sv_vbuildraw(struct phia_runtime *r, char *src, int size, uint64_t ts)
 }
 
 static inline struct svv*
-sv_vdup(struct phia_runtime *r, struct sv *src)
+sv_vdup(struct runtime *r, struct sv *src)
 {
 	struct svv *v = sv_vbuildraw(r, sv_pointer(src), sv_size(src), 0);
 	if (ssunlikely(v == NULL))
@@ -5480,7 +5502,7 @@ sv_vref(struct svv *v) {
 }
 
 static inline int
-sv_vunref(struct phia_runtime *r, struct svv *v)
+sv_vunref(struct runtime *r, struct svv *v)
 {
 	if (sslikely(--v->refs == 0)) {
 		uint32_t size = sv_vsize(v);
@@ -5504,10 +5526,10 @@ struct svref {
 	struct ssrbnode node;
 } sspacked;
 
-extern struct svif sv_refif;
+static struct svif sv_refif;
 
 static inline struct svref*
-sv_refnew(struct phia_runtime *r, struct svv *v)
+sv_refnew(struct runtime *r, struct svv *v)
 {
 	struct svref *ref = ss_malloc(r->aref, sizeof(struct svref));
 	if (ssunlikely(ref == NULL))
@@ -5520,7 +5542,7 @@ sv_refnew(struct phia_runtime *r, struct svv *v)
 }
 
 static inline void
-sv_reffree(struct phia_runtime *r, struct svref *v)
+sv_reffree(struct runtime *r, struct svref *v)
 {
 	while (v) {
 		struct svref *n = v->next;
@@ -5547,7 +5569,7 @@ sv_refvisible_gte(struct svref *v, uint64_t vlsn) {
 	return 0;
 }
 
-extern struct svif sv_upsertvif;
+static struct svif sv_upsertvif;
 
 struct svupsertnode {
 	uint64_t lsn;
@@ -5584,7 +5606,7 @@ sv_upsertinit(struct svupsert *u)
 }
 
 static inline void
-sv_upsertfree(struct svupsert *u, struct phia_runtime *r)
+sv_upsertfree(struct svupsert *u, struct runtime *r)
 {
 	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
 	int i = 0;
@@ -5612,7 +5634,7 @@ sv_upsertreset(struct svupsert *u)
 }
 
 static inline void
-sv_upsertgc(struct svupsert *u, struct phia_runtime *r, int wm_stack, int wm_buf)
+sv_upsertgc(struct svupsert *u, struct runtime *r, int wm_stack, int wm_buf)
 {
 	struct svupsertnode *n = (struct svupsertnode*)u->stack.s;
 	if (u->max >= wm_stack) {
@@ -5631,7 +5653,7 @@ sv_upsertgc(struct svupsert *u, struct phia_runtime *r, int wm_stack, int wm_buf
 }
 
 static inline int
-sv_upsertpush_raw(struct svupsert *u, struct phia_runtime *r,
+sv_upsertpush_raw(struct svupsert *u, struct runtime *r,
 		  char *pointer, int size,
                   uint8_t flags,
                   uint64_t lsn,
@@ -5664,7 +5686,7 @@ sv_upsertpush_raw(struct svupsert *u, struct phia_runtime *r,
 }
 
 static inline int
-sv_upsertpush(struct svupsert *u, struct phia_runtime *r, struct sv *v)
+sv_upsertpush(struct svupsert *u, struct runtime *r, struct sv *v)
 {
 	return sv_upsertpush_raw(u, r, sv_pointer(v),
 	                         sv_size(v),
@@ -5683,7 +5705,7 @@ sv_upsertpop(struct svupsert *u)
 }
 
 static inline int
-sv_upsertdo(struct svupsert *u, struct phia_runtime *r, struct svupsertnode *a,
+sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	    struct svupsertnode *b)
 {
 	assert(r->scheme->fields_count <= 16);
@@ -5769,7 +5791,7 @@ cleanup:
 }
 
 static inline int
-sv_upsert(struct svupsert *u, struct phia_runtime *r)
+sv_upsert(struct svupsert *u, struct runtime *r)
 {
 	assert(u->count >= 1 );
 	struct svupsertnode *f = ss_bufat(&u->stack,
@@ -5924,7 +5946,7 @@ sv_mergeinit(struct svmerge *m)
 }
 
 static inline int
-sv_mergeprepare(struct svmerge *m, struct phia_runtime *r, int count)
+sv_mergeprepare(struct svmerge *m, struct runtime *r, int count)
 {
 	int rc = ss_bufensure(&m->buf, r->a, sizeof(struct svmergesrc) * count);
 	if (ssunlikely(rc == -1))
@@ -5978,7 +6000,7 @@ struct svmergeiter {
 	struct svmerge *merge;
 	struct svmergesrc *src, *end;
 	struct svmergesrc *v;
-	struct phia_runtime *r;
+	struct runtime *r;
 } sspacked;
 
 static inline void
@@ -6101,7 +6123,7 @@ sv_mergeiter_next(struct ssiter *it)
 }
 
 static inline int
-sv_mergeiter_open(struct ssiter *i, struct phia_runtime *r, struct svmerge *m, enum ssorder o)
+sv_mergeiter_open(struct ssiter *i, struct runtime *r, struct svmerge *m, enum ssorder o)
 {
 	struct svmergeiter *im = (struct svmergeiter*)i->priv;
 	im->merge = m;
@@ -6125,7 +6147,7 @@ sv_mergeiter_has(struct ssiter *i)
 	return im->v != NULL;
 }
 
-static inline void*
+static inline void *
 sv_mergeiter_of(struct ssiter *i)
 {
 	struct svmergeiter *im = (struct svmergeiter*)i->priv;
@@ -6144,7 +6166,7 @@ sv_mergeisdup(struct ssiter *i)
 	return 0;
 }
 
-extern struct ssiterif sv_mergeiter;
+static struct ssiterif sv_mergeiter;
 
 struct svreaditer {
 	struct ssiter *merge;
@@ -6153,7 +6175,7 @@ struct svreaditer {
 	int nextdup;
 	int save_delete;
 	struct svupsert *u;
-	struct phia_runtime *r;
+	struct runtime *r;
 	struct sv *v;
 } sspacked;
 
@@ -6252,7 +6274,7 @@ sv_readiter_forward(struct ssiter *i)
 }
 
 static inline int
-sv_readiter_open(struct ssiter *i, struct phia_runtime *r, struct ssiter *iterator, struct svupsert *u,
+sv_readiter_open(struct ssiter *i, struct runtime *r, struct ssiter *iterator, struct svupsert *u,
                  uint64_t vlsn, int save_delete)
 {
 	struct svreaditer *im = (struct svreaditer*)i->priv;
@@ -6290,7 +6312,7 @@ sv_readiter_of(struct ssiter *i)
 	return im->v;
 }
 
-extern struct ssiterif sv_readiter;
+static struct ssiterif sv_readiter;
 
 struct svwriteiter {
 	uint64_t  vlsn;
@@ -6309,7 +6331,7 @@ struct svwriteiter {
 	struct sv       *v;
 	struct svupsert *u;
 	struct ssiter   *merge;
-	struct phia_runtime       *r;
+	struct runtime       *r;
 } sspacked;
 
 static inline int
@@ -6435,7 +6457,7 @@ sv_writeiter_next(struct ssiter *i)
 }
 
 static inline int
-sv_writeiter_open(struct ssiter *i, struct phia_runtime *r, struct ssiter *merge, struct svupsert *u,
+sv_writeiter_open(struct ssiter *i, struct runtime *r, struct ssiter *merge, struct svupsert *u,
                   uint64_t limit,
                   uint32_t sizev,
                   uint32_t expire,
@@ -6511,7 +6533,7 @@ sv_writeiter_is_duplicate(struct ssiter *i)
 	return im->vdup;
 }
 
-extern struct ssiterif sv_writeiter;
+static struct ssiterif sv_writeiter;
 
 struct svindexpos {
 	struct ssrbnode *node;
@@ -6530,13 +6552,20 @@ ss_rbget(sv_indexmatch,
                     (sscast(n, struct svref, node))->v->size,
                     key, keysize))
 
-int sv_indexinit(struct svindex*);
-int sv_indexfree(struct svindex*, struct phia_runtime*);
-int sv_indexupdate(struct svindex*, struct svindexpos*, struct svref*);
-struct svref *sv_indexget(struct svindex*, struct phia_runtime*, struct svindexpos*, struct svref*);
+static int
+sv_indexinit(struct svindex*);
+
+static int
+sv_indexfree(struct svindex*, struct runtime*);
+
+static int
+sv_indexupdate(struct svindex*, struct svindexpos*, struct svref*);
+
+static struct svref *
+sv_indexget(struct svindex*, struct runtime*, struct svindexpos*, struct svref*);
 
 static inline int
-sv_indexset(struct svindex *i, struct phia_runtime *r, struct svref  *v)
+sv_indexset(struct svindex *i, struct runtime *r, struct svref  *v)
 {
 	struct svindexpos pos;
 	sv_indexget(i, r, &pos, v);
@@ -6558,7 +6587,7 @@ struct svindexiter {
 } sspacked;
 
 static inline int
-sv_indexiter_open(struct ssiter *i, struct phia_runtime *r, struct svindex *index, enum ssorder o, void *key, int keysize)
+sv_indexiter_open(struct ssiter *i, struct runtime *r, struct svindex *index, enum ssorder o, void *key, int keysize)
 {
 	struct svindexiter *ii = (struct svindexiter*)i->priv;
 	ii->index   = index;
@@ -6671,12 +6700,12 @@ sv_indexiter_next(struct ssiter *i)
 	}
 }
 
-extern struct ssiterif sv_indexiter;
+static struct ssiterif sv_indexiter;
 
 ss_rbtruncate(sv_indextruncate,
-              sv_reffree((struct phia_runtime*)arg, sscast(n, struct svref, node)))
+              sv_reffree((struct runtime*)arg, sscast(n, struct svref, node)))
 
-int sv_indexinit(struct svindex *i)
+static int sv_indexinit(struct svindex *i)
 {
 	i->lsnmin = UINT64_MAX;
 	i->count  = 0;
@@ -6685,7 +6714,7 @@ int sv_indexinit(struct svindex *i)
 	return 0;
 }
 
-int sv_indexfree(struct svindex *i, struct phia_runtime *r)
+static int sv_indexfree(struct svindex *i, struct runtime *r)
 {
 	if (i->i.root)
 		sv_indextruncate(i->i.root, r);
@@ -6720,8 +6749,8 @@ sv_vset(struct svref *head, struct svref *v)
 	return head;
 }
 
-struct svref*
-sv_indexget(struct svindex *i, struct phia_runtime *r, struct svindexpos *p, struct svref *v)
+static struct svref*
+sv_indexget(struct svindex *i, struct runtime *r, struct svindexpos *p, struct svref *v)
 {
 	p->rc = sv_indexmatch(&i->i, r->scheme, sv_vpointer(v->v), v->v->size, &p->node);
 	if (p->rc == 0 && p->node)
@@ -6729,7 +6758,7 @@ sv_indexget(struct svindex *i, struct phia_runtime *r, struct svindexpos *p, str
 	return NULL;
 }
 
-int sv_indexupdate(struct svindex *i, struct svindexpos *p, struct svref *v)
+static int sv_indexupdate(struct svindex *i, struct svindexpos *p, struct svref *v)
 {
 	if (p->rc == 0 && p->node) {
 		struct svref *head = sscast(p->node, struct svref, node);
@@ -6746,7 +6775,7 @@ int sv_indexupdate(struct svindex *i, struct svindexpos *p, struct svref *v)
 	return 0;
 }
 
-struct ssiterif sv_indexiter =
+static struct ssiterif sv_indexiter =
 {
 	.close   = sv_indexiter_close,
 	.has     = sv_indexiter_has,
@@ -6754,7 +6783,7 @@ struct ssiterif sv_indexiter =
 	.next    = sv_indexiter_next
 };
 
-struct ssiterif sv_mergeiter =
+static struct ssiterif sv_mergeiter =
 {
 	.close = sv_mergeiter_close,
 	.has   = sv_mergeiter_has,
@@ -6762,7 +6791,7 @@ struct ssiterif sv_mergeiter =
 	.next  = sv_mergeiter_next
 };
 
-struct ssiterif sv_readiter =
+static struct ssiterif sv_readiter =
 {
 	.close   = sv_readiter_close,
 	.has     = sv_readiter_has,
@@ -6801,7 +6830,7 @@ sv_refifsize(struct sv *v) {
 	return ((struct svv*)((struct svref*)v->v)->v)->size;
 }
 
-struct svif sv_refif =
+static struct svif sv_refif =
 {
 	.flags     = sv_refifflags,
 	.lsn       = sv_refiflsn,
@@ -6846,7 +6875,7 @@ sv_upsertvifsize(struct sv *v) {
 	return ss_bufused(&n->buf);
 }
 
-struct svif sv_upsertvif =
+static struct svif sv_upsertvif =
 {
 	.flags     = sv_upsertvifflags,
 	.lsn       = sv_upsertviflsn,
@@ -6886,7 +6915,7 @@ sv_vifsize(struct sv *v) {
 	return ((struct svv*)v->v)->size;
 }
 
-struct svif sv_vif =
+static struct svif sv_vif =
 {
 	.flags     = sv_vifflags,
 	.lsn       = sv_viflsn,
@@ -6896,7 +6925,7 @@ struct svif sv_vif =
 	.size      = sv_vifsize
 };
 
-struct ssiterif sv_writeiter =
+static struct ssiterif sv_writeiter =
 {
 	.close   = sv_writeiter_close,
 	.has     = sv_writeiter_has,
@@ -6919,11 +6948,11 @@ struct sxv {
 struct sxvpool {
 	struct sxv *head;
 	int n;
-	struct phia_runtime *r;
+	struct runtime *r;
 };
 
 static inline void
-sx_vpool_init(struct sxvpool *p, struct phia_runtime *r)
+sx_vpool_init(struct sxvpool *p, struct runtime *r)
 {
 	p->head = NULL;
 	p->n = 0;
@@ -7081,7 +7110,7 @@ sx_vaborted(struct sxv *v)
 	return v->v->flags & SVCONFLICT;
 }
 
-extern struct svif sx_vif;
+static struct svif sx_vif;
 
 enum sxstate {
 	SXUNDEF,
@@ -7102,7 +7131,7 @@ struct sxindex {
 	uint32_t  dsn;
 	struct so       *object;
 	void     *ptr;
-	struct phia_runtime       *r;
+	struct runtime       *r;
 	struct rlist    link;
 };
 
@@ -7133,37 +7162,37 @@ struct sxmanager {
 	uint64_t    csn;
 	struct sxv        *gc;
 	struct sxvpool     pool;
-	struct phia_runtime         *r;
+	struct runtime         *r;
 };
 
-int       sx_managerinit(struct sxmanager*, struct phia_runtime*);
-int       sx_managerfree(struct sxmanager*);
-int       sx_indexinit(struct sxindex*, struct sxmanager*, struct phia_runtime*, struct so*, void*);
-int       sx_indexset(struct sxindex*, uint32_t);
-int       sx_indexfree(struct sxindex*, struct sxmanager*);
-struct sx       *sx_find(struct sxmanager*, uint64_t);
-void      sx_init(struct sxmanager*, struct sx*, struct svlog*);
-enum sxstate  sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*, uint64_t);
-void      sx_gc(struct sx*);
-enum sxstate   sx_prepare(struct sx*, sxpreparef, void*);
-enum sxstate   sx_commit(struct sx*);
-enum sxstate   sx_rollback(struct sx*);
-int       sx_set(struct sx*, struct sxindex*, struct svv*);
-int       sx_get(struct sx*, struct sxindex*, struct sv*, struct sv*);
-uint64_t  sx_min(struct sxmanager*);
-uint64_t  sx_max(struct sxmanager*);
-uint64_t  sx_vlsn(struct sxmanager*);
-enum sxstate   sx_set_autocommit(struct sxmanager*, struct sxindex*, struct sx*, struct svlog*, struct svv*);
-enum sxstate   sx_get_autocommit(struct sxmanager*, struct sxindex*);
+static int sx_managerinit(struct sxmanager*, struct runtime*);
+static int sx_managerfree(struct sxmanager*);
+static int sx_indexinit(struct sxindex*, struct sxmanager*, struct runtime*, struct so*, void*);
+static int sx_indexset(struct sxindex*, uint32_t);
+static int sx_indexfree(struct sxindex*, struct sxmanager*);
+static struct sx *sx_find(struct sxmanager*, uint64_t);
+static void sx_init(struct sxmanager*, struct sx*, struct svlog*);
+static enum sxstate sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*, uint64_t);
+static void sx_gc(struct sx*);
+static enum sxstate sx_prepare(struct sx*, sxpreparef, void*);
+static enum sxstate sx_commit(struct sx*);
+static enum sxstate sx_rollback(struct sx*);
+static int sx_set(struct sx*, struct sxindex*, struct svv*);
+static int sx_get(struct sx*, struct sxindex*, struct sv*, struct sv*);
+static uint64_t sx_min(struct sxmanager*);
+static uint64_t sx_max(struct sxmanager*);
+static uint64_t sx_vlsn(struct sxmanager*);
+static enum sxstate sx_set_autocommit(struct sxmanager*, struct sxindex*, struct sx*, struct svlog*, struct svv*);
+static enum sxstate sx_get_autocommit(struct sxmanager*, struct sxindex*);
 
-int sx_deadlock(struct sx*);
+static int sx_deadlock(struct sx*);
 
 static inline int
 sx_count(struct sxmanager *m) {
 	return m->count_rd + m->count_rw;
 }
 
-int sx_managerinit(struct sxmanager *m, struct phia_runtime *r)
+static int sx_managerinit(struct sxmanager *m, struct runtime *r)
 {
 	ss_rbinit(&m->i);
 	m->count_rd = 0;
@@ -7178,7 +7207,7 @@ int sx_managerinit(struct sxmanager *m, struct phia_runtime *r)
 	return 0;
 }
 
-int sx_managerfree(struct sxmanager *m)
+static int sx_managerfree(struct sxmanager *m)
 {
 	assert(sx_count(m) == 0);
 	sx_vpool_free(&m->pool);
@@ -7186,7 +7215,7 @@ int sx_managerfree(struct sxmanager *m)
 	return 0;
 }
 
-int sx_indexinit(struct sxindex *i, struct sxmanager *m, struct phia_runtime *r, struct so *object, void *ptr)
+static int sx_indexinit(struct sxindex *i, struct sxmanager *m, struct runtime *r, struct so *object, void *ptr)
 {
 	ss_rbinit(&i->i);
 	rlist_create(&i->link);
@@ -7198,7 +7227,7 @@ int sx_indexinit(struct sxindex *i, struct sxmanager *m, struct phia_runtime *r,
 	return 0;
 }
 
-int sx_indexset(struct sxindex *i, uint32_t dsn)
+static int sx_indexset(struct sxindex *i, uint32_t dsn)
 {
 	i->dsn = dsn;
 	return 0;
@@ -7215,14 +7244,14 @@ sx_indextruncate(struct sxindex *i, struct sxmanager *m)
 	ss_rbinit(&i->i);
 }
 
-int sx_indexfree(struct sxindex *i, struct sxmanager *m)
+static int sx_indexfree(struct sxindex *i, struct sxmanager *m)
 {
 	sx_indextruncate(i, m);
 	rlist_del(&i->link);
 	return 0;
 }
 
-uint64_t sx_min(struct sxmanager *m)
+static uint64_t sx_min(struct sxmanager *m)
 {
 	ss_spinlock(&m->lock);
 	uint64_t id = 0;
@@ -7235,7 +7264,7 @@ uint64_t sx_min(struct sxmanager *m)
 	return id;
 }
 
-uint64_t sx_max(struct sxmanager *m)
+static uint64_t sx_max(struct sxmanager *m)
 {
 	ss_spinlock(&m->lock);
 	uint64_t id = 0;
@@ -7248,7 +7277,7 @@ uint64_t sx_max(struct sxmanager *m)
 	return id;
 }
 
-uint64_t sx_vlsn(struct sxmanager *m)
+static uint64_t sx_vlsn(struct sxmanager *m)
 {
 	ss_spinlock(&m->lock);
 	uint64_t vlsn;
@@ -7265,7 +7294,7 @@ uint64_t sx_vlsn(struct sxmanager *m)
 
 ss_rbget(sx_matchtx, ss_cmp((sscast(n, struct sx, node))->id, load_u64(key)))
 
-struct sx *sx_find(struct sxmanager *m, uint64_t id)
+static struct sx *sx_find(struct sxmanager *m, uint64_t id)
 {
 	struct ssrbnode *n = NULL;
 	int rc = sx_matchtx(&m->i, NULL, (char*)&id, sizeof(id), &n);
@@ -7274,7 +7303,7 @@ struct sx *sx_find(struct sxmanager *m, uint64_t id)
 	return NULL;
 }
 
-void sx_init(struct sxmanager *m, struct sx *x, struct svlog *log)
+static void sx_init(struct sxmanager *m, struct sx *x, struct svlog *log)
 {
 	x->manager = m;
 	x->log = log;
@@ -7288,7 +7317,7 @@ sx_promote(struct sx *x, enum sxstate state)
 	return state;
 }
 
-enum sxstate
+static enum sxstate
 sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	 struct svlog *log, uint64_t vlsn)
 {
@@ -7379,7 +7408,7 @@ sx_garbage_collect(struct sxmanager *m)
 	m->gc = gc;
 }
 
-void sx_gc(struct sx *x)
+static void sx_gc(struct sx *x)
 {
 	struct sxmanager *m = x->manager;
 	sx_promote(x, SXUNDEF);
@@ -7426,7 +7455,7 @@ sx_rollback_svp(struct sx *x, struct ssiter *i, int free)
 	ss_quota(m->r->quota, SS_QREMOVE, gc);
 }
 
-enum sxstate sx_rollback(struct sx *x)
+static enum sxstate sx_rollback(struct sx *x)
 {
 	struct sxmanager *m = x->manager;
 	struct ssiter i;
@@ -7466,7 +7495,7 @@ sx_preparecb(struct sx *x, struct svlogv *v, uint64_t lsn, sxpreparef prepare, v
 	return 0;
 }
 
-enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
+static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 {
 	uint64_t lsn = sr_seq(x->manager->r->seq, SR_LSN);
 	/* proceed read-only transactions */
@@ -7507,7 +7536,7 @@ enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 	return sx_promote(x, SXPREPARE);
 }
 
-enum sxstate sx_commit(struct sx *x)
+static enum sxstate sx_commit(struct sx *x)
 {
 	assert(x->state == SXPREPARE);
 
@@ -7558,10 +7587,10 @@ ss_rbget(sx_match,
                     (sscast(n, struct sxv, node))->v->size,
                     key, keysize))
 
-int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
+static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 {
 	struct sxmanager *m = x->manager;
-	struct phia_runtime *r = m->r;
+	struct runtime *r = m->r;
 	if (! (version->flags & SVGET)) {
 		x->log_read = -1;
 	}
@@ -7640,7 +7669,7 @@ error:
 	return -1;
 }
 
-int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv *result)
+static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv *result)
 {
 	struct sxmanager *m = x->manager;
 	struct ssrbnode *n = NULL;
@@ -7682,7 +7711,7 @@ add:
 	return 0;
 }
 
-enum sxstate
+static enum sxstate
 sx_set_autocommit(struct sxmanager *m, struct sxindex *index,
 		  struct sx *x, struct svlog *log, struct svv *v)
 {
@@ -7712,7 +7741,7 @@ sx_set_autocommit(struct sxmanager *m, struct sxindex *index,
 	return s;
 }
 
-enum sxstate sx_get_autocommit(struct sxmanager *m, struct sxindex *index ssunused)
+static enum sxstate sx_get_autocommit(struct sxmanager *m, struct sxindex *index ssunused)
 {
 	sr_seq(m->r->seq, SR_TSNNEXT);
 	return SXCOMMIT;
@@ -7756,7 +7785,7 @@ sx_deadlock_unmark(struct rlist *mark)
 	}
 }
 
-int sx_deadlock(struct sx *t)
+static int sx_deadlock(struct sx *t)
 {
 	struct sxmanager *m = t->manager;
 	struct rlist mark;
@@ -7815,7 +7844,7 @@ sx_vifsize(struct sv *v) {
 	return ((struct sxv*)v->v)->v->size;
 }
 
-struct svif sx_vif =
+static struct svif sx_vif =
 {
 	.flags     = sx_vifflags,
 	.lsn       = sx_viflsn,
@@ -7844,7 +7873,7 @@ struct sldirid {
 	uint64_t id;
 };
 
-int sl_dirread(struct ssbuf*, struct ssa*, struct sldirtype*, char*);
+static int sl_dirread(struct ssbuf*, struct ssa*, struct sldirtype*, char*);
 
 struct slv {
 	uint32_t crc;
@@ -7855,7 +7884,7 @@ struct slv {
 	uint8_t  flags;
 } sspacked;
 
-extern struct svif sl_vif;
+static struct svif sl_vif;
 
 static inline uint32_t
 sl_vdsn(struct sv *v) {
@@ -7884,7 +7913,7 @@ struct slpool {
 	int gc;
 	int n;
 	struct ssiov iov;
-	struct phia_runtime *r;
+	struct runtime *r;
 };
 
 struct sltx {
@@ -7895,26 +7924,26 @@ struct sltx {
 	uint64_t svp;
 };
 
-int sl_poolinit(struct slpool*, struct phia_runtime*);
-int sl_poolopen(struct slpool*, struct slconf*);
-int sl_poolrotate(struct slpool*);
-int sl_poolrotate_ready(struct slpool*);
-int sl_poolshutdown(struct slpool*);
-int sl_poolgc_enable(struct slpool*, int);
-int sl_poolgc(struct slpool*);
-int sl_poolfiles(struct slpool*);
-int sl_poolcopy(struct slpool*, char*, struct ssbuf*);
+static int sl_poolinit(struct slpool*, struct runtime*);
+static int sl_poolopen(struct slpool*, struct slconf*);
+static int sl_poolrotate(struct slpool*);
+static int sl_poolrotate_ready(struct slpool*);
+static int sl_poolshutdown(struct slpool*);
+static int sl_poolgc_enable(struct slpool*, int);
+static int sl_poolgc(struct slpool*);
+static int sl_poolfiles(struct slpool*);
+static int sl_poolcopy(struct slpool*, char*, struct ssbuf*);
 
-int sl_begin(struct slpool*, struct sltx*, uint64_t, int);
-int sl_commit(struct sltx*);
-int sl_rollback(struct sltx*);
-int sl_write(struct sltx*, struct svlog*);
+static int sl_begin(struct slpool*, struct sltx*, uint64_t, int);
+static int sl_commit(struct sltx*);
+static int sl_rollback(struct sltx*);
+static int sl_write(struct sltx*, struct svlog*);
 
-int sl_iter_open(struct ssiter *i, struct phia_runtime*, struct ssfile*, int);
-int sl_iter_error(struct ssiter*);
-int sl_iter_continue(struct ssiter*);
+static int sl_iter_open(struct ssiter *i, struct runtime*, struct ssfile*, int);
+static int sl_iter_error(struct ssiter*);
+static int sl_iter_continue(struct ssiter*);
 
-extern struct ssiterif sl_iter;
+static struct ssiterif sl_iter;
 
 static inline struct sl*
 sl_alloc(struct slpool *p, uint64_t id)
@@ -7999,7 +8028,7 @@ error:
 	return NULL;
 }
 
-int sl_poolinit(struct slpool *p, struct phia_runtime *r)
+static int sl_poolinit(struct slpool *p, struct runtime *r)
 {
 	ss_spinlockinit(&p->lock);
 	rlist_create(&p->list);
@@ -8063,7 +8092,7 @@ sl_poolrecover(struct slpool *p)
 	return 0;
 }
 
-int sl_poolopen(struct slpool *p, struct slconf *conf)
+static int sl_poolopen(struct slpool *p, struct slconf *conf)
 {
 	p->conf = conf;
 	if (ssunlikely(! p->conf->enable))
@@ -8079,7 +8108,7 @@ int sl_poolopen(struct slpool *p, struct slconf *conf)
 	return 0;
 }
 
-int sl_poolrotate(struct slpool *p)
+static int sl_poolrotate(struct slpool *p)
 {
 	if (ssunlikely(! p->conf->enable))
 		return 0;
@@ -8111,7 +8140,7 @@ int sl_poolrotate(struct slpool *p)
 	return 0;
 }
 
-int sl_poolrotate_ready(struct slpool *p)
+static int sl_poolrotate_ready(struct slpool *p)
 {
 	if (ssunlikely(! p->conf->enable))
 		return 0;
@@ -8123,7 +8152,7 @@ int sl_poolrotate_ready(struct slpool *p)
 	return ready;
 }
 
-int sl_poolshutdown(struct slpool *p)
+static int sl_poolshutdown(struct slpool *p)
 {
 	int rcret = 0;
 	int rc;
@@ -8157,7 +8186,7 @@ sl_gc(struct slpool *p, struct sl *l)
 	return 1;
 }
 
-int sl_poolgc_enable(struct slpool *p, int enable)
+static int sl_poolgc_enable(struct slpool *p, int enable)
 {
 	ss_spinlock(&p->lock);
 	p->gc = enable;
@@ -8165,7 +8194,7 @@ int sl_poolgc_enable(struct slpool *p, int enable)
 	return 0;
 }
 
-int sl_poolgc(struct slpool *p)
+static int sl_poolgc(struct slpool *p)
 {
 	if (ssunlikely(! p->conf->enable))
 		return 0;
@@ -8196,7 +8225,7 @@ int sl_poolgc(struct slpool *p)
 	return 0;
 }
 
-int sl_poolfiles(struct slpool *p)
+static int sl_poolfiles(struct slpool *p)
 {
 	ss_spinlock(&p->lock);
 	int n = p->n;
@@ -8204,7 +8233,7 @@ int sl_poolfiles(struct slpool *p)
 	return n;
 }
 
-int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
+static int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
 {
 	struct rlist list;
 	rlist_create(&list);
@@ -8267,7 +8296,7 @@ int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
 	return 0;
 }
 
-int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
+static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
 {
 	ss_spinlock(&p->lock);
 	if (sslikely(lsn == 0)) {
@@ -8294,7 +8323,7 @@ int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
 	return 0;
 }
 
-int sl_commit(struct sltx *t)
+static int sl_commit(struct sltx *t)
 {
 	if (t->p->conf->enable)
 		ss_mutexunlock(&t->l->filelock);
@@ -8302,7 +8331,7 @@ int sl_commit(struct sltx *t)
 	return 0;
 }
 
-int sl_rollback(struct sltx *t)
+static int sl_rollback(struct sltx *t)
 {
 	int rc = 0;
 	if (t->p->conf->enable) {
@@ -8426,7 +8455,7 @@ sl_writestmt_multi(struct sltx *t, struct svlog *vlog)
 	return 0;
 }
 
-int sl_write(struct sltx *t, struct svlog *vlog)
+static int sl_write(struct sltx *t, struct svlog *vlog)
 {
 	int count = sv_logcount_write(vlog);
 	/* fast path for log-disabled, recover or
@@ -8516,7 +8545,7 @@ sl_dircmp(const void *p1, const void *p2)
 	return (a->id > b->id)? 1: -1;
 }
 
-int sl_dirread(struct ssbuf *list, struct ssa *a, struct sldirtype *types, char *dir)
+static int sl_dirread(struct ssbuf *list, struct ssa *a, struct sldirtype *types, char *dir)
 {
 	DIR *d = opendir(dir);
 	if (ssunlikely(d == NULL))
@@ -8575,7 +8604,7 @@ struct sliter {
 	uint32_t count;
 	uint32_t pos;
 	struct sv current;
-	struct phia_runtime *r;
+	struct runtime *r;
 } sspacked;
 
 static void
@@ -8642,7 +8671,7 @@ sl_iternext_of(struct sliter *i, struct slv *next, int validate)
 	return 1;
 }
 
-int sl_itercontinue_of(struct sliter *i)
+static int sl_itercontinue_of(struct sliter *i)
 {
 	if (ssunlikely(i->error))
 		return -1;
@@ -8684,7 +8713,7 @@ sl_iterprepare(struct sliter *i)
 	return 0;
 }
 
-int sl_iter_open(struct ssiter *i, struct phia_runtime *r, struct ssfile *file, int validate)
+static int sl_iter_open(struct ssiter *i, struct runtime *r, struct ssfile *file, int validate)
 {
 	struct sliter *li = (struct sliter*)i->priv;
 	memset(li, 0, sizeof(*li));
@@ -8745,7 +8774,7 @@ sl_iter_next(struct ssiter *i)
 	sl_iternext_of(li, next, 1);
 }
 
-struct ssiterif sl_iter =
+static struct ssiterif sl_iter =
 {
 	.close   = sl_iter_close,
 	.has     = sl_iter_has,
@@ -8753,13 +8782,13 @@ struct ssiterif sl_iter =
 	.next    = sl_iter_next
 };
 
-int sl_iter_error(struct ssiter *i)
+static int sl_iter_error(struct ssiter *i)
 {
 	struct sliter *li = (struct sliter*)i->priv;
 	return li->error;
 }
 
-int sl_iter_continue(struct ssiter *i)
+static int sl_iter_continue(struct ssiter *i)
 {
 	struct sliter *li = (struct sliter*)i->priv;
 	return sl_itercontinue_of(li);
@@ -8790,7 +8819,7 @@ sl_vifsize(struct sv *v) {
 	return ((struct slv*)v->v)->size;
 }
 
-struct svif sl_vif =
+static struct svif sl_vif =
 {
 	.flags     = sl_vifflags,
 	.lsn       = sl_viflsn,
@@ -8824,8 +8853,8 @@ struct sdv {
 	uint32_t size;
 } sspacked;
 
-extern struct svif sd_vif;
-extern struct svif sd_vrawif;
+static struct svif sd_vif;
+static struct svif sd_vrawif;
 
 struct sdpageheader {
 	uint32_t crc;
@@ -8881,7 +8910,7 @@ sd_pagesparse_field(struct sdpage *p, struct sdv *v, int pos, uint32_t *size)
 }
 
 static inline void
-sd_pagesparse_convert(struct sdpage *p, struct phia_runtime *r, struct sdv *v, char *dest)
+sd_pagesparse_convert(struct sdpage *p, struct runtime *r, struct sdv *v, char *dest)
 {
 	char *ptr = dest;
 	memcpy(ptr, v, sizeof(struct sdv));
@@ -8905,7 +8934,7 @@ struct sdpageiter {
 	enum ssorder order;
 	void *key;
 	int keysize;
-	struct phia_runtime *r;
+	struct runtime *r;
 } sspacked;
 
 static inline void
@@ -8929,7 +8958,7 @@ sd_pageiter_end(struct sdpageiter *i)
 }
 
 static inline int
-sd_pageiter_cmp(struct sdpageiter *i, struct phia_runtime *r, struct sdv *v)
+sd_pageiter_cmp(struct sdpageiter *i, struct runtime *r, struct sdv *v)
 {
 	if (sslikely(r->fmt_storage == SF_RAW)) {
 		return sf_compare(r->scheme, sd_pagepointer(i->page, v),
@@ -9062,7 +9091,7 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 }
 
 static inline int
-sd_pageiter_open(struct ssiter *i, struct phia_runtime *r, struct ssbuf *xfbuf, struct sdpage *page, enum ssorder o,
+sd_pageiter_open(struct ssiter *i, struct runtime *r, struct ssbuf *xfbuf, struct sdpage *page, enum ssorder o,
                  void *key, int keysize)
 {
 	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
@@ -9154,7 +9183,7 @@ sd_pageiter_next(struct ssiter *i)
 	sd_pageiter_result(pi);
 }
 
-extern struct ssiterif sd_pageiter;
+static struct ssiterif sd_pageiter;
 
 struct sdbuildref {
 	uint32_t m, msize;
@@ -9175,10 +9204,10 @@ struct sdbuild {
 	struct ssht tracker;
 };
 
-void sd_buildinit(struct sdbuild*);
-void sd_buildfree(struct sdbuild*, struct phia_runtime*);
-void sd_buildreset(struct sdbuild*, struct phia_runtime*);
-void sd_buildgc(struct sdbuild*, struct phia_runtime*, int);
+static void sd_buildinit(struct sdbuild*);
+static void sd_buildfree(struct sdbuild*, struct runtime*);
+static void sd_buildreset(struct sdbuild*, struct runtime*);
+static void sd_buildgc(struct sdbuild*, struct runtime*, int);
 
 static inline struct sdbuildref*
 sd_buildref(struct sdbuild *b) {
@@ -9213,10 +9242,10 @@ sd_buildmaxkey(struct sdbuild *b) {
 	return b->v.s + r->v + sd_buildmax(b)->offset;
 }
 
-int sd_buildbegin(struct sdbuild*, struct phia_runtime*, int, int, int, int, struct ssfilterif*);
-int sd_buildend(struct sdbuild*, struct phia_runtime*);
-int sd_buildcommit(struct sdbuild*, struct phia_runtime*);
-int sd_buildadd(struct sdbuild*, struct phia_runtime*, struct sv*, uint32_t);
+static int sd_buildbegin(struct sdbuild*, struct runtime*, int, int, int, int, struct ssfilterif*);
+static int sd_buildend(struct sdbuild*, struct runtime*);
+static int sd_buildcommit(struct sdbuild*, struct runtime*);
+static int sd_buildadd(struct sdbuild*, struct runtime*, struct sv*, uint32_t);
 
 #define SD_INDEXEXT_AMQF 1
 
@@ -9283,7 +9312,7 @@ sd_indexinit(struct sdindex *i) {
 }
 
 static inline void
-sd_indexfree(struct sdindex *i, struct phia_runtime *r) {
+sd_indexfree(struct sdindex *i, struct runtime *r) {
 	ss_buffree(&i->i, r->a);
 	ss_buffree(&i->v, r->a);
 }
@@ -9341,10 +9370,10 @@ sd_indexamqf(struct sdindex *i) {
 	return (struct sdindexamqf*)(i->i.s + sizeof(struct sdindexheader) + h->size);
 }
 
-int sd_indexbegin(struct sdindex*, struct phia_runtime*);
-int sd_indexcommit(struct sdindex*, struct phia_runtime*, struct sdid*, struct ssqf*, uint64_t);
-int sd_indexadd(struct sdindex*, struct phia_runtime*, struct sdbuild*, uint64_t);
-int sd_indexcopy(struct sdindex*, struct phia_runtime*, struct sdindexheader*);
+static int sd_indexbegin(struct sdindex*, struct runtime*);
+static int sd_indexcommit(struct sdindex*, struct runtime*, struct sdid*, struct ssqf*, uint64_t);
+static int sd_indexadd(struct sdindex*, struct runtime*, struct sdbuild*, uint64_t);
+static int sd_indexcopy(struct sdindex*, struct runtime*, struct sdindexheader*);
 
 struct sdindexiter {
 	struct sdindex *index;
@@ -9353,7 +9382,7 @@ struct sdindexiter {
 	enum ssorder cmp;
 	void *key;
 	int keysize;
-	struct phia_runtime *r;
+	struct runtime *r;
 } sspacked;
 
 static inline int
@@ -9382,7 +9411,7 @@ sd_indexiter_route(struct sdindexiter *i)
 }
 
 static inline int
-sd_indexiter_open(struct ssiter *i, struct phia_runtime *r, struct sdindex *index, enum ssorder o, void *key, int keysize)
+sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index, enum ssorder o, void *key, int keysize)
 {
 	struct sdindexiter *ii = (struct sdindexiter*)i->priv;
 	ii->r       = r;
@@ -9483,7 +9512,7 @@ sd_indexiter_next(struct ssiter *i)
 		ii->v = sd_indexpage(ii->index, ii->pos);
 }
 
-extern struct ssiterif sd_indexiter;
+static struct ssiterif sd_indexiter;
 
 #define SD_SEALED 1
 
@@ -9567,7 +9596,7 @@ sd_cinit(struct sdc *sc)
 }
 
 static inline void
-sd_cfree(struct sdc *sc, struct phia_runtime *r)
+sd_cfree(struct sdc *sc, struct runtime *r)
 {
 	sd_buildfree(&sc->build, r);
 	ss_qffree(&sc->qf, r->a);
@@ -9588,7 +9617,7 @@ sd_cfree(struct sdc *sc, struct phia_runtime *r)
 }
 
 static inline void
-sd_cgc(struct sdc *sc, struct phia_runtime *r, int wm)
+sd_cgc(struct sdc *sc, struct runtime *r, int wm)
 {
 	sd_buildgc(&sc->build, r, wm);
 	ss_qfgc(&sc->qf, r->a, wm);
@@ -9606,7 +9635,7 @@ sd_cgc(struct sdc *sc, struct phia_runtime *r, int wm)
 }
 
 static inline int
-sd_censure(struct sdc *c, struct phia_runtime *r, int count)
+sd_censure(struct sdc *c, struct runtime *r, int count)
 {
 	if (c->count < count) {
 		while (count-- >= 0) {
@@ -9647,7 +9676,7 @@ struct sdmerge {
 	struct ssiter      *merge;
 	struct ssiter      i;
 	struct sdmergeconf *conf;
-	struct phia_runtime          *r;
+	struct runtime          *r;
 	struct sdbuild     *build;
 	struct ssqf        *qf;
 	uint64_t    processed;
@@ -9656,12 +9685,13 @@ struct sdmerge {
 	int         resume;
 };
 
-int sd_mergeinit(struct sdmerge*, struct phia_runtime*, struct ssiter*, struct sdbuild*, struct ssqf*, struct svupsert*,
-                 struct sdmergeconf*);
-int sd_mergefree(struct sdmerge*);
-int sd_merge(struct sdmerge*);
-int sd_mergepage(struct sdmerge*, uint64_t);
-int sd_mergecommit(struct sdmerge*, struct sdid*, uint64_t);
+static int
+sd_mergeinit(struct sdmerge*, struct runtime*, struct ssiter*, struct sdbuild*, struct ssqf*, struct svupsert*,
+	     struct sdmergeconf*);
+static int sd_mergefree(struct sdmerge*);
+static int sd_merge(struct sdmerge*);
+static int sd_mergepage(struct sdmerge*, uint64_t);
+static int sd_mergecommit(struct sdmerge*, struct sdid*, uint64_t);
 
 struct sdreadarg {
 	struct sdindex    *index;
@@ -9681,7 +9711,7 @@ struct sdreadarg {
 	int         use_mmap_copy;
 	int         use_compression;
 	struct ssfilterif *compression_if;
-	struct phia_runtime         *r;
+	struct runtime         *r;
 };
 
 struct sdread {
@@ -9695,7 +9725,7 @@ static inline int
 sd_read_page(struct sdread *i, struct sdindexpage *ref)
 {
 	struct sdreadarg *arg = &i->ra;
-	struct phia_runtime *r = arg->r;
+	struct runtime *r = arg->r;
 
 	ss_bufreset(arg->buf);
 	int rc = ss_bufensure(arg->buf, r->a, ref->sizeorigin);
@@ -9895,19 +9925,17 @@ sd_read_stat(struct ssiter *iptr)
 	return i->reads;
 }
 
-extern struct ssiterif sd_read;
+static struct ssiterif sd_read;
 
-int sd_commitpage(struct sdbuild*, struct phia_runtime*, struct ssbuf*);
+static int sd_writeseal(struct runtime*, struct ssfile*, struct ssblob*);
+static int sd_writepage(struct runtime*, struct ssfile*, struct ssblob*, struct sdbuild*);
+static int sd_writeindex(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*);
+static int sd_seal(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*, uint64_t);
 
-int sd_writeseal(struct phia_runtime*, struct ssfile*, struct ssblob*);
-int sd_writepage(struct phia_runtime*, struct ssfile*, struct ssblob*, struct sdbuild*);
-int sd_writeindex(struct phia_runtime*, struct ssfile*, struct ssblob*, struct sdindex*);
-int sd_seal(struct phia_runtime*, struct ssfile*, struct ssblob*, struct sdindex*, uint64_t);
+static int sd_recover_open(struct ssiter*, struct runtime*, struct ssfile*);
+static int sd_recover_complete(struct ssiter*);
 
-int sd_recover_open(struct ssiter*, struct phia_runtime*, struct ssfile*);
-int sd_recover_complete(struct ssiter*);
-
-extern struct ssiterif sd_recover;
+static struct ssiterif sd_recover;
 
 struct sdschemeheader {
 	uint32_t crc;
@@ -9931,7 +9959,7 @@ sd_schemeinit(struct sdscheme *c) {
 }
 
 static inline void
-sd_schemefree(struct sdscheme *c, struct phia_runtime *r) {
+sd_schemefree(struct sdscheme *c, struct runtime *r) {
 	ss_buffree(&c->buf, r->a);
 }
 
@@ -9953,11 +9981,11 @@ sd_schemeu64(struct sdschemeopt *o) {
 	return load_u64((char*)o + sizeof(struct sdschemeopt));
 }
 
-int sd_schemebegin(struct sdscheme*, struct phia_runtime*);
-int sd_schemeadd(struct sdscheme*, struct phia_runtime*, uint8_t, enum sstype, void*, uint32_t);
-int sd_schemecommit(struct sdscheme*);
-int sd_schemewrite(struct sdscheme*, struct phia_runtime*, char*, int);
-int sd_schemerecover(struct sdscheme*, struct phia_runtime*, char*);
+static int sd_schemebegin(struct sdscheme*, struct runtime*);
+static int sd_schemeadd(struct sdscheme*, struct runtime*, uint8_t, enum sstype, void*, uint32_t);
+static int sd_schemecommit(struct sdscheme*);
+static int sd_schemewrite(struct sdscheme*, struct runtime*, char*, int);
+static int sd_schemerecover(struct sdscheme*, struct runtime*, char*);
 
 struct sdschemeiter {
 	struct sdscheme *c;
@@ -9965,7 +9993,7 @@ struct sdschemeiter {
 } sspacked;
 
 static inline int
-sd_schemeiter_open(struct ssiter *i, struct phia_runtime *r, struct sdscheme *c, int validate)
+sd_schemeiter_open(struct ssiter *i, struct runtime *r, struct sdscheme *c, int validate)
 {
 	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
 	ci->c = c;
@@ -10015,7 +10043,7 @@ sd_schemeiter_next(struct ssiter *i)
 	ci->p = (char*)o + sizeof(struct sdschemeopt) + o->size;
 }
 
-extern struct ssiterif sd_schemeiter;
+static struct ssiterif sd_schemeiter;
 
 struct sdsnapshotheader {
 	uint32_t crc;
@@ -10054,7 +10082,7 @@ sd_snapshot_init(struct sdsnapshot *s)
 }
 
 static inline void
-sd_snapshot_free(struct sdsnapshot *s, struct phia_runtime *r)
+sd_snapshot_free(struct sdsnapshot *s, struct runtime *r)
 {
 	ss_buffree(&s->buf, r->a);
 }
@@ -10069,11 +10097,11 @@ sd_snapshot_is(struct sdsnapshot *s) {
 	return s->buf.s != NULL;
 }
 
-int sd_snapshot_begin(struct sdsnapshot*, struct phia_runtime*);
-int sd_snapshot_add(struct sdsnapshot*, struct phia_runtime*, uint64_t, uint64_t, uint32_t, uint64_t);
-int sd_snapshot_addbranch(struct sdsnapshot*, struct phia_runtime*, struct sdindexheader*);
-int sd_snapshot_commit(struct sdsnapshot*, uint64_t, uint64_t, uint64_t, uint64_t,
-                       uint64_t, uint64_t);
+static int sd_snapshot_begin(struct sdsnapshot*, struct runtime*);
+static int sd_snapshot_add(struct sdsnapshot*, struct runtime*, uint64_t, uint64_t, uint32_t, uint64_t);
+static int sd_snapshot_addbranch(struct sdsnapshot*, struct runtime*, struct sdindexheader*);
+static int sd_snapshot_commit(struct sdsnapshot*, uint64_t, uint64_t, uint64_t, uint64_t,
+			      uint64_t, uint64_t);
 
 struct sdsnapshotiter {
 	struct sdsnapshot *s;
@@ -10082,7 +10110,7 @@ struct sdsnapshotiter {
 } sspacked;
 
 static inline int
-sd_snapshotiter_open(struct ssiter *i, struct phia_runtime *r, struct sdsnapshot *s)
+sd_snapshotiter_open(struct ssiter *i, struct runtime *r, struct sdsnapshot *s)
 {
 	struct sdsnapshotiter *si = (struct sdsnapshotiter*)i->priv;
 	si->s = s;
@@ -10138,9 +10166,9 @@ sd_snapshotiter_next(struct ssiter *i)
 	si->n = NULL;
 }
 
-extern struct ssiterif sd_snapshotiter;
+static struct ssiterif sd_snapshotiter;
 
-void sd_buildinit(struct sdbuild *b)
+static void sd_buildinit(struct sdbuild *b)
 {
 	memset(&b->tracker, 0, sizeof(b->tracker));
 	ss_bufinit(&b->list);
@@ -10157,7 +10185,7 @@ void sd_buildinit(struct sdbuild *b)
 }
 
 static inline void
-sd_buildfree_tracker(struct sdbuild *b, struct phia_runtime *r)
+sd_buildfree_tracker(struct sdbuild *b, struct runtime *r)
 {
 	if (b->tracker.count == 0)
 		return;
@@ -10171,7 +10199,7 @@ sd_buildfree_tracker(struct sdbuild *b, struct phia_runtime *r)
 	b->tracker.count = 0;
 }
 
-void sd_buildfree(struct sdbuild *b, struct phia_runtime *r)
+static void sd_buildfree(struct sdbuild *b, struct runtime *r)
 {
 	sd_buildfree_tracker(b, r);
 	ss_htfree(&b->tracker, r->a);
@@ -10182,7 +10210,7 @@ void sd_buildfree(struct sdbuild *b, struct phia_runtime *r)
 	ss_buffree(&b->k, r->a);
 }
 
-void sd_buildreset(struct sdbuild *b, struct phia_runtime *r)
+static void sd_buildreset(struct sdbuild *b, struct runtime *r)
 {
 	sd_buildfree_tracker(b, r);
 	ss_htreset(&b->tracker);
@@ -10195,7 +10223,7 @@ void sd_buildreset(struct sdbuild *b, struct phia_runtime *r)
 	b->vmax = 0;
 }
 
-void sd_buildgc(struct sdbuild *b, struct phia_runtime *r, int wm)
+static void sd_buildgc(struct sdbuild *b, struct runtime *r, int wm)
 {
 	sd_buildfree_tracker(b, r);
 	ss_htreset(&b->tracker);
@@ -10208,11 +10236,12 @@ void sd_buildgc(struct sdbuild *b, struct phia_runtime *r, int wm)
 	b->vmax = 0;
 }
 
-int sd_buildbegin(struct sdbuild *b, struct phia_runtime *r, int crc,
-                  int timestamp,
-                  int compress_dup,
-                  int compress,
-                  struct ssfilterif *compress_if)
+static int
+sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
+	      int timestamp,
+	      int compress_dup,
+	      int compress,
+	      struct ssfilterif *compress_if)
 {
 	b->crc = crc;
 	b->compress_dup = compress_dup;
@@ -10266,7 +10295,7 @@ ss_htsearch(sd_buildsearch,
                     sscast(t->i[pos], struct sdbuildkey, node)->offsetstart, key, size) == 0))
 
 static inline int
-sd_buildadd_sparse(struct sdbuild *b, struct phia_runtime *r, struct sv *v)
+sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 {
 	int i = 0;
 	for (; i < r->scheme->fields_count; i++)
@@ -10332,7 +10361,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct phia_runtime *r, struct sv *v)
 }
 
 static inline int
-sd_buildadd_raw(struct sdbuild *b, struct phia_runtime *r, struct sv *v, uint32_t size)
+sd_buildadd_raw(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t size)
 {
 	int rc = ss_bufensure(&b->v, r->a, size);
 	if (ssunlikely(rc == -1))
@@ -10342,7 +10371,7 @@ sd_buildadd_raw(struct sdbuild *b, struct phia_runtime *r, struct sv *v, uint32_
 	return 0;
 }
 
-int sd_buildadd(struct sdbuild *b, struct phia_runtime *r, struct sv *v, uint32_t flags)
+int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t flags)
 {
 	/* prepare document metadata */
 	int rc = ss_bufensure(&b->m, r->a, sizeof(struct sdv));
@@ -10390,7 +10419,7 @@ int sd_buildadd(struct sdbuild *b, struct phia_runtime *r, struct sv *v, uint32_
 }
 
 static inline int
-sd_buildcompress(struct sdbuild *b, struct phia_runtime *r)
+sd_buildcompress(struct sdbuild *b, struct runtime *r)
 {
 	assert(b->compress_if != &ss_nonefilter);
 	/* reserve header */
@@ -10427,7 +10456,7 @@ error:
 	return -1;
 }
 
-int sd_buildend(struct sdbuild *b, struct phia_runtime *r)
+static int sd_buildend(struct sdbuild *b, struct runtime *r)
 {
 	/* update sizes */
 	struct sdbuildref *ref = sd_buildref(b);
@@ -10466,7 +10495,7 @@ int sd_buildend(struct sdbuild *b, struct phia_runtime *r)
 	return 0;
 }
 
-int sd_buildcommit(struct sdbuild *b, struct phia_runtime *r)
+static int sd_buildcommit(struct sdbuild *b, struct runtime *r)
 {
 	if (b->compress_dup)
 		sd_buildfree_tracker(b, r);
@@ -10479,7 +10508,7 @@ int sd_buildcommit(struct sdbuild *b, struct phia_runtime *r)
 	return 0;
 }
 
-int sd_indexbegin(struct sdindex *i, struct phia_runtime *r)
+static int sd_indexbegin(struct sdindex *i, struct runtime *r)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexheader));
 	if (ssunlikely(rc == -1))
@@ -10508,7 +10537,7 @@ int sd_indexbegin(struct sdindex *i, struct phia_runtime *r)
 	return 0;
 }
 
-int sd_indexcommit(struct sdindex *i, struct phia_runtime *r, struct sdid *id, struct ssqf *qf, uint64_t offset)
+static int sd_indexcommit(struct sdindex *i, struct runtime *r, struct sdid *id, struct ssqf *qf, uint64_t offset)
 {
 	int size = ss_bufused(&i->v);
 	int size_extension = 0;
@@ -10544,7 +10573,7 @@ int sd_indexcommit(struct sdindex *i, struct phia_runtime *r, struct sdid *id, s
 }
 
 static inline int
-sd_indexadd_raw(struct sdindex *i, struct phia_runtime *r, struct sdindexpage *p, char *min, char *max)
+sd_indexadd_raw(struct sdindex *i, struct runtime *r, struct sdindexpage *p, char *min, char *max)
 {
 	/* reformat document to exclude non-key fields */
 	p->sizemin = sf_comparable_size(r->scheme, min);
@@ -10560,7 +10589,7 @@ sd_indexadd_raw(struct sdindex *i, struct phia_runtime *r, struct sdindexpage *p
 }
 
 static inline int
-sd_indexadd_sparse(struct sdindex *i, struct phia_runtime *r, struct sdbuild *build, struct sdindexpage *p, char *min, char *max)
+sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, struct sdindexpage *p, char *min, char *max)
 {
 	struct sfv fields[16];
 
@@ -10625,7 +10654,7 @@ sd_indexadd_sparse(struct sdindex *i, struct phia_runtime *r, struct sdbuild *bu
 	return 0;
 }
 
-int sd_indexadd(struct sdindex *i, struct phia_runtime *r, struct sdbuild *build, uint64_t offset)
+static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *build, uint64_t offset)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexpage));
 	if (ssunlikely(rc == -1))
@@ -10685,7 +10714,7 @@ int sd_indexadd(struct sdindex *i, struct phia_runtime *r, struct sdbuild *build
 	return 0;
 }
 
-int sd_indexcopy(struct sdindex *i, struct phia_runtime *r, struct sdindexheader *h)
+static int sd_indexcopy(struct sdindex *i, struct runtime *r, struct sdindexheader *h)
 {
 	int size = sd_indexsize_ext(h);
 	int rc = ss_bufensure(&i->i, r->a, size);
@@ -10697,7 +10726,7 @@ int sd_indexcopy(struct sdindex *i, struct phia_runtime *r, struct sdindexheader
 	return 0;
 }
 
-struct ssiterif sd_indexiter =
+static struct ssiterif sd_indexiter =
 {
 	.close = sd_indexiter_close,
 	.has   = sd_indexiter_has,
@@ -10705,8 +10734,10 @@ struct ssiterif sd_indexiter =
 	.next  = sd_indexiter_next
 };
 
-int sd_mergeinit(struct sdmerge *m, struct phia_runtime *r, struct ssiter *i, struct sdbuild *build, struct ssqf *qf,
-                 struct svupsert *upsert, struct sdmergeconf *conf)
+static int
+sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
+	     struct sdbuild *build, struct ssqf *qf, struct svupsert *upsert,
+	     struct sdmergeconf *conf)
 {
 	m->conf      = conf;
 	m->build     = build;
@@ -10735,7 +10766,7 @@ int sd_mergeinit(struct sdmerge *m, struct phia_runtime *r, struct ssiter *i, st
 	return 0;
 }
 
-int sd_mergefree(struct sdmerge *m)
+static int sd_mergefree(struct sdmerge *m)
 {
 	sd_indexfree(&m->index, m->r);
 	return 0;
@@ -10751,7 +10782,7 @@ sd_mergehas(struct sdmerge *m)
 	return 1;
 }
 
-int sd_merge(struct sdmerge *m)
+static int sd_merge(struct sdmerge *m)
 {
 	if (ssunlikely(! ss_iterhas(sv_writeiter, &m->i)))
 		return 0;
@@ -10777,7 +10808,7 @@ int sd_merge(struct sdmerge *m)
 	return sd_mergehas(m);
 }
 
-int sd_mergepage(struct sdmerge *m, uint64_t offset)
+static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 {
 	struct sdmergeconf *conf = m->conf;
 	sd_buildreset(m->build, m->r);
@@ -10821,7 +10852,7 @@ int sd_mergepage(struct sdmerge *m, uint64_t offset)
 	return 1;
 }
 
-int sd_mergecommit(struct sdmerge *m, struct sdid *id, uint64_t offset)
+static int sd_mergecommit(struct sdmerge *m, struct sdid *id, uint64_t offset)
 {
 	m->processed += sd_indextotal(&m->index);
 	struct ssqf *qf = NULL;
@@ -10830,7 +10861,7 @@ int sd_mergecommit(struct sdmerge *m, struct sdid *id, uint64_t offset)
 	return sd_indexcommit(&m->index, m->r, id, qf, offset);
 }
 
-struct ssiterif sd_pageiter =
+static struct ssiterif sd_pageiter =
 {
 	.close   = sd_pageiter_close,
 	.has     = sd_pageiter_has,
@@ -10838,7 +10869,7 @@ struct ssiterif sd_pageiter =
 	.next    = sd_pageiter_next
 };
 
-struct ssiterif sd_read =
+static struct ssiterif sd_read =
 {
 	.close = sd_read_close,
 	.has   = sd_read_has,
@@ -10853,7 +10884,7 @@ struct sdrecover {
 	struct sdindexheader *actual;
 	struct sdseal *seal;
 	struct ssmmap map;
-	struct phia_runtime *r;
+	struct runtime *r;
 } sspacked;
 
 static int
@@ -10927,7 +10958,8 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	return 1;
 }
 
-int sd_recover_open(struct ssiter *i, struct phia_runtime *r, struct ssfile *file)
+static int sd_recover_open(struct ssiter *i, struct runtime *r,
+			   struct ssfile *file)
 {
 	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	memset(ri, 0, sizeof(*ri));
@@ -10987,7 +11019,7 @@ sd_recovernext(struct ssiter *i)
 	sd_recovernext_of(ri, next);
 }
 
-struct ssiterif sd_recover =
+static struct ssiterif sd_recover =
 {
 	.close   = sd_recoverclose,
 	.has     = sd_recoverhas,
@@ -10995,7 +11027,7 @@ struct ssiterif sd_recover =
 	.next    = sd_recovernext
 };
 
-int sd_recover_complete(struct ssiter *i)
+static int sd_recover_complete(struct ssiter *i)
 {
 	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	if (ssunlikely(ri->seal == NULL))
@@ -11017,7 +11049,7 @@ int sd_recover_complete(struct ssiter *i)
 	return 0;
 }
 
-int sd_schemebegin(struct sdscheme *c, struct phia_runtime *r)
+static int sd_schemebegin(struct sdscheme *c, struct runtime *r)
 {
 	int rc = ss_bufensure(&c->buf, r->a, sizeof(struct sdschemeheader));
 	if (ssunlikely(rc == -1))
@@ -11028,8 +11060,9 @@ int sd_schemebegin(struct sdscheme *c, struct phia_runtime *r)
 	return 0;
 }
 
-int sd_schemeadd(struct sdscheme *c, struct phia_runtime *r, uint8_t id, enum sstype type,
-                 void *value, uint32_t size)
+static int
+sd_schemeadd(struct sdscheme *c, struct runtime *r, uint8_t id,
+	     enum sstype type, void *value, uint32_t size)
 {
 	struct sdschemeopt opt = {
 		.type = type,
@@ -11049,7 +11082,7 @@ error:
 	return sr_oom(r->e);
 }
 
-int sd_schemecommit(struct sdscheme *c)
+static int sd_schemecommit(struct sdscheme *c)
 {
 	if (ssunlikely(ss_bufused(&c->buf) == 0))
 		return 0;
@@ -11059,7 +11092,8 @@ int sd_schemecommit(struct sdscheme *c)
 	return 0;
 }
 
-int sd_schemewrite(struct sdscheme *c, struct phia_runtime *r, char *path, int sync)
+static int
+sd_schemewrite(struct sdscheme *c, struct runtime *r, char *path, int sync)
 {
 	struct ssfile meta;
 	ss_fileinit(&meta, r->vfs);
@@ -11085,7 +11119,8 @@ error:
 	return -1;
 }
 
-int sd_schemerecover(struct sdscheme *c, struct phia_runtime *r, char *path)
+static int
+sd_schemerecover(struct sdscheme *c, struct runtime *r, char *path)
 {
 	ssize_t size = ss_vfssize(r->vfs, path);
 	if (ssunlikely(size == -1))
@@ -11116,7 +11151,7 @@ error:
 	return -1;
 }
 
-struct ssiterif sd_schemeiter =
+static struct ssiterif sd_schemeiter =
 {
 	.close   = sd_schemeiter_close,
 	.has     = sd_schemeiter_has,
@@ -11124,7 +11159,7 @@ struct ssiterif sd_schemeiter =
 	.next    = sd_schemeiter_next
 };
 
-int sd_snapshot_begin(struct sdsnapshot *s, struct phia_runtime *r)
+static int sd_snapshot_begin(struct sdsnapshot *s, struct runtime *r)
 {
 	int rc = ss_bufensure(&s->buf, r->a, sizeof(struct sdsnapshotheader));
 	if (ssunlikely(rc == -1))
@@ -11135,9 +11170,9 @@ int sd_snapshot_begin(struct sdsnapshot *s, struct phia_runtime *r)
 	return 0;
 }
 
-int sd_snapshot_add(struct sdsnapshot *s, struct phia_runtime *r, uint64_t id,
-                    uint64_t file_size,
-                    uint32_t branch_count, uint64_t tr)
+static int
+sd_snapshot_add(struct sdsnapshot *s, struct runtime *r, uint64_t id,
+		uint64_t file_size, uint32_t branch_count, uint64_t tr)
 {
 	int rc = ss_bufensure(&s->buf, r->a, sizeof(struct sdsnapshotnode));
 	if (ssunlikely(rc == -1))
@@ -11161,7 +11196,9 @@ int sd_snapshot_add(struct sdsnapshot *s, struct phia_runtime *r, uint64_t id,
 	return 0;
 }
 
-int sd_snapshot_addbranch(struct sdsnapshot *s, struct phia_runtime *r, struct sdindexheader *h)
+static int
+sd_snapshot_addbranch(struct sdsnapshot *s, struct runtime *r,
+		      struct sdindexheader *h)
 {
 	int size = sd_indexsize_ext(h);
 	int rc = ss_bufensure(&s->buf, r->a, size);
@@ -11174,13 +11211,14 @@ int sd_snapshot_addbranch(struct sdsnapshot *s, struct phia_runtime *r, struct s
 	return 0;
 }
 
-int sd_snapshot_commit(struct sdsnapshot *s,
-                       uint64_t lru_v,
-                       uint64_t lru_steps,
-                       uint64_t lru_intr_lsn,
-                       uint64_t lru_intr_sum,
-                       uint64_t read_disk,
-                       uint64_t read_cache)
+static int
+sd_snapshot_commit(struct sdsnapshot *s,
+		   uint64_t lru_v,
+		   uint64_t lru_steps,
+		   uint64_t lru_intr_lsn,
+		   uint64_t lru_intr_sum,
+		   uint64_t read_disk,
+		   uint64_t read_cache)
 {
 	struct sdsnapshotheader *h = sd_snapshot_header(s);
 	h->lru_v        = lru_v;
@@ -11194,7 +11232,7 @@ int sd_snapshot_commit(struct sdsnapshot *s,
 	return 0;
 }
 
-struct ssiterif sd_snapshotiter =
+static struct ssiterif sd_snapshotiter =
 {
 	.close   = sd_snapshotiter_close,
 	.has     = sd_snapshotiter_has,
@@ -11235,7 +11273,7 @@ sd_vifsize(struct sv *v)
 	return ((struct sdv*)v->v)->size;
 }
 
-struct svif sd_vif =
+static struct svif sd_vif =
 {
 	.flags     = sd_vifflags,
 	.lsn       = sd_viflsn,
@@ -11251,7 +11289,7 @@ sd_vrawifpointer(struct sv *v)
 	return (char*)v->v + sizeof(struct sdv);
 }
 
-struct svif sd_vrawif =
+static struct svif sd_vrawif =
 {
 	.flags     = sd_vifflags,
 	.lsn       = sd_viflsn,
@@ -11261,36 +11299,8 @@ struct svif sd_vrawif =
 	.size      = sd_vifsize
 };
 
-int sd_commitpage(struct sdbuild *b, struct phia_runtime *r, struct ssbuf *buf)
-{
-	struct sdbuildref *ref = sd_buildref(b);
-	/* compressed */
-	uint32_t size = ss_bufused(&b->c);
-	int rc;
-	if (size > 0) {
-		rc = ss_bufensure(buf, r->a, ref->csize);
-		if (ssunlikely(rc == -1))
-			return -1;
-		memcpy(buf->p, b->c.s, ref->csize);
-		ss_bufadvance(buf, ref->csize);
-		return 0;
-	}
-	/* not compressed */
-	assert(ref->msize != 0);
-	int total = ref->msize + ref->vsize + ref->ksize;
-	rc = ss_bufensure(buf, r->a, total);
-	if (ssunlikely(rc == -1))
-		return -1;
-	memcpy(buf->p, b->m.s + ref->m, ref->msize);
-	ss_bufadvance(buf, ref->msize);
-	memcpy(buf->p, b->v.s + ref->v, ref->vsize);
-	ss_bufadvance(buf, ref->vsize);
-	memcpy(buf->p, b->k.s + ref->k, ref->ksize);
-	ss_bufadvance(buf, ref->ksize);
-	return 0;
-}
-
-int sd_writeseal(struct phia_runtime *r, struct ssfile *file, struct ssblob *blob)
+static int
+sd_writeseal(struct runtime *r, struct ssfile *file, struct ssblob *blob)
 {
 	struct sdseal seal;
 	sd_sealset_open(&seal);
@@ -11312,7 +11322,9 @@ int sd_writeseal(struct phia_runtime *r, struct ssfile *file, struct ssblob *blo
 	return 0;
 }
 
-int sd_writepage(struct phia_runtime *r, struct ssfile *file, struct ssblob *blob, struct sdbuild *b)
+static int
+sd_writepage(struct runtime *r, struct ssfile *file, struct ssblob *blob,
+	     struct sdbuild *b)
 {
 	SS_INJECTION(r->i, SS_INJECTION_SD_BUILD_0,
 	             sr_malfunction(r->e, "%s", "error injection");
@@ -11351,7 +11363,9 @@ int sd_writepage(struct phia_runtime *r, struct ssfile *file, struct ssblob *blo
 	return 0;
 }
 
-int sd_writeindex(struct phia_runtime *r, struct ssfile *file, struct ssblob *blob, struct sdindex *index)
+static int
+sd_writeindex(struct runtime *r, struct ssfile *file,
+	      struct ssblob *blob, struct sdindex *index)
 {
 	int rc;
 	rc = ss_filewrite(file, index->i.s, ss_bufused(&index->i));
@@ -11369,7 +11383,8 @@ int sd_writeindex(struct phia_runtime *r, struct ssfile *file, struct ssblob *bl
 	return 0;
 }
 
-int sd_seal(struct phia_runtime *r, struct ssfile *file, struct ssblob *blob, struct sdindex *index, uint64_t offset)
+static int
+sd_seal(struct runtime *r, struct ssfile *file, struct ssblob *blob, struct sdindex *index, uint64_t offset)
 {
 	struct sdseal seal;
 	sd_sealset_close(&seal, index->h);
@@ -11429,10 +11444,10 @@ struct sischeme {
 	struct srversion   version_storage;
 };
 
-void si_schemeinit(struct sischeme*);
-void si_schemefree(struct sischeme*, struct phia_runtime*);
-int  si_schemedeploy(struct sischeme*, struct phia_runtime*);
-int  si_schemerecover(struct sischeme*, struct phia_runtime*);
+static void si_schemeinit(struct sischeme*);
+static void si_schemefree(struct sischeme*, struct runtime*);
+static int  si_schemedeploy(struct sischeme*, struct runtime*);
+static int  si_schemerecover(struct sischeme*, struct runtime*);
 
 struct sibranch {
 	struct sdid id;
@@ -11443,7 +11458,7 @@ struct sibranch {
 } sspacked;
 
 static inline void
-si_branchinit(struct sibranch *b, struct phia_runtime *r)
+si_branchinit(struct sibranch *b, struct runtime *r)
 {
 	memset(&b->id, 0, sizeof(b->id));
 	sd_indexinit(&b->index);
@@ -11453,7 +11468,7 @@ si_branchinit(struct sibranch *b, struct phia_runtime *r)
 }
 
 static inline struct sibranch*
-si_branchnew(struct phia_runtime *r)
+si_branchnew(struct runtime *r)
 {
 	struct sibranch *b = (struct sibranch*)ss_malloc(r->a, sizeof(struct sibranch));
 	if (ssunlikely(b == NULL)) {
@@ -11472,7 +11487,7 @@ si_branchset(struct sibranch *b, struct sdindex *i)
 }
 
 static inline void
-si_branchfree(struct sibranch *b, struct phia_runtime *r)
+si_branchfree(struct sibranch *b, struct runtime *r)
 {
 	sd_indexfree(&b->index, r);
 	ss_blobfree(&b->copy);
@@ -11485,7 +11500,7 @@ si_branchis_root(struct sibranch *b) {
 }
 
 static inline int
-si_branchload(struct sibranch *b, struct phia_runtime *r, struct ssfile *file)
+si_branchload(struct sibranch *b, struct runtime *r, struct ssfile *file)
 {
 	struct sdindexheader *h = b->index.h;
 	uint64_t offset = h->offset - h->total - sizeof(struct sdseal);
@@ -11545,16 +11560,19 @@ struct sinode {
 	struct rlist     commit;
 } sspacked;
 
-struct sinode *si_nodenew(struct phia_runtime*);
-int si_nodeopen(struct sinode*, struct phia_runtime*, struct sischeme*, struct sspath*, struct sdsnapshotnode*);
-int si_nodecreate(struct sinode*, struct phia_runtime*, struct sischeme*, struct sdid*);
-int si_nodefree(struct sinode*, struct phia_runtime*, int);
-int si_nodemap(struct sinode*, struct phia_runtime*);
-int si_noderead(struct sinode*, struct phia_runtime*, struct ssbuf*);
-int si_nodegc_index(struct phia_runtime*, struct svindex*);
-int si_nodegc(struct sinode*, struct phia_runtime*, struct sischeme*);
-int si_nodeseal(struct sinode*, struct phia_runtime*, struct sischeme*);
-int si_nodecomplete(struct sinode*, struct phia_runtime*, struct sischeme*);
+static struct sinode *si_nodenew(struct runtime*);
+static int
+si_nodeopen(struct sinode*, struct runtime*, struct sischeme*,
+	    struct sspath*, struct sdsnapshotnode*);
+static int
+si_nodecreate(struct sinode*, struct runtime*, struct sischeme*, struct sdid*);
+static int si_nodefree(struct sinode*, struct runtime*, int);
+static int si_nodemap(struct sinode*, struct runtime*);
+static int si_noderead(struct sinode*, struct runtime*, struct ssbuf*);
+static int si_nodegc_index(struct runtime*, struct svindex*);
+static int si_nodegc(struct sinode*, struct runtime*, struct sischeme*);
+static int si_nodeseal(struct sinode*, struct runtime*, struct sischeme*);
+static int si_nodecomplete(struct sinode*, struct runtime*, struct sischeme*);
 
 static inline void
 si_nodelock(struct sinode *node) {
@@ -11768,16 +11786,16 @@ struct siplan {
 	struct sinode *node;
 };
 
-int si_planinit(struct siplan*);
-int si_plannerinit(struct siplanner*, struct ssa*, void*);
-int si_plannerfree(struct siplanner*, struct ssa*);
-int si_plannertrace(struct siplan*, uint32_t, struct sstrace*);
-int si_plannerupdate(struct siplanner*, int, struct sinode*);
-int si_plannerremove(struct siplanner*, int, struct sinode*);
-int si_planner(struct siplanner*, struct siplan*);
+static int si_planinit(struct siplan*);
+static int si_plannerinit(struct siplanner*, struct ssa*, void*);
+static int si_plannerfree(struct siplanner*, struct ssa*);
+static int si_plannertrace(struct siplan*, uint32_t, struct sstrace*);
+static int si_plannerupdate(struct siplanner*, int, struct sinode*);
+static int si_plannerremove(struct siplanner*, int, struct sinode*);
+static int si_planner(struct siplanner*, struct siplan*);
 
 static inline int
-si_amqfhas_branch(struct phia_runtime *r, struct sibranch *b, char *key)
+si_amqfhas_branch(struct runtime *r, struct sibranch *b, char *key)
 {
 	struct sdindexamqf *qh = sd_indexamqf(&b->index);
 	struct ssqf qf;
@@ -11817,7 +11835,7 @@ struct si {
 	struct svupsert   u;
 	struct sischeme   scheme;
 	struct so        *object;
-	struct phia_runtime         r;
+	struct runtime         r;
 	struct rlist     link;
 };
 
@@ -11836,7 +11854,7 @@ si_unlock(struct si *i) {
 	ss_mutexunlock(&i->lock);
 }
 
-static inline struct phia_runtime*
+static inline struct runtime*
 si_r(struct si *i) {
 	return &i->r;
 }
@@ -11846,18 +11864,18 @@ si_scheme(struct si *i) {
 	return &i->scheme;
 }
 
-struct si *si_init(struct phia_runtime*, struct so*);
-int si_open(struct si*);
-int si_close(struct si*);
-int si_insert(struct si*, struct sinode*);
-int si_remove(struct si*, struct sinode*);
-int si_replace(struct si*, struct sinode*, struct sinode*);
-int si_refs(struct si*);
-int si_refof(struct si*, enum siref);
-int si_ref(struct si*, enum siref);
-int si_unref(struct si*, enum siref);
-int si_plan(struct si*, struct siplan*);
-int si_execute(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
+static struct si *si_init(struct runtime*, struct so*);
+static int si_open(struct si*);
+static int si_close(struct si*);
+static int si_insert(struct si*, struct sinode*);
+static int si_remove(struct si*, struct sinode*);
+static int si_replace(struct si*, struct sinode*, struct sinode*);
+static int si_refs(struct si*);
+static int si_ref(struct si*, enum siref);
+static int si_unref(struct si*, enum siref);
+static int si_plan(struct si*, struct siplan*);
+static int
+si_execute(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
 static inline void
 si_lru_add(struct si *i, struct svref *ref)
@@ -11900,8 +11918,8 @@ si_lru_vlsn(struct si *i)
 	return rc;
 }
 
-uint32_t si_gcv(struct phia_runtime*, struct svv*);
-uint32_t si_gcref(struct phia_runtime*, struct svref*);
+static uint32_t si_gcv(struct runtime*, struct svv*);
+static uint32_t si_gcref(struct runtime*, struct svref*);
 
 struct sicachebranch {
 	struct sibranch *branch;
@@ -11929,7 +11947,7 @@ struct sicache {
 struct sicachepool {
 	struct sicache *head;
 	int n;
-	struct phia_runtime *r;
+	struct runtime *r;
 };
 
 static inline void
@@ -12099,7 +12117,7 @@ si_cachefollow(struct sicache *c, struct sibranch *seek)
 }
 
 static inline void
-si_cachepool_init(struct sicachepool *p, struct phia_runtime *r)
+si_cachepool_init(struct sicachepool *p, struct runtime *r)
 {
 	p->head = NULL;
 	p->n    = 0;
@@ -12153,8 +12171,8 @@ struct sitx {
 	struct si *index;
 };
 
-void si_begin(struct sitx*, struct si*);
-void si_commit(struct sitx*);
+static void si_begin(struct sitx*, struct si*);
+static void si_commit(struct sitx*);
 
 static inline void
 si_txtrack(struct sitx *x, struct sinode *n) {
@@ -12162,7 +12180,8 @@ si_txtrack(struct sitx *x, struct sinode *n) {
 		rlist_add(&x->nodelist, &n->commit);
 }
 
-void si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t, int);
+static void
+si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t, int);
 
 struct siread {
 	enum ssorder   order;
@@ -12181,21 +12200,22 @@ struct siread {
 	int       upsert_eq;
 	struct sv        result;
 	struct sicache  *cache;
-	struct phia_runtime       *r;
+	struct runtime       *r;
 	struct si       *index;
 };
 
-int  si_readopen(struct siread*, struct si*, struct sicache*, enum ssorder,
-                 uint64_t,
-                 void*, uint32_t,
-                 void*, uint32_t);
-int  si_readclose(struct siread*);
-void si_readcache_only(struct siread*);
-void si_readoldest_only(struct siread*);
-void si_readhas(struct siread*);
-void si_readupsert(struct siread*, struct sv*, int);
-int  si_read(struct siread*);
-int  si_readcommited(struct si*, struct phia_runtime*, struct sv*, int);
+static int
+si_readopen(struct siread*, struct si*, struct sicache*, enum ssorder,
+	    uint64_t,
+	    void*, uint32_t,
+	    void*, uint32_t);
+static int si_readclose(struct siread*);
+static void si_readcache_only(struct siread*);
+static void si_readoldest_only(struct siread*);
+static void si_readhas(struct siread*);
+static void si_readupsert(struct siread*, struct sv*, int);
+static int  si_read(struct siread*);
+static int  si_readcommited(struct si*, struct runtime*, struct sv*, int);
 
 struct siiter {
 	struct si *index;
@@ -12209,7 +12229,8 @@ ss_rbget(si_itermatch,
          si_nodecmp(sscast(n, struct sinode, node), key, keysize, scheme))
 
 static inline int
-si_iter_open(struct ssiter *i, struct phia_runtime *r, struct si *index, enum ssorder o, void *key, int keysize)
+si_iter_open(struct ssiter *i, struct runtime *r,
+	     struct si *index, enum ssorder o, void *key, int keysize)
 {
 	struct siiter *ii = (struct siiter*)i->priv;
 	ii->index   = index;
@@ -12298,23 +12319,28 @@ si_iter_next(struct ssiter *i)
 	}
 }
 
-extern struct ssiterif si_iter;
+static struct ssiterif si_iter;
 
-int si_drop(struct si*);
-int si_dropmark(struct si*);
-int si_droprepository(struct phia_runtime*, char*, int);
+static int si_drop(struct si*);
+static int si_dropmark(struct si*);
+static int si_droprepository(struct runtime*, char*, int);
 
-int si_anticache(struct si*, struct siplan*);
+static int si_anticache(struct si*, struct siplan*);
 
-int si_snapshot(struct si*, struct siplan*);
+static int si_snapshot(struct si*, struct siplan*);
 
-int si_backup(struct si*, struct sdc*, struct siplan*);
+static int si_backup(struct si*, struct sdc*, struct siplan*);
 
-int si_merge(struct si*, struct sdc*, struct sinode*, uint64_t, uint64_t, struct ssiter*, uint64_t, uint32_t);
+static int
+si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
+	 uint64_t, struct ssiter*, uint64_t, uint32_t);
 
-int si_branch(struct si*, struct sdc*, struct siplan*, uint64_t);
-int si_compact(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t, struct ssiter*, uint64_t);
-int si_compact_index(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
+static int si_branch(struct si*, struct sdc*, struct siplan*, uint64_t);
+static int
+si_compact(struct si*, struct sdc*, struct siplan*, uint64_t,
+	   uint64_t, struct ssiter*, uint64_t);
+static int
+si_compact_index(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
 struct sitrack {
 	struct ssrb i;
@@ -12332,10 +12358,10 @@ si_trackinit(struct sitrack *t) {
 }
 
 ss_rbtruncate(si_tracktruncate,
-              si_nodefree(sscast(n, struct sinode, node), (struct phia_runtime*)arg, 0))
+              si_nodefree(sscast(n, struct sinode, node), (struct runtime*)arg, 0))
 
 static inline void
-si_trackfree(struct sitrack *t, struct phia_runtime *r) {
+si_trackfree(struct sitrack *t, struct runtime *r) {
 	if (t->i.root)
 		si_tracktruncate(t->i.root, r);
 }
@@ -12394,8 +12420,8 @@ si_trackreplace(struct sitrack *t, struct sinode *o, struct sinode *n)
 	ss_rbreplace(&t->i, &o->node, &n->node);
 }
 
-struct sinode *si_bootstrap(struct si*, uint64_t);
-int si_recover(struct si*);
+static struct sinode *si_bootstrap(struct si*, uint64_t);
+static int si_recover(struct si*);
 
 struct siprofiler {
 	uint32_t  total_node_count;
@@ -12424,14 +12450,14 @@ struct siprofiler {
 	struct si       *i;
 } sspacked;
 
-int si_profilerbegin(struct siprofiler*, struct si*);
-int si_profilerend(struct siprofiler*);
-int si_profiler(struct siprofiler*);
+static int si_profilerbegin(struct siprofiler*, struct si*);
+static int si_profilerend(struct siprofiler*);
+static int si_profiler(struct siprofiler*);
 
-int si_anticache(struct si *index, struct siplan *plan)
+static int si_anticache(struct si *index, struct siplan *plan)
 {
 	struct sinode *n = plan->node;
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 
 	/* promote */
 	if (n->flags & SI_PROMOTE) {
@@ -12472,7 +12498,7 @@ int si_anticache(struct si *index, struct siplan *plan)
 static inline int
 si_backupend(struct si *index, struct sdc *c, struct siplan *plan)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	/* copy index scheme file */
 	char src[PATH_MAX];
 	snprintf(src, sizeof(src), "%s/scheme", index->scheme.path);
@@ -12542,9 +12568,9 @@ si_backupend(struct si *index, struct sdc *c, struct siplan *plan)
 	return 0;
 }
 
-int si_backup(struct si *index, struct sdc *c, struct siplan *plan)
+static int si_backup(struct si *index, struct sdc *c, struct siplan *plan)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	if (ssunlikely(plan->plan == SI_BACKUPEND))
 		return si_backupend(index, c, plan);
 
@@ -12593,7 +12619,7 @@ int si_backup(struct si *index, struct sdc *c, struct siplan *plan)
 	return 0;
 }
 
-struct si *si_init(struct phia_runtime *r, struct so *object)
+static struct si *si_init(struct runtime *r, struct so *object)
 {
 	struct si *i = ss_malloc(r->a, sizeof(struct si));
 	if (ssunlikely(i == NULL))
@@ -12633,15 +12659,15 @@ struct si *si_init(struct phia_runtime *r, struct so *object)
 	return i;
 }
 
-int si_open(struct si *i)
+static int si_open(struct si *i)
 {
 	return si_recover(i);
 }
 
 ss_rbtruncate(si_truncate,
-              si_nodefree(sscast(n, struct sinode, node), (struct phia_runtime*)arg, 0))
+              si_nodefree(sscast(n, struct sinode, node), (struct runtime*)arg, 0))
 
-int si_close(struct si *i)
+static int si_close(struct si *i)
 {
 	int rc_ret = 0;
 	int rc = 0;
@@ -12674,7 +12700,7 @@ ss_rbget(si_match,
                     sd_indexmin(&(sscast(n, struct sinode, node))->self.index)->sizemin,
                                 key, keysize))
 
-int si_insert(struct si *i, struct sinode *n)
+static int si_insert(struct si *i, struct sinode *n)
 {
 	struct sdindexpage *min = sd_indexmin(&n->self.index);
 	struct ssrbnode *p = NULL;
@@ -12687,20 +12713,20 @@ int si_insert(struct si *i, struct sinode *n)
 	return 0;
 }
 
-int si_remove(struct si *i, struct sinode *n)
+static int si_remove(struct si *i, struct sinode *n)
 {
 	ss_rbremove(&i->i, &n->node);
 	i->n--;
 	return 0;
 }
 
-int si_replace(struct si *i, struct sinode *o, struct sinode *n)
+static int si_replace(struct si *i, struct sinode *o, struct sinode *n)
 {
 	ss_rbreplace(&i->i, &o->node, &n->node);
 	return 0;
 }
 
-int si_refs(struct si *i)
+static int si_refs(struct si *i)
 {
 	ss_spinlock(&i->ref_lock);
 	int v = i->ref_be + i->ref_fe;
@@ -12708,19 +12734,7 @@ int si_refs(struct si *i)
 	return v;
 }
 
-int si_refof(struct si *i, enum siref ref)
-{
-	int v = 0;
-	ss_spinlock(&i->ref_lock);
-	if (ref == SI_REFBE)
-		v = i->ref_be;
-	else
-		v = i->ref_fe;
-	ss_spinunlock(&i->ref_lock);
-	return v;
-}
-
-int si_ref(struct si *i, enum siref ref)
+static int si_ref(struct si *i, enum siref ref)
 {
 	ss_spinlock(&i->ref_lock);
 	if (ref == SI_REFBE)
@@ -12731,7 +12745,7 @@ int si_ref(struct si *i, enum siref ref)
 	return 0;
 }
 
-int si_unref(struct si *i, enum siref ref)
+static int si_unref(struct si *i, enum siref ref)
 {
 	int prev_ref = 0;
 	ss_spinlock(&i->ref_lock);
@@ -12748,7 +12762,7 @@ int si_unref(struct si *i, enum siref ref)
 	return prev_ref;
 }
 
-int si_plan(struct si *i, struct siplan *plan)
+static int si_plan(struct si *i, struct siplan *plan)
 {
 	si_lock(i);
 	int rc = si_planner(&i->p, plan);
@@ -12756,9 +12770,9 @@ int si_plan(struct si *i, struct siplan *plan)
 	return rc;
 }
 
-int si_execute(struct si *i, struct sdc *c, struct siplan *plan,
-               uint64_t vlsn,
-               uint64_t vlsn_lru)
+static int
+si_execute(struct si *i, struct sdc *c, struct siplan *plan,
+	   uint64_t vlsn, uint64_t vlsn_lru)
 {
 	int rc = -1;
 	switch (plan->plan) {
@@ -12805,10 +12819,11 @@ int si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 }
 
 static inline int
-si_branchcreate(struct si *index, struct sdc *c, struct sinode *parent, struct svindex *vindex, uint64_t vlsn,
-                struct sibranch **result)
+si_branchcreate(struct si *index, struct sdc *c,
+		struct sinode *parent, struct svindex *vindex,
+		uint64_t vlsn, struct sibranch **result)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	struct sibranch *branch = NULL;
 
 	/* in-memory mode blob */
@@ -12975,9 +12990,10 @@ e1:
 	return -1;
 }
 
-int si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
+static int
+si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	struct sinode *n = plan->node;
 	assert(n->flags & SI_LOCK);
 
@@ -13044,13 +13060,14 @@ int si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vls
 	return 1;
 }
 
-int si_compact(struct si *index, struct sdc *c, struct siplan *plan,
-               uint64_t vlsn,
-               uint64_t vlsn_lru,
-               struct ssiter *vindex,
-               uint64_t vindex_used)
+static int
+si_compact(struct si *index, struct sdc *c, struct siplan *plan,
+	   uint64_t vlsn,
+	   uint64_t vlsn_lru,
+	   struct ssiter *vindex,
+	   uint64_t vindex_used)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	struct sinode *node = plan->node;
 	assert(node->flags & SI_LOCK);
 
@@ -13139,9 +13156,10 @@ int si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	return rc;
 }
 
-int si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
-                     uint64_t vlsn,
-                     uint64_t vlsn_lru)
+static int
+si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
+		 uint64_t vlsn,
+		 uint64_t vlsn_lru)
 {
 	struct sinode *node = plan->node;
 
@@ -13162,7 +13180,7 @@ int si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
 	return si_compact(index, c, plan, vlsn, vlsn_lru, &i, size_stream);
 }
 
-int si_droprepository(struct phia_runtime *r, char *repo, int drop_directory)
+static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 {
 	DIR *dir = opendir(repo);
 	if (dir == NULL) {
@@ -13208,7 +13226,7 @@ int si_droprepository(struct phia_runtime *r, char *repo, int drop_directory)
 	return 0;
 }
 
-int si_dropmark(struct si *i)
+static int si_dropmark(struct si *i)
 {
 	/* create drop file */
 	char path[1024];
@@ -13225,9 +13243,9 @@ int si_dropmark(struct si *i)
 	return 0;
 }
 
-int si_drop(struct si *i)
+static int si_drop(struct si *i)
 {
-	struct phia_runtime r = i->r;
+	struct runtime r = i->r;
 	struct sspath path;
 	ss_pathinit(&path);
 	ss_pathset(&path, "%s", i->scheme.path);
@@ -13241,7 +13259,7 @@ int si_drop(struct si *i)
 	return rc;
 }
 
-uint32_t si_gcv(struct phia_runtime *r, struct svv *v)
+static uint32_t si_gcv(struct runtime *r, struct svv *v)
 {
 	uint32_t size = sv_vsize(v);
 	struct sl *log = (struct sl*)v->log;
@@ -13253,7 +13271,7 @@ uint32_t si_gcv(struct phia_runtime *r, struct svv *v)
 	return 0;
 }
 
-uint32_t si_gcref(struct phia_runtime *r, struct svref *gc)
+static uint32_t si_gcref(struct runtime *r, struct svref *gc)
 {
 	uint32_t used = 0;
 	struct svref *v = gc;
@@ -13268,7 +13286,7 @@ uint32_t si_gcref(struct phia_runtime *r, struct svref *gc)
 	return used;
 }
 
-struct ssiterif si_iter =
+static struct ssiterif si_iter =
 {
 	.close = si_iter_close,
 	.has   = si_iter_has,
@@ -13277,7 +13295,7 @@ struct ssiterif si_iter =
 };
 
 static int
-si_redistribute(struct si *index, struct phia_runtime *r, struct sdc *c, struct sinode *node, struct ssbuf *result)
+si_redistribute(struct si *index, struct runtime *r, struct sdc *c, struct sinode *node, struct ssbuf *result)
 {
 	(void)index;
 	struct svindex *vindex = si_nodeindex(node);
@@ -13337,7 +13355,7 @@ si_redistribute(struct si *index, struct phia_runtime *r, struct sdc *c, struct 
 }
 
 static inline void
-si_redistribute_set(struct si *index, struct phia_runtime *r, uint64_t now, struct svref *v)
+si_redistribute_set(struct si *index, struct runtime *r, uint64_t now, struct svref *v)
 {
 	index->update_time = now;
 	/* match node */
@@ -13356,7 +13374,7 @@ si_redistribute_set(struct si *index, struct phia_runtime *r, uint64_t now, stru
 }
 
 static int
-si_redistribute_index(struct si *index, struct phia_runtime *r, struct sdc *c, struct sinode *node)
+si_redistribute_index(struct si *index, struct runtime *r, struct sdc *c, struct sinode *node)
 {
 	struct svindex *vindex = si_nodeindex(node);
 	struct ssiter i;
@@ -13384,7 +13402,7 @@ si_redistribute_index(struct si *index, struct phia_runtime *r, struct sdc *c, s
 }
 
 static int
-si_splitfree(struct ssbuf *result, struct phia_runtime *r)
+si_splitfree(struct ssbuf *result, struct runtime *r)
 {
 	struct ssiter i;
 	ss_iterinit(ss_bufiterref, &i);
@@ -13408,7 +13426,7 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
          uint64_t  vlsn,
          uint64_t  vlsn_lru)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	uint32_t timestamp = time(NULL);
 	int rc;
 	struct sdmergeconf mergeconf = {
@@ -13523,14 +13541,15 @@ error:
 	return -1;
 }
 
-int si_merge(struct si *index, struct sdc *c, struct sinode *node,
-             uint64_t vlsn,
-             uint64_t vlsn_lru,
-             struct ssiter *stream,
-             uint64_t size_stream,
-             uint32_t n_stream)
+static int
+si_merge(struct si *index, struct sdc *c, struct sinode *node,
+	 uint64_t vlsn,
+	 uint64_t vlsn_lru,
+	 struct ssiter *stream,
+	 uint64_t size_stream,
+	 uint32_t n_stream)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 	struct ssbuf *result = &c->a;
 	struct ssiter i;
 
@@ -13708,7 +13727,7 @@ int si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	return 0;
 }
 
-struct sinode *si_nodenew(struct phia_runtime *r)
+static struct sinode *si_nodenew(struct runtime *r)
 {
 	struct sinode *n = (struct sinode*)ss_malloc(r->a, sizeof(struct sinode));
 	if (ssunlikely(n == NULL)) {
@@ -13745,9 +13764,9 @@ struct sinode *si_nodenew(struct phia_runtime *r)
 }
 
 ss_rbtruncate(si_nodegc_indexgc,
-              si_gcref((struct phia_runtime*)arg, sscast(n, struct svref, node)))
+              si_gcref((struct runtime*)arg, sscast(n, struct svref, node)))
 
-int si_nodegc_index(struct phia_runtime *r, struct svindex *i)
+static int si_nodegc_index(struct runtime *r, struct svindex *i)
 {
 	if (i->i.root)
 		si_nodegc_indexgc(i->i.root, r);
@@ -13756,7 +13775,7 @@ int si_nodegc_index(struct phia_runtime *r, struct svindex *i)
 }
 
 static inline int
-si_nodeclose(struct sinode *n, struct phia_runtime *r, int gc)
+si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 {
 	int rcret = 0;
 
@@ -13786,7 +13805,7 @@ si_nodeclose(struct sinode *n, struct phia_runtime *r, int gc)
 }
 
 static inline int
-si_noderecover_snapshot(struct sinode *n, struct phia_runtime *r, struct sdsnapshotnode *sn)
+si_noderecover_snapshot(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn)
 {
 	char *p = (char*)sn + sizeof(struct sdsnapshotnode);
 	uint32_t i = 0;
@@ -13824,7 +13843,7 @@ si_noderecover_snapshot(struct sinode *n, struct phia_runtime *r, struct sdsnaps
 }
 
 static inline int
-si_noderecover(struct sinode *n, struct phia_runtime *r, struct sdsnapshotnode *sn, int in_memory)
+si_noderecover(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn, int in_memory)
 {
 	/* fast recover from snapshot file */
 	if (sn) {
@@ -13885,8 +13904,10 @@ e1:
 	return -1;
 }
 
-int si_nodeopen(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme, struct sspath *path,
-                struct sdsnapshotnode *sn)
+static int
+si_nodeopen(struct sinode *n, struct runtime *r,
+	    struct sischeme *scheme, struct sspath *path,
+	    struct sdsnapshotnode *sn)
 {
 	int rc = ss_fileopen(&n->file, path->path);
 	if (ssunlikely(rc == -1)) {
@@ -13917,7 +13938,9 @@ int si_nodeopen(struct sinode *n, struct phia_runtime *r, struct sischeme *schem
 	return 0;
 }
 
-int si_nodecreate(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme, struct sdid *id)
+static int
+si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
+	      struct sdid *id)
 {
 	struct sspath path;
 	ss_pathcompound(&path, scheme->path, id->parent, id->id,
@@ -13931,7 +13954,7 @@ int si_nodecreate(struct sinode *n, struct phia_runtime *r, struct sischeme *sch
 	return 0;
 }
 
-int si_nodemap(struct sinode *n, struct phia_runtime *r)
+static int si_nodemap(struct sinode *n, struct runtime *r)
 {
 	int rc = ss_vfsmmap(r->vfs, &n->map, n->file.fd, n->file.size, 1);
 	if (ssunlikely(rc == -1)) {
@@ -13944,7 +13967,7 @@ int si_nodemap(struct sinode *n, struct phia_runtime *r)
 }
 
 static inline void
-si_nodefree_branches(struct sinode *n, struct phia_runtime *r)
+si_nodefree_branches(struct sinode *n, struct runtime *r)
 {
 	struct sibranch *p = n->branch;
 	struct sibranch *next = NULL;
@@ -13957,7 +13980,7 @@ si_nodefree_branches(struct sinode *n, struct phia_runtime *r)
 	ss_blobfree(&n->self.copy);
 }
 
-int si_nodefree(struct sinode *n, struct phia_runtime *r, int gc)
+static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 {
 	int rcret = 0;
 	int rc;
@@ -13979,7 +14002,7 @@ int si_nodefree(struct sinode *n, struct phia_runtime *r, int gc)
 	return rcret;
 }
 
-int si_noderead(struct sinode *n, struct phia_runtime *r, struct ssbuf *dest)
+static int si_noderead(struct sinode *n, struct runtime *r, struct ssbuf *dest)
 {
 	int rc = ss_bufensure(dest, r->a, n->file.size);
 	if (ssunlikely(rc == -1))
@@ -13995,7 +14018,7 @@ int si_noderead(struct sinode *n, struct phia_runtime *r, struct ssbuf *dest)
 	return 0;
 }
 
-int si_nodeseal(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme)
+static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 {
 	int rc;
 	if (scheme->sync) {
@@ -14021,7 +14044,8 @@ int si_nodeseal(struct sinode *n, struct phia_runtime *r, struct sischeme *schem
 	return 0;
 }
 
-int si_nodecomplete(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme)
+static int
+si_nodecomplete(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 {
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".db");
@@ -14034,7 +14058,7 @@ int si_nodecomplete(struct sinode *n, struct phia_runtime *r, struct sischeme *s
 	return rc;
 }
 
-int si_nodegc(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme)
+static int si_nodegc(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 {
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".db.gc");
@@ -14047,7 +14071,7 @@ int si_nodegc(struct sinode *n, struct phia_runtime *r, struct sischeme *scheme)
 	return rc;
 }
 
-int si_planinit(struct siplan *p)
+static int si_planinit(struct siplan *p)
 {
 	p->plan    = SI_NONE;
 	p->explain = SI_ENONE;
@@ -14058,7 +14082,7 @@ int si_planinit(struct siplan *p)
 	return 0;
 }
 
-int si_plannerinit(struct siplanner *p, struct ssa *a, void *i)
+static int si_plannerinit(struct siplanner *p, struct ssa *a, void *i)
 {
 	int rc = ss_rqinit(&p->compact, a, 1, 20);
 	if (ssunlikely(rc == -1))
@@ -14079,7 +14103,7 @@ int si_plannerinit(struct siplanner *p, struct ssa *a, void *i)
 	return 0;
 }
 
-int si_plannerfree(struct siplanner *p, struct ssa *a)
+static int si_plannerfree(struct siplanner *p, struct ssa *a)
 {
 	ss_rqfree(&p->compact, a);
 	ss_rqfree(&p->branch, a);
@@ -14087,7 +14111,7 @@ int si_plannerfree(struct siplanner *p, struct ssa *a)
 	return 0;
 }
 
-int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
+static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 {
 	char *plan = NULL;
 	switch (p->plan) {
@@ -14147,7 +14171,7 @@ int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 	return 0;
 }
 
-int si_plannerupdate(struct siplanner *p, int mask, struct sinode *n)
+static int si_plannerupdate(struct siplanner *p, int mask, struct sinode *n)
 {
 	if (mask & SI_BRANCH)
 		ss_rqupdate(&p->branch, &n->nodebranch, n->used);
@@ -14158,7 +14182,7 @@ int si_plannerupdate(struct siplanner *p, int mask, struct sinode *n)
 	return 0;
 }
 
-int si_plannerremove(struct siplanner *p, int mask, struct sinode *n)
+static int si_plannerremove(struct siplanner *p, int mask, struct sinode *n)
 {
 	if (mask & SI_BRANCH)
 		ss_rqdelete(&p->branch, &n->nodebranch);
@@ -14532,7 +14556,7 @@ si_plannerpeek_nodegc(struct siplanner *p, struct siplan *plan)
 	return rc_inprogress;
 }
 
-int si_planner(struct siplanner *p, struct siplan *plan)
+static int si_planner(struct siplanner *p, struct siplan *plan)
 {
 	switch (plan->plan) {
 	case SI_BRANCH:
@@ -14567,7 +14591,7 @@ int si_planner(struct siplanner *p, struct siplan *plan)
 	return -1;
 }
 
-int si_profilerbegin(struct siprofiler *p, struct si *i)
+static int si_profilerbegin(struct siprofiler *p, struct si *i)
 {
 	memset(p, 0, sizeof(*p));
 	p->i = i;
@@ -14576,7 +14600,7 @@ int si_profilerbegin(struct siprofiler *p, struct si *i)
 	return 0;
 }
 
-int si_profilerend(struct siprofiler *p)
+static int si_profilerend(struct siprofiler *p)
 {
 	si_unlock(p->i);
 	return 0;
@@ -14653,7 +14677,7 @@ si_profiler_histogram_temperature(struct siprofiler *p)
 	}
 }
 
-int si_profiler(struct siprofiler *p)
+static int si_profiler(struct siprofiler *p)
 {
 	uint32_t temperature_total = 0;
 	uint64_t memory_used = 0;
@@ -14711,10 +14735,11 @@ int si_profiler(struct siprofiler *p)
 	return 0;
 }
 
-int si_readopen(struct siread *q, struct si *i, struct sicache *c, enum ssorder o,
-                uint64_t vlsn,
-                void *prefix, uint32_t prefixsize,
-                void *key, uint32_t keysize)
+static int
+si_readopen(struct siread *q, struct si *i, struct sicache *c, enum ssorder o,
+	    uint64_t vlsn,
+	    void *prefix, uint32_t prefixsize,
+	    void *key, uint32_t keysize)
 {
 	q->order       = o;
 	q->key         = key;
@@ -14738,28 +14763,28 @@ int si_readopen(struct siread *q, struct si *i, struct sicache *c, enum ssorder 
 	return 0;
 }
 
-void si_readcache_only(struct siread *q)
+static void si_readcache_only(struct siread *q)
 {
 	q->cache_only = 1;
 }
 
-void si_readoldest_only(struct siread *q)
+static void si_readoldest_only(struct siread *q)
 {
 	q->oldest_only = 1;
 }
 
-void si_readhas(struct siread *q)
+static void si_readhas(struct siread *q)
 {
 	q->has = 1;
 }
 
-void si_readupsert(struct siread *q, struct sv *v, int eq)
+static void si_readupsert(struct siread *q, struct sv *v, int eq)
 {
 	q->upsert_v  = v;
 	q->upsert_eq = eq;
 }
 
-int si_readclose(struct siread *q)
+static int si_readclose(struct siread *q)
 {
 	si_unlock(q->index);
 	sv_mergefree(&q->merge, q->r->a);
@@ -14987,7 +15012,8 @@ si_get(struct siread *q)
 }
 
 static inline int
-si_rangebranch(struct siread *q, struct sinode *n, struct sibranch *b, struct svmerge *m)
+si_rangebranch(struct siread *q, struct sinode *n,
+	       struct sibranch *b, struct svmerge *m)
 {
 	struct sicachebranch *c = si_cachefollow(q->cache, b);
 	assert(c->branch == b);
@@ -15158,7 +15184,7 @@ next_node:
 	return rc;
 }
 
-int si_read(struct siread *q)
+static int si_read(struct siread *q)
 {
 	switch (q->order) {
 	case SS_EQ:
@@ -15174,7 +15200,8 @@ int si_read(struct siread *q)
 	return -1;
 }
 
-int si_readcommited(struct si *index, struct phia_runtime *r, struct sv *v, int recover)
+static int
+si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 {
 	/* search node index */
 	struct ssiter i;
@@ -15255,9 +15282,10 @@ int si_readcommited(struct si *index, struct phia_runtime *r, struct sv *v, int 
 	see: test/crash/durability.test.c
 */
 
-struct sinode *si_bootstrap(struct si *i, uint64_t parent)
+static struct sinode *
+si_bootstrap(struct si *i, uint64_t parent)
 {
-	struct phia_runtime *r = &i->r;
+	struct runtime *r = &i->r;
 	/* create node */
 	struct sinode *n = si_nodenew(r);
 	if (ssunlikely(n == NULL))
@@ -15362,7 +15390,7 @@ e0:
 }
 
 static inline int
-si_deploy(struct si *i, struct phia_runtime *r, int create_directory)
+si_deploy(struct si *i, struct runtime *r, int create_directory)
 {
 	/* create directory */
 	int rc;
@@ -15448,7 +15476,7 @@ si_process(char *name, uint64_t *nsn, uint64_t *parent)
 }
 
 static inline int
-si_trackdir(struct sitrack *track, struct phia_runtime *r, struct si *i)
+si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 {
 	DIR *dir = opendir(i->scheme.path);
 	if (ssunlikely(dir == NULL)) {
@@ -15565,7 +15593,7 @@ error:
 }
 
 static inline int
-si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct phia_runtime *r, struct si *i)
+si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, struct si *i)
 {
 	ss_bufreset(buf);
 	struct ssrbnode *p = ss_rbmax(&track->i);
@@ -15617,7 +15645,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct phia_runtime *
 }
 
 static inline int
-si_recovercomplete(struct sitrack *track, struct phia_runtime *r, struct si *index, struct ssbuf *buf)
+si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, struct ssbuf *buf)
 {
 	/* prepare and build primary index */
 	ss_bufreset(buf);
@@ -15651,7 +15679,7 @@ si_recovercomplete(struct sitrack *track, struct phia_runtime *r, struct si *ind
 }
 
 static inline int
-si_tracksnapshot(struct sitrack *track, struct phia_runtime *r, struct si *i, struct sdsnapshot *s)
+si_tracksnapshot(struct sitrack *track, struct runtime *r, struct si *i, struct sdsnapshot *s)
 {
 	/* read snapshot */
 	struct ssiter iter;
@@ -15707,7 +15735,7 @@ si_recoversize(struct si *i)
 }
 
 static inline int
-si_recoverindex(struct si *i, struct phia_runtime *r, struct sdsnapshot *s)
+si_recoverindex(struct si *i, struct runtime *r, struct sdsnapshot *s)
 {
 	struct sitrack track;
 	si_trackinit(&track);
@@ -15745,7 +15773,7 @@ error:
 }
 
 static inline int
-si_recoverdrop(struct si *i, struct phia_runtime *r)
+si_recoverdrop(struct si *i, struct runtime *r)
 {
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->scheme.path);
@@ -15764,7 +15792,7 @@ si_recoverdrop(struct si *i, struct phia_runtime *r)
 }
 
 static inline int
-si_recoversnapshot(struct si *i, struct phia_runtime *r, struct sdsnapshot *s)
+si_recoversnapshot(struct si *i, struct runtime *r, struct sdsnapshot *s)
 {
 	/* recovery stages:
 
@@ -15828,9 +15856,9 @@ si_recoversnapshot(struct si *i, struct phia_runtime *r, struct sdsnapshot *s)
 	return 0;
 }
 
-int si_recover(struct si *i)
+static int si_recover(struct si *i)
 {
-	struct phia_runtime *r = &i->r;
+	struct runtime *r = &i->r;
 	int exist = ss_vfsexists(r->vfs, i->scheme.path);
 	if (exist == 0)
 		goto deploy;
@@ -15884,14 +15912,14 @@ enum {
 	SI_SCHEME_EXPIRE
 };
 
-void si_schemeinit(struct sischeme *s)
+static void si_schemeinit(struct sischeme *s)
 {
 	memset(s, 0, sizeof(*s));
 	sr_version(&s->version);
 	sr_version_storage(&s->version_storage);
 }
 
-void si_schemefree(struct sischeme *s, struct phia_runtime *r)
+static void si_schemefree(struct sischeme *s, struct runtime *r)
 {
 	if (s->name) {
 		ss_free(r->a, s->name);
@@ -15920,7 +15948,7 @@ void si_schemefree(struct sischeme *s, struct phia_runtime *r)
 	sf_schemefree(&s->scheme, r->a);
 }
 
-int si_schemedeploy(struct sischeme *s, struct phia_runtime *r)
+static int si_schemedeploy(struct sischeme *s, struct runtime *r)
 {
 	struct sdscheme c;
 	sd_schemeinit(&c);
@@ -16012,7 +16040,7 @@ error:
 	return -1;
 }
 
-int si_schemerecover(struct sischeme *s, struct phia_runtime *r)
+static int si_schemerecover(struct sischeme *s, struct runtime *r)
 {
 	struct sdscheme c;
 	sd_schemeinit(&c);
@@ -16117,9 +16145,9 @@ error:
 	return -1;
 }
 
-int si_snapshot(struct si *index, struct siplan *plan)
+static int si_snapshot(struct si *index, struct siplan *plan)
 {
-	struct phia_runtime *r = &index->r;
+	struct runtime *r = &index->r;
 
 	struct ssfile file;
 	ss_fileinit(&file, r->vfs);
@@ -16250,14 +16278,14 @@ error:
 	return -1;
 }
 
-void si_begin(struct sitx *x, struct si *index)
+static void si_begin(struct sitx *x, struct si *index)
 {
 	x->index = index;
 	rlist_create(&x->nodelist);
 	si_lock(index);
 }
 
-void si_commit(struct sitx *x)
+static void si_commit(struct sitx *x)
 {
 	/* reschedule nodes */
 	struct sinode *node, *n;
@@ -16295,10 +16323,11 @@ static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
 	return 0;
 }
 
-void si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
-              int recover)
+static void
+si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
+	 int recover)
 {
-	struct phia_runtime *r = &x->index->r;
+	struct runtime *r = &x->index->r;
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
@@ -16334,18 +16363,18 @@ struct sy {
 	struct syconf *conf;
 };
 
-int sy_init(struct sy*);
-int sy_open(struct sy*, struct phia_runtime*, struct syconf*);
-int sy_close(struct sy*, struct phia_runtime*);
+static int sy_init(struct sy*);
+static int sy_open(struct sy*, struct runtime*, struct syconf*);
+static int sy_close(struct sy*, struct runtime*);
 
-int sy_init(struct sy *e)
+static int sy_init(struct sy *e)
 {
 	e->conf = NULL;
 	return 0;
 }
 
 static int
-sy_deploy(struct sy *e, struct phia_runtime *r)
+sy_deploy(struct sy *e, struct runtime *r)
 {
 	int rc;
 	rc = ss_vfsmkdir(r->vfs, e->conf->path, 0755);
@@ -16387,7 +16416,7 @@ sy_process(char *name, uint32_t *bsn)
 }
 
 static inline int
-sy_recoverbackup(struct sy *i, struct phia_runtime *r)
+sy_recoverbackup(struct sy *i, struct runtime *r)
 {
 	if (i->conf->path_backup == NULL)
 		return 0;
@@ -16430,7 +16459,7 @@ sy_recoverbackup(struct sy *i, struct phia_runtime *r)
 	return 0;
 }
 
-int sy_open(struct sy *e, struct phia_runtime *r, struct syconf *conf)
+static int sy_open(struct sy *e, struct runtime *r, struct syconf *conf)
 {
 	e->conf = conf;
 	int rc = sy_recoverbackup(e, r);
@@ -16447,7 +16476,7 @@ int sy_open(struct sy *e, struct phia_runtime *r, struct syconf *conf)
 	return 0;
 }
 
-int sy_close(struct sy *e, struct phia_runtime *r)
+static int sy_close(struct sy *e, struct runtime *r)
 {
 	(void)e;
 	(void)r;
@@ -16470,12 +16499,11 @@ struct scworkerpool {
 	int idle;
 };
 
-int sc_workerpool_init(struct scworkerpool*);
-int sc_workerpool_free(struct scworkerpool*, struct phia_runtime*);
-int sc_workerpool_new(struct scworkerpool*, struct phia_runtime*);
+static int sc_workerpool_init(struct scworkerpool*);
+static int sc_workerpool_new(struct scworkerpool*, struct runtime*);
 
 static inline struct scworker*
-sc_workerpool_pop(struct scworkerpool *p, struct phia_runtime *r)
+sc_workerpool_pop(struct scworkerpool *p, struct runtime *r)
 {
 	ss_spinlock(&p->lock);
 	if (sslikely(p->idle >= 1))
@@ -16527,7 +16555,7 @@ struct sctask {
 	int    gc;
 };
 
-struct sc {
+struct scheduler {
 	struct ssmutex        lock;
 	uint64_t       checkpoint_lsn_last;
 	uint64_t       checkpoint_lsn;
@@ -16565,16 +16593,16 @@ struct sc {
 	struct slpool        *lp;
 	char          *backup_path;
 	struct sstrigger     *on_event;
-	struct phia_runtime            *r;
+	struct runtime            *r;
 };
 
-int sc_init(struct sc*, struct phia_runtime*, struct sstrigger*, struct slpool*);
-int sc_set(struct sc *s, uint64_t, char*);
-int sc_add(struct sc*, struct si*);
-int sc_del(struct sc*, struct si*, int);
+static int sc_init(struct scheduler*, struct runtime*, struct sstrigger*, struct slpool*);
+static int sc_set(struct scheduler *s, uint64_t, char*);
+static int sc_add(struct scheduler*, struct si*);
+static int sc_del(struct scheduler*, struct si*, int);
 
 static inline void
-sc_start(struct sc *s, int task)
+sc_start(struct scheduler *s, int task)
 {
 	int i = 0;
 	while (i < s->count) {
@@ -16584,7 +16612,7 @@ sc_start(struct sc *s, int task)
 }
 
 static inline int
-sc_end(struct sc *s, struct scdb *db, int task)
+sc_end(struct scheduler *s, struct scdb *db, int task)
 {
 	db->active &= ~task;
 	int complete = 1;
@@ -16598,7 +16626,7 @@ sc_end(struct sc *s, struct scdb *db, int task)
 }
 
 static inline void
-sc_task_checkpoint(struct sc *s)
+sc_task_checkpoint(struct scheduler *s)
 {
 	uint64_t lsn = sr_seq(s->r->seq, SR_LSN);
 	s->checkpoint_lsn = lsn;
@@ -16607,7 +16635,7 @@ sc_task_checkpoint(struct sc *s)
 }
 
 static inline void
-sc_task_checkpoint_done(struct sc *s)
+sc_task_checkpoint_done(struct scheduler *s)
 {
 	s->checkpoint = 0;
 	s->checkpoint_lsn_last = s->checkpoint_lsn;
@@ -16615,7 +16643,7 @@ sc_task_checkpoint_done(struct sc *s)
 }
 
 static inline void
-sc_task_anticache(struct sc *s)
+sc_task_anticache(struct scheduler *s)
 {
 	s->anticache = 1;
 	s->anticache_storage = s->anticache_limit;
@@ -16624,7 +16652,7 @@ sc_task_anticache(struct sc *s)
 }
 
 static inline void
-sc_task_anticache_done(struct sc *s, uint64_t now)
+sc_task_anticache_done(struct scheduler *s, uint64_t now)
 {
 	s->anticache = 0;
 	s->anticache_asn_last = s->anticache_asn;
@@ -16634,7 +16662,7 @@ sc_task_anticache_done(struct sc *s, uint64_t now)
 }
 
 static inline void
-sc_task_snapshot(struct sc *s)
+sc_task_snapshot(struct scheduler *s)
 {
 	s->snapshot = 1;
 	s->snapshot_ssn = sr_seq(s->r->seq, SR_SSNNEXT);
@@ -16642,7 +16670,7 @@ sc_task_snapshot(struct sc *s)
 }
 
 static inline void
-sc_task_snapshot_done(struct sc *s, uint64_t now)
+sc_task_snapshot_done(struct scheduler *s, uint64_t now)
 {
 	s->snapshot = 0;
 	s->snapshot_ssn_last = s->snapshot_ssn;
@@ -16651,76 +16679,75 @@ sc_task_snapshot_done(struct sc *s, uint64_t now)
 }
 
 static inline void
-sc_task_expire(struct sc *s)
+sc_task_expire(struct scheduler *s)
 {
 	s->expire = 1;
 	sc_start(s, SI_EXPIRE);
 }
 
 static inline void
-sc_task_expire_done(struct sc *s, uint64_t now)
+sc_task_expire_done(struct scheduler *s, uint64_t now)
 {
 	s->expire = 0;
 	s->expire_time = now;
 }
 
 static inline void
-sc_task_gc(struct sc *s)
+sc_task_gc(struct scheduler *s)
 {
 	s->gc = 1;
 	sc_start(s, SI_GC);
 }
 
 static inline void
-sc_task_gc_done(struct sc *s, uint64_t now)
+sc_task_gc_done(struct scheduler *s, uint64_t now)
 {
 	s->gc = 0;
 	s->gc_time = now;
 }
 
 static inline void
-sc_task_lru(struct sc *s)
+sc_task_lru(struct scheduler *s)
 {
 	s->lru = 1;
 	sc_start(s, SI_LRU);
 }
 
 static inline void
-sc_task_lru_done(struct sc *s, uint64_t now)
+sc_task_lru_done(struct scheduler *s, uint64_t now)
 {
 	s->lru = 0;
 	s->lru_time = now;
 }
 
 static inline void
-sc_task_age(struct sc *s)
+sc_task_age(struct scheduler *s)
 {
 	s->age = 1;
 	sc_start(s, SI_AGE);
 }
 
 static inline void
-sc_task_age_done(struct sc *s, uint64_t now)
+sc_task_age_done(struct scheduler *s, uint64_t now)
 {
 	s->age = 0;
 	s->age_time = now;
 }
 
-int sc_step(struct sc*, struct scworker*, uint64_t);
+static int sc_step(struct scheduler*, struct scworker*, uint64_t);
 
-int sc_ctl_call(struct sc*, uint64_t);
-int sc_ctl_branch(struct sc*, uint64_t, struct si*);
-int sc_ctl_compact(struct sc*, uint64_t, struct si*);
-int sc_ctl_compact_index(struct sc*, uint64_t, struct si*);
-int sc_ctl_anticache(struct sc*);
-int sc_ctl_snapshot(struct sc*);
-int sc_ctl_checkpoint(struct sc*);
-int sc_ctl_expire(struct sc*);
-int sc_ctl_gc(struct sc*);
-int sc_ctl_lru(struct sc*);
-int sc_ctl_backup(struct sc*);
-int sc_ctl_backup_event(struct sc*);
-int sc_ctl_shutdown(struct sc*, struct si*);
+static int sc_ctl_call(struct scheduler*, uint64_t);
+static int sc_ctl_branch(struct scheduler*, uint64_t, struct si*);
+static int sc_ctl_compact(struct scheduler*, uint64_t, struct si*);
+static int sc_ctl_compact_index(struct scheduler*, uint64_t, struct si*);
+static int sc_ctl_anticache(struct scheduler*);
+static int sc_ctl_snapshot(struct scheduler*);
+static int sc_ctl_checkpoint(struct scheduler*);
+static int sc_ctl_expire(struct scheduler*);
+static int sc_ctl_gc(struct scheduler*);
+static int sc_ctl_lru(struct scheduler*);
+static int sc_ctl_backup(struct scheduler*);
+static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
 struct screadarg {
 	struct sv        v;
@@ -16748,21 +16775,21 @@ struct scread {
 	int         read_cache;
 	struct svv        *result;
 	int         rc;
-	struct phia_runtime         *r;
+	struct runtime         *r;
 };
 
-void sc_readopen(struct scread*, struct phia_runtime*, struct so*, struct si*);
-void sc_readclose(struct scread*);
-int  sc_read(struct scread*, struct sc*);
+static void sc_readopen(struct scread*, struct runtime*, struct so*, struct si*);
+static void sc_readclose(struct scread*);
+static int sc_read(struct scread*, struct scheduler*);
 
-int sc_write(struct sc*, struct svlog*, uint64_t, int);
+static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
 
-int sc_backupstart(struct sc*);
-int sc_backupbegin(struct sc*);
-int sc_backupend(struct sc*, struct scworker*);
-int sc_backuperror(struct sc*);
+static int sc_backupstart(struct scheduler*);
+static int sc_backupbegin(struct scheduler*);
+static int sc_backupend(struct scheduler*, struct scworker*);
+static int sc_backuperror(struct scheduler*);
 
-int sc_backupstart(struct sc *s)
+static int sc_backupstart(struct scheduler *s)
 {
 	if (ssunlikely(s->backup_path == NULL)) {
 		sr_error(s->r->e, "%s", "backup is not enabled");
@@ -16789,7 +16816,7 @@ int sc_backupstart(struct sc *s)
 	return 0;
 }
 
-int sc_backupbegin(struct sc *s)
+static int sc_backupbegin(struct scheduler *s)
 {
 	/*
 	 * a. create backup_path/<bsn.incomplete> directory
@@ -16830,7 +16857,7 @@ int sc_backupbegin(struct sc *s)
 	return 0;
 }
 
-int sc_backupend(struct sc *s, struct scworker *w)
+static int sc_backupend(struct scheduler *s, struct scworker *w)
 {
 	/*
 	 * a. rotate log file
@@ -16882,7 +16909,7 @@ int sc_backupend(struct sc *s, struct scworker *w)
 	return 0;
 }
 
-int sc_backuperror(struct sc *s)
+static int sc_backuperror(struct scheduler *s)
 {
 	sl_poolgc_enable(s->lp, 1);
 	s->backup = 0;
@@ -16890,7 +16917,9 @@ int sc_backuperror(struct sc *s)
 	return 0;
 }
 
-int sc_init(struct sc *s, struct phia_runtime *r, struct sstrigger *on_event, struct slpool *lp)
+static int
+sc_init(struct scheduler *s, struct runtime *r,
+	struct sstrigger *on_event, struct slpool *lp)
 {
 	uint64_t now = clock_monotonic64();
 	ss_mutexinit(&s->lock);
@@ -16934,14 +16963,14 @@ int sc_init(struct sc *s, struct phia_runtime *r, struct sstrigger *on_event, st
 	return 0;
 }
 
-int sc_set(struct sc *s, uint64_t anticache, char *backup_path)
+static int sc_set(struct scheduler *s, uint64_t anticache, char *backup_path)
 {
 	s->anticache_limit = anticache;
 	s->backup_path = backup_path;
 	return 0;
 }
 
-int sc_add(struct sc *s, struct si *index)
+static int sc_add(struct scheduler *s, struct si *index)
 {
 	struct scdb *db = ss_malloc(s->r->a, sizeof(struct scdb));
 	if (ssunlikely(db == NULL))
@@ -16969,7 +16998,7 @@ int sc_add(struct sc *s, struct si *index)
 	return 0;
 }
 
-int sc_del(struct sc *s, struct si *index, int lock)
+static int sc_del(struct scheduler *s, struct si *index, int lock)
 {
 	if (ssunlikely(s->i == NULL))
 		return 0;
@@ -17016,7 +17045,7 @@ free:
 	return 0;
 }
 
-int sc_ctl_call(struct sc *s, uint64_t vlsn)
+static int sc_ctl_call(struct scheduler *s, uint64_t vlsn)
 {
 	int rc = sr_statusactive(s->r->status);
 	if (ssunlikely(rc == 0))
@@ -17029,9 +17058,9 @@ int sc_ctl_call(struct sc *s, uint64_t vlsn)
 	return rc;
 }
 
-int sc_ctl_branch(struct sc *s, uint64_t vlsn, struct si *index)
+static int sc_ctl_branch(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
-	struct phia_runtime *r = s->r;
+	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
 	if (ssunlikely(rc == 0))
 		return 0;
@@ -17060,9 +17089,9 @@ int sc_ctl_branch(struct sc *s, uint64_t vlsn, struct si *index)
 	return rc;
 }
 
-int sc_ctl_compact(struct sc *s, uint64_t vlsn, struct si *index)
+static int sc_ctl_compact(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
-	struct phia_runtime *r = s->r;
+	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
 	if (ssunlikely(rc == 0))
 		return 0;
@@ -17091,9 +17120,10 @@ int sc_ctl_compact(struct sc *s, uint64_t vlsn, struct si *index)
 	return rc;
 }
 
-int sc_ctl_compact_index(struct sc *s, uint64_t vlsn, struct si *index)
+static int
+sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
-	struct phia_runtime *r = s->r;
+	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
 	if (ssunlikely(rc == 0))
 		return 0;
@@ -17122,7 +17152,7 @@ int sc_ctl_compact_index(struct sc *s, uint64_t vlsn, struct si *index)
 	return rc;
 }
 
-int sc_ctl_anticache(struct sc *s)
+static int sc_ctl_anticache(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_anticache(s);
@@ -17130,7 +17160,7 @@ int sc_ctl_anticache(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_snapshot(struct sc *s)
+static int sc_ctl_snapshot(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_snapshot(s);
@@ -17138,7 +17168,7 @@ int sc_ctl_snapshot(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_checkpoint(struct sc *s)
+static int sc_ctl_checkpoint(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_checkpoint(s);
@@ -17146,7 +17176,7 @@ int sc_ctl_checkpoint(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_expire(struct sc *s)
+static int sc_ctl_expire(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_expire(s);
@@ -17154,7 +17184,7 @@ int sc_ctl_expire(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_gc(struct sc *s)
+static int sc_ctl_gc(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_gc(s);
@@ -17162,7 +17192,7 @@ int sc_ctl_gc(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_lru(struct sc *s)
+static int sc_ctl_lru(struct scheduler *s)
 {
 	ss_mutexlock(&s->lock);
 	sc_task_lru(s);
@@ -17170,24 +17200,12 @@ int sc_ctl_lru(struct sc *s)
 	return 0;
 }
 
-int sc_ctl_backup(struct sc *s)
+static int sc_ctl_backup(struct scheduler *s)
 {
 	return sc_backupstart(s);
 }
 
-int sc_ctl_backup_event(struct sc *s)
-{
-	int event = 0;
-	ss_mutexlock(&s->lock);
-	if (ssunlikely(s->backup_events > 0)) {
-		s->backup_events--;
-		event = 1;
-	}
-	ss_mutexunlock(&s->lock);
-	return event;
-}
-
-int sc_ctl_shutdown(struct sc *s, struct si *i)
+static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
 {
 	ss_mutexlock(&s->lock);
 	s->shutdown_pending++;
@@ -17196,9 +17214,9 @@ int sc_ctl_shutdown(struct sc *s, struct si *i)
 	return 0;
 }
 
-void sc_readclose(struct scread *r)
+static void sc_readclose(struct scread *r)
 {
-	struct phia_runtime *rt = r->r;
+	struct runtime *rt = r->r;
 	/* free key, prefix, upsert and a pending result */
 	if (r->arg.v.v)
 		sv_vunref(rt, r->arg.v.v);
@@ -17211,7 +17229,8 @@ void sc_readclose(struct scread *r)
 		si_cachepool_push(r->arg.cache);
 }
 
-void sc_readopen(struct scread *r, struct phia_runtime *rt, struct so *db, struct si *index)
+static void
+sc_readopen(struct scread *r, struct runtime *rt, struct so *db, struct si *index)
 {
 	r->db = db;
 	r->index = index;
@@ -17223,7 +17242,7 @@ void sc_readopen(struct scread *r, struct phia_runtime *rt, struct so *db, struc
 	r->r = rt;
 }
 
-int sc_read(struct scread *r, struct sc *s)
+static int sc_read(struct scread *r, struct scheduler *s)
 {
 	struct screadarg *arg = &r->arg;
 	struct si *index = r->index;
@@ -17256,7 +17275,7 @@ int sc_read(struct scread *r, struct sc *s)
 }
 
 static inline int
-sc_rotate(struct sc*s, struct scworker *w)
+sc_rotate(struct scheduler*s, struct scworker *w)
 {
 	ss_trace(&w->trace, "%s", "log rotation");
 	int rc = sl_poolrotate_ready(s->lp);
@@ -17269,7 +17288,7 @@ sc_rotate(struct sc*s, struct scworker *w)
 }
 
 static inline int
-sc_gc(struct sc *s, struct scworker *w)
+sc_gc(struct scheduler *s, struct scworker *w)
 {
 	ss_trace(&w->trace, "%s", "log gc");
 	int rc = sl_poolgc(s->lp);
@@ -17293,7 +17312,7 @@ sc_execute(struct sctask *t, struct scworker *w, uint64_t vlsn)
 }
 
 static inline struct scdb*
-sc_peek(struct sc *s)
+sc_peek(struct scheduler *s)
 {
 	if (s->rr >= s->count)
 		s->rr = 0;
@@ -17320,7 +17339,7 @@ first_half:
 }
 
 static inline void
-sc_next(struct sc *s)
+sc_next(struct scheduler *s)
 {
 	s->rr++;
 	if (s->rr >= s->count)
@@ -17328,7 +17347,7 @@ sc_next(struct sc *s)
 }
 
 static inline int
-sc_plan(struct sc *s, struct siplan *plan)
+sc_plan(struct scheduler *s, struct siplan *plan)
 {
 	struct scdb *db = s->i[s->rr];
 	return si_plan(db->index, plan);
@@ -17337,7 +17356,7 @@ sc_plan(struct sc *s, struct siplan *plan)
 }
 
 static inline int
-sc_planquota(struct sc *s, struct siplan *plan, uint32_t quota, uint32_t quota_limit)
+sc_planquota(struct scheduler *s, struct siplan *plan, uint32_t quota, uint32_t quota_limit)
 {
 	struct scdb *db = s->i[s->rr];
 	if (db->workers[quota] >= quota_limit)
@@ -17346,7 +17365,7 @@ sc_planquota(struct sc *s, struct siplan *plan, uint32_t quota, uint32_t quota_l
 }
 
 static inline int
-sc_do_shutdown(struct sc *s, struct sctask *task)
+sc_do_shutdown(struct scheduler *s, struct sctask *task)
 {
 	if (sslikely(s->shutdown_pending == 0))
 		return 0;
@@ -17369,7 +17388,7 @@ sc_do_shutdown(struct sc *s, struct sctask *task)
 }
 
 static int
-sc_do(struct sc *s, struct sctask *task, struct scworker *w, struct srzone *zone,
+sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzone *zone,
       struct scdb *db, uint64_t vlsn, uint64_t now)
 {
 	int rc;
@@ -17639,7 +17658,7 @@ no_job:
 }
 
 static inline void
-sc_periodic_done(struct sc *s, uint64_t now)
+sc_periodic_done(struct scheduler *s, uint64_t now)
 {
 	/* checkpoint */
 	if (ssunlikely(s->checkpoint))
@@ -17665,7 +17684,7 @@ sc_periodic_done(struct sc *s, uint64_t now)
 }
 
 static inline void
-sc_periodic(struct sc *s, struct sctask *task, struct srzone *zone, uint64_t now)
+sc_periodic(struct scheduler *s, struct sctask *task, struct srzone *zone, uint64_t now)
 {
 	if (ssunlikely(s->count == 0))
 		return;
@@ -17723,7 +17742,7 @@ sc_periodic(struct sc *s, struct sctask *task, struct srzone *zone, uint64_t now
 }
 
 static int
-sc_schedule(struct sc *s, struct sctask *task, struct scworker *w, uint64_t vlsn)
+sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64_t vlsn)
 {
 	uint64_t now = clock_monotonic64();
 	struct srzone *zone = sr_zoneof(s->r);
@@ -17754,7 +17773,7 @@ sc_schedule(struct sc *s, struct sctask *task, struct scworker *w, uint64_t vlsn
 }
 
 static inline int
-sc_complete(struct sc *s, struct sctask *t)
+sc_complete(struct scheduler *s, struct sctask *t)
 {
 	ss_mutexlock(&s->lock);
 	struct scdb *db = t->db;
@@ -17803,7 +17822,8 @@ sc_taskinit(struct sctask *task)
 	task->shutdown = NULL;
 }
 
-int sc_step(struct sc *s, struct scworker *w, uint64_t vlsn)
+static int
+sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 {
 	struct sctask task;
 	sc_taskinit(&task);
@@ -17845,7 +17865,7 @@ error:
 }
 
 static inline struct scworker*
-sc_workernew(struct phia_runtime *r, int id)
+sc_workernew(struct runtime *r, int id)
 {
 	struct scworker *w = ss_malloc(r->a, sizeof(struct scworker));
 	if (ssunlikely(w == NULL)) {
@@ -17862,14 +17882,14 @@ sc_workernew(struct phia_runtime *r, int id)
 }
 
 static inline void
-sc_workerfree(struct scworker *w, struct phia_runtime *r)
+sc_workerfree(struct scworker *w, struct runtime *r)
 {
 	sd_cfree(&w->dc, r);
 	ss_tracefree(&w->trace);
 	ss_free(r->a, w);
 }
 
-int sc_workerpool_init(struct scworkerpool *p)
+static int sc_workerpool_init(struct scworkerpool *p)
 {
 	ss_spinlockinit(&p->lock);
 	rlist_create(&p->list);
@@ -17879,16 +17899,7 @@ int sc_workerpool_init(struct scworkerpool *p)
 	return 0;
 }
 
-int sc_workerpool_free(struct scworkerpool *p, struct phia_runtime *r)
-{
-	struct scworker *w, *n;
-	rlist_foreach_entry_safe(w, &p->list, link, n) {
-		sc_workerfree(w, r);
-	}
-	return 0;
-}
-
-int sc_workerpool_new(struct scworkerpool *p, struct phia_runtime *r)
+static int sc_workerpool_new(struct scworkerpool *p, struct runtime *r)
 {
 	struct scworker *w = sc_workernew(r, p->total);
 	if (ssunlikely(w == NULL))
@@ -17900,7 +17911,7 @@ int sc_workerpool_new(struct scworkerpool *p, struct phia_runtime *r)
 	return 0;
 }
 
-int sc_write(struct sc *s, struct svlog *log, uint64_t lsn, int recover)
+static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int recover)
 {
 	/* write-ahead log */
 	struct sltx tl;
@@ -17943,7 +17954,7 @@ enum {
 	SECURSOR
 };
 
-extern struct sotype se_o[];
+static struct sotype se_o[];
 
 #define se_cast(ptr, cast, id) so_cast(ptr, cast, &se_o[id])
 
@@ -18032,15 +18043,15 @@ struct seconf {
 	struct so           *env;
 };
 
-int      se_confinit(struct seconf*, struct so*);
-void     se_conffree(struct seconf*);
-int      se_confvalidate(struct seconf*);
-int      se_confserialize(struct seconf*, struct ssbuf*);
-int      se_confset_string(struct so*, const char*, void*, int);
-int      se_confset_int(struct so*, const char*, int64_t);
-void    *se_confget_object(struct so*, const char*);
-void    *se_confget_string(struct so*, const char*, int*);
-int64_t  se_confget_int(struct so*, const char*);
+static int se_confinit(struct seconf*, struct so*);
+static void se_conffree(struct seconf*);
+static int se_confvalidate(struct seconf*);
+static int se_confserialize(struct seconf*, struct ssbuf*);
+static int se_confset_string(struct so*, const char*, void*, int);
+static int se_confset_int(struct so*, const char*, int64_t);
+static void *se_confget_object(struct so*, const char*);
+static void *se_confget_string(struct so*, const char*, int*);
+static int64_t se_confget_int(struct so*, const char*);
 
 struct seconfkv {
 	struct so    o;
@@ -18055,9 +18066,9 @@ struct seconfcursor {
 	struct srconfdump *pos;
 };
 
-struct so *se_confcursor_new(struct so*);
+static struct so *se_confcursor_new(struct so*);
 
-struct se {
+struct phia_env {
 	struct so          o;
 	struct srstatus    status;
 	struct ssmutex     apilock;
@@ -18082,30 +18093,27 @@ struct se {
 	struct slconf      lpconf;
 	struct slpool      lp;
 	struct sxmanager   xm;
-	struct sc          scheduler;
+	struct scheduler          scheduler;
 	struct srerror     error;
 	struct srstat      stat;
 	struct sflimit     limit;
 	struct ssinjection ei;
-	struct phia_runtime          r;
+	struct runtime          r;
 };
 
 static inline void
 se_apilock(struct so *o) {
-	ss_mutexlock(&((struct se*)o)->apilock);
+	ss_mutexlock(&((struct phia_env*)o)->apilock);
 }
 
 static inline void
 se_apiunlock(struct so *o) {
-	ss_mutexunlock(&((struct se*)o)->apilock);
+	ss_mutexunlock(&((struct phia_env*)o)->apilock);
 }
 
-static inline struct se *se_of(struct so *o) {
-	return (struct se*)o->env;
+static inline struct phia_env *se_of(struct so *o) {
+	return (struct phia_env*)o->env;
 }
-
-struct so  *se_new(void);
-int  se_service(struct so*);
 
 struct sedocument {
 	struct so        o;
@@ -18138,12 +18146,12 @@ struct sedocument {
 	int       event;
 };
 
-struct so *se_document_new(struct se*, struct so*, struct sv*);
+static struct so *se_document_new(struct phia_env*, struct so*, struct sv*);
 
 static inline int
 se_document_validate_ro(struct sedocument *o, struct so *dest)
 {
-	struct se *e = se_of(&o->o);
+	struct phia_env *e = se_of(&o->o);
 	if (ssunlikely(o->o.parent != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
@@ -18157,7 +18165,7 @@ se_document_validate_ro(struct sedocument *o, struct so *dest)
 static inline int
 se_document_validate(struct sedocument *o, struct so *dest, uint8_t flags)
 {
-	struct se *e = se_of(&o->o);
+	struct phia_env *e = se_of(&o->o);
 	if (ssunlikely(o->o.parent != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
@@ -18182,7 +18190,7 @@ struct sedb {
 	struct siprofiler rtp;
 	struct sischeme  *scheme;
 	struct si        *index;
-	struct phia_runtime *r;
+	struct runtime *r;
 	struct sxindex    coindex;
 	uint64_t   txn_min;
 	uint64_t   txn_max;
@@ -18193,14 +18201,15 @@ se_dbactive(struct sedb *o) {
 	return si_active(o->index);
 }
 
-struct so   *se_dbnew(struct se*, char*, int);
-struct so   *se_dbmatch(struct se*, char*);
-struct so   *se_dbmatch_id(struct se*, uint32_t);
-struct so   *se_dbresult(struct se*, struct scread*);
-void *se_dbread(struct sedb*, struct sedocument*, struct sx*, int, struct sicache*);
-int   se_dbvisible(struct sedb*, uint64_t);
-void  se_dbbind(struct se*);
-void  se_dbunbind(struct se*, uint64_t);
+static struct so *se_dbnew(struct phia_env*, char*, int);
+static struct so *se_dbmatch(struct phia_env*, char*);
+static struct so *se_dbmatch_id(struct phia_env*, uint32_t);
+static struct so *se_dbresult(struct phia_env*, struct scread*);
+static void *
+se_dbread(struct sedb*, struct sedocument*, struct sx*, int, struct sicache*);
+static int se_dbvisible(struct sedb*, uint64_t);
+static void se_dbbind(struct phia_env*);
+static void se_dbunbind(struct phia_env*, uint64_t);
 
 struct setx {
 	struct so o;
@@ -18211,7 +18220,7 @@ struct setx {
 	struct sx t;
 };
 
-struct so *se_txnew(struct se*);
+static struct so *se_txnew(struct phia_env*);
 
 struct seviewdb {
 	struct so        o;
@@ -18222,7 +18231,7 @@ struct seviewdb {
 	struct sedb     *v;
 } sspacked;
 
-struct so *se_viewdb_new(struct se*, uint64_t);
+static struct so *se_viewdb_new(struct phia_env*, uint64_t);
 
 struct seview {
 	struct so        o;
@@ -18234,8 +18243,8 @@ struct seview {
 	struct solist    cursor;
 } sspacked;
 
-struct so  *se_viewnew(struct se*, uint64_t, char*, int);
-int  se_viewupdate(struct seview*);
+static struct so *se_viewnew(struct phia_env*, uint64_t, char*, int);
+static int se_viewupdate(struct seview*);
 
 struct secursor {
 	struct so o;
@@ -18249,7 +18258,7 @@ struct secursor {
 	struct sicache *cache;
 };
 
-struct so *se_cursornew(struct se*, uint64_t);
+static struct so *se_cursornew(struct phia_env*, uint64_t);
 
 enum {
 	SE_RECOVER_1P = 1,
@@ -18257,15 +18266,15 @@ enum {
 	SE_RECOVER_NP = 3
 };
 
-int se_recoverbegin(struct sedb*);
-int se_recoverend(struct sedb*);
-int se_recover(struct se*);
-int se_recover_repository(struct se*);
+static int se_recoverbegin(struct sedb*);
+static int se_recoverend(struct sedb*);
+static int se_recover(struct phia_env*);
+static int se_recover_repository(struct phia_env*);
 
 static int
 se_open(struct so *o)
 {
-	struct se *e = se_cast(o, struct se*, SE);
+	struct phia_env *e = se_cast(o, struct phia_env*, SE);
 	/* recover phases */
 	int status = sr_status(&e->status);
 	switch (e->conf.recover) {
@@ -18337,7 +18346,7 @@ online:
 static int
 se_destroy(struct so *o)
 {
-	struct se *e = se_cast(o, struct se*, SE);
+	struct phia_env *e = se_cast(o, struct phia_env*, SE);
 	int rcret = 0;
 	int rc;
 	sr_statusset(&e->status, SR_SHUTDOWN);
@@ -18395,14 +18404,14 @@ se_close(struct so *o)
 static void*
 se_begin(struct so *o)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	return se_txnew(e);
 }
 
 static void*
 se_cursor(struct so *o)
 {
-	struct se *e = se_cast(o, struct se*, SE);
+	struct phia_env *e = se_cast(o, struct phia_env*, SE);
 	return se_cursornew(e, UINT64_MAX);
 }
 
@@ -18429,57 +18438,6 @@ static struct soif seif =
 	.cursor       = se_cursor,
 };
 
-int se_service(struct so *o)
-{
-	struct se *e = se_cast(o, struct se*, SE);
-	return sc_ctl_call(&e->scheduler, sx_vlsn(&e->xm));
-}
-
-struct so *se_new(void)
-{
-	struct se *e = malloc(sizeof(*e));
-	if (ssunlikely(e == NULL))
-		return NULL;
-	memset(e, 0, sizeof(*e));
-	so_init(&e->o, &se_o[SE], &seif, &e->o, &e->o /* self */);
-	sr_statusinit(&e->status);
-	sr_statusset(&e->status, SR_OFFLINE);
-	ss_vfsinit(&e->vfs, &ss_stdvfs);
-	ss_aopen(&e->a, &ss_stda);
-	ss_aopen(&e->a_ref, &ss_stda);
-	int rc;
-	rc = se_confinit(&e->conf, &e->o);
-	if (ssunlikely(rc == -1))
-		goto error;
-	so_poolinit(&e->document, 1024);
-	so_poolinit(&e->cursor, 512);
-	so_poolinit(&e->tx, 512);
-	so_poolinit(&e->confcursor, 2);
-	so_poolinit(&e->confcursor_kv, 1);
-	so_poolinit(&e->view, 1);
-	so_poolinit(&e->viewdb, 1);
-	so_listinit(&e->db);
-	ss_mutexinit(&e->apilock);
-	ss_quotainit(&e->quota);
-	sr_seqinit(&e->seq);
-	sr_errorinit(&e->error);
-	sr_statinit(&e->stat);
-	sf_limitinit(&e->limit, &e->a);
-	sr_init(&e->r, &e->status, &e->error, &e->a, &e->a_ref, &e->vfs, &e->quota,
-	        &e->conf.zones, &e->seq, SF_RAW, NULL,
-	        NULL, &e->ei, &e->stat);
-	sy_init(&e->rep);
-	sl_poolinit(&e->lp, &e->r);
-	sx_managerinit(&e->xm, &e->r);
-	si_cachepool_init(&e->cachepool, &e->r);
-	sc_init(&e->scheduler, &e->r, &e->conf.on_event, &e->lp);
-	return &e->o;
-error:
-	sr_statusfree(&e->status);
-	free(e);
-	return NULL;
-}
-
 static inline int
 se_confv(struct srconf *c, struct srconfstmt *s)
 {
@@ -18495,7 +18453,7 @@ se_confv(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confv_offline(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op == SR_WRITE) {
 		if (sr_status(&e->status)) {
 			sr_error(s->r->e, "write to %s is offline-only", s->path);
@@ -18508,7 +18466,7 @@ se_confv_offline(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confphia_error(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	char *errorp;
 	char  error[128];
 	error[0] = 0;
@@ -18530,7 +18488,7 @@ se_confphia_error(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline struct srconf*
-se_confphia(struct se *e, struct seconfrt *rt, struct srconf **pc)
+se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *phia = *pc;
 	struct srconf *p = NULL;
@@ -18545,7 +18503,7 @@ se_confphia(struct se *e, struct seconfrt *rt, struct srconf **pc)
 }
 
 static inline struct srconf*
-se_confmemory(struct se *e, struct seconfrt *rt, struct srconf **pc)
+se_confmemory(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *memory = *pc;
 	struct srconf *p = NULL;
@@ -18558,7 +18516,7 @@ se_confmemory(struct se *e, struct seconfrt *rt, struct srconf **pc)
 static inline int
 se_confcompaction_set(struct srconf *c ssunused, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_WRITE) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
@@ -18581,7 +18539,7 @@ se_confcompaction_set(struct srconf *c ssunused, struct srconfstmt *s)
 }
 
 static inline struct srconf*
-se_confcompaction(struct se *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 {
 	struct srconf *compaction = NULL;
 	struct srconf *prev = NULL;
@@ -18647,7 +18605,7 @@ se_confscheduler_checkpoint(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_checkpoint(&e->scheduler);
 }
 
@@ -18656,7 +18614,7 @@ se_confscheduler_snapshot(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_snapshot(&e->scheduler);
 }
 
@@ -18665,14 +18623,14 @@ se_confscheduler_anticache(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_anticache(&e->scheduler);
 }
 
 static inline int
 se_confscheduler_on_recover(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(sr_statusactive(&e->status))) {
@@ -18687,7 +18645,7 @@ se_confscheduler_on_recover(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confscheduler_on_recover_arg(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(sr_statusactive(&e->status))) {
@@ -18701,7 +18659,7 @@ se_confscheduler_on_recover_arg(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confscheduler_on_event(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(sr_statusactive(&e->status))) {
@@ -18715,7 +18673,7 @@ se_confscheduler_on_event(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confscheduler_on_event_arg(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(sr_statusactive(&e->status))) {
@@ -18731,7 +18689,7 @@ se_confscheduler_gc(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_gc(&e->scheduler);
 }
 
@@ -18740,7 +18698,7 @@ se_confscheduler_expire(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_expire(&e->scheduler);
 }
 
@@ -18749,7 +18707,7 @@ se_confscheduler_lru(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_lru(&e->scheduler);
 }
 
@@ -18758,13 +18716,13 @@ se_confscheduler_run(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_call(&e->scheduler, vlsn);
 }
 
 static inline struct srconf*
-se_confscheduler(struct se *e, struct seconfrt *rt, struct srconf **pc)
+se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *scheduler = *pc;
 	struct srconf *prev;
@@ -18810,7 +18768,7 @@ se_conflog_rotate(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sl_poolrotate(&e->lp);
 }
 
@@ -18819,12 +18777,12 @@ se_conflog_gc(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sl_poolgc(&e->lp);
 }
 
 static inline struct srconf*
-se_conflog(struct se *e, struct seconfrt *rt, struct srconf **pc)
+se_conflog(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *log = *pc;
 	struct srconf *p = NULL;
@@ -18840,7 +18798,7 @@ se_conflog(struct se *e, struct seconfrt *rt, struct srconf **pc)
 }
 
 static inline struct srconf*
-se_confperformance(struct se *e ssunused, struct seconfrt *rt, struct srconf **pc)
+se_confperformance(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *perf = *pc;
 	struct srconf *p = NULL;
@@ -18876,7 +18834,7 @@ se_confperformance(struct se *e ssunused, struct seconfrt *rt, struct srconf **p
 }
 
 static inline struct srconf*
-se_confmetric(struct se *e ssunused, struct seconfrt *rt, struct srconf **pc)
+se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *metric = *pc;
 	struct srconf *p = NULL;
@@ -18895,7 +18853,7 @@ static inline int
 se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 {
 	/* set(db) */
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op == SR_WRITE) {
 		char *name = s->value;
 		struct sedb *db = (struct sedb*)se_dbmatch(e, name);
@@ -18928,7 +18886,7 @@ static inline int
 se_confdb_get(struct srconf *c, struct srconfstmt *s)
 {
 	/* get(db.name) */
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_READ) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
@@ -18999,7 +18957,7 @@ se_confdb_branch(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct sedb *db = c->value;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_branch(&e->scheduler, vlsn, db->index);
 }
@@ -19010,7 +18968,7 @@ se_confdb_compact(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct sedb *db = c->value;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact(&e->scheduler, vlsn, db->index);
 }
@@ -19021,7 +18979,7 @@ se_confdb_compact_index(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct sedb *db = c->value;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact_index(&e->scheduler, vlsn, db->index);
 }
@@ -19044,7 +19002,7 @@ se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
 {
 	/* set(scheme, field) */
 	struct sedb *db = c->ptr;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	if (s->op != SR_WRITE) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
@@ -19085,7 +19043,7 @@ static inline int
 se_confdb_field(struct srconf *c, struct srconfstmt *s)
 {
 	struct sedb *db = c->ptr;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(se_dbactive(db))) {
@@ -19100,7 +19058,7 @@ se_confdb_field(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline struct srconf*
-se_confdb(struct se *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 {
 	struct srconf *db = NULL;
 	struct srconf *prev = NULL;
@@ -19186,7 +19144,7 @@ se_confview_set(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	uint64_t lsn = sr_seq(&e->seq, SR_LSN);
 	/* create view object */
 	struct seview *view = (struct seview*)se_viewnew(e, lsn, s->value, s->valuesize);
@@ -19212,7 +19170,7 @@ static inline int
 se_confview_get(struct srconf *c, struct srconfstmt *s)
 {
 	/* get(view.name) */
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	if (s->op != SR_READ) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
@@ -19223,7 +19181,7 @@ se_confview_get(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline struct srconf*
-se_confview(struct se *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confview(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 {
 	struct srconf *view = NULL;
 	struct srconf *prev = NULL;
@@ -19246,12 +19204,12 @@ se_confbackup_run(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	return sc_ctl_backup(&e->scheduler);
 }
 
 static inline struct srconf*
-se_confbackup(struct se *e, struct seconfrt *rt, struct srconf **pc)
+se_confbackup(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *backup = *pc;
 	struct srconf *p = NULL;
@@ -19266,7 +19224,7 @@ se_confbackup(struct se *e, struct seconfrt *rt, struct srconf **pc)
 static inline int
 se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	assert(e->ei.oom == 0);
 	int rc = se_confv(c, s);
 	if (ssunlikely(rc == -1))
@@ -19280,7 +19238,7 @@ se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confdebug_io(struct srconf *c, struct srconfstmt *s)
 {
-	struct se *e = s->ptr;
+	struct phia_env *e = s->ptr;
 	assert(e->ei.io == 0);
 	int rc = se_confv(c, s);
 	if (ssunlikely(rc == -1))
@@ -19291,7 +19249,7 @@ se_confdebug_io(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline struct srconf*
-se_confdebug(struct se *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confdebug(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 {
 	struct srconf *prev = NULL;
 	struct srconf *p = NULL;
@@ -19317,7 +19275,7 @@ se_confdebug(struct se *e, struct seconfrt *rt ssunused, struct srconf **pc)
 }
 
 static struct srconf*
-se_confprepare(struct se *e, struct seconfrt *rt, struct srconf *c, int serialize)
+se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int serialize)
 {
 	/* phia */
 	struct srconf *pc = c;
@@ -19348,7 +19306,7 @@ se_confprepare(struct se *e, struct seconfrt *rt, struct srconf *c, int serializ
 }
 
 static int
-se_confrt(struct se *e, struct seconfrt *rt)
+se_confrt(struct phia_env *e, struct seconfrt *rt)
 {
 	/* phia */
 	snprintf(rt->version, sizeof(rt->version),
@@ -19413,7 +19371,7 @@ se_confrt(struct se *e, struct seconfrt *rt)
 static inline int
 se_confensure(struct seconf *c)
 {
-	struct se *e = (struct se*)c->env;
+	struct phia_env *e = (struct phia_env*)c->env;
 	int confmax = 2048 + (e->db.n * 100) + (e->view.list.n * 10);
 	confmax *= sizeof(struct srconf);
 	if (sslikely(confmax <= c->confmax))
@@ -19427,13 +19385,13 @@ se_confensure(struct seconf *c)
 	return 0;
 }
 
-int se_confserialize(struct seconf *c, struct ssbuf *buf)
+static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 {
 	int rc;
 	rc = se_confensure(c);
 	if (ssunlikely(rc == -1))
 		return -1;
-	struct se *e = (struct se*)c->env;
+	struct phia_env *e = (struct phia_env*)c->env;
 	struct seconfrt rt;
 	se_confrt(e, &rt);
 	struct srconf *conf = c->conf;
@@ -19453,7 +19411,7 @@ int se_confserialize(struct seconf *c, struct ssbuf *buf)
 }
 
 static int
-se_confquery(struct se *e, int op, const char *path,
+se_confquery(struct phia_env *e, int op, const char *path,
              enum sstype valuetype, void *value, int valuesize,
              int *size)
 {
@@ -19482,25 +19440,26 @@ se_confquery(struct se *e, int op, const char *path,
 	return rc;
 }
 
-int se_confset_string(struct so *o, const char *path, void *string, int size)
+static int
+se_confset_string(struct so *o, const char *path, void *string, int size)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (string && size == 0)
 		size = strlen(string) + 1;
 	return se_confquery(e, SR_WRITE, path, SS_STRING,
 	                   string, size, NULL);
 }
 
-int se_confset_int(struct so *o, const char *path, int64_t v)
+static int se_confset_int(struct so *o, const char *path, int64_t v)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	return se_confquery(e, SR_WRITE, path, SS_I64,
 	                    &v, sizeof(v), NULL);
 }
 
-void *se_confget_object(struct so *o, const char *path)
+static void *se_confget_object(struct so *o, const char *path)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (path == NULL)
 		return se_confcursor_new(o);
 	void *result = NULL;
@@ -19511,9 +19470,9 @@ void *se_confget_object(struct so *o, const char *path)
 	return result;
 }
 
-void *se_confget_string(struct so *o, const char *path, int *size)
+static void *se_confget_string(struct so *o, const char *path, int *size)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	void *result = NULL;
 	int rc = se_confquery(e, SR_READ, path, SS_STRING,
 	                      &result, sizeof(void*), size);
@@ -19522,9 +19481,9 @@ void *se_confget_string(struct so *o, const char *path, int *size)
 	return result;
 }
 
-int64_t se_confget_int(struct so *o, const char *path)
+static int64_t se_confget_int(struct so *o, const char *path)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	int64_t result = 0;
 	int rc = se_confquery(e, SR_READ, path, SS_I64,
 	                      &result, sizeof(void*), NULL);
@@ -19533,9 +19492,9 @@ int64_t se_confget_int(struct so *o, const char *path)
 	return result;
 }
 
-int se_confinit(struct seconf *c, struct so *e)
+static int se_confinit(struct seconf *c, struct so *e)
 {
-	struct se *o = se_of(e);
+	struct phia_env *o = se_of(e);
 	c->confmax = 2048;
 	c->conf = ss_malloc(&o->a, sizeof(struct srconf) * c->confmax);
 	if (ssunlikely(c->conf == NULL))
@@ -19604,9 +19563,9 @@ int se_confinit(struct seconf *c, struct so *e)
 	return 0;
 }
 
-void se_conffree(struct seconf *c)
+static void se_conffree(struct seconf *c)
 {
-	struct se *e = (struct se*)c->env;
+	struct phia_env *e = (struct phia_env*)c->env;
 	if (c->conf) {
 		ss_free(&e->a, c->conf);
 		c->conf = NULL;
@@ -19626,9 +19585,9 @@ void se_conffree(struct seconf *c)
 	sf_schemefree(&c->scheme, &e->a);
 }
 
-int se_confvalidate(struct seconf *c)
+static int se_confvalidate(struct seconf *c)
 {
-	struct se *e = (struct se*)c->env;
+	struct phia_env *e = (struct phia_env*)c->env;
 	if (c->path == NULL) {
 		sr_error(&e->error, "%s", "repository path is not set");
 		return -1;
@@ -19665,7 +19624,7 @@ static void
 se_confkv_free(struct so *o)
 {
 	struct seconfkv *v = (struct seconfkv*)o;
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	ss_buffree(&v->key, &e->a);
 	ss_buffree(&v->value, &e->a);
 	ss_free(&e->a, v);
@@ -19675,7 +19634,7 @@ static int
 se_confkv_destroy(struct so *o)
 {
 	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	ss_bufreset(&v->key);
 	ss_bufreset(&v->value);
 	so_mark_destroyed(&v->o);
@@ -19683,7 +19642,7 @@ se_confkv_destroy(struct so *o)
 	return 0;
 }
 
-void *se_confkv_getstring(struct so *o, const char *path, int *size)
+static void *se_confkv_getstring(struct so *o, const char *path, int *size)
 {
 	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
 	int len;
@@ -19727,7 +19686,7 @@ static struct soif seconfkvif =
 	.cursor       = NULL,
 };
 
-static inline struct so *se_confkv_new(struct se *e, struct srconfdump *vp)
+static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp)
 {
 	int cache;
 	struct seconfkv *v = (struct seconfkv*)so_poolpop(&e->confcursor_kv);
@@ -19773,7 +19732,7 @@ static void
 se_confcursor_free(struct so *o)
 {
 	assert(o->destroyed);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	struct seconfcursor *c = (struct seconfcursor*)o;
 	ss_buffree(&c->dump, &e->a);
 	ss_free(&e->a, o);
@@ -19783,7 +19742,7 @@ static int
 se_confcursor_destroy(struct so *o)
 {
 	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	ss_bufreset(&c->dump);
 	so_mark_destroyed(&c->o);
 	so_poolgc(&e->confcursor, &c->o);
@@ -19809,7 +19768,7 @@ se_confcursor_get(struct so *o, struct so *v)
 	}
 	if (ssunlikely(c->pos == NULL))
 		return NULL;
-	struct se *e = se_of(&c->o);
+	struct phia_env *e = se_of(&c->o);
 	return se_confkv_new(e, c->pos);
 }
 
@@ -19835,9 +19794,9 @@ static struct soif seconfcursorif =
 	.cursor       = NULL,
 };
 
-struct so *se_confcursor_new(struct so *o)
+static struct so *se_confcursor_new(struct so *o)
 {
-	struct se *e = (struct se*)o;
+	struct phia_env *e = (struct phia_env*)o;
 	int cache;
 	struct seconfcursor *c = (struct seconfcursor*)so_poolpop(&e->confcursor);
 	if (! c) {
@@ -19870,7 +19829,7 @@ static void
 se_cursorfree(struct so *o)
 {
 	assert(o->destroyed);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	ss_free(&e->a, o);
 }
 
@@ -19878,7 +19837,7 @@ static int
 se_cursordestroy(struct so *o)
 {
 	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
-	struct se *e = se_of(&c->o);
+	struct phia_env *e = se_of(&c->o);
 	uint64_t id = c->t.id;
 	if (! c->read_commited)
 		sx_rollback(&c->t);
@@ -19952,7 +19911,7 @@ static struct soif secursorif =
 	.cursor       = NULL,
 };
 
-struct so *se_cursornew(struct se *e, uint64_t vlsn)
+static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 {
 	struct secursor *c = (struct secursor*)so_poolpop(&e->cursor);
 	if (c == NULL)
@@ -19986,7 +19945,7 @@ struct so *se_cursornew(struct se *e, uint64_t vlsn)
 static int
 se_dbscheme_init(struct sedb *db, char *name, int size)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	/* prepare index scheme */
 	struct sischeme *scheme = db->scheme;
 	if (size == 0)
@@ -20040,7 +19999,7 @@ error:
 static int
 se_dbscheme_set(struct sedb *db)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	struct sischeme *s = si_scheme(db->index);
 	/* set default scheme */
 	int rc;
@@ -20138,7 +20097,7 @@ static int
 se_dbopen(struct so *o)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (status == SR_RECOVER ||
 	    status == SR_DROP_PENDING)
@@ -20167,7 +20126,7 @@ online:
 static inline int
 se_dbfree(struct sedb *db, int close)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	int rcret = 0;
 	int rc;
 	sx_indexfree(&db->coindex, &e->xm);
@@ -20184,7 +20143,7 @@ se_dbfree(struct sedb *db, int close)
 static inline void
 se_dbunref(struct sedb *db)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	/* do nothing during env shutdown */
 	int status = sr_status(&e->status);
 	if (status == SR_SHUTDOWN)
@@ -20224,7 +20183,7 @@ static int
 se_dbdestroy(struct so *o)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&e->status);
 	if (status == SR_SHUTDOWN ||
 	    status == SR_OFFLINE) {
@@ -20238,7 +20197,7 @@ static int
 se_dbclose(struct so *o)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -20252,7 +20211,7 @@ static int
 se_dbdrop(struct so *o)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -20265,7 +20224,7 @@ se_dbdrop(struct so *o)
 	return 0;
 }
 
-struct so *se_dbresult(struct se *e, struct scread *r)
+static struct so *se_dbresult(struct phia_env *e, struct scread *r)
 {
 	struct sv result;
 	sv_init(&result, &sv_vif, r->result, NULL);
@@ -20309,11 +20268,11 @@ struct so *se_dbresult(struct se *e, struct scread *r)
 	return &v->o;
 }
 
-void*
+static void *
 se_dbread(struct sedb *db, struct sedocument *o, struct sx *x, int x_search,
           struct sicache *cache)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t start  = clock_monotonic64();
 
 	/* prepare the key */
@@ -20426,7 +20385,7 @@ error:
 static inline int
 se_dbwrite(struct sedb *db, struct sedocument *o, uint8_t flags)
 {
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 
 	int auto_close = !o->created;
 	if (ssunlikely(! sr_online(&db->index->status)))
@@ -20480,7 +20439,7 @@ se_dbset(struct so *o, struct so *v)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t start = clock_monotonic64();
 	int rc = se_dbwrite(db, key, 0);
 	sr_statset(&e->stat, start);
@@ -20492,7 +20451,7 @@ se_dbupsert(struct so *o, struct so *v)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t start = clock_monotonic64();
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
@@ -20506,14 +20465,14 @@ se_dbdel(struct so *o, struct so *v)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	uint64_t start = clock_monotonic64();
 	int rc = se_dbwrite(db, key, SVDELETE);
 	sr_statdelete(&e->stat, start);
 	return rc;
 }
 
-static void*
+static void *
 se_dbget(struct so *o, struct so *v)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
@@ -20521,15 +20480,15 @@ se_dbget(struct so *o, struct so *v)
 	return se_dbread(db, key, NULL, 0, NULL);
 }
 
-static void*
+static void *
 se_dbdocument(struct so *o)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	return se_document_new(e, &db->o, NULL);
 }
 
-static void*
+static void *
 se_dbget_string(struct so *o, const char *path, int *size)
 {
 	struct sedb *db = se_cast(o, struct sedb*, SEDB);
@@ -20581,7 +20540,7 @@ static struct soif sedbif =
 	.cursor       = NULL,
 };
 
-struct so *se_dbnew(struct se *e, char *name, int size)
+static struct so *se_dbnew(struct phia_env *e, char *name, int size)
 {
 	struct sedb *o = ss_malloc(&e->a, sizeof(struct sedb));
 	if (ssunlikely(o == NULL)) {
@@ -20611,7 +20570,7 @@ struct so *se_dbnew(struct se *e, char *name, int size)
 	return &o->o;
 }
 
-struct so *se_dbmatch(struct se *e, char *name)
+static struct so *se_dbmatch(struct phia_env *e, char *name)
 {
 	struct so *item;
 	rlist_foreach_entry(item, &e->db.list, link) {
@@ -20622,7 +20581,7 @@ struct so *se_dbmatch(struct se *e, char *name)
 	return NULL;
 }
 
-struct so *se_dbmatch_id(struct se *e, uint32_t id)
+static struct so *se_dbmatch_id(struct phia_env *e, uint32_t id)
 {
 	struct so *item;
 	rlist_foreach_entry(item, &e->db.list, link) {
@@ -20633,12 +20592,12 @@ struct so *se_dbmatch_id(struct se *e, uint32_t id)
 	return NULL;
 }
 
-int se_dbvisible(struct sedb *db, uint64_t txn)
+static int se_dbvisible(struct sedb *db, uint64_t txn)
 {
 	return txn > db->txn_min && txn <= db->txn_max;
 }
 
-void se_dbbind(struct se *e)
+static void se_dbbind(struct phia_env *e)
 {
 	struct so *item;
 	rlist_foreach_entry(item, &e->db.list, link) {
@@ -20649,7 +20608,7 @@ void se_dbbind(struct se *e)
 	}
 }
 
-void se_dbunbind(struct se *e, uint64_t txn)
+static void se_dbunbind(struct phia_env *e, uint64_t txn)
 {
 	struct so *i, *n;
 	rlist_foreach_entry_safe(i, &e->db.list, link, n) {
@@ -20725,7 +20684,7 @@ static inline int
 se_document_create(struct sedocument *o)
 {
 	struct sedb *db = (struct sedb*)o->o.parent;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 
 	assert(o->v.v == NULL);
 
@@ -20808,7 +20767,7 @@ static void
 se_document_free(struct so *o)
 {
 	assert(o->destroyed);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	ss_free(&e->a, o);
 }
 
@@ -20816,7 +20775,7 @@ static int
 se_document_destroy(struct so *o)
 {
 	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (v->v.v)
 		si_gcv(&e->r, v->v.v);
 	v->v.v = NULL;
@@ -20832,7 +20791,7 @@ se_document_destroy(struct so *o)
 static struct sfv*
 se_document_setfield(struct sedocument *v, const char *path, void *pointer, int size)
 {
-	struct se *e = se_of(&v->o);
+	struct phia_env *e = se_of(&v->o);
 	struct sedb *db = (struct sedb*)v->o.parent;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 	if (ssunlikely(field == NULL))
@@ -20867,7 +20826,7 @@ static int
 se_document_setstring(struct so *o, const char *path, void *pointer, int size)
 {
 	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (ssunlikely(v->v.v))
 		return sr_error(&e->error, "%s", "document is read-only");
 	switch (se_document_opt(path)) {
@@ -20964,7 +20923,6 @@ se_document_getstring(struct so *o, const char *path, int *size)
 	return NULL;
 }
 
-
 static int
 se_document_setint(struct so *o, const char *path, int64_t num)
 {
@@ -21016,7 +20974,7 @@ se_document_setobject(struct so *o, const char *path, void *object)
 	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
 	switch (se_document_opt(path)) {
 	case SE_DOCUMENT_REUSE: {
-		struct se *e = se_of(o);
+		struct phia_env *e = se_of(o);
 		struct sedocument *reuse = se_cast(object, struct sedocument*, SEDOCUMENT);
 		if (ssunlikely(v->created))
 			return sr_error(&e->error, "%s", "document is read-only");
@@ -21059,7 +21017,8 @@ static struct soif sedocumentif =
 	.cursor       = NULL,
 };
 
-struct so *se_document_new(struct se *e, struct so *parent, struct sv *vp)
+static struct so *
+se_document_new(struct phia_env *e, struct so *parent, struct sv *vp)
 {
 	struct sedocument *v = (struct sedocument*)so_poolpop(&e->document);
 	if (v == NULL)
@@ -21078,7 +21037,7 @@ struct so *se_document_new(struct se *e, struct so *parent, struct sv *vp)
 	return &v->o;
 }
 
-struct sotype se_o[] =
+static struct sotype se_o[] =
 {
 	{ 0L,          "undefined"         },
 	{ 0x9BA14568L, "destroyed"         },
@@ -21096,7 +21055,7 @@ struct sotype se_o[] =
 };
 
 static inline void
-se_recoverf(struct se *e, char *fmt, ...)
+se_recoverf(struct phia_env *e, char *fmt, ...)
 {
 	if (e->conf.on_recover.function == NULL)
 		return;
@@ -21108,11 +21067,11 @@ se_recoverf(struct se *e, char *fmt, ...)
 	e->conf.on_recover.function(trace, e->conf.on_recover.arg);
 }
 
-int se_recoverbegin(struct sedb *db)
+static int se_recoverbegin(struct sedb *db)
 {
 	/* open and recover repository */
 	sr_statusset(&db->index->status, SR_RECOVER);
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 	/* do not allow to recover existing databases
 	 * during online (only create), since logpool
 	 * reply is required. */
@@ -21130,7 +21089,7 @@ error:
 	return -1;
 }
 
-int se_recoverend(struct sedb *db)
+static int se_recoverend(struct sedb *db)
 {
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(status == SR_DROP_PENDING))
@@ -21140,7 +21099,7 @@ int se_recoverend(struct sedb *db)
 }
 
 static int
-se_recoverlog(struct se *e, struct sl *log)
+se_recoverlog(struct phia_env *e, struct sl *log)
 {
 	struct so *tx = NULL;
 	struct sedb *db = NULL;
@@ -21223,7 +21182,7 @@ error:
 }
 
 static inline int
-se_recoverlogpool(struct se *e)
+se_recoverlogpool(struct phia_env *e)
 {
 	struct sl *log;
 	rlist_foreach_entry(log, &e->lp.list, link) {
@@ -21237,7 +21196,7 @@ se_recoverlogpool(struct se *e)
 	return 0;
 }
 
-int se_recover(struct se *e)
+static int se_recover(struct phia_env *e)
 {
 	struct slconf *lc = &e->lpconf;
 	lc->enable         = e->conf.log_enable;
@@ -21263,7 +21222,7 @@ error:
 	return -1;
 }
 
-int se_recover_repository(struct se *e)
+static int se_recover_repository(struct phia_env *e)
 {
 	struct syconf *rc = &e->repconf;
 	rc->path        = e->conf.path;
@@ -21277,7 +21236,7 @@ int se_recover_repository(struct se *e)
 static inline int
 se_txwrite(struct setx *t, struct sedocument *o, uint8_t flags)
 {
-	struct se *e = se_of(&t->o);
+	struct phia_env *e = se_of(&t->o);
 	struct sedb *db = se_cast(o->o.parent, struct sedb*, SEDB);
 
 	int auto_close = !o->created;
@@ -21349,7 +21308,7 @@ se_txupsert(struct so *o, struct so *v)
 {
 	struct setx *t = se_cast(o, struct setx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(&t->o);
+	struct phia_env *e = se_of(&t->o);
 	struct sedb *db = se_cast(v->parent, struct sedb*, SEDB);
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
@@ -21364,12 +21323,12 @@ se_txdelete(struct so *o, struct so *v)
 	return se_txwrite(t, key, SVDELETE);
 }
 
-static void*
+static void *
 se_txget(struct so *o, struct so *v)
 {
 	struct setx *t = se_cast(o, struct setx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct se *e = se_of(&t->o);
+	struct phia_env *e = se_of(&t->o);
 	struct sedb *db = se_cast(key->o.parent, struct sedb*, SEDB);
 	/* validate database */
 	int status = sr_status(&db->index->status);
@@ -21396,7 +21355,7 @@ static inline void
 se_txfree(struct so *o)
 {
 	assert(o->destroyed);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	struct setx *t = (struct setx*)o;
 	sv_logfree(&t->log, &e->a);
 	ss_free(&e->a, o);
@@ -21405,7 +21364,7 @@ se_txfree(struct so *o)
 static inline void
 se_txend(struct setx *t, int rlb, int conflict)
 {
-	struct se *e = se_of(&t->o);
+	struct phia_env *e = se_of(&t->o);
 	uint32_t count = sv_logcount(&t->log);
 	sx_gc(&t->t);
 	sv_logreset(&t->log);
@@ -21429,7 +21388,7 @@ se_txprepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
 {
 	struct sicache *cache = ptr;
 	struct sedb *db = (struct sedb*)o;
-	struct se *e = se_of(&db->o);
+	struct phia_env *e = se_of(&db->o);
 
 	struct scread q;
 	sc_readopen(&q, db->r, &db->o, db->index);
@@ -21457,7 +21416,7 @@ static int
 se_txcommit(struct so *o)
 {
 	struct setx *t = se_cast(o, struct setx*, SETX);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	int status = sr_status(&e->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -21563,7 +21522,8 @@ static struct soif setxif =
 	.cursor       = NULL
 };
 
-struct so *se_txnew(struct se *e)
+static struct so *
+se_txnew(struct phia_env *e)
 {
 	int cache;
 	struct setx *t = (struct setx*)so_poolpop(&e->tx);
@@ -21593,7 +21553,7 @@ struct so *se_txnew(struct se *e)
 static void
 se_viewfree(struct so *o)
 {
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	struct seview *s = (struct seview*)o;
 	ss_buffree(&s->name, &e->a);
 	ss_free(&e->a, o);
@@ -21603,7 +21563,7 @@ static int
 se_viewdestroy(struct so *o)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	uint32_t id = s->t.id;
 	se_dbunbind(e, id);
 	if (sslikely(! s->db_view_only))
@@ -21618,7 +21578,7 @@ static void*
 se_viewget(struct so *o, struct so *key)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	struct sedocument *v = se_cast(key, struct sedocument*, SEDOCUMENT);
 	struct sedb *db = se_cast(key->parent, struct sedb*, SEDB);
 	if (s->db_view_only) {
@@ -21632,7 +21592,7 @@ static void*
 se_viewcursor(struct so *o)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (s->db_view_only) {
 		sr_error(&e->error, "view '%s' is in db-view-only mode", s->name);
 		return NULL;
@@ -21640,10 +21600,10 @@ se_viewcursor(struct so *o)
 	return se_cursornew(e, s->vlsn);
 }
 
-void *se_viewget_object(struct so *o, const char *path)
+static void *se_viewget_object(struct so *o, const char *path)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct se *e = se_of(o);
+	struct phia_env *e = se_of(o);
 	if (strcmp(path, "db") == 0)
 		return se_viewdb_new(e, s->t.id);
 	return NULL;
@@ -21686,7 +21646,8 @@ static struct soif seviewif =
 	.cursor       = se_viewcursor
 };
 
-struct so *se_viewnew(struct se *e, uint64_t vlsn, char *name, int size)
+static struct so *
+se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
 {
 	struct so *i;
 	rlist_foreach_entry(i, &e->view.list.list, link) {
@@ -21733,9 +21694,9 @@ struct so *se_viewnew(struct se *e, uint64_t vlsn, char *name, int size)
 	return &s->o;
 }
 
-int se_viewupdate(struct seview *s)
+static int se_viewupdate(struct seview *s)
 {
-	struct se *e = se_of(&s->o);
+	struct phia_env *e = se_of(&s->o);
 	uint32_t id = s->t.id;
 	if (! s->db_view_only) {
 		sx_rollback(&s->t);
@@ -21749,7 +21710,7 @@ static void
 se_viewdb_free(struct so *o)
 {
 	struct seviewdb *c = (struct seviewdb*)o;
-	struct se *e = se_of(&c->o);
+	struct phia_env *e = se_of(&c->o);
 	ss_buffree(&c->list, &e->a);
 	ss_free(&e->a, c);
 }
@@ -21758,7 +21719,7 @@ static int
 se_viewdb_destroy(struct so *o)
 {
 	struct seviewdb *c = se_cast(o, struct seviewdb*, SEDBCURSOR);
-	struct se *e = se_of(&c->o);
+	struct phia_env *e = se_of(&c->o);
 	ss_bufreset(&c->list);
 	so_mark_destroyed(&c->o);
 	so_poolgc(&e->viewdb, &c->o);
@@ -21811,7 +21772,7 @@ static struct soif seviewdbif =
 static inline int
 se_viewdb_open(struct seviewdb *c)
 {
-	struct se *e = se_of(&c->o);
+	struct phia_env *e = se_of(&c->o);
 	int rc;
 	struct so *i;
 	rlist_foreach_entry(i, &e->db.list, link) {
@@ -21833,7 +21794,7 @@ se_viewdb_open(struct seviewdb *c)
 	return 0;
 }
 
-struct so *se_viewdb_new(struct se *e, uint64_t txn_id)
+static struct so *se_viewdb_new(struct phia_env *e, uint64_t txn_id)
 {
 	int cache;
 	struct seviewdb *c = (struct seviewdb*)so_poolpop(&e->viewdb);
@@ -21892,9 +21853,49 @@ sp_cast(void *ptr, const char *method)
 	return o;
 }
 
-void *phia_env(void)
+struct phia_env *phia_env(void)
 {
-	return se_new();
+	struct phia_env *e = malloc(sizeof(*e));
+	if (ssunlikely(e == NULL))
+		return NULL;
+	memset(e, 0, sizeof(*e));
+	so_init(&e->o, &se_o[SE], &seif, &e->o, &e->o /* self */);
+	sr_statusinit(&e->status);
+	sr_statusset(&e->status, SR_OFFLINE);
+	ss_vfsinit(&e->vfs, &ss_stdvfs);
+	ss_aopen(&e->a, &ss_stda);
+	ss_aopen(&e->a_ref, &ss_stda);
+	int rc;
+	rc = se_confinit(&e->conf, &e->o);
+	if (ssunlikely(rc == -1))
+		goto error;
+	so_poolinit(&e->document, 1024);
+	so_poolinit(&e->cursor, 512);
+	so_poolinit(&e->tx, 512);
+	so_poolinit(&e->confcursor, 2);
+	so_poolinit(&e->confcursor_kv, 1);
+	so_poolinit(&e->view, 1);
+	so_poolinit(&e->viewdb, 1);
+	so_listinit(&e->db);
+	ss_mutexinit(&e->apilock);
+	ss_quotainit(&e->quota);
+	sr_seqinit(&e->seq);
+	sr_errorinit(&e->error);
+	sr_statinit(&e->stat);
+	sf_limitinit(&e->limit, &e->a);
+	sr_init(&e->r, &e->status, &e->error, &e->a, &e->a_ref, &e->vfs, &e->quota,
+	        &e->conf.zones, &e->seq, SF_RAW, NULL,
+	        NULL, &e->ei, &e->stat);
+	sy_init(&e->rep);
+	sl_poolinit(&e->lp, &e->r);
+	sx_managerinit(&e->xm, &e->r);
+	si_cachepool_init(&e->cachepool, &e->r);
+	sc_init(&e->scheduler, &e->r, &e->conf.on_event, &e->lp);
+	return e;
+error:
+	sr_statusfree(&e->status);
+	free(e);
+	return NULL;
 }
 
 void *phia_document(void *ptr)
@@ -21972,10 +21973,9 @@ int phia_destroy(void *ptr)
 	return rc;
 }
 
-int phia_service(void *ptr)
+int phia_service(struct phia_env *env)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	return se_service(o->env);
+	return sc_ctl_call(&env->scheduler, sx_vlsn(&env->xm));
 }
 
 int phia_setstring(void *ptr, const char *path, const void *pointer, int size)

@@ -86,7 +86,7 @@ phia_configure_storage(struct space *space, struct key_def *key_def)
 {
 	PhiaEngine *engine =
 		(PhiaEngine *)space->handler->engine;
-	void *env = engine->env;
+	struct phia_env *env = engine->env;
 	/* create database */
 	char c[128];
 	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,

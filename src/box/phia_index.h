@@ -57,7 +57,7 @@ public:
 	virtual size_t bsize() const override;
 
 public:
-	void *env;
+	struct phia_env *env;
 	void *db;
 
 	void *createDocument(const char *key, const char **keyend);

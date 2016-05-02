@@ -55,7 +55,7 @@ struct PhiaEngine: public Engine {
 private:
 	int64_t m_prev_commit_lsn;
 public:
-	void *env;
+	struct phia_env *env;
 	int recovery_complete;
 };
 
@@ -63,9 +63,9 @@ extern "C" {
 typedef void (*phia_info_f)(const char*, const char*, void*);
 int phia_info(const char*, phia_info_f, void*);
 }
-void  phia_error(void*);
+void  phia_error(struct phia_env *);
 void *phia_read(void*, void*);
-void  phia_workers_start(void*);
+void phia_workers_start(struct phia_env *);
 
 struct tuple *
 phia_tuple_new(void *obj, struct key_def *key_def,

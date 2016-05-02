@@ -163,8 +163,9 @@ phia_tuple_data_new(void *obj, struct key_def *key_def, uint32_t *bsize)
 }
 
 static void*
-phia_worker(void *env)
+phia_worker(void *arg)
 {
+	struct phia_env *env = (struct phia_env *) arg;
 	while (pm_atomic_load_explicit(&worker_pool_run,
 				       pm_memory_order_relaxed)) {
 		int rc = phia_service(env);
@@ -177,7 +178,7 @@ phia_worker(void *env)
 }
 
 void
-phia_workers_start(void *env)
+phia_workers_start(struct phia_env *env)
 {
 	if (worker_pool_run)
 		return;
@@ -205,7 +206,7 @@ phia_workers_stop(void)
 	free(worker_pool);
 }
 
-void phia_error(void *env)
+void phia_error(struct phia_env *env)
 {
 	char *error = (char *)phia_getstring(env, "phia.error", NULL);
 	char msg[512];
