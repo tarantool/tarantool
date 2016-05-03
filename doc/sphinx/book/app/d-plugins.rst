@@ -46,8 +46,9 @@ very similar, so the following sections -- "MySQL Example" and
                   MySQL Example
 ===========================================================
 
-This example assumes that MySQL 5.5 or MySQL 5.6 has been installed. Recent
-MariaDB versions should also work. The package that matters most is the MySQL
+This example assumes that MySQL 5.5 or MySQL 5.6 or MySQL 5.7 has been installed.
+Recent MariaDB versions will also work, the MariaDB C connector is used.
+The package that matters most is the MySQL
 client developer package, typically named something like libmysqlclient-dev.
 The file that matters most from this package is libmysqlclient.so or a similar name.
 One can use :code:`find` or :code:`whereis` to see what directories these files
@@ -93,6 +94,8 @@ For example:
 
     luarocks install mysql MYSQL_LIBDIR=/usr/local/mysql/lib
 
+See also :ref:`Modules, LuaRocks, and requiring packages <modules-luarocks-and-requiring-packages>`.
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
        With GitHub
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -135,9 +138,13 @@ The connection-options parameter is a table. Possible options are:
 * :samp:`user = {user-name}` - string, default value is operating-system user name
 * :samp:`password = {password}` - string, default value is blank
 * :samp:`db = {database-name}` - string, default value is blank
+* :samp:`raise = {true|false}` - boolean, default value is false
 
-The names are similar to the names that MySQL's mysql client uses, for details
+The option names, except for `raise`,
+are similar to the names that MySQL's mysql client uses, for details
 see the MySQL manual at `dev.mysql.com/doc/refman/5.6/en/connecting.html`_.
+The `raise` option should be set to :codenormal:`true` if
+errors should be raised when encountered.
 To connect with a Unix socket rather than with TCP, specify ``host = 'unix/'``
 and :samp:`port = {socket-name}`.
 
@@ -150,7 +157,8 @@ Example, using a table literal enclosed in {braces}:
         port = 3306,
         user = 'p',
         password = 'p',
-        db = 'test'
+        db = 'test',
+        raise = true
     })
     -- OR
     conn = mysql.connect({
@@ -441,6 +449,8 @@ For example:
 .. code-block:: bash
 
     luarocks install pg POSTGRESQL_LIBDIR=/usr/local/postgresql/lib
+
+See also :ref:`Modules, LuaRocks, and requiring packages <modules-luarocks-and-requiring-packages>`.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
        With GitHub

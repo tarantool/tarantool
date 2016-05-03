@@ -976,6 +976,8 @@ Finally, clients make a CALL to ``myapp.api_for_call`` and other API functions.
 
 In the case of ``tarantool-http``, there is no need to start the binary protocol at all.
 
+.. _modules-luarocks-and-requiring-packages:
+
 =====================================================================
        Modules, LuaRocks, and requiring packages
 =====================================================================
