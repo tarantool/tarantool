@@ -1,0 +1,5 @@
+test_run = require('test_run')
+inspector = test_run.new()
+engine = inspector:get_cfg('engine')
+math.randomseed(1)
+delete_insert(engine)

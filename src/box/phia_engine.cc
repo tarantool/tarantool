@@ -299,9 +299,9 @@ PhiaEngine::PhiaEngine()
 
 PhiaEngine::~PhiaEngine()
 {
-	phia_workers_stop();
 	if (env)
 		phia_destroy(env);
+	phia_workers_stop();
 }
 
 void
