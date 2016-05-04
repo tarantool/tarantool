@@ -10,7 +10,7 @@ function string_function()
     return random_string
 end
 
-function delete_replace_update(engine_name)
+function delete_replace_update(engine_name, iterations)
     local string_value
     if (box.space._space.index.name:select{'tester'}[1] ~= nil) then
         box.space.tester:drop()
@@ -22,7 +22,7 @@ function delete_replace_update(engine_name)
     local string_value_2
     local string_value_3
     local counter = 1
-    while counter < 100000 do
+    while counter < iterations do
         local string_value = string_function()
 
         local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'GE', limit = 1})
@@ -53,10 +53,8 @@ function delete_replace_update(engine_name)
             box.space.tester:insert{string_value_2, counter}
         end
         if random_number == 4 then
-            if counter < 1000000 then
-                box.space.tester:delete{string_value_3}
-                box.space.tester:insert{string_value_3, counter, string_value_2}
-            end
+            box.space.tester:delete{string_value_3}
+            box.space.tester:insert{string_value_3, counter, string_value_2}
         end
         if random_number == 5 then
             box.space.tester:update({string_value_2}, {{'=', 2, string_value_3}})
@@ -71,7 +69,7 @@ function delete_replace_update(engine_name)
     return {counter, random_number, string_value_2, string_value_3}
 end
 
-function delete_insert(engine_name)
+function delete_insert(engine_name, iterations)
     local string_value
     if (box.space._space.index.name:select{'tester'}[1] ~= nil) then
         box.space.tester:drop()
@@ -80,7 +78,7 @@ function delete_insert(engine_name)
     box.space.tester:create_index('primary',{type = 'tree', parts = {1, 'STR'}})
     local string_value_2
     local counter = 1
-    while counter < 100000 do
+    while counter < iterations do
         local string_value = string_function()
         local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'GE', limit = 1})
 
