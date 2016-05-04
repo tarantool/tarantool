@@ -5143,8 +5143,6 @@ struct so {
 	struct sotype *type;
 	struct so *parent;
 	struct so *env;
-	uint8_t destroyed;
-	struct rlist link;
 };
 
 static inline void
@@ -5154,14 +5152,6 @@ so_init(struct so *o, struct sotype *type, struct soif *i, struct so *parent, st
 	o->i         = i;
 	o->parent    = parent;
 	o->env       = env;
-	o->destroyed = 0;
-	rlist_create(&o->link);
-}
-
-static inline void
-so_mark_destroyed(struct so *o)
-{
-	o->destroyed = 1;
 }
 
 static inline void*
@@ -5205,137 +5195,6 @@ so_cast_dynamic(void *ptr, struct sotype *type,
 	(o)->i->getstring(o, path, sizep)
 #define so_getint(o, path) \
 	(o)->i->getnumber(o, path)
-
-struct solist {
-	struct rlist list;
-	int n;
-};
-
-static inline void
-so_listinit(struct solist *i)
-{
-	rlist_create(&i->list);
-	i->n = 0;
-}
-
-static inline int
-so_listdestroy(struct solist *i)
-{
-	int rcret = 0;
-	int rc;
-	struct so *o, *n;
-	rlist_foreach_entry_safe(o, &i->list, link, n) {
-		rc = so_destroy(o);
-		if (ssunlikely(rc == -1))
-			rcret = -1;
-	}
-	i->n = 0;
-	rlist_create(&i->list);
-	return rcret;
-}
-
-static inline void
-so_listfree(struct solist *i)
-{
-	struct so *o, *n;
-	rlist_foreach_entry_safe(o, &i->list, link, n) {
-		so_free(o);
-	}
-	i->n = 0;
-	rlist_create(&i->list);
-}
-
-static inline void
-so_listadd(struct solist *i, struct so *o)
-{
-	rlist_add(&i->list, &o->link);
-	i->n++;
-}
-
-static inline void
-so_listdel(struct solist *i, struct so *o)
-{
-	rlist_del(&o->link);
-	i->n--;
-}
-
-static inline struct so*
-so_listfirst(struct solist *i)
-{
-	assert(i->n > 0);
-	return sscast(i->list.next, struct so, link);
-}
-
-struct sopool {
-	ssspinlock lock;
-	int free_max;
-	struct solist list;
-	struct solist free;
-};
-
-static inline void
-so_poolinit(struct sopool *p, int n)
-{
-	ss_spinlockinit(&p->lock);
-	so_listinit(&p->list);
-	so_listinit(&p->free);
-	p->free_max = n;
-}
-
-static inline int
-so_pooldestroy(struct sopool *p)
-{
-	ss_spinlockfree(&p->lock);
-	int rcret = 0;
-	int rc = so_listdestroy(&p->list);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	so_listfree(&p->free);
-	return rcret;
-}
-
-static inline void
-so_pooladd(struct sopool *p, struct so *o)
-{
-	ss_spinlock(&p->lock);
-	so_listadd(&p->list, o);
-	ss_spinunlock(&p->lock);
-}
-
-static inline void
-so_poolgc(struct sopool *p, struct so *o)
-{
-	ss_spinlock(&p->lock);
-	so_listdel(&p->list, o);
-	if (p->free.n < p->free_max) {
-		so_listadd(&p->free, o);
-		ss_spinunlock(&p->lock);
-		return;
-	}
-	ss_spinunlock(&p->lock);
-	so_free(o);
-}
-
-static inline void
-so_poolpush(struct sopool *p, struct so *o)
-{
-	ss_spinlock(&p->lock);
-	so_listadd(&p->free, o);
-	ss_spinunlock(&p->lock);
-}
-
-static inline struct so*
-so_poolpop(struct sopool *p)
-{
-	struct so *o = NULL;
-	ss_spinlock(&p->lock);
-	if (sslikely(p->free.n)) {
-		o = so_listfirst(&p->free);
-		so_listdel(&p->free, o);
-	}
-	ss_spinunlock(&p->lock);
-	return o;
-}
 
 #define SVNONE       0
 #define SVDELETE     1
@@ -18072,14 +17931,10 @@ struct phia_env {
 	struct so          o;
 	struct srstatus    status;
 	struct ssmutex     apilock;
-	struct sopool      document;
-	struct sopool      cursor;
-	struct sopool      tx;
-	struct sopool      confcursor;
-	struct sopool      confcursor_kv;
-	struct sopool      view;
-	struct sopool      viewdb;
-	struct solist      db;
+	/** List of open spaces. */
+	struct rlist db;
+	/** List of active read views. */
+	struct rlist view;
 	struct srseq       seq;
 	struct seconf      conf;
 	struct ssquota     quota;
@@ -18194,6 +18049,8 @@ struct sedb {
 	struct sxindex    coindex;
 	uint64_t   txn_min;
 	uint64_t   txn_max;
+	/** Member of env->db list. */
+	struct rlist link;
 };
 
 static inline int
@@ -18240,7 +18097,8 @@ struct seview {
 	struct sx        t;
 	struct svlog     log;
 	int       db_view_only;
-	struct solist    cursor;
+	/* Member of env->view list. */
+	struct rlist link;
 } sspacked;
 
 static struct so *se_viewnew(struct phia_env*, uint64_t, char*, int);
@@ -18313,9 +18171,9 @@ se_open(struct so *o)
 	if (ssunlikely(rc == -1))
 		return -1;
 	/* databases recover */
-	struct so *item, *n;
-	rlist_foreach_entry_safe(item, &e->db.list, link, n) {
-		rc = so_open(item);
+	struct sedb *item, *n;
+	rlist_foreach_entry_safe(item, &e->db, link, n) {
+		rc = so_open(&item->o);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -18328,8 +18186,8 @@ se_open(struct so *o)
 
 online:
 	/* complete */
-	rlist_foreach_entry_safe(item, &e->db.list, link, n) {
-		rc = so_open(item);
+	rlist_foreach_entry_safe(item, &e->db, link, n) {
+		rc = so_open(&item->o);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -18350,30 +18208,14 @@ se_destroy(struct so *o)
 	int rcret = 0;
 	int rc;
 	sr_statusset(&e->status, SR_SHUTDOWN);
-	rc = so_pooldestroy(&e->cursor);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->view);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->viewdb);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->tx);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->confcursor_kv);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->confcursor);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_listdestroy(&e->db);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = so_pooldestroy(&e->document);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
+	{
+		struct sedb *db, *next;
+		rlist_foreach_entry_safe(db, &e->db, link, next) {
+			rc = so_destroy(&db->o);
+			if (ssunlikely(rc == -1))
+				rcret = -1;
+		}
+	}
 	rc = sl_poolshutdown(&e->lp);
 	if (ssunlikely(rc == -1))
 		rcret = -1;
@@ -18390,7 +18232,6 @@ se_destroy(struct so *o)
 	sr_statfree(&e->stat);
 	sr_seqfree(&e->seq);
 	sr_statusfree(&e->status);
-	so_mark_destroyed(&e->o);
 	free(e);
 	return rcret;
 }
@@ -18864,7 +18705,7 @@ se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 		db = (struct sedb*)se_dbnew(e, name, s->valuesize);
 		if (ssunlikely(db == NULL))
 			return -1;
-		so_listadd(&e->db, &db->o);
+		rlist_add(&e->db, &db->link);
 		return 0;
 	}
 
@@ -19063,10 +18904,9 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 	struct srconf *db = NULL;
 	struct srconf *prev = NULL;
 	struct srconf *p;
-	struct so *item;
-	rlist_foreach_entry(item, &e->db.list, link)
+	struct sedb *o;
+	rlist_foreach_entry(o, &e->db, link)
 	{
-		struct sedb *o = (struct sedb *)item;
 		si_profilerbegin(&o->rtp, o->index);
 		si_profiler(&o->rtp);
 		si_profilerend(&o->rtp);
@@ -19184,11 +19024,12 @@ static inline struct srconf*
 se_confview(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 {
 	struct srconf *view = NULL;
+	(void) e;
 	struct srconf *prev = NULL;
-	struct so *item;
-	rlist_foreach_entry(item, &e->view.list.list, link)
+	struct seview *s;
+
+	rlist_foreach_entry(s, &e->view, link)
 	{
-		struct seview *s = (struct seview *)item;
 		struct srconf *p = sr_C(NULL, pc, se_confview_lsn, "lsn", SS_U64, &s->vlsn, 0, s);
 		sr_C(&prev, pc, se_confview_get, s->name.s, SS_STRING, p, SR_NS, s);
 		if (view == NULL)
@@ -19372,7 +19213,7 @@ static inline int
 se_confensure(struct seconf *c)
 {
 	struct phia_env *e = (struct phia_env*)c->env;
-	int confmax = 2048 + (e->db.n * 100) + (e->view.list.n * 10);
+	int confmax = 2048;
 	confmax *= sizeof(struct srconf);
 	if (sslikely(confmax <= c->confmax))
 		return 0;
@@ -19634,11 +19475,9 @@ static int
 se_confkv_destroy(struct so *o)
 {
 	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
-	struct phia_env *e = se_of(o);
 	ss_bufreset(&v->key);
 	ss_bufreset(&v->value);
-	so_mark_destroyed(&v->o);
-	so_poolgc(&e->confcursor_kv, &v->o);
+	so_free(&v->o);
 	return 0;
 }
 
@@ -19688,35 +19527,25 @@ static struct soif seconfkvif =
 
 static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp)
 {
-	int cache;
-	struct seconfkv *v = (struct seconfkv*)so_poolpop(&e->confcursor_kv);
-	if (! v) {
-		v = ss_malloc(&e->a, sizeof(struct seconfkv));
-		cache = 0;
-	} else {
-		cache = 1;
-	}
+	struct seconfkv *v;
+	v = ss_malloc(&e->a, sizeof(struct seconfkv));
 	if (ssunlikely(v == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
 	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, &e->o, &e->o);
-	if (! cache) {
-		ss_bufinit(&v->key);
-		ss_bufinit(&v->value);
-	}
+	ss_bufinit(&v->key);
+	ss_bufinit(&v->value);
 	int rc;
 	rc = ss_bufensure(&v->key, &e->a, vp->keysize);
 	if (ssunlikely(rc == -1)) {
-		so_mark_destroyed(&v->o);
-		so_poolpush(&e->confcursor_kv, &v->o);
+		so_free(&v->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
 	rc = ss_bufensure(&v->value, &e->a, vp->valuesize);
 	if (ssunlikely(rc == -1)) {
-		so_mark_destroyed(&v->o);
-		so_poolpush(&e->confcursor_kv, &v->o);
+		so_free(&v->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -19724,14 +19553,12 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 	memcpy(v->value.s, sr_confvalue(vp), vp->valuesize);
 	ss_bufadvance(&v->key, vp->keysize);
 	ss_bufadvance(&v->value, vp->valuesize);
-	so_pooladd(&e->confcursor_kv, &v->o);
 	return &v->o;
 }
 
 static void
 se_confcursor_free(struct so *o)
 {
-	assert(o->destroyed);
 	struct phia_env *e = se_of(o);
 	struct seconfcursor *c = (struct seconfcursor*)o;
 	ss_buffree(&c->dump, &e->a);
@@ -19742,10 +19569,8 @@ static int
 se_confcursor_destroy(struct so *o)
 {
 	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
-	struct phia_env *e = se_of(o);
 	ss_bufreset(&c->dump);
-	so_mark_destroyed(&c->o);
-	so_poolgc(&e->confcursor, &c->o);
+	so_free(&c->o);
 	return 0;
 }
 
@@ -19797,14 +19622,8 @@ static struct soif seconfcursorif =
 static struct so *se_confcursor_new(struct so *o)
 {
 	struct phia_env *e = (struct phia_env*)o;
-	int cache;
-	struct seconfcursor *c = (struct seconfcursor*)so_poolpop(&e->confcursor);
-	if (! c) {
-		c = ss_malloc(&e->a, sizeof(struct seconfcursor));
-		cache = 0;
-	} else {
-		cache = 1;
-	}
+	struct seconfcursor *c;
+	c = ss_malloc(&e->a, sizeof(struct seconfcursor));
 	if (ssunlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
@@ -19812,23 +19631,19 @@ static struct so *se_confcursor_new(struct so *o)
 	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, &e->o, &e->o);
 	c->pos = NULL;
 	c->first = 1;
-	if (! cache)
-		ss_bufinit(&c->dump);
+	ss_bufinit(&c->dump);
 	int rc = se_confserialize(&e->conf, &c->dump);
 	if (ssunlikely(rc == -1)) {
-		so_mark_destroyed(&c->o);
-		so_poolpush(&e->confcursor, &c->o);
+		so_free(&c->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_pooladd(&e->confcursor, &c->o);
 	return &c->o;
 }
 
 static void
 se_cursorfree(struct so *o)
 {
-	assert(o->destroyed);
 	struct phia_env *e = se_of(o);
 	ss_free(&e->a, o);
 }
@@ -19848,8 +19663,7 @@ se_cursordestroy(struct so *o)
 	              c->read_disk,
 	              c->read_cache,
 	              c->ops);
-	so_mark_destroyed(&c->o);
-	so_poolgc(&e->cursor, &c->o);
+	so_free(&c->o);
 	return 0;
 }
 
@@ -19913,9 +19727,8 @@ static struct soif secursorif =
 
 static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 {
-	struct secursor *c = (struct secursor*)so_poolpop(&e->cursor);
-	if (c == NULL)
-		c = ss_malloc(&e->a, sizeof(struct secursor));
+	struct secursor *c;
+	c = ss_malloc(&e->a, sizeof(struct secursor));
 	if (ssunlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
@@ -19930,15 +19743,13 @@ static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 	c->t.state = SXUNDEF;
 	c->cache = si_cachepool_pop(&e->cachepool);
 	if (ssunlikely(c->cache == NULL)) {
-		so_mark_destroyed(&c->o);
-		so_poolpush(&e->cursor, &c->o);
+		so_free(&c->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
 	c->read_commited = 0;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
 	se_dbbind(e);
-	so_pooladd(&e->cursor, &c->o);
 	return &c->o;
 }
 
@@ -20135,7 +19946,6 @@ se_dbfree(struct sedb *db, int close)
 		if (ssunlikely(rc == -1))
 			rcret = -1;
 	}
-	so_mark_destroyed(&db->o);
 	ss_free(&e->a, db);
 	return rcret;
 }
@@ -20171,7 +19981,7 @@ se_dbunref(struct sedb *db)
 	}
 	/* destroy database object */
 	struct si *index = db->index;
-	so_listdel(&e->db, &db->o);
+	rlist_del(&db->link);
 	se_dbfree(db, 0);
 
 	/* schedule index shutdown or drop */
@@ -20572,9 +20382,8 @@ static struct so *se_dbnew(struct phia_env *e, char *name, int size)
 
 static struct so *se_dbmatch(struct phia_env *e, char *name)
 {
-	struct so *item;
-	rlist_foreach_entry(item, &e->db.list, link) {
-		struct sedb *db = (struct sedb*)item;
+	struct sedb *db;
+	rlist_foreach_entry(db, &e->db, link) {
 		if (strcmp(db->scheme->name, name) == 0)
 			return &db->o;
 	}
@@ -20583,9 +20392,8 @@ static struct so *se_dbmatch(struct phia_env *e, char *name)
 
 static struct so *se_dbmatch_id(struct phia_env *e, uint32_t id)
 {
-	struct so *item;
-	rlist_foreach_entry(item, &e->db.list, link) {
-		struct sedb *db = (struct sedb*)item;
+	struct sedb *db;
+	rlist_foreach_entry(db, &e->db, link) {
 		if (db->scheme->id == id)
 			return &db->o;
 	}
@@ -20599,9 +20407,8 @@ static int se_dbvisible(struct sedb *db, uint64_t txn)
 
 static void se_dbbind(struct phia_env *e)
 {
-	struct so *item;
-	rlist_foreach_entry(item, &e->db.list, link) {
-		struct sedb *db = (struct sedb*)item;
+	struct sedb *db;
+	rlist_foreach_entry(db, &e->db, link) {
 		int status = sr_status(&db->index->status);
 		if (sr_statusactive_is(status))
 			si_ref(db->index, SI_REFFE);
@@ -20610,9 +20417,8 @@ static void se_dbbind(struct phia_env *e)
 
 static void se_dbunbind(struct phia_env *e, uint64_t txn)
 {
-	struct so *i, *n;
-	rlist_foreach_entry_safe(i, &e->db.list, link, n) {
-		struct sedb *db = (struct sedb*)i;
+	struct sedb *db, *tmp;
+	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
 		if (se_dbvisible(db, txn))
 			se_dbunref(db);
 	}
@@ -20766,7 +20572,6 @@ se_document_open(struct so *o)
 static void
 se_document_free(struct so *o)
 {
-	assert(o->destroyed);
 	struct phia_env *e = se_of(o);
 	ss_free(&e->a, o);
 }
@@ -20783,8 +20588,7 @@ se_document_destroy(struct so *o)
 		ss_free(&e->a, v->prefixcopy);
 	v->prefixcopy = NULL;
 	v->prefix = NULL;
-	so_mark_destroyed(&v->o);
-	so_poolgc(&e->document, &v->o);
+	so_free(&v->o);
 	return 0;
 }
 
@@ -21020,9 +20824,8 @@ static struct soif sedocumentif =
 static struct so *
 se_document_new(struct phia_env *e, struct so *parent, struct sv *vp)
 {
-	struct sedocument *v = (struct sedocument*)so_poolpop(&e->document);
-	if (v == NULL)
-		v = ss_malloc(&e->a, sizeof(struct sedocument));
+	struct sedocument *v;
+	v = ss_malloc(&e->a, sizeof(struct sedocument));
 	if (ssunlikely(v == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
@@ -21033,7 +20836,6 @@ se_document_new(struct phia_env *e, struct so *parent, struct sv *vp)
 	if (vp) {
 		v->v = *vp;
 	}
-	so_pooladd(&e->document, &v->o);
 	return &v->o;
 }
 
@@ -21354,7 +21156,6 @@ error:
 static inline void
 se_txfree(struct so *o)
 {
-	assert(o->destroyed);
 	struct phia_env *e = se_of(o);
 	struct setx *t = (struct setx*)o;
 	sv_logfree(&t->log, &e->a);
@@ -21370,8 +21171,7 @@ se_txend(struct setx *t, int rlb, int conflict)
 	sv_logreset(&t->log);
 	sr_stattx(&e->stat, t->start, count, rlb, conflict);
 	se_dbunbind(e, t->t.id);
-	so_mark_destroyed(&t->o);
-	so_poolgc(&e->tx, &t->o);
+	so_free(&t->o);
 }
 
 static int
@@ -21525,28 +21325,20 @@ static struct soif setxif =
 static struct so *
 se_txnew(struct phia_env *e)
 {
-	int cache;
-	struct setx *t = (struct setx*)so_poolpop(&e->tx);
-	if (! t) {
-		t = ss_malloc(&e->a, sizeof(struct setx));
-		cache = 0;
-	} else {
-		cache = 1;
-	}
+	struct setx *t;
+	t = ss_malloc(&e->a, sizeof(struct setx));
 	if (ssunlikely(t == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
 	so_init(&t->o, &se_o[SETX], &setxif, &e->o, &e->o);
-	if (! cache)
-		sv_loginit(&t->log);
+	sv_loginit(&t->log);
 	sx_init(&e->xm, &t->t, &t->log);
 	t->start = clock_monotonic64();
 	t->lsn = 0;
 	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
 	se_dbbind(e);
-	so_pooladd(&e->tx, &t->o);
 	return &t->o;
 }
 
@@ -21569,8 +21361,8 @@ se_viewdestroy(struct so *o)
 	if (sslikely(! s->db_view_only))
 		sx_rollback(&s->t);
 	ss_bufreset(&s->name);
-	so_mark_destroyed(&s->o);
-	so_poolgc(&e->view, o);
+	rlist_del(&s->link);
+	so_free(&s->o);
 	return 0;
 }
 
@@ -21649,37 +21441,27 @@ static struct soif seviewif =
 static struct so *
 se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
 {
-	struct so *i;
-	rlist_foreach_entry(i, &e->view.list.list, link) {
-		struct seview *s = (struct seview*)i;
+	struct seview *s;
+	rlist_foreach_entry(s, &e->view, link) {
 		if (ssunlikely(strcmp(s->name.s, name) == 0)) {
 			sr_error(&e->error, "view '%s' already exists", name);
 			return NULL;
 		}
 	}
-	struct seview *s = (struct seview*)so_poolpop(&e->view);
-	int cache;
-	if (! s) {
-		s = ss_malloc(&e->a, sizeof(struct seview));
-		cache = 0;
-	} else {
-		cache = 1;
-	}
+	s = ss_malloc(&e->a, sizeof(struct seview));
 	if (ssunlikely(s == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
 	so_init(&s->o, &se_o[SEVIEW], &seviewif, &e->o, &e->o);
 	s->vlsn = vlsn;
-	if (! cache)
-		ss_bufinit(&s->name);
+	ss_bufinit(&s->name);
 	int rc;
 	if (size == 0)
 		size = strlen(name);
 	rc = ss_bufensure(&s->name, &e->a, size + 1);
 	if (ssunlikely(rc == -1)) {
-		so_mark_destroyed(&s->o);
-		so_poolpush(&e->view, &s->o);
+		so_free(&s->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -21690,7 +21472,7 @@ se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
 	sx_begin(&e->xm, &s->t, SXRO, &s->log, vlsn);
 	s->db_view_only = 0;
 	se_dbbind(e);
-	so_pooladd(&e->view, &s->o);
+	rlist_add(&e->view, &s->link);
 	return &s->o;
 }
 
@@ -21719,10 +21501,8 @@ static int
 se_viewdb_destroy(struct so *o)
 {
 	struct seviewdb *c = se_cast(o, struct seviewdb*, SEDBCURSOR);
-	struct phia_env *e = se_of(&c->o);
 	ss_bufreset(&c->list);
-	so_mark_destroyed(&c->o);
-	so_poolgc(&e->viewdb, &c->o);
+	so_free(&c->o);
 	return 0;
 }
 
@@ -21774,9 +21554,8 @@ se_viewdb_open(struct seviewdb *c)
 {
 	struct phia_env *e = se_of(&c->o);
 	int rc;
-	struct so *i;
-	rlist_foreach_entry(i, &e->db.list, link) {
-		struct sedb *db = (struct sedb*)i;
+	struct sedb *db;
+	rlist_foreach_entry(db, &e->db, link) {
 		int status = sr_status(&db->index->status);
 		if (status != SR_ONLINE)
 			continue;
@@ -21796,16 +21575,8 @@ se_viewdb_open(struct seviewdb *c)
 
 static struct so *se_viewdb_new(struct phia_env *e, uint64_t txn_id)
 {
-	int cache;
-	struct seviewdb *c = (struct seviewdb*)so_poolpop(&e->viewdb);
-	if (! c) {
-		cache = 0;
-		c = ss_malloc(&e->a, sizeof(struct seviewdb));
-	} else {
-		cache = 1;
-	}
-	if (c == NULL)
-		c = ss_malloc(&e->a, sizeof(struct seviewdb));
+	struct seviewdb *c;
+	c = ss_malloc(&e->a, sizeof(struct seviewdb));
 	if (ssunlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
@@ -21816,16 +21587,13 @@ static struct so *se_viewdb_new(struct phia_env *e, uint64_t txn_id)
 	c->v      = NULL;
 	c->pos    = NULL;
 	c->ready  = 0;
-	if (! cache)
-		ss_bufinit(&c->list);
+	ss_bufinit(&c->list);
 	int rc = se_viewdb_open(c);
 	if (ssunlikely(rc == -1)) {
-		so_mark_destroyed(&c->o);
-		so_poolpush(&e->viewdb, &c->o);
+		so_free(&c->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_pooladd(&e->viewdb, &c->o);
 	return &c->o;
 }
 
@@ -21843,11 +21611,6 @@ sp_cast(void *ptr, const char *method)
 	struct so *o = se_cast_validate(ptr);
 	if (ssunlikely(o == NULL)) {
 		fprintf(stderr, "\n%s(%p): bad object\n", method, ptr);
-		abort();
-	}
-	if (ssunlikely(o->destroyed)) {
-		fprintf(stderr, "\n%s(%p): attempt to use destroyed object\n",
-		        method, ptr);
 		abort();
 	}
 	return o;
@@ -21869,14 +21632,8 @@ struct phia_env *phia_env(void)
 	rc = se_confinit(&e->conf, &e->o);
 	if (ssunlikely(rc == -1))
 		goto error;
-	so_poolinit(&e->document, 1024);
-	so_poolinit(&e->cursor, 512);
-	so_poolinit(&e->tx, 512);
-	so_poolinit(&e->confcursor, 2);
-	so_poolinit(&e->confcursor_kv, 1);
-	so_poolinit(&e->view, 1);
-	so_poolinit(&e->viewdb, 1);
-	so_listinit(&e->db);
+	rlist_create(&e->db);
+	rlist_create(&e->view);
 	ss_mutexinit(&e->apilock);
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
