@@ -46,6 +46,8 @@
     Default: null |br|
     Dynamic: **yes** |br|
 
+.. _confval-wal-mode:
+
 .. confval:: wal_mode
 
     Specify fiber-WAL-disk synchronization mode as:

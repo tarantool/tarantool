@@ -71,8 +71,10 @@ API is a direct binding to corresponding methods of index objects of type
         To understand consistency of tuples returned by an iterator, it's essential
         to know the principles of the Tarantool transaction processing subsystem. An
         iterator in Tarantool does not own a consistent read view. Instead, each
-        procedure is granted exclusive access to all tuples and spaces until it
-        encounters a "context switch": by causing a write to disk, network, or by an
+        procedure is granted exclusive access to all tuples and spaces until
+        there is a "context switch": which may happen due to
+        :ref:`the-implicit-yield-rules <the-implicit-yield-rules>`,
+        or by an
         explicit call to :func:`fiber.yield`. When the execution flow returns
         to the yielded procedure, the data set could have changed significantly.
         Iteration, resumed after a yield point, does not preserve the read view,

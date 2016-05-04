@@ -40,8 +40,9 @@ necessary to prioritize requests or to use different authentication ids.
     can be replaced by :samp:`conn = {net_box}.self`. However, there is an important
     difference between the embedded connection and a remote one. With the
     embedded connection, requests which do not modify data do not yield.
-    When using a remote connection, any request can yield, and local database
-    state may have changed by the time it returns.
+    When using a remote connection, due to :ref:`the implicit rules <the-implicit-yield-rules>`
+    any request can yield, and database
+    state may have changed by the time it regains control.
 
     :param string host:
     :param number port:
@@ -120,10 +121,11 @@ necessary to prioritize requests or to use different authentication ids.
 
         :samp:`conn.space.{space-name}:select`:code:`{...}` is the remote-call equivalent
         of the local call :samp:`box.space.{space-name}:select`:code:`{...}`. Please note
-        this difference: a local :samp:`box.space.{space-name}:select`:code:`{...}` does
+        this difference: due to :ref:`the implicit yield rules <the-implicit-yield-rules>`
+        a local :samp:`box.space.{space-name}:select`:code:`{...}` does
         not yield, but a remote :samp:`conn.space.{space-name}:select`:code:`{...}` call
-        does yield, so local data may change while a remote
-        :samp:`conn.space.{space-name}:select`:code:`{...}` is running.
+        does yield, so global variables or database tuples data may change when a remote
+        :samp:`conn.space.{space-name}:select`:code:`{...}` occurs.
 
     .. method:: conn.space.<space-name>:insert{field-value, ...}
 

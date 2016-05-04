@@ -300,7 +300,7 @@ row#x for the sake of fiber#1, then writes row#y for the sake of fiber#2.
 
 **FACT #3**: yields must happen, otherwise the transaction processor
 thread would stick permanently on the same fiber.
-There are implicit yields: every data-change operation
+There are :ref:`implicit yields <the-implicit-yield-rules>`: every data-change operation
 or network-access causes an implicit yield, and every
 statement that goes through the tarantool client causes
 an implicit yield. And there are explicit yields:
