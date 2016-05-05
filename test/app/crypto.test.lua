@@ -2,8 +2,8 @@ crypto = require('crypto')
 type(crypto)
 
 ciph = crypto.cipher.aes128.cbc
-pass = '12345678876543211234567887654321'
-iv = 'abcdefghijklmnopqrstuvwxyz123456'
+pass = '1234567887654321'
+iv = 'abcdefghijklmnop'
 enc = ciph.encrypt('test', pass, iv)
 enc
 ciph.decrypt(enc, pass, iv)
@@ -31,8 +31,8 @@ crypto.cipher.aes256.nomode
 crypto.digest.nodigest
 
 
-bad_pass = '87654321123456788765432112345678'
-bad_iv = '123456abcdefghijklmnopqrstuvwxyz'
+bad_pass = '8765432112345678'
+bad_iv = '123456abcdefghij'
 ciph.decrypt(enc, bad_pass, iv)
 ciph.decrypt(enc, pass, bad_iv)
 
