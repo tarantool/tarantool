@@ -175,10 +175,10 @@ struct ssvfsif {
 	int     (*init)(struct ssvfs*, va_list);
 	void    (*free)(struct ssvfs*);
 	int64_t (*size)(struct ssvfs*, char*);
-	int     (*exists)(struct ssvfs*, char*);
+	int     (*exists)(struct ssvfs*, const char*);
 	int     (*unlink)(struct ssvfs*, char*);
 	int     (*rename)(struct ssvfs*, char*, char*);
-	int     (*mkdir)(struct ssvfs*, char*, int);
+	int     (*mkdir)(struct ssvfs*, const char*, int);
 	int     (*rmdir)(struct ssvfs*, char*);
 	int     (*open)(struct ssvfs*, char*, int, int);
 	int     (*close)(struct ssvfs*, int);
@@ -2604,7 +2604,7 @@ ss_stdvfs_size(struct ssvfs *f ssunused, char *path)
 }
 
 static int
-ss_stdvfs_exists(struct ssvfs *f ssunused, char *path)
+ss_stdvfs_exists(struct ssvfs *f ssunused, const char *path)
 {
 	struct stat st;
 	int rc = lstat(path, &st);
@@ -2624,7 +2624,7 @@ ss_stdvfs_rename(struct ssvfs *f ssunused, char *src, char *dest)
 }
 
 static int
-ss_stdvfs_mkdir(struct ssvfs *f ssunused, char *path, int mode)
+ss_stdvfs_mkdir(struct ssvfs *f ssunused, const char *path, int mode)
 {
 	return mkdir(path, mode);
 }
@@ -2893,7 +2893,7 @@ ss_testvfs_size(struct ssvfs *f, char *path)
 }
 
 static int
-ss_testvfs_exists(struct ssvfs *f, char *path)
+ss_testvfs_exists(struct ssvfs *f, const char *path)
 {
 	if (ss_testvfs_call(f))
 		return -1;
@@ -2917,7 +2917,7 @@ ss_testvfs_rename(struct ssvfs *f, char *src, char *dest)
 }
 
 static int
-ss_testvfs_mkdir(struct ssvfs *f, char *path, int mode)
+ss_testvfs_mkdir(struct ssvfs *f, const char *path, int mode)
 {
 	if (ss_testvfs_call(f))
 		return -1;
@@ -16101,134 +16101,17 @@ next:
 	return;
 }
 
-struct syconf {
-	char *path;
-	int   path_create;
-	char *path_backup;
-	int   sync;
-};
-
-struct sy {
-	struct syconf *conf;
-};
-
-static int sy_init(struct sy*);
-static int sy_open(struct sy*, struct runtime*, struct syconf*);
-static int sy_close(struct sy*, struct runtime*);
-
-static int sy_init(struct sy *e)
-{
-	e->conf = NULL;
-	return 0;
-}
-
+/**
+ * Create phia_dir if it doesn't exist.
+ */
 static int
-sy_deploy(struct sy *e, struct runtime *r)
+sr_checkdir(struct runtime *r, const char *path)
 {
-	int rc;
-	rc = ss_vfsmkdir(r->vfs, e->conf->path, 0755);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "directory '%s' create error: %s",
-		         e->conf->path, strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
-static inline ssize_t
-sy_processid(char **str) {
-	char *s = *str;
-	size_t v = 0;
-	while (*s && *s != '.') {
-		if (ssunlikely(!isdigit(*s)))
-			return -1;
-		v = (v * 10) + *s - '0';
-		s++;
-	}
-	*str = s;
-	return v;
-}
-
-static inline int
-sy_process(char *name, uint32_t *bsn)
-{
-	/* id */
-	/* id.incomplete */
-	char *token = name;
-	ssize_t id = sy_processid(&token);
-	if (ssunlikely(id == -1))
-		return -1;
-	*bsn = id;
-	if (strcmp(token, ".incomplete") == 0)
-		return 1;
-	return 0;
-}
-
-static inline int
-sy_recoverbackup(struct sy *i, struct runtime *r)
-{
-	if (i->conf->path_backup == NULL)
-		return 0;
-	int rc;
-	int exists = ss_vfsexists(r->vfs, i->conf->path_backup);
-	if (! exists) {
-		rc = ss_vfsmkdir(r->vfs, i->conf->path_backup, 0755);
-		if (ssunlikely(rc == -1)) {
-			sr_error(r->e, "backup directory '%s' create error: %s",
-					 i->conf->path_backup, strerror(errno));
-			return -1;
-		}
-	}
-	/* recover backup sequential number */
-	DIR *dir = opendir(i->conf->path_backup);
-	if (ssunlikely(dir == NULL)) {
-		sr_error(r->e, "backup directory '%s' open error: %s",
-				 i->conf->path_backup, strerror(errno));
-		return -1;
-	}
-	uint32_t bsn = 0;
-	struct dirent *de;
-	while ((de = readdir(dir))) {
-		if (ssunlikely(de->d_name[0] == '.'))
-			continue;
-		uint32_t id = 0;
-		rc = sy_process(de->d_name, &id);
-		switch (rc) {
-		case  1:
-		case  0:
-			if (id > bsn)
-				bsn = id;
-			break;
-		case -1: /* skip unknown file */
-			continue;
-		}
-	}
-	closedir(dir);
-	r->seq->bsn = bsn;
-	return 0;
-}
-
-static int sy_open(struct sy *e, struct runtime *r, struct syconf *conf)
-{
-	e->conf = conf;
-	int rc = sy_recoverbackup(e, r);
-	if (ssunlikely(rc == -1))
-		return -1;
-	int exists = ss_vfsexists(r->vfs, conf->path);
+	int exists = ss_vfsexists(r->vfs, path);
 	if (exists == 0) {
-		if (ssunlikely(! conf->path_create)) {
-			sr_error(r->e, "directory '%s' does not exist", conf->path);
-			return -1;
-		}
-		return sy_deploy(e, r);
+		sr_error(r->e, "directory '%s' does not exist", path);
+		return -1;
 	}
-	return 0;
-}
-
-static int sy_close(struct sy *e, struct runtime *r)
-{
-	(void)e;
-	(void)r;
 	return 0;
 }
 
@@ -17717,13 +17600,6 @@ se_cast_validate(void *ptr)
 	return NULL;
 }
 
-typedef void (*serecovercbf)(char*, void*);
-
-struct serecovercb {
-	serecovercbf function;
-	void *arg;
-};
-
 struct seconfrt {
 	/* phia */
 	char      version[16];
@@ -17774,7 +17650,6 @@ struct seconf {
 	/* compaction */
 	struct srzonemap     zones;
 	/* scheduler */
-	struct serecovercb   on_recover;
 	struct sstrigger     on_event;
 	uint32_t      event_on_backup;
 	/* memory */
@@ -17833,8 +17708,6 @@ struct phia_env {
 	struct ssa         a;
 	struct ssa         a_ref;
 	struct sicachepool cachepool;
-	struct syconf      repconf;
-	struct sy          rep;
 	struct slconf      lpconf;
 	struct slpool      lp;
 	struct sxmanager   xm;
@@ -18017,7 +17890,6 @@ enum {
 static int se_recoverbegin(struct sedb*);
 static int se_recoverend(struct sedb*);
 static int se_recover(struct phia_env*);
-static int se_recover_repository(struct phia_env*);
 
 static int
 se_open(struct so *o)
@@ -18056,8 +17928,8 @@ se_open(struct so *o)
 	ss_quotaset(&e->quota, e->conf.memory_limit);
 	ss_quotaenable(&e->quota, 0);
 
-	/* repository recover */
-	rc = se_recover_repository(e);
+	/* Ensure phia data directory exists. */
+	rc = sr_checkdir(&e->r, e->conf.path);
 	if (ssunlikely(rc == -1))
 		return -1;
 	/* databases recover */
@@ -18107,9 +17979,6 @@ se_destroy(struct so *o)
 		}
 	}
 	rc = sl_poolshutdown(&e->lp);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
-	rc = sy_close(&e->rep, &e->r);
 	if (ssunlikely(rc == -1))
 		rcret = -1;
 	sx_managerfree(&e->xm);
@@ -18359,35 +18228,6 @@ se_confscheduler_anticache(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline int
-se_confscheduler_on_recover(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	if (ssunlikely(sr_statusactive(&e->status))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	e->conf.on_recover.function =
-		(serecovercbf)(uintptr_t)s->value;
-	return 0;
-}
-
-static inline int
-se_confscheduler_on_recover_arg(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	if (ssunlikely(sr_statusactive(&e->status))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	e->conf.on_recover.arg = s->value;
-	return 0;
-}
-
-static inline int
 se_confscheduler_on_event(struct srconf *c, struct srconfstmt *s)
 {
 	struct phia_env *e = s->ptr;
@@ -18471,8 +18311,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "snapshot_ssn", SS_U64, &rt->snapshot_ssn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "snapshot_ssn_last", SS_U64, &rt->snapshot_ssn_last, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_snapshot, "snapshot", SS_FUNCTION, NULL);
-	sr_c(&p, pc, se_confscheduler_on_recover, "on_recover", SS_STRING, NULL);
-	sr_c(&p, pc, se_confscheduler_on_recover_arg, "on_recover_arg", SS_STRING, NULL);
 	sr_c(&p, pc, se_confscheduler_on_event, "on_event", SS_STRING, NULL);
 	sr_c(&p, pc, se_confscheduler_on_event_arg, "on_event_arg", SS_STRING, NULL);
 	sr_c(&p, pc, se_confv_offline, "event_on_backup", SS_U32, &e->conf.event_on_backup);
@@ -19242,8 +19080,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 	c->log_rotate_wm       = 500000;
 	c->log_sync            = 0;
 	c->log_rotate_sync     = 1;
-	c->on_recover.function = NULL;
-	c->on_recover.arg      = NULL;
 	ss_triggerinit(&c->on_event);
 	c->event_on_backup     = 0;
 	struct srzone def = {
@@ -20746,19 +20582,6 @@ static struct sotype se_o[] =
 	{ 0x45ABCDFAL, "cursor"            }
 };
 
-static inline void
-se_recoverf(struct phia_env *e, char *fmt, ...)
-{
-	if (e->conf.on_recover.function == NULL)
-		return;
-	char trace[1024];
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(trace, sizeof(trace), fmt, args);
-	va_end(args);
-	e->conf.on_recover.function(trace, e->conf.on_recover.arg);
-}
-
 static int se_recoverbegin(struct sedb *db)
 {
 	/* open and recover repository */
@@ -20770,7 +20593,6 @@ static int se_recoverbegin(struct sedb *db)
 	if (sr_status(&e->status) == SR_ONLINE)
 		if (e->conf.recover != SE_RECOVER_NP)
 			db->scheme->path_fail_on_exists = 1;
-	se_recoverf(e, "loading database '%s'", db->scheme->path);
 	int rc = si_open(db->index);
 	if (ssunlikely(rc == -1))
 		goto error;
@@ -20847,8 +20669,6 @@ se_recoverlog(struct phia_env *e, struct sl *log)
 				goto rlb;
 			ss_gcmark(&log->gc, 1);
 			processed++;
-			if ((processed % 100000) == 0)
-				se_recoverf(e, " %.1fM processed", processed / 1000000.0);
 			ss_iteratornext(&i);
 		}
 		if (ssunlikely(sl_iter_error(&i)))
@@ -20878,8 +20698,6 @@ se_recoverlogpool(struct phia_env *e)
 {
 	struct sl *log;
 	rlist_foreach_entry(log, &e->lp.list, link) {
-		char *path = ss_pathof(&log->file.path);
-		se_recoverf(e, "loading journal '%s'", path);
 		int rc = se_recoverlog(e, log);
 		if (ssunlikely(rc == -1))
 			return -1;
@@ -20912,17 +20730,6 @@ static int se_recover(struct phia_env *e)
 error:
 	sr_statusset(&e->status, SR_MALFUNCTION);
 	return -1;
-}
-
-static int se_recover_repository(struct phia_env *e)
-{
-	struct syconf *rc = &e->repconf;
-	rc->path        = e->conf.path;
-	rc->path_create = e->conf.path_create;
-	rc->path_backup = e->conf.backup_path;
-	rc->sync = 0;
-	se_recoverf(e, "recovering repository '%s'", e->conf.path);
-	return sy_open(&e->rep, &e->r, rc);
 }
 
 static inline int
@@ -21533,7 +21340,6 @@ struct phia_env *phia_env(void)
 	sr_init(&e->r, &e->status, &e->error, &e->a, &e->a_ref, &e->vfs, &e->quota,
 	        &e->conf.zones, &e->seq, SF_RAW, NULL,
 	        NULL, &e->ei, &e->stat);
-	sy_init(&e->rep);
 	sl_poolinit(&e->lp, &e->r);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
