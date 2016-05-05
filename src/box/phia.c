@@ -61,12 +61,7 @@
 #include "crc32.h"
 #include "clock.h"
 #include "trivia/config.h"
-
-#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 3
-#  define sshot __attribute__((hot))
-#else
-#  define sshot
-#endif
+#include "tt_pthread.h"
 
 #define sspacked __attribute__((packed))
 #define ssunused __attribute__((unused))
@@ -83,45 +78,6 @@
 
 #define ss_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
-
-typedef uint8_t ssspinlock;
-
-#if defined(__x86_64__) || defined(__i386) || defined(_X86_)
-# define CPU_PAUSE __asm__ ("pause")
-#elif defined(__powerpc__)
-# define CPU_PAUSE __asm__ ("ori 27, 27, 27")
-#else
-# define CPU_PAUSE do { } while(0)
-#endif
-
-static inline void
-ss_spinlockinit(ssspinlock *l) {
-	*l = 0;
-}
-
-static inline void
-ss_spinlockfree(ssspinlock *l) {
-	*l = 0;
-}
-
-static inline void
-ss_spinlock(ssspinlock *l) {
-	if (__sync_lock_test_and_set(l, 1) != 0) {
-		unsigned int spin_count = 0U;
-		for (;;) {
-			CPU_PAUSE;
-			if (*l == 0U && __sync_lock_test_and_set(l, 1) == 0)
-				break;
-			if (++spin_count > 100U)
-				usleep(0);
-		}
-	}
-}
-
-static inline void
-ss_spinunlock(ssspinlock *l) {
-	__sync_lock_release(l);
-}
 
 struct sspath {
 	char path[PATH_MAX];
@@ -505,7 +461,7 @@ static struct ssaif ss_stda;
 static struct ssaif ss_ooma;
 
 struct sstrace {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	const char *file;
 	const char *function;
 	int line;
@@ -514,7 +470,7 @@ struct sstrace {
 
 static inline void
 ss_traceinit(struct sstrace *t) {
-	ss_spinlockinit(&t->lock);
+	tt_pthread_mutex_init(&t->lock, NULL);
 	t->message[0] = 0;
 	t->line = 0;
 	t->function = NULL;
@@ -523,14 +479,14 @@ ss_traceinit(struct sstrace *t) {
 
 static inline void
 ss_tracefree(struct sstrace *t) {
-	ss_spinlockfree(&t->lock);
+	tt_pthread_mutex_destroy(&t->lock);
 }
 
 static inline int
 ss_tracecopy(struct sstrace *t, char *buf, int bufsize) {
-	ss_spinlock(&t->lock);
+	tt_pthread_mutex_lock(&t->lock);
 	int len = snprintf(buf, bufsize, "%s", t->message);
-	ss_spinunlock(&t->lock);
+	tt_pthread_mutex_unlock(&t->lock);
 	return len;
 }
 
@@ -540,12 +496,12 @@ ss_vtrace(struct sstrace *t,
           const char *function, int line,
           char *fmt, va_list args)
 {
-	ss_spinlock(&t->lock);
+	tt_pthread_mutex_lock(&t->lock);
 	t->file     = file;
 	t->function = function;
 	t->line     = line;
 	vsnprintf(t->message, sizeof(t->message), fmt, args);
-	ss_spinunlock(&t->lock);
+	tt_pthread_mutex_unlock(&t->lock);
 }
 
 static inline int
@@ -565,7 +521,7 @@ ss_traceset(struct sstrace *t,
 	ss_traceset(t, __FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
 
 struct ssgc {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	int mark;
 	int sweep;
 	int complete;
@@ -574,7 +530,7 @@ struct ssgc {
 static inline void
 ss_gcinit(struct ssgc *gc)
 {
-	ss_spinlockinit(&gc->lock);
+	tt_pthread_mutex_init(&gc->lock, NULL);
 	gc->mark     = 0;
 	gc->sweep    = 0;
 	gc->complete = 0;
@@ -583,58 +539,58 @@ ss_gcinit(struct ssgc *gc)
 static inline void
 ss_gcfree(struct ssgc *gc)
 {
-	ss_spinlockfree(&gc->lock);
+	tt_pthread_mutex_destroy(&gc->lock);
 }
 
 static inline void
 ss_gcmark(struct ssgc *gc, int n)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	gc->mark += n;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 }
 
 static inline void
 ss_gcsweep(struct ssgc *gc, int n)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	gc->sweep += n;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 }
 
 static inline void
 ss_gccomplete(struct ssgc *gc)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	gc->complete = 1;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 }
 
 static inline int
 ss_gcinprogress(struct ssgc *gc)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	int v = gc->complete;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 	return !v;
 }
 
 static inline int
 ss_gcrotateready(struct ssgc *gc, int wm)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	int rc = gc->mark >= wm;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 	return rc;
 }
 
 static inline int
 ss_gcgarbage(struct ssgc *gc)
 {
-	ss_spinlock(&gc->lock);
+	tt_pthread_mutex_lock(&gc->lock);
 	int ready = (gc->mark == gc->sweep);
 	int rc = gc->complete && ready;
-	ss_spinunlock(&gc->lock);
+	tt_pthread_mutex_unlock(&gc->lock);
 	return rc;
 }
 
@@ -905,54 +861,6 @@ ss_typeof(enum sstype type) {
 	return NULL;
 }
 
-struct ssmutex {
-	pthread_mutex_t m;
-};
-
-static inline void
-ss_mutexinit(struct ssmutex *m) {
-	pthread_mutex_init(&m->m, NULL);
-}
-
-static inline void
-ss_mutexfree(struct ssmutex *m) {
-	pthread_mutex_destroy(&m->m);
-}
-
-static inline void
-ss_mutexlock(struct ssmutex *m) {
-	pthread_mutex_lock(&m->m);
-}
-
-static inline void
-ss_mutexunlock(struct ssmutex *m) {
-	pthread_mutex_unlock(&m->m);
-}
-
-struct sscond {
-	pthread_cond_t c;
-};
-
-static inline void
-ss_condinit(struct sscond *c) {
-	pthread_cond_init(&c->c, NULL);
-}
-
-static inline void
-ss_condfree(struct sscond *c) {
-	pthread_cond_destroy(&c->c);
-}
-
-static inline void
-ss_condsignal(struct sscond *c) {
-	pthread_cond_signal(&c->c);
-}
-
-static inline void
-ss_condwait(struct sscond *c, struct ssmutex *m) {
-	pthread_cond_wait(&c->c, &m->m);
-}
-
 typedef void *(*ssthreadf)(void*);
 
 struct ssthread {
@@ -978,8 +886,8 @@ struct ssquota {
 	int wait;
 	uint64_t limit;
 	uint64_t used;
-	struct ssmutex lock;
-	struct sscond cond;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
 };
 
 static int ss_quotainit(struct ssquota*);
@@ -991,23 +899,23 @@ static int ss_quota(struct ssquota*, enum ssquotaop, uint64_t);
 static inline uint64_t
 ss_quotaused(struct ssquota *q)
 {
-	ss_mutexlock(&q->lock);
+	tt_pthread_mutex_lock(&q->lock);
 	uint64_t used = q->used;
-	ss_mutexunlock(&q->lock);
+	tt_pthread_mutex_unlock(&q->lock);
 	return used;
 }
 
 static inline int
 ss_quotaused_percent(struct ssquota *q)
 {
-	ss_mutexlock(&q->lock);
+	tt_pthread_mutex_lock(&q->lock);
 	int percent;
 	if (q->limit == 0) {
 		percent = 0;
 	} else {
 		percent = (q->used * 100) / q->limit;
 	}
-	ss_mutexunlock(&q->lock);
+	tt_pthread_mutex_unlock(&q->lock);
 	return percent;
 }
 
@@ -1890,7 +1798,7 @@ static struct ssfilterif ss_nonefilter =
 };
 
 struct ssooma {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	uint32_t fail_from;
 	uint32_t n;
 	int ref;
@@ -1901,7 +1809,7 @@ static struct ssooma oom_alloc;
 static inline int
 ss_oomaclose(struct ssa *a ssunused)
 {
-	ss_spinlockfree(&oom_alloc.lock);
+	tt_pthread_mutex_destroy(&oom_alloc.lock);
 	return 0;
 }
 
@@ -1910,21 +1818,21 @@ ss_oomaopen(struct ssa *a ssunused, va_list args)
 {
 	oom_alloc.fail_from = va_arg(args, int);
 	oom_alloc.n = 0;
-	ss_spinlockinit(&oom_alloc.lock);
+	tt_pthread_mutex_init(&oom_alloc.lock, NULL);
 	return 0;
 }
 
 static inline int
 ss_oomaevent(void)
 {
-	ss_spinlock(&oom_alloc.lock);
+	tt_pthread_mutex_lock(&oom_alloc.lock);
 	int generate_fail = oom_alloc.n >= oom_alloc.fail_from;
 	oom_alloc.n++;
-	ss_spinunlock(&oom_alloc.lock);
+	tt_pthread_mutex_unlock(&oom_alloc.lock);
 	return generate_fail;
 }
 
-sshot static inline void*
+static inline void*
 ss_oomamalloc(struct ssa *a ssunused, int size)
 {
 	if (ss_oomaevent())
@@ -1950,7 +1858,7 @@ ss_oomarealloc(struct ssa *a ssunused, void *ptr, int size)
 	return realloc(ptr, size);
 }
 
-sshot static inline void
+static inline void
 ss_oomafree(struct ssa *a ssunused, void *ptr)
 {
 	free(ptr);
@@ -2279,8 +2187,8 @@ ss_quotainit(struct ssquota *q)
 	q->wait   = 0;
 	q->limit  = 0;
 	q->used   = 0;
-	ss_mutexinit(&q->lock);
-	ss_condinit(&q->cond);
+	tt_pthread_mutex_init(&q->lock, NULL);
+	tt_pthread_cond_init(&q->cond, NULL);
 	return 0;
 }
 
@@ -2301,8 +2209,8 @@ ss_quotaenable(struct ssquota *q, int v)
 static int
 ss_quotafree(struct ssquota *q)
 {
-	ss_mutexfree(&q->lock);
-	ss_condfree(&q->cond);
+	tt_pthread_mutex_destroy(&q->lock);
+	tt_pthread_cond_destroy(&q->cond);
 	return 0;
 }
 
@@ -2311,7 +2219,7 @@ ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 {
 	if (sslikely(v == 0))
 		return 0;
-	ss_mutexlock(&q->lock);
+	tt_pthread_mutex_lock(&q->lock);
 	switch (op) {
 	case SS_QADD:
 		if (ssunlikely(!q->enable || q->limit == 0)) {
@@ -2319,7 +2227,7 @@ ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 		} else {
 			if (ssunlikely((q->used + v) >= q->limit)) {
 				q->wait++;
-				ss_condwait(&q->cond, &q->lock);
+				tt_pthread_cond_wait(&q->cond, &q->lock);
 			}
 		}
 	case SS_QGROW:
@@ -2329,11 +2237,11 @@ ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 		q->used -= v;
 		if (ssunlikely(q->wait)) {
 			q->wait--;
-			ss_condsignal(&q->cond);
+			tt_pthread_cond_signal(&q->cond);
 		}
 		break;
 	}
-	ss_mutexunlock(&q->lock);
+	tt_pthread_mutex_unlock(&q->lock);
 	return 0;
 }
 
@@ -2961,7 +2869,7 @@ static struct ssvfsif ss_stdvfs =
 };
 
 struct  sstestvfs {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	uint32_t fail_from;
 	uint32_t n;
 };
@@ -2972,7 +2880,7 @@ ss_testvfs_init(struct ssvfs *f, va_list args ssunused)
 	struct sstestvfs *o = (struct sstestvfs*)f->priv;
 	o->fail_from = va_arg(args, int);
 	o->n = 0;
-	ss_spinlockinit(&o->lock);
+	tt_pthread_mutex_init(&o->lock, NULL);
 	return 0;
 }
 
@@ -2980,17 +2888,17 @@ static inline void
 ss_testvfs_free(struct ssvfs *f)
 {
 	struct sstestvfs *o = (struct sstestvfs*)f->priv;
-	ss_spinlockfree(&o->lock);
+	tt_pthread_mutex_destroy(&o->lock);
 }
 
 static inline int
 ss_testvfs_call(struct ssvfs *f)
 {
 	struct sstestvfs *o = (struct sstestvfs*)f->priv;
-	ss_spinlock(&o->lock);
+	tt_pthread_mutex_lock(&o->lock);
 	int generate_fail = o->n >= o->fail_from;
 	o->n++;
-	ss_spinunlock(&o->lock);
+	tt_pthread_mutex_unlock(&o->lock);
 	return generate_fail;
 }
 
@@ -3687,7 +3595,7 @@ sf_upserthas(struct sfupsert *u) {
 	return u->function != NULL;
 }
 
-static inline sshot int
+static inline int
 sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 {
 	int size = (asz < bsz) ? asz : bsz;
@@ -3700,7 +3608,7 @@ sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 	return rc > 0 ? 1 : -1;
 }
 
-static inline sshot int
+static inline int
 sf_cmpu32(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
 {
 	uint32_t av = load_u32(a);
@@ -3710,7 +3618,7 @@ sf_cmpu32(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunus
 	return (av > bv) ? 1 : -1;
 }
 
-static inline sshot int
+static inline int
 sf_cmpu32_reverse(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
 {
 	uint32_t av = load_u32(a);
@@ -3720,7 +3628,7 @@ sf_cmpu32_reverse(char *a, int asz ssunused, char *b, int bsz ssunused, void *ar
 	return (av > bv) ? -1 : 1;
 }
 
-static inline sshot int
+static inline int
 sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
               void *arg ssunused)
 {
@@ -3731,7 +3639,7 @@ sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
 	return (av > bv) ? 1 : -1;
 }
 
-static inline sshot int
+static inline int
 sf_cmpu64_reverse(char *a, int asz ssunused, char *b, int bsz ssunused,
               void *arg ssunused)
 {
@@ -4094,7 +4002,7 @@ enum {
 };
 
 struct srerror {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	int type;
 	const char *file;
 	const char *function;
@@ -4109,54 +4017,54 @@ sr_errorinit(struct srerror *e) {
 	e->line = 0;
 	e->function = NULL;
 	e->file = NULL;
-	ss_spinlockinit(&e->lock);
+	tt_pthread_mutex_init(&e->lock, NULL);
 }
 
 /* TODO: where is se_delete() ? */
 static inline __attribute__((unused)) void
 sr_errorfree(struct srerror *e) {
-	ss_spinlockfree(&e->lock);
+	tt_pthread_mutex_destroy(&e->lock);
 }
 
 static inline void
 sr_errorreset(struct srerror *e) {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	e->type = SR_ERROR_NONE;
 	e->error[0] = 0;
 	e->line = 0;
 	e->function = NULL;
 	e->file = NULL;
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 }
 
 static inline void
 sr_errorrecover(struct srerror *e) {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	assert(e->type == SR_ERROR_MALFUNCTION);
 	e->type = SR_ERROR;
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 }
 
 static inline void
 sr_malfunction_set(struct srerror *e) {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	e->type = SR_ERROR_MALFUNCTION;
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 }
 
 static inline int
 sr_errorof(struct srerror *e) {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	int type = e->type;
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 	return type;
 }
 
 static inline int
 sr_errorcopy(struct srerror *e, char *buf, int bufsize) {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	int len = snprintf(buf, bufsize, "%s", e->error);
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 	return len;
 }
 
@@ -4166,9 +4074,9 @@ sr_verrorset(struct srerror *e, int type,
              const char *function, int line,
              char *fmt, va_list args)
 {
-	ss_spinlock(&e->lock);
+	tt_pthread_mutex_lock(&e->lock);
 	if (ssunlikely(e->type == SR_ERROR_MALFUNCTION)) {
-		ss_spinunlock(&e->lock);
+		tt_pthread_mutex_unlock(&e->lock);
 		return;
 	}
 	e->file     = file;
@@ -4178,7 +4086,7 @@ sr_verrorset(struct srerror *e, int type,
 	int len;
 	len = snprintf(e->error, sizeof(e->error), "%s:%d ", file, line);
 	vsnprintf(e->error + len, sizeof(e->error) - len, fmt, args);
-	ss_spinunlock(&e->lock);
+	tt_pthread_mutex_unlock(&e->lock);
 }
 
 static inline int
@@ -4222,38 +4130,38 @@ enum {
 
 struct srstatus {
 	int status;
-	ssspinlock lock;
+	pthread_mutex_t lock;
 };
 
 static inline void
 sr_statusinit(struct srstatus *s)
 {
 	s->status = SR_OFFLINE;
-	ss_spinlockinit(&s->lock);
+	tt_pthread_mutex_init(&s->lock, NULL);
 }
 
 static inline void
 sr_statusfree(struct srstatus *s)
 {
-	ss_spinlockfree(&s->lock);
+	tt_pthread_mutex_destroy(&s->lock);
 }
 
 static inline int
 sr_statusset(struct srstatus *s, int status)
 {
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	int old = s->status;
 	s->status = status;
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return old;
 }
 
 static inline int
 sr_status(struct srstatus *s)
 {
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	int status = s->status;
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return status;
 }
 
@@ -4305,7 +4213,7 @@ sr_online(struct srstatus *s) {
 }
 
 struct srstat {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	/* memory */
 	uint64_t v_count;
 	uint64_t v_allocated;
@@ -4344,12 +4252,12 @@ static inline void
 sr_statinit(struct srstat *s)
 {
 	memset(s, 0, sizeof(*s));
-	ss_spinlockinit(&s->lock);
+	tt_pthread_mutex_init(&s->lock, NULL);
 }
 
 static inline void
 sr_statfree(struct srstat *s) {
-	ss_spinlockfree(&s->lock);
+	tt_pthread_mutex_destroy(&s->lock);
 }
 
 static inline void
@@ -4374,50 +4282,50 @@ sr_statprepare(struct srstat *s)
 static inline void
 sr_statkey(struct srstat *s, int size)
 {
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	ss_avgupdate(&s->key, size);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_statset(struct srstat *s, uint64_t start)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->set++;
 	ss_avgupdate(&s->set_latency, diff);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_statdelete(struct srstat *s, uint64_t start)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->del++;
 	ss_avgupdate(&s->del_latency, diff);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_statupsert(struct srstat *s, uint64_t start)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->upsert++;
 	ss_avgupdate(&s->upsert_latency, diff);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_statget(struct srstat *s, uint64_t diff, int read_disk, int read_cache)
 {
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->get++;
 	ss_avgupdate(&s->get_read_disk, read_disk);
 	ss_avgupdate(&s->get_read_cache, read_cache);
 	ss_avgupdate(&s->get_latency, diff);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
@@ -4425,34 +4333,34 @@ sr_stattx(struct srstat *s, uint64_t start, uint32_t count,
           int rlb, int conflict)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->tx++;
 	s->tx_rlb += rlb;
 	s->tx_conflict += conflict;
 	ss_avgupdate(&s->tx_stmts, count);
 	ss_avgupdate(&s->tx_latency, diff);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_stattx_lock(struct srstat *s)
 {
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->tx_lock++;
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 static inline void
 sr_statcursor(struct srstat *s, uint64_t start, int read_disk, int read_cache, int ops)
 {
 	uint64_t diff = clock_monotonic64() - start;
-	ss_spinlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->cursor++;
 	ss_avgupdate(&s->cursor_read_disk, read_disk);
 	ss_avgupdate(&s->cursor_read_cache, read_cache);
 	ss_avgupdate(&s->cursor_latency, diff);
 	ss_avgupdate(&s->cursor_ops, ops);
-	ss_spinunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 }
 
 enum srseqop {
@@ -4475,7 +4383,7 @@ enum srseqop {
 };
 
 struct srseq {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	/** Log sequence number. */
 	uint64_t lsn;
 	/** Transaction sequence number. */
@@ -4497,22 +4405,22 @@ struct srseq {
 static inline void
 sr_seqinit(struct srseq *n) {
 	memset(n, 0, sizeof(*n));
-	ss_spinlockinit(&n->lock);
+	tt_pthread_mutex_init(&n->lock, NULL);
 }
 
 static inline void
 sr_seqfree(struct srseq *n) {
-	ss_spinlockfree(&n->lock);
+	tt_pthread_mutex_destroy(&n->lock);
 }
 
 static inline void
 sr_seqlock(struct srseq *n) {
-	ss_spinlock(&n->lock);
+	tt_pthread_mutex_lock(&n->lock);
 }
 
 static inline void
 sr_sequnlock(struct srseq *n) {
-	ss_spinunlock(&n->lock);
+	tt_pthread_mutex_unlock(&n->lock);
 }
 
 static inline uint64_t
@@ -5315,10 +5223,10 @@ sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
 	char *ptr = sv_vpointer(v);
 	sf_write(r->scheme, fields, ptr);
 	/* update runtime statistics */
-	ss_spinlock(&r->stat->lock);
+	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
 	r->stat->v_allocated += sizeof(struct svv) + size;
-	ss_spinunlock(&r->stat->lock);
+	tt_pthread_mutex_unlock(&r->stat->lock);
 	return v;
 }
 
@@ -5336,10 +5244,10 @@ sv_vbuildraw(struct runtime *r, char *src, int size, uint64_t ts)
 	v->log       = NULL;
 	memcpy(sv_vpointer(v), src, size);
 	/* update runtime statistics */
-	ss_spinlock(&r->stat->lock);
+	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
 	r->stat->v_allocated += sizeof(struct svv) + size;
-	ss_spinunlock(&r->stat->lock);
+	tt_pthread_mutex_unlock(&r->stat->lock);
 	return v;
 }
 
@@ -5366,12 +5274,12 @@ sv_vunref(struct runtime *r, struct svv *v)
 	if (sslikely(--v->refs == 0)) {
 		uint32_t size = sv_vsize(v);
 		/* update runtime statistics */
-		ss_spinlock(&r->stat->lock);
+		tt_pthread_mutex_lock(&r->stat->lock);
 		assert(r->stat->v_count > 0);
 		assert(r->stat->v_allocated >= size);
 		r->stat->v_count--;
 		r->stat->v_allocated -= size;
-		ss_spinunlock(&r->stat->lock);
+		tt_pthread_mutex_unlock(&r->stat->lock);
 		ss_free(r->a, v);
 		return 1;
 	}
@@ -7012,7 +6920,7 @@ struct sx {
 };
 
 struct sxmanager {
-	ssspinlock  lock;
+	pthread_mutex_t  lock;
 	struct rlist      indexes;
 	struct ssrb        i;
 	uint32_t    count_rd;
@@ -7059,7 +6967,7 @@ static int sx_managerinit(struct sxmanager *m, struct runtime *r)
 	m->count_gc = 0;
 	m->csn = 0;
 	m->gc  = NULL;
-	ss_spinlockinit(&m->lock);
+	tt_pthread_mutex_init(&m->lock, NULL);
 	rlist_create(&m->indexes);
 	sx_vpool_init(&m->pool, r);
 	m->r = r;
@@ -7070,7 +6978,7 @@ static int sx_managerfree(struct sxmanager *m)
 {
 	assert(sx_count(m) == 0);
 	sx_vpool_free(&m->pool);
-	ss_spinlockfree(&m->lock);
+	tt_pthread_mutex_destroy(&m->lock);
 	return 0;
 }
 
@@ -7112,33 +7020,33 @@ static int sx_indexfree(struct sxindex *i, struct sxmanager *m)
 
 static uint64_t sx_min(struct sxmanager *m)
 {
-	ss_spinlock(&m->lock);
+	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmin(&m->i);
 		struct sx *min = sscast(node, struct sx, node);
 		id = min->id;
 	}
-	ss_spinunlock(&m->lock);
+	tt_pthread_mutex_unlock(&m->lock);
 	return id;
 }
 
 static uint64_t sx_max(struct sxmanager *m)
 {
-	ss_spinlock(&m->lock);
+	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmax(&m->i);
 		struct sx *max = sscast(node, struct sx, node);
 		id = max->id;
 	}
-	ss_spinunlock(&m->lock);
+	tt_pthread_mutex_unlock(&m->lock);
 	return id;
 }
 
 static uint64_t sx_vlsn(struct sxmanager *m)
 {
-	ss_spinlock(&m->lock);
+	tt_pthread_mutex_lock(&m->lock);
 	uint64_t vlsn;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmin(&m->i);
@@ -7147,7 +7055,7 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	} else {
 		vlsn = sr_seq(m->r->seq, SR_LSN);
 	}
-	ss_spinunlock(&m->lock);
+	tt_pthread_mutex_unlock(&m->lock);
 	return vlsn;
 }
 
@@ -7192,7 +7100,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 		x->vlsn = vlsn;
 	sr_sequnlock(m->r->seq);
 	sx_init(m, x, log);
-	ss_spinlock(&m->lock);
+	tt_pthread_mutex_lock(&m->lock);
 	struct ssrbnode *n = NULL;
 	int rc = sx_matchtx(&m->i, NULL, (char*)&x->id, sizeof(x->id), &n);
 	if (rc == 0 && n) {
@@ -7204,7 +7112,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 		m->count_rd++;
 	else
 		m->count_rw++;
-	ss_spinunlock(&m->lock);
+	tt_pthread_mutex_unlock(&m->lock);
 	return SXREADY;
 }
 
@@ -7281,13 +7189,13 @@ static inline void
 sx_end(struct sx *x)
 {
 	struct sxmanager *m = x->manager;
-	ss_spinlock(&m->lock);
+	tt_pthread_mutex_lock(&m->lock);
 	ss_rbremove(&m->i, &x->node);
 	if (x->type == SXRO)
 		m->count_rd--;
 	else
 		m->count_rw--;
-	ss_spinunlock(&m->lock);
+	tt_pthread_mutex_unlock(&m->lock);
 }
 
 static inline void
@@ -7758,7 +7666,7 @@ sl_vtimestamp(struct sv *v) {
 struct sl {
 	uint64_t id;
 	struct ssgc gc;
-	struct ssmutex filelock;
+	pthread_mutex_t filelock;
 	struct ssfile file;
 	struct slpool *p;
 	struct rlist link;
@@ -7766,7 +7674,7 @@ struct sl {
 };
 
 struct slpool {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	struct slconf *conf;
 	struct rlist list;
 	int gc;
@@ -7815,7 +7723,7 @@ sl_alloc(struct slpool *p, uint64_t id)
 	l->id   = id;
 	l->p    = NULL;
 	ss_gcinit(&l->gc);
-	ss_mutexinit(&l->filelock);
+	tt_pthread_mutex_init(&l->filelock, NULL);
 	ss_fileinit(&l->file, p->r->vfs);
 	rlist_create(&l->link);
 	rlist_create(&l->linkcopy);
@@ -7831,7 +7739,7 @@ sl_close(struct slpool *p, struct sl *l)
 		               ss_pathof(&l->file.path),
 		               strerror(errno));
 	}
-	ss_mutexfree(&l->filelock);
+	tt_pthread_mutex_destroy(&l->filelock);
 	ss_gcfree(&l->gc);
 	ss_free(p->r->a, l);
 	return rc;
@@ -7889,7 +7797,7 @@ error:
 
 static int sl_poolinit(struct slpool *p, struct runtime *r)
 {
-	ss_spinlockinit(&p->lock);
+	tt_pthread_mutex_init(&p->lock, NULL);
 	rlist_create(&p->list);
 	p->n    = 0;
 	p->r    = r;
@@ -7976,12 +7884,12 @@ static int sl_poolrotate(struct slpool *p)
 	if (ssunlikely(l == NULL))
 		return -1;
 	struct sl *log = NULL;
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	if (p->n)
 		log = sscast(p->list.prev, struct sl, link);
 	rlist_add(&p->list, &l->link);
 	p->n++;
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 	if (log) {
 		assert(log->file.fd != -1);
 		if (p->conf->sync_on_rotate) {
@@ -8003,11 +7911,11 @@ static int sl_poolrotate_ready(struct slpool *p)
 {
 	if (ssunlikely(! p->conf->enable))
 		return 0;
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	assert(p->n > 0);
 	struct sl *l = sscast(p->list.prev, struct sl, link);
 	int ready = ss_gcrotateready(&l->gc, p->conf->rotatewm);
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 	return ready;
 }
 
@@ -8025,7 +7933,7 @@ static int sl_poolshutdown(struct slpool *p)
 	}
 	if (p->iov.v)
 		ss_free(p->r->a, p->iov.v);
-	ss_spinlockfree(&p->lock);
+	tt_pthread_mutex_destroy(&p->lock);
 	return rcret;
 }
 
@@ -8047,9 +7955,9 @@ sl_gc(struct slpool *p, struct sl *l)
 
 static int sl_poolgc_enable(struct slpool *p, int enable)
 {
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	p->gc = enable;
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 	return 0;
 }
 
@@ -8058,9 +7966,9 @@ static int sl_poolgc(struct slpool *p)
 	if (ssunlikely(! p->conf->enable))
 		return 0;
 	for (;;) {
-		ss_spinlock(&p->lock);
+		tt_pthread_mutex_lock(&p->lock);
 		if (ssunlikely(! p->gc)) {
-			ss_spinunlock(&p->lock);
+			tt_pthread_mutex_unlock(&p->lock);
 			return 0;
 		}
 		struct sl *current = NULL, *l;
@@ -8072,7 +7980,7 @@ static int sl_poolgc(struct slpool *p)
 			current = l;
 			break;
 		}
-		ss_spinunlock(&p->lock);
+		tt_pthread_mutex_unlock(&p->lock);
 		if (current) {
 			int rc = sl_gc(p, current);
 			if (ssunlikely(rc == -1))
@@ -8086,9 +7994,9 @@ static int sl_poolgc(struct slpool *p)
 
 static int sl_poolfiles(struct slpool *p)
 {
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	int n = p->n;
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 	return n;
 }
 
@@ -8096,14 +8004,14 @@ static int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
 {
 	struct rlist list;
 	rlist_create(&list);
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	struct sl *l;
 	rlist_foreach_entry(l, &p->list, link) {
 		if (ss_gcinprogress(&l->gc))
 			break;
 		rlist_add(&list, &l->linkcopy);
 	}
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 
 	ss_bufreset(buf);
 	struct sl *n;
@@ -8157,7 +8065,7 @@ static int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
 
 static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
 {
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	if (sslikely(lsn == 0)) {
 		lsn = sr_seq(p->r->seq, SR_LSNNEXT);
 	} else {
@@ -8175,7 +8083,7 @@ static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
 		return 0;
 	assert(p->n > 0);
 	struct sl *l = sscast(p->list.prev, struct sl, link);
-	ss_mutexlock(&l->filelock);
+	tt_pthread_mutex_lock(&l->filelock);
 	t->svp = ss_filesvp(&l->file);
 	t->l = l;
 	t->p = p;
@@ -8185,8 +8093,8 @@ static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
 static int sl_commit(struct sltx *t)
 {
 	if (t->p->conf->enable)
-		ss_mutexunlock(&t->l->filelock);
-	ss_spinunlock(&t->p->lock);
+		tt_pthread_mutex_unlock(&t->l->filelock);
+	tt_pthread_mutex_unlock(&t->p->lock);
 	return 0;
 }
 
@@ -8199,9 +8107,9 @@ static int sl_rollback(struct sltx *t)
 			sr_malfunction(t->p->r->e, "log file '%s' truncate error: %s",
 			               ss_pathof(&t->l->file.path),
 			               strerror(errno));
-		ss_mutexunlock(&t->l->filelock);
+		tt_pthread_mutex_unlock(&t->l->filelock);
 	}
-	ss_spinunlock(&t->p->lock);
+	tt_pthread_mutex_unlock(&t->p->lock);
 	return rc;
 }
 
@@ -11407,7 +11315,7 @@ struct sinode {
 	uint32_t   temperature;
 	uint64_t   temperature_reads;
 	uint16_t   refs;
-	ssspinlock reflock;
+	pthread_mutex_t reflock;
 	struct svindex    i0, i1;
 	struct ssfile     file;
 	struct ssmmap     map, map_swap;
@@ -11453,27 +11361,27 @@ si_nodesplit(struct sinode *node) {
 static inline void
 si_noderef(struct sinode *node)
 {
-	ss_spinlock(&node->reflock);
+	tt_pthread_mutex_lock(&node->reflock);
 	node->refs++;
-	ss_spinunlock(&node->reflock);
+	tt_pthread_mutex_unlock(&node->reflock);
 }
 
 static inline uint16_t
 si_nodeunref(struct sinode *node)
 {
-	ss_spinlock(&node->reflock);
+	tt_pthread_mutex_lock(&node->reflock);
 	assert(node->refs > 0);
 	uint16_t v = node->refs--;
-	ss_spinunlock(&node->reflock);
+	tt_pthread_mutex_unlock(&node->reflock);
 	return v;
 }
 
 static inline uint16_t
 si_noderefof(struct sinode *node)
 {
-	ss_spinlock(&node->reflock);
+	tt_pthread_mutex_lock(&node->reflock);
 	uint16_t v = node->refs;
-	ss_spinunlock(&node->reflock);
+	tt_pthread_mutex_unlock(&node->reflock);
 	return v;
 }
 
@@ -11669,7 +11577,7 @@ enum siref {
 
 struct si {
 	struct srstatus   status;
-	struct ssmutex    lock;
+	pthread_mutex_t    lock;
 	struct siplanner  p;
 	struct ssrb       i;
 	int        n;
@@ -11685,7 +11593,7 @@ struct si {
 	uint64_t   read_disk;
 	uint64_t   read_cache;
 	uint64_t   size;
-	ssspinlock ref_lock;
+	pthread_mutex_t ref_lock;
 	uint32_t   ref_fe;
 	uint32_t   ref_be;
 	uint32_t   gc_count;
@@ -11705,12 +11613,12 @@ si_active(struct si *i) {
 
 static inline void
 si_lock(struct si *i) {
-	ss_mutexlock(&i->lock);
+	tt_pthread_mutex_lock(&i->lock);
 }
 
 static inline void
 si_unlock(struct si *i) {
-	ss_mutexunlock(&i->lock);
+	tt_pthread_mutex_unlock(&i->lock);
 }
 
 static inline struct runtime*
@@ -12493,7 +12401,7 @@ static struct si *si_init(struct runtime *r, struct so *object)
 	ss_bufinit(&i->readbuf);
 	sv_upsertinit(&i->u);
 	ss_rbinit(&i->i);
-	ss_mutexinit(&i->lock);
+	tt_pthread_mutex_init(&i->lock, NULL);
 	si_schemeinit(&i->scheme);
 	rlist_create(&i->link);
 	rlist_create(&i->gc);
@@ -12511,7 +12419,7 @@ static struct si *si_init(struct runtime *r, struct so *object)
 	i->snapshot_run = 0;
 	i->snapshot     = 0;
 	i->n            = 0;
-	ss_spinlockinit(&i->ref_lock);
+	tt_pthread_mutex_init(&i->ref_lock, NULL);
 	i->ref_fe       = 0;
 	i->ref_be       = 0;
 	i->object       = object;
@@ -12544,8 +12452,8 @@ static int si_close(struct si *i)
 	sv_upsertfree(&i->u, &i->r);
 	ss_buffree(&i->readbuf, i->r.a);
 	si_plannerfree(&i->p, i->r.a);
-	ss_mutexfree(&i->lock);
-	ss_spinlockfree(&i->ref_lock);
+	tt_pthread_mutex_destroy(&i->lock);
+	tt_pthread_mutex_destroy(&i->ref_lock);
 	sr_statusfree(&i->status);
 	si_schemefree(&i->scheme, &i->r);
 	ss_free(i->r.a, i);
@@ -12587,27 +12495,27 @@ static int si_replace(struct si *i, struct sinode *o, struct sinode *n)
 
 static int si_refs(struct si *i)
 {
-	ss_spinlock(&i->ref_lock);
+	tt_pthread_mutex_lock(&i->ref_lock);
 	int v = i->ref_be + i->ref_fe;
-	ss_spinunlock(&i->ref_lock);
+	tt_pthread_mutex_unlock(&i->ref_lock);
 	return v;
 }
 
 static int si_ref(struct si *i, enum siref ref)
 {
-	ss_spinlock(&i->ref_lock);
+	tt_pthread_mutex_lock(&i->ref_lock);
 	if (ref == SI_REFBE)
 		i->ref_be++;
 	else
 		i->ref_fe++;
-	ss_spinunlock(&i->ref_lock);
+	tt_pthread_mutex_unlock(&i->ref_lock);
 	return 0;
 }
 
 static int si_unref(struct si *i, enum siref ref)
 {
 	int prev_ref = 0;
-	ss_spinlock(&i->ref_lock);
+	tt_pthread_mutex_lock(&i->ref_lock);
 	if (ref == SI_REFBE) {
 		prev_ref = i->ref_be;
 		if (i->ref_be > 0)
@@ -12617,7 +12525,7 @@ static int si_unref(struct si *i, enum siref ref)
 		if (i->ref_fe > 0)
 			i->ref_fe--;
 	}
-	ss_spinunlock(&i->ref_lock);
+	tt_pthread_mutex_unlock(&i->ref_lock);
 	return prev_ref;
 }
 
@@ -13607,7 +13515,7 @@ static struct sinode *si_nodenew(struct runtime *r)
 	n->temperature = 0;
 	n->temperature_reads = 0;
 	n->refs = 0;
-	ss_spinlockinit(&n->reflock);
+	tt_pthread_mutex_init(&n->reflock, NULL);
 	ss_fileinit(&n->file, r->vfs);
 	ss_mmapinit(&n->map);
 	ss_mmapinit(&n->map_swap);
@@ -13658,7 +13566,7 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 	} else {
 		sv_indexfree(&n->i0, r);
 		sv_indexfree(&n->i1, r);
-		ss_spinlockfree(&n->reflock);
+		tt_pthread_mutex_destroy(&n->reflock);
 	}
 	return rcret;
 }
@@ -16351,7 +16259,7 @@ struct scworker {
 } sspacked;
 
 struct scworkerpool {
-	ssspinlock lock;
+	pthread_mutex_t lock;
 	struct rlist list;
 	struct rlist listidle;
 	int total;
@@ -16364,12 +16272,12 @@ static int sc_workerpool_new(struct scworkerpool*, struct runtime*);
 static inline struct scworker*
 sc_workerpool_pop(struct scworkerpool *p, struct runtime *r)
 {
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	if (sslikely(p->idle >= 1))
 		goto pop_idle;
 	int rc = sc_workerpool_new(p, r);
 	if (ssunlikely(rc == -1)) {
-		ss_spinunlock(&p->lock);
+		tt_pthread_mutex_unlock(&p->lock);
 		return NULL;
 	}
 	assert(p->idle >= 1);
@@ -16377,17 +16285,17 @@ pop_idle:;
 	struct scworker *w =
 		rlist_shift_tail_entry(&p->listidle, struct scworker, linkidle);
 	p->idle--;
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 	return w;
 }
 
 static inline void
 sc_workerpool_push(struct scworkerpool *p, struct scworker *w)
 {
-	ss_spinlock(&p->lock);
+	tt_pthread_mutex_lock(&p->lock);
 	rlist_add_tail(&p->listidle, &w->linkidle);
 	p->idle++;
-	ss_spinunlock(&p->lock);
+	tt_pthread_mutex_unlock(&p->lock);
 }
 
 enum {
@@ -16415,7 +16323,7 @@ struct sctask {
 };
 
 struct scheduler {
-	struct ssmutex        lock;
+	pthread_mutex_t        lock;
 	uint64_t       checkpoint_lsn_last;
 	uint64_t       checkpoint_lsn;
 	uint32_t       checkpoint;
@@ -16660,9 +16568,9 @@ static int sc_backupstart(struct scheduler *s)
 	 * disable log garbage-collection
 	*/
 	sl_poolgc_enable(s->lp, 0);
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	if (ssunlikely(s->backup > 0)) {
-		ss_mutexunlock(&s->lock);
+		tt_pthread_mutex_unlock(&s->lock);
 		sl_poolgc_enable(s->lp, 1);
 		/* in progress */
 		return 0;
@@ -16671,7 +16579,7 @@ static int sc_backupstart(struct scheduler *s)
 	s->backup = 1;
 	s->backup_bsn = bsn;
 	sc_start(s, SI_BACKUP);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
@@ -16781,7 +16689,7 @@ sc_init(struct scheduler *s, struct runtime *r,
 	struct sstrigger *on_event, struct slpool *lp)
 {
 	uint64_t now = clock_monotonic64();
-	ss_mutexinit(&s->lock);
+	tt_pthread_mutex_init(&s->lock, NULL);
 	s->checkpoint_lsn           = 0;
 	s->checkpoint_lsn_last      = 0;
 	s->checkpoint               = 0;
@@ -16838,11 +16746,11 @@ static int sc_add(struct scheduler *s, struct si *index)
 	db->active = 0;
 	memset(db->workers, 0, sizeof(db->workers));
 
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	int count = s->count + 1;
 	struct scdb **i = ss_malloc(s->r->a, count * sizeof(struct scdb*));
 	if (ssunlikely(i == NULL)) {
-		ss_mutexunlock(&s->lock);
+		tt_pthread_mutex_unlock(&s->lock);
 		ss_free(s->r->a, db);
 		return -1;
 	}
@@ -16851,7 +16759,7 @@ static int sc_add(struct scheduler *s, struct si *index)
 	void *iprev = s->i;
 	s->i = i;
 	s->count = count;
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	if (iprev)
 		ss_free(s->r->a, iprev);
 	return 0;
@@ -16862,7 +16770,7 @@ static int sc_del(struct scheduler *s, struct si *index, int lock)
 	if (ssunlikely(s->i == NULL))
 		return 0;
 	if (lock)
-		ss_mutexlock(&s->lock);
+		tt_pthread_mutex_lock(&s->lock);
 	struct scdb *db = NULL;
 	struct scdb **iprev;
 	int count = s->count - 1;
@@ -16876,7 +16784,7 @@ static int sc_del(struct scheduler *s, struct si *index, int lock)
 	struct scdb **i = ss_malloc(s->r->a, count * sizeof(struct scdb*));
 	if (ssunlikely(i == NULL)) {
 		if (lock)
-			ss_mutexunlock(&s->lock);
+			tt_pthread_mutex_unlock(&s->lock);
 		return -1;
 	}
 	int j = 0;
@@ -16898,7 +16806,7 @@ static int sc_del(struct scheduler *s, struct si *index, int lock)
 		s->rr = 0;
 free:
 	if (lock)
-		ss_mutexunlock(&s->lock);
+		tt_pthread_mutex_unlock(&s->lock);
 	ss_free(s->r->a, iprev);
 	ss_free(s->r->a, db);
 	return 0;
@@ -17013,49 +16921,49 @@ sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
 
 static int sc_ctl_anticache(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_anticache(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
 static int sc_ctl_snapshot(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_snapshot(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
 static int sc_ctl_checkpoint(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_checkpoint(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
 static int sc_ctl_expire(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_expire(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
 static int sc_ctl_gc(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_gc(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
 static int sc_ctl_lru(struct scheduler *s)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	sc_task_lru(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
@@ -17066,10 +16974,10 @@ static int sc_ctl_backup(struct scheduler *s)
 
 static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	s->shutdown_pending++;
 	rlist_add(&s->shutdown, &i->link);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
@@ -17606,13 +17514,13 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 	uint64_t now = clock_monotonic64();
 	struct srzone *zone = sr_zoneof(s->r);
 	int rc;
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	/* start periodic tasks */
 	sc_periodic(s, task, zone, now);
 	/* database shutdown-drop */
 	rc = sc_do_shutdown(s, task);
 	if (rc) {
-		ss_mutexunlock(&s->lock);
+		tt_pthread_mutex_unlock(&s->lock);
 		return rc;
 	}
 	/* peek a database */
@@ -17621,20 +17529,20 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 		/* complete on-going periodic tasks when there
 		 * are no active databases left */
 		sc_periodic_done(s, now);
-		ss_mutexunlock(&s->lock);
+		tt_pthread_mutex_unlock(&s->lock);
 		return 0;
 	}
 	rc = sc_do(s, task, w, zone, db, vlsn, now);
 	/* schedule next database */
 	sc_next(s);
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return rc;
 }
 
 static inline int
 sc_complete(struct scheduler *s, struct sctask *t)
 {
-	ss_mutexlock(&s->lock);
+	tt_pthread_mutex_lock(&s->lock);
 	struct scdb *db = t->db;
 	switch (t->plan.plan) {
 	case SI_BRANCH:
@@ -17666,7 +17574,7 @@ sc_complete(struct scheduler *s, struct sctask *t)
 		si_unref(db->index, SI_REFBE);
 	if (t->rotate == 1)
 		s->rotate = 0;
-	ss_mutexunlock(&s->lock);
+	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
 
@@ -17705,9 +17613,9 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 				             SR_MALFUNCTION);
 				goto error;
 			}
-			ss_mutexlock(&s->lock);
+			tt_pthread_mutex_lock(&s->lock);
 			sc_backuperror(s);
-			ss_mutexunlock(&s->lock);
+			tt_pthread_mutex_unlock(&s->lock);
 		}
 	}
 	if (task.gc) {
@@ -17750,7 +17658,7 @@ sc_workerfree(struct scworker *w, struct runtime *r)
 
 static int sc_workerpool_init(struct scworkerpool *p)
 {
-	ss_spinlockinit(&p->lock);
+	tt_pthread_mutex_init(&p->lock, NULL);
 	rlist_create(&p->list);
 	rlist_create(&p->listidle);
 	p->total = 0;
@@ -17930,7 +17838,7 @@ static struct so *se_confcursor_new(struct so*);
 struct phia_env {
 	struct so          o;
 	struct srstatus    status;
-	struct ssmutex     apilock;
+	pthread_mutex_t     apilock;
 	/** List of open spaces. */
 	struct rlist db;
 	/** List of active read views. */
@@ -17958,12 +17866,12 @@ struct phia_env {
 
 static inline void
 se_apilock(struct so *o) {
-	ss_mutexlock(&((struct phia_env*)o)->apilock);
+	tt_pthread_mutex_lock(&((struct phia_env*)o)->apilock);
 }
 
 static inline void
 se_apiunlock(struct so *o) {
-	ss_mutexunlock(&((struct phia_env*)o)->apilock);
+	tt_pthread_mutex_unlock(&((struct phia_env*)o)->apilock);
 }
 
 static inline struct phia_env *se_of(struct so *o) {
@@ -18227,7 +18135,7 @@ se_destroy(struct so *o)
 	si_cachepool_free(&e->cachepool);
 	se_conffree(&e->conf);
 	ss_quotafree(&e->quota);
-	ss_mutexfree(&e->apilock);
+	tt_pthread_mutex_destroy(&e->apilock);
 	sf_limitfree(&e->limit, &e->a);
 	sr_statfree(&e->stat);
 	sr_seqfree(&e->seq);
@@ -19167,7 +19075,7 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	rt->memory_used = ss_quotaused(&e->quota);
 
 	/* scheduler */
-	ss_mutexlock(&e->scheduler.lock);
+	tt_pthread_mutex_lock(&e->scheduler.lock);
 	rt->checkpoint_active    = e->scheduler.checkpoint;
 	rt->checkpoint_lsn_last  = e->scheduler.checkpoint_lsn_last;
 	rt->checkpoint_lsn       = e->scheduler.checkpoint_lsn;
@@ -19183,7 +19091,7 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	rt->expire_active        = e->scheduler.expire;
 	rt->gc_active            = e->scheduler.gc;
 	rt->lru_active           = e->scheduler.lru;
-	ss_mutexunlock(&e->scheduler.lock);
+	tt_pthread_mutex_unlock(&e->scheduler.lock);
 
 	int v = ss_quotaused_percent(&e->quota);
 	struct srzone *z = sr_zonemap(&e->conf.zones, v);
@@ -19202,9 +19110,9 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	rt->tx_ro = e->xm.count_rd;
 	rt->tx_gc_queue = e->xm.count_gc;
 
-	ss_spinlock(&e->stat.lock);
+	tt_pthread_mutex_lock(&e->stat.lock);
 	rt->stat = e->stat;
-	ss_spinunlock(&e->stat.lock);
+	tt_pthread_mutex_unlock(&e->stat.lock);
 	sr_statprepare(&rt->stat);
 	return 0;
 }
@@ -21634,7 +21542,7 @@ struct phia_env *phia_env(void)
 		goto error;
 	rlist_create(&e->db);
 	rlist_create(&e->view);
-	ss_mutexinit(&e->apilock);
+	tt_pthread_mutex_init(&e->apilock, NULL);
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
 	sr_errorinit(&e->error);

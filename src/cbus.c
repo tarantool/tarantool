@@ -183,14 +183,7 @@ fiber_pool_create(struct fiber_pool *pool, int max_pool_size,
 	pool->fetch_output.data = pool;
 	ev_async_start(pool->consumer, &pool->fetch_output);
 
-	pthread_mutexattr_t errorcheck;
-	(void) tt_pthread_mutexattr_init(&errorcheck);
-#ifndef NDEBUG
-	(void) tt_pthread_mutexattr_settype(&errorcheck,
-					    PTHREAD_MUTEX_ERRORCHECK);
-#endif
-	(void) tt_pthread_mutex_init(&pool->mutex, &errorcheck);
-	(void) tt_pthread_mutexattr_destroy(&errorcheck);
+	(void) tt_pthread_mutex_init(&pool->mutex, NULL);
 }
 
 /** }}} fiber_pool */
@@ -225,17 +218,9 @@ cbus_create(struct cbus *bus)
 	if (bus->stats == NULL)
 		panic_syserror("cbus_create");
 
-	pthread_mutexattr_t errorcheck;
 
-	(void) tt_pthread_mutexattr_init(&errorcheck);
-
-#ifndef NDEBUG
-	(void) tt_pthread_mutexattr_settype(&errorcheck,
-					    PTHREAD_MUTEX_ERRORCHECK);
-#endif
 	/* Initialize queue lock mutex. */
-	(void) tt_pthread_mutex_init(&bus->mutex, &errorcheck);
-	(void) tt_pthread_mutexattr_destroy(&errorcheck);
+	(void) tt_pthread_mutex_init(&bus->mutex, NULL);
 
 	(void) tt_pthread_cond_init(&bus->cond, NULL);
 }

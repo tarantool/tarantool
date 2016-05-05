@@ -60,108 +60,125 @@
  * Debug/logging friendly wrappers around pthread
  * functions.
  */
-
+#ifndef NDEBUG
 #define tt_pthread_mutex_init(mutex, attr)	\
-({	int e = pthread_mutex_init(mutex, attr);\
-	tt_pthread_error(e);			\
+({						\
+	pthread_mutexattr_t *p_attr = attr;	\
+	pthread_mutexattr_t errorcheck;	\
+	if (p_attr == NULL) {			\
+		(void) tt_pthread_mutexattr_init(&errorcheck);\
+		(void) pthread_mutexattr_settype(&errorcheck, \
+				 PTHREAD_MUTEX_ERRORCHECK);   \
+		p_attr = &errorcheck;		\
+	}					\
+	int e__ = pthread_mutex_init(mutex, p_attr);\
+	(void) tt_pthread_mutexattr_destroy(&errorcheck); \
+	tt_pthread_error(e__);			\
 })
+#else
+#define tt_pthread_mutex_init(mutex, attr)	\
+({						\
+	int e__ = pthread_mutex_init(mutex, attr);\
+	tt_pthread_error(e__);			\
+})
+#endif
 
 #define tt_pthread_mutex_destroy(mutex)		\
-({	int e = pthread_mutex_destroy(mutex);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutex_destroy(mutex);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutex_lock(mutex)		\
-({	int e = pthread_mutex_lock(mutex);	\
+({	int e__ = pthread_mutex_lock(mutex);	\
 	say_debug("%s: locking %s", __func__, #mutex);\
-	tt_pthread_error(e);\
+	tt_pthread_error(e__);\
 })
 
 #define tt_pthread_mutex_trylock(mutex)		\
-({	int e = pthread_mutex_trylock(mutex);	\
-	if (e != 0 && e != EBUSY)		\
-		say_error("%s error %d at %s:%d", __func__, e, __FILE__, __LINE__);\
-	assert(e == 0 || e == EBUSY);		\
-	e;					\
+({	int e__ = pthread_mutex_trylock(mutex);	\
+	if (e__ != 0 && e__ != EBUSY)		\
+		say_error("%s error %d at %s:%d", __func__, e__, __FILE__, __LINE__);\
+	assert(e__ == 0 || e__ == EBUSY);	\
+	e__;					\
 })
 
 #define tt_pthread_mutex_unlock(mutex)		\
-({	int e = pthread_mutex_unlock(mutex);	\
+({	int e__ = pthread_mutex_unlock(mutex);	\
 	say_debug("%s: unlocking %s", __func__, #mutex);\
-	tt_pthread_error(e);			\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutex_destroy(mutex)		\
-({	int e = pthread_mutex_destroy(mutex);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutex_destroy(mutex);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutexattr_init(attr)		\
-({	int e = pthread_mutexattr_init(attr);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutexattr_init(attr);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutexattr_destroy(attr)	\
-({	int e = pthread_mutexattr_destroy(attr);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutexattr_destroy(attr);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutexattr_gettype(attr, type)\
-({	int e = pthread_mutexattr_gettype(attr, type);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutexattr_gettype(attr, type);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_mutexattr_settype(attr, type)\
-({	int e = pthread_mutexattr_settype(attr, type);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_mutexattr_settype(attr, type);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_condattr_init(attr)		\
-({	int e = pthread_condattr_init(attr);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_condattr_init(attr);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_condattr_destroy(attr)	\
-({ int e = pthread_condattr_destroy(attr);	\
-	tt_pthread_error(e);			\
+({ int e__ = pthread_condattr_destroy(attr);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_cond_init(cond, attr)	\
-({	int e = pthread_cond_init(cond, attr);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_cond_init(cond, attr);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_cond_destroy(cond)		\
-({	int e = pthread_cond_destroy(cond);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_cond_destroy(cond);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_cond_signal(cond)		\
-({	int e = pthread_cond_signal(cond);	\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_cond_signal(cond);	\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_cond_wait(cond, mutex)	\
-({	int e = pthread_cond_wait(cond, mutex);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_cond_wait(cond, mutex);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_cond_timedwait(cond, mutex, timeout)	\
-({	int e = pthread_cond_timedwait(cond, mutex, timeout);\
-	if (ETIMEDOUT != e)                           \
-		say_error("%s error %d", __func__, e);\
-	assert(e == 0 || e == ETIMEDOUT);             \
-	e;                                             \
+({	int e__ = pthread_cond_timedwait(cond, mutex, timeout);\
+	if (ETIMEDOUT != e__)			\
+		say_error("%s error %d", __func__, e__);\
+	assert(e__ == 0 || e__ == ETIMEDOUT);	\
+	e__;					\
 })
 
 #define tt_pthread_once(control, function)	\
-({	int e = pthread_once(control, function);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_once(control, function);\
+	tt_pthread_error(e__);			\
 })
 
 #define tt_pthread_atfork(prepare, parent, child)\
-({	int e = pthread_atfork(prepare, parent, child);\
-	tt_pthread_error(e);			\
+({	int e__ = pthread_atfork(prepare, parent, child);\
+	tt_pthread_error(e__);			\
 })
 
 /** Make sure the created thread blocks all signals,
@@ -171,14 +188,14 @@
 ({	sigset_t set, oldset;				\
 	sigfillset(&set);				\
 	pthread_sigmask(SIG_BLOCK, &set, &oldset);	\
-	int e = pthread_create(thread, attr, run, arg);	\
+	int e__ = pthread_create(thread, attr, run, arg);\
 	pthread_sigmask(SIG_SETMASK, &oldset, NULL);	\
-	tt_pthread_error(e);				\
+	tt_pthread_error(e__);				\
 })
 
 #define tt_pthread_join(thread, ret)			\
-({	int e = pthread_join(thread, ret);		\
-	tt_pthread_error(e);				\
+({	int e__ = pthread_join(thread, ret);		\
+	tt_pthread_error(e__);				\
 })
 
 /** Set the current thread's name
