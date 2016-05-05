@@ -7,16 +7,15 @@ Building documentation
 After building and testing your local instance of Tarantool, you can build a
 local version of this documentation and contribute to it.
 
-Documentation is based on the python-based Sphinx generator. So, make sure to
-install all python modules indicated in the BUILDING FROM SOURCE
-(http://tarantool.org/doc/dev_guide/building_from_source.html) section of this
-documentation. The procedure below implies that you already took those steps and
-successfully tested your instance of Tarantool.
+Documentation is based on the Python-based Sphinx generator. So, make sure to
+install all Python modules indicated in the :ref:`building-from-source` section
+of this documentation. The procedure below implies that you already took those
+steps and successfully tested your instance of Tarantool.
 
 1. Build a local version of the existing documentation package.
 
 Run the following set of commands (the example below is based on Ubuntu OS, but
-the precedure is similar for other supported OS's):
+the procedure is similar for other supported platforms):
 
    .. code-block:: bash
 
@@ -46,7 +45,7 @@ guidelines below:
 
 If all the prerequisites are met, run the following command to set up a
 web-server (the example below is based on Ubuntu, but the procedure is similar
-for other supported OS's). Make sure to run it from the documentation output
+for other supported platforms). Make sure to run it from the documentation output
 folder, as specified below:
 
    .. code-block:: bash
