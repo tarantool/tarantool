@@ -520,80 +520,6 @@ ss_traceset(struct sstrace *t,
 #define ss_trace(t, fmt, ...) \
 	ss_traceset(t, __FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
 
-struct ssgc {
-	pthread_mutex_t lock;
-	int mark;
-	int sweep;
-	int complete;
-};
-
-static inline void
-ss_gcinit(struct ssgc *gc)
-{
-	tt_pthread_mutex_init(&gc->lock, NULL);
-	gc->mark     = 0;
-	gc->sweep    = 0;
-	gc->complete = 0;
-}
-
-static inline void
-ss_gcfree(struct ssgc *gc)
-{
-	tt_pthread_mutex_destroy(&gc->lock);
-}
-
-static inline void
-ss_gcmark(struct ssgc *gc, int n)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	gc->mark += n;
-	tt_pthread_mutex_unlock(&gc->lock);
-}
-
-static inline void
-ss_gcsweep(struct ssgc *gc, int n)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	gc->sweep += n;
-	tt_pthread_mutex_unlock(&gc->lock);
-}
-
-static inline void
-ss_gccomplete(struct ssgc *gc)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	gc->complete = 1;
-	tt_pthread_mutex_unlock(&gc->lock);
-}
-
-static inline int
-ss_gcinprogress(struct ssgc *gc)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	int v = gc->complete;
-	tt_pthread_mutex_unlock(&gc->lock);
-	return !v;
-}
-
-static inline int
-ss_gcrotateready(struct ssgc *gc, int wm)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	int rc = gc->mark >= wm;
-	tt_pthread_mutex_unlock(&gc->lock);
-	return rc;
-}
-
-static inline int
-ss_gcgarbage(struct ssgc *gc)
-{
-	tt_pthread_mutex_lock(&gc->lock);
-	int ready = (gc->mark == gc->sweep);
-	int rc = gc->complete && ready;
-	tt_pthread_mutex_unlock(&gc->lock);
-	return rc;
-}
-
 enum ssorder {
 	SS_LT,
 	SS_LTE,
@@ -5165,7 +5091,6 @@ struct svv {
 	uint32_t timestamp;
 	uint8_t  flags;
 	uint16_t refs;
-	void *log;
 } sspacked;
 
 static struct svif sv_vif;
@@ -5192,7 +5117,6 @@ sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
 	v->timestamp = ts;
 	v->flags     = 0;
 	v->refs      = 1;
-	v->log       = NULL;
 	char *ptr = sv_vpointer(v);
 	sf_write(r->scheme, fields, ptr);
 	/* update runtime statistics */
@@ -5214,7 +5138,6 @@ sv_vbuildraw(struct runtime *r, char *src, int size, uint64_t ts)
 	v->flags     = 0;
 	v->refs      = 1;
 	v->lsn       = 0;
-	v->log       = NULL;
 	memcpy(sv_vpointer(v), src, size);
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
@@ -7594,907 +7517,40 @@ static struct svif sx_vif =
 	.size      = sx_vifsize
 };
 
-struct slconf {
-	int   enable;
-	char *path;
-	int   sync_on_rotate;
-	int   sync_on_write;
-	int   rotatewm;
-};
-
-struct sldirtype {
-	char *ext;
-	uint32_t mask;
-	int count;
-};
-
-struct sldirid {
-	uint32_t mask;
-	uint64_t id;
-};
-
-static int sl_dirread(struct ssbuf*, struct ssa*, struct sldirtype*, char*);
-
-struct slv {
-	uint32_t crc;
-	uint64_t lsn;
-	uint32_t dsn;
-	uint32_t size;
-	uint32_t timestamp;
-	uint8_t  flags;
-} sspacked;
-
-static struct svif sl_vif;
-
-static inline uint32_t
-sl_vdsn(struct sv *v) {
-	return ((struct slv*)v->v)->dsn;
-}
-
-static inline uint32_t
-sl_vtimestamp(struct sv *v) {
-	return ((struct slv*)v->v)->timestamp;
-}
-
-struct sl {
-	uint64_t id;
-	struct ssgc gc;
-	pthread_mutex_t filelock;
-	struct ssfile file;
-	struct slpool *p;
-	struct rlist link;
-	struct rlist linkcopy;
-};
-
-struct slpool {
-	pthread_mutex_t lock;
-	struct slconf *conf;
-	struct rlist list;
-	int gc;
-	int n;
-	struct ssiov iov;
-	struct runtime *r;
-};
-
 struct sltx {
-	struct slpool *p;
-	struct sl *l;
-	int recover;
 	uint64_t lsn;
-	uint64_t svp;
 };
 
-static int sl_poolinit(struct slpool*, struct runtime*);
-static int sl_poolopen(struct slpool*, struct slconf*);
-static int sl_poolrotate(struct slpool*);
-static int sl_poolrotate_ready(struct slpool*);
-static int sl_poolshutdown(struct slpool*);
-static int sl_poolgc(struct slpool*);
-static int sl_poolfiles(struct slpool*);
-
-static int sl_begin(struct slpool*, struct sltx*, uint64_t, int);
-static int sl_commit(struct sltx*);
-static int sl_rollback(struct sltx*);
-static int sl_write(struct sltx*, struct svlog*);
-
-static int sl_iter_open(struct ssiter *i, struct runtime*, struct ssfile*, int);
-static int sl_iter_error(struct ssiter*);
-static int sl_iter_continue(struct ssiter*);
-
-static struct ssiterif sl_iter;
-
-static inline struct sl*
-sl_alloc(struct slpool *p, uint64_t id)
+static int sl_begin(struct runtime *r, struct sltx *t, uint64_t lsn)
 {
-	struct sl *l = ss_malloc(p->r->a, sizeof(*l));
-	if (ssunlikely(l == NULL)) {
-		sr_oom_malfunction(p->r->e);
-		return NULL;
-	}
-	l->id   = id;
-	l->p    = NULL;
-	ss_gcinit(&l->gc);
-	tt_pthread_mutex_init(&l->filelock, NULL);
-	ss_fileinit(&l->file, p->r->vfs);
-	rlist_create(&l->link);
-	rlist_create(&l->linkcopy);
-	return l;
-}
-
-static inline int
-sl_close(struct slpool *p, struct sl *l)
-{
-	int rc = ss_fileclose(&l->file);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(p->r->e, "log file '%s' close error: %s",
-		               ss_pathof(&l->file.path),
-		               strerror(errno));
-	}
-	tt_pthread_mutex_destroy(&l->filelock);
-	ss_gcfree(&l->gc);
-	ss_free(p->r->a, l);
-	return rc;
-}
-
-static inline struct sl*
-sl_open(struct slpool *p, uint64_t id)
-{
-	struct sl *l = sl_alloc(p, id);
-	if (ssunlikely(l == NULL))
-		return NULL;
-	struct sspath path;
-	ss_path(&path, p->conf->path, id, ".log");
-	int rc = ss_fileopen(&l->file, path.path);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(p->r->e, "log file '%s' open error: %s",
-		               ss_pathof(&l->file.path),
-		               strerror(errno));
-		goto error;
-	}
-	return l;
-error:
-	sl_close(p, l);
-	return NULL;
-}
-
-static inline struct sl*
-sl_new(struct slpool *p, uint64_t id)
-{
-	struct sl *l = sl_alloc(p, id);
-	if (ssunlikely(l == NULL))
-		return NULL;
-	struct sspath path;
-	ss_path(&path, p->conf->path, id, ".log");
-	int rc = ss_filenew(&l->file, path.path);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(p->r->e, "log file '%s' create error: %s",
-		               path.path, strerror(errno));
-		goto error;
-	}
-	struct srversion v;
-	sr_version_storage(&v);
-	rc = ss_filewrite(&l->file, &v, sizeof(v));
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(p->r->e, "log file '%s' header write error: %s",
-		               ss_pathof(&l->file.path),
-		               strerror(errno));
-		goto error;
-	}
-	return l;
-error:
-	sl_close(p, l);
-	return NULL;
-}
-
-static int sl_poolinit(struct slpool *p, struct runtime *r)
-{
-	tt_pthread_mutex_init(&p->lock, NULL);
-	rlist_create(&p->list);
-	p->n    = 0;
-	p->r    = r;
-	p->gc   = 1;
-	p->conf = NULL;
-	struct iovec *iov =
-		ss_malloc(r->a, sizeof(struct iovec) * 1021);
-	if (ssunlikely(iov == NULL))
-		return sr_oom_malfunction(r->e);
-	ss_iovinit(&p->iov, iov, 1021);
-	return 0;
-}
-
-static inline int
-sl_poolcreate(struct slpool *p)
-{
-	int rc;
-	rc = ss_vfsmkdir(p->r->vfs, p->conf->path, 0755);
-	if (ssunlikely(rc == -1))
-		return sr_malfunction(p->r->e, "log directory '%s' create error: %s",
-		                      p->conf->path, strerror(errno));
-	return 1;
-}
-
-static inline int
-sl_poolrecover(struct slpool *p)
-{
-	struct ssbuf list;
-	ss_bufinit(&list);
-	struct sldirtype types[] =
-	{
-		{ "log", 1, 0 },
-		{ NULL,  0, 0 }
-	};
-	int rc = sl_dirread(&list, p->r->a, types, p->conf->path);
-	if (ssunlikely(rc == -1))
-		return sr_malfunction(p->r->e, "log directory '%s' open error",
-		                      p->conf->path);
-	struct ssiter i;
-	ss_iterinit(ss_bufiter, &i);
-	ss_iteropen(ss_bufiter, &i, &list, sizeof(struct sldirid));
-	while(ss_iterhas(ss_bufiter, &i)) {
-		struct sldirid *id = ss_iterof(ss_bufiter, &i);
-		struct sl *l = sl_open(p, id->id);
-		if (ssunlikely(l == NULL)) {
-			ss_buffree(&list, p->r->a);
-			return -1;
-		}
-		rlist_add(&p->list, &l->link);
-		p->n++;
-		ss_iternext(ss_bufiter, &i);
-	}
-	ss_buffree(&list, p->r->a);
-	if (p->n) {
-		struct sl *last = sscast(p->list.prev, struct sl, link);
-		p->r->seq->lfsn = last->id;
-		p->r->seq->lfsn++;
-	}
-	return 0;
-}
-
-static int sl_poolopen(struct slpool *p, struct slconf *conf)
-{
-	p->conf = conf;
-	if (ssunlikely(! p->conf->enable))
-		return 0;
-	int exists = ss_vfsexists(p->r->vfs, p->conf->path);
-	int rc;
-	if (! exists)
-		rc = sl_poolcreate(p);
-	else
-		rc = sl_poolrecover(p);
-	if (ssunlikely(rc == -1))
-		return -1;
-	return 0;
-}
-
-static int sl_poolrotate(struct slpool *p)
-{
-	if (ssunlikely(! p->conf->enable))
-		return 0;
-	uint64_t lfsn = sr_seq(p->r->seq, SR_LFSNNEXT);
-	struct sl *l = sl_new(p, lfsn);
-	if (ssunlikely(l == NULL))
-		return -1;
-	struct sl *log = NULL;
-	tt_pthread_mutex_lock(&p->lock);
-	if (p->n)
-		log = sscast(p->list.prev, struct sl, link);
-	rlist_add(&p->list, &l->link);
-	p->n++;
-	tt_pthread_mutex_unlock(&p->lock);
-	if (log) {
-		assert(log->file.fd != -1);
-		if (p->conf->sync_on_rotate) {
-			int rc = ss_filesync(&log->file);
-			if (ssunlikely(rc == -1)) {
-				sr_malfunction(p->r->e, "log file '%s' sync error: %s",
-				               ss_pathof(&log->file.path),
-				               strerror(errno));
-				return -1;
-			}
-		}
-		ss_fileadvise(&log->file, 0, 0, log->file.size);
-		ss_gccomplete(&log->gc);
-	}
-	return 0;
-}
-
-static int sl_poolrotate_ready(struct slpool *p)
-{
-	if (ssunlikely(! p->conf->enable))
-		return 0;
-	tt_pthread_mutex_lock(&p->lock);
-	assert(p->n > 0);
-	struct sl *l = sscast(p->list.prev, struct sl, link);
-	int ready = ss_gcrotateready(&l->gc, p->conf->rotatewm);
-	tt_pthread_mutex_unlock(&p->lock);
-	return ready;
-}
-
-static int sl_poolshutdown(struct slpool *p)
-{
-	int rcret = 0;
-	int rc;
-	if (p->n) {
-		struct sl *l, *n;
-		rlist_foreach_entry_safe(l, &p->list, link, n) {
-			rc = sl_close(p, l);
-			if (ssunlikely(rc == -1))
-				rcret = -1;
-		}
-	}
-	if (p->iov.v)
-		ss_free(p->r->a, p->iov.v);
-	tt_pthread_mutex_destroy(&p->lock);
-	return rcret;
-}
-
-static inline int
-sl_gc(struct slpool *p, struct sl *l)
-{
-	int rc;
-	rc = ss_vfsunlink(p->r->vfs, ss_pathof(&l->file.path));
-	if (ssunlikely(rc == -1)) {
-		return sr_malfunction(p->r->e, "log file '%s' unlink error: %s",
-		                      ss_pathof(&l->file.path),
-		                      strerror(errno));
-	}
-	rc = sl_close(p, l);
-	if (ssunlikely(rc == -1))
-		return -1;
-	return 1;
-}
-
-static int sl_poolgc(struct slpool *p)
-{
-	if (ssunlikely(! p->conf->enable))
-		return 0;
-	for (;;) {
-		tt_pthread_mutex_lock(&p->lock);
-		if (ssunlikely(! p->gc)) {
-			tt_pthread_mutex_unlock(&p->lock);
-			return 0;
-		}
-		struct sl *current = NULL, *l;
-		rlist_foreach_entry(l, &p->list, link) {
-			if (sslikely(! ss_gcgarbage(&l->gc)))
-				continue;
-			rlist_del(&l->link);
-			p->n--;
-			current = l;
-			break;
-		}
-		tt_pthread_mutex_unlock(&p->lock);
-		if (current) {
-			int rc = sl_gc(p, current);
-			if (ssunlikely(rc == -1))
-				return -1;
-		} else {
-			break;
-		}
-	}
-	return 0;
-}
-
-static int sl_poolfiles(struct slpool *p)
-{
-	tt_pthread_mutex_lock(&p->lock);
-	int n = p->n;
-	tt_pthread_mutex_unlock(&p->lock);
-	return n;
-}
-
-static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
-{
-	tt_pthread_mutex_lock(&p->lock);
 	if (sslikely(lsn == 0)) {
-		lsn = sr_seq(p->r->seq, SR_LSNNEXT);
+		lsn = sr_seq(r->seq, SR_LSNNEXT);
 	} else {
-		sr_seqlock(p->r->seq);
-		if (lsn > p->r->seq->lsn)
-			p->r->seq->lsn = lsn;
-		sr_sequnlock(p->r->seq);
+		sr_seqlock(r->seq);
+		if (lsn > r->seq->lsn)
+			r->seq->lsn = lsn;
+		sr_sequnlock(r->seq);
 	}
 	t->lsn = lsn;
-	t->recover = recover;
-	t->svp = 0;
-	t->p = p;
-	t->l = NULL;
-	if (! p->conf->enable)
-		return 0;
-	assert(p->n > 0);
-	struct sl *l = sscast(p->list.prev, struct sl, link);
-	tt_pthread_mutex_lock(&l->filelock);
-	t->svp = ss_filesvp(&l->file);
-	t->l = l;
-	t->p = p;
-	return 0;
-}
-
-static int sl_commit(struct sltx *t)
-{
-	if (t->p->conf->enable)
-		tt_pthread_mutex_unlock(&t->l->filelock);
-	tt_pthread_mutex_unlock(&t->p->lock);
-	return 0;
-}
-
-static int sl_rollback(struct sltx *t)
-{
-	int rc = 0;
-	if (t->p->conf->enable) {
-		rc = ss_filerlb(&t->l->file, t->svp);
-		if (ssunlikely(rc == -1))
-			sr_malfunction(t->p->r->e, "log file '%s' truncate error: %s",
-			               ss_pathof(&t->l->file.path),
-			               strerror(errno));
-		tt_pthread_mutex_unlock(&t->l->filelock);
-	}
-	tt_pthread_mutex_unlock(&t->p->lock);
-	return rc;
-}
-
-static inline void
-sl_writeadd(struct slpool *p, struct sltx *t, struct slv *lv, struct svlogv *logv)
-{
-	struct sv *v = &logv->v;
-	lv->lsn       = t->lsn;
-	lv->dsn       = logv->id;
-	lv->flags     = sv_flags(v);
-	lv->size      = sv_size(v);
-	lv->timestamp = sv_timestamp(v);
-	lv->crc       = ss_crcp(sv_pointer(v), lv->size, 0);
-	lv->crc       = ss_crcs(lv, sizeof(struct slv), lv->crc);
-	ss_iovadd(&p->iov, lv, sizeof(struct slv));
-	ss_iovadd(&p->iov, sv_pointer(v), lv->size);
-	((struct svv*)v->v)->log = t->l;
-}
-
-static inline int
-sl_writestmt(struct sltx *t, struct svlog *vlog)
-{
-	struct slpool *p = t->p;
-	struct svlogv *stmt = NULL;
-	struct ssiter i;
-	ss_iterinit(ss_bufiter, &i);
-	ss_iteropen(ss_bufiter, &i, &vlog->buf, sizeof(struct svlogv));
-	for (; ss_iterhas(ss_bufiter, &i); ss_iternext(ss_bufiter, &i)) {
-		struct svlogv *logv = ss_iterof(ss_bufiter, &i);
-		struct sv *v = &logv->v;
-		assert(v->i == &sv_vif);
-		sv_lsnset(v, t->lsn);
-		if (sslikely(! (sv_is(v, SVGET)))) {
-			assert(stmt == NULL);
-			stmt = logv;
-		}
-	}
-	assert(stmt != NULL);
-	struct slv lv;
-	sl_writeadd(t->p, t, &lv, stmt);
-	int rc = ss_filewritev(&t->l->file, &p->iov);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(p->r->e, "log file '%s' write error: %s",
-		               ss_pathof(&t->l->file.path),
-		               strerror(errno));
-		return -1;
-	}
-	ss_gcmark(&t->l->gc, 1);
-	ss_iovreset(&p->iov);
-	return 0;
-}
-
-static int
-sl_writestmt_multi(struct sltx *t, struct svlog *vlog)
-{
-	struct slpool *p = t->p;
-	struct sl *l = t->l;
-	struct slv lvbuf[510]; /* 1 + 510 per syscall */
-	int lvp;
-	int rc;
-	lvp = 0;
-	/* transaction header */
-	struct slv *lv = &lvbuf[0];
-	lv->lsn       = t->lsn;
-	lv->dsn       = 0;
-	lv->timestamp = 0;
-	lv->flags     = SVBEGIN;
-	lv->size      = sv_logcount_write(vlog);
-	lv->crc       = ss_crcs(lv, sizeof(struct slv), 0);
-	ss_iovadd(&p->iov, lv, sizeof(struct slv));
-	lvp++;
-	/* body */
-	struct ssiter i;
-	ss_iterinit(ss_bufiter, &i);
-	ss_iteropen(ss_bufiter, &i, &vlog->buf, sizeof(struct svlogv));
-	for (; ss_iterhas(ss_bufiter, &i); ss_iternext(ss_bufiter, &i))
-	{
-		if (ssunlikely(! ss_iovensure(&p->iov, 2))) {
-			rc = ss_filewritev(&l->file, &p->iov);
-			if (ssunlikely(rc == -1)) {
-				sr_malfunction(p->r->e, "log file '%s' write error: %s",
-				               ss_pathof(&l->file.path),
-				               strerror(errno));
-				return -1;
-			}
-			ss_iovreset(&p->iov);
-			lvp = 0;
-		}
-		struct svlogv *logv = ss_iterof(ss_bufiter, &i);
-		struct sv *v = &logv->v;
-		assert(v->i == &sv_vif);
-		sv_lsnset(v, t->lsn);
-		if (sv_is(v, SVGET))
-			continue;
-		lv = &lvbuf[lvp];
-		sl_writeadd(p, t, lv, logv);
-		lvp++;
-	}
-	if (sslikely(ss_iovhas(&p->iov))) {
-		rc = ss_filewritev(&l->file, &p->iov);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(p->r->e, "log file '%s' write error: %s",
-			               ss_pathof(&l->file.path),
-			               strerror(errno));
-			return -1;
-		}
-		ss_iovreset(&p->iov);
-	}
-	ss_gcmark(&l->gc, sv_logcount_write(vlog));
 	return 0;
 }
 
 static int sl_write(struct sltx *t, struct svlog *vlog)
 {
-	int count = sv_logcount_write(vlog);
-	/* fast path for log-disabled, recover or
+	/*
+	 * fast path for log-disabled, recover or
 	 * ro-transactions
 	 */
-	if (t->recover || !t->p->conf->enable || count == 0)
+	struct ssiter i;
+	ss_iterinit(ss_bufiter, &i);
+	ss_iteropen(ss_bufiter, &i, &vlog->buf, sizeof(struct svlogv));
+	for (; ss_iterhas(ss_bufiter, &i); ss_iternext(ss_bufiter, &i))
 	{
-		struct ssiter i;
-		ss_iterinit(ss_bufiter, &i);
-		ss_iteropen(ss_bufiter, &i, &vlog->buf, sizeof(struct svlogv));
-		for (; ss_iterhas(ss_bufiter, &i); ss_iternext(ss_bufiter, &i))
-		{
-			struct svlogv *v = ss_iterof(ss_bufiter, &i);
-			sv_lsnset(&v->v, t->lsn);
-		}
-		return 0;
-	}
-
-	/* write single or multi-stmt transaction */
-	int rc;
-	if (sslikely(count == 1)) {
-		rc = sl_writestmt(t, vlog);
-	} else {
-		rc = sl_writestmt_multi(t, vlog);
-	}
-	if (ssunlikely(rc == -1))
-		return -1;
-
-	/* sync */
-	if (t->p->conf->sync_on_write) {
-		rc = ss_filesync(&t->l->file);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(t->p->r->e, "log file '%s' sync error: %s",
-			               ss_pathof(&t->l->file.path),
-			               strerror(errno));
-			return -1;
-		}
+		struct svlogv *v = ss_iterof(ss_bufiter, &i);
+		sv_lsnset(&v->v, t->lsn);
 	}
 	return 0;
 }
-
-static inline ssize_t sl_diridof(char *s)
-{
-	size_t v = 0;
-	while (*s && *s != '.') {
-		if (ssunlikely(!isdigit(*s)))
-			return -1;
-		v = (v * 10) + *s - '0';
-		s++;
-	}
-	return v;
-}
-
-static inline struct sldirid*
-sl_dirmatch(struct ssbuf *list, uint64_t id)
-{
-	if (ssunlikely(ss_bufused(list) == 0))
-		return NULL;
-	struct sldirid *n = (struct sldirid*)list->s;
-	while ((char*)n < list->p) {
-		if (n->id == id)
-			return n;
-		n++;
-	}
-	return NULL;
-}
-
-static inline struct sldirtype*
-sl_dirtypeof(struct sldirtype *types, char *ext)
-{
-	struct sldirtype *p = &types[0];
-	int n = 0;
-	while (p[n].ext != NULL) {
-		if (strcmp(p[n].ext, ext) == 0)
-			return &p[n];
-		n++;
-	}
-	return NULL;
-}
-
-static int
-sl_dircmp(const void *p1, const void *p2)
-{
-	struct sldirid *a = (struct sldirid*)p1;
-	struct sldirid *b = (struct sldirid*)p2;
-	assert(a->id != b->id);
-	return (a->id > b->id)? 1: -1;
-}
-
-static int sl_dirread(struct ssbuf *list, struct ssa *a, struct sldirtype *types, char *dir)
-{
-	DIR *d = opendir(dir);
-	if (ssunlikely(d == NULL))
-		return -1;
-
-	struct dirent *de;
-	while ((de = readdir(d))) {
-		if (ssunlikely(de->d_name[0] == '.'))
-			continue;
-		ssize_t id = sl_diridof(de->d_name);
-		if (ssunlikely(id == -1))
-			goto error;
-		char *ext = strstr(de->d_name, ".");
-		if (ssunlikely(ext == NULL))
-			goto error;
-		ext++;
-		struct sldirtype *type = sl_dirtypeof(types, ext);
-		if (ssunlikely(type == NULL))
-			continue;
-		struct sldirid *n = sl_dirmatch(list, id);
-		if (n) {
-			n->mask |= type->mask;
-			type->count++;
-			continue;
-		}
-		int rc = ss_bufensure(list, a, sizeof(struct sldirid));
-		if (ssunlikely(rc == -1))
-			goto error;
-		n = (struct sldirid*)list->p;
-		ss_bufadvance(list, sizeof(struct sldirid));
-		n->id  = id;
-		n->mask = type->mask;
-		type->count++;
-	}
-	closedir(d);
-
-	if (ssunlikely(ss_bufused(list) == 0))
-		return 0;
-
-	int n = ss_bufused(list) / sizeof(struct sldirid);
-	qsort(list->s, n, sizeof(struct sldirid), sl_dircmp);
-	return n;
-
-error:
-	closedir(d);
-	return -1;
-}
-
-struct sliter {
-	int validate;
-	int error;
-	struct ssfile *log;
-	struct ssmmap map;
-	struct slv *v;
-	struct slv *next;
-	uint32_t count;
-	uint32_t pos;
-	struct sv current;
-	struct runtime *r;
-} sspacked;
-
-static void
-sl_iterseterror(struct sliter *i)
-{
-	i->error = 1;
-	i->v     = NULL;
-	i->next  = NULL;
-}
-
-static int
-sl_iternext_of(struct sliter *i, struct slv *next, int validate)
-{
-	if (next == NULL)
-		return 0;
-	char *eof   = (char*)i->map.p + i->map.size;
-	char *start = (char*)next;
-
-	/* eof */
-	if (ssunlikely(start == eof)) {
-		if (i->count != i->pos) {
-			sr_malfunction(i->r->e, "corrupted log file '%s': transaction is incomplete",
-			               ss_pathof(&i->log->path));
-			sl_iterseterror(i);
-			return -1;
-		}
-		i->v = NULL;
-		i->next = NULL;
-		return 0;
-	}
-
-	char *end = start + next->size;
-	if (ssunlikely((start > eof || (end > eof)))) {
-		sr_malfunction(i->r->e, "corrupted log file '%s': bad record size",
-		               ss_pathof(&i->log->path));
-		sl_iterseterror(i);
-		return -1;
-	}
-	if (validate && i->validate)
-	{
-		uint32_t crc = 0;
-		if (! (next->flags & SVBEGIN)) {
-			crc = ss_crcp(start + sizeof(struct slv), next->size, 0);
-		}
-		crc = ss_crcs(start, sizeof(struct slv), crc);
-		if (ssunlikely(crc != next->crc)) {
-			sr_malfunction(i->r->e, "corrupted log file '%s': bad record crc",
-			               ss_pathof(&i->log->path));
-			sl_iterseterror(i);
-			return -1;
-		}
-	}
-	i->pos++;
-	if (i->pos > i->count) {
-		/* next transaction */
-		i->v     = NULL;
-		i->pos   = 0;
-		i->count = 0;
-		i->next  = next;
-		return 0;
-	}
-	i->v = next;
-	sv_init(&i->current, &sl_vif, i->v, NULL);
-	return 1;
-}
-
-static int sl_itercontinue_of(struct sliter *i)
-{
-	if (ssunlikely(i->error))
-		return -1;
-	if (ssunlikely(i->v))
-		return 1;
-	if (ssunlikely(i->next == NULL))
-		return 0;
-	int validate = 0;
-	i->pos   = 0;
-	i->count = 0;
-	struct slv *v = i->next;
-	if (v->flags & SVBEGIN) {
-		validate = 1;
-		i->count = v->size;
-		v = (struct slv*)((char*)i->next + sizeof(struct slv));
-	} else {
-		i->count = 1;
-		v = i->next;
-	}
-	return sl_iternext_of(i, v, validate);
-}
-
-static inline int
-sl_iterprepare(struct sliter *i)
-{
-	struct srversion *ver = (struct srversion*)i->map.p;
-	if (! sr_versionstorage_check(ver))
-		return sr_malfunction(i->r->e, "bad log file '%s' version",
-		                      ss_pathof(&i->log->path));
-	if (ssunlikely(i->log->size < (sizeof(struct srversion))))
-		return sr_malfunction(i->r->e, "corrupted log file '%s': bad size",
-		                      ss_pathof(&i->log->path));
-	struct slv *next = (struct slv*)((char*)i->map.p + sizeof(struct srversion));
-	int rc = sl_iternext_of(i, next, 1);
-	if (ssunlikely(rc == -1))
-		return -1;
-	if (sslikely(i->next))
-		return sl_itercontinue_of(i);
-	return 0;
-}
-
-static int sl_iter_open(struct ssiter *i, struct runtime *r, struct ssfile *file, int validate)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	memset(li, 0, sizeof(*li));
-	li->r        = r;
-	li->log      = file;
-	li->validate = validate;
-	if (ssunlikely(li->log->size < sizeof(struct srversion))) {
-		sr_malfunction(li->r->e, "corrupted log file '%s': bad size",
-		               ss_pathof(&li->log->path));
-		return -1;
-	}
-	if (ssunlikely(li->log->size == sizeof(struct srversion)))
-		return 0;
-	int rc = ss_vfsmmap(r->vfs, &li->map, li->log->fd, li->log->size, 1);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(li->r->e, "failed to mmap log file '%s': %s",
-		               ss_pathof(&li->log->path),
-		               strerror(errno));
-		return -1;
-	}
-	rc = sl_iterprepare(li);
-	if (ssunlikely(rc == -1))
-		ss_vfsmunmap(r->vfs, &li->map);
-	return 0;
-}
-
-static void
-sl_iter_close(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	ss_vfsmunmap(li->r->vfs, &li->map);
-}
-
-static int
-sl_iter_has(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	return li->v != NULL;
-}
-
-static void*
-sl_iter_of(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	if (ssunlikely(li->v == NULL))
-		return NULL;
-	return &li->current;
-}
-
-static void
-sl_iter_next(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	if (ssunlikely(li->v == NULL))
-		return;
-	struct slv *next =
-		(struct slv*)((char*)li->v + sizeof(struct slv) + li->v->size);
-	sl_iternext_of(li, next, 1);
-}
-
-static struct ssiterif sl_iter =
-{
-	.close   = sl_iter_close,
-	.has     = sl_iter_has,
-	.of      = sl_iter_of,
-	.next    = sl_iter_next
-};
-
-static int sl_iter_error(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	return li->error;
-}
-
-static int sl_iter_continue(struct ssiter *i)
-{
-	struct sliter *li = (struct sliter*)i->priv;
-	return sl_itercontinue_of(li);
-}
-
-static uint8_t
-sl_vifflags(struct sv *v) {
-	return ((struct slv*)v->v)->flags;
-}
-
-static uint64_t
-sl_viflsn(struct sv *v) {
-	return ((struct slv*)v->v)->lsn;
-}
-
-static char*
-sl_vifpointer(struct sv *v) {
-	return (char*)v->v + sizeof(struct slv);
-}
-
-static uint32_t
-sl_viftimestamp(struct sv *v) {
-	return ((struct slv*)v->v)->size;
-}
-
-static uint32_t
-sl_vifsize(struct sv *v) {
-	return ((struct slv*)v->v)->size;
-}
-
-static struct svif sl_vif =
-{
-	.flags     = sl_vifflags,
-	.lsn       = sl_viflsn,
-	.lsnset    = NULL,
-	.timestamp = sl_viftimestamp,
-	.pointer   = sl_vifpointer,
-	.size      = sl_vifsize
-};
 
 #define SD_IDBRANCH 1
 
@@ -12793,10 +11849,7 @@ static int si_drop(struct si *i)
 static uint32_t si_gcv(struct runtime *r, struct svv *v)
 {
 	uint32_t size = sv_vsize(v);
-	struct sl *log = (struct sl*)v->log;
 	if (sv_vunref(r, v)) {
-		if (log)
-			ss_gcsweep(&log->gc, 1);
 		return size;
 	}
 	return 0;
@@ -15824,7 +14877,6 @@ si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
 			}
 		}
 		if (v->flags & SVGET) {
-			assert(v->log == NULL);
 			sv_vunref(r, v);
 			goto next;
 		}
@@ -15917,8 +14969,6 @@ struct sctask {
 	struct siplan plan;
 	struct scdb  *db;
 	struct si    *shutdown;
-	int    rotate;
-	int    gc;
 };
 
 struct scheduler {
@@ -15944,19 +14994,17 @@ struct scheduler {
 	uint32_t       gc;
 	uint64_t       lru_time;
 	uint32_t       lru;
-	int            rotate;
 	int            rr;
 	int            count;
 	struct scdb         **i;
 	struct rlist   shutdown;
 	int            shutdown_pending;
 	struct scworkerpool   wp;
-	struct slpool        *lp;
 	struct sstrigger     *on_event;
 	struct runtime            *r;
 };
 
-static int sc_init(struct scheduler*, struct runtime*, struct sstrigger*, struct slpool*);
+static int sc_init(struct scheduler*, struct runtime*, struct sstrigger*);
 static int sc_set(struct scheduler *s, uint64_t);
 static int sc_add(struct scheduler*, struct si*);
 static int sc_del(struct scheduler*, struct si*, int);
@@ -16145,7 +15193,7 @@ static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
 
 static int
 sc_init(struct scheduler *s, struct runtime *r,
-	struct sstrigger *on_event, struct slpool *lp)
+	struct sstrigger *on_event)
 {
 	uint64_t now = clock_monotonic64();
 	tt_pthread_mutex_init(&s->lock, NULL);
@@ -16170,13 +15218,11 @@ sc_init(struct scheduler *s, struct runtime *r,
 	s->gc_time                  = now;
 	s->lru                      = 0;
 	s->lru_time                 = now;
-	s->rotate                   = 0;
 	s->i                        = NULL;
 	s->count                    = 0;
 	s->rr                       = 0;
 	s->r                        = r;
 	s->on_event                 = on_event;
-	s->lp                       = lp;
 	sc_workerpool_init(&s->wp);
 	rlist_create(&s->shutdown);
 	s->shutdown_pending = 0;
@@ -16489,29 +15535,6 @@ static int sc_read(struct scread *r, struct scheduler *s)
 }
 
 static inline int
-sc_rotate(struct scheduler*s, struct scworker *w)
-{
-	ss_trace(&w->trace, "%s", "log rotation");
-	int rc = sl_poolrotate_ready(s->lp);
-	if (rc) {
-		rc = sl_poolrotate(s->lp);
-		if (ssunlikely(rc == -1))
-			return -1;
-	}
-	return 0;
-}
-
-static inline int
-sc_gc(struct scheduler *s, struct scworker *w)
-{
-	ss_trace(&w->trace, "%s", "log gc");
-	int rc = sl_poolgc(s->lp);
-	if (ssunlikely(rc == -1))
-		return -1;
-	return 0;
-}
-
-static inline int
 sc_execute(struct sctask *t, struct scworker *w, uint64_t vlsn)
 {
 	struct si *index;
@@ -16594,7 +15617,6 @@ sc_do_shutdown(struct scheduler *s, struct sctask *task)
 			sc_del(s, index, 0);
 			task->shutdown = index;
 			task->db = NULL;
-			task->gc = 1;
 			return 1;
 		}
 	}
@@ -16627,7 +15649,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzon
 			db->workers[SC_QBRANCH]++;
 			si_ref(db->index, SI_REFBE);
 			task->db = db;
-			task->gc = 1;
 			return 1;
 		case 0: /* complete */
 			if (sc_end(s, db, SI_CHECKPOINT))
@@ -16767,7 +15788,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzon
 		if (rc == 1) {
 			si_ref(db->index, SI_REFBE);
 			task->db = db;
-			task->gc = 1;
 			return 1;
 		}
 		goto no_job;
@@ -16781,7 +15801,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzon
 		db->workers[SC_QBRANCH]++;
 		si_ref(db->index, SI_REFBE);
 		task->db = db;
-		task->gc = 1;
 		return 1;
 	}
 
@@ -16828,15 +15847,10 @@ sc_periodic_done(struct scheduler *s, uint64_t now)
 }
 
 static inline void
-sc_periodic(struct scheduler *s, struct sctask *task, struct srzone *zone, uint64_t now)
+sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 {
 	if (ssunlikely(s->count == 0))
 		return;
-	/* log gc and rotation */
-	if (s->rotate == 0) {
-		task->rotate = 1;
-		s->rotate = 1;
-	}
 	/* checkpoint */
 	switch (zone->mode) {
 	case 0:  /* compact_index */
@@ -16893,7 +15907,7 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 	int rc;
 	tt_pthread_mutex_lock(&s->lock);
 	/* start periodic tasks */
-	sc_periodic(s, task, zone, now);
+	sc_periodic(s, zone, now);
 	/* database shutdown-drop */
 	rc = sc_do_shutdown(s, task);
 	if (rc) {
@@ -16949,8 +15963,6 @@ sc_complete(struct scheduler *s, struct sctask *t)
 	}
 	if (db)
 		si_unref(db->index, SI_REFBE);
-	if (t->rotate == 1)
-		s->rotate = 0;
 	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
@@ -16959,8 +15971,6 @@ static inline void
 sc_taskinit(struct sctask *task)
 {
 	si_planinit(&task->plan);
-	task->rotate = 0;
-	task->gc = 0;
 	task->db = NULL;
 	task->shutdown = NULL;
 }
@@ -16972,11 +15982,6 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 	sc_taskinit(&task);
 	int rc = sc_schedule(s, &task, w, vlsn);
 	int rc_job = rc;
-	if (task.rotate) {
-		rc = sc_rotate(s, w);
-		if (ssunlikely(rc == -1))
-			goto error;
-	}
 	if (rc_job > 0) {
 		rc = sc_execute(&task, w, vlsn);
 		if (ssunlikely(rc == -1)) {
@@ -16984,11 +15989,6 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 				     SR_MALFUNCTION);
 			goto error;
 		}
-	}
-	if (task.gc) {
-		rc = sc_gc(s, w);
-		if (ssunlikely(rc == -1))
-			goto error;
 	}
 	sc_complete(s, &task);
 	ss_trace(&w->trace, "%s", "sleep");
@@ -17049,13 +16049,11 @@ static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int re
 {
 	/* write-ahead log */
 	struct sltx tl;
-	sl_begin(s->lp, &tl, lsn, recover);
+	sl_begin(s->r, &tl, lsn);
 	int rc = sl_write(&tl, log);
 	if (ssunlikely(rc == -1)) {
-		sl_rollback(&tl);
 		return -1;
 	}
-	sl_commit(&tl);
 
 	/* index */
 	uint64_t now = clock_monotonic64();
@@ -17127,8 +16125,6 @@ struct seconfrt {
 	uint32_t  gc_active;
 	uint32_t  expire_active;
 	uint32_t  lru_active;
-	/* log */
-	uint32_t  log_files;
 	/* metric */
 	struct srseq     seq;
 	/* performance */
@@ -17151,12 +16147,6 @@ struct seconf {
 	/* memory */
 	uint64_t      memory_limit;
 	uint64_t      anticache;
-	/* log */
-	uint32_t      log_enable;
-	char         *log_path;
-	uint32_t      log_sync;
-	uint32_t      log_rotate_wm;
-	uint32_t      log_rotate_sync;
 	struct sfscheme      scheme;
 	int           confmax;
 	struct srconf       *conf;
@@ -17204,8 +16194,6 @@ struct phia_env {
 	struct ssa         a;
 	struct ssa         a_ref;
 	struct sicachepool cachepool;
-	struct slconf      lpconf;
-	struct slpool      lp;
 	struct sxmanager   xm;
 	struct scheduler          scheduler;
 	struct srerror     error;
@@ -17248,7 +16236,6 @@ struct sedocument {
 	void     *raw;
 	uint32_t  rawsize;
 	uint32_t  timestamp;
-	void     *log;
 	/* read options */
 	int       cache_only;
 	int       oldest_only;
@@ -17319,7 +16306,6 @@ se_dbactive(struct sedb *o) {
 
 static struct so *se_dbnew(struct phia_env*, char*, int);
 static struct so *se_dbmatch(struct phia_env*, char*);
-static struct so *se_dbmatch_id(struct phia_env*, uint32_t);
 static struct so *se_dbresult(struct phia_env*, struct scread*);
 static void *
 se_dbread(struct sedb*, struct sedocument*, struct sx*, int, struct sicache*);
@@ -17385,7 +16371,6 @@ enum {
 
 static int se_recoverbegin(struct sedb*);
 static int se_recoverend(struct sedb*);
-static int se_recover(struct phia_env*);
 
 static int
 se_open(struct so *o)
@@ -17435,10 +16420,6 @@ se_open(struct so *o)
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
-	/* recover logpool */
-	rc = se_recover(e);
-	if (ssunlikely(rc == -1))
-		return -1;
 	if (e->conf.recover == SE_RECOVER_2P)
 		return 0;
 
@@ -17473,9 +16454,6 @@ se_destroy(struct so *o)
 				rcret = -1;
 		}
 	}
-	rc = sl_poolshutdown(&e->lp);
-	if (ssunlikely(rc == -1))
-		rcret = -1;
 	sx_managerfree(&e->xm);
 	ss_vfsfree(&e->vfs);
 	si_cachepool_free(&e->cachepool);
@@ -17823,40 +16801,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 		sr_C(&prev, pc, NULL, w->name, SS_UNDEF, worker, SR_NS, NULL);
 	}
 	return sr_C(NULL, pc, NULL, "scheduler", SS_UNDEF, scheduler, SR_NS, NULL);
-}
-
-static inline int
-se_conflog_rotate(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sl_poolrotate(&e->lp);
-}
-
-static inline int
-se_conflog_gc(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sl_poolgc(&e->lp);
-}
-
-static inline struct srconf*
-se_conflog(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
-{
-	struct srconf *log = *pc;
-	struct srconf *p = NULL;
-	sr_c(&p, pc, se_confv_offline, "enable", SS_U32, &e->conf.log_enable);
-	sr_c(&p, pc, se_confv_offline, "path", SS_STRINGPTR, &e->conf.log_path);
-	sr_c(&p, pc, se_confv_offline, "sync", SS_U32, &e->conf.log_sync);
-	sr_c(&p, pc, se_confv_offline, "rotate_wm", SS_U32, &e->conf.log_rotate_wm);
-	sr_c(&p, pc, se_confv_offline, "rotate_sync", SS_U32, &e->conf.log_rotate_sync);
-	sr_c(&p, pc, se_conflog_rotate, "rotate", SS_FUNCTION, NULL);
-	sr_c(&p, pc, se_conflog_gc, "gc", SS_FUNCTION, NULL);
-	sr_C(&p, pc, se_confv, "files", SS_U32, &rt->log_files, SR_RO, NULL);
-	return sr_C(NULL, pc, NULL, "log", SS_UNDEF, log, SR_NS, NULL);
 }
 
 static inline struct srconf*
@@ -18323,7 +17267,6 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	struct srconf *scheduler  = se_confscheduler(e, rt, &pc);
 	struct srconf *perf       = se_confperformance(e, rt, &pc);
 	struct srconf *metric     = se_confmetric(e, rt, &pc);
-	struct srconf *log        = se_conflog(e, rt, &pc);
 	struct srconf *view       = se_confview(e, rt, &pc);
 	struct srconf *db         = se_confdb(e, rt, &pc);
 	struct srconf *debug      = se_confdebug(e, rt, &pc);
@@ -18333,8 +17276,7 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	compaction->next = scheduler;
 	scheduler->next  = perf;
 	perf->next       = metric;
-	metric->next     = log;
-	log->next        = view;
+	metric->next     = view;
 	view->next       = db;
 	if (! serialize)
 		db->next = debug;
@@ -18380,9 +17322,6 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	int v = ss_quotaused_percent(&e->quota);
 	struct srzone *z = sr_zonemap(&e->conf.zones, v);
 	memcpy(rt->zone, z->name, sizeof(rt->zone));
-
-	/* log */
-	rt->log_files = sl_poolfiles(&e->lp);
 
 	/* metric */
 	sr_seqlock(&e->seq);
@@ -18539,11 +17478,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 	c->recover             = 1;
 	c->memory_limit        = 0;
 	c->anticache           = 0;
-	c->log_enable          = 1;
-	c->log_path            = NULL;
-	c->log_rotate_wm       = 500000;
-	c->log_sync            = 0;
-	c->log_rotate_sync     = 1;
 	ss_triggerinit(&c->on_event);
 	struct srzone def = {
 		.enable            = 1,
@@ -18601,10 +17535,6 @@ static void se_conffree(struct seconf *c)
 		ss_free(&e->a, c->path);
 		c->path = NULL;
 	}
-	if (c->log_path) {
-		ss_free(&e->a, c->log_path);
-		c->log_path = NULL;
-	}
 	sf_schemefree(&c->scheme, &e->a);
 }
 
@@ -18614,14 +17544,6 @@ static int se_confvalidate(struct seconf *c)
 	if (c->path == NULL) {
 		sr_error(&e->error, "%s", "repository path is not set");
 		return -1;
-	}
-	char path[1024];
-	if (c->log_path == NULL) {
-		snprintf(path, sizeof(path), "%s/log", c->path);
-		c->log_path = ss_strdup(&e->a, path);
-		if (ssunlikely(c->log_path == NULL)) {
-			return sr_oom(&e->error);
-		}
 	}
 	int i = 0;
 	for (; i < 11; i++) {
@@ -19564,16 +18486,6 @@ static struct so *se_dbmatch(struct phia_env *e, char *name)
 	return NULL;
 }
 
-static struct so *se_dbmatch_id(struct phia_env *e, uint32_t id)
-{
-	struct sedb *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		if (db->scheme->id == id)
-			return &db->o;
-	}
-	return NULL;
-}
-
 static int se_dbvisible(struct sedb *db, uint64_t txn)
 {
 	return txn > db->txn_min && txn <= db->txn_max;
@@ -19604,7 +18516,6 @@ enum {
 	SE_DOCUMENT_PREFIX,
 	SE_DOCUMENT_LSN,
 	SE_DOCUMENT_TIMESTAMP,
-	SE_DOCUMENT_LOG,
 	SE_DOCUMENT_RAW,
 	SE_DOCUMENT_FLAGS,
 	SE_DOCUMENT_CACHE_ONLY,
@@ -19627,8 +18538,6 @@ se_document_opt(const char *path)
 	case 'l':
 		if (sslikely(strcmp(path, "lsn") == 0))
 			return SE_DOCUMENT_LSN;
-		if (sslikely(strcmp(path, "log") == 0))
-			return SE_DOCUMENT_LOG;
 		break;
 	case 't':
 		if (sslikely(strcmp(path, "timestamp") == 0))
@@ -19828,9 +18737,6 @@ se_document_setstring(struct so *o, const char *path, void *pointer, int size)
 	case SE_DOCUMENT_PREFIX:
 		v->prefix = pointer;
 		v->prefixsize = size;
-		break;
-	case SE_DOCUMENT_LOG:
-		v->log = pointer;
 		break;
 	case SE_DOCUMENT_RAW:
 		v->raw = pointer;
@@ -20060,126 +18966,6 @@ static int se_recoverend(struct sedb *db)
 	return 0;
 }
 
-static int
-se_recoverlog(struct phia_env *e, struct sl *log)
-{
-	struct so *tx = NULL;
-	struct sedb *db = NULL;
-	struct ssiter i;
-	ss_iterinit(sl_iter, &i);
-	int processed = 0;
-	int rc = ss_iteropen(sl_iter, &i, &e->r, &log->file, 1);
-	if (ssunlikely(rc == -1))
-		return -1;
-	for (;;)
-	{
-		struct sv *v = ss_iteratorof(&i);
-		if (ssunlikely(v == NULL))
-			break;
-
-		/* reply transaction */
-		uint64_t lsn = sv_lsn(v);
-		tx = so_begin(&e->o);
-		if (ssunlikely(tx == NULL))
-			goto error;
-
-		while (ss_iteratorhas(&i)) {
-			v = ss_iteratorof(&i);
-			assert(sv_lsn(v) == lsn);
-			/* match a database */
-			uint32_t timestamp = sl_vtimestamp(v);
-			uint32_t dsn = sl_vdsn(v);
-			if (db == NULL || db->scheme->id != dsn)
-				db = (struct sedb*)se_dbmatch_id(e, dsn);
-			if (ssunlikely(db == NULL)) {
-				sr_malfunction(&e->error, "database id %" PRIu32
-				               " is not declared", dsn);
-				goto rlb;
-			}
-			struct so *o = so_document(&db->o);
-			if (ssunlikely(o == NULL))
-				goto rlb;
-			so_setstring(o, "raw", sv_pointer(v), sv_size(v));
-			so_setstring(o, "log", log, 0);
-			so_setint(o, "timestamp", timestamp);
-
-			int flags = sv_flags(v);
-			if (flags == SVDELETE) {
-				rc = so_delete(tx, o);
-			} else
-			if (flags == SVUPSERT) {
-				rc = so_upsert(tx, o);
-			} else {
-				assert(flags == 0);
-				rc = so_set(tx, o);
-			}
-			if (ssunlikely(rc == -1))
-				goto rlb;
-			ss_gcmark(&log->gc, 1);
-			processed++;
-			ss_iteratornext(&i);
-		}
-		if (ssunlikely(sl_iter_error(&i)))
-			goto rlb;
-
-		so_setint(tx, "lsn", lsn);
-		rc = so_commit(tx);
-		if (ssunlikely(rc != 0))
-			goto error;
-		rc = sl_iter_continue(&i);
-		if (ssunlikely(rc == -1))
-			goto error;
-		if (rc == 0)
-			break;
-	}
-	ss_iteratorclose(&i);
-	return 0;
-rlb:
-	so_destroy(tx);
-error:
-	ss_iteratorclose(&i);
-	return -1;
-}
-
-static inline int
-se_recoverlogpool(struct phia_env *e)
-{
-	struct sl *log;
-	rlist_foreach_entry(log, &e->lp.list, link) {
-		int rc = se_recoverlog(e, log);
-		if (ssunlikely(rc == -1))
-			return -1;
-		ss_gccomplete(&log->gc);
-	}
-	return 0;
-}
-
-static int se_recover(struct phia_env *e)
-{
-	struct slconf *lc = &e->lpconf;
-	lc->enable         = e->conf.log_enable;
-	lc->path           = e->conf.log_path;
-	lc->rotatewm       = e->conf.log_rotate_wm;
-	lc->sync_on_rotate = e->conf.log_rotate_sync;
-	lc->sync_on_write  = e->conf.log_sync;
-	int rc = sl_poolopen(&e->lp, lc);
-	if (ssunlikely(rc == -1))
-		return -1;
-	if (e->conf.recover == SE_RECOVER_2P)
-		return 0;
-	/* recover log files */
-	rc = se_recoverlogpool(e);
-	if (ssunlikely(rc == -1))
-		goto error;
-	rc = sl_poolrotate(&e->lp);
-	if (ssunlikely(rc == -1))
-		goto error;
-	return 0;
-error:
-	sr_statusset(&e->status, SR_MALFUNCTION);
-	return -1;
-}
-
 static inline int
 se_txwrite(struct setx *t, struct sedocument *o, uint8_t flags)
 {
@@ -20219,7 +19005,6 @@ se_txwrite(struct setx *t, struct sedocument *o, uint8_t flags)
 
 	struct svv *v = o->v.v;
 	sv_vref(v);
-	v->log = o->log;
 
 	/* destroy document object */
 	int size = sv_vsize(v);
@@ -20788,10 +19573,9 @@ struct phia_env *phia_env(void)
 	sr_init(&e->r, &e->status, &e->error, &e->a, &e->a_ref, &e->vfs, &e->quota,
 	        &e->conf.zones, &e->seq, SF_RAW, NULL,
 	        NULL, &e->ei, &e->stat);
-	sl_poolinit(&e->lp, &e->r);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
-	sc_init(&e->scheduler, &e->r, &e->conf.on_event, &e->lp);
+	sc_init(&e->scheduler, &e->r, &e->conf.on_event);
 	return e;
 error:
 	sr_statusfree(&e->status);
