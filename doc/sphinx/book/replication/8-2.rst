@@ -20,7 +20,10 @@
     ---
     - [3, 'Another']
     ...
-    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    <...> [25579] main/103/replica/localhost:3301 I> authenticated
-    <...> [25581] main/101/spawner I> created a replication relay: pid = 29632
-    <...> [29632] main/101/relay/127.0.0.1:45908 I> recover from ./00000000000000000000.xlog'
+    <...> [11243] main/105/applier/localhost:3301 I> connected to 1.6.0 at 127.0.0.1:3301
+    <...> [11243] main/105/applier/localhost:3301 I> authenticated
+    tarantool>
+    <...> [11243] relay/127.0.0.1:36150/101/main I> recover from `./00000000000000000000.xlog'
+    <...> [11243] relay/127.0.0.1:36150/101/main recovery.cc:211 W> file
+         `./00000000000000000000.xlog` wasn't correctly closed
+    <...> [11243] relay/127.0.0.1:36150/102/main I> recover from `./00000000000000000000.xlog'

@@ -8,9 +8,10 @@
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
     ...
     tarantool> 
-    <...> [25020] main/101/spawner I> created a replication relay: pid = 25583
-    <...> [25583] main/101/relay/127.0.0.1:50883 I> recovery start
-    <...> [25583] main/101/relay/127.0.0.1:50883 I> recovering from ./00000000000000000000.snap'
-    <...> [25583] main/101/relay/127.0.0.1:50883 I> snapshot sent
-    <...> [25020] main/101/spawner I> created a replication relay: pid = 25585
-    <...> [25585] main/101/relay/127.0.0.1:50884 I> recover from ./00000000000000000000.xlog'
+    <...> [11031] relay/127.0.0.1:58734/101/main I> recovery start
+    <...> [11031] relay/127.0.0.1:58734/101/main I> recovering from `./00000000000000000000.snap'
+    <...> [11031] relay/127.0.0.1:58734/101/main I> snapshot sent
+    <...> [11031] relay/127.0.0.1:58734/101/main I> recover from `./00000000000000000000.xlog'
+    <...> [11031] relay/127.0.0.1:58734/101/main recovery.cc:211 W> file
+          `./00000000000000000000.xlog` wasn't correctly closed
+    <...> [11031] relay/127.0.0.1:58734/102/main I> recover from `./00000000000000000000.xlog'

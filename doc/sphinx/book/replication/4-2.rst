@@ -2,10 +2,6 @@
 
     <... ...>
     tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
-    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    <...> [25579] main/103/replica/localhost:3301 I> authenticated
-    <...> [25579] wal I> creating ./00000000000000000000.xlog.inprogress'
-    ---
     - - [1, '6190d919-1133-4452-b123-beca0b178b32']
       - [2, '236230b8-af3e-406b-b709-15a60b44c20c']
     ...

@@ -380,7 +380,6 @@ On the first shell, which we'll call Terminal #1, execute these commands:
     $ ~/tarantool/src/tarantool
     tarantool> box.cfg{listen = 3301}
     tarantool> box.schema.user.create('replicator', {password = 'password'})
-    tarantool> box.schema.role.grant('replication','read,write','universe')
     tarantool> box.schema.user.grant('replicator','execute','role','replication')
     tarantool> box.space._cluster:select({0}, {iterator = 'GE'})
 
@@ -742,7 +741,7 @@ similar sizes because they both contain the same tuples.
             })();
         </script>
 
-On Terminal #2, ignore the repeated messages saying "failed to connect",
+On Terminal #2, ignore the error messages,
 and execute these requests:
 
 .. code-block:: tarantoolsession
@@ -750,8 +749,8 @@ and execute these requests:
     tarantool> box.space.tester:select({0}, {iterator = 'GE'})
     tarantool> box.space.tester:insert{3, 'Another'}
 
-Now the screen looks like this (ignoring the repeated messages saying
-"failed to connect"):
+Now the screen looks like this (ignoring the error
+messages):
 
 .. container:: b-block-wrapper_doc
 
@@ -820,10 +819,9 @@ On Terminal #1 execute these commands:
 
     $ ~/tarantool/src/tarantool
     tarantool> box.cfg{listen = 3301}
-    tarantool> box.space.tester:select({0}, {iteratir = 'GE'})
+    tarantool> box.space.tester:select({0}, {iterator = 'GE'})
 
-Now the screen looks like this (ignoring the repeated messages on terminal #2
-saying "failed to connect"):
+Now the screen looks like this:
 
 .. container:: b-block-wrapper_doc
 
