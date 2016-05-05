@@ -861,22 +861,7 @@ ss_typeof(enum sstype type) {
 	return NULL;
 }
 
-typedef void *(*ssthreadf)(void*);
-
-struct ssthread {
-	pthread_t id;
-	ssthreadf f;
-	void *arg;
-	struct rlist link;
-};
-
-struct ssthreadpool {
-	struct rlist list;
-	int n;
-};
-
 enum ssquotaop {
-	SS_QGROW,
 	SS_QADD,
 	SS_QREMOVE
 };
@@ -2230,9 +2215,6 @@ ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 				tt_pthread_cond_wait(&q->cond, &q->lock);
 			}
 		}
-	case SS_QGROW:
-		q->used += v;
-		break;
 	case SS_QREMOVE:
 		q->used -= v;
 		if (ssunlikely(q->wait)) {
@@ -5754,7 +5736,7 @@ sv_mergeadd(struct svmerge *m, struct ssiter *i)
 }
 
 /*
- * Merge serveral sorted streams into one.
+ * Merge several sorted streams into one.
  * Track duplicates.
  *
  * Merger does not recognize duplicates from
