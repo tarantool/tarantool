@@ -4354,8 +4354,6 @@ enum srseqop {
 	SR_ASNNEXT,
 	SR_SSN,
 	SR_SSNNEXT,
-	SR_BSN,
-	SR_BSNNEXT,
 	SR_LSN,
 	SR_LSNNEXT,
 	SR_LFSN,
@@ -4380,8 +4378,6 @@ struct srseq {
 	uint64_t lfsn;
 	/** Database sequence number. */
 	uint32_t dsn;
-	/** Backup sequence number. */
-	uint32_t bsn;
 };
 
 static inline void
@@ -4434,10 +4430,6 @@ sr_seqdo(struct srseq *n, enum srseqop op)
 		break;
 	case SR_ASNNEXT:   v = ++n->asn;
 		break;
-	case SR_BSN:       v = n->bsn;
-		break;
-	case SR_BSNNEXT:   v = ++n->bsn;
-		break;
 	case SR_DSN:       v = n->dsn;
 		break;
 	case SR_DSNNEXT:   v = ++n->dsn;
@@ -4467,7 +4459,6 @@ struct srzone {
 	uint32_t branch_age_period;
 	uint64_t branch_age_period_us;
 	uint32_t branch_age_wm;
-	uint32_t backup_prio;
 	uint32_t snapshot_period;
 	uint64_t snapshot_period_us;
 	uint32_t anticache_period;
@@ -7678,10 +7669,8 @@ static int sl_poolopen(struct slpool*, struct slconf*);
 static int sl_poolrotate(struct slpool*);
 static int sl_poolrotate_ready(struct slpool*);
 static int sl_poolshutdown(struct slpool*);
-static int sl_poolgc_enable(struct slpool*, int);
 static int sl_poolgc(struct slpool*);
 static int sl_poolfiles(struct slpool*);
-static int sl_poolcopy(struct slpool*, char*, struct ssbuf*);
 
 static int sl_begin(struct slpool*, struct sltx*, uint64_t, int);
 static int sl_commit(struct sltx*);
@@ -7935,14 +7924,6 @@ sl_gc(struct slpool *p, struct sl *l)
 	return 1;
 }
 
-static int sl_poolgc_enable(struct slpool *p, int enable)
-{
-	tt_pthread_mutex_lock(&p->lock);
-	p->gc = enable;
-	tt_pthread_mutex_unlock(&p->lock);
-	return 0;
-}
-
 static int sl_poolgc(struct slpool *p)
 {
 	if (ssunlikely(! p->conf->enable))
@@ -7980,69 +7961,6 @@ static int sl_poolfiles(struct slpool *p)
 	int n = p->n;
 	tt_pthread_mutex_unlock(&p->lock);
 	return n;
-}
-
-static int sl_poolcopy(struct slpool *p, char *dest, struct ssbuf *buf)
-{
-	struct rlist list;
-	rlist_create(&list);
-	tt_pthread_mutex_lock(&p->lock);
-	struct sl *l;
-	rlist_foreach_entry(l, &p->list, link) {
-		if (ss_gcinprogress(&l->gc))
-			break;
-		rlist_add(&list, &l->linkcopy);
-	}
-	tt_pthread_mutex_unlock(&p->lock);
-
-	ss_bufreset(buf);
-	struct sl *n;
-	rlist_foreach_entry_safe(l, &list, link, n)
-	{
-		rlist_create(&l->linkcopy);
-		struct sspath path;
-		ss_path(&path, dest, l->id, ".log");
-		struct ssfile file;
-		ss_fileinit(&file, p->r->vfs);
-		int rc = ss_filenew(&file, path.path);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(p->r->e, "log file '%s' create error: %s",
-			               path.path, strerror(errno));
-			return -1;
-		}
-		rc = ss_bufensure(buf, p->r->a, l->file.size);
-		if (ssunlikely(rc == -1)) {
-			sr_oom_malfunction(p->r->e);
-			ss_fileclose(&file);
-			return -1;
-		}
-		rc = ss_filepread(&l->file, 0, buf->s, l->file.size);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(p->r->e, "log file '%s' read error: %s",
-			               ss_pathof(&l->file.path),
-			               strerror(errno));
-			ss_fileclose(&file);
-			return -1;
-		}
-		ss_bufadvance(buf, l->file.size);
-		rc = ss_filewrite(&file, buf->s, l->file.size);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(p->r->e, "log file '%s' write error: %s",
-			               path.path,
-			               strerror(errno));
-			ss_fileclose(&file);
-			return -1;
-		}
-		/* sync? */
-		rc = ss_fileclose(&file);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(p->r->e, "log file '%s' close error: %s",
-			               path.path, strerror(errno));
-			return -1;
-		}
-		ss_bufreset(buf);
-	}
-	return 0;
 }
 
 static int sl_begin(struct slpool *p, struct sltx *t, uint64_t lsn, int recover)
@@ -11164,7 +11082,6 @@ struct sischeme {
 	char       *path;
 	uint32_t    path_fail_on_exists;
 	uint32_t    path_fail_on_drop;
-	char       *path_backup;
 	uint32_t    mmap;
 	enum sistorage storage;
 	char       *storage_sz;
@@ -11287,7 +11204,6 @@ struct sinode {
 	uint16_t   flags;
 	uint64_t   update_time;
 	uint32_t   used;
-	uint32_t   backup;
 	uint64_t   lru;
 	uint64_t   ac;
 	uint32_t   in_memory;
@@ -11526,8 +11442,6 @@ struct siplan {
 	 *   c: *node_size
 	 * snapshot:
 	 *   a: ssn
-	 * backup:
-	 *   a: bsn
 	 * shutdown:
 	 * drop:
 	 */
@@ -11564,7 +11478,6 @@ struct si {
 	struct ssrb       i;
 	int        n;
 	uint64_t   update_time;
-	uint32_t   backup;
 	uint32_t   snapshot_run;
 	uint64_t   snapshot;
 	uint64_t   lru_run_lsn;
@@ -12078,8 +11991,6 @@ static int si_anticache(struct si*, struct siplan*);
 
 static int si_snapshot(struct si*, struct siplan*);
 
-static int si_backup(struct si*, struct sdc*, struct siplan*);
-
 static int
 si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
 	 uint64_t, struct ssiter*, uint64_t, uint32_t);
@@ -12244,130 +12155,6 @@ static int si_anticache(struct si *index, struct siplan *plan)
 	return 0;
 }
 
-static inline int
-si_backupend(struct si *index, struct sdc *c, struct siplan *plan)
-{
-	struct runtime *r = &index->r;
-	/* copy index scheme file */
-	char src[PATH_MAX];
-	snprintf(src, sizeof(src), "%s/scheme", index->scheme.path);
-
-	char dst[PATH_MAX];
-	snprintf(dst, sizeof(dst), "%s/%" PRIu32 ".incomplete/%s/scheme",
-	         index->scheme.path_backup,
-	         (uint32_t)plan->a,
-	         index->scheme.name);
-
-	/* prepare buffer */
-	ssize_t size = ss_vfssize(r->vfs, src);
-	if (ssunlikely(size == -1)) {
-		sr_error(r->e, "backup db file '%s' read error: %s",
-		         src, strerror(errno));
-		return -1;
-	}
-	int rc = ss_bufensure(&c->c, r->a, size);
-	if (ssunlikely(rc == -1))
-		return sr_oom(r->e);
-
-	/* read scheme file */
-	struct ssfile file;
-	ss_fileinit(&file, r->vfs);
-	rc = ss_fileopen(&file, src);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' open error: %s",
-		         src, strerror(errno));
-		return -1;
-	}
-	rc = ss_filepread(&file, 0, c->c.s, size);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' read error: %s",
-		         src, strerror(errno));
-		ss_fileclose(&file);
-		return -1;
-	}
-	ss_fileclose(&file);
-
-	/* write scheme file */
-	ss_fileinit(&file, r->vfs);
-	rc = ss_filenew(&file, dst);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' create error: %s",
-		         dst, strerror(errno));
-		return -1;
-	}
-	rc = ss_filewrite(&file, c->c.s, size);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' write error: %s",
-		         dst, strerror(errno));
-		ss_fileclose(&file);
-		return -1;
-	}
-	/* sync? */
-	rc = ss_fileclose(&file);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' close error: %s",
-		         dst, strerror(errno));
-		return -1;
-	}
-
-	/* finish index backup */
-	si_lock(index);
-	index->backup = plan->a;
-	si_unlock(index);
-	return 0;
-}
-
-static int si_backup(struct si *index, struct sdc *c, struct siplan *plan)
-{
-	struct runtime *r = &index->r;
-	if (ssunlikely(plan->plan == SI_BACKUPEND))
-		return si_backupend(index, c, plan);
-
-	struct sinode *node = plan->node;
-	char dst[PATH_MAX];
-	snprintf(dst, sizeof(dst), "%s/%" PRIu32 ".incomplete/%s",
-	         index->scheme.path_backup,
-	         (uint32_t)plan->a,
-	         index->scheme.name);
-
-	/* read origin file */
-	int rc = si_noderead(node, r, &c->c);
-	if (ssunlikely(rc == -1))
-		return -1;
-
-	/* copy */
-	struct sspath path;
-	ss_path(&path, dst, node->self.id.id, ".db");
-	struct ssfile file;
-	ss_fileinit(&file, r->vfs);
-	rc = ss_filenew(&file, path.path);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' create error: %s",
-		         path.path, strerror(errno));
-		return -1;
-	}
-	rc = ss_filewrite(&file, c->c.s, node->file.size);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' write error: %s",
-				 path.path, strerror(errno));
-		ss_fileclose(&file);
-		return -1;
-	}
-	/* sync? */
-	rc = ss_fileclose(&file);
-	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "backup db file '%s' close error: %s",
-				 path.path, strerror(errno));
-		return -1;
-	}
-
-	si_lock(index);
-	node->backup = plan->a;
-	si_nodeunlock(node);
-	si_unlock(index);
-	return 0;
-}
-
 static struct si *si_init(struct runtime *r, struct so *object)
 {
 	struct si *i = ss_malloc(r->a, sizeof(struct si));
@@ -12397,7 +12184,6 @@ static struct si *si_init(struct runtime *r, struct so *object)
 	i->size         = 0;
 	i->read_disk    = 0;
 	i->read_cache   = 0;
-	i->backup       = 0;
 	i->snapshot_run = 0;
 	i->snapshot     = 0;
 	i->n            = 0;
@@ -12547,10 +12333,6 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 		break;
 	case SI_SNAPSHOT:
 		rc = si_snapshot(i, plan);
-		break;
-	case SI_BACKUP:
-	case SI_BACKUPEND:
-		rc = si_backup(i, c, plan);
 		break;
 	case SI_SHUTDOWN:
 		rc = si_close(i);
@@ -13484,7 +13266,6 @@ static struct sinode *si_nodenew(struct runtime *r)
 		return NULL;
 	}
 	n->recover = 0;
-	n->backup = 0;
 	n->lru = 0;
 	n->ac = 0;
 	n->flags = 0;
@@ -13880,9 +13661,6 @@ static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 		break;
 	case SI_TEMP: plan = "temperature";
 		break;
-	case SI_BACKUP:
-	case SI_BACKUPEND: plan = "backup";
-		break;
 	case SI_SHUTDOWN: plan = "database shutdown";
 		break;
 	case SI_DROP: plan = "database drop";
@@ -13940,43 +13718,6 @@ static int si_plannerremove(struct siplanner *p, int mask, struct sinode *n)
 	if (mask & SI_TEMP)
 		ss_rqdelete(&p->temp, &n->nodetemp);
 	return 0;
-}
-
-static inline int
-si_plannerpeek_backup(struct siplanner *p, struct siplan *plan)
-{
-	/* try to peek a node which has
-	 * bsn <= required value
-	*/
-	int rc_inprogress = 0;
-	struct sinode *n;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&p->branch, pn))) {
-		n = sscast(pn, struct sinode, nodebranch);
-		if (n->backup < plan->a) {
-			if (n->flags & SI_LOCK) {
-				rc_inprogress = 2;
-				continue;
-			}
-			goto match;
-		}
-	}
-	if (rc_inprogress) {
-		plan->explain = SI_ERETRY;
-		return 2;
-	}
-	struct si *index = p->i;
-	if (index->backup < plan->a) {
-		plan->plan = SI_BACKUPEND;
-		plan->node = 0;
-		return 1;
-	}
-	return 0;
-match:
-	si_nodelock(n);
-	plan->explain = SI_ENONE;
-	plan->node = n;
-	return 1;
 }
 
 static inline int
@@ -14325,8 +14066,6 @@ static int si_planner(struct siplanner *p, struct siplan *plan)
 		return si_plannerpeek_checkpoint(p, plan);
 	case SI_AGE:
 		return si_plannerpeek_age(p, plan);
-	case SI_BACKUP:
-		return si_plannerpeek_backup(p, plan);
 	case SI_SNAPSHOT:
 		return si_plannerpeek_snapshot(p, plan);
 	case SI_ANTICACHE:
@@ -15678,10 +15417,6 @@ static void si_schemefree(struct sischeme *s, struct runtime *r)
 		ss_free(r->a, s->path);
 		s->path = NULL;
 	}
-	if (s->path_backup) {
-		ss_free(r->a, s->path_backup);
-		s->path_backup = NULL;
-	}
 	if (s->storage_sz) {
 		ss_free(r->a, s->storage_sz);
 		s->storage_sz = NULL;
@@ -16182,7 +15917,6 @@ struct sctask {
 	struct siplan plan;
 	struct scdb  *db;
 	struct si    *shutdown;
-	int    on_backup;
 	int    rotate;
 	int    gc;
 };
@@ -16210,11 +15944,6 @@ struct scheduler {
 	uint32_t       gc;
 	uint64_t       lru_time;
 	uint32_t       lru;
-	uint32_t       backup_bsn;
-	uint32_t       backup_bsn_last;
-	uint32_t       backup_bsn_last_complete;
-	uint32_t       backup_events;
-	uint32_t       backup;
 	int            rotate;
 	int            rr;
 	int            count;
@@ -16223,13 +15952,12 @@ struct scheduler {
 	int            shutdown_pending;
 	struct scworkerpool   wp;
 	struct slpool        *lp;
-	char          *backup_path;
 	struct sstrigger     *on_event;
 	struct runtime            *r;
 };
 
 static int sc_init(struct scheduler*, struct runtime*, struct sstrigger*, struct slpool*);
-static int sc_set(struct scheduler *s, uint64_t, char*);
+static int sc_set(struct scheduler *s, uint64_t);
 static int sc_add(struct scheduler*, struct si*);
 static int sc_del(struct scheduler*, struct si*, int);
 
@@ -16378,7 +16106,6 @@ static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_expire(struct scheduler*);
 static int sc_ctl_gc(struct scheduler*);
 static int sc_ctl_lru(struct scheduler*);
-static int sc_ctl_backup(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
 struct screadarg {
@@ -16416,139 +16143,6 @@ static int sc_read(struct scread*, struct scheduler*);
 
 static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
 
-static int sc_backupstart(struct scheduler*);
-static int sc_backupbegin(struct scheduler*);
-static int sc_backupend(struct scheduler*, struct scworker*);
-static int sc_backuperror(struct scheduler*);
-
-static int sc_backupstart(struct scheduler *s)
-{
-	if (ssunlikely(s->backup_path == NULL)) {
-		sr_error(s->r->e, "%s", "backup is not enabled");
-		return -1;
-	}
-	/* begin backup procedure
-	 * state 0
-	 *
-	 * disable log garbage-collection
-	*/
-	sl_poolgc_enable(s->lp, 0);
-	tt_pthread_mutex_lock(&s->lock);
-	if (ssunlikely(s->backup > 0)) {
-		tt_pthread_mutex_unlock(&s->lock);
-		sl_poolgc_enable(s->lp, 1);
-		/* in progress */
-		return 0;
-	}
-	uint64_t bsn = sr_seq(s->r->seq, SR_BSNNEXT);
-	s->backup = 1;
-	s->backup_bsn = bsn;
-	sc_start(s, SI_BACKUP);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
-static int sc_backupbegin(struct scheduler *s)
-{
-	/*
-	 * a. create backup_path/<bsn.incomplete> directory
-	 * b. create database directories
-	 * c. create log directory
-	*/
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/%" PRIu32 ".incomplete",
-	         s->backup_path, s->backup_bsn);
-	int rc = ss_vfsmkdir(s->r->vfs, path, 0755);
-	if (ssunlikely(rc == -1)) {
-		sr_error(s->r->e, "backup directory '%s' create error: %s",
-		         path, strerror(errno));
-		return -1;
-	}
-	int i = 0;
-	while (i < s->count) {
-		struct scdb *db = s->i[i];
-		snprintf(path, sizeof(path), "%s/%" PRIu32 ".incomplete/%s",
-		         s->backup_path, s->backup_bsn,
-		         db->index->scheme.name);
-		rc = ss_vfsmkdir(s->r->vfs, path, 0755);
-		if (ssunlikely(rc == -1)) {
-			sr_error(s->r->e, "backup directory '%s' create error: %s",
-			         path, strerror(errno));
-			return -1;
-		}
-		i++;
-	}
-	snprintf(path, sizeof(path), "%s/%" PRIu32 ".incomplete/log",
-	         s->backup_path, s->backup_bsn);
-	rc = ss_vfsmkdir(s->r->vfs, path, 0755);
-	if (ssunlikely(rc == -1)) {
-		sr_error(s->r->e, "backup directory '%s' create error: %s",
-		         path, strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
-static int sc_backupend(struct scheduler *s, struct scworker *w)
-{
-	/*
-	 * a. rotate log file
-	 * b. copy log files
-	 * c. enable log gc
-	 * d. rename <bsn.incomplete> into <bsn>
-	 * e. set last backup, set COMPLETE
-	 */
-
-	/* force log rotation */
-	ss_trace(&w->trace, "%s", "log rotation for backup");
-	int rc = sl_poolrotate(s->lp);
-	if (ssunlikely(rc == -1))
-		return -1;
-
-	/* copy log files */
-	ss_trace(&w->trace, "%s", "log files backup");
-
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/%" PRIu32 ".incomplete/log",
-	         s->backup_path, s->backup_bsn);
-	rc = sl_poolcopy(s->lp, path, &w->dc.c);
-	if (ssunlikely(rc == -1)) {
-		sr_errorrecover(s->r->e);
-		return -1;
-	}
-
-	/* enable log gc */
-	sl_poolgc_enable(s->lp, 1);
-
-	/* complete backup */
-	snprintf(path, sizeof(path), "%s/%" PRIu32 ".incomplete",
-	         s->backup_path, s->backup_bsn);
-	char newpath[1024];
-	snprintf(newpath, sizeof(newpath), "%s/%" PRIu32,
-	         s->backup_path, s->backup_bsn);
-	rc = ss_vfsrename(s->r->vfs, path, newpath);
-	if (ssunlikely(rc == -1)) {
-		sr_error(s->r->e, "backup directory '%s' rename error: %s",
-		         path, strerror(errno));
-		return -1;
-	}
-
-	/* complete */
-	s->backup_bsn_last = s->backup_bsn;
-	s->backup_bsn_last_complete = 1;
-	s->backup = 0;
-	s->backup_bsn = 0;
-	return 0;
-}
-
-static int sc_backuperror(struct scheduler *s)
-{
-	sl_poolgc_enable(s->lp, 1);
-	s->backup = 0;
-	s->backup_bsn_last_complete = 0;
-	return 0;
-}
-
 static int
 sc_init(struct scheduler *s, struct runtime *r,
 	struct sstrigger *on_event, struct slpool *lp)
@@ -16562,11 +16156,6 @@ sc_init(struct scheduler *s, struct runtime *r,
 	s->age_time                 = now;
 	s->expire                   = 0;
 	s->expire_time              = now;
-	s->backup_bsn               = 0;
-	s->backup_bsn_last          = 0;
-	s->backup_bsn_last_complete = 0;
-	s->backup_events            = 0;
-	s->backup                   = 0;
 	s->anticache_asn            = 0;
 	s->anticache_asn_last       = 0;
 	s->anticache_storage        = 0;
@@ -16587,7 +16176,6 @@ sc_init(struct scheduler *s, struct runtime *r,
 	s->rr                       = 0;
 	s->r                        = r;
 	s->on_event                 = on_event;
-	s->backup_path              = NULL;
 	s->lp                       = lp;
 	sc_workerpool_init(&s->wp);
 	rlist_create(&s->shutdown);
@@ -16595,10 +16183,9 @@ sc_init(struct scheduler *s, struct runtime *r,
 	return 0;
 }
 
-static int sc_set(struct scheduler *s, uint64_t anticache, char *backup_path)
+static int sc_set(struct scheduler *s, uint64_t anticache)
 {
 	s->anticache_limit = anticache;
-	s->backup_path = backup_path;
 	return 0;
 }
 
@@ -16830,11 +16417,6 @@ static int sc_ctl_lru(struct scheduler *s)
 	sc_task_lru(s);
 	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
-}
-
-static int sc_ctl_backup(struct scheduler *s)
-{
-	return sc_backupstart(s);
 }
 
 static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
@@ -17094,76 +16676,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzon
 				sc_task_snapshot_done(s, now);
 			break;
 		}
-	}
-
-	/* backup */
-	if (s->backup)
-	{
-		/* backup procedure.
-		 *
-		 * state 0 (start)
-		 * -------
-		 *
-		 * a. disable log gc
-		 * b. mark to start backup (state 1)
-		 *
-		 * state 1 (background, delayed start)
-		 * -------
-		 *
-		 * a. create backup_path/<bsn.incomplete> directory
-		 * b. create database directories
-		 * c. create log directory
-		 * d. state 2
-		 *
-		 * state 2 (background, copy)
-		 * -------
-		 *
-		 * a. schedule and execute node backup which bsn < backup_bsn
-		 * b. state 3
-		 *
-		 * state 3 (background, completion)
-		 * -------
-		 *
-		 * a. rotate log file
-		 * b. copy log files
-		 * c. enable log gc, schedule gc
-		 * d. rename <bsn.incomplete> into <bsn>
-		 * e. set last backup, set COMPLETE
-		 *
-		*/
-		if (s->backup == 1) {
-			/* state 1 */
-			rc = sc_backupbegin(s);
-			if (ssunlikely(rc == -1)) {
-				sc_backuperror(s);
-				goto backup_error;
-			}
-			s->backup = 2;
-		}
-		/* state 2 */
-		task->plan.plan = SI_BACKUP;
-		task->plan.a = s->backup_bsn;
-		rc = sc_planquota(s, &task->plan, SC_QBACKUP, zone->backup_prio);
-		switch (rc) {
-		case 1:
-			db->workers[SC_QBACKUP]++;
-			si_ref(db->index, SI_REFBE);
-			task->db = db;
-			return 1;
-		case 0: /* state 3 */
-			if (sc_end(s, db, SI_BACKUP)) {
-				rc = sc_backupend(s, w);
-				if (ssunlikely(rc == -1)) {
-					sc_backuperror(s);
-					goto backup_error;
-				}
-				s->backup_events++;
-				task->gc = 1;
-				task->on_backup = 1;
-			}
-			break;
-		}
-backup_error:;
 	}
 
 	/* expire */
@@ -17447,7 +16959,6 @@ static inline void
 sc_taskinit(struct sctask *task)
 {
 	si_planinit(&task->plan);
-	task->on_backup = 0;
 	task->rotate = 0;
 	task->gc = 0;
 	task->db = NULL;
@@ -17466,21 +16977,12 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 		if (ssunlikely(rc == -1))
 			goto error;
 	}
-	/* trigger backup competion */
-	if (task.on_backup)
-		ss_triggerrun(s->on_event);
 	if (rc_job > 0) {
 		rc = sc_execute(&task, w, vlsn);
 		if (ssunlikely(rc == -1)) {
-			if (task.plan.plan != SI_BACKUP &&
-			    task.plan.plan != SI_BACKUPEND) {
-				sr_statusset(&task.db->index->status,
-				             SR_MALFUNCTION);
-				goto error;
-			}
-			tt_pthread_mutex_lock(&s->lock);
-			sc_backuperror(s);
-			tt_pthread_mutex_unlock(&s->lock);
+			sr_statusset(&task.db->index->status,
+				     SR_MALFUNCTION);
+			goto error;
 		}
 	}
 	if (task.gc) {
@@ -17622,9 +17124,6 @@ struct seconfrt {
 	uint32_t  anticache_active;
 	uint64_t  anticache_asn;
 	uint64_t  anticache_asn_last;
-	uint32_t  backup_active;
-	uint32_t  backup_last;
-	uint32_t  backup_last_complete;
 	uint32_t  gc_active;
 	uint32_t  expire_active;
 	uint32_t  lru_active;
@@ -17645,13 +17144,10 @@ struct seconf {
 	uint32_t      path_create;
 	int           recover;
 	int           recover_complete;
-	/* backup */
-	char         *backup_path;
 	/* compaction */
 	struct srzonemap     zones;
 	/* scheduler */
 	struct sstrigger     on_event;
-	uint32_t      event_on_backup;
 	/* memory */
 	uint64_t      memory_limit;
 	uint64_t      anticache;
@@ -17958,8 +17454,7 @@ online:
 	sr_statusset(&e->status, SR_ONLINE);
 
 	/* run thread-pool and scheduler */
-	sc_set(&e->scheduler, e->conf.anticache,
-	        e->conf.backup_path);
+	sc_set(&e->scheduler, e->conf.anticache);
 	return 0;
 }
 
@@ -18168,7 +17663,6 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 		sr_c(&p, pc, se_confv_offline, "gc_period", SS_U32, &z->gc_period);
 		sr_c(&p, pc, se_confv_offline, "lru_prio", SS_U32, &z->lru_prio);
 		sr_c(&p, pc, se_confv_offline, "lru_period", SS_U32, &z->lru_period);
-		sr_c(&p, pc, se_confv_offline, "backup_prio", SS_U32, &z->backup_prio);
 		prev = sr_C(&prev, pc, NULL, z->name, SS_UNDEF, zone, SR_NS, NULL);
 		if (compaction == NULL)
 			compaction = prev;
@@ -18313,7 +17807,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_c(&p, pc, se_confscheduler_snapshot, "snapshot", SS_FUNCTION, NULL);
 	sr_c(&p, pc, se_confscheduler_on_event, "on_event", SS_STRING, NULL);
 	sr_c(&p, pc, se_confscheduler_on_event_arg, "on_event_arg", SS_STRING, NULL);
-	sr_c(&p, pc, se_confv_offline, "event_on_backup", SS_U32, &e->conf.event_on_backup);
 	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "expire_active", SS_U32, &rt->expire_active, SR_RO, NULL);
@@ -18413,7 +17906,6 @@ se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **
 	sr_C(&p, pc, se_confv, "ssn",  SS_U64, &rt->seq.ssn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "asn",  SS_U64, &rt->seq.asn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "dsn",  SS_U32, &rt->seq.dsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "bsn",  SS_U32, &rt->seq.bsn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "lfsn", SS_U64, &rt->seq.lfsn, SR_RO, NULL);
 	return sr_C(NULL, pc, NULL, "metric", SS_UNDEF, metric, SR_NS, NULL);
 }
@@ -18767,29 +18259,6 @@ se_confview(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc
 	            view, SR_NS, NULL);
 }
 
-
-static inline int
-se_confbackup_run(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_backup(&e->scheduler);
-}
-
-static inline struct srconf*
-se_confbackup(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
-{
-	struct srconf *backup = *pc;
-	struct srconf *p = NULL;
-	sr_c(&p, pc, se_confv_offline, "path", SS_STRINGPTR, &e->conf.backup_path);
-	sr_c(&p, pc, se_confbackup_run, "run", SS_FUNCTION, NULL);
-	sr_C(&p, pc, se_confv, "active", SS_U32, &rt->backup_active, SR_RO, NULL);
-	sr_c(&p, pc, se_confv, "last", SS_U32, &rt->backup_last);
-	sr_c(&p, pc, se_confv, "last_complete", SS_U32, &rt->backup_last_complete);
-	return sr_C(NULL, pc, NULL, "backup", 0, backup, SR_NS, NULL);
-}
-
 static inline int
 se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
 {
@@ -18856,7 +18325,6 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	struct srconf *metric     = se_confmetric(e, rt, &pc);
 	struct srconf *log        = se_conflog(e, rt, &pc);
 	struct srconf *view       = se_confview(e, rt, &pc);
-	struct srconf *backup     = se_confbackup(e, rt, &pc);
 	struct srconf *db         = se_confdb(e, rt, &pc);
 	struct srconf *debug      = se_confdebug(e, rt, &pc);
 
@@ -18867,8 +18335,7 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	perf->next       = metric;
 	metric->next     = log;
 	log->next        = view;
-	view->next       = backup;
-	backup->next     = db;
+	view->next       = db;
 	if (! serialize)
 		db->next = debug;
 	return phia;
@@ -18905,9 +18372,6 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	rt->anticache_active     = e->scheduler.anticache;
 	rt->anticache_asn        = e->scheduler.anticache_asn;
 	rt->anticache_asn_last   = e->scheduler.anticache_asn_last;
-	rt->backup_active        = e->scheduler.backup;
-	rt->backup_last          = e->scheduler.backup_bsn_last;
-	rt->backup_last_complete = e->scheduler.backup_bsn_last_complete;
 	rt->expire_active        = e->scheduler.expire;
 	rt->gc_active            = e->scheduler.gc;
 	rt->lru_active           = e->scheduler.lru;
@@ -19081,7 +18545,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 	c->log_sync            = 0;
 	c->log_rotate_sync     = 1;
 	ss_triggerinit(&c->on_event);
-	c->event_on_backup     = 0;
 	struct srzone def = {
 		.enable            = 1,
 		.mode              = 3, /* branch + compact */
@@ -19094,7 +18557,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 		.branch_age_wm     = 1 * 1024 * 1024,
 		.anticache_period  = 0,
 		.snapshot_period   = 0,
-		.backup_prio       = 1,
 		.expire_prio       = 0,
 		.expire_period     = 0,
 		.gc_prio           = 1,
@@ -19115,7 +18577,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 		.branch_age_wm     = 0,
 		.anticache_period  = 0,
 		.snapshot_period   = 0,
-		.backup_prio       = 0,
 		.expire_prio       = 0,
 		.expire_period     = 0,
 		.gc_prio           = 0,
@@ -19126,7 +18587,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 	};
 	sr_zonemap_set(&o->conf.zones,  0, &def);
 	sr_zonemap_set(&o->conf.zones, 80, &redzone);
-	c->backup_path = NULL;
 	return 0;
 }
 
@@ -19144,10 +18604,6 @@ static void se_conffree(struct seconf *c)
 	if (c->log_path) {
 		ss_free(&e->a, c->log_path);
 		c->log_path = NULL;
-	}
-	if (c->backup_path) {
-		ss_free(&e->a, c->backup_path);
-		c->backup_path = NULL;
 	}
 	sf_schemefree(&c->scheme, &e->a);
 }
@@ -19616,14 +19072,6 @@ se_dbscheme_set(struct sedb *db)
 		if (ssunlikely(s->path == NULL))
 			return sr_oom(&e->error);
 	}
-	/* backup path */
-	s->path_backup = e->conf.backup_path;
-	if (e->conf.backup_path) {
-		s->path_backup = ss_strdup(&e->a, e->conf.backup_path);
-		if (ssunlikely(s->path_backup == NULL))
-			return sr_oom(&e->error);
-	}
-
 	db->r->scheme = &s->scheme;
 	db->r->fmt_storage = s->fmt_storage;
 	db->r->fmt_upsert = &s->fmt_upsert;
