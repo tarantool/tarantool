@@ -561,40 +561,6 @@ ss_ordername(enum ssorder o)
 	return NULL;
 }
 
-typedef int (*sstriggerf)(void *arg);
-
-struct sstrigger {
-	sstriggerf function;
-	void *arg;
-};
-
-static inline void
-ss_triggerinit(struct sstrigger *t)
-{
-	t->function = NULL;
-	t->arg = NULL;
-}
-
-static inline void
-ss_triggerset(struct sstrigger *t, void *pointer)
-{
-	t->function = (sstriggerf)(uintptr_t)pointer;
-}
-
-static inline void
-ss_triggerset_arg(struct sstrigger *t, void *pointer)
-{
-	t->arg = pointer;
-}
-
-static inline void
-ss_triggerrun(struct sstrigger *t)
-{
-	if (t->function == NULL)
-		return;
-	t->function(t->arg);
-}
-
 struct ssbuf {
 	char *reserve;
 	char *s, *p, *e;
@@ -15000,11 +14966,10 @@ struct scheduler {
 	struct rlist   shutdown;
 	int            shutdown_pending;
 	struct scworkerpool   wp;
-	struct sstrigger     *on_event;
 	struct runtime            *r;
 };
 
-static int sc_init(struct scheduler*, struct runtime*, struct sstrigger*);
+static int sc_init(struct scheduler*, struct runtime*);
 static int sc_set(struct scheduler *s, uint64_t);
 static int sc_add(struct scheduler*, struct si*);
 static int sc_del(struct scheduler*, struct si*, int);
@@ -15192,8 +15157,7 @@ static int sc_read(struct scread*, struct scheduler*);
 static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
 
 static int
-sc_init(struct scheduler *s, struct runtime *r,
-	struct sstrigger *on_event)
+sc_init(struct scheduler *s, struct runtime *r)
 {
 	uint64_t now = clock_monotonic64();
 	tt_pthread_mutex_init(&s->lock, NULL);
@@ -15222,7 +15186,6 @@ sc_init(struct scheduler *s, struct runtime *r,
 	s->count                    = 0;
 	s->rr                       = 0;
 	s->r                        = r;
-	s->on_event                 = on_event;
 	sc_workerpool_init(&s->wp);
 	rlist_create(&s->shutdown);
 	s->shutdown_pending = 0;
@@ -16142,8 +16105,6 @@ struct seconf {
 	int           recover_complete;
 	/* compaction */
 	struct srzonemap     zones;
-	/* scheduler */
-	struct sstrigger     on_event;
 	/* memory */
 	uint64_t      memory_limit;
 	uint64_t      anticache;
@@ -16700,34 +16661,6 @@ se_confscheduler_anticache(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline int
-se_confscheduler_on_event(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	if (ssunlikely(sr_statusactive(&e->status))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	ss_triggerset(&e->conf.on_event, s->value);
-	return 0;
-}
-
-static inline int
-se_confscheduler_on_event_arg(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	if (ssunlikely(sr_statusactive(&e->status))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	ss_triggerset_arg(&e->conf.on_event, s->value);
-	return 0;
-}
-
-static inline int
 se_confscheduler_gc(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
@@ -16783,8 +16716,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "snapshot_ssn", SS_U64, &rt->snapshot_ssn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "snapshot_ssn_last", SS_U64, &rt->snapshot_ssn_last, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_snapshot, "snapshot", SS_FUNCTION, NULL);
-	sr_c(&p, pc, se_confscheduler_on_event, "on_event", SS_STRING, NULL);
-	sr_c(&p, pc, se_confscheduler_on_event_arg, "on_event_arg", SS_STRING, NULL);
 	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "expire_active", SS_U32, &rt->expire_active, SR_RO, NULL);
@@ -17478,7 +17409,6 @@ static int se_confinit(struct seconf *c, struct so *e)
 	c->recover             = 1;
 	c->memory_limit        = 0;
 	c->anticache           = 0;
-	ss_triggerinit(&c->on_event);
 	struct srzone def = {
 		.enable            = 1,
 		.mode              = 3, /* branch + compact */
@@ -19575,7 +19505,7 @@ struct phia_env *phia_env(void)
 	        NULL, &e->ei, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
-	sc_init(&e->scheduler, &e->r, &e->conf.on_event);
+	sc_init(&e->scheduler, &e->r);
 	return e;
 error:
 	sr_statusfree(&e->status);
