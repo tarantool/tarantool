@@ -38,8 +38,25 @@ extern "C" {
 #include <stdint.h>
 
 struct phia_env;
+struct phia_tx;
 
-struct phia_env *phia_env(void);
+struct phia_env *
+phia_env(void);
+
+struct phia_tx *
+phia_begin(struct phia_env *env);
+
+int
+phia_replace(struct phia_tx *tx, void*);
+
+int
+phia_upsert(struct phia_tx *tx, void*);
+
+int
+phia_delete(struct phia_tx *tx, void*);
+
+int
+phia_commit(struct phia_tx *tx);
 
 void    *phia_document(void *);
 int      phia_setstring(void*, const char*, const void*, int);
@@ -52,13 +69,8 @@ int      phia_close(void*);
 int      phia_drop(void*);
 int      phia_destroy(void*);
 int      phia_service(struct phia_env *env);
-int      phia_set(void*, void*);
-int      phia_upsert(void*, void*);
-int      phia_delete(void*, void*);
 void    *phia_get(void*, void*);
 void    *phia_cursor(void*);
-void    *phia_begin(void*);
-int      phia_commit(void*);
 
 #ifdef __cplusplus
 }

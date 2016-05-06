@@ -70,7 +70,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 
 	assert(request->header != NULL);
 
-	void *tx = phia_begin(index->env);
+	struct phia_tx *tx = phia_begin(index->env);
 	if (tx == NULL) {
 		phia_destroy(obj);
 		phia_error(index->env);
@@ -79,8 +79,8 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	int64_t signature = request->header->lsn;
 	phia_setint(tx, "lsn", signature);
 
-	if (phia_set(tx, obj) != 0)
-		phia_error(index->env); /* obj destroyed by phia_set() */
+	if (phia_replace(tx, obj) != 0)
+		phia_error(index->env); /* obj destroyed by phia_replace() */
 
 	int rc = phia_commit(tx);
 	switch (rc) {
@@ -103,8 +103,8 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 
 struct tuple *
 PhiaSpace::executeReplace(struct txn*,
-                            struct space *space,
-                            struct request *request)
+			  struct space *space,
+			  struct request *request)
 {
 	PhiaIndex *index = (PhiaIndex *)index_find(space, 0);
 
@@ -134,14 +134,14 @@ PhiaSpace::executeReplace(struct txn*,
 	}
 
 	/* replace */
-	void *transaction = in_txn()->engine_tx;
+	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	const char *value = NULL;
 	void *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
 		phia_setstring(obj, "value", value, valuesize);
 	int rc;
-	rc = phia_set(transaction, obj);
+	rc = phia_replace(tx, obj);
 	if (rc == -1)
 		phia_error(index->env);
 
@@ -159,8 +159,8 @@ PhiaSpace::executeDelete(struct txn*, struct space *space,
 
 	/* remove */
 	void *obj = index->createDocument(key, NULL);
-	void *transaction = in_txn()->engine_tx;
-	int rc = phia_delete(transaction, obj);
+	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
+	int rc = phia_delete(tx, obj);
 	if (rc == -1)
 		phia_error(index->env);
 	return NULL;
@@ -199,14 +199,14 @@ PhiaSpace::executeUpdate(struct txn*, struct space *space,
 	/* replace */
 	key = tuple_field_raw(new_tuple->data, new_tuple->bsize,
 	                      index->key_def->parts[0].fieldno);
-	void *transaction = in_txn()->engine_tx;
+	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	const char *value = NULL;
 	void *obj = index->createDocument(key, &value);
 	size_t valuesize = new_tuple->bsize - (value - new_tuple->data);
 	if (valuesize > 0)
 		phia_setstring(obj, "value", value, valuesize);
 	int rc;
-	rc = phia_set(transaction, obj);
+	rc = phia_replace(tx, obj);
 	if (rc == -1)
 		phia_error(index->env);
 	return NULL;
@@ -292,7 +292,7 @@ phia_update_alloc(void *arg, size_t size)
 }
 
 static inline int
-phia_upsert(char **result, uint32_t *result_size,
+phia_upsert_do(char **result, uint32_t *result_size,
               char *tuple, uint32_t tuple_size, uint32_t tuple_size_key,
               char *upsert, int upsert_size)
 {
@@ -381,7 +381,7 @@ phia_upsert_cb(int count,
 		return -1;
 
 	/* execute upsert */
-	rc = phia_upsert(&result[value_field],
+	rc = phia_upsert_do(&result[value_field],
 	                   &result_size[value_field],
 	                   tuple, tuple_size, tuple_size_key,
 	                   upsert[value_field],
@@ -436,8 +436,8 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 	p += tuple_value_size;
 	memcpy(p, expr, expr_size);
 	phia_setstring(obj, "value", value, value_size);
-	void *transaction = in_txn()->engine_tx;
-	int rc = phia_upsert(transaction, obj);
+	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
+	int rc = phia_upsert(tx, obj);
 	free(value);
 	if (rc == -1)
 		phia_error(index->env);

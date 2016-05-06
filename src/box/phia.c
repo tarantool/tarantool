@@ -134,21 +134,6 @@ ss_iovinit(struct ssiov *v, struct iovec *vp, int max)
 	v->iovmax = max;
 }
 
-static inline int
-ss_iovensure(struct ssiov *v, int count) {
-	return (v->iovc + count) < v->iovmax;
-}
-
-static inline int
-ss_iovhas(struct ssiov *v) {
-	return v->iovc > 0;
-}
-
-static inline void
-ss_iovreset(struct ssiov *v) {
-	v->iovc = 0;
-}
-
 static inline void
 ss_iovadd(struct ssiov *v, void *ptr, size_t size)
 {
@@ -378,26 +363,6 @@ static inline int
 ss_fileseek(struct ssfile *f, uint64_t off)
 {
 	return ss_vfsseek(f->vfs, f->fd, off);
-}
-
-static inline uint64_t
-ss_filesvp(struct ssfile *f) {
-	return f->size;
-}
-
-static inline int
-ss_filerlb(struct ssfile *f, uint64_t svp)
-{
-	if (ssunlikely(f->size == svp))
-		return 0;
-	int rc = ss_vfstruncate(f->vfs, f->fd, svp);
-	if (ssunlikely(rc == -1))
-		return -1;
-	f->size = svp;
-	rc = ss_fileseek(f, f->size);
-	if (ssunlikely(rc == -1))
-		return -1;
-	return 0;
 }
 
 struct ssa;
@@ -3912,14 +3877,6 @@ sr_errorreset(struct srerror *e) {
 }
 
 static inline void
-sr_errorrecover(struct srerror *e) {
-	tt_pthread_mutex_lock(&e->lock);
-	assert(e->type == SR_ERROR_MALFUNCTION);
-	e->type = SR_ERROR;
-	tt_pthread_mutex_unlock(&e->lock);
-}
-
-static inline void
 sr_malfunction_set(struct srerror *e) {
 	tt_pthread_mutex_lock(&e->lock);
 	e->type = SR_ERROR_MALFUNCTION;
@@ -4168,26 +4125,6 @@ sr_statset(struct srstat *s, uint64_t start)
 	tt_pthread_mutex_lock(&s->lock);
 	s->set++;
 	ss_avgupdate(&s->set_latency, diff);
-	tt_pthread_mutex_unlock(&s->lock);
-}
-
-static inline void
-sr_statdelete(struct srstat *s, uint64_t start)
-{
-	uint64_t diff = clock_monotonic64() - start;
-	tt_pthread_mutex_lock(&s->lock);
-	s->del++;
-	ss_avgupdate(&s->del_latency, diff);
-	tt_pthread_mutex_unlock(&s->lock);
-}
-
-static inline void
-sr_statupsert(struct srstat *s, uint64_t start)
-{
-	uint64_t diff = clock_monotonic64() - start;
-	tt_pthread_mutex_lock(&s->lock);
-	s->upsert++;
-	ss_avgupdate(&s->upsert_latency, diff);
 	tt_pthread_mutex_unlock(&s->lock);
 }
 
@@ -4897,12 +4834,7 @@ struct soif {
 	void    *(*getobject)(struct so*, const char*);
 	void    *(*getstring)(struct so*, const char*, int*);
 	int64_t  (*getint)(struct so*, const char*);
-	int      (*set)(struct so*, struct so*);
-	int      (*upsert)(struct so*, struct so*);
-	int      (*del)(struct so*, struct so*);
 	void    *(*get)(struct so*, struct so*);
-	void    *(*begin)(struct so*);
-	int      (*commit)(struct so*);
 	void    *(*cursor)(struct so*);
 };
 
@@ -4915,11 +4847,12 @@ struct so {
 	struct soif *i;
 	struct sotype *type;
 	struct so *parent;
-	struct so *env;
+	struct phia_env *env;
 };
 
 static inline void
-so_init(struct so *o, struct sotype *type, struct soif *i, struct so *parent, struct so *env)
+so_init(struct so *o, struct sotype *type, struct soif *i, struct so *parent,
+	struct phia_env *env)
 {
 	o->type      = type;
 	o->i         = i;
@@ -16114,7 +16047,7 @@ struct seconf {
 	struct so           *env;
 };
 
-static int se_confinit(struct seconf*, struct so*);
+static int se_confinit(struct seconf*, struct phia_env *o);
 static void se_conffree(struct seconf*);
 static int se_confvalidate(struct seconf*);
 static int se_confserialize(struct seconf*, struct ssbuf*);
@@ -16165,13 +16098,15 @@ struct phia_env {
 };
 
 static inline void
-se_apilock(struct so *o) {
-	tt_pthread_mutex_lock(&((struct phia_env*)o)->apilock);
+se_apilock(struct phia_env *env)
+{
+	tt_pthread_mutex_lock(&env->apilock);
 }
 
 static inline void
-se_apiunlock(struct so *o) {
-	tt_pthread_mutex_unlock(&((struct phia_env*)o)->apilock);
+se_apiunlock(struct phia_env *env)
+{
+	tt_pthread_mutex_unlock(&env->apilock);
 }
 
 static inline struct phia_env *se_of(struct so *o) {
@@ -16274,7 +16209,7 @@ static int se_dbvisible(struct sedb*, uint64_t);
 static void se_dbbind(struct phia_env*);
 static void se_dbunbind(struct phia_env*, uint64_t);
 
-struct setx {
+struct phia_tx {
 	struct so o;
 	int64_t lsn;
 	int half_commit;
@@ -16283,7 +16218,7 @@ struct setx {
 	struct sx t;
 };
 
-static struct so *se_txnew(struct phia_env*);
+static struct phia_tx *phia_tx_new(struct phia_env*);
 
 struct seviewdb {
 	struct so        o;
@@ -16436,13 +16371,6 @@ se_close(struct so *o)
 }
 
 static void*
-se_begin(struct so *o)
-{
-	struct phia_env *e = se_of(o);
-	return se_txnew(e);
-}
-
-static void*
 se_cursor(struct so *o)
 {
 	struct phia_env *e = se_cast(o, struct phia_env*, SE);
@@ -16463,12 +16391,7 @@ static struct soif seif =
 	.getobject    = se_confget_object,
 	.getstring    = se_confget_string,
 	.getint       = se_confget_int,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = NULL,
-	.begin        = se_begin,
-	.commit       = NULL,
 	.cursor       = se_cursor,
 };
 
@@ -17395,15 +17318,14 @@ static int64_t se_confget_int(struct so *o, const char *path)
 	return result;
 }
 
-static int se_confinit(struct seconf *c, struct so *e)
+static int se_confinit(struct seconf *c, struct phia_env *o)
 {
-	struct phia_env *o = se_of(e);
 	c->confmax = 2048;
 	c->conf = ss_malloc(&o->a, sizeof(struct srconf) * c->confmax);
 	if (ssunlikely(c->conf == NULL))
 		return -1;
 	sf_schemeinit(&c->scheme);
-	c->env                 = e;
+	c->env                 = &o->o;
 	c->path                = NULL;
 	c->path_create         = 1;
 	c->recover             = 1;
@@ -17550,12 +17472,7 @@ static struct soif seconfkvif =
 	.getobject    = NULL,
 	.getstring    = se_confkv_getstring,
 	.getint       = NULL,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = NULL,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -17567,7 +17484,7 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, &e->o, &e->o);
+	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, &e->o, e);
 	ss_bufinit(&v->key);
 	ss_bufinit(&v->value);
 	int rc;
@@ -17644,12 +17561,7 @@ static struct soif seconfcursorif =
 	.getobject    = NULL,
 	.getstring    = NULL,
 	.getint       = NULL,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = se_confcursor_get,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -17662,7 +17574,7 @@ static struct so *se_confcursor_new(struct so *o)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, &e->o, &e->o);
+	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, &e->o, e);
 	c->pos = NULL;
 	c->first = 1;
 	ss_bufinit(&c->dump);
@@ -17750,12 +17662,7 @@ static struct soif secursorif =
 	.getobject    = NULL,
 	.getstring    = NULL,
 	.getint       = NULL,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = se_cursorget,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -17767,7 +17674,7 @@ static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SECURSOR], &secursorif, &e->o, &e->o);
+	so_init(&c->o, &se_o[SECURSOR], &secursorif, &e->o, e);
 	sv_loginit(&c->log);
 	sx_init(&e->xm, &c->t, &c->log);
 	c->start = clock_monotonic64();
@@ -18270,44 +18177,6 @@ error:
 	return -1;
 }
 
-static int
-se_dbset(struct so *o, struct so *v)
-{
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct phia_env *e = se_of(&db->o);
-	uint64_t start = clock_monotonic64();
-	int rc = se_dbwrite(db, key, 0);
-	sr_statset(&e->stat, start);
-	return rc;
-}
-
-static int
-se_dbupsert(struct so *o, struct so *v)
-{
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct phia_env *e = se_of(&db->o);
-	uint64_t start = clock_monotonic64();
-	if (! sf_upserthas(&db->scheme->fmt_upsert))
-		return sr_error(&e->error, "%s", "upsert callback is not set");
-	int rc = se_dbwrite(db, key, SVUPSERT);
-	sr_statupsert(&e->stat, start);
-	return rc;
-}
-
-static int
-se_dbdel(struct so *o, struct so *v)
-{
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct phia_env *e = se_of(&db->o);
-	uint64_t start = clock_monotonic64();
-	int rc = se_dbwrite(db, key, SVDELETE);
-	sr_statdelete(&e->stat, start);
-	return rc;
-}
-
 static void *
 se_dbget(struct so *o, struct so *v)
 {
@@ -18367,12 +18236,7 @@ static struct soif sedbif =
 	.getobject    = NULL,
 	.getstring    = se_dbget_string,
 	.getint       = se_dbget_int,
-	.set          = se_dbset,
-	.upsert       = se_dbupsert,
-	.del          = se_dbdel,
 	.get          = se_dbget,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -18384,7 +18248,7 @@ static struct so *se_dbnew(struct phia_env *e, char *name, int size)
 		return NULL;
 	}
 	memset(o, 0, sizeof(*o));
-	so_init(&o->o, &se_o[SEDB], &sedbif, &e->o, &e->o);
+	so_init(&o->o, &se_o[SEDB], &sedbif, &e->o, e);
 	o->index = si_init(&e->r, &o->o);
 	if (ssunlikely(o->index == NULL)) {
 		ss_free(&e->a, o);
@@ -18822,12 +18686,7 @@ static struct soif sedocumentif =
 	.getobject    = NULL,
 	.getstring    = se_document_getstring,
 	.getint       = se_document_getint,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = NULL,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -18841,7 +18700,7 @@ se_document_new(struct phia_env *e, struct so *parent, struct sv *vp)
 		return NULL;
 	}
 	memset(v, 0, sizeof(*v));
-	so_init(&v->o, &se_o[SEDOCUMENT], &sedocumentif, parent, &e->o);
+	so_init(&v->o, &se_o[SEDOCUMENT], &sedocumentif, parent, e);
 	v->order = SS_EQ;
 	if (vp) {
 		v->v = *vp;
@@ -18897,7 +18756,7 @@ static int se_recoverend(struct sedb *db)
 }
 
 static inline int
-se_txwrite(struct setx *t, struct sedocument *o, uint8_t flags)
+phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
 {
 	struct phia_env *e = se_of(&t->o);
 	struct sedb *db = se_cast(o->o.parent, struct sedb*, SEDB);
@@ -18958,37 +18817,34 @@ error:
 }
 
 static int
-se_txset(struct so *o, struct so *v)
+phia_tx_replace(struct phia_tx *tx, struct so *v)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	return se_txwrite(t, key, 0);
+	return phia_tx_write(tx, key, 0);
 }
 
 static int
-se_txupsert(struct so *o, struct so *v)
+phia_tx_upsert(struct phia_tx *tx, struct so *v)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct phia_env *e = se_of(&t->o);
+	struct phia_env *e = se_of(&tx->o);
 	struct sedb *db = se_cast(v->parent, struct sedb*, SEDB);
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
-	return se_txwrite(t, key, SVUPSERT);
+	return phia_tx_write(tx, key, SVUPSERT);
 }
 
 static int
-se_txdelete(struct so *o, struct so *v)
+phia_tx_delete(struct phia_tx *tx, struct so *v)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	return se_txwrite(t, key, SVDELETE);
+	return phia_tx_write(tx, key, SVDELETE);
 }
 
 static void *
-se_txget(struct so *o, struct so *v)
+phia_tx_get(struct so *o, struct so *v)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
+	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
 	struct phia_env *e = se_of(&t->o);
 	struct sedb *db = se_cast(key->o.parent, struct sedb*, SEDB);
@@ -19014,16 +18870,16 @@ error:
 }
 
 static inline void
-se_txfree(struct so *o)
+phia_tx_free(struct so *o)
 {
 	struct phia_env *e = se_of(o);
-	struct setx *t = (struct setx*)o;
+	struct phia_tx *t = (struct phia_tx*)o;
 	sv_logfree(&t->log, &e->a);
 	ss_free(&e->a, o);
 }
 
 static inline void
-se_txend(struct setx *t, int rlb, int conflict)
+phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 {
 	struct phia_env *e = se_of(&t->o);
 	uint32_t count = sv_logcount(&t->log);
@@ -19035,16 +18891,16 @@ se_txend(struct setx *t, int rlb, int conflict)
 }
 
 static int
-se_txrollback(struct so *o)
+phia_tx_rollback(struct so *o)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
+	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	sx_rollback(&t->t);
-	se_txend(t, 1, 0);
+	phia_tx_end(t, 1, 0);
 	return 0;
 }
 
 static int
-se_txprepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
+phia_tx_prepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
 {
 	struct sicache *cache = ptr;
 	struct sedb *db = (struct sedb*)o;
@@ -19073,10 +18929,9 @@ se_txprepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
 }
 
 static int
-se_txcommit(struct so *o)
+phia_tx_commit(struct phia_tx *t)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
-	struct phia_env *e = se_of(o);
+	struct phia_env *e = se_of(&t->o);
 	int status = sr_status(&e->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -19088,7 +18943,7 @@ se_txcommit(struct so *o)
 		struct sicache *cache = NULL;
 		sxpreparef prepare = NULL;
 		if (! recover) {
-			prepare = se_txprepare;
+			prepare = phia_tx_prepare;
 			cache = si_cachepool_pop(&e->cachepool);
 			if (ssunlikely(cache == NULL))
 				return sr_oom(&e->error);
@@ -19102,7 +18957,7 @@ se_txcommit(struct so *o)
 		}
 		if (s == SXROLLBACK) {
 			sx_rollback(&t->t);
-			se_txend(t, 0, 1);
+			phia_tx_end(t, 0, 1);
 			return 1;
 		}
 		assert(s == SXPREPARE);
@@ -19131,14 +18986,14 @@ se_txcommit(struct so *o)
 	if (ssunlikely(rc == -1))
 		sx_rollback(&t->t);
 
-	se_txend(t, 0, 0);
+	phia_tx_end(t, 0, 0);
 	return rc;
 }
 
 static int
-se_txset_int(struct so *o, const char *path, int64_t v)
+phia_tx_set_int(struct so *o, const char *path, int64_t v)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
+	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	if (strcmp(path, "lsn") == 0) {
 		t->lsn = v;
 		return 0;
@@ -19151,9 +19006,9 @@ se_txset_int(struct so *o, const char *path, int64_t v)
 }
 
 static int64_t
-se_txget_int(struct so *o, const char *path)
+phia_tx_get_int(struct so *o, const char *path)
 {
-	struct setx *t = se_cast(o, struct setx*, SETX);
+	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	if (strcmp(path, "deadlock") == 0)
 		return sx_deadlock(&t->t);
 	return -1;
@@ -19163,35 +19018,30 @@ static struct soif setxif =
 {
 	.open         = NULL,
 	.close        = NULL,
-	.destroy      = se_txrollback,
-	.free         = se_txfree,
+	.destroy      = phia_tx_rollback,
+	.free         = phia_tx_free,
 	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
-	.setint       = se_txset_int,
+	.setint       = phia_tx_set_int,
 	.setobject    = NULL,
 	.getobject    = NULL,
 	.getstring    = NULL,
-	.getint       = se_txget_int,
-	.set          = se_txset,
-	.upsert       = se_txupsert,
-	.del          = se_txdelete,
-	.get          = se_txget,
-	.begin        = NULL,
-	.commit       = se_txcommit,
+	.getint       = phia_tx_get_int,
+	.get          = phia_tx_get,
 	.cursor       = NULL
 };
 
-static struct so *
-se_txnew(struct phia_env *e)
+static struct phia_tx *
+phia_tx_new(struct phia_env *e)
 {
-	struct setx *t;
-	t = ss_malloc(&e->a, sizeof(struct setx));
+	struct phia_tx *t;
+	t = ss_malloc(&e->a, sizeof(struct phia_tx));
 	if (ssunlikely(t == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&t->o, &se_o[SETX], &setxif, &e->o, &e->o);
+	so_init(&t->o, &se_o[SETX], &setxif, &e->o, e);
 	sv_loginit(&t->log);
 	sx_init(&e->xm, &t->t, &t->log);
 	t->start = clock_monotonic64();
@@ -19199,7 +19049,7 @@ se_txnew(struct phia_env *e)
 	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
 	se_dbbind(e);
-	return &t->o;
+	return t;
 }
 
 static void
@@ -19289,12 +19139,7 @@ static struct soif seviewif =
 	.getobject    = se_viewget_object,
 	.getstring    = NULL,
 	.getint       = NULL,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = se_viewget,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = se_viewcursor
 };
 
@@ -19313,7 +19158,7 @@ se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&s->o, &se_o[SEVIEW], &seviewif, &e->o, &e->o);
+	so_init(&s->o, &se_o[SEVIEW], &seviewif, &e->o, e);
 	s->vlsn = vlsn;
 	ss_bufinit(&s->name);
 	int rc;
@@ -19400,12 +19245,7 @@ static struct soif seviewdbif =
 	.getobject    = NULL,
 	.getstring    = NULL,
 	.getint       = NULL,
-	.set          = NULL,
-	.upsert       = NULL,
-	.del          = NULL,
 	.get          = se_viewdb_get,
-	.begin        = NULL,
-	.commit       = NULL,
 	.cursor       = NULL,
 };
 
@@ -19441,8 +19281,7 @@ static struct so *se_viewdb_new(struct phia_env *e, uint64_t txn_id)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SEDBCURSOR], &seviewdbif,
-	        &e->o, &e->o);
+	so_init(&c->o, &se_o[SEDBCURSOR], &seviewdbif, &e->o, e);
 	c->txn_id = txn_id;
 	c->v      = NULL;
 	c->pos    = NULL;
@@ -19482,14 +19321,14 @@ struct phia_env *phia_env(void)
 	if (ssunlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	so_init(&e->o, &se_o[SE], &seif, &e->o, &e->o /* self */);
+	so_init(&e->o, &se_o[SE], &seif, &e->o, e);
 	sr_statusinit(&e->status);
 	sr_statusset(&e->status, SR_OFFLINE);
 	ss_vfsinit(&e->vfs, &ss_stdvfs);
 	ss_aopen(&e->a, &ss_stda);
 	ss_aopen(&e->a_ref, &ss_stda);
 	int rc;
-	rc = se_confinit(&e->conf, &e->o);
+	rc = se_confinit(&e->conf, e);
 	if (ssunlikely(rc == -1))
 		goto error;
 	rlist_create(&e->db);
@@ -19520,7 +19359,7 @@ void *phia_document(void *ptr)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->document(o);
 	se_apiunlock(e);
@@ -19534,7 +19373,7 @@ int phia_open(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->open(o);
 	se_apiunlock(e);
@@ -19548,7 +19387,7 @@ int phia_close(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->close(o);
 	se_apiunlock(e);
@@ -19562,7 +19401,7 @@ int phia_drop(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->drop(o);
 	se_apiunlock(e);
@@ -19576,9 +19415,9 @@ int phia_destroy(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	int rc;
-	if (ssunlikely(e == o)) {
+	if (ssunlikely(&e->o == o)) {
 		rc = o->i->destroy(o);
 		return rc;
 	}
@@ -19600,7 +19439,7 @@ int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->setstring(o, path, (void*)pointer, size);
 	se_apiunlock(e);
@@ -19614,7 +19453,7 @@ int phia_setint(void *ptr, const char *path, int64_t v)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->setint(o, path, v);
 	se_apiunlock(e);
@@ -19628,7 +19467,7 @@ int phia_setobject(void *ptr, const char *path, void *v)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int rc = o->i->setobject(o, path, v);
 	se_apiunlock(e);
@@ -19642,7 +19481,7 @@ void *phia_getobject(void *ptr, const char *path)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->getobject(o, path);
 	se_apiunlock(e);
@@ -19656,7 +19495,7 @@ void *phia_getstring(void *ptr, const char *path, int *size)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->getstring(o, path, size);
 	se_apiunlock(e);
@@ -19670,52 +19509,39 @@ int64_t phia_getint(void *ptr, const char *path)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	int64_t rc = o->i->getint(o, path);
 	se_apiunlock(e);
 	return rc;
 }
 
-int phia_set(void *ptr, void *v)
+int phia_replace(struct phia_tx *tx, void *v)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->set == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->set(o, v);
-	se_apiunlock(e);
+	struct phia_env *env = tx->o.env;
+	se_apilock(env);
+	int rc = phia_tx_replace(tx, v);
+	se_apiunlock(env);
 	return rc;
 }
 
-int phia_upsert(void *ptr, void *v)
+int
+phia_upsert(struct phia_tx *tx, void *v)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->upsert == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->upsert(o, v);
-	se_apiunlock(e);
+	struct phia_env *env = tx->o.env;
+	se_apilock(env);
+	int rc = phia_tx_upsert(tx, v);
+	se_apiunlock(env);
 	return rc;
 }
 
-int phia_delete(void *ptr, void *v)
+int
+phia_delete(struct phia_tx *tx, void *v)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->del == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->del(o, v);
-	se_apiunlock(e);
+	struct phia_env *env = tx->o.env;
+	se_apilock(env);
+	int rc = phia_tx_delete(tx, v);
+	se_apiunlock(env);
 	return rc;
 }
 
@@ -19726,7 +19552,7 @@ void *phia_get(void *ptr, void *v)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->get(o, v);
 	se_apiunlock(e);
@@ -19740,37 +19566,29 @@ void *phia_cursor(void *ptr)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct so *e = o->env;
+	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->cursor(o);
 	se_apiunlock(e);
 	return h;
 }
 
-void *phia_begin(void *ptr)
+struct phia_tx *
+phia_begin(struct phia_env *env)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->begin == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	void *h = o->i->begin(o);
-	se_apiunlock(e);
-	return h;
+	se_apilock(env);
+	struct phia_tx *tx = phia_tx_new(env);
+	se_apiunlock(env);
+	return tx;
 }
 
-int phia_commit(void *ptr)
+int
+phia_commit(struct phia_tx *tx)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->commit == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct so *e = o->env;
-	se_apilock(e);
-	int rc = o->i->commit(o);
-	se_apiunlock(e);
+	/* Save the pointer to env since we're about to destroy tx */
+	struct phia_env *env = tx->o.env;
+	se_apilock(env);
+	int rc = phia_tx_commit(tx);
+	se_apiunlock(env);
 	return rc;
 }

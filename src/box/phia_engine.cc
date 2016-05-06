@@ -563,7 +563,7 @@ PhiaEngine::prepare(struct txn *txn)
 	 */
 	phia_setint(txn->engine_tx, "half_commit", 1);
 
-	int rc = phia_commit(txn->engine_tx);
+	int rc = phia_commit((struct phia_tx *) txn->engine_tx);
 	switch (rc) {
 	case 1: /* rollback */
 		txn->engine_tx = NULL;
@@ -595,7 +595,7 @@ PhiaEngine::commit(struct txn *txn, int64_t signature)
 		m_prev_commit_lsn = signature;
 	}
 
-	int rc = phia_commit(txn->engine_tx);
+	int rc = phia_commit((struct phia_tx *) txn->engine_tx);
 	if (rc == -1) {
 		panic("phia commit failed: txn->signature = %"
 		      PRIu64, signature);
