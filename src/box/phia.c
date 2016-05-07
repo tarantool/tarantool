@@ -6744,7 +6744,6 @@ static int sx_get(struct sx*, struct sxindex*, struct sv*, struct sv*);
 static uint64_t sx_min(struct sxmanager*);
 static uint64_t sx_max(struct sxmanager*);
 static uint64_t sx_vlsn(struct sxmanager*);
-static enum sxstate sx_set_autocommit(struct sxmanager*, struct sxindex*, struct sx*, struct svlog*, struct svv*);
 static enum sxstate sx_get_autocommit(struct sxmanager*, struct sxindex*);
 
 static int sx_deadlock(struct sx*);
@@ -7274,36 +7273,7 @@ add:
 }
 
 static enum sxstate
-sx_set_autocommit(struct sxmanager *m, struct sxindex *index,
-		  struct sx *x, struct svlog *log, struct svv *v)
-{
-	if (sslikely(m->count_rw == 0)) {
-		sx_init(m, x, log);
-		struct svlogv lv;
-		lv.id   = index->dsn;
-		lv.next = UINT32_MAX;
-		sv_init(&lv.v, &sv_vif, v, NULL);
-		sv_logadd(x->log, m->r->a, &lv, index->ptr);
-		sr_seq(m->r->seq, SR_TSNNEXT);
-		sx_promote(x, SXCOMMIT);
-		return SXCOMMIT;
-	}
-	sx_begin(m, x, SXRW, log, 0);
-	int rc = sx_set(x, index, v);
-	if (ssunlikely(rc == -1)) {
-		sx_rollback(x);
-		return SXROLLBACK;
-	}
-	enum sxstate s = sx_prepare(x, NULL, NULL);
-	if (sslikely(s == SXPREPARE))
-		sx_commit(x);
-	else
-	if (s == SXLOCK)
-		sx_rollback(x);
-	return s;
-}
-
-static enum sxstate sx_get_autocommit(struct sxmanager *m, struct sxindex *index ssunused)
+sx_get_autocommit(struct sxmanager *m, struct sxindex *index ssunused)
 {
 	sr_seq(m->r->seq, SR_TSNNEXT);
 	return SXCOMMIT;
@@ -18123,58 +18093,6 @@ error:
 	if (auto_close)
 		so_destroy(&o->o);
 	return NULL;
-}
-
-static inline int
-se_dbwrite(struct sedb *db, struct sedocument *o, uint8_t flags)
-{
-	struct phia_env *e = se_of(&db->o);
-
-	int auto_close = !o->created;
-	if (ssunlikely(! sr_online(&db->index->status)))
-		goto error;
-
-	/* create document */
-	int rc = so_open(&o->o);
-	if (ssunlikely(rc == -1))
-		goto error;
-	rc = se_document_validate(o, &db->o, flags);
-	if (ssunlikely(rc == -1))
-		goto error;
-
-	struct svv *v = o->v.v;
-	sv_vref(v);
-
-	/* destroy document object */
-	if (auto_close) {
-		/* ensure quota */
-		ss_quota(&e->quota, SS_QADD, sv_vsize(v));
-		so_destroy(&o->o);
-	}
-
-	/* single-statement transaction */
-	struct svlog log;
-	sv_loginit(&log);
-	struct sx x;
-	enum sxstate state = sx_set_autocommit(&e->xm, &db->coindex, &x, &log, v);
-	switch (state) {
-	case SXLOCK: return 2;
-	case SXROLLBACK: return 1;
-	default: break;
-	}
-
-	/* write wal and index */
-	rc = sc_write(&e->scheduler, &log, 0, 0);
-	if (ssunlikely(rc == -1))
-		sx_rollback(&x);
-
-	sx_gc(&x);
-	return rc;
-
-error:
-	if (auto_close)
-		so_destroy(&o->o);
-	return -1;
 }
 
 static void *
