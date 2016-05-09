@@ -16170,6 +16170,8 @@ se_dbactive(struct sedb *o) {
 	return si_active(o->index);
 }
 
+
+
 static struct so *se_dbnew(struct phia_env*, char*, int);
 static struct so *se_dbmatch(struct phia_env*, char*);
 static struct so *se_dbresult(struct phia_env*, struct scread*);
@@ -16178,6 +16180,8 @@ se_dbread(struct sedb*, struct sedocument*, struct sx*, int, struct sicache*);
 static int se_dbvisible(struct sedb*, uint64_t);
 static void se_dbbind(struct phia_env*);
 static void se_dbunbind(struct phia_env*, uint64_t);
+static int se_dbrecoverbegin(struct sedb*);
+static int se_dbrecoverend(struct sedb*);
 
 struct phia_tx {
 	struct so o;
@@ -16234,9 +16238,6 @@ enum {
 	SE_RECOVER_2P = 2,
 	SE_RECOVER_NP = 3
 };
-
-static int se_recoverbegin(struct sedb*);
-static int se_recoverend(struct sedb*);
 
 static int
 se_open(struct so *o)
@@ -17822,7 +17823,7 @@ se_dbopen(struct so *o)
 	if (ssunlikely(rc == -1))
 		return -1;
 	sx_indexset(&db->coindex, db->scheme->id);
-	rc = se_recoverbegin(db);
+	rc = se_dbrecoverbegin(db);
 	if (ssunlikely(rc == -1))
 		return -1;
 
@@ -17830,7 +17831,7 @@ se_dbopen(struct so *o)
 		if (e->conf.recover != SE_RECOVER_NP)
 			return 0;
 online:
-	se_recoverend(db);
+	se_dbrecoverend(db);
 	rc = sc_add(&e->scheduler, db->index);
 	if (ssunlikely(rc == -1))
 		return -1;
@@ -18221,6 +18222,37 @@ static void se_dbunbind(struct phia_env *e, uint64_t txn)
 			se_dbunref(db);
 	}
 }
+
+static int se_dbrecoverbegin(struct sedb *db)
+{
+	/* open and recover repository */
+	sr_statusset(&db->index->status, SR_RECOVER);
+	struct phia_env *e = se_of(&db->o);
+	/* do not allow to recover existing databases
+	 * during online (only create), since logpool
+	 * reply is required. */
+	if (sr_status(&e->status) == SR_ONLINE)
+		if (e->conf.recover != SE_RECOVER_NP)
+			db->scheme->path_fail_on_exists = 1;
+	int rc = si_open(db->index);
+	if (ssunlikely(rc == -1))
+		goto error;
+	db->created = rc;
+	return 0;
+error:
+	sr_statusset(&db->index->status, SR_MALFUNCTION);
+	return -1;
+}
+
+static int se_dbrecoverend(struct sedb *db)
+{
+	int status = sr_status(&db->index->status);
+	if (ssunlikely(status == SR_DROP_PENDING))
+		return 0;
+	sr_statusset(&db->index->status, SR_ONLINE);
+	return 0;
+}
+
 
 enum {
 	SE_DOCUMENT_FIELD,
@@ -18642,36 +18674,6 @@ static struct sotype se_o[] =
 	{ 0x22FA0348L, "view"              },
 	{ 0x45ABCDFAL, "cursor"            }
 };
-
-static int se_recoverbegin(struct sedb *db)
-{
-	/* open and recover repository */
-	sr_statusset(&db->index->status, SR_RECOVER);
-	struct phia_env *e = se_of(&db->o);
-	/* do not allow to recover existing databases
-	 * during online (only create), since logpool
-	 * reply is required. */
-	if (sr_status(&e->status) == SR_ONLINE)
-		if (e->conf.recover != SE_RECOVER_NP)
-			db->scheme->path_fail_on_exists = 1;
-	int rc = si_open(db->index);
-	if (ssunlikely(rc == -1))
-		goto error;
-	db->created = rc;
-	return 0;
-error:
-	sr_statusset(&db->index->status, SR_MALFUNCTION);
-	return -1;
-}
-
-static int se_recoverend(struct sedb *db)
-{
-	int status = sr_status(&db->index->status);
-	if (ssunlikely(status == SR_DROP_PENDING))
-		return 0;
-	sr_statusset(&db->index->status, SR_ONLINE);
-	return 0;
-}
 
 static inline int
 phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
