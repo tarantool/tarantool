@@ -6,16 +6,13 @@ local private = require('box.internal')
 
 -- see default_cfg below
 local default_phia_cfg = {
-    memory_limit      = 0,
+    memory_limit      = 0, -- no limit
     threads           = 5,
     compact_wm        = 2,
     branch_prio       = 2,
     branch_age        = 0,
     branch_age_period = 0,
     branch_age_wm     = 0,
-    snapshot_period   = 0,
-    expire_period     = 0,
-    expire_prio       = 0,
 }
 
 -- all available options
@@ -64,9 +61,6 @@ local phia_template_cfg = {
     branch_age        = 'number',
     branch_age_period = 'number',
     branch_age_wm     = 'number',
-    snapshot_period   = 'number',
-    expire_period     = 'number',
-    expire_prio       = 'number',
 }
 
 -- types of available options

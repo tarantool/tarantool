@@ -663,9 +663,6 @@ ss_bufset(struct ssbuf *b, int size, int i, char *buf, int bufsize)
 #define SS_INJECTION_SI_COMPACTION_3 6
 #define SS_INJECTION_SI_COMPACTION_4 7
 #define SS_INJECTION_SI_RECOVER_0    8
-#define SS_INJECTION_SI_SNAPSHOT_0   9
-#define SS_INJECTION_SI_SNAPSHOT_1   10
-#define SS_INJECTION_SI_SNAPSHOT_2   11
 
 struct ssinjection {
 	uint32_t e[12];
@@ -4179,10 +4176,6 @@ enum srseqop {
 	SR_DSNNEXT,
 	SR_NSN,
 	SR_NSNNEXT,
-	SR_ASN,
-	SR_ASNNEXT,
-	SR_SSN,
-	SR_SSNNEXT,
 	SR_LSN,
 	SR_LSNNEXT,
 	SR_LFSN,
@@ -4199,10 +4192,6 @@ struct srseq {
 	uint64_t tsn;
 	/** Node sequence number. */
 	uint64_t nsn;
-	/** Snapshot sequence number. */
-	uint64_t ssn;
-	/** Anti-cache sequence number. */
-	uint64_t asn;
 	/** Log file sequence number. */
 	uint64_t lfsn;
 	/** Database sequence number. */
@@ -4251,14 +4240,6 @@ sr_seqdo(struct srseq *n, enum srseqop op)
 		break;
 	case SR_LFSNNEXT:  v = ++n->lfsn;
 		break;
-	case SR_SSN:       v = n->ssn;
-		break;
-	case SR_SSNNEXT:   v = ++n->ssn;
-		break;
-	case SR_ASN:       v = n->asn;
-		break;
-	case SR_ASNNEXT:   v = ++n->asn;
-		break;
 	case SR_DSN:       v = n->dsn;
 		break;
 	case SR_DSNNEXT:   v = ++n->dsn;
@@ -4292,9 +4273,6 @@ struct srzone {
 	uint64_t snapshot_period_us;
 	uint32_t anticache_period;
 	uint64_t anticache_period_us;
-	uint32_t expire_prio;
-	uint32_t expire_period;
-	uint64_t expire_period_us;
 	uint32_t gc_prio;
 	uint32_t gc_period;
 	uint64_t gc_period_us;
@@ -4915,7 +4893,6 @@ struct svif {
 	uint8_t   (*flags)(struct sv*);
 	void      (*lsnset)(struct sv*, uint64_t);
 	uint64_t  (*lsn)(struct sv*);
-	uint32_t  (*timestamp)(struct sv*);
 	char     *(*pointer)(struct sv*);
 	uint32_t  (*size)(struct sv*);
 };
@@ -4957,11 +4934,6 @@ sv_lsnset(struct sv *v, uint64_t lsn) {
 	v->i->lsnset(v, lsn);
 }
 
-static inline uint32_t
-sv_timestamp(struct sv *v) {
-	return v->i->timestamp(v);
-}
-
 static inline char*
 sv_pointer(struct sv *v) {
 	return v->i->pointer(v);
@@ -4986,7 +4958,6 @@ sv_hash(struct sv *v, struct runtime *r) {
 struct svv {
 	uint64_t lsn;
 	uint32_t size;
-	uint32_t timestamp;
 	uint8_t  flags;
 	uint16_t refs;
 } sspacked;
@@ -5004,7 +4975,7 @@ sv_vsize(struct svv *v) {
 }
 
 static inline struct svv*
-sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
+sv_vbuild(struct runtime *r, struct sfv *fields)
 {
 	int size = sf_writesize(r->scheme, fields);
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
@@ -5012,7 +4983,6 @@ sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
 		return NULL;
 	v->size      = size;
 	v->lsn       = 0;
-	v->timestamp = ts;
 	v->flags     = 0;
 	v->refs      = 1;
 	char *ptr = sv_vpointer(v);
@@ -5026,13 +4996,12 @@ sv_vbuild(struct runtime *r, struct sfv *fields, uint32_t ts)
 }
 
 static inline struct svv*
-sv_vbuildraw(struct runtime *r, char *src, int size, uint64_t ts)
+sv_vbuildraw(struct runtime *r, char *src, int size)
 {
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
 	if (ssunlikely(v == NULL))
 		return NULL;
 	v->size      = size;
-	v->timestamp = ts;
 	v->flags     = 0;
 	v->refs      = 1;
 	v->lsn       = 0;
@@ -5048,12 +5017,11 @@ sv_vbuildraw(struct runtime *r, char *src, int size, uint64_t ts)
 static inline struct svv*
 sv_vdup(struct runtime *r, struct sv *src)
 {
-	struct svv *v = sv_vbuildraw(r, sv_pointer(src), sv_size(src), 0);
+	struct svv *v = sv_vbuildraw(r, sv_pointer(src), sv_size(src));
 	if (ssunlikely(v == NULL))
 		return NULL;
 	v->flags     = sv_flags(src);
 	v->lsn       = sv_lsn(src);
-	v->timestamp = sv_timestamp(src);
 	return v;
 }
 
@@ -5134,7 +5102,6 @@ static struct svif sv_upsertvif;
 
 struct svupsertnode {
 	uint64_t lsn;
-	uint32_t timestamp;
 	uint8_t  flags;
 	struct ssbuf    buf;
 };
@@ -5217,8 +5184,7 @@ static inline int
 sv_upsertpush_raw(struct svupsert *u, struct runtime *r,
 		  char *pointer, int size,
                   uint8_t flags,
-                  uint64_t lsn,
-                  uint32_t timestamp)
+                  uint64_t lsn)
 {
 	struct svupsertnode *n;
 	int rc;
@@ -5239,7 +5205,6 @@ sv_upsertpush_raw(struct svupsert *u, struct runtime *r,
 	memcpy(n->buf.p, pointer, size);
 	n->flags = flags;
 	n->lsn = lsn;
-	n->timestamp = timestamp;
 	ss_bufadvance(&n->buf, size);
 	ss_bufadvance(&u->stack, sizeof(struct svupsertnode));
 	u->count++;
@@ -5251,7 +5216,7 @@ sv_upsertpush(struct svupsert *u, struct runtime *r, struct sv *v)
 {
 	return sv_upsertpush_raw(u, r, sv_pointer(v),
 	                         sv_size(v),
-	                         sv_flags(v), sv_lsn(v), sv_timestamp(v));
+	                         sv_flags(v), sv_lsn(v));
 }
 
 static inline struct svupsertnode*
@@ -5334,8 +5299,7 @@ sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	/* save result */
 	rc = sv_upsertpush_raw(u, r, u->tmp.s, ss_bufused(&u->tmp),
 	                       b->flags & ~SVUPSERT,
-	                       b->lsn,
-	                       b->timestamp);
+	                       b->lsn);
 cleanup:
 	/* free fields */
 	i = 0;
@@ -5881,7 +5845,6 @@ struct svwriteiter {
 	uint64_t  limit;
 	uint64_t  size;
 	uint32_t  sizev;
-	uint32_t  expire;
 	uint32_t  now;
 	int       save_delete;
 	int       save_upsert;
@@ -5951,11 +5914,6 @@ sv_writeiter_next(struct ssiter *i)
 	for (; ss_iterhas(sv_mergeiter, im->merge); ss_iternext(sv_mergeiter, im->merge))
 	{
 		struct sv *v = ss_iterof(sv_mergeiter, im->merge);
-		if (im->expire > 0) {
-			uint32_t timestamp = sv_timestamp(v);
-			if ((im->now - timestamp) >= im->expire)
-				 continue;
-		}
 		uint64_t lsn = sv_lsn(v);
 		if (lsn < im->vlsn_lru)
 			continue;
@@ -6021,8 +5979,6 @@ static inline int
 sv_writeiter_open(struct ssiter *i, struct runtime *r, struct ssiter *merge, struct svupsert *u,
                   uint64_t limit,
                   uint32_t sizev,
-                  uint32_t expire,
-                  uint32_t timestamp,
                   uint64_t vlsn,
                   uint64_t vlsn_lru,
                   int save_delete,
@@ -6035,8 +5991,6 @@ sv_writeiter_open(struct ssiter *i, struct runtime *r, struct ssiter *merge, str
 	im->limit       = limit;
 	im->size        = 0;
 	im->sizev       = sizev;
-	im->expire      = expire;
-	im->now         = timestamp;
 	im->vlsn        = vlsn;
 	im->vlsn_lru    = vlsn_lru;
 	im->save_delete = save_delete;
@@ -6376,11 +6330,6 @@ sv_refiflsnset(struct sv *v, uint64_t lsn) {
 	((struct svv*)((struct svref*)v->v)->v)->lsn = lsn;
 }
 
-static uint32_t
-sv_refiftimestamp(struct sv *v) {
-	return ((struct svv*)((struct svref*)v->v)->v)->timestamp;
-}
-
 static char*
 sv_refifpointer(struct sv *v) {
 	return sv_vpointer(((struct svv*)((struct svref*)v->v)->v));
@@ -6396,7 +6345,6 @@ static struct svif sv_refif =
 	.flags     = sv_refifflags,
 	.lsn       = sv_refiflsn,
 	.lsnset    = sv_refiflsnset,
-	.timestamp = sv_refiftimestamp,
 	.pointer   = sv_refifpointer,
 	.size      = sv_refifsize
 };
@@ -6418,12 +6366,6 @@ sv_upsertviflsnset(struct sv *v ssunused, uint64_t lsn ssunused) {
 	assert(0);
 }
 
-static uint32_t
-sv_upsertviftimestamp(struct sv *v) {
-	struct svupsertnode *n = v->v;
-	return n->timestamp;
-}
-
 static char*
 sv_upsertvifpointer(struct sv *v) {
 	struct svupsertnode *n = v->v;
@@ -6441,7 +6383,6 @@ static struct svif sv_upsertvif =
 	.flags     = sv_upsertvifflags,
 	.lsn       = sv_upsertviflsn,
 	.lsnset    = sv_upsertviflsnset,
-	.timestamp = sv_upsertviftimestamp,
 	.pointer   = sv_upsertvifpointer,
 	.size      = sv_upsertvifsize
 };
@@ -6461,11 +6402,6 @@ sv_viflsnset(struct sv *v, uint64_t lsn) {
 	((struct svv*)v->v)->lsn = lsn;
 }
 
-static uint32_t
-sv_viftimestamp(struct sv *v) {
-	return ((struct svv*)v->v)->timestamp;
-}
-
 static char*
 sv_vifpointer(struct sv *v) {
 	return sv_vpointer(((struct svv*)v->v));
@@ -6481,7 +6417,6 @@ static struct svif sv_vif =
 	.flags     = sv_vifflags,
 	.lsn       = sv_viflsn,
 	.lsnset    = sv_viflsnset,
-	.timestamp = sv_viftimestamp,
 	.pointer   = sv_vifpointer,
 	.size      = sv_vifsize
 };
@@ -7360,11 +7295,6 @@ sx_viflsnset(struct sv *v, uint64_t lsn) {
 	((struct sxv*)v->v)->v->lsn = lsn;
 }
 
-static uint32_t
-sx_viftimestamp(struct sv *v) {
-	return ((struct sxv*)v->v)->v->timestamp;
-}
-
 static char*
 sx_vifpointer(struct sv *v) {
 	return sv_vpointer(((struct sxv*)v->v)->v);
@@ -7380,7 +7310,6 @@ static struct svif sx_vif =
 	.flags     = sx_vifflags,
 	.lsn       = sx_viflsn,
 	.lsnset    = sx_viflsnset,
-	.timestamp = sx_viftimestamp,
 	.pointer   = sx_vifpointer,
 	.size      = sx_vifsize
 };
@@ -7440,7 +7369,6 @@ struct sdv {
 	uint32_t offset;
 	uint8_t  flags;
 	uint64_t lsn;
-	uint32_t timestamp;
 	uint32_t size;
 } sspacked;
 
@@ -7458,7 +7386,6 @@ struct sdpageheader {
 	uint64_t lsnmin;
 	uint64_t lsnmindup;
 	uint64_t lsnmax;
-	uint32_t tsmin;
 	uint32_t reserve;
 } sspacked;
 
@@ -7786,7 +7713,6 @@ struct sdbuildref {
 struct sdbuild {
 	struct ssbuf list, m, v, k, c;
 	struct ssfilterif *compress_if;
-	int timestamp;
 	int compress_dup;
 	int compress;
 	int crc;
@@ -7833,7 +7759,7 @@ sd_buildmaxkey(struct sdbuild *b) {
 	return b->v.s + r->v + sd_buildmax(b)->offset;
 }
 
-static int sd_buildbegin(struct sdbuild*, struct runtime*, int, int, int, int, struct ssfilterif*);
+static int sd_buildbegin(struct sdbuild*, struct runtime*, int, int, int, struct ssfilterif*);
 static int sd_buildend(struct sdbuild*, struct runtime*);
 static int sd_buildcommit(struct sdbuild*, struct runtime*);
 static int sd_buildadd(struct sdbuild*, struct runtime*, struct sv*, uint32_t);
@@ -7851,7 +7777,6 @@ struct sdindexheader {
 	uint32_t  keys;
 	uint64_t  total;
 	uint64_t  totalorigin;
-	uint32_t  tsmin;
 	uint64_t  lsnmin;
 	uint64_t  lsnmax;
 	uint32_t  dupkeys;
@@ -8250,8 +8175,6 @@ struct sdmergeconf {
 	uint64_t    size_node;
 	uint32_t    size_page;
 	uint32_t    checksum;
-	uint32_t    expire;
-	uint32_t    timestamp;
 	uint32_t    compression_key;
 	uint32_t    compression;
 	struct ssfilterif *compression_if;
@@ -8277,8 +8200,8 @@ struct sdmerge {
 };
 
 static int
-sd_mergeinit(struct sdmerge*, struct runtime*, struct ssiter*, struct sdbuild*, struct ssqf*, struct svupsert*,
-	     struct sdmergeconf*);
+sd_mergeinit(struct sdmerge*, struct runtime*, struct ssiter*, struct sdbuild*,
+	     struct ssqf*, struct svupsert*, struct sdmergeconf*);
 static int sd_mergefree(struct sdmerge*);
 static int sd_merge(struct sdmerge*);
 static int sd_mergepage(struct sdmerge*, uint64_t);
@@ -8296,7 +8219,6 @@ struct sdreadarg {
 	enum ssorder     o;
 	int         has;
 	uint64_t    has_vlsn;
-	int         use_memory;
 	int         use_compression;
 	struct ssfilterif *compression_if;
 	struct runtime         *r;
@@ -8326,33 +8248,23 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 
 	i->reads++;
 
-	/* in-memory mode only offsets */
-	uint64_t branch_start_offset =
-		arg->index->h->offset - arg->index->h->total - sizeof(struct sdseal);
-	uint64_t branch_ref_offset =
-		ref->offset - branch_start_offset;
-
 	/* compression */
 	if (arg->use_compression)
 	{
 		char *page_pointer;
-		if (arg->use_memory) {
-			page_pointer = arg->memory->map.p + branch_ref_offset;
-		} else {
-			ss_bufreset(arg->buf_read);
-			rc = ss_bufensure(arg->buf_read, r->a, ref->size);
-			if (ssunlikely(rc == -1))
-				return sr_oom(r->e);
-			rc = ss_filepread(arg->file, ref->offset, arg->buf_read->s, ref->size);
-			if (ssunlikely(rc == -1)) {
-				sr_error(r->e, "index file '%s' read error: %s",
-				         ss_pathof(&arg->file->path),
-				         strerror(errno));
-				return -1;
-			}
-			ss_bufadvance(arg->buf_read, ref->size);
-			page_pointer = arg->buf_read->s;
+		ss_bufreset(arg->buf_read);
+		rc = ss_bufensure(arg->buf_read, r->a, ref->size);
+		if (ssunlikely(rc == -1))
+			return sr_oom(r->e);
+		rc = ss_filepread(arg->file, ref->offset, arg->buf_read->s, ref->size);
+		if (ssunlikely(rc == -1)) {
+			sr_error(r->e, "index file '%s' read error: %s",
+				 ss_pathof(&arg->file->path),
+				 strerror(errno));
+			return -1;
 		}
+		ss_bufadvance(arg->buf_read, ref->size);
+		page_pointer = arg->buf_read->s;
 
 		/* copy header */
 		memcpy(arg->buf->p, page_pointer, sizeof(struct sdpageheader));
@@ -8375,12 +8287,6 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		}
 		ss_filterfree(&f);
 		sd_pageinit(&i->page, (struct sdpageheader*)arg->buf->s);
-		return 0;
-	}
-
-	/* in-memory mode */
-	if (arg->use_memory) {
-		sd_pageinit(&i->page, (struct sdpageheader*)(arg->memory->map.p + branch_ref_offset));
 		return 0;
 	}
 
@@ -8619,129 +8525,6 @@ sd_schemeiter_next(struct ssiter *i)
 
 static struct ssiterif sd_schemeiter;
 
-struct sdsnapshotheader {
-	uint32_t crc;
-	uint32_t size;
-	uint32_t nodes;
-	uint64_t lru_v;
-	uint64_t lru_steps;
-	uint64_t lru_intr_lsn;
-	uint64_t lru_intr_sum;
-	uint64_t read_disk;
-	uint64_t read_cache;
-	uint64_t reserve[4];
-} sspacked;
-
-struct sdsnapshotnode {
-	uint32_t crc;
-	uint64_t id;
-	uint64_t size_file;
-	uint32_t size;
-	uint32_t branch_count;
-	uint64_t temperature_reads;
-	uint64_t reserve[4];
-	/* struct sdindexheader[] */
-} sspacked;
-
-struct sdsnapshot {
-	uint32_t current;
-	struct ssbuf buf;
-};
-
-static inline void
-sd_snapshot_init(struct sdsnapshot *s)
-{
-	s->current = 0;
-	ss_bufinit(&s->buf);
-}
-
-static inline void
-sd_snapshot_free(struct sdsnapshot *s, struct runtime *r)
-{
-	ss_buffree(&s->buf, r->a);
-}
-
-static inline struct sdsnapshotheader*
-sd_snapshot_header(struct sdsnapshot *s) {
-	return (struct sdsnapshotheader*)s->buf.s;
-}
-
-static inline int
-sd_snapshot_is(struct sdsnapshot *s) {
-	return s->buf.s != NULL;
-}
-
-static int sd_snapshot_begin(struct sdsnapshot*, struct runtime*);
-static int sd_snapshot_add(struct sdsnapshot*, struct runtime*, uint64_t, uint64_t, uint32_t, uint64_t);
-static int sd_snapshot_addbranch(struct sdsnapshot*, struct runtime*, struct sdindexheader*);
-static int sd_snapshot_commit(struct sdsnapshot*, uint64_t, uint64_t, uint64_t, uint64_t,
-			      uint64_t, uint64_t);
-
-struct sdsnapshotiter {
-	struct sdsnapshot *s;
-	struct sdsnapshotnode *n;
-	uint32_t npos;
-} sspacked;
-
-static inline int
-sd_snapshotiter_open(struct ssiter *i, struct runtime *r, struct sdsnapshot *s)
-{
-	struct sdsnapshotiter *si = (struct sdsnapshotiter*)i->priv;
-	si->s = s;
-	si->n = NULL;
-	si->npos = 0;
-	if (ssunlikely(ss_bufused(&s->buf) < (int)sizeof(struct sdsnapshotheader)))
-		goto error;
-	struct sdsnapshotheader *h = (struct sdsnapshotheader*)s->buf.s;
-	uint32_t crc = ss_crcs(h, sizeof(*h), 0);
-	if (h->crc != crc)
-		goto error;
-	if (ssunlikely((int)h->size != ss_bufused(&s->buf)))
-		goto error;
-	si->n = (struct sdsnapshotnode*)(s->buf.s + sizeof(struct sdsnapshotheader));
-	return 0;
-error:
-	sr_malfunction(r->e, "%s", "snapshot file corrupted");
-	return -1;
-}
-
-static inline void
-sd_snapshotiter_close(struct ssiter *i ssunused)
-{ }
-
-static inline int
-sd_snapshotiter_has(struct ssiter *i)
-{
-	struct sdsnapshotiter *si = (struct sdsnapshotiter*)i->priv;
-	return si->n != NULL;
-}
-
-static inline void*
-sd_snapshotiter_of(struct ssiter *i)
-{
-	struct sdsnapshotiter *si = (struct sdsnapshotiter*)i->priv;
-	if (ssunlikely(si->n == NULL))
-		return NULL;
-	return si->n;
-}
-
-static inline void
-sd_snapshotiter_next(struct ssiter *i)
-{
-	struct sdsnapshotiter *si = (struct sdsnapshotiter*)i->priv;
-	if (ssunlikely(si->n == NULL))
-		return;
-	si->npos++;
-	struct sdsnapshotheader *h = (struct sdsnapshotheader*)si->s->buf.s;
-	if (si->npos < h->nodes) {
-		si->n = (struct sdsnapshotnode*)((char*)si->n + sizeof(struct sdsnapshotnode) + si->n->size);
-		return;
-	}
-	si->n = NULL;
-}
-
-static struct ssiterif sd_snapshotiter;
-
 static void sd_buildinit(struct sdbuild *b)
 {
 	memset(&b->tracker, 0, sizeof(b->tracker));
@@ -8812,7 +8595,6 @@ static void sd_buildgc(struct sdbuild *b, struct runtime *r, int wm)
 
 static int
 sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
-	      int timestamp,
 	      int compress_dup,
 	      int compress,
 	      struct ssfilterif *compress_if)
@@ -8821,7 +8603,6 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	b->compress_dup = compress_dup;
 	b->compress = compress;
 	b->compress_if = compress_if;
-	b->timestamp = timestamp;
 	int rc;
 	if (compress_dup && b->tracker.size == 0) {
 		rc = ss_htinit(&b->tracker, r->a, 32768);
@@ -8848,7 +8629,6 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	memset(h, 0, sizeof(*h));
 	h->lsnmin    = UINT64_MAX;
 	h->lsnmindup = UINT64_MAX;
-	h->tsmin     = UINT32_MAX;
 	h->reserve   = 0;
 	ss_bufadvance(&b->list, sizeof(struct sdbuildref));
 	ss_bufadvance(&b->m, sizeof(struct sdpageheader));
@@ -8952,7 +8732,6 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 	if (ssunlikely(rc == -1))
 		return sr_oom(r->e);
 	uint64_t lsn = sv_lsn(v);
-	uint32_t timestamp = sv_timestamp(v);
 	uint32_t size = sv_size(v);
 	struct sdpageheader *h = sd_buildheader(b);
 	struct sdv *sv = (struct sdv*)b->m.p;
@@ -8960,7 +8739,6 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 	sv->offset = ss_bufused(&b->v) - sd_buildref(b)->v;
 	sv->size = size;
 	sv->lsn = lsn;
-	sv->timestamp = timestamp;
 	ss_bufadvance(&b->m, sizeof(struct sdv));
 	/* copy document */
 	switch (r->fmt_storage) {
@@ -8982,8 +8760,6 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 		h->lsnmax = lsn;
 	if (lsn < h->lsnmin)
 		h->lsnmin = lsn;
-	if (timestamp < h->tsmin)
-		h->tsmin = timestamp;
 	if (sv->flags & SVDUP) {
 		h->countdup++;
 		if (lsn < h->lsnmindup)
@@ -9100,7 +8876,6 @@ static int sd_indexbegin(struct sdindex *i, struct runtime *r)
 	h->extensions  = 0;
 	h->lsnmin      = UINT64_MAX;
 	h->lsnmax      = 0;
-	h->tsmin       = UINT32_MAX;
 	h->offset      = 0;
 	h->dupkeys     = 0;
 	h->dupmin      = UINT64_MAX;
@@ -9279,8 +9054,6 @@ static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *bui
 		h->lsnmin = ph->lsnmin;
 	if (ph->lsnmax > h->lsnmax)
 		h->lsnmax = ph->lsnmax;
-	if (ph->tsmin < h->tsmin)
-		h->tsmin = ph->tsmin;
 	h->dupkeys += ph->countdup;
 	if (ph->lsnmindup < h->dupmin)
 		h->dupmin = ph->lsnmindup;
@@ -9331,8 +9104,6 @@ sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
 	ss_iterinit(sv_writeiter, &m->i);
 	ss_iteropen(sv_writeiter, &m->i, r, i, upsert,
 	            (uint64_t)conf->size_page, sizeof(struct sdv),
-	            conf->expire,
-	            conf->timestamp,
 	            conf->vlsn,
 	            conf->vlsn_lru,
 	            conf->save_delete,
@@ -9395,7 +9166,6 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		return 0;
 	int rc;
 	rc = sd_buildbegin(m->build, m->r, conf->checksum,
-	                   conf->expire,
 	                   conf->compression_key,
 	                   conf->compression,
 	                   conf->compression_if);
@@ -9733,87 +9503,6 @@ static struct ssiterif sd_schemeiter =
 	.next    = sd_schemeiter_next
 };
 
-static int sd_snapshot_begin(struct sdsnapshot *s, struct runtime *r)
-{
-	int rc = ss_bufensure(&s->buf, r->a, sizeof(struct sdsnapshotheader));
-	if (ssunlikely(rc == -1))
-		return sr_oom(r->e);
-	struct sdsnapshotheader *h = sd_snapshot_header(s);
-	memset(h, 0, sizeof(*h));
-	ss_bufadvance(&s->buf, sizeof(*h));
-	return 0;
-}
-
-static int
-sd_snapshot_add(struct sdsnapshot *s, struct runtime *r, uint64_t id,
-		uint64_t file_size, uint32_t branch_count, uint64_t tr)
-{
-	int rc = ss_bufensure(&s->buf, r->a, sizeof(struct sdsnapshotnode));
-	if (ssunlikely(rc == -1))
-		return sr_oom(r->e);
-	s->current = (uint32_t)(s->buf.p - s->buf.s);
-	struct sdsnapshotnode *n = (struct sdsnapshotnode*)s->buf.p;
-	n->crc               = 0;
-	n->id                = id;
-	n->size_file         = file_size;
-	n->size              = 0;
-	n->branch_count      = branch_count;
-	n->temperature_reads = tr;
-	n->reserve[0]        = 0;
-	n->reserve[1]        = 0;
-	n->reserve[2]        = 0;
-	n->reserve[3]        = 0;
-	n->crc = ss_crcs((char*)n, sizeof(*n), 0);
-	ss_bufadvance(&s->buf, sizeof(*n));
-	struct sdsnapshotheader *h = sd_snapshot_header(s);
-	h->nodes++;
-	return 0;
-}
-
-static int
-sd_snapshot_addbranch(struct sdsnapshot *s, struct runtime *r,
-		      struct sdindexheader *h)
-{
-	int size = sd_indexsize_ext(h);
-	int rc = ss_bufensure(&s->buf, r->a, size);
-	if (ssunlikely(rc == -1))
-		return sr_oom(r->e);
-	memcpy(s->buf.p, (void*)h, size);
-	ss_bufadvance(&s->buf, size);
-	struct sdsnapshotnode *n = (struct sdsnapshotnode*)(s->buf.s + s->current);
-	n->size += size;
-	return 0;
-}
-
-static int
-sd_snapshot_commit(struct sdsnapshot *s,
-		   uint64_t lru_v,
-		   uint64_t lru_steps,
-		   uint64_t lru_intr_lsn,
-		   uint64_t lru_intr_sum,
-		   uint64_t read_disk,
-		   uint64_t read_cache)
-{
-	struct sdsnapshotheader *h = sd_snapshot_header(s);
-	h->lru_v        = lru_v;
-	h->lru_steps    = lru_steps;
-	h->lru_intr_lsn = lru_intr_lsn;
-	h->lru_intr_sum = lru_intr_sum;
-	h->read_disk    = read_disk;
-	h->read_cache   = read_cache;
-	h->size         = ss_bufused(&s->buf);
-	h->crc = ss_crcs((char*)h, sizeof(*h), 0);
-	return 0;
-}
-
-static struct ssiterif sd_snapshotiter =
-{
-	.close   = sd_snapshotiter_close,
-	.has     = sd_snapshotiter_has,
-	.of      = sd_snapshotiter_of,
-	.next    = sd_snapshotiter_next
-};
-
 static uint8_t
 sd_vifflags(struct sv *v)
 {
@@ -9836,12 +9525,6 @@ sd_vifpointer(struct sv *v)
 }
 
 static uint32_t
-sd_viftimestamp(struct sv *v)
-{
-	return ((struct sdv*)v->v)->timestamp;
-}
-
-static uint32_t
 sd_vifsize(struct sv *v)
 {
 	return ((struct sdv*)v->v)->size;
@@ -9852,7 +9535,6 @@ static struct svif sd_vif =
 	.flags     = sd_vifflags,
 	.lsn       = sd_viflsn,
 	.lsnset    = NULL,
-	.timestamp = sd_viftimestamp,
 	.pointer   = sd_vifpointer,
 	.size      = sd_vifsize
 };
@@ -9868,7 +9550,6 @@ static struct svif sd_vrawif =
 	.flags     = sd_vifflags,
 	.lsn       = sd_viflsn,
 	.lsnset    = NULL,
-	.timestamp = sd_viftimestamp,
 	.pointer   = sd_vrawifpointer,
 	.size      = sd_vifsize
 };
@@ -9977,25 +9658,16 @@ sd_seal(struct runtime *r, struct ssfile *file, struct ssblob *blob, struct sdin
 	return 0;
 }
 
-enum sistorage {
-	SI_SCACHE,
-	SI_SANTI_CACHE,
-	SI_SIN_MEMORY
-};
-
 struct sischeme {
 	uint32_t    id;
 	char       *name;
 	char       *path;
 	uint32_t    path_fail_on_exists;
 	uint32_t    path_fail_on_drop;
-	enum sistorage storage;
-	char       *storage_sz;
 	uint32_t    sync;
 	uint64_t    node_size;
 	uint32_t    node_page_size;
 	uint32_t    node_page_checksum;
-	uint32_t    expire;
 	uint32_t    compression;
 	char       *compression_sz;
 	struct ssfilterif *compression_if;
@@ -10111,7 +9783,6 @@ struct sinode {
 	uint32_t   used;
 	uint64_t   lru;
 	uint64_t   ac;
-	uint32_t   in_memory;
 	struct sibranch   self;
 	struct sibranch  *branch;
 	uint32_t   branch_count;
@@ -10131,8 +9802,7 @@ struct sinode {
 
 static struct sinode *si_nodenew(struct runtime*);
 static int
-si_nodeopen(struct sinode*, struct runtime*, struct sischeme*,
-	    struct sspath*, struct sdsnapshotnode*);
+si_nodeopen(struct sinode*, struct runtime*, struct sspath*);
 static int
 si_nodecreate(struct sinode*, struct runtime*, struct sischeme*, struct sdid*);
 static int si_nodefree(struct sinode*, struct runtime*, int);
@@ -10298,15 +9968,10 @@ struct siplanner {
 #define SI_CHECKPOINT    16
 #define SI_GC            32
 #define SI_TEMP          64
-#define SI_BACKUP        128
-#define SI_BACKUPEND     256
 #define SI_SHUTDOWN      512
 #define SI_DROP          1024
-#define SI_SNAPSHOT      2048
-#define SI_ANTICACHE     4096
 #define SI_LRU           8192
 #define SI_NODEGC        16384
-#define SI_EXPIRE        32768
 
 /* explain */
 #define SI_ENONE         0
@@ -10334,14 +9999,8 @@ struct siplan {
 	 * gc:
 	 *   a: lsn
 	 *   b: percent
-	 * expire:
-	 *   a: ttl
 	 * lru:
 	 * temperature:
-	 * anticache:
-	 *   a: asn
-	 *   b: available
-	 *   c: *node_size
 	 * snapshot:
 	 *   a: ssn
 	 * shutdown:
@@ -10889,10 +10548,6 @@ static int si_drop(struct si*);
 static int si_dropmark(struct si*);
 static int si_droprepository(struct runtime*, char*, int);
 
-static int si_anticache(struct si*, struct siplan*);
-
-static int si_snapshot(struct si*, struct siplan*);
-
 static int
 si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
 	 uint64_t, struct ssiter*, uint64_t, uint32_t);
@@ -11015,47 +10670,6 @@ struct siprofiler {
 static int si_profilerbegin(struct siprofiler*, struct si*);
 static int si_profilerend(struct siprofiler*);
 static int si_profiler(struct siprofiler*);
-
-static int si_anticache(struct si *index, struct siplan *plan)
-{
-	struct sinode *n = plan->node;
-	struct runtime *r = &index->r;
-
-	/* promote */
-	if (n->flags & SI_PROMOTE) {
-		struct sibranch *b = n->branch;
-		while (b) {
-			int rc;
-			rc = si_branchload(b, r, &n->file);
-			if (ssunlikely(rc == -1))
-				return -1;
-			b = b->next;
-		}
-		si_lock(index);
-		n->flags &= ~SI_PROMOTE;
-		n->in_memory = 1;
-		si_nodeunlock(n);
-		si_unlock(index);
-		return 0;
-	}
-
-	/* revoke */
-	assert(n->flags & SI_REVOKE);
-	si_lock(index);
-	n->flags &= ~SI_REVOKE;
-	n->in_memory = 0;
-	si_unlock(index);
-	struct sibranch *b = n->branch;
-	while (b) {
-		ss_blobfree(&b->copy);
-		ss_blobinit(&b->copy, r->vfs);
-		b = b->next;
-	}
-	si_lock(index);
-	si_nodeunlock(n);
-	si_unlock(index);
-	return 0;
-}
 
 static struct si *si_init(struct runtime *r, struct so *object)
 {
@@ -11222,19 +10836,12 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 		rc = si_branch(i, c, plan, vlsn);
 		break;
 	case SI_LRU:
-	case SI_EXPIRE:
 	case SI_GC:
 	case SI_COMPACT:
 		rc = si_compact(i, c, plan, vlsn, vlsn_lru, NULL, 0);
 		break;
 	case SI_COMPACT_INDEX:
 		rc = si_compact_index(i, c, plan, vlsn, vlsn_lru);
-		break;
-	case SI_ANTICACHE:
-		rc = si_anticache(i, plan);
-		break;
-	case SI_SNAPSHOT:
-		rc = si_snapshot(i, plan);
 		break;
 	case SI_SHUTDOWN:
 		rc = si_close(i);
@@ -11262,14 +10869,6 @@ si_branchcreate(struct si *index, struct sdc *c,
 	/* in-memory mode blob */
 	int rc;
 	struct ssblob copy, *blob = NULL;
-	if (parent->in_memory) {
-		ss_blobinit(&copy, r->vfs);
-		rc = ss_blobensure(&copy, 10ULL * 1024 * 1024);
-		if (ssunlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
-		blob = &copy;
-	}
-
 	struct svmerge vmerge;
 	sv_mergeinit(&vmerge);
 	rc = sv_mergeprepare(&vmerge, r, 1);
@@ -11283,15 +10882,12 @@ si_branchcreate(struct si *index, struct sdc *c,
 	ss_iteropen(sv_mergeiter, &i, r, &vmerge, SS_GTE);
 
 	/* merge iter is not used */
-	uint32_t timestamp = time(NULL);
 	struct sdmergeconf mergeconf = {
 		.stream          = vindex->count,
 		.size_stream     = UINT32_MAX,
 		.size_node       = UINT64_MAX,
 		.size_page       = index->scheme.node_page_size,
 		.checksum        = index->scheme.node_page_checksum,
-		.expire          = index->scheme.expire,
-		.timestamp       = timestamp,
 		.compression_key = index->scheme.compression_key,
 		.compression     = index->scheme.compression_branch,
 		.compression_if  = index->scheme.compression_branch_if,
@@ -11520,7 +11116,6 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 			.buf_read        = &c->d,
 			.index_iter      = &cbuf->index_iter,
 			.page_iter       = &cbuf->page_iter,
-			.use_memory      = node->in_memory,
 			.use_compression = compression,
 			.compression_if  = compression_if,
 			.has             = 0,
@@ -11815,7 +11410,6 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
          uint64_t  vlsn_lru)
 {
 	struct runtime *r = &index->r;
-	uint32_t timestamp = time(NULL);
 	int rc;
 	struct sdmergeconf mergeconf = {
 		.stream          = stream,
@@ -11823,8 +11417,6 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 		.size_node       = size_node,
 		.size_page       = index->scheme.node_page_size,
 		.checksum        = index->scheme.node_page_checksum,
-		.expire          = index->scheme.expire,
-		.timestamp       = timestamp,
 		.compression_key = index->scheme.compression_key,
 		.compression     = index->scheme.compression,
 		.compression_if  = index->scheme.compression_if,
@@ -11857,14 +11449,6 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 		n->branch_count++;
 
 		struct ssblob *blob = NULL;
-		if (parent->in_memory) {
-			blob = &n->self.copy;
-			rc = ss_blobensure(blob, index->scheme.node_size);
-			if (ssunlikely(rc == -1))
-				goto error;
-			n->in_memory = 1;
-		}
-
 		/* write open seal */
 		uint64_t seal = n->file.size;
 		rc = sd_writeseal(r, &n->file, blob);
@@ -12121,7 +11705,6 @@ static struct sinode *si_nodenew(struct runtime *r)
 	n->flags = 0;
 	n->update_time = 0;
 	n->used = 0;
-	n->in_memory = 0;
 	si_branchinit(&n->self, r);
 	n->branch = NULL;
 	n->branch_count = 0;
@@ -12176,53 +11759,8 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 }
 
 static inline int
-si_noderecover_snapshot(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn)
+si_noderecover(struct sinode *n, struct runtime *r)
 {
-	char *p = (char*)sn + sizeof(struct sdsnapshotnode);
-	uint32_t i = 0;
-	int first = 1;
-	int rc;
-	while (i < sn->branch_count) {
-		struct sdindexheader *h = (struct sdindexheader*)p;
-		struct sibranch *b;
-		if (first) {
-			b = &n->self;
-		} else {
-			b = si_branchnew(r);
-			if (ssunlikely(b == NULL))
-				return -1;
-		}
-
-		struct sdindex index;
-		sd_indexinit(&index);
-		rc = sd_indexcopy(&index, r, h);
-		if (ssunlikely(rc == -1)) {
-			if (! first)
-				si_branchfree(b, r);
-			return -1;
-		}
-		si_branchset(b, &index);
-
-		b->next   = n->branch;
-		n->branch = b;
-		n->branch_count++;
-		first = 0;
-		p += sd_indexsize_ext(h);
-		i++;
-	}
-	return 0;
-}
-
-static inline int
-si_noderecover(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn, int in_memory)
-{
-	/* fast recover from snapshot file */
-	if (sn) {
-		n->temperature_reads = sn->temperature_reads;
-		if (! in_memory)
-			return si_noderecover_snapshot(n, r, sn);
-	}
-
 	/* recover branches */
 	struct sibranch *b = NULL;
 	struct ssiter i;
@@ -12247,12 +11785,6 @@ si_noderecover(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn, i
 			goto e0;
 		si_branchset(b, &index);
 
-		if (in_memory) {
-			rc = si_branchload(b, r, &n->file);
-			if (ssunlikely(rc == -1))
-				goto e0;
-		}
-
 		b->next   = n->branch;
 		n->branch = b;
 		n->branch_count++;
@@ -12265,7 +11797,6 @@ si_noderecover(struct sinode *n, struct runtime *r, struct sdsnapshotnode *sn, i
 		goto e1;
 	ss_iteratorclose(&i);
 
-	n->in_memory = in_memory;
 	return 0;
 e0:
 	if (b && !first)
@@ -12276,9 +11807,7 @@ e1:
 }
 
 static int
-si_nodeopen(struct sinode *n, struct runtime *r,
-	    struct sischeme *scheme, struct sspath *path,
-	    struct sdsnapshotnode *sn)
+si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 {
 	int rc = ss_fileopen(&n->file, path->path);
 	if (ssunlikely(rc == -1)) {
@@ -12295,10 +11824,7 @@ si_nodeopen(struct sinode *n, struct runtime *r,
 		               strerror(errno));
 		return -1;
 	}
-	int in_memory = 0;
-	if (scheme->storage == SI_SIN_MEMORY)
-		in_memory = 1;
-	rc = si_noderecover(n, r, sn, in_memory);
+	rc = si_noderecover(n, r);
 	if (ssunlikely(rc == -1))
 		return -1;
 	return 0;
@@ -12465,17 +11991,11 @@ static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 		break;
 	case SI_GC: plan = "gc";
 		break;
-	case SI_EXPIRE: plan = "expire";
-		break;
 	case SI_TEMP: plan = "temperature";
 		break;
 	case SI_SHUTDOWN: plan = "index shutdown";
 		break;
 	case SI_DROP: plan = "index drop";
-		break;
-	case SI_SNAPSHOT: plan = "snapshot";
-		break;
-	case SI_ANTICACHE: plan = "anticache";
 		break;
 	}
 	char *explain = NULL;
@@ -12683,99 +12203,6 @@ match:
 }
 
 static inline int
-si_plannerpeek_expire(struct siplanner *p, struct siplan *plan)
-{
-	/* full scan */
-	int rc_inprogress = 0;
-	uint32_t now = time(NULL);
-	struct sinode *n = NULL;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&p->branch, pn))) {
-		n = sscast(pn, struct sinode, nodebranch);
-		struct sdindexheader *h = n->self.index.h;
-		if (h->tsmin == UINT32_MAX)
-			continue;
-		uint32_t diff = now - h->tsmin;
-		if (sslikely(diff >= plan->a)) {
-			if (n->flags & SI_LOCK) {
-				rc_inprogress = 2;
-				continue;
-			}
-			goto match;
-		}
-	}
-	if (rc_inprogress)
-		plan->explain = SI_ERETRY;
-	return rc_inprogress;
-match:
-	si_nodelock(n);
-	plan->node = n;
-	return 1;
-}
-
-
-static inline int
-si_plannerpeek_snapshot(struct siplanner *p, struct siplan *plan)
-{
-	struct si *index = p->i;
-	if (index->snapshot >= plan->a)
-		return 0;
-	if (index->snapshot_run) {
-		/* snaphot inprogress */
-		plan->explain = SI_ERETRY;
-		return 2;
-	}
-	index->snapshot_run = 1;
-	return 1;
-}
-
-static inline int
-si_plannerpeek_anticache(struct siplanner *p, struct siplan *plan)
-{
-	struct si *index = p->i;
-	if (index->scheme.storage != SI_SANTI_CACHE)
-		return 0;
-	int rc_inprogress = 0;
-	struct sinode *n;
-	struct ssrqnode *pn = NULL;
-	while ((pn = ss_rqprev(&p->temp, pn))) {
-		n = sscast(pn, struct sinode, nodetemp);
-		if (n->flags & SI_LOCK) {
-			rc_inprogress = 2;
-			continue;
-		}
-		if (n->ac >= plan->a)
-			continue;
-		n->ac = plan->a;
-		uint64_t size = si_nodesize(n) + n->used;
-		if (size <= plan->b) {
-			/* promote */
-			if (n->in_memory)
-				continue;
-			plan->c = size;
-			n->flags |= SI_PROMOTE;
-		} else {
-			/* revoke in_memory flag */
-			if (! n->in_memory)
-				continue;
-			plan->c = 0;
-			n->flags |= SI_REVOKE;
-		}
-		goto match;
-	}
-	if (rc_inprogress) {
-		plan->explain = SI_ERETRY;
-		return 2;
-	}
-	return 0;
-match:
-	si_nodelock(n);
-	plan->explain = SI_ENONE;
-	plan->node = n;
-	return 1;
-}
-
-static inline int
 si_plannerpeek_lru(struct siplanner *p, struct siplan *plan)
 {
 	struct si *index = p->i;
@@ -12868,16 +12295,10 @@ static int si_planner(struct siplanner *p, struct siplan *plan)
 		return si_plannerpeek_nodegc(p, plan);
 	case SI_GC:
 		return si_plannerpeek_gc(p, plan);
-	case SI_EXPIRE:
-		return si_plannerpeek_expire(p, plan);
 	case SI_CHECKPOINT:
 		return si_plannerpeek_checkpoint(p, plan);
 	case SI_AGE:
 		return si_plannerpeek_age(p, plan);
-	case SI_SNAPSHOT:
-		return si_plannerpeek_snapshot(p, plan);
-	case SI_ANTICACHE:
-		return si_plannerpeek_anticache(p, plan);
 	case SI_LRU:
 		return si_plannerpeek_lru(p, plan);
 	case SI_SHUTDOWN:
@@ -13219,7 +12640,6 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 		.buf_read        = &q->index->readbuf,
 		.index_iter      = &c->index_iter,
 		.page_iter       = &c->page_iter,
-		.use_memory      = n->in_memory,
 		.use_compression = compression,
 		.compression_if  = compression_if,
 		.has             = q->has,
@@ -13342,7 +12762,6 @@ si_rangebranch(struct siread *q, struct sinode *n,
 		.buf_read        = &q->index->readbuf,
 		.index_iter      = &c->index_iter,
 		.page_iter       = &c->page_iter,
-		.use_memory      = n->in_memory,
 		.use_compression = compression,
 		.compression_if  = compression_if,
 		.has             = 0,
@@ -13594,14 +13013,6 @@ si_bootstrap(struct si *i, uint64_t parent)
 
 	/* in-memory mode support */
 	struct ssblob *blob = NULL;
-	if (i->scheme.storage == SI_SIN_MEMORY) {
-		blob = &n->self.copy;
-		rc = ss_blobensure(blob, 4096);
-		if (ssunlikely(rc == -1))
-			goto e0;
-		n->in_memory = 1;
-	}
-
 	/* create index with one empty page */
 	struct sdindex index;
 	sd_indexinit(&index);
@@ -13616,7 +13027,6 @@ si_bootstrap(struct si *i, uint64_t parent)
 	sd_buildinit(&build);
 	rc = sd_buildbegin(&build, r,
 	                   i->scheme.node_page_checksum,
-	                   i->scheme.expire > 0,
 	                   i->scheme.compression_key,
 	                   i->scheme.compression,
 	                   i->scheme.compression_if);
@@ -13818,7 +13228,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			node->recover = SI_RDB_DBSEAL;
 			ss_pathcompound(&path, i->scheme.path, id_parent, id,
 			                ".index.seal");
-			rc = si_nodeopen(node, r, &i->scheme, &path, NULL);
+			rc = si_nodeopen(node, r, &path);
 			if (ssunlikely(rc == -1)) {
 				si_nodefree(node, r, 0);
 				goto error;
@@ -13851,7 +13261,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			goto error;
 		node->recover = SI_RDB;
 		ss_path(&path, i->scheme.path, id, ".index");
-		rc = si_nodeopen(node, r, &i->scheme, &path, NULL);
+		rc = si_nodeopen(node, r, &path);
 		if (ssunlikely(rc == -1)) {
 			si_nodefree(node, r, 0);
 			goto error;
@@ -13963,51 +13373,6 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 	return 0;
 }
 
-static inline int
-si_tracksnapshot(struct sitrack *track, struct runtime *r, struct si *i, struct sdsnapshot *s)
-{
-	/* read snapshot */
-	struct ssiter iter;
-	ss_iterinit(sd_snapshotiter, &iter);
-	int rc;
-	rc = ss_iteropen(sd_snapshotiter, &iter, r, s);
-	if (ssunlikely(rc == -1))
-		return -1;
-	for (; ss_iterhas(sd_snapshotiter, &iter);
-	      ss_iternext(sd_snapshotiter, &iter))
-	{
-		struct sdsnapshotnode *n = ss_iterof(sd_snapshotiter, &iter);
-		/* skip updated nodes */
-		struct sspath path;
-		ss_path(&path, i->scheme.path, n->id, ".index");
-		rc = ss_vfsexists(r->vfs, path.path);
-		if (! rc)
-			continue;
-		uint64_t size = ss_vfssize(r->vfs, path.path);
-		if (size != n->size_file)
-			continue;
-		/* recover node */
-		struct sinode *node = si_nodenew(r);
-		if (ssunlikely(node == NULL))
-			return -1;
-		node->recover = SI_RDB;
-		rc = si_nodeopen(node, r, &i->scheme, &path, n);
-		if (ssunlikely(rc == -1)) {
-			si_nodefree(node, r, 0);
-			return -1;
-		}
-		si_trackmetrics(track, node);
-		si_trackset(track, node);
-	}
-	/* recover index temperature (read stats) */
-	struct sdsnapshotheader *h = sd_snapshot_header(s);
-	i->read_cache = h->read_cache;
-	i->read_disk  = h->read_disk;
-	i->lru_v      = h->lru_v;
-	i->lru_steps  = h->lru_steps;
-	return 0;
-}
-
 static inline void
 si_recoversize(struct si *i)
 {
@@ -14020,18 +13385,13 @@ si_recoversize(struct si *i)
 }
 
 static inline int
-si_recoverindex(struct si *i, struct runtime *r, struct sdsnapshot *s)
+si_recoverindex(struct si *i, struct runtime *r)
 {
 	struct sitrack track;
 	si_trackinit(&track);
 	struct ssbuf buf;
 	ss_bufinit(&buf);
 	int rc;
-	if (sd_snapshot_is(s)) {
-		rc = si_tracksnapshot(&track, r, i, s);
-		if (ssunlikely(rc == -1))
-			goto error;
-	}
 	rc = si_trackdir(&track, r, i);
 	if (ssunlikely(rc == -1))
 		goto error;
@@ -14076,71 +13436,6 @@ si_recoverdrop(struct si *i, struct runtime *r)
 	return 1;
 }
 
-static inline int
-si_recoversnapshot(struct si *i, struct runtime *r, struct sdsnapshot *s)
-{
-	/* recovery stages:
-
-	   snapshot            (1) ok
-	   snapshot.incomplete (2) remove snapshot.incomplete
-	   snapshot            (3) remove snapshot.incomplete, load snapshot
-	   snapshot.incomplete
-	*/
-
-	/* recover snapshot file (crash recover) */
-	int snapshot = 0;
-	int snapshot_incomplete = 0;
-
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/index", i->scheme.path);
-	snapshot = ss_vfsexists(r->vfs, path);
-	snprintf(path, sizeof(path), "%s/index.incomplete", i->scheme.path);
-	snapshot_incomplete = ss_vfsexists(r->vfs, path);
-
-	int rc;
-	if (snapshot_incomplete) {
-		rc = ss_vfsunlink(r->vfs, path);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' unlink error: %s",
-			               path, strerror(errno));
-			return -1;
-		}
-	}
-	if (! snapshot)
-		return 0;
-
-	/* read snapshot file */
-	snprintf(path, sizeof(path), "%s/index", i->scheme.path);
-
-	ssize_t size = ss_vfssize(r->vfs, path);
-	if (ssunlikely(size == -1)) {
-		sr_malfunction(r->e, "index file '%s' read error: %s",
-		               path, strerror(errno));
-		return -1;
-	}
-	rc = ss_bufensure(&s->buf, r->a, size);
-	if (ssunlikely(rc == -1))
-		return sr_oom_malfunction(r->e);
-	struct ssfile file;
-	ss_fileinit(&file, r->vfs);
-	rc = ss_fileopen(&file, path);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' open error: %s",
-		               path, strerror(errno));
-		return -1;
-	}
-	rc = ss_filepread(&file, 0, s->buf.s, size);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' read error: %s",
-		               path, strerror(errno));
-		ss_fileclose(&file);
-		return -1;
-	}
-	ss_bufadvance(&s->buf, size);
-	ss_fileclose(&file);
-	return 0;
-}
-
 static int si_recover(struct si *i)
 {
 	struct runtime *r = &i->r;
@@ -14161,15 +13456,7 @@ static int si_recover(struct si *i)
 		return -1;
 	r->scheme = &i->scheme.scheme;
 	r->fmt_storage = i->scheme.fmt_storage;
-	struct sdsnapshot snapshot;
-	sd_snapshot_init(&snapshot);
-	rc = si_recoversnapshot(i, r, &snapshot);
-	if (ssunlikely(rc == -1)) {
-		sd_snapshot_free(&snapshot, r);
-		return -1;
-	}
-	rc = si_recoverindex(i, r, &snapshot);
-	sd_snapshot_free(&snapshot, r);
+	rc = si_recoverindex(i, r);
 	if (sslikely(rc <= 0))
 		return rc;
 deploy:
@@ -14194,7 +13481,6 @@ enum {
 	SI_SCHEME_COMPRESSION_RESERVED1,
 	SI_SCHEME_AMQF,
 	SI_SCHEME_CACHE_MODE,
-	SI_SCHEME_EXPIRE
 };
 
 static void si_schemeinit(struct sischeme *s)
@@ -14213,10 +13499,6 @@ static void si_schemefree(struct sischeme *s, struct runtime *r)
 	if (s->path) {
 		ss_free(r->a, s->path);
 		s->path = NULL;
-	}
-	if (s->storage_sz) {
-		ss_free(r->a, s->storage_sz);
-		s->storage_sz = NULL;
 	}
 	if (s->compression_sz) {
 		ss_free(r->a, s->compression_sz);
@@ -14301,10 +13583,6 @@ static int si_schemedeploy(struct sischeme *s, struct runtime *r)
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_AMQF, SS_U32,
 	                  &s->amqf, sizeof(s->amqf));
-	if (ssunlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_EXPIRE, SS_U32,
-	                  &s->expire, sizeof(s->expire));
 	if (ssunlikely(rc == -1))
 		goto error;
 	rc = sd_schemecommit(&c);
@@ -14407,9 +13685,6 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 		case SI_SCHEME_AMQF:
 			s->amqf = sd_schemeu32(opt);
 			break;
-		case SI_SCHEME_EXPIRE:
-			s->expire = sd_schemeu32(opt);
-			break;
 		default: /* skip unknown */
 			break;
 		}
@@ -14423,139 +13698,6 @@ error_format:
 	sr_error(r->e, "%s", "incompatible storage format version");
 error:
 	sd_schemefree(&c, r);
-	return -1;
-}
-
-static int si_snapshot(struct si *index, struct siplan *plan)
-{
-	struct runtime *r = &index->r;
-
-	struct ssfile file;
-	ss_fileinit(&file, r->vfs);
-
-	/* prepare to take snapshot */
-	struct sdsnapshot snapshot;
-	sd_snapshot_init(&snapshot);
-	int rc = ss_bufensure(&snapshot.buf, r->a, 1 * 1024 * 1024);
-	if (ssunlikely(rc == -1))
-		goto error_oom;
-	rc = sd_snapshot_begin(&snapshot, r);
-	if (ssunlikely(rc == -1))
-		goto error_oom;
-
-	/* save node index image */
-	si_lock(index);
-	struct ssrbnode *p = NULL;
-	while ((p = ss_rbnext(&index->i, p)))
-	{
-		struct sinode *n = sscast(p, struct sinode, node);
-		rc = sd_snapshot_add(&snapshot, r, n->self.id.id,
-		                     n->file.size,
-		                     n->branch_count,
-		                     n->temperature_reads);
-		if (ssunlikely(rc == -1)) {
-			si_unlock(index);
-			goto error_oom;
-		}
-		struct sibranch *b = &n->self;
-		while (b) {
-			rc = sd_snapshot_addbranch(&snapshot, r, b->index.h);
-			if (ssunlikely(rc == -1)) {
-				si_unlock(index);
-				goto error_oom;
-			}
-			b = b->link;
-		}
-	}
-	sd_snapshot_commit(&snapshot,
-	                   index->lru_v,
-	                   index->lru_steps,
-	                   index->lru_intr_lsn,
-	                   index->lru_intr_sum,
-	                   index->read_disk,
-	                   index->read_cache);
-	si_unlock(index);
-
-	/* create snapshot.inprogress */
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/index.incomplete",
-	         index->scheme.path);
-	rc = ss_filenew(&file, path);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' create error: %s",
-		               path, strerror(errno));
-		goto error;
-	}
-	rc = ss_filewrite(&file, snapshot.buf.s, ss_bufused(&snapshot.buf));
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' write error: %s",
-		               path, strerror(errno));
-		goto error;
-	}
-
-	SS_INJECTION(r->i, SS_INJECTION_SI_SNAPSHOT_0,
-	             ss_fileclose(&file);
-	             sd_snapshot_free(&snapshot, r);
-				 sr_malfunction(r->e, "%s", "error injection");
-				 return -1);
-
-	/* sync snapshot file */
-	if (index->scheme.sync) {
-		rc = ss_filesync(&file);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' sync error: %s",
-			               path, strerror(errno));
-			goto error;
-		}
-	}
-
-	/* remove old snapshot file (if exists) */
-	snprintf(path, sizeof(path), "%s/index", index->scheme.path);
-	ss_vfsunlink(r->vfs, path);
-
-	SS_INJECTION(r->i, SS_INJECTION_SI_SNAPSHOT_1,
-	             ss_fileclose(&file);
-	             sd_snapshot_free(&snapshot, r);
-				 sr_malfunction(r->e, "%s", "error injection");
-				 return -1);
-
-	/* rename snapshot.incomplete to snapshot */
-	rc = ss_filerename(&file, path);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' rename error: %s",
-		               ss_pathof(&file.path),
-		               strerror(errno));
-		goto error;
-	}
-
-	SS_INJECTION(r->i, SS_INJECTION_SI_SNAPSHOT_2,
-	             ss_fileclose(&file);
-	             sd_snapshot_free(&snapshot, r);
-				 sr_malfunction(r->e, "%s", "error injection");
-				 return -1);
-
-	/* close snapshot file */
-	rc = ss_fileclose(&file);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' close error: %s",
-		               path, strerror(errno));
-		goto error;
-	}
-
-	sd_snapshot_free(&snapshot, r);
-
-	/* finish index snapshot */
-	si_lock(index);
-	index->snapshot = plan->a;
-	index->snapshot_run = 0;
-	si_unlock(index);
-	return 0;
-
-error_oom:
-	sr_oom(r->e);
-error:
-	ss_fileclose(&file);
-	sd_snapshot_free(&snapshot, r);
 	return -1;
 }
 
@@ -14697,9 +13839,7 @@ sc_workerpool_push(struct scworkerpool *p, struct scworker *w)
 enum {
 	SC_QBRANCH  = 0,
 	SC_QGC      = 1,
-	SC_QEXPIRE  = 2,
 	SC_QLRU     = 3,
-	SC_QBACKUP  = 4,
 	SC_QMAX
 };
 
@@ -14722,18 +13862,6 @@ struct scheduler {
 	uint32_t       checkpoint;
 	uint32_t       age;
 	uint64_t       age_time;
-	uint32_t       expire;
-	uint64_t       expire_time;
-	uint64_t       anticache_asn;
-	uint64_t       anticache_asn_last;
-	uint64_t       anticache_storage;
-	uint64_t       anticache_time;
-	uint64_t       anticache_limit;
-	uint64_t       anticache;
-	uint64_t       snapshot_ssn;
-	uint64_t       snapshot_ssn_last;
-	uint64_t       snapshot_time;
-	uint64_t       snapshot;
 	uint64_t       gc_time;
 	uint32_t       gc;
 	uint64_t       lru_time;
@@ -14748,7 +13876,6 @@ struct scheduler {
 };
 
 static int sc_init(struct scheduler*, struct runtime*);
-static int sc_set(struct scheduler *s, uint64_t);
 static int sc_add(struct scheduler*, struct si*);
 static int sc_del(struct scheduler*, struct si*, int);
 
@@ -14791,56 +13918,6 @@ sc_task_checkpoint_done(struct scheduler *s)
 	s->checkpoint = 0;
 	s->checkpoint_lsn_last = s->checkpoint_lsn;
 	s->checkpoint_lsn = 0;
-}
-
-static inline void
-sc_task_anticache(struct scheduler *s)
-{
-	s->anticache = 1;
-	s->anticache_storage = s->anticache_limit;
-	s->anticache_asn = sr_seq(s->r->seq, SR_ASNNEXT);
-	sc_start(s, SI_ANTICACHE);
-}
-
-static inline void
-sc_task_anticache_done(struct scheduler *s, uint64_t now)
-{
-	s->anticache = 0;
-	s->anticache_asn_last = s->anticache_asn;
-	s->anticache_asn = 0;
-	s->anticache_storage = 0;
-	s->anticache_time = now;
-}
-
-static inline void
-sc_task_snapshot(struct scheduler *s)
-{
-	s->snapshot = 1;
-	s->snapshot_ssn = sr_seq(s->r->seq, SR_SSNNEXT);
-	sc_start(s, SI_SNAPSHOT);
-}
-
-static inline void
-sc_task_snapshot_done(struct scheduler *s, uint64_t now)
-{
-	s->snapshot = 0;
-	s->snapshot_ssn_last = s->snapshot_ssn;
-	s->snapshot_ssn = 0;
-	s->snapshot_time = now;
-}
-
-static inline void
-sc_task_expire(struct scheduler *s)
-{
-	s->expire = 1;
-	sc_start(s, SI_EXPIRE);
-}
-
-static inline void
-sc_task_expire_done(struct scheduler *s, uint64_t now)
-{
-	s->expire = 0;
-	s->expire_time = now;
 }
 
 static inline void
@@ -14891,10 +13968,7 @@ static int sc_ctl_call(struct scheduler*, uint64_t);
 static int sc_ctl_branch(struct scheduler*, uint64_t, struct si*);
 static int sc_ctl_compact(struct scheduler*, uint64_t, struct si*);
 static int sc_ctl_compact_index(struct scheduler*, uint64_t, struct si*);
-static int sc_ctl_anticache(struct scheduler*);
-static int sc_ctl_snapshot(struct scheduler*);
 static int sc_ctl_checkpoint(struct scheduler*);
-static int sc_ctl_expire(struct scheduler*);
 static int sc_ctl_gc(struct scheduler*);
 static int sc_ctl_lru(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
@@ -14944,18 +14018,6 @@ sc_init(struct scheduler *s, struct runtime *r)
 	s->checkpoint               = 0;
 	s->age                      = 0;
 	s->age_time                 = now;
-	s->expire                   = 0;
-	s->expire_time              = now;
-	s->anticache_asn            = 0;
-	s->anticache_asn_last       = 0;
-	s->anticache_storage        = 0;
-	s->anticache_time           = now;
-	s->anticache                = 0;
-	s->anticache_limit          = 0;
-	s->snapshot_ssn             = 0;
-	s->snapshot_ssn_last        = 0;
-	s->snapshot_time            = now;
-	s->snapshot                 = 0;
 	s->gc                       = 0;
 	s->gc_time                  = now;
 	s->lru                      = 0;
@@ -14967,12 +14029,6 @@ sc_init(struct scheduler *s, struct runtime *r)
 	sc_workerpool_init(&s->wp);
 	rlist_create(&s->shutdown);
 	s->shutdown_pending = 0;
-	return 0;
-}
-
-static int sc_set(struct scheduler *s, uint64_t anticache)
-{
-	s->anticache_limit = anticache;
 	return 0;
 }
 
@@ -15158,34 +14214,10 @@ sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
 	return rc;
 }
 
-static int sc_ctl_anticache(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	sc_task_anticache(s);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
-static int sc_ctl_snapshot(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	sc_task_snapshot(s);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
 static int sc_ctl_checkpoint(struct scheduler *s)
 {
 	tt_pthread_mutex_lock(&s->lock);
 	sc_task_checkpoint(s);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
-static int sc_ctl_expire(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	sc_task_expire(s);
 	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
@@ -15329,8 +14361,6 @@ sc_plan(struct scheduler *s, struct siplan *plan)
 {
 	struct scdb *db = s->i[s->rr];
 	return si_plan(db->index, plan);
-
-
 }
 
 static inline int
@@ -15394,68 +14424,6 @@ sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzon
 		case 0: /* complete */
 			if (sc_end(s, db, SI_CHECKPOINT))
 				sc_task_checkpoint_done(s);
-			break;
-		}
-	}
-
-	/* anti-cache */
-	if (s->anticache) {
-		task->plan.plan = SI_ANTICACHE;
-		task->plan.a = s->anticache_asn;
-		task->plan.b = s->anticache_storage;
-		rc = sc_plan(s, &task->plan);
-		switch (rc) {
-		case 1:
-			si_ref(db->index, SI_REFBE);
-			task->db = db;
-			uint64_t size = task->plan.c;
-			if (size > 0) {
-				if (ssunlikely(size > s->anticache_storage))
-					s->anticache_storage = 0;
-				else
-					s->anticache_storage -= size;
-			}
-			return 1;
-		case 0: /* complete */
-			if (sc_end(s, db, SI_ANTICACHE))
-				sc_task_anticache_done(s, now);
-			break;
-		}
-	}
-
-	/* snapshot */
-	if (s->snapshot) {
-		task->plan.plan = SI_SNAPSHOT;
-		task->plan.a = s->snapshot_ssn;
-		rc = sc_plan(s, &task->plan);
-		switch (rc) {
-		case 1:
-			si_ref(db->index, SI_REFBE);
-			task->db = db;
-			return 1;
-		case 0: /* complete */
-			if (sc_end(s, db, SI_SNAPSHOT))
-				sc_task_snapshot_done(s, now);
-			break;
-		}
-	}
-
-	/* expire */
-	if (s->expire) {
-		task->plan.plan = SI_EXPIRE;
-		task->plan.a = db->index->scheme.expire;
-		rc = sc_planquota(s, &task->plan, SC_QEXPIRE, zone->expire_prio);
-		switch (rc) {
-		case 1:
-			if (zone->mode == 0)
-				task->plan.plan = SI_COMPACT_INDEX;
-			si_ref(db->index, SI_REFBE);
-			db->workers[SC_QEXPIRE]++;
-			task->db = db;
-			return 1;
-		case 0: /* complete */
-			if (sc_end(s, db, SI_EXPIRE))
-				sc_task_expire_done(s, now);
 			break;
 		}
 	}
@@ -15567,15 +14535,6 @@ sc_periodic_done(struct scheduler *s, uint64_t now)
 	/* checkpoint */
 	if (ssunlikely(s->checkpoint))
 		sc_task_checkpoint_done(s);
-	/* anti-cache */
-	if (ssunlikely(s->anticache))
-		sc_task_anticache_done(s, now);
-	/* snapshot */
-	if (ssunlikely(s->snapshot))
-		sc_task_snapshot_done(s, now);
-	/* expire */
-	if (ssunlikely(s->expire))
-		sc_task_expire_done(s, now);
 	/* gc */
 	if (ssunlikely(s->gc))
 		sc_task_gc_done(s, now);
@@ -15607,21 +14566,6 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 	}
 	default: /* branch + compact */
 		assert(zone->mode == 3);
-	}
-	/* anti-cache */
-	if (s->anticache == 0 && zone->anticache_period) {
-		if ((now - s->anticache_time) >= zone->anticache_period_us)
-			sc_task_anticache(s);
-	}
-	/* snapshot */
-	if (s->snapshot == 0 && zone->snapshot_period) {
-		if ((now - s->snapshot_time) >= zone->snapshot_period_us)
-			sc_task_snapshot(s);
-	}
-	/* expire */
-	if (s->expire == 0 && zone->expire_prio && zone->expire_period) {
-		if ((now - s->expire_time) >= zone->expire_period_us)
-			sc_task_expire(s);
 	}
 	/* gc */
 	if (s->gc == 0 && zone->gc_prio && zone->gc_period) {
@@ -15683,17 +14627,6 @@ sc_complete(struct scheduler *s, struct sctask *t)
 		db->workers[SC_QBRANCH]--;
 		break;
 	case SI_COMPACT_INDEX:
-		break;
-	case SI_BACKUP:
-	case SI_BACKUPEND:
-		db->workers[SC_QBACKUP]--;
-		break;
-	case SI_SNAPSHOT:
-		break;
-	case SI_ANTICACHE:
-		break;
-	case SI_EXPIRE:
-		db->workers[SC_QEXPIRE]--;
 		break;
 	case SI_GC:
 		db->workers[SC_QGC]--;
@@ -15857,14 +14790,7 @@ struct seconfrt {
 	uint32_t  checkpoint_active;
 	uint64_t  checkpoint_lsn;
 	uint64_t  checkpoint_lsn_last;
-	uint32_t  snapshot_active;
-	uint64_t  snapshot_ssn;
-	uint64_t  snapshot_ssn_last;
-	uint32_t  anticache_active;
-	uint64_t  anticache_asn;
-	uint64_t  anticache_asn_last;
 	uint32_t  gc_active;
-	uint32_t  expire_active;
 	uint32_t  lru_active;
 	/* metric */
 	struct srseq     seq;
@@ -15976,7 +14902,6 @@ struct phia_document {
 	/* recover */
 	void     *raw;
 	uint32_t  rawsize;
-	uint32_t  timestamp;
 	/* read options */
 	int       cache_only;
 	int       oldest_only;
@@ -16045,8 +14970,6 @@ static inline int
 phia_index_active(struct phia_index *o) {
 	return si_active(o->index);
 }
-
-
 
 static struct phia_index *phia_index_new(struct phia_env*, char*, int);
 static struct phia_index *phia_index_match(struct phia_env*, char*);
@@ -16177,8 +15100,6 @@ online:
 	ss_quotaenable(&e->quota, 1);
 	sr_statusset(&e->status, SR_ONLINE);
 
-	/* run thread-pool and scheduler */
-	sc_set(&e->scheduler, e->conf.anticache);
 	return 0;
 }
 
@@ -16362,10 +15283,6 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 		sr_c(&p, pc, se_confv_offline, "branch_age", SS_U32, &z->branch_age);
 		sr_c(&p, pc, se_confv_offline, "branch_age_period", SS_U32, &z->branch_age_period);
 		sr_c(&p, pc, se_confv_offline, "branch_age_wm", SS_U32, &z->branch_age_wm);
-		sr_c(&p, pc, se_confv_offline, "anticache_period", SS_U32, &z->anticache_period);
-		sr_c(&p, pc, se_confv_offline, "snapshot_period", SS_U32, &z->snapshot_period);
-		sr_c(&p, pc, se_confv_offline, "expire_prio", SS_U32, &z->expire_prio);
-		sr_c(&p, pc, se_confv_offline, "expire_period", SS_U32, &z->expire_period);
 		sr_c(&p, pc, se_confv_offline, "gc_wm", SS_U32, &z->gc_wm);
 		sr_c(&p, pc, se_confv_offline, "gc_prio", SS_U32, &z->gc_prio);
 		sr_c(&p, pc, se_confv_offline, "gc_period", SS_U32, &z->gc_period);
@@ -16412,39 +15329,12 @@ se_confscheduler_checkpoint(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline int
-se_confscheduler_snapshot(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_snapshot(&e->scheduler);
-}
-
-static inline int
-se_confscheduler_anticache(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_anticache(&e->scheduler);
-}
-
-static inline int
 se_confscheduler_gc(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_env *e = s->ptr;
 	return sc_ctl_gc(&e->scheduler);
-}
-
-static inline int
-se_confscheduler_expire(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_expire(&e->scheduler);
 }
 
 static inline int
@@ -16477,18 +15367,8 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "checkpoint_lsn", SS_U64, &rt->checkpoint_lsn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "checkpoint_lsn_last", SS_U64, &rt->checkpoint_lsn_last, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_checkpoint, "checkpoint",  SS_FUNCTION, NULL);
-	sr_C(&p, pc, se_confv, "anticache_active", SS_U32, &rt->anticache_active, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "anticache_asn", SS_U64, &rt->anticache_asn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "anticache_asn_last", SS_U64, &rt->anticache_asn_last, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_anticache, "anticache", SS_FUNCTION, NULL);
-	sr_C(&p, pc, se_confv, "snapshot_active", SS_U32, &rt->snapshot_active, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "snapshot_ssn", SS_U64, &rt->snapshot_ssn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "snapshot_ssn_last", SS_U64, &rt->snapshot_ssn_last, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_snapshot, "snapshot", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
-	sr_C(&p, pc, se_confv, "expire_active", SS_U32, &rt->expire_active, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_expire, "expire", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "lru_active", SS_U32, &rt->lru_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_lru, "lru", SS_FUNCTION, NULL);
 	sr_c(&p, pc, se_confscheduler_run, "run", SS_FUNCTION, NULL);
@@ -16547,8 +15427,6 @@ se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **
 	sr_C(&p, pc, se_confv, "lsn",  SS_U64, &rt->seq.lsn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "tsn",  SS_U64, &rt->seq.tsn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "nsn",  SS_U64, &rt->seq.nsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "ssn",  SS_U64, &rt->seq.ssn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "asn",  SS_U64, &rt->seq.asn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "dsn",  SS_U32, &rt->seq.dsn, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "lfsn", SS_U64, &rt->seq.lfsn, SR_RO, NULL);
 	return sr_C(NULL, pc, NULL, "metric", SS_UNDEF, metric, SR_NS, NULL);
@@ -16780,7 +15658,6 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		sr_C(&p, pc, se_confv, "memory_used", SS_U64, &o->rtp.memory_used, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "size", SS_U64, &o->rtp.total_node_size, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "size_uncompressed", SS_U64, &o->rtp.total_node_origin_size, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "size_snapshot", SS_U64, &o->rtp.total_snapshot_size, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "size_amqf", SS_U64, &o->rtp.total_amqf_size, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "count", SS_U64, &o->rtp.count, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "count_dup", SS_U64, &o->rtp.count_dup, SR_RO, NULL);
@@ -16811,9 +15688,7 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		sr_C(&p, pc, se_confv, "name", SS_STRINGPTR, &o->scheme->name, SR_RO, NULL);
 		sr_C(&p, pc, se_confv_dboffline, "id", SS_U32, &o->scheme->id, 0, o);
 		sr_C(&p, pc, se_confdb_status,   "status", SS_STRING, o, SR_RO, NULL);
-		sr_C(&p, pc, se_confv_dboffline, "storage", SS_STRINGPTR, &o->scheme->storage_sz, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "temperature", SS_U32, &o->scheme->temperature, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "expire", SS_U32, &o->scheme->expire, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "amqf", SS_U32, &o->scheme->amqf, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "path", SS_STRINGPTR, &o->scheme->path, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "path_fail_on_exists", SS_U32, &o->scheme->path_fail_on_exists, 0, o);
@@ -16946,9 +15821,6 @@ se_confdebug(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **p
 	sr_c(&p, pc, se_confv, "si_compaction_3", SS_U32, &e->ei.e[6]);
 	sr_c(&p, pc, se_confv, "si_compaction_4", SS_U32, &e->ei.e[7]);
 	sr_c(&p, pc, se_confv, "si_recover_0",    SS_U32, &e->ei.e[8]);
-	sr_c(&p, pc, se_confv, "si_snapshot_0",   SS_U32, &e->ei.e[9]);
-	sr_c(&p, pc, se_confv, "si_snapshot_1",   SS_U32, &e->ei.e[10]);
-	sr_c(&p, pc, se_confv, "si_snapshot_2",   SS_U32, &e->ei.e[11]);
 	sr_C(&prev, pc, NULL, "error_injection", SS_UNDEF, ei, SR_NS, NULL);
 	struct srconf *debug = prev;
 	return sr_C(NULL, pc, NULL, "debug", SS_UNDEF, debug, SR_NS, NULL);
@@ -17006,13 +15878,6 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	rt->checkpoint_active    = e->scheduler.checkpoint;
 	rt->checkpoint_lsn_last  = e->scheduler.checkpoint_lsn_last;
 	rt->checkpoint_lsn       = e->scheduler.checkpoint_lsn;
-	rt->snapshot_active      = e->scheduler.snapshot;
-	rt->snapshot_ssn         = e->scheduler.snapshot_ssn;
-	rt->snapshot_ssn_last    = e->scheduler.snapshot_ssn_last;
-	rt->anticache_active     = e->scheduler.anticache;
-	rt->anticache_asn        = e->scheduler.anticache_asn;
-	rt->anticache_asn_last   = e->scheduler.anticache_asn_last;
-	rt->expire_active        = e->scheduler.expire;
 	rt->gc_active            = e->scheduler.gc;
 	rt->lru_active           = e->scheduler.lru;
 	tt_pthread_mutex_unlock(&e->scheduler.lock);
@@ -17186,9 +16051,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		.branch_age_period = 40,
 		.branch_age_wm     = 1 * 1024 * 1024,
 		.anticache_period  = 0,
-		.snapshot_period   = 0,
-		.expire_prio       = 0,
-		.expire_period     = 0,
 		.gc_prio           = 1,
 		.gc_period         = 60,
 		.gc_wm             = 30,
@@ -17206,9 +16068,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		.branch_age_period = 0,
 		.branch_age_wm     = 0,
 		.anticache_period  = 0,
-		.snapshot_period   = 0,
-		.expire_prio       = 0,
-		.expire_period     = 0,
 		.gc_prio           = 0,
 		.gc_period         = 0,
 		.gc_wm             = 0,
@@ -17252,10 +16111,8 @@ static int se_confvalidate(struct seconf *c)
 		}
 		/* convert periodic times from sec to usec */
 		z->branch_age_period_us = z->branch_age_period * 1000000;
-		z->snapshot_period_us   = z->snapshot_period * 1000000;
 		z->anticache_period_us  = z->anticache_period * 1000000;
 		z->gc_period_us         = z->gc_period * 1000000;
-		z->expire_period_us     = z->expire_period * 1000000;
 		z->lru_period_us        = z->lru_period * 1000000;
 	}
 	return 0;
@@ -17550,7 +16407,6 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	scheme->name[size] = 0;
 	scheme->id                    = sr_seq(&e->seq, SR_DSNNEXT);
 	scheme->sync                  = 2;
-	scheme->storage               = SI_SCACHE;
 	scheme->node_size             = 64 * 1024 * 1024;
 	scheme->node_page_size        = 128 * 1024;
 	scheme->node_page_checksum    = 1;
@@ -17560,7 +16416,6 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	scheme->compression_branch    = 0;
 	scheme->compression_branch_if = &ss_nonefilter;
 	scheme->temperature           = 0;
-	scheme->expire                = 0;
 	scheme->amqf                  = 0;
 	scheme->fmt_storage           = SF_RAW;
 	scheme->path_fail_on_exists   = 0;
@@ -17568,9 +16423,6 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	scheme->lru                   = 0;
 	scheme->lru_step              = 128 * 1024;
 	scheme->buf_gc_wm             = 1024 * 1024;
-	scheme->storage_sz = ss_strdup(&e->a, "cache");
-	if (ssunlikely(scheme->storage_sz == NULL))
-		goto error;
 	scheme->compression_sz =
 		ss_strdup(&e->a, scheme->compression_if->name);
 	if (ssunlikely(scheme->compression_sz == NULL))
@@ -17627,19 +16479,6 @@ phia_index_scheme_set(struct phia_index *db)
 	rc = sf_schemevalidate(&s->scheme, &e->a);
 	if (ssunlikely(rc == -1)) {
 		sr_error(&e->error, "incomplete scheme", s->name);
-		return -1;
-	}
-	/* storage */
-	if (strcmp(s->storage_sz, "cache") == 0) {
-		s->storage = SI_SCACHE;
-	} else
-	if (strcmp(s->storage_sz, "anti-cache") == 0) {
-		s->storage = SI_SANTI_CACHE;
-	} else
-	if (strcmp(s->storage_sz, "in-memory") == 0) {
-		s->storage = SI_SIN_MEMORY;
-	} else {
-		sr_error(&e->error, "unknown storage type '%s'", s->storage_sz);
 		return -1;
 	}
 	/* compression_key */
@@ -18119,7 +16958,6 @@ enum {
 	SE_DOCUMENT_ORDER,
 	SE_DOCUMENT_PREFIX,
 	SE_DOCUMENT_LSN,
-	SE_DOCUMENT_TIMESTAMP,
 	SE_DOCUMENT_RAW,
 	SE_DOCUMENT_FLAGS,
 	SE_DOCUMENT_CACHE_ONLY,
@@ -18142,10 +16980,6 @@ phia_document_opt(const char *path)
 	case 'l':
 		if (sslikely(strcmp(path, "lsn") == 0))
 			return SE_DOCUMENT_LSN;
-		break;
-	case 't':
-		if (sslikely(strcmp(path, "timestamp") == 0))
-			return SE_DOCUMENT_TIMESTAMP;
 		break;
 	case 'p':
 		if (sslikely(strcmp(path, "prefix") == 0))
@@ -18181,19 +17015,10 @@ phia_document_create(struct phia_document *o)
 
 	assert(o->v.v == NULL);
 
-	/* reuse document */
-	uint32_t timestamp = UINT32_MAX;
-	if (db->scheme->expire > 0) {
-		if (ssunlikely(o->timestamp > 0))
-			timestamp = o->timestamp;
-		else
-			timestamp = time(NULL);
-	}
-
 	/* create document from raw data */
 	struct svv *v;
 	if (o->raw) {
-		v = sv_vbuildraw(db->r, o->raw, o->rawsize, timestamp);
+		v = sv_vbuildraw(db->r, o->raw, o->rawsize);
 		if (ssunlikely(v == NULL))
 			return sr_oom(&e->error);
 		sv_init(&o->v, &sv_vif, v, NULL);
@@ -18234,7 +17059,7 @@ phia_document_create(struct phia_document *o)
 	}
 
 allocate:
-	v = sv_vbuild(db->r, o->fields, timestamp);
+	v = sv_vbuild(db->r, o->fields);
 	if (ssunlikely(v == NULL))
 		return sr_oom(&e->error);
 	sv_init(&o->v, &sv_vif, v, NULL);
@@ -18416,9 +17241,6 @@ phia_document_setint(struct so *o, const char *path, int64_t num)
 {
 	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
 	switch (phia_document_opt(path)) {
-	case SE_DOCUMENT_TIMESTAMP:
-		v->timestamp = num;
-		break;
 	case SE_DOCUMENT_CACHE_ONLY:
 		v->cache_only = num;
 		break;

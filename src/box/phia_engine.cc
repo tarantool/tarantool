@@ -321,16 +321,14 @@ PhiaEngine::init()
 	phia_setint(env, "phia.path_create", 0);
 	phia_setint(env, "phia.recover", 2);
 	phia_setstring(env, "phia.path", cfg_gets("phia_dir"), 0);
-	phia_setint(env, "memory.limit", cfg_geti64("phia.memory_limit"));
+	phia_setint(env, "memory.limit",
+		    cfg_getd("phia.memory_limit")*1024*1024*1024);
 	phia_setint(env, "compaction.0.async", 1);
 	phia_setint(env, "compaction.0.compact_wm", cfg_geti("phia.compact_wm"));
 	phia_setint(env, "compaction.0.branch_prio", cfg_geti("phia.branch_prio"));
 	phia_setint(env, "compaction.0.branch_age", cfg_geti("phia.branch_age"));
 	phia_setint(env, "compaction.0.branch_age_wm", cfg_geti("phia.branch_age_wm"));
 	phia_setint(env, "compaction.0.branch_age_period", cfg_geti("phia.branch_age_period"));
-	phia_setint(env, "compaction.0.snapshot_period", cfg_geti("phia.snapshot_period"));
-	phia_setint(env, "compaction.0.expire_period", cfg_geti("phia.expire_period"));
-	phia_setint(env, "compaction.0.expire_prio", cfg_geti("phia.expire_prio"));
 	phia_setint(env, "phia.recover", 3);
 	int rc = phia_open(env);
 	if (rc == -1)
