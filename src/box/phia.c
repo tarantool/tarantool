@@ -8352,7 +8352,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 				return sr_oom(r->e);
 			rc = ss_filepread(arg->file, ref->offset, arg->buf_read->s, ref->size);
 			if (ssunlikely(rc == -1)) {
-				sr_error(r->e, "db file '%s' read error: %s",
+				sr_error(r->e, "index file '%s' read error: %s",
 				         ss_pathof(&arg->file->path),
 				         strerror(errno));
 				return -1;
@@ -8369,14 +8369,14 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		struct ssfilter f;
 		rc = ss_filterinit(&f, (struct ssfilterif*)arg->compression_if, r->a, SS_FOUTPUT);
 		if (ssunlikely(rc == -1)) {
-			sr_error(r->e, "db file '%s' decompression error",
+			sr_error(r->e, "index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
 		}
 		int size = ref->size - sizeof(struct sdpageheader);
 		rc = ss_filternext(&f, arg->buf, page_pointer + sizeof(struct sdpageheader), size);
 		if (ssunlikely(rc == -1)) {
-			sr_error(r->e, "db file '%s' decompression error",
+			sr_error(r->e, "index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
 		}
@@ -8405,7 +8405,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 	/* default */
 	rc = ss_filepread(arg->file, ref->offset, arg->buf->s, ref->sizeorigin);
 	if (ssunlikely(rc == -1)) {
-		sr_error(r->e, "db file '%s' read error: %s",
+		sr_error(r->e, "index file '%s' read error: %s",
 		         ss_pathof(&arg->file->path),
 		         strerror(errno));
 		return -1;
@@ -9496,7 +9496,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 
 	/* validate seal pointer */
 	if (ssunlikely(((pointer + sizeof(struct sdseal)) > eof))) {
-		sr_malfunction(i->r->e, "corrupted db file '%s': bad seal size",
+		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -9506,7 +9506,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 
 	/* validate index pointer */
 	if (ssunlikely(((pointer + sizeof(struct sdindexheader)) > eof))) {
-		sr_malfunction(i->r->e, "corrupted db file '%s': bad index size",
+		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -9517,7 +9517,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	/* validate index crc */
 	uint32_t crc = ss_crcs(index, sizeof(struct sdindexheader), 0);
 	if (index->crc != crc) {
-		sr_malfunction(i->r->e, "corrupted db file '%s': bad index crc",
+		sr_malfunction(i->r->e, "corrupted index file '%s': bad index crc",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -9528,7 +9528,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	char *end = pointer + sizeof(struct sdindexheader) + index->size +
 	            index->extension;
 	if (ssunlikely(end > eof)) {
-		sr_malfunction(i->r->e, "corrupted db file '%s': bad index size",
+		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -9538,7 +9538,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	/* validate seal */
 	int rc = sd_sealvalidate(next, index);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(i->r->e, "corrupted db file '%s': bad seal",
+		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -9558,14 +9558,14 @@ static int sd_recover_open(struct ssiter *i, struct runtime *r,
 	ri->r = r;
 	ri->file = file;
 	if (ssunlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct sdindexheader)))) {
-		sr_malfunction(ri->r->e, "corrupted db file '%s': bad size",
+		sr_malfunction(ri->r->e, "corrupted index file '%s': bad size",
 		               ss_pathof(&ri->file->path));
 		ri->corrupt = 1;
 		return -1;
 	}
 	int rc = ss_vfsmmap(r->vfs, &ri->map, ri->file->fd, ri->file->size, 1);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(ri->r->e, "failed to mmap db file '%s': %s",
+		sr_malfunction(ri->r->e, "failed to mmap index file '%s': %s",
 		               ss_pathof(&ri->file->path),
 		               strerror(errno));
 		return -1;
@@ -10104,7 +10104,7 @@ si_branchload(struct sibranch *b, struct runtime *r, struct ssfile *file)
 		return sr_oom_malfunction(r->e);
 	rc = ss_filepread(file, offset, b->copy.s, size);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' read error: %s",
+		sr_malfunction(r->e, "index file '%s' read error: %s",
 		               ss_pathof(&file->path), strerror(errno));
 		return -1;
 	}
@@ -11426,7 +11426,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		rc = ss_vfsmmap(r->vfs, &parent->map_swap, parent->file.fd,
 		              parent->file.size, 1);
 		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "db file '%s' mmap error: %s",
+			sr_malfunction(r->e, "index file '%s' mmap error: %s",
 			               ss_pathof(&parent->file.path),
 			               strerror(errno));
 			goto e1;
@@ -11506,7 +11506,7 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 	if (index->scheme.mmap) {
 		int rc = ss_vfsmunmap(r->vfs, &swap_map);
 		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "db file '%s' munmap error: %s",
+			sr_malfunction(r->e, "index file '%s' munmap error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
 			return -1;
@@ -11656,7 +11656,7 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 		snprintf(path, sizeof(path), "%s/%s", repo, de->d_name);
 		rc = ss_vfsunlink(r->vfs, path);
 		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "db file '%s' unlink error: %s",
+			sr_malfunction(r->e, "index file '%s' unlink error: %s",
 			               path, strerror(errno));
 			closedir(dir);
 			return -1;
@@ -11667,7 +11667,7 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 	snprintf(path, sizeof(path), "%s/drop", repo);
 	rc = ss_vfsunlink(r->vfs, path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' unlink error: %s",
+		sr_malfunction(r->e, "index file '%s' unlink error: %s",
 		               path, strerror(errno));
 		return -1;
 	}
@@ -12233,14 +12233,14 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 
 	int rc = ss_vfsmunmap(r->vfs, &n->map);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' munmap error: %s",
+		sr_malfunction(r->e, "index file '%s' munmap error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		rcret = -1;
 	}
 	rc = ss_fileclose(&n->file);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' close error: %s",
+		sr_malfunction(r->e, "index file '%s' close error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		rcret = -1;
@@ -12363,7 +12363,7 @@ si_nodeopen(struct sinode *n, struct runtime *r,
 {
 	int rc = ss_fileopen(&n->file, path->path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' open error: %s "
+		sr_malfunction(r->e, "index file '%s' open error: %s "
 		               "(please ensure storage version compatibility)",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -12371,7 +12371,7 @@ si_nodeopen(struct sinode *n, struct runtime *r,
 	}
 	rc = ss_fileseek(&n->file, n->file.size);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' seek error: %s",
+		sr_malfunction(r->e, "index file '%s' seek error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -12396,10 +12396,10 @@ si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
 {
 	struct sspath path;
 	ss_pathcompound(&path, scheme->path, id->parent, id->id,
-	                ".db.incomplete");
+	                ".index.incomplete");
 	int rc = ss_filenew(&n->file, path.path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' create error: %s",
+		sr_malfunction(r->e, "index file '%s' create error: %s",
 		               path.path, strerror(errno));
 		return -1;
 	}
@@ -12410,7 +12410,7 @@ static int si_nodemap(struct sinode *n, struct runtime *r)
 {
 	int rc = ss_vfsmmap(r->vfs, &n->map, n->file.fd, n->file.size, 1);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' mmap error: %s",
+		sr_malfunction(r->e, "index file '%s' mmap error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -12440,7 +12440,7 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 		ss_fileadvise(&n->file, 0, 0, n->file.size);
 		rc = ss_vfsunlink(r->vfs, ss_pathof(&n->file.path));
 		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "db file '%s' unlink error: %s",
+			sr_malfunction(r->e, "index file '%s' unlink error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
 			rcret = -1;
@@ -12461,7 +12461,7 @@ static int si_noderead(struct sinode *n, struct runtime *r, struct ssbuf *dest)
 		return sr_oom_malfunction(r->e);
 	rc = ss_filepread(&n->file, 0, dest->s, n->file.size);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' read error: %s",
+		sr_malfunction(r->e, "index file '%s' read error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -12476,7 +12476,7 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 	if (scheme->sync) {
 		rc = ss_filesync(&n->file);
 		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "db file '%s' sync error: %s",
+			sr_malfunction(r->e, "index file '%s' sync error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
 			return -1;
@@ -12485,10 +12485,10 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 	struct sspath path;
 	ss_pathcompound(&path, scheme->path,
 	                n->self.id.parent, n->self.id.id,
-	                ".db.seal");
+	                ".index.seal");
 	rc = ss_filerename(&n->file, path.path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' rename error: %s",
+		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -12500,10 +12500,10 @@ static int
 si_nodecomplete(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 {
 	struct sspath path;
-	ss_path(&path, scheme->path, n->self.id.id, ".db");
+	ss_path(&path, scheme->path, n->self.id.id, ".index");
 	int rc = ss_filerename(&n->file, path.path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' rename error: %s",
+		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 	}
@@ -12513,10 +12513,10 @@ si_nodecomplete(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 static int si_nodegc(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 {
 	struct sspath path;
-	ss_path(&path, scheme->path, n->self.id.id, ".db.gc");
+	ss_path(&path, scheme->path, n->self.id.id, ".index.gc");
 	int rc = ss_filerename(&n->file, path.path);
 	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "db file '%s' rename error: %s",
+		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 	}
@@ -12583,9 +12583,9 @@ static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 		break;
 	case SI_TEMP: plan = "temperature";
 		break;
-	case SI_SHUTDOWN: plan = "database shutdown";
+	case SI_SHUTDOWN: plan = "index shutdown";
 		break;
-	case SI_DROP: plan = "database drop";
+	case SI_DROP: plan = "index drop";
 		break;
 	case SI_SNAPSHOT: plan = "snapshot";
 		break;
@@ -12611,7 +12611,7 @@ static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
 		break;
 	}
 	if (p->node) {
-		ss_trace(t, "%s <%" PRIu32 ":%020" PRIu64 ".db explain: %s>",
+		ss_trace(t, "%s <%" PRIu32 ":%020" PRIu64 ".index explain: %s>",
 		         plan, id, p->node->self.id.id, explain);
 	} else {
 		ss_trace(t, "%s <%" PRIu32 " explain: %s>",
@@ -13671,12 +13671,12 @@ si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 
 	compaction
 
-	000000001.000000002.db.incomplete  (1)
-	000000001.000000002.db.seal        (2)
-	000000002.db                       (3)
-	000000001.000000003.db.incomplete
-	000000001.000000003.db.seal
-	000000003.db
+	000000001.000000002.index.incomplete  (1)
+	000000001.000000002.index.seal        (2)
+	000000002.index                       (3)
+	000000001.000000003.index.incomplete
+	000000001.000000003.index.seal
+	000000003.index
 	(4)
 
 	1. remove incomplete, mark parent as having incomplete
@@ -13855,20 +13855,20 @@ si_processid(char **str)
 static inline int
 si_process(char *name, uint64_t *nsn, uint64_t *parent)
 {
-	/* id.db */
-	/* id.id.db.incomplete */
-	/* id.id.db.seal */
-	/* id.id.db.gc */
+	/* id.index */
+	/* id.id.index.incomplete */
+	/* id.id.index.seal */
+	/* id.id.index.gc */
 	char *token = name;
 	int64_t id = si_processid(&token);
 	if (ssunlikely(id == -1))
 		return -1;
 	*parent = id;
 	*nsn = id;
-	if (strcmp(token, ".db") == 0)
+	if (strcmp(token, ".index") == 0)
 		return SI_RDB;
 	else
-	if (strcmp(token, ".db.gc") == 0)
+	if (strcmp(token, ".index.gc") == 0)
 		return SI_RDB_REMOVE;
 	if (ssunlikely(*token != '.'))
 		return -1;
@@ -13877,10 +13877,10 @@ si_process(char *name, uint64_t *nsn, uint64_t *parent)
 	if (ssunlikely(id == -1))
 		return -1;
 	*nsn = id;
-	if (strcmp(token, ".db.incomplete") == 0)
+	if (strcmp(token, ".index.incomplete") == 0)
 		return SI_RDB_DBI;
 	else
-	if (strcmp(token, ".db.seal") == 0)
+	if (strcmp(token, ".index.seal") == 0)
 		return SI_RDB_DBSEAL;
 	return -1;
 }
@@ -13926,10 +13926,10 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			/* remove any incomplete file made during compaction */
 			if (rc == SI_RDB_DBI) {
 				ss_pathcompound(&path, i->scheme.path, id_parent, id,
-				                ".db.incomplete");
+				                ".index.incomplete");
 				rc = ss_vfsunlink(r->vfs, path.path);
 				if (ssunlikely(rc == -1)) {
-					sr_malfunction(r->e, "db file '%s' unlink error: %s",
+					sr_malfunction(r->e, "index file '%s' unlink error: %s",
 					               path.path, strerror(errno));
 					goto error;
 				}
@@ -13942,7 +13942,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 				goto error;
 			node->recover = SI_RDB_DBSEAL;
 			ss_pathcompound(&path, i->scheme.path, id_parent, id,
-			                ".db.seal");
+			                ".index.seal");
 			rc = si_nodeopen(node, r, &i->scheme, &path, NULL);
 			if (ssunlikely(rc == -1)) {
 				si_nodefree(node, r, 0);
@@ -13953,10 +13953,10 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			continue;
 		}
 		case SI_RDB_REMOVE:
-			ss_path(&path, i->scheme.path, id, ".db.gc");
+			ss_path(&path, i->scheme.path, id, ".index.gc");
 			rc = ss_vfsunlink(r->vfs, ss_pathof(&path));
 			if (ssunlikely(rc == -1)) {
-				sr_malfunction(r->e, "db file '%s' unlink error: %s",
+				sr_malfunction(r->e, "index file '%s' unlink error: %s",
 				               ss_pathof(&path), strerror(errno));
 				goto error;
 			}
@@ -13975,7 +13975,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 		if (ssunlikely(node == NULL))
 			goto error;
 		node->recover = SI_RDB;
-		ss_path(&path, i->scheme.path, id, ".db");
+		ss_path(&path, i->scheme.path, id, ".index");
 		rc = si_nodeopen(node, r, &i->scheme, &path, NULL);
 		if (ssunlikely(rc == -1)) {
 			si_nodefree(node, r, 0);
@@ -14046,7 +14046,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, st
 		}
 		default:
 			/* corrupted states */
-			return sr_malfunction(r->e, "corrupted database repository: %s",
+			return sr_malfunction(r->e, "corrupted index repository: %s",
 			                      i->scheme.path);
 		}
 		p = ss_rbprev(&track->i, p);
@@ -14104,7 +14104,7 @@ si_tracksnapshot(struct sitrack *track, struct runtime *r, struct si *i, struct 
 		struct sdsnapshotnode *n = ss_iterof(sd_snapshotiter, &iter);
 		/* skip updated nodes */
 		struct sspath path;
-		ss_path(&path, i->scheme.path, n->id, ".db");
+		ss_path(&path, i->scheme.path, n->id, ".index");
 		rc = ss_vfsexists(r->vfs, path.path);
 		if (! rc)
 			continue;
@@ -14191,7 +14191,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 	if (sslikely(! rc))
 		return 0;
 	if (i->scheme.path_fail_on_drop) {
-		sr_malfunction(r->e, "attempt to recover a dropped database: %s:",
+		sr_malfunction(r->e, "attempt to recover a dropped index: %s:",
 		               i->scheme.path);
 		return -1;
 	}
@@ -15774,23 +15774,23 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 	tt_pthread_mutex_lock(&s->lock);
 	/* start periodic tasks */
 	sc_periodic(s, zone, now);
-	/* database shutdown-drop */
+	/* index shutdown-drop */
 	rc = sc_do_shutdown(s, task);
 	if (rc) {
 		tt_pthread_mutex_unlock(&s->lock);
 		return rc;
 	}
-	/* peek a database */
+	/* peek an index */
 	struct scdb *db = sc_peek(s);
 	if (ssunlikely(db == NULL)) {
 		/* complete on-going periodic tasks when there
-		 * are no active databases left */
+		 * are no active index maintenance tasks left */
 		sc_periodic_done(s, now);
 		tt_pthread_mutex_unlock(&s->lock);
 		return 0;
 	}
 	rc = sc_do(s, task, w, zone, db, vlsn, now);
-	/* schedule next database */
+	/* schedule next index */
 	sc_next(s);
 	tt_pthread_mutex_unlock(&s->lock);
 	return rc;
@@ -16151,7 +16151,7 @@ se_document_validate(struct sedocument *o, struct so *dest, uint8_t flags)
 	return 0;
 }
 
-struct sedb {
+struct phia_index {
 	struct so         o;
 	uint32_t   created;
 	struct siprofiler rtp;
@@ -16166,22 +16166,22 @@ struct sedb {
 };
 
 static inline int
-se_dbactive(struct sedb *o) {
+phia_index_active(struct phia_index *o) {
 	return si_active(o->index);
 }
 
 
 
-static struct so *se_dbnew(struct phia_env*, char*, int);
-static struct so *se_dbmatch(struct phia_env*, char*);
-static struct so *se_dbresult(struct phia_env*, struct scread*);
+static struct so *phia_index_new(struct phia_env*, char*, int);
+static struct so *phia_index_match(struct phia_env*, char*);
+static struct so *phia_index_result(struct phia_env*, struct scread*);
 static void *
-se_dbread(struct sedb*, struct sedocument*, struct sx*, int, struct sicache*);
-static int se_dbvisible(struct sedb*, uint64_t);
-static void se_dbbind(struct phia_env*);
-static void se_dbunbind(struct phia_env*, uint64_t);
-static int se_dbrecoverbegin(struct sedb*);
-static int se_dbrecoverend(struct sedb*);
+phia_index_read(struct phia_index*, struct sedocument*, struct sx*, int, struct sicache*);
+static int phia_index_visible(struct phia_index*, uint64_t);
+static void phia_index_bind(struct phia_env*);
+static void phia_index_unbind(struct phia_env*, uint64_t);
+static int phia_index_recoverbegin(struct phia_index*);
+static int phia_index_recoverend(struct phia_index*);
 
 struct phia_tx {
 	struct so o;
@@ -16200,7 +16200,7 @@ struct seviewdb {
 	int       ready;
 	struct ssbuf     list;
 	char     *pos;
-	struct sedb     *v;
+	struct phia_index     *v;
 } sspacked;
 
 static struct so *se_viewdb_new(struct phia_env*, uint64_t);
@@ -16211,7 +16211,7 @@ struct seview {
 	struct ssbuf     name;
 	struct sx        t;
 	struct svlog     log;
-	int       db_view_only;
+	int       cursor_only;
 	/* Member of env->view list. */
 	struct rlist link;
 } sspacked;
@@ -16280,8 +16280,8 @@ se_open(struct so *o)
 	rc = sr_checkdir(&e->r, e->conf.path);
 	if (ssunlikely(rc == -1))
 		return -1;
-	/* databases recover */
-	struct sedb *item, *n;
+	/* index recover */
+	struct phia_index *item, *n;
 	rlist_foreach_entry_safe(item, &e->db, link, n) {
 		rc = so_open(&item->o);
 		if (ssunlikely(rc == -1))
@@ -16314,7 +16314,7 @@ se_destroy(struct so *o)
 	int rc;
 	sr_statusset(&e->status, SR_SHUTDOWN);
 	{
-		struct sedb *db, *next;
+		struct phia_index *db, *next;
 		rlist_foreach_entry_safe(db, &e->db, link, next) {
 			rc = so_destroy(&db->o);
 			if (ssunlikely(rc == -1))
@@ -16686,12 +16686,12 @@ se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 	struct phia_env *e = s->ptr;
 	if (s->op == SR_WRITE) {
 		char *name = s->value;
-		struct sedb *db = (struct sedb*)se_dbmatch(e, name);
+		struct phia_index *db = (struct phia_index*)phia_index_match(e, name);
 		if (ssunlikely(db)) {
-			sr_error(&e->error, "database '%s' already exists", name);
+			sr_error(&e->error, "index '%s' already exists", name);
 			return -1;
 		}
-		db = (struct sedb*)se_dbnew(e, name, s->valuesize);
+		db = (struct phia_index*)phia_index_new(e, name, s->valuesize);
 		if (ssunlikely(db == NULL))
 			return -1;
 		rlist_add(&e->db, &db->link);
@@ -16722,11 +16722,11 @@ se_confdb_get(struct srconf *c, struct srconfstmt *s)
 		return -1;
 	}
 	assert(c->ptr != NULL);
-	struct sedb *db = c->ptr;
+	struct phia_index *db = c->ptr;
 	int status = sr_status(&db->index->status);
 	if (status == SR_SHUTDOWN_PENDING ||
 	    status == SR_DROP_PENDING) {
-		sr_error(&e->error, "%s", "database has been scheduled for shutdown/drop");
+		sr_error(&e->error, "%s", "index has been scheduled for shutdown/drop");
 		return -1;
 	}
 	si_ref(db->index, SI_REFFE);
@@ -16739,8 +16739,8 @@ se_confdb_upsert(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct sedb *db = c->ptr;
-	if (ssunlikely(se_dbactive(db))) {
+	struct phia_index *db = c->ptr;
+	if (ssunlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -16755,8 +16755,8 @@ se_confdb_upsertarg(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct sedb *db = c->ptr;
-	if (ssunlikely(se_dbactive(db))) {
+	struct phia_index *db = c->ptr;
+	if (ssunlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -16767,7 +16767,7 @@ se_confdb_upsertarg(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confdb_status(struct srconf *c, struct srconfstmt *s)
 {
-	struct sedb *db = c->value;
+	struct phia_index *db = c->value;
 	char *status = sr_statusof(&db->index->status);
 	struct srconf conf = {
 		.key      = c->key,
@@ -16786,7 +16786,7 @@ se_confdb_branch(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct sedb *db = c->value;
+	struct phia_index *db = c->value;
 	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_branch(&e->scheduler, vlsn, db->index);
@@ -16797,7 +16797,7 @@ se_confdb_compact(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct sedb *db = c->value;
+	struct phia_index *db = c->value;
 	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact(&e->scheduler, vlsn, db->index);
@@ -16808,7 +16808,7 @@ se_confdb_compact_index(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	struct sedb *db = c->value;
+	struct phia_index *db = c->value;
 	struct phia_env *e = se_of(&db->o);
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact_index(&e->scheduler, vlsn, db->index);
@@ -16817,9 +16817,9 @@ se_confdb_compact_index(struct srconf *c, struct srconfstmt *s)
 static inline int
 se_confv_dboffline(struct srconf *c, struct srconfstmt *s)
 {
-	struct sedb *db = c->ptr;
+	struct phia_index *db = c->ptr;
 	if (s->op == SR_WRITE) {
-		if (se_dbactive(db)) {
+		if (phia_index_active(db)) {
 			sr_error(s->r->e, "write to %s is offline-only", s->path);
 			return -1;
 		}
@@ -16831,13 +16831,13 @@ static inline int
 se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
 {
 	/* set(scheme, field) */
-	struct sedb *db = c->ptr;
+	struct phia_index *db = c->ptr;
 	struct phia_env *e = se_of(&db->o);
 	if (s->op != SR_WRITE) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
 	}
-	if (ssunlikely(se_dbactive(db))) {
+	if (ssunlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -16872,11 +16872,11 @@ se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
 static inline int
 se_confdb_field(struct srconf *c, struct srconfstmt *s)
 {
-	struct sedb *db = c->ptr;
+	struct phia_index *db = c->ptr;
 	struct phia_env *e = se_of(&db->o);
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	if (ssunlikely(se_dbactive(db))) {
+	if (ssunlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -16893,7 +16893,7 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 	struct srconf *db = NULL;
 	struct srconf *prev = NULL;
 	struct srconf *p;
-	struct sedb *o;
+	struct phia_index *o;
 	rlist_foreach_entry(o, &e->db, link)
 	{
 		si_profilerbegin(&o->rtp, o->index);
@@ -17575,7 +17575,7 @@ se_cursordestroy(struct so *o)
 		sx_rollback(&c->t);
 	if (c->cache)
 		si_cachepool_push(c->cache);
-	se_dbunbind(e, id);
+	phia_index_unbind(e, id);
 	sr_statcursor(&e->stat, c->start,
 	              c->read_disk,
 	              c->read_cache,
@@ -17589,7 +17589,7 @@ se_cursorget(struct so *o, struct so *v)
 {
 	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	struct sedb *db = se_cast(v->parent, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
 	if (ssunlikely(! key->orderset))
 		key->order = SS_GTE;
 	/* this statistics might be not complete, because
@@ -17600,7 +17600,7 @@ se_cursorget(struct so *o, struct so *v)
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
-	return se_dbread(db, key, x, 0, c->cache);
+	return phia_index_read(db, key, x, 0, c->cache);
 }
 
 static int
@@ -17661,12 +17661,12 @@ static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 	}
 	c->read_commited = 0;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
-	se_dbbind(e);
+	phia_index_bind(e);
 	return &c->o;
 }
 
 static int
-se_dbscheme_init(struct sedb *db, char *name, int size)
+phia_index_scheme_init(struct phia_index *db, char *name, int size)
 {
 	struct phia_env *e = se_of(&db->o);
 	/* prepare index scheme */
@@ -17720,7 +17720,7 @@ error:
 }
 
 static int
-se_dbscheme_set(struct sedb *db)
+phia_index_scheme_set(struct phia_index *db)
 {
 	struct phia_env *e = se_of(&db->o);
 	struct sischeme *s = si_scheme(db->index);
@@ -17809,9 +17809,9 @@ se_dbscheme_set(struct sedb *db)
 }
 
 static int
-se_dbopen(struct so *o)
+phia_index_open(struct so *o)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (status == SR_RECOVER ||
@@ -17819,11 +17819,11 @@ se_dbopen(struct so *o)
 		goto online;
 	if (status != SR_OFFLINE)
 		return -1;
-	int rc = se_dbscheme_set(db);
+	int rc = phia_index_scheme_set(db);
 	if (ssunlikely(rc == -1))
 		return -1;
 	sx_indexset(&db->coindex, db->scheme->id);
-	rc = se_dbrecoverbegin(db);
+	rc = phia_index_recoverbegin(db);
 	if (ssunlikely(rc == -1))
 		return -1;
 
@@ -17831,7 +17831,7 @@ se_dbopen(struct so *o)
 		if (e->conf.recover != SE_RECOVER_NP)
 			return 0;
 online:
-	se_dbrecoverend(db);
+	phia_index_recoverend(db);
 	rc = sc_add(&e->scheduler, db->index);
 	if (ssunlikely(rc == -1))
 		return -1;
@@ -17839,7 +17839,7 @@ online:
 }
 
 static inline int
-se_dbfree(struct sedb *db, int close)
+phia_index_free(struct phia_index *db, int close)
 {
 	struct phia_env *e = se_of(&db->o);
 	int rcret = 0;
@@ -17855,7 +17855,7 @@ se_dbfree(struct sedb *db, int close)
 }
 
 static inline void
-se_dbunref(struct sedb *db)
+phia_index_unref(struct phia_index *db)
 {
 	struct phia_env *e = se_of(&db->o);
 	/* do nothing during env shutdown */
@@ -17883,10 +17883,10 @@ se_dbunref(struct sedb *db)
 	default:
 		return;
 	}
-	/* destroy database object */
+	/* destroy index object */
 	struct si *index = db->index;
 	rlist_del(&db->link);
-	se_dbfree(db, 0);
+	phia_index_free(db, 0);
 
 	/* schedule index shutdown or drop */
 	sr_statusset(&index->status, status);
@@ -17894,23 +17894,23 @@ se_dbunref(struct sedb *db)
 }
 
 static int
-se_dbdestroy(struct so *o)
+phia_index_destroy(struct so *o)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&e->status);
 	if (status == SR_SHUTDOWN ||
 	    status == SR_OFFLINE) {
-		return se_dbfree(db, 1);
+		return phia_index_free(db, 1);
 	}
-	se_dbunref(db);
+	phia_index_unref(db);
 	return 0;
 }
 
 static int
-se_dbclose(struct so *o)
+phia_index_close(struct so *o)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
@@ -17922,9 +17922,9 @@ se_dbclose(struct so *o)
 }
 
 static int
-se_dbdrop(struct so *o)
+phia_index_drop(struct so *o)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct phia_env *e = se_of(&db->o);
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
@@ -17938,7 +17938,7 @@ se_dbdrop(struct so *o)
 	return 0;
 }
 
-static struct so *se_dbresult(struct phia_env *e, struct scread *r)
+static struct so *phia_index_result(struct phia_env *e, struct scread *r)
 {
 	struct sv result;
 	sv_init(&result, &sv_vif, r->result, NULL);
@@ -17983,7 +17983,7 @@ static struct so *se_dbresult(struct phia_env *e, struct scread *r)
 }
 
 static void *
-se_dbread(struct sedb *db, struct sedocument *o, struct sx *x, int x_search,
+phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x_search,
           struct sicache *cache)
 {
 	struct phia_env *e = se_of(&db->o);
@@ -18081,7 +18081,7 @@ se_dbread(struct sedb *db, struct sedocument *o, struct sx *x, int x_search,
 	/* read index */
 	rc = sc_read(&q, &e->scheduler);
 	if (rc == 1) {
-		ret = (struct sedocument*)se_dbresult(e, &q);
+		ret = (struct sedocument*)phia_index_result(e, &q);
 		if (ret)
 			o->prefixcopy = NULL;
 	}
@@ -18097,25 +18097,25 @@ error:
 }
 
 static void *
-se_dbget(struct so *o, struct so *v)
+phia_index_get(struct so *o, struct so *v)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
-	return se_dbread(db, key, NULL, 0, NULL);
+	return phia_index_read(db, key, NULL, 0, NULL);
 }
 
 static void *
-se_dbdocument(struct so *o)
+phia_index_document(struct so *o)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	struct phia_env *e = se_of(&db->o);
 	return se_document_new(e, &db->o, NULL);
 }
 
 static void *
-se_dbget_string(struct so *o, const char *path, int *size)
+phia_index_get_string(struct so *o, const char *path, int *size)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	if (strcmp(path, "name") == 0) {
 		int namesize = strlen(db->scheme->name) + 1;
 		if (size)
@@ -18130,9 +18130,9 @@ se_dbget_string(struct so *o, const char *path, int *size)
 }
 
 static int64_t
-se_dbget_int(struct so *o, const char *path)
+phia_index_get_int(struct so *o, const char *path)
 {
-	struct sedb *db = se_cast(o, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
 	if (strcmp(path, "id") == 0)
 		return db->scheme->id;
 	else
@@ -18143,25 +18143,25 @@ se_dbget_int(struct so *o, const char *path)
 
 static struct soif sedbif =
 {
-	.open         = se_dbopen,
-	.close        = se_dbclose,
-	.destroy      = se_dbdestroy,
+	.open         = phia_index_open,
+	.close        = phia_index_close,
+	.destroy      = phia_index_destroy,
 	.free         = NULL,
-	.document     = se_dbdocument,
-	.drop         = se_dbdrop,
+	.document     = phia_index_document,
+	.drop         = phia_index_drop,
 	.setstring    = NULL,
 	.setint       = NULL,
 	.setobject    = NULL,
 	.getobject    = NULL,
-	.getstring    = se_dbget_string,
-	.getint       = se_dbget_int,
-	.get          = se_dbget,
+	.getstring    = phia_index_get_string,
+	.getint       = phia_index_get_int,
+	.get          = phia_index_get,
 	.cursor       = NULL,
 };
 
-static struct so *se_dbnew(struct phia_env *e, char *name, int size)
+static struct so *phia_index_new(struct phia_env *e, char *name, int size)
 {
-	struct sedb *o = ss_malloc(&e->a, sizeof(struct sedb));
+	struct phia_index *o = ss_malloc(&e->a, sizeof(struct phia_index));
 	if (ssunlikely(o == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
@@ -18176,7 +18176,7 @@ static struct so *se_dbnew(struct phia_env *e, char *name, int size)
 	o->r = si_r(o->index);
 	o->scheme = si_scheme(o->index);
 	int rc;
-	rc = se_dbscheme_init(o, name, size);
+	rc = phia_index_scheme_init(o, name, size);
 	if (ssunlikely(rc == -1)) {
 		si_close(o->index);
 		ss_free(&e->a, o);
@@ -18189,9 +18189,9 @@ static struct so *se_dbnew(struct phia_env *e, char *name, int size)
 	return &o->o;
 }
 
-static struct so *se_dbmatch(struct phia_env *e, char *name)
+static struct so *phia_index_match(struct phia_env *e, char *name)
 {
-	struct sedb *db;
+	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {
 		if (strcmp(db->scheme->name, name) == 0)
 			return &db->o;
@@ -18199,14 +18199,14 @@ static struct so *se_dbmatch(struct phia_env *e, char *name)
 	return NULL;
 }
 
-static int se_dbvisible(struct sedb *db, uint64_t txn)
+static int phia_index_visible(struct phia_index *db, uint64_t txn)
 {
 	return txn > db->txn_min && txn <= db->txn_max;
 }
 
-static void se_dbbind(struct phia_env *e)
+static void phia_index_bind(struct phia_env *e)
 {
-	struct sedb *db;
+	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {
 		int status = sr_status(&db->index->status);
 		if (sr_statusactive_is(status))
@@ -18214,21 +18214,21 @@ static void se_dbbind(struct phia_env *e)
 	}
 }
 
-static void se_dbunbind(struct phia_env *e, uint64_t txn)
+static void phia_index_unbind(struct phia_env *e, uint64_t txn)
 {
-	struct sedb *db, *tmp;
+	struct phia_index *db, *tmp;
 	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
-		if (se_dbvisible(db, txn))
-			se_dbunref(db);
+		if (phia_index_visible(db, txn))
+			phia_index_unref(db);
 	}
 }
 
-static int se_dbrecoverbegin(struct sedb *db)
+static int phia_index_recoverbegin(struct phia_index *db)
 {
 	/* open and recover repository */
 	sr_statusset(&db->index->status, SR_RECOVER);
 	struct phia_env *e = se_of(&db->o);
-	/* do not allow to recover existing databases
+	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
 	if (sr_status(&e->status) == SR_ONLINE)
@@ -18244,7 +18244,7 @@ error:
 	return -1;
 }
 
-static int se_dbrecoverend(struct sedb *db)
+static int phia_index_recoverend(struct phia_index *db)
 {
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(status == SR_DROP_PENDING))
@@ -18316,7 +18316,7 @@ se_document_opt(const char *path)
 static inline int
 se_document_create(struct sedocument *o)
 {
-	struct sedb *db = (struct sedb*)o->o.parent;
+	struct phia_index *db = (struct phia_index*)o->o.parent;
 	struct phia_env *e = se_of(&db->o);
 
 	assert(o->v.v == NULL);
@@ -18423,7 +18423,7 @@ static struct sfv*
 se_document_setfield(struct sedocument *v, const char *path, void *pointer, int size)
 {
 	struct phia_env *e = se_of(&v->o);
-	struct sedb *db = (struct sedb*)v->o.parent;
+	struct phia_index *db = (struct phia_index*)v->o.parent;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 	if (ssunlikely(field == NULL))
 		return NULL;
@@ -18499,14 +18499,14 @@ se_document_getstring(struct so *o, const char *path, int *size)
 	switch (se_document_opt(path)) {
 	case SE_DOCUMENT_FIELD: {
 		/* match field */
-		struct sedb *db = (struct sedb*)o->parent;
+		struct phia_index *db = (struct phia_index*)o->parent;
 		struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 		if (ssunlikely(field == NULL))
 			return NULL;
-		/* database result document */
+		/* result document */
 		if (v->v.v)
 			return sv_field(&v->v, db->r, field->position, (uint32_t*)size);
-		/* database field document */
+		/* field document */
 		assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
 		struct sfv *fv = &v->fields[field->position];
 		if (fv->pointer == NULL)
@@ -18668,8 +18668,8 @@ static struct sotype se_o[] =
 	{ 0x00FCDE12L, "env_conf_kv"       },
 	{ 0x64519F00L, "req"               },
 	{ 0x2FABCDE2L, "document"          },
-	{ 0x34591111L, "database"          },
-	{ 0x63102654L, "database_cursor"   },
+	{ 0x34591111L, "index"		   },
+	{ 0x63102654L, "index_cursor"	   },
 	{ 0x13491FABL, "transaction"       },
 	{ 0x22FA0348L, "view"              },
 	{ 0x45ABCDFAL, "cursor"            }
@@ -18679,7 +18679,7 @@ static inline int
 phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
 {
 	struct phia_env *e = se_of(&t->o);
-	struct sedb *db = se_cast(o->o.parent, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(o->o.parent, struct phia_index*, SEDB);
 
 	int auto_close = !o->created;
 
@@ -18689,13 +18689,13 @@ phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
 		goto error;
 	}
 
-	/* validate database status */
+	/* validate index status */
 	int status = sr_status(&db->index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (ssunlikely(! se_dbvisible(db, t->t.id))) {
-			sr_error(&e->error, "%s", "database is invisible for the transaction");
+		if (ssunlikely(! phia_index_visible(db, t->t.id))) {
+			sr_error(&e->error, "%s", "index is invisible for the transaction");
 			goto error;
 		}
 		break;
@@ -18748,7 +18748,7 @@ phia_tx_upsert(struct phia_tx *tx, struct so *v)
 {
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
 	struct phia_env *e = se_of(&tx->o);
-	struct sedb *db = se_cast(v->parent, struct sedb*, SEDB);
+	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
 	return phia_tx_write(tx, key, SVUPSERT);
@@ -18767,14 +18767,14 @@ phia_tx_get(struct so *o, struct so *v)
 	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
 	struct phia_env *e = se_of(&t->o);
-	struct sedb *db = se_cast(key->o.parent, struct sedb*, SEDB);
-	/* validate database */
+	struct phia_index *db = se_cast(key->o.parent, struct phia_index*, SEDB);
+	/* validate index */
 	int status = sr_status(&db->index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (ssunlikely(! se_dbvisible(db, t->t.id))) {
-			sr_error(&e->error, "%s", "database is invisible for the transaction");
+		if (ssunlikely(! phia_index_visible(db, t->t.id))) {
+			sr_error(&e->error, "%s", "index is invisible to the transaction");
 			goto error;
 		}
 		break;
@@ -18783,7 +18783,7 @@ phia_tx_get(struct so *o, struct so *v)
 		break;
 	default: goto error;
 	}
-	return se_dbread(db, key, &t->t, 1, NULL);
+	return phia_index_read(db, key, &t->t, 1, NULL);
 error:
 	so_destroy(&key->o);
 	return NULL;
@@ -18806,7 +18806,7 @@ phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 	sx_gc(&t->t);
 	sv_logreset(&t->log);
 	sr_stattx(&e->stat, t->start, count, rlb, conflict);
-	se_dbunbind(e, t->t.id);
+	phia_index_unbind(e, t->t.id);
 	so_free(&t->o);
 }
 
@@ -18823,7 +18823,7 @@ static int
 phia_tx_prepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
 {
 	struct sicache *cache = ptr;
-	struct sedb *db = (struct sedb*)o;
+	struct phia_index *db = (struct phia_index*)o;
 	struct phia_env *e = se_of(&db->o);
 
 	struct scread q;
@@ -18968,7 +18968,7 @@ phia_tx_new(struct phia_env *e)
 	t->lsn = 0;
 	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
-	se_dbbind(e);
+	phia_index_bind(e);
 	return t;
 }
 
@@ -18987,8 +18987,8 @@ se_viewdestroy(struct so *o)
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
 	struct phia_env *e = se_of(o);
 	uint32_t id = s->t.id;
-	se_dbunbind(e, id);
-	if (sslikely(! s->db_view_only))
+	phia_index_unbind(e, id);
+	if (sslikely(! s->cursor_only))
 		sx_rollback(&s->t);
 	ss_bufreset(&s->name);
 	rlist_del(&s->link);
@@ -19002,12 +19002,12 @@ se_viewget(struct so *o, struct so *key)
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
 	struct phia_env *e = se_of(o);
 	struct sedocument *v = se_cast(key, struct sedocument*, SEDOCUMENT);
-	struct sedb *db = se_cast(key->parent, struct sedb*, SEDB);
-	if (s->db_view_only) {
-		sr_error(&e->error, "view '%s' is in db-cursor-only mode", s->name);
+	struct phia_index *db = se_cast(key->parent, struct phia_index*, SEDB);
+	if (s->cursor_only) {
+		sr_error(&e->error, "view '%s' is in cursor-only mode", s->name);
 		return NULL;
 	}
-	return se_dbread(db, v, &s->t, 0, NULL);
+	return phia_index_read(db, v, &s->t, 0, NULL);
 }
 
 static void*
@@ -19015,8 +19015,8 @@ se_viewcursor(struct so *o)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
 	struct phia_env *e = se_of(o);
-	if (s->db_view_only) {
-		sr_error(&e->error, "view '%s' is in db-view-only mode", s->name);
+	if (s->cursor_only) {
+		sr_error(&e->error, "view '%s' is in cursor-only mode", s->name);
 		return NULL;
 	}
 	return se_cursornew(e, s->vlsn);
@@ -19035,11 +19035,11 @@ static int
 se_viewset_int(struct so *o, const char *path, int64_t v ssunused)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	if (strcmp(path, "db-view-only") == 0) {
-		if (s->db_view_only)
+	if (strcmp(path, "cursor-only") == 0) {
+		if (s->cursor_only)
 			return -1;
 		sx_rollback(&s->t);
-		s->db_view_only = 1;
+		s->cursor_only = 1;
 		return 0;
 	}
 	return -1;
@@ -19095,8 +19095,8 @@ se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
 	ss_bufadvance(&s->name, size + 1);
 	sv_loginit(&s->log);
 	sx_begin(&e->xm, &s->t, SXRO, &s->log, vlsn);
-	s->db_view_only = 0;
-	se_dbbind(e);
+	s->cursor_only = 0;
+	phia_index_bind(e);
 	rlist_add(&e->view, &s->link);
 	return &s->o;
 }
@@ -19105,7 +19105,7 @@ static int se_viewupdate(struct seview *s)
 {
 	struct phia_env *e = se_of(&s->o);
 	uint32_t id = s->t.id;
-	if (! s->db_view_only) {
+	if (! s->cursor_only) {
 		sx_rollback(&s->t);
 		sx_begin(&e->xm, &s->t, SXRO, &s->log, s->vlsn);
 	}
@@ -19141,13 +19141,13 @@ se_viewdb_get(struct so *o, struct so *v ssunused)
 	}
 	if (ssunlikely(c->pos == NULL))
 		return NULL;
-	c->pos += sizeof(struct sedb**);
+	c->pos += sizeof(struct phia_index**);
 	if (c->pos >= c->list.p) {
 		c->pos = NULL;
 		c->v = NULL;
 		return NULL;
 	}
-	c->v = *(struct sedb**)c->pos;
+	c->v = *(struct phia_index**)c->pos;
 	return c->v;
 }
 
@@ -19174,12 +19174,12 @@ se_viewdb_open(struct seviewdb *c)
 {
 	struct phia_env *e = se_of(&c->o);
 	int rc;
-	struct sedb *db;
+	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {
 		int status = sr_status(&db->index->status);
 		if (status != SR_ONLINE)
 			continue;
-		if (se_dbvisible(db, c->txn_id)) {
+		if (phia_index_visible(db, c->txn_id)) {
 			rc = ss_bufadd(&c->list, &e->a, &db, sizeof(db));
 			if (ssunlikely(rc == -1))
 				return -1;
@@ -19189,7 +19189,7 @@ se_viewdb_open(struct seviewdb *c)
 		return 0;
 	c->ready = 1;
 	c->pos = c->list.s;
-	c->v = *(struct sedb**)c->list.s;
+	c->v = *(struct phia_index**)c->list.s;
 	return 0;
 }
 
