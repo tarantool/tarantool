@@ -2,14 +2,11 @@ box.cfg.phia
 ---
 - expire_period: 0
   branch_age_wm: 0
-  node_preload: 0
   memory_limit: 0
   compact_wm: 2
   threads: 3
-  sync: 2
   snapshot_period: 0
   branch_age: 0
-  mmap: 1
   branch_age_period: 0
   branch_prio: 2
   expire_prio: 0
@@ -24,10 +21,6 @@ index = space:create_index('primary', {type = 'tree', amqf=1, read_oldest=0, par
 ---
 ...
 box.phia["db.".. tostring(space.id)..":0.amqf"]
----
-- '1'
-...
-box.phia["db.".. tostring(space.id)..":0.mmap"]
 ---
 - '1'
 ...

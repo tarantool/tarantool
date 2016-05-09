@@ -16,9 +16,6 @@ local default_phia_cfg = {
     snapshot_period   = 0,
     expire_period     = 0,
     expire_prio       = 0,
-    node_preload      = 0,
-    mmap              = 1,
-    sync              = 2
 }
 
 -- all available options
@@ -70,9 +67,6 @@ local phia_template_cfg = {
     snapshot_period   = 'number',
     expire_period     = 'number',
     expire_prio       = 'number',
-    node_preload      = 'number',
-    mmap              = 'number',
-    sync              = 'number'
 }
 
 -- types of available options

@@ -8291,15 +8291,12 @@ struct sdreadarg {
 	struct ssbuf      *buf_read;
 	struct ssiter     *index_iter;
 	struct ssiter     *page_iter;
-	struct ssmmap     *mmap;
 	struct ssblob     *memory;
 	struct ssfile     *file;
 	enum ssorder     o;
 	int         has;
 	uint64_t    has_vlsn;
 	int         use_memory;
-	int         use_mmap;
-	int         use_mmap_copy;
 	int         use_compression;
 	struct ssfilterif *compression_if;
 	struct runtime         *r;
@@ -8341,9 +8338,6 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		char *page_pointer;
 		if (arg->use_memory) {
 			page_pointer = arg->memory->map.p + branch_ref_offset;
-		} else
-		if (arg->use_mmap) {
-			page_pointer = arg->mmap->p + ref->offset;
 		} else {
 			ss_bufreset(arg->buf_read);
 			rc = ss_bufensure(arg->buf_read, r->a, ref->size);
@@ -8387,17 +8381,6 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 	/* in-memory mode */
 	if (arg->use_memory) {
 		sd_pageinit(&i->page, (struct sdpageheader*)(arg->memory->map.p + branch_ref_offset));
-		return 0;
-	}
-
-	/* mmap */
-	if (arg->use_mmap) {
-		if (arg->use_mmap_copy) {
-			memcpy(arg->buf->s, arg->mmap->p + ref->offset, ref->sizeorigin);
-			sd_pageinit(&i->page, (struct sdpageheader*)(arg->buf->s));
-		} else {
-			sd_pageinit(&i->page, (struct sdpageheader*)(arg->mmap->p + ref->offset));
-		}
 		return 0;
 	}
 
@@ -10006,14 +9989,12 @@ struct sischeme {
 	char       *path;
 	uint32_t    path_fail_on_exists;
 	uint32_t    path_fail_on_drop;
-	uint32_t    mmap;
 	enum sistorage storage;
 	char       *storage_sz;
 	uint32_t    sync;
 	uint64_t    node_size;
 	uint32_t    node_page_size;
 	uint32_t    node_page_checksum;
-	uint32_t    node_compact_load;
 	uint32_t    expire;
 	uint32_t    compression;
 	char       *compression_sz;
@@ -10140,7 +10121,6 @@ struct sinode {
 	pthread_mutex_t reflock;
 	struct svindex    i0, i1;
 	struct ssfile     file;
-	struct ssmmap     map, map_swap;
 	struct ssrbnode   node;
 	struct ssrqnode   nodecompact;
 	struct ssrqnode   nodebranch;
@@ -10156,8 +10136,6 @@ si_nodeopen(struct sinode*, struct runtime*, struct sischeme*,
 static int
 si_nodecreate(struct sinode*, struct runtime*, struct sischeme*, struct sdid*);
 static int si_nodefree(struct sinode*, struct runtime*, int);
-static int si_nodemap(struct sinode*, struct runtime*);
-static int si_noderead(struct sinode*, struct runtime*, struct ssbuf*);
 static int si_nodegc_index(struct runtime*, struct svindex*);
 static int si_nodegc(struct sinode*, struct runtime*, struct sischeme*);
 static int si_nodeseal(struct sinode*, struct runtime*, struct sischeme*);
@@ -11419,18 +11397,6 @@ si_branchcreate(struct si *index, struct sdc *c,
 		}
 		branch->copy = copy;
 	}
-	/* mmap support */
-	if (index->scheme.mmap) {
-		ss_mmapinit(&parent->map_swap);
-		rc = ss_vfsmmap(r->vfs, &parent->map_swap, parent->file.fd,
-		              parent->file.size, 1);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' mmap error: %s",
-			               ss_pathof(&parent->file.path),
-			               strerror(errno));
-			goto e1;
-		}
-	}
 
 	*result = branch;
 	return 0;
@@ -11496,21 +11462,8 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 	si_nodeunrotate(n);
 	si_nodeunlock(n);
 	si_plannerupdate(&index->p, SI_BRANCH|SI_COMPACT, n);
-	struct ssmmap swap_map = n->map;
-	n->map = n->map_swap;
-	memset(&n->map_swap, 0, sizeof(n->map_swap));
 	si_unlock(index);
 
-	/* gc */
-	if (index->scheme.mmap) {
-		int rc = ss_vfsmunmap(r->vfs, &swap_map);
-		if (ssunlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' munmap error: %s",
-			               ss_pathof(&n->file.path),
-			               strerror(errno));
-			return -1;
-		}
-	}
 	si_nodegc_index(r, &swap);
 	return 1;
 }
@@ -11536,20 +11489,6 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	rc = sv_mergeprepare(&merge, r, node->branch_count + 1);
 	if (ssunlikely(rc == -1))
 		return -1;
-
-	/* read node file into memory */
-	int use_mmap = index->scheme.mmap;
-	struct ssmmap *map = &node->map;
-	struct ssmmap  preload;
-	if (index->scheme.node_compact_load) {
-		rc = si_noderead(node, r, &c->c);
-		if (ssunlikely(rc == -1))
-			return -1;
-		preload.p = c->c.s;
-		preload.size = ss_bufused(&c->c);
-		map = &preload;
-		use_mmap = 1;
-	}
 
 	/* include vindex into merge process */
 	struct svmergesrc *s;
@@ -11582,15 +11521,12 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 			.index_iter      = &cbuf->index_iter,
 			.page_iter       = &cbuf->page_iter,
 			.use_memory      = node->in_memory,
-			.use_mmap        = use_mmap,
-			.use_mmap_copy   = 0,
 			.use_compression = compression,
 			.compression_if  = compression_if,
 			.has             = 0,
 			.has_vlsn        = 0,
 			.o               = SS_GTE,
 			.memory          = &b->copy,
-			.mmap            = map,
 			.file            = &node->file,
 			.r               = r
 		};
@@ -11966,13 +11902,6 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			if (ssunlikely(rc == -1))
 				goto error;
 		}
-		/* mmap mode */
-		if (index->scheme.mmap) {
-			rc = si_nodemap(n, r);
-			if (ssunlikely(rc == -1))
-				goto error;
-		}
-
 		/* add node to the list */
 		rc = ss_bufadd(result, index->r.a, &n, sizeof(struct sinode*));
 		if (ssunlikely(rc == -1)) {
@@ -12201,8 +12130,6 @@ static struct sinode *si_nodenew(struct runtime *r)
 	n->refs = 0;
 	tt_pthread_mutex_init(&n->reflock, NULL);
 	ss_fileinit(&n->file, r->vfs);
-	ss_mmapinit(&n->map);
-	ss_mmapinit(&n->map_swap);
 	sv_indexinit(&n->i0);
 	sv_indexinit(&n->i1);
 	ss_rbinitnode(&n->node);
@@ -12230,14 +12157,7 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 {
 	int rcret = 0;
 
-	int rc = ss_vfsmunmap(r->vfs, &n->map);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' munmap error: %s",
-		               ss_pathof(&n->file.path),
-		               strerror(errno));
-		rcret = -1;
-	}
-	rc = ss_fileclose(&n->file);
+	int rc = ss_fileclose(&n->file);
 	if (ssunlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' close error: %s",
 		               ss_pathof(&n->file.path),
@@ -12381,11 +12301,6 @@ si_nodeopen(struct sinode *n, struct runtime *r,
 	rc = si_noderecover(n, r, sn, in_memory);
 	if (ssunlikely(rc == -1))
 		return -1;
-	if (scheme->mmap) {
-		rc = si_nodemap(n, r);
-		if (ssunlikely(rc == -1))
-			return -1;
-	}
 	return 0;
 }
 
@@ -12400,18 +12315,6 @@ si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
 	if (ssunlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' create error: %s",
 		               path.path, strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
-static int si_nodemap(struct sinode *n, struct runtime *r)
-{
-	int rc = ss_vfsmmap(r->vfs, &n->map, n->file.fd, n->file.size, 1);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' mmap error: %s",
-		               ss_pathof(&n->file.path),
-		               strerror(errno));
 		return -1;
 	}
 	return 0;
@@ -12451,22 +12354,6 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 		rcret = -1;
 	ss_free(r->a, n);
 	return rcret;
-}
-
-static int si_noderead(struct sinode *n, struct runtime *r, struct ssbuf *dest)
-{
-	int rc = ss_bufensure(dest, r->a, n->file.size);
-	if (ssunlikely(rc == -1))
-		return sr_oom_malfunction(r->e);
-	rc = ss_filepread(&n->file, 0, dest->s, n->file.size);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' read error: %s",
-		               ss_pathof(&n->file.path),
-		               strerror(errno));
-		return -1;
-	}
-	ss_bufadvance(dest, n->file.size);
-	return 0;
 }
 
 static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *scheme)
@@ -13333,14 +13220,11 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 		.index_iter      = &c->index_iter,
 		.page_iter       = &c->page_iter,
 		.use_memory      = n->in_memory,
-		.use_mmap        = scheme->mmap,
-		.use_mmap_copy   = 0,
 		.use_compression = compression,
 		.compression_if  = compression_if,
 		.has             = q->has,
 		.has_vlsn        = q->vlsn,
 		.o               = SS_GTE,
-		.mmap            = &n->map,
 		.memory          = &b->copy,
 		.file            = &n->file,
 		.r               = q->r
@@ -13459,15 +13343,12 @@ si_rangebranch(struct siread *q, struct sinode *n,
 		.index_iter      = &c->index_iter,
 		.page_iter       = &c->page_iter,
 		.use_memory      = n->in_memory,
-		.use_mmap        = scheme->mmap,
-		.use_mmap_copy   = 1,
 		.use_compression = compression,
 		.compression_if  = compression_if,
 		.has             = 0,
 		.has_vlsn        = 0,
 		.o               = q->order,
 		.memory          = &b->copy,
-		.mmap            = &n->map,
 		.file            = &n->file,
 		.r               = q->r
 	};
@@ -13776,11 +13657,6 @@ si_bootstrap(struct si *i, uint64_t parent)
 		goto e1;
 	if (blob) {
 		rc = ss_blobfit(blob);
-		if (ssunlikely(rc == -1))
-			goto e1;
-	}
-	if (i->scheme.mmap) {
-		rc = si_nodemap(n, r);
 		if (ssunlikely(rc == -1))
 			goto e1;
 	}
@@ -16942,9 +16818,7 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		sr_C(&p, pc, se_confv_dboffline, "path", SS_STRINGPTR, &o->scheme->path, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "path_fail_on_exists", SS_U32, &o->scheme->path_fail_on_exists, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "path_fail_on_drop", SS_U32, &o->scheme->path_fail_on_drop, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "mmap", SS_U32, &o->scheme->mmap, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "sync", SS_U32, &o->scheme->sync, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "node_preload", SS_U32, &o->scheme->node_compact_load, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "node_size", SS_U64, &o->scheme->node_size, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "page_size", SS_U32, &o->scheme->node_page_size, 0, o);
 		sr_C(&p, pc, se_confv_dboffline, "page_checksum", SS_U32, &o->scheme->node_page_checksum, 0, o);
@@ -17676,10 +17550,8 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	scheme->name[size] = 0;
 	scheme->id                    = sr_seq(&e->seq, SR_DSNNEXT);
 	scheme->sync                  = 2;
-	scheme->mmap                  = 0;
 	scheme->storage               = SI_SCACHE;
 	scheme->node_size             = 64 * 1024 * 1024;
-	scheme->node_compact_load     = 0;
 	scheme->node_page_size        = 128 * 1024;
 	scheme->node_page_checksum    = 1;
 	scheme->compression_key       = 0;

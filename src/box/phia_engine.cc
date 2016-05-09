@@ -331,7 +331,6 @@ PhiaEngine::init()
 	phia_setint(env, "compaction.0.snapshot_period", cfg_geti("phia.snapshot_period"));
 	phia_setint(env, "compaction.0.expire_period", cfg_geti("phia.expire_period"));
 	phia_setint(env, "compaction.0.expire_prio", cfg_geti("phia.expire_prio"));
-	phia_setint(env, "log.enable", 0);
 	phia_setint(env, "phia.recover", 3);
 	int rc = phia_open(env);
 	if (rc == -1)
