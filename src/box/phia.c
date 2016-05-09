@@ -16174,7 +16174,7 @@ phia_index_active(struct phia_index *o) {
 
 static struct phia_index *phia_index_new(struct phia_env*, char*, int);
 static struct phia_index *phia_index_match(struct phia_env*, char*);
-static struct so *phia_index_result(struct phia_env*, struct scread*);
+static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
 static void *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
 static int phia_index_visible(struct phia_index*, uint64_t);
@@ -17934,7 +17934,8 @@ phia_index_drop(struct so *o)
 	return 0;
 }
 
-static struct so *phia_index_result(struct phia_env *e, struct scread *r)
+static struct phia_document *
+phia_index_result(struct phia_env *e, struct scread *r)
 {
 	struct sv result;
 	sv_init(&result, &sv_vif, r->result, NULL);
@@ -17974,12 +17975,12 @@ static struct so *phia_index_result(struct phia_env *e, struct scread *r)
 
 	v->created = 1;
 	v->flagset = 1;
-	return &v->o;
+	return v;
 }
 
 static void *
-phia_index_read(struct phia_index *db, struct phia_document *o, struct sx *x, int x_search,
-          struct sicache *cache)
+phia_index_read(struct phia_index *db, struct phia_document *o,
+		struct sx *x, int x_search, struct sicache *cache)
 {
 	struct phia_env *e = se_of(&db->o);
 	uint64_t start  = clock_monotonic64();
@@ -18076,7 +18077,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o, struct sx *x, in
 	/* read index */
 	rc = sc_read(&q, &e->scheduler);
 	if (rc == 1) {
-		ret = (struct phia_document*)phia_index_result(e, &q);
+		ret = phia_index_result(e, &q);
 		if (ret)
 			o->prefixcopy = NULL;
 	}

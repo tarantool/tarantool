@@ -436,7 +436,7 @@ PhiaEngine::join(struct xstream *stream)
 		}
 		/* tell cursor not to hold a transaction, which
 		 * in result enables compaction process
-		 * for a duplicates */
+		 * for duplicates */
 		phia_setint(cursor, "read_commited", 1);
 
 		void *obj = phia_document(db);
