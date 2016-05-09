@@ -4826,7 +4826,6 @@ struct soif {
 	int      (*close)(struct so*);
 	int      (*destroy)(struct so*);
 	void     (*free)(struct so*);
-	void    *(*document)(struct so*);
 	int      (*drop)(struct so*);
 	int      (*setstring)(struct so*, const char*, void*, int);
 	int      (*setint)(struct so*, const char*, int64_t);
@@ -16083,7 +16082,7 @@ static inline struct phia_env *se_of(struct so *o) {
 	return (struct phia_env*)o->env;
 }
 
-struct sedocument {
+struct phia_document {
 	struct so        o;
 	int       created;
 	struct sv        v;
@@ -16113,10 +16112,11 @@ struct sedocument {
 	int       event;
 };
 
-static struct so *se_document_new(struct phia_env*, struct so*, struct sv*);
+static struct phia_document *
+phia_document_new(struct phia_env*, struct so*, const struct sv*);
 
 static inline int
-se_document_validate_ro(struct sedocument *o, struct so *dest)
+phia_document_validate_ro(struct phia_document *o, struct so *dest)
 {
 	struct phia_env *e = se_of(&o->o);
 	if (ssunlikely(o->o.parent != dest))
@@ -16130,7 +16130,7 @@ se_document_validate_ro(struct sedocument *o, struct so *dest)
 }
 
 static inline int
-se_document_validate(struct sedocument *o, struct so *dest, uint8_t flags)
+phia_document_validate(struct phia_document *o, struct so *dest, uint8_t flags)
 {
 	struct phia_env *e = se_of(&o->o);
 	if (ssunlikely(o->o.parent != dest))
@@ -16172,11 +16172,11 @@ phia_index_active(struct phia_index *o) {
 
 
 
-static struct so *phia_index_new(struct phia_env*, char*, int);
-static struct so *phia_index_match(struct phia_env*, char*);
+static struct phia_index *phia_index_new(struct phia_env*, char*, int);
+static struct phia_index *phia_index_match(struct phia_env*, char*);
 static struct so *phia_index_result(struct phia_env*, struct scread*);
 static void *
-phia_index_read(struct phia_index*, struct sedocument*, struct sx*, int, struct sicache*);
+phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_env*);
 static void phia_index_unbind(struct phia_env*, uint64_t);
@@ -16354,7 +16354,6 @@ static struct soif seif =
 	.close        = se_close,
 	.destroy      = se_destroy,
 	.free         = NULL,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
@@ -16686,15 +16685,15 @@ se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 	struct phia_env *e = s->ptr;
 	if (s->op == SR_WRITE) {
 		char *name = s->value;
-		struct phia_index *db = (struct phia_index*)phia_index_match(e, name);
-		if (ssunlikely(db)) {
+		struct phia_index *index = phia_index_match(e, name);
+		if (ssunlikely(index)) {
 			sr_error(&e->error, "index '%s' already exists", name);
 			return -1;
 		}
-		db = (struct phia_index*)phia_index_new(e, name, s->valuesize);
-		if (ssunlikely(db == NULL))
+		index = phia_index_new(e, name, s->valuesize);
+		if (ssunlikely(index == NULL))
 			return -1;
-		rlist_add(&e->db, &db->link);
+		rlist_add(&e->db, &index->link);
 		return 0;
 	}
 
@@ -17435,7 +17434,6 @@ static struct soif seconfkvif =
 	.close        = NULL,
 	.destroy      = se_confkv_destroy,
 	.free         = se_confkv_free,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -17524,7 +17522,6 @@ static struct soif seconfcursorif =
 	.open         = NULL,
 	.destroy      = se_confcursor_destroy,
 	.free         = se_confcursor_free,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -17588,7 +17585,7 @@ static void*
 se_cursorget(struct so *o, struct so *v)
 {
 	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
 	if (ssunlikely(! key->orderset))
 		key->order = SS_GTE;
@@ -17625,7 +17622,6 @@ static struct soif secursorif =
 	.close        = NULL,
 	.destroy      = se_cursordestroy,
 	.free         = se_cursorfree,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = se_cursorset_int,
@@ -17944,7 +17940,7 @@ static struct so *phia_index_result(struct phia_env *e, struct scread *r)
 	sv_init(&result, &sv_vif, r->result, NULL);
 	r->result = NULL;
 
-	struct sedocument *v = (struct sedocument*)se_document_new(e, r->db, &result);
+	struct phia_document *v = phia_document_new(e, r->db, &result);
 	if (ssunlikely(v == NULL))
 		return NULL;
 	v->cache_only   = r->arg.cache_only;
@@ -17966,8 +17962,7 @@ static struct so *phia_index_result(struct phia_env *e, struct scread *r)
 	v->order = r->arg.order;
 	if (v->order == SS_GTE)
 		v->order = SS_GT;
-	else
-	if (v->order == SS_LTE)
+	else if (v->order == SS_LTE)
 		v->order = SS_LT;
 
 	/* set prefix */
@@ -17983,7 +17978,7 @@ static struct so *phia_index_result(struct phia_env *e, struct scread *r)
 }
 
 static void *
-phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x_search,
+phia_index_read(struct phia_index *db, struct phia_document *o, struct sx *x, int x_search,
           struct sicache *cache)
 {
 	struct phia_env *e = se_of(&db->o);
@@ -17994,7 +17989,7 @@ phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x
 	int rc = so_open(&o->o);
 	if (ssunlikely(rc == -1))
 		goto error;
-	rc = se_document_validate_ro(o, &db->o);
+	rc = phia_document_validate_ro(o, &db->o);
 	if (ssunlikely(rc == -1))
 		goto error;
 	if (ssunlikely(! sr_online(&db->index->status)))
@@ -18003,7 +17998,7 @@ phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x
 	struct sv vup;
 	sv_init(&vup, &sv_vif, NULL, NULL);
 
-	struct sedocument *ret = NULL;
+	struct phia_document *ret = NULL;
 
 	/* concurrent */
 	if (x_search && o->order == SS_EQ) {
@@ -18013,7 +18008,7 @@ phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x
 		if (ssunlikely(rc == -1 || rc == 2 /* delete */))
 			goto error;
 		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
-			ret = (struct sedocument*)se_document_new(e, &db->o, &vup);
+			ret = phia_document_new(e, &db->o, &vup);
 			if (sslikely(ret)) {
 				ret->cache_only  = o->cache_only;
 				ret->oldest_only = o->oldest_only;
@@ -18081,7 +18076,7 @@ phia_index_read(struct phia_index *db, struct sedocument *o, struct sx *x, int x
 	/* read index */
 	rc = sc_read(&q, &e->scheduler);
 	if (rc == 1) {
-		ret = (struct sedocument*)phia_index_result(e, &q);
+		ret = (struct phia_document*)phia_index_result(e, &q);
 		if (ret)
 			o->prefixcopy = NULL;
 	}
@@ -18100,16 +18095,8 @@ static void *
 phia_index_get(struct so *o, struct so *v)
 {
 	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_index_read(db, key, NULL, 0, NULL);
-}
-
-static void *
-phia_index_document(struct so *o)
-{
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_env *e = se_of(&db->o);
-	return se_document_new(e, &db->o, NULL);
 }
 
 static void *
@@ -18147,7 +18134,6 @@ static struct soif sedbif =
 	.close        = phia_index_close,
 	.destroy      = phia_index_destroy,
 	.free         = NULL,
-	.document     = phia_index_document,
 	.drop         = phia_index_drop,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -18159,7 +18145,8 @@ static struct soif sedbif =
 	.cursor       = NULL,
 };
 
-static struct so *phia_index_new(struct phia_env *e, char *name, int size)
+static struct phia_index *
+phia_index_new(struct phia_env *e, char *name, int size)
 {
 	struct phia_index *o = ss_malloc(&e->a, sizeof(struct phia_index));
 	if (ssunlikely(o == NULL)) {
@@ -18186,15 +18173,15 @@ static struct so *phia_index_new(struct phia_env *e, char *name, int size)
 	sx_indexinit(&o->coindex, &e->xm, o->r, &o->o, o->index);
 	o->txn_min = sx_min(&e->xm);
 	o->txn_max = UINT32_MAX;
-	return &o->o;
+	return o;
 }
 
-static struct so *phia_index_match(struct phia_env *e, char *name)
+static struct phia_index *phia_index_match(struct phia_env *e, char *name)
 {
-	struct phia_index *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		if (strcmp(db->scheme->name, name) == 0)
-			return &db->o;
+	struct phia_index *index;
+	rlist_foreach_entry(index, &e->db, link) {
+		if (strcmp(index->scheme->name, name) == 0)
+			return index;
 	}
 	return NULL;
 }
@@ -18270,7 +18257,7 @@ enum {
 };
 
 static inline int
-se_document_opt(const char *path)
+phia_document_opt(const char *path)
 {
 	switch (path[0]) {
 	case 'o':
@@ -18314,7 +18301,7 @@ se_document_opt(const char *path)
 }
 
 static inline int
-se_document_create(struct sedocument *o)
+phia_document_create(struct phia_document *o)
 {
 	struct phia_index *db = (struct phia_index*)o->o.parent;
 	struct phia_env *e = se_of(&db->o);
@@ -18382,14 +18369,14 @@ allocate:
 }
 
 static int
-se_document_open(struct so *o)
+phia_document_open(struct so *o)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
 	if (sslikely(v->created)) {
 		assert(v->v.v != NULL);
 		return 0;
 	}
-	int rc = se_document_create(v);
+	int rc = phia_document_create(v);
 	if (ssunlikely(rc == -1))
 		return -1;
 	v->created = 1;
@@ -18397,16 +18384,16 @@ se_document_open(struct so *o)
 }
 
 static void
-se_document_free(struct so *o)
+phia_document_free(struct so *o)
 {
 	struct phia_env *e = se_of(o);
 	ss_free(&e->a, o);
 }
 
 static int
-se_document_destroy(struct so *o)
+phia_document_destroy(struct so *o)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(o);
 	if (v->v.v)
 		si_gcv(&e->r, v->v.v);
@@ -18420,7 +18407,7 @@ se_document_destroy(struct so *o)
 }
 
 static struct sfv*
-se_document_setfield(struct sedocument *v, const char *path, void *pointer, int size)
+phia_document_setfield(struct phia_document *v, const char *path, void *pointer, int size)
 {
 	struct phia_env *e = se_of(&v->o);
 	struct phia_index *db = (struct phia_index*)v->o.parent;
@@ -18454,15 +18441,15 @@ se_document_setfield(struct sedocument *v, const char *path, void *pointer, int 
 }
 
 static int
-se_document_setstring(struct so *o, const char *path, void *pointer, int size)
+phia_document_setstring(struct so *o, const char *path, void *pointer, int size)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(o);
 	if (ssunlikely(v->v.v))
 		return sr_error(&e->error, "%s", "document is read-only");
-	switch (se_document_opt(path)) {
+	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_FIELD: {
-		struct sfv *fv = se_document_setfield(v, path, pointer, size);
+		struct sfv *fv = phia_document_setfield(v, path, pointer, size);
 		if (ssunlikely(fv == NULL))
 			return -1;
 		break;
@@ -18493,10 +18480,10 @@ se_document_setstring(struct so *o, const char *path, void *pointer, int size)
 }
 
 static void*
-se_document_getstring(struct so *o, const char *path, int *size)
+phia_document_getstring(struct so *o, const char *path, int *size)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	switch (se_document_opt(path)) {
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_FIELD: {
 		/* match field */
 		struct phia_index *db = (struct phia_index*)o->parent;
@@ -18552,10 +18539,10 @@ se_document_getstring(struct so *o, const char *path, int *size)
 }
 
 static int
-se_document_setint(struct so *o, const char *path, int64_t num)
+phia_document_setint(struct so *o, const char *path, int64_t num)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	switch (se_document_opt(path)) {
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_TIMESTAMP:
 		v->timestamp = num;
 		break;
@@ -18572,10 +18559,10 @@ se_document_setint(struct so *o, const char *path, int64_t num)
 }
 
 static int64_t
-se_document_getint(struct so *o, const char *path)
+phia_document_getint(struct so *o, const char *path)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	switch (se_document_opt(path)) {
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_LSN: {
 		uint64_t lsn = -1;
 		if (v->v.v)
@@ -18597,13 +18584,13 @@ se_document_getint(struct so *o, const char *path)
 }
 
 static int
-se_document_setobject(struct so *o, const char *path, void *object)
+phia_document_setobject(struct so *o, const char *path, void *object)
 {
-	struct sedocument *v = se_cast(o, struct sedocument*, SEDOCUMENT);
-	switch (se_document_opt(path)) {
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_REUSE: {
 		struct phia_env *e = se_of(o);
-		struct sedocument *reuse = se_cast(object, struct sedocument*, SEDOCUMENT);
+		struct phia_document *reuse = se_cast(object, struct phia_document*, SEDOCUMENT);
 		if (ssunlikely(v->created))
 			return sr_error(&e->error, "%s", "document is read-only");
 		assert(v->v.v == NULL);
@@ -18624,38 +18611,37 @@ se_document_setobject(struct so *o, const char *path, void *object)
 
 static struct soif sedocumentif =
 {
-	.open         = se_document_open,
+	.open         = phia_document_open,
 	.close        = NULL,
-	.destroy      = se_document_destroy,
-	.free         = se_document_free,
-	.document     = NULL,
+	.destroy      = phia_document_destroy,
+	.free         = phia_document_free,
 	.drop         = NULL,
-	.setstring    = se_document_setstring,
-	.setint       = se_document_setint,
-	.setobject    = se_document_setobject,
+	.setstring    = phia_document_setstring,
+	.setint       = phia_document_setint,
+	.setobject    = phia_document_setobject,
 	.getobject    = NULL,
-	.getstring    = se_document_getstring,
-	.getint       = se_document_getint,
+	.getstring    = phia_document_getstring,
+	.getint       = phia_document_getint,
 	.get          = NULL,
 	.cursor       = NULL,
 };
 
-static struct so *
-se_document_new(struct phia_env *e, struct so *parent, struct sv *vp)
+static struct phia_document *
+phia_document_new(struct phia_env *e, struct so *parent, const struct sv *vp)
 {
-	struct sedocument *v;
-	v = ss_malloc(&e->a, sizeof(struct sedocument));
-	if (ssunlikely(v == NULL)) {
+	struct phia_document *doc;
+	doc = ss_malloc(&e->a, sizeof(struct phia_document));
+	if (ssunlikely(doc == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
-	memset(v, 0, sizeof(*v));
-	so_init(&v->o, &se_o[SEDOCUMENT], &sedocumentif, parent, e);
-	v->order = SS_EQ;
+	memset(doc, 0, sizeof(*doc));
+	so_init(&doc->o, &se_o[SEDOCUMENT], &sedocumentif, parent, e);
+	doc->order = SS_EQ;
 	if (vp) {
-		v->v = *vp;
+		doc->v = *vp;
 	}
-	return &v->o;
+	return doc;
 }
 
 static struct sotype se_o[] =
@@ -18676,7 +18662,7 @@ static struct sotype se_o[] =
 };
 
 static inline int
-phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
+phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 {
 	struct phia_env *e = se_of(&t->o);
 	struct phia_index *db = se_cast(o->o.parent, struct phia_index*, SEDB);
@@ -18708,7 +18694,7 @@ phia_tx_write(struct phia_tx *t, struct sedocument *o, uint8_t flags)
 	int rc = so_open(&o->o);
 	if (ssunlikely(rc == -1))
 		goto error;
-	rc = se_document_validate(o, &db->o, flags);
+	rc = phia_document_validate(o, &db->o, flags);
 	if (ssunlikely(rc == -1))
 		goto error;
 
@@ -18739,14 +18725,14 @@ error:
 static int
 phia_tx_replace(struct phia_tx *tx, struct so *v)
 {
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_tx_write(tx, key, 0);
 }
 
 static int
 phia_tx_upsert(struct phia_tx *tx, struct so *v)
 {
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(&tx->o);
 	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
@@ -18757,7 +18743,7 @@ phia_tx_upsert(struct phia_tx *tx, struct so *v)
 static int
 phia_tx_delete(struct phia_tx *tx, struct so *v)
 {
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_tx_write(tx, key, SVDELETE);
 }
 
@@ -18765,7 +18751,7 @@ static void *
 phia_tx_get(struct so *o, struct so *v)
 {
 	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
-	struct sedocument *key = se_cast(v, struct sedocument*, SEDOCUMENT);
+	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(&t->o);
 	struct phia_index *db = se_cast(key->o.parent, struct phia_index*, SEDB);
 	/* validate index */
@@ -18940,7 +18926,6 @@ static struct soif setxif =
 	.close        = NULL,
 	.destroy      = phia_tx_rollback,
 	.free         = phia_tx_free,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = phia_tx_set_int,
@@ -19001,7 +18986,7 @@ se_viewget(struct so *o, struct so *key)
 {
 	struct seview *s = se_cast(o, struct seview*, SEVIEW);
 	struct phia_env *e = se_of(o);
-	struct sedocument *v = se_cast(key, struct sedocument*, SEDOCUMENT);
+	struct phia_document *v = se_cast(key, struct phia_document*, SEDOCUMENT);
 	struct phia_index *db = se_cast(key->parent, struct phia_index*, SEDB);
 	if (s->cursor_only) {
 		sr_error(&e->error, "view '%s' is in cursor-only mode", s->name);
@@ -19051,7 +19036,6 @@ static struct soif seviewif =
 	.close        = NULL,
 	.destroy      = se_viewdestroy,
 	.free         = se_viewfree,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = se_viewset_int,
@@ -19157,7 +19141,6 @@ static struct soif seviewdbif =
 	.close        = NULL,
 	.destroy      = se_viewdb_destroy,
 	.free         = se_viewdb_free,
-	.document     = NULL,
 	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -19272,18 +19255,16 @@ error:
 	return NULL;
 }
 
-void *phia_document(void *ptr)
+struct phia_document *
+phia_document(void *ptr)
 {
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->document == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	void *h = o->i->document(o);
-	se_apiunlock(e);
-	return h;
+	struct phia_index *index = se_cast(ptr, struct phia_index *, SEDB);
+	struct phia_env *env = index->o.env;
+	struct phia_document *doc;
+	se_apilock(env);
+	doc = phia_document_new(env, &index->o, NULL);
+	se_apiunlock(env);
+	return doc;
 }
 
 int phia_open(void *ptr)

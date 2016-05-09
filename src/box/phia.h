@@ -39,6 +39,7 @@ extern "C" {
 
 struct phia_env;
 struct phia_tx;
+struct phia_document;
 
 struct phia_env *
 phia_env(void);
@@ -58,7 +59,9 @@ phia_delete(struct phia_tx *tx, void*);
 int
 phia_commit(struct phia_tx *tx);
 
-void    *phia_document(void *);
+struct phia_document *
+phia_document(void *);
+
 int      phia_setstring(void*, const char*, const void*, int);
 int      phia_setint(void*, const char*, int64_t);
 void    *phia_getobject(void*, const char*);
