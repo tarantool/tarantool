@@ -2,7 +2,7 @@ box.cfg.phia
 ---
 - branch_age_wm: 0
   branch_age: 0
-  memory_limit: 0
+  memory_limit: 1
   compact_wm: 2
   threads: 3
   branch_age_period: 0

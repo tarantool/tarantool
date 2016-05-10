@@ -6,7 +6,7 @@ local private = require('box.internal')
 
 -- see default_cfg below
 local default_phia_cfg = {
-    memory_limit      = 0, -- no limit
+    memory_limit      = 1.0, -- 1G
     threads           = 5,
     compact_wm        = 2,
     branch_prio       = 2,

@@ -46,7 +46,7 @@ cfg_filter(box.cfg)
       - - compact_wm
         - 2
       - - memory_limit
-        - 0
+        - 1
       - - threads
         - 5
   - - phia_dir

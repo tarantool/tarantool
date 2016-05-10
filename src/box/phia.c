@@ -723,17 +723,17 @@ enum ssquotaop {
 struct ssquota {
 	int enable;
 	int wait;
-	uint64_t limit;
-	uint64_t used;
+	int64_t limit;
+	int64_t used;
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
 };
 
 static int ss_quotainit(struct ssquota*);
-static int ss_quotaset(struct ssquota*, uint64_t);
+static int ss_quotaset(struct ssquota*, int64_t);
 static int ss_quotaenable(struct ssquota*, int);
 static int ss_quotafree(struct ssquota*);
-static int ss_quota(struct ssquota*, enum ssquotaop, uint64_t);
+static int ss_quota(struct ssquota*, enum ssquotaop, int64_t);
 
 static inline uint64_t
 ss_quotaused(struct ssquota *q)
@@ -2032,7 +2032,7 @@ ss_quotainit(struct ssquota *q)
 }
 
 static int
-ss_quotaset(struct ssquota *q, uint64_t limit)
+ss_quotaset(struct ssquota *q, int64_t limit)
 {
 	q->limit = limit;
 	return 0;
@@ -2054,7 +2054,7 @@ ss_quotafree(struct ssquota *q)
 }
 
 static int
-ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
+ss_quota(struct ssquota *q, enum ssquotaop op, int64_t v)
 {
 	if (sslikely(v == 0))
 		return 0;
@@ -2062,17 +2062,22 @@ ss_quota(struct ssquota *q, enum ssquotaop op, uint64_t v)
 	switch (op) {
 	case SS_QADD:
 		if (ssunlikely(!q->enable || q->limit == 0)) {
-			/* .. */
+			/*
+			 * Fall through to quota accounting, skip
+			 * the wait.
+			 */
 		} else {
-			if (ssunlikely((q->used + v) >= q->limit)) {
+			while (q->used + v >= q->limit) {
 				q->wait++;
 				tt_pthread_cond_wait(&q->cond, &q->lock);
+				q->wait--;
 			}
 		}
+		q->used += v;
+		break;
 	case SS_QREMOVE:
 		q->used -= v;
-		if (ssunlikely(q->wait)) {
-			q->wait--;
+		if (q->wait) {
 			tt_pthread_cond_signal(&q->cond);
 		}
 		break;
