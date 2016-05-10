@@ -128,7 +128,7 @@ API is a direct binding to corresponding methods of index objects of type
             | or 'EQ'       | value     | If an index key is equal to a search value, |
             |               |           | it matches.                                 |
             |               |           | Tuples are returned in ascending order by   |
-            |               |           | index key.                                  |
+            |               |           | index key. This is the default.             |
             +---------------+-----------+---------------------------------------------+
             | box.index.REQ | search    | Matching is the same as for                 |
             | or 'REQ'      | value     | ``box.index.EQ``.                           |
@@ -188,6 +188,7 @@ API is a direct binding to corresponding methods of index objects of type
             | or 'EQ'       | value     | If an index key is equal to a search value,    |
             |               |           | it matches.                                    |
             |               |           | The number of returned tuples will be 0 or 1.  |
+            |               |           | This is the default.                           |
             +---------------+-----------+------------------------------------------------+
             | box.index.GT  | search    | The comparison operator is '>' (greater than). |
             | or 'GT'       | value     | If a hash of an index key is greater than a    |
@@ -219,7 +220,7 @@ API is a direct binding to corresponding methods of index objects of type
             | box.index.EQ               | bitset    | If an index key is equal to a bitset value,  |
             | or 'EQ'                    | value     | it matches.                                  |
             |                            |           | Tuples are returned in their order within    |
-            |                            |           | the space.                                   |
+            |                            |           | the space. This is the default.              |
             +----------------------------+-----------+----------------------------------------------+
             | box.index.BITS_ALL_SET     | bitset    | If all of the bits which are 1 in the bitset |
             |                            | value     | value are 1 in the index key, it matches.    |
@@ -256,7 +257,7 @@ API is a direct binding to corresponding methods of index objects of type
             |                    |           | defined by the index key, it matches.                   |
             |                    |           | Tuples are returned in their order within the space.    |
             |                    |           | "Rectangle-or-box" means "rectangle-or-box as           |
-            |                    |           | explained in section RTREE_".                           |
+            |                    |           | explained in section RTREE_". This is the default.      |
             +--------------------+-----------+---------------------------------------------------------+
             | box.index.GT       | search    | If all points of the rectangle-or-box defined by the    |
             | or 'GT'            | value     | search value are within the rectangle-or-box            |
