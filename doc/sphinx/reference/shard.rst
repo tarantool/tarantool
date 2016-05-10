@@ -101,16 +101,16 @@ The shard package will conclude that there is only one shard.
              >   servers = {
              >     { uri = 'localhost:33131', zone = '1' },
              >     { uri = 'localhost:33132', zone = '2' },
-             >     { uri = 'localhost:33133', zone = '3' },1
+             >     { uri = 'localhost:33133', zone = '3' }
              >   },
              >   login = 'tester',
              >   password = 'pass',
-             >   redundancy = '3'
+             >   redundancy = '3',
              >   binary = 33131,
              > }
     ---
     ...
-    tarantool> server.init(cfg)
+    tarantool> shard.init(cfg)
     ---
     ...
 
@@ -119,7 +119,7 @@ The shard package will conclude that there is only one shard.
 =====================================================================
 
 This describes three shards. Each shard has two replicas. Since the number of
-servers is 7, and the number of replicas per server is 2, and dividing 7 / 2
+servers is 7, and the number of replicas per shard is 2, and dividing 7 / 2
 leaves a remainder of 1, one of the servers will not be used. This is not
 necessarily an error, because perhaps one of the servers in the list is not alive.
 
@@ -127,22 +127,22 @@ necessarily an error, because perhaps one of the servers in the list is not aliv
 
     tarantool> cfg = {
              >   servers = {
-             >     { uri = 'localhost:33131', zone = '1' },
-             >     { uri = 'localhost:33131', zone = '2' },
-             >     { uri = 'localhost:33132', zone = '1' },
-             >     { uri = 'localhost:33133', zone = '2' },
-             >     { uri = 'localhost:33131', zone = '1' },
-             >     { uri = 'localhost:33132', zone = '2' },
-             >     { uri = 'localhost:33133', zone = '1' },
+             >     { uri = 'host1:33131', zone = '1' },
+             >     { uri = 'host2:33131', zone = '2' },
+             >     { uri = 'host3:33131', zone = '3' },
+             >     { uri = 'host4:33131', zone = '4' },
+             >     { uri = 'host5:33131', zone = '5' },
+             >     { uri = 'host6:33131', zone = '6' },
+             >     { uri = 'host7:33131', zone = '7' }
              >   },
              >   login = 'tester',
              >   password = 'pass',
-             >   redundancy = '3'
+             >   redundancy = '2',
              >   binary = 33131,
              > }
     ---
     ...
-    tarantool> server.init(cfg)
+    tarantool> shard.init(cfg)
     ---
     ...
 
