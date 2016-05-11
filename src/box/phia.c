@@ -3886,14 +3886,6 @@ sr_malfunction_set(struct srerror *e) {
 }
 
 static inline int
-sr_errorof(struct srerror *e) {
-	tt_pthread_mutex_lock(&e->lock);
-	int type = e->type;
-	tt_pthread_mutex_unlock(&e->lock);
-	return type;
-}
-
-static inline int
 sr_errorcopy(struct srerror *e, char *buf, int bufsize) {
 	tt_pthread_mutex_lock(&e->lock);
 	int len = snprintf(buf, bufsize, "%s", e->error);
@@ -4117,16 +4109,6 @@ sr_statkey(struct srstat *s, int size)
 {
 	tt_pthread_mutex_lock(&s->lock);
 	ss_avgupdate(&s->key, size);
-	tt_pthread_mutex_unlock(&s->lock);
-}
-
-static inline void
-sr_statset(struct srstat *s, uint64_t start)
-{
-	uint64_t diff = clock_monotonic64() - start;
-	tt_pthread_mutex_lock(&s->lock);
-	s->set++;
-	ss_avgupdate(&s->set_latency, diff);
 	tt_pthread_mutex_unlock(&s->lock);
 }
 
@@ -9747,28 +9729,6 @@ si_branchis_root(struct sibranch *b) {
 	return b->next == NULL;
 }
 
-static inline int
-si_branchload(struct sibranch *b, struct runtime *r, struct ssfile *file)
-{
-	struct sdindexheader *h = b->index.h;
-	uint64_t offset = h->offset - h->total - sizeof(struct sdseal);
-	uint64_t size   = h->total + sizeof(struct sdseal) + sizeof(struct sdindexheader) +
-	                  h->size + h->extension;
-	assert(b->copy.s == NULL);
-	int rc;
-	rc = ss_blobensure(&b->copy, size);
-	if (ssunlikely(rc == -1))
-		return sr_oom_malfunction(r->e);
-	rc = ss_filepread(file, offset, b->copy.s, size);
-	if (ssunlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' read error: %s",
-		               ss_pathof(&file->path), strerror(errno));
-		return -1;
-	}
-	ss_blobadvance(&b->copy, size);
-	return 0;
-}
-
 #define SI_NONE       0
 #define SI_LOCK       1
 #define SI_ROTATE     2
@@ -14694,7 +14654,7 @@ sc_workernew(struct runtime *r, int id)
 	return w;
 }
 
-static inline void
+static inline ssunused void
 sc_workerfree(struct scworker *w, struct runtime *r)
 {
 	sd_cfree(&w->dc, r);
