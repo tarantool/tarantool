@@ -70,6 +70,8 @@ For example:
     1000     17337 16716  1 91362  6916   0 11:07 pts/5    00:00:13 tarantool script.lua <running>
 
 
+.. _using-tarantool-as-a-client:
+
 =====================================================================
                         Using ``tarantool`` as a client
 =====================================================================
@@ -975,6 +977,8 @@ specification in :file:`RPM.spec` and the :file:`/debian` directory.
 Finally, clients make a CALL to ``myapp.api_for_call`` and other API functions.
 
 In the case of ``tarantool-http``, there is no need to start the binary protocol at all.
+
+.. _modules-luarocks-and-requiring-packages:
 
 =====================================================================
        Modules, LuaRocks, and requiring packages

@@ -13,9 +13,6 @@
     <...> I> creating ./00000000000000000000.xlog.inprogress'
     ---
     ...
-    tarantool> box.schema.role.grant('replication','read,write','universe')
-    ---
-    ...
     tarantool> box.schema.user.grant('replicator','execute','role','replication')
     ---
     ...

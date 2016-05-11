@@ -185,7 +185,7 @@ box.once('example-1.0', bootstrap)
 --    binary = '127.0.0.1:3301';
 --    monitor = false;
 --}
---shard.init(cfg)
+--shard.init(shards)
 
 -----------------
 -- Message queue

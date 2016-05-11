@@ -166,6 +166,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             ...
 
+    .. _space_insert:
+
     .. method:: insert(tuple)
 
         Insert a tuple into a space.
@@ -189,6 +191,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             - [5000, 'tuple number five thousand']
             ...
+
+    .. _space-select:
 
     .. method:: select(key)
 
@@ -291,6 +295,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
             box.space.tester:get{1}
 
+    .. _space_drop:
+
     .. method:: drop()
 
         Drop a space.
@@ -332,6 +338,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             ---
             ...
 
+    .. _space_replace:
+
     .. method:: replace(tuple)
                   put(tuple)
 
@@ -362,6 +370,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         .. code-block:: lua
 
             box.space.tester:replace{5000, 'tuple number five thousand'}
+
+    .. _space_update:
 
     .. method:: update(key, {{operator, field_no, value}, ...})
 
@@ -527,6 +537,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
         The seventh argument is ``'!!'``, because ``'!!'`` is to be added at this position.
         Therefore, after this update, ``field[1]`` = ``999``, ``field[2]`` = ``'X!!Z'``.
 
+    .. _space_upsert:
+
     .. method:: upsert(tuple_value, {{operator, field_no, value}, ...}, )
 
         Update or insert a tuple.
@@ -563,6 +575,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
             .. code-block:: lua
 
                 box.space.tester:upsert({12,'c'}, {{'=', 3, 'a'}, {'=', 4, 'b'}})
+
+    .. _space_delete:
 
     .. method:: delete(key)
 

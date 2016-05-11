@@ -110,7 +110,7 @@ recommended.
 
 .. function:: sleep(time)
 
-    Yield control to the scheduler and sleep for the specified number
+    Yield control to the transaction processor thread and sleep for the specified number
     of seconds. Only the current fiber can be made to sleep.
 
     :param time: number of seconds to sleep.
@@ -122,6 +122,8 @@ recommended.
         tarantool> fiber.sleep(1.5)
         ---
         ...
+
+.. _fiber-yield:
 
 .. function:: yield()
 
@@ -192,6 +194,8 @@ recommended.
         ---
         - error: fiber is cancelled
         ...
+
+.. _fiber-testcancel:
 
 .. function:: testcancel()
 

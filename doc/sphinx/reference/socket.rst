@@ -1,3 +1,5 @@
+.. _package-socket:
+
 -------------------------------------------------------------------------------
                             Package `socket`
 -------------------------------------------------------------------------------
@@ -85,8 +87,9 @@ Typically a socket session will begin with the setup functions, will set one
 or more flags, will have a loop with sending and receiving functions, will
 end with the teardown functions -- as an example at the end of this section
 will show. Throughout, there may be error-checking and waiting functions for
-synchronization. Some functions may "block" if a non-default option flag is
-set, therefore the fiber that they are in will yield so that other processes
+synchronization. To prevent a fiber containing socket functions from "blocking"
+other fibers, the :ref:`implicit yield rules <the-implicit-yield-rules>`
+will cause a yield so that other processes
 may take over, as is the norm for cooperative multitasking.
 
 For all examples in this section the socket name will be sock and

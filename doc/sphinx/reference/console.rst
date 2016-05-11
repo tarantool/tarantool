@@ -110,3 +110,28 @@ host/port.
 
         console = require('console')
         console.start()
+
+.. _console-ac:
+
+.. function:: ac([true|false])
+
+   Set the auto-completion flag.
+   If auto-completion is `true`, and
+   the user is :ref:`using tarantool as a client <using-tarantool-as-a-client>`,
+   then hitting the TAB
+   key will have a special effect. Suppose that, so far,
+   the user has typed 'ap'. |br|
+   * If there is a single variable or function name
+   which begins with 'ap', such as 'apple', then auto-completion occurs,
+   the full name 'apple' appears on the screen. |br|
+   * If there are two variables or function names
+   which begin with 'ap', such as 'apple' and 'application',
+   then auto-completion occurs for the letters that are
+   in common, and the terminal beeps. |br|
+   * If there are no variables or function names
+   which begin with 'ap', then the terminal beeps.
+
+   The default auto-completion value is `true`.
+   When auto-completion is true, users can still put tabs
+   inside strings with the Lua escape sequence: \\t.
+

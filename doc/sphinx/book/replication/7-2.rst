@@ -20,5 +20,6 @@
     ---
     - [3, 'Another']
     ...
-    <...> [25579] main/103/replica/localhost:3301 C> connected to 127.0.0.1:3301
-    <...> [25579] main/103/replica/localhost:3301 I> authenticated
+    <...> [11243] main/105/applier/localhost:3301 I> connected to 1.6.0 at 127.0.0.1:3301
+    <...> [11243] main/105/applier/localhost:3301 I> authenticated
+

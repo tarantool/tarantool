@@ -35,11 +35,12 @@ such a way that yields do not occur for a long time. This can lead to unfair
 scheduling, when a single client throttles the rest of the system, or to
 apparent stalls in request processing. Avoiding this situation is the
 responsibility of the function's author. For the default memtx storage engine
-most of the box calls, including the data-change requests
+some of the box calls, including the data-change requests
 :func:`box.space...insert <space_object.insert>` or
 :func:`box.space...update <space_object.update>` or
-:func:`box.space...delete <space_object.delete>`, are yield points;
-however, :func:`box.space...select <space_object.select>` is not.
+:func:`box.space...delete <space_object.delete>`, will usually cause yielding;
+however, :func:`box.space...select <space_object.select>` will not.
+A fuller description will appear in section :ref:`The Implicit Yield Rules <the-implicit-yield-rules>`.
 
 Note re storage engine: phia has different rules: insert or update or delete
 will very rarely cause a yield, but select can cause a yield.
@@ -58,6 +59,8 @@ account #2. If something interrupted after the withdrawal, then the institution
 would be out of balance. For such cases, the ``begin ... commit|rollback``
 block was designed.
 
+.. _box-begin:
+
 .. function:: box.begin()
 
     Begin the transaction. Disable implicit yields until the transaction ends.
@@ -65,10 +68,14 @@ block was designed.
     In effect the fiber which executes ``box.begin()`` is starting an "active
     multi-request transaction", blocking all other fibers.
 
+.. _box-commit:
+
 .. function:: box.commit()
 
     End the transaction, and make all its data-change
     operations permanent.
+
+.. _box-rollback:
 
 .. function:: box.rollback()
 
@@ -109,3 +116,69 @@ tuple#1, deposit in tuple#2, and end the transaction, making its effects permane
     ---
     - "ok"
     ...
+
+.. _the-implicit-yield-rules:
+
+===========================================================
+            The Implicit Yield Rules
+===========================================================
+
+The only explicit yield requests are :ref:`fiber.sleep() <fiber-sleep>` and :ref:`fiber.yield() <fiber-yield>`,
+but many other requests "imply" yields because Tarantool is designed to avoid
+blocking.
+
+The implicit yield requests are:
+:ref:`insert <space_insert>` :ref:`replace <space_replace>`
+:ref:`update <space_update>` :ref:`upsert <space_update>` :ref:`delete <space_delete>` (the "data-change" requests),
+and
+functions in package
+:ref:`fio <fio-section>`,
+:ref:`net_box <package_net_box>`,
+:ref:`console <package-console>`, or
+:ref:`socket <package-socket>` (the "os" and "network" requests).
+Note re storage engine: with sophia :ref:`select <space-select>` is
+an implicit yield request, but data-change requests may not be.
+
+The yield occurs just before a blocking syscall, such as a write to the Write-Ahead Log (WAL)
+or a network message reception.
+
+Implicit yield requests are disabled by :ref:`begin <box-begin>`,
+and enabled again by :ref:`commit <box-commit>`.
+Therefore the sequence` |br|
+:codenormal:`begin` |br|
+:codenormal:`implicit yield request #1` |br|
+:codenormal:`implicit yield request #2` |br|
+:codenormal:`implicit yield request #3` |br|
+:codenormal:`commit` |br|
+will not cause implicit yield until the commit occurs
+(specifically: just before the writes to the WAL, which are delayed until commit time).
+The commit request is not itself an implicit yield request,
+it only enables yields caused by earlier implicit yield requests.
+
+Despite their resemblance to implicit yield requests,
+:ref:`truncate <space_truncate>` and :ref:`drop <space_drop>` do not cause implicit yield.
+Despite their resemblance to functions of the fio package,
+functions of the :ref:`os <package-os>` package do not cause implicit yield.
+Despite its resemblance to commit, :ref:`rollback <box-rollback>` does not
+enable yields.
+
+If :ref:`wal_mode <confval-wal-mode>` = 'none', then implicit yielding is disabled,
+because there are no writes to the WAL.
+
+If a task is interactive -- sending requests to the server
+and receiving responses -- then it involves network IO,
+and therefore there is an implicit yield, even if the
+request that is sent to the server is not itself an implicit yield request.
+Therefore the sequence |br|
+:codenormal:`select` |br|
+:codenormal:`select` |br|
+:codenormal:`select` |br|
+causes blocking if it is inside a function or Lua program
+being executed on the server, but causes yielding if it
+is done as a series of transmissions from a client, including
+a client which operates via telnet, via one of the connectors,
+or via the MySQL and PostgreSQL rocks,
+or via the interactive mode when :ref:`"Using tarantool as a client" <using-tarantool-as-a-client>`.
+
+After a fiber has yielded and then has regained control,
+it immediately issues :ref:`testcancel <fiber-testcancel>`.

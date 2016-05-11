@@ -2,17 +2,11 @@
 
     <... ...>
     $ ~/tarantool/src/tarantool
-    /home/username/tarantool/src/tarantool: version 1.6.3-515-g0a06cce
-    type 'help' for interactive help
+    <...>
     tarantool> box.cfg{listen = 3301}
+    <...> [22612] main/101/interactive I> ready to accept requests
     <... ...>
-    ---
-    ...
     tarantool> box.space.tester:select({0}, {iterator = 'GE'})
-    <...> [28989] main/101/spawner I> created a replication relay: pid = 28992
-    <...> [28992] main/101/relay/127.0.0.1:51892 I> recover from ./00000000000000000000.xlog'
-    <...> [28992] main/101/relay/127.0.0.1:51892 I> done ./00000000000000000000.xlog'
-    ---
     - - [1, 'Tuple inserted on Terminal #1']
     ...
     tarantool> box.cfg{
@@ -21,13 +15,17 @@
      [28987] main/101/interactive C> starting replication from localhost:3302
     ---
     ...
-    <...> [28987] main/104/replica/localhost:3302 C> connected to 127.0.0.1:3302
-    <...> [28987] main/104/replica/localhost:3302 I> authenticated
+    [22612] main/101/interactive C> starting replication from localhost:3302
+    [22612] main/101/interactive I> set 'replication_source' configuration
+            option to "replicator:password@localhost:3302"
+    [22612] main/104/applier/localhost:3302 I> connected to 1.6.0 at 127.0.0.1:3302
+    [22612] main/104/applier/localhost:3302 I> authenticated
+    [22612] wal/101/main I> creating `./00000000000000000008.xlog.inprogress'
+    [22612] relay/127.0.0.1:33510/102/main I> done `./00000000000000000000.xlog'
+    [22612] relay/127.0.0.1:33510/102/main I> recover from `./00000000000000000008.xlog'
     tarantool> box.space.tester:select({0}, {iterator = 'GE'})
-    <...> [28987] wal I> creating ./00000000000000000006.xlog.inprogress'
-    <...> [28992] main/101/relay/127.0.0.1:51892 I> recover from ./00000000000000000006.xlog'
-    ---
     - - [1, 'Tuple inserted on Terminal #1']
       - [2, 'Tuple inserted on Terminal #2']
       - [3, 'Another']
     ...
+
