@@ -14761,7 +14761,6 @@ enum {
 	SEDB,
 	SEDBCURSOR,
 	SETX,
-	SEVIEW,
 	SECURSOR
 };
 
@@ -15008,20 +15007,6 @@ struct seviewdb {
 } sspacked;
 
 static struct so *se_viewdb_new(struct phia_env*, uint64_t);
-
-struct seview {
-	struct so        o;
-	uint64_t  vlsn;
-	struct ssbuf     name;
-	struct sx        t;
-	struct svlog     log;
-	int       cursor_only;
-	/* Member of env->view list. */
-	struct rlist link;
-} sspacked;
-
-static struct so *se_viewnew(struct phia_env*, uint64_t, char*, int);
-static int se_viewupdate(struct seview*);
 
 struct secursor {
 	struct so o;
@@ -15722,66 +15707,6 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 }
 
 static inline int
-se_confview_set(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	uint64_t lsn = sr_seq(&e->seq, SR_LSN);
-	/* create view object */
-	struct seview *view = (struct seview*)se_viewnew(e, lsn, s->value, s->valuesize);
-	if (ssunlikely(view == NULL))
-		return -1;
-	return 0;
-}
-
-static inline int
-se_confview_lsn(struct srconf *c, struct srconfstmt *s)
-{
-	int rc = se_confv(c, s);
-	if (ssunlikely(rc == -1))
-		return -1;
-	if (s->op != SR_WRITE)
-		return 0;
-	struct seview *view  = c->ptr;
-	se_viewupdate(view);
-	return 0;
-}
-
-static inline int
-se_confview_get(struct srconf *c, struct srconfstmt *s)
-{
-	/* get(view.name) */
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_READ) {
-		sr_error(&e->error, "%s", "bad operation");
-		return -1;
-	}
-	assert(c->ptr != NULL);
-	*(void**)s->value = c->ptr;
-	return 0;
-}
-
-static inline struct srconf*
-se_confview(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
-{
-	struct srconf *view = NULL;
-	(void) e;
-	struct srconf *prev = NULL;
-	struct seview *s;
-
-	rlist_foreach_entry(s, &e->view, link)
-	{
-		struct srconf *p = sr_C(NULL, pc, se_confview_lsn, "lsn", SS_U64, &s->vlsn, 0, s);
-		sr_C(&prev, pc, se_confview_get, s->name.s, SS_STRING, p, SR_NS, s);
-		if (view == NULL)
-			view = prev;
-	}
-	return sr_C(NULL, pc, se_confview_set, "view", SS_STRING,
-	            view, SR_NS, NULL);
-}
-
-static inline int
 se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
 {
 	struct phia_env *e = s->ptr;
@@ -15842,7 +15767,6 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	struct srconf *scheduler  = se_confscheduler(e, rt, &pc);
 	struct srconf *perf       = se_confperformance(e, rt, &pc);
 	struct srconf *metric     = se_confmetric(e, rt, &pc);
-	struct srconf *view       = se_confview(e, rt, &pc);
 	struct srconf *db         = se_confdb(e, rt, &pc);
 	struct srconf *debug      = se_confdebug(e, rt, &pc);
 
@@ -15851,8 +15775,7 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	compaction->next = scheduler;
 	scheduler->next  = perf;
 	perf->next       = metric;
-	metric->next     = view;
-	view->next       = db;
+	metric->next     = db;
 	if (! serialize)
 		db->next = debug;
 	return phia;
@@ -16256,6 +16179,7 @@ se_confcursor_get(struct so *o, struct so *v)
 static struct soif seconfcursorif =
 {
 	.open         = NULL,
+	.close        = NULL,
 	.destroy      = se_confcursor_destroy,
 	.free         = se_confcursor_free,
 	.drop         = NULL,
@@ -17357,7 +17281,6 @@ static struct sotype se_o[] =
 	{ 0x34591111L, "index"		   },
 	{ 0x63102654L, "index_cursor"	   },
 	{ 0x13491FABL, "transaction"       },
-	{ 0x22FA0348L, "view"              },
 	{ 0x45ABCDFAL, "cursor"            }
 };
 
@@ -17655,146 +17578,6 @@ phia_tx_new(struct phia_env *e)
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
 	phia_index_bind(e);
 	return t;
-}
-
-static void
-se_viewfree(struct so *o)
-{
-	struct phia_env *e = se_of(o);
-	struct seview *s = (struct seview*)o;
-	ss_buffree(&s->name, &e->a);
-	ss_free(&e->a, o);
-}
-
-static int
-se_viewdestroy(struct so *o)
-{
-	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct phia_env *e = se_of(o);
-	uint32_t id = s->t.id;
-	phia_index_unbind(e, id);
-	if (sslikely(! s->cursor_only))
-		sx_rollback(&s->t);
-	ss_bufreset(&s->name);
-	rlist_del(&s->link);
-	so_free(&s->o);
-	return 0;
-}
-
-static void*
-se_viewget(struct so *o, struct so *key)
-{
-	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct phia_env *e = se_of(o);
-	struct phia_document *v = se_cast(key, struct phia_document*, SEDOCUMENT);
-	struct phia_index *db = se_cast(key->parent, struct phia_index*, SEDB);
-	if (s->cursor_only) {
-		sr_error(&e->error, "view '%s' is in cursor-only mode", s->name);
-		return NULL;
-	}
-	return phia_index_read(db, v, &s->t, 0, NULL);
-}
-
-static void*
-se_viewcursor(struct so *o)
-{
-	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct phia_env *e = se_of(o);
-	if (s->cursor_only) {
-		sr_error(&e->error, "view '%s' is in cursor-only mode", s->name);
-		return NULL;
-	}
-	return se_cursornew(e, s->vlsn);
-}
-
-static void *se_viewget_object(struct so *o, const char *path)
-{
-	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	struct phia_env *e = se_of(o);
-	if (strcmp(path, "db") == 0)
-		return se_viewdb_new(e, s->t.id);
-	return NULL;
-}
-
-static int
-se_viewset_int(struct so *o, const char *path, int64_t v ssunused)
-{
-	struct seview *s = se_cast(o, struct seview*, SEVIEW);
-	if (strcmp(path, "cursor-only") == 0) {
-		if (s->cursor_only)
-			return -1;
-		sx_rollback(&s->t);
-		s->cursor_only = 1;
-		return 0;
-	}
-	return -1;
-}
-
-static struct soif seviewif =
-{
-	.open         = NULL,
-	.close        = NULL,
-	.destroy      = se_viewdestroy,
-	.free         = se_viewfree,
-	.drop         = NULL,
-	.setstring    = NULL,
-	.setint       = se_viewset_int,
-	.setobject    = NULL,
-	.getobject    = se_viewget_object,
-	.getstring    = NULL,
-	.getint       = NULL,
-	.get          = se_viewget,
-	.cursor       = se_viewcursor
-};
-
-static struct so *
-se_viewnew(struct phia_env *e, uint64_t vlsn, char *name, int size)
-{
-	struct seview *s;
-	rlist_foreach_entry(s, &e->view, link) {
-		if (ssunlikely(strcmp(s->name.s, name) == 0)) {
-			sr_error(&e->error, "view '%s' already exists", name);
-			return NULL;
-		}
-	}
-	s = ss_malloc(&e->a, sizeof(struct seview));
-	if (ssunlikely(s == NULL)) {
-		sr_oom(&e->error);
-		return NULL;
-	}
-	so_init(&s->o, &se_o[SEVIEW], &seviewif, &e->o, e);
-	s->vlsn = vlsn;
-	ss_bufinit(&s->name);
-	int rc;
-	if (size == 0)
-		size = strlen(name);
-	rc = ss_bufensure(&s->name, &e->a, size + 1);
-	if (ssunlikely(rc == -1)) {
-		so_free(&s->o);
-		sr_oom(&e->error);
-		return NULL;
-	}
-	memcpy(s->name.s, name, size);
-	s->name.s[size] = 0;
-	ss_bufadvance(&s->name, size + 1);
-	sv_loginit(&s->log);
-	sx_begin(&e->xm, &s->t, SXRO, &s->log, vlsn);
-	s->cursor_only = 0;
-	phia_index_bind(e);
-	rlist_add(&e->view, &s->link);
-	return &s->o;
-}
-
-static int se_viewupdate(struct seview *s)
-{
-	struct phia_env *e = se_of(&s->o);
-	uint32_t id = s->t.id;
-	if (! s->cursor_only) {
-		sx_rollback(&s->t);
-		sx_begin(&e->xm, &s->t, SXRO, &s->log, s->vlsn);
-	}
-	s->t.id = id;
-	return 0;
 }
 
 static void
