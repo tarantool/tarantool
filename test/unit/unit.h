@@ -104,7 +104,6 @@ int check_plan(void);
 		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
-	res = res;					\
 }
 
 #define is(a, b, fmt, args...)	{			\
@@ -117,7 +116,6 @@ int check_plan(void);
 		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
-	res = res;					\
 }
 
 #define isnt(a, b, fmt, args...) {			\
@@ -130,7 +128,6 @@ int check_plan(void);
 		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
-	res = res;					\
 }
 
 #if defined(__cplusplus)

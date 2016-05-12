@@ -57,6 +57,7 @@
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include "lua/crypto.h"
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -150,4 +151,6 @@ void *ffi_symbols[] = {
 	(void *) ERR_load_crypto_strings,
 	(void *) exception_get_string,
 	(void *) exception_get_int,
+	(void *) tnt_EVP_CIPHER_key_length,
+	(void *) tnt_EVP_CIPHER_iv_length,
 };

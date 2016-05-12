@@ -1,3 +1,5 @@
+.. _package-msgpack:
+
 -------------------------------------------------------------------------------
                                     Package `msgpack`
 -------------------------------------------------------------------------------
@@ -146,6 +148,9 @@ with the MsgPack format name and encoding on the right.
         +--------------+-------------------------------------------------+
         | 1.5          | 'float 64' = cb 3f f8 0 0 0 0 0 0               |
         +--------------+-------------------------------------------------+
+
+Also, some MsgPack configuration settings for encoding can be changed, in the
+same way that they can be changed for :ref:`JSON <package-json-cfg>`.
 
 .. _MsgPack: http://msgpack.org/
 .. _Specification: http://github.com/msgpack/msgpack/blob/master/spec.md

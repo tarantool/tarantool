@@ -1,3 +1,5 @@
+.. _package-json:
+
 -------------------------------------------------------------------------------
                           Package `json`
 -------------------------------------------------------------------------------
@@ -125,6 +127,32 @@ Serializing 'A' and 'B' with different ``__serialize`` values causes different r
     ---
     - '[[]]'
     ...
+
+
+.. _package-json-cfg:
+
+A NOTE ABOUT CONFIGURATION SETTINGS:
+There are configuration settings which affect the way that Tarantool
+encodes invalid numbers or types. They are all boolean true/false values. |br|
+:codenormal:`cfg.encode_invalid_numbers     default = true    /* allow nan and inf */` |br|
+:codenormal:`cfg.encode_use_tostring        default = false   /* use tostring for unrecognizable types */` |br|
+:codenormal:`cfg.encode_invalid_as_nil      default = false   /* use null for all unrecognizable types */` |br|
+:codenormal:`cfg.encode_load_metatables     default = true    /* load metatables */` |br|
+For example, the following code will interpret 0/0
+(which is "not a number") and 1/0 (which is "infinity")
+as special values rather than nulls or errors: |br|
+:codenormal:`json = require('json')` |br|
+:codenormal:`json.cfg{encode_invalid_numbers = true}` |br|
+:codenormal:`x = 0/0` |br|
+:codenormal:`y = 1/0` |br|
+:codenormal:`json.encode({1,x,y,2})` |br|
+The result of the json.encode request will look like this: |br|
+:codenormal:`tarantool>` :codebold:`json.encode({1,x,y,2})` |br|
+:codenormal:`---` |br|
+:codenormal:`- '[1,nan,inf,2]` |br|
+:codenormal:`...` |br|
+The same configuration settings exist for json, for :ref:`MsgPack <package-msgpack>`, and
+for :ref:`yaml <package-yaml>`.
 
 .. _Lua-CJSON package by Mark Pulford: http://www.kyne.com.au/~mark/software/lua-cjson.php
 .. _the official documentation: http://www.kyne.com.au/~mark/software/lua-cjson-manual.html

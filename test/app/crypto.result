@@ -8,10 +8,10 @@ type(crypto)
 ciph = crypto.cipher.aes128.cbc
 ---
 ...
-pass = '12345678876543211234567887654321'
+pass = '1234567887654321'
 ---
 ...
-iv = 'abcdefghijklmnopqrstuvwxyz123456'
+iv = 'abcdefghijklmnop'
 ---
 ...
 enc = ciph.encrypt('test', pass, iv)
@@ -28,59 +28,59 @@ ciph.decrypt(enc, pass, iv)
 --Failing scenaries
 crypto.cipher.aes128.cbc.encrypt('a')
 ---
-- error: 'builtin/crypto.lua:282: Key length should be equal to cipher block length
+- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
     (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:282: Key length should be equal to cipher block length
+- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
     (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321')
 ---
-- error: 'builtin/crypto.lua:282: Initial vector length should be equal to cipher
-    block length (16 bytes)'
+- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+    iv length (16 bytes)'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:282: Initial vector length should be equal to cipher
-    block length (16 bytes)'
+- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+    iv length (16 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a')
 ---
-- error: 'builtin/crypto.lua:282: Key length should be equal to cipher block length
-    (16 bytes)'
+- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+    (32 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:282: Key length should be equal to cipher block length
-    (16 bytes)'
+- error: 'builtin/crypto.lua:284: Key length should be equal to cipher key length
+    (32 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '12345678876543211234567887654321')
 ---
-- error: 'builtin/crypto.lua:282: Initial vector length should be equal to cipher
-    block length (16 bytes)'
+- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+    iv length (16 bytes)'
 ...
 crypto.cipher.aes256.cbc.decrypt('12', '12345678876543211234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:282: Initial vector length should be equal to cipher
-    block length (16 bytes)'
+- error: 'builtin/crypto.lua:284: Initial vector length should be equal to cipher
+    iv length (16 bytes)'
 ...
 crypto.cipher.aes192.cbc.encrypt.new()
 ---
-- error: Key length should be equal to cipher block length (16 bytes)
+- error: Key length should be equal to cipher key length (24 bytes)
 ...
 crypto.cipher.aes192.cbc.encrypt.new('123321')
 ---
-- error: Key length should be equal to cipher block length (16 bytes)
+- error: Key length should be equal to cipher key length (24 bytes)
 ...
 crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678')
 ---
-- error: Initial vector length should be equal to cipher block length (16 bytes)
+- error: Initial vector length should be equal to cipher iv length (16 bytes)
 ...
 crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678', '12345')
 ---
-- error: Initial vector length should be equal to cipher block length (16 bytes)
+- error: Initial vector length should be equal to cipher iv length (16 bytes)
 ...
 crypto.cipher.aes100.efb
 ---
@@ -89,26 +89,26 @@ crypto.cipher.aes100.efb
 ...
 crypto.cipher.aes256.nomode
 ---
-- error: 'builtin/crypto.lua:267: Cipher mode nomode is not supported'
+- error: 'builtin/crypto.lua:269: Cipher mode nomode is not supported'
 ...
 crypto.digest.nodigest
 ---
 - error: '[string "return crypto.digest.nodigest "]:1: Digest method "nodigest" is
     not supported'
 ...
-bad_pass = '87654321123456788765432112345678'
+bad_pass = '8765432112345678'
 ---
 ...
-bad_iv = '123456abcdefghijklmnopqrstuvwxyz'
+bad_iv = '123456abcdefghij'
 ---
 ...
 ciph.decrypt(enc, bad_pass, iv)
 ---
-- error: 'builtin/crypto.lua:284: Can''t finalize cipher:error:06065064:digital envelope
+- error: 'builtin/crypto.lua:286: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
 ...
 ciph.decrypt(enc, pass, bad_iv)
 ---
-- error: 'builtin/crypto.lua:284: Can''t finalize cipher:error:06065064:digital envelope
+- error: 'builtin/crypto.lua:286: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
 ...

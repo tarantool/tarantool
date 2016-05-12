@@ -1,4 +1,7 @@
 add_compile_flags("C;CXX" "-Wno-unused")
+if(CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
+    add_compile_flags("C;CXX" "-Wno-tautological-compare")
+endif()
 file(GLOB all_sources *.c *.cc)
 set_source_files_compile_flags(${all_sources})
 

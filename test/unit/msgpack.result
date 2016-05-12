@@ -1,4 +1,4 @@
-1..16
+1..17
     1..135
     # *** test_uints ***
     # uint 0U
@@ -1557,3 +1557,8 @@ ok 15 - subtests
     ok 230 - buffer overflow on step 50
     # *** test_format: done ***
 ok 16 - subtests
+    1..1
+    # *** test_mp_print ***
+    ok 1 - identical
+    # *** test_mp_print: done ***
+ok 17 - subtests
