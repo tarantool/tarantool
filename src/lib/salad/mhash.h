@@ -160,7 +160,7 @@ void _mh(delete)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_arg_t arg);
 int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		      mh_arg_t arg);
-void _mh(reserve)(struct _mh(t) *h, mh_int_t size,
+int _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 		  mh_arg_t arg);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 					       mh_arg_t arg);
@@ -557,11 +557,11 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	return 0;
 }
 
-void
+int
 _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 	     mh_arg_t arg)
 {
-	_mh(start_resize)(h, size/MH_DENSITY, h->size, arg);
+	return _mh(start_resize)(h, size/MH_DENSITY, h->size, arg);
 }
 
 #ifndef mh_stat

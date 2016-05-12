@@ -8487,7 +8487,8 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	}
 	int rc;
 	if (compress_dup && mh_size(b->tracker) == 0) {
-		mh_strnptr_reserve(b->tracker, 32768, NULL);
+		if (mh_strnptr_reserve(b->tracker, 32768, NULL) == -1)
+			return sr_oom(r->e);
 	}
 	rc = ss_bufensure(&b->list, r->a, sizeof(struct sdbuildref));
 	if (ssunlikely(rc == -1))
