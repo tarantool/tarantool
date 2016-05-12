@@ -171,7 +171,6 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	ev_tstamp start, delay;
 	evio_timeout_init(loop, &start, &delay, timeout);
 
-	assert(service != NULL);
 	if (strcmp(host, URI_HOST_UNIX) == 0) {
 		/* UNIX socket */
 		struct sockaddr_un un;
