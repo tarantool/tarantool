@@ -401,6 +401,56 @@ phia_join_key_def(void *env, void *db)
 	return key_def;
 }
 
+struct join_send_space_arg {
+	struct phia_env *env;
+	struct xstream *stream;
+};
+
+static void
+join_send_space(struct space *sp, void *data)
+{
+	struct phia_env *env = ((struct join_send_space_arg *) data)->env;
+	struct xstream *stream = ((struct join_send_space_arg *) data)->stream;
+	if (space_is_temporary(sp))
+		return;
+	if (!space_is_phia(sp))
+		return;
+	PhiaIndex *pk = (PhiaIndex *) space_index(sp, 0);
+	if (!pk)
+		return;
+
+	/* send database */
+	void *cursor = phia_cursor(env);
+	if (cursor == NULL)
+		phia_error(env);
+	auto cursor_guard = make_scoped_guard([=]{
+		phia_destroy(cursor);
+	});
+
+	/* tell cursor not to hold a transaction, which
+	 * in result enables compaction process
+	 * for duplicates */
+	phia_setint(cursor, "read_commited", 1);
+
+	void *obj = phia_document(pk->db);
+	while ((obj = phia_get(cursor, obj)))
+	{
+		int64_t lsn = phia_getint(obj, "lsn");
+		uint32_t tuple_size;
+		char *tuple = phia_tuple_data_new(obj, pk->key_def,
+						  &tuple_size);
+		try {
+			phia_send_row(stream, pk->key_def->space_id,
+				      tuple, tuple_size, lsn);
+		} catch (Exception *e) {
+			free(tuple);
+			phia_destroy(obj);
+			throw;
+		}
+		free(tuple);
+	}
+}
+
 /**
  * Relay all data currently stored in Phia engine
  * to the replica.
@@ -408,58 +458,8 @@ phia_join_key_def(void *env, void *db)
 void
 PhiaEngine::join(struct xstream *stream)
 {
-	/* iterate through a list of databases currently used
-	 * in Phia engine */
-	void *db;
-	void *db_cursor = phia_getobject(env, "db");
-	if (db_cursor == NULL)
-		phia_error(env);
-	while ((db = phia_get(db_cursor, NULL)))
-	{
-		/* prepare space schema */
-		struct key_def *key_def;
-		try {
-			key_def = phia_join_key_def(env, db);
-		} catch (Exception *e) {
-			phia_destroy(db_cursor);
-			throw;
-		}
-		/* send database */
-		void *cursor = phia_cursor(env);
-		if (cursor == NULL) {
-			phia_destroy(db_cursor);
-			key_def_delete(key_def);
-			phia_error(env);
-		}
-		/* tell cursor not to hold a transaction, which
-		 * in result enables compaction process
-		 * for duplicates */
-		phia_setint(cursor, "read_commited", 1);
-
-		void *obj = phia_document(db);
-		while ((obj = phia_get(cursor, obj)))
-		{
-			int64_t lsn = phia_getint(obj, "lsn");
-			uint32_t tuple_size;
-			char *tuple = phia_tuple_data_new(obj, key_def,
-								 &tuple_size);
-			try {
-				phia_send_row(stream, key_def->space_id,
-						tuple, tuple_size, lsn);
-			} catch (Exception *e) {
-				key_def_delete(key_def);
-				free(tuple);
-				phia_destroy(obj);
-				phia_destroy(cursor);
-				phia_destroy(db_cursor);
-				throw;
-			}
-			free(tuple);
-		}
-		phia_destroy(cursor);
-		key_def_delete(key_def);
-	}
-	phia_destroy(db_cursor);
+	struct join_send_space_arg arg = { env, stream };
+	space_foreach(join_send_space, &arg);
 }
 
 Index*

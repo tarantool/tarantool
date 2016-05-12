@@ -58,7 +58,7 @@ public:
 
 public:
 	struct phia_env *env;
-	void *db;
+	struct phia_index *db;
 
 	void *createDocument(const char *key, const char **keyend);
 private:

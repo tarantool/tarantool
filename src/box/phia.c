@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "phia.h"
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -14822,7 +14824,6 @@ phia_index_active(struct phia_index *o) {
 }
 
 static struct phia_index *phia_index_new(struct phia_env*, char*, int);
-static struct phia_index *phia_index_match(struct phia_env*, char*);
 static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
 static void *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
@@ -14851,8 +14852,6 @@ struct seviewdb {
 	char     *pos;
 	struct phia_index     *v;
 } sspacked;
-
-static struct so *se_viewdb_new(struct phia_env*, uint64_t);
 
 struct secursor {
 	struct so o;
@@ -15273,32 +15272,22 @@ se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 {
 	/* set(db) */
 	struct phia_env *e = s->ptr;
-	if (s->op == SR_WRITE) {
-		char *name = s->value;
-		struct phia_index *index = phia_index_match(e, name);
-		if (ssunlikely(index)) {
-			sr_error(&e->error, "index '%s' already exists", name);
-			return -1;
-		}
-		index = phia_index_new(e, name, s->valuesize);
-		if (ssunlikely(index == NULL))
-			return -1;
-		rlist_add(&e->db, &index->link);
-		return 0;
+	if (s->op != SR_WRITE) {
+		sr_error(&e->error, "%s", "bad operation");
+		return -1;
 	}
 
-	/* get() */
-	if (s->op == SR_READ) {
-		uint64_t txn = sr_seq(&e->seq, SR_TSN);
-		struct so *c = se_viewdb_new(e, txn);
-		if (ssunlikely(c == NULL))
-			return -1;
-		*(void**)s->value = c;
-		return 0;
+	char *name = s->value;
+	struct phia_index *index = phia_index_by_name(e, name);
+	if (ssunlikely(index)) {
+		sr_error(&e->error, "index '%s' already exists", name);
+		return -1;
 	}
-
-	sr_error(&e->error, "%s", "bad operation");
-	return -1;
+	index = phia_index_new(e, name, s->valuesize);
+	if (ssunlikely(index == NULL))
+		return -1;
+	rlist_add(&e->db, &index->link);
+	return 0;
 }
 
 static inline int
@@ -16663,7 +16652,8 @@ phia_index_new(struct phia_env *e, char *name, int size)
 	return o;
 }
 
-static struct phia_index *phia_index_match(struct phia_env *e, char *name)
+struct phia_index *
+phia_index_by_name(struct phia_env *e, const char *name)
 {
 	struct phia_index *index;
 	rlist_foreach_entry(index, &e->db, link) {
@@ -17424,108 +17414,6 @@ phia_tx_new(struct phia_env *e)
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
 	phia_index_bind(e);
 	return t;
-}
-
-static void
-se_viewdb_free(struct so *o)
-{
-	struct seviewdb *c = (struct seviewdb*)o;
-	struct phia_env *e = se_of(&c->o);
-	ss_buffree(&c->list, &e->a);
-	ss_free(&e->a, c);
-}
-
-static int
-se_viewdb_destroy(struct so *o)
-{
-	struct seviewdb *c = se_cast(o, struct seviewdb*, SEDBCURSOR);
-	ss_bufreset(&c->list);
-	so_free(&c->o);
-	return 0;
-}
-
-static void*
-se_viewdb_get(struct so *o, struct so *v ssunused)
-{
-	struct seviewdb *c = se_cast(o, struct seviewdb*, SEDBCURSOR);
-	if (c->ready) {
-		c->ready = 0;
-		return c->v;
-	}
-	if (ssunlikely(c->pos == NULL))
-		return NULL;
-	c->pos += sizeof(struct phia_index**);
-	if (c->pos >= c->list.p) {
-		c->pos = NULL;
-		c->v = NULL;
-		return NULL;
-	}
-	c->v = *(struct phia_index**)c->pos;
-	return c->v;
-}
-
-static struct soif seviewdbif =
-{
-	.open         = NULL,
-	.close        = NULL,
-	.destroy      = se_viewdb_destroy,
-	.free         = se_viewdb_free,
-	.drop         = NULL,
-	.setstring    = NULL,
-	.setint       = NULL,
-	.setobject    = NULL,
-	.getobject    = NULL,
-	.getstring    = NULL,
-	.getint       = NULL,
-	.get          = se_viewdb_get,
-	.cursor       = NULL,
-};
-
-static inline int
-se_viewdb_open(struct seviewdb *c)
-{
-	struct phia_env *e = se_of(&c->o);
-	int rc;
-	struct phia_index *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		int status = sr_status(&db->index->status);
-		if (status != SR_ONLINE)
-			continue;
-		if (phia_index_visible(db, c->txn_id)) {
-			rc = ss_bufadd(&c->list, &e->a, &db, sizeof(db));
-			if (ssunlikely(rc == -1))
-				return -1;
-		}
-	}
-	if (ss_bufsize(&c->list) == 0)
-		return 0;
-	c->ready = 1;
-	c->pos = c->list.s;
-	c->v = *(struct phia_index**)c->list.s;
-	return 0;
-}
-
-static struct so *se_viewdb_new(struct phia_env *e, uint64_t txn_id)
-{
-	struct seviewdb *c;
-	c = ss_malloc(&e->a, sizeof(struct seviewdb));
-	if (ssunlikely(c == NULL)) {
-		sr_oom(&e->error);
-		return NULL;
-	}
-	so_init(&c->o, &se_o[SEDBCURSOR], &seviewdbif, &e->o, e);
-	c->txn_id = txn_id;
-	c->v      = NULL;
-	c->pos    = NULL;
-	c->ready  = 0;
-	ss_bufinit(&c->list);
-	int rc = se_viewdb_open(c);
-	if (ssunlikely(rc == -1)) {
-		so_free(&c->o);
-		sr_oom(&e->error);
-		return NULL;
-	}
-	return &c->o;
 }
 
 static inline void

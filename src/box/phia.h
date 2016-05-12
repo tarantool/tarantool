@@ -75,6 +75,9 @@ int      phia_service(struct phia_env *env);
 void    *phia_get(void*, void*);
 void    *phia_cursor(void*);
 
+struct phia_index *
+phia_index_by_name(struct phia_env *env, const char *name);
+
 #ifdef __cplusplus
 }
 #endif

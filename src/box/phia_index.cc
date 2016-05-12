@@ -81,7 +81,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 	return obj;
 }
 
-static inline void*
+static inline struct phia_index *
 phia_configure_storage(struct space *space, struct key_def *key_def)
 {
 	PhiaEngine *engine =
@@ -117,9 +117,9 @@ phia_configure_storage(struct space *space, struct key_def *key_def)
 	         key_def->space_id, key_def->iid);
 	phia_setstring(env, c, "value", 0);
 	/* get database object */
-	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32,
+	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,
 	         key_def->space_id, key_def->iid);
-	void *db = phia_getobject(env, c);
+	struct phia_index *db = phia_index_by_name(env, c);
 	if (db == NULL)
 		phia_error(env);
 	return db;
