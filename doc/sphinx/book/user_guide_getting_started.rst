@@ -171,7 +171,7 @@ In the previous section the first request was with :code:`box.cfg{listen = 3301}
 The :code:`listen` value can be any form of URI (uniform resource identifier);
 in this case it's just a local port: port 3301.
 It's possible to send requests to the listen URI via (a) telnet,
-(b) a connector (which will be the subject of Chapter 8),
+(b) a connector (which will be the subject of the :ref:`Connectors <box-connectors>` chapter),
 or (c) another instance of Tarantool. Let's try (c).
 
 Switch to another terminal.
