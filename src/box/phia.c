@@ -62,6 +62,7 @@
 #include "clock.h"
 #include "trivia/config.h"
 #include "tt_pthread.h"
+#include "assoc.h"
 
 #define sspacked __attribute__((packed))
 #define ssunused __attribute__((unused))
@@ -859,115 +860,6 @@ ss_fnv(char *key, int len)
 		p++;
 	}
 	return h;
-}
-
-struct sshtnode {
-	uint32_t hash;
-};
-
-struct ssht {
-	struct sshtnode **i;
-	int count;
-	int size;
-};
-
-static inline int
-ss_htinit(struct ssht *t, struct ssa *a, int size)
-{
-	int sz = size * sizeof(struct sshtnode*);
-	t->i = (struct sshtnode**)ss_malloc(a, sz);
-	if (ssunlikely(t->i == NULL))
-		return -1;
-	t->count = 0;
-	t->size = size;
-	memset(t->i, 0, sz);
-	return 0;
-}
-
-static inline void
-ss_htfree(struct ssht *t, struct ssa *a)
-{
-	if (ssunlikely(t->i == NULL))
-		return;
-	ss_free(a, t->i);
-	t->i = NULL;
-	t->size = 0;
-}
-
-static inline void
-ss_htreset(struct ssht *t)
-{
-	int sz = t->size * sizeof(struct sshtnode*);
-	memset(t->i, 0, sz);
-	t->count = 0;
-}
-
-static inline int
-ss_htisfull(struct ssht *t)
-{
-	return t->count > (t->size / 2);
-}
-
-static inline int
-ss_htplace(struct ssht *t, struct sshtnode *node)
-{
-	uint32_t pos = node->hash % t->size;
-	for (;;) {
-		if (t->i[pos] != NULL) {
-			pos = (pos + 1) % t->size;
-			continue;
-		}
-		return pos;
-	}
-	return -1;
-}
-
-static inline int
-ss_htresize(struct ssht *t, struct ssa *a)
-{
-	struct ssht nt;
-	int rc = ss_htinit(&nt, a, t->size * 2);
-	if (ssunlikely(rc == -1))
-		return -1;
-	int i = 0;
-	while (i < t->size) {
-		if (t->i[i]) {
-			int pos = ss_htplace(&nt, t->i[i]);
-			nt.i[pos] = t->i[i];
-		}
-		i++;
-	}
-	nt.count = t->count;
-	ss_htfree(t, a);
-	*t = nt;
-	return 0;
-}
-
-#define ss_htsearch(name, compare) \
-static inline int \
-name(struct ssht *t, uint32_t hash, \
-     char *key ssunused, \
-     uint32_t size ssunused, void *ptr ssunused) \
-{ \
-	uint32_t pos = hash % t->size; \
-	for (;;) { \
-		if (t->i[pos] != NULL) { \
-			if ( (compare) ) \
-				return pos; \
-			pos = (pos + 1) % t->size; \
-			continue; \
-		} \
-		return pos; \
-	} \
-	return -1; \
-}
-
-static inline void
-ss_htset(struct ssht *t, int pos, struct sshtnode *node)
-{
-	if (t->i[pos] == NULL)
-		t->count++;
-	t->i[pos] = node;
 }
 
 /* range queue */
@@ -7705,7 +7597,7 @@ struct sdbuild {
 	int crc;
 	uint32_t vmax;
 	uint32_t n;
-	struct ssht tracker;
+	struct mh_strnptr_t *tracker;
 };
 
 static void sd_buildinit(struct sdbuild*);
@@ -8514,7 +8406,7 @@ static struct ssiterif sd_schemeiter;
 
 static void sd_buildinit(struct sdbuild *b)
 {
-	memset(&b->tracker, 0, sizeof(b->tracker));
+	b->tracker = NULL;
 	ss_bufinit(&b->list);
 	ss_bufinit(&b->m);
 	ss_bufinit(&b->v);
@@ -8531,22 +8423,22 @@ static void sd_buildinit(struct sdbuild *b)
 static inline void
 sd_buildfree_tracker(struct sdbuild *b, struct runtime *r)
 {
-	if (b->tracker.count == 0)
+	if (!b->tracker)
 		return;
-	int i = 0;
-	for (; i < b->tracker.size; i++) {
-		if (b->tracker.i[i] == NULL)
-			continue;
-		ss_free(r->a, b->tracker.i[i]);
-		b->tracker.i[i] = NULL;
+	mh_int_t i;
+	mh_foreach(b->tracker, i) {
+		ss_free(r->a, mh_strnptr_node(b->tracker, i)->val);
 	}
-	b->tracker.count = 0;
+	mh_strnptr_clear(b->tracker);
 }
 
 static void sd_buildfree(struct sdbuild *b, struct runtime *r)
 {
-	sd_buildfree_tracker(b, r);
-	ss_htfree(&b->tracker, r->a);
+	if (b->tracker) {
+		sd_buildfree_tracker(b, r);
+		mh_strnptr_delete(b->tracker);
+		b->tracker = NULL;
+	}
 	ss_buffree(&b->list, r->a);
 	ss_buffree(&b->m, r->a);
 	ss_buffree(&b->v, r->a);
@@ -8557,7 +8449,6 @@ static void sd_buildfree(struct sdbuild *b, struct runtime *r)
 static void sd_buildreset(struct sdbuild *b, struct runtime *r)
 {
 	sd_buildfree_tracker(b, r);
-	ss_htreset(&b->tracker);
 	ss_bufreset(&b->list);
 	ss_bufreset(&b->m);
 	ss_bufreset(&b->v);
@@ -8570,7 +8461,6 @@ static void sd_buildreset(struct sdbuild *b, struct runtime *r)
 static void sd_buildgc(struct sdbuild *b, struct runtime *r, int wm)
 {
 	sd_buildfree_tracker(b, r);
-	ss_htreset(&b->tracker);
 	ss_bufgc(&b->list, r->a, wm);
 	ss_bufgc(&b->m, r->a, wm);
 	ss_bufgc(&b->v, r->a, wm);
@@ -8590,11 +8480,14 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	b->compress_dup = compress_dup;
 	b->compress = compress;
 	b->compress_if = compress_if;
-	int rc;
-	if (compress_dup && b->tracker.size == 0) {
-		rc = ss_htinit(&b->tracker, r->a, 32768);
-		if (ssunlikely(rc == -1))
+	if (!b->tracker) {
+		b->tracker = mh_strnptr_new();
+		if (!b->tracker)
 			return sr_oom(r->e);
+	}
+	int rc;
+	if (compress_dup && mh_size(b->tracker) == 0) {
+		mh_strnptr_reserve(b->tracker, 32768, NULL);
 	}
 	rc = ss_bufensure(&b->list, r->a, sizeof(struct sdbuildref));
 	if (ssunlikely(rc == -1))
@@ -8623,17 +8516,10 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 }
 
 struct sdbuildkey {
-	struct sshtnode node;
 	uint32_t offset;
 	uint32_t offsetstart;
 	uint32_t size;
 };
-
-ss_htsearch(sd_buildsearch,
-            (sscast(t->i[pos], struct sdbuildkey, node)->node.hash == hash) &&
-            (sscast(t->i[pos], struct sdbuildkey, node)->size == size) &&
-            (memcmp(((struct sdbuild*)ptr)->k.s +
-                    sscast(t->i[pos], struct sdbuildkey, node)->offsetstart, key, size) == 0))
 
 static inline int
 sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
@@ -8649,14 +8535,12 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 
 		/* match a field copy */
 		int is_duplicate = 0;
-		uint32_t hash = 0;
-		int pos = 0;
 		if (b->compress_dup) {
-			hash = ss_fnv(field, fieldsize);
-			pos = sd_buildsearch(&b->tracker, hash, field, fieldsize, b);
-			if (b->tracker.i[pos]) {
+			mh_int_t pos = mh_strnptr_find_inp(b->tracker, field, fieldsize);
+			if (pos != mh_end(b->tracker)) {
 				is_duplicate = 1;
-				struct sdbuildkey *ref = sscast(b->tracker.i[pos], struct sdbuildkey, node);
+				struct sdbuildkey *ref = (struct sdbuildkey *)
+					mh_strnptr_node(b->tracker, pos)->val;
 				offset = ref->offset;
 			}
 		}
@@ -8682,19 +8566,20 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 
 		/* add field reference */
 		if (b->compress_dup) {
-			if (ssunlikely(ss_htisfull(&b->tracker))) {
-				rc = ss_htresize(&b->tracker, r->a);
-				if (ssunlikely(rc == -1))
-					return sr_oom(r->e);
-			}
 			struct sdbuildkey *ref = ss_malloc(r->a, sizeof(struct sdbuildkey));
 			if (ssunlikely(ref == NULL))
 				return sr_oom(r->e);
-			ref->node.hash = hash;
 			ref->offset = offset;
 			ref->offsetstart = offsetstart + sizeof(uint32_t);
 			ref->size = fieldsize;
-			ss_htset(&b->tracker, pos, &ref->node);
+			uint32_t hash = mh_strn_hash(field, fieldsize);
+			const struct mh_strnptr_node_t strnode = {
+				field, fieldsize, hash, ref};
+			mh_int_t ins_pos = mh_strnptr_put(b->tracker, &strnode,
+							  NULL, NULL);
+			if (ssunlikely(ins_pos == mh_end(b->tracker)))
+				return sr_error(r->e, "%s",
+						"Can't insert assoc array item");
 		}
 	}
 
