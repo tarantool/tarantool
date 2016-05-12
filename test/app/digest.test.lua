@@ -94,8 +94,8 @@ mur:update('1234')
 mur:result()
 mur, mur_new, nulldigest = nil, nil, nil
 
-digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
-digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
-digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbhuytrghjklmnbdr34')
+digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
+digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 
 digest = nil

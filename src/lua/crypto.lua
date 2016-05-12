@@ -37,6 +37,9 @@ ffi.cdef[[
     int EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl);
     int EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *ctx);
 
+    int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
+    int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
+
     int EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
     const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
 ]]
@@ -154,14 +157,13 @@ local function cipher_gc(ctx)
 end
 
 local function cipher_new(cipher, key, iv, direction)
-    local block_size = ffi.C.EVP_CIPHER_block_size(cipher)
-    if key == nil or key:len() < block_size then
-      return error('Key length should be equal to cipher block length ('
-        .. tostring(block_size) .. ' bytes)')
+    if key == nil or key:len() ~= ffi.C.tnt_EVP_CIPHER_key_length(cipher) then
+        return error('Key length should be equal to cipher key length ('
+            .. tostring(ffi.C.tnt_EVP_CIPHER_key_length(cipher)) .. ' bytes)')
     end
-    if iv == nil or iv:len() < block_size then
-      return error('Initial vector length should be equal to cipher block length ('
-        .. tostring(block_size) .. ' bytes)')
+    if iv == nil or iv:len() ~= ffi.C.tnt_EVP_CIPHER_iv_length(cipher) then
+        return error('Initial vector length should be equal to cipher iv length ('
+            .. tostring(ffi.C.tnt_EVP_CIPHER_iv_length(cipher)) .. ' bytes)')
     end
     local ctx = ffi.C.EVP_CIPHER_CTX_new()
     if ctx == nil then
@@ -171,7 +173,7 @@ local function cipher_new(cipher, key, iv, direction)
     local self = setmetatable({
         ctx = ctx,
         cipher = cipher,
-        block_size = block_size,
+        block_size = ffi.C.EVP_CIPHER_block_size(cipher),
         direction = direction,
         buf = buffer.ibuf(),
         initialized = false,
