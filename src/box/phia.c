@@ -4206,7 +4206,6 @@ struct runtime {
 	struct sfscheme *scheme;
 	struct srseq *seq;
 	struct ssa *a;
-	struct ssa *aref;
 	struct ssvfs *vfs;
 	struct ssquota *quota;
 	struct srzonemap *zonemap;
@@ -4219,7 +4218,6 @@ sr_init(struct runtime *r,
         struct srstatus *status,
         struct srerror *e,
         struct ssa *a,
-        struct ssa *aref,
         struct ssvfs *vfs,
         struct ssquota *quota,
         struct srzonemap *zonemap,
@@ -4233,7 +4231,6 @@ sr_init(struct runtime *r,
 	r->status      = status;
 	r->e           = e;
 	r->a           = a;
-	r->aref        = aref;
 	r->vfs         = vfs;
 	r->quota       = quota;
 	r->zonemap     = zonemap;
@@ -4934,7 +4931,7 @@ static struct svif sv_refif;
 static inline struct svref*
 sv_refnew(struct runtime *r, struct svv *v)
 {
-	struct svref *ref = ss_malloc(r->aref, sizeof(struct svref));
+	struct svref *ref = ss_malloc(r->a, sizeof(struct svref));
 	if (ssunlikely(ref == NULL))
 		return NULL;
 	ref->v = v;
@@ -4950,7 +4947,7 @@ sv_reffree(struct runtime *r, struct svref *v)
 	while (v) {
 		struct svref *n = v->next;
 		sv_vunref(r, v->v);
-		ss_free(r->aref, v);
+		ss_free(r->a, v);
 		v = n;
 	}
 }
@@ -11094,7 +11091,7 @@ static uint32_t si_gcref(struct runtime *r, struct svref *gc)
 		uint32_t size = sv_vsize(v->v);
 		if (si_gcv(r, v->v))
 			used += size;
-		ss_free(r->aref, v);
+		ss_free(r->a, v);
 		v = n;
 	}
 	return used;
@@ -14675,15 +14672,12 @@ struct phia_env {
 	struct srstatus    status;
 	/** List of open spaces. */
 	struct rlist db;
-	/** List of active read views. */
-	struct rlist view;
 	struct srseq       seq;
 	struct seconf      conf;
 	struct ssquota     quota;
 	struct ssvfs       vfs;
 	struct ssa         a_oom;
 	struct ssa         a;
-	struct ssa         a_ref;
 	struct sicachepool cachepool;
 	struct sxmanager   xm;
 	struct scheduler          scheduler;
@@ -17249,19 +17243,17 @@ struct phia_env *phia_env(void)
 	sr_statusset(&e->status, SR_OFFLINE);
 	ss_vfsinit(&e->vfs, &ss_stdvfs);
 	ss_aopen(&e->a, &ss_stda);
-	ss_aopen(&e->a_ref, &ss_stda);
 	int rc;
 	rc = se_confinit(&e->conf, e);
 	if (ssunlikely(rc == -1))
 		goto error;
 	rlist_create(&e->db);
-	rlist_create(&e->view);
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
 	sr_errorinit(&e->error);
 	sr_statinit(&e->stat);
 	sf_limitinit(&e->limit, &e->a);
-	sr_init(&e->r, &e->status, &e->error, &e->a, &e->a_ref, &e->vfs, &e->quota,
+	sr_init(&e->r, &e->status, &e->error, &e->a, &e->vfs, &e->quota,
 	        &e->conf.zones, &e->seq, SF_RAW, NULL,
 	        NULL, &e->ei, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
