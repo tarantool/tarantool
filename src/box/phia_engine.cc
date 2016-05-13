@@ -375,32 +375,6 @@ phia_send_row(struct xstream *stream, uint32_t space_id, char *tuple,
 	xstream_write(stream, &row);
 }
 
-static inline struct key_def *
-phia_join_key_def(void *env, void *db)
-{
-	uint32_t id = phia_getint(db, "id");
-	uint32_t count = phia_getint(db, "key-count");
-	struct key_def *key_def;
-	struct key_opts key_opts = key_opts_default;
-	key_def = key_def_new(id, 0, "phia_join", TREE, &key_opts, count);
-	unsigned i = 0;
-	while (i < count) {
-		char path[64];
-		snprintf(path, sizeof(path), "db.%d:0.scheme.key_%d", id, i);
-		char *type = (char *)phia_getstring(env, path, NULL);
-		assert(type != NULL);
-		if (strncmp(type, "string", 6) == 0)
-			key_def->parts[i].type = STRING;
-		else
-		if (strncmp(type, "u64", 3) == 0)
-			key_def->parts[i].type = NUM;
-		free(type);
-		key_def->parts[i].fieldno = i;
-		i++;
-	}
-	return key_def;
-}
-
 struct join_send_space_arg {
 	struct phia_env *env;
 	struct xstream *stream;

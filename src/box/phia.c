@@ -10721,7 +10721,6 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 	/* in-memory mode blob */
 	int rc;
-	struct ssblob copy, *blob = NULL;
 	struct svmerge vmerge;
 	sv_mergeinit(&vmerge);
 	rc = sv_mergeprepare(&vmerge, r, 1);
@@ -10762,7 +10761,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		/* write open seal */
 		uint64_t seal = parent->file.size;
-		rc = sd_writeseal(r, &parent->file, blob);
+		rc = sd_writeseal(r, &parent->file, NULL);
 		if (ssunlikely(rc == -1))
 			goto e0;
 
@@ -10770,7 +10769,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		uint64_t offset = parent->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1)
 		{
-			rc = sd_writepage(r, &parent->file, blob, merge.build);
+			rc = sd_writepage(r, &parent->file, NULL, merge.build);
 			if (ssunlikely(rc == -1))
 				goto e0;
 			offset = parent->file.size;
@@ -10787,7 +10786,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 			goto e0;
 
 		/* write index */
-		rc = sd_writeindex(r, &parent->file, blob, &merge.index);
+		rc = sd_writeindex(r, &parent->file, NULL, &merge.index);
 		if (ssunlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync) {
@@ -10806,7 +10805,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		             return -1);
 
 		/* seal the branch */
-		rc = sd_seal(r, &parent->file, blob, &merge.index, seal);
+		rc = sd_seal(r, &parent->file, NULL, &merge.index, seal);
 		if (ssunlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync == 2) {
@@ -10837,26 +10836,11 @@ si_branchcreate(struct si *index, struct sdc *c,
 	if (ssunlikely(branch == NULL))
 		return 0;
 
-	/* in-memory mode support */
-	if (blob) {
-		rc = ss_blobfit(blob);
-		if (ssunlikely(rc == -1)) {
-			ss_blobfree(blob);
-			goto e1;
-		}
-		branch->copy = copy;
-	}
-
 	*result = branch;
 	return 0;
 e0:
 	sd_mergefree(&merge);
-	if (blob)
-		ss_blobfree(blob);
-		sv_mergefree(&vmerge, r->a);
-	return -1;
-e1:
-	si_branchfree(branch, r);
+	sv_mergefree(&vmerge, r->a);
 	return -1;
 }
 
