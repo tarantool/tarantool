@@ -211,7 +211,7 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
-	rc = phia_open(db);
+	rc = phia_index_open(db);
 	if (rc == -1)
 		phia_error(env);
 	format = space->format;
@@ -223,11 +223,11 @@ PhiaIndex::~PhiaIndex()
 	if (db == NULL)
 		return;
 	/* schedule database shutdown */
-	int rc = phia_close(db);
+	int rc = phia_index_close(db);
 	if (rc == -1)
 		goto error;
 	/* unref database object */
-	rc = phia_destroy(db);
+	rc = phia_index_delete(db);
 	if (rc == -1)
 		goto error;
 error:;
@@ -276,7 +276,7 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	}
 	struct phia_document *result;
 	if (transaction == NULL) {
-		result = (struct phia_document *) phia_get(db, obj);
+		result = (struct phia_document *) phia_index_get(db, obj);
 	} else {
 		result = (struct phia_document *) phia_get(transaction, obj);
 	}

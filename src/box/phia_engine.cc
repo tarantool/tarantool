@@ -56,8 +56,9 @@ static int worker_pool_size;
 static volatile int worker_pool_run;
 
 static inline uint32_t
-phia_get_parts(struct key_def *key_def, void *obj, void *value, int valuesize,
-		 struct iovec *parts, uint32_t *field_count)
+phia_get_parts(struct key_def *key_def, struct phia_document *obj,
+	       void *value, int valuesize, struct iovec *parts,
+	       uint32_t *field_count)
 {
 	/* prepare keys */
 	int size = 0;
@@ -116,8 +117,8 @@ phia_write_parts(struct key_def *key_def, void *value, int valuesize,
 }
 
 struct tuple *
-phia_tuple_new(void *obj, struct key_def *key_def,
-		 struct tuple_format *format)
+phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
+	       struct tuple_format *format)
 {
 	assert(format);
 	assert(key_def->part_count <= 8);
@@ -142,7 +143,8 @@ phia_tuple_new(void *obj, struct key_def *key_def,
 }
 
 static char *
-phia_tuple_data_new(void *obj, struct key_def *key_def, uint32_t *bsize)
+phia_tuple_data_new(struct phia_document *obj, struct key_def *key_def,
+		    uint32_t *bsize)
 {
 	assert(key_def->part_count <= 8);
 	struct iovec parts[8];
@@ -266,8 +268,7 @@ phia_index_read_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	task->result = (struct phia_document *)
-		phia_get(task->index, task->key);
+	task->result = phia_index_get(task->index, task->key);
 	return 0;
 }
 
@@ -496,11 +497,11 @@ PhiaEngine::dropIndex(Index *index)
 {
 	PhiaIndex *i = (PhiaIndex *)index;
 	/* schedule asynchronous drop */
-	int rc = phia_drop(i->db);
+	int rc = phia_index_drop(i->db);
 	if (rc == -1)
 		phia_error(env);
 	/* unref db object */
-	rc = phia_destroy(i->db);
+	rc = phia_index_delete(i->db);
 	if (rc == -1)
 		phia_error(env);
 	i->db  = NULL;

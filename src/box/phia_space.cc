@@ -136,7 +136,7 @@ PhiaSpace::executeReplace(struct txn*,
 	/* replace */
 	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	const char *value = NULL;
-	void *obj = index->createDocument(key, &value);
+	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
 		phia_setstring(obj, "value", value, valuesize);

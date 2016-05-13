@@ -4704,17 +4704,14 @@ struct sotype {
 struct so {
 	struct soif *i;
 	struct sotype *type;
-	struct so *parent;
 	struct phia_env *env;
 };
 
 static inline void
-so_init(struct so *o, struct sotype *type, struct soif *i, struct so *parent,
-	struct phia_env *env)
+so_init(struct so *o, struct sotype *type, struct soif *i, struct phia_env *env)
 {
 	o->type      = type;
 	o->i         = i;
-	o->parent    = parent;
 	o->env       = env;
 }
 
@@ -6506,7 +6503,7 @@ enum sxtype {
 struct sxindex {
 	struct ssrb      i;
 	uint32_t  dsn;
-	struct so       *object;
+	struct phia_index *db;
 	void     *ptr;
 	struct runtime       *r;
 	struct rlist    link;
@@ -6514,7 +6511,7 @@ struct sxindex {
 
 struct sx;
 
-typedef int (*sxpreparef)(struct sx*, struct sv*, struct so*, void*);
+typedef int (*sxpreparef)(struct sx*, struct sv*, struct phia_index*, void*);
 
 struct sx {
 	enum sxtype     type;
@@ -6544,7 +6541,7 @@ struct sxmanager {
 
 static int sx_managerinit(struct sxmanager*, struct runtime*);
 static int sx_managerfree(struct sxmanager*);
-static int sx_indexinit(struct sxindex*, struct sxmanager*, struct runtime*, struct so*, void*);
+static int sx_indexinit(struct sxindex*, struct sxmanager*, struct runtime*, struct phia_index*, void*);
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
 static struct sx *sx_find(struct sxmanager*, uint64_t);
@@ -6591,12 +6588,13 @@ static int sx_managerfree(struct sxmanager *m)
 	return 0;
 }
 
-static int sx_indexinit(struct sxindex *i, struct sxmanager *m, struct runtime *r, struct so *object, void *ptr)
+static int sx_indexinit(struct sxindex *i, struct sxmanager *m,
+			struct runtime *r, struct phia_index *db, void *ptr)
 {
 	ss_rbinit(&i->i);
 	rlist_create(&i->link);
 	i->dsn = 0;
-	i->object = object;
+	i->db = db;
 	i->ptr = ptr;
 	i->r = r;
 	rlist_add(&m->indexes, &i->link);
@@ -6865,7 +6863,7 @@ sx_preparecb(struct sx *x, struct svlogv *v, uint64_t lsn, sxpreparef prepare, v
 		return 0;
 	if (prepare) {
 		struct sxindex *i = ((struct sxv*)v->v.v)->index;
-		if (prepare(x, &v->v, i->object, arg))
+		if (prepare(x, &v->v, i->db, arg))
 			return 1;
 	}
 	return 0;
@@ -9910,7 +9908,7 @@ struct si {
 	struct ssbuf      readbuf;
 	struct svupsert   u;
 	struct sischeme   scheme;
-	struct so        *object;
+	struct phia_index *db;
 	struct runtime         r;
 	struct rlist     link;
 };
@@ -9940,7 +9938,7 @@ si_scheme(struct si *i) {
 	return &i->scheme;
 }
 
-static struct si *si_init(struct runtime*, struct so*);
+static struct si *si_init(struct runtime*, struct phia_index*);
 static int si_open(struct si*);
 static int si_close(struct si*);
 static int si_insert(struct si*, struct sinode*);
@@ -10524,7 +10522,7 @@ static int si_profilerbegin(struct siprofiler*, struct si*);
 static int si_profilerend(struct siprofiler*);
 static int si_profiler(struct siprofiler*);
 
-static struct si *si_init(struct runtime *r, struct so *object)
+static struct si *si_init(struct runtime *r, struct phia_index *db)
 {
 	struct si *i = ss_malloc(r->a, sizeof(struct si));
 	if (ssunlikely(i == NULL))
@@ -10559,7 +10557,7 @@ static struct si *si_init(struct runtime *r, struct so *object)
 	tt_pthread_mutex_init(&i->ref_lock, NULL);
 	i->ref_fe       = 0;
 	i->ref_be       = 0;
-	i->object       = object;
+	i->db           = db;
 	return i;
 }
 
@@ -13828,7 +13826,7 @@ struct screadarg {
 };
 
 struct scread {
-	struct so         *db;
+	struct phia_index *db;
 	struct si         *index;
 	struct screadarg   arg;
 	int         start;
@@ -13839,7 +13837,7 @@ struct scread {
 	struct runtime         *r;
 };
 
-static void sc_readopen(struct scread*, struct runtime*, struct so*, struct si*);
+static void sc_readopen(struct scread*, struct runtime*, struct phia_index*, struct si*);
 static void sc_readclose(struct scread*);
 static int sc_read(struct scread*, struct scheduler*);
 
@@ -14100,7 +14098,7 @@ static void sc_readclose(struct scread *r)
 }
 
 static void
-sc_readopen(struct scread *r, struct runtime *rt, struct so *db, struct si *index)
+sc_readopen(struct scread *r, struct runtime *rt, struct phia_index *db, struct si *index)
 {
 	r->db = db;
 	r->index = index;
@@ -14722,6 +14720,7 @@ static inline struct phia_env *se_of(struct so *o) {
 
 struct phia_document {
 	struct so        o;
+	struct phia_index *db;
 	int       created;
 	struct sv        v;
 	enum ssorder   order;
@@ -14750,13 +14749,13 @@ struct phia_document {
 };
 
 static struct phia_document *
-phia_document_new(struct phia_env*, struct so*, const struct sv*);
+phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
 
 static inline int
-phia_document_validate_ro(struct phia_document *o, struct so *dest)
+phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
 	struct phia_env *e = se_of(&o->o);
-	if (ssunlikely(o->o.parent != dest))
+	if (ssunlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (! o->flagset) {
@@ -14767,10 +14766,10 @@ phia_document_validate_ro(struct phia_document *o, struct so *dest)
 }
 
 static inline int
-phia_document_validate(struct phia_document *o, struct so *dest, uint8_t flags)
+phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
 {
 	struct phia_env *e = se_of(&o->o);
-	if (ssunlikely(o->o.parent != dest))
+	if (ssunlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (o->flagset) {
@@ -14789,7 +14788,7 @@ phia_document_validate(struct phia_document *o, struct so *dest, uint8_t flags)
 }
 
 struct phia_index {
-	struct so         o;
+	struct phia_env *env;
 	uint32_t   created;
 	struct siprofiler rtp;
 	struct sischeme  *scheme;
@@ -14899,7 +14898,7 @@ se_open(struct so *o)
 	/* index recover */
 	struct phia_index *item, *n;
 	rlist_foreach_entry_safe(item, &e->db, link, n) {
-		rc = so_open(&item->o);
+		rc = phia_index_open(item);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -14909,7 +14908,7 @@ se_open(struct so *o)
 online:
 	/* complete */
 	rlist_foreach_entry_safe(item, &e->db, link, n) {
-		rc = so_open(&item->o);
+		rc = phia_index_open(item);
 		if (ssunlikely(rc == -1))
 			return -1;
 	}
@@ -14930,7 +14929,7 @@ se_destroy(struct so *o)
 	{
 		struct phia_index *db, *next;
 		rlist_foreach_entry_safe(db, &e->db, link, next) {
-			rc = so_destroy(&db->o);
+			rc = phia_index_delete(db);
 			if (ssunlikely(rc == -1))
 				rcret = -1;
 		}
@@ -15340,7 +15339,7 @@ se_confdb_branch(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_index *db = c->value;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_branch(&e->scheduler, vlsn, db->index);
 }
@@ -15351,7 +15350,7 @@ se_confdb_compact(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_index *db = c->value;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact(&e->scheduler, vlsn, db->index);
 }
@@ -15362,7 +15361,7 @@ se_confdb_compact_index(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_index *db = c->value;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	uint64_t vlsn = sx_vlsn(&e->xm);
 	return sc_ctl_compact_index(&e->scheduler, vlsn, db->index);
 }
@@ -15385,7 +15384,7 @@ se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
 {
 	/* set(scheme, field) */
 	struct phia_index *db = c->ptr;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	if (s->op != SR_WRITE) {
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
@@ -15426,7 +15425,7 @@ static inline int
 se_confdb_field(struct srconf *c, struct srconfstmt *s)
 {
 	struct phia_index *db = c->ptr;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	if (ssunlikely(phia_index_active(db))) {
@@ -15922,7 +15921,7 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, &e->o, e);
+	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, e);
 	ss_bufinit(&v->key);
 	ss_bufinit(&v->value);
 	int rc;
@@ -16012,7 +16011,7 @@ static struct so *se_confcursor_new(struct so *o)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, &e->o, e);
+	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, e);
 	c->pos = NULL;
 	c->first = 1;
 	ss_bufinit(&c->dump);
@@ -16046,7 +16045,7 @@ struct phia_document *
 phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
 {
 	se_apilock(c->env);
-	struct phia_index *db = se_cast(key->o.parent, struct phia_index*, SEDB);
+	struct phia_index *db = key->db;
 	if (ssunlikely(! key->orderset))
 		key->order = SS_GTE;
 	/* this statistics might be not complete, because
@@ -16108,7 +16107,7 @@ phia_cursor(struct phia_env *e)
 static int
 phia_index_scheme_init(struct phia_index *db, char *name, int size)
 {
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	/* prepare index scheme */
 	struct sischeme *scheme = db->scheme;
 	if (size == 0)
@@ -16155,7 +16154,7 @@ error:
 static int
 phia_index_scheme_set(struct phia_index *db)
 {
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	struct sischeme *s = si_scheme(db->index);
 	/* set default scheme */
 	int rc;
@@ -16228,11 +16227,10 @@ phia_index_scheme_set(struct phia_index *db)
 	return 0;
 }
 
-static int
-phia_index_open(struct so *o)
+int
+phia_index_open(struct phia_index *db)
 {
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
 	if (status == SR_RECOVER ||
 	    status == SR_DROP_PENDING)
@@ -16261,7 +16259,7 @@ online:
 static inline int
 phia_index_free(struct phia_index *db, int close)
 {
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	int rcret = 0;
 	int rc;
 	sx_indexfree(&db->coindex, &e->xm);
@@ -16277,7 +16275,7 @@ phia_index_free(struct phia_index *db, int close)
 static inline void
 phia_index_unref(struct phia_index *db)
 {
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	/* do nothing during env shutdown */
 	int status = sr_status(&e->status);
 	if (status == SR_SHUTDOWN)
@@ -16313,11 +16311,10 @@ phia_index_unref(struct phia_index *db)
 	sc_ctl_shutdown(&e->scheduler, index);
 }
 
-static int
-phia_index_destroy(struct so *o)
+int
+phia_index_delete(struct phia_index *db)
 {
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	int status = sr_status(&e->status);
 	if (status == SR_SHUTDOWN ||
 	    status == SR_OFFLINE) {
@@ -16327,11 +16324,10 @@ phia_index_destroy(struct so *o)
 	return 0;
 }
 
-static int
-phia_index_close(struct so *o)
+int
+phia_index_close(struct phia_index *db)
 {
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -16341,11 +16337,10 @@ phia_index_close(struct so *o)
 	return 0;
 }
 
-static int
-phia_index_drop(struct so *o)
+int
+phia_index_drop(struct phia_index *db)
 {
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -16406,7 +16401,7 @@ static struct phia_document *
 phia_index_read(struct phia_index *db, struct phia_document *o,
 		struct sx *x, int x_search, struct sicache *cache)
 {
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
 
 	/* prepare the key */
@@ -16414,7 +16409,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	int rc = so_open(&o->o);
 	if (ssunlikely(rc == -1))
 		goto error;
-	rc = phia_document_validate_ro(o, &db->o);
+	rc = phia_document_validate_ro(o, db);
 	if (ssunlikely(rc == -1))
 		goto error;
 	if (ssunlikely(! sr_online(&db->index->status)))
@@ -16433,7 +16428,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		if (ssunlikely(rc == -1 || rc == 2 /* delete */))
 			goto error;
 		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
-			ret = phia_document_new(e, &db->o, &vup);
+			ret = phia_document_new(e, db, &vup);
 			if (sslikely(ret)) {
 				ret->cache_only  = o->cache_only;
 				ret->oldest_only = o->oldest_only;
@@ -16468,7 +16463,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 	/* prepare request */
 	struct scread q;
-	sc_readopen(&q, db->r, &db->o, db->index);
+	sc_readopen(&q, db->r, db, db->index);
 	q.start = start;
 	struct screadarg *arg = &q.arg;
 	arg->v           = o->v;
@@ -16516,59 +16511,11 @@ error:
 	return NULL;
 }
 
-static void *
-phia_index_get(struct so *o, struct so *v)
+struct phia_document *
+phia_index_get(struct phia_index *db, struct phia_document *key)
 {
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_index_read(db, key, NULL, 0, NULL);
 }
-
-static void *
-phia_index_get_string(struct so *o, const char *path, int *size)
-{
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	if (strcmp(path, "name") == 0) {
-		int namesize = strlen(db->scheme->name) + 1;
-		if (size)
-			*size = namesize;
-		char *name = malloc(namesize);
-		if (name == NULL)
-			return NULL;
-		memcpy(name, db->scheme->name, namesize);
-		return name;
-	}
-	return NULL;
-}
-
-static int64_t
-phia_index_get_int(struct so *o, const char *path)
-{
-	struct phia_index *db = se_cast(o, struct phia_index*, SEDB);
-	if (strcmp(path, "id") == 0)
-		return db->scheme->id;
-	else
-	if (strcmp(path, "key-count") == 0)
-		return db->scheme->scheme.keys_count;
-	return -1;
-}
-
-static struct soif sedbif =
-{
-	.open         = phia_index_open,
-	.close        = phia_index_close,
-	.destroy      = phia_index_destroy,
-	.free         = NULL,
-	.drop         = phia_index_drop,
-	.setstring    = NULL,
-	.setint       = NULL,
-	.setobject    = NULL,
-	.getobject    = NULL,
-	.getstring    = phia_index_get_string,
-	.getint       = phia_index_get_int,
-	.get          = phia_index_get,
-	.cursor       = NULL,
-};
 
 static struct phia_index *
 phia_index_new(struct phia_env *e, char *name, int size)
@@ -16579,8 +16526,8 @@ phia_index_new(struct phia_env *e, char *name, int size)
 		return NULL;
 	}
 	memset(o, 0, sizeof(*o));
-	so_init(&o->o, &se_o[SEDB], &sedbif, &e->o, e);
-	o->index = si_init(&e->r, &o->o);
+	o->env = e;
+	o->index = si_init(&e->r, o);
 	if (ssunlikely(o->index == NULL)) {
 		ss_free(&e->a, o);
 		return NULL;
@@ -16595,7 +16542,7 @@ phia_index_new(struct phia_env *e, char *name, int size)
 		return NULL;
 	}
 	sr_statusset(&o->index->status, SR_OFFLINE);
-	sx_indexinit(&o->coindex, &e->xm, o->r, &o->o, o->index);
+	sx_indexinit(&o->coindex, &e->xm, o->r, o, o->index);
 	o->txn_min = sx_min(&e->xm);
 	o->txn_max = UINT32_MAX;
 	return o;
@@ -16640,7 +16587,7 @@ static int phia_index_recoverbegin(struct phia_index *db)
 {
 	/* open and recover repository */
 	sr_statusset(&db->index->status, SR_RECOVER);
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
@@ -16724,8 +16671,8 @@ phia_document_opt(const char *path)
 static inline int
 phia_document_create(struct phia_document *o)
 {
-	struct phia_index *db = (struct phia_index*)o->o.parent;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_index *db = o->db;
+	struct phia_env *e = db->env;
 
 	assert(o->v.v == NULL);
 
@@ -16822,7 +16769,7 @@ static struct sfv*
 phia_document_setfield(struct phia_document *v, const char *path, void *pointer, int size)
 {
 	struct phia_env *e = se_of(&v->o);
-	struct phia_index *db = (struct phia_index*)v->o.parent;
+	struct phia_index *db = v->db;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 	if (ssunlikely(field == NULL))
 		return NULL;
@@ -16898,7 +16845,7 @@ phia_document_getstring(struct so *o, const char *path, int *size)
 	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_FIELD: {
 		/* match field */
-		struct phia_index *db = (struct phia_index*)o->parent;
+		struct phia_index *db = v->db;
 		struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 		if (ssunlikely(field == NULL))
 			return NULL;
@@ -16992,6 +16939,7 @@ phia_document_getint(struct so *o, const char *path)
 	return -1;
 }
 
+#if 0
 static int
 phia_document_setobject(struct so *o, const char *path, void *object)
 {
@@ -17003,7 +16951,7 @@ phia_document_setobject(struct so *o, const char *path, void *object)
 		if (ssunlikely(v->created))
 			return sr_error(&e->error, "%s", "document is read-only");
 		assert(v->v.v == NULL);
-		if (ssunlikely(object == o->parent))
+		if (ssunlikely(object == v->db))
 			return sr_error(&e->error, "%s", "bad document operation");
 		if (ssunlikely(! reuse->created))
 			return sr_error(&e->error, "%s", "bad document operation");
@@ -17017,6 +16965,7 @@ phia_document_setobject(struct so *o, const char *path, void *object)
 	}
 	return 0;
 }
+#endif
 
 static struct soif sedocumentif =
 {
@@ -17027,7 +16976,7 @@ static struct soif sedocumentif =
 	.drop         = NULL,
 	.setstring    = phia_document_setstring,
 	.setint       = phia_document_setint,
-	.setobject    = phia_document_setobject,
+	.setobject    = NULL,
 	.getobject    = NULL,
 	.getstring    = phia_document_getstring,
 	.getint       = phia_document_getint,
@@ -17036,7 +16985,7 @@ static struct soif sedocumentif =
 };
 
 static struct phia_document *
-phia_document_new(struct phia_env *e, struct so *parent, const struct sv *vp)
+phia_document_new(struct phia_env *e, struct phia_index *db, const struct sv *vp)
 {
 	struct phia_document *doc;
 	doc = ss_malloc(&e->a, sizeof(struct phia_document));
@@ -17045,8 +16994,9 @@ phia_document_new(struct phia_env *e, struct so *parent, const struct sv *vp)
 		return NULL;
 	}
 	memset(doc, 0, sizeof(*doc));
-	so_init(&doc->o, &se_o[SEDOCUMENT], &sedocumentif, parent, e);
+	so_init(&doc->o, &se_o[SEDOCUMENT], &sedocumentif, e);
 	doc->order = SS_EQ;
+	doc->db = db;
 	if (vp) {
 		doc->v = *vp;
 	}
@@ -17073,7 +17023,7 @@ static inline int
 phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 {
 	struct phia_env *e = se_of(&t->o);
-	struct phia_index *db = se_cast(o->o.parent, struct phia_index*, SEDB);
+	struct phia_index *db = o->db;
 
 	int auto_close = !o->created;
 
@@ -17102,7 +17052,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	int rc = so_open(&o->o);
 	if (ssunlikely(rc == -1))
 		goto error;
-	rc = phia_document_validate(o, &db->o, flags);
+	rc = phia_document_validate(o, db, flags);
 	if (ssunlikely(rc == -1))
 		goto error;
 
@@ -17142,7 +17092,7 @@ phia_tx_upsert(struct phia_tx *tx, struct so *v)
 {
 	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(&tx->o);
-	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
+	struct phia_index *db = key->db;
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
 	return phia_tx_write(tx, key, SVUPSERT);
@@ -17161,7 +17111,7 @@ phia_tx_get(struct so *o, struct so *v)
 	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
 	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(&t->o);
-	struct phia_index *db = se_cast(key->o.parent, struct phia_index*, SEDB);
+	struct phia_index *db = key->db;
 	/* validate index */
 	int status = sr_status(&db->index->status);
 	switch (status) {
@@ -17214,14 +17164,13 @@ phia_tx_rollback(struct so *o)
 }
 
 static int
-phia_tx_prepare(struct sx *x, struct sv *v, struct so *o, void *ptr)
+phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db, void *ptr)
 {
 	struct sicache *cache = ptr;
-	struct phia_index *db = (struct phia_index*)o;
-	struct phia_env *e = se_of(&db->o);
+	struct phia_env *e = db->env;
 
 	struct scread q;
-	sc_readopen(&q, db->r, &db->o, db->index);
+	sc_readopen(&q, db->r, db, db->index);
 	struct screadarg *arg = &q.arg;
 	arg->v             = *v;
 	arg->vup.v         = NULL;
@@ -17354,7 +17303,7 @@ phia_tx_new(struct phia_env *e)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&t->o, &se_o[SETX], &setxif, &e->o, e);
+	so_init(&t->o, &se_o[SETX], &setxif, e);
 	sv_loginit(&t->log);
 	sx_init(&e->xm, &t->t, &t->log);
 	t->start = clock_monotonic64();
@@ -17390,7 +17339,7 @@ struct phia_env *phia_env(void)
 	if (ssunlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	so_init(&e->o, &se_o[SE], &seif, &e->o, e);
+	so_init(&e->o, &se_o[SE], &seif, e);
 	sr_statusinit(&e->status);
 	sr_statusset(&e->status, SR_OFFLINE);
 	ss_vfsinit(&e->vfs, &ss_stdvfs);
@@ -17422,13 +17371,12 @@ error:
 }
 
 struct phia_document *
-phia_document(void *ptr)
+phia_document(struct phia_index *db)
 {
-	struct phia_index *index = se_cast(ptr, struct phia_index *, SEDB);
-	struct phia_env *env = index->o.env;
+	struct phia_env *env = db->env;
 	struct phia_document *doc;
 	se_apilock(env);
-	doc = phia_document_new(env, &index->o, NULL);
+	doc = phia_document_new(env, db, NULL);
 	se_apiunlock(env);
 	return doc;
 }
@@ -17527,6 +17475,7 @@ int phia_setint(void *ptr, const char *path, int64_t v)
 	return rc;
 }
 
+#if 0
 int phia_setobject(void *ptr, const char *path, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
@@ -17540,6 +17489,7 @@ int phia_setobject(void *ptr, const char *path, void *v)
 	se_apiunlock(e);
 	return rc;
 }
+#endif
 
 void *phia_getobject(void *ptr, const char *path)
 {

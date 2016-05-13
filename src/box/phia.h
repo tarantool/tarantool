@@ -42,6 +42,7 @@ struct phia_env;
 struct phia_tx;
 struct phia_document;
 struct phia_cursor;
+struct phia_index;
 
 struct phia_env *
 phia_env(void);
@@ -62,7 +63,7 @@ int
 phia_commit(struct phia_tx *tx);
 
 struct phia_document *
-phia_document(void *);
+phia_document(struct phia_index *index);
 
 int      phia_setstring(void*, const char*, const void*, int);
 int      phia_setint(void*, const char*, int64_t);
@@ -87,6 +88,21 @@ phia_cursor_get(struct phia_cursor *cursor, struct phia_document *key);
 
 struct phia_index *
 phia_index_by_name(struct phia_env *env, const char *name);
+
+int
+phia_index_open(struct phia_index *index);
+
+int
+phia_index_close(struct phia_index *index);
+
+int
+phia_index_drop(struct phia_index *index);
+
+int
+phia_index_delete(struct phia_index *index);
+
+struct phia_document *
+phia_index_get(struct phia_index *index, struct phia_document *key);
 
 #ifdef __cplusplus
 }

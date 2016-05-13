@@ -78,7 +78,7 @@ struct phia_document *
 phia_cursor_read(struct phia_cursor *tx, struct phia_document *key);
 
 struct tuple *
-phia_tuple_new(void *obj, struct key_def *key_def,
-                 struct tuple_format *format);
+phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
+               struct tuple_format *format);
 
 #endif /* TARANTOOL_BOX_PHIA_ENGINE_H_INCLUDED */
