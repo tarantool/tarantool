@@ -14791,8 +14791,8 @@ static struct phia_document *phia_index_result(struct phia_env*, struct scread*)
 static struct phia_document *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
 static int phia_index_visible(struct phia_index*, uint64_t);
-static void phia_index_bind(struct phia_env*);
-static void phia_index_unbind(struct phia_env*, uint64_t);
+static void phia_index_bind(struct phia_index*);
+static void phia_index_unbind(struct phia_index*, uint64_t);
 static int phia_index_recoverbegin(struct phia_index*);
 static int phia_index_recoverend(struct phia_index*);
 
@@ -14815,7 +14815,7 @@ struct seviewdb {
 } sspacked;
 
 struct phia_cursor {
-	struct phia_env *env;
+	struct phia_index *db;
 	struct svlog log;
 	struct sx t;
 	uint64_t start;
@@ -15979,13 +15979,13 @@ phia_confcursor(struct phia_env *e)
 void
 phia_cursor_delete(struct phia_cursor *c)
 {
-	struct phia_env *e = c->env;
+	struct phia_env *e = c->db->env;
 	uint64_t id = c->t.id;
 	if (! c->read_commited)
 		sx_rollback(&c->t);
 	if (c->cache)
 		si_cachepool_push(c->cache);
-	phia_index_unbind(e, id);
+	phia_index_unbind(c->db, id);
 	sr_statcursor(&e->stat, c->start,
 	              c->read_disk,
 	              c->read_cache,
@@ -16018,8 +16018,9 @@ phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 }
 
 struct phia_cursor *
-phia_cursor(struct phia_env *e)
+phia_cursor(struct phia_index *db)
 {
+	struct phia_env *e = db->env;
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
 	if (ssunlikely(c == NULL)) {
@@ -16028,7 +16029,7 @@ phia_cursor(struct phia_env *e)
 	}
 	sv_loginit(&c->log);
 	sx_init(&e->xm, &c->t, &c->log);
-	c->env = e;
+	c->db = db;
 	c->start = clock_monotonic64();
 	c->ops = 0;
 	c->read_disk = 0;
@@ -16042,7 +16043,7 @@ phia_cursor(struct phia_env *e)
 	c->read_commited = 0;
 	uint64_t vlsn = UINT64_MAX;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
-	phia_index_bind(e);
+	phia_index_bind(db);
 	return c;
 }
 
@@ -16506,23 +16507,19 @@ static int phia_index_visible(struct phia_index *db, uint64_t txn)
 	return txn > db->txn_min && txn <= db->txn_max;
 }
 
-static void phia_index_bind(struct phia_env *e)
+static void
+phia_index_bind(struct phia_index *db)
 {
-	struct phia_index *db;
-	rlist_foreach_entry(db, &e->db, link) {
-		int status = sr_status(&db->index->status);
-		if (sr_statusactive_is(status))
-			si_ref(db->index, SI_REFFE);
-	}
+	int status = sr_status(&db->index->status);
+	if (sr_statusactive_is(status))
+		si_ref(db->index, SI_REFFE);
 }
 
-static void phia_index_unbind(struct phia_env *e, uint64_t txn)
+static void
+phia_index_unbind(struct phia_index *db, uint64_t txn)
 {
-	struct phia_index *db, *tmp;
-	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
 		if (phia_index_visible(db, txn))
 			phia_index_unref(db);
-	}
 }
 
 static int phia_index_recoverbegin(struct phia_index *db)
@@ -17082,7 +17079,10 @@ phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 	sx_gc(&t->t);
 	sv_logreset(&t->log);
 	sr_stattx(&e->stat, t->start, count, rlb, conflict);
-	phia_index_unbind(e, t->t.id);
+	struct phia_index *db, *tmp;
+	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
+		phia_index_unbind(db, t->t.id);
+	}
 	phia_tx_free(t);
 }
 
@@ -17212,7 +17212,10 @@ phia_begin(struct phia_env *e)
 	t->lsn = 0;
 	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
-	phia_index_bind(e);
+	struct phia_index *db;
+	rlist_foreach_entry(db, &e->db, link) {
+		phia_index_bind(db);
+	}
 	return t;
 }
 

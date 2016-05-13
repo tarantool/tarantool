@@ -438,7 +438,7 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	struct phia_cursor *cursor = phia_cursor(env);
+	struct phia_cursor *cursor = phia_cursor(pk->db);
 	if (cursor == NULL)
 		phia_error(env);
 	auto cursor_guard = make_scoped_guard([=]{

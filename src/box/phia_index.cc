@@ -449,7 +449,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	default:
 		return initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = phia_cursor(env);
+	it->cursor = phia_cursor(db);
 	if (it->cursor == NULL)
 		phia_error(env);
 	/* Position first key here, since key pointer might be

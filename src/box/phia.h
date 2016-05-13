@@ -81,7 +81,7 @@ int      phia_service(struct phia_env *env);
 void    *phia_get(void*, void*);
 
 struct phia_cursor *
-phia_cursor(struct phia_env *env);
+phia_cursor(struct phia_index *index);
 void *
 phia_confcursor(struct phia_env *env);
 void
