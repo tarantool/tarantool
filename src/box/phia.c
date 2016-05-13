@@ -60,6 +60,7 @@
 #include <bit/bit.h>
 #include <small/rlist.h>
 
+#include "trivia/util.h"
 #include "crc32.h"
 #include "clock.h"
 #include "trivia/config.h"
@@ -72,9 +73,6 @@
 
 #define sslikely(e)   __builtin_expect(!! (e), 1)
 #define ssunlikely(e) __builtin_expect(!! (e), 0)
-
-#define sscast(ptr, t, f) \
-	((t*)((char*)(ptr) - __builtin_offsetof(t, f)))
 
 #define ss_align(align, len) \
 	(((uintptr_t)(len) + ((align) - 1)) & ~((uintptr_t)((align) - 1)))
@@ -980,7 +978,7 @@ ss_rqprev(struct ssrq *q, struct ssrqnode *n)
 		pos = n->q;
 		p = &q->q[pos];
 		if (n->link.next != (&p->list)) {
-			return sscast(n->link.next, struct ssrqnode, link);
+			return container_of(n->link.next, struct ssrqnode, link);
 		}
 		pos--;
 	} else {
@@ -990,7 +988,7 @@ ss_rqprev(struct ssrq *q, struct ssrqnode *n)
 		p = &q->q[pos];
 		if (ssunlikely(p->count == 0))
 			continue;
-		return sscast(p->list.next, struct ssrqnode, link);
+		return container_of(p->list.next, struct ssrqnode, link);
 	}
 	return NULL;
 }
@@ -5934,8 +5932,8 @@ struct svindex {
 } sspacked;
 
 ss_rbget(sv_indexmatch,
-         sf_compare(scheme, sv_vpointer((sscast(n, struct svref, node))->v),
-                    (sscast(n, struct svref, node))->v->size,
+         sf_compare(scheme, sv_vpointer((container_of(n, struct svref, node))->v),
+                    (container_of(n, struct svref, node))->v->size,
                     key, keysize))
 
 static int
@@ -6028,7 +6026,7 @@ sv_indexiter_open(struct ssiter *i, struct runtime *r, struct svindex *index, en
 	}
 	ii->vcur = NULL;
 	if (ii->v) {
-		ii->vcur = sscast(ii->v, struct svref, node);
+		ii->vcur = container_of(ii->v, struct svref, node);
 		ii->current.v = ii->vcur;
 	}
 	return eq;
@@ -6079,7 +6077,7 @@ sv_indexiter_next(struct ssiter *i)
 	default: assert(0);
 	}
 	if (sslikely(ii->v)) {
-		ii->vcur = sscast(ii->v, struct svref, node);
+		ii->vcur = container_of(ii->v, struct svref, node);
 		ii->current.v = ii->vcur;
 	} else {
 		ii->vcur = NULL;
@@ -6089,7 +6087,7 @@ sv_indexiter_next(struct ssiter *i)
 static struct ssiterif sv_indexiter;
 
 ss_rbtruncate(sv_indextruncate,
-              sv_reffree((struct runtime*)arg, sscast(n, struct svref, node)))
+              sv_reffree((struct runtime*)arg, container_of(n, struct svref, node)))
 
 static int sv_indexinit(struct svindex *i)
 {
@@ -6140,14 +6138,14 @@ sv_indexget(struct svindex *i, struct runtime *r, struct svindexpos *p, struct s
 {
 	p->rc = sv_indexmatch(&i->i, r->scheme, sv_vpointer(v->v), v->v->size, &p->node);
 	if (p->rc == 0 && p->node)
-		return sscast(p->node, struct svref, node);
+		return container_of(p->node, struct svref, node);
 	return NULL;
 }
 
 static int sv_indexupdate(struct svindex *i, struct svindexpos *p, struct svref *v)
 {
 	if (p->rc == 0 && p->node) {
-		struct svref *head = sscast(p->node, struct svref, node);
+		struct svref *head = container_of(p->node, struct svref, node);
 		struct svref *update = sv_vset(head, v);
 		if (head != update)
 			ss_rbreplace(&i->i, p->node, &update->node);
@@ -6600,7 +6598,7 @@ static int sx_indexset(struct sxindex *i, uint32_t dsn)
 	return 0;
 }
 
-ss_rbtruncate(sx_truncate, sx_vfreeall(arg, sscast(n, struct sxv, node)))
+ss_rbtruncate(sx_truncate, sx_vfreeall(arg, container_of(n, struct sxv, node)))
 
 static inline void
 sx_indextruncate(struct sxindex *i, struct sxmanager *m)
@@ -6624,7 +6622,7 @@ static uint64_t sx_min(struct sxmanager *m)
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmin(&m->i);
-		struct sx *min = sscast(node, struct sx, node);
+		struct sx *min = container_of(node, struct sx, node);
 		id = min->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -6637,7 +6635,7 @@ static uint64_t sx_max(struct sxmanager *m)
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmax(&m->i);
-		struct sx *max = sscast(node, struct sx, node);
+		struct sx *max = container_of(node, struct sx, node);
 		id = max->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -6650,7 +6648,7 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	uint64_t vlsn;
 	if (sx_count(m) > 0) {
 		struct ssrbnode *node = ss_rbmin(&m->i);
-		struct sx *min = sscast(node, struct sx, node);
+		struct sx *min = container_of(node, struct sx, node);
 		vlsn = min->vlsn;
 	} else {
 		vlsn = sr_seq(m->r->seq, SR_LSN);
@@ -6659,14 +6657,14 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	return vlsn;
 }
 
-ss_rbget(sx_matchtx, ss_cmp((sscast(n, struct sx, node))->id, load_u64(key)))
+ss_rbget(sx_matchtx, ss_cmp((container_of(n, struct sx, node))->id, load_u64(key)))
 
 static struct sx *sx_find(struct sxmanager *m, uint64_t id)
 {
 	struct ssrbnode *n = NULL;
 	int rc = sx_matchtx(&m->i, NULL, (char*)&id, sizeof(id), &n);
 	if (rc == 0 && n)
-		return  sscast(n, struct sx, node);
+		return  container_of(n, struct sx, node);
 	return NULL;
 }
 
@@ -6738,7 +6736,7 @@ sx_csn(struct sxmanager *m)
 	struct ssrbnode *p = ss_rbmin(&m->i);
 	struct sx *min = NULL;
 	while (p) {
-		min = sscast(p, struct sx, node);
+		min = container_of(p, struct sx, node);
 		if (min->type == SXRO) {
 			p = ss_rbnext(&m->i, p);
 			continue;
@@ -6950,8 +6948,8 @@ static enum sxstate sx_commit(struct sx *x)
 }
 
 ss_rbget(sx_match,
-         sf_compare(scheme, sv_vpointer((sscast(n, struct sxv, node))->v),
-                    (sscast(n, struct sxv, node))->v->size,
+         sf_compare(scheme, sv_vpointer((container_of(n, struct sxv, node))->v),
+                    (container_of(n, struct sxv, node))->v->size,
                     key, keysize))
 
 static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
@@ -6994,7 +6992,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 		ss_rbset(&index->i, n, pos, &v->node);
 		return 0;
 	}
-	struct sxv *head = sscast(n, struct sxv, node);
+	struct sxv *head = container_of(n, struct sxv, node);
 	/* match previous update made by current
 	 * transaction */
 	struct sxv *own = sx_vmatch(head, x->id);
@@ -7047,7 +7045,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv
 	              &n);
 	if (! (rc == 0 && n))
 		goto add;
-	struct sxv *head = sscast(n, struct sxv, node);
+	struct sxv *head = container_of(n, struct sxv, node);
 	struct sxv *v = sx_vmatch(head, x->id);
 	if (v == NULL)
 		goto add;
@@ -9733,7 +9731,7 @@ si_nodeindex_priority(struct sinode *node, struct svindex **second)
 
 static inline struct sinode*
 si_nodeof(struct ssrbnode *node) {
-	return sscast(node, struct sinode, node);
+	return container_of(node, struct sinode, node);
 }
 
 static inline int
@@ -10293,7 +10291,7 @@ struct siiter {
 } sspacked;
 
 ss_rbget(si_itermatch,
-         si_nodecmp(sscast(n, struct sinode, node), key, keysize, scheme))
+         si_nodecmp(container_of(n, struct sinode, node), key, keysize, scheme))
 
 static inline int
 si_iter_open(struct ssiter *i, struct runtime *r,
@@ -10419,7 +10417,7 @@ si_trackinit(struct sitrack *t) {
 }
 
 ss_rbtruncate(si_tracktruncate,
-              si_nodefree(sscast(n, struct sinode, node), (struct runtime*)arg, 0))
+              si_nodefree(container_of(n, struct sinode, node), (struct runtime*)arg, 0))
 
 static inline void
 si_trackfree(struct sitrack *t, struct runtime *r) {
@@ -10452,7 +10450,7 @@ si_tracknsn(struct sitrack *t, uint64_t nsn)
 		t->nsn = nsn;
 }
 
-ss_rbget(si_trackmatch, ss_cmp((sscast(n, struct sinode, node))->self.id.id, load_u64(key)))
+ss_rbget(si_trackmatch, ss_cmp((container_of(n, struct sinode, node))->self.id.id, load_u64(key)))
 
 static inline void
 si_trackset(struct sitrack *t, struct sinode *n)
@@ -10471,7 +10469,7 @@ si_trackget(struct sitrack *t, uint64_t id)
 	struct ssrbnode *p = NULL;
 	int rc = si_trackmatch(&t->i, NULL, (char*)&id, sizeof(id), &p);
 	if (rc == 0 && p)
-		return sscast(p, struct sinode, node);
+		return container_of(p, struct sinode, node);
 	return NULL;
 }
 
@@ -10560,7 +10558,7 @@ static int si_open(struct si *i)
 }
 
 ss_rbtruncate(si_truncate,
-              si_nodefree(sscast(n, struct sinode, node), (struct runtime*)arg, 0))
+              si_nodefree(container_of(n, struct sinode, node), (struct runtime*)arg, 0))
 
 static int si_close(struct si *i)
 {
@@ -10590,9 +10588,9 @@ static int si_close(struct si *i)
 
 ss_rbget(si_match,
          sf_compare(scheme,
-                    sd_indexpage_min(&(sscast(n, struct sinode, node))->self.index,
-                                     sd_indexmin(&(sscast(n, struct sinode, node))->self.index)),
-                    sd_indexmin(&(sscast(n, struct sinode, node))->self.index)->sizemin,
+                    sd_indexpage_min(&(container_of(n, struct sinode, node))->self.index,
+                                     sd_indexmin(&(container_of(n, struct sinode, node))->self.index)),
+                    sd_indexmin(&(container_of(n, struct sinode, node))->self.index)->sizemin,
                                 key, keysize))
 
 static int si_insert(struct si *i, struct sinode *n)
@@ -11553,7 +11551,7 @@ static struct sinode *si_nodenew(struct runtime *r)
 }
 
 ss_rbtruncate(si_nodegc_indexgc,
-              si_gcref((struct runtime*)arg, sscast(n, struct svref, node)))
+              si_gcref((struct runtime*)arg, container_of(n, struct svref, node)))
 
 static int si_nodegc_index(struct runtime *r, struct svindex *i)
 {
@@ -11886,7 +11884,7 @@ si_plannerpeek_checkpoint(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
-		n = sscast(pn, struct sinode, nodebranch);
+		n = container_of(pn, struct sinode, nodebranch);
 		if (n->i0.lsnmin <= plan->a) {
 			if (n->flags & SI_LOCK) {
 				rc_inprogress = 2;
@@ -11912,7 +11910,7 @@ si_plannerpeek_branch(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
-		n = sscast(pn, struct sinode, nodebranch);
+		n = container_of(pn, struct sinode, nodebranch);
 		if (n->flags & SI_LOCK)
 			continue;
 		if (n->used >= plan->a)
@@ -11938,7 +11936,7 @@ si_plannerpeek_age(struct siplanner *p, struct siplan *plan)
 	struct sinode *n = NULL;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->branch, pn))) {
-		n = sscast(pn, struct sinode, nodebranch);
+		n = container_of(pn, struct sinode, nodebranch);
 		if (n->flags & SI_LOCK)
 			continue;
 		if (n->used >= plan->b && ((now - n->update_time) >= plan->a))
@@ -11960,7 +11958,7 @@ si_plannerpeek_compact(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->compact, pn))) {
-		n = sscast(pn, struct sinode, nodecompact);
+		n = container_of(pn, struct sinode, nodecompact);
 		if (n->flags & SI_LOCK)
 			continue;
 		if (n->branch_count >= plan->a)
@@ -11983,7 +11981,7 @@ si_plannerpeek_compact_temperature(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->temp, pn))) {
-		n = sscast(pn, struct sinode, nodetemp);
+		n = container_of(pn, struct sinode, nodetemp);
 		if (n->flags & SI_LOCK)
 			continue;
 		if (n->branch_count >= plan->a)
@@ -12007,7 +12005,7 @@ si_plannerpeek_gc(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->compact, pn))) {
-		n = sscast(pn, struct sinode, nodecompact);
+		n = container_of(pn, struct sinode, nodecompact);
 		struct sdindexheader *h = n->self.index.h;
 		if (sslikely(h->dupkeys == 0) || (h->dupmin >= plan->a))
 			continue;
@@ -12045,7 +12043,7 @@ si_plannerpeek_lru(struct siplanner *p, struct siplan *plan)
 	struct sinode *n;
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->compact, pn))) {
-		n = sscast(pn, struct sinode, nodecompact);
+		n = container_of(pn, struct sinode, nodecompact);
 		struct sdindexheader *h = n->self.index.h;
 		if (h->lsnmin < index->lru_run_lsn) {
 			if (n->flags & SI_LOCK) {
@@ -12194,7 +12192,7 @@ si_profiler_histogram_temperature(struct siprofiler *p)
 	struct ssrqnode *pn = NULL;
 	while ((pn = ss_rqprev(&p->i->p.temp, pn)))
 	{
-		n = sscast(pn, struct sinode, nodetemp);
+		n = container_of(pn, struct sinode, nodetemp);
 		h[pn->v].nodes++;
 		h[pn->v].branches += n->branch_count;
 	}
@@ -12230,7 +12228,7 @@ static int si_profiler(struct siprofiler *p)
 	struct sinode *n;
 	pn = ss_rbmin(&p->i->i);
 	while (pn) {
-		n = sscast(pn, struct sinode, node);
+		n = container_of(pn, struct sinode, node);
 		if (p->temperature_max < n->temperature)
 			p->temperature_max = n->temperature;
 		if (p->temperature_min > n->temperature)
@@ -13121,7 +13119,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, st
 	ss_bufreset(buf);
 	struct ssrbnode *p = ss_rbmax(&track->i);
 	while (p) {
-		struct sinode *n = sscast(p, struct sinode, node);
+		struct sinode *n = container_of(p, struct sinode, node);
 		switch (n->recover) {
 		case SI_RDB|SI_RDB_DBI|SI_RDB_DBSEAL|SI_RDB_REMOVE:
 		case SI_RDB|SI_RDB_DBSEAL|SI_RDB_REMOVE:
@@ -13174,7 +13172,7 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 	ss_bufreset(buf);
 	struct ssrbnode *p = ss_rbmin(&track->i);
 	while (p) {
-		struct sinode *n = sscast(p, struct sinode, node);
+		struct sinode *n = container_of(p, struct sinode, node);
 		int rc = ss_bufadd(buf, r->a, &n, sizeof(struct sinode*));
 		if (ssunlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
@@ -13206,7 +13204,7 @@ si_recoversize(struct si *i)
 {
 	struct ssrbnode *pn = ss_rbmin(&i->i);
 	while (pn) {
-		struct sinode *n = sscast(pn, struct sinode, node);
+		struct sinode *n = container_of(pn, struct sinode, node);
 		i->size += si_nodesize(n);
 		pn = ss_rbnext(&i->i, pn);
 	}
