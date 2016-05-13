@@ -14680,7 +14680,6 @@ static struct so *se_confcursor_new(struct so*);
 struct phia_env {
 	struct so          o;
 	struct srstatus    status;
-	pthread_mutex_t     apilock;
 	/** List of open spaces. */
 	struct rlist db;
 	/** List of active read views. */
@@ -14701,18 +14700,6 @@ struct phia_env {
 	struct ssinjection ei;
 	struct runtime          r;
 };
-
-static inline void
-se_apilock(struct phia_env *env)
-{
-	tt_pthread_mutex_lock(&env->apilock);
-}
-
-static inline void
-se_apiunlock(struct phia_env *env)
-{
-	tt_pthread_mutex_unlock(&env->apilock);
-}
 
 static inline struct phia_env *se_of(struct so *o) {
 	return (struct phia_env*)o->env;
@@ -14937,7 +14924,6 @@ se_destroy(struct so *o)
 	si_cachepool_free(&e->cachepool);
 	se_conffree(&e->conf);
 	ss_quotafree(&e->quota);
-	tt_pthread_mutex_destroy(&e->apilock);
 	sf_limitfree(&e->limit, &e->a);
 	sr_statfree(&e->stat);
 	sr_seqfree(&e->seq);
@@ -16042,7 +16028,6 @@ phia_cursor_delete(struct phia_cursor *c)
 struct phia_document *
 phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
 {
-	se_apilock(c->env);
 	struct phia_index *db = key->db;
 	if (ssunlikely(! key->orderset))
 		key->order = SS_GTE;
@@ -16054,30 +16039,23 @@ phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
-	struct phia_document *result = phia_index_read(db, key, x, 0, c->cache);
-	se_apiunlock(c->env);
-	return result;
+	return phia_index_read(db, key, x, 0, c->cache);
 }
 
 void
 phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 {
-	struct phia_env *e = c->env;
-	se_apilock(e);
 	sx_rollback(&c->t);
 	c->read_commited = read_commited;
-	se_apiunlock(e);
 }
 
 struct phia_cursor *
 phia_cursor(struct phia_env *e)
 {
-	se_apilock(e);
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
 	if (ssunlikely(c == NULL)) {
 		sr_oom(&e->error);
-		se_apiunlock(e);
 		return NULL;
 	}
 	sv_loginit(&c->log);
@@ -16091,14 +16069,12 @@ phia_cursor(struct phia_env *e)
 	c->cache = si_cachepool_pop(&e->cachepool);
 	if (ssunlikely(c->cache == NULL)) {
 		sr_oom(&e->error);
-		se_apiunlock(e);
 		return NULL;
 	}
 	c->read_commited = 0;
 	uint64_t vlsn = UINT64_MAX;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
 	phia_index_bind(e);
-	se_apiunlock(e);
 	return c;
 }
 
@@ -17313,7 +17289,6 @@ struct phia_env *phia_env(void)
 		goto error;
 	rlist_create(&e->db);
 	rlist_create(&e->view);
-	tt_pthread_mutex_init(&e->apilock, NULL);
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
 	sr_errorinit(&e->error);
@@ -17336,11 +17311,7 @@ struct phia_document *
 phia_document(struct phia_index *db)
 {
 	struct phia_env *env = db->env;
-	struct phia_document *doc;
-	se_apilock(env);
-	doc = phia_document_new(env, db, NULL);
-	se_apiunlock(env);
-	return doc;
+	return phia_document_new(env, db, NULL);
 }
 
 int phia_open(void *ptr)
@@ -17350,11 +17321,7 @@ int phia_open(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->open(o);
-	se_apiunlock(e);
-	return rc;
+	return o->i->open(o);
 }
 
 int phia_close(void *ptr)
@@ -17364,11 +17331,7 @@ int phia_close(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->close(o);
-	se_apiunlock(e);
-	return rc;
+	return o->i->close(o);
 }
 
 int phia_drop(void *ptr)
@@ -17378,11 +17341,7 @@ int phia_drop(void *ptr)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->drop(o);
-	se_apiunlock(e);
-	return rc;
+	return o->i->drop(o);
 }
 
 int phia_destroy(void *ptr)
@@ -17398,10 +17357,7 @@ int phia_destroy(void *ptr)
 		rc = o->i->destroy(o);
 		return rc;
 	}
-	se_apilock(e);
-	rc = o->i->destroy(o);
-	se_apiunlock(e);
-	return rc;
+	return o->i->destroy(o);
 }
 
 int phia_service(struct phia_env *env)
@@ -17416,11 +17372,7 @@ int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->setstring(o, path, (void*)pointer, size);
-	se_apiunlock(e);
-	return rc;
+	return o->i->setstring(o, path, (void*)pointer, size);
 }
 
 int phia_setint(void *ptr, const char *path, int64_t v)
@@ -17430,28 +17382,8 @@ int phia_setint(void *ptr, const char *path, int64_t v)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->setint(o, path, v);
-	se_apiunlock(e);
-	return rc;
+	return o->i->setint(o, path, v);
 }
-
-#if 0
-int phia_setobject(void *ptr, const char *path, void *v)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->setobject == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int rc = o->i->setobject(o, path, v);
-	se_apiunlock(e);
-	return rc;
-}
-#endif
 
 void *phia_getobject(void *ptr, const char *path)
 {
@@ -17460,11 +17392,7 @@ void *phia_getobject(void *ptr, const char *path)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	void *h = o->i->getobject(o, path);
-	se_apiunlock(e);
-	return h;
+	return o->i->getobject(o, path);
 }
 
 void *phia_getstring(void *ptr, const char *path, int *size)
@@ -17474,11 +17402,7 @@ void *phia_getstring(void *ptr, const char *path, int *size)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	void *h = o->i->getstring(o, path, size);
-	se_apiunlock(e);
-	return h;
+	return o->i->getstring(o, path, size);
 }
 
 int64_t phia_getint(void *ptr, const char *path)
@@ -17488,11 +17412,7 @@ int64_t phia_getint(void *ptr, const char *path)
 		sp_unsupported(o, __func__);
 		return -1;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	int64_t rc = o->i->getint(o, path);
-	se_apiunlock(e);
-	return rc;
+	return o->i->getint(o, path);
 }
 
 void *phia_get(void *ptr, void *v)
@@ -17502,9 +17422,5 @@ void *phia_get(void *ptr, void *v)
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	void *h = o->i->get(o, v);
-	se_apiunlock(e);
-	return h;
+	return o->i->get(o, v);
 }
