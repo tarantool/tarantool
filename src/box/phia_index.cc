@@ -46,11 +46,11 @@
 
 static uint64_t num_parts[8];
 
-void*
+struct phia_document *
 PhiaIndex::createDocument(const char *key, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
-	void *obj = phia_document(db);
+	struct phia_document *obj = phia_document(db);
 	if (obj == NULL)
 		phia_error(env);
 	phia_setstring(obj, "arg", fiber(), 0);
@@ -257,13 +257,14 @@ struct tuple *
 PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 {
 	(void)part_count;
-	void *obj = ((PhiaIndex *)this)->createDocument(key, NULL);
-	void *transaction = db;
+	struct phia_document *obj = ((PhiaIndex *)this)->
+		createDocument(key, NULL);
+	struct phia_tx *transaction = NULL;
 	/* engine_tx might be empty, even if we are in txn context.
 	 *
 	 * This can happen on a first-read statement. */
 	if (in_txn())
-		transaction = in_txn()->engine_tx;
+		transaction = (struct phia_tx *) in_txn()->engine_tx;
 	/* try to read from cache first, if nothing is found
 	 * retry using disk */
 	phia_setint(obj, "cache_only", 1);
@@ -273,10 +274,19 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 		phia_destroy(obj);
 		phia_error(env);
 	}
-	void *result = phia_get(transaction, obj);
+	struct phia_document *result;
+	if (transaction == NULL) {
+		result = (struct phia_document *) phia_get(db, obj);
+	} else {
+		result = (struct phia_document *) phia_get(transaction, obj);
+	}
 	if (result == NULL) {
 		phia_setint(obj, "cache_only", 0);
-		result = phia_read(transaction, obj);
+		if (transaction == NULL) {
+			result = phia_index_read(db, obj);
+		} else {
+			result = phia_tx_read(transaction, obj);
+		}
 		phia_destroy(obj);
 		if (result == NULL)
 			return NULL;
@@ -305,10 +315,10 @@ struct phia_iterator {
 	const char *keyend;
 	struct space *space;
 	struct key_def *key_def;
-	void *env;
-	void *db;
-	void *cursor;
-	void *current;
+	struct phia_env *env;
+	struct phia_index *db;
+	struct phia_cursor *cursor;
+	struct phia_document *current;
 };
 
 void
@@ -321,7 +331,7 @@ phia_iterator_free(struct iterator *ptr)
 		it->current = NULL;
 	}
 	if (it->cursor) {
-		phia_destroy(it->cursor);
+		phia_cursor_delete(it->cursor);
 		it->cursor = NULL;
 	}
 	free(ptr);
@@ -340,8 +350,7 @@ phia_iterator_next(struct iterator *ptr)
 	assert(it->cursor != NULL);
 
 	/* read from cache */
-	void *obj;
-	obj = phia_get(it->cursor, it->current);
+	struct phia_document *obj = phia_cursor_get(it->cursor, it->current);
 	if (likely(obj != NULL)) {
 		phia_destroy(it->current);
 		it->current = obj;
@@ -351,11 +360,11 @@ phia_iterator_next(struct iterator *ptr)
 	/* switch to asynchronous mode (read from disk) */
 	phia_setint(it->current, "cache_only", 0);
 
-	obj = phia_read(it->cursor, it->current);
+	obj = phia_cursor_read(it->cursor, it->current);
 	if (obj == NULL) {
 		ptr->next = phia_iterator_last;
 		/* immediately close the cursor */
-		phia_destroy(it->cursor);
+		phia_cursor_delete(it->cursor);
 		phia_destroy(it->current);
 		it->current = NULL;
 		it->cursor = NULL;
@@ -449,11 +458,11 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	 * Read from disk and fill cursor cache.
 	 */
 	PhiaIndex *index = (PhiaIndex *)this;
-	void *obj = index->createDocument(key, &it->keyend);
+	struct phia_document *obj = index->createDocument(key, &it->keyend);
 	phia_setstring(obj, "order", compare, 0);
-	obj = phia_read(it->cursor, obj);
+	obj = phia_cursor_read(it->cursor, obj);
 	if (obj == NULL) {
-		phia_destroy(it->cursor);
+		phia_cursor_delete(it->cursor);
 		it->cursor = NULL;
 		return;
 	}

@@ -60,7 +60,7 @@ public:
 	struct phia_env *env;
 	struct phia_index *db;
 
-	void *createDocument(const char *key, const char **keyend);
+	struct phia_document *createDocument(const char *key, const char **keyend);
 private:
 	struct tuple_format *format;
 };

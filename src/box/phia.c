@@ -14809,7 +14809,7 @@ phia_index_active(struct phia_index *o) {
 
 static struct phia_index *phia_index_new(struct phia_env*, char*, int);
 static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
-static void *
+static struct phia_document *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_env*);
@@ -14837,8 +14837,8 @@ struct seviewdb {
 	struct phia_index     *v;
 } sspacked;
 
-struct secursor {
-	struct so o;
+struct phia_cursor {
+	struct phia_env *env;
 	struct svlog log;
 	struct sx t;
 	uint64_t start;
@@ -14848,8 +14848,6 @@ struct secursor {
 	int read_commited;
 	struct sicache *cache;
 };
-
-static struct so *se_cursornew(struct phia_env*, uint64_t);
 
 enum {
 	SE_RECOVER_1P = 1,
@@ -14957,13 +14955,6 @@ se_close(struct so *o)
 	return se_destroy(o);
 }
 
-static void*
-se_cursor(struct so *o)
-{
-	struct phia_env *e = se_cast(o, struct phia_env*, SE);
-	return se_cursornew(e, UINT64_MAX);
-}
-
 static struct soif seif =
 {
 	.open         = se_open,
@@ -14978,7 +14969,7 @@ static struct soif seif =
 	.getstring    = se_confget_string,
 	.getint       = se_confget_int,
 	.get          = NULL,
-	.cursor       = se_cursor,
+	.cursor       = NULL,
 };
 
 static inline int
@@ -16034,18 +16025,10 @@ static struct so *se_confcursor_new(struct so *o)
 	return &c->o;
 }
 
-static void
-se_cursorfree(struct so *o)
+void
+phia_cursor_delete(struct phia_cursor *c)
 {
-	struct phia_env *e = se_of(o);
-	ss_free(&e->a, o);
-}
-
-static int
-se_cursordestroy(struct so *o)
-{
-	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
-	struct phia_env *e = se_of(&c->o);
+	struct phia_env *e = c->env;
 	uint64_t id = c->t.id;
 	if (! c->read_commited)
 		sx_rollback(&c->t);
@@ -16056,16 +16039,14 @@ se_cursordestroy(struct so *o)
 	              c->read_disk,
 	              c->read_cache,
 	              c->ops);
-	so_free(&c->o);
-	return 0;
+	ss_free(&e->a, c);
 }
 
-static void*
-se_cursorget(struct so *o, struct so *v)
+struct phia_document *
+phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
 {
-	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
-	struct phia_index *db = se_cast(v->parent, struct phia_index*, SEDB);
+	se_apilock(c->env);
+	struct phia_index *db = se_cast(key->o.parent, struct phia_index*, SEDB);
 	if (ssunlikely(! key->orderset))
 		key->order = SS_GTE;
 	/* this statistics might be not complete, because
@@ -16076,53 +16057,35 @@ se_cursorget(struct so *o, struct so *v)
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
-	return phia_index_read(db, key, x, 0, c->cache);
+	struct phia_document *result = phia_index_read(db, key, x, 0, c->cache);
+	se_apiunlock(c->env);
+	return result;
 }
 
-static int
-se_cursorset_int(struct so *o, const char *path, int64_t v)
+void
+phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 {
-	struct secursor *c = se_cast(o, struct secursor*, SECURSOR);
-	if (strcmp(path, "read_commited") == 0) {
-		if (c->read_commited)
-			return -1;
-		if (v != 1)
-			return -1;
-		sx_rollback(&c->t);
-		c->read_commited = 1;
-		return 0;
-	}
-	return -1;
+	struct phia_env *e = c->env;
+	se_apilock(e);
+	sx_rollback(&c->t);
+	c->read_commited = read_commited;
+	se_apiunlock(e);
 }
 
-static struct soif secursorif =
+struct phia_cursor *
+phia_cursor(struct phia_env *e)
 {
-	.open         = NULL,
-	.close        = NULL,
-	.destroy      = se_cursordestroy,
-	.free         = se_cursorfree,
-	.drop         = NULL,
-	.setstring    = NULL,
-	.setint       = se_cursorset_int,
-	.setobject    = NULL,
-	.getobject    = NULL,
-	.getstring    = NULL,
-	.getint       = NULL,
-	.get          = se_cursorget,
-	.cursor       = NULL,
-};
-
-static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
-{
-	struct secursor *c;
-	c = ss_malloc(&e->a, sizeof(struct secursor));
+	se_apilock(e);
+	struct phia_cursor *c;
+	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
 	if (ssunlikely(c == NULL)) {
 		sr_oom(&e->error);
+		se_apiunlock(e);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SECURSOR], &secursorif, &e->o, e);
 	sv_loginit(&c->log);
 	sx_init(&e->xm, &c->t, &c->log);
+	c->env = e;
 	c->start = clock_monotonic64();
 	c->ops = 0;
 	c->read_disk = 0;
@@ -16130,14 +16093,16 @@ static struct so *se_cursornew(struct phia_env *e, uint64_t vlsn)
 	c->t.state = SXUNDEF;
 	c->cache = si_cachepool_pop(&e->cachepool);
 	if (ssunlikely(c->cache == NULL)) {
-		so_free(&c->o);
 		sr_oom(&e->error);
+		se_apiunlock(e);
 		return NULL;
 	}
 	c->read_commited = 0;
+	uint64_t vlsn = UINT64_MAX;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
 	phia_index_bind(e);
-	return &c->o;
+	se_apiunlock(e);
+	return c;
 }
 
 static int
@@ -16437,7 +16402,7 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	return v;
 }
 
-static void *
+static struct phia_document *
 phia_index_read(struct phia_index *db, struct phia_document *o,
 		struct sx *x, int x_search, struct sicache *cache)
 {
@@ -17657,20 +17622,6 @@ void *phia_get(void *ptr, void *v)
 	struct phia_env *e = o->env;
 	se_apilock(e);
 	void *h = o->i->get(o, v);
-	se_apiunlock(e);
-	return h;
-}
-
-void *phia_cursor(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->cursor == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	struct phia_env *e = o->env;
-	se_apilock(e);
-	void *h = o->i->cursor(o);
 	se_apiunlock(e);
 	return h;
 }

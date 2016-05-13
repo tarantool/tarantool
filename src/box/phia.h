@@ -36,10 +36,12 @@ extern "C" {
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 struct phia_env;
 struct phia_tx;
 struct phia_document;
+struct phia_cursor;
 
 struct phia_env *
 phia_env(void);
@@ -73,7 +75,15 @@ int      phia_drop(void*);
 int      phia_destroy(void*);
 int      phia_service(struct phia_env *env);
 void    *phia_get(void*, void*);
-void    *phia_cursor(void*);
+
+struct phia_cursor *
+phia_cursor(struct phia_env *env);
+void
+phia_cursor_delete(struct phia_cursor *cursor);
+void
+phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
+struct phia_document *
+phia_cursor_get(struct phia_cursor *cursor, struct phia_document *key);
 
 struct phia_index *
 phia_index_by_name(struct phia_env *env, const char *name);

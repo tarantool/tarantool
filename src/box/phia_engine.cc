@@ -244,17 +244,39 @@ static struct mempool phia_read_pool;
 
 struct phia_read_task {
 	struct coio_task base;
-	void *dest;
-	void *key;
-	void *result;
+	struct phia_index *index;
+	struct phia_cursor *cursor;
+	struct phia_tx *tx;
+	struct phia_document *key;
+	struct phia_document *result;
 };
 
 static ssize_t
-phia_read_cb(struct coio_task *ptr)
+phia_tx_read_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	task->result = phia_get(task->dest, task->key);
+	task->result = (struct phia_document *)
+		phia_get(task->tx, task->key);
+	return 0;
+}
+
+static ssize_t
+phia_index_read_cb(struct coio_task *ptr)
+{
+	struct phia_read_task *task =
+		(struct phia_read_task *) ptr;
+	task->result = (struct phia_document *)
+		phia_get(task->index, task->key);
+	return 0;
+}
+
+static ssize_t
+phia_cursor_read_cb(struct coio_task *ptr)
+{
+	struct phia_read_task *task =
+		(struct phia_read_task *) ptr;
+	task->result = phia_cursor_get(task->cursor, task->key);
 	return 0;
 }
 
@@ -269,23 +291,45 @@ phia_read_free_cb(struct coio_task *ptr)
 	return 0;
 }
 
-void *
-phia_read(void *dest, void *key)
+static inline struct phia_document *
+phia_read(struct phia_index *index, struct phia_tx *tx,
+	  struct phia_cursor *cursor, struct phia_document *key,
+	  coio_task_cb func)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) mempool_alloc(&phia_read_pool);
 	if (task == NULL)
 		return NULL;
-	task->dest = dest;
+	task->index = index;
+	task->tx = tx;
+	task->cursor = cursor;
 	task->key = key;
 	task->result = NULL;
-	if (coio_task(&task->base, phia_read_cb, phia_read_free_cb,
+	if (coio_task(&task->base, func, phia_read_free_cb,
 	              TIMEOUT_INFINITY) == -1) {
 		return NULL;
 	}
-	void *result = task->result;
+	struct phia_document *result = task->result;
 	mempool_free(&phia_read_pool, task);
 	return result;
+}
+
+struct phia_document *
+phia_index_read(struct phia_index *index, struct phia_document *key)
+{
+	return phia_read(index, NULL, NULL, key, phia_index_read_cb);
+}
+
+struct phia_document *
+phia_tx_read(struct phia_tx *tx, struct phia_document *key)
+{
+	return phia_read(NULL, tx, NULL, key, phia_tx_read_cb);
+}
+
+struct phia_document *
+phia_cursor_read(struct phia_cursor *cursor, struct phia_document *key)
+{
+	return phia_read(NULL, NULL, cursor, key, phia_cursor_read_cb);
 }
 
 PhiaEngine::PhiaEngine()
@@ -394,20 +438,20 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	void *cursor = phia_cursor(env);
+	struct phia_cursor *cursor = phia_cursor(env);
 	if (cursor == NULL)
 		phia_error(env);
 	auto cursor_guard = make_scoped_guard([=]{
-		phia_destroy(cursor);
+		phia_cursor_delete(cursor);
 	});
 
 	/* tell cursor not to hold a transaction, which
 	 * in result enables compaction process
 	 * for duplicates */
-	phia_setint(cursor, "read_commited", 1);
+	phia_cursor_set_read_commited(cursor, true);
 
-	void *obj = phia_document(pk->db);
-	while ((obj = phia_get(cursor, obj)))
+	struct phia_document *obj = phia_document(pk->db);
+	while ((obj = phia_cursor_get(cursor, obj)))
 	{
 		int64_t lsn = phia_getint(obj, "lsn");
 		uint32_t tuple_size;
