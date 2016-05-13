@@ -63,7 +63,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	primary_key_validate(index->key_def, key, index->key_def->part_count);
 
 	const char *value = NULL;
-	void *obj = index->createDocument(key, &value);
+	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
 		phia_setstring(obj, "value", value, valuesize);
@@ -77,7 +77,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	}
 
 	int64_t signature = request->header->lsn;
-	phia_setint(tx, "lsn", signature);
+	phia_tx_set_lsn(tx, signature);
 
 	if (phia_replace(tx, obj) != 0)
 		phia_error(index->env); /* obj destroyed by phia_replace() */
@@ -158,7 +158,7 @@ PhiaSpace::executeDelete(struct txn*, struct space *space,
 	primary_key_validate(index->key_def, key, part_count);
 
 	/* remove */
-	void *obj = index->createDocument(key, NULL);
+	struct phia_document *obj = index->createDocument(key, NULL);
 	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	int rc = phia_delete(tx, obj);
 	if (rc == -1)
@@ -201,7 +201,7 @@ PhiaSpace::executeUpdate(struct txn*, struct space *space,
 	                      index->key_def->parts[0].fieldno);
 	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	const char *value = NULL;
-	void *obj = index->createDocument(key, &value);
+	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = new_tuple->bsize - (value - new_tuple->data);
 	if (valuesize > 0)
 		phia_setstring(obj, "value", value, valuesize);
@@ -417,7 +417,7 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 	uint32_t tuple_size = tuple_end - tuple;
 	uint32_t tuple_value_size;
 	const char *tuple_value;
-	void *obj = index->createDocument(tuple, &tuple_value);
+	struct phia_document *obj = index->createDocument(tuple, &tuple_value);
 	tuple_value_size = tuple_size - (tuple_value - tuple);
 	uint32_t value_size =
 		sizeof(uint8_t) + sizeof(uint32_t) + tuple_value_size + expr_size;

@@ -276,9 +276,9 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	}
 	struct phia_document *result;
 	if (transaction == NULL) {
-		result = (struct phia_document *) phia_index_get(db, obj);
+		result = phia_index_get(db, obj);
 	} else {
-		result = (struct phia_document *) phia_get(transaction, obj);
+		result = phia_tx_get(transaction, obj);
 	}
 	if (result == NULL) {
 		phia_setint(obj, "cache_only", 0);

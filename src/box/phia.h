@@ -48,19 +48,22 @@ struct phia_env *
 phia_env(void);
 
 struct phia_tx *
-phia_begin(struct phia_env *env);
+phia_begin(struct phia_env *e);
 
 int
-phia_replace(struct phia_tx *tx, void*);
+phia_replace(struct phia_tx *tx, struct phia_document *doc);
 
 int
-phia_upsert(struct phia_tx *tx, void*);
+phia_upsert(struct phia_tx *tx, struct phia_document *doc);
 
 int
-phia_delete(struct phia_tx *tx, void*);
+phia_delete(struct phia_tx *tx, struct phia_document *doc);
 
 int
 phia_commit(struct phia_tx *tx);
+
+int
+phia_rollback(struct phia_tx *tx);
 
 struct phia_document *
 phia_document(struct phia_index *index);
@@ -103,6 +106,15 @@ phia_index_delete(struct phia_index *index);
 
 struct phia_document *
 phia_index_get(struct phia_index *index, struct phia_document *key);
+
+void
+phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn);
+
+void
+phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit);
+
+struct phia_document *
+phia_tx_get(struct phia_tx *t, struct phia_document *key);
 
 #ifdef __cplusplus
 }

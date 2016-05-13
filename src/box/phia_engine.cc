@@ -258,8 +258,7 @@ phia_tx_read_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	task->result = (struct phia_document *)
-		phia_get(task->tx, task->key);
+	task->result = phia_tx_get(task->tx, task->key);
 	return 0;
 }
 
@@ -577,9 +576,10 @@ PhiaEngine::prepare(struct txn *txn)
 	 * It is important to maintain correct serial
 	 * commit order by wal_writer.
 	 */
-	phia_setint(txn->engine_tx, "half_commit", 1);
+	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
+	phia_tx_set_half_commit(tx, true);
 
-	int rc = phia_commit((struct phia_tx *) txn->engine_tx);
+	int rc = phia_commit(tx);
 	switch (rc) {
 	case 1: /* rollback */
 		txn->engine_tx = NULL;
@@ -598,6 +598,7 @@ PhiaEngine::commit(struct txn *txn, int64_t signature)
 	if (txn->engine_tx == NULL)
 		return;
 
+	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
 	if (txn->n_rows > 0) {
 		/* commit transaction using transaction commit signature */
 		assert(signature >= 0);
@@ -607,11 +608,11 @@ PhiaEngine::commit(struct txn *txn, int64_t signature)
 			      PRIu64, signature);
 		}
 		/* Set tx id in Phia only if tx has WRITE requests */
-		phia_setint(txn->engine_tx, "lsn", signature);
+		phia_tx_set_lsn(tx, signature);
 		m_prev_commit_lsn = signature;
 	}
 
-	int rc = phia_commit((struct phia_tx *) txn->engine_tx);
+	int rc = phia_commit(tx);
 	if (rc == -1) {
 		panic("phia commit failed: txn->signature = %"
 		      PRIu64, signature);
@@ -622,10 +623,12 @@ PhiaEngine::commit(struct txn *txn, int64_t signature)
 void
 PhiaEngine::rollback(struct txn *txn)
 {
-	if (txn->engine_tx) {
-		phia_destroy(txn->engine_tx);
-		txn->engine_tx = NULL;
-	}
+	if (txn->engine_tx == NULL)
+		return;
+
+	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
+	phia_rollback(tx);
+	txn->engine_tx = NULL;
 }
 
 void

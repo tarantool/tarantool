@@ -7130,7 +7130,7 @@ sx_deadlock_unmark(struct rlist *mark)
 	}
 }
 
-static int sx_deadlock(struct sx *t)
+static int ssunused sx_deadlock(struct sx *t)
 {
 	struct sxmanager *m = t->manager;
 	struct rlist mark;
@@ -14817,15 +14817,13 @@ static int phia_index_recoverbegin(struct phia_index*);
 static int phia_index_recoverend(struct phia_index*);
 
 struct phia_tx {
-	struct so o;
+	struct phia_env *env;
 	int64_t lsn;
-	int half_commit;
+	bool half_commit;
 	uint64_t start;
 	struct svlog log;
 	struct sx t;
 };
-
-static struct phia_tx *phia_tx_new(struct phia_env*);
 
 struct seviewdb {
 	struct so        o;
@@ -17022,7 +17020,7 @@ static struct sotype se_o[] =
 static inline int
 phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 {
-	struct phia_env *e = se_of(&t->o);
+	struct phia_env *e = t->env;
 	struct phia_index *db = o->db;
 
 	int auto_close = !o->created;
@@ -17080,38 +17078,33 @@ error:
 	return -1;
 }
 
-static int
-phia_tx_replace(struct phia_tx *tx, struct so *v)
+int
+phia_replace(struct phia_tx *tx, struct phia_document *key)
 {
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_tx_write(tx, key, 0);
 }
 
-static int
-phia_tx_upsert(struct phia_tx *tx, struct so *v)
+int
+phia_upsert(struct phia_tx *tx, struct phia_document *key)
 {
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
-	struct phia_env *e = se_of(&tx->o);
+	struct phia_env *e = tx->env;
 	struct phia_index *db = key->db;
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
 		return sr_error(&e->error, "%s", "upsert callback is not set");
 	return phia_tx_write(tx, key, SVUPSERT);
 }
 
-static int
-phia_tx_delete(struct phia_tx *tx, struct so *v)
+int
+phia_delete(struct phia_tx *tx, struct phia_document *key)
 {
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
 	return phia_tx_write(tx, key, SVDELETE);
 }
 
-static void *
-phia_tx_get(struct so *o, struct so *v)
+struct phia_document *
+phia_tx_get(struct phia_tx *t, struct phia_document *key)
 {
-	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
-	struct phia_document *key = se_cast(v, struct phia_document*, SEDOCUMENT);
-	struct phia_env *e = se_of(&t->o);
 	struct phia_index *db = key->db;
+	struct phia_env *e = db->env;
 	/* validate index */
 	int status = sr_status(&db->index->status);
 	switch (status) {
@@ -17134,32 +17127,30 @@ error:
 }
 
 static inline void
-phia_tx_free(struct so *o)
+phia_tx_free(struct phia_tx *tx)
 {
-	struct phia_env *e = se_of(o);
-	struct phia_tx *t = (struct phia_tx*)o;
-	sv_logfree(&t->log, &e->a);
-	ss_free(&e->a, o);
+	struct phia_env *env = tx->env;
+	sv_logfree(&tx->log, &env->a);
+	ss_free(&env->a, tx);
 }
 
 static inline void
 phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 {
-	struct phia_env *e = se_of(&t->o);
+	struct phia_env *e = t->env;
 	uint32_t count = sv_logcount(&t->log);
 	sx_gc(&t->t);
 	sv_logreset(&t->log);
 	sr_stattx(&e->stat, t->start, count, rlb, conflict);
 	phia_index_unbind(e, t->t.id);
-	so_free(&t->o);
+	phia_tx_free(t);
 }
 
-static int
-phia_tx_rollback(struct so *o)
+int
+phia_rollback(struct phia_tx *tx)
 {
-	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
-	sx_rollback(&t->t);
-	phia_tx_end(t, 1, 0);
+	sx_rollback(&tx->t);
+	phia_tx_end(tx, 1, 0);
 	return 0;
 }
 
@@ -17191,10 +17182,10 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db, void *ptr)
 	return rc;
 }
 
-static int
-phia_tx_commit(struct phia_tx *t)
+int
+phia_commit(struct phia_tx *t)
 {
-	struct phia_env *e = se_of(&t->o);
+	struct phia_env *e = t->env;
 	int status = sr_status(&e->status);
 	if (ssunlikely(! sr_statusactive_is(status)))
 		return -1;
@@ -17253,49 +17244,20 @@ phia_tx_commit(struct phia_tx *t)
 	return rc;
 }
 
-static int
-phia_tx_set_int(struct so *o, const char *path, int64_t v)
+void
+phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn)
 {
-	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
-	if (strcmp(path, "lsn") == 0) {
-		t->lsn = v;
-		return 0;
-	} else
-	if (strcmp(path, "half_commit") == 0) {
-		t->half_commit = v;
-		return 0;
-	}
-	return -1;
+	tx->lsn = lsn;
 }
 
-static int64_t
-phia_tx_get_int(struct so *o, const char *path)
+void
+phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit)
 {
-	struct phia_tx *t = se_cast(o, struct phia_tx*, SETX);
-	if (strcmp(path, "deadlock") == 0)
-		return sx_deadlock(&t->t);
-	return -1;
+	tx->half_commit = half_commit;
 }
 
-static struct soif setxif =
-{
-	.open         = NULL,
-	.close        = NULL,
-	.destroy      = phia_tx_rollback,
-	.free         = phia_tx_free,
-	.drop         = NULL,
-	.setstring    = NULL,
-	.setint       = phia_tx_set_int,
-	.setobject    = NULL,
-	.getobject    = NULL,
-	.getstring    = NULL,
-	.getint       = phia_tx_get_int,
-	.get          = phia_tx_get,
-	.cursor       = NULL
-};
-
-static struct phia_tx *
-phia_tx_new(struct phia_env *e)
+struct phia_tx *
+phia_begin(struct phia_env *e)
 {
 	struct phia_tx *t;
 	t = ss_malloc(&e->a, sizeof(struct phia_tx));
@@ -17303,7 +17265,7 @@ phia_tx_new(struct phia_env *e)
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&t->o, &se_o[SETX], &setxif, e);
+	t->env = e;
 	sv_loginit(&t->log);
 	sx_init(&e->xm, &t->t, &t->log);
 	t->start = clock_monotonic64();
@@ -17533,35 +17495,6 @@ int64_t phia_getint(void *ptr, const char *path)
 	return rc;
 }
 
-int phia_replace(struct phia_tx *tx, void *v)
-{
-	struct phia_env *env = tx->o.env;
-	se_apilock(env);
-	int rc = phia_tx_replace(tx, v);
-	se_apiunlock(env);
-	return rc;
-}
-
-int
-phia_upsert(struct phia_tx *tx, void *v)
-{
-	struct phia_env *env = tx->o.env;
-	se_apilock(env);
-	int rc = phia_tx_upsert(tx, v);
-	se_apiunlock(env);
-	return rc;
-}
-
-int
-phia_delete(struct phia_tx *tx, void *v)
-{
-	struct phia_env *env = tx->o.env;
-	se_apilock(env);
-	int rc = phia_tx_delete(tx, v);
-	se_apiunlock(env);
-	return rc;
-}
-
 void *phia_get(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
@@ -17574,24 +17507,4 @@ void *phia_get(void *ptr, void *v)
 	void *h = o->i->get(o, v);
 	se_apiunlock(e);
 	return h;
-}
-
-struct phia_tx *
-phia_begin(struct phia_env *env)
-{
-	se_apilock(env);
-	struct phia_tx *tx = phia_tx_new(env);
-	se_apiunlock(env);
-	return tx;
-}
-
-int
-phia_commit(struct phia_tx *tx)
-{
-	/* Save the pointer to env since we're about to destroy tx */
-	struct phia_env *env = tx->o.env;
-	se_apilock(env);
-	int rc = phia_tx_commit(tx);
-	se_apiunlock(env);
-	return rc;
 }
