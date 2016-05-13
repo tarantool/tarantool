@@ -71,9 +71,6 @@
 #define ssunused __attribute__((unused))
 #define ssinline __attribute__((always_inline))
 
-#define sslikely(e)   __builtin_expect(!! (e), 1)
-#define ssunlikely(e) __builtin_expect(!! (e), 0)
-
 #define ss_align(align, len) \
 	(((uintptr_t)(len) + ((align) - 1)) & ~((uintptr_t)((align) - 1)))
 
@@ -250,14 +247,14 @@ ss_fileopen_as(struct ssfile *f, char *path, int flags)
 {
 	f->creat = (flags & O_CREAT ? 1 : 0);
 	f->fd = ss_vfsopen(f->vfs, path, flags, 0644);
-	if (ssunlikely(f->fd == -1))
+	if (unlikely(f->fd == -1))
 		return -1;
 	ss_pathset(&f->path, "%s", path);
 	f->size = 0;
 	if (f->creat)
 		return 0;
 	int64_t size = ss_vfssize(f->vfs, path);
-	if (ssunlikely(size == -1)) {
+	if (unlikely(size == -1)) {
 		ss_vfsclose(f->vfs, f->fd);
 		f->fd = -1;
 		return -1;
@@ -279,9 +276,9 @@ ss_filenew(struct ssfile *f, char *path) {
 static inline int
 ss_fileclose(struct ssfile *f)
 {
-	if (ssunlikely(f->fd != -1)) {
+	if (unlikely(f->fd != -1)) {
 		int rc = ss_vfsclose(f->vfs, f->fd);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		f->fd  = -1;
 		f->vfs = NULL;
@@ -293,7 +290,7 @@ static inline int
 ss_filerename(struct ssfile *f, char *path)
 {
 	int rc = ss_vfsrename(f->vfs, ss_pathof(&f->path), path);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_pathset(&f->path, "%s", path);
 	return 0;
@@ -313,7 +310,7 @@ static inline int
 ss_fileresize(struct ssfile *f, uint64_t size)
 {
 	int rc = ss_vfstruncate(f->vfs, f->fd, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	f->size = size;
 	return 0;
@@ -323,7 +320,7 @@ static inline int
 ss_filepread(struct ssfile *f, uint64_t off, void *buf, int size)
 {
 	int64_t rc = ss_vfspread(f->vfs, f->fd, off, buf, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	assert(rc == size);
 	return rc;
@@ -333,7 +330,7 @@ static inline int
 ss_filepwrite(struct ssfile *f, uint64_t off, void *buf, int size)
 {
 	int64_t rc = ss_vfspwrite(f->vfs, f->fd, off, buf, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	assert(rc == size);
 	return rc;
@@ -343,7 +340,7 @@ static inline int
 ss_filewrite(struct ssfile *f, void *buf, int size)
 {
 	int64_t rc = ss_vfswrite(f->vfs, f->fd, buf, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	assert(rc == size);
 	f->size += rc;
@@ -354,7 +351,7 @@ static inline int
 ss_filewritev(struct ssfile *f, struct ssiov *iov)
 {
 	int64_t rc = ss_vfswritev(f->vfs, f->fd, iov);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	f->size += rc;
 	return rc;
@@ -416,7 +413,7 @@ static inline char*
 ss_strdup(struct ssa *a, char *str) {
 	int sz = strlen(str) + 1;
 	char *s = ss_malloc(a, sz);
-	if (ssunlikely(s == NULL))
+	if (unlikely(s == NULL))
 		return NULL;
 	memcpy(s, str, sz);
 	return s;
@@ -553,9 +550,9 @@ ss_bufinit_reserve(struct ssbuf *b, void *buf, int size)
 static inline void
 ss_buffree(struct ssbuf *b, struct ssa *a)
 {
-	if (ssunlikely(b->s == NULL))
+	if (unlikely(b->s == NULL))
 		return;
-	if (ssunlikely(b->s != b->reserve))
+	if (unlikely(b->s != b->reserve))
 		ss_free(a, b->s);
 	b->s = NULL;
 	b->p = NULL;
@@ -585,7 +582,7 @@ ss_bufreset(struct ssbuf *b) {
 static inline void
 ss_bufgc(struct ssbuf *b, struct ssa *a, int wm)
 {
-	if (ssunlikely(ss_bufsize(b) >= wm)) {
+	if (unlikely(ss_bufsize(b) >= wm)) {
 		ss_buffree(b, a);
 		ss_bufinit(b);
 		return;
@@ -596,21 +593,21 @@ ss_bufgc(struct ssbuf *b, struct ssa *a, int wm)
 static inline int
 ss_bufensure(struct ssbuf *b, struct ssa *a, int size)
 {
-	if (sslikely(b->e - b->p >= size))
+	if (likely(b->e - b->p >= size))
 		return 0;
 	int sz = ss_bufsize(b) * 2;
 	int actual = ss_bufused(b) + size;
-	if (ssunlikely(actual > sz))
+	if (unlikely(actual > sz))
 		sz = actual;
 	char *p;
-	if (ssunlikely(b->s == b->reserve)) {
+	if (unlikely(b->s == b->reserve)) {
 		p = ss_malloc(a, sz);
-		if (ssunlikely(p == NULL))
+		if (unlikely(p == NULL))
 			return -1;
 		memcpy(p, b->s, ss_bufused(b));
 	} else {
 		p = ss_realloc(a, b->s, sz);
-		if (ssunlikely(p == NULL))
+		if (unlikely(p == NULL))
 			return -1;
 	}
 	b->p = p + (b->p - b->s);
@@ -630,7 +627,7 @@ static inline int
 ss_bufadd(struct ssbuf *b, struct ssa *a, void *buf, int size)
 {
 	int rc = ss_bufensure(b, a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	memcpy(b->p, buf, size);
 	ss_bufadvance(b, size);
@@ -895,7 +892,7 @@ ss_rqinit(struct ssrq *q, struct ssa *a, uint32_t range, uint32_t count)
 	q->range_count = count + 1 /* zero */;
 	q->range = range;
 	q->q = ss_malloc(a, sizeof(struct ssrqq) * q->range_count);
-	if (ssunlikely(q->q == NULL))
+	if (unlikely(q->q == NULL))
 		return -1;
 	uint32_t i = 0;
 	while (i < q->range_count) {
@@ -922,11 +919,11 @@ static inline void
 ss_rqadd(struct ssrq *q, struct ssrqnode *n, uint32_t v)
 {
 	uint32_t pos;
-	if (ssunlikely(v == 0)) {
+	if (unlikely(v == 0)) {
 		pos = 0;
 	} else {
 		pos = (v / q->range) + 1;
-		if (ssunlikely(pos >= q->range_count))
+		if (unlikely(pos >= q->range_count))
 			pos = q->range_count - 1;
 	}
 	struct ssrqq *p = &q->q[pos];
@@ -934,7 +931,7 @@ ss_rqadd(struct ssrq *q, struct ssrqnode *n, uint32_t v)
 	n->v = v;
 	n->q = pos;
 	rlist_add(&p->list, &n->link);
-	if (ssunlikely(p->count == 0)) {
+	if (unlikely(p->count == 0)) {
 		if (pos > q->last)
 			q->last = pos;
 	}
@@ -947,7 +944,7 @@ ss_rqdelete(struct ssrq *q, struct ssrqnode *n)
 	struct ssrqq *p = &q->q[n->q];
 	p->count--;
 	rlist_del(&n->link);
-	if (ssunlikely(p->count == 0 && q->last == n->q))
+	if (unlikely(p->count == 0 && q->last == n->q))
 	{
 		int i = n->q - 1;
 		while (i >= 0) {
@@ -964,7 +961,7 @@ ss_rqdelete(struct ssrq *q, struct ssrqnode *n)
 static inline void
 ss_rqupdate(struct ssrq *q, struct ssrqnode *n, uint32_t v)
 {
-	if (sslikely(n->q != UINT32_MAX))
+	if (likely(n->q != UINT32_MAX))
 		ss_rqdelete(q, n);
 	ss_rqadd(q, n, v);
 }
@@ -974,7 +971,7 @@ ss_rqprev(struct ssrq *q, struct ssrqnode *n)
 {
 	int pos;
 	struct ssrqq *p;
-	if (sslikely(n)) {
+	if (likely(n)) {
 		pos = n->q;
 		p = &q->q[pos];
 		if (n->link.next != (&p->list)) {
@@ -986,7 +983,7 @@ ss_rqprev(struct ssrq *q, struct ssrqnode *n)
 	}
 	for (; pos >= 0; pos--) {
 		p = &q->q[pos];
-		if (ssunlikely(p->count == 0))
+		if (unlikely(p->count == 0))
 			continue;
 		return container_of(p->list.next, struct ssrqnode, link);
 	}
@@ -1117,9 +1114,9 @@ ss_bufiter_open(struct ssiter *i, struct ssbuf *buf, int vsize)
 	bi->buf = buf;
 	bi->vsize = vsize;
 	bi->v = bi->buf->s;
-	if (ssunlikely(bi->v == NULL))
+	if (unlikely(bi->v == NULL))
 		return 0;
-	if (ssunlikely(! ss_bufin(bi->buf, bi->v))) {
+	if (unlikely(! ss_bufin(bi->buf, bi->v))) {
 		bi->v = NULL;
 		return 0;
 	}
@@ -1148,10 +1145,10 @@ static inline void
 ss_bufiter_next(struct ssiter *i)
 {
 	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
-	if (ssunlikely(bi->v == NULL))
+	if (unlikely(bi->v == NULL))
 		return;
 	bi->v = (char*)bi->v + bi->vsize;
-	if (ssunlikely(! ss_bufin(bi->buf, bi->v)))
+	if (unlikely(! ss_bufin(bi->buf, bi->v)))
 		bi->v = NULL;
 }
 
@@ -1173,7 +1170,7 @@ static inline void*
 ss_bufiterref_of(struct ssiter *i)
 {
 	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
-	if (ssunlikely(bi->v == NULL))
+	if (unlikely(bi->v == NULL))
 		return NULL;
 	return *(void**)bi->v;
 }
@@ -1229,7 +1226,7 @@ static inline int
 ss_blobrealloc(struct ssblob *b, int size)
 {
 	int rc = ss_vfsmremap(b->vfs, &b->map, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	char *p = b->map.p;
 	b->p = p + (b->p - b->s);
@@ -1242,11 +1239,11 @@ ss_blobrealloc(struct ssblob *b, int size)
 static inline int
 ss_blobensure(struct ssblob *b, int size)
 {
-	if (sslikely(b->e - b->p >= size))
+	if (likely(b->e - b->p >= size))
 		return 0;
 	int sz = ss_blobsize(b) * 2;
 	int actual = ss_blobused(b) + size;
-	if (ssunlikely(actual > sz))
+	if (unlikely(actual > sz))
 		sz = actual;
 	return ss_blobrealloc(b, sz);
 }
@@ -1263,7 +1260,7 @@ static inline int
 ss_blobadd(struct ssblob *b, void *buf, int size)
 {
 	int rc = ss_blobensure(b, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	memcpy(b->p, buf, size);
 	ss_blobadvance(b, size);
@@ -1334,7 +1331,7 @@ ss_lz4filter_init(struct ssfilter *f, va_list args ssunused)
 						     LZ4F_VERSION);
 		break;
 	}
-	if (ssunlikely(rc != 0))
+	if (unlikely(rc != 0))
 		return -1;
 	return 0;
 }
@@ -1371,10 +1368,10 @@ ss_lz4filter_start(struct ssfilter *f, struct ssbuf *dest)
 	case SS_FINPUT:;
 		block = LZ4F_MAXHEADERFRAME_SIZE;
 		rc = ss_bufensure(dest, f->a, block);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		sz = LZ4F_compressBegin(z->compress, dest->p, block, NULL);
-		if (ssunlikely(LZ4F_isError(sz)))
+		if (unlikely(LZ4F_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
 		break;
@@ -1389,7 +1386,7 @@ static int
 ss_lz4filter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 {
 	struct sslz4filter *z = (struct sslz4filter*)f->priv;
-	if (ssunlikely(size == 0))
+	if (unlikely(size == 0))
 		return 0;
 	int rc;
 	switch (f->op) {
@@ -1398,12 +1395,12 @@ ss_lz4filter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 		int capacity = LZ4F_compressBound(z->total_size + size, NULL);
 		assert(capacity >= ss_bufused(dest));
 		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = LZ4F_compressUpdate(z->compress, dest->p,
 						ss_bufunused(dest),
 						buf, size, NULL);
-		if (ssunlikely(LZ4F_isError(sz)))
+		if (unlikely(LZ4F_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
 		z->total_size += size;
@@ -1461,11 +1458,11 @@ ss_lz4filter_complete(struct ssfilter *f, struct ssbuf *dest)
 		int capacity = LZ4F_compressBound(z->total_size, NULL);
 		assert(capacity >= ss_bufused(dest));
 		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = LZ4F_compressEnd(z->compress, dest->p,
 					     ss_bufunused(dest), NULL);
-		if (ssunlikely(LZ4F_isError(sz)))
+		if (unlikely(LZ4F_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
 		break;
@@ -1658,7 +1655,7 @@ ss_qfensure(struct ssqf *f, struct ssa *a, uint32_t count)
 	if (f->qf_table_size % 8)
 		f->qf_table_size++;
 	int rc = ss_bufensure(&f->qf_buf, a, f->qf_table_size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_bufadvance(&f->qf_buf, f->qf_table_size);
 	f->qf_table = (uint64_t*)f->qf_buf.s;
@@ -1678,7 +1675,7 @@ ss_qffree(struct ssqf *f, struct ssa *a)
 static void
 ss_qfgc(struct ssqf *f, struct ssa *a, int wm)
 {
-	if (ssunlikely(ss_bufsize(&f->qf_buf) >= wm)) {
+	if (unlikely(ss_bufsize(&f->qf_buf) >= wm)) {
 		ss_buffree(&f->qf_buf, a);
 		ss_bufinit(&f->qf_buf);
 		return;
@@ -1841,7 +1838,7 @@ ss_qffull(struct ssqf *f) {
 static void
 ss_qfadd(struct ssqf *f, uint64_t h)
 {
-	if (ssunlikely(ss_qffull(f)))
+	if (unlikely(ss_qffull(f)))
 		return;
 
 	uint64_t fq    = ss_qfhash_to_q(f, h);
@@ -1849,7 +1846,7 @@ ss_qfadd(struct ssqf *f, uint64_t h)
 	uint64_t T_fq  = ss_qfget(f, fq);
 	uint64_t entry = (fr << 3) & ~7;
 
-	if (sslikely(ss_qfis_empty(T_fq))) {
+	if (likely(ss_qfis_empty(T_fq))) {
 		ss_qfset(f, fq, ss_qfoccupied_set(entry));
 		f->qf_entries++;
 		return;
@@ -1948,12 +1945,12 @@ ss_quotafree(struct ssquota *q)
 static int
 ss_quota(struct ssquota *q, enum ssquotaop op, int64_t v)
 {
-	if (sslikely(v == 0))
+	if (likely(v == 0))
 		return 0;
 	tt_pthread_mutex_lock(&q->lock);
 	switch (op) {
 	case SS_QADD:
-		if (ssunlikely(!q->enable || q->limit == 0)) {
+		if (unlikely(!q->enable || q->limit == 0)) {
 			/*
 			 * Fall through to quota accounting, skip
 			 * the wait.
@@ -1986,7 +1983,7 @@ static struct ssrbnode *
 ss_rbmin(struct ssrb *t)
 {
 	struct ssrbnode *n = t->root;
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return NULL;
 	while (n->l)
 		n = n->l;
@@ -1997,7 +1994,7 @@ static struct ssrbnode *
 ss_rbmax(struct ssrb *t)
 {
 	struct ssrbnode *n = t->root;
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return NULL;
 	while (n->r)
 		n = n->r;
@@ -2007,7 +2004,7 @@ ss_rbmax(struct ssrb *t)
 static struct ssrbnode *
 ss_rbnext(struct ssrb *t, struct ssrbnode *n)
 {
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return ss_rbmin(t);
 	if (n->r) {
 		n = n->r;
@@ -2024,7 +2021,7 @@ ss_rbnext(struct ssrb *t, struct ssrbnode *n)
 static struct ssrbnode *
 ss_rbprev(struct ssrb *t, struct ssrbnode *n)
 {
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return ss_rbmax(t);
 	if (n->l) {
 		n = n->l;
@@ -2044,7 +2041,7 @@ ss_rbrotate_left(struct ssrb *t, struct ssrbnode *n)
 	struct ssrbnode *p = n;
 	struct ssrbnode *q = n->r;
 	struct ssrbnode *parent = n->p;
-	if (sslikely(p->p != NULL)) {
+	if (likely(p->p != NULL)) {
 		if (parent->l == p)
 			parent->l = q;
 		else
@@ -2066,7 +2063,7 @@ ss_rbrotate_right(struct ssrb *t, struct ssrbnode *n)
 	struct ssrbnode *p = n;
 	struct ssrbnode *q = n->l;
 	struct ssrbnode *parent = n->p;
-	if (sslikely(p->p != NULL)) {
+	if (likely(p->p != NULL)) {
 		if (parent->l == p)
 			parent->l = q;
 		else
@@ -2135,7 +2132,7 @@ ss_rbset(struct ssrb *t, struct ssrbnode *p, int prel, struct ssrbnode *n)
 	n->p     = p;
 	n->l     = NULL;
 	n->r     = NULL;
-	if (sslikely(p)) {
+	if (likely(p)) {
 		assert(prel != 0);
 		if (prel > 0)
 			p->l = n;
@@ -2170,7 +2167,7 @@ ss_rbreplace(struct ssrb *t, struct ssrbnode *o, struct ssrbnode *n)
 static void
 ss_rbremove(struct ssrb *t, struct ssrbnode *n)
 {
-	if (ssunlikely(n->color == SS_RBUNDEF))
+	if (unlikely(n->color == SS_RBUNDEF))
 		return;
 	struct ssrbnode *l = n->l;
 	struct ssrbnode *r = n->r;
@@ -2229,7 +2226,7 @@ ss_rbremove(struct ssrb *t, struct ssrbnode *n)
 
 	struct ssrbnode *s;
 	do {
-		if (ssunlikely(n == t->root))
+		if (unlikely(n == t->root))
 			break;
 
 		if (n == p->l) {
@@ -2349,7 +2346,7 @@ ss_stdvfs_size(struct ssvfs *f ssunused, char *path)
 {
 	struct stat st;
 	int rc = lstat(path, &st);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return st.st_size;
 }
@@ -2531,7 +2528,7 @@ ss_stdvfs_mmap_allocate(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t siz
 {
 	int flags = PROT_READ|PROT_WRITE;
 	m->p = mmap(NULL, size, flags, MAP_PRIVATE|MAP_ANON, -1, 0);
-	if (ssunlikely(m->p == MAP_FAILED)) {
+	if (unlikely(m->p == MAP_FAILED)) {
 		m->p = NULL;
 		return -1;
 	}
@@ -2542,7 +2539,7 @@ ss_stdvfs_mmap_allocate(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t siz
 static int
 ss_stdvfs_mremap(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
 {
-	if (ssunlikely(m->p == NULL))
+	if (unlikely(m->p == NULL))
 		return ss_stdvfs_mmap_allocate(f, m, size);
 	void *p;
 #if !defined(HAVE_MREMAP)
@@ -2557,7 +2554,7 @@ ss_stdvfs_mremap(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
 	munmap(m->p, m->size);
 #else
 	p = mremap(m->p, m->size, size, MREMAP_MAYMOVE);
-	if (ssunlikely(p == MAP_FAILED))
+	if (unlikely(p == MAP_FAILED))
 		return -1;
 #endif
 	m->p = p;
@@ -2568,7 +2565,7 @@ ss_stdvfs_mremap(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
 static int
 ss_stdvfs_munmap(struct ssvfs *f ssunused, struct ssmmap *m)
 {
-	if (ssunlikely(m->p == NULL))
+	if (unlikely(m->p == NULL))
 		return 0;
 	int rc = munmap(m->p, m->size);
 	m->p = NULL;
@@ -2834,7 +2831,7 @@ ss_zstdfilter_init(struct ssfilter *f, va_list args ssunused)
 	switch (f->op) {
 	case SS_FINPUT:
 		z->ctx = ZSTD_createCCtx();
-		if (ssunlikely(z->ctx == NULL))
+		if (unlikely(z->ctx == NULL))
 			return -1;
 		break;
 	case SS_FOUTPUT:
@@ -2868,7 +2865,7 @@ ss_zstdfilter_start(struct ssfilter *f, struct ssbuf *dest)
 	case SS_FINPUT:;
 		int compressionLevel = 3; /* fast */
 		sz = ZSTD_compressBegin(z->ctx, compressionLevel);
-		if (ssunlikely(ZSTD_isError(sz)))
+		if (unlikely(ZSTD_isError(sz)))
 			return -1;
 		break;
 	case SS_FOUTPUT:
@@ -2883,16 +2880,16 @@ ss_zstdfilter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 {
 	struct sszstdfilter *z = (struct sszstdfilter*)f->priv;
 	int rc;
-	if (ssunlikely(size == 0))
+	if (unlikely(size == 0))
 		return 0;
 	switch (f->op) {
 	case SS_FINPUT:;
 		size_t block = ZSTD_compressBound(size);
 		rc = ss_bufensure(dest, f->a, block);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = ZSTD_compressContinue(z->ctx, dest->p, block, buf, size);
-		if (ssunlikely(ZSTD_isError(sz)))
+		if (unlikely(ZSTD_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
 		break;
@@ -2903,7 +2900,7 @@ ss_zstdfilter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 		 * original size.
 		 */
 		sz = ZSTD_decompress(dest->p, ss_bufunused(dest), buf, size);
-		if (ssunlikely(ZSTD_isError(sz)))
+		if (unlikely(ZSTD_isError(sz)))
 			return -1;
 		break;
 	}
@@ -2919,10 +2916,10 @@ ss_zstdfilter_complete(struct ssfilter *f, struct ssbuf *dest)
 	case SS_FINPUT:;
 		size_t block = ZSTD_blockHeaderSize;
 		rc = ss_bufensure(dest, f->a, block);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = ZSTD_compressEnd(z->ctx, dest->p, block);
-		if (ssunlikely(ZSTD_isError(sz)))
+		if (unlikely(ZSTD_isError(sz)))
 			return -1;
 		ss_bufadvance(dest, sz);
 		break;
@@ -2973,7 +2970,7 @@ static inline struct sffield*
 sf_fieldnew(struct ssa *a, char *name)
 {
 	struct sffield *f = ss_malloc(a, sizeof(struct sffield));
-	if (ssunlikely(f == NULL))
+	if (unlikely(f == NULL))
 		return NULL;
 	f->key = 0;
 	f->fixed_size = 0;
@@ -2981,7 +2978,7 @@ sf_fieldnew(struct ssa *a, char *name)
 	f->position = 0;
 	f->position_ref = 0;
 	f->name = ss_strdup(a, name);
-	if (ssunlikely(f->name == NULL)) {
+	if (unlikely(f->name == NULL)) {
 		ss_free(a, f);
 		return NULL;
 	}
@@ -3009,7 +3006,7 @@ static inline int
 sf_fieldoptions(struct sffield *f, struct ssa *a, char *options)
 {
 	char *sz = ss_strdup(a, options);
-	if (ssunlikely(sz == NULL))
+	if (unlikely(sz == NULL))
 		return -1;
 	if (f->options)
 		ss_free(a, f->options);
@@ -3059,14 +3056,14 @@ struct sfv {
 static inline char*
 sf_fieldof_ptr(struct sfscheme *s, struct sffield *f, char *data, uint32_t *size)
 {
-	if (sslikely(f->fixed_size > 0)) {
-		if (sslikely(size))
+	if (likely(f->fixed_size > 0)) {
+		if (likely(size))
 			*size = f->fixed_size;
 		return data + f->fixed_offset;
 	}
 	register struct sfvar *v =
 		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
-	if (sslikely(size))
+	if (likely(size))
 		*size = v->size;
 	return data + v->offset;
 }
@@ -3081,7 +3078,7 @@ static inline char*
 sf_field(struct sfscheme *s, int pos, char *data)
 {
 	register struct sffield *f = s->fields[pos];
-	if (sslikely(f->fixed_size > 0))
+	if (likely(f->fixed_size > 0))
 		return data + f->fixed_offset;
 	register struct sfvar *v =
 		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
@@ -3092,7 +3089,7 @@ static inline int
 sf_fieldsize(struct sfscheme *s, int pos, char *data)
 {
 	register struct sffield *f = s->fields[pos];
-	if (sslikely(f->fixed_size > 0))
+	if (likely(f->fixed_size > 0))
 		return f->fixed_size;
 	register struct sfvar *v =
 		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
@@ -3211,7 +3208,7 @@ sf_limitinit(struct sflimit *b, struct ssa *a)
 	b->string_min = "";
 	b->string_max_size = 1024;
 	b->string_max = ss_malloc(a, b->string_max_size);
-	if (ssunlikely(b->string_max == NULL))
+	if (unlikely(b->string_max == NULL))
 		return -1;
 	memset(b->string_max, 0xff, b->string_max_size);
 	return 0;
@@ -3333,8 +3330,8 @@ sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 {
 	int size = (asz < bsz) ? asz : bsz;
 	int rc = memcmp(a, b, size);
-	if (ssunlikely(rc == 0)) {
-		if (sslikely(asz == bsz))
+	if (unlikely(rc == 0)) {
+		if (likely(asz == bsz))
 			return 0;
 		return (asz < bsz) ? -1 : 1;
 	}
@@ -3450,7 +3447,7 @@ sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
 {
 	int size = sizeof(struct sffield*) * (s->fields_count + 1);
 	struct sffield **fields = ss_malloc(a, size);
-	if (ssunlikely(fields == NULL))
+	if (unlikely(fields == NULL))
 		return -1;
 	memcpy(fields, s->fields, size - sizeof(struct sffield*));
 	fields[s->fields_count] = f;
@@ -3494,17 +3491,17 @@ sf_schemeset(struct sfscheme *s, struct sffield *f, char *opt)
 	} else
 	if (strncmp(opt, "key", 3) == 0) {
 		char *p = opt + 3;
-		if (ssunlikely(*p != '('))
+		if (unlikely(*p != '('))
 			return -1;
 		p++;
-		if (ssunlikely(! isdigit(*p)))
+		if (unlikely(! isdigit(*p)))
 			return -1;
 		int v = 0;
 		while (isdigit(*p)) {
 			v = (v * 10) + *p - '0';
 			p++;
 		}
-		if (ssunlikely(*p != ')'))
+		if (unlikely(*p != ')'))
 			return -1;
 		p++;
 		f->position_key = v;
@@ -3539,7 +3536,7 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 		     p = strtok(NULL, " ,"))
 		{
 			int rc = sf_schemeset(s, f, p);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return -1;
 		}
 		/* calculate offset and position for fixed
@@ -3559,11 +3556,11 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 	s->var_offset = fixed_offset;
 
 	/* validate keys */
-	if (ssunlikely(s->keys_count == 0))
+	if (unlikely(s->keys_count == 0))
 		return -1;
 	int size = sizeof(struct sffield*) * s->keys_count;
 	s->keys = ss_malloc(a, size);
-	if (ssunlikely(s->keys == NULL))
+	if (unlikely(s->keys == NULL))
 		return -1;
 	memset(s->keys, 0, size);
 	int pos_var = 0;
@@ -3571,13 +3568,13 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 	while (i < s->fields_count) {
 		struct sffield *f = s->fields[i];
 		if (f->key) {
-			if (ssunlikely(f->position_key < 0))
+			if (unlikely(f->position_key < 0))
 				return -1;
-			if (ssunlikely(f->position_key >= s->fields_count))
+			if (unlikely(f->position_key >= s->fields_count))
 				return -1;
-			if (ssunlikely(f->position_key >= s->keys_count))
+			if (unlikely(f->position_key >= s->keys_count))
 				return -1;
-			if (ssunlikely(s->keys[f->position_key] != NULL))
+			if (unlikely(s->keys[f->position_key] != NULL))
 				return -1;
 			s->keys[f->position_key] = f;
 		}
@@ -3601,7 +3598,7 @@ sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
 	/* fields count */
 	uint32_t v = s->fields_count;
 	int rc = ss_bufadd(buf, a, &v, sizeof(uint32_t));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	int i = 0;
 	while (i < s->fields_count) {
@@ -3609,7 +3606,7 @@ sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
 		/* name */
 		v = strlen(field->name) + 1;
 		rc = ss_bufensure(buf, a, sizeof(uint32_t) + v);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 		memcpy(buf->p, &v, sizeof(v));
 		ss_bufadvance(buf, sizeof(uint32_t));
@@ -3618,7 +3615,7 @@ sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
 		/* options */
 		v = strlen(field->options) + 1;
 		rc = ss_bufensure(buf, a, sizeof(uint32_t) + v);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 		memcpy(buf->p, &v, sizeof(v));
 		ss_bufadvance(buf, sizeof(uint32_t));
@@ -3646,19 +3643,19 @@ sf_schemeload(struct sfscheme *s, struct ssa *a, char *buf, int size ssunused)
 		v = load_u32(p);
 		p += sizeof(uint32_t);
 		struct sffield *field = sf_fieldnew(a, p);
-		if (ssunlikely(field == NULL))
+		if (unlikely(field == NULL))
 			goto error;
 		p += v;
 		/* options */
 		v = load_u32(p);
 		p += sizeof(uint32_t);
 		int rc = sf_fieldoptions(field, a, p);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, a);
 			goto error;
 		}
 		rc = sf_schemeadd(s, a, field);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, a);
 			goto error;
 		}
@@ -3792,7 +3789,7 @@ sr_verrorset(struct srerror *e, int type,
              char *fmt, va_list args)
 {
 	tt_pthread_mutex_lock(&e->lock);
-	if (ssunlikely(e->type == SR_ERROR_MALFUNCTION)) {
+	if (unlikely(e->type == SR_ERROR_MALFUNCTION)) {
 		tt_pthread_mutex_unlock(&e->lock);
 		return;
 	}
@@ -4168,7 +4165,7 @@ struct srzonemap {
 static inline void
 sr_zonemap_set(struct srzonemap *m, uint32_t percent, struct srzone *z)
 {
-	if (ssunlikely(percent > 100))
+	if (unlikely(percent > 100))
 		percent = 100;
 	percent = percent - percent % 10;
 	int p = percent / 10;
@@ -4179,7 +4176,7 @@ sr_zonemap_set(struct srzonemap *m, uint32_t percent, struct srzone *z)
 static inline struct srzone*
 sr_zonemap(struct srzonemap *m, uint32_t percent)
 {
-	if (ssunlikely(percent > 100))
+	if (unlikely(percent > 100))
 		percent = 100;
 	percent = percent - percent % 10;
 	int p = percent / 10;
@@ -4309,8 +4306,8 @@ sr_c(struct srconf **link, struct srconf **cp, srconff func,
 	c->ptr      = NULL;
 	c->next     = NULL;
 	*cp = c + 1;
-	if (sslikely(link)) {
-		if (sslikely(*link))
+	if (likely(link)) {
+		if (likely(*link))
 			(*link)->next = c;
 		*link = c;
 	}
@@ -4381,7 +4378,7 @@ static int sr_conf_read(struct srconf *m, struct srconfstmt *s)
 		int size = strlen(string) + 1;
 		s->valuesize = size;
 		*result = malloc(size);
-		if (ssunlikely(*result == NULL))
+		if (unlikely(*result == NULL))
 			return sr_oom(s->r->e);
 		memcpy(*result, string, size);
 		break;
@@ -4398,7 +4395,7 @@ static int sr_conf_read(struct srconf *m, struct srconfstmt *s)
 		int size = strlen(*string) + 1;
 		s->valuesize = size;
 		*result = malloc(size);
-		if (ssunlikely(*result == NULL))
+		if (unlikely(*result == NULL))
 			return sr_oom(s->r->e);
 		memcpy(*result, *string, size);
 		break;
@@ -4461,7 +4458,7 @@ sr_conf_write(struct srconf *m, struct srconfstmt *s)
 			int len = s->valuesize + 1;
 			char *sz;
 			sz = ss_malloc(s->r->a, len);
-			if (ssunlikely(sz == NULL))
+			if (unlikely(sz == NULL))
 				return sr_oom(s->r->e);
 			memcpy(sz, s->value, s->valuesize);
 			sz[s->valuesize] = 0;
@@ -4587,7 +4584,7 @@ sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 	struct ssbuf *p = s->serialize;
 	int size = sizeof(v) + v.keysize + v.valuesize;
 	int rc = ss_bufensure(p, s->r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(s->r->e);
 	memcpy(p->p, &v, sizeof(v));
 	memcpy(p->p + sizeof(v), name, v.keysize);
@@ -4608,12 +4605,12 @@ sr_confexec_serialize(struct srconf *c, struct srconfstmt *stmt, char *root)
 		int rc;
 		if (c->flags & SR_NS) {
 			rc = sr_confexec_serialize(c->value, stmt, path);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return -1;
 		} else {
 			stmt->path = path;
 			rc = c->function(c, stmt);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return -1;
 			stmt->path = NULL;
 		}
@@ -4631,7 +4628,7 @@ static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 	char *ptr = NULL;
 	char *token;
 	token = strtok_r(path, ".", &ptr);
-	if (ssunlikely(token == NULL))
+	if (unlikely(token == NULL))
 		return -1;
 	struct srconf *c = start;
 	while (c) {
@@ -4641,11 +4638,11 @@ static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 		}
 		if (c->flags & SR_NS) {
 			token = strtok_r(NULL, ".", &ptr);
-			if (ssunlikely(token == NULL))
+			if (unlikely(token == NULL))
 			{
 				if (s->op == SR_WRITE && c->type != SS_UNDEF) {
 					int rc = sr_conf_write_cast(c->type, s->valuetype);
-					if (ssunlikely(rc == -1))
+					if (unlikely(rc == -1))
 						goto bad_type;
 				}
 				s->match = c;
@@ -4659,7 +4656,7 @@ static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 		}
 		s->match = c;
 		token = strtok_r(NULL, ".", &ptr);
-		if (ssunlikely(token != NULL))
+		if (unlikely(token != NULL))
 			goto bad_path;
 		return c->function(c, s);
 	}
@@ -4712,7 +4709,7 @@ so_cast_dynamic(void *ptr, struct sotype *type,
           const char *function, int line)
 {
 	int eq = ptr != NULL && ((struct so*)ptr)->type == type;
-	if (sslikely(eq))
+	if (likely(eq))
 		return ptr;
 	fprintf(stderr, "%s:%d %s(%p) expected '%s' object\n",
 	        file, line, function, ptr, type->name);
@@ -4848,7 +4845,7 @@ sv_vbuild(struct runtime *r, struct sfv *fields)
 {
 	int size = sf_writesize(r->scheme, fields);
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return NULL;
 	v->size      = size;
 	v->lsn       = 0;
@@ -4868,7 +4865,7 @@ static inline struct svv*
 sv_vbuildraw(struct runtime *r, char *src, int size)
 {
 	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return NULL;
 	v->size      = size;
 	v->flags     = 0;
@@ -4887,7 +4884,7 @@ static inline struct svv*
 sv_vdup(struct runtime *r, struct sv *src)
 {
 	struct svv *v = sv_vbuildraw(r, sv_pointer(src), sv_size(src));
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return NULL;
 	v->flags     = sv_flags(src);
 	v->lsn       = sv_lsn(src);
@@ -4902,7 +4899,7 @@ sv_vref(struct svv *v) {
 static inline int
 sv_vunref(struct runtime *r, struct svv *v)
 {
-	if (sslikely(--v->refs == 0)) {
+	if (likely(--v->refs == 0)) {
 		uint32_t size = sv_vsize(v);
 		/* update runtime statistics */
 		tt_pthread_mutex_lock(&r->stat->lock);
@@ -4930,7 +4927,7 @@ static inline struct svref*
 sv_refnew(struct runtime *r, struct svv *v)
 {
 	struct svref *ref = ss_malloc(r->a, sizeof(struct svref));
-	if (ssunlikely(ref == NULL))
+	if (unlikely(ref == NULL))
 		return NULL;
 	ref->v = v;
 	ref->next = NULL;
@@ -5057,19 +5054,19 @@ sv_upsertpush_raw(struct svupsert *u, struct runtime *r,
 {
 	struct svupsertnode *n;
 	int rc;
-	if (sslikely(u->max > u->count)) {
+	if (likely(u->max > u->count)) {
 		n = (struct svupsertnode*)u->stack.p;
 		ss_bufreset(&n->buf);
 	} else {
 		rc = ss_bufensure(&u->stack, r->a, sizeof(struct svupsertnode));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		n = (struct svupsertnode*)u->stack.p;
 		ss_bufinit(&n->buf);
 		u->max++;
 	}
 	rc = ss_bufensure(&n->buf, r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	memcpy(n->buf.p, pointer, size);
 	n->flags = flags;
@@ -5117,7 +5114,7 @@ sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	char     *result[16];
 
 	int i = 0;
-	if (sslikely(a && !(a->flags & SVDELETE)))
+	if (likely(a && !(a->flags & SVDELETE)))
 	{
 		src_ptr = src;
 		src_size_ptr = src_size;
@@ -5147,7 +5144,7 @@ sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	                             result,
 	                             result_size,
 	                             r->fmt_upsert->arg);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 
 	/* validate and create new record */
@@ -5160,7 +5157,7 @@ sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	int size = sf_writesize(r->scheme, v);
 	ss_bufreset(&u->tmp);
 	rc = ss_bufensure(&u->tmp, r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto cleanup;
 	sf_write(r->scheme, v, u->tmp.s);
 	ss_bufadvance(&u->tmp, size);
@@ -5195,7 +5192,7 @@ sv_upsert(struct svupsert *u, struct runtime *r)
 	if (f->flags & SVUPSERT) {
 		f = sv_upsertpop(u);
 		rc = sv_upsertdo(u, r, NULL, f);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 	if (u->count == 1)
@@ -5206,7 +5203,7 @@ sv_upsert(struct svupsert *u, struct runtime *r)
 		assert(f != NULL);
 		assert(s != NULL);
 		rc = sv_upsertdo(u, r, f, s);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 done:
@@ -5280,11 +5277,11 @@ sv_logadd(struct svlog *l, struct ssa *a, struct svlogv *v, void *ptr)
 {
 	uint32_t n = sv_logcount(l);
 	int rc = ss_bufadd(&l->buf, a, v, sizeof(struct svlogv));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	struct svlogindex *i = (struct svlogindex*)l->index.s;
 	while ((char*)i < l->index.p) {
-		if (sslikely(i->id == v->id)) {
+		if (likely(i->id == v->id)) {
 			struct svlogv *tail = sv_logat(l, i->tail);
 			tail->next = n;
 			i->tail = n;
@@ -5294,7 +5291,7 @@ sv_logadd(struct svlog *l, struct ssa *a, struct svlogv *v, void *ptr)
 		i++;
 	}
 	rc = ss_bufensure(&l->index, a, sizeof(struct svlogindex));
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		l->buf.p -= sizeof(struct svlogv);
 		return -1;
 	}
@@ -5343,7 +5340,7 @@ static inline int
 sv_mergeprepare(struct svmerge *m, struct runtime *r, int count)
 {
 	int rc = ss_bufensure(&m->buf, r->a, sizeof(struct svmergesrc) * count);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	return 0;
 }
@@ -5448,7 +5445,7 @@ sv_mergeiter_gt(struct svmergeiter *i)
 			break;
 		}
 	}
-	if (ssunlikely(min == NULL))
+	if (unlikely(min == NULL))
 		return;
 	i->v = min;
 }
@@ -5494,7 +5491,7 @@ sv_mergeiter_lt(struct svmergeiter *i)
 			break;
 		}
 	}
-	if (ssunlikely(max == NULL))
+	if (unlikely(max == NULL))
 		return;
 	i->v = max;
 }
@@ -5545,7 +5542,7 @@ static inline void *
 sv_mergeiter_of(struct ssiter *i)
 {
 	struct svmergeiter *im = (struct svmergeiter*)i->priv;
-	if (ssunlikely(im->v == NULL))
+	if (unlikely(im->v == NULL))
 		return NULL;
 	return ss_iteratorof(im->v->i);
 }
@@ -5582,7 +5579,7 @@ sv_readiter_upsert(struct svreaditer *i)
 	assert(v != NULL);
 	assert(sv_flags(v) & SVUPSERT);
 	int rc = sv_upsertpush(i->u, i->r, v);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_iternext(sv_mergeiter, i->merge);
 	/* iterate over upsert statements */
@@ -5596,14 +5593,14 @@ sv_readiter_upsert(struct svreaditer *i)
 		if (skip)
 			continue;
 		int rc = sv_upsertpush(i->u, i->r, v);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		if (! (sv_flags(v) & SVUPSERT))
 			skip = 1;
 	}
 	/* upsert */
 	rc = sv_upsert(i->u, i->r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
@@ -5631,11 +5628,11 @@ sv_readiter_next(struct ssiter *i)
 			continue;
 		}
 		im->nextdup = 1;
-		if (ssunlikely(!im->save_delete && sv_is(v, SVDELETE)))
+		if (unlikely(!im->save_delete && sv_is(v, SVDELETE)))
 			continue;
-		if (ssunlikely(sv_is(v, SVUPSERT))) {
+		if (unlikely(sv_is(v, SVUPSERT))) {
 			int rc = sv_readiter_upsert(im);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return;
 			im->v = &im->u->result;
 			im->next = 0;
@@ -5701,7 +5698,7 @@ static inline void*
 sv_readiter_of(struct ssiter *i)
 {
 	struct svreaditer *im = (struct svreaditer*)i->priv;
-	if (ssunlikely(im->v == NULL))
+	if (unlikely(im->v == NULL))
 		return NULL;
 	return im->v;
 }
@@ -5740,7 +5737,7 @@ sv_writeiter_upsert(struct svwriteiter *i)
 	assert(sv_flags(v) & SVUPSERT);
 	assert(sv_lsn(v) <= i->vlsn);
 	int rc = sv_upsertpush(i->u, i->r, v);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_iternext(sv_mergeiter, i->merge);
 
@@ -5759,13 +5756,13 @@ sv_writeiter_upsert(struct svwriteiter *i)
 			continue;
 		last_non_upd = ! sv_isflags(flags, SVUPSERT);
 		int rc = sv_upsertpush(i->u, i->r, v);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 
 	/* upsert */
 	rc = sv_upsert(i->u, i->r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
@@ -5793,7 +5790,7 @@ sv_writeiter_next(struct ssiter *i)
 				break;
 		}
 
-		if (ssunlikely(dup)) {
+		if (unlikely(dup)) {
 			/* keep atleast one visible version for <= vlsn */
 			if (im->prevlsn <= im->vlsn) {
 				if (im->upsert) {
@@ -5807,7 +5804,7 @@ sv_writeiter_next(struct ssiter *i)
 			/* delete (stray or on branch) */
 			if (! im->save_delete) {
 				int del = sv_isflags(flags, SVDELETE);
-				if (ssunlikely(del && (lsn <= im->vlsn))) {
+				if (unlikely(del && (lsn <= im->vlsn))) {
 					im->prevlsn = lsn;
 					continue;
 				}
@@ -5824,7 +5821,7 @@ sv_writeiter_next(struct ssiter *i)
 				if (lsn <= im->vlsn) {
 					int rc;
 					rc = sv_writeiter_upsert(im);
-					if (ssunlikely(rc == -1))
+					if (unlikely(rc == -1))
 						return;
 					im->upsert = 0;
 					im->prevlsn = lsn;
@@ -5889,7 +5886,7 @@ static inline void*
 sv_writeiter_of(struct ssiter *i)
 {
 	struct svwriteiter *im = (struct svwriteiter*)i->priv;
-	if (ssunlikely(im->v == NULL))
+	if (unlikely(im->v == NULL))
 		return NULL;
 	return im->v;
 }
@@ -5899,7 +5896,7 @@ sv_writeiter_resume(struct ssiter *i)
 {
 	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	im->v       = ss_iterof(sv_mergeiter, im->merge);
-	if (ssunlikely(im->v == NULL))
+	if (unlikely(im->v == NULL))
 		return 0;
 	im->vdup    = sv_is(im->v, SVDUP) || sv_mergeisdup(im->merge);
 	im->prevlsn = sv_lsn(im->v);
@@ -5984,7 +5981,7 @@ sv_indexiter_open(struct ssiter *i, struct runtime *r, struct svindex *index, en
 	switch (ii->order) {
 	case SS_LT:
 	case SS_LTE:
-		if (ssunlikely(key == NULL)) {
+		if (unlikely(key == NULL)) {
 			ii->v = ss_rbmax(&ii->index->i);
 			break;
 		}
@@ -6004,7 +6001,7 @@ sv_indexiter_open(struct ssiter *i, struct runtime *r, struct svindex *index, en
 		break;
 	case SS_GT:
 	case SS_GTE:
-		if (ssunlikely(key == NULL)) {
+		if (unlikely(key == NULL)) {
 			ii->v = ss_rbmin(&ii->index->i);
 			break;
 		}
@@ -6047,7 +6044,7 @@ static inline void*
 sv_indexiter_of(struct ssiter *i)
 {
 	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	if (ssunlikely(ii->v == NULL))
+	if (unlikely(ii->v == NULL))
 		return NULL;
 	return &ii->current;
 }
@@ -6056,7 +6053,7 @@ static inline void
 sv_indexiter_next(struct ssiter *i)
 {
 	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	if (ssunlikely(ii->v == NULL))
+	if (unlikely(ii->v == NULL))
 		return;
 	assert(ii->vcur != NULL);
 	struct svref *v = ii->vcur->next;
@@ -6076,7 +6073,7 @@ sv_indexiter_next(struct ssiter *i)
 		break;
 	default: assert(0);
 	}
-	if (sslikely(ii->v)) {
+	if (likely(ii->v)) {
 		ii->vcur = container_of(ii->v, struct svref, node);
 		ii->current.v = ii->vcur;
 	} else {
@@ -6112,7 +6109,7 @@ sv_vset(struct svref *head, struct svref *v)
 	assert(head->v->lsn != v->v->lsn);
 	struct svv *vv = v->v;
 	/* default */
-	if (sslikely(head->v->lsn < vv->lsn)) {
+	if (likely(head->v->lsn < vv->lsn)) {
 		v->next = head;
 		head->flags |= SVDUP;
 		return v;
@@ -6338,7 +6335,7 @@ sx_vpool_free(struct sxvpool *p)
 static inline struct sxv*
 sx_vpool_pop(struct sxvpool *p)
 {
-	if (ssunlikely(p->n == 0))
+	if (unlikely(p->n == 0))
 		return NULL;
 	struct sxv *v = p->head;
 	p->head = v->next;
@@ -6361,9 +6358,9 @@ static inline struct sxv*
 sx_valloc(struct sxvpool *p, struct svv *ref)
 {
 	struct sxv *v = sx_vpool_pop(p);
-	if (ssunlikely(v == NULL)) {
+	if (unlikely(v == NULL)) {
 		v = ss_malloc(p->r->a, sizeof(struct sxv));
-		if (ssunlikely(v == NULL))
+		if (unlikely(v == NULL))
 			return NULL;
 	}
 	v->index = NULL;
@@ -6692,7 +6689,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	sr_seqlock(m->r->seq);
 	x->csn = m->csn;
 	x->id = sr_seqdo(m->r->seq, SR_TSNNEXT);
-	if (sslikely(vlsn == UINT64_MAX))
+	if (likely(vlsn == UINT64_MAX))
 		x->vlsn = sr_seqdo(m->r->seq, SR_LSN);
 	else
 		x->vlsn = vlsn;
@@ -6850,7 +6847,7 @@ static enum sxstate sx_rollback(struct sx *x)
 static inline int
 sx_preparecb(struct sx *x, struct svlogv *v, uint64_t lsn, sxpreparef prepare, void *arg)
 {
-	if (sslikely(lsn == x->vlsn))
+	if (likely(lsn == x->vlsn))
 		return 0;
 	if (prepare) {
 		struct sxindex *i = ((struct sxv*)v->v.v)->index;
@@ -6878,9 +6875,9 @@ static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 			break;
 		if (sx_vaborted(v))
 			return sx_promote(x, SXROLLBACK);
-		if (sslikely(v->prev == NULL)) {
+		if (likely(v->prev == NULL)) {
 			rc = sx_preparecb(x, lv, lsn, prepare, arg);
-			if (ssunlikely(rc != 0))
+			if (unlikely(rc != 0))
 				return sx_promote(x, SXROLLBACK);
 			continue;
 		}
@@ -6892,7 +6889,7 @@ static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 		/* force commit for read-only conflicts */
 		if (v->prev->v->flags & SVGET) {
 			rc = sx_preparecb(x, lv, lsn, prepare, arg);
-			if (ssunlikely(rc != 0))
+			if (unlikely(rc != 0))
 				return sx_promote(x, SXROLLBACK);
 			continue;
 		}
@@ -6961,7 +6958,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	}
 	/* allocate mvcc container */
 	struct sxv *v = sx_valloc(&m->pool, version);
-	if (ssunlikely(v == NULL)) {
+	if (unlikely(v == NULL)) {
 		ss_quota(r->quota, SS_QREMOVE, sv_vsize(version));
 		sv_vunref(r, version);
 		return -1;
@@ -6978,14 +6975,14 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	                  sv_vpointer(version),
 	                  version->size,
 	                  &n);
-	if (ssunlikely(rc == 0 && n)) {
+	if (unlikely(rc == 0 && n)) {
 		/* exists */
 	} else {
 		int pos = rc;
 		/* unique */
 		v->lo = sv_logcount(x->log);
 		rc = sv_logadd(x->log, r->a, &lv, index->ptr);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_oom(r->e);
 			goto error;
 		}
@@ -6996,9 +6993,9 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	/* match previous update made by current
 	 * transaction */
 	struct sxv *own = sx_vmatch(head, x->id);
-	if (ssunlikely(own))
+	if (unlikely(own))
 	{
-		if (ssunlikely(version->flags & SVUPSERT)) {
+		if (unlikely(version->flags & SVUPSERT)) {
 			sr_error(r->e, "%s", "only one upsert statement is "
 			         "allowed per a transaction key");
 			goto error;
@@ -7006,10 +7003,10 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 		/* replace old document with the new one */
 		lv.next = sv_logat(x->log, own->lo)->next;
 		v->lo = own->lo;
-		if (ssunlikely(sx_vaborted(own)))
+		if (unlikely(sx_vaborted(own)))
 			sx_vabort(v);
 		sx_vreplace(own, v);
-		if (sslikely(head == own))
+		if (likely(head == own))
 			ss_rbreplace(&index->i, &own->node, &v->node);
 		/* update log */
 		sv_logreplace(x->log, v->lo, &lv);
@@ -7021,7 +7018,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	/* update log */
 	v->lo = sv_logcount(x->log);
 	rc = sv_logadd(x->log, r->a, &lv, index->ptr);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_oom(r->e);
 		goto error;
 	}
@@ -7049,14 +7046,14 @@ static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv
 	struct sxv *v = sx_vmatch(head, x->id);
 	if (v == NULL)
 		goto add;
-	if (ssunlikely((v->v->flags & SVGET) > 0))
+	if (unlikely((v->v->flags & SVGET) > 0))
 		return 0;
-	if (ssunlikely((v->v->flags & SVDELETE) > 0))
+	if (unlikely((v->v->flags & SVDELETE) > 0))
 		return 2;
 	struct sv vv;
 	sv_init(&vv, &sv_vif, v->v, NULL);
 	struct svv *ret = sv_vdup(m->r, &vv);
-	if (ssunlikely(ret == NULL)) {
+	if (unlikely(ret == NULL)) {
 		rc = sr_oom(m->r->e);
 	} else {
 		sv_init(result, &sv_vif, ret, NULL);
@@ -7070,7 +7067,7 @@ add:
 	if (x->log_read == -1)
 		x->log_read = sv_logcount(x->log);
 	rc = sx_set(x, index, key->v);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	sv_vref((struct svv*)key->v);
 	return 0;
@@ -7101,10 +7098,10 @@ sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct sx *t, struct sx 
 		do {
 			struct sx *n = sx_find(m, v->id);
 			assert(n != NULL);
-			if (ssunlikely(n == t))
+			if (unlikely(n == t))
 				return 1;
 			int rc = sx_deadlock_in(m, mark, t, n);
-			if (ssunlikely(rc == 1))
+			if (unlikely(rc == 1))
 				return 1;
 			v = v->prev;
 		} while (v);
@@ -7140,7 +7137,7 @@ static int ssunused sx_deadlock(struct sx *t)
 		struct sx *p = sx_find(m, v->prev->id);
 		assert(p != NULL);
 		int rc = sx_deadlock_in(m, &mark, t, p);
-		if (ssunlikely(rc)) {
+		if (unlikely(rc)) {
 			sx_deadlock_unmark(&mark);
 			return 1;
 		}
@@ -7190,7 +7187,7 @@ struct sltx {
 
 static int sl_begin(struct runtime *r, struct sltx *t, uint64_t lsn)
 {
-	if (sslikely(lsn == 0)) {
+	if (likely(lsn == 0)) {
 		lsn = sr_seq(r->seq, SR_LSNNEXT);
 	} else {
 		sr_seqlock(r->seq);
@@ -7328,9 +7325,9 @@ struct sdpageiter {
 static inline void
 sd_pageiter_result(struct sdpageiter *i)
 {
-	if (ssunlikely(i->v == NULL))
+	if (unlikely(i->v == NULL))
 		return;
-	if (sslikely(i->r->fmt_storage == SF_RAW)) {
+	if (likely(i->r->fmt_storage == SF_RAW)) {
 		sv_init(&i->current, &sd_vif, i->v, i->page->h);
 		return;
 	}
@@ -7348,7 +7345,7 @@ sd_pageiter_end(struct sdpageiter *i)
 static inline int
 sd_pageiter_cmp(struct sdpageiter *i, struct runtime *r, struct sdv *v)
 {
-	if (sslikely(r->fmt_storage == SF_RAW)) {
+	if (likely(r->fmt_storage == SF_RAW)) {
 		return sf_compare(r->scheme, sd_pagepointer(i->page, v),
 		                  v->size, i->key, i->keysize);
 	}
@@ -7396,7 +7393,7 @@ sd_pageiter_chain_head(struct sdpageiter *i, int64_t pos)
 	/* find first non-duplicate key */
 	while (pos >= 0) {
 		struct sdv *v = sd_pagev(i->page, pos);
-		if (sslikely(! (v->flags & SVDUP))) {
+		if (likely(! (v->flags & SVDUP))) {
 			i->pos = pos;
 			i->v = v;
 			return;
@@ -7413,7 +7410,7 @@ sd_pageiter_chain_next(struct sdpageiter *i)
 	int64_t pos = i->pos + 1;
 	while (pos < i->page->h->count) {
 		struct sdv *v = sd_pagev(i->page, pos);
-		if (sslikely(! (v->flags & SVDUP))) {
+		if (likely(! (v->flags & SVDUP))) {
 			i->pos = pos;
 			i->v = v;
 			return;
@@ -7432,7 +7429,7 @@ sd_pageiter_gt(struct sdpageiter *i, int e)
 		return 0;
 	}
 	int64_t pos = sd_pageiter_search(i);
-	if (ssunlikely(pos >= i->page->h->count))
+	if (unlikely(pos >= i->page->h->count))
 		pos = i->page->h->count - 1;
 	sd_pageiter_chain_head(i, pos);
 	if (i->v == NULL)
@@ -7459,7 +7456,7 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 		return 0;
 	}
 	int64_t pos = sd_pageiter_search(i);
-	if (ssunlikely(pos >= i->page->h->count))
+	if (unlikely(pos >= i->page->h->count))
 		pos = i->page->h->count - 1;
 	sd_pageiter_chain_head(i, pos);
 	if (i->v == NULL)
@@ -7491,7 +7488,7 @@ sd_pageiter_open(struct ssiter *i, struct runtime *r, struct ssbuf *xfbuf, struc
 	pi->keysize = keysize;
 	pi->v       = NULL;
 	pi->pos     = 0;
-	if (ssunlikely(pi->page->h->count == 0)) {
+	if (unlikely(pi->page->h->count == 0)) {
 		sd_pageiter_end(pi);
 		return 0;
 	}
@@ -7526,7 +7523,7 @@ static inline void*
 sd_pageiter_of(struct ssiter *i)
 {
 	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
-	if (ssunlikely(pi->v == NULL))
+	if (unlikely(pi->v == NULL))
 		return NULL;
 	return &pi->current;
 }
@@ -7541,7 +7538,7 @@ sd_pageiter_next(struct ssiter *i)
 	case SS_GTE:
 	case SS_GT:
 		pi->pos++;
-		if (ssunlikely(pi->pos >= pi->page->h->count)) {
+		if (unlikely(pi->pos >= pi->page->h->count)) {
 			sd_pageiter_end(pi);
 			return;
 		}
@@ -7730,7 +7727,7 @@ sd_indexmax(struct sdindex *i) {
 static inline uint32_t
 sd_indexkeys(struct sdindex *i)
 {
-	if (ssunlikely(i->i.s == NULL))
+	if (unlikely(i->i.s == NULL))
 		return 0;
 	return sd_indexheader(i)->keys;
 }
@@ -7738,7 +7735,7 @@ sd_indexkeys(struct sdindex *i)
 static inline uint32_t
 sd_indextotal(struct sdindex *i)
 {
-	if (ssunlikely(i->i.s == NULL))
+	if (unlikely(i->i.s == NULL))
 		return 0;
 	return sd_indexheader(i)->total;
 }
@@ -7791,7 +7788,7 @@ sd_indexiter_route(struct sdindexiter *i)
 			end = mid;
 		}
 	}
-	if (ssunlikely(end >= (int)i->index->h->count))
+	if (unlikely(end >= (int)i->index->h->count))
 		end = i->index->h->count - 1;
 	return end;
 }
@@ -7807,7 +7804,7 @@ sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index, en
 	ii->keysize = keysize;
 	ii->v       = NULL;
 	ii->pos     = 0;
-	if (ssunlikely(ii->index->h->count == 1)) {
+	if (unlikely(ii->index->h->count == 1)) {
 		/* skip bootstrap node  */
 		if (ii->index->h->lsnmin == UINT64_MAX &&
 		    ii->index->h->lsnmax == 0)
@@ -7827,7 +7824,7 @@ sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index, en
 		ii->v = sd_indexpage(ii->index, ii->pos);
 		return 0;
 	}
-	if (sslikely(ii->index->h->count > 1))
+	if (likely(ii->index->h->count > 1))
 		ii->pos = sd_indexiter_route(ii);
 
 	struct sdindexpage *p = sd_indexpage(ii->index, ii->pos);
@@ -7849,7 +7846,7 @@ sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index, en
 		break;
 	default: assert(0);
 	}
-	if (ssunlikely(ii->pos == -1 ||
+	if (unlikely(ii->pos == -1 ||
 	               ii->pos >= (int)ii->index->h->count))
 		return 0;
 	ii->v = sd_indexpage(ii->index, ii->pos);
@@ -7889,10 +7886,10 @@ sd_indexiter_next(struct ssiter *i)
 		assert(0);
 		break;
 	}
-	if (ssunlikely(ii->pos < 0))
+	if (unlikely(ii->pos < 0))
 		ii->v = NULL;
 	else
-	if (ssunlikely(ii->pos >= (int)ii->index->h->count))
+	if (unlikely(ii->pos >= (int)ii->index->h->count))
 		ii->v = NULL;
 	else
 		ii->v = sd_indexpage(ii->index, ii->pos);
@@ -7934,15 +7931,15 @@ static inline int
 sd_sealvalidate(struct sdseal *s, struct sdindexheader *h)
 {
 	uint32_t crc = ss_crcs(s, sizeof(struct sdseal), 0);
-	if (ssunlikely(s->crc != crc))
+	if (unlikely(s->crc != crc))
 		return -1;
-	if (ssunlikely(h->crc != s->index_crc))
+	if (unlikely(h->crc != s->index_crc))
 		return -1;
-	if (ssunlikely(h->offset != s->index_offset))
+	if (unlikely(h->offset != s->index_offset))
 		return -1;
-	if (ssunlikely(! sr_versionstorage_check(&s->version)))
+	if (unlikely(! sr_versionstorage_check(&s->version)))
 		return -1;
-	if (ssunlikely(s->flags != SD_SEALED))
+	if (unlikely(s->flags != SD_SEALED))
 		return -1;
 	return 0;
 }
@@ -8026,7 +8023,7 @@ sd_censure(struct sdc *c, struct runtime *r, int count)
 	if (c->count < count) {
 		while (count-- >= 0) {
 			struct sdcbuf *b = ss_malloc(r->a, sizeof(struct sdcbuf));
-			if (ssunlikely(b == NULL))
+			if (unlikely(b == NULL))
 				return -1;
 			ss_bufinit(&b->a);
 			ss_bufinit(&b->b);
@@ -8109,11 +8106,11 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 
 	ss_bufreset(arg->buf);
 	int rc = ss_bufensure(arg->buf, r->a, ref->sizeorigin);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	ss_bufreset(arg->buf_xf);
 	rc = ss_bufensure(arg->buf_xf, r->a, arg->index->h->sizevmax);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 
 	i->reads++;
@@ -8124,10 +8121,10 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		char *page_pointer;
 		ss_bufreset(arg->buf_read);
 		rc = ss_bufensure(arg->buf_read, r->a, ref->size);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom(r->e);
 		rc = ss_filepread(arg->file, ref->offset, arg->buf_read->s, ref->size);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_error(r->e, "index file '%s' read error: %s",
 				 ss_pathof(&arg->file->path),
 				 strerror(errno));
@@ -8143,14 +8140,14 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		/* decompression */
 		struct ssfilter f;
 		rc = ss_filterinit(&f, (struct ssfilterif*)arg->compression_if, r->a, SS_FOUTPUT);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_error(r->e, "index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
 		}
 		int size = ref->size - sizeof(struct sdpageheader);
 		rc = ss_filternext(&f, arg->buf, page_pointer + sizeof(struct sdpageheader), size);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_error(r->e, "index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
@@ -8162,7 +8159,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 
 	/* default */
 	rc = ss_filepread(arg->file, ref->offset, arg->buf->s, ref->sizeorigin);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_error(r->e, "index file '%s' read error: %s",
 		         ss_pathof(&arg->file->path),
 		         strerror(errno));
@@ -8179,7 +8176,7 @@ sd_read_openpage(struct sdread *i, void *key, int keysize)
 	struct sdreadarg *arg = &i->ra;
 	assert(i->ref != NULL);
 	int rc = sd_read_page(i, i->ref);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_iterinit(sd_pageiter, arg->page_iter);
 	return ss_iteropen(sd_pageiter, arg->page_iter, arg->r,
@@ -8204,17 +8201,17 @@ sd_read_open(struct ssiter *iptr, struct sdreadarg *arg, void *key, int keysize)
 		return 0;
 	if (arg->has) {
 		assert(arg->o == SS_GTE);
-		if (sslikely(i->ref->lsnmax <= arg->has_vlsn)) {
+		if (likely(i->ref->lsnmax <= arg->has_vlsn)) {
 			i->ref = NULL;
 			return 0;
 		}
 	}
 	int rc = sd_read_openpage(i, key, keysize);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		i->ref = NULL;
 		return -1;
 	}
-	if (ssunlikely(! ss_iterhas(sd_pageiter, i->ra.page_iter))) {
+	if (unlikely(! ss_iterhas(sd_pageiter, i->ra.page_iter))) {
 		sd_read_next(iptr);
 		rc = 0;
 	}
@@ -8232,7 +8229,7 @@ static inline int
 sd_read_has(struct ssiter *iptr)
 {
 	struct sdread *i = (struct sdread*)iptr->priv;
-	if (ssunlikely(i->ref == NULL))
+	if (unlikely(i->ref == NULL))
 		return 0;
 	return ss_iterhas(sd_pageiter, i->ra.page_iter);
 }
@@ -8241,7 +8238,7 @@ static inline void*
 sd_read_of(struct ssiter *iptr)
 {
 	struct sdread *i = (struct sdread*)iptr->priv;
-	if (ssunlikely(i->ref == NULL))
+	if (unlikely(i->ref == NULL))
 		return NULL;
 	return ss_iterof(sd_pageiter, i->ra.page_iter);
 }
@@ -8250,18 +8247,18 @@ static inline void
 sd_read_next(struct ssiter *iptr)
 {
 	struct sdread *i = (struct sdread*)iptr->priv;
-	if (ssunlikely(i->ref == NULL))
+	if (unlikely(i->ref == NULL))
 		return;
 	ss_iternext(sd_pageiter, i->ra.page_iter);
 retry:
-	if (sslikely(ss_iterhas(sd_pageiter, i->ra.page_iter)))
+	if (likely(ss_iterhas(sd_pageiter, i->ra.page_iter)))
 		return;
 	ss_iternext(sd_indexiter, i->ra.index_iter);
 	i->ref = ss_iterof(sd_indexiter, i->ra.index_iter);
 	if (i->ref == NULL)
 		return;
 	int rc = sd_read_openpage(i, NULL, 0);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		i->ref = NULL;
 		return;
 	}
@@ -8378,7 +8375,7 @@ static inline void*
 sd_schemeiter_of(struct ssiter *i)
 {
 	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
-	if (ssunlikely(ci->p >= ci->c->buf.p))
+	if (unlikely(ci->p >= ci->c->buf.p))
 		return NULL;
 	return ci->p;
 }
@@ -8387,7 +8384,7 @@ static inline void
 sd_schemeiter_next(struct ssiter *i)
 {
 	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
-	if (ssunlikely(ci->p >= ci->c->buf.p))
+	if (unlikely(ci->p >= ci->c->buf.p))
 		return;
 	struct sdschemeopt *o = (struct sdschemeopt*)ci->p;
 	ci->p = (char*)o + sizeof(struct sdschemeopt) + o->size;
@@ -8482,7 +8479,7 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 			return sr_oom(r->e);
 	}
 	rc = ss_bufensure(&b->list, r->a, sizeof(struct sdbuildref));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct sdbuildref *ref =
 		(struct sdbuildref*)ss_bufat(&b->list, sizeof(struct sdbuildref), b->n);
@@ -8495,7 +8492,7 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	ref->c     = ss_bufused(&b->c);
 	ref->csize = 0;
 	rc = ss_bufensure(&b->m, r->a, sizeof(struct sdpageheader));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct sdpageheader *h = sd_buildheader(b);
 	memset(h, 0, sizeof(*h));
@@ -8540,7 +8537,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 		/* offset */
 		int rc;
 		rc = ss_bufensure(&b->v, r->a, sizeof(uint32_t));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom(r->e);
 		*(uint32_t*)b->v.p = offset;
 		ss_bufadvance(&b->v, sizeof(uint32_t));
@@ -8549,7 +8546,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 
 		/* copy field */
 		rc = ss_bufensure(&b->k, r->a, sizeof(uint32_t) + fieldsize);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom(r->e);
 		*(uint32_t*)b->k.p = fieldsize;
 		ss_bufadvance(&b->k, sizeof(uint32_t));
@@ -8559,7 +8556,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 		/* add field reference */
 		if (b->compress_dup) {
 			struct sdbuildkey *ref = ss_malloc(r->a, sizeof(struct sdbuildkey));
-			if (ssunlikely(ref == NULL))
+			if (unlikely(ref == NULL))
 				return sr_oom(r->e);
 			ref->offset = offset;
 			ref->offsetstart = offsetstart + sizeof(uint32_t);
@@ -8569,7 +8566,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 				field, fieldsize, hash, ref};
 			mh_int_t ins_pos = mh_strnptr_put(b->tracker, &strnode,
 							  NULL, NULL);
-			if (ssunlikely(ins_pos == mh_end(b->tracker)))
+			if (unlikely(ins_pos == mh_end(b->tracker)))
 				return sr_error(r->e, "%s",
 						"Can't insert assoc array item");
 		}
@@ -8582,7 +8579,7 @@ static inline int
 sd_buildadd_raw(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t size)
 {
 	int rc = ss_bufensure(&b->v, r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	memcpy(b->v.p, sv_pointer(v), size);
 	ss_bufadvance(&b->v, size);
@@ -8593,7 +8590,7 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 {
 	/* prepare document metadata */
 	int rc = ss_bufensure(&b->m, r->a, sizeof(struct sdv));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	uint64_t lsn = sv_lsn(v);
 	uint32_t size = sv_size(v);
@@ -8613,7 +8610,7 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 		rc = sd_buildadd_sparse(b, r, v);
 		break;
 	}
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	/* update page header */
 	h->count++;
@@ -8638,30 +8635,30 @@ sd_buildcompress(struct sdbuild *b, struct runtime *r)
 	assert(b->compress_if != &ss_nonefilter);
 	/* reserve header */
 	int rc = ss_bufensure(&b->c, r->a, sizeof(struct sdpageheader));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	ss_bufadvance(&b->c, sizeof(struct sdpageheader));
 	/* compression (including meta-data) */
 	struct sdbuildref *ref = sd_buildref(b);
 	struct ssfilter f;
 	rc = ss_filterinit(&f, b->compress_if, r->a, SS_FINPUT);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	rc = ss_filterstart(&f, &b->c);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filternext(&f, &b->c, b->m.s + ref->m + sizeof(struct sdpageheader),
 	                   ref->msize - sizeof(struct sdpageheader));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filternext(&f, &b->c, b->v.s + ref->v, ref->vsize);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filternext(&f, &b->c, b->k.s + ref->k, ref->ksize);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filtercomplete(&f, &b->c);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	ss_filterfree(&f);
 	return 0;
@@ -8681,7 +8678,7 @@ static int sd_buildend(struct sdbuild *b, struct runtime *r)
 	/* calculate data crc (non-compressed) */
 	struct sdpageheader *h = sd_buildheader(b);
 	uint32_t crc = 0;
-	if (sslikely(b->crc)) {
+	if (likely(b->crc)) {
 		crc = ss_crcp(b->m.s + ref->m, ref->msize, 0);
 		crc = ss_crcp(b->v.s + ref->v, ref->vsize, crc);
 		crc = ss_crcp(b->k.s + ref->k, ref->ksize, crc);
@@ -8690,7 +8687,7 @@ static int sd_buildend(struct sdbuild *b, struct runtime *r)
 	/* compression */
 	if (b->compress) {
 		int rc = sd_buildcompress(b, r);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		ref->csize = ss_bufused(&b->c) - ref->c;
 	}
@@ -8725,7 +8722,7 @@ static int sd_buildcommit(struct sdbuild *b, struct runtime *r)
 static int sd_indexbegin(struct sdindex *i, struct runtime *r)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexheader));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct sdindexheader *h = sd_indexheader(i);
 	sr_version_storage(&h->version);
@@ -8761,7 +8758,7 @@ static int sd_indexcommit(struct sdindex *i, struct runtime *r, struct sdid *id,
 		size_extension += qf->qf_table_size;
 	}
 	int rc = ss_bufensure(&i->i, r->a, size + size_extension);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	memcpy(i->i.p, i->v.s, size);
 	ss_bufadvance(&i->i, size);
@@ -8792,7 +8789,7 @@ sd_indexadd_raw(struct sdindex *i, struct runtime *r, struct sdindexpage *p, cha
 	p->sizemin = sf_comparable_size(r->scheme, min);
 	p->sizemax = sf_comparable_size(r->scheme, max);
 	int rc = ss_bufensure(&i->v, r->a, p->sizemin + p->sizemax);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	sf_comparable_write(r->scheme, min, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
@@ -8830,7 +8827,7 @@ sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, 
 	}
 	p->sizemin = sf_writesize(r->scheme, fields);
 	int rc = ss_bufensure(&i->v, r->a, p->sizemin);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	sf_write(r->scheme, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
@@ -8860,7 +8857,7 @@ sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, 
 	}
 	p->sizemax = sf_writesize(r->scheme, fields);
 	rc = ss_bufensure(&i->v, r->a, p->sizemax);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	sf_write(r->scheme, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemax);
@@ -8870,7 +8867,7 @@ sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, 
 static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *build, uint64_t offset)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexpage));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct sdpageheader *ph = sd_buildheader(build);
 
@@ -8889,7 +8886,7 @@ static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *bui
 	p->sizemax     = 0;
 
 	/* copy keys */
-	if (ssunlikely(ph->count > 0))
+	if (unlikely(ph->count > 0))
 	{
 		char *min = sd_buildminkey(build);
 		char *max = sd_buildmaxkey(build);
@@ -8901,7 +8898,7 @@ static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *bui
 			rc = sd_indexadd_sparse(i, r, build, p, min, max);
 			break;
 		}
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 
@@ -8929,7 +8926,7 @@ static int sd_indexcopy(struct sdindex *i, struct runtime *r, struct sdindexhead
 {
 	int size = sd_indexsize_ext(h);
 	int rc = ss_bufensure(&i->i, r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	memcpy(i->i.s, (char*)h, size);
 	ss_bufadvance(&i->i, size);
@@ -8961,7 +8958,7 @@ sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
 	m->resume    = 0;
 	if (conf->amqf) {
 		int rc = ss_qfensure(qf, r->a, conf->stream);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom(r->e);
 	}
 	sd_indexinit(&m->index);
@@ -8993,12 +8990,12 @@ sd_mergehas(struct sdmerge *m)
 
 static int sd_merge(struct sdmerge *m)
 {
-	if (ssunlikely(! ss_iterhas(sv_writeiter, &m->i)))
+	if (unlikely(! ss_iterhas(sv_writeiter, &m->i)))
 		return 0;
 	struct sdmergeconf *conf = m->conf;
 	sd_indexinit(&m->index);
 	int rc = sd_indexbegin(&m->index, m->r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	if (conf->amqf)
 		ss_qfreset(m->qf);
@@ -9023,7 +9020,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 	sd_buildreset(m->build, m->r);
 	if (m->resume) {
 		m->resume = 0;
-		if (ssunlikely(! sv_writeiter_resume(&m->i)))
+		if (unlikely(! sv_writeiter_resume(&m->i)))
 			return 0;
 	}
 	if (! sd_mergehas(m))
@@ -9033,7 +9030,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 	                   conf->compression_key,
 	                   conf->compression,
 	                   conf->compression_if);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	while (ss_iterhas(sv_writeiter, &m->i))
 	{
@@ -9042,7 +9039,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		if (sv_writeiter_is_duplicate(&m->i))
 			flags |= SVDUP;
 		rc = sd_buildadd(m->build, m->r, v, flags);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		if (conf->amqf) {
 			ss_qfadd(m->qf, sv_hash(v, m->r));
@@ -9050,10 +9047,10 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		ss_iternext(sv_writeiter, &m->i);
 	}
 	rc = sd_buildend(m->build, m->r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	rc = sd_indexadd(&m->index, m->r, m->build, offset);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	m->current = sd_indextotal(&m->index);
 	m->resume  = 1;
@@ -9105,13 +9102,13 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	char *pointer = (char*)next;
 
 	/* eof */
-	if (ssunlikely(pointer == eof)) {
+	if (unlikely(pointer == eof)) {
 		i->v = NULL;
 		return 0;
 	}
 
 	/* validate seal pointer */
-	if (ssunlikely(((pointer + sizeof(struct sdseal)) > eof))) {
+	if (unlikely(((pointer + sizeof(struct sdseal)) > eof))) {
 		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
@@ -9121,7 +9118,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	pointer = i->map.p + next->index_offset;
 
 	/* validate index pointer */
-	if (ssunlikely(((pointer + sizeof(struct sdindexheader)) > eof))) {
+	if (unlikely(((pointer + sizeof(struct sdindexheader)) > eof))) {
 		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
@@ -9143,7 +9140,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	/* validate index size */
 	char *end = pointer + sizeof(struct sdindexheader) + index->size +
 	            index->extension;
-	if (ssunlikely(end > eof)) {
+	if (unlikely(end > eof)) {
 		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
@@ -9153,7 +9150,7 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 
 	/* validate seal */
 	int rc = sd_sealvalidate(next, index);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
@@ -9173,14 +9170,14 @@ static int sd_recover_open(struct ssiter *i, struct runtime *r,
 	memset(ri, 0, sizeof(*ri));
 	ri->r = r;
 	ri->file = file;
-	if (ssunlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct sdindexheader)))) {
+	if (unlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct sdindexheader)))) {
 		sr_malfunction(ri->r->e, "corrupted index file '%s': bad size",
 		               ss_pathof(&ri->file->path));
 		ri->corrupt = 1;
 		return -1;
 	}
 	int rc = ss_vfsmmap(r->vfs, &ri->map, ri->file->fd, ri->file->size, 1);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(ri->r->e, "failed to mmap index file '%s': %s",
 		               ss_pathof(&ri->file->path),
 		               strerror(errno));
@@ -9188,7 +9185,7 @@ static int sd_recover_open(struct ssiter *i, struct runtime *r,
 	}
 	struct sdseal *seal = (struct sdseal*)((char*)ri->map.p);
 	rc = sd_recovernext_of(ri, seal);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		ss_vfsmunmap(r->vfs, &ri->map);
 	return rc;
 }
@@ -9218,7 +9215,7 @@ static void
 sd_recovernext(struct ssiter *i)
 {
 	struct sdrecover *ri = (struct sdrecover*)i->priv;
-	if (ssunlikely(ri->v == NULL))
+	if (unlikely(ri->v == NULL))
 		return;
 	struct sdseal *next =
 		(struct sdseal*)((char*)ri->v +
@@ -9238,9 +9235,9 @@ static struct ssiterif sd_recover =
 static int sd_recover_complete(struct ssiter *i)
 {
 	struct sdrecover *ri = (struct sdrecover*)i->priv;
-	if (ssunlikely(ri->seal == NULL))
+	if (unlikely(ri->seal == NULL))
 		return -1;
-	if (sslikely(ri->corrupt == 0))
+	if (likely(ri->corrupt == 0))
 		return  0;
 	/* truncate file to the end of a latest actual
 	 * index */
@@ -9251,7 +9248,7 @@ static int sd_recover_complete(struct ssiter *i)
 		       ri->actual->extension;
 	uint64_t file_size = eof - ri->map.p;
 	int rc = ss_fileresize(ri->file, file_size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	sr_errorreset(ri->r->e);
 	return 0;
@@ -9260,7 +9257,7 @@ static int sd_recover_complete(struct ssiter *i)
 static int sd_schemebegin(struct sdscheme *c, struct runtime *r)
 {
 	int rc = ss_bufensure(&c->buf, r->a, sizeof(struct sdschemeheader));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
 	memset(h, 0, sizeof(struct sdschemeheader));
@@ -9278,10 +9275,10 @@ sd_schemeadd(struct sdscheme *c, struct runtime *r, uint8_t id,
 		.size = size
 	};
 	int rc = ss_bufadd(&c->buf, r->a, &opt, sizeof(opt));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_bufadd(&c->buf, r->a, value, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
 	h->count++;
@@ -9292,7 +9289,7 @@ error:
 
 static int sd_schemecommit(struct sdscheme *c)
 {
-	if (ssunlikely(ss_bufused(&c->buf) == 0))
+	if (unlikely(ss_bufused(&c->buf) == 0))
 		return 0;
 	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
 	h->size = ss_bufused(&c->buf) - sizeof(struct sdschemeheader);
@@ -9306,18 +9303,18 @@ sd_schemewrite(struct sdscheme *c, struct runtime *r, char *path, int sync)
 	struct ssfile meta;
 	ss_fileinit(&meta, r->vfs);
 	int rc = ss_filenew(&meta, path);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filewrite(&meta, c->buf.s, ss_bufused(&c->buf));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	if (sync) {
 		rc = ss_filesync(&meta);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 	}
 	rc = ss_fileclose(&meta);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	return 0;
 error:
@@ -9331,25 +9328,25 @@ static int
 sd_schemerecover(struct sdscheme *c, struct runtime *r, char *path)
 {
 	ssize_t size = ss_vfssize(r->vfs, path);
-	if (ssunlikely(size == -1))
+	if (unlikely(size == -1))
 		goto error;
-	if (ssunlikely((unsigned int)size < sizeof(struct sdschemeheader))) {
+	if (unlikely((unsigned int)size < sizeof(struct sdschemeheader))) {
 		sr_error(r->e, "scheme file '%s' is corrupted", path);
 		return -1;
 	}
 	int rc = ss_bufensure(&c->buf, r->a, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom(r->e);
 	struct ssfile meta;
 	ss_fileinit(&meta, r->vfs);
 	rc = ss_fileopen(&meta, path);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_filepread(&meta, 0, c->buf.s, size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = ss_fileclose(&meta);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	ss_bufadvance(&c->buf, size);
 	return 0;
@@ -9427,7 +9424,7 @@ sd_writeseal(struct runtime *r, struct ssfile *file, struct ssblob *blob)
 	             seal.crc++); /* corrupt seal */
 	int rc;
 	rc = ss_filewrite(file, &seal, sizeof(seal));
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
@@ -9435,7 +9432,7 @@ sd_writeseal(struct runtime *r, struct ssfile *file, struct ssblob *blob)
 	}
 	if (blob) {
 		rc = ss_blobadd(blob, &seal, sizeof(seal));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 	}
 	return 0;
@@ -9463,7 +9460,7 @@ sd_writepage(struct runtime *r, struct ssfile *file, struct ssblob *blob,
 	}
 	int rc;
 	rc = ss_filewritev(file, &iov);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
@@ -9474,7 +9471,7 @@ sd_writepage(struct runtime *r, struct ssfile *file, struct ssblob *blob,
 		while (i < iov.iovc) {
 			struct iovec *v = &iovv[i];
 			rc = ss_blobadd(blob, v->iov_base, v->iov_len);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return sr_oom_malfunction(r->e);
 			i++;
 		}
@@ -9488,7 +9485,7 @@ sd_writeindex(struct runtime *r, struct ssfile *file,
 {
 	int rc;
 	rc = ss_filewrite(file, index->i.s, ss_bufused(&index->i));
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
@@ -9496,7 +9493,7 @@ sd_writeindex(struct runtime *r, struct ssfile *file,
 	}
 	if (blob) {
 		rc = ss_blobadd(blob, index->i.s, ss_bufused(&index->i));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 	}
 	return 0;
@@ -9509,7 +9506,7 @@ sd_seal(struct runtime *r, struct ssfile *file, struct ssblob *blob, struct sdin
 	sd_sealset_close(&seal, index->h);
 	int rc;
 	rc = ss_filepwrite(file, offset, &seal, sizeof(seal));
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
@@ -9578,7 +9575,7 @@ static inline struct sibranch*
 si_branchnew(struct runtime *r)
 {
 	struct sibranch *b = (struct sibranch*)ss_malloc(r->a, sizeof(struct sibranch));
-	if (ssunlikely(b == NULL)) {
+	if (unlikely(b == NULL)) {
 		sr_oom_malfunction(r->e);
 		return NULL;
 	}
@@ -9721,7 +9718,7 @@ si_nodeindex(struct sinode *node) {
 static inline struct svindex*
 si_nodeindex_priority(struct sinode *node, struct svindex **second)
 {
-	if (ssunlikely(node->flags & SI_ROTATE)) {
+	if (unlikely(node->flags & SI_ROTATE)) {
 		*second = &node->i0;
 		return &node->i1;
 	}
@@ -9946,7 +9943,7 @@ static inline void
 si_lru_add(struct si *i, struct svref *ref)
 {
 	i->lru_intr_sum += ref->v->size;
-	if (ssunlikely(i->lru_intr_sum >= i->scheme.lru_step))
+	if (unlikely(i->lru_intr_sum >= i->scheme.lru_step))
 	{
 		uint64_t lsn = sr_seq(i->r.seq, SR_LSN);
 		i->lru_v += (lsn - i->lru_intr_lsn);
@@ -9961,7 +9958,7 @@ si_lru_vlsn_of(struct si *i)
 {
 	assert(i->scheme.lru_step != 0);
 	uint64_t size = i->size;
-	if (sslikely(size <= i->scheme.lru))
+	if (likely(size <= i->scheme.lru))
 		return 0;
 	uint64_t lru_v = i->lru_v;
 	uint64_t lru_steps = i->lru_steps;
@@ -9975,7 +9972,7 @@ si_lru_vlsn_of(struct si *i)
 static inline uint64_t
 si_lru_vlsn(struct si *i)
 {
-	if (sslikely(i->scheme.lru == 0))
+	if (likely(i->scheme.lru == 0))
 		return 0;
 	si_lock(i);
 	int rc = si_lru_vlsn_of(i);
@@ -10066,7 +10063,7 @@ si_cacheadd(struct sicache *c, struct sibranch *b)
 {
 	struct sicachebranch *nb =
 		ss_malloc(c->pool->r->a, sizeof(struct sicachebranch));
-	if (ssunlikely(nb == NULL))
+	if (unlikely(nb == NULL))
 		return NULL;
 	nb->branch  = b;
 	nb->ref     = NULL;
@@ -10082,9 +10079,9 @@ si_cacheadd(struct sicache *c, struct sibranch *b)
 static inline int
 si_cachevalidate(struct sicache *c, struct sinode *n)
 {
-	if (sslikely(c->node == n && c->nsn == n->self.id.id))
+	if (likely(c->node == n && c->nsn == n->self.id.id))
 	{
-		if (sslikely(n->branch_count == c->count)) {
+		if (likely(n->branch_count == c->count)) {
 			c->branch = c->path;
 			return 0;
 		}
@@ -10102,7 +10099,7 @@ si_cachevalidate(struct sicache *c, struct sinode *n)
 				break;
 			}
 			struct sicachebranch *nb = si_cacheadd(c, b);
-			if (ssunlikely(nb == NULL))
+			if (unlikely(nb == NULL))
 				return -1;
 			if (! head)
 				head = nb;
@@ -10141,7 +10138,7 @@ si_cachevalidate(struct sicache *c, struct sinode *n)
 	}
 	while (b) {
 		cb = si_cacheadd(c, b);
-		if (ssunlikely(cb == NULL))
+		if (unlikely(cb == NULL))
 			return -1;
 		if (last)
 			last->next = cb;
@@ -10163,7 +10160,7 @@ si_cacheseek(struct sicache *c, struct sibranch *seek)
 	while (c->branch) {
 		struct sicachebranch *cb = c->branch;
 		c->branch = c->branch->next;
-		if (sslikely(cb->branch == seek))
+		if (likely(cb->branch == seek))
 			return cb;
 	}
 	return NULL;
@@ -10175,7 +10172,7 @@ si_cachefollow(struct sicache *c, struct sibranch *seek)
 	while (c->branch) {
 		struct sicachebranch *cb = c->branch;
 		c->branch = c->branch->next;
-		if (sslikely(cb->branch == seek))
+		if (likely(cb->branch == seek))
 			return cb;
 	}
 	return NULL;
@@ -10206,7 +10203,7 @@ static inline struct sicache*
 si_cachepool_pop(struct sicachepool *p)
 {
 	struct sicache *c;
-	if (sslikely(p->n > 0)) {
+	if (likely(p->n > 0)) {
 		c = p->head;
 		p->head = c->next;
 		p->n--;
@@ -10215,7 +10212,7 @@ si_cachepool_pop(struct sicachepool *p)
 		return c;
 	}
 	c = ss_malloc(p->r->a, sizeof(struct sicache));
-	if (ssunlikely(c == NULL))
+	if (unlikely(c == NULL))
 		return NULL;
 	si_cacheinit(c, p);
 	return c;
@@ -10304,11 +10301,11 @@ si_iter_open(struct ssiter *i, struct runtime *r,
 	ii->keysize = keysize;
 	ii->v       = NULL;
 	int eq = 0;
-	if (ssunlikely(ii->index->n == 1)) {
+	if (unlikely(ii->index->n == 1)) {
 		ii->v = ss_rbmin(&ii->index->i);
 		return 1;
 	}
-	if (ssunlikely(ii->key == NULL)) {
+	if (unlikely(ii->key == NULL)) {
 		switch (ii->order) {
 		case SS_LT:
 		case SS_LTE:
@@ -10328,7 +10325,7 @@ si_iter_open(struct ssiter *i, struct runtime *r,
 	assert(ii->key != NULL);
 	int rc;
 	rc = si_itermatch(&ii->index->i, r->scheme, ii->key, ii->keysize, &ii->v);
-	if (ssunlikely(ii->v == NULL)) {
+	if (unlikely(ii->v == NULL)) {
 		assert(rc != 0);
 		if (rc == 1)
 			ii->v = ss_rbmin(&ii->index->i);
@@ -10338,7 +10335,7 @@ si_iter_open(struct ssiter *i, struct runtime *r,
 		eq = rc == 0 && ii->v;
 		if (rc == 1) {
 			ii->v = ss_rbprev(&ii->index->i, ii->v);
-			if (ssunlikely(ii->v == NULL))
+			if (unlikely(ii->v == NULL))
 				ii->v = ss_rbmin(&ii->index->i);
 		}
 	}
@@ -10361,7 +10358,7 @@ static inline void*
 si_iter_of(struct ssiter *i)
 {
 	struct siiter *ii = (struct siiter*)i->priv;
-	if (ssunlikely(ii->v == NULL))
+	if (unlikely(ii->v == NULL))
 		return NULL;
 	struct sinode *n = si_nodeof(ii->v);
 	return n;
@@ -10516,12 +10513,12 @@ static int si_profiler(struct siprofiler*);
 static struct si *si_init(struct runtime *r, struct phia_index *db)
 {
 	struct si *i = ss_malloc(r->a, sizeof(struct si));
-	if (ssunlikely(i == NULL))
+	if (unlikely(i == NULL))
 		return NULL;
 	i->r = *r;
 	sr_statusinit(&i->status);
 	int rc = si_plannerinit(&i->p, r->a, i);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		ss_free(r->a, i);
 		return NULL;
 	}
@@ -10567,7 +10564,7 @@ static int si_close(struct si *i)
 	struct sinode *node, *n;
 	rlist_foreach_entry_safe(node, &i->gc, gc, n) {
 		rc = si_nodefree(node, &i->r, 1);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			rc_ret = -1;
 	}
 	rlist_create(&i->gc);
@@ -10713,7 +10710,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 	struct svmerge vmerge;
 	sv_mergeinit(&vmerge);
 	rc = sv_mergeprepare(&vmerge, r, 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
 	ss_iterinit(sv_indexiter, &s->src);
@@ -10741,7 +10738,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 	struct sdmerge merge;
 	rc = sd_mergeinit(&merge, r, &i, &c->build, &c->qf,
 	                  &c->upsert, &mergeconf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 
 	while ((rc = sd_merge(&merge)) > 0)
@@ -10751,7 +10748,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		/* write open seal */
 		uint64_t seal = parent->file.size;
 		rc = sd_writeseal(r, &parent->file, NULL);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 
 		/* write pages */
@@ -10759,11 +10756,11 @@ si_branchcreate(struct si *index, struct sdc *c,
 		while ((rc = sd_mergepage(&merge, offset)) == 1)
 		{
 			rc = sd_writepage(r, &parent->file, NULL, merge.build);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				goto e0;
 			offset = parent->file.size;
 		}
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 		struct sdid id = {
 			.parent = parent->self.id.id,
@@ -10771,16 +10768,16 @@ si_branchcreate(struct si *index, struct sdc *c,
 			.id     = sr_seq(r->seq, SR_NSNNEXT)
 		};
 		rc = sd_mergecommit(&merge, &id, parent->file.size);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 
 		/* write index */
 		rc = sd_writeindex(r, &parent->file, NULL, &merge.index);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync) {
 			rc = ss_filesync(&parent->file);
-			if (ssunlikely(rc == -1)) {
+			if (unlikely(rc == -1)) {
 				sr_malfunction(r->e, "file '%s' sync error: %s",
 				               ss_pathof(&parent->file.path),
 				               strerror(errno));
@@ -10795,11 +10792,11 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		/* seal the branch */
 		rc = sd_seal(r, &parent->file, NULL, &merge.index, seal);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync == 2) {
 			rc = ss_filesync(&parent->file);
-			if (ssunlikely(rc == -1)) {
+			if (unlikely(rc == -1)) {
 				sr_malfunction(r->e, "file '%s' sync error: %s",
 				               ss_pathof(&parent->file.path),
 				               strerror(errno));
@@ -10809,20 +10806,20 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		/* create new branch object */
 		branch = si_branchnew(r);
-		if (ssunlikely(branch == NULL))
+		if (unlikely(branch == NULL))
 			goto e0;
 		si_branchset(branch, &merge.index);
 	}
 	sv_mergefree(&vmerge, r->a);
 
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_oom_malfunction(r->e);
 		goto e0;
 	}
 
 	/* in case of expire, branch may not be created if there
 	 * are no keys left */
-	if (ssunlikely(branch == NULL))
+	if (unlikely(branch == NULL))
 		return 0;
 
 	*result = branch;
@@ -10841,7 +10838,7 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 	assert(n->flags & SI_LOCK);
 
 	si_lock(index);
-	if (ssunlikely(n->used == 0)) {
+	if (unlikely(n->used == 0)) {
 		si_nodeunlock(n);
 		si_unlock(index);
 		return 0;
@@ -10852,9 +10849,9 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 
 	struct sibranch *branch = NULL;
 	int rc = si_branchcreate(index, c, n, i, vlsn, &branch);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
-	if (ssunlikely(branch == NULL)) {
+	if (unlikely(branch == NULL)) {
 		si_lock(index);
 		uint32_t used = sv_indexused(i);
 		n->used -= used;
@@ -10904,12 +10901,12 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	/* prepare for compaction */
 	int rc;
 	rc = sd_censure(c, r, node->branch_count);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return sr_oom_malfunction(r->e);
 	struct svmerge merge;
 	sv_mergeinit(&merge);
 	rc = sv_mergeprepare(&merge, r, node->branch_count + 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 
 	/* include vindex into merge process */
@@ -10953,7 +10950,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 		};
 		ss_iterinit(sd_read, &s->src);
 		int rc = ss_iteropen(sd_read, &s->src, &arg, NULL, 0);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 		size_stream += sd_indextotal(&b->index);
 		count += sd_indexkeys(&b->index);
@@ -10976,7 +10973,7 @@ si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
 	struct sinode *node = plan->node;
 
 	si_lock(index);
-	if (ssunlikely(node->used == 0)) {
+	if (unlikely(node->used == 0)) {
 		si_nodeunlock(node);
 		si_unlock(index);
 		return 0;
@@ -11007,11 +11004,11 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 		if (de->d_name[0] == '.')
 			continue;
 		/* skip drop file */
-		if (ssunlikely(strcmp(de->d_name, "drop") == 0))
+		if (unlikely(strcmp(de->d_name, "drop") == 0))
 			continue;
 		snprintf(path, sizeof(path), "%s/%s", repo, de->d_name);
 		rc = ss_vfsunlink(r->vfs, path);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_malfunction(r->e, "index file '%s' unlink error: %s",
 			               path, strerror(errno));
 			closedir(dir);
@@ -11022,14 +11019,14 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 
 	snprintf(path, sizeof(path), "%s/drop", repo);
 	rc = ss_vfsunlink(r->vfs, path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' unlink error: %s",
 		               path, strerror(errno));
 		return -1;
 	}
 	if (drop_directory) {
 		rc = ss_vfsrmdir(r->vfs, repo);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_malfunction(r->e, "directory '%s' unlink error: %s",
 			               repo, strerror(errno));
 			return -1;
@@ -11046,7 +11043,7 @@ static int si_dropmark(struct si *i)
 	struct ssfile drop;
 	ss_fileinit(&drop, i->r.vfs);
 	int rc = ss_filenew(&drop, path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(i->r.e, "drop file '%s' create error: %s",
 		               path, strerror(errno));
 		return -1;
@@ -11064,7 +11061,7 @@ static int si_drop(struct si *i)
 	/* drop file must exists at this point */
 	/* shutdown */
 	int rc = si_close(i);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	/* remove directory */
 	rc = si_droprepository(&r, path.path, 1);
@@ -11115,11 +11112,11 @@ si_redistribute(struct si *index, struct runtime *r, struct sdc *c, struct sinod
 	{
 		struct sv *v = ss_iterof(sv_indexiter, &i);
 		int rc = ss_bufadd(&c->b, r->a, &v->v, sizeof(struct svref**));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 		ss_iternext(sv_indexiter, &i);
 	}
-	if (ssunlikely(ss_bufused(&c->b) == 0))
+	if (unlikely(ss_bufused(&c->b) == 0))
 		return 0;
 	ss_iterinit(ss_bufiterref, &i);
 	ss_iteropen(ss_bufiterref, &i, &c->b, sizeof(struct svref*));
@@ -11149,12 +11146,12 @@ si_redistribute(struct si *index, struct runtime *r, struct sdc *c, struct sinod
 			int rc = sf_compare(r->scheme, sv_vpointer(v->v), v->v->size,
 			                    sd_indexpage_min(&p->self.index, page),
 			                    page->sizemin);
-			if (ssunlikely(rc >= 0))
+			if (unlikely(rc >= 0))
 				break;
 			sv_indexset(&prev->i0, r, v);
 			ss_iternext(ss_bufiterref, &i);
 		}
-		if (ssunlikely(! ss_iterhas(ss_bufiterref, &i)))
+		if (unlikely(! ss_iterhas(ss_bufiterref, &i)))
 			break;
 		prev = p;
 		ss_iternext(ss_bufiterref, &j);
@@ -11192,11 +11189,11 @@ si_redistribute_index(struct si *index, struct runtime *r, struct sdc *c, struct
 	while (ss_iterhas(sv_indexiter, &i)) {
 		struct sv *v = ss_iterof(sv_indexiter, &i);
 		int rc = ss_bufadd(&c->b, r->a, &v->v, sizeof(struct svref**));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 		ss_iternext(sv_indexiter, &i);
 	}
-	if (ssunlikely(ss_bufused(&c->b) == 0))
+	if (unlikely(ss_bufused(&c->b) == 0))
 		return 0;
 	uint64_t now = clock_monotonic64();
 	ss_iterinit(ss_bufiterref, &i);
@@ -11255,13 +11252,13 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 	struct sinode *n = NULL;
 	struct sdmerge merge;
 	rc = sd_mergeinit(&merge, r, i, &c->build, &c->qf, &c->upsert, &mergeconf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	while ((rc = sd_merge(&merge)) > 0)
 	{
 		/* create new node */
 		n = si_nodenew(r);
-		if (ssunlikely(n == NULL))
+		if (unlikely(n == NULL))
 			goto error;
 		struct sdid id = {
 			.parent = parent->self.id.id,
@@ -11269,7 +11266,7 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			.id     = sr_seq(index->r.seq, SR_NSNNEXT)
 		};
 		rc = si_nodecreate(n, r, &index->scheme, &id);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 		n->branch = &n->self;
 		n->branch_count++;
@@ -11278,50 +11275,50 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 		/* write open seal */
 		uint64_t seal = n->file.size;
 		rc = sd_writeseal(r, &n->file, blob);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 
 		/* write pages */
 		uint64_t offset = n->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1) {
 			rc = sd_writepage(r, &n->file, blob, merge.build);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				goto error;
 			offset = n->file.size;
 		}
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 
 		rc = sd_mergecommit(&merge, &id, n->file.size);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 
 		/* write index */
 		rc = sd_writeindex(r, &n->file, blob, &merge.index);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 
 		/* update seal */
 		rc = sd_seal(r, &n->file, blob, &merge.index, seal);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto error;
 
 		/* in-memory mode */
 		if (blob) {
 			rc = ss_blobfit(blob);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				goto error;
 		}
 		/* add node to the list */
 		rc = ss_bufadd(result, index->r.a, &n, sizeof(struct sinode*));
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_oom_malfunction(index->r.e);
 			goto error;
 		}
 
 		si_branchset(&n->self, &merge.index);
 	}
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	return 0;
 error:
@@ -11357,7 +11354,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	              n_stream,
 	              vlsn,
 	              vlsn_lru);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 
 	SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_0,
@@ -11375,13 +11372,13 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	si_unlock(index);
 
 	struct sinode *n;
-	if (ssunlikely(count == 0 && count_index == 1))
+	if (unlikely(count == 0 && count_index == 1))
 	{
 		n = si_bootstrap(index, node->self.id.id);
-		if (ssunlikely(n == NULL))
+		if (unlikely(n == NULL))
 			return -1;
 		rc = ss_bufadd(result, r->a, &n, sizeof(struct sinode*));
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_oom_malfunction(r->e);
 			si_nodefree(n, r, 1);
 			return -1;
@@ -11413,7 +11410,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 		break;
 	default: /* split */
 		rc = si_redistribute(index, r, c, node, result);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			si_unlock(index);
 			si_splitfree(result, r);
 			return -1;
@@ -11453,7 +11450,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	{
 		n  = ss_iterof(ss_bufiterref, &i);
 		rc = si_nodeseal(n, r, &index->scheme);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			si_nodefree(node, r, 0);
 			return -1;
 		}
@@ -11471,9 +11468,9 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 
 	/* gc node */
 	uint16_t refs = si_noderefof(node);
-	if (sslikely(refs == 0)) {
+	if (likely(refs == 0)) {
 		rc = si_nodefree(node, r, 1);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	} else {
 		/* node concurrently being read, schedule for
@@ -11496,7 +11493,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	{
 		n = ss_iterof(ss_bufiterref, &i);
 		rc = si_nodecomplete(n, r, &index->scheme);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 		SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_4,
 		             sr_malfunction(r->e, "%s", "error injection");
@@ -11521,7 +11518,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 static struct sinode *si_nodenew(struct runtime *r)
 {
 	struct sinode *n = (struct sinode*)ss_malloc(r->a, sizeof(struct sinode));
-	if (ssunlikely(n == NULL)) {
+	if (unlikely(n == NULL)) {
 		sr_oom_malfunction(r->e);
 		return NULL;
 	}
@@ -11567,7 +11564,7 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 	int rcret = 0;
 
 	int rc = ss_fileclose(&n->file);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' close error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -11601,13 +11598,13 @@ si_noderecover(struct sinode *n, struct runtime *r)
 			b = &n->self;
 		} else {
 			b = si_branchnew(r);
-			if (ssunlikely(b == NULL))
+			if (unlikely(b == NULL))
 				goto e0;
 		}
 		struct sdindex index;
 		sd_indexinit(&index);
 		rc = sd_indexcopy(&index, r, h);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e0;
 		si_branchset(b, &index);
 
@@ -11619,7 +11616,7 @@ si_noderecover(struct sinode *n, struct runtime *r)
 		ss_iteratornext(&i);
 	}
 	rc = sd_recover_complete(&i);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	ss_iteratorclose(&i);
 
@@ -11636,7 +11633,7 @@ static int
 si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 {
 	int rc = ss_fileopen(&n->file, path->path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' open error: %s "
 		               "(please ensure storage version compatibility)",
 		               ss_pathof(&n->file.path),
@@ -11644,14 +11641,14 @@ si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 		return -1;
 	}
 	rc = ss_fileseek(&n->file, n->file.size);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' seek error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
 	}
 	rc = si_noderecover(n, r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
@@ -11664,7 +11661,7 @@ si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
 	ss_pathcompound(&path, scheme->path, id->parent, id->id,
 	                ".index.incomplete");
 	int rc = ss_filenew(&n->file, path.path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' create error: %s",
 		               path.path, strerror(errno));
 		return -1;
@@ -11693,7 +11690,7 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 	if (gc && ss_pathis_set(&n->file.path)) {
 		ss_fileadvise(&n->file, 0, 0, n->file.size);
 		rc = ss_vfsunlink(r->vfs, ss_pathof(&n->file.path));
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_malfunction(r->e, "index file '%s' unlink error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
@@ -11702,7 +11699,7 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 	}
 	si_nodefree_branches(n, r);
 	rc = si_nodeclose(n, r, gc);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		rcret = -1;
 	ss_free(r->a, n);
 	return rcret;
@@ -11713,7 +11710,7 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 	int rc;
 	if (scheme->sync) {
 		rc = ss_filesync(&n->file);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_malfunction(r->e, "index file '%s' sync error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
@@ -11725,7 +11722,7 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 	                n->self.id.parent, n->self.id.id,
 	                ".index.seal");
 	rc = ss_filerename(&n->file, path.path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -11740,7 +11737,7 @@ si_nodecomplete(struct sinode *n, struct runtime *r, struct sischeme *scheme)
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".index");
 	int rc = ss_filerename(&n->file, path.path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -11753,7 +11750,7 @@ static int si_nodegc(struct sinode *n, struct runtime *r, struct sischeme *schem
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".index.gc");
 	int rc = ss_filerename(&n->file, path.path);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction(r->e, "index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -11775,16 +11772,16 @@ static int si_planinit(struct siplan *p)
 static int si_plannerinit(struct siplanner *p, struct ssa *a, void *i)
 {
 	int rc = ss_rqinit(&p->compact, a, 1, 20);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	/* 1Mb step up to 4Gb */
 	rc = ss_rqinit(&p->branch, a, 1024 * 1024, 4000);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		ss_rqfree(&p->compact, a);
 		return -1;
 	}
 	rc = ss_rqinit(&p->temp, a, 1, 100);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		ss_rqfree(&p->compact, a);
 		ss_rqfree(&p->branch, a);
 		return -1;
@@ -12007,7 +12004,7 @@ si_plannerpeek_gc(struct siplanner *p, struct siplan *plan)
 	while ((pn = ss_rqprev(&p->compact, pn))) {
 		n = container_of(pn, struct sinode, nodecompact);
 		struct sdindexheader *h = n->self.index.h;
-		if (sslikely(h->dupkeys == 0) || (h->dupmin >= plan->a))
+		if (likely(h->dupkeys == 0) || (h->dupmin >= plan->a))
 			continue;
 		uint32_t used = (h->dupkeys * 100) / h->keys;
 		if (used >= plan->b) {
@@ -12032,11 +12029,11 @@ static inline int
 si_plannerpeek_lru(struct siplanner *p, struct siplan *plan)
 {
 	struct si *index = p->i;
-	if (sslikely(! index->scheme.lru))
+	if (likely(! index->scheme.lru))
 		return 0;
 	if (! index->lru_run_lsn) {
 		index->lru_run_lsn = si_lru_vlsn_of(index);
-		if (sslikely(index->lru_run_lsn == 0))
+		if (likely(index->lru_run_lsn == 0))
 			return 0;
 	}
 	int rc_inprogress = 0;
@@ -12089,12 +12086,12 @@ static inline int
 si_plannerpeek_nodegc(struct siplanner *p, struct siplan *plan)
 {
 	struct si *index = p->i;
-	if (sslikely(index->gc_count == 0))
+	if (likely(index->gc_count == 0))
 		return 0;
 	int rc_inprogress = 0;
 	struct sinode *n;
 	rlist_foreach_entry(n, &index->gc, gc) {
-		if (sslikely(si_noderefof(n) == 0)) {
+		if (likely(si_noderefof(n) == 0)) {
 			rlist_del(&n->gc);
 			index->gc_count--;
 			plan->explain = SI_ENONE;
@@ -12338,12 +12335,12 @@ static inline int
 si_readdup(struct siread *q, struct sv *result)
 {
 	struct svv *v;
-	if (sslikely(result->i == &sv_vif)) {
+	if (likely(result->i == &sv_vif)) {
 		v = result->v;
 		sv_vref(v);
 	} else {
 		v = sv_vdup(q->r, result);
-		if (ssunlikely(v == NULL))
+		if (unlikely(v == NULL))
 			return sr_oom(q->r->e);
 	}
 	sv_init(&q->result, &sv_vif, v, NULL);
@@ -12365,7 +12362,7 @@ si_readstat(struct siread *q, int cache, struct sinode *n, uint32_t reads)
 	if (i->scheme.temperature) {
 		n->temperature_reads += reads;
 		uint64_t total = i->read_disk + i->read_cache;
-		if (ssunlikely(total == 0))
+		if (unlikely(total == 0))
 			return;
 		n->temperature = (n->temperature_reads * 100ULL) / total;
 		si_plannerupdate(&q->index->p, SI_TEMP, n);
@@ -12379,7 +12376,7 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 	if (compare) {
 		rc = sf_compare(q->r->scheme, sv_pointer(v), sv_size(v),
 		                q->key, q->keysize);
-		if (ssunlikely(rc != 0))
+		if (unlikely(rc != 0))
 			return 0;
 	}
 	if (q->prefix) {
@@ -12387,15 +12384,15 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 		                      q->prefix,
 		                      q->prefixsize,
 		                      sv_pointer(v), sv_size(v));
-		if (ssunlikely(! rc))
+		if (unlikely(! rc))
 			return 0;
 	}
-	if (ssunlikely(q->has))
+	if (unlikely(q->has))
 		return sv_lsn(v) > q->vlsn;
-	if (ssunlikely(sv_is(v, SVDELETE)))
+	if (unlikely(sv_is(v, SVDELETE)))
 		return 2;
 	rc = si_readdup(q, v);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 1;
 }
@@ -12415,7 +12412,7 @@ si_getindex(struct siread *q, struct sinode *n)
 			goto result;
 		}
 	}
-	if (sslikely(second == NULL || !second->count))
+	if (likely(second == NULL || !second->count))
 		return 0;
 	rc = ss_iteropen(sv_indexiter, &i, q->r, second,
 	                 SS_GTE, q->key, q->keysize);
@@ -12427,7 +12424,7 @@ result:;
 	struct sv *v = ss_iterof(sv_indexiter, &i);
 	assert(v != NULL);
 	struct svref *visible = v->v;
-	if (sslikely(! q->has)) {
+	if (likely(! q->has)) {
 		visible = sv_refvisible(visible, q->vlsn);
 		if (visible == NULL)
 			return 0;
@@ -12446,7 +12443,7 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	int rc;
 	if (scheme->amqf) {
 		rc = si_amqfhas_branch(q->r, b, q->key);
-		if (sslikely(! rc))
+		if (likely(! rc))
 			return 0;
 	}
 	/* choose compression type */
@@ -12479,7 +12476,7 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	rc = ss_iteropen(sd_read, &c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
 	si_readstat(q, 0, n, reads);
-	if (ssunlikely(rc <= 0))
+	if (unlikely(rc <= 0))
 		return rc;
 	/* prepare sources */
 	sv_mergereset(&q->merge);
@@ -12488,13 +12485,13 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	ss_iterinit(sv_mergeiter, &i);
 	ss_iteropen(sv_mergeiter, &i, q->r, &q->merge, SS_GTE);
 	uint64_t vlsn = q->vlsn;
-	if (ssunlikely(q->has))
+	if (unlikely(q->has))
 		vlsn = UINT64_MAX;
 	struct ssiter j;
 	ss_iterinit(sv_readiter, &j);
 	ss_iteropen(sv_readiter, &j, q->r, &i, &q->index->u, vlsn, 1);
 	struct sv *v = ss_iterof(sv_readiter, &j);
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return 0;
 	return si_getresult(q, v, 1);
 }
@@ -12520,7 +12517,7 @@ si_get(struct siread *q)
 	struct sinodeview view;
 	si_nodeview_open(&view, node);
 	rc = si_cachevalidate(q->cache, node);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_oom(q->r->e);
 		return -1;
 	}
@@ -12601,9 +12598,9 @@ si_rangebranch(struct siread *q, struct sinode *n,
 	int rc = ss_iteropen(sd_read, &c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
 	si_readstat(q, 0, n, reads);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
-	if (ssunlikely(! ss_iterhas(sd_read, &c->i)))
+	if (unlikely(! ss_iterhas(sd_read, &c->i)))
 		return 0;
 	struct svmergesrc *s = sv_mergeadd(m, &c->i);
 	s->ptr = c;
@@ -12621,14 +12618,14 @@ si_range(struct siread *q)
 	struct sinode *node;
 next_node:
 	node = ss_iterof(si_iter, &i);
-	if (ssunlikely(node == NULL))
+	if (unlikely(node == NULL))
 		return 0;
 
 	/* prepare sources */
 	struct svmerge *m = &q->merge;
 	int count = node->branch_count + 2 + 1;
 	int rc = sv_mergeprepare(m, q->r, count);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_errorreset(q->r->e);
 		return -1;
 	}
@@ -12637,7 +12634,7 @@ next_node:
 	struct svmergesrc *s;
 	struct sv upbuf_reserve;
 	struct ssbuf upbuf;
-	if (ssunlikely(q->upsert_v && q->upsert_v->v)) {
+	if (unlikely(q->upsert_v && q->upsert_v->v)) {
 		ss_bufinit_reserve(&upbuf, &upbuf_reserve, sizeof(upbuf_reserve));
 		ss_bufadd(&upbuf, NULL, (void*)&q->upsert_v, sizeof(struct sv*));
 		s = sv_mergeadd(m, NULL);
@@ -12654,7 +12651,7 @@ next_node:
 		ss_iteropen(sv_indexiter, &s->src, q->r, first, q->order,
 		            q->key, q->keysize);
 	}
-	if (ssunlikely(second && second->count)) {
+	if (unlikely(second && second->count)) {
 		s = sv_mergeadd(m, NULL);
 		ss_iterinit(sv_indexiter, &s->src);
 		ss_iteropen(sv_indexiter, &s->src, q->r, second, q->order,
@@ -12663,20 +12660,20 @@ next_node:
 
 	/* cache and branches */
 	rc = si_cachevalidate(q->cache, node);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_oom(q->r->e);
 		return -1;
 	}
 
 	if (q->oldest_only) {
 		rc = si_rangebranch(q, node, &node->self, m);
-		if (ssunlikely(rc == -1 || rc == 2))
+		if (unlikely(rc == -1 || rc == 2))
 			return rc;
 	} else {
 		struct sibranch *b = node->branch;
 		while (b) {
 			rc = si_rangebranch(q, node, b, m);
-			if (ssunlikely(rc == -1 || rc == 2))
+			if (unlikely(rc == -1 || rc == 2))
 				return rc;
 			b = b->next;
 		}
@@ -12690,7 +12687,7 @@ next_node:
 	ss_iterinit(sv_readiter, &k);
 	ss_iteropen(sv_readiter, &k, q->r, &j, &q->index->u, q->vlsn, 0);
 	struct sv *v = ss_iterof(sv_readiter, &k);
-	if (ssunlikely(v == NULL)) {
+	if (unlikely(v == NULL)) {
 		sv_mergereset(&q->merge);
 		ss_iternext(si_iter, &i);
 		goto next_node;
@@ -12709,8 +12706,8 @@ next_node:
 		                      sv_pointer(v),
 		                      sv_size(v));
 	}
-	if (sslikely(rc == 1)) {
-		if (ssunlikely(si_readdup(q, v) == -1))
+	if (likely(rc == 1)) {
+		if (unlikely(si_readdup(q, v) == -1))
 			return -1;
 	}
 
@@ -12754,7 +12751,7 @@ si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 		struct svindex *second;
 		struct svindex *first = si_nodeindex_priority(node, &second);
 		ss_iterinit(sv_indexiter, &i);
-		if (sslikely(first->count > 0)) {
+		if (likely(first->count > 0)) {
 			rc = ss_iteropen(sv_indexiter, &i, r, first, SS_GTE,
 			                 sv_pointer(v), sv_size(v));
 			if (rc) {
@@ -12823,7 +12820,7 @@ si_bootstrap(struct si *i, uint64_t parent)
 	struct runtime *r = &i->r;
 	/* create node */
 	struct sinode *n = si_nodenew(r);
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return NULL;
 	struct sdid id = {
 		.parent = parent,
@@ -12832,7 +12829,7 @@ si_bootstrap(struct si *i, uint64_t parent)
 	};
 	int rc;
 	rc = si_nodecreate(n, r, &i->scheme, &id);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e0;
 	n->branch = &n->self;
 	n->branch_count++;
@@ -12843,7 +12840,7 @@ si_bootstrap(struct si *i, uint64_t parent)
 	struct sdindex index;
 	sd_indexinit(&index);
 	rc = sd_indexbegin(&index, r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e0;
 
 	struct ssqf f, *qf = NULL;
@@ -12856,44 +12853,44 @@ si_bootstrap(struct si *i, uint64_t parent)
 	                   i->scheme.compression_key,
 	                   i->scheme.compression,
 	                   i->scheme.compression_if);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	sd_buildend(&build, r);
 	rc = sd_indexadd(&index, r, &build, sizeof(struct sdseal));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 
 	/* write seal */
 	uint64_t seal = n->file.size;
 	rc = sd_writeseal(r, &n->file, blob);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	/* write page */
 	rc = sd_writepage(r, &n->file, blob, &build);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	/* amqf */
 	if (i->scheme.amqf) {
 		rc = ss_qfensure(&f, r->a, 0);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e1;
 		qf = &f;
 	}
 	rc = sd_indexcommit(&index, r, &id, qf, n->file.size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	ss_qffree(&f, r->a);
 	/* write index */
 	rc = sd_writeindex(r, &n->file, blob, &index);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	/* close seal */
 	rc = sd_seal(r, &n->file, blob, &index, seal);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto e1;
 	if (blob) {
 		rc = ss_blobfit(blob);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			goto e1;
 	}
 	si_branchset(&n->self, &index);
@@ -12915,9 +12912,9 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 {
 	/* create directory */
 	int rc;
-	if (sslikely(create_directory)) {
+	if (likely(create_directory)) {
 		rc = ss_vfsmkdir(r->vfs, i->scheme.path, 0755);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_malfunction(r->e, "directory '%s' create error: %s",
 			               i->scheme.path, strerror(errno));
 			return -1;
@@ -12925,20 +12922,20 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 	}
 	/* create scheme file */
 	rc = si_schemedeploy(&i->scheme, r);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_malfunction_set(r->e);
 		return -1;
 	}
 	/* create initial node */
 	struct sinode *n = si_bootstrap(i, 0);
-	if (ssunlikely(n == NULL))
+	if (unlikely(n == NULL))
 		return -1;
 	SS_INJECTION(r->i, SS_INJECTION_SI_RECOVER_0,
 	             si_nodefree(n, r, 0);
 	             sr_malfunction(r->e, "%s", "error injection");
 	             return -1);
 	rc = si_nodecomplete(n, r, &i->scheme);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		si_nodefree(n, r, 1);
 		return -1;
 	}
@@ -12954,7 +12951,7 @@ si_processid(char **str)
 	char *s = *str;
 	size_t v = 0;
 	while (*s && *s != '.') {
-		if (ssunlikely(! isdigit(*s)))
+		if (unlikely(! isdigit(*s)))
 			return -1;
 		v = (v * 10) + *s - '0';
 		s++;
@@ -12972,7 +12969,7 @@ si_process(char *name, uint64_t *nsn, uint64_t *parent)
 	/* id.id.index.gc */
 	char *token = name;
 	int64_t id = si_processid(&token);
-	if (ssunlikely(id == -1))
+	if (unlikely(id == -1))
 		return -1;
 	*parent = id;
 	*nsn = id;
@@ -12981,11 +12978,11 @@ si_process(char *name, uint64_t *nsn, uint64_t *parent)
 	else
 	if (strcmp(token, ".index.gc") == 0)
 		return SI_RDB_REMOVE;
-	if (ssunlikely(*token != '.'))
+	if (unlikely(*token != '.'))
 		return -1;
 	token++;
 	id = si_processid(&token);
-	if (ssunlikely(id == -1))
+	if (unlikely(id == -1))
 		return -1;
 	*nsn = id;
 	if (strcmp(token, ".index.incomplete") == 0)
@@ -13000,19 +12997,19 @@ static inline int
 si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 {
 	DIR *dir = opendir(i->scheme.path);
-	if (ssunlikely(dir == NULL)) {
+	if (unlikely(dir == NULL)) {
 		sr_malfunction(r->e, "directory '%s' open error: %s",
 		               i->scheme.path, strerror(errno));
 		return -1;
 	}
 	struct dirent *de;
 	while ((de = readdir(dir))) {
-		if (ssunlikely(de->d_name[0] == '.'))
+		if (unlikely(de->d_name[0] == '.'))
 			continue;
 		uint64_t id_parent = 0;
 		uint64_t id = 0;
 		int rc = si_process(de->d_name, &id, &id_parent);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			continue; /* skip unknown file */
 		si_tracknsn(track, id_parent);
 		si_tracknsn(track, id);
@@ -13025,9 +13022,9 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			/* find parent node and mark it as having
 			 * incomplete compaction process */
 			head = si_trackget(track, id_parent);
-			if (sslikely(head == NULL)) {
+			if (likely(head == NULL)) {
 				head = si_nodenew(r);
-				if (ssunlikely(head == NULL))
+				if (unlikely(head == NULL))
 					goto error;
 				head->self.id.id = id_parent;
 				head->recover = SI_RDB_UNDEF;
@@ -13039,7 +13036,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 				ss_pathcompound(&path, i->scheme.path, id_parent, id,
 				                ".index.incomplete");
 				rc = ss_vfsunlink(r->vfs, path.path);
-				if (ssunlikely(rc == -1)) {
+				if (unlikely(rc == -1)) {
 					sr_malfunction(r->e, "index file '%s' unlink error: %s",
 					               path.path, strerror(errno));
 					goto error;
@@ -13049,13 +13046,13 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			assert(rc == SI_RDB_DBSEAL);
 			/* recover 'sealed' node */
 			node = si_nodenew(r);
-			if (ssunlikely(node == NULL))
+			if (unlikely(node == NULL))
 				goto error;
 			node->recover = SI_RDB_DBSEAL;
 			ss_pathcompound(&path, i->scheme.path, id_parent, id,
 			                ".index.seal");
 			rc = si_nodeopen(node, r, &path);
-			if (ssunlikely(rc == -1)) {
+			if (unlikely(rc == -1)) {
 				si_nodefree(node, r, 0);
 				goto error;
 			}
@@ -13066,7 +13063,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 		case SI_RDB_REMOVE:
 			ss_path(&path, i->scheme.path, id, ".index.gc");
 			rc = ss_vfsunlink(r->vfs, ss_pathof(&path));
-			if (ssunlikely(rc == -1)) {
+			if (unlikely(rc == -1)) {
 				sr_malfunction(r->e, "index file '%s' unlink error: %s",
 				               ss_pathof(&path), strerror(errno));
 				goto error;
@@ -13083,19 +13080,19 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 
 		/* recover node */
 		node = si_nodenew(r);
-		if (ssunlikely(node == NULL))
+		if (unlikely(node == NULL))
 			goto error;
 		node->recover = SI_RDB;
 		ss_path(&path, i->scheme.path, id, ".index");
 		rc = si_nodeopen(node, r, &path);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			si_nodefree(node, r, 0);
 			goto error;
 		}
 		si_trackmetrics(track, node);
 
 		/* track node */
-		if (sslikely(head == NULL)) {
+		if (likely(head == NULL)) {
 			si_trackset(track, node);
 		} else {
 			/* replace a node previously created by a
@@ -13149,7 +13146,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, st
 			if (! (n->recover & SI_RDB_REMOVE)) {
 				/* complete node */
 				int rc = si_nodecomplete(n, r, &i->scheme);
-				if (ssunlikely(rc == -1))
+				if (unlikely(rc == -1))
 					return -1;
 				n->recover = SI_RDB;
 			}
@@ -13174,7 +13171,7 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 	while (p) {
 		struct sinode *n = container_of(p, struct sinode, node);
 		int rc = ss_bufadd(buf, r->a, &n, sizeof(struct sinode*));
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return sr_oom_malfunction(r->e);
 		p = ss_rbnext(&track->i, p);
 	}
@@ -13186,7 +13183,7 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 		struct sinode *n = ss_iterof(ss_bufiterref, &i);
 		if (n->recover & SI_RDB_REMOVE) {
 			int rc = si_nodefree(n, r, 1);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				return -1;
 			ss_iternext(ss_bufiterref, &i);
 			continue;
@@ -13219,15 +13216,15 @@ si_recoverindex(struct si *i, struct runtime *r)
 	ss_bufinit(&buf);
 	int rc;
 	rc = si_trackdir(&track, r, i);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
-	if (ssunlikely(track.count == 0))
+	if (unlikely(track.count == 0))
 		return 1;
 	rc = si_trackvalidate(&track, &buf, r, i);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = si_recovercomplete(&track, r, i, &buf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	/* set actual metrics */
 	if (track.nsn > r->seq->nsn)
@@ -13249,7 +13246,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->scheme.path);
 	int rc = ss_vfsexists(r->vfs, path);
-	if (sslikely(! rc))
+	if (likely(! rc))
 		return 0;
 	if (i->scheme.path_fail_on_drop) {
 		sr_malfunction(r->e, "attempt to recover a dropped index: %s:",
@@ -13257,7 +13254,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 		return -1;
 	}
 	rc = si_droprepository(r, i->scheme.path, 0);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 1;
 }
@@ -13278,12 +13275,12 @@ static int si_recover(struct si *i)
 	case  1: goto deploy;
 	}
 	rc = si_schemerecover(&i->scheme, r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	r->scheme = &i->scheme.scheme;
 	r->fmt_storage = i->scheme.fmt_storage;
 	rc = si_recoverindex(i, r);
-	if (sslikely(rc <= 0))
+	if (likely(rc <= 0))
 		return rc;
 deploy:
 	return si_deploy(i, r, !exist);
@@ -13343,76 +13340,76 @@ static int si_schemedeploy(struct sischeme *s, struct runtime *r)
 	sd_schemeinit(&c);
 	int rc;
 	rc = sd_schemebegin(&c, r);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	struct ssbuf buf;
 	ss_bufinit(&buf);
 	rc = sd_schemeadd(&c, r, SI_SCHEME_VERSION, SS_STRING, &s->version,
 	                  sizeof(s->version));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_VERSION_STORAGE, SS_STRING,
 	                  &s->version_storage, sizeof(s->version_storage));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_NAME, SS_STRING, s->name,
 	                  strlen(s->name) + 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sf_schemesave(&s->scheme, r->a, &buf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_SCHEME, SS_STRING, buf.s,
 	                  ss_bufused(&buf));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	ss_buffree(&buf, r->a);
 	uint32_t v;
 	v = s->fmt_storage;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_FORMAT_STORAGE, SS_U32, &v, sizeof(v));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_SIZE, SS_U64,
 	                  &s->node_size,
 	                  sizeof(s->node_size));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_PAGE_SIZE, SS_U32,
 	                  &s->node_page_size,
 	                  sizeof(s->node_page_size));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_PAGE_CHECKSUM, SS_U32,
 	                  &s->node_page_checksum,
 	                  sizeof(s->node_page_checksum));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_SYNC, SS_U32,
 	                  &s->sync,
 	                  sizeof(s->sync));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION, SS_STRING,
 	                  s->compression_if->name,
 	                  strlen(s->compression_if->name) + 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION_BRANCH, SS_STRING,
 	                  s->compression_branch_if->name,
 	                  strlen(s->compression_branch_if->name) + 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION_KEY, SS_U32,
 	                  &s->compression_key,
 	                  sizeof(s->compression_key));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemeadd(&c, r, SI_SCHEME_AMQF, SS_U32,
 	                  &s->amqf, sizeof(s->amqf));
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = sd_schemecommit(&c);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	char path[PATH_MAX];
 	snprintf(path, sizeof(path), "%s/scheme", s->path);
@@ -13434,12 +13431,12 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 	int version_storage_set = 0;
 	int rc;
 	rc = sd_schemerecover(&c, r, path);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	struct ssiter i;
 	ss_iterinit(sd_schemeiter, &i);
 	rc = ss_iteropen(sd_schemeiter, &i, r, &c, 1);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	while (ss_iterhas(sd_schemeiter, &i))
 	{
@@ -13465,10 +13462,10 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 			struct ssbuf buf;
 			ss_bufinit(&buf);
 			rc = sf_schemeload(&s->scheme, r->a, sd_schemesz(opt), opt->size);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				goto error;
 			rc = sf_schemevalidate(&s->scheme, r->a);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				goto error;
 			ss_buffree(&buf, r->a);
 			break;
@@ -13485,26 +13482,26 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 		case SI_SCHEME_COMPRESSION: {
 			char *name = sd_schemesz(opt);
 			struct ssfilterif *cif = ss_filterof(name);
-			if (ssunlikely(cif == NULL))
+			if (unlikely(cif == NULL))
 				goto error;
 			s->compression_if = cif;
 			s->compression = s->compression_if != &ss_nonefilter;
 			ss_free(r->a, s->compression_sz);
 			s->compression_sz = ss_strdup(r->a, cif->name);
-			if (ssunlikely(s->compression_sz == NULL))
+			if (unlikely(s->compression_sz == NULL))
 				goto error;
 			break;
 		}
 		case SI_SCHEME_COMPRESSION_BRANCH: {
 			char *name = sd_schemesz(opt);
 			struct ssfilterif *cif = ss_filterof(name);
-			if (ssunlikely(cif == NULL))
+			if (unlikely(cif == NULL))
 				goto error;
 			s->compression_branch_if = cif;
 			s->compression_branch = s->compression_branch_if != &ss_nonefilter;
 			ss_free(r->a, s->compression_branch_sz);
 			s->compression_branch_sz = ss_strdup(r->a, cif->name);
-			if (ssunlikely(s->compression_branch_sz == NULL))
+			if (unlikely(s->compression_branch_sz == NULL))
 				goto error;
 			break;
 		}
@@ -13516,7 +13513,7 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 		}
 		ss_iternext(sd_schemeiter, &i);
 	}
-	if (ssunlikely(! version_storage_set))
+	if (unlikely(! version_storage_set))
 		goto error_format;
 	sd_schemefree(&c, r);
 	return 0;
@@ -13637,10 +13634,10 @@ static inline struct scworker*
 sc_workerpool_pop(struct scworkerpool *p, struct runtime *r)
 {
 	tt_pthread_mutex_lock(&p->lock);
-	if (sslikely(p->idle >= 1))
+	if (likely(p->idle >= 1))
 		goto pop_idle;
 	int rc = sc_workerpool_new(p, r);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		tt_pthread_mutex_unlock(&p->lock);
 		return NULL;
 	}
@@ -13861,7 +13858,7 @@ sc_init(struct scheduler *s, struct runtime *r)
 static int sc_add(struct scheduler *s, struct si *index)
 {
 	struct scdb *db = ss_malloc(s->r->a, sizeof(struct scdb));
-	if (ssunlikely(db == NULL))
+	if (unlikely(db == NULL))
 		return -1;
 	db->index  = index;
 	db->active = 0;
@@ -13870,7 +13867,7 @@ static int sc_add(struct scheduler *s, struct si *index)
 	tt_pthread_mutex_lock(&s->lock);
 	int count = s->count + 1;
 	struct scdb **i = ss_malloc(s->r->a, count * sizeof(struct scdb*));
-	if (ssunlikely(i == NULL)) {
+	if (unlikely(i == NULL)) {
 		tt_pthread_mutex_unlock(&s->lock);
 		ss_free(s->r->a, db);
 		return -1;
@@ -13888,14 +13885,14 @@ static int sc_add(struct scheduler *s, struct si *index)
 
 static int sc_del(struct scheduler *s, struct si *index, int lock)
 {
-	if (ssunlikely(s->i == NULL))
+	if (unlikely(s->i == NULL))
 		return 0;
 	if (lock)
 		tt_pthread_mutex_lock(&s->lock);
 	struct scdb *db = NULL;
 	struct scdb **iprev;
 	int count = s->count - 1;
-	if (ssunlikely(count == 0)) {
+	if (unlikely(count == 0)) {
 		iprev = s->i;
 		db = s->i[0];
 		s->count = 0;
@@ -13903,7 +13900,7 @@ static int sc_del(struct scheduler *s, struct si *index, int lock)
 		goto free;
 	}
 	struct scdb **i = ss_malloc(s->r->a, count * sizeof(struct scdb*));
-	if (ssunlikely(i == NULL)) {
+	if (unlikely(i == NULL)) {
 		if (lock)
 			tt_pthread_mutex_unlock(&s->lock);
 		return -1;
@@ -13923,7 +13920,7 @@ static int sc_del(struct scheduler *s, struct si *index, int lock)
 	iprev = s->i;
 	s->i = i;
 	s->count = count;
-	if (ssunlikely(s->rr >= s->count))
+	if (unlikely(s->rr >= s->count))
 		s->rr = 0;
 free:
 	if (lock)
@@ -13936,10 +13933,10 @@ free:
 static int sc_ctl_call(struct scheduler *s, uint64_t vlsn)
 {
 	int rc = sr_statusactive(s->r->status);
-	if (ssunlikely(rc == 0))
+	if (unlikely(rc == 0))
 		return 0;
 	struct scworker *w = sc_workerpool_pop(&s->wp, s->r);
-	if (ssunlikely(w == NULL))
+	if (unlikely(w == NULL))
 		return -1;
 	rc = sc_step(s, w, vlsn);
 	sc_workerpool_push(&s->wp, w);
@@ -13950,11 +13947,11 @@ static int sc_ctl_branch(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
 	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
-	if (ssunlikely(rc == 0))
+	if (unlikely(rc == 0))
 		return 0;
 	struct srzone *z = sr_zoneof(r);
 	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (ssunlikely(w == NULL))
+	if (unlikely(w == NULL))
 		return -1;
 	while (1) {
 		uint64_t vlsn_lru = si_lru_vlsn(index);
@@ -13970,7 +13967,7 @@ static int sc_ctl_branch(struct scheduler *s, uint64_t vlsn, struct si *index)
 		if (rc == 0)
 			break;
 		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			break;
 	}
 	sc_workerpool_push(&s->wp, w);
@@ -13981,11 +13978,11 @@ static int sc_ctl_compact(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
 	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
-	if (ssunlikely(rc == 0))
+	if (unlikely(rc == 0))
 		return 0;
 	struct srzone *z = sr_zoneof(r);
 	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (ssunlikely(w == NULL))
+	if (unlikely(w == NULL))
 		return -1;
 	while (1) {
 		uint64_t vlsn_lru = si_lru_vlsn(index);
@@ -14001,7 +13998,7 @@ static int sc_ctl_compact(struct scheduler *s, uint64_t vlsn, struct si *index)
 		if (rc == 0)
 			break;
 		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			break;
 	}
 	sc_workerpool_push(&s->wp, w);
@@ -14013,11 +14010,11 @@ sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
 {
 	struct runtime *r = s->r;
 	int rc = sr_statusactive(r->status);
-	if (ssunlikely(rc == 0))
+	if (unlikely(rc == 0))
 		return 0;
 	struct srzone *z = sr_zoneof(r);
 	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (ssunlikely(w == NULL))
+	if (unlikely(w == NULL))
 		return -1;
 	while (1) {
 		uint64_t vlsn_lru = si_lru_vlsn(index);
@@ -14033,7 +14030,7 @@ sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
 		if (rc == 0)
 			break;
 		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			break;
 	}
 	sc_workerpool_push(&s->wp, w);
@@ -14081,10 +14078,10 @@ static void sc_readclose(struct scread *r)
 		sv_vunref(rt, r->arg.v.v);
 	if (r->arg.vup.v)
 		sv_vunref(rt, r->arg.vup.v);
-	if (ssunlikely(r->result))
+	if (unlikely(r->result))
 		sv_vunref(rt, r->result);
 	/* free read cache */
-	if (sslikely(r->arg.cachegc && r->arg.cache))
+	if (likely(r->arg.cachegc && r->arg.cache))
 		si_cachepool_push(r->arg.cache);
 }
 
@@ -14106,7 +14103,7 @@ static int sc_read(struct scread *r, struct scheduler *s)
 	struct screadarg *arg = &r->arg;
 	struct si *index = r->index;
 
-	if (sslikely(arg->vlsn_generate))
+	if (likely(arg->vlsn_generate))
 		arg->vlsn = sr_seq(s->r->seq, SR_LSN);
 
 	struct siread q;
@@ -14137,7 +14134,7 @@ static inline int
 sc_execute(struct sctask *t, struct scworker *w, uint64_t vlsn)
 {
 	struct si *index;
-	if (ssunlikely(t->shutdown))
+	if (unlikely(t->shutdown))
 		index = t->shutdown;
 	else
 		index = t->db->index;
@@ -14158,7 +14155,7 @@ sc_peek(struct scheduler *s)
 first_half:
 	while (i < limit) {
 		struct scdb *db = s->i[i];
-		if (ssunlikely(! si_active(db->index))) {
+		if (unlikely(! si_active(db->index))) {
 			i++;
 			continue;
 		}
@@ -14201,7 +14198,7 @@ sc_planquota(struct scheduler *s, struct siplan *plan, uint32_t quota, uint32_t 
 static inline int
 sc_do_shutdown(struct scheduler *s, struct sctask *task)
 {
-	if (sslikely(s->shutdown_pending == 0))
+	if (likely(s->shutdown_pending == 0))
 		return 0;
 	struct si *index, *n;
 	rlist_foreach_entry_safe(index, &s->shutdown, link, n) {
@@ -14359,23 +14356,23 @@ static inline void
 sc_periodic_done(struct scheduler *s, uint64_t now)
 {
 	/* checkpoint */
-	if (ssunlikely(s->checkpoint))
+	if (unlikely(s->checkpoint))
 		sc_task_checkpoint_done(s);
 	/* gc */
-	if (ssunlikely(s->gc))
+	if (unlikely(s->gc))
 		sc_task_gc_done(s, now);
 	/* lru */
-	if (ssunlikely(s->lru))
+	if (unlikely(s->lru))
 		sc_task_lru_done(s, now);
 	/* age */
-	if (ssunlikely(s->age))
+	if (unlikely(s->age))
 		sc_task_age_done(s, now);
 }
 
 static inline void
 sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 {
-	if (ssunlikely(s->count == 0))
+	if (unlikely(s->count == 0))
 		return;
 	/* checkpoint */
 	switch (zone->mode) {
@@ -14427,7 +14424,7 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 	}
 	/* peek an index */
 	struct scdb *db = sc_peek(s);
-	if (ssunlikely(db == NULL)) {
+	if (unlikely(db == NULL)) {
 		/* complete on-going periodic tasks when there
 		 * are no active index maintenance tasks left */
 		sc_periodic_done(s, now);
@@ -14484,7 +14481,7 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 	int rc_job = rc;
 	if (rc_job > 0) {
 		rc = sc_execute(&task, w, vlsn);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sr_statusset(&task.db->index->status,
 				     SR_MALFUNCTION);
 			goto error;
@@ -14502,7 +14499,7 @@ static inline struct scworker*
 sc_workernew(struct runtime *r, int id)
 {
 	struct scworker *w = ss_malloc(r->a, sizeof(struct scworker));
-	if (ssunlikely(w == NULL)) {
+	if (unlikely(w == NULL)) {
 		sr_oom_malfunction(r->e);
 		return NULL;
 	}
@@ -14536,7 +14533,7 @@ static int sc_workerpool_init(struct scworkerpool *p)
 static int sc_workerpool_new(struct scworkerpool *p, struct runtime *r)
 {
 	struct scworker *w = sc_workernew(r, p->total);
-	if (ssunlikely(w == NULL))
+	if (unlikely(w == NULL))
 		return -1;
 	rlist_add(&p->list, &w->link);
 	rlist_add(&p->listidle, &w->linkidle);
@@ -14551,7 +14548,7 @@ static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int re
 	struct sltx tl;
 	sl_begin(s->r, &tl, lsn);
 	int rc = sl_write(&tl, log);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		return -1;
 	}
 
@@ -14727,7 +14724,7 @@ static inline int
 phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
 	struct phia_env *e = se_of(&o->o);
-	if (ssunlikely(o->db != dest))
+	if (unlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (! o->flagset) {
@@ -14741,11 +14738,11 @@ static inline int
 phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
 {
 	struct phia_env *e = se_of(&o->o);
-	if (ssunlikely(o->db != dest))
+	if (unlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (o->flagset) {
-		if (ssunlikely(v->flags != flags))
+		if (unlikely(v->flags != flags))
 			return sr_error(&e->error, "%s", "incompatible document flags");
 	} else {
 		o->flagset = 1;
@@ -14853,7 +14850,7 @@ se_open(struct so *o)
 	/* validate configuration */
 	int rc;
 	rc = se_confvalidate(&e->conf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	sr_statusset(&e->status, SR_RECOVER);
 
@@ -14863,13 +14860,13 @@ se_open(struct so *o)
 
 	/* Ensure phia data directory exists. */
 	rc = sr_checkdir(&e->r, e->conf.path);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	/* index recover */
 	struct phia_index *item, *n;
 	rlist_foreach_entry_safe(item, &e->db, link, n) {
 		rc = phia_index_open(item);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 	if (e->conf.recover == SE_RECOVER_2P)
@@ -14879,7 +14876,7 @@ online:
 	/* complete */
 	rlist_foreach_entry_safe(item, &e->db, link, n) {
 		rc = phia_index_open(item);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			return -1;
 	}
 	/* enable quota */
@@ -14900,7 +14897,7 @@ se_destroy(struct so *o)
 		struct phia_index *db, *next;
 		rlist_foreach_entry_safe(db, &e->db, link, next) {
 			rc = phia_index_delete(db);
-			if (ssunlikely(rc == -1))
+			if (unlikely(rc == -1))
 				rcret = -1;
 		}
 	}
@@ -14969,7 +14966,7 @@ se_confphia_error(struct srconf *c, struct srconfstmt *s)
 	char  error[128];
 	error[0] = 0;
 	int len = sr_errorcopy(&e->error, error, sizeof(error));
-	if (sslikely(len == 0))
+	if (likely(len == 0))
 		errorp = NULL;
 	else
 		errorp = error;
@@ -15019,7 +15016,7 @@ se_confcompaction_set(struct srconf *c ssunused, struct srconfstmt *s)
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
 	}
-	if (ssunlikely(sr_statusactive(&e->status))) {
+	if (unlikely(sr_statusactive(&e->status))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -15077,7 +15074,7 @@ se_confscheduler_trace(struct srconf *c, struct srconfstmt *s)
 	char tracesz[128];
 	char *trace;
 	int tracelen = ss_tracecopy(&w->trace, tracesz, sizeof(tracesz));
-	if (sslikely(tracelen == 0))
+	if (likely(tracelen == 0))
 		trace = NULL;
 	else
 		trace = tracesz;
@@ -15218,12 +15215,12 @@ se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
 
 	char *name = s->value;
 	struct phia_index *index = phia_index_by_name(e, name);
-	if (ssunlikely(index)) {
+	if (unlikely(index)) {
 		sr_error(&e->error, "index '%s' already exists", name);
 		return -1;
 	}
 	index = phia_index_new(e, name, s->valuesize);
-	if (ssunlikely(index == NULL))
+	if (unlikely(index == NULL))
 		return -1;
 	rlist_add(&e->db, &index->link);
 	return 0;
@@ -15257,7 +15254,7 @@ se_confdb_upsert(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_index *db = c->ptr;
-	if (ssunlikely(phia_index_active(db))) {
+	if (unlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -15273,7 +15270,7 @@ se_confdb_upsertarg(struct srconf *c, struct srconfstmt *s)
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
 	struct phia_index *db = c->ptr;
-	if (ssunlikely(phia_index_active(db))) {
+	if (unlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -15354,32 +15351,32 @@ se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
 		sr_error(&e->error, "%s", "bad operation");
 		return -1;
 	}
-	if (ssunlikely(phia_index_active(db))) {
+	if (unlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
-	if (ssunlikely(db->scheme->scheme.fields_count == 8)) {
+	if (unlikely(db->scheme->scheme.fields_count == 8)) {
 		sr_error(s->r->e, "%s", "fields number limit reached");
 		return -1;
 	}
 	char *name = s->value;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, name);
-	if (ssunlikely(field)) {
+	if (unlikely(field)) {
 		sr_error(&e->error, "field '%s' is already set", name);
 		return -1;
 	}
 	/* create new field */
 	field = sf_fieldnew(&e->a, name);
-	if (ssunlikely(field == NULL))
+	if (unlikely(field == NULL))
 		return sr_oom(&e->error);
 	int rc;
 	rc = sf_fieldoptions(field, &e->a, "string");
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sf_fieldfree(field, &e->a);
 		return sr_oom(&e->error);
 	}
 	rc = sf_schemeadd(&db->scheme->scheme, &e->a, field);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sf_fieldfree(field, &e->a);
 		return sr_oom(&e->error);
 	}
@@ -15393,7 +15390,7 @@ se_confdb_field(struct srconf *c, struct srconfstmt *s)
 	struct phia_env *e = db->env;
 	if (s->op != SR_WRITE)
 		return se_confv(c, s);
-	if (ssunlikely(phia_index_active(db))) {
+	if (unlikely(phia_index_active(db))) {
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
@@ -15486,7 +15483,7 @@ se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
 	struct phia_env *e = s->ptr;
 	assert(e->ei.oom == 0);
 	int rc = se_confv(c, s);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return rc;
 	ss_aclose(&e->a);
 	ss_aopen(&e->a_oom, &ss_ooma, e->ei.oom);
@@ -15500,7 +15497,7 @@ se_confdebug_io(struct srconf *c, struct srconfstmt *s)
 	struct phia_env *e = s->ptr;
 	assert(e->ei.io == 0);
 	int rc = se_confv(c, s);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return rc;
 	ss_vfsfree(&e->vfs);
 	ss_vfsinit(&e->vfs, &ss_testvfs, e->ei.io);
@@ -15611,10 +15608,10 @@ se_confensure(struct seconf *c)
 	struct phia_env *e = (struct phia_env*)c->env;
 	int confmax = 2048;
 	confmax *= sizeof(struct srconf);
-	if (sslikely(confmax <= c->confmax))
+	if (likely(confmax <= c->confmax))
 		return 0;
 	struct srconf *cptr = ss_malloc(&e->a, confmax);
-	if (ssunlikely(cptr == NULL))
+	if (unlikely(cptr == NULL))
 		return sr_oom(&e->error);
 	ss_free(&e->a, c->conf);
 	c->conf = cptr;
@@ -15626,7 +15623,7 @@ static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 {
 	int rc;
 	rc = se_confensure(c);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	struct phia_env *e = (struct phia_env*)c->env;
 	struct seconfrt rt;
@@ -15654,7 +15651,7 @@ se_confquery(struct phia_env *e, int op, const char *path,
 {
 	int rc;
 	rc = se_confensure(&e->conf);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	struct seconfrt rt;
 	se_confrt(e, &rt);
@@ -15700,7 +15697,7 @@ static void *se_confget_string(struct so *o, const char *path, int *size)
 	void *result = NULL;
 	int rc = se_confquery(e, SR_READ, path, SS_STRING,
 	                      &result, sizeof(void*), size);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return NULL;
 	return result;
 }
@@ -15711,7 +15708,7 @@ static int64_t se_confget_int(struct so *o, const char *path)
 	int64_t result = 0;
 	int rc = se_confquery(e, SR_READ, path, SS_I64,
 	                      &result, sizeof(void*), NULL);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return result;
 }
@@ -15720,7 +15717,7 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 {
 	c->confmax = 2048;
 	c->conf = ss_malloc(&o->a, sizeof(struct srconf) * c->confmax);
-	if (ssunlikely(c->conf == NULL))
+	if (unlikely(c->conf == NULL))
 		return -1;
 	sf_schemeinit(&c->scheme);
 	c->env                 = &o->o;
@@ -15865,7 +15862,7 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 {
 	struct seconfkv *v;
 	v = ss_malloc(&e->a, sizeof(struct seconfkv));
-	if (ssunlikely(v == NULL)) {
+	if (unlikely(v == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -15874,13 +15871,13 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 	ss_bufinit(&v->value);
 	int rc;
 	rc = ss_bufensure(&v->key, &e->a, vp->keysize);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		so_free(&v->o);
 		sr_oom(&e->error);
 		return NULL;
 	}
 	rc = ss_bufensure(&v->value, &e->a, vp->valuesize);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		so_free(&v->o);
 		sr_oom(&e->error);
 		return NULL;
@@ -15927,7 +15924,7 @@ se_confcursor_get(struct so *o, struct so *v)
 		if ((char*)c->pos >= c->dump.p)
 			c->pos = NULL;
 	}
-	if (ssunlikely(c->pos == NULL))
+	if (unlikely(c->pos == NULL))
 		return NULL;
 	struct phia_env *e = se_of(&c->o);
 	return se_confkv_new(e, c->pos);
@@ -15951,7 +15948,7 @@ phia_confcursor(struct phia_env *e)
 {
 	struct seconfcursor *c;
 	c = ss_malloc(&e->a, sizeof(struct seconfcursor));
-	if (ssunlikely(c == NULL)) {
+	if (unlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -15960,7 +15957,7 @@ phia_confcursor(struct phia_env *e)
 	c->first = 1;
 	ss_bufinit(&c->dump);
 	int rc = se_confserialize(&e->conf, &c->dump);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		so_free(&c->o);
 		sr_oom(&e->error);
 		return NULL;
@@ -15989,7 +15986,7 @@ struct phia_document *
 phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
 {
 	struct phia_index *db = key->db;
-	if (ssunlikely(! key->orderset))
+	if (unlikely(! key->orderset))
 		key->order = SS_GTE;
 	/* this statistics might be not complete, because
 	 * last statement is not accounted here */
@@ -16015,7 +16012,7 @@ phia_cursor(struct phia_index *db)
 	struct phia_env *e = db->env;
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
-	if (ssunlikely(c == NULL)) {
+	if (unlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -16028,7 +16025,7 @@ phia_cursor(struct phia_index *db)
 	c->read_cache = 0;
 	c->t.state = SXUNDEF;
 	c->cache = si_cachepool_pop(&e->cachepool);
-	if (ssunlikely(c->cache == NULL)) {
+	if (unlikely(c->cache == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -16048,7 +16045,7 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	if (size == 0)
 		size = strlen(name);
 	scheme->name = ss_malloc(&e->a, size + 1);
-	if (ssunlikely(scheme->name == NULL))
+	if (unlikely(scheme->name == NULL))
 		goto error;
 	memcpy(scheme->name, name, size);
 	scheme->name[size] = 0;
@@ -16072,11 +16069,11 @@ phia_index_scheme_init(struct phia_index *db, char *name, int size)
 	scheme->buf_gc_wm             = 1024 * 1024;
 	scheme->compression_sz =
 		ss_strdup(&e->a, scheme->compression_if->name);
-	if (ssunlikely(scheme->compression_sz == NULL))
+	if (unlikely(scheme->compression_sz == NULL))
 		goto error;
 	scheme->compression_branch_sz =
 		ss_strdup(&e->a, scheme->compression_branch_if->name);
-	if (ssunlikely(scheme->compression_branch_sz == NULL))
+	if (unlikely(scheme->compression_branch_sz == NULL))
 		goto error;
 	sf_upsertinit(&scheme->fmt_upsert);
 	sf_schemeinit(&scheme->scheme);
@@ -16096,35 +16093,35 @@ phia_index_scheme_set(struct phia_index *db)
 	if (s->scheme.fields_count == 0)
 	{
 		struct sffield *field = sf_fieldnew(&e->a, "key");
-		if (ssunlikely(field == NULL))
+		if (unlikely(field == NULL))
 			return sr_oom(&e->error);
 		rc = sf_fieldoptions(field, &e->a, "string,key(0)");
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
 			return sr_oom(&e->error);
 		}
 		rc = sf_schemeadd(&s->scheme, &e->a, field);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
 			return sr_oom(&e->error);
 		}
 		field = sf_fieldnew(&e->a, "value");
-		if (ssunlikely(field == NULL))
+		if (unlikely(field == NULL))
 			return sr_oom(&e->error);
 		rc = sf_fieldoptions(field, &e->a, "string");
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
 			return sr_oom(&e->error);
 		}
 		rc = sf_schemeadd(&s->scheme, &e->a, field);
-		if (ssunlikely(rc == -1)) {
+		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
 			return sr_oom(&e->error);
 		}
 	}
 	/* validate scheme and set keys */
 	rc = sf_schemevalidate(&s->scheme, &e->a);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		sr_error(&e->error, "incomplete scheme", s->name);
 		return -1;
 	}
@@ -16134,7 +16131,7 @@ phia_index_scheme_set(struct phia_index *db)
 	}
 	/* compression */
 	s->compression_if = ss_filterof(s->compression_sz);
-	if (ssunlikely(s->compression_if == NULL)) {
+	if (unlikely(s->compression_if == NULL)) {
 		sr_error(&e->error, "unknown compression type '%s'",
 		         s->compression_sz);
 		return -1;
@@ -16142,7 +16139,7 @@ phia_index_scheme_set(struct phia_index *db)
 	s->compression = s->compression_if != &ss_nonefilter;
 	/* compression branch */
 	s->compression_branch_if = ss_filterof(s->compression_branch_sz);
-	if (ssunlikely(s->compression_branch_if == NULL)) {
+	if (unlikely(s->compression_branch_if == NULL)) {
 		sr_error(&e->error, "unknown compression type '%s'",
 		         s->compression_branch_sz);
 		return -1;
@@ -16153,7 +16150,7 @@ phia_index_scheme_set(struct phia_index *db)
 		char path[1024];
 		snprintf(path, sizeof(path), "%s/%s", e->conf.path, s->name);
 		s->path = ss_strdup(&e->a, path);
-		if (ssunlikely(s->path == NULL))
+		if (unlikely(s->path == NULL))
 			return sr_oom(&e->error);
 	}
 	db->r->scheme = &s->scheme;
@@ -16173,11 +16170,11 @@ phia_index_open(struct phia_index *db)
 	if (status != SR_OFFLINE)
 		return -1;
 	int rc = phia_index_scheme_set(db);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	sx_indexset(&db->coindex, db->scheme->id);
 	rc = phia_index_recoverbegin(db);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 
 	if (sr_status(&e->status) == SR_RECOVER)
@@ -16186,7 +16183,7 @@ phia_index_open(struct phia_index *db)
 online:
 	phia_index_recoverend(db);
 	rc = sc_add(&e->scheduler, db->index);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	return 0;
 }
@@ -16200,7 +16197,7 @@ phia_index_free(struct phia_index *db, int close)
 	sx_indexfree(&db->coindex, &e->xm);
 	if (close) {
 		rc = si_close(db->index);
-		if (ssunlikely(rc == -1))
+		if (unlikely(rc == -1))
 			rcret = -1;
 	}
 	ss_free(&e->a, db);
@@ -16264,7 +16261,7 @@ phia_index_close(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
-	if (ssunlikely(! sr_statusactive_is(status)))
+	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
 	/* set last visible transaction id */
 	db->txn_max = sx_max(&e->xm);
@@ -16277,10 +16274,10 @@ phia_index_drop(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
-	if (ssunlikely(! sr_statusactive_is(status)))
+	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
 	int rc = si_dropmark(db->index);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	/* set last visible transaction id */
 	db->txn_max = sx_max(&e->xm);
@@ -16296,7 +16293,7 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	r->result = NULL;
 
 	struct phia_document *v = phia_document_new(e, r->db, &result);
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return NULL;
 	v->cache_only   = r->arg.cache_only;
 	v->oldest_only  = r->arg.oldest_only;
@@ -16342,12 +16339,12 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	/* prepare the key */
 	int auto_close = !o->created;
 	int rc = so_open(&o->o);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = phia_document_validate_ro(o, db);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
-	if (ssunlikely(! sr_online(&db->index->status)))
+	if (unlikely(! sr_online(&db->index->status)))
 		goto error;
 
 	struct sv vup;
@@ -16360,11 +16357,11 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		/* note: prefix is ignored during concurrent
 		 * index search */
 		int rc = sx_get(x, &db->coindex, &o->v, &vup);
-		if (ssunlikely(rc == -1 || rc == 2 /* delete */))
+		if (unlikely(rc == -1 || rc == 2 /* delete */))
 			goto error;
 		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
 			ret = phia_document_new(e, db, &vup);
-			if (sslikely(ret)) {
+			if (likely(ret)) {
 				ret->cache_only  = o->cache_only;
 				ret->oldest_only = o->oldest_only;
 				ret->created     = 1;
@@ -16386,7 +16383,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	if (cache == NULL) {
 		cachegc = 1;
 		cache = si_cachepool_pop(&e->cachepool);
-		if (ssunlikely(cache == NULL)) {
+		if (unlikely(cache == NULL)) {
 			if (vup.v)
 				sv_vunref(db->r, vup.v);
 			sr_oom(&e->error);
@@ -16456,14 +16453,14 @@ static struct phia_index *
 phia_index_new(struct phia_env *e, char *name, int size)
 {
 	struct phia_index *o = ss_malloc(&e->a, sizeof(struct phia_index));
-	if (ssunlikely(o == NULL)) {
+	if (unlikely(o == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
 	memset(o, 0, sizeof(*o));
 	o->env = e;
 	o->index = si_init(&e->r, o);
-	if (ssunlikely(o->index == NULL)) {
+	if (unlikely(o->index == NULL)) {
 		ss_free(&e->a, o);
 		return NULL;
 	}
@@ -16471,7 +16468,7 @@ phia_index_new(struct phia_env *e, char *name, int size)
 	o->scheme = si_scheme(o->index);
 	int rc;
 	rc = phia_index_scheme_init(o, name, size);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		si_close(o->index);
 		ss_free(&e->a, o);
 		return NULL;
@@ -16526,7 +16523,7 @@ static int phia_index_recoverbegin(struct phia_index *db)
 		if (e->conf.recover != SE_RECOVER_NP)
 			db->scheme->path_fail_on_exists = 1;
 	int rc = si_open(db->index);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	db->created = rc;
 	return 0;
@@ -16538,7 +16535,7 @@ error:
 static int phia_index_recoverend(struct phia_index *db)
 {
 	int status = sr_status(&db->index->status);
-	if (ssunlikely(status == SR_DROP_PENDING))
+	if (unlikely(status == SR_DROP_PENDING))
 		return 0;
 	sr_statusset(&db->index->status, SR_ONLINE);
 	return 0;
@@ -16564,35 +16561,35 @@ phia_document_opt(const char *path)
 {
 	switch (path[0]) {
 	case 'o':
-		if (sslikely(strcmp(path, "order") == 0))
+		if (likely(strcmp(path, "order") == 0))
 			return SE_DOCUMENT_ORDER;
-		if (sslikely(strcmp(path, "oldest_only") == 0))
+		if (likely(strcmp(path, "oldest_only") == 0))
 			return SE_DOCUMENT_OLDEST_ONLY;
 		break;
 	case 'l':
-		if (sslikely(strcmp(path, "lsn") == 0))
+		if (likely(strcmp(path, "lsn") == 0))
 			return SE_DOCUMENT_LSN;
 		break;
 	case 'p':
-		if (sslikely(strcmp(path, "prefix") == 0))
+		if (likely(strcmp(path, "prefix") == 0))
 			return SE_DOCUMENT_PREFIX;
 		break;
 	case 'r':
-		if (sslikely(strcmp(path, "raw") == 0))
+		if (likely(strcmp(path, "raw") == 0))
 			return SE_DOCUMENT_RAW;
-		if (sslikely(strcmp(path, "reuse") == 0))
+		if (likely(strcmp(path, "reuse") == 0))
 			return SE_DOCUMENT_REUSE;
 		break;
 	case 'f':
-		if (sslikely(strcmp(path, "flags") == 0))
+		if (likely(strcmp(path, "flags") == 0))
 			return SE_DOCUMENT_FLAGS;
 		break;
 	case 'c':
-		if (sslikely(strcmp(path, "cache_only") == 0))
+		if (likely(strcmp(path, "cache_only") == 0))
 			return SE_DOCUMENT_CACHE_ONLY;
 		break;
 	case 'e':
-		if (sslikely(strcmp(path, "event") == 0))
+		if (likely(strcmp(path, "event") == 0))
 			return SE_DOCUMENT_EVENT;
 		break;
 	}
@@ -16611,7 +16608,7 @@ phia_document_create(struct phia_document *o)
 	struct svv *v;
 	if (o->raw) {
 		v = sv_vbuildraw(db->r, o->raw, o->rawsize);
-		if (ssunlikely(v == NULL))
+		if (unlikely(v == NULL))
 			return sr_oom(&e->error);
 		sv_init(&o->v, &sv_vif, v, NULL);
 		return 0;
@@ -16623,7 +16620,7 @@ phia_document_create(struct phia_document *o)
 			                "supported for a string key");
 
 		void *copy = ss_malloc(&e->a, o->prefixsize);
-		if (ssunlikely(copy == NULL))
+		if (unlikely(copy == NULL))
 			return sr_oom(&e->error);
 		memcpy(copy, o->prefix, o->prefixsize);
 		o->prefixcopy = copy;
@@ -16640,7 +16637,7 @@ phia_document_create(struct phia_document *o)
 
 	/* create document using current format, supplied
 	 * key-chain and value */
-	if (ssunlikely(o->fields_count_keys != db->scheme->scheme.keys_count))
+	if (unlikely(o->fields_count_keys != db->scheme->scheme.keys_count))
 	{
 		/* set unspecified min/max keys, depending on
 		 * iteration order */
@@ -16652,7 +16649,7 @@ phia_document_create(struct phia_document *o)
 
 allocate:
 	v = sv_vbuild(db->r, o->fields);
-	if (ssunlikely(v == NULL))
+	if (unlikely(v == NULL))
 		return sr_oom(&e->error);
 	sv_init(&o->v, &sv_vif, v, NULL);
 	return 0;
@@ -16662,12 +16659,12 @@ static int
 phia_document_open(struct so *o)
 {
 	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	if (sslikely(v->created)) {
+	if (likely(v->created)) {
 		assert(v->v.v != NULL);
 		return 0;
 	}
 	int rc = phia_document_create(v);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		return -1;
 	v->created = 1;
 	return 0;
@@ -16702,7 +16699,7 @@ phia_document_setfield(struct phia_document *v, const char *path, void *pointer,
 	struct phia_env *e = se_of(&v->o);
 	struct phia_index *db = v->db;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
-	if (ssunlikely(field == NULL))
+	if (unlikely(field == NULL))
 		return NULL;
 	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
 	struct sfv *fv = &v->fields[field->position];
@@ -16714,7 +16711,7 @@ phia_document_setfield(struct phia_document *v, const char *path, void *pointer,
 	} else {
 		fieldsize_max = 2 * 1024 * 1024;
 	}
-	if (ssunlikely(size > fieldsize_max)) {
+	if (unlikely(size > fieldsize_max)) {
 		sr_error(&e->error, "field '%s' is too big (%d limit)",
 		         pointer, fieldsize_max);
 		return NULL;
@@ -16735,12 +16732,12 @@ phia_document_setstring(struct so *o, const char *path, void *pointer, int size)
 {
 	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
 	struct phia_env *e = se_of(o);
-	if (ssunlikely(v->v.v))
+	if (unlikely(v->v.v))
 		return sr_error(&e->error, "%s", "document is read-only");
 	switch (phia_document_opt(path)) {
 	case SE_DOCUMENT_FIELD: {
 		struct sfv *fv = phia_document_setfield(v, path, pointer, size);
-		if (ssunlikely(fv == NULL))
+		if (unlikely(fv == NULL))
 			return -1;
 		break;
 	}
@@ -16748,7 +16745,7 @@ phia_document_setstring(struct so *o, const char *path, void *pointer, int size)
 		if (size == 0)
 			size = strlen(pointer);
 		enum ssorder cmp = ss_orderof(pointer, size);
-		if (ssunlikely(cmp == SS_STOP)) {
+		if (unlikely(cmp == SS_STOP)) {
 			sr_error(&e->error, "%s", "bad order name");
 			return -1;
 		}
@@ -16778,7 +16775,7 @@ phia_document_getstring(struct so *o, const char *path, int *size)
 		/* match field */
 		struct phia_index *db = v->db;
 		struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
-		if (ssunlikely(field == NULL))
+		if (unlikely(field == NULL))
 			return NULL;
 		/* result document */
 		if (v->v.v)
@@ -16879,12 +16876,12 @@ phia_document_setobject(struct so *o, const char *path, void *object)
 	case SE_DOCUMENT_REUSE: {
 		struct phia_env *e = se_of(o);
 		struct phia_document *reuse = se_cast(object, struct phia_document*, SEDOCUMENT);
-		if (ssunlikely(v->created))
+		if (unlikely(v->created))
 			return sr_error(&e->error, "%s", "document is read-only");
 		assert(v->v.v == NULL);
-		if (ssunlikely(object == v->db))
+		if (unlikely(object == v->db))
 			return sr_error(&e->error, "%s", "bad document operation");
-		if (ssunlikely(! reuse->created))
+		if (unlikely(! reuse->created))
 			return sr_error(&e->error, "%s", "bad document operation");
 		sv_init(&v->v, &sv_vif, reuse->v.v, NULL);
 		sv_vref(v->v.v);
@@ -16916,7 +16913,7 @@ phia_document_new(struct phia_env *e, struct phia_index *db, const struct sv *vp
 {
 	struct phia_document *doc;
 	doc = ss_malloc(&e->a, sizeof(struct phia_document));
-	if (ssunlikely(doc == NULL)) {
+	if (unlikely(doc == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -16955,7 +16952,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	int auto_close = !o->created;
 
 	/* validate req */
-	if (ssunlikely(t->t.state == SXPREPARE)) {
+	if (unlikely(t->t.state == SXPREPARE)) {
 		sr_error(&e->error, "%s", "transaction is in 'prepare' state (read-only)");
 		goto error;
 	}
@@ -16965,7 +16962,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (ssunlikely(! phia_index_visible(db, t->t.id))) {
+		if (unlikely(! phia_index_visible(db, t->t.id))) {
 			sr_error(&e->error, "%s", "index is invisible for the transaction");
 			goto error;
 		}
@@ -16977,10 +16974,10 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 
 	/* create document */
 	int rc = so_open(&o->o);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rc = phia_document_validate(o, db, flags);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 
 	struct svv *v = o->v.v;
@@ -16995,7 +16992,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 
 	/* concurrent index only */
 	rc = sx_set(&t->t, &db->coindex, v);
-	if (ssunlikely(rc == -1)) {
+	if (unlikely(rc == -1)) {
 		if (auto_close)
 			ss_quota(&e->quota, SS_QREMOVE, size);
 		return -1;
@@ -17039,7 +17036,7 @@ phia_tx_get(struct phia_tx *t, struct phia_document *key)
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
-		if (ssunlikely(! phia_index_visible(db, t->t.id))) {
+		if (unlikely(! phia_index_visible(db, t->t.id))) {
 			sr_error(&e->error, "%s", "index is invisible to the transaction");
 			goto error;
 		}
@@ -17119,7 +17116,7 @@ phia_commit(struct phia_tx *t)
 {
 	struct phia_env *e = t->env;
 	int status = sr_status(&e->status);
-	if (ssunlikely(! sr_statusactive_is(status)))
+	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
 	int recover = (status == SR_RECOVER);
 
@@ -17131,7 +17128,7 @@ phia_commit(struct phia_tx *t)
 		if (! recover) {
 			prepare = phia_tx_prepare;
 			cache = si_cachepool_pop(&e->cachepool);
-			if (ssunlikely(cache == NULL))
+			if (unlikely(cache == NULL))
 				return sr_oom(&e->error);
 		}
 		enum sxstate s = sx_prepare(&t->t, prepare, cache);
@@ -17165,11 +17162,11 @@ phia_commit(struct phia_tx *t)
 	assert(t->t.state == SXCOMMIT);
 
 	/* do wal write and backend commit */
-	if (ssunlikely(recover))
+	if (unlikely(recover))
 		recover = (e->conf.recover == 3) ? 2: 1;
 	int rc;
 	rc = sc_write(&e->scheduler, &t->log, t->lsn, recover);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		sx_rollback(&t->t);
 
 	phia_tx_end(t, 0, 0);
@@ -17193,7 +17190,7 @@ phia_begin(struct phia_env *e)
 {
 	struct phia_tx *t;
 	t = ss_malloc(&e->a, sizeof(struct phia_tx));
-	if (ssunlikely(t == NULL)) {
+	if (unlikely(t == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -17223,7 +17220,7 @@ static inline struct so*
 sp_cast(void *ptr, const char *method)
 {
 	struct so *o = se_cast_validate(ptr);
-	if (ssunlikely(o == NULL)) {
+	if (unlikely(o == NULL)) {
 		fprintf(stderr, "\n%s(%p): bad object\n", method, ptr);
 		abort();
 	}
@@ -17233,7 +17230,7 @@ sp_cast(void *ptr, const char *method)
 struct phia_env *phia_env(void)
 {
 	struct phia_env *e = malloc(sizeof(*e));
-	if (ssunlikely(e == NULL))
+	if (unlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
 	so_init(&e->o, &se_o[SE], &seif, e);
@@ -17243,7 +17240,7 @@ struct phia_env *phia_env(void)
 	ss_aopen(&e->a, &ss_stda);
 	int rc;
 	rc = se_confinit(&e->conf, e);
-	if (ssunlikely(rc == -1))
+	if (unlikely(rc == -1))
 		goto error;
 	rlist_create(&e->db);
 	ss_quotainit(&e->quota);
@@ -17274,7 +17271,7 @@ phia_document(struct phia_index *db)
 int phia_open(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->open == NULL)) {
+	if (unlikely(o->i->open == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
@@ -17284,7 +17281,7 @@ int phia_open(void *ptr)
 int phia_close(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->close == NULL)) {
+	if (unlikely(o->i->close == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
@@ -17294,13 +17291,13 @@ int phia_close(void *ptr)
 int phia_destroy(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->destroy == NULL)) {
+	if (unlikely(o->i->destroy == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
 	struct phia_env *e = o->env;
 	int rc;
-	if (ssunlikely(&e->o == o)) {
+	if (unlikely(&e->o == o)) {
 		rc = o->i->destroy(o);
 		return rc;
 	}
@@ -17315,7 +17312,7 @@ int phia_service(struct phia_env *env)
 int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->setstring == NULL)) {
+	if (unlikely(o->i->setstring == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
@@ -17325,7 +17322,7 @@ int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
 int phia_setint(void *ptr, const char *path, int64_t v)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->setint == NULL)) {
+	if (unlikely(o->i->setint == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
@@ -17335,7 +17332,7 @@ int phia_setint(void *ptr, const char *path, int64_t v)
 void *phia_getstring(void *ptr, const char *path, int *size)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->getstring == NULL)) {
+	if (unlikely(o->i->getstring == NULL)) {
 		sp_unsupported(o, __func__);
 		return NULL;
 	}
@@ -17345,7 +17342,7 @@ void *phia_getstring(void *ptr, const char *path, int *size)
 int64_t phia_getint(void *ptr, const char *path)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->getint == NULL)) {
+	if (unlikely(o->i->getint == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
 	}
@@ -17355,7 +17352,7 @@ int64_t phia_getint(void *ptr, const char *path)
 void *phia_get(void *ptr, void *v)
 {
 	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->get == NULL)) {
+	if (unlikely(o->i->get == NULL)) {
 		sp_unsupported(o, __func__);
 		return NULL;
 	}

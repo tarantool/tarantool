@@ -84,8 +84,8 @@ uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
 
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
-#define likely(x)    __builtin_expect((x),1)
-#define unlikely(x)  __builtin_expect((x),0)
+#define likely(x)    __builtin_expect(!! (x),1)
+#define unlikely(x)  __builtin_expect(!! (x),0)
 #define field_sizeof(compound_type, field) sizeof(((compound_type *)NULL)->field)
 
 #ifndef offsetof
