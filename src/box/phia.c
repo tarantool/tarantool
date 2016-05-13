@@ -67,12 +67,7 @@
 #include "tt_pthread.h"
 #include "assoc.h"
 
-#define sspacked __attribute__((packed))
 #define ssunused __attribute__((unused))
-#define ssinline __attribute__((always_inline))
-
-#define ss_align(align, len) \
-	(((uintptr_t)(len) + ((align) - 1)) & ~((uintptr_t)((align) - 1)))
 
 #define ss_cmp(a, b) \
 	((a) == (b) ? 0 : (((a) > (b)) ? 1 : -1))
@@ -224,13 +219,13 @@ ss_vfsfree(struct ssvfs *f)
 
 static struct ssvfsif ss_stdvfs;
 
-struct ssfile {
+struct PACKED ssfile {
 	int fd;
 	uint64_t size;
 	int creat;
 	struct sspath path;
 	struct ssvfs *vfs;
-} sspacked;
+};
 
 static inline void
 ss_fileinit(struct ssfile *f, struct ssvfs *vfs)
@@ -756,14 +751,14 @@ ss_quotaused_percent(struct ssquota *q)
 	return percent;
 }
 
-struct ssrbnode {
+struct PACKED ssrbnode {
 	struct ssrbnode *p, *l, *r;
 	uint8_t color;
-} sspacked;
+};
 
-struct ssrb {
+struct PACKED ssrb {
 	struct ssrbnode *root;
-} sspacked;
+};
 
 static inline void
 ss_rbinit(struct ssrb *t) {
@@ -1105,7 +1100,7 @@ struct ssbufiter {
 	struct ssbuf *buf;
 	int vsize;
 	void *v;
-} sspacked;
+};
 
 static inline int
 ss_bufiter_open(struct ssiter *i, struct ssbuf *buf, int vsize)
@@ -1314,7 +1309,7 @@ struct sslz4filter {
 	LZ4F_compressionContext_t compress;
 	LZ4F_decompressionContext_t decompress;
 	size_t total_size;
-} sspacked;
+};
 
 static int
 ss_lz4filter_init(struct ssfilter *f, va_list args ssunused)
@@ -2820,7 +2815,7 @@ static struct ssvfsif ss_testvfs =
 
 struct sszstdfilter {
 	void *ctx;
-} sspacked;
+};
 
 static const size_t ZSTD_blockHeaderSize = 3;
 
@@ -3043,10 +3038,10 @@ enum sfstorage {
 	SF_SPARSE
 };
 
-struct sfvar {
+struct PACKED sfvar {
 	uint32_t offset;
 	uint32_t size;
-} sspacked;
+};
 
 struct sfv {
 	char     *pointer;
@@ -3688,10 +3683,10 @@ sf_schemefind(struct sfscheme *s, char *name)
 #define SR_VERSION_STORAGE_B '1'
 #define SR_VERSION_STORAGE_C '1'
 
-struct srversion {
+struct PACKED srversion {
 	uint64_t magic;
 	uint8_t  a, b, c;
-} sspacked;
+};
 
 static inline void
 sr_version(struct srversion *v)
@@ -4269,11 +4264,11 @@ struct srconf {
 	struct srconf  *next;
 };
 
-struct srconfdump {
+struct PACKED srconfdump {
 	uint8_t  type;
 	uint16_t keysize;
 	uint32_t valuesize;
-} sspacked;
+};
 
 struct srconfstmt {
 	enum srconfop op;
@@ -4763,10 +4758,10 @@ struct svif {
 	uint32_t  (*size)(struct sv*);
 };
 
-struct sv {
+struct PACKED sv {
 	struct svif *i;
 	void *v, *arg;
-} sspacked;
+};
 
 static inline void
 sv_init(struct sv *v, struct svif *i, void *vptr, void *arg) {
@@ -4821,12 +4816,12 @@ sv_hash(struct sv *v, struct runtime *r) {
 }
 
 
-struct svv {
+struct PACKED svv {
 	uint64_t lsn;
 	uint32_t size;
 	uint8_t  flags;
 	uint16_t refs;
-} sspacked;
+};
 
 static struct svif sv_vif;
 
@@ -4914,12 +4909,12 @@ sv_vunref(struct runtime *r, struct svv *v)
 	return 0;
 }
 
-struct svref {
+struct PACKED svref {
 	struct svv      *v;
 	struct svref    *next;
 	uint8_t  flags;
 	struct ssrbnode node;
-} sspacked;
+};
 
 static struct svif sv_refif;
 
@@ -5212,18 +5207,18 @@ done:
 }
 
 
-struct svlogindex {
+struct PACKED svlogindex {
 	uint32_t id;
 	uint32_t head, tail;
 	uint32_t count;
 	void *ptr;
-} sspacked;
+};
 
-struct svlogv {
+struct PACKED svlogv {
 	struct sv v;
 	uint32_t id;
 	uint32_t next;
-} sspacked;
+};
 
 struct svlog {
 	int count_write;
@@ -5319,11 +5314,11 @@ sv_logreplace(struct svlog *l, int n, struct svlogv *v)
 	ss_bufset(&l->buf, sizeof(struct svlogv), n, (char*)v, sizeof(struct svlogv));
 }
 
-struct svmergesrc {
+struct PACKED svmergesrc {
 	struct ssiter *i, src;
 	uint8_t dup;
 	void *ptr;
-} sspacked;
+};
 
 struct svmerge {
 	struct svmergesrc reserve[16];
@@ -5386,13 +5381,13 @@ sv_mergeadd(struct svmerge *m, struct ssiter *i)
  * by the incoming data sources.
 */
 
-struct svmergeiter {
+struct PACKED svmergeiter {
 	enum ssorder order;
 	struct svmerge *merge;
 	struct svmergesrc *src, *end;
 	struct svmergesrc *v;
 	struct runtime *r;
-} sspacked;
+};
 
 static inline void
 sv_mergeiter_dupreset(struct svmergeiter *i, struct svmergesrc *pos)
@@ -5559,7 +5554,7 @@ sv_mergeisdup(struct ssiter *i)
 
 static struct ssiterif sv_mergeiter;
 
-struct svreaditer {
+struct PACKED svreaditer {
 	struct ssiter *merge;
 	uint64_t vlsn;
 	int next;
@@ -5568,7 +5563,7 @@ struct svreaditer {
 	struct svupsert *u;
 	struct runtime *r;
 	struct sv *v;
-} sspacked;
+};
 
 static inline int
 sv_readiter_upsert(struct svreaditer *i)
@@ -5705,7 +5700,7 @@ sv_readiter_of(struct ssiter *i)
 
 static struct ssiterif sv_readiter;
 
-struct svwriteiter {
+struct PACKED svwriteiter {
 	uint64_t  vlsn;
 	uint64_t  vlsn_lru;
 	uint64_t  limit;
@@ -5722,7 +5717,7 @@ struct svwriteiter {
 	struct svupsert *u;
 	struct ssiter   *merge;
 	struct runtime       *r;
-} sspacked;
+};
 
 static inline int
 sv_writeiter_upsert(struct svwriteiter *i)
@@ -5921,12 +5916,12 @@ struct svindexpos {
 	int rc;
 };
 
-struct svindex {
+struct PACKED svindex {
 	struct ssrb i;
 	uint32_t count;
 	uint32_t used;
 	uint64_t lsnmin;
-} sspacked;
+};
 
 ss_rbget(sv_indexmatch,
          sf_compare(scheme, sv_vpointer((container_of(n, struct svref, node))->v),
@@ -5959,13 +5954,13 @@ sv_indexused(struct svindex *i) {
 	return i->count * sizeof(struct svv) + i->used;
 }
 
-struct svindexiter {
+struct PACKED svindexiter {
 	struct svindex *index;
 	struct ssrbnode *v;
 	struct svref *vcur;
 	struct sv current;
 	enum ssorder order;
-} sspacked;
+};
 
 static inline int
 sv_indexiter_open(struct ssiter *i, struct runtime *r, struct svindex *index, enum ssorder o, void *key, int keysize)
@@ -6295,7 +6290,7 @@ static struct ssiterif sv_writeiter =
 	.next    = sv_writeiter_next
 };
 
-struct sxv {
+struct PACKED sxv {
 	uint64_t id;
 	uint32_t lo;
 	uint64_t csn;
@@ -6305,7 +6300,7 @@ struct sxv {
 	struct sxv *prev;
 	struct sxv *gc;
 	struct ssrbnode node;
-} sspacked;
+};
 
 struct sxvpool {
 	struct sxv *head;
@@ -7218,11 +7213,11 @@ static int sl_write(struct sltx *t, struct svlog *vlog)
 
 #define SD_IDBRANCH 1
 
-struct sdid {
+struct PACKED sdid {
 	uint64_t parent;
 	uint64_t id;
 	uint8_t  flags;
-} sspacked;
+};
 
 static inline void
 sd_idinit(struct sdid *i, uint64_t id, uint64_t parent, uint8_t flags)
@@ -7232,17 +7227,17 @@ sd_idinit(struct sdid *i, uint64_t id, uint64_t parent, uint8_t flags)
 	i->flags  = flags;
 }
 
-struct sdv {
+struct PACKED sdv {
 	uint32_t offset;
 	uint8_t  flags;
 	uint64_t lsn;
 	uint32_t size;
-} sspacked;
+};
 
 static struct svif sd_vif;
 static struct svif sd_vrawif;
 
-struct sdpageheader {
+struct PACKED sdpageheader {
 	uint32_t crc;
 	uint32_t crcdata;
 	uint32_t count;
@@ -7254,7 +7249,7 @@ struct sdpageheader {
 	uint64_t lsnmindup;
 	uint64_t lsnmax;
 	uint32_t reserve;
-} sspacked;
+};
 
 struct sdpage {
 	struct sdpageheader *h;
@@ -7310,7 +7305,7 @@ sd_pagesparse_convert(struct sdpage *p, struct runtime *r, struct sdv *v, char *
 	sf_write(r->scheme, fields, ptr);
 }
 
-struct sdpageiter {
+struct PACKED sdpageiter {
 	struct sdpage *page;
 	struct ssbuf *xfbuf;
 	int64_t pos;
@@ -7320,7 +7315,7 @@ struct sdpageiter {
 	void *key;
 	int keysize;
 	struct runtime *r;
-} sspacked;
+};
 
 static inline void
 sd_pageiter_result(struct sdpageiter *i)
@@ -7570,12 +7565,12 @@ sd_pageiter_next(struct ssiter *i)
 
 static struct ssiterif sd_pageiter;
 
-struct sdbuildref {
+struct PACKED sdbuildref {
 	uint32_t m, msize;
 	uint32_t v, vsize;
 	uint32_t k, ksize;
 	uint32_t c, csize;
-} sspacked;
+};
 
 struct sdbuild {
 	struct ssbuf list, m, v, k, c;
@@ -7633,7 +7628,7 @@ static int sd_buildadd(struct sdbuild*, struct runtime*, struct sv*, uint32_t);
 
 #define SD_INDEXEXT_AMQF 1
 
-struct sdindexheader {
+struct PACKED sdindexheader {
 	uint32_t  crc;
 	struct srversion version;
 	struct sdid      id;
@@ -7651,16 +7646,16 @@ struct sdindexheader {
 	uint32_t  extension;
 	uint8_t   extensions;
 	char      reserve[31];
-} sspacked;
+};
 
-struct sdindexamqf {
+struct PACKED sdindexamqf {
 	uint8_t  q, r;
 	uint32_t entries;
 	uint32_t size;
 	uint64_t table[];
-} sspacked;
+};
 
-struct sdindexpage {
+struct PACKED sdindexpage {
 	uint64_t offset;
 	uint32_t offsetindex;
 	uint32_t size;
@@ -7669,7 +7664,7 @@ struct sdindexpage {
 	uint16_t sizemax;
 	uint64_t lsnmin;
 	uint64_t lsnmax;
-} sspacked;
+};
 
 struct sdindex {
 	struct ssbuf i, v;
@@ -7758,7 +7753,7 @@ static int sd_indexcommit(struct sdindex*, struct runtime*, struct sdid*, struct
 static int sd_indexadd(struct sdindex*, struct runtime*, struct sdbuild*, uint64_t);
 static int sd_indexcopy(struct sdindex*, struct runtime*, struct sdindexheader*);
 
-struct sdindexiter {
+struct PACKED sdindexiter {
 	struct sdindex *index;
 	struct sdindexpage *v;
 	int pos;
@@ -7766,7 +7761,7 @@ struct sdindexiter {
 	void *key;
 	int keysize;
 	struct runtime *r;
-} sspacked;
+};
 
 static inline int
 sd_indexiter_route(struct sdindexiter *i)
@@ -7899,13 +7894,13 @@ static struct ssiterif sd_indexiter;
 
 #define SD_SEALED 1
 
-struct sdseal {
+struct PACKED sdseal {
 	uint32_t  crc;
 	struct srversion version;
 	uint8_t   flags;
 	uint32_t  index_crc;
 	uint64_t  index_offset;
-} sspacked;
+};
 
 static inline void
 sd_sealset_open(struct sdseal *s)
@@ -8091,12 +8086,12 @@ struct sdreadarg {
 	struct runtime         *r;
 };
 
-struct sdread {
+struct PACKED sdread {
 	struct sdreadarg ra;
 	struct sdindexpage *ref;
 	struct sdpage page;
 	int reads;
-} sspacked;
+};
 
 static inline int
 sd_read_page(struct sdread *i, struct sdindexpage *ref)
@@ -8284,17 +8279,17 @@ static int sd_recover_complete(struct ssiter*);
 
 static struct ssiterif sd_recover;
 
-struct sdschemeheader {
+struct PACKED sdschemeheader {
 	uint32_t crc;
 	uint32_t size;
 	uint32_t count;
-} sspacked;
+};
 
-struct sdschemeopt {
+struct PACKED sdschemeopt {
 	uint8_t  type;
 	uint8_t  id;
 	uint32_t size;
-} sspacked;
+};
 
 struct sdscheme {
 	struct ssbuf buf;
@@ -8334,10 +8329,10 @@ static int sd_schemecommit(struct sdscheme*);
 static int sd_schemewrite(struct sdscheme*, struct runtime*, char*, int);
 static int sd_schemerecover(struct sdscheme*, struct runtime*, char*);
 
-struct sdschemeiter {
+struct PACKED sdschemeiter {
 	struct sdscheme *c;
 	char *p;
-} sspacked;
+};
 
 static inline int
 sd_schemeiter_open(struct ssiter *i, struct runtime *r, struct sdscheme *c, int validate)
@@ -9082,7 +9077,7 @@ static struct ssiterif sd_read =
 	.next  = sd_read_next
 };
 
-struct sdrecover {
+struct PACKED sdrecover {
 	struct ssfile *file;
 	int corrupt;
 	struct sdindexheader *v;
@@ -9090,7 +9085,7 @@ struct sdrecover {
 	struct sdseal *seal;
 	struct ssmmap map;
 	struct runtime *r;
-} sspacked;
+};
 
 static int
 sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
@@ -9553,13 +9548,13 @@ static void si_schemefree(struct sischeme*, struct runtime*);
 static int  si_schemedeploy(struct sischeme*, struct runtime*);
 static int  si_schemerecover(struct sischeme*, struct runtime*);
 
-struct sibranch {
+struct PACKED sibranch {
 	struct sdid id;
 	struct sdindex index;
 	struct ssblob copy;
 	struct sibranch *link;
 	struct sibranch *next;
-} sspacked;
+};
 
 static inline void
 si_branchinit(struct sibranch *b, struct runtime *r)
@@ -9615,7 +9610,7 @@ si_branchis_root(struct sibranch *b) {
 #define SI_RDB_UNDEF  256
 #define SI_RDB_REMOVE 512
 
-struct sinode {
+struct PACKED sinode {
 	uint32_t   recover;
 	uint16_t   flags;
 	uint64_t   update_time;
@@ -9637,7 +9632,7 @@ struct sinode {
 	struct ssrqnode   nodetemp;
 	struct rlist     gc;
 	struct rlist     commit;
-} sspacked;
+};
 
 static struct sinode *si_nodenew(struct runtime*);
 static int
@@ -9983,7 +9978,7 @@ si_lru_vlsn(struct si *i)
 static uint32_t si_gcv(struct runtime*, struct svv*);
 static uint32_t si_gcref(struct runtime*, struct svref*);
 
-struct sicachebranch {
+struct PACKED sicachebranch {
 	struct sibranch *branch;
 	struct sdindexpage *ref;
 	struct sdpage page;
@@ -9994,7 +9989,7 @@ struct sicachebranch {
 	struct ssbuf buf_b;
 	int open;
 	struct sicachebranch *next;
-} sspacked;
+};
 
 struct sicache {
 	struct sicachebranch *path;
@@ -10279,13 +10274,13 @@ static void si_readupsert(struct siread*, struct sv*, int);
 static int  si_read(struct siread*);
 static int  si_readcommited(struct si*, struct runtime*, struct sv*, int);
 
-struct siiter {
+struct PACKED siiter {
 	struct si *index;
 	struct ssrbnode *v;
 	enum ssorder order;
 	void *key;
 	int keysize;
-} sspacked;
+};
 
 ss_rbget(si_itermatch,
          si_nodecmp(container_of(n, struct sinode, node), key, keysize, scheme))
@@ -10479,7 +10474,7 @@ si_trackreplace(struct sitrack *t, struct sinode *o, struct sinode *n)
 static struct sinode *si_bootstrap(struct si*, uint64_t);
 static int si_recover(struct si*);
 
-struct siprofiler {
+struct PACKED siprofiler {
 	uint32_t  total_node_count;
 	uint64_t  total_node_size;
 	uint64_t  total_node_origin_size;
@@ -10504,7 +10499,7 @@ struct siprofiler {
 	char      histogram_temperature_sz[256];
 	char     *histogram_temperature_ptr;
 	struct si       *i;
-} sspacked;
+};
 
 static int si_profilerbegin(struct siprofiler*, struct si*);
 static int si_profilerend(struct siprofiler*);
@@ -13611,13 +13606,13 @@ sr_checkdir(struct runtime *r, const char *path)
 	return 0;
 }
 
-struct scworker {
+struct PACKED scworker {
 	char name[16];
 	struct sstrace trace;
 	struct sdc dc;
 	struct rlist link;
 	struct rlist linkidle;
-} sspacked;
+};
 
 struct scworkerpool {
 	pthread_mutex_t lock;
@@ -14794,14 +14789,14 @@ struct phia_tx {
 	struct sx t;
 };
 
-struct seviewdb {
+struct PACKED seviewdb {
 	struct so        o;
 	uint64_t  txn_id;
 	int       ready;
 	struct ssbuf     list;
 	char     *pos;
 	struct phia_index     *v;
-} sspacked;
+};
 
 struct phia_cursor {
 	struct phia_index *db;

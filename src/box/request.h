@@ -33,6 +33,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "trivia/config.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -78,13 +80,13 @@ struct request
 } /* extern "C" */
 
 /** The snapshot row metadata repeats the structure of REPLACE request. */
-struct request_replace_body {
+struct PACKED request_replace_body {
 	uint8_t m_body;
 	uint8_t k_space_id;
 	uint8_t m_space_id;
 	uint32_t v_space_id;
 	uint8_t k_tuple;
-} __attribute__((packed));
+};
 
 void
 request_create(struct request *request, uint32_t code);

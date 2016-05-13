@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "trivia/config.h"
 #include "iproto_port.h"
 #include "iproto_constants.h"
 #include "schema.h" /* sc_version */
@@ -36,7 +37,7 @@
 #include <fcntl.h>
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
-struct iproto_header_bin {
+struct PACKED iproto_header_bin {
 	uint8_t m_len;                          /* MP_UINT32 */
 	uint32_t v_len;                         /* length */
 	uint8_t m_header;                       /* MP_MAP */
@@ -49,7 +50,7 @@ struct iproto_header_bin {
 	uint8_t k_schema_id;                    /* IPROTO_SCHEMA_ID */
 	uint8_t m_schema_id;                    /* MP_UINT32 */
 	uint32_t v_schema_id;                   /* schema_id */
-} __attribute__((packed));
+};
 
 static const struct iproto_header_bin iproto_header_bin = {
 	0xce, 0, 0x83,
@@ -58,12 +59,12 @@ static const struct iproto_header_bin iproto_header_bin = {
 	IPROTO_SCHEMA_ID, 0xce, 0
 };
 
-struct iproto_body_bin {
+struct PACKED iproto_body_bin {
 	uint8_t m_body;                    /* MP_MAP */
 	uint8_t k_data;                    /* IPROTO_DATA or IPROTO_ERROR */
 	uint8_t m_data;                    /* MP_STR or MP_ARRAY */
 	uint32_t v_data_len;               /* string length of array size */
-} __attribute__((packed));
+};
 
 static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0

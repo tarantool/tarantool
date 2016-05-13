@@ -271,7 +271,7 @@ extern struct slab_arena memtx_arena;
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  */
-struct tuple
+struct PACKED tuple
 {
 	/*
 	 * sic: the header of the tuple is used
@@ -293,7 +293,7 @@ struct tuple
 	 * with BER-packed field length.
 	 */
 	char data[0];
-} __attribute__((packed));
+};
 
 /**
  * Create a new tuple from a sequence of MsgPack encoded fields.

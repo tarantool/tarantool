@@ -54,7 +54,7 @@ extern "C" {
 #define bit_likely(x)    __builtin_expect((x),1)
 #define bit_unlikely(x)  __builtin_expect((x),0)
 
-struct unaligned_mem
+struct PACKED unaligned_mem
 {
 	union
 	{
@@ -66,7 +66,7 @@ struct unaligned_mem
 		double	 lf;
 		bool     b;
 	};
-} __attribute__((__packed__));
+};
 /** @endcond **/
 
 /**

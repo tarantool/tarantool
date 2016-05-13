@@ -46,6 +46,12 @@
 #define TARANTOOL_LIBEXT "dylib"
 #endif
 
+#if defined(__CC_ARM)         /* set the alignment to 1 for armcc compiler */
+#define PACKED    __packed
+#else
+#define PACKED  __attribute__((packed))
+#endif
+
 /*
  * Defined if gcov instrumentation should be enabled.
  */
