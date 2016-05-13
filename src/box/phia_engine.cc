@@ -219,7 +219,7 @@ void phia_error(struct phia_env *env)
 int phia_info(const char *name, phia_info_f cb, void *arg)
 {
 	PhiaEngine *e = (PhiaEngine *)engine_find("phia");
-	void *cursor = phia_getobject(e->env, NULL);
+	void *cursor = phia_confcursor(e->env);
 	void *o = NULL;
 	if (name) {
 		while ((o = phia_get(cursor, o))) {

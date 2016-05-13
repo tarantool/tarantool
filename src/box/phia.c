@@ -4685,15 +4685,11 @@ struct soif {
 	int      (*close)(struct so*);
 	int      (*destroy)(struct so*);
 	void     (*free)(struct so*);
-	int      (*drop)(struct so*);
 	int      (*setstring)(struct so*, const char*, void*, int);
 	int      (*setint)(struct so*, const char*, int64_t);
-	int      (*setobject)(struct so*, const char*, void*);
-	void    *(*getobject)(struct so*, const char*);
 	void    *(*getstring)(struct so*, const char*, int*);
 	int64_t  (*getint)(struct so*, const char*);
 	void    *(*get)(struct so*, struct so*);
-	void    *(*cursor)(struct so*);
 };
 
 struct sotype {
@@ -14658,7 +14654,6 @@ static int se_confvalidate(struct seconf*);
 static int se_confserialize(struct seconf*, struct ssbuf*);
 static int se_confset_string(struct so*, const char*, void*, int);
 static int se_confset_int(struct so*, const char*, int64_t);
-static void *se_confget_object(struct so*, const char*);
 static void *se_confget_string(struct so*, const char*, int*);
 static int64_t se_confget_int(struct so*, const char*);
 
@@ -14674,8 +14669,6 @@ struct seconfcursor {
 	int first;
 	struct srconfdump *pos;
 };
-
-static struct so *se_confcursor_new(struct so*);
 
 struct phia_env {
 	struct so          o;
@@ -14944,15 +14937,11 @@ static struct soif seif =
 	.close        = se_close,
 	.destroy      = se_destroy,
 	.free         = NULL,
-	.drop         = NULL,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
-	.setobject    = NULL,
-	.getobject    = se_confget_object,
 	.getstring    = se_confget_string,
 	.getint       = se_confget_int,
 	.get          = NULL,
-	.cursor       = NULL,
 };
 
 static inline int
@@ -15713,19 +15702,6 @@ static int se_confset_int(struct so *o, const char *path, int64_t v)
 	                    &v, sizeof(v), NULL);
 }
 
-static void *se_confget_object(struct so *o, const char *path)
-{
-	struct phia_env *e = se_of(o);
-	if (path == NULL)
-		return se_confcursor_new(o);
-	void *result = NULL;
-	int rc = se_confquery(e, SR_READ, path, SS_OBJECT,
-	                      &result, sizeof(void*), NULL);
-	if (ssunlikely(rc == -1))
-		return NULL;
-	return result;
-}
-
 static void *se_confget_string(struct so *o, const char *path, int *size)
 {
 	struct phia_env *e = se_of(o);
@@ -15886,15 +15862,11 @@ static struct soif seconfkvif =
 	.close        = NULL,
 	.destroy      = se_confkv_destroy,
 	.free         = se_confkv_free,
-	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
-	.setobject    = NULL,
-	.getobject    = NULL,
 	.getstring    = se_confkv_getstring,
 	.getint       = NULL,
 	.get          = NULL,
-	.cursor       = NULL,
 };
 
 static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp)
@@ -15975,20 +15947,16 @@ static struct soif seconfcursorif =
 	.close        = NULL,
 	.destroy      = se_confcursor_destroy,
 	.free         = se_confcursor_free,
-	.drop         = NULL,
 	.setstring    = NULL,
 	.setint       = NULL,
-	.setobject    = NULL,
-	.getobject    = NULL,
 	.getstring    = NULL,
 	.getint       = NULL,
 	.get          = se_confcursor_get,
-	.cursor       = NULL,
 };
 
-static struct so *se_confcursor_new(struct so *o)
+void *
+phia_confcursor(struct phia_env *e)
 {
-	struct phia_env *e = (struct phia_env*)o;
 	struct seconfcursor *c;
 	c = ss_malloc(&e->a, sizeof(struct seconfcursor));
 	if (ssunlikely(c == NULL)) {
@@ -16947,15 +16915,11 @@ static struct soif sedocumentif =
 	.close        = NULL,
 	.destroy      = phia_document_destroy,
 	.free         = phia_document_free,
-	.drop         = NULL,
 	.setstring    = phia_document_setstring,
 	.setint       = phia_document_setint,
-	.setobject    = NULL,
-	.getobject    = NULL,
 	.getstring    = phia_document_getstring,
 	.getint       = phia_document_getint,
 	.get          = NULL,
-	.cursor       = NULL,
 };
 
 static struct phia_document *
@@ -17334,16 +17298,6 @@ int phia_close(void *ptr)
 	return o->i->close(o);
 }
 
-int phia_drop(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->drop == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->drop(o);
-}
-
 int phia_destroy(void *ptr)
 {
 	struct so *o = sp_cast(ptr, __func__);
@@ -17383,16 +17337,6 @@ int phia_setint(void *ptr, const char *path, int64_t v)
 		return -1;
 	}
 	return o->i->setint(o, path, v);
-}
-
-void *phia_getobject(void *ptr, const char *path)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (ssunlikely(o->i->getobject == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	return o->i->getobject(o, path);
 }
 
 void *phia_getstring(void *ptr, const char *path, int *size)

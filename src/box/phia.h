@@ -82,6 +82,8 @@ void    *phia_get(void*, void*);
 
 struct phia_cursor *
 phia_cursor(struct phia_env *env);
+void *
+phia_confcursor(struct phia_env *env);
 void
 phia_cursor_delete(struct phia_cursor *cursor);
 void
