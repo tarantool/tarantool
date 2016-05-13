@@ -6,6 +6,7 @@ os.execute("rm -rf phia_test")
 os.execute("mkdir -p phia_test")
 
 local phia = {
+    memory_limit = 0.1,
 	threads = 5
 }
 
