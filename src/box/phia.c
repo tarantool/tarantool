@@ -1082,7 +1082,6 @@ struct ssiter {
 #define ss_iteratorof(i) (i)->vif->get(i)
 #define ss_iteratornext(i) (i)->vif->next(i)
 
-static struct ssiterif ss_bufiterif;
 static struct ssiterif ss_bufiterrefif;
 
 struct ssbufiter {
@@ -1092,10 +1091,8 @@ struct ssbufiter {
 };
 
 static inline void
-ss_bufiter_open(struct ssiter *i, struct ssbuf *buf, int vsize)
+ss_bufiter_open(struct ssbufiter *bi, struct ssbuf *buf, int vsize)
 {
-	i->vif = &ss_bufiterif;
-	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
 	bi->buf = buf;
 	bi->vsize = vsize;
 	bi->v = bi->buf->s;
@@ -1104,27 +1101,26 @@ ss_bufiter_open(struct ssiter *i, struct ssbuf *buf, int vsize)
 }
 
 static inline void
-ss_bufiter_close(struct ssiter *i ssunused)
-{ }
+ss_bufiter_close(struct ssbufiter *bi)
+{
+	(void) bi;
+}
 
 static inline int
-ss_bufiter_has(struct ssiter *i)
+ss_bufiter_has(struct ssbufiter *bi)
 {
-	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
 	return bi->v != NULL;
 }
 
-static inline void*
-ss_bufiter_get(struct ssiter *i)
+static inline void *
+ss_bufiter_get(struct ssbufiter *bi)
 {
-	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
 	return bi->v;
 }
 
 static inline void
-ss_bufiter_next(struct ssiter *i)
+ss_bufiter_next(struct ssbufiter *bi)
 {
-	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
 	if (unlikely(bi->v == NULL))
 		return;
 	bi->v = (char*)bi->v + bi->vsize;
@@ -1133,18 +1129,24 @@ ss_bufiter_next(struct ssiter *i)
 }
 
 static inline void
-ss_bufiterref_open(struct ssiter *i, struct ssbuf *buf, int vsize) {
-	ss_bufiter_open(i, buf, vsize);
+ss_bufiterref_open(struct ssiter *i, struct ssbuf *buf, int vsize)
+{
 	i->vif = &ss_bufiterrefif;
+	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
+	ss_bufiter_open(bi, buf, vsize);
 }
 
 static inline void
-ss_bufiterref_close(struct ssiter *i ssunused)
-{ }
+ss_bufiterref_close(struct ssiter *i)
+{
+	(void) i;
+}
 
 static inline int
-ss_bufiterref_has(struct ssiter *i) {
-	return ss_bufiter_has(i);
+ss_bufiterref_has(struct ssiter *i)
+{
+	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
+	return ss_bufiter_has(bi);
 }
 
 static inline void*
@@ -1157,8 +1159,10 @@ ss_bufiterref_get(struct ssiter *i)
 }
 
 static inline void
-ss_bufiterref_next(struct ssiter *i) {
-	ss_bufiter_next(i);
+ss_bufiterref_next(struct ssiter *i)
+{
+	struct ssbufiter *bi = (struct ssbufiter*)i->priv;
+	ss_bufiter_next(bi);
 }
 
 struct ssblob {
@@ -1274,14 +1278,6 @@ ss_avgprepare(struct ssavg *a)
 	snprintf(a->sz, sizeof(a->sz), "%"PRIu32" %"PRIu32" %.1f",
 	         a->min, a->max, a->avg);
 }
-
-static struct ssiterif ss_bufiterif =
-{
-	.close   = ss_bufiter_close,
-	.has     = ss_bufiter_has,
-	.get	 = ss_bufiter_get,
-	.next    = ss_bufiter_next
-};
 
 static struct ssiterif ss_bufiterrefif =
 {
@@ -5478,9 +5474,8 @@ sv_mergeiter_lt(struct svmergeiter *i)
 }
 
 static inline void
-sv_mergeiter_next(struct ssiter *it)
+sv_mergeiter_next(struct svmergeiter *im)
 {
-	struct svmergeiter *im = (struct svmergeiter*)it->priv;
 	switch (im->order) {
 	case SS_GT:
 	case SS_GTE:
@@ -5494,47 +5489,43 @@ sv_mergeiter_next(struct ssiter *it)
 	}
 }
 
-static struct ssiterif sv_mergeiterif;
-
 static inline int
-sv_mergeiter_open(struct ssiter *i, struct runtime *r, struct svmerge *m, enum ssorder o)
+sv_mergeiter_open(struct svmergeiter *im, struct runtime *r,
+		  struct svmerge *m, enum ssorder o)
 {
-	i->vif = &sv_mergeiterif;
-	struct svmergeiter *im = (struct svmergeiter*)i->priv;
 	im->merge = m;
 	im->r     = r;
 	im->order = o;
 	im->src   = (struct svmergesrc*)(im->merge->buf.s);
 	im->end   = (struct svmergesrc*)(im->merge->buf.p);
 	im->v     = NULL;
-	sv_mergeiter_next(i);
+	sv_mergeiter_next(im);
 	return 0;
 }
 
 static inline void
-sv_mergeiter_close(struct ssiter *i ssunused)
-{ }
+sv_mergeiter_close(struct svmergeiter *im)
+{
+	(void) im;
+}
 
 static inline int
-sv_mergeiter_has(struct ssiter *i)
+sv_mergeiter_has(struct svmergeiter *im)
 {
-	struct svmergeiter *im = (struct svmergeiter*)i->priv;
 	return im->v != NULL;
 }
 
 static inline void *
-sv_mergeiter_get(struct ssiter *i)
+sv_mergeiter_get(struct svmergeiter *im)
 {
-	struct svmergeiter *im = (struct svmergeiter*)i->priv;
 	if (unlikely(im->v == NULL))
 		return NULL;
 	return ss_iteratorof(im->v->i);
 }
 
 static inline uint32_t
-sv_mergeisdup(struct ssiter *i)
+sv_mergeisdup(struct svmergeiter *im)
 {
-	struct svmergeiter *im = (struct svmergeiter*)i->priv;
 	assert(im->v != NULL);
 	if (im->v->dup)
 		return SVDUP;
@@ -5542,7 +5533,7 @@ sv_mergeisdup(struct ssiter *i)
 }
 
 struct PACKED svreaditer {
-	struct ssiter *merge;
+	struct svmergeiter *merge;
 	uint64_t vlsn;
 	int next;
 	int nextdup;
@@ -5588,9 +5579,8 @@ sv_readiter_upsert(struct svreaditer *i)
 }
 
 static inline void
-sv_readiter_next(struct ssiter *i)
+sv_readiter_next(struct svreaditer *im)
 {
-	struct svreaditer *im = (struct svreaditer*)i->priv;
 	if (im->next)
 		sv_mergeiter_next(im->merge);
 	im->next = 0;
@@ -5627,9 +5617,8 @@ sv_readiter_next(struct ssiter *i)
 }
 
 static inline void
-sv_readiter_forward(struct ssiter *i)
+sv_readiter_forward(struct svreaditer *im)
 {
-	struct svreaditer *im = (struct svreaditer*)i->priv;
 	if (im->next)
 		sv_mergeiter_next(im->merge);
 	im->next = 0;
@@ -5646,43 +5635,39 @@ sv_readiter_forward(struct ssiter *i)
 	}
 }
 
-static struct ssiterif sv_readiterif;
-
 static inline int
-sv_readiter_open(struct ssiter *i, struct runtime *r, struct ssiter *iterator, struct svupsert *u,
-                 uint64_t vlsn, int save_delete)
+sv_readiter_open(struct svreaditer *im, struct runtime *r,
+		 struct svmergeiter *merge, struct svupsert *u,
+		 uint64_t vlsn, int save_delete)
 {
-	i->vif = &sv_readiterif;
-	struct svreaditer *im = (struct svreaditer*)i->priv;
 	im->r     = r;
 	im->u     = u;
-	im->merge = iterator;
+	im->merge = merge;
 	im->vlsn  = vlsn;
-	assert(im->merge->vif == &sv_mergeiterif);
 	im->v = NULL;
 	im->next = 0;
 	im->nextdup = 0;
 	im->save_delete = save_delete;
 	/* iteration can start from duplicate */
-	sv_readiter_next(i);
+	sv_readiter_next(im);
 	return 0;
 }
 
 static inline void
-sv_readiter_close(struct ssiter *i ssunused)
-{ }
+sv_readiter_close(struct svreaditer *im)
+{
+	(void) im;
+}
 
 static inline int
-sv_readiter_has(struct ssiter *i)
+sv_readiter_has(struct svreaditer *im)
 {
-	struct svreaditer *im = (struct svreaditer*)i->priv;
 	return im->v != NULL;
 }
 
 static inline void*
-sv_readiter_get(struct ssiter *i)
+sv_readiter_get(struct svreaditer *im)
 {
-	struct svreaditer *im = (struct svreaditer*)i->priv;
 	if (unlikely(im->v == NULL))
 		return NULL;
 	return im->v;
@@ -5703,7 +5688,7 @@ struct PACKED svwriteiter {
 	int       vdup;
 	struct sv       *v;
 	struct svupsert *u;
-	struct ssiter   *merge;
+	struct svmergeiter   *merge;
 	struct runtime       *r;
 };
 
@@ -5751,9 +5736,8 @@ sv_writeiter_upsert(struct svwriteiter *i)
 }
 
 static inline void
-sv_writeiter_next(struct ssiter *i)
+sv_writeiter_next(struct svwriteiter *im)
 {
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	if (im->next)
 		sv_mergeiter_next(im->merge);
 	im->next = 0;
@@ -5824,11 +5808,9 @@ sv_writeiter_next(struct ssiter *i)
 	}
 }
 
-static struct ssiterif sv_writeiterif;
-
 static inline int
-sv_writeiter_open(struct ssiter *i, struct runtime *r,
-		  struct ssiter *merge, struct svupsert *u,
+sv_writeiter_open(struct svwriteiter *im, struct runtime *r,
+		  struct svmergeiter *merge, struct svupsert *u,
                   uint64_t limit,
                   uint32_t sizev,
                   uint64_t vlsn,
@@ -5836,8 +5818,6 @@ sv_writeiter_open(struct ssiter *i, struct runtime *r,
                   int save_delete,
                   int save_upsert)
 {
-	i->vif = &sv_writeiterif;
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	im->u           = u;
 	im->r           = r;
 	im->merge       = merge;
@@ -5848,40 +5828,36 @@ sv_writeiter_open(struct ssiter *i, struct runtime *r,
 	im->vlsn_lru    = vlsn_lru;
 	im->save_delete = save_delete;
 	im->save_upsert = save_upsert;
-	assert(im->merge->vif == &sv_mergeiterif);
 	im->next  = 0;
 	im->prevlsn  = 0;
 	im->v = NULL;
 	im->vdup = 0;
 	im->upsert = 0;
-	sv_writeiter_next(i);
+	sv_writeiter_next(im);
 	return 0;
 }
 
 static inline void
-sv_writeiter_close(struct ssiter *i ssunused)
-{ }
+sv_writeiter_close(struct svwriteiter *im)
+{
+	(void) im;
+}
 
 static inline int
-sv_writeiter_has(struct ssiter *i)
+sv_writeiter_has(struct svwriteiter *im)
 {
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	return im->v != NULL;
 }
 
-static inline void*
-sv_writeiter_get(struct ssiter *i)
+static inline void *
+sv_writeiter_get(struct svwriteiter *im)
 {
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
-	if (unlikely(im->v == NULL))
-		return NULL;
 	return im->v;
 }
 
 static inline int
-sv_writeiter_resume(struct ssiter *i)
+sv_writeiter_resume(struct svwriteiter *im)
 {
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	im->v       = sv_mergeiter_get(im->merge);
 	if (unlikely(im->v == NULL))
 		return 0;
@@ -5894,9 +5870,8 @@ sv_writeiter_resume(struct ssiter *i)
 }
 
 static inline int
-sv_writeiter_is_duplicate(struct ssiter *i)
+sv_writeiter_is_duplicate(struct svwriteiter *im)
 {
-	struct svwriteiter *im = (struct svwriteiter*)i->priv;
 	assert(im->v != NULL);
 	return im->vdup;
 }
@@ -6150,22 +6125,6 @@ static struct ssiterif sv_indexiterif =
 	.next    = sv_indexiter_next
 };
 
-static struct ssiterif sv_mergeiterif =
-{
-	.close = sv_mergeiter_close,
-	.has   = sv_mergeiter_has,
-	.get   = sv_mergeiter_get,
-	.next  = sv_mergeiter_next
-};
-
-static struct ssiterif sv_readiterif =
-{
-	.close   = sv_readiter_close,
-	.has     = sv_readiter_has,
-	.get     = sv_readiter_get,
-	.next    = sv_readiter_next
-};
-
 static uint8_t
 sv_refifflags(struct sv *v) {
 	struct svref *ref = (struct svref*)v->v;
@@ -6271,14 +6230,6 @@ static struct svif sv_vif =
 	.lsnset    = sv_viflsnset,
 	.pointer   = sv_vifpointer,
 	.size      = sv_vifsize
-};
-
-static struct ssiterif sv_writeiterif =
-{
-	.close   = sv_writeiter_close,
-	.has     = sv_writeiter_has,
-	.get     = sv_writeiter_get,
-	.next    = sv_writeiter_next
 };
 
 struct PACKED sxv {
@@ -6780,7 +6731,7 @@ sx_end(struct sx *x)
 }
 
 static inline void
-sx_rollback_svp(struct sx *x, struct ssiter *i, int free)
+sx_rollback_svp(struct sx *x, struct ssbufiter *i, int free)
 {
 	struct sxmanager *m = x->manager;
 	int gc = 0;
@@ -6806,7 +6757,7 @@ sx_rollback_svp(struct sx *x, struct ssiter *i, int free)
 static enum sxstate sx_rollback(struct sx *x)
 {
 	struct sxmanager *m = x->manager;
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
 	/* support log free after commit and half-commit mode */
 	if (x->state == SXCOMMIT) {
@@ -6848,7 +6799,7 @@ static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 	/* proceed read-only transactions */
 	if (x->type == SXRO || sv_logcount_write(x->log) == 0)
 		return sx_promote(x, SXPREPARE);
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
 	enum sxstate rc;
 	for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
@@ -6887,7 +6838,7 @@ static enum sxstate sx_commit(struct sx *x)
 	assert(x->state == SXPREPARE);
 
 	struct sxmanager *m = x->manager;
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &x->log->buf, sizeof(struct svlogv));
 	uint64_t csn = ++m->csn;
 	for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
@@ -7069,7 +7020,7 @@ sx_deadlock_in(struct sxmanager *m, struct rlist *mark, struct sx *t, struct sx 
 	if (p->deadlock.next != &p->deadlock)
 		return 0;
 	rlist_add(mark, &p->deadlock);
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &p->log->buf, sizeof(struct svlogv));
 	for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
 	{
@@ -7105,7 +7056,7 @@ static int ssunused sx_deadlock(struct sx *t)
 	struct sxmanager *m = t->manager;
 	struct rlist mark;
 	rlist_create(&mark);
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &t->log->buf, sizeof(struct svlogv));
 	while (ss_bufiter_has(&i))
 	{
@@ -7186,7 +7137,7 @@ static int sl_write(struct sltx *t, struct svlog *vlog)
 	 * fast path for log-disabled, recover or
 	 * ro-transactions
 	 */
-	struct ssiter i;
+	struct ssbufiter i;
 	ss_bufiter_open(&i, &vlog->buf, sizeof(struct svlogv));
 	for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
 	{
@@ -7455,14 +7406,10 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 	return match;
 }
 
-static struct ssiterif sd_pageiterif;
-
 static inline int
-sd_pageiter_open(struct ssiter *i, struct runtime *r, struct ssbuf *xfbuf, struct sdpage *page, enum ssorder o,
-                 void *key, int keysize)
+sd_pageiter_open(struct sdpageiter *pi, struct runtime *r, struct ssbuf *xfbuf,
+		 struct sdpage *page, enum ssorder o, void *key, int keysize)
 {
-	i->vif = &sd_pageiterif;
-	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
 	pi->r       = r;
 	pi->page    = page;
 	pi->xfbuf   = xfbuf;
@@ -7492,29 +7439,28 @@ sd_pageiter_open(struct ssiter *i, struct runtime *r, struct ssbuf *xfbuf, struc
 }
 
 static inline void
-sd_pageiter_close(struct ssiter *i ssunused)
-{ }
+sd_pageiter_close(struct sdpageiter *pi)
+{
+	(void) pi;
+}
 
 static inline int
-sd_pageiter_has(struct ssiter *i)
+sd_pageiter_has(struct sdpageiter *pi)
 {
-	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
 	return pi->v != NULL;
 }
 
-static inline void*
-sd_pageiter_get(struct ssiter *i)
+static inline void *
+sd_pageiter_get(struct sdpageiter *pi)
 {
-	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
 	if (unlikely(pi->v == NULL))
 		return NULL;
 	return &pi->current;
 }
 
 static inline void
-sd_pageiter_next(struct ssiter *i)
+sd_pageiter_next(struct sdpageiter *pi)
 {
-	struct sdpageiter *pi = (struct sdpageiter*)i->priv;
 	if (pi->v == NULL)
 		return;
 	switch (pi->order) {
@@ -7774,14 +7720,11 @@ sd_indexiter_route(struct sdindexiter *i)
 	return end;
 }
 
-static struct ssiterif sd_indexiterif;
-
 static inline int
-sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index,
-		  enum ssorder o, void *key, int keysize)
+sd_indexiter_open(struct sdindexiter *ii, struct runtime *r,
+		  struct sdindex *index, enum ssorder o, void *key,
+		  int keysize)
 {
-	i->vif = &sd_indexiterif;
-	struct sdindexiter *ii = (struct sdindexiter*)i->priv;
 	ii->r       = r;
 	ii->index   = index;
 	ii->cmp     = o;
@@ -7839,27 +7782,26 @@ sd_indexiter_open(struct ssiter *i, struct runtime *r, struct sdindex *index,
 }
 
 static inline void
-sd_indexiter_close(struct ssiter *i ssunused)
-{ }
+sd_indexiter_close(struct sdindexiter *ii)
+{
+	(void) ii;
+}
 
 static inline int
-sd_indexiter_has(struct ssiter *i)
+sd_indexiter_has(struct sdindexiter *ii)
 {
-	struct sdindexiter *ii = (struct sdindexiter*)i->priv;
 	return ii->v != NULL;
 }
 
 static inline void*
-sd_indexiter_get(struct ssiter *i)
+sd_indexiter_get(struct sdindexiter *ii)
 {
-	struct sdindexiter *ii = (struct sdindexiter*)i->priv;
 	return ii->v;
 }
 
 static inline void
-sd_indexiter_next(struct ssiter *i)
+sd_indexiter_next(struct sdindexiter *ii)
 {
-	struct sdindexiter *ii = (struct sdindexiter*)i->priv;
 	switch (ii->cmp) {
 	case SS_LT:
 	case SS_LTE: ii->pos--;
@@ -7930,8 +7872,8 @@ sd_sealvalidate(struct sdseal *s, struct sdindexheader *h)
 struct sdcbuf {
 	struct ssbuf a; /* decompression */
 	struct ssbuf b; /* transformation */
-	struct ssiter index_iter;
-	struct ssiter page_iter;
+	struct sdindexiter index_iter;
+	struct sdpageiter page_iter;
 	struct sdcbuf *next;
 };
 
@@ -8037,8 +7979,8 @@ struct sdmergeconf {
 
 struct sdmerge {
 	struct sdindex     index;
-	struct ssiter      *merge;
-	struct ssiter      i;
+	struct svmergeiter *merge;
+	struct svwriteiter i;
 	struct sdmergeconf *conf;
 	struct runtime          *r;
 	struct sdbuild     *build;
@@ -8050,7 +7992,7 @@ struct sdmerge {
 };
 
 static int
-sd_mergeinit(struct sdmerge*, struct runtime*, struct ssiter*, struct sdbuild*,
+sd_mergeinit(struct sdmerge*, struct runtime*, struct svmergeiter*, struct sdbuild*,
 	     struct ssqf*, struct svupsert*, struct sdmergeconf*);
 static int sd_mergefree(struct sdmerge*);
 static int sd_merge(struct sdmerge*);
@@ -8062,8 +8004,8 @@ struct sdreadarg {
 	struct ssbuf      *buf;
 	struct ssbuf      *buf_xf;
 	struct ssbuf      *buf_read;
-	struct ssiter     *index_iter;
-	struct ssiter     *page_iter;
+	struct sdindexiter *index_iter;
+	struct sdpageiter *page_iter;
 	struct ssblob     *memory;
 	struct ssfile     *file;
 	enum ssorder     o;
@@ -8261,11 +8203,6 @@ static int sd_writepage(struct runtime*, struct ssfile*, struct ssblob*, struct 
 static int sd_writeindex(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*);
 static int sd_seal(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*, uint64_t);
 
-static int sd_recover_open(struct ssiter*, struct runtime*, struct ssfile*);
-static int sd_recover_complete(struct ssiter*);
-
-static struct ssiterif sd_recoverif;
-
 struct PACKED sdschemeheader {
 	uint32_t crc;
 	uint32_t size;
@@ -8321,13 +8258,10 @@ struct PACKED sdschemeiter {
 	char *p;
 };
 
-static struct ssiterif sd_schemeiterif;
-
 static inline int
-sd_schemeiter_open(struct ssiter *i, struct runtime *r, struct sdscheme *c, int validate)
+sd_schemeiter_open(struct sdschemeiter *ci, struct runtime *r,
+		   struct sdscheme *c, int validate)
 {
-	i->vif = &sd_schemeiterif;
-	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
 	ci->c = c;
 	ci->p = NULL;
 	if (validate) {
@@ -8343,33 +8277,29 @@ sd_schemeiter_open(struct ssiter *i, struct runtime *r, struct sdscheme *c, int 
 }
 
 static inline void
-sd_schemeiter_close(struct ssiter *i ssunused)
+sd_schemeiter_close(struct sdschemeiter *ci)
 {
-	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
-	(void)ci;
+	(void) ci;
 }
 
 static inline int
-sd_schemeiter_has(struct ssiter *i)
+sd_schemeiter_has(struct sdschemeiter *ci)
 {
-	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
 	return ci->p < ci->c->buf.p;
 }
 
-static inline void*
-sd_schemeiter_get(struct ssiter *i)
+static inline void *
+sd_schemeiter_get(struct sdschemeiter *ci)
 {
-	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
-	if (unlikely(ci->p >= ci->c->buf.p))
+	if (ci->p >= ci->c->buf.p)
 		return NULL;
 	return ci->p;
 }
 
 static inline void
-sd_schemeiter_next(struct ssiter *i)
+sd_schemeiter_next(struct sdschemeiter *ci)
 {
-	struct sdschemeiter *ci = (struct sdschemeiter*)i->priv;
-	if (unlikely(ci->p >= ci->c->buf.p))
+	if (ci->p >= ci->c->buf.p)
 		return;
 	struct sdschemeopt *o = (struct sdschemeopt*)ci->p;
 	ci->p = (char*)o + sizeof(struct sdschemeopt) + o->size;
@@ -8917,16 +8847,8 @@ static int sd_indexcopy(struct sdindex *i, struct runtime *r, struct sdindexhead
 	return 0;
 }
 
-static struct ssiterif sd_indexiterif =
-{
-	.close = sd_indexiter_close,
-	.has   = sd_indexiter_has,
-	.get   = sd_indexiter_get,
-	.next  = sd_indexiter_next
-};
-
 static int
-sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
+sd_mergeinit(struct sdmerge *m, struct runtime *r, struct svmergeiter *im,
 	     struct sdbuild *build, struct ssqf *qf, struct svupsert *upsert,
 	     struct sdmergeconf *conf)
 {
@@ -8934,7 +8856,7 @@ sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
 	m->build     = build;
 	m->qf        = qf;
 	m->r         = r;
-	m->merge     = i;
+	m->merge     = im;
 	m->processed = 0;
 	m->current   = 0;
 	m->limit     = 0;
@@ -8945,7 +8867,7 @@ sd_mergeinit(struct sdmerge *m, struct runtime *r, struct ssiter *i,
 			return sr_oom(r->e);
 	}
 	sd_indexinit(&m->index);
-	sv_writeiter_open(&m->i, r, i, upsert,
+	sv_writeiter_open(&m->i, r, m->merge, upsert,
 			  (uint64_t)conf->size_page, sizeof(struct sdv),
 			  conf->vlsn,
 			  conf->vlsn_lru,
@@ -9048,14 +8970,6 @@ static int sd_mergecommit(struct sdmerge *m, struct sdid *id, uint64_t offset)
 	return sd_indexcommit(&m->index, m->r, id, qf, offset);
 }
 
-static struct ssiterif sd_pageiterif =
-{
-	.close   = sd_pageiter_close,
-	.has     = sd_pageiter_has,
-	.get     = sd_pageiter_get,
-	.next    = sd_pageiter_next
-};
-
 static struct ssiterif sd_readif =
 {
 	.close = sd_read_close,
@@ -9075,7 +8989,7 @@ struct PACKED sdrecover {
 };
 
 static int
-sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
+sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 {
 	if (next == NULL)
 		return 0;
@@ -9145,11 +9059,9 @@ sd_recovernext_of(struct sdrecover *i, struct sdseal *next)
 	return 1;
 }
 
-static int sd_recover_open(struct ssiter *i, struct runtime *r,
+static int sd_recover_open(struct sdrecover *ri, struct runtime *r,
 			   struct ssfile *file)
 {
-	i->vif = &sd_recoverif;
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	memset(ri, 0, sizeof(*ri));
 	ri->r = r;
 	ri->file = file;
@@ -9167,57 +9079,44 @@ static int sd_recover_open(struct ssiter *i, struct runtime *r,
 		return -1;
 	}
 	struct sdseal *seal = (struct sdseal*)((char*)ri->map.p);
-	rc = sd_recovernext_of(ri, seal);
+	rc = sd_recover_next_of(ri, seal);
 	if (unlikely(rc == -1))
 		ss_vfsmunmap(r->vfs, &ri->map);
 	return rc;
 }
 
 static void
-sd_recoverclose(struct ssiter *i)
+sd_recover_close(struct sdrecover *ri)
 {
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	ss_vfsmunmap(ri->r->vfs, &ri->map);
 }
 
 static int
-sd_recoverhas(struct ssiter *i)
+sd_recover_has(struct sdrecover *ri)
 {
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	return ri->v != NULL;
 }
 
 static void*
-sd_recoverof(struct ssiter *i)
+sd_recover_get(struct sdrecover *ri)
 {
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	return ri->v;
 }
 
 static void
-sd_recovernext(struct ssiter *i)
+sd_recover_next(struct sdrecover *ri)
 {
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	if (unlikely(ri->v == NULL))
 		return;
 	struct sdseal *next =
 		(struct sdseal*)((char*)ri->v +
 		    (sizeof(struct sdindexheader) + ri->v->size) +
 		     ri->v->extension);
-	sd_recovernext_of(ri, next);
+	sd_recover_next_of(ri, next);
 }
 
-static struct ssiterif sd_recoverif =
+static int sd_recover_complete(struct sdrecover *ri)
 {
-	.close   = sd_recoverclose,
-	.has     = sd_recoverhas,
-	.get     = sd_recoverof,
-	.next    = sd_recovernext
-};
-
-static int sd_recover_complete(struct ssiter *i)
-{
-	struct sdrecover *ri = (struct sdrecover*)i->priv;
 	if (unlikely(ri->seal == NULL))
 		return -1;
 	if (likely(ri->corrupt == 0))
@@ -9338,14 +9237,6 @@ error:
 	         path, strerror(errno));
 	return -1;
 }
-
-static struct ssiterif sd_schemeiterif =
-{
-	.close   = sd_schemeiter_close,
-	.has     = sd_schemeiter_has,
-	.get     = sd_schemeiter_get,
-	.next    = sd_schemeiter_next
-};
 
 static uint8_t
 sd_vifflags(struct sv *v)
@@ -9971,8 +9862,8 @@ struct PACKED sicachebranch {
 	struct sdindexpage *ref;
 	struct sdpage page;
 	struct ssiter i;
-	struct ssiter page_iter;
-	struct ssiter index_iter;
+	struct sdpageiter page_iter;
+	struct sdindexiter index_iter;
 	struct ssbuf buf_a;
 	struct ssbuf buf_b;
 	int open;
@@ -10272,14 +10163,10 @@ struct PACKED siiter {
 ss_rbget(si_itermatch,
          si_nodecmp(container_of(n, struct sinode, node), key, keysize, scheme))
 
-static struct ssiterif si_iterif;
-
 static inline int
-si_iter_open(struct ssiter *i, struct runtime *r,
+si_iter_open(struct siiter *ii, struct runtime *r,
 	     struct si *index, enum ssorder o, void *key, int keysize)
 {
-	i->vif = &si_iterif;
-	struct siiter *ii = (struct siiter*)i->priv;
 	ii->index   = index;
 	ii->order   = o;
 	ii->key     = key;
@@ -10329,20 +10216,20 @@ si_iter_open(struct ssiter *i, struct runtime *r,
 }
 
 static inline void
-si_iter_close(struct ssiter *i ssunused)
-{ }
+si_iter_close(struct siiter *ii)
+{
+	(void) ii;
+}
 
 static inline int
-si_iter_has(struct ssiter *i)
+si_iter_has(struct siiter *ii)
 {
-	struct siiter *ii = (struct siiter*)i->priv;
 	return ii->v != NULL;
 }
 
 static inline void*
-si_iter_get(struct ssiter *i)
+si_iter_get(struct siiter *ii)
 {
-	struct siiter *ii = (struct siiter*)i->priv;
 	if (unlikely(ii->v == NULL))
 		return NULL;
 	struct sinode *n = si_nodeof(ii->v);
@@ -10350,9 +10237,8 @@ si_iter_get(struct ssiter *i)
 }
 
 static inline void
-si_iter_next(struct ssiter *i)
+si_iter_next(struct siiter *ii)
 {
-	struct siiter *ii = (struct siiter*)i->priv;
 	switch (ii->order) {
 	case SS_LT:
 	case SS_LTE:
@@ -10372,7 +10258,7 @@ static int si_droprepository(struct runtime*, char*, int);
 
 static int
 si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
-	 uint64_t, struct ssiter*, uint64_t, uint32_t);
+	 uint64_t, struct svmergeiter*, uint64_t, uint32_t);
 
 static int si_branch(struct si*, struct sdc*, struct siplan*, uint64_t);
 static int
@@ -10697,8 +10583,8 @@ si_branchcreate(struct si *index, struct sdc *c,
 		return -1;
 	struct svmergesrc *s = sv_mergeadd(&vmerge, NULL);
 	sv_indexiter_open(&s->src, r, vindex, SS_GTE, NULL, 0);
-	struct ssiter i;
-	sv_mergeiter_open(&i, r, &vmerge, SS_GTE);
+	struct svmergeiter im;
+	sv_mergeiter_open(&im, r, &vmerge, SS_GTE);
 
 	/* merge iter is not used */
 	struct sdmergeconf mergeconf = {
@@ -10717,7 +10603,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		.save_upsert     = 1
 	};
 	struct sdmerge merge;
-	rc = sd_mergeinit(&merge, r, &i, &c->build, &c->qf,
+	rc = sd_mergeinit(&merge, r, &im, &c->build, &c->qf,
 	                  &c->upsert, &mergeconf);
 	if (unlikely(rc == -1))
 		return -1;
@@ -10937,9 +10823,9 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 		cbuf = cbuf->next;
 		b = b->next;
 	}
-	struct ssiter i;
-	sv_mergeiter_open(&i, r, &merge, SS_GTE);
-	rc = si_merge(index, c, node, vlsn, vlsn_lru, &i, size_stream, count);
+	struct svmergeiter im;
+	sv_mergeiter_open(&im, r, &merge, SS_GTE);
+	rc = si_merge(index, c, node, vlsn, vlsn_lru, &im, size_stream, count);
 	sv_mergefree(&merge, r->a);
 	return rc;
 }
@@ -11070,14 +10956,6 @@ static uint32_t si_gcref(struct runtime *r, struct svref *gc)
 	return used;
 }
 
-static struct ssiterif si_iterif =
-{
-	.close = si_iter_close,
-	.has   = si_iter_has,
-	.get   = si_iter_get,
-	.next  = si_iter_next
-};
-
 static int
 si_redistribute(struct si *index, struct runtime *r, struct sdc *c, struct sinode *node, struct ssbuf *result)
 {
@@ -11140,9 +11018,9 @@ si_redistribute_set(struct si *index, struct runtime *r, uint64_t now, struct sv
 {
 	index->update_time = now;
 	/* match node */
-	struct ssiter i;
-	si_iter_open(&i, r, index, SS_GTE, sv_vpointer(v->v), v->v->size);
-	struct sinode *node = si_iter_get(&i);
+	struct siiter ii;
+	si_iter_open(&ii, r, index, SS_GTE, sv_vpointer(v->v), v->v->size);
+	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
 	/* update node */
 	struct svindex *vindex = si_nodeindex(node);
@@ -11196,7 +11074,7 @@ si_splitfree(struct ssbuf *result, struct runtime *r)
 static inline int
 si_split(struct si *index, struct sdc *c, struct ssbuf *result,
          struct sinode   *parent,
-         struct ssiter   *i,
+         struct svmergeiter *i,
          uint64_t  size_node,
          uint64_t  size_stream,
          uint32_t  stream,
@@ -11304,7 +11182,7 @@ static int
 si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	 uint64_t vlsn,
 	 uint64_t vlsn_lru,
-	 struct ssiter *stream,
+	 struct svmergeiter *stream,
 	 uint64_t size_stream,
 	 uint32_t n_stream)
 {
@@ -11553,13 +11431,13 @@ si_noderecover(struct sinode *n, struct runtime *r)
 {
 	/* recover branches */
 	struct sibranch *b = NULL;
-	struct ssiter i;
-	sd_recover_open(&i, r, &n->file);
+	struct sdrecover ri;
+	sd_recover_open(&ri, r, &n->file);
 	int first = 1;
 	int rc;
-	while (ss_iteratorhas(&i))
+	while (sd_recover_has(&ri))
 	{
-		struct sdindexheader *h = ss_iteratorof(&i);
+		struct sdindexheader *h = sd_recover_get(&ri);
 		if (first) {
 			b = &n->self;
 		} else {
@@ -11579,19 +11457,19 @@ si_noderecover(struct sinode *n, struct runtime *r)
 		n->branch_count++;
 
 		first = 0;
-		ss_iteratornext(&i);
+		sd_recover_next(&ri);
 	}
-	rc = sd_recover_complete(&i);
+	rc = sd_recover_complete(&ri);
 	if (unlikely(rc == -1))
 		goto e1;
-	ss_iteratorclose(&i);
+	sd_recover_close(&ri);
 
 	return 0;
 e0:
 	if (b && !first)
 		si_branchfree(b, r);
 e1:
-	ss_iteratorclose(&i);
+	sd_recover_close(&ri);
 	return -1;
 }
 
@@ -12445,14 +12323,14 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	/* prepare sources */
 	sv_mergereset(&q->merge);
 	sv_mergeadd(&q->merge, &c->i);
-	struct ssiter i;
-	sv_mergeiter_open(&i, q->r, &q->merge, SS_GTE);
+	struct svmergeiter im;
+	sv_mergeiter_open(&im, q->r, &q->merge, SS_GTE);
 	uint64_t vlsn = q->vlsn;
 	if (unlikely(q->has))
 		vlsn = UINT64_MAX;
-	struct ssiter j;
-	sv_readiter_open(&j, q->r, &i, &q->index->u, vlsn, 1);
-	struct sv *v = sv_readiter_get(&j);
+	struct svreaditer ri;
+	sv_readiter_open(&ri, q->r, &im, &q->index->u, vlsn, 1);
+	struct sv *v = sv_readiter_get(&ri);
 	if (unlikely(v == NULL))
 		return 0;
 	return si_getresult(q, v, 1);
@@ -12462,10 +12340,10 @@ static inline int
 si_get(struct siread *q)
 {
 	assert(q->key != NULL);
-	struct ssiter i;
-	si_iter_open(&i, q->r, q->index, SS_GTE, q->key, q->keysize);
+	struct siiter ii;
+	si_iter_open(&ii, q->r, q->index, SS_GTE, q->key, q->keysize);
 	struct sinode *node;
-	node = si_iter_get(&i);
+	node = si_iter_get(&ii);
 	assert(node != NULL);
 
 	/* search in memory */
@@ -12572,11 +12450,11 @@ si_range(struct siread *q)
 {
 	assert(q->has == 0);
 
-	struct ssiter i;
-	si_iter_open(&i, q->r, q->index, q->order, q->key, q->keysize);
+	struct siiter ii;
+	si_iter_open(&ii, q->r, q->index, q->order, q->key, q->keysize);
 	struct sinode *node;
 next_node:
-	node = si_iter_get(&i);
+	node = si_iter_get(&ii);
 	if (unlikely(node == NULL))
 		return 0;
 
@@ -12636,14 +12514,14 @@ next_node:
 	}
 
 	/* merge and filter data stream */
-	struct ssiter j;
-	sv_mergeiter_open(&j, q->r, m, q->order);
-	struct ssiter k;
-	sv_readiter_open(&k, q->r, &j, &q->index->u, q->vlsn, 0);
-	struct sv *v = sv_readiter_get(&k);
+	struct svmergeiter im;
+	sv_mergeiter_open(&im, q->r, m, q->order);
+	struct svreaditer ri;
+	sv_readiter_open(&ri, q->r, &im, &q->index->u, q->vlsn, 0);
+	struct sv *v = sv_readiter_get(&ri);
 	if (unlikely(v == NULL)) {
 		sv_mergereset(&q->merge);
-		si_iter_next(&i);
+		si_iter_next(&ii);
 		goto next_node;
 	}
 
@@ -12666,7 +12544,7 @@ next_node:
 	}
 
 	/* skip a possible duplicates from data sources */
-	sv_readiter_forward(&k);
+	sv_readiter_forward(&ri);
 	return rc;
 }
 
@@ -12690,10 +12568,10 @@ static int
 si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 {
 	/* search node index */
-	struct ssiter i;
-	si_iter_open(&i, r, index, SS_GTE, sv_pointer(v), sv_size(v));
+	struct siiter ii;
+	si_iter_open(&ii, r, index, SS_GTE, sv_pointer(v), sv_size(v));
 	struct sinode *node;
-	node = si_iter_get(&i);
+	node = si_iter_get(&ii);
 	assert(node != NULL);
 
 	uint64_t lsn = sv_lsn(v);
@@ -12703,6 +12581,7 @@ si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 		struct svindex *second;
 		struct svindex *first = si_nodeindex_priority(node, &second);
 		if (likely(first->count > 0)) {
+			struct ssiter i;
 			rc = sv_indexiter_open(&i, r, first, SS_GTE,
 					       sv_pointer(v), sv_size(v));
 			if (rc) {
@@ -12712,6 +12591,7 @@ si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 			}
 		}
 		if (second && !second->count) {
+			struct ssiter i;
 			rc = sv_indexiter_open(&i, r, second, SS_GTE,
 					       sv_pointer(v), sv_size(v));
 			if (rc) {
@@ -12726,9 +12606,10 @@ si_readcommited(struct si *index, struct runtime *r, struct sv *v, int recover)
 	struct sibranch *b;
 	for (b = node->branch; b; b = b->next)
 	{
-		sd_indexiter_open(&i, r, &b->index, SS_GTE,
+		struct sdindexiter ii;
+		sd_indexiter_open(&ii, r, &b->index, SS_GTE,
 				  sv_pointer(v), sv_size(v));
-		struct sdindexpage *page = sd_indexiter_get(&i);
+		struct sdindexpage *page = sd_indexiter_get(&ii);
 		if (page == NULL)
 			continue;
 		if (page->lsnmax >= lsn)
@@ -13382,13 +13263,13 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 	rc = sd_schemerecover(&c, r, path);
 	if (unlikely(rc == -1))
 		goto error;
-	struct ssiter i;
-	rc = sd_schemeiter_open(&i, r, &c, 1);
+	struct sdschemeiter ci;
+	rc = sd_schemeiter_open(&ci, r, &c, 1);
 	if (unlikely(rc == -1))
 		goto error;
-	while (sd_schemeiter_has(&i))
+	while (sd_schemeiter_has(&ci))
 	{
-		struct sdschemeopt *opt = sd_schemeiter_get(&i);
+		struct sdschemeopt *opt = sd_schemeiter_get(&ci);
 		switch (opt->id) {
 		case SI_SCHEME_VERSION:
 			break;
@@ -13459,7 +13340,7 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 		default: /* skip unknown */
 			break;
 		}
-		sd_schemeiter_next(&i);
+		sd_schemeiter_next(&ci);
 	}
 	if (unlikely(! version_storage_set))
 		goto error_format;
@@ -13495,10 +13376,10 @@ static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
 	struct si *index = x->index;
 	index->update_time = time;
 	/* match node */
-	struct ssiter i;
-	si_iter_open(&i, &index->r, index, SS_GTE,
+	struct siiter ii;
+	si_iter_open(&ii, &index->r, index, SS_GTE,
 		     sv_vpointer(v), v->size);
-	struct sinode *node = si_iter_get(&i);
+	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
 	struct svref *ref = sv_refnew(&index->r, v);
 	assert(ref != NULL);
