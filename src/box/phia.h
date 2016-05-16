@@ -39,6 +39,7 @@ extern "C" {
 #include <stdbool.h>
 
 struct phia_env;
+struct phia_service;
 struct phia_tx;
 struct phia_document;
 struct phia_cursor;
@@ -77,7 +78,12 @@ int      phia_open(void*);
 int      phia_close(void*);
 int      phia_drop(void*);
 int      phia_destroy(void*);
-int      phia_service(struct phia_env *env);
+struct phia_service *
+phia_service_new(struct phia_env *env);
+int
+phia_service_do(struct phia_service *srv);
+void
+phia_service_delete(struct phia_service *srv);
 void    *phia_get(void*, void*);
 
 struct phia_cursor *

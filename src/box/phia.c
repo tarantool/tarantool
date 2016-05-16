@@ -7754,6 +7754,11 @@ struct sdc {
 	int count;
 };
 
+struct phia_service {
+	struct phia_env *env;
+	struct sdc sdc;
+};
+
 static inline void
 sd_cinit(struct sdc *sc)
 {
@@ -9556,7 +9561,6 @@ struct siplan {
 static int si_planinit(struct siplan*);
 static int si_plannerinit(struct siplanner*, struct ssa*, void*);
 static int si_plannerfree(struct siplanner*, struct ssa*);
-static int si_plannertrace(struct siplan*, uint32_t, struct sstrace*);
 static int si_plannerupdate(struct siplanner*, int, struct sinode*);
 static int si_plannerremove(struct siplanner*, int, struct sinode*);
 static int si_planner(struct siplanner*, struct siplan*);
@@ -11451,57 +11455,6 @@ static int si_plannerfree(struct siplanner *p, struct ssa *a)
 	return 0;
 }
 
-static int si_plannertrace(struct siplan *p, uint32_t id, struct sstrace *t)
-{
-	char *plan = NULL;
-	switch (p->plan) {
-	case SI_BRANCH: plan = "branch";
-		break;
-	case SI_AGE: plan = "age";
-		break;
-	case SI_COMPACT: plan = "compact";
-		break;
-	case SI_CHECKPOINT: plan = "checkpoint";
-		break;
-	case SI_NODEGC: plan = "node gc";
-		break;
-	case SI_GC: plan = "gc";
-		break;
-	case SI_TEMP: plan = "temperature";
-		break;
-	case SI_SHUTDOWN: plan = "index shutdown";
-		break;
-	case SI_DROP: plan = "index drop";
-		break;
-	}
-	char *explain = NULL;
-	switch (p->explain) {
-	case SI_ENONE:
-		explain = "none";
-		break;
-	case SI_ERETRY:
-		explain = "retry expected";
-		break;
-	case SI_EINDEX_SIZE:
-		explain = "index size";
-		break;
-	case SI_EINDEX_AGE:
-		explain = "index age";
-		break;
-	case SI_EBRANCH_COUNT:
-		explain = "branch count";
-		break;
-	}
-	if (p->node) {
-		ss_trace(t, "%s <%" PRIu32 ":%020" PRIu64 ".index explain: %s>",
-		         plan, id, p->node->self.id.id, explain);
-	} else {
-		ss_trace(t, "%s <%" PRIu32 " explain: %s>",
-		         plan, id, explain);
-	}
-	return 0;
-}
-
 static int si_plannerupdate(struct siplanner *p, int mask, struct sinode *n)
 {
 	if (mask & SI_BRANCH)
@@ -13239,54 +13192,6 @@ sr_checkdir(struct runtime *r, const char *path)
 	return 0;
 }
 
-struct PACKED scworker {
-	char name[16];
-	struct sstrace trace;
-	struct sdc dc;
-	struct rlist link;
-	struct rlist linkidle;
-};
-
-struct scworkerpool {
-	pthread_mutex_t lock;
-	struct rlist list;
-	struct rlist listidle;
-	int total;
-	int idle;
-};
-
-static int sc_workerpool_init(struct scworkerpool*);
-static int sc_workerpool_new(struct scworkerpool*, struct runtime*);
-
-static inline struct scworker*
-sc_workerpool_pop(struct scworkerpool *p, struct runtime *r)
-{
-	tt_pthread_mutex_lock(&p->lock);
-	if (likely(p->idle >= 1))
-		goto pop_idle;
-	int rc = sc_workerpool_new(p, r);
-	if (unlikely(rc == -1)) {
-		tt_pthread_mutex_unlock(&p->lock);
-		return NULL;
-	}
-	assert(p->idle >= 1);
-pop_idle:;
-	struct scworker *w =
-		rlist_shift_tail_entry(&p->listidle, struct scworker, linkidle);
-	p->idle--;
-	tt_pthread_mutex_unlock(&p->lock);
-	return w;
-}
-
-static inline void
-sc_workerpool_push(struct scworkerpool *p, struct scworker *w)
-{
-	tt_pthread_mutex_lock(&p->lock);
-	rlist_add_tail(&p->listidle, &w->linkidle);
-	p->idle++;
-	tt_pthread_mutex_unlock(&p->lock);
-}
-
 enum {
 	SC_QBRANCH  = 0,
 	SC_QGC      = 1,
@@ -13322,7 +13227,6 @@ struct scheduler {
 	struct scdb         **i;
 	struct rlist   shutdown;
 	int            shutdown_pending;
-	struct scworkerpool   wp;
 	struct runtime            *r;
 };
 
@@ -13413,12 +13317,9 @@ sc_task_age_done(struct scheduler *s, uint64_t now)
 	s->age_time = now;
 }
 
-static int sc_step(struct scheduler*, struct scworker*, uint64_t);
+static int sc_step(struct phia_service*, uint64_t);
 
-static int sc_ctl_call(struct scheduler*, uint64_t);
-static int sc_ctl_branch(struct scheduler*, uint64_t, struct si*);
-static int sc_ctl_compact(struct scheduler*, uint64_t, struct si*);
-static int sc_ctl_compact_index(struct scheduler*, uint64_t, struct si*);
+static int sc_ctl_call(struct phia_service *, uint64_t);
 static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_gc(struct scheduler*);
 static int sc_ctl_lru(struct scheduler*);
@@ -13477,7 +13378,6 @@ sc_init(struct scheduler *s, struct runtime *r)
 	s->count                    = 0;
 	s->rr                       = 0;
 	s->r                        = r;
-	sc_workerpool_init(&s->wp);
 	rlist_create(&s->shutdown);
 	s->shutdown_pending = 0;
 	return 0;
@@ -13558,110 +13458,16 @@ free:
 	return 0;
 }
 
-static int sc_ctl_call(struct scheduler *s, uint64_t vlsn)
+static struct scheduler *
+get_scheduler(struct phia_env *);
+
+static int sc_ctl_call(struct phia_service *srv, uint64_t vlsn)
 {
+	struct scheduler *s = get_scheduler(srv->env);
 	int rc = sr_statusactive(s->r->status);
 	if (unlikely(rc == 0))
 		return 0;
-	struct scworker *w = sc_workerpool_pop(&s->wp, s->r);
-	if (unlikely(w == NULL))
-		return -1;
-	rc = sc_step(s, w, vlsn);
-	sc_workerpool_push(&s->wp, w);
-	return rc;
-}
-
-static int sc_ctl_branch(struct scheduler *s, uint64_t vlsn, struct si *index)
-{
-	struct runtime *r = s->r;
-	int rc = sr_statusactive(r->status);
-	if (unlikely(rc == 0))
-		return 0;
-	struct srzone *z = sr_zoneof(r);
-	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (unlikely(w == NULL))
-		return -1;
-	while (1) {
-		uint64_t vlsn_lru = si_lru_vlsn(index);
-		struct siplan plan = {
-			.explain   = SI_ENONE,
-			.plan      = SI_BRANCH,
-			.a         = z->branch_wm,
-			.b         = 0,
-			.c         = 0,
-			.node      = NULL
-		};
-		rc = si_plan(index, &plan);
-		if (rc == 0)
-			break;
-		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (unlikely(rc == -1))
-			break;
-	}
-	sc_workerpool_push(&s->wp, w);
-	return rc;
-}
-
-static int sc_ctl_compact(struct scheduler *s, uint64_t vlsn, struct si *index)
-{
-	struct runtime *r = s->r;
-	int rc = sr_statusactive(r->status);
-	if (unlikely(rc == 0))
-		return 0;
-	struct srzone *z = sr_zoneof(r);
-	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (unlikely(w == NULL))
-		return -1;
-	while (1) {
-		uint64_t vlsn_lru = si_lru_vlsn(index);
-		struct siplan plan = {
-			.explain   = SI_ENONE,
-			.plan      = SI_COMPACT,
-			.a         = z->compact_wm,
-			.b         = z->compact_mode,
-			.c         = 0,
-			.node      = NULL
-		};
-		rc = si_plan(index, &plan);
-		if (rc == 0)
-			break;
-		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (unlikely(rc == -1))
-			break;
-	}
-	sc_workerpool_push(&s->wp, w);
-	return rc;
-}
-
-static int
-sc_ctl_compact_index(struct scheduler *s, uint64_t vlsn, struct si *index)
-{
-	struct runtime *r = s->r;
-	int rc = sr_statusactive(r->status);
-	if (unlikely(rc == 0))
-		return 0;
-	struct srzone *z = sr_zoneof(r);
-	struct scworker *w = sc_workerpool_pop(&s->wp, r);
-	if (unlikely(w == NULL))
-		return -1;
-	while (1) {
-		uint64_t vlsn_lru = si_lru_vlsn(index);
-		struct siplan plan = {
-			.explain   = SI_ENONE,
-			.plan      = SI_COMPACT_INDEX,
-			.a         = z->branch_wm,
-			.b         = 0,
-			.c         = 0,
-			.node      = NULL
-		};
-		rc = si_plan(index, &plan);
-		if (rc == 0)
-			break;
-		rc = si_execute(index, &w->dc, &plan, vlsn, vlsn_lru);
-		if (unlikely(rc == -1))
-			break;
-	}
-	sc_workerpool_push(&s->wp, w);
+	rc = sc_step(srv, vlsn);
 	return rc;
 }
 
@@ -13759,7 +13565,7 @@ static int sc_read(struct scread *r, struct scheduler *s)
 }
 
 static inline int
-sc_execute(struct sctask *t, struct scworker *w, uint64_t vlsn)
+sc_execute(struct sctask *t, struct sdc *c, uint64_t vlsn)
 {
 	struct si *index;
 	if (unlikely(t->shutdown))
@@ -13767,9 +13573,8 @@ sc_execute(struct sctask *t, struct scworker *w, uint64_t vlsn)
 	else
 		index = t->db->index;
 
-	si_plannertrace(&t->plan, index->scheme.id, &w->trace);
 	uint64_t vlsn_lru = si_lru_vlsn(index);
-	return si_execute(index, &w->dc, &t->plan, vlsn, vlsn_lru);
+	return si_execute(index, c, &t->plan, vlsn, vlsn_lru);
 }
 
 static inline struct scdb*
@@ -13846,11 +13651,10 @@ sc_do_shutdown(struct scheduler *s, struct sctask *task)
 }
 
 static int
-sc_do(struct scheduler *s, struct sctask *task, struct scworker *w, struct srzone *zone,
+sc_do(struct scheduler *s, struct sctask *task, struct srzone *zone,
       struct scdb *db, uint64_t vlsn, uint64_t now)
 {
 	int rc;
-	ss_trace(&w->trace, "%s", "schedule");
 
 	/* node gc */
 	task->plan.plan = SI_NODEGC;
@@ -14036,9 +13840,10 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 }
 
 static int
-sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64_t vlsn)
+sc_schedule(struct sctask *task, struct phia_service *srv, uint64_t vlsn)
 {
 	uint64_t now = clock_monotonic64();
+	struct scheduler *s = get_scheduler(srv->env);
 	struct srzone *zone = sr_zoneof(s->r);
 	int rc;
 	tt_pthread_mutex_lock(&s->lock);
@@ -14059,7 +13864,7 @@ sc_schedule(struct scheduler *s, struct sctask *task, struct scworker *w, uint64
 		tt_pthread_mutex_unlock(&s->lock);
 		return 0;
 	}
-	rc = sc_do(s, task, w, zone, db, vlsn, now);
+	rc = sc_do(s, task, zone, db, vlsn, now);
 	/* schedule next index */
 	sc_next(s);
 	tt_pthread_mutex_unlock(&s->lock);
@@ -14101,14 +13906,15 @@ sc_taskinit(struct sctask *task)
 }
 
 static int
-sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
+sc_step(struct phia_service *srv, uint64_t vlsn)
 {
+	struct scheduler *s = get_scheduler(srv->env);
 	struct sctask task;
 	sc_taskinit(&task);
-	int rc = sc_schedule(s, &task, w, vlsn);
+	int rc = sc_schedule(&task, srv, vlsn);
 	int rc_job = rc;
 	if (rc_job > 0) {
-		rc = sc_execute(&task, w, vlsn);
+		rc = sc_execute(&task, &srv->sdc, vlsn);
 		if (unlikely(rc == -1)) {
 			sr_statusset(&task.db->index->status,
 				     SR_MALFUNCTION);
@@ -14116,58 +13922,9 @@ sc_step(struct scheduler *s, struct scworker *w, uint64_t vlsn)
 		}
 	}
 	sc_complete(s, &task);
-	ss_trace(&w->trace, "%s", "sleep");
 	return rc_job;
 error:
-	ss_trace(&w->trace, "%s", "malfunction");
 	return -1;
-}
-
-static inline struct scworker*
-sc_workernew(struct runtime *r, int id)
-{
-	struct scworker *w = ss_malloc(r->a, sizeof(struct scworker));
-	if (unlikely(w == NULL)) {
-		sr_oom_malfunction(r->e);
-		return NULL;
-	}
-	snprintf(w->name, sizeof(w->name), "%d", id);
-	sd_cinit(&w->dc);
-	rlist_create(&w->link);
-	rlist_create(&w->linkidle);
-	ss_traceinit(&w->trace);
-	ss_trace(&w->trace, "%s", "init");
-	return w;
-}
-
-static inline ssunused void
-sc_workerfree(struct scworker *w, struct runtime *r)
-{
-	sd_cfree(&w->dc, r);
-	ss_tracefree(&w->trace);
-	ss_free(r->a, w);
-}
-
-static int sc_workerpool_init(struct scworkerpool *p)
-{
-	tt_pthread_mutex_init(&p->lock, NULL);
-	rlist_create(&p->list);
-	rlist_create(&p->listidle);
-	p->total = 0;
-	p->idle = 0;
-	return 0;
-}
-
-static int sc_workerpool_new(struct scworkerpool *p, struct runtime *r)
-{
-	struct scworker *w = sc_workernew(r, p->total);
-	if (unlikely(w == NULL))
-		return -1;
-	rlist_add(&p->list, &w->link);
-	rlist_add(&p->listidle, &w->linkidle);
-	p->total++;
-	p->idle++;
-	return 0;
 }
 
 static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int recover)
@@ -14340,6 +14097,12 @@ struct phia_document {
 	/* events */
 	int       event;
 };
+
+struct scheduler *
+get_scheduler(struct phia_env *env)
+{
+	return &env->scheduler;
+}
 
 static struct phia_document *
 phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
@@ -14692,29 +14455,6 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 }
 
 static inline int
-se_confscheduler_trace(struct srconf *c, struct srconfstmt *s)
-{
-	struct scworker *w = c->value;
-	char tracesz[128];
-	char *trace;
-	int tracelen = ss_tracecopy(&w->trace, tracesz, sizeof(tracesz));
-	if (likely(tracelen == 0))
-		trace = NULL;
-	else
-		trace = tracesz;
-	struct srconf conf = {
-		.key      = c->key,
-		.flags    = c->flags,
-		.type     = c->type,
-		.function = NULL,
-		.value    = trace,
-		.ptr      = NULL,
-		.next     = NULL
-	};
-	return se_confv(&conf, s);
-}
-
-static inline int
 se_confscheduler_checkpoint(struct srconf *c, struct srconfstmt *s)
 {
 	if (s->op != SR_WRITE)
@@ -14741,21 +14481,11 @@ se_confscheduler_lru(struct srconf *c, struct srconfstmt *s)
 	return sc_ctl_lru(&e->scheduler);
 }
 
-static inline int
-se_confscheduler_run(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	uint64_t vlsn = sx_vlsn(&e->xm);
-	return sc_ctl_call(&e->scheduler, vlsn);
-}
-
 static inline struct srconf*
 se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
+	(void) e;
 	struct srconf *scheduler = *pc;
-	struct srconf *prev;
 	struct srconf *p = NULL;
 	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "checkpoint_active", SS_U32, &rt->checkpoint_active, SR_RO, NULL);
@@ -14766,15 +14496,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "lru_active", SS_U32, &rt->lru_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_lru, "lru", SS_FUNCTION, NULL);
-	sr_c(&p, pc, se_confscheduler_run, "run", SS_FUNCTION, NULL);
-	prev = p;
-	struct scworker *w;
-	rlist_foreach_entry(w, &e->scheduler.wp.list, link) {
-		struct srconf *worker = *pc;
-		p = NULL;
-		sr_C(&p, pc, se_confscheduler_trace, "trace", SS_STRING, w, SR_RO, NULL);
-		sr_C(&prev, pc, NULL, w->name, SS_UNDEF, worker, SR_NS, NULL);
-	}
 	return sr_C(NULL, pc, NULL, "scheduler", SS_UNDEF, scheduler, SR_NS, NULL);
 }
 
@@ -14920,39 +14641,6 @@ se_confdb_status(struct srconf *c, struct srconfstmt *s)
 }
 
 static inline int
-se_confdb_branch(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_index *db = c->value;
-	struct phia_env *e = db->env;
-	uint64_t vlsn = sx_vlsn(&e->xm);
-	return sc_ctl_branch(&e->scheduler, vlsn, db->index);
-}
-
-static inline int
-se_confdb_compact(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_index *db = c->value;
-	struct phia_env *e = db->env;
-	uint64_t vlsn = sx_vlsn(&e->xm);
-	return sc_ctl_compact(&e->scheduler, vlsn, db->index);
-}
-
-static inline int
-se_confdb_compact_index(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_index *db = c->value;
-	struct phia_env *e = db->env;
-	uint64_t vlsn = sx_vlsn(&e->xm);
-	return sc_ctl_compact_index(&e->scheduler, vlsn, db->index);
-}
-
-static inline int
 se_confv_dboffline(struct srconf *c, struct srconfstmt *s)
 {
 	struct phia_index *db = c->ptr;
@@ -15089,9 +14777,6 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		sr_C(&p, pc, se_confv_dboffline, "lru_step", SS_U32, &o->scheme->lru_step, 0, o);
 		sr_C(&p, pc, se_confdb_upsert, "upsert", SS_STRING, NULL, 0, o);
 		sr_C(&p, pc, se_confdb_upsertarg, "upsert_arg", SS_STRING, NULL, 0, o);
-		sr_c(&p, pc, se_confdb_branch, "branch", SS_FUNCTION, o);
-		sr_c(&p, pc, se_confdb_compact, "compact", SS_FUNCTION, o);
-		sr_c(&p, pc, se_confdb_compact_index, "compact_index", SS_FUNCTION, o);
 		sr_C(&p, pc, NULL, "index", SS_UNDEF, index, SR_NS, o);
 		sr_C(&p, pc, se_confdb_scheme, "scheme", SS_UNDEF, scheme, SR_NS, o);
 		sr_C(&prev, pc, se_confdb_get, o->scheme->name, SS_STRING, database, SR_NS, o);
@@ -16895,9 +16580,25 @@ int phia_destroy(void *ptr)
 	return o->i->destroy(o);
 }
 
-int phia_service(struct phia_env *env)
+struct phia_service *
+phia_service_new(struct phia_env *env)
 {
-	return sc_ctl_call(&env->scheduler, sx_vlsn(&env->xm));
+	struct phia_service *srv = ss_malloc(env->r.a, sizeof(struct phia_service));
+	srv->env = env;
+	sd_cinit(&srv->sdc);
+	return srv;
+}
+
+int
+phia_service_do(struct phia_service *srv)
+{
+	return sc_ctl_call(srv, sx_vlsn(&srv->env->xm));
+}
+
+void
+phia_service_delete(struct phia_service *srv)
+{
+	ss_free(srv->env->r.a, srv);
 }
 
 int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
