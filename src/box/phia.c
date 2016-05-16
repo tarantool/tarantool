@@ -1100,12 +1100,6 @@ ss_bufiter_open(struct ssbufiter *bi, struct ssbuf *buf, int vsize)
 		bi->v = NULL;
 }
 
-static inline void
-ss_bufiter_close(struct ssbufiter *bi)
-{
-	(void) bi;
-}
-
 static inline int
 ss_bufiter_has(struct ssbufiter *bi)
 {
@@ -5503,12 +5497,6 @@ sv_mergeiter_open(struct svmergeiter *im, struct runtime *r,
 	return 0;
 }
 
-static inline void
-sv_mergeiter_close(struct svmergeiter *im)
-{
-	(void) im;
-}
-
 static inline int
 sv_mergeiter_has(struct svmergeiter *im)
 {
@@ -5651,18 +5639,6 @@ sv_readiter_open(struct svreaditer *im, struct runtime *r,
 	/* iteration can start from duplicate */
 	sv_readiter_next(im);
 	return 0;
-}
-
-static inline void
-sv_readiter_close(struct svreaditer *im)
-{
-	(void) im;
-}
-
-static inline int
-sv_readiter_has(struct svreaditer *im)
-{
-	return im->v != NULL;
 }
 
 static inline void*
@@ -5835,12 +5811,6 @@ sv_writeiter_open(struct svwriteiter *im, struct runtime *r,
 	im->upsert = 0;
 	sv_writeiter_next(im);
 	return 0;
-}
-
-static inline void
-sv_writeiter_close(struct svwriteiter *im)
-{
-	(void) im;
 }
 
 static inline int
@@ -7438,12 +7408,6 @@ sd_pageiter_open(struct sdpageiter *pi, struct runtime *r, struct ssbuf *xfbuf,
 	return rc;
 }
 
-static inline void
-sd_pageiter_close(struct sdpageiter *pi)
-{
-	(void) pi;
-}
-
 static inline int
 sd_pageiter_has(struct sdpageiter *pi)
 {
@@ -7779,18 +7743,6 @@ sd_indexiter_open(struct sdindexiter *ii, struct runtime *r,
 		return 0;
 	ii->v = sd_indexpage(ii->index, ii->pos);
 	return 0;
-}
-
-static inline void
-sd_indexiter_close(struct sdindexiter *ii)
-{
-	(void) ii;
-}
-
-static inline int
-sd_indexiter_has(struct sdindexiter *ii)
-{
-	return ii->v != NULL;
 }
 
 static inline void*
@@ -8274,12 +8226,6 @@ sd_schemeiter_open(struct sdschemeiter *ci, struct runtime *r,
 	}
 	ci->p = c->buf.s + sizeof(struct sdschemeheader);
 	return 0;
-}
-
-static inline void
-sd_schemeiter_close(struct sdschemeiter *ci)
-{
-	(void) ci;
 }
 
 static inline int
@@ -10213,18 +10159,6 @@ si_iter_open(struct siiter *ii, struct runtime *r,
 	}
 	assert(ii->v != NULL);
 	return eq;
-}
-
-static inline void
-si_iter_close(struct siiter *ii)
-{
-	(void) ii;
-}
-
-static inline int
-si_iter_has(struct siiter *ii)
-{
-	return ii->v != NULL;
 }
 
 static inline void*
