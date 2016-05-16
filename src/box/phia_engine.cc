@@ -168,14 +168,16 @@ static void*
 phia_worker(void *arg)
 {
 	struct phia_env *env = (struct phia_env *) arg;
+	struct phia_service *srv = phia_service_new(env);
 	while (pm_atomic_load_explicit(&worker_pool_run,
 				       pm_memory_order_relaxed)) {
-		int rc = phia_service(env);
+		int rc = phia_service_do(srv);
 		if (rc == -1)
 			break;
 		if (rc == 0)
 			usleep(10000); /* 10ms */
 	}
+	phia_service_delete(srv);
 	return NULL;
 }
 
