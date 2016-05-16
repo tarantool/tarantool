@@ -146,7 +146,7 @@ macro(luajit_build)
         set(luajit_cflags "${luajit_cflags} -Wno-tautological-compare")
     endif()
     separate_arguments(luajit_cflags)
-    set (luajut_ldflags ${CMAKE_STATIC_LINKER_FLAGS})
+    set (luajit_ldflags ${CMAKE_EXE_LINKER_FLAGS})
     separate_arguments(luajit_ldflags)
     # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")

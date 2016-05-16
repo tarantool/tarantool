@@ -5,6 +5,7 @@ _CPack_Packages
 *.dylib
 *.gcno
 *.gcda
+*.gcov
 *.o
 *.reject
 *.so
