@@ -14445,10 +14445,6 @@ struct phia_env {
 	struct runtime          r;
 };
 
-static inline struct phia_env *se_of(struct so *o) {
-	return (struct phia_env*)o->env;
-}
-
 struct phia_document {
 	struct so        o;
 	struct phia_index *db;
@@ -14485,7 +14481,7 @@ phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
 static inline int
 phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
-	struct phia_env *e = se_of(&o->o);
+	struct phia_env *e = o->o.env;
 	if (unlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
@@ -14499,7 +14495,7 @@ phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 static inline int
 phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
 {
-	struct phia_env *e = se_of(&o->o);
+	struct phia_env *e = o->o.env;
 	if (unlikely(o->db != dest))
 		return sr_error(&e->error, "%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
@@ -15439,25 +15435,22 @@ se_confquery(struct phia_env *e, int op, const char *path,
 static int
 se_confset_string(struct so *o, const char *path, void *string, int size)
 {
-	struct phia_env *e = se_of(o);
 	if (string && size == 0)
 		size = strlen(string) + 1;
-	return se_confquery(e, SR_WRITE, path, SS_STRING,
+	return se_confquery(o->env, SR_WRITE, path, SS_STRING,
 	                   string, size, NULL);
 }
 
 static int se_confset_int(struct so *o, const char *path, int64_t v)
 {
-	struct phia_env *e = se_of(o);
-	return se_confquery(e, SR_WRITE, path, SS_I64,
+	return se_confquery(o->env, SR_WRITE, path, SS_I64,
 	                    &v, sizeof(v), NULL);
 }
 
 static void *se_confget_string(struct so *o, const char *path, int *size)
 {
-	struct phia_env *e = se_of(o);
 	void *result = NULL;
-	int rc = se_confquery(e, SR_READ, path, SS_STRING,
+	int rc = se_confquery(o->env, SR_READ, path, SS_STRING,
 	                      &result, sizeof(void*), size);
 	if (unlikely(rc == -1))
 		return NULL;
@@ -15466,9 +15459,8 @@ static void *se_confget_string(struct so *o, const char *path, int *size)
 
 static int64_t se_confget_int(struct so *o, const char *path)
 {
-	struct phia_env *e = se_of(o);
 	int64_t result = 0;
-	int rc = se_confquery(e, SR_READ, path, SS_I64,
+	int rc = se_confquery(o->env, SR_READ, path, SS_I64,
 	                      &result, sizeof(void*), NULL);
 	if (unlikely(rc == -1))
 		return -1;
@@ -15570,7 +15562,7 @@ static void
 se_confkv_free(struct so *o)
 {
 	struct seconfkv *v = (struct seconfkv*)o;
-	struct phia_env *e = se_of(o);
+	struct phia_env *e = o->env;
 	ss_buffree(&v->key, &e->a);
 	ss_buffree(&v->value, &e->a);
 	ss_free(&e->a, v);
@@ -15654,7 +15646,7 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 static void
 se_confcursor_free(struct so *o)
 {
-	struct phia_env *e = se_of(o);
+	struct phia_env *e = o->env;
 	struct seconfcursor *c = (struct seconfcursor*)o;
 	ss_buffree(&c->dump, &e->a);
 	ss_free(&e->a, o);
@@ -15688,7 +15680,7 @@ se_confcursor_get(struct so *o, struct so *v)
 	}
 	if (unlikely(c->pos == NULL))
 		return NULL;
-	struct phia_env *e = se_of(&c->o);
+	struct phia_env *e = c->o.env;
 	return se_confkv_new(e, c->pos);
 }
 
@@ -16435,15 +16427,14 @@ phia_document_open(struct so *o)
 static void
 phia_document_free(struct so *o)
 {
-	struct phia_env *e = se_of(o);
-	ss_free(&e->a, o);
+	ss_free(&o->env->a, o);
 }
 
 static int
 phia_document_destroy(struct so *o)
 {
 	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	struct phia_env *e = se_of(o);
+	struct phia_env *e = o->env;
 	if (v->v.v)
 		si_gcv(&e->r, v->v.v);
 	v->v.v = NULL;
@@ -16458,7 +16449,7 @@ phia_document_destroy(struct so *o)
 static struct sfv*
 phia_document_setfield(struct phia_document *v, const char *path, void *pointer, int size)
 {
-	struct phia_env *e = se_of(&v->o);
+	struct phia_env *e = v->o.env;
 	struct phia_index *db = v->db;
 	struct sffield *field = sf_schemefind(&db->scheme->scheme, (char*)path);
 	if (unlikely(field == NULL))
@@ -16493,7 +16484,7 @@ static int
 phia_document_setstring(struct so *o, const char *path, void *pointer, int size)
 {
 	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	struct phia_env *e = se_of(o);
+	struct phia_env *e = o->env;
 	if (unlikely(v->v.v))
 		return sr_error(&e->error, "%s", "document is read-only");
 	switch (phia_document_opt(path)) {
@@ -16628,34 +16619,6 @@ phia_document_getint(struct so *o, const char *path)
 	}
 	return -1;
 }
-
-#if 0
-static int
-phia_document_setobject(struct so *o, const char *path, void *object)
-{
-	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	switch (phia_document_opt(path)) {
-	case SE_DOCUMENT_REUSE: {
-		struct phia_env *e = se_of(o);
-		struct phia_document *reuse = se_cast(object, struct phia_document*, SEDOCUMENT);
-		if (unlikely(v->created))
-			return sr_error(&e->error, "%s", "document is read-only");
-		assert(v->v.v == NULL);
-		if (unlikely(object == v->db))
-			return sr_error(&e->error, "%s", "bad document operation");
-		if (unlikely(! reuse->created))
-			return sr_error(&e->error, "%s", "bad document operation");
-		sv_init(&v->v, &sv_vif, reuse->v.v, NULL);
-		sv_vref(v->v.v);
-		v->created = 1;
-		break;
-	}
-	default:
-		return -1;
-	}
-	return 0;
-}
-#endif
 
 static struct soif sedocumentif =
 {
