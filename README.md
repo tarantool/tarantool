@@ -1,5 +1,7 @@
-# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=1.7)](https://travis-ci.org/tarantool/tarantool)
+# tarantool
 
+[![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=1.7)](https://travis-ci.org/tarantool/tarantool)
+[![Coverage Status](https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.7)](https://coveralls.io/github/tarantool/tarantool?branch=1.7)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tarantool/tarantool?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 http://tarantool.org
