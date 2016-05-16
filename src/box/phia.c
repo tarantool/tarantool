@@ -13459,12 +13459,12 @@ free:
 }
 
 static struct scheduler *
-get_scheduler(struct phia_env *);
+phia_env_get_scheduler(struct phia_env *);
 
 static int sc_ctl_call(struct phia_service *srv, uint64_t vlsn)
 {
-	struct scheduler *s = get_scheduler(srv->env);
-	int rc = sr_statusactive(s->r->status);
+	struct scheduler *sc = phia_env_get_scheduler(srv->env);
+	int rc = sr_statusactive(sc->r->status);
 	if (unlikely(rc == 0))
 		return 0;
 	rc = sc_step(srv, vlsn);
@@ -13843,31 +13843,31 @@ static int
 sc_schedule(struct sctask *task, struct phia_service *srv, uint64_t vlsn)
 {
 	uint64_t now = clock_monotonic64();
-	struct scheduler *s = get_scheduler(srv->env);
-	struct srzone *zone = sr_zoneof(s->r);
+	struct scheduler *sc = phia_env_get_scheduler(srv->env);
+	struct srzone *zone = sr_zoneof(sc->r);
 	int rc;
-	tt_pthread_mutex_lock(&s->lock);
+	tt_pthread_mutex_lock(&sc->lock);
 	/* start periodic tasks */
-	sc_periodic(s, zone, now);
+	sc_periodic(sc, zone, now);
 	/* index shutdown-drop */
-	rc = sc_do_shutdown(s, task);
+	rc = sc_do_shutdown(sc, task);
 	if (rc) {
-		tt_pthread_mutex_unlock(&s->lock);
+		tt_pthread_mutex_unlock(&sc->lock);
 		return rc;
 	}
 	/* peek an index */
-	struct scdb *db = sc_peek(s);
+	struct scdb *db = sc_peek(sc);
 	if (unlikely(db == NULL)) {
 		/* complete on-going periodic tasks when there
 		 * are no active index maintenance tasks left */
-		sc_periodic_done(s, now);
-		tt_pthread_mutex_unlock(&s->lock);
+		sc_periodic_done(sc, now);
+		tt_pthread_mutex_unlock(&sc->lock);
 		return 0;
 	}
-	rc = sc_do(s, task, zone, db, vlsn, now);
+	rc = sc_do(sc, task, zone, db, vlsn, now);
 	/* schedule next index */
-	sc_next(s);
-	tt_pthread_mutex_unlock(&s->lock);
+	sc_next(sc);
+	tt_pthread_mutex_unlock(&sc->lock);
 	return rc;
 }
 
@@ -13908,7 +13908,7 @@ sc_taskinit(struct sctask *task)
 static int
 sc_step(struct phia_service *srv, uint64_t vlsn)
 {
-	struct scheduler *s = get_scheduler(srv->env);
+	struct scheduler *sc = phia_env_get_scheduler(srv->env);
 	struct sctask task;
 	sc_taskinit(&task);
 	int rc = sc_schedule(&task, srv, vlsn);
@@ -13921,7 +13921,7 @@ sc_step(struct phia_service *srv, uint64_t vlsn)
 			goto error;
 		}
 	}
-	sc_complete(s, &task);
+	sc_complete(sc, &task);
 	return rc_job;
 error:
 	return -1;
@@ -14099,7 +14099,7 @@ struct phia_document {
 };
 
 struct scheduler *
-get_scheduler(struct phia_env *env)
+phia_env_get_scheduler(struct phia_env *env)
 {
 	return &env->scheduler;
 }
