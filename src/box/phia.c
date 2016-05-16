@@ -1159,93 +1159,6 @@ ss_bufiterref_next(struct ssiter *i)
 	ss_bufiter_next(bi);
 }
 
-struct ssblob {
-	struct ssmmap map;
-	char *s, *p, *e;
-	struct ssvfs *vfs;
-};
-
-static inline void
-ss_blobinit(struct ssblob *b, struct ssvfs *vfs)
-{
-	ss_mmapinit(&b->map);
-	b->s   = NULL;
-	b->p   = NULL;
-	b->e   = NULL;
-	b->vfs = vfs;
-}
-
-static inline int
-ss_blobfree(struct ssblob *b)
-{
-	return ss_vfsmunmap(b->vfs, &b->map);
-}
-static inline int
-ss_blobsize(struct ssblob *b) {
-	return b->e - b->s;
-}
-
-static inline int
-ss_blobused(struct ssblob *b) {
-	return b->p - b->s;
-}
-
-static inline int
-ss_blobunused(struct ssblob *b) {
-	return b->e - b->p;
-}
-
-static inline void
-ss_blobadvance(struct ssblob *b, int size)
-{
-	b->p += size;
-}
-
-static inline int
-ss_blobrealloc(struct ssblob *b, int size)
-{
-	int rc = ss_vfsmremap(b->vfs, &b->map, size);
-	if (unlikely(rc == -1))
-		return -1;
-	char *p = b->map.p;
-	b->p = p + (b->p - b->s);
-	b->e = p + size;
-	b->s = p;
-	assert((b->e - b->p) <= size);
-	return 0;
-}
-
-static inline int
-ss_blobensure(struct ssblob *b, int size)
-{
-	if (likely(b->e - b->p >= size))
-		return 0;
-	int sz = ss_blobsize(b) * 2;
-	int actual = ss_blobused(b) + size;
-	if (unlikely(actual > sz))
-		sz = actual;
-	return ss_blobrealloc(b, sz);
-}
-
-static inline int
-ss_blobfit(struct ssblob *b)
-{
-	if (ss_blobunused(b) == 0)
-		return 0;
-	return ss_blobrealloc(b, ss_blobused(b));
-}
-
-static inline int
-ss_blobadd(struct ssblob *b, void *buf, int size)
-{
-	int rc = ss_blobensure(b, size);
-	if (unlikely(rc == -1))
-		return -1;
-	memcpy(b->p, buf, size);
-	ss_blobadvance(b, size);
-	return 0;
-}
-
 struct ssavg {
 	uint64_t count;
 	uint64_t total;
@@ -7958,7 +7871,6 @@ struct sdreadarg {
 	struct ssbuf      *buf_read;
 	struct sdindexiter *index_iter;
 	struct sdpageiter *page_iter;
-	struct ssblob     *memory;
 	struct ssfile     *file;
 	enum ssorder     o;
 	int         has;
@@ -8150,10 +8062,10 @@ sd_read_stat(struct ssiter *iptr)
 	return i->reads;
 }
 
-static int sd_writeseal(struct runtime*, struct ssfile*, struct ssblob*);
-static int sd_writepage(struct runtime*, struct ssfile*, struct ssblob*, struct sdbuild*);
-static int sd_writeindex(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*);
-static int sd_seal(struct runtime*, struct ssfile*, struct ssblob*, struct sdindex*, uint64_t);
+static int sd_writeseal(struct runtime*, struct ssfile*);
+static int sd_writepage(struct runtime*, struct ssfile*, struct sdbuild*);
+static int sd_writeindex(struct runtime*, struct ssfile*, struct sdindex*);
+static int sd_seal(struct runtime*, struct ssfile*, struct sdindex*, uint64_t);
 
 struct PACKED sdschemeheader {
 	uint32_t crc;
@@ -9236,7 +9148,7 @@ static struct svif sd_vrawif =
 };
 
 static int
-sd_writeseal(struct runtime *r, struct ssfile *file, struct ssblob *blob)
+sd_writeseal(struct runtime *r, struct ssfile *file)
 {
 	struct sdseal seal;
 	sd_sealset_open(&seal);
@@ -9250,17 +9162,11 @@ sd_writeseal(struct runtime *r, struct ssfile *file, struct ssblob *blob)
 		               strerror(errno));
 		return -1;
 	}
-	if (blob) {
-		rc = ss_blobadd(blob, &seal, sizeof(seal));
-		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
-	}
 	return 0;
 }
 
 static int
-sd_writepage(struct runtime *r, struct ssfile *file, struct ssblob *blob,
-	     struct sdbuild *b)
+sd_writepage(struct runtime *r, struct ssfile *file, struct sdbuild *b)
 {
 	SS_INJECTION(r->i, SS_INJECTION_SD_BUILD_0,
 	             sr_malfunction(r->e, "%s", "error injection");
@@ -9286,22 +9192,11 @@ sd_writepage(struct runtime *r, struct ssfile *file, struct ssblob *blob,
 		               strerror(errno));
 		return -1;
 	}
-	if (blob) {
-		int i = 0;
-		while (i < iov.iovc) {
-			struct iovec *v = &iovv[i];
-			rc = ss_blobadd(blob, v->iov_base, v->iov_len);
-			if (unlikely(rc == -1))
-				return sr_oom_malfunction(r->e);
-			i++;
-		}
-	}
 	return 0;
 }
 
 static int
-sd_writeindex(struct runtime *r, struct ssfile *file,
-	      struct ssblob *blob, struct sdindex *index)
+sd_writeindex(struct runtime *r, struct ssfile *file, struct sdindex *index)
 {
 	int rc;
 	rc = ss_filewrite(file, index->i.s, ss_bufused(&index->i));
@@ -9311,16 +9206,12 @@ sd_writeindex(struct runtime *r, struct ssfile *file,
 		               strerror(errno));
 		return -1;
 	}
-	if (blob) {
-		rc = ss_blobadd(blob, index->i.s, ss_bufused(&index->i));
-		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
-	}
 	return 0;
 }
 
 static int
-sd_seal(struct runtime *r, struct ssfile *file, struct ssblob *blob, struct sdindex *index, uint64_t offset)
+sd_seal(struct runtime *r, struct ssfile *file, struct sdindex *index,
+	uint64_t offset)
 {
 	struct sdseal seal;
 	sd_sealset_close(&seal, index->h);
@@ -9331,10 +9222,6 @@ sd_seal(struct runtime *r, struct ssfile *file, struct ssblob *blob, struct sdin
 		               ss_pathof(&file->path),
 		               strerror(errno));
 		return -1;
-	}
-	if (blob) {
-		assert(blob->map.size >= sizeof(seal));
-		memcpy(blob->map.p, &seal, sizeof(seal));
 	}
 	return 0;
 }
@@ -9376,17 +9263,15 @@ static int  si_schemerecover(struct sischeme*, struct runtime*);
 struct PACKED sibranch {
 	struct sdid id;
 	struct sdindex index;
-	struct ssblob copy;
 	struct sibranch *link;
 	struct sibranch *next;
 };
 
 static inline void
-si_branchinit(struct sibranch *b, struct runtime *r)
+si_branchinit(struct sibranch *b)
 {
 	memset(&b->id, 0, sizeof(b->id));
 	sd_indexinit(&b->index);
-	ss_blobinit(&b->copy, r->vfs);
 	b->link = NULL;
 	b->next = NULL;
 }
@@ -9399,7 +9284,7 @@ si_branchnew(struct runtime *r)
 		sr_oom_malfunction(r->e);
 		return NULL;
 	}
-	si_branchinit(b, r);
+	si_branchinit(b);
 	return b;
 }
 
@@ -9414,7 +9299,6 @@ static inline void
 si_branchfree(struct sibranch *b, struct runtime *r)
 {
 	sd_indexfree(&b->index, r);
-	ss_blobfree(&b->copy);
 	ss_free(r->a, b);
 }
 
@@ -10548,7 +10432,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		/* write open seal */
 		uint64_t seal = parent->file.size;
-		rc = sd_writeseal(r, &parent->file, NULL);
+		rc = sd_writeseal(r, &parent->file);
 		if (unlikely(rc == -1))
 			goto e0;
 
@@ -10556,7 +10440,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		uint64_t offset = parent->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1)
 		{
-			rc = sd_writepage(r, &parent->file, NULL, merge.build);
+			rc = sd_writepage(r, &parent->file, merge.build);
 			if (unlikely(rc == -1))
 				goto e0;
 			offset = parent->file.size;
@@ -10573,7 +10457,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 			goto e0;
 
 		/* write index */
-		rc = sd_writeindex(r, &parent->file, NULL, &merge.index);
+		rc = sd_writeindex(r, &parent->file, &merge.index);
 		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync) {
@@ -10592,7 +10476,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		             return -1);
 
 		/* seal the branch */
-		rc = sd_seal(r, &parent->file, NULL, &merge.index, seal);
+		rc = sd_seal(r, &parent->file, &merge.index, seal);
 		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync == 2) {
@@ -10745,7 +10629,6 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 			.has             = 0,
 			.has_vlsn        = 0,
 			.o               = SS_GTE,
-			.memory          = &b->copy,
 			.file            = &node->file,
 			.r               = r
 		};
@@ -11054,17 +10937,16 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 		n->branch = &n->self;
 		n->branch_count++;
 
-		struct ssblob *blob = NULL;
 		/* write open seal */
 		uint64_t seal = n->file.size;
-		rc = sd_writeseal(r, &n->file, blob);
+		rc = sd_writeseal(r, &n->file);
 		if (unlikely(rc == -1))
 			goto error;
 
 		/* write pages */
 		uint64_t offset = n->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1) {
-			rc = sd_writepage(r, &n->file, blob, merge.build);
+			rc = sd_writepage(r, &n->file, merge.build);
 			if (unlikely(rc == -1))
 				goto error;
 			offset = n->file.size;
@@ -11077,21 +10959,15 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			goto error;
 
 		/* write index */
-		rc = sd_writeindex(r, &n->file, blob, &merge.index);
+		rc = sd_writeindex(r, &n->file, &merge.index);
 		if (unlikely(rc == -1))
 			goto error;
 
 		/* update seal */
-		rc = sd_seal(r, &n->file, blob, &merge.index, seal);
+		rc = sd_seal(r, &n->file, &merge.index, seal);
 		if (unlikely(rc == -1))
 			goto error;
 
-		/* in-memory mode */
-		if (blob) {
-			rc = ss_blobfit(blob);
-			if (unlikely(rc == -1))
-				goto error;
-		}
 		/* add node to the list */
 		rc = ss_bufadd(result, index->r.a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1)) {
@@ -11307,7 +11183,7 @@ static struct sinode *si_nodenew(struct runtime *r)
 	n->flags = 0;
 	n->update_time = 0;
 	n->used = 0;
-	si_branchinit(&n->self, r);
+	si_branchinit(&n->self);
 	n->branch = NULL;
 	n->branch_count = 0;
 	n->temperature = 0;
@@ -11458,7 +11334,6 @@ si_nodefree_branches(struct sinode *n, struct runtime *r)
 		p = next;
 	}
 	sd_indexfree(&n->self.index, r);
-	ss_blobfree(&n->self.copy);
 }
 
 static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
@@ -12245,7 +12120,6 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 		.has             = q->has,
 		.has_vlsn        = q->vlsn,
 		.o               = SS_GTE,
-		.memory          = &b->copy,
 		.file            = &n->file,
 		.r               = q->r
 	};
@@ -12363,7 +12237,6 @@ si_rangebranch(struct siread *q, struct sinode *n,
 		.has             = 0,
 		.has_vlsn        = 0,
 		.o               = q->order,
-		.memory          = &b->copy,
 		.file            = &n->file,
 		.r               = q->r
 	};
@@ -12599,8 +12472,6 @@ si_bootstrap(struct si *i, uint64_t parent)
 	n->branch = &n->self;
 	n->branch_count++;
 
-	/* in-memory mode support */
-	struct ssblob *blob = NULL;
 	/* create index with one empty page */
 	struct sdindex index;
 	sd_indexinit(&index);
@@ -12627,11 +12498,11 @@ si_bootstrap(struct si *i, uint64_t parent)
 
 	/* write seal */
 	uint64_t seal = n->file.size;
-	rc = sd_writeseal(r, &n->file, blob);
+	rc = sd_writeseal(r, &n->file);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* write page */
-	rc = sd_writepage(r, &n->file, blob, &build);
+	rc = sd_writepage(r, &n->file, &build);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* amqf */
@@ -12646,18 +12517,13 @@ si_bootstrap(struct si *i, uint64_t parent)
 		goto e1;
 	ss_qffree(&f, r->a);
 	/* write index */
-	rc = sd_writeindex(r, &n->file, blob, &index);
+	rc = sd_writeindex(r, &n->file, &index);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* close seal */
-	rc = sd_seal(r, &n->file, blob, &index, seal);
+	rc = sd_seal(r, &n->file, &index, seal);
 	if (unlikely(rc == -1))
 		goto e1;
-	if (blob) {
-		rc = ss_blobfit(blob);
-		if (unlikely(rc == -1))
-			goto e1;
-	}
 	si_branchset(&n->self, &index);
 
 	sd_buildcommit(&build, r);
