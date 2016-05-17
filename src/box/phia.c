@@ -13864,6 +13864,7 @@ sc_schedule(struct sctask *task, struct phia_service *srv, uint64_t vlsn)
 		tt_pthread_mutex_unlock(&sc->lock);
 		return 0;
 	}
+	assert(db != NULL);
 	rc = sc_do(sc, task, zone, db, vlsn, now);
 	/* schedule next index */
 	sc_next(sc);
@@ -13916,15 +13917,15 @@ sc_step(struct phia_service *srv, uint64_t vlsn)
 	if (rc_job > 0) {
 		rc = sc_execute(&task, &srv->sdc, vlsn);
 		if (unlikely(rc == -1)) {
-			sr_statusset(&task.db->index->status,
-				     SR_MALFUNCTION);
-			goto error;
+			if (task.db != NULL) {
+				sr_statusset(&task.db->index->status,
+					     SR_MALFUNCTION);
+			}
+			return -1;
 		}
 	}
 	sc_complete(sc, &task);
 	return rc_job;
-error:
-	return -1;
 }
 
 static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int recover)
