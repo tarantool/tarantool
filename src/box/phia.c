@@ -4600,33 +4600,8 @@ so_cast_dynamic(void *ptr, struct sotype *type,
 	return NULL;
 }
 
-#define so_cast(o, cast, type) \
-	((cast)so_cast_dynamic(o, type, __FILE__, __func__, __LINE__))
-
-#define so_open(o)      (o)->i->open(o)
-#define so_close(o)     (o)->i->close(o)
-#define so_destroy(o)   (o)->i->destroy(o)
-#define so_free(o)      (o)->i->free(o)
-#define so_document(o)  (o)->i->document(o)
-#define so_drop(o)      (o)->i->drop(o)
-#define so_set(o, v)    (o)->i->set(o, v)
-#define so_upsert(o, v) (o)->i->upsert(o, v)
-#define so_delete(o, v) (o)->i->del(o, v)
-#define so_get(o, v)    (o)->i->get(o, v)
-#define so_begin(o)     (o)->i->begin(o)
-#define so_commit(o)    (o)->i->commit(o)
-#define so_cursor(o)    (o)->i->cursor(o)
-
-#define so_setstring(o, path, pointer, size) \
-	(o)->i->setstring(o, path, pointer, size)
-#define so_setint(o, path, v) \
-	(o)->i->setint(o, path, v)
-#define so_getobject(o, path) \
-	(o)->i->getobject(o, path)
-#define so_getstring(o, path, sizep) \
-	(o)->i->getstring(o, path, sizep)
-#define so_getint(o, path) \
-	(o)->i->getnumber(o, path)
+#define se_cast(o, cast, id) \
+	((cast)so_cast_dynamic(o, &se_o[id], __FILE__, __func__, __LINE__))
 
 #define SVNONE       0
 #define SVDELETE     1
@@ -13969,8 +13944,6 @@ enum {
 
 static struct sotype se_o[];
 
-#define se_cast(ptr, cast, id) so_cast(ptr, cast, &se_o[id])
-
 static inline struct so*
 se_cast_validate(void *ptr)
 {
@@ -14107,6 +14080,23 @@ phia_env_get_scheduler(struct phia_env *env)
 static struct phia_document *
 phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
 
+static int
+phia_document_destroy(struct so *o)
+{
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	struct phia_env *e = o->env;
+	if (v->v.v)
+		si_gcv(&e->r, v->v.v);
+	v->v.v = NULL;
+	if (v->prefixcopy)
+		ss_free(&e->a, v->prefixcopy);
+	v->prefixcopy = NULL;
+	v->prefix = NULL;
+	ss_free(&e->a, v);
+	return 0;
+}
+
+
 static inline int
 phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
@@ -14118,6 +14108,24 @@ phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 		o->flagset = 1;
 		v->flags = SVGET;
 	}
+	return 0;
+}
+
+static inline int
+phia_document_create(struct phia_document *o);
+
+static int
+phia_document_open(struct so *o)
+{
+	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
+	if (likely(v->created)) {
+		assert(v->v.v != NULL);
+		return 0;
+	}
+	int rc = phia_document_create(v);
+	if (unlikely(rc == -1))
+		return -1;
+	v->created = 1;
 	return 0;
 }
 
@@ -15213,7 +15221,7 @@ se_confcursor_get(struct so *o, struct so *v)
 {
 	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
 	if (v) {
-		so_destroy(v);
+		se_confcursor_destroy(o);
 	}
 	if (c->first) {
 		assert( ss_bufsize(&c->dump) >= (int)sizeof(struct srconfdump) );
@@ -15638,7 +15646,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 	/* prepare the key */
 	int auto_close = !o->created;
-	int rc = so_open(&o->o);
+	int rc = phia_document_open(&o->o);
 	if (unlikely(rc == -1))
 		goto error;
 	rc = phia_document_validate_ro(o, db);
@@ -15671,7 +15679,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 				sv_vunref(db->r, vup.v);
 			}
 			if (auto_close)
-				so_destroy(&o->o);
+				phia_document_destroy(&o->o);
 			return ret;
 		}
 	} else {
@@ -15735,11 +15743,11 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	sc_readclose(&q);
 
 	if (auto_close)
-		so_destroy(&o->o);
+		phia_document_destroy(&o->o);
 	return ret;
 error:
 	if (auto_close)
-		so_destroy(&o->o);
+		phia_document_destroy(&o->o);
 	return NULL;
 }
 
@@ -15952,37 +15960,6 @@ allocate:
 	if (unlikely(v == NULL))
 		return sr_oom(&e->error);
 	sv_init(&o->v, &sv_vif, v, NULL);
-	return 0;
-}
-
-static int
-phia_document_open(struct so *o)
-{
-	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	if (likely(v->created)) {
-		assert(v->v.v != NULL);
-		return 0;
-	}
-	int rc = phia_document_create(v);
-	if (unlikely(rc == -1))
-		return -1;
-	v->created = 1;
-	return 0;
-}
-
-static int
-phia_document_destroy(struct so *o)
-{
-	struct phia_document *v = se_cast(o, struct phia_document*, SEDOCUMENT);
-	struct phia_env *e = o->env;
-	if (v->v.v)
-		si_gcv(&e->r, v->v.v);
-	v->v.v = NULL;
-	if (v->prefixcopy)
-		ss_free(&e->a, v->prefixcopy);
-	v->prefixcopy = NULL;
-	v->prefix = NULL;
-	ss_free(&e->a, v);
 	return 0;
 }
 
@@ -16237,7 +16214,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	}
 
 	/* create document */
-	int rc = so_open(&o->o);
+	int rc = phia_document_open(&o->o);
 	if (unlikely(rc == -1))
 		goto error;
 	rc = phia_document_validate(o, db, flags);
@@ -16251,7 +16228,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	int size = sv_vsize(v);
 	if (auto_close) {
 		ss_quota(&e->quota, SS_QADD, size);
-		so_destroy(&o->o);
+		phia_document_destroy(&o->o);
 	}
 
 	/* concurrent index only */
@@ -16264,7 +16241,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	return 0;
 error:
 	if (auto_close)
-		so_destroy(&o->o);
+		phia_document_destroy(&o->o);
 	return -1;
 }
 
@@ -16312,7 +16289,7 @@ phia_tx_get(struct phia_tx *t, struct phia_document *key)
 	}
 	return phia_index_read(db, key, &t->t, 1, NULL);
 error:
-	so_destroy(&key->o);
+	phia_document_destroy(&key->o);
 	return NULL;
 }
 
