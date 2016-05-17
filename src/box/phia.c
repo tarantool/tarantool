@@ -14309,16 +14309,9 @@ se_destroy(struct so *o)
 	return rcret;
 }
 
-static int
-se_close(struct so *o)
-{
-	return se_destroy(o);
-}
-
 static struct soif seif =
 {
 	.open         = se_open,
-	.close        = se_close,
 	.destroy      = se_destroy,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
@@ -15159,7 +15152,6 @@ static void *se_confkv_getstring(struct so *o, const char *path, int *size)
 static struct soif seconfkvif =
 {
 	.open         = NULL,
-	.close        = NULL,
 	.destroy      = se_confkv_destroy,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -15242,7 +15234,6 @@ se_confcursor_get(struct so *o, struct so *v)
 static struct soif seconfcursorif =
 {
 	.open         = NULL,
-	.close        = NULL,
 	.destroy      = se_confcursor_destroy,
 	.setstring    = NULL,
 	.setint       = NULL,
@@ -16140,7 +16131,6 @@ phia_document_getint(struct so *o, const char *path)
 static struct soif sedocumentif =
 {
 	.open         = phia_document_open,
-	.close        = NULL,
 	.destroy      = phia_document_destroy,
 	.setstring    = phia_document_setstring,
 	.setint       = phia_document_setint,
@@ -16517,16 +16507,6 @@ int phia_open(void *ptr)
 		return -1;
 	}
 	return o->i->open(o);
-}
-
-int phia_close(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->close == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->close(o);
 }
 
 int phia_destroy(void *ptr)

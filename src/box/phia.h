@@ -75,7 +75,6 @@ void    *phia_getobject(void*, const char*);
 void    *phia_getstring(void*, const char*, int*);
 int64_t  phia_getint(void*, const char*);
 int      phia_open(void*);
-int      phia_close(void*);
 int      phia_drop(void*);
 int      phia_destroy(void*);
 struct phia_service *
