@@ -110,6 +110,108 @@ function tuple_to_string(tuple, yaml)
     return ans
 end;
 
+function check_space(space, N)
+    --
+    -- Insert
+    --
+    local keys = {}
+    math.randomseed(0)
+    for i=1,N do
+        local key = math.random(2147483647)
+        keys[i] = key
+        space:insert({key, 0})
+    end
+
+    --
+    -- Select
+    --
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        local tuple = space:get({key})
+        if tuple == nil or tuple[1] ~= key then
+            return nil, 'missing key', key
+        end
+    end
+
+    --
+    -- Delete some keys
+    --
+    table_shuffle(keys)
+    for i=1,N,3 do
+        local key = keys[i]
+        space:delete({key})
+    end
+
+    --
+    -- Upsert
+    --
+    for k=1,2 do
+        -- Insert/update valuaes
+        table_shuffle(keys)
+        for i=1,N do
+            local key = keys[i]
+            space:upsert({key, 1}, {{'+', 2, 1}})
+        end
+        -- Check values
+        table_shuffle(keys)
+        for i=1,N do
+            local key = keys[i]
+            local tuple = space:get({key})
+            if tuple == nil or tuple[1] ~= key then
+                return nil, 'missing key', key
+            end
+            if tuple[2] ~= k then
+                return nil, 'invalid value after upsert', tuple
+            end
+        end
+    end
+
+    --
+    -- Update
+    --
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        space:update(key, {{'+', 2, 10}})
+    end
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        local tuple = space:get({key})
+        if tuple == nil or tuple[1] ~= key then
+            return nil, 'missing key', key
+        end
+        if tuple[2] ~= 12 then
+            return nil, 'invalid value after update', tuple
+        end
+    end
+
+    --
+    -- Delete
+    --
+    table_shuffle(keys)
+    for i=1,N do
+        local key = keys[i]
+        space:delete({key})
+    end
+
+    local count = #space:select()
+    -- :len() doesn't work on phia
+    if count ~= 0 then
+        return nil, 'invalid count after delete', count
+    end
+
+    for i=1,N do
+        local key = keys[i]
+        if space:get({key}) ~= nil then
+            return nil, 'found deleted key', key
+        end
+    end
+
+    return true
+end
+
 return {
     space_field_types = space_field_types;
     iterate = iterate;
@@ -118,4 +220,5 @@ return {
     table_shuffle = table_shuffle;
     sort = sort;
     tuple_to_string = tuple_to_string;
+    check_space = check_space;
 };
