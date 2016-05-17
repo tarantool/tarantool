@@ -4560,7 +4560,6 @@ struct soif {
 	int      (*open)(struct so*);
 	int      (*close)(struct so*);
 	int      (*destroy)(struct so*);
-	void     (*free)(struct so*);
 	int      (*setstring)(struct so*, const char*, void*, int);
 	int      (*setint)(struct so*, const char*, int64_t);
 	void    *(*getstring)(struct so*, const char*, int*);
@@ -14313,7 +14312,6 @@ static struct soif seif =
 	.open         = se_open,
 	.close        = se_close,
 	.destroy      = se_destroy,
-	.free         = NULL,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
 	.getstring    = se_confget_string,
@@ -15111,10 +15109,9 @@ static int se_confvalidate(struct seconf *c)
 }
 
 static void
-se_confkv_free(struct so *o)
+se_confkv_free(struct seconfkv *v)
 {
-	struct seconfkv *v = (struct seconfkv*)o;
-	struct phia_env *e = o->env;
+	struct phia_env *e = v->o.env;
 	ss_buffree(&v->key, &e->a);
 	ss_buffree(&v->value, &e->a);
 	ss_free(&e->a, v);
@@ -15126,7 +15123,7 @@ se_confkv_destroy(struct so *o)
 	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
 	ss_bufreset(&v->key);
 	ss_bufreset(&v->value);
-	so_free(&v->o);
+	se_confkv_free(v);
 	return 0;
 }
 
@@ -15156,7 +15153,6 @@ static struct soif seconfkvif =
 	.open         = NULL,
 	.close        = NULL,
 	.destroy      = se_confkv_destroy,
-	.free         = se_confkv_free,
 	.setstring    = NULL,
 	.setint       = NULL,
 	.getstring    = se_confkv_getstring,
@@ -15178,13 +15174,13 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 	int rc;
 	rc = ss_bufensure(&v->key, &e->a, vp->keysize);
 	if (unlikely(rc == -1)) {
-		so_free(&v->o);
+		se_confkv_free(v);
 		sr_oom(&e->error);
 		return NULL;
 	}
 	rc = ss_bufensure(&v->value, &e->a, vp->valuesize);
 	if (unlikely(rc == -1)) {
-		so_free(&v->o);
+		se_confkv_free(v);
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -15196,12 +15192,11 @@ static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp
 }
 
 static void
-se_confcursor_free(struct so *o)
+se_confcursor_free(struct seconfcursor *c)
 {
-	struct phia_env *e = o->env;
-	struct seconfcursor *c = (struct seconfcursor*)o;
+	struct phia_env *e = c->o.env;
 	ss_buffree(&c->dump, &e->a);
-	ss_free(&e->a, o);
+	ss_free(&e->a, c);
 }
 
 static int
@@ -15209,7 +15204,7 @@ se_confcursor_destroy(struct so *o)
 {
 	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
 	ss_bufreset(&c->dump);
-	so_free(&c->o);
+	se_confcursor_free(c);
 	return 0;
 }
 
@@ -15241,7 +15236,6 @@ static struct soif seconfcursorif =
 	.open         = NULL,
 	.close        = NULL,
 	.destroy      = se_confcursor_destroy,
-	.free         = se_confcursor_free,
 	.setstring    = NULL,
 	.setint       = NULL,
 	.getstring    = NULL,
@@ -15264,7 +15258,7 @@ phia_confcursor(struct phia_env *e)
 	ss_bufinit(&c->dump);
 	int rc = se_confserialize(&e->conf, &c->dump);
 	if (unlikely(rc == -1)) {
-		so_free(&c->o);
+		se_confcursor_free(c);
 		sr_oom(&e->error);
 		return NULL;
 	}
@@ -15976,12 +15970,6 @@ phia_document_open(struct so *o)
 	return 0;
 }
 
-static void
-phia_document_free(struct so *o)
-{
-	ss_free(&o->env->a, o);
-}
-
 static int
 phia_document_destroy(struct so *o)
 {
@@ -15994,7 +15982,7 @@ phia_document_destroy(struct so *o)
 		ss_free(&e->a, v->prefixcopy);
 	v->prefixcopy = NULL;
 	v->prefix = NULL;
-	so_free(&v->o);
+	ss_free(&e->a, v);
 	return 0;
 }
 
@@ -16177,7 +16165,6 @@ static struct soif sedocumentif =
 	.open         = phia_document_open,
 	.close        = NULL,
 	.destroy      = phia_document_destroy,
-	.free         = phia_document_free,
 	.setstring    = phia_document_setstring,
 	.setint       = phia_document_setint,
 	.getstring    = phia_document_getstring,
