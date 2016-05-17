@@ -178,6 +178,10 @@ Tarantool is leveraged by <a href="https://corp.mail.ru/en/company/portal/">100+
   papers:
       - date:
           - year: "2016"
+          - day: "27 Apr"
+        link: '<a href="https://medium.com/@rvncerr/tarantool-vs-competitors-racing-in-microsoft-azure-ebde9c5d619">Tarantool vs competitors: racing in Microsoft Azure</a>'
+      - date:
+          - year: "2016"
           - day: "26 Apr"
         link: '<a href="https://medium.com/@e_sha/getting-started-with-tarantool-1-6-69f73737989b">Getting started with Tarantool 1.6</a>'
       - date:
