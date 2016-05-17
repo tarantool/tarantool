@@ -633,10 +633,11 @@ fiber_destroy_all(struct cord *cord)
 		fiber_destroy(cord, f);
 }
 
-static void
-cord_init(const char *name)
+void
+cord_create(struct cord *cord, const char *name)
 {
-	struct cord *cord = cord();
+	cord() = cord;
+	slab_cache_set_thread(&cord()->slabc);
 
 	cord->id = pthread_self();
 	cord->on_exit = NULL;
@@ -668,7 +669,7 @@ cord_init(const char *name)
 	cord_set_name(name);
 }
 
-static void
+void
 cord_destroy(struct cord *cord)
 {
 	slab_cache_set_thread(&cord->slabc);
@@ -702,9 +703,7 @@ struct cord_thread_arg
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
-	cord() = ct_arg->cord;
-	slab_cache_set_thread(&cord()->slabc);
-	cord_init(ct_arg->name);
+	cord_create(ct_arg->cord, (ct_arg->name));
 	/** Can't possibly be the main thread */
 	assert(cord()->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
@@ -962,9 +961,8 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
-	cord() = &main_cord;
-	cord()->loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
-	cord_init("main");
+	main_cord.loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
+	cord_create(&main_cord, "main");
 }
 
 void

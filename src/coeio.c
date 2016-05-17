@@ -125,6 +125,14 @@ coeio_init(void)
 	ev_async_start(loop(), &coeio_manager.coeio_async);
 }
 
+void
+coeio_set_thread_cb(int (*on_start_cb)(void *),
+		    int (*on_stop_cb)(void *), void *data)
+{
+	eio_set_thread_on_start(on_start_cb, data);
+	eio_set_thread_on_stop(on_stop_cb, data);
+}
+
 static void
 coio_on_exec(eio_req *req)
 {

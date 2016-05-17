@@ -309,6 +309,12 @@ void eio_set_max_poll_time (eio_tstamp nseconds);
 /* do not handle more then count requests in one call to eio_poll_cb */
 void eio_set_max_poll_reqs (unsigned int nreqs);
 
+/* on start callback for eio worker thread */
+void eio_set_thread_on_start(int (*on_start_cb)(void *), void *data);
+
+/* on stop callback for eio worker thread */
+void eio_set_thread_on_stop(int (*on_stop_cb)(void *), void *data);
+
 /* set minimum required number
  * maximum wanted number
  * or maximum idle number of threads */

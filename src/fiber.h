@@ -339,6 +339,12 @@ extern __thread struct cord *cord_ptr;
 #define fiber() cord()->fiber
 #define loop() (cord()->loop)
 
+void
+cord_create(struct cord *cord, const char *name);
+
+void
+cord_destroy(struct cord *cord);
+
 /**
  * Start a cord with the given thread function.
  * The return value of the function can be collected

@@ -517,6 +517,25 @@ tarantool_free(void)
 #endif
 }
 
+static int 
+coeio_cord_start(void *data)
+{
+	(void) data;
+	struct cord *cord = (struct cord *)calloc(sizeof(struct cord), 1);
+	if (!cord)
+		return -1;
+	cord_create(cord, "coeio");
+	return 0;
+}
+
+static int
+coeio_cord_stop(void *data)
+{
+	(void) data;
+	cord_destroy(cord());
+	return 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -626,6 +645,7 @@ main(int argc, char **argv)
 	/* Init iobuf library with default readahead */
 	iobuf_init();
 	coeio_init();
+	coeio_set_thread_cb(coeio_cord_start, coeio_cord_stop, NULL);
 	signal_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 	box_lua_init(tarantool_L);

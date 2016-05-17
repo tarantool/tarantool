@@ -138,6 +138,11 @@ struct etp_pool
    xmutex_t lock;
    xcond_t  reqwait;
    xcond_t  wrkwait;
+
+   int (*on_start_cb)(void *data);
+   void *on_start_data;
+   int (*on_stop_cb)(void *data);
+   void *on_stop_data;
 };
 
 struct etp_pool_user
@@ -324,6 +329,11 @@ X_THREAD_PROC (etp_proc)
 
   X_LOCK (pool->lock);
 
+  if (pool->on_start_cb)
+    if (pool->on_start_cb(pool->on_start_data))
+      goto quit;
+
+
   for (;;)
     {
       for (;;)
@@ -379,6 +389,8 @@ quit:
   pool->started--;
   X_COND_BROADCAST (pool->wrkwait);
   X_UNLOCK (pool->lock);
+  if (pool->on_stop_cb)
+    pool->on_stop_cb(pool->on_stop_data);
 
   return 0;
 }
@@ -540,6 +552,21 @@ etp_set_max_poll_reqs (etp_pool_user user, unsigned int maxreqs)
 {
   user->max_poll_reqs = maxreqs;
 }
+
+ETP_API_DECL void ecb_cold
+etp_set_thread_on_start(etp_pool pool, int (*on_start_cb)(void *), void *data)
+{
+  pool->on_start_cb = on_start_cb;
+  pool->on_start_data = data;
+}
+
+ETP_API_DECL void ecb_cold
+etp_set_thread_on_stop(etp_pool pool, int (*on_stop_cb)(void *), void *data)
+{
+  pool->on_stop_cb = on_stop_cb;
+  pool->on_stop_data = data;
+}
+
 
 ETP_API_DECL void ecb_cold
 etp_set_max_idle (etp_pool pool, unsigned int threads)

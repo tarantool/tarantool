@@ -512,6 +512,18 @@ eio_set_max_poll_reqs (unsigned int maxreqs)
   etp_set_max_poll_reqs (EIO_POOL_USER, maxreqs);
 }
 
+void
+eio_set_thread_on_start(int (*on_start_cb)(void *), void *data)
+{
+  etp_set_thread_on_start(EIO_POOL, on_start_cb, data);
+}
+
+void
+eio_set_thread_on_stop(int (*on_stop)(void *), void *data)
+{
+  etp_set_thread_on_stop(EIO_POOL, on_stop, data);
+}
+
 void ecb_cold
 eio_set_max_idle (unsigned int nthreads)
 {
