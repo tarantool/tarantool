@@ -1,0 +1,160 @@
+﻿{% extends "base" %}
+
+{% block header_scripts %}
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="js/index_tabs.js"></script>
+<script src="js/highcharts.js"></script>
+{% endblock header_scripts %}
+
+{% block content %}
+<section class="b-gray_block b-mainhead">
+  <div class="b-block-wrapper">
+    <!-- <a  href="https://github.com/tarantool/tarantool/" class="b-follow">Follow on</a> -->
+    <div class="header-logo"></div>
+    <h2 class="b-Tarantool_title-note">{{ page.blocks.header[1] }}</h2>
+    <p  class="b-Tarantool_title-text">{{ page.blocks.header[2] }}</p>
+    <div class="buttons-header">
+        <a href="http://tarantool.org/download.html" class="b-button-red-download">DOWNLOAD</a>
+        <a href="mailto:support@tarantool.org" class="b-button-white">ASK QUESTION</a>
+    </div>
+  </div>
+</section>
+
+<section class="b-block b-features">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Features</h2>
+    <ul class="b-features-list">
+    {% for item in page.blocks.features %}
+      <li class="b-features-list-item">{{ item }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-gray_block b-support">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Support</h2>
+    <ul class="b-support-list">
+    {% for item in page.blocks.support %}
+      <li class="b-support-list-item">{{ item }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-block">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Business Services</h2>
+    <ul class="b-support-list">
+    {% for item in page.blocks.businessservices %}
+      <li class="b-support-list-item">{{ item }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-gray_block b-support">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Why Tarantool?</h2>
+    <ul class="b-support-list">
+    {% for item in page.blocks.whytarantool %}
+      <li class="b-support-list-item">{{ item }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-block b-features">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Use cases</h2>
+    <ul class="b-features-list">
+    {% for item in page.blocks.usecases %}
+      <li class="b-features-list-item">{{ item }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-gray_block">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Papers</h2>
+    <ul class="b-news-list papers">
+    {% for item in page.blocks.papers %}
+      <li class="b-news-list-item">
+          <div class="b-date">
+              <span>{{ item.date[1].day }}</span>
+              {{ item.date[0].year }}
+          </div>
+          <h3 class="b-news-list-item-title">
+              {{ item.link }}
+          </h3>
+      </li>
+    {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="b-block b-benchmark">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Our benchmarks (YCSB)</h2>
+    <div class="b-block-wrapper_bench">
+      <div class="b-benchmark-catalog">
+        <ul class="b-switcher">
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url p-active">A</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">B</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">C</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">D</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">E</a></li>
+          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">F</a></li>
+        </ul>
+      </div>
+      <div class="b-benchmark-type">
+        <ul class="b-switcher">
+          <li class="b-switcher-item">
+            <a href="#" class="b-switcher-item-url p-active">Throughput</a>
+          </li>
+          <li class="b-switcher-item">
+            <a href="#" class="b-switcher-item-url">Latency</a>
+          </li>
+        </ul>
+      </div>
+      <h3 class="b-benchmark-type-title">Workload A</h3>
+    </div>
+    <div class="b-benchmark-grapf"><div id="b-benchmark-grapf-image"></div></div>
+    <div class="b-benchmark-more"> <a href="/benchmark.html">Learn more</a></div>
+  </div>
+</section>
+
+<section class="b-gray_block b-customers">
+  <div class="b-block-wrapper">
+    <h2 class="b-section-title">Our users</h2>
+    <div class="b-cols">
+      <div class="b-cols-item">
+        <a href="http://mail.ru" class="b-cust_logo i-mailru"></a>
+      </div>
+      <div class="b-cols-item-empty">&nbsp;</div>
+      <div class="b-cols-item">
+        <a href="http://badoo.com" class="b-cust_logo i-badoo"></a>
+      </div>
+      <!--div class="b-cols-item-empty">&nbsp;</div>
+      <div class="b-cols-item">
+        <a href="http://sbrf.ru" class="b-cust_logo i-sberbank"></a>
+      </div-->
+      <div class="b-cols-item-empty">&nbsp;</div>
+      <div class="b-cols-item">
+        <a href="http://avito.ru" class="b-cust_logo i-avito"></a>
+      </div>
+      <div class="b-cols-item-empty">&nbsp;</div>
+      <div class="b-cols-item">
+        <a href="http://qiwi.ru" class="b-cust_logo i-qiwi"></a>
+      </div>
+      <div class="b-cols-item-empty">&nbsp;</div>
+      <div class="b-cols-item">
+        <a href="http://wallarm.com" class="b-cust_logo i-wallarm"></a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock content %}
+
+{# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}

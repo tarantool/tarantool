@@ -1,0 +1,220 @@
+---
+title   : "Tarantool - A NoSQL database running in a Lua application server"
+slug    : "index_308"
+save_as : "index_308.html"
+template: "index_308"
+blocks  :
+  header:
+    - "Tarantool"
+    - "A single source of truth at the speed above memcache."
+    - 'Backed by <a href="https://corp.mail.ru/en/company/portal/">Mail.Ru</a>, a <a href="https://corp.mail.ru/en/press/releases/9530/">public company</a>, world’s leading web/mobile portal and the <a href="https://corp.mail.ru/en/press/releases/9530/">5th largest Internet business globally</a>,<br>
+Tarantool is leveraged by <a href="https://corp.mail.ru/en/company/portal/">100+ million</a> active users of Mail.Ru'
+  features:
+    - format: rst
+      content: >
+        .. |br| raw:: html
+
+            <br />
+
+        One of the most `efficient databases <http://highscalability.com/blog/2015/12/30/how-to-choose-an-in-memory-nosql-solution-performance-measur.html>`_ in the world, great for
+        a mix of heavy read/write workloads
+    - format: rst
+      content: >
+        Proven to handle 1 million `transactions per second <https://gist.github.com/danikin/a5ddc6fe0cedc6257853>`_ or 1.6 million `queries per second <https://gist.github.com/danikin/a5ddc6fe0cedc6257853>`_ on ONE CPU CORE!
+    - format: rst
+      content: >
+        Able to deliver `sub 1 ms latency <http://sh5.tarantool.org/?first=1.6.8-563-g6a2a686&last=1.6.8-567-ga812cda&tab=all>`_ even on
+        massively parallel workloads
+    - format: rst
+      content: >
+        Two highly productive storage engines: one is 100%
+        in-memory with optional persistence, and the other is
+        disk based with a log structured merge tree, which is highly
+        efficient even with slow HDD!
+    - format: rst
+      content: >
+        The best for both enterprise and web-scale apps
+        — with hot backups, hot replica join, no maintenance
+        windows, extremely fast warm-up, highly available
+    - "Last but not least, Tarantool is a real DBMS, a single source of truth with a whole bunch of DBMS features:"
+    - format: rst
+      content: >
+        **Indexes**: `secondary indexes <http://tarantool.org/doc/book/box/box_index.html>`_,
+        `range queries <http://tarantool.org/doc/book/box/box_index.html>`_,
+        `index iterators <http://tarantool.org/doc/book/box/box_index.html>`_
+    - format: rst
+      content: >
+        **Transactions**: `ACID transactions <http://tarantool.org/doc/book/box/atomic.html>`_
+    - format: rst
+      content: >
+        **Replication**: asynchronous `master-slave <http://tarantool.org/doc/book/replication/index.html>`_ and
+        `master-master <http://tarantool.org/doc/book/replication/index.html>`_ replication
+    - format: rst
+      content: >
+        **Query language**: `server-side scripting and stored procedures <http://tarantool.org/doc/book/app/c_lua_tutorial.html>`_
+    - format: rst
+      content: >
+        **Security**: `authentication and access control <http://tarantool.org/doc/book/box/authentication.html>`_
+  news:
+    -
+      - "Tarantool 1.6.8 is released"
+      - "https://groups.google.com/forum/#!topic/tarantool/j82aeZTtCgw"
+      - "25.02"
+      - "2016"
+    -
+      - "Tarantool 1.6.7 is released"
+      - "https://groups.google.com/forum/#!topic/tarantool/kN60cpRRAyE"
+      - "17.11"
+      - "2015"
+    -
+      - "Tarantool 1.6.6 is released"
+      - "https://groups.google.com/forum/#!topic/tarantool/4-RwTCVp2uQ"
+      - "28.08"
+      - "2015"
+  support:
+    - format: rst
+      content: >
+          We are happy to provide help on
+          `tarantool@groups.google.com <https://groups.google.com/forum/#!forum/tarantool>`_
+          and `support@tarantool.org <support@tarantool.org>`_
+    - format: rst
+      content: >
+        If you need immediate help, try to ping maintainers on
+        `\#tarantool <http://webchat.freenode.net/?channels=tarantool>`_
+        channel at `irc.freenode.net <irc://irc.freenode.net>`_
+  businessservices:
+    - format: rst
+      content: >
+        We offer 24x7 business support at very moderate pricing, along with consulting, implementation and training
+    - format: rst
+      content: >
+        **Our support is conducted by real software engineers
+        of the Tarantool core engine!**
+    - format: rst
+      content: >
+        Terms and conditions of all commercial services are
+        available upon request, please send an inquiry to `support@tarantool.org <support@tarantool.org>`_
+  whytarantool:
+      - format: rst
+        content: >
+          Tarantool is one of the `most efficient known <http://highscalability.com/blog/2015/12/30/how-to-choose-an-in-memory-nosql-solution-performance-measur.html>`_
+          open-source databases on the market
+      - format: rst
+        content: >
+          Tarantool is backed by `Mail.Ru <https://corp.mail.ru/en/company/portal/>`_, a `public company <https://corp.mail.ru/en/press/releases/9530/>`_,
+          world’s leading web/mobile portal and the `5th largest Internet business globally <https://corp.mail.ru/en/press/releases/9530/>`_
+      - format: rst
+        content: >
+          Tarantool is leveraged by `100+ million <https://corp.mail.ru/en/company/portal/>`_ active users of
+          Mail.Ru services such as `Email <https://corp.mail.ru/en/company/portal/>`_,
+          `Search <https://corp.mail.ru/en/company/search/>`_,
+          `E-Commerce <https://corp.mail.ru/en/company/search/>`_,
+          `Social Networks <https://corp.mail.ru/en/company/social/>`_,
+          `Instant Messaging <https://corp.mail.ru/en/company/messagers/>`_,
+          `Email Apps, Maps and Games <https://my.com/>`_
+      - format: rst
+        content: >
+          Tarantool is the cornerstone of the database infrastructure of a
+          `multi-billion dollar public company <https://corp.mail.ru/en/press/releases/9530/>`_
+          which competes globally with all the industry monsters
+      - format: rst
+        content: >
+          When we’re saying the cornerstone, then we really mean it.
+          Just a couple of examples:
+      - '<ul class="b-support-list">
+			<li class="b-features-list-item">Mail.Ru Email heavily leverages Tarantool. It’s not caching. It’s not backed by any other database. <b>Tarantool is the single source of truth</b></li>
+			<li class="b-features-list-item">Mail.Ru Calendar uses Tarantool as its the one and only storage</li>
+			<li class="b-features-list-item">Mail.Ru Cloud doesn’t use any traditional database except Tarantool. Even financial transactions are securely stored into Tarantool without any backend</li>
+		</ul>'
+      - format: rst
+        content: >
+          We guarantee that inside Mail.Ru we’re using the same branch of
+          Tarantool as the one that is freely available
+          in the form of `binaries <http://tarantool.org/download.html>`_ and `sources <https://github.com/tarantool/tarantool>`_
+      - format: rst
+        content: >
+         You can use it absolutely for free even for commercial purposes as
+         Tarantool is licensed under the `BSD license <https://en.wikipedia.org/wiki/BSD_licenses>`_
+      - format: rst
+        content: >
+          And empower your business with the top-tier technology
+          by one of the tech giants
+      - format: rst
+        content: >
+          **Purchasing our 24x7 support unlocks the access to the world-class
+          engineers and architects of one of the most**
+          `successful <https://corp.mail.ru/en/press/releases/9530/>`_ **Internet businesses worldwide**
+  usecases:
+      - format: rst
+        content: >
+          `Session management system <https://medium.com/@denisanikin/heavy-workloads-our-use-cases-of-tarantool-914b0b1cbac2>`_
+      - format: rst
+        content: >
+          `Authentication system <https://medium.com/@denisanikin/heavy-workloads-our-use-cases-of-tarantool-914b0b1cbac2>`_
+      - "Anti brute-force, anti spam, anti fraud/hacker systems"
+      - format: rst
+        content: >
+          `Online ad system <https://medium.com/@denisanikin/heavy-workloads-our-use-cases-of-tarantool-914b0b1cbac2>`_
+      - format: rst
+        content: >
+          `Fast & durable queueing solution <https://medium.com/@shveenkov/asyncio-tarantool-queue-get-in-the-queue-3d10d84edb38>`_
+      - format: rst
+        content: >
+          `User profile system <https://medium.com/@denisanikin/how-to-save-one-million-dollars-on-databases-with-tarantool-5eb1596ec628>`_
+      - "Online transaction processing for banks & telecoms"
+      - "Online analytics"
+      - "Shard routing table"
+      - format: rst
+        content: >
+          **At web-scale applications: to handle extremely heavy read/write workloads**
+      - format: rst
+        content: >
+          **At enterprise-scale applications: to deliver extremely small latencies like sub 1 ms**
+      - format: rst
+        content: >
+          **In general: everywhere you need hot data to be durably and
+          consistently stored, accessed and
+          changed**
+  papers:
+      - date:
+          - year: "2016"
+          - day: "27 Apr"
+        link: '<a href="https://medium.com/@rvncerr/tarantool-vs-competitors-racing-in-microsoft-azure-ebde9c5d619">Tarantool vs competitors: racing in Microsoft Azure</a>'
+      - date:
+          - year: "2016"
+          - day: "26 Apr"
+        link: '<a href="https://medium.com/@e_sha/getting-started-with-tarantool-1-6-69f73737989b">Getting started with Tarantool 1.6</a>'
+      - date:
+          - year: "2016"
+          - day: "21 Apr"
+        link: '<a href="https://medium.com/@denisanikin/heavy-workloads-our-use-cases-of-tarantool-914b0b1cbac2">Heavy workloads: our use cases of Tarantool</a>'
+      - date:
+          - year: "2016"
+          - day: "07 Apr"
+        link: '<a href="https://medium.com/@shveenkov/asynchronous-work-with-tarantool-in-python-92a1d9e5d9f6">Asynchronous work with Tarantool in Python</a>'
+      - date:
+          - year: "2016"
+          - day: "05 Apr"
+        link: '<a href="https://medium.com/@denisanikin/how-to-save-one-million-dollars-on-databases-with-tarantool-5eb1596ec628">How to save one million dollars on databases with Tarantool</a>'
+      - date:
+          - year: "2016"
+          - day: "23 Mar"
+        link: '<a href=https://medium.com/@cdump/how-we-implemented-the-video-player-in-mail-ru-cloud-1b73499b7f56">How we implemented the video player in Mail.Ru Cloud</a>'
+      - date:
+          - year: "2016"
+          - day: "06 Mar"
+        link: '<a href="https://medium.com/@rtsisyk/dbms-as-an-application-server-779402dbf485">DBMS as an application server</a>'
+      - date:
+          - year: "2015"
+          - day: "19 Feb"
+        link: '<a href="https://medium.com/@shveenkov/asyncio-tarantool-queue-get-in-the-queue-3d10d84edb38#.6h5thzf7v">Asyncio Tarantool Queue, get in the queue</a>'
+      - date:
+          - year: "2016"
+          - day: "17 Feb"
+        link: '<a href="http://highscalability.com/blog/2016/2/17/building-nginx-and-tarantool-based-services.html">Building Nginx And Tarantool Based Services</a>'
+      - date:
+          - year: "2015"
+          - day: "30 Dec"
+        link: '<a href="http://highscalability.com/blog/2015/12/30/how-to-choose-an-in-memory-nosql-solution-performance-measur.html">How to choose an in-memory NoSQL solution: performance measuring</a>'
+  video: '<iframe src="//www.youtube.com/embed/R9UHoZDFLWg" frameborder="0" allowfullscreen></iframe>'
+...

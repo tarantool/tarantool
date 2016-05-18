@@ -7,7 +7,7 @@ html {
     -webkit-font-smoothing:antialiased;
 }
 body {
-    font-family:helvetica-r, Arial, Tahoma, Verdana;
+    font-family:Arial, Tahoma, Verdana;
     font-size:1em;
     font-style:normal;
     font-weight:normal;
@@ -251,7 +251,7 @@ h1, h2, h3, h4, h5 {
     margin:0 auto;
 }
 .b-Tarantool_title {
-    font:65px helvetica-b, Arial, Tahoma, Verdana;
+    font:65px Arial, Tahoma, Verdana;
     padding: 0;
 /*    padding:30px 0 0 0;*/
     margin:0;
@@ -1516,6 +1516,54 @@ div.b-rock-list-item-ico {
 
 .b-button.b-email {
     margin-right: 2px;
+}
+
+.buttons-header {
+    text-align: center;
+    margin: 25px;
+}
+
+.buttons-header a {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-right: 25px;
+    border-radius: 4px;
+    text-decoration: blink;
+    font-size: 0.9em;
+    font-family: 'helvetica-b';
+}
+
+.b-button-red-download {
+    background: url('/theme/download_button_icon.png') 15px no-repeat;
+    background-color: #FF272C;
+    padding-left: 40px;
+    color: white;
+    margin-right: 10px;
+}
+
+.b-button-white {
+    background-color: white;
+    padding-left: 25px;
+    color: #262626;
+    margin-left: 10px;
+}
+
+.b-button-red-download:hover {
+    color: white;
+}
+
+.b-button-white:hover {
+    color: #262626;
+}
+
+.header-logo {
+    height: 80px;
+    width: 100%;
+    background: url('/theme/tarantool_infinity_logo.png') center no-repeat;
+}
+
+.papers a:hover{
+    text-decoration: underline;
 }
 
 /* vim: expandtab */
