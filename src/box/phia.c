@@ -141,12 +141,6 @@ struct ssmmap {
 	size_t size;
 };
 
-static inline void
-ss_mmapinit(struct ssmmap *m) {
-	m->p = NULL;
-	m->size = 0;
-}
-
 struct ssvfs;
 
 struct ssvfsif {
@@ -425,58 +419,6 @@ struct sstrace {
 	int line;
 	char message[100];
 };
-
-static inline void
-ss_traceinit(struct sstrace *t) {
-	tt_pthread_mutex_init(&t->lock, NULL);
-	t->message[0] = 0;
-	t->line = 0;
-	t->function = NULL;
-	t->file = NULL;
-}
-
-static inline void
-ss_tracefree(struct sstrace *t) {
-	tt_pthread_mutex_destroy(&t->lock);
-}
-
-static inline int
-ss_tracecopy(struct sstrace *t, char *buf, int bufsize) {
-	tt_pthread_mutex_lock(&t->lock);
-	int len = snprintf(buf, bufsize, "%s", t->message);
-	tt_pthread_mutex_unlock(&t->lock);
-	return len;
-}
-
-static inline void
-ss_vtrace(struct sstrace *t,
-          const char *file,
-          const char *function, int line,
-          char *fmt, va_list args)
-{
-	tt_pthread_mutex_lock(&t->lock);
-	t->file     = file;
-	t->function = function;
-	t->line     = line;
-	vsnprintf(t->message, sizeof(t->message), fmt, args);
-	tt_pthread_mutex_unlock(&t->lock);
-}
-
-static inline int
-ss_traceset(struct sstrace *t,
-            const char *file,
-            const char *function, int line,
-            char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	ss_vtrace(t, file, function, line, fmt, args);
-	va_end(args);
-	return -1;
-}
-
-#define ss_trace(t, fmt, ...) \
-	ss_traceset(t, __FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
 
 enum ssorder {
 	SS_LT,
@@ -16543,6 +16485,7 @@ phia_service_do(struct phia_service *srv)
 void
 phia_service_delete(struct phia_service *srv)
 {
+	sd_cfree(&srv->sdc, &srv->env->r);
 	ss_free(srv->env->r.a, srv);
 }
 
