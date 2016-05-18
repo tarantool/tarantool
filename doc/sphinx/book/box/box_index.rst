@@ -56,6 +56,8 @@ API is a direct binding to corresponding methods of index objects of type
               type: TREE
             ...
 
+.. _index-pairs:
+
     .. method:: pairs(bitset-value | search-value, iterator-type)
 
         This method provides iteration support within an index.
@@ -79,6 +81,8 @@ API is a direct binding to corresponding methods of index objects of type
         to the yielded procedure, the data set could have changed significantly.
         Iteration, resumed after a yield point, does not preserve the read view,
         but continues with the new content of the database.
+        The tutorial :ref:`Indexed pattern search <tutorial-indexed-pattern-search>`
+        shows one way that iterators and yields can be used together.
 
         Parameters:
 
