@@ -131,9 +131,10 @@ struct passwd *getpwnam(const char *name);
 struct group *getgrgid(int gid);
 ]]
 --
--- table with all available commands
+-- tables with all available commands
 --
-local available_commands
+local local_commands
+local remote_commands
 --
 -- true if we're running in HOME directory of a user
 --
@@ -156,10 +157,16 @@ local group_name
 -- print usage and exit
 --
 local function usage()
-    local tbl = fun.map(function(name, cmd) return name end, available_commands)
-    tbl = tbl:totable();
-    table.sort(tbl)
-    log.error("Usage: %s {%s} instance_name", arg[0], table.concat(tbl, '|'))
+    local local_tbl = fun.map(function(name, cmd) return name end,
+                                 local_commands):totable()
+    local remote_tbl = fun.map(function(name, cmd) return name end,
+                               remote_commands):totable()
+    table.sort(local_tbl)
+    table.sort(remote_tbl)
+
+    log.error("Usage: %s {%s} instance_name", arg[0], table.concat(local_tbl, '|'))
+    log.error("       %s {%s} URI", arg[0], table.concat(remote_tbl, '|'))
+
     log.error("Config file: %s", default_file)
     os.exit(1)
 end
@@ -532,6 +539,15 @@ local function enter()
     return 0
 end
 
+local function connect()
+    local cmd = string.format("require('console').connect('%s')", arg[0])
+
+    console.on_start(function(self) self:eval(cmd) end)
+    console.on_client_disconnect(function(self) self.running = false end)
+    console.start()
+    return 0
+end
+
 local function status()
     local pid_file = default_cfg.pid_file
     local console_sock = uri.parse(console_sock).service
@@ -604,7 +620,7 @@ local function exit_wrapper(func)
     return function() os.exit(func()) end
 end
 
-available_commands = setmetatable({
+local_commands = {
     start     = start,
     stop      = exit_wrapper(stop),
     logrotate = exit_wrapper(logrotate),
@@ -614,38 +630,52 @@ available_commands = setmetatable({
     reload    = exit_wrapper(eval),
     eval      = exit_wrapper(eval),
     check     = exit_wrapper(check)
-}, {
-    __index = function(table, cmd)
-        log.error("Unknown command '%s'", cmd)
-        usage()
-    end
-})
+}
+
+remote_commands = {
+    connect   = exit_wrapper(connect)
+}
+
+if #arg <2 then
+    usage()
+end
 
 default_file = find_default_file()
 
-instance_name = find_instance_name(arg[0], arg[2])
+if local_commands[arg[1]] ~= nil then
+    -- Check if the requested action is among supported ones, and return it in this
+    -- case. Otherwise print help and exit.
+    local cmd_function = local_commands[arg[1]]
 
--- Check if the requested action is among supported ones, and return it in this
--- case. Otherwise print help and exit.
-local cmd_function = available_commands[arg[1]]
+    instance_name = find_instance_name(arg[0], arg[2])
+    load_default_file(default_file)
 
-load_default_file(default_file)
+    -- Pass the rest of command line arguments to the instance
+    shift_argv(arg, 0, 2)
 
--- Pass the rest of command line arguments to the instance
-shift_argv(arg, 0, 2)
+    instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
 
-instance_path = fio.pathjoin(instance_dir, instance_name .. '.lua')
+    if not fio.stat(instance_path) then
+        log.error('Instance %s is not found in %s', instance_name, instance_dir)
+        os.exit(-1)
+    end
 
-if not fio.stat(instance_path) then
-    log.error('Instance %s is not found in %s', instance_name, instance_dir)
-    os.exit(-1)
+    -- create a path to the control socket (admin console)
+    console_sock = instance_name .. '.control'
+    console_sock = fio.pathjoin(fio.dirname(default_cfg.pid_file), console_sock)
+    console_sock = 'unix/:' .. console_sock
+
+    cmd_function()
+elseif remote_commands[arg[1]] ~= nil then
+    local cmd_function = remote_commands[arg[1]]
+
+    -- Pass the rest of command line arguments to the instance
+    shift_argv(arg, 0, 2)
+
+    cmd_function()
+else
+    log.error("Unknown command '%s'", arg[1])
+    usage()
 end
-
--- create a path to the control socket (admin console)
-console_sock = instance_name .. '.control'
-console_sock = fio.pathjoin(fio.dirname(default_cfg.pid_file), console_sock)
-console_sock = 'unix/:' .. console_sock
-
-cmd_function()
 
 -- vim: syntax=lua
