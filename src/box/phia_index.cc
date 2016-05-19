@@ -174,21 +174,12 @@ phia_configure(struct space *space, struct key_def *key_def)
 	/* db.page_size */
 	phia_ctl(c, sizeof(c), key_def, "page_size");
 	phia_setint(env, c, key_def->opts.page_size);
-	/* db.mmap */
-	phia_ctl(c, sizeof(c), key_def, "mmap");
-	phia_setint(env, c, cfg_geti("phia.mmap"));
 	/* db.sync */
 	phia_ctl(c, sizeof(c), key_def, "sync");
 	phia_setint(env, c, cfg_geti("phia.sync"));
 	/* db.amqf */
 	phia_ctl(c, sizeof(c), key_def, "amqf");
 	phia_setint(env, c, key_def->opts.amqf);
-	/* db.read_oldest */
-	phia_ctl(c, sizeof(c), key_def, "read_oldest");
-	phia_setint(env, c, key_def->opts.read_oldest);
-	/* db.expire */
-	phia_ctl(c, sizeof(c), key_def, "expire");
-	phia_setint(env, c, key_def->opts.expire);
 	/* db.path_fail_on_drop */
 	phia_ctl(c, sizeof(c), key_def, "path_fail_on_drop");
 	phia_setint(env, c, 0);

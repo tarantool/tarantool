@@ -77,10 +77,7 @@ const struct key_opts key_opts_default = {
 	/* .node_size           = */ 67108864,
 	/* .page_size           = */ 131072,
 	/* .sync                = */ 2,
-	/* .mmap                = */ 0,
 	/* .amqf                = */ 0,
-	/* .read_oldest         = */ 0,
-	/* .expire              = */ 0
 };
 
 const struct opt_def key_opts_reg[] = {
@@ -94,10 +91,7 @@ const struct opt_def key_opts_reg[] = {
 	OPT_DEF("node_size", MP_UINT, struct key_opts, node_size),
 	OPT_DEF("page_size", MP_UINT, struct key_opts, page_size),
 	OPT_DEF("sync", MP_UINT, struct key_opts, sync),
-	OPT_DEF("mmap", MP_UINT, struct key_opts, mmap),
 	OPT_DEF("amqf", MP_UINT, struct key_opts, amqf),
-	OPT_DEF("read_oldest", MP_UINT, struct key_opts, read_oldest),
-	OPT_DEF("expire", MP_UINT, struct key_opts, expire),
 	{ NULL, MP_NIL, 0, 0 }
 };
 
