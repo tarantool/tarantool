@@ -363,18 +363,6 @@ PhiaEngine::init()
 	if (env == NULL)
 		panic("failed to create phia environment");
 	worker_pool_size = cfg_geti("phia.threads");
-	phia_setint(env, "phia.path_create", 0);
-	phia_setint(env, "phia.recover", 2);
-	phia_setstring(env, "phia.path", cfg_gets("phia_dir"), 0);
-	phia_setint(env, "memory.limit",
-		    cfg_getd("phia.memory_limit")*1024*1024*1024);
-	phia_setint(env, "compaction.0.async", 1);
-	phia_setint(env, "compaction.0.compact_wm", cfg_geti("phia.compact_wm"));
-	phia_setint(env, "compaction.0.branch_prio", cfg_geti("phia.branch_prio"));
-	phia_setint(env, "compaction.0.branch_age", cfg_geti("phia.branch_age"));
-	phia_setint(env, "compaction.0.branch_age_wm", cfg_geti("phia.branch_age_wm"));
-	phia_setint(env, "compaction.0.branch_age_period", cfg_geti("phia.branch_age_period"));
-	phia_setint(env, "phia.recover", 3);
 	int rc = phia_env_open(env);
 	if (rc == -1)
 		phia_error(env);
@@ -648,7 +636,7 @@ PhiaEngine::beginCheckpoint()
 	if (! worker_pool_run)
 		return 0;
 
-	int rc = phia_setint(env, "scheduler.checkpoint", 0);
+	int rc = phia_checkpoint(env);
 	if (rc == -1)
 		phia_error(env);
 	return 0;
@@ -660,8 +648,7 @@ PhiaEngine::waitCheckpoint(struct vclock*)
 	if (! worker_pool_run)
 		return 0;
 	for (;;) {
-		int64_t is_active = phia_getint(env, "scheduler.checkpoint_active");
-		if (! is_active)
+		if (!phia_checkpoint_is_active(env))
 			break;
 		fiber_yield_timeout(.020);
 	}

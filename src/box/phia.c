@@ -402,7 +402,7 @@ ss_free(struct ssa *a, void *ptr) {
 }
 
 static inline char*
-ss_strdup(struct ssa *a, char *str) {
+ss_strdup(struct ssa *a, const char *str) {
 	int sz = strlen(str) + 1;
 	char *s = ss_malloc(a, sz);
 	if (unlikely(s == NULL))
@@ -13134,7 +13134,7 @@ struct scheduler {
 	pthread_mutex_t        lock;
 	uint64_t       checkpoint_lsn_last;
 	uint64_t       checkpoint_lsn;
-	uint32_t       checkpoint;
+	bool           checkpoint;
 	uint32_t       age;
 	uint64_t       age_time;
 	uint64_t       gc_time;
@@ -13182,14 +13182,14 @@ sc_task_checkpoint(struct scheduler *s)
 {
 	uint64_t lsn = sr_seq(s->r->seq, SR_LSN);
 	s->checkpoint_lsn = lsn;
-	s->checkpoint = 1;
+	s->checkpoint = true;
 	sc_start(s, SI_CHECKPOINT);
 }
 
 static inline void
 sc_task_checkpoint_done(struct scheduler *s)
 {
-	s->checkpoint = 0;
+	s->checkpoint = false;
 	s->checkpoint_lsn_last = s->checkpoint_lsn;
 	s->checkpoint_lsn = 0;
 }
@@ -13286,7 +13286,7 @@ sc_init(struct scheduler *s, struct runtime *r)
 	tt_pthread_mutex_init(&s->lock, NULL);
 	s->checkpoint_lsn           = 0;
 	s->checkpoint_lsn_last      = 0;
-	s->checkpoint               = 0;
+	s->checkpoint               = false;
 	s->age                      = 0;
 	s->age_time                 = now;
 	s->gc                       = 0;
@@ -13734,7 +13734,7 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 		break;
 	case 2:  /* checkpoint */
 	{
-		if (s->checkpoint == 0)
+		if (!s->checkpoint)
 			sc_task_checkpoint(s);
 		break;
 	}
@@ -13912,7 +13912,7 @@ struct seconfrt {
 	uint32_t  pager_ref_pool_size;
 	/* scheduler */
 	char      zone[4];
-	uint32_t  checkpoint_active;
+	uint32_t  checkpoint;
 	uint64_t  checkpoint_lsn;
 	uint64_t  checkpoint_lsn_last;
 	uint32_t  gc_active;
@@ -13940,17 +13940,13 @@ struct seconf {
 	struct sfscheme      scheme;
 	int           confmax;
 	struct srconf       *conf;
-	struct so           *env;
+	struct phia_env     *env;
 };
 
 static int se_confinit(struct seconf*, struct phia_env *o);
 static void se_conffree(struct seconf*);
 static int se_confvalidate(struct seconf*);
 static int se_confserialize(struct seconf*, struct ssbuf*);
-static int se_confset_string(struct so*, const char*, void*, int);
-static int se_confset_int(struct so*, const char*, int64_t);
-static void *se_confget_string(struct so*, const char*, int*);
-static int64_t se_confget_int(struct so*, const char*);
 
 struct phia_confcursor {
 	struct phia_env *env;
@@ -13960,7 +13956,6 @@ struct phia_confcursor {
 };
 
 struct phia_env {
-	struct so          o;
 	struct srstatus    status;
 	/** List of open spaces. */
 	struct rlist db;
@@ -14245,17 +14240,6 @@ phia_env_delete(struct phia_env *e)
 	return rcret;
 }
 
-static struct soif seif =
-{
-	.open         = NULL,
-	.destroy      = NULL,
-	.setstring    = se_confset_string,
-	.setint       = se_confset_int,
-	.getstring    = se_confget_string,
-	.getint       = se_confget_int,
-	.get          = NULL,
-};
-
 static inline int
 se_confv(struct srconf *c, struct srconfstmt *s)
 {
@@ -14390,13 +14374,19 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 	            compaction, SR_NS, NULL);
 }
 
-static inline int
-se_confscheduler_checkpoint(struct srconf *c, struct srconfstmt *s)
+int
+phia_checkpoint(struct phia_env *env)
 {
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_checkpoint(&e->scheduler);
+	return sc_ctl_checkpoint(&env->scheduler);
+}
+
+bool
+phia_checkpoint_is_active(struct phia_env *env)
+{
+	tt_pthread_mutex_lock(&env->scheduler.lock);
+	bool is_active = env->scheduler.checkpoint;
+	tt_pthread_mutex_unlock(&env->scheduler.lock);
+	return is_active;
 }
 
 static inline int
@@ -14424,10 +14414,6 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	struct srconf *scheduler = *pc;
 	struct srconf *p = NULL;
 	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "checkpoint_active", SS_U32, &rt->checkpoint_active, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "checkpoint_lsn", SS_U64, &rt->checkpoint_lsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "checkpoint_lsn_last", SS_U64, &rt->checkpoint_lsn_last, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_checkpoint, "checkpoint",  SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
 	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "lru_active", SS_U32, &rt->lru_active, SR_RO, NULL);
@@ -14747,7 +14733,7 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 
 	/* scheduler */
 	tt_pthread_mutex_lock(&e->scheduler.lock);
-	rt->checkpoint_active    = e->scheduler.checkpoint;
+	rt->checkpoint           = e->scheduler.checkpoint;
 	rt->checkpoint_lsn_last  = e->scheduler.checkpoint_lsn_last;
 	rt->checkpoint_lsn       = e->scheduler.checkpoint_lsn;
 	rt->gc_active            = e->scheduler.gc;
@@ -14817,71 +14803,6 @@ static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 	return sr_confexec(root, &stmt);
 }
 
-static int
-se_confquery(struct phia_env *e, int op, const char *path,
-             enum sstype valuetype, void *value, int valuesize,
-             int *size)
-{
-	int rc;
-	rc = se_confensure(&e->conf);
-	if (unlikely(rc == -1))
-		return -1;
-	struct seconfrt rt;
-	se_confrt(e, &rt);
-	struct srconf *conf = e->conf.conf;
-	struct srconf *root;
-	root = se_confprepare(e, &rt, conf, 0);
-	struct srconfstmt stmt = {
-		.op        = op,
-		.path      = path,
-		.value     = value,
-		.valuesize = valuesize,
-		.valuetype = valuetype,
-		.serialize = NULL,
-		.ptr       = e,
-		.r         = &e->r
-	};
-	rc = sr_confexec(root, &stmt);
-	if (size)
-		*size = stmt.valuesize;
-	return rc;
-}
-
-static int
-se_confset_string(struct so *o, const char *path, void *string, int size)
-{
-	if (string && size == 0)
-		size = strlen(string) + 1;
-	return se_confquery(o->env, SR_WRITE, path, SS_STRING,
-	                   string, size, NULL);
-}
-
-static int se_confset_int(struct so *o, const char *path, int64_t v)
-{
-	return se_confquery(o->env, SR_WRITE, path, SS_I64,
-	                    &v, sizeof(v), NULL);
-}
-
-static void *se_confget_string(struct so *o, const char *path, int *size)
-{
-	void *result = NULL;
-	int rc = se_confquery(o->env, SR_READ, path, SS_STRING,
-	                      &result, sizeof(void*), size);
-	if (unlikely(rc == -1))
-		return NULL;
-	return result;
-}
-
-static int64_t se_confget_int(struct so *o, const char *path)
-{
-	int64_t result = 0;
-	int rc = se_confquery(o->env, SR_READ, path, SS_I64,
-	                      &result, sizeof(void*), NULL);
-	if (unlikely(rc == -1))
-		return -1;
-	return result;
-}
-
 static int se_confinit(struct seconf *c, struct phia_env *o)
 {
 	c->confmax = 2048;
@@ -14889,7 +14810,7 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 	if (unlikely(c->conf == NULL))
 		return -1;
 	sf_schemeinit(&c->scheme);
-	c->env                 = &o->o;
+	c->env                 = o;
 	c->path                = NULL;
 	c->path_create         = 1;
 	c->recover             = 1;
@@ -16279,7 +16200,6 @@ phia_env_new(void)
 	if (unlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	so_init(&e->o, &se_o[SE], &seif, e);
 	sr_statusinit(&e->status);
 	sr_statusset(&e->status, SR_OFFLINE);
 	ss_vfsinit(&e->vfs, &ss_stdvfs);
@@ -16300,6 +16220,25 @@ phia_env_new(void)
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
+
+	e->conf.path_create = 0;
+	e->conf.path = ss_strdup(&e->a, cfg_gets("phia_dir"));
+	if (e->conf.path == NULL) {
+		sr_oom(e->r.e);
+		goto error;
+	}
+	e->conf.memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
+
+	/* configure zone = 0 */
+	struct srzone *z = &e->conf.zones.zones[0];
+	assert(z->enable);
+	z->compact_wm = cfg_geti("phia.compact_wm");
+	z->branch_prio = cfg_geti("phia.branch_prio");
+	z->branch_age = cfg_geti("phia.branch_age");
+	z->branch_age_period = cfg_geti("phia.branch_age_period");
+	z->branch_age_wm = cfg_geti("phia.branch_age_wm");
+
+	e->conf.recover = SE_RECOVER_NP;
 	return e;
 error:
 	sr_statusfree(&e->status);
@@ -16330,12 +16269,6 @@ int phia_destroy(void *ptr)
 	if (unlikely(o->i->destroy == NULL)) {
 		sp_unsupported(o, __func__);
 		return -1;
-	}
-	struct phia_env *e = o->env;
-	int rc;
-	if (unlikely(&e->o == o)) {
-		rc = o->i->destroy(o);
-		return rc;
 	}
 	return o->i->destroy(o);
 }

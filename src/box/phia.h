@@ -75,6 +75,12 @@ phia_commit(struct phia_tx *tx);
 int
 phia_rollback(struct phia_tx *tx);
 
+int
+phia_checkpoint(struct phia_env *env);
+
+bool
+phia_checkpoint_is_active(struct phia_env *env);
+
 struct phia_document *
 phia_document(struct phia_index *index);
 
