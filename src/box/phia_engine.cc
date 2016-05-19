@@ -223,26 +223,23 @@ void phia_error(struct phia_env *env)
 int phia_info(const char *name, phia_info_f cb, void *arg)
 {
 	PhiaEngine *e = (PhiaEngine *)engine_find("phia");
-	void *cursor = phia_confcursor(e->env);
-	void *o = NULL;
+	struct phia_confcursor *cursor = phia_confcursor(e->env);
+	const char *key;
+	const char *value;
 	if (name) {
-		while ((o = phia_get(cursor, o))) {
-			char *key = (char *)phia_getstring(o, "key", 0);
+		while (phia_confcursor_next(cursor, &key, &value) == 0) {
 			if (name && strcmp(key, name) != 0)
 				continue;
-			char *value = (char *)phia_getstring(o, "value", 0);
 			cb(key, value, arg);
 			return 1;
 		}
-		phia_destroy(cursor);
+		phia_confcursor_delete(cursor);
 		return 0;
 	}
-	while ((o = phia_get(cursor, o))) {
-		char *key = (char *)phia_getstring(o, "key", 0);
-		char *value = (char *)phia_getstring(o, "value", 0);
+	while (phia_confcursor_next(cursor, &key, &value) == 0) {
 		cb(key, value, arg);
 	}
-	phia_destroy(cursor);
+	phia_confcursor_delete(cursor);
 	return 0;
 }
 

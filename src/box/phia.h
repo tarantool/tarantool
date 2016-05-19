@@ -44,6 +44,8 @@ struct phia_tx;
 struct phia_document;
 struct phia_cursor;
 struct phia_index;
+struct phia_confcursor;
+struct phia_confkv;
 struct key_def;
 
 struct phia_env *
@@ -94,8 +96,6 @@ void    *phia_get(void*, void*);
 
 struct phia_cursor *
 phia_cursor(struct phia_index *index);
-void *
-phia_confcursor(struct phia_env *env);
 void
 phia_cursor_delete(struct phia_cursor *cursor);
 void
@@ -103,6 +103,22 @@ phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 struct phia_document *
 phia_cursor_get(struct phia_cursor *cursor, struct phia_document *key);
 
+/*
+ * Configuration
+ */
+struct phia_confcursor *
+phia_confcursor(struct phia_env *env);
+
+void
+phia_confcursor_delete(struct phia_confcursor *c);
+
+int
+phia_confcursor_next(struct phia_confcursor *c, const char **key,
+		     const char **value);
+
+/*
+ * Index
+ */
 struct phia_index *
 phia_index_by_name(struct phia_env *env, const char *name);
 

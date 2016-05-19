@@ -13952,14 +13952,8 @@ static int se_confset_int(struct so*, const char*, int64_t);
 static void *se_confget_string(struct so*, const char*, int*);
 static int64_t se_confget_int(struct so*, const char*);
 
-struct seconfkv {
-	struct so    o;
-	struct ssbuf key;
-	struct ssbuf value;
-};
-
-struct seconfcursor {
-	struct so o;
+struct phia_confcursor {
+	struct phia_env *env;
 	struct ssbuf dump;
 	int first;
 	struct srconfdump *pos;
@@ -14979,112 +14973,18 @@ static int se_confvalidate(struct seconf *c)
 	return 0;
 }
 
-static void
-se_confkv_free(struct seconfkv *v)
+void
+phia_confcursor_delete(struct phia_confcursor *c)
 {
-	struct phia_env *e = v->o.env;
-	ss_buffree(&v->key, &e->a);
-	ss_buffree(&v->value, &e->a);
-	ss_free(&e->a, v);
-}
-
-static int
-se_confkv_destroy(struct so *o)
-{
-	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
-	ss_bufreset(&v->key);
-	ss_bufreset(&v->value);
-	se_confkv_free(v);
-	return 0;
-}
-
-static void *se_confkv_getstring(struct so *o, const char *path, int *size)
-{
-	struct seconfkv *v = se_cast(o, struct seconfkv*, SECONFKV);
-	int len;
-	if (strcmp(path, "key") == 0) {
-		len = ss_bufused(&v->key);
-		if (size)
-			*size = len;
-		return v->key.s;
-	} else
-	if (strcmp(path, "value") == 0) {
-		len = ss_bufused(&v->value);
-		if (size)
-			*size = len;
-		if (len == 0)
-			return NULL;
-		return v->value.s;
-	}
-	return NULL;
-}
-
-static struct soif seconfkvif =
-{
-	.open         = NULL,
-	.destroy      = se_confkv_destroy,
-	.setstring    = NULL,
-	.setint       = NULL,
-	.getstring    = se_confkv_getstring,
-	.getint       = NULL,
-	.get          = NULL,
-};
-
-static inline struct so *se_confkv_new(struct phia_env *e, struct srconfdump *vp)
-{
-	struct seconfkv *v;
-	v = ss_malloc(&e->a, sizeof(struct seconfkv));
-	if (unlikely(v == NULL)) {
-		sr_oom(&e->error);
-		return NULL;
-	}
-	so_init(&v->o, &se_o[SECONFKV], &seconfkvif, e);
-	ss_bufinit(&v->key);
-	ss_bufinit(&v->value);
-	int rc;
-	rc = ss_bufensure(&v->key, &e->a, vp->keysize);
-	if (unlikely(rc == -1)) {
-		se_confkv_free(v);
-		sr_oom(&e->error);
-		return NULL;
-	}
-	rc = ss_bufensure(&v->value, &e->a, vp->valuesize);
-	if (unlikely(rc == -1)) {
-		se_confkv_free(v);
-		sr_oom(&e->error);
-		return NULL;
-	}
-	memcpy(v->key.s, sr_confkey(vp), vp->keysize);
-	memcpy(v->value.s, sr_confvalue(vp), vp->valuesize);
-	ss_bufadvance(&v->key, vp->keysize);
-	ss_bufadvance(&v->value, vp->valuesize);
-	return &v->o;
-}
-
-static void
-se_confcursor_free(struct seconfcursor *c)
-{
-	struct phia_env *e = c->o.env;
+	struct phia_env *e = c->env;
 	ss_buffree(&c->dump, &e->a);
 	ss_free(&e->a, c);
 }
 
-static int
-se_confcursor_destroy(struct so *o)
+int
+phia_confcursor_next(struct phia_confcursor *c, const char **key,
+		    const char **value)
 {
-	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
-	ss_bufreset(&c->dump);
-	se_confcursor_free(c);
-	return 0;
-}
-
-static void*
-se_confcursor_get(struct so *o, struct so *v)
-{
-	struct seconfcursor *c = se_cast(o, struct seconfcursor*, SECONFCURSOR);
-	if (v) {
-		se_confcursor_destroy(o);
-	}
 	if (c->first) {
 		assert( ss_bufsize(&c->dump) >= (int)sizeof(struct srconfdump) );
 		c->first = 0;
@@ -15092,46 +14992,36 @@ se_confcursor_get(struct so *o, struct so *v)
 	} else {
 		int size = sizeof(struct srconfdump) + c->pos->keysize + c->pos->valuesize;
 		c->pos = (struct srconfdump*)((char*)c->pos + size);
-		if ((char*)c->pos >= c->dump.p)
+	if ((char*)c->pos >= c->dump.p)
 			c->pos = NULL;
 	}
 	if (unlikely(c->pos == NULL))
-		return NULL;
-	struct phia_env *e = c->o.env;
-	return se_confkv_new(e, c->pos);
+		return 1;
+	*key = sr_confkey(c->pos);
+	*value = sr_confvalue(c->pos);
+	return 0;
 }
 
-static struct soif seconfcursorif =
-{
-	.open         = NULL,
-	.destroy      = se_confcursor_destroy,
-	.setstring    = NULL,
-	.setint       = NULL,
-	.getstring    = NULL,
-	.getint       = NULL,
-	.get          = se_confcursor_get,
-};
-
-void *
+struct phia_confcursor *
 phia_confcursor(struct phia_env *e)
 {
-	struct seconfcursor *c;
-	c = ss_malloc(&e->a, sizeof(struct seconfcursor));
+	struct phia_confcursor *c;
+	c = ss_malloc(&e->a, sizeof(struct phia_confcursor));
 	if (unlikely(c == NULL)) {
 		sr_oom(&e->error);
 		return NULL;
 	}
-	so_init(&c->o, &se_o[SECONFCURSOR], &seconfcursorif, e);
+	c->env = e;
 	c->pos = NULL;
 	c->first = 1;
 	ss_bufinit(&c->dump);
 	int rc = se_confserialize(&e->conf, &c->dump);
 	if (unlikely(rc == -1)) {
-		se_confcursor_free(c);
+		phia_confcursor_delete(c);
 		sr_oom(&e->error);
 		return NULL;
 	}
-	return &c->o;
+	return c;
 }
 
 void
