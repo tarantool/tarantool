@@ -16471,6 +16471,10 @@ struct phia_service *
 phia_service_new(struct phia_env *env)
 {
 	struct phia_service *srv = ss_malloc(env->r.a, sizeof(struct phia_service));
+	if (srv == NULL) {
+		sr_oom(env->r.e);
+		return NULL;
+	}
 	srv->env = env;
 	sd_cinit(&srv->sdc);
 	return srv;
