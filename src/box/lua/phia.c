@@ -139,56 +139,6 @@ seek_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
 }
 #endif
 
-typedef void (*phia_info_f)(const char*, const char*, void *);
-
-extern int phia_info(const char *name, phia_info_f, void *);
-
-static void
-lbox_phia_cb_index(const char *key, const char *value, void *arg)
-{
-	(void) key;
-	struct lua_State *L;
-	L = (struct lua_State*)arg;
-	if (value == NULL) {
-		lua_pushnil(L);
-		return;
-	}
-	lua_pushstring(L, value);
-}
-
-static int
-lbox_phia_index(struct lua_State *L)
-{
-	luaL_checkstring(L, -1);
-	const char *name = lua_tostring(L, -1);
-	return phia_info(name, lbox_phia_cb_index, (void*)L);
-}
-
-static void
-lbox_phia_cb(const char *key, const char *value, void *arg)
-{
-	struct lua_State *L;
-	L = (struct lua_State*)arg;
-	if (value == NULL)
-		return;
-	lua_pushstring(L, key);
-	lua_pushstring(L, value);
-	lua_settable(L, -3);
-}
-
-static int
-lbox_phia_call(struct lua_State *L)
-{
-	lua_newtable(L);
-	phia_info(NULL, lbox_phia_cb, (void*)L);
-	return 1;
-}
-
-static const struct luaL_reg lbox_phia_meta [] = {
-	{"__index", lbox_phia_index},
-	{"__call",  lbox_phia_call},
-	{NULL, NULL}
-};
 
 void
 box_lua_phia_init(struct lua_State *L)
