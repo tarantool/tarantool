@@ -52,7 +52,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 	assert(key_def->part_count <= 8);
 	struct phia_document *obj = phia_document(db);
 	if (obj == NULL)
-		phia_error(env);
+		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
 	phia_setstring(obj, "arg", fiber(), 0);
 	if (key == NULL)
 		return obj;
@@ -72,7 +72,8 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 		if (partsize == 0)
 			part = "";
 		if (phia_setstring(obj, partname, part, partsize) == -1)
-			phia_error(env);
+			tnt_raise(ClientError, ER_PHIA,
+				  phia_env_get_error(env));
 		i++;
 	}
 	if (keyend) {
@@ -93,14 +94,14 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	/* create database */
 	db = phia_index_new(env, key_def);
 	if (db == NULL)
-		phia_error(env);
+		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	rc = phia_index_open(db);
 	if (rc == -1)
-		phia_error(env);
+		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
 	format = space->format;
 	tuple_format_ref(format, 1);
 }
@@ -118,10 +119,8 @@ PhiaIndex::~PhiaIndex()
 	if (rc == -1)
 		goto error;
 error:;
-	char *error = (char *)phia_getstring(env, "phia.error", 0);
 	say_info("phia space %" PRIu32 " close error: %s",
-			 key_def->space_id, error);
-	free(error);
+			 key_def->space_id, phia_env_get_error(env));
 }
 
 size_t
@@ -155,7 +154,7 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	rc = phia_open(obj);
 	if (rc == -1) {
 		phia_destroy(obj);
-		phia_error(env);
+		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
 	}
 	struct phia_document *result;
 	if (transaction == NULL) {
@@ -334,7 +333,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	}
 	it->cursor = phia_cursor(db);
 	if (it->cursor == NULL)
-		phia_error(env);
+		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *

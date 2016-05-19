@@ -63,7 +63,6 @@ extern "C" {
 typedef void (*phia_info_f)(const char*, const char*, void*);
 int phia_info(const char*, phia_info_f, void*);
 }
-void  phia_error(struct phia_env *);
 void phia_workers_start(struct phia_env *);
 
 struct phia_document;

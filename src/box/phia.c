@@ -14011,6 +14011,15 @@ phia_env_get_scheduler(struct phia_env *env)
 	return &env->scheduler;
 }
 
+const char *
+phia_env_get_error(struct phia_env *env)
+{
+	static char error[128];
+	error[0] = 0;
+	(void) sr_errorcopy(&env->error, error, sizeof(error));
+	return error;
+}
+
 static struct phia_document *
 phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
 
@@ -14265,30 +14274,6 @@ se_confv_offline(struct srconf *c, struct srconfstmt *s)
 	return se_confv(c, s);
 }
 
-static inline int
-se_confphia_error(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	char *errorp;
-	char  error[128];
-	error[0] = 0;
-	int len = sr_errorcopy(&e->error, error, sizeof(error));
-	if (likely(len == 0))
-		errorp = NULL;
-	else
-		errorp = error;
-	struct srconf conf = {
-		.key      = c->key,
-		.flags    = c->flags,
-		.type     = c->type,
-		.function = NULL,
-		.value    = errorp,
-		.ptr      = NULL,
-		.next     = NULL
-	};
-	return se_confv(&conf, s);
-}
-
 static inline struct srconf*
 se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
@@ -14297,7 +14282,6 @@ se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "version", SS_STRING, rt->version, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "version_storage", SS_STRING, rt->version_storage, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "build", SS_STRING, rt->build, SR_RO, NULL);
-	sr_C(&p, pc, se_confphia_error, "error", SS_STRING, NULL, SR_RO, NULL);
 	sr_c(&p, pc, se_confv_offline, "path", SS_STRINGPTR, &e->conf.path);
 	sr_c(&p, pc, se_confv_offline, "path_create", SS_U32, &e->conf.path_create);
 	sr_c(&p, pc, se_confv_offline, "recover", SS_U32, &e->conf.recover);
@@ -14492,109 +14476,6 @@ se_confdb_get(struct srconf *c, struct srconfstmt *s)
 	return 0;
 }
 
-static inline int
-se_confdb_upsert(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_index *db = c->ptr;
-	if (unlikely(phia_index_active(db))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	/* set upsert function */
-	return 0;
-}
-
-static inline int
-se_confdb_upsertarg(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_index *db = c->ptr;
-	if (unlikely(phia_index_active(db))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	return 0;
-}
-
-static inline int
-se_confdb_status(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_index *db = c->value;
-	char *status = sr_statusof(&db->index->status);
-	struct srconf conf = {
-		.key      = c->key,
-		.flags    = c->flags,
-		.type     = c->type,
-		.function = NULL,
-		.value    = status,
-		.ptr      = NULL,
-		.next     = NULL
-	};
-	return se_confv(&conf, s);
-}
-
-static inline int
-se_confdb_scheme(struct srconf *c ssunused, struct srconfstmt *s)
-{
-	/* set(scheme, field) */
-	struct phia_index *db = c->ptr;
-	struct phia_env *e = db->env;
-	if (s->op != SR_WRITE) {
-		sr_error(&e->error, "%s", "bad operation");
-		return -1;
-	}
-	if (unlikely(phia_index_active(db))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	if (unlikely(db->scheme->scheme.fields_count == 8)) {
-		sr_error(s->r->e, "%s", "fields number limit reached");
-		return -1;
-	}
-	char *name = s->value;
-	struct sffield *field = sf_schemefind(&db->scheme->scheme, name);
-	if (unlikely(field)) {
-		sr_error(&e->error, "field '%s' is already set", name);
-		return -1;
-	}
-	/* create new field */
-	field = sf_fieldnew(&e->a, name);
-	if (unlikely(field == NULL))
-		return sr_oom(&e->error);
-	int rc;
-	rc = sf_fieldoptions(field, &e->a, "string");
-	if (unlikely(rc == -1)) {
-		sf_fieldfree(field, &e->a);
-		return sr_oom(&e->error);
-	}
-	rc = sf_schemeadd(&db->scheme->scheme, &e->a, field);
-	if (unlikely(rc == -1)) {
-		sf_fieldfree(field, &e->a);
-		return sr_oom(&e->error);
-	}
-	return 0;
-}
-
-static inline int
-se_confdb_field(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_index *db = c->ptr;
-	struct phia_env *e = db->env;
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	if (unlikely(phia_index_active(db))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	char *path = s->value;
-	/* update key-part path */
-	struct sffield *field = sf_schemefind(&db->scheme->scheme, c->key);
-	assert(field != NULL);
-	return sf_fieldoptions(field, &e->a, path);
-}
 
 static inline struct srconf*
 se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)

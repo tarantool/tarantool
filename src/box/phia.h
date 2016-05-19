@@ -57,6 +57,9 @@ phia_env_open(struct phia_env *e);
 int
 phia_env_delete(struct phia_env *e);
 
+const char *
+phia_env_get_error(struct phia_env *e);
+
 struct phia_tx *
 phia_begin(struct phia_env *e);
 
