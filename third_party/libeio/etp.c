@@ -331,8 +331,7 @@ X_THREAD_PROC (etp_proc)
 
   if (pool->on_start_cb)
     if (pool->on_start_cb(pool->on_start_data))
-      goto quit;
-
+      goto error;
 
   for (;;)
     {
@@ -392,6 +391,13 @@ quit:
   if (pool->on_stop_cb)
     pool->on_stop_cb(pool->on_stop_data);
 
+  return 0;
+
+error:
+  assert(pool->started > 0);
+  pool->started--;
+  X_COND_BROADCAST (pool->wrkwait);
+  X_UNLOCK (pool->lock);
   return 0;
 }
 

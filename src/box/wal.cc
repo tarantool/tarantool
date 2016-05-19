@@ -661,7 +661,7 @@ wal_writer_f(va_list ap)
 {
 	struct wal_writer *writer = va_arg(ap, struct wal_writer *);
 	/** Initialize eio in this thread */
-	coeio_init();
+	coeio_enable();
 
 	writer->main_f = fiber();
 	cbus_join(&writer->tx_wal_bus, &writer->wal_pipe);

@@ -49,9 +49,8 @@ extern "C" {
  */
 
 void coeio_init(void);
+void coeio_enable(void);
 
-void coeio_set_thread_cb(int (*on_start_cb)(void *),
-			 int (*on_stop_cb)(void *), void *data);
 
 struct coio_task;
 

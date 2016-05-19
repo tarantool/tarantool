@@ -108,13 +108,39 @@ coeio_done_poll_cb(void *ptr)
 	(void)ptr;
 }
 
+static int
+coeio_on_start(void *data)
+{
+	(void) data;
+	struct cord *cord = (struct cord *)calloc(sizeof(struct cord), 1);
+	if (!cord)
+		return -1;
+	cord_create(cord, "coeio");
+	return 0;
+}
+
+static int
+coeio_on_stop(void *data)
+{
+	(void) data;
+	cord_destroy(cord());
+	return 0;
+}
+
+void
+coeio_init(void)
+{
+	eio_set_thread_on_start(coeio_on_start, NULL);
+	eio_set_thread_on_stop(coeio_on_stop, NULL);
+}
+
 /**
  * Init coeio subsystem.
  *
  * Create idle and async watchers, init eio.
  */
 void
-coeio_init(void)
+coeio_enable(void)
 {
 	eio_init(&coeio_manager, coeio_want_poll_cb, coeio_done_poll_cb);
 	coeio_manager.loop = loop();
@@ -123,14 +149,6 @@ coeio_init(void)
 	ev_async_init(&coeio_manager.coeio_async, coeio_async_cb);
 
 	ev_async_start(loop(), &coeio_manager.coeio_async);
-}
-
-void
-coeio_set_thread_cb(int (*on_start_cb)(void *),
-		    int (*on_stop_cb)(void *), void *data)
-{
-	eio_set_thread_on_start(on_start_cb, data);
-	eio_set_thread_on_stop(on_stop_cb, data);
 }
 
 static void
