@@ -49,7 +49,8 @@ struct PhiaSpace: public Handler {
 	              struct request *request);
 };
 
-int
+/* TODO: move to phia.c */
+extern "C" int
 phia_upsert_cb(int count,
                  char **src,    uint32_t *src_size,
                  char **upsert, uint32_t *upsert_size,

@@ -44,6 +44,7 @@ struct phia_tx;
 struct phia_document;
 struct phia_cursor;
 struct phia_index;
+struct key_def;
 
 struct phia_env *
 phia_env_new(void);
@@ -105,6 +106,9 @@ phia_cursor_get(struct phia_cursor *cursor, struct phia_document *key);
 struct phia_index *
 phia_index_by_name(struct phia_env *env, const char *name);
 
+struct phia_index *
+phia_index_new(struct phia_env *e, struct key_def *);
+
 int
 phia_index_open(struct phia_index *index);
 
@@ -119,6 +123,12 @@ phia_index_delete(struct phia_index *index);
 
 struct phia_document *
 phia_index_get(struct phia_index *index, struct phia_document *key);
+
+size_t
+phia_index_bsize(struct phia_index *db);
+
+uint64_t
+phia_index_size(struct phia_index *db);
 
 void
 phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn);

@@ -66,6 +66,9 @@
 #include "trivia/config.h"
 #include "tt_pthread.h"
 #include "assoc.h"
+#include "cfg.h"
+
+#include "key_def.h"
 
 #define ssunused __attribute__((unused))
 
@@ -9177,7 +9180,7 @@ struct sischeme {
 };
 
 static void si_schemeinit(struct sischeme*);
-static void si_schemefree(struct sischeme*, struct runtime*);
+static void si_schemefree(struct sischeme*, struct ssa*);
 static int  si_schemedeploy(struct sischeme*, struct runtime*);
 static int  si_schemerecover(struct sischeme*, struct runtime*);
 
@@ -10185,7 +10188,7 @@ static int si_close(struct si *i)
 	tt_pthread_mutex_destroy(&i->lock);
 	tt_pthread_mutex_destroy(&i->ref_lock);
 	sr_statusfree(&i->status);
-	si_schemefree(&i->scheme, &i->r);
+	si_schemefree(&i->scheme, i->r.a);
 	ss_free(i->r.a, i);
 	return rc_ret;
 }
@@ -12812,25 +12815,25 @@ static void si_schemeinit(struct sischeme *s)
 	sr_version_storage(&s->version_storage);
 }
 
-static void si_schemefree(struct sischeme *s, struct runtime *r)
+static void si_schemefree(struct sischeme *s, struct ssa *a)
 {
 	if (s->name) {
-		ss_free(r->a, s->name);
+		ss_free(a, s->name);
 		s->name = NULL;
 	}
 	if (s->path) {
-		ss_free(r->a, s->path);
+		ss_free(a, s->path);
 		s->path = NULL;
 	}
 	if (s->compression_sz) {
-		ss_free(r->a, s->compression_sz);
+		ss_free(a, s->compression_sz);
 		s->compression_sz = NULL;
 	}
 	if (s->compression_branch_sz) {
-		ss_free(r->a, s->compression_branch_sz);
+		ss_free(a, s->compression_branch_sz);
 		s->compression_branch_sz = NULL;
 	}
-	sf_schemefree(&s->scheme, r->a);
+	sf_schemefree(&s->scheme, a);
 }
 
 static int si_schemedeploy(struct sischeme *s, struct runtime *r)
@@ -14112,7 +14115,6 @@ phia_index_active(struct phia_index *o) {
 	return si_active(o->index);
 }
 
-static struct phia_index *phia_index_new(struct phia_env*, char*, int);
 static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
 static struct phia_document *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
@@ -14489,29 +14491,6 @@ se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **
 }
 
 static inline int
-se_confdb_set(struct srconf *c ssunused, struct srconfstmt *s)
-{
-	/* set(db) */
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE) {
-		sr_error(&e->error, "%s", "bad operation");
-		return -1;
-	}
-
-	char *name = s->value;
-	struct phia_index *index = phia_index_by_name(e, name);
-	if (unlikely(index)) {
-		sr_error(&e->error, "index '%s' already exists", name);
-		return -1;
-	}
-	index = phia_index_new(e, name, s->valuesize);
-	if (unlikely(index == NULL))
-		return -1;
-	rlist_add(&e->db, &index->link);
-	return 0;
-}
-
-static inline int
 se_confdb_get(struct srconf *c, struct srconfstmt *s)
 {
 	/* get(db.name) */
@@ -14544,8 +14523,6 @@ se_confdb_upsert(struct srconf *c, struct srconfstmt *s)
 		return -1;
 	}
 	/* set upsert function */
-	sfupsertf upsert = (sfupsertf)(uintptr_t)s->value;
-	sf_upsertset(&db->scheme->fmt_upsert, upsert);
 	return 0;
 }
 
@@ -14559,7 +14536,6 @@ se_confdb_upsertarg(struct srconf *c, struct srconfstmt *s)
 		sr_error(s->r->e, "write to %s is offline-only", s->path);
 		return -1;
 	}
-	sf_upsertset_arg(&db->scheme->fmt_upsert, s->value);
 	return 0;
 }
 
@@ -14578,19 +14554,6 @@ se_confdb_status(struct srconf *c, struct srconfstmt *s)
 		.next     = NULL
 	};
 	return se_confv(&conf, s);
-}
-
-static inline int
-se_confv_dboffline(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_index *db = c->ptr;
-	if (s->op == SR_WRITE) {
-		if (phia_index_active(db)) {
-			sr_error(s->r->e, "write to %s is offline-only", s->path);
-			return -1;
-		}
-	}
-	return se_confv(c, s);
 }
 
 static inline int
@@ -14666,7 +14629,7 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		si_profiler(&o->rtp);
 		si_profilerend(&o->rtp);
 		/* database index */
-		struct srconf *index = *pc;
+		struct srconf *database = *pc;
 		p = NULL;
 		sr_C(&p, pc, se_confv, "memory_used", SS_U64, &o->rtp.memory_used, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "size", SS_U64, &o->rtp.total_node_size, SR_RO, NULL);
@@ -14686,44 +14649,11 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		sr_C(&p, pc, se_confv, "branch_max", SS_U32, &o->rtp.total_branch_max, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "branch_histogram", SS_STRINGPTR, &o->rtp.histogram_branch_ptr, SR_RO, NULL);
 		sr_C(&p, pc, se_confv, "page_count", SS_U32, &o->rtp.total_page_count, SR_RO, NULL);
-		/* scheme */
-		struct srconf *scheme = *pc;
-		p = NULL;
-		int i = 0;
-		while (i < o->scheme->scheme.fields_count) {
-			struct sffield *field = o->scheme->scheme.fields[i];
-			sr_C(&p, pc, se_confdb_field, field->name, SS_STRING, field->options, 0, o);
-			i++;
-		}
-		/* database */
-		struct srconf *database = *pc;
-		p = NULL;
-		sr_C(&p, pc, se_confv, "name", SS_STRINGPTR, &o->scheme->name, SR_RO, NULL);
-		sr_C(&p, pc, se_confv_dboffline, "id", SS_U32, &o->scheme->id, 0, o);
-		sr_C(&p, pc, se_confdb_status,   "status", SS_STRING, o, SR_RO, NULL);
-		sr_C(&p, pc, se_confv_dboffline, "temperature", SS_U32, &o->scheme->temperature, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "amqf", SS_U32, &o->scheme->amqf, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "path", SS_STRINGPTR, &o->scheme->path, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "path_fail_on_exists", SS_U32, &o->scheme->path_fail_on_exists, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "path_fail_on_drop", SS_U32, &o->scheme->path_fail_on_drop, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "sync", SS_U32, &o->scheme->sync, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "node_size", SS_U64, &o->scheme->node_size, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "page_size", SS_U32, &o->scheme->node_page_size, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "page_checksum", SS_U32, &o->scheme->node_page_checksum, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "compression_key", SS_U32, &o->scheme->compression_key, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "compression_branch", SS_STRINGPTR, &o->scheme->compression_branch_sz, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "compression", SS_STRINGPTR, &o->scheme->compression_sz, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "lru", SS_U64, &o->scheme->lru, 0, o);
-		sr_C(&p, pc, se_confv_dboffline, "lru_step", SS_U32, &o->scheme->lru_step, 0, o);
-		sr_C(&p, pc, se_confdb_upsert, "upsert", SS_STRING, NULL, 0, o);
-		sr_C(&p, pc, se_confdb_upsertarg, "upsert_arg", SS_STRING, NULL, 0, o);
-		sr_C(&p, pc, NULL, "index", SS_UNDEF, index, SR_NS, o);
-		sr_C(&p, pc, se_confdb_scheme, "scheme", SS_UNDEF, scheme, SR_NS, o);
-		sr_C(&prev, pc, se_confdb_get, o->scheme->name, SS_STRING, database, SR_NS, o);
+		sr_C(&prev, pc, NULL, o->scheme->name, SS_UNDEF, database, SR_NS, o);
 		if (db == NULL)
 			db = prev;
 	}
-	return sr_C(NULL, pc, se_confdb_set, "db", SS_STRING, db, SR_NS, NULL);
+	return sr_C(NULL, pc, NULL, "db", SS_UNDEF, db, SR_NS, NULL);
 }
 
 static inline int
@@ -15275,127 +15205,157 @@ phia_cursor(struct phia_index *db)
 	return c;
 }
 
+/* TODO: move implementation from phia_space.cc */
+extern int
+phia_upsert_cb(int count,
+                 char **src,    uint32_t *src_size,
+                 char **upsert, uint32_t *upsert_size,
+                 char **result, uint32_t *result_size,
+                 void *arg);
+
 static int
-phia_index_scheme_init(struct phia_index *db, char *name, int size)
+phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 {
 	struct phia_env *e = db->env;
 	/* prepare index scheme */
 	struct sischeme *scheme = db->scheme;
-	if (size == 0)
-		size = strlen(name);
-	scheme->name = ss_malloc(&e->a, size + 1);
-	if (unlikely(scheme->name == NULL))
+	char name[128];
+	snprintf(name, sizeof(name), "%" PRIu32 ":%" PRIu32,
+	         key_def->space_id, key_def->iid);
+	scheme->name = ss_strdup(&e->a, name);
+	if (scheme->name == NULL) {
+		sr_oom(&e->error);
 		goto error;
-	memcpy(scheme->name, name, size);
-	scheme->name[size] = 0;
-	scheme->id                    = sr_seq(&e->seq, SR_DSNNEXT);
-	scheme->sync                  = 2;
-	scheme->node_size             = 64 * 1024 * 1024;
-	scheme->node_page_size        = 128 * 1024;
+	}
+	scheme->id                    = key_def->space_id;
+	scheme->sync                  = cfg_geti("phia.sync");
+	scheme->node_size             = key_def->opts.node_size;
+	scheme->node_page_size        = key_def->opts.page_size;
 	scheme->node_page_checksum    = 1;
-	scheme->compression_key       = 0;
-	scheme->compression           = 0;
-	scheme->compression_if        = &ss_nonefilter;
-	scheme->compression_branch    = 0;
-	scheme->compression_branch_if = &ss_nonefilter;
+	scheme->compression_key       = key_def->opts.compression_key;
+	scheme->fmt_storage = scheme->compression_key ? SF_SPARSE : SF_RAW;
+
+	/* compression */
+	if (key_def->opts.compression[0] != '\0') {
+		scheme->compression_if = ss_filterof(key_def->opts.compression);
+		if (unlikely(scheme->compression_if == NULL)) {
+			sr_error(&e->error, "unknown compression type '%s'",
+				 key_def->opts.compression);
+			goto error;
+		}
+		scheme->compression = 1;
+	} else {
+		scheme->compression = 0;
+		scheme->compression_if = &ss_nonefilter;
+	}
+	scheme->compression_sz = ss_strdup(&e->a, scheme->compression_if->name);
+	if (unlikely(scheme->compression_sz == NULL)) {
+		sr_oom(&e->error);
+		goto error;
+	}
+
+	/* compression_branch */
+	if (key_def->opts.compression_branch[0] != '\0') {
+		scheme->compression_branch_if =
+			ss_filterof(key_def->opts.compression_branch);
+		if (unlikely(scheme->compression_branch_if == NULL)) {
+			sr_error(&e->error, "unknown compression type '%s'",
+				 key_def->opts.compression_branch);
+			goto error;
+		}
+		scheme->compression_branch = 1;
+	} else {
+		scheme->compression_branch = 0;
+		scheme->compression_branch_if = &ss_nonefilter;
+	}
+	scheme->compression_branch_sz = ss_strdup(&e->a,
+		scheme->compression_branch_if->name);
+	if (unlikely(scheme->compression_branch_sz == NULL)) {
+		sr_oom(&e->error);
+		goto error;
+	}
+
 	scheme->temperature           = 0;
-	scheme->amqf                  = 0;
-	scheme->fmt_storage           = SF_RAW;
+	scheme->amqf                  = key_def->opts.amqf;
+	/* path */
+	if (key_def->opts.path[0] == '\0') {
+		char path[1024];
+		snprintf(path, sizeof(path), "%s/%s", e->conf.path, scheme->name);
+		scheme->path = ss_strdup(&e->a, path);
+	} else {
+		scheme->path = ss_strdup(&e->a, key_def->opts.path);
+	}
+	if (unlikely(scheme->path == NULL)) {
+		sr_oom(&e->error);
+		goto error;
+	}
 	scheme->path_fail_on_exists   = 0;
-	scheme->path_fail_on_drop     = 1;
+	scheme->path_fail_on_drop     = 0;
 	scheme->lru                   = 0;
 	scheme->lru_step              = 128 * 1024;
 	scheme->buf_gc_wm             = 1024 * 1024;
-	scheme->compression_sz =
-		ss_strdup(&e->a, scheme->compression_if->name);
-	if (unlikely(scheme->compression_sz == NULL))
-		goto error;
-	scheme->compression_branch_sz =
-		ss_strdup(&e->a, scheme->compression_branch_if->name);
-	if (unlikely(scheme->compression_branch_sz == NULL))
-		goto error;
 	sf_upsertinit(&scheme->fmt_upsert);
+	sf_upsertset(&scheme->fmt_upsert, phia_upsert_cb);
+	sf_upsertset_arg(&scheme->fmt_upsert, key_def);
 	sf_schemeinit(&scheme->scheme);
+
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		char name[32];
+		snprintf(name, sizeof(name), "key_%" PRIu32, i);
+		struct sffield *field = sf_fieldnew(&e->a, name);
+		if (unlikely(field == NULL)) {
+			sr_oom(&e->error);
+			goto error;
+		}
+
+		/* set field type */
+		char type[32];
+		snprintf(type, sizeof(type), "%s,key(%" PRIu32 ")",
+		         (key_def->parts[i].type == NUM ? "u64" : "string"),
+		         i);
+		int rc = sf_fieldoptions(field, &e->a, type);
+		if (unlikely(rc == -1)) {
+			sf_fieldfree(field, &e->a);
+			sr_oom(&e->error);
+			goto error;
+		}
+		rc = sf_schemeadd(&scheme->scheme, &e->a, field);
+		if (unlikely(rc == -1)) {
+			sf_fieldfree(field, &e->a);
+			sr_oom(&e->error);
+			goto error;
+		}
+	}
+
+	struct sffield *field = sf_fieldnew(&e->a, "value");
+	if (unlikely(field == NULL)) {
+		sr_oom(&e->error);
+		goto error;
+	}
+	int rc = sf_fieldoptions(field, &e->a, "string");
+	if (unlikely(rc == -1)) {
+		sf_fieldfree(field, &e->a);
+		goto error;
+	}
+	rc = sf_schemeadd(&scheme->scheme, &e->a, field);
+	if (unlikely(rc == -1)) {
+		sf_fieldfree(field, &e->a);
+		goto error;
+	}
+
+	/* validate scheme and set keys */
+	rc = sf_schemevalidate(&scheme->scheme, &e->a);
+	if (unlikely(rc == -1)) {
+		sr_error(&e->error, "incomplete scheme", scheme->name);
+		goto error;
+	}
+	db->r->scheme = &scheme->scheme;
+	db->r->fmt_storage = scheme->fmt_storage;
+	db->r->fmt_upsert = &scheme->fmt_upsert;
 	return 0;
 error:
-	sr_oom(&e->error);
+	si_schemefree(scheme, &e->a);
 	return -1;
-}
-
-static int
-phia_index_scheme_set(struct phia_index *db)
-{
-	struct phia_env *e = db->env;
-	struct sischeme *s = si_scheme(db->index);
-	/* set default scheme */
-	int rc;
-	if (s->scheme.fields_count == 0)
-	{
-		struct sffield *field = sf_fieldnew(&e->a, "key");
-		if (unlikely(field == NULL))
-			return sr_oom(&e->error);
-		rc = sf_fieldoptions(field, &e->a, "string,key(0)");
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, &e->a);
-			return sr_oom(&e->error);
-		}
-		rc = sf_schemeadd(&s->scheme, &e->a, field);
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, &e->a);
-			return sr_oom(&e->error);
-		}
-		field = sf_fieldnew(&e->a, "value");
-		if (unlikely(field == NULL))
-			return sr_oom(&e->error);
-		rc = sf_fieldoptions(field, &e->a, "string");
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, &e->a);
-			return sr_oom(&e->error);
-		}
-		rc = sf_schemeadd(&s->scheme, &e->a, field);
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, &e->a);
-			return sr_oom(&e->error);
-		}
-	}
-	/* validate scheme and set keys */
-	rc = sf_schemevalidate(&s->scheme, &e->a);
-	if (unlikely(rc == -1)) {
-		sr_error(&e->error, "incomplete scheme", s->name);
-		return -1;
-	}
-	/* compression_key */
-	if (s->compression_key) {
-		s->fmt_storage = SF_SPARSE;
-	}
-	/* compression */
-	s->compression_if = ss_filterof(s->compression_sz);
-	if (unlikely(s->compression_if == NULL)) {
-		sr_error(&e->error, "unknown compression type '%s'",
-		         s->compression_sz);
-		return -1;
-	}
-	s->compression = s->compression_if != &ss_nonefilter;
-	/* compression branch */
-	s->compression_branch_if = ss_filterof(s->compression_branch_sz);
-	if (unlikely(s->compression_branch_if == NULL)) {
-		sr_error(&e->error, "unknown compression type '%s'",
-		         s->compression_branch_sz);
-		return -1;
-	}
-	s->compression_branch = s->compression_branch_if != &ss_nonefilter;
-	/* path */
-	if (s->path == NULL) {
-		char path[1024];
-		snprintf(path, sizeof(path), "%s/%s", e->conf.path, s->name);
-		s->path = ss_strdup(&e->a, path);
-		if (unlikely(s->path == NULL))
-			return sr_oom(&e->error);
-	}
-	db->r->scheme = &s->scheme;
-	db->r->fmt_storage = s->fmt_storage;
-	db->r->fmt_upsert = &s->fmt_upsert;
-	return 0;
 }
 
 int
@@ -15408,11 +15368,8 @@ phia_index_open(struct phia_index *db)
 		goto online;
 	if (status != SR_OFFLINE)
 		return -1;
-	int rc = phia_index_scheme_set(db);
-	if (unlikely(rc == -1))
-		return -1;
 	sx_indexset(&db->coindex, db->scheme->id);
-	rc = phia_index_recoverbegin(db);
+	int rc = phia_index_recoverbegin(db);
 	if (unlikely(rc == -1))
 		return -1;
 
@@ -15688,9 +15645,17 @@ phia_index_get(struct phia_index *db, struct phia_document *key)
 	return phia_index_read(db, key, NULL, 0, NULL);
 }
 
-static struct phia_index *
-phia_index_new(struct phia_env *e, char *name, int size)
+struct phia_index *
+phia_index_new(struct phia_env *e, struct key_def *key_def)
 {
+	char name[128];
+	snprintf(name, sizeof(name), "%" PRIu32 ":%" PRIu32,
+	         key_def->space_id, key_def->iid);
+	struct phia_index *index = phia_index_by_name(e, name);
+	if (unlikely(index)) {
+		sr_error(&e->error, "index '%s' already exists", name);
+		return NULL;
+	}
 	struct phia_index *o = ss_malloc(&e->a, sizeof(struct phia_index));
 	if (unlikely(o == NULL)) {
 		sr_oom(&e->error);
@@ -15706,7 +15671,7 @@ phia_index_new(struct phia_env *e, char *name, int size)
 	o->r = si_r(o->index);
 	o->scheme = si_scheme(o->index);
 	int rc;
-	rc = phia_index_scheme_init(o, name, size);
+	rc = phia_index_scheme_init(o, key_def);
 	if (unlikely(rc == -1)) {
 		si_close(o->index);
 		ss_free(&e->a, o);
@@ -15716,6 +15681,7 @@ phia_index_new(struct phia_env *e, char *name, int size)
 	sx_indexinit(&o->coindex, &e->xm, o->r, o, o->index);
 	o->txn_min = sx_min(&e->xm);
 	o->txn_max = UINT32_MAX;
+	rlist_add(&e->db, &o->link);
 	return o;
 }
 
@@ -15748,6 +15714,24 @@ phia_index_unbind(struct phia_index *db, uint64_t txn)
 {
 		if (phia_index_visible(db, txn))
 			phia_index_unref(db);
+}
+
+size_t
+phia_index_bsize(struct phia_index *db)
+{
+	si_profilerbegin(&db->rtp, db->index);
+	si_profiler(&db->rtp);
+	si_profilerend(&db->rtp);
+	return db->rtp.memory_used;
+}
+
+uint64_t
+phia_index_size(struct phia_index *db)
+{
+	si_profilerbegin(&db->rtp, db->index);
+	si_profiler(&db->rtp);
+	si_profilerend(&db->rtp);
+	return db->rtp.count;
 }
 
 static int phia_index_recoverbegin(struct phia_index *db)

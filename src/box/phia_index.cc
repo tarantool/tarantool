@@ -81,110 +81,6 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 	return obj;
 }
 
-static inline struct phia_index *
-phia_configure_storage(struct space *space, struct key_def *key_def)
-{
-	PhiaEngine *engine =
-		(PhiaEngine *)space->handler->engine;
-	struct phia_env *env = engine->env;
-	/* create database */
-	char c[128];
-	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,
-	         key_def->space_id, key_def->iid);
-	phia_setstring(env, "db", c, 0);
-	/* define storage scheme */
-	uint32_t i = 0;
-	while (i < key_def->part_count)
-	{
-		/* create key field */
-		char part[32];
-		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
-		         key_def->space_id, key_def->iid);
-		snprintf(part, sizeof(part), "key_%" PRIu32, i);
-		phia_setstring(env, c, part, 0);
-		/* set field type */
-		char type[32];
-		snprintf(type, sizeof(type), "%s,key(%" PRIu32 ")",
-		         (key_def->parts[i].type == NUM ? "u64" : "string"),
-		         i);
-		snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme.%s",
-		         key_def->space_id, key_def->iid, part);
-		phia_setstring(env, c, type, 0);
-		i++;
-	}
-	/* create value field */
-	snprintf(c, sizeof(c), "db.%" PRIu32 ":%" PRIu32 ".scheme",
-	         key_def->space_id, key_def->iid);
-	phia_setstring(env, c, "value", 0);
-	/* get database object */
-	snprintf(c, sizeof(c), "%" PRIu32 ":%" PRIu32,
-	         key_def->space_id, key_def->iid);
-	struct phia_index *db = phia_index_by_name(env, c);
-	if (db == NULL)
-		phia_error(env);
-	return db;
-}
-
-static inline void
-phia_ctl(char *path, int size, struct key_def *key_def, const char *name)
-{
-	snprintf(path, size, "db.%" PRIu32 ":%" PRIu32 ".%s",
-	         key_def->space_id, key_def->iid, name);
-}
-
-static inline void
-phia_configure(struct space *space, struct key_def *key_def)
-{
-	PhiaEngine *engine =
-		(PhiaEngine *)space->handler->engine;
-	void *env = engine->env;
-	char c[128];
-	/* db.id */
-	phia_ctl(c, sizeof(c), key_def, "id");
-	phia_setint(env, c, key_def->space_id);
-	/* db.path */
-	if (key_def->opts.path[0] != '\0') {
-		phia_ctl(c, sizeof(c), key_def, "path");
-		phia_setstring(env, c, key_def->opts.path, 0);
-	}
-	/* db.upsert */
-	phia_ctl(c, sizeof(c), key_def, "upsert");
-	phia_setstring(env, c, (const void *)(uintptr_t)phia_upsert_cb, 0);
-	phia_ctl(c, sizeof(c), key_def, "upsert_arg");
-	phia_setstring(env, c, (const void *)key_def, 0);
-	/* db.compression */
-	if (key_def->opts.compression[0] != '\0') {
-		phia_ctl(c, sizeof(c), key_def, "compression");
-		phia_setstring(env, c, key_def->opts.compression, 0);
-	}
-	/* db.compression_branch */
-	if (key_def->opts.compression_branch[0] != '\0') {
-		phia_ctl(c, sizeof(c), key_def, "compression_branch");
-		phia_setstring(env, c, key_def->opts.compression_branch, 0);
-	}
-	/* db.compression_key */
-	phia_ctl(c, sizeof(c), key_def, "compression_key");
-	phia_setint(env, c, key_def->opts.compression_key);
-	/* db.node_preload */
-	phia_ctl(c, sizeof(c), key_def, "node_preload");
-	phia_setint(env, c, cfg_geti("phia.node_preload"));
-	/* db.node_size */
-	phia_ctl(c, sizeof(c), key_def, "node_size");
-	phia_setint(env, c, key_def->opts.node_size);
-	/* db.page_size */
-	phia_ctl(c, sizeof(c), key_def, "page_size");
-	phia_setint(env, c, key_def->opts.page_size);
-	/* db.sync */
-	phia_ctl(c, sizeof(c), key_def, "sync");
-	phia_setint(env, c, cfg_geti("phia.sync"));
-	/* db.amqf */
-	phia_ctl(c, sizeof(c), key_def, "amqf");
-	phia_setint(env, c, key_def->opts.amqf);
-	/* db.path_fail_on_drop */
-	phia_ctl(c, sizeof(c), key_def, "path_fail_on_drop");
-	phia_setint(env, c, 0);
-}
-
 PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	: Index(key_def_arg)
 {
@@ -194,10 +90,10 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	env = engine->env;
 	int rc;
 	phia_workers_start(env);
-	db = phia_configure_storage(space, key_def);
+	/* create database */
+	db = phia_index_new(env, key_def);
 	if (db == NULL)
 		phia_error(env);
-	phia_configure(space, key_def);
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
@@ -231,17 +127,13 @@ error:;
 size_t
 PhiaIndex::size() const
 {
-	char c[128];
-	phia_ctl(c, sizeof(c), key_def, "index.count");
-	return phia_getint(env, c);
+	return phia_index_size(db);
 }
 
 size_t
 PhiaIndex::bsize() const
 {
-	char c[128];
-	phia_ctl(c, sizeof(c), key_def, "index.memory_used");
-	return phia_getint(env, c);
+	return phia_index_bsize(db);
 }
 
 struct tuple *
