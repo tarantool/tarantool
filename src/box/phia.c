@@ -14158,10 +14158,9 @@ enum {
 	SE_RECOVER_NP = 3
 };
 
-static int
-se_open(struct so *o)
+int
+phia_env_open(struct phia_env *e)
 {
-	struct phia_env *e = se_cast(o, struct phia_env*, SE);
 	/* recover phases */
 	int status = sr_status(&e->status);
 	switch (e->conf.recover) {
@@ -14223,10 +14222,9 @@ online:
 	return 0;
 }
 
-static int
-se_destroy(struct so *o)
+int
+phia_env_delete(struct phia_env *e)
 {
-	struct phia_env *e = se_cast(o, struct phia_env*, SE);
 	int rcret = 0;
 	int rc;
 	sr_statusset(&e->status, SR_SHUTDOWN);
@@ -14253,8 +14251,8 @@ se_destroy(struct so *o)
 
 static struct soif seif =
 {
-	.open         = se_open,
-	.destroy      = se_destroy,
+	.open         = NULL,
+	.destroy      = NULL,
 	.setstring    = se_confset_string,
 	.setint       = se_confset_int,
 	.getstring    = se_confget_string,
@@ -16400,7 +16398,8 @@ sp_cast(void *ptr, const char *method)
 	return o;
 }
 
-struct phia_env *phia_env(void)
+struct phia_env *
+phia_env_new(void)
 {
 	struct phia_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL))
@@ -16430,7 +16429,7 @@ struct phia_env *phia_env(void)
 	return e;
 error:
 	sr_statusfree(&e->status);
-	free(e);
+	phia_env_delete(e);
 	return NULL;
 }
 

@@ -46,7 +46,13 @@ struct phia_cursor;
 struct phia_index;
 
 struct phia_env *
-phia_env(void);
+phia_env_new(void);
+
+int
+phia_env_open(struct phia_env *e);
+
+int
+phia_env_delete(struct phia_env *e);
 
 struct phia_tx *
 phia_begin(struct phia_env *e);

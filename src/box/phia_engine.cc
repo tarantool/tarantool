@@ -349,7 +349,7 @@ PhiaEngine::~PhiaEngine()
 {
 	phia_workers_stop();
 	if (env)
-		phia_destroy(env);
+		phia_env_delete(env);
 }
 
 void
@@ -362,7 +362,7 @@ PhiaEngine::init()
 	mempool_create(&phia_read_pool, &cord()->slabc,
 	               sizeof(struct phia_read_task));
 	/* prepare worker pool */
-	env = phia_env();
+	env = phia_env_new();
 	if (env == NULL)
 		panic("failed to create phia environment");
 	worker_pool_size = cfg_geti("phia.threads");
@@ -378,7 +378,7 @@ PhiaEngine::init()
 	phia_setint(env, "compaction.0.branch_age_wm", cfg_geti("phia.branch_age_wm"));
 	phia_setint(env, "compaction.0.branch_age_period", cfg_geti("phia.branch_age_period"));
 	phia_setint(env, "phia.recover", 3);
-	int rc = phia_open(env);
+	int rc = phia_env_open(env);
 	if (rc == -1)
 		phia_error(env);
 }
@@ -389,7 +389,7 @@ PhiaEngine::endRecovery()
 	if (recovery_complete)
 		return;
 	/* complete two-phase recovery */
-	int rc = phia_open(env);
+	int rc = phia_env_open(env);
 	if (rc == -1)
 		phia_error(env);
 	recovery_complete = 1;
@@ -638,7 +638,7 @@ PhiaEngine::rollback(struct txn *txn)
 void
 PhiaEngine::beginWalRecovery()
 {
-	int rc = phia_open(env);
+	int rc = phia_env_open(env);
 	if (rc == -1)
 		phia_error(env);
 }
