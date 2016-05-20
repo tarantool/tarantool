@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_LIB_BIT_INT96_H_INCLUDED
 #define TARANTOOL_LIB_BIT_INT96_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
