@@ -3667,24 +3667,6 @@ sr_status(struct srstatus *s)
 	return status;
 }
 
-static inline char*
-sr_statusof(struct srstatus *s)
-{
-	int status = sr_status(s);
-	switch (status) {
-	case SR_OFFLINE:          return "offline";
-	case SR_ONLINE:           return "online";
-	case SR_RECOVER:          return "recover";
-	case SR_SHUTDOWN_PENDING: return "shutdown_pending";
-	case SR_SHUTDOWN:         return "shutdown";
-	case SR_DROP_PENDING:     return "drop";
-	case SR_DROP:             return "drop";
-	case SR_MALFUNCTION:      return "malfunction";
-	}
-	assert(0);
-	return NULL;
-}
-
 static inline int
 sr_statusactive_is(int status)
 {
@@ -4481,31 +4463,6 @@ struct so {
 	struct sotype *type;
 	struct phia_env *env;
 };
-
-static inline void
-so_init(struct so *o, struct sotype *type, struct soif *i, struct phia_env *env)
-{
-	o->type      = type;
-	o->i         = i;
-	o->env       = env;
-}
-
-static inline void*
-so_cast_dynamic(void *ptr, struct sotype *type,
-          const char *file,
-          const char *function, int line)
-{
-	int eq = ptr != NULL && ((struct so*)ptr)->type == type;
-	if (likely(eq))
-		return ptr;
-	fprintf(stderr, "%s:%d %s(%p) expected '%s' object\n",
-	        file, line, function, ptr, type->name);
-	abort();
-	return NULL;
-}
-
-#define se_cast(o, cast, id) \
-	((cast)so_cast_dynamic(o, &se_o[id], __FILE__, __func__, __LINE__))
 
 #define SVNONE       0
 #define SVDELETE     1
@@ -14064,11 +14021,6 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 	return 0;
 }
 
-static inline int
-phia_index_active(struct phia_index *o) {
-	return si_active(o->index);
-}
-
 static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
 static struct phia_document *
 phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
@@ -14409,29 +14361,6 @@ se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **
 	sr_C(&p, pc, se_confv, "lfsn", SS_U64, &rt->seq.lfsn, SR_RO, NULL);
 	return sr_C(NULL, pc, NULL, "metric", SS_UNDEF, metric, SR_NS, NULL);
 }
-
-static inline int
-se_confdb_get(struct srconf *c, struct srconfstmt *s)
-{
-	/* get(db.name) */
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_READ) {
-		sr_error(&e->error, "%s", "bad operation");
-		return -1;
-	}
-	assert(c->ptr != NULL);
-	struct phia_index *db = c->ptr;
-	int status = sr_status(&db->index->status);
-	if (status == SR_SHUTDOWN_PENDING ||
-	    status == SR_DROP_PENDING) {
-		sr_error(&e->error, "%s", "index has been scheduled for shutdown/drop");
-		return -1;
-	}
-	si_ref(db->index, SI_REFFE);
-	*(void**)s->value = db;
-	return 0;
-}
-
 
 static inline struct srconf*
 se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
