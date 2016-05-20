@@ -143,7 +143,6 @@ box_info_sort(box.info.phia())
     - build: <build>
     - path: <path>
     - path_create: '0'
-    - recover: '3'
     - version: 2.1.1
     - version_storage: 2.1.1
   - scheduler:

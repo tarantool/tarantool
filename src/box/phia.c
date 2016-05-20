@@ -13497,7 +13497,6 @@ struct seconf {
 	struct srzonemap     zones;
 	/* memory */
 	uint64_t      memory_limit;
-	struct sfscheme      scheme;
 	int           confmax;
 	struct srconf       *conf;
 	struct phia_env     *env;
@@ -13695,33 +13694,18 @@ struct phia_cursor {
 	struct sicache *cache;
 };
 
-enum {
-	SE_RECOVER_1P = 1,
-	SE_RECOVER_2P = 2,
-	SE_RECOVER_NP = 3
-};
-
 int
 phia_recover(struct phia_env *e)
 {
 	/* recover phases */
 	int status = sr_status(&e->status);
-	switch (e->conf.recover) {
-	case SE_RECOVER_1P: break;
-	case SE_RECOVER_2P:
-		if (status == SR_RECOVER)
-			goto online;
-		break;
-	case SE_RECOVER_NP:
-		if (status == SR_RECOVER) {
-			sr_statusset(&e->status, SR_ONLINE);
-			return 0;
-		}
-		if (status == SR_ONLINE) {
-			sr_statusset(&e->status, SR_RECOVER);
-			return 0;
-		}
-		break;
+	if (status == SR_RECOVER) {
+		sr_statusset(&e->status, SR_ONLINE);
+		return 0;
+	}
+	if (status == SR_ONLINE) {
+		sr_statusset(&e->status, SR_RECOVER);
+		return 0;
 	}
 	if (status != SR_OFFLINE)
 		return -1;
@@ -13741,23 +13725,6 @@ phia_recover(struct phia_env *e)
 	rc = sr_checkdir(&e->r, e->conf.path);
 	if (unlikely(rc == -1))
 		return -1;
-	/* index recover */
-	struct phia_index *item, *n;
-	rlist_foreach_entry_safe(item, &e->db, link, n) {
-		rc = phia_index_open(item);
-		if (unlikely(rc == -1))
-			return -1;
-	}
-	if (e->conf.recover == SE_RECOVER_2P)
-		return 0;
-
-online:
-	/* complete */
-	rlist_foreach_entry_safe(item, &e->db, link, n) {
-		rc = phia_index_open(item);
-		if (unlikely(rc == -1))
-			return -1;
-	}
 	/* enable quota */
 	ss_quotaenable(&e->quota, 1);
 	sr_statusset(&e->status, SR_ONLINE);
@@ -13808,7 +13775,6 @@ se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "build", SS_STRING, rt->build, SR_RO, NULL);
 	sr_c(&p, pc, se_confv, "path", SS_STRINGPTR, &e->conf.path);
 	sr_c(&p, pc, se_confv, "path_create", SS_U32, &e->conf.path_create);
-	sr_c(&p, pc, se_confv, "recover", SS_U32, &e->conf.recover);
 	return sr_C(NULL, pc, NULL, "phia", SS_UNDEF, phia, SR_NS, NULL);
 }
 
@@ -14143,7 +14109,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 	c->conf = ss_malloc(&o->a, sizeof(struct srconf) * c->confmax);
 	if (unlikely(c->conf == NULL))
 		return -1;
-	sf_schemeinit(&c->scheme);
 	c->env                 = o;
 	c->path                = NULL;
 	c->path_create         = 1;
@@ -14197,7 +14162,6 @@ static void se_conffree(struct seconf *c)
 		ss_free(&e->a, c->path);
 		c->path = NULL;
 	}
-	sf_schemefree(&c->scheme, &e->a);
 }
 
 static int se_confvalidate(struct seconf *c)
@@ -14514,9 +14478,6 @@ phia_index_open(struct phia_index *db)
 	if (unlikely(rc == -1))
 		return -1;
 
-	if (sr_status(&e->status) == SR_RECOVER)
-		if (e->conf.recover != SE_RECOVER_NP)
-			return 0;
 online:
 	phia_index_recoverend(db);
 	rc = sc_add(&e->scheduler, db->index);
@@ -14879,13 +14840,9 @@ static int phia_index_recoverbegin(struct phia_index *db)
 {
 	/* open and recover repository */
 	sr_statusset(&db->index->status, SR_RECOVER);
-	struct phia_env *e = db->env;
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
-	if (sr_status(&e->status) == SR_ONLINE)
-		if (e->conf.recover != SE_RECOVER_NP)
-			db->scheme->path_fail_on_exists = 1;
 	int rc = si_open(db->index);
 	if (unlikely(rc == -1))
 		goto error;
@@ -15280,7 +15237,7 @@ phia_commit(struct phia_tx *t)
 
 	/* do wal write and backend commit */
 	if (unlikely(recover))
-		recover = (e->conf.recover == 3) ? 2: 1;
+		recover = 2;
 	int rc;
 	rc = sc_write(&e->scheduler, &t->log, t->lsn, recover);
 	if (unlikely(rc == -1))
@@ -15370,7 +15327,6 @@ phia_env_new(void)
 	z->branch_age_period = cfg_geti("phia.branch_age_period");
 	z->branch_age_wm = cfg_geti("phia.branch_age_wm");
 
-	e->conf.recover = SE_RECOVER_NP;
 	return e;
 error:
 	sr_statusfree(&e->status);
