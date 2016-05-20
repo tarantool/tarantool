@@ -382,11 +382,6 @@ ss_aopen(struct ssa *a, struct ssaif *i, ...) {
 	return rc;
 }
 
-static inline int
-ss_aclose(struct ssa *a) {
-	return a->i->close(a);
-}
-
 static inline void*
 ss_malloc(struct ssa *a, size_t size) {
 	return a->i->malloc(a, size);
@@ -413,16 +408,6 @@ ss_strdup(struct ssa *a, const char *str) {
 }
 
 static struct ssaif ss_stda;
-
-static struct ssaif ss_ooma;
-
-struct sstrace {
-	pthread_mutex_t lock;
-	const char *file;
-	const char *function;
-	int line;
-	char message[100];
-};
 
 struct ssbuf {
 	char *reserve;
@@ -561,12 +546,6 @@ ss_bufset(struct ssbuf *b, int size, int i, char *buf, size_t bufsize)
 #define SS_INJECTION_SI_COMPACTION_3 6
 #define SS_INJECTION_SI_COMPACTION_4 7
 #define SS_INJECTION_SI_RECOVER_0    8
-
-struct ssinjection {
-	uint32_t e[12];
-	uint32_t oom;
-	uint32_t io;
-};
 
 #ifdef SS_INJECTION_ENABLE
 	#define SS_INJECTION(E, ID, X) \
@@ -1290,83 +1269,6 @@ static struct ssfilterif ss_nonefilter =
 	.start    = ss_nonefilter_start,
 	.next     = ss_nonefilter_next,
 	.complete = ss_nonefilter_complete
-};
-
-struct ssooma {
-	pthread_mutex_t lock;
-	uint32_t fail_from;
-	uint32_t n;
-	int ref;
-};
-
-static struct ssooma oom_alloc;
-
-static inline int
-ss_oomaclose(struct ssa *a ssunused)
-{
-	tt_pthread_mutex_destroy(&oom_alloc.lock);
-	return 0;
-}
-
-static inline int
-ss_oomaopen(struct ssa *a ssunused, va_list args)
-{
-	oom_alloc.fail_from = va_arg(args, int);
-	oom_alloc.n = 0;
-	tt_pthread_mutex_init(&oom_alloc.lock, NULL);
-	return 0;
-}
-
-static inline int
-ss_oomaevent(void)
-{
-	tt_pthread_mutex_lock(&oom_alloc.lock);
-	int generate_fail = oom_alloc.n >= oom_alloc.fail_from;
-	oom_alloc.n++;
-	tt_pthread_mutex_unlock(&oom_alloc.lock);
-	return generate_fail;
-}
-
-static inline void*
-ss_oomamalloc(struct ssa *a ssunused, size_t size)
-{
-	if (ss_oomaevent())
-		return NULL;
-	return malloc(size);
-}
-
-static inline int
-ss_oomaensure(struct ssa *a ssunused, int n, int size)
-{
-	if (ss_oomaevent())
-		return -1;
-	(void)n;
-	(void)size;
-	return 0;
-}
-
-static inline void*
-ss_oomarealloc(struct ssa *a ssunused, void *ptr, size_t size)
-{
-	if (ss_oomaevent())
-		return NULL;
-	return realloc(ptr, size);
-}
-
-static inline void
-ss_oomafree(struct ssa *a ssunused, void *ptr)
-{
-	free(ptr);
-}
-
-static struct ssaif ss_ooma =
-{
-	.open    = ss_oomaopen,
-	.close   = ss_oomaclose,
-	.malloc  = ss_oomamalloc,
-	.ensure  = ss_oomaensure,
-	.realloc = ss_oomarealloc,
-	.free    = ss_oomafree
 };
 
 /*
@@ -2363,226 +2265,6 @@ static struct ssvfsif ss_stdvfs =
 	.mmap_allocate = ss_stdvfs_mmap_allocate,
 	.mremap        = ss_stdvfs_mremap,
 	.munmap        = ss_stdvfs_munmap
-};
-
-struct  sstestvfs {
-	pthread_mutex_t lock;
-	uint32_t fail_from;
-	uint32_t n;
-};
-
-static inline int
-ss_testvfs_init(struct ssvfs *f, va_list args ssunused)
-{
-	struct sstestvfs *o = (struct sstestvfs*)f->priv;
-	o->fail_from = va_arg(args, int);
-	o->n = 0;
-	tt_pthread_mutex_init(&o->lock, NULL);
-	return 0;
-}
-
-static inline void
-ss_testvfs_free(struct ssvfs *f)
-{
-	struct sstestvfs *o = (struct sstestvfs*)f->priv;
-	tt_pthread_mutex_destroy(&o->lock);
-}
-
-static inline int
-ss_testvfs_call(struct ssvfs *f)
-{
-	struct sstestvfs *o = (struct sstestvfs*)f->priv;
-	tt_pthread_mutex_lock(&o->lock);
-	int generate_fail = o->n >= o->fail_from;
-	o->n++;
-	tt_pthread_mutex_unlock(&o->lock);
-	return generate_fail;
-}
-
-static int64_t
-ss_testvfs_size(struct ssvfs *f, char *path)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.size(f, path);
-}
-
-static int
-ss_testvfs_exists(struct ssvfs *f, const char *path)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.exists(f, path);
-}
-
-static int
-ss_testvfs_unlink(struct ssvfs *f, char *path)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.unlink(f, path);
-}
-
-static int
-ss_testvfs_rename(struct ssvfs *f, char *src, char *dest)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.rename(f, src, dest);
-}
-
-static int
-ss_testvfs_mkdir(struct ssvfs *f, const char *path, int mode)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.mkdir(f, path, mode);
-}
-
-static int
-ss_testvfs_rmdir(struct ssvfs *f, char *path)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.rmdir(f, path);
-}
-
-static int
-ss_testvfs_open(struct ssvfs *f, char *path, int flags, int mode)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.open(f, path, flags, mode);
-}
-
-static int
-ss_testvfs_close(struct ssvfs *f, int fd)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.close(f, fd);
-}
-
-static int
-ss_testvfs_sync(struct ssvfs *f, int fd)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.sync(f, fd);
-}
-
-static int
-ss_testvfs_advise(struct ssvfs *f, int fd, int hint, uint64_t off, uint64_t len)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.advise(f, fd, hint, off, len);
-}
-
-static int
-ss_testvfs_truncate(struct ssvfs *f, int fd, uint64_t size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.truncate(f, fd, size);
-}
-
-static int64_t
-ss_testvfs_pread(struct ssvfs *f, int fd, uint64_t off, void *buf, int size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.pread(f, fd, off, buf, size);
-}
-
-static int64_t
-ss_testvfs_pwrite(struct ssvfs *f, int fd, uint64_t off, void *buf, int size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.pwrite(f, fd, off, buf, size);
-}
-
-static int64_t
-ss_testvfs_write(struct ssvfs *f, int fd, void *buf, int size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.write(f, fd, buf, size);
-}
-
-static int64_t
-ss_testvfs_writev(struct ssvfs *f, int fd, struct ssiov *iov)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.writev(f, fd, iov);
-}
-
-static int64_t
-ss_testvfs_seek(struct ssvfs *f, int fd, uint64_t off)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.seek(f, fd, off);
-}
-
-static int
-ss_testvfs_mmap(struct ssvfs *f, struct ssmmap *m, int fd, uint64_t size, int ro)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.mmap(f, m, fd, size, ro);
-}
-
-static int
-ss_testvfs_mmap_allocate(struct ssvfs *f, struct ssmmap *m, uint64_t size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.mmap_allocate(f, m, size);
-}
-
-static int
-ss_testvfs_mremap(struct ssvfs *f, struct ssmmap *m, uint64_t size)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.mremap(f, m, size);
-}
-
-static int
-ss_testvfs_munmap(struct ssvfs *f, struct ssmmap *m)
-{
-	if (ss_testvfs_call(f))
-		return -1;
-	return ss_stdvfs.munmap(f, m);
-}
-
-static struct ssvfsif ss_testvfs =
-{
-	.init          = ss_testvfs_init,
-	.free          = ss_testvfs_free,
-	.size          = ss_testvfs_size,
-	.exists        = ss_testvfs_exists,
-	.unlink        = ss_testvfs_unlink,
-	.rename        = ss_testvfs_rename,
-	.mkdir         = ss_testvfs_mkdir,
-	.rmdir         = ss_testvfs_rmdir,
-	.open          = ss_testvfs_open,
-	.close         = ss_testvfs_close,
-	.sync          = ss_testvfs_sync,
-	.advise        = ss_testvfs_advise,
-	.truncate      = ss_testvfs_truncate,
-	.pread         = ss_testvfs_pread,
-	.pwrite        = ss_testvfs_pwrite,
-	.write         = ss_testvfs_write,
-	.writev        = ss_testvfs_writev,
-	.seek          = ss_testvfs_seek,
-	.mmap          = ss_testvfs_mmap,
-	.mmap_allocate = ss_testvfs_mmap_allocate,
-	.mremap        = ss_testvfs_mremap,
-	.munmap        = ss_testvfs_munmap
 };
 
 struct sszstdfilter {
@@ -3739,7 +3421,6 @@ struct runtime {
 	struct ssvfs *vfs;
 	struct ssquota *quota;
 	struct srzonemap *zonemap;
-	struct ssinjection *i;
 	struct srstat *stat;
 };
 
@@ -3751,7 +3432,6 @@ sr_init(struct runtime *r,
         struct ssquota *quota,
         struct srzonemap *zonemap,
         struct srseq *seq,
-        struct ssinjection *i,
         struct srstat *stat)
 {
 	r->status      = status;
@@ -3760,7 +3440,6 @@ sr_init(struct runtime *r,
 	r->quota       = quota;
 	r->zonemap     = zonemap;
 	r->seq         = seq;
-	r->i           = i;
 	r->stat        = stat;
 }
 
@@ -12782,8 +12461,7 @@ struct phia_env {
 	struct scheduler          scheduler;
 	struct srstat      stat;
 	struct sflimit     limit;
-	struct ssinjection ei;
-	struct runtime      r;
+	struct runtime          r;
 };
 
 struct phia_index {
@@ -13112,58 +12790,8 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 	return sr_C(NULL, pc, NULL, "db", SS_UNDEF, db, SR_NS, NULL);
 }
 
-static inline int
-se_confdebug_oom(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	assert(e->ei.oom == 0);
-	int rc = se_confv(c, s);
-	if (unlikely(rc == -1))
-		return rc;
-	ss_aclose(&e->a);
-	ss_aopen(&e->a_oom, &ss_ooma, e->ei.oom);
-	e->a = e->a_oom;
-	return 0;
-}
-
-static inline int
-se_confdebug_io(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	assert(e->ei.io == 0);
-	int rc = se_confv(c, s);
-	if (unlikely(rc == -1))
-		return rc;
-	ss_vfsfree(&e->vfs);
-	ss_vfsinit(&e->vfs, &ss_testvfs, e->ei.io);
-	return 0;
-}
-
-static inline struct srconf*
-se_confdebug(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
-{
-	struct srconf *prev = NULL;
-	struct srconf *p = NULL;
-	prev = p;
-	struct srconf *ei = *pc;
-	sr_c(&p, pc, se_confdebug_oom, "oom",     SS_U32, &e->ei.oom);
-	sr_c(&p, pc, se_confdebug_io, "io",       SS_U32, &e->ei.io);
-	sr_c(&p, pc, se_confv, "sd_build_0",      SS_U32, &e->ei.e[0]);
-	sr_c(&p, pc, se_confv, "sd_build_1",      SS_U32, &e->ei.e[1]);
-	sr_c(&p, pc, se_confv, "si_branch_0",     SS_U32, &e->ei.e[2]);
-	sr_c(&p, pc, se_confv, "si_compaction_0", SS_U32, &e->ei.e[3]);
-	sr_c(&p, pc, se_confv, "si_compaction_1", SS_U32, &e->ei.e[4]);
-	sr_c(&p, pc, se_confv, "si_compaction_2", SS_U32, &e->ei.e[5]);
-	sr_c(&p, pc, se_confv, "si_compaction_3", SS_U32, &e->ei.e[6]);
-	sr_c(&p, pc, se_confv, "si_compaction_4", SS_U32, &e->ei.e[7]);
-	sr_c(&p, pc, se_confv, "si_recover_0",    SS_U32, &e->ei.e[8]);
-	sr_C(&prev, pc, NULL, "error_injection", SS_UNDEF, ei, SR_NS, NULL);
-	struct srconf *debug = prev;
-	return sr_C(NULL, pc, NULL, "debug", SS_UNDEF, debug, SR_NS, NULL);
-}
-
 static struct srconf*
-se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int serialize)
+se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c)
 {
 	/* phia */
 	struct srconf *pc = c;
@@ -13174,7 +12802,6 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	struct srconf *perf       = se_confperformance(e, rt, &pc);
 	struct srconf *metric     = se_confmetric(e, rt, &pc);
 	struct srconf *db         = se_confdb(e, rt, &pc);
-	struct srconf *debug      = se_confdebug(e, rt, &pc);
 
 	phia->next     = memory;
 	memory->next     = compaction;
@@ -13182,8 +12809,6 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	scheduler->next  = perf;
 	perf->next       = metric;
 	metric->next     = db;
-	if (! serialize)
-		db->next = debug;
 	return phia;
 }
 
@@ -13265,7 +12890,7 @@ static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 	se_confrt(e, &rt);
 	struct srconf *conf = c->conf;
 	struct srconf *root;
-	root = se_confprepare(e, &rt, conf, 1);
+	root = se_confprepare(e, &rt, conf);
 	struct srconfstmt stmt = {
 		.path      = NULL,
 		.value     = NULL,
@@ -14455,7 +14080,7 @@ phia_env_new(void)
 	sr_statinit(&e->stat);
 	sf_limitinit(&e->limit, &e->a);
 	sr_init(&e->r, &e->status, &e->a, &e->vfs, &e->quota,
-	        &e->conf.zones, &e->seq, &e->ei, &e->stat);
+		&e->conf.zones, &e->seq, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
