@@ -87,21 +87,12 @@ phia_checkpoint_is_active(struct phia_env *env);
 struct phia_document *
 phia_document(struct phia_index *index);
 
-int      phia_setstring(void*, const char*, const void*, int);
-int      phia_setint(void*, const char*, int64_t);
-void    *phia_getobject(void*, const char*);
-void    *phia_getstring(void*, const char*, int*);
-int64_t  phia_getint(void*, const char*);
-int      phia_open(void*);
-int      phia_drop(void*);
-int      phia_destroy(void*);
 struct phia_service *
 phia_service_new(struct phia_env *env);
 int
 phia_service_do(struct phia_service *srv);
 void
 phia_service_delete(struct phia_service *srv);
-void    *phia_get(void*, void*);
 
 struct phia_cursor *
 phia_cursor(struct phia_index *index);

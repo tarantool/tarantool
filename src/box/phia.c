@@ -4440,30 +4440,6 @@ bad_type:
 	                ss_typeof(c->type), s->path);
 }
 
-struct so;
-
-struct soif {
-	int      (*open)(struct so*);
-	int      (*close)(struct so*);
-	int      (*destroy)(struct so*);
-	int      (*setstring)(struct so*, const char*, void*, int);
-	int      (*setint)(struct so*, const char*, int64_t);
-	void    *(*getstring)(struct so*, const char*, int*);
-	int64_t  (*getint)(struct so*, const char*);
-	void    *(*get)(struct so*, struct so*);
-};
-
-struct sotype {
-	uint32_t magic;
-	char *name;
-};
-
-struct so {
-	struct soif *i;
-	struct sotype *type;
-	struct phia_env *env;
-};
-
 #define SVNONE       0
 #define SVDELETE     1
 #define SVUPSERT     2
@@ -13788,33 +13764,6 @@ static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int re
 	return 0;
 }
 
-enum {
-	SEUNDEF,
-	SEDESTROYED,
-	SE,
-	SECONF,
-	SECONFCURSOR,
-	SECONFKV,
-	SEREQ,
-	SEDOCUMENT,
-	SEDB,
-	SEDBCURSOR,
-	SETX,
-	SECURSOR
-};
-
-static struct sotype se_o[];
-
-static inline struct so*
-se_cast_validate(void *ptr)
-{
-	struct so *o = ptr;
-	if ((char*)o->type >= (char*)&se_o[0] &&
-	    (char*)o->type <= (char*)&se_o[SECURSOR])
-		return ptr;
-	return NULL;
-}
-
 struct seconfrt {
 	/* phia */
 	char      version[16];
@@ -14037,15 +13986,6 @@ struct phia_tx {
 	uint64_t start;
 	struct svlog log;
 	struct sx t;
-};
-
-struct PACKED seviewdb {
-	struct so        o;
-	uint64_t  txn_id;
-	int       ready;
-	struct ssbuf     list;
-	char     *pos;
-	struct phia_index     *v;
 };
 
 struct phia_cursor {
@@ -15496,22 +15436,6 @@ phia_document_new(struct phia_env *e, struct phia_index *db, const struct sv *vp
 	return doc;
 }
 
-static struct sotype se_o[] =
-{
-	{ 0L,          "undefined"         },
-	{ 0x9BA14568L, "destroyed"         },
-	{ 0x06154834L, "env"               },
-	{ 0x20490B34L, "env_conf"          },
-	{ 0x6AB65429L, "env_conf_cursor"   },
-	{ 0x00FCDE12L, "env_conf_kv"       },
-	{ 0x64519F00L, "req"               },
-	{ 0x2FABCDE2L, "document"          },
-	{ 0x34591111L, "index"		   },
-	{ 0x63102654L, "index_cursor"	   },
-	{ 0x13491FABL, "transaction"       },
-	{ 0x45ABCDFAL, "cursor"            }
-};
-
 static inline int
 phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 {
@@ -15777,25 +15701,6 @@ phia_begin(struct phia_env *e)
 	return t;
 }
 
-static inline void
-sp_unsupported(struct so *o, const char *method)
-{
-	fprintf(stderr, "\n%s(%s): unsupported operation\n",
-	        (char*)method, o->type->name);
-	abort();
-}
-
-static inline struct so*
-sp_cast(void *ptr, const char *method)
-{
-	struct so *o = se_cast_validate(ptr);
-	if (unlikely(o == NULL)) {
-		fprintf(stderr, "\n%s(%p): bad object\n", method, ptr);
-		abort();
-	}
-	return o;
-}
-
 struct phia_env *
 phia_env_new(void)
 {
@@ -15856,26 +15761,6 @@ phia_document(struct phia_index *db)
 	return phia_document_new(env, db, NULL);
 }
 
-int phia_open(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->open == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->open(o);
-}
-
-int phia_destroy(void *ptr)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->destroy == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->destroy(o);
-}
-
 struct phia_service *
 phia_service_new(struct phia_env *env)
 {
@@ -15900,54 +15785,4 @@ phia_service_delete(struct phia_service *srv)
 {
 	sd_cfree(&srv->sdc, &srv->env->r);
 	ss_free(srv->env->r.a, srv);
-}
-
-int phia_setstring(void *ptr, const char *path, const void *pointer, int size)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->setstring == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->setstring(o, path, (void*)pointer, size);
-}
-
-int phia_setint(void *ptr, const char *path, int64_t v)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->setint == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->setint(o, path, v);
-}
-
-void *phia_getstring(void *ptr, const char *path, int *size)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->getstring == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	return o->i->getstring(o, path, size);
-}
-
-int64_t phia_getint(void *ptr, const char *path)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->getint == NULL)) {
-		sp_unsupported(o, __func__);
-		return -1;
-	}
-	return o->i->getint(o, path);
-}
-
-void *phia_get(void *ptr, void *v)
-{
-	struct so *o = sp_cast(ptr, __func__);
-	if (unlikely(o->i->get == NULL)) {
-		sp_unsupported(o, __func__);
-		return NULL;
-	}
-	return o->i->get(o, v);
 }
