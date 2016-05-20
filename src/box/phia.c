@@ -590,27 +590,7 @@ enum sstype {
 	SS_U32REV,
 	SS_U64,
 	SS_U64REV,
-	SS_I64,
-	SS_OBJECT,
-	SS_FUNCTION
 };
-
-static inline char*
-ss_typeof(enum sstype type) {
-	switch (type) {
-	case SS_UNDEF:     return "undef";
-	case SS_STRING:    return "string";
-	case SS_STRINGPTR: return "stringptr";
-	case SS_U32:       return "u32";
-	case SS_U32REV:    return "u32rev";
-	case SS_U64:       return "u64";
-	case SS_U64REV:    return "u64rev";
-	case SS_I64:       return "i64";
-	case SS_OBJECT:    return "object";
-	case SS_FUNCTION:  return "function";
-	}
-	return NULL;
-}
 
 enum ssquotaop {
 	SS_QADD,
@@ -3055,15 +3035,6 @@ sf_limitset(struct sflimit *b, struct sfscheme *s, struct sfv *fields, enum phia
 				v->size = sizeof(uint64_t);
 			}
 			break;
-		case SS_I64:
-			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = (char*)&b->i64_max;
-				v->size = sizeof(int64_t);
-			} else {
-				v->pointer = (char*)&b->i64_min;
-				v->size = sizeof(int64_t);
-			}
-			break;
 		case SS_STRING:
 			if (order == PHIA_LT || order == PHIA_LE) {
 				v->pointer = b->string_max;
@@ -4018,12 +3989,6 @@ struct srconf;
 
 typedef int (*srconff)(struct srconf*, struct srconfstmt*);
 
-enum srconfop {
-	SR_WRITE,
-	SR_READ,
-	SR_SERIALIZE
-};
-
 enum {
 	SR_RO = 1,
 	SR_NS = 2
@@ -4046,7 +4011,6 @@ struct PACKED srconfdump {
 };
 
 struct srconfstmt {
-	enum srconfop op;
 	const char *path;
 	void       *value;
 	enum sstype valuetype;
@@ -4058,8 +4022,6 @@ struct srconfstmt {
 };
 
 static int sr_confexec(struct srconf*, struct srconfstmt*);
-static int sr_conf_read(struct srconf*, struct srconfstmt*);
-static int sr_conf_write(struct srconf*, struct srconfstmt*);
 static int sr_conf_serialize(struct srconf*, struct srconfstmt*);
 
 static inline struct srconf*
@@ -4105,195 +4067,10 @@ sr_confvalue(struct srconfdump *v) {
 	return sr_confkey(v) + v->keysize;
 }
 
-static int sr_conf_read(struct srconf *m, struct srconfstmt *s)
-{
-	switch (m->type) {
-	case SS_U32:
-		s->valuesize = sizeof(uint32_t);
-		if (s->valuetype == SS_I64) {
-			store_u64(s->value, (int64_t)load_u32(m->value));
-		} else
-		if (s->valuetype == SS_U32) {
-			store_u32(s->value, load_u32(m->value));
-		} else
-		if (s->valuetype == SS_U64) {
-			store_u64(s->value, load_u32(m->value));
-		} else {
-			goto bad_type;
-		}
-		break;
-	case SS_U64:
-		s->valuesize = sizeof(uint64_t);
-		if (s->valuetype == SS_I64) {
-			store_u64(s->value, load_u64(m->value));
-		} else
-		if (s->valuetype == SS_U32) {
-			store_u32(s->value, load_u64(m->value));
-		} else
-		if (s->valuetype == SS_U64) {
-			store_u64(s->value, load_u64(m->value));
-		} else {
-			goto bad_type;
-		}
-		break;
-	case SS_STRING: {
-		if (s->valuetype != SS_STRING)
-			goto bad_type;
-		char **result = s->value;
-		*result = NULL;
-		s->valuesize = 0;
-		char *string = m->value;
-		if (string == NULL)
-			break;
-		int size = strlen(string) + 1;
-		s->valuesize = size;
-		*result = malloc(size);
-		if (unlikely(*result == NULL))
-			return sr_oom(s->r->e);
-		memcpy(*result, string, size);
-		break;
-	}
-	case SS_STRINGPTR: {
-		if (s->valuetype != SS_STRING)
-			goto bad_type;
-		char **result = s->value;
-		*result = NULL;
-		s->valuesize = 0;
-		char **string = m->value;
-		if (*string == NULL)
-			break;
-		int size = strlen(*string) + 1;
-		s->valuesize = size;
-		*result = malloc(size);
-		if (unlikely(*result == NULL))
-			return sr_oom(s->r->e);
-		memcpy(*result, *string, size);
-		break;
-	}
-	case SS_OBJECT:
-		if (s->valuetype != SS_STRING)
-			goto bad_type;
-		*(void**)s->value = m->value;
-		s->valuesize = sizeof(void*);
-		break;
-	default:
-		goto bad_type;
-	}
-
-	return 0;
-
-bad_type:
-	return sr_error(s->r->e, "configuration read bad type (%s) -> (%s) %s",
-	                ss_typeof(s->valuetype),
-	                ss_typeof(m->type), s->path);
-}
-
-static int
-sr_conf_write(struct srconf *m, struct srconfstmt *s)
-{
-	if (m->flags & SR_RO) {
-		sr_error(s->r->e, "%s is read-only", s->path);
-		return -1;
-	}
-	switch (m->type) {
-	case SS_U32:
-		if (s->valuetype == SS_I64) {
-			store_u32(m->value, load_u64(s->value));
-		} else
-		if (s->valuetype == SS_U32) {
-			store_u32(m->value, load_u32(s->value));
-		} else
-		if (s->valuetype == SS_U64) {
-			store_u32(m->value, load_u64(s->value));
-		} else {
-			goto bad_type;
-		}
-		break;
-	case SS_U64:
-		if (s->valuetype == SS_I64) {
-			store_u64(m->value, load_u64(s->value));
-		} else
-		if (s->valuetype == SS_U32) {
-			store_u64(m->value, load_u32(s->value));
-		} else
-		if (s->valuetype == SS_U64) {
-			store_u64(m->value, load_u64(s->value));
-		} else {
-			goto bad_type;
-		}
-		break;
-	case SS_STRINGPTR: {
-		char **string = m->value;
-		if (s->valuetype == SS_STRING) {
-			int len = s->valuesize + 1;
-			char *sz;
-			sz = ss_malloc(s->r->a, len);
-			if (unlikely(sz == NULL))
-				return sr_oom(s->r->e);
-			memcpy(sz, s->value, s->valuesize);
-			sz[s->valuesize] = 0;
-			if (*string)
-				ss_free(s->r->a, *string);
-			*string = sz;
-		} else {
-			goto bad_type;
-		}
-		break;
-	}
-	default:
-		goto bad_type;
-	}
-	return 0;
-
-bad_type:
-	return sr_error(s->r->e, "configuration write bad type (%s) for (%s) %s",
-	                ss_typeof(s->valuetype),
-	                ss_typeof(m->type), s->path);
-}
-
-static inline int
-sr_conf_write_cast(enum sstype a, enum sstype b)
-{
-	switch (a) {
-	case SS_U32:
-		if (b == SS_I64) {
-		} else
-		if (b == SS_U32) {
-		} else
-		if (b == SS_U64) {
-		} else {
-			return -1;
-		}
-		break;
-	case SS_U64:
-		if (b == SS_I64) {
-		} else
-		if (b == SS_U32) {
-		} else
-		if (b == SS_U64) {
-		} else {
-			return -1;
-		}
-		break;
-	case SS_STRING:
-	case SS_STRINGPTR:
-		if (b == SS_STRING) {
-		} else {
-			return -1;
-		}
-		break;
-	default:
-		return -1;
-	}
-	return 0;
-}
-
 static int
 sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 {
 	char buf[128];
-	char name_function[] = "function";
-	char name_object[] = "object";
 	void *value = NULL;
 	struct srconfdump v = {
 		.type = m->type
@@ -4306,11 +4083,6 @@ sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 		break;
 	case SS_U64:
 		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIu64, load_u64(m->value));
-		v.valuesize += 1;
-		value = buf;
-		break;
-	case SS_I64:
-		v.valuesize  = snprintf(buf, sizeof(buf), "%" PRIi64, load_u64(m->value));
 		v.valuesize += 1;
 		value = buf;
 		break;
@@ -4335,16 +4107,6 @@ sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 		v.type = SS_STRING;
 		break;
 	}
-	case SS_OBJECT:
-		v.type = SS_STRING;
-		v.valuesize = sizeof(name_object);
-		value = name_object;
-		break;
-	case SS_FUNCTION:
-		v.type = SS_STRING;
-		v.valuesize = sizeof(name_function);
-		value = name_function;
-		break;
 	default:
 		return -1;
 	}
@@ -4391,53 +4153,7 @@ sr_confexec_serialize(struct srconf *c, struct srconfstmt *stmt, char *root)
 
 static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 {
-	if (s->op == SR_SERIALIZE)
-		return sr_confexec_serialize(start, s, NULL);
-	char path[256];
-	snprintf(path, sizeof(path), "%s", s->path);
-	char *ptr = NULL;
-	char *token;
-	token = strtok_r(path, ".", &ptr);
-	if (unlikely(token == NULL))
-		return -1;
-	struct srconf *c = start;
-	while (c) {
-		if (strcmp(token, c->key) != 0) {
-			c = c->next;
-			continue;
-		}
-		if (c->flags & SR_NS) {
-			token = strtok_r(NULL, ".", &ptr);
-			if (unlikely(token == NULL))
-			{
-				if (s->op == SR_WRITE && c->type != SS_UNDEF) {
-					int rc = sr_conf_write_cast(c->type, s->valuetype);
-					if (unlikely(rc == -1))
-						goto bad_type;
-				}
-				s->match = c;
-				if (c->function)
-					return c->function(c, s);
-				/* not supported */
-				goto bad_path;
-			}
-			c = (struct srconf*)c->value;
-			continue;
-		}
-		s->match = c;
-		token = strtok_r(NULL, ".", &ptr);
-		if (unlikely(token != NULL))
-			goto bad_path;
-		return c->function(c, s);
-	}
-
-bad_path:
-	return sr_error(s->r->e, "bad configuration path: %s", s->path);
-
-bad_type:
-	return sr_error(s->r->e, "incompatible type (%s) for (%s) %s",
-	                ss_typeof(s->valuetype),
-	                ss_typeof(c->type), s->path);
+	return sr_confexec_serialize(start, s, NULL);
 }
 
 #define SVNONE       0
@@ -13132,8 +12848,6 @@ static int sc_step(struct phia_service*, uint64_t);
 
 static int sc_ctl_call(struct phia_service *, uint64_t);
 static int sc_ctl_checkpoint(struct scheduler*);
-static int sc_ctl_gc(struct scheduler*);
-static int sc_ctl_lru(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
 struct screadarg {
@@ -13286,22 +13000,6 @@ static int sc_ctl_checkpoint(struct scheduler *s)
 {
 	tt_pthread_mutex_lock(&s->lock);
 	sc_task_checkpoint(s);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
-static int sc_ctl_gc(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	sc_task_gc(s);
-	tt_pthread_mutex_unlock(&s->lock);
-	return 0;
-}
-
-static int sc_ctl_lru(struct scheduler *s)
-{
-	tt_pthread_mutex_lock(&s->lock);
-	sc_task_lru(s);
 	tt_pthread_mutex_unlock(&s->lock);
 	return 0;
 }
@@ -14100,26 +13798,7 @@ phia_env_delete(struct phia_env *e)
 static inline int
 se_confv(struct srconf *c, struct srconfstmt *s)
 {
-	switch (s->op) {
-	case SR_SERIALIZE: return sr_conf_serialize(c, s);
-	case SR_READ:      return sr_conf_read(c, s);
-	case SR_WRITE:     return sr_conf_write(c, s);
-	}
-	assert(0);
-	return -1;
-}
-
-static inline int
-se_confv_offline(struct srconf *c, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op == SR_WRITE) {
-		if (sr_status(&e->status)) {
-			sr_error(s->r->e, "write to %s is offline-only", s->path);
-			return -1;
-		}
-	}
-	return se_confv(c, s);
+	return sr_conf_serialize(c, s);
 }
 
 static inline struct srconf*
@@ -14130,9 +13809,9 @@ se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "version", SS_STRING, rt->version, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "version_storage", SS_STRING, rt->version_storage, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "build", SS_STRING, rt->build, SR_RO, NULL);
-	sr_c(&p, pc, se_confv_offline, "path", SS_STRINGPTR, &e->conf.path);
-	sr_c(&p, pc, se_confv_offline, "path_create", SS_U32, &e->conf.path_create);
-	sr_c(&p, pc, se_confv_offline, "recover", SS_U32, &e->conf.recover);
+	sr_c(&p, pc, se_confv, "path", SS_STRINGPTR, &e->conf.path);
+	sr_c(&p, pc, se_confv, "path_create", SS_U32, &e->conf.path_create);
+	sr_c(&p, pc, se_confv, "recover", SS_U32, &e->conf.recover);
 	return sr_C(NULL, pc, NULL, "phia", SS_UNDEF, phia, SR_NS, NULL);
 }
 
@@ -14141,35 +13820,10 @@ se_confmemory(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *memory = *pc;
 	struct srconf *p = NULL;
-	sr_c(&p, pc, se_confv_offline, "limit", SS_U64, &e->conf.memory_limit);
+	sr_c(&p, pc, se_confv, "limit", SS_U64, &e->conf.memory_limit);
 	sr_C(&p, pc, se_confv, "used", SS_U64, &rt->memory_used, SR_RO, NULL);
-	sr_c(&p, pc, se_confv_offline, "anticache", SS_U64, &e->conf.anticache);
+	sr_c(&p, pc, se_confv, "anticache", SS_U64, &e->conf.anticache);
 	return sr_C(NULL, pc, NULL, "memory", SS_UNDEF, memory, SR_NS, NULL);
-}
-
-static inline int
-se_confcompaction_set(struct srconf *c ssunused, struct srconfstmt *s)
-{
-	struct phia_env *e = s->ptr;
-	if (s->op != SR_WRITE) {
-		sr_error(&e->error, "%s", "bad operation");
-		return -1;
-	}
-	if (unlikely(sr_statusactive(&e->status))) {
-		sr_error(s->r->e, "write to %s is offline-only", s->path);
-		return -1;
-	}
-	/* validate argument */
-	uint32_t percent = load_u32(s->value);
-	if (percent > 100) {
-		sr_error(&e->error, "%s", "bad argument");
-		return -1;
-	}
-	struct srzone z;
-	memset(&z, 0, sizeof(z));
-	z.enable = 1;
-	sr_zonemap_set(&e->conf.zones, percent, &z);
-	return 0;
 }
 
 static inline struct srconf*
@@ -14185,25 +13839,24 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 			continue;
 		struct srconf *zone = *pc;
 		p = NULL;
-		sr_c(&p, pc, se_confv_offline, "mode", SS_U32, &z->mode);
-		sr_c(&p, pc, se_confv_offline, "compact_wm", SS_U32, &z->compact_wm);
-		sr_c(&p, pc, se_confv_offline, "compact_mode", SS_U32, &z->compact_mode);
-		sr_c(&p, pc, se_confv_offline, "branch_prio", SS_U32, &z->branch_prio);
-		sr_c(&p, pc, se_confv_offline, "branch_wm", SS_U32, &z->branch_wm);
-		sr_c(&p, pc, se_confv_offline, "branch_age", SS_U32, &z->branch_age);
-		sr_c(&p, pc, se_confv_offline, "branch_age_period", SS_U32, &z->branch_age_period);
-		sr_c(&p, pc, se_confv_offline, "branch_age_wm", SS_U32, &z->branch_age_wm);
-		sr_c(&p, pc, se_confv_offline, "gc_wm", SS_U32, &z->gc_wm);
-		sr_c(&p, pc, se_confv_offline, "gc_prio", SS_U32, &z->gc_prio);
-		sr_c(&p, pc, se_confv_offline, "gc_period", SS_U32, &z->gc_period);
-		sr_c(&p, pc, se_confv_offline, "lru_prio", SS_U32, &z->lru_prio);
-		sr_c(&p, pc, se_confv_offline, "lru_period", SS_U32, &z->lru_period);
+		sr_c(&p, pc, se_confv, "mode", SS_U32, &z->mode);
+		sr_c(&p, pc, se_confv, "compact_wm", SS_U32, &z->compact_wm);
+		sr_c(&p, pc, se_confv, "compact_mode", SS_U32, &z->compact_mode);
+		sr_c(&p, pc, se_confv, "branch_prio", SS_U32, &z->branch_prio);
+		sr_c(&p, pc, se_confv, "branch_wm", SS_U32, &z->branch_wm);
+		sr_c(&p, pc, se_confv, "branch_age", SS_U32, &z->branch_age);
+		sr_c(&p, pc, se_confv, "branch_age_period", SS_U32, &z->branch_age_period);
+		sr_c(&p, pc, se_confv, "branch_age_wm", SS_U32, &z->branch_age_wm);
+		sr_c(&p, pc, se_confv, "gc_wm", SS_U32, &z->gc_wm);
+		sr_c(&p, pc, se_confv, "gc_prio", SS_U32, &z->gc_prio);
+		sr_c(&p, pc, se_confv, "gc_period", SS_U32, &z->gc_period);
+		sr_c(&p, pc, se_confv, "lru_prio", SS_U32, &z->lru_prio);
+		sr_c(&p, pc, se_confv, "lru_period", SS_U32, &z->lru_period);
 		prev = sr_C(&prev, pc, NULL, z->name, SS_UNDEF, zone, SR_NS, NULL);
 		if (compaction == NULL)
 			compaction = prev;
 	}
-	return sr_C(NULL, pc, se_confcompaction_set, "compaction", SS_U32,
-	            compaction, SR_NS, NULL);
+	return sr_C(NULL, pc, NULL, "compaction", SS_UNDEF, compaction, SR_NS, NULL);
 }
 
 int
@@ -14221,24 +13874,6 @@ phia_checkpoint_is_active(struct phia_env *env)
 	return is_active;
 }
 
-static inline int
-se_confscheduler_gc(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_gc(&e->scheduler);
-}
-
-static inline int
-se_confscheduler_lru(struct srconf *c, struct srconfstmt *s)
-{
-	if (s->op != SR_WRITE)
-		return se_confv(c, s);
-	struct phia_env *e = s->ptr;
-	return sc_ctl_lru(&e->scheduler);
-}
-
 static inline struct srconf*
 se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
@@ -14247,9 +13882,7 @@ se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	struct srconf *p = NULL;
 	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_gc, "gc", SS_FUNCTION, NULL);
 	sr_C(&p, pc, se_confv, "lru_active", SS_U32, &rt->lru_active, SR_RO, NULL);
-	sr_c(&p, pc, se_confscheduler_lru, "lru", SS_FUNCTION, NULL);
 	return sr_C(NULL, pc, NULL, "scheduler", SS_UNDEF, scheduler, SR_NS, NULL);
 }
 
@@ -14497,7 +14130,6 @@ static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 	struct srconf *root;
 	root = se_confprepare(e, &rt, conf, 1);
 	struct srconfstmt stmt = {
-		.op        = SR_SERIALIZE,
 		.path      = NULL,
 		.value     = NULL,
 		.valuesize = 0,
