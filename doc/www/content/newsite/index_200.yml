@@ -1,8 +1,8 @@
 ---
 title   : "Tarantool - A NoSQL database running in a Lua application server"
-slug    : "index_308"
-save_as : "index_308.html"
-template: "index_308"
+slug    : "index_200"
+save_as : "index_200.html"
+template: "index_200"
 blocks  :
   header:
     - "Tarantool"
