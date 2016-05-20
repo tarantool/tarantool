@@ -69,7 +69,7 @@ phia_get_parts(struct key_def *key_def, struct phia_document *obj,
 	};
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		int len = 0;
-		parts[i].iov_base = phia_getstring(obj, PARTNAMES[i], &len);
+		parts[i].iov_base = phia_document_field(obj, PARTNAMES[i], &len);
 		parts[i].iov_len = len;
 		assert(parts[i].iov_base != NULL);
 		switch (key_def->parts[i].type) {
@@ -124,7 +124,7 @@ phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
 	assert(key_def->part_count <= 8);
 	struct iovec parts[8];
 	int valuesize = 0;
-	void *value = phia_getstring(obj, "value", &valuesize);
+	void *value = phia_document_field(obj, "value", &valuesize);
 	uint32_t field_count = 0;
 	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,
 				       &field_count);
@@ -149,7 +149,7 @@ phia_tuple_data_new(struct phia_document *obj, struct key_def *key_def,
 	assert(key_def->part_count <= 8);
 	struct iovec parts[8];
 	int valuesize = 0;
-	void *value = phia_getstring(obj, "value", &valuesize);
+	void *value = phia_document_field(obj, "value", &valuesize);
 	uint32_t field_count = 0;
 	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,
 				       &field_count);
@@ -279,7 +279,7 @@ phia_read_free_cb(struct coio_task *ptr)
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
 	if (task->result != NULL)
-		phia_destroy(task->result);
+		phia_document_delete(task->result);
 	mempool_free(&phia_read_pool, task);
 	return 0;
 }
@@ -434,7 +434,7 @@ join_send_space(struct space *sp, void *data)
 	struct phia_document *obj = phia_document(pk->db);
 	while ((obj = phia_cursor_get(cursor, obj)))
 	{
-		int64_t lsn = phia_getint(obj, "lsn");
+		int64_t lsn = phia_document_lsn(obj);
 		uint32_t tuple_size;
 		char *tuple = phia_tuple_data_new(obj, pk->key_def,
 						  &tuple_size);
@@ -443,7 +443,7 @@ join_send_space(struct space *sp, void *data)
 				      tuple, tuple_size, lsn);
 		} catch (Exception *e) {
 			free(tuple);
-			phia_destroy(obj);
+			phia_document_delete(obj);
 			throw;
 		}
 		free(tuple);

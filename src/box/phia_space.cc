@@ -66,13 +66,13 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
-		phia_setstring(obj, "value", value, valuesize);
+		phia_document_set_field(obj, "value", value, valuesize);
 
 	assert(request->header != NULL);
 
 	struct phia_tx *tx = phia_begin(index->env);
 	if (tx == NULL) {
-		phia_destroy(obj);
+		phia_document_delete(obj);
 		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(index->env));
 	}
 
@@ -90,7 +90,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	case 1: /* rollback */
 		return;
 	case 2: /* lock */
-		phia_destroy(tx);
+		phia_rollback(tx);
 		/* must never happen during JOIN */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		return;
@@ -140,7 +140,7 @@ PhiaSpace::executeReplace(struct txn*,
 	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = size - (value - request->tuple);
 	if (valuesize > 0)
-		phia_setstring(obj, "value", value, valuesize);
+		phia_document_set_field(obj, "value", value, valuesize);
 	int rc;
 	rc = phia_replace(tx, obj);
 	if (rc == -1)
@@ -205,7 +205,7 @@ PhiaSpace::executeUpdate(struct txn*, struct space *space,
 	struct phia_document *obj = index->createDocument(key, &value);
 	size_t valuesize = new_tuple->bsize - (value - new_tuple->data);
 	if (valuesize > 0)
-		phia_setstring(obj, "value", value, valuesize);
+		phia_document_set_field(obj, "value", value, valuesize);
 	int rc;
 	rc = phia_replace(tx, obj);
 	if (rc == -1)
@@ -424,7 +424,7 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 		sizeof(uint8_t) + sizeof(uint32_t) + tuple_value_size + expr_size;
 	char *value = (char *)malloc(value_size);
 	if (value == NULL) {
-		phia_destroy(obj);
+		phia_document_delete(obj);
 		tnt_raise(OutOfMemory, sizeof(value_size), "Phia Space",
 		          "executeUpsert");
 	}
@@ -436,7 +436,7 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 	memcpy(p, tuple_value, tuple_value_size);
 	p += tuple_value_size;
 	memcpy(p, expr, expr_size);
-	phia_setstring(obj, "value", value, value_size);
+	phia_document_set_field(obj, "value", value, value_size);
 	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	int rc = phia_upsert(tx, obj);
 	free(value);

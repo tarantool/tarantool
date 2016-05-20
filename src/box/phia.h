@@ -164,6 +164,40 @@ phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit);
 struct phia_document *
 phia_tx_get(struct phia_tx *t, struct phia_document *key);
 
+/*
+ * Document
+ */
+
+enum phia_order {
+	PHIA_LT,
+	PHIA_LE,
+	PHIA_GT,
+	PHIA_GE,
+	PHIA_EQ
+};
+
+int
+phia_document_open(struct phia_document *v);
+
+int
+phia_document_delete(struct phia_document *v);
+
+int
+phia_document_set_field(struct phia_document *doc, const char *path,
+			const char *value, int size);
+
+char *
+phia_document_field(struct phia_document *v, const char *path, int *size);
+
+void
+phia_document_set_cache_only(struct phia_document *doc, bool cache_only);
+
+void
+phia_document_set_order(struct phia_document *doc, enum phia_order order);
+
+int64_t
+phia_document_lsn(struct phia_document *doc);
+
 #ifdef __cplusplus
 }
 #endif
