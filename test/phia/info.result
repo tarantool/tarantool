@@ -102,7 +102,6 @@ box_info_sort(box.info.phia())
       - temperature_max: '0'
       - temperature_min: '0'
   - memory:
-    - anticache: '0'
     - limit: '53687091'
     - used: '68'
   - metric:

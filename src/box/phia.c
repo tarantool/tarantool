@@ -3888,8 +3888,6 @@ struct srzone {
 	uint32_t branch_age_wm;
 	uint32_t snapshot_period;
 	uint64_t snapshot_period_us;
-	uint32_t anticache_period;
-	uint64_t anticache_period_us;
 	uint32_t gc_prio;
 	uint32_t gc_period;
 	uint64_t gc_period_us;
@@ -13499,7 +13497,6 @@ struct seconf {
 	struct srzonemap     zones;
 	/* memory */
 	uint64_t      memory_limit;
-	uint64_t      anticache;
 	struct sfscheme      scheme;
 	int           confmax;
 	struct srconf       *conf;
@@ -13822,7 +13819,6 @@ se_confmemory(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	struct srconf *p = NULL;
 	sr_c(&p, pc, se_confv, "limit", SS_U64, &e->conf.memory_limit);
 	sr_C(&p, pc, se_confv, "used", SS_U64, &rt->memory_used, SR_RO, NULL);
-	sr_c(&p, pc, se_confv, "anticache", SS_U64, &e->conf.anticache);
 	return sr_C(NULL, pc, NULL, "memory", SS_UNDEF, memory, SR_NS, NULL);
 }
 
@@ -14153,7 +14149,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 	c->path_create         = 1;
 	c->recover             = 1;
 	c->memory_limit        = 0;
-	c->anticache           = 0;
 	struct srzone def = {
 		.enable            = 1,
 		.mode              = 3, /* branch + compact */
@@ -14164,7 +14159,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		.branch_age        = 40,
 		.branch_age_period = 40,
 		.branch_age_wm     = 1 * 1024 * 1024,
-		.anticache_period  = 0,
 		.gc_prio           = 1,
 		.gc_period         = 60,
 		.gc_wm             = 30,
@@ -14181,7 +14175,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		.branch_age        = 0,
 		.branch_age_period = 0,
 		.branch_age_wm     = 0,
-		.anticache_period  = 0,
 		.gc_prio           = 0,
 		.gc_period         = 0,
 		.gc_wm             = 0,
@@ -14225,7 +14218,6 @@ static int se_confvalidate(struct seconf *c)
 		}
 		/* convert periodic times from sec to usec */
 		z->branch_age_period_us = z->branch_age_period * 1000000;
-		z->anticache_period_us  = z->anticache_period * 1000000;
 		z->gc_period_us         = z->gc_period * 1000000;
 		z->lru_period_us        = z->lru_period * 1000000;
 	}
