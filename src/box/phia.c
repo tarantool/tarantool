@@ -70,6 +70,9 @@
 
 #include "key_def.h"
 
+#include "box/errcode.h"
+#include "diag.h"
+
 #define ssunused __attribute__((unused))
 
 #define ss_cmp(a, b) \
@@ -3484,111 +3487,18 @@ sr_versionstorage_check(struct srversion *v)
 	return 1;
 }
 
-enum {
-	SR_ERROR_NONE  = 0,
-	SR_ERROR = 1,
-	SR_ERROR_MALFUNCTION = 2
-};
 
-struct srerror {
-	pthread_mutex_t lock;
-	int type;
-	const char *file;
-	const char *function;
-	int line;
-	char error[256];
-};
+#define sr_e(type, fmt, ...) \
+	({int res = -1; diag_set(ClientError, type, fmt, __VA_ARGS__); res;})
 
-static inline void
-sr_errorinit(struct srerror *e) {
-	e->type = SR_ERROR_NONE;
-	e->error[0] = 0;
-	e->line = 0;
-	e->function = NULL;
-	e->file = NULL;
-	tt_pthread_mutex_init(&e->lock, NULL);
-}
+#define sr_error(fmt, ...) \
+	sr_e(ER_PHIA, fmt, __VA_ARGS__)
 
-/* TODO: where is se_delete() ? */
-static inline __attribute__((unused)) void
-sr_errorfree(struct srerror *e) {
-	tt_pthread_mutex_destroy(&e->lock);
-}
+#define sr_malfunction(fmt, ...) \
+	sr_e(ER_PHIA, fmt, __VA_ARGS__)
 
-static inline void
-sr_errorreset(struct srerror *e) {
-	tt_pthread_mutex_lock(&e->lock);
-	e->type = SR_ERROR_NONE;
-	e->error[0] = 0;
-	e->line = 0;
-	e->function = NULL;
-	e->file = NULL;
-	tt_pthread_mutex_unlock(&e->lock);
-}
-
-static inline void
-sr_malfunction_set(struct srerror *e) {
-	tt_pthread_mutex_lock(&e->lock);
-	e->type = SR_ERROR_MALFUNCTION;
-	tt_pthread_mutex_unlock(&e->lock);
-}
-
-static inline int
-sr_errorcopy(struct srerror *e, char *buf, int bufsize) {
-	tt_pthread_mutex_lock(&e->lock);
-	int len = snprintf(buf, bufsize, "%s", e->error);
-	tt_pthread_mutex_unlock(&e->lock);
-	return len;
-}
-
-static inline void
-sr_verrorset(struct srerror *e, int type,
-             const char *file,
-             const char *function, int line,
-             char *fmt, va_list args)
-{
-	tt_pthread_mutex_lock(&e->lock);
-	if (unlikely(e->type == SR_ERROR_MALFUNCTION)) {
-		tt_pthread_mutex_unlock(&e->lock);
-		return;
-	}
-	e->file     = file;
-	e->function = function;
-	e->line     = line;
-	e->type     = type;
-	int len;
-	len = snprintf(e->error, sizeof(e->error), "%s:%d ", file, line);
-	vsnprintf(e->error + len, sizeof(e->error) - len, fmt, args);
-	tt_pthread_mutex_unlock(&e->lock);
-}
-
-static inline int
-sr_errorset(struct srerror *e, int type,
-            const char *file,
-            const char *function, int line,
-            char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	sr_verrorset(e, type, file, function, line, fmt, args);
-	va_end(args);
-	return -1;
-}
-
-#define sr_e(e, type, fmt, ...) \
-	sr_errorset(e, type, __FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
-
-#define sr_error(e, fmt, ...) \
-	sr_e(e, SR_ERROR, fmt, __VA_ARGS__)
-
-#define sr_malfunction(e, fmt, ...) \
-	sr_e(e, SR_ERROR_MALFUNCTION, fmt, __VA_ARGS__)
-
-#define sr_oom(e) \
-	sr_e(e, SR_ERROR, "%s", "memory allocation failed")
-
-#define sr_oom_malfunction(e) \
-	sr_e(e, SR_ERROR_MALFUNCTION, "%s", "memory allocation failed")
+#define sr_oom() \
+	sr_e(ER_PHIA, "%s", "memory allocation failed")
 
 enum {
 	SR_OFFLINE,
@@ -3934,7 +3844,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 
 struct runtime {
 	struct srstatus *status;
-	struct srerror *e;
 	struct sfupsert *fmt_upsert;
 	enum sfstorage fmt_storage;
 	struct sfscheme *scheme;
@@ -3950,7 +3859,6 @@ struct runtime {
 static inline void
 sr_init(struct runtime *r,
         struct srstatus *status,
-        struct srerror *e,
         struct ssa *a,
         struct ssvfs *vfs,
         struct ssquota *quota,
@@ -3963,7 +3871,6 @@ sr_init(struct runtime *r,
         struct srstat *stat)
 {
 	r->status      = status;
-	r->e           = e;
 	r->a           = a;
 	r->vfs         = vfs;
 	r->quota       = quota;
@@ -4115,7 +4022,7 @@ sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 	int size = sizeof(v) + v.keysize + v.valuesize;
 	int rc = ss_bufensure(p, s->r->a, size);
 	if (unlikely(rc == -1))
-		return sr_oom(s->r->e);
+		return sr_oom();
 	memcpy(p->p, &v, sizeof(v));
 	memcpy(p->p + sizeof(v), name, v.keysize);
 	memcpy(p->p + sizeof(v) + v.keysize, value, v.valuesize);
@@ -4750,7 +4657,7 @@ sv_mergeprepare(struct svmerge *m, struct runtime *r, int count)
 {
 	int rc = ss_bufensure(&m->buf, r->a, sizeof(struct svmergesrc) * count);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	return 0;
 }
 
@@ -6325,7 +6232,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 		v->lo = sv_logcount(x->log);
 		rc = sv_logadd(x->log, r->a, &lv, index->ptr);
 		if (unlikely(rc == -1)) {
-			sr_oom(r->e);
+			sr_oom();
 			goto error;
 		}
 		ss_rbset(&index->i, n, pos, &v->node);
@@ -6338,7 +6245,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	if (unlikely(own))
 	{
 		if (unlikely(version->flags & SVUPSERT)) {
-			sr_error(r->e, "%s", "only one upsert statement is "
+			sr_error("%s", "only one upsert statement is "
 			         "allowed per a transaction key");
 			goto error;
 		}
@@ -6361,7 +6268,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	v->lo = sv_logcount(x->log);
 	rc = sv_logadd(x->log, r->a, &lv, index->ptr);
 	if (unlikely(rc == -1)) {
-		sr_oom(r->e);
+		sr_oom();
 		goto error;
 	}
 	/* add version */
@@ -6396,7 +6303,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv
 	sv_init(&vv, &sv_vif, v->v, NULL);
 	struct svv *ret = sv_vdup(m->r, &vv);
 	if (unlikely(ret == NULL)) {
-		rc = sr_oom(m->r->e);
+		rc = sr_oom();
 	} else {
 		sv_init(result, &sv_vif, ret, NULL);
 		rc = 1;
@@ -7426,11 +7333,11 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 	ss_bufreset(arg->buf);
 	int rc = ss_bufensure(arg->buf, r->a, ref->sizeorigin);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	ss_bufreset(arg->buf_xf);
 	rc = ss_bufensure(arg->buf_xf, r->a, arg->index->h->sizevmax);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 
 	i->reads++;
 
@@ -7441,10 +7348,10 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		ss_bufreset(arg->buf_read);
 		rc = ss_bufensure(arg->buf_read, r->a, ref->size);
 		if (unlikely(rc == -1))
-			return sr_oom(r->e);
+			return sr_oom();
 		rc = ss_filepread(arg->file, ref->offset, arg->buf_read->s, ref->size);
 		if (unlikely(rc == -1)) {
-			sr_error(r->e, "index file '%s' read error: %s",
+			sr_error("index file '%s' read error: %s",
 				 ss_pathof(&arg->file->path),
 				 strerror(errno));
 			return -1;
@@ -7460,14 +7367,14 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 		struct ssfilter f;
 		rc = ss_filterinit(&f, (struct ssfilterif*)arg->compression_if, r->a, SS_FOUTPUT);
 		if (unlikely(rc == -1)) {
-			sr_error(r->e, "index file '%s' decompression error",
+			sr_error("index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
 		}
 		int size = ref->size - sizeof(struct sdpageheader);
 		rc = ss_filternext(&f, arg->buf, page_pointer + sizeof(struct sdpageheader), size);
 		if (unlikely(rc == -1)) {
-			sr_error(r->e, "index file '%s' decompression error",
+			sr_error("index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
 			return -1;
 		}
@@ -7479,7 +7386,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 	/* default */
 	rc = ss_filepread(arg->file, ref->offset, arg->buf->s, ref->sizeorigin);
 	if (unlikely(rc == -1)) {
-		sr_error(r->e, "index file '%s' read error: %s",
+		sr_error("index file '%s' read error: %s",
 		         ss_pathof(&arg->file->path),
 		         strerror(errno));
 		return -1;
@@ -7592,10 +7499,10 @@ sd_read_stat(struct ssiter *iptr)
 	return i->reads;
 }
 
-static int sd_writeseal(struct runtime*, struct ssfile*);
-static int sd_writepage(struct runtime*, struct ssfile*, struct sdbuild*);
-static int sd_writeindex(struct runtime*, struct ssfile*, struct sdindex*);
-static int sd_seal(struct runtime*, struct ssfile*, struct sdindex*, uint64_t);
+static int sd_writeseal(struct ssfile*);
+static int sd_writepage(struct ssfile*, struct sdbuild*);
+static int sd_writeindex(struct ssfile*, struct sdindex*);
+static int sd_seal(struct ssfile*, struct sdindex*, uint64_t);
 
 struct PACKED sdschemeheader {
 	uint32_t crc;
@@ -7653,7 +7560,7 @@ struct PACKED sdschemeiter {
 };
 
 static inline int
-sd_schemeiter_open(struct sdschemeiter *ci, struct runtime *r,
+sd_schemeiter_open(struct sdschemeiter *ci,
 		   struct sdscheme *c, int validate)
 {
 	ci->c = c;
@@ -7662,7 +7569,7 @@ sd_schemeiter_open(struct sdschemeiter *ci, struct runtime *r,
 		struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
 		uint32_t crc = ss_crcs(h, ss_bufused(&c->buf), 0);
 		if (h->crc != crc) {
-			sr_malfunction(r->e, "%s", "scheme file corrupted");
+			sr_malfunction("%s", "scheme file corrupted");
 			return -1;
 		}
 	}
@@ -7772,16 +7679,16 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	if (!b->tracker) {
 		b->tracker = mh_strnptr_new();
 		if (!b->tracker)
-			return sr_oom(r->e);
+			return sr_oom();
 	}
 	int rc;
 	if (compress_dup && mh_size(b->tracker) == 0) {
 		if (mh_strnptr_reserve(b->tracker, 32768, NULL) == -1)
-			return sr_oom(r->e);
+			return sr_oom();
 	}
 	rc = ss_bufensure(&b->list, r->a, sizeof(struct sdbuildref));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct sdbuildref *ref =
 		(struct sdbuildref*)ss_bufat(&b->list, sizeof(struct sdbuildref), b->n);
 	ref->m     = ss_bufused(&b->m);
@@ -7794,7 +7701,7 @@ sd_buildbegin(struct sdbuild *b, struct runtime *r, int crc,
 	ref->csize = 0;
 	rc = ss_bufensure(&b->m, r->a, sizeof(struct sdpageheader));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct sdpageheader *h = sd_buildheader(b);
 	memset(h, 0, sizeof(*h));
 	h->lsnmin    = UINT64_MAX;
@@ -7839,7 +7746,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 		int rc;
 		rc = ss_bufensure(&b->v, r->a, sizeof(uint32_t));
 		if (unlikely(rc == -1))
-			return sr_oom(r->e);
+			return sr_oom();
 		*(uint32_t*)b->v.p = offset;
 		ss_bufadvance(&b->v, sizeof(uint32_t));
 		if (is_duplicate)
@@ -7848,7 +7755,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 		/* copy field */
 		rc = ss_bufensure(&b->k, r->a, sizeof(uint32_t) + fieldsize);
 		if (unlikely(rc == -1))
-			return sr_oom(r->e);
+			return sr_oom();
 		*(uint32_t*)b->k.p = fieldsize;
 		ss_bufadvance(&b->k, sizeof(uint32_t));
 		memcpy(b->k.p, field, fieldsize);
@@ -7858,7 +7765,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 		if (b->compress_dup) {
 			struct sdbuildkey *ref = ss_malloc(r->a, sizeof(struct sdbuildkey));
 			if (unlikely(ref == NULL))
-				return sr_oom(r->e);
+				return sr_oom();
 			ref->offset = offset;
 			ref->offsetstart = offsetstart + sizeof(uint32_t);
 			ref->size = fieldsize;
@@ -7868,7 +7775,7 @@ sd_buildadd_sparse(struct sdbuild *b, struct runtime *r, struct sv *v)
 			mh_int_t ins_pos = mh_strnptr_put(b->tracker, &strnode,
 							  NULL, NULL);
 			if (unlikely(ins_pos == mh_end(b->tracker)))
-				return sr_error(r->e, "%s",
+				return sr_error("%s",
 						"Can't insert assoc array item");
 		}
 	}
@@ -7881,7 +7788,7 @@ sd_buildadd_raw(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t siz
 {
 	int rc = ss_bufensure(&b->v, r->a, size);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	memcpy(b->v.p, sv_pointer(v), size);
 	ss_bufadvance(&b->v, size);
 	return 0;
@@ -7892,7 +7799,7 @@ int sd_buildadd(struct sdbuild *b, struct runtime *r, struct sv *v, uint32_t fla
 	/* prepare document metadata */
 	int rc = ss_bufensure(&b->m, r->a, sizeof(struct sdv));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	uint64_t lsn = sv_lsn(v);
 	uint32_t size = sv_size(v);
 	struct sdpageheader *h = sd_buildheader(b);
@@ -8024,7 +7931,7 @@ static int sd_indexbegin(struct sdindex *i, struct runtime *r)
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexheader));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct sdindexheader *h = sd_indexheader(i);
 	sr_version_storage(&h->version);
 	h->crc         = 0;
@@ -8060,7 +7967,7 @@ static int sd_indexcommit(struct sdindex *i, struct runtime *r, struct sdid *id,
 	}
 	int rc = ss_bufensure(&i->i, r->a, size + size_extension);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	memcpy(i->i.p, i->v.s, size);
 	ss_bufadvance(&i->i, size);
 	if (qf) {
@@ -8091,7 +7998,7 @@ sd_indexadd_raw(struct sdindex *i, struct runtime *r, struct sdindexpage *p, cha
 	p->sizemax = sf_comparable_size(r->scheme, max);
 	int rc = ss_bufensure(&i->v, r->a, p->sizemin + p->sizemax);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	sf_comparable_write(r->scheme, min, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
 	sf_comparable_write(r->scheme, max, i->v.p);
@@ -8129,7 +8036,7 @@ sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, 
 	p->sizemin = sf_writesize(r->scheme, fields);
 	int rc = ss_bufensure(&i->v, r->a, p->sizemin);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	sf_write(r->scheme, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
 
@@ -8159,7 +8066,7 @@ sd_indexadd_sparse(struct sdindex *i, struct runtime *r, struct sdbuild *build, 
 	p->sizemax = sf_writesize(r->scheme, fields);
 	rc = ss_bufensure(&i->v, r->a, p->sizemax);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	sf_write(r->scheme, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemax);
 	return 0;
@@ -8169,7 +8076,7 @@ static int sd_indexadd(struct sdindex *i, struct runtime *r, struct sdbuild *bui
 {
 	int rc = ss_bufensure(&i->i, r->a, sizeof(struct sdindexpage));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct sdpageheader *ph = sd_buildheader(build);
 
 	int size = ph->size + sizeof(struct sdpageheader);
@@ -8228,7 +8135,7 @@ static int sd_indexcopy(struct sdindex *i, struct runtime *r, struct sdindexhead
 	int size = sd_indexsize_ext(h);
 	int rc = ss_bufensure(&i->i, r->a, size);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	memcpy(i->i.s, (char*)h, size);
 	ss_bufadvance(&i->i, size);
 	i->h = sd_indexheader(i);
@@ -8252,7 +8159,7 @@ sd_mergeinit(struct sdmerge *m, struct runtime *r, struct svmergeiter *im,
 	if (conf->amqf) {
 		int rc = ss_qfensure(qf, r->a, conf->stream);
 		if (unlikely(rc == -1))
-			return sr_oom(r->e);
+			return sr_oom();
 	}
 	sd_indexinit(&m->index);
 	sv_writeiter_open(&m->i, r, m->merge, upsert,
@@ -8393,7 +8300,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 
 	/* validate seal pointer */
 	if (unlikely(((pointer + sizeof(struct sdseal)) > eof))) {
-		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal size",
+		sr_malfunction("corrupted index file '%s': bad seal size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -8403,7 +8310,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 
 	/* validate index pointer */
 	if (unlikely(((pointer + sizeof(struct sdindexheader)) > eof))) {
-		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
+		sr_malfunction("corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -8414,7 +8321,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	/* validate index crc */
 	uint32_t crc = ss_crcs(index, sizeof(struct sdindexheader), 0);
 	if (index->crc != crc) {
-		sr_malfunction(i->r->e, "corrupted index file '%s': bad index crc",
+		sr_malfunction("corrupted index file '%s': bad index crc",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -8425,7 +8332,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	char *end = pointer + sizeof(struct sdindexheader) + index->size +
 	            index->extension;
 	if (unlikely(end > eof)) {
-		sr_malfunction(i->r->e, "corrupted index file '%s': bad index size",
+		sr_malfunction("corrupted index file '%s': bad index size",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -8435,7 +8342,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	/* validate seal */
 	int rc = sd_sealvalidate(next, index);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(i->r->e, "corrupted index file '%s': bad seal",
+		sr_malfunction("corrupted index file '%s': bad seal",
 		               ss_pathof(&i->file->path));
 		i->corrupt = 1;
 		i->v = NULL;
@@ -8454,14 +8361,14 @@ static int sd_recover_open(struct sdrecover *ri, struct runtime *r,
 	ri->r = r;
 	ri->file = file;
 	if (unlikely(ri->file->size < (sizeof(struct sdseal) + sizeof(struct sdindexheader)))) {
-		sr_malfunction(ri->r->e, "corrupted index file '%s': bad size",
+		sr_malfunction("corrupted index file '%s': bad size",
 		               ss_pathof(&ri->file->path));
 		ri->corrupt = 1;
 		return -1;
 	}
 	int rc = ss_vfsmmap(r->vfs, &ri->map, ri->file->fd, ri->file->size, 1);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(ri->r->e, "failed to mmap index file '%s': %s",
+		sr_malfunction("failed to mmap index file '%s': %s",
 		               ss_pathof(&ri->file->path),
 		               strerror(errno));
 		return -1;
@@ -8520,7 +8427,7 @@ static int sd_recover_complete(struct sdrecover *ri)
 	int rc = ss_fileresize(ri->file, file_size);
 	if (unlikely(rc == -1))
 		return -1;
-	sr_errorreset(ri->r->e);
+	diag_clear(diag_get());
 	return 0;
 }
 
@@ -8528,7 +8435,7 @@ static int sd_schemebegin(struct sdscheme *c, struct runtime *r)
 {
 	int rc = ss_bufensure(&c->buf, r->a, sizeof(struct sdschemeheader));
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
 	memset(h, 0, sizeof(struct sdschemeheader));
 	ss_bufadvance(&c->buf, sizeof(struct sdschemeheader));
@@ -8554,7 +8461,7 @@ sd_schemeadd(struct sdscheme *c, struct runtime *r, uint8_t id,
 	h->count++;
 	return 0;
 error:
-	return sr_oom(r->e);
+	return sr_oom();
 }
 
 static int sd_schemecommit(struct sdscheme *c)
@@ -8588,7 +8495,7 @@ sd_schemewrite(struct sdscheme *c, struct runtime *r, char *path, int sync)
 		goto error;
 	return 0;
 error:
-	sr_error(r->e, "scheme file '%s' error: %s",
+	sr_error("scheme file '%s' error: %s",
 	         path, strerror(errno));
 	ss_fileclose(&meta);
 	return -1;
@@ -8601,12 +8508,12 @@ sd_schemerecover(struct sdscheme *c, struct runtime *r, char *path)
 	if (unlikely(size == -1))
 		goto error;
 	if (unlikely((unsigned int)size < sizeof(struct sdschemeheader))) {
-		sr_error(r->e, "scheme file '%s' is corrupted", path);
+		sr_error("scheme file '%s' is corrupted", path);
 		return -1;
 	}
 	int rc = ss_bufensure(&c->buf, r->a, size);
 	if (unlikely(rc == -1))
-		return sr_oom(r->e);
+		return sr_oom();
 	struct ssfile meta;
 	ss_fileinit(&meta, r->vfs);
 	rc = ss_fileopen(&meta, path);
@@ -8621,7 +8528,7 @@ sd_schemerecover(struct sdscheme *c, struct runtime *r, char *path)
 	ss_bufadvance(&c->buf, size);
 	return 0;
 error:
-	sr_error(r->e, "scheme file '%s' error: %s",
+	sr_error("scheme file '%s' error: %s",
 	         path, strerror(errno));
 	return -1;
 }
@@ -8678,7 +8585,7 @@ static struct svif sd_vrawif =
 };
 
 static int
-sd_writeseal(struct runtime *r, struct ssfile *file)
+sd_writeseal(struct ssfile *file)
 {
 	struct sdseal seal;
 	sd_sealset_open(&seal);
@@ -8687,7 +8594,7 @@ sd_writeseal(struct runtime *r, struct ssfile *file)
 	int rc;
 	rc = ss_filewrite(file, &seal, sizeof(seal));
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "file '%s' write error: %s",
+		sr_malfunction("file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
 		return -1;
@@ -8696,10 +8603,10 @@ sd_writeseal(struct runtime *r, struct ssfile *file)
 }
 
 static int
-sd_writepage(struct runtime *r, struct ssfile *file, struct sdbuild *b)
+sd_writepage(struct ssfile *file, struct sdbuild *b)
 {
 	SS_INJECTION(r->i, SS_INJECTION_SD_BUILD_0,
-	             sr_malfunction(r->e, "%s", "error injection");
+	             sr_malfunction("%s", "error injection");
 	             return -1);
 	struct sdbuildref *ref = sd_buildref(b);
 	struct iovec iovv[3];
@@ -8717,7 +8624,7 @@ sd_writepage(struct runtime *r, struct ssfile *file, struct sdbuild *b)
 	int rc;
 	rc = ss_filewritev(file, &iov);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "file '%s' write error: %s",
+		sr_malfunction("file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
 		return -1;
@@ -8726,12 +8633,12 @@ sd_writepage(struct runtime *r, struct ssfile *file, struct sdbuild *b)
 }
 
 static int
-sd_writeindex(struct runtime *r, struct ssfile *file, struct sdindex *index)
+sd_writeindex(struct ssfile *file, struct sdindex *index)
 {
 	int rc;
 	rc = ss_filewrite(file, index->i.s, ss_bufused(&index->i));
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "file '%s' write error: %s",
+		sr_malfunction("file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
 		return -1;
@@ -8740,7 +8647,7 @@ sd_writeindex(struct runtime *r, struct ssfile *file, struct sdindex *index)
 }
 
 static int
-sd_seal(struct runtime *r, struct ssfile *file, struct sdindex *index,
+sd_seal(struct ssfile *file, struct sdindex *index,
 	uint64_t offset)
 {
 	struct sdseal seal;
@@ -8748,7 +8655,7 @@ sd_seal(struct runtime *r, struct ssfile *file, struct sdindex *index,
 	int rc;
 	rc = ss_filepwrite(file, offset, &seal, sizeof(seal));
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "file '%s' write error: %s",
+		sr_malfunction("file '%s' write error: %s",
 		               ss_pathof(&file->path),
 		               strerror(errno));
 		return -1;
@@ -8811,7 +8718,7 @@ si_branchnew(struct runtime *r)
 {
 	struct sibranch *b = (struct sibranch*)ss_malloc(r->a, sizeof(struct sibranch));
 	if (unlikely(b == NULL)) {
-		sr_oom_malfunction(r->e);
+		sr_oom();
 		return NULL;
 	}
 	si_branchinit(b);
@@ -8877,12 +8784,12 @@ static struct sinode *si_nodenew(struct runtime*);
 static int
 si_nodeopen(struct sinode*, struct runtime*, struct sspath*);
 static int
-si_nodecreate(struct sinode*, struct runtime*, struct sischeme*, struct sdid*);
+si_nodecreate(struct sinode*, struct sischeme*, struct sdid*);
 static int si_nodefree(struct sinode*, struct runtime*, int);
 static int si_nodegc_index(struct runtime*, struct svindex*);
-static int si_nodegc(struct sinode*, struct runtime*, struct sischeme*);
-static int si_nodeseal(struct sinode*, struct runtime*, struct sischeme*);
-static int si_nodecomplete(struct sinode*, struct runtime*, struct sischeme*);
+static int si_nodegc(struct sinode*, struct sischeme*);
+static int si_nodeseal(struct sinode*, struct sischeme*);
+static int si_nodecomplete(struct sinode*, struct sischeme*);
 
 static inline void
 si_nodelock(struct sinode *node) {
@@ -9961,7 +9868,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		/* write open seal */
 		uint64_t seal = parent->file.size;
-		rc = sd_writeseal(r, &parent->file);
+		rc = sd_writeseal(&parent->file);
 		if (unlikely(rc == -1))
 			goto e0;
 
@@ -9969,7 +9876,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 		uint64_t offset = parent->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1)
 		{
-			rc = sd_writepage(r, &parent->file, merge.build);
+			rc = sd_writepage(&parent->file, merge.build);
 			if (unlikely(rc == -1))
 				goto e0;
 			offset = parent->file.size;
@@ -9986,13 +9893,13 @@ si_branchcreate(struct si *index, struct sdc *c,
 			goto e0;
 
 		/* write index */
-		rc = sd_writeindex(r, &parent->file, &merge.index);
+		rc = sd_writeindex(&parent->file, &merge.index);
 		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync) {
 			rc = ss_filesync(&parent->file);
 			if (unlikely(rc == -1)) {
-				sr_malfunction(r->e, "file '%s' sync error: %s",
+				sr_malfunction("file '%s' sync error: %s",
 				               ss_pathof(&parent->file.path),
 				               strerror(errno));
 				goto e0;
@@ -10001,17 +9908,17 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 		SS_INJECTION(r->i, SS_INJECTION_SI_BRANCH_0,
 		             sd_mergefree(&merge);
-		             sr_malfunction(r->e, "%s", "error injection");
+		             sr_malfunction("%s", "error injection");
 		             return -1);
 
 		/* seal the branch */
-		rc = sd_seal(r, &parent->file, &merge.index, seal);
+		rc = sd_seal(&parent->file, &merge.index, seal);
 		if (unlikely(rc == -1))
 			goto e0;
 		if (index->scheme.sync == 2) {
 			rc = ss_filesync(&parent->file);
 			if (unlikely(rc == -1)) {
-				sr_malfunction(r->e, "file '%s' sync error: %s",
+				sr_malfunction("file '%s' sync error: %s",
 				               ss_pathof(&parent->file.path),
 				               strerror(errno));
 				goto e0;
@@ -10027,7 +9934,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 	sv_mergefree(&vmerge, r->a);
 
 	if (unlikely(rc == -1)) {
-		sr_oom_malfunction(r->e);
+		sr_oom();
 		goto e0;
 	}
 
@@ -10116,7 +10023,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	int rc;
 	rc = sd_censure(c, r, node->branch_count);
 	if (unlikely(rc == -1))
-		return sr_oom_malfunction(r->e);
+		return sr_oom();
 	struct svmerge merge;
 	sv_mergeinit(&merge);
 	rc = sv_mergeprepare(&merge, r, node->branch_count + 1);
@@ -10163,7 +10070,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 		};
 		int rc = sd_read_open(&s->src, &arg, NULL, 0);
 		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
+			return sr_oom();
 		size_stream += sd_indextotal(&b->index);
 		count += sd_indexkeys(&b->index);
 		cbuf = cbuf->next;
@@ -10203,7 +10110,7 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 {
 	DIR *dir = opendir(repo);
 	if (dir == NULL) {
-		sr_malfunction(r->e, "directory '%s' open error: %s",
+		sr_malfunction("directory '%s' open error: %s",
 		               repo, strerror(errno));
 		return -1;
 	}
@@ -10219,7 +10126,7 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 		snprintf(path, sizeof(path), "%s/%s", repo, de->d_name);
 		rc = ss_vfsunlink(r->vfs, path);
 		if (unlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' unlink error: %s",
+			sr_malfunction("index file '%s' unlink error: %s",
 			               path, strerror(errno));
 			closedir(dir);
 			return -1;
@@ -10230,14 +10137,14 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 	snprintf(path, sizeof(path), "%s/drop", repo);
 	rc = ss_vfsunlink(r->vfs, path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' unlink error: %s",
+		sr_malfunction("index file '%s' unlink error: %s",
 		               path, strerror(errno));
 		return -1;
 	}
 	if (drop_directory) {
 		rc = ss_vfsrmdir(r->vfs, repo);
 		if (unlikely(rc == -1)) {
-			sr_malfunction(r->e, "directory '%s' unlink error: %s",
+			sr_malfunction("directory '%s' unlink error: %s",
 			               repo, strerror(errno));
 			return -1;
 		}
@@ -10254,7 +10161,7 @@ static int si_dropmark(struct si *i)
 	ss_fileinit(&drop, i->r.vfs);
 	int rc = ss_filenew(&drop, path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(i->r.e, "drop file '%s' create error: %s",
+		sr_malfunction("drop file '%s' create error: %s",
 		               path, strerror(errno));
 		return -1;
 	}
@@ -10314,7 +10221,7 @@ si_redistribute(struct si *index, struct runtime *r, struct sdc *c, struct sinod
 		struct sv *v = sv_indexiter_get(&i);
 		int rc = ss_bufadd(&c->b, r->a, &v->v, sizeof(struct svref**));
 		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
+			return sr_oom();
 		sv_indexiter_next(&i);
 	}
 	if (unlikely(ss_bufused(&c->b) == 0))
@@ -10387,7 +10294,7 @@ si_redistribute_index(struct si *index, struct runtime *r, struct sdc *c, struct
 		struct sv *v = sv_indexiter_get(&i);
 		int rc = ss_bufadd(&c->b, r->a, &v->v, sizeof(struct svref**));
 		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
+			return sr_oom();
 		sv_indexiter_next(&i);
 	}
 	if (unlikely(ss_bufused(&c->b) == 0))
@@ -10460,7 +10367,7 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			.flags  = 0,
 			.id     = sr_seq(index->r.seq, SR_NSNNEXT)
 		};
-		rc = si_nodecreate(n, r, &index->scheme, &id);
+		rc = si_nodecreate(n, &index->scheme, &id);
 		if (unlikely(rc == -1))
 			goto error;
 		n->branch = &n->self;
@@ -10468,14 +10375,14 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 
 		/* write open seal */
 		uint64_t seal = n->file.size;
-		rc = sd_writeseal(r, &n->file);
+		rc = sd_writeseal(&n->file);
 		if (unlikely(rc == -1))
 			goto error;
 
 		/* write pages */
 		uint64_t offset = n->file.size;
 		while ((rc = sd_mergepage(&merge, offset)) == 1) {
-			rc = sd_writepage(r, &n->file, merge.build);
+			rc = sd_writepage(&n->file, merge.build);
 			if (unlikely(rc == -1))
 				goto error;
 			offset = n->file.size;
@@ -10488,19 +10395,19 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			goto error;
 
 		/* write index */
-		rc = sd_writeindex(r, &n->file, &merge.index);
+		rc = sd_writeindex(&n->file, &merge.index);
 		if (unlikely(rc == -1))
 			goto error;
 
 		/* update seal */
-		rc = sd_seal(r, &n->file, &merge.index, seal);
+		rc = sd_seal(&n->file, &merge.index, seal);
 		if (unlikely(rc == -1))
 			goto error;
 
 		/* add node to the list */
 		rc = ss_bufadd(result, index->r.a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1)) {
-			sr_oom_malfunction(index->r.e);
+			sr_oom();
 			goto error;
 		}
 
@@ -10547,7 +10454,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 
 	SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_0,
 	             si_splitfree(result, r);
-	             sr_malfunction(r->e, "%s", "error injection");
+	             sr_malfunction("%s", "error injection");
 	             return -1);
 
 	/* mask removal of a single node as a
@@ -10567,7 +10474,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 			return -1;
 		rc = ss_bufadd(result, r->a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1)) {
-			sr_oom_malfunction(r->e);
+			sr_oom();
 			si_nodefree(n, r, 1);
 			return -1;
 		}
@@ -10635,21 +10542,21 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	while (ss_bufiterref_has(&i))
 	{
 		n  = ss_bufiterref_get(&i);
-		rc = si_nodeseal(n, r, &index->scheme);
+		rc = si_nodeseal(n, &index->scheme);
 		if (unlikely(rc == -1)) {
 			si_nodefree(node, r, 0);
 			return -1;
 		}
 		SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_3,
 		             si_nodefree(node, r, 0);
-		             sr_malfunction(r->e, "%s", "error injection");
+		             sr_malfunction("%s", "error injection");
 		             return -1);
 		ss_bufiterref_next(&i);
 	}
 
 	SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_1,
 	             si_nodefree(node, r, 0);
-	             sr_malfunction(r->e, "%s", "error injection");
+	             sr_malfunction("%s", "error injection");
 	             return -1);
 
 	/* gc node */
@@ -10661,7 +10568,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	} else {
 		/* node concurrently being read, schedule for
 		 * delayed removal */
-		si_nodegc(node, r, &index->scheme);
+		si_nodegc(node, &index->scheme);
 		si_lock(index);
 		rlist_add(&index->gc, &node->gc);
 		index->gc_count++;
@@ -10669,7 +10576,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	}
 
 	SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_2,
-	             sr_malfunction(r->e, "%s", "error injection");
+	             sr_malfunction("%s", "error injection");
 	             return -1);
 
 	/* complete new nodes */
@@ -10677,11 +10584,11 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	while (ss_bufiterref_has(&i))
 	{
 		n = ss_bufiterref_get(&i);
-		rc = si_nodecomplete(n, r, &index->scheme);
+		rc = si_nodecomplete(n, &index->scheme);
 		if (unlikely(rc == -1))
 			return -1;
 		SS_INJECTION(r->i, SS_INJECTION_SI_COMPACTION_4,
-		             sr_malfunction(r->e, "%s", "error injection");
+		             sr_malfunction("%s", "error injection");
 		             return -1);
 		ss_bufiterref_next(&i);
 	}
@@ -10703,7 +10610,7 @@ static struct sinode *si_nodenew(struct runtime *r)
 {
 	struct sinode *n = (struct sinode*)ss_malloc(r->a, sizeof(struct sinode));
 	if (unlikely(n == NULL)) {
-		sr_oom_malfunction(r->e);
+		sr_oom();
 		return NULL;
 	}
 	n->recover = 0;
@@ -10749,7 +10656,7 @@ si_nodeclose(struct sinode *n, struct runtime *r, int gc)
 
 	int rc = ss_fileclose(&n->file);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' close error: %s",
+		sr_malfunction("index file '%s' close error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		rcret = -1;
@@ -10817,7 +10724,7 @@ si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 {
 	int rc = ss_fileopen(&n->file, path->path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' open error: %s "
+		sr_malfunction("index file '%s' open error: %s "
 		               "(please ensure storage version compatibility)",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
@@ -10825,7 +10732,7 @@ si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 	}
 	rc = ss_fileseek(&n->file, n->file.size);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' seek error: %s",
+		sr_malfunction("index file '%s' seek error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -10837,7 +10744,7 @@ si_nodeopen(struct sinode *n, struct runtime *r, struct sspath *path)
 }
 
 static int
-si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
+si_nodecreate(struct sinode *n, struct sischeme *scheme,
 	      struct sdid *id)
 {
 	struct sspath path;
@@ -10845,7 +10752,7 @@ si_nodecreate(struct sinode *n, struct runtime *r, struct sischeme *scheme,
 	                ".index.incomplete");
 	int rc = ss_filenew(&n->file, path.path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' create error: %s",
+		sr_malfunction("index file '%s' create error: %s",
 		               path.path, strerror(errno));
 		return -1;
 	}
@@ -10873,7 +10780,7 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 		ss_fileadvise(&n->file, 0, 0, n->file.size);
 		rc = ss_vfsunlink(r->vfs, ss_pathof(&n->file.path));
 		if (unlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' unlink error: %s",
+			sr_malfunction("index file '%s' unlink error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
 			rcret = -1;
@@ -10887,13 +10794,13 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 	return rcret;
 }
 
-static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *scheme)
+static int si_nodeseal(struct sinode *n, struct sischeme *scheme)
 {
 	int rc;
 	if (scheme->sync) {
 		rc = ss_filesync(&n->file);
 		if (unlikely(rc == -1)) {
-			sr_malfunction(r->e, "index file '%s' sync error: %s",
+			sr_malfunction("index file '%s' sync error: %s",
 			               ss_pathof(&n->file.path),
 			               strerror(errno));
 			return -1;
@@ -10905,7 +10812,7 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 	                ".index.seal");
 	rc = ss_filerename(&n->file, path.path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' rename error: %s",
+		sr_malfunction("index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 		return -1;
@@ -10914,26 +10821,26 @@ static int si_nodeseal(struct sinode *n, struct runtime *r, struct sischeme *sch
 }
 
 static int
-si_nodecomplete(struct sinode *n, struct runtime *r, struct sischeme *scheme)
+si_nodecomplete(struct sinode *n, struct sischeme *scheme)
 {
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".index");
 	int rc = ss_filerename(&n->file, path.path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' rename error: %s",
+		sr_malfunction("index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 	}
 	return rc;
 }
 
-static int si_nodegc(struct sinode *n, struct runtime *r, struct sischeme *scheme)
+static int si_nodegc(struct sinode *n, struct sischeme *scheme)
 {
 	struct sspath path;
 	ss_path(&path, scheme->path, n->self.id.id, ".index.gc");
 	int rc = ss_filerename(&n->file, path.path);
 	if (unlikely(rc == -1)) {
-		sr_malfunction(r->e, "index file '%s' rename error: %s",
+		sr_malfunction("index file '%s' rename error: %s",
 		               ss_pathof(&n->file.path),
 		               strerror(errno));
 	}
@@ -11472,7 +11379,7 @@ si_readdup(struct siread *q, struct sv *result)
 	} else {
 		v = sv_vdup(q->r, result);
 		if (unlikely(v == NULL))
-			return sr_oom(q->r->e);
+			return sr_oom();
 	}
 	sv_init(&q->result, &sv_vif, v, NULL);
 	return 1;
@@ -11643,7 +11550,7 @@ si_get(struct siread *q)
 	si_nodeview_open(&view, node);
 	rc = si_cachevalidate(q->cache, node);
 	if (unlikely(rc == -1)) {
-		sr_oom(q->r->e);
+		sr_oom();
 		return -1;
 	}
 	si_unlock(q->index);
@@ -11748,7 +11655,7 @@ next_node:
 	int count = node->branch_count + 2 + 1;
 	int rc = sv_mergeprepare(m, q->r, count);
 	if (unlikely(rc == -1)) {
-		sr_errorreset(q->r->e);
+		diag_clear(diag_get());
 		return -1;
 	}
 
@@ -11780,7 +11687,7 @@ next_node:
 	/* cache and branches */
 	rc = si_cachevalidate(q->cache, node);
 	if (unlikely(rc == -1)) {
-		sr_oom(q->r->e);
+		sr_oom();
 		return -1;
 	}
 
@@ -11944,7 +11851,7 @@ si_bootstrap(struct si *i, uint64_t parent)
 		.id     = sr_seq(r->seq, SR_NSNNEXT)
 	};
 	int rc;
-	rc = si_nodecreate(n, r, &i->scheme, &id);
+	rc = si_nodecreate(n, &i->scheme, &id);
 	if (unlikely(rc == -1))
 		goto e0;
 	n->branch = &n->self;
@@ -11976,11 +11883,11 @@ si_bootstrap(struct si *i, uint64_t parent)
 
 	/* write seal */
 	uint64_t seal = n->file.size;
-	rc = sd_writeseal(r, &n->file);
+	rc = sd_writeseal(&n->file);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* write page */
-	rc = sd_writepage(r, &n->file, &build);
+	rc = sd_writepage(&n->file, &build);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* amqf */
@@ -11995,11 +11902,11 @@ si_bootstrap(struct si *i, uint64_t parent)
 		goto e1;
 	ss_qffree(&f, r->a);
 	/* write index */
-	rc = sd_writeindex(r, &n->file, &index);
+	rc = sd_writeindex(&n->file, &index);
 	if (unlikely(rc == -1))
 		goto e1;
 	/* close seal */
-	rc = sd_seal(r, &n->file, &index, seal);
+	rc = sd_seal(&n->file, &index, seal);
 	if (unlikely(rc == -1))
 		goto e1;
 	si_branchset(&n->self, &index);
@@ -12024,7 +11931,7 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 	if (likely(create_directory)) {
 		rc = ss_vfsmkdir(r->vfs, i->scheme.path, 0755);
 		if (unlikely(rc == -1)) {
-			sr_malfunction(r->e, "directory '%s' create error: %s",
+			sr_malfunction("directory '%s' create error: %s",
 			               i->scheme.path, strerror(errno));
 			return -1;
 		}
@@ -12032,7 +11939,6 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 	/* create scheme file */
 	rc = si_schemedeploy(&i->scheme, r);
 	if (unlikely(rc == -1)) {
-		sr_malfunction_set(r->e);
 		return -1;
 	}
 	/* create initial node */
@@ -12041,9 +11947,9 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 		return -1;
 	SS_INJECTION(r->i, SS_INJECTION_SI_RECOVER_0,
 	             si_nodefree(n, r, 0);
-	             sr_malfunction(r->e, "%s", "error injection");
+	             sr_malfunction("%s", "error injection");
 	             return -1);
-	rc = si_nodecomplete(n, r, &i->scheme);
+	rc = si_nodecomplete(n, &i->scheme);
 	if (unlikely(rc == -1)) {
 		si_nodefree(n, r, 1);
 		return -1;
@@ -12107,7 +12013,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 {
 	DIR *dir = opendir(i->scheme.path);
 	if (unlikely(dir == NULL)) {
-		sr_malfunction(r->e, "directory '%s' open error: %s",
+		sr_malfunction("directory '%s' open error: %s",
 		               i->scheme.path, strerror(errno));
 		return -1;
 	}
@@ -12146,7 +12052,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 				                ".index.incomplete");
 				rc = ss_vfsunlink(r->vfs, path.path);
 				if (unlikely(rc == -1)) {
-					sr_malfunction(r->e, "index file '%s' unlink error: %s",
+					sr_malfunction("index file '%s' unlink error: %s",
 					               path.path, strerror(errno));
 					goto error;
 				}
@@ -12173,7 +12079,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			ss_path(&path, i->scheme.path, id, ".index.gc");
 			rc = ss_vfsunlink(r->vfs, ss_pathof(&path));
 			if (unlikely(rc == -1)) {
-				sr_malfunction(r->e, "index file '%s' unlink error: %s",
+				sr_malfunction("index file '%s' unlink error: %s",
 				               ss_pathof(&path), strerror(errno));
 				goto error;
 			}
@@ -12220,7 +12126,7 @@ error:
 }
 
 static inline int
-si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, struct si *i)
+si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct si *i)
 {
 	ss_bufreset(buf);
 	struct ssrbnode *p = ss_rbmax(&track->i);
@@ -12254,7 +12160,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, st
 			}
 			if (! (n->recover & SI_RDB_REMOVE)) {
 				/* complete node */
-				int rc = si_nodecomplete(n, r, &i->scheme);
+				int rc = si_nodecomplete(n, &i->scheme);
 				if (unlikely(rc == -1))
 					return -1;
 				n->recover = SI_RDB;
@@ -12263,7 +12169,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct runtime *r, st
 		}
 		default:
 			/* corrupted states */
-			return sr_malfunction(r->e, "corrupted index repository: %s",
+			return sr_malfunction("corrupted index repository: %s",
 			                      i->scheme.path);
 		}
 		p = ss_rbprev(&track->i, p);
@@ -12281,7 +12187,7 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 		struct sinode *n = container_of(p, struct sinode, node);
 		int rc = ss_bufadd(buf, r->a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1))
-			return sr_oom_malfunction(r->e);
+			return sr_oom();
 		p = ss_rbnext(&track->i, p);
 	}
 	struct ssiter i;
@@ -12328,7 +12234,7 @@ si_recoverindex(struct si *i, struct runtime *r)
 		goto error;
 	if (unlikely(track.count == 0))
 		return 1;
-	rc = si_trackvalidate(&track, &buf, r, i);
+	rc = si_trackvalidate(&track, &buf, i);
 	if (unlikely(rc == -1))
 		goto error;
 	rc = si_recovercomplete(&track, r, i, &buf);
@@ -12357,7 +12263,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 	if (likely(! rc))
 		return 0;
 	if (i->scheme.path_fail_on_drop) {
-		sr_malfunction(r->e, "attempt to recover a dropped index: %s:",
+		sr_malfunction("attempt to recover a dropped index: %s:",
 		               i->scheme.path);
 		return -1;
 	}
@@ -12374,7 +12280,7 @@ static int si_recover(struct si *i)
 	if (exist == 0)
 		goto deploy;
 	if (i->scheme.path_fail_on_exists) {
-		sr_error(r->e, "directory '%s' already exists", i->scheme.path);
+		sr_error("directory '%s' already exists", i->scheme.path);
 		return -1;
 	}
 	int rc = si_recoverdrop(i, r);
@@ -12542,7 +12448,7 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 	if (unlikely(rc == -1))
 		goto error;
 	struct sdschemeiter ci;
-	rc = sd_schemeiter_open(&ci, r, &c, 1);
+	rc = sd_schemeiter_open(&ci, &c, 1);
 	if (unlikely(rc == -1))
 		goto error;
 	while (sd_schemeiter_has(&ci))
@@ -12625,7 +12531,7 @@ static int si_schemerecover(struct sischeme *s, struct runtime *r)
 	sd_schemefree(&c, r);
 	return 0;
 error_format:
-	sr_error(r->e, "%s", "incompatible storage format version");
+	sr_error("%s", "incompatible storage format version");
 error:
 	sd_schemefree(&c, r);
 	return -1;
@@ -12711,7 +12617,7 @@ sr_checkdir(struct runtime *r, const char *path)
 {
 	int exists = ss_vfsexists(r->vfs, path);
 	if (exists == 0) {
-		sr_error(r->e, "directory '%s' does not exist", path);
+		sr_error("directory '%s' does not exist", path);
 		return -1;
 	}
 	return 0;
@@ -13527,7 +13433,6 @@ struct phia_env {
 	struct sicachepool cachepool;
 	struct sxmanager   xm;
 	struct scheduler          scheduler;
-	struct srerror     error;
 	struct srstat      stat;
 	struct sflimit     limit;
 	struct ssinjection ei;
@@ -13583,13 +13488,10 @@ phia_env_get_scheduler(struct phia_env *env)
 	return &env->scheduler;
 }
 
-const char *
-phia_error(struct phia_env *env)
+void
+phia_error()
 {
-	static char error[128];
-	error[0] = 0;
-	(void) sr_errorcopy(&env->error, error, sizeof(error));
-	return error;
+	diag_raise();
 }
 
 static struct phia_document *
@@ -13614,9 +13516,8 @@ phia_document_delete(struct phia_document *v)
 static inline int
 phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
-	struct phia_env *e = o->db->env;
 	if (unlikely(o->db != dest))
-		return sr_error(&e->error, "%s", "incompatible document parent db");
+		return sr_error("%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (! o->flagset) {
 		o->flagset = 1;
@@ -13647,11 +13548,11 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 {
 	struct phia_env *e = o->db->env;
 	if (unlikely(o->db != dest))
-		return sr_error(&e->error, "%s", "incompatible document parent db");
+		return sr_error("%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
 	if (o->flagset) {
 		if (unlikely(v->flags != flags))
-			return sr_error(&e->error, "%s", "incompatible document flags");
+			return sr_error("%s", "incompatible document flags");
 	} else {
 		o->flagset = 1;
 		v->flags = flags;
@@ -13659,7 +13560,7 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 	if (v->lsn != 0) {
 		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
 		if (v->lsn <= lsn)
-			return sr_error(&e->error, "%s", "incompatible document lsn");
+			return sr_error("%s", "incompatible document lsn");
 	}
 	return 0;
 }
@@ -13837,9 +13738,8 @@ phia_checkpoint_is_active(struct phia_env *env)
 }
 
 static inline struct srconf*
-se_confscheduler(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
+se_confscheduler(struct seconfrt *rt, struct srconf **pc)
 {
-	(void) e;
 	struct srconf *scheduler = *pc;
 	struct srconf *p = NULL;
 	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
@@ -13995,7 +13895,7 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c, int se
 	struct srconf *phia     = se_confphia(e, rt, &pc);
 	struct srconf *memory     = se_confmemory(e, rt, &pc);
 	struct srconf *compaction = se_confcompaction(e, rt, &pc);
-	struct srconf *scheduler  = se_confscheduler(e, rt, &pc);
+	struct srconf *scheduler  = se_confscheduler(rt, &pc);
 	struct srconf *perf       = se_confperformance(e, rt, &pc);
 	struct srconf *metric     = se_confmetric(e, rt, &pc);
 	struct srconf *db         = se_confdb(e, rt, &pc);
@@ -14072,7 +13972,7 @@ se_confensure(struct seconf *c)
 		return 0;
 	struct srconf *cptr = ss_malloc(&e->a, confmax);
 	if (unlikely(cptr == NULL))
-		return sr_oom(&e->error);
+		return sr_oom();
 	ss_free(&e->a, c->conf);
 	c->conf = cptr;
 	c->confmax = confmax;
@@ -14168,7 +14068,7 @@ static int se_confvalidate(struct seconf *c)
 {
 	struct phia_env *e = (struct phia_env*)c->env;
 	if (c->path == NULL) {
-		sr_error(&e->error, "%s", "repository path is not set");
+		sr_error("%s", "repository path is not set");
 		return -1;
 	}
 	int i = 0;
@@ -14177,7 +14077,7 @@ static int se_confvalidate(struct seconf *c)
 		if (! z->enable)
 			continue;
 		if (z->compact_wm <= 1) {
-			sr_error(&e->error, "bad %d.compact_wm value", i * 10);
+			sr_error("bad %d.compact_wm value", i * 10);
 			return -1;
 		}
 		/* convert periodic times from sec to usec */
@@ -14223,7 +14123,7 @@ phia_confcursor_new(struct phia_env *e)
 	struct phia_confcursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_confcursor));
 	if (unlikely(c == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	c->env = e;
@@ -14233,7 +14133,7 @@ phia_confcursor_new(struct phia_env *e)
 	int rc = se_confserialize(&e->conf, &c->dump);
 	if (unlikely(rc == -1)) {
 		phia_confcursor_delete(c);
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	return c;
@@ -14287,7 +14187,7 @@ phia_cursor_new(struct phia_index *db)
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
 	if (unlikely(c == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	sv_loginit(&c->log);
@@ -14300,7 +14200,7 @@ phia_cursor_new(struct phia_index *db)
 	c->t.state = SXUNDEF;
 	c->cache = si_cachepool_pop(&e->cachepool);
 	if (unlikely(c->cache == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	c->read_commited = 0;
@@ -14329,7 +14229,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	         key_def->space_id, key_def->iid);
 	scheme->name = ss_strdup(&e->a, name);
 	if (scheme->name == NULL) {
-		sr_oom(&e->error);
+		sr_oom();
 		goto error;
 	}
 	scheme->id                    = key_def->space_id;
@@ -14344,7 +14244,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	if (key_def->opts.compression[0] != '\0') {
 		scheme->compression_if = ss_filterof(key_def->opts.compression);
 		if (unlikely(scheme->compression_if == NULL)) {
-			sr_error(&e->error, "unknown compression type '%s'",
+			sr_error("unknown compression type '%s'",
 				 key_def->opts.compression);
 			goto error;
 		}
@@ -14355,7 +14255,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	}
 	scheme->compression_sz = ss_strdup(&e->a, scheme->compression_if->name);
 	if (unlikely(scheme->compression_sz == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		goto error;
 	}
 
@@ -14364,7 +14264,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 		scheme->compression_branch_if =
 			ss_filterof(key_def->opts.compression_branch);
 		if (unlikely(scheme->compression_branch_if == NULL)) {
-			sr_error(&e->error, "unknown compression type '%s'",
+			sr_error("unknown compression type '%s'",
 				 key_def->opts.compression_branch);
 			goto error;
 		}
@@ -14376,7 +14276,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	scheme->compression_branch_sz = ss_strdup(&e->a,
 		scheme->compression_branch_if->name);
 	if (unlikely(scheme->compression_branch_sz == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		goto error;
 	}
 
@@ -14391,7 +14291,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 		scheme->path = ss_strdup(&e->a, key_def->opts.path);
 	}
 	if (unlikely(scheme->path == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		goto error;
 	}
 	scheme->path_fail_on_exists   = 0;
@@ -14409,7 +14309,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 		snprintf(name, sizeof(name), "key_%" PRIu32, i);
 		struct sffield *field = sf_fieldnew(&e->a, name);
 		if (unlikely(field == NULL)) {
-			sr_oom(&e->error);
+			sr_oom();
 			goto error;
 		}
 
@@ -14421,20 +14321,20 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 		int rc = sf_fieldoptions(field, &e->a, type);
 		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
-			sr_oom(&e->error);
+			sr_oom();
 			goto error;
 		}
 		rc = sf_schemeadd(&scheme->scheme, &e->a, field);
 		if (unlikely(rc == -1)) {
 			sf_fieldfree(field, &e->a);
-			sr_oom(&e->error);
+			sr_oom();
 			goto error;
 		}
 	}
 
 	struct sffield *field = sf_fieldnew(&e->a, "value");
 	if (unlikely(field == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		goto error;
 	}
 	int rc = sf_fieldoptions(field, &e->a, "string");
@@ -14451,7 +14351,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	/* validate scheme and set keys */
 	rc = sf_schemevalidate(&scheme->scheme, &e->a);
 	if (unlikely(rc == -1)) {
-		sr_error(&e->error, "incomplete scheme", scheme->name);
+		sr_error("incomplete scheme", scheme->name);
 		goto error;
 	}
 	db->r->scheme = &scheme->scheme;
@@ -14684,7 +14584,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		if (unlikely(cache == NULL)) {
 			if (vup.v)
 				sv_vunref(db->r, vup.v);
-			sr_oom(&e->error);
+			sr_oom();
 			goto error;
 		}
 	}
@@ -14755,12 +14655,12 @@ phia_index_new(struct phia_env *e, struct key_def *key_def)
 	         key_def->space_id, key_def->iid);
 	struct phia_index *index = phia_index_by_name(e, name);
 	if (unlikely(index)) {
-		sr_error(&e->error, "index '%s' already exists", name);
+		sr_error("index '%s' already exists", name);
 		return NULL;
 	}
 	struct phia_index *o = ss_malloc(&e->a, sizeof(struct phia_index));
 	if (unlikely(o == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	memset(o, 0, sizeof(*o));
@@ -14875,19 +14775,19 @@ phia_document_create(struct phia_document *o)
 	if (o->raw) {
 		v = sv_vbuildraw(db->r, o->raw, o->rawsize);
 		if (unlikely(v == NULL))
-			return sr_oom(&e->error);
+			return sr_oom();
 		sv_init(&o->v, &sv_vif, v, NULL);
 		return 0;
 	}
 
 	if (o->prefix) {
 		if (db->scheme->scheme.keys[0]->type != SS_STRING)
-			return sr_error(&e->error, "%s", "prefix search is only "
+			return sr_error("%s", "prefix search is only "
 			                "supported for a string key");
 
 		void *copy = ss_malloc(&e->a, o->prefixsize);
 		if (unlikely(copy == NULL))
-			return sr_oom(&e->error);
+			return sr_oom();
 		memcpy(copy, o->prefix, o->prefixsize);
 		o->prefixcopy = copy;
 
@@ -14916,7 +14816,7 @@ phia_document_create(struct phia_document *o)
 allocate:
 	v = sv_vbuild(db->r, o->fields);
 	if (unlikely(v == NULL))
-		return sr_oom(&e->error);
+		return sr_oom();
 	sv_init(&o->v, &sv_vif, v, NULL);
 	return 0;
 }
@@ -14941,7 +14841,7 @@ phia_document_set_field(struct phia_document *v, const char *path,
 		fieldsize_max = 2 * 1024 * 1024;
 	}
 	if (unlikely(size > fieldsize_max)) {
-		sr_error(&e->error, "field '%s' is too big (%d limit)",
+		sr_error("field '%s' is too big (%d limit)",
 		         pointer, fieldsize_max);
 		return -1;
 	}
@@ -15005,7 +14905,7 @@ phia_document_newv(struct phia_env *e, struct phia_index *db, const struct sv *v
 	struct phia_document *doc;
 	doc = ss_malloc(&e->a, sizeof(struct phia_document));
 	if (unlikely(doc == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	memset(doc, 0, sizeof(*doc));
@@ -15027,7 +14927,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 
 	/* validate req */
 	if (unlikely(t->t.state == SXPREPARE)) {
-		sr_error(&e->error, "%s", "transaction is in 'prepare' state (read-only)");
+		sr_error("%s", "transaction is in 'prepare' state (read-only)");
 		goto error;
 	}
 
@@ -15037,7 +14937,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
 		if (unlikely(! phia_index_visible(db, t->t.id))) {
-			sr_error(&e->error, "%s", "index is invisible for the transaction");
+			sr_error("%s", "index is invisible for the transaction");
 			goto error;
 		}
 		break;
@@ -15087,10 +14987,9 @@ phia_replace(struct phia_tx *tx, struct phia_document *key)
 int
 phia_upsert(struct phia_tx *tx, struct phia_document *key)
 {
-	struct phia_env *e = tx->env;
 	struct phia_index *db = key->db;
 	if (! sf_upserthas(&db->scheme->fmt_upsert))
-		return sr_error(&e->error, "%s", "upsert callback is not set");
+		return sr_error("%s", "upsert callback is not set");
 	return phia_tx_write(tx, key, SVUPSERT);
 }
 
@@ -15104,14 +15003,13 @@ struct phia_document *
 phia_get(struct phia_tx *t, struct phia_document *key)
 {
 	struct phia_index *db = key->db;
-	struct phia_env *e = db->env;
 	/* validate index */
 	int status = sr_status(&db->index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 	case SR_DROP_PENDING:
 		if (unlikely(! phia_index_visible(db, t->t.id))) {
-			sr_error(&e->error, "%s", "index is invisible to the transaction");
+			sr_error("%s", "index is invisible to the transaction");
 			goto error;
 		}
 		break;
@@ -15203,7 +15101,7 @@ phia_commit(struct phia_tx *t)
 			prepare = phia_tx_prepare;
 			cache = si_cachepool_pop(&e->cachepool);
 			if (unlikely(cache == NULL))
-				return sr_oom(&e->error);
+				return sr_oom();
 		}
 		enum sxstate s = sx_prepare(&t->t, prepare, cache);
 		if (cache)
@@ -15265,7 +15163,7 @@ phia_begin(struct phia_env *e)
 	struct phia_tx *t;
 	t = ss_malloc(&e->a, sizeof(struct phia_tx));
 	if (unlikely(t == NULL)) {
-		sr_oom(&e->error);
+		sr_oom();
 		return NULL;
 	}
 	t->env = e;
@@ -15300,10 +15198,9 @@ phia_env_new(void)
 	rlist_create(&e->db);
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
-	sr_errorinit(&e->error);
 	sr_statinit(&e->stat);
 	sf_limitinit(&e->limit, &e->a);
-	sr_init(&e->r, &e->status, &e->error, &e->a, &e->vfs, &e->quota,
+	sr_init(&e->r, &e->status, &e->a, &e->vfs, &e->quota,
 	        &e->conf.zones, &e->seq, SF_RAW, NULL,
 	        NULL, &e->ei, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
@@ -15313,7 +15210,7 @@ phia_env_new(void)
 	e->conf.path_create = 0;
 	e->conf.path = ss_strdup(&e->a, cfg_gets("phia_dir"));
 	if (e->conf.path == NULL) {
-		sr_oom(e->r.e);
+		sr_oom();
 		goto error;
 	}
 	e->conf.memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
@@ -15346,7 +15243,7 @@ phia_service_new(struct phia_env *env)
 {
 	struct phia_service *srv = ss_malloc(env->r.a, sizeof(struct phia_service));
 	if (srv == NULL) {
-		sr_oom(env->r.e);
+		sr_oom();
 		return NULL;
 	}
 	srv->env = env;
