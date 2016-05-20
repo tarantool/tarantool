@@ -59,8 +59,8 @@ phia_env_new(void);
 int
 phia_env_delete(struct phia_env *e);
 
-const char *
-phia_error(struct phia_env *e);
+void
+phia_error();
 
 struct phia_confcursor *
 phia_confcursor_new(struct phia_env *env);

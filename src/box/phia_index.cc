@@ -52,7 +52,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 	assert(key_def->part_count <= 8);
 	struct phia_document *obj = phia_document_new(db);
 	if (obj == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_error(env));
+		phia_error();
 	if (key == NULL)
 		return obj;
 	uint32_t i = 0;
@@ -71,8 +71,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 		if (partsize == 0)
 			part = "";
 		if (phia_document_set_field(obj, partname, part, partsize) == -1)
-			tnt_raise(ClientError, ER_PHIA,
-				  phia_error(env));
+			phia_error();
 		i++;
 	}
 	if (keyend) {
@@ -93,14 +92,14 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	/* create database */
 	db = phia_index_new(env, key_def);
 	if (db == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_error(env));
+		phia_error();
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	rc = phia_index_open(db);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_error(env));
+		phia_error();
 	format = space->format;
 	tuple_format_ref(format, 1);
 }
@@ -117,9 +116,10 @@ PhiaIndex::~PhiaIndex()
 	rc = phia_index_delete(db);
 	if (rc == -1)
 		goto error;
+	return;
 error:;
 	say_info("phia space %" PRIu32 " close error: %s",
-			 key_def->space_id, phia_error(env));
+			 key_def->space_id, diag_last_error(diag_get())->errmsg);
 }
 
 size_t
@@ -153,7 +153,7 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	rc = phia_document_open(obj);
 	if (rc == -1) {
 		phia_document_delete(obj);
-		tnt_raise(ClientError, ER_PHIA, phia_error(env));
+		phia_error();
 	}
 	struct phia_document *result;
 	if (transaction == NULL) {
@@ -332,7 +332,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	}
 	it->cursor = phia_cursor_new(db);
 	if (it->cursor == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_error(env));
+		phia_error();
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *
