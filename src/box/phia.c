@@ -13890,7 +13890,7 @@ phia_env_get_scheduler(struct phia_env *env)
 }
 
 const char *
-phia_env_get_error(struct phia_env *env)
+phia_error(struct phia_env *env)
 {
 	static char error[128];
 	error[0] = 0;
@@ -13899,7 +13899,7 @@ phia_env_get_error(struct phia_env *env)
 }
 
 static struct phia_document *
-phia_document_new(struct phia_env*, struct phia_index *, const struct sv*);
+phia_document_newv(struct phia_env*, struct phia_index *, const struct sv*);
 
 int
 phia_document_delete(struct phia_document *v)
@@ -14007,7 +14007,7 @@ enum {
 };
 
 int
-phia_env_open(struct phia_env *e)
+phia_recover(struct phia_env *e)
 {
 	/* recover phases */
 	int status = sr_status(&e->status);
@@ -14630,7 +14630,7 @@ phia_confcursor_next(struct phia_confcursor *c, const char **key,
 }
 
 struct phia_confcursor *
-phia_confcursor(struct phia_env *e)
+phia_confcursor_new(struct phia_env *e)
 {
 	struct phia_confcursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_confcursor));
@@ -14669,7 +14669,7 @@ phia_cursor_delete(struct phia_cursor *c)
 }
 
 struct phia_document *
-phia_cursor_get(struct phia_cursor *c, struct phia_document *key)
+phia_cursor_next(struct phia_cursor *c, struct phia_document *key)
 {
 	struct phia_index *db = key->db;
 	if (unlikely(! key->orderset))
@@ -14693,7 +14693,7 @@ phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 }
 
 struct phia_cursor *
-phia_cursor(struct phia_index *db)
+phia_cursor_new(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
 	struct phia_cursor *c;
@@ -15005,7 +15005,7 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	sv_init(&result, &sv_vif, r->result, NULL);
 	r->result = NULL;
 
-	struct phia_document *v = phia_document_new(e, r->db, &result);
+	struct phia_document *v = phia_document_newv(e, r->db, &result);
 	if (unlikely(v == NULL))
 		return NULL;
 	v->cache_only   = r->arg.cache_only;
@@ -15073,7 +15073,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		if (unlikely(rc == -1 || rc == 2 /* delete */))
 			goto error;
 		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
-			ret = phia_document_new(e, db, &vup);
+			ret = phia_document_newv(e, db, &vup);
 			if (likely(ret)) {
 				ret->cache_only  = o->cache_only;
 				ret->oldest_only = o->oldest_only;
@@ -15419,7 +15419,7 @@ phia_document_lsn(struct phia_document *v)
 }
 
 static struct phia_document *
-phia_document_new(struct phia_env *e, struct phia_index *db, const struct sv *vp)
+phia_document_newv(struct phia_env *e, struct phia_index *db, const struct sv *vp)
 {
 	struct phia_document *doc;
 	doc = ss_malloc(&e->a, sizeof(struct phia_document));
@@ -15520,7 +15520,7 @@ phia_delete(struct phia_tx *tx, struct phia_document *key)
 }
 
 struct phia_document *
-phia_tx_get(struct phia_tx *t, struct phia_document *key)
+phia_get(struct phia_tx *t, struct phia_document *key)
 {
 	struct phia_index *db = key->db;
 	struct phia_env *e = db->env;
@@ -15755,10 +15755,10 @@ error:
 }
 
 struct phia_document *
-phia_document(struct phia_index *db)
+phia_document_new(struct phia_index *db)
 {
 	struct phia_env *env = db->env;
-	return phia_document_new(env, db, NULL);
+	return phia_document_newv(env, db, NULL);
 }
 
 struct phia_service *

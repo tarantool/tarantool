@@ -30,13 +30,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct phia_env;
 struct phia_service;
@@ -48,20 +49,60 @@ struct phia_confcursor;
 struct phia_confkv;
 struct key_def;
 
+/*
+ * Environment
+ */
+
 struct phia_env *
 phia_env_new(void);
-
-int
-phia_env_open(struct phia_env *e);
 
 int
 phia_env_delete(struct phia_env *e);
 
 const char *
-phia_env_get_error(struct phia_env *e);
+phia_error(struct phia_env *e);
+
+struct phia_confcursor *
+phia_confcursor_new(struct phia_env *env);
+
+void
+phia_confcursor_delete(struct phia_confcursor *confcursor);
+
+int
+phia_confcursor_next(struct phia_confcursor *confcursor, const char **key,
+		     const char **value);
+
+int
+phia_recover(struct phia_env *env);
+
+int
+phia_checkpoint(struct phia_env *env);
+
+bool
+phia_checkpoint_is_active(struct phia_env *env);
+
+/*
+ * Workers
+ */
+
+struct phia_service *
+phia_service_new(struct phia_env *env);
+
+int
+phia_service_do(struct phia_service *srv);
+
+void
+phia_service_delete(struct phia_service *srv);
+
+/*
+ * Transaction
+ */
 
 struct phia_tx *
 phia_begin(struct phia_env *e);
+
+struct phia_document *
+phia_get(struct phia_tx *tx, struct phia_document *key);
 
 int
 phia_replace(struct phia_tx *tx, struct phia_document *doc);
@@ -78,47 +119,16 @@ phia_commit(struct phia_tx *tx);
 int
 phia_rollback(struct phia_tx *tx);
 
-int
-phia_checkpoint(struct phia_env *env);
-
-bool
-phia_checkpoint_is_active(struct phia_env *env);
-
-struct phia_document *
-phia_document(struct phia_index *index);
-
-struct phia_service *
-phia_service_new(struct phia_env *env);
-int
-phia_service_do(struct phia_service *srv);
 void
-phia_service_delete(struct phia_service *srv);
-
-struct phia_cursor *
-phia_cursor(struct phia_index *index);
-void
-phia_cursor_delete(struct phia_cursor *cursor);
-void
-phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
-struct phia_document *
-phia_cursor_get(struct phia_cursor *cursor, struct phia_document *key);
-
-/*
- * Configuration
- */
-struct phia_confcursor *
-phia_confcursor(struct phia_env *env);
+phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn);
 
 void
-phia_confcursor_delete(struct phia_confcursor *c);
-
-int
-phia_confcursor_next(struct phia_confcursor *c, const char **key,
-		     const char **value);
+phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit);
 
 /*
  * Index
  */
+
 struct phia_index *
 phia_index_by_name(struct phia_env *env, const char *name);
 
@@ -146,14 +156,21 @@ phia_index_bsize(struct phia_index *db);
 uint64_t
 phia_index_size(struct phia_index *db);
 
-void
-phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn);
+/*
+ * Index Cursor
+ */
+
+struct phia_cursor *
+phia_cursor_new(struct phia_index *index);
 
 void
-phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit);
+phia_cursor_delete(struct phia_cursor *cursor);
+
+void
+phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 
 struct phia_document *
-phia_tx_get(struct phia_tx *t, struct phia_document *key);
+phia_cursor_next(struct phia_cursor *cursor, struct phia_document *key);
 
 /*
  * Document
@@ -167,18 +184,21 @@ enum phia_order {
 	PHIA_EQ
 };
 
-int
-phia_document_open(struct phia_document *v);
+struct phia_document *
+phia_document_new(struct phia_index *index);
 
 int
-phia_document_delete(struct phia_document *v);
+phia_document_delete(struct phia_document *doc);
+
+int
+phia_document_open(struct phia_document *doc);
 
 int
 phia_document_set_field(struct phia_document *doc, const char *path,
 			const char *value, int size);
 
 char *
-phia_document_field(struct phia_document *v, const char *path, int *size);
+phia_document_field(struct phia_document *doc, const char *path, int *size);
 
 void
 phia_document_set_cache_only(struct phia_document *doc, bool cache_only);

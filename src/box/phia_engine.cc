@@ -215,7 +215,7 @@ phia_workers_stop(void)
 int phia_info(const char *name, phia_info_f cb, void *arg)
 {
 	PhiaEngine *e = (PhiaEngine *)engine_find("phia");
-	struct phia_confcursor *cursor = phia_confcursor(e->env);
+	struct phia_confcursor *cursor = phia_confcursor_new(e->env);
 	const char *key;
 	const char *value;
 	if (name) {
@@ -251,7 +251,7 @@ phia_tx_read_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	task->result = phia_tx_get(task->tx, task->key);
+	task->result = phia_get(task->tx, task->key);
 	return 0;
 }
 
@@ -269,7 +269,7 @@ phia_cursor_read_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	task->result = phia_cursor_get(task->cursor, task->key);
+	task->result = phia_cursor_next(task->cursor, task->key);
 	return 0;
 }
 
@@ -355,9 +355,9 @@ PhiaEngine::init()
 	if (env == NULL)
 		panic("failed to create phia environment");
 	worker_pool_size = cfg_geti("phia.threads");
-	int rc = phia_env_open(env);
+	int rc = phia_recover(env);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 }
 
 void
@@ -366,9 +366,9 @@ PhiaEngine::endRecovery()
 	if (recovery_complete)
 		return;
 	/* complete two-phase recovery */
-	int rc = phia_env_open(env);
+	int rc = phia_recover(env);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	recovery_complete = 1;
 }
 
@@ -419,9 +419,9 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	struct phia_cursor *cursor = phia_cursor(pk->db);
+	struct phia_cursor *cursor = phia_cursor_new(pk->db);
 	if (cursor == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	auto cursor_guard = make_scoped_guard([=]{
 		phia_cursor_delete(cursor);
 	});
@@ -431,8 +431,8 @@ join_send_space(struct space *sp, void *data)
 	 * for duplicates */
 	phia_cursor_set_read_commited(cursor, true);
 
-	struct phia_document *obj = phia_document(pk->db);
-	while ((obj = phia_cursor_get(cursor, obj)))
+	struct phia_document *obj = phia_document_new(pk->db);
+	while ((obj = phia_cursor_next(cursor, obj)))
 	{
 		int64_t lsn = phia_document_lsn(obj);
 		uint32_t tuple_size;
@@ -479,11 +479,11 @@ PhiaEngine::dropIndex(Index *index)
 	/* schedule asynchronous drop */
 	int rc = phia_index_drop(i->db);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	/* unref db object */
 	rc = phia_index_delete(i->db);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	i->db  = NULL;
 	i->env = NULL;
 }
@@ -540,7 +540,7 @@ PhiaEngine::begin(struct txn *txn)
 	assert(txn->engine_tx == NULL);
 	txn->engine_tx = phia_begin(env);
 	if (txn->engine_tx == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 }
 
 void
@@ -568,7 +568,7 @@ PhiaEngine::prepare(struct txn *txn)
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;
 	case -1:
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 		break;
 	}
 }
@@ -615,9 +615,9 @@ PhiaEngine::rollback(struct txn *txn)
 void
 PhiaEngine::beginWalRecovery()
 {
-	int rc = phia_env_open(env);
+	int rc = phia_recover(env);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 }
 
 int
@@ -630,7 +630,7 @@ PhiaEngine::beginCheckpoint()
 
 	int rc = phia_checkpoint(env);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	return 0;
 }
 

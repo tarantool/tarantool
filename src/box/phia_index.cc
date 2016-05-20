@@ -50,9 +50,9 @@ struct phia_document *
 PhiaIndex::createDocument(const char *key, const char **keyend)
 {
 	assert(key_def->part_count <= 8);
-	struct phia_document *obj = phia_document(db);
+	struct phia_document *obj = phia_document_new(db);
 	if (obj == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	if (key == NULL)
 		return obj;
 	uint32_t i = 0;
@@ -72,7 +72,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 			part = "";
 		if (phia_document_set_field(obj, partname, part, partsize) == -1)
 			tnt_raise(ClientError, ER_PHIA,
-				  phia_env_get_error(env));
+				  phia_error(env));
 		i++;
 	}
 	if (keyend) {
@@ -93,14 +93,14 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	/* create database */
 	db = phia_index_new(env, key_def);
 	if (db == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	rc = phia_index_open(db);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	format = space->format;
 	tuple_format_ref(format, 1);
 }
@@ -119,7 +119,7 @@ PhiaIndex::~PhiaIndex()
 		goto error;
 error:;
 	say_info("phia space %" PRIu32 " close error: %s",
-			 key_def->space_id, phia_env_get_error(env));
+			 key_def->space_id, phia_error(env));
 }
 
 size_t
@@ -153,13 +153,13 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	rc = phia_document_open(obj);
 	if (rc == -1) {
 		phia_document_delete(obj);
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	}
 	struct phia_document *result;
 	if (transaction == NULL) {
 		result = phia_index_get(db, obj);
 	} else {
-		result = phia_tx_get(transaction, obj);
+		result = phia_get(transaction, obj);
 	}
 	if (result == NULL) {
 		phia_document_set_cache_only(obj, false);
@@ -231,7 +231,7 @@ phia_iterator_next(struct iterator *ptr)
 	assert(it->cursor != NULL);
 
 	/* read from cache */
-	struct phia_document *obj = phia_cursor_get(it->cursor, it->current);
+	struct phia_document *obj = phia_cursor_next(it->cursor, it->current);
 	if (likely(obj != NULL)) {
 		phia_document_delete(it->current);
 		it->current = obj;
@@ -330,9 +330,9 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	default:
 		return initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = phia_cursor(db);
+	it->cursor = phia_cursor_new(db);
 	if (it->cursor == NULL)
-		tnt_raise(ClientError, ER_PHIA, phia_env_get_error(env));
+		tnt_raise(ClientError, ER_PHIA, phia_error(env));
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *
