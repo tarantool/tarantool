@@ -37,6 +37,7 @@
 #include <stdarg.h>
 
 #include "third_party/tarantool_eio.h"
+#include "diag.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -77,6 +78,8 @@ struct coio_task {
 	};
 	/** Callback results. */
 	int complete;
+	/** Task diag **/
+	struct diag diag;
 };
 
 ssize_t

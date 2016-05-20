@@ -39,7 +39,6 @@
 #include <sys/socket.h>
 
 #include "fiber.h"
-#include "diag.h"
 #include "third_party/tarantool_ev.h"
 
 /*
@@ -156,6 +155,8 @@ coio_on_exec(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->task_cb(task);
+	if (req->result)
+		diag_move(diag_get(), &task->diag);
 }
 
 /**
@@ -218,6 +219,7 @@ coio_task(struct coio_task *task, coio_task_cb func,
 	task->task_cb = func;
 	task->timeout_cb = on_timeout;
 	task->complete = 0;
+	diag_create(&task->diag);
 
 	eio_submit(&task->base);
 	fiber_yield_timeout(timeout);
@@ -230,7 +232,10 @@ coio_task(struct coio_task *task, coio_task_cb func,
 			diag_set(TimedOut);
 		return -1;
 	}
-	diag_clear(&fiber()->diag);
+	if (task->base.result) {
+		diag_move(&task->diag, &fiber()->diag);
+		return -1;
+	}
 	return 0;
 }
 
@@ -239,6 +244,8 @@ coio_on_call(eio_req *req)
 {
 	struct coio_task *task = (struct coio_task *) req;
 	req->result = task->call_cb(task->ap);
+	if (req->result)
+		diag_move(diag_get(), &task->diag);
 }
 
 ssize_t
@@ -257,6 +264,7 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 	task->fiber = fiber();
 	task->call_cb = func;
 	task->complete = 0;
+	diag_create(&task->diag);
 
 	bool cancellable = fiber_set_cancellable(false);
 
@@ -273,6 +281,8 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 
 	ssize_t result = task->base.result;
 	int save_errno = errno;
+	if (result)
+		diag_move(&task->diag, diag_get());
 	free(task);
 	errno = save_errno;
 	return result;
