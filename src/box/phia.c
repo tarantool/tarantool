@@ -2789,8 +2789,6 @@ static void sf_schemeinit(struct sfscheme*);
 static void sf_schemefree(struct sfscheme*, struct ssa*);
 static int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
 static int  sf_schemevalidate(struct sfscheme*, struct ssa*);
-static int  sf_schemesave(struct sfscheme*, struct ssa*, struct ssbuf*);
-static int  sf_schemeload(struct sfscheme*, struct ssa*, char*, int);
 static struct sffield*
 sf_schemefind(struct sfscheme*, char *);
 
@@ -3352,82 +3350,6 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 		i++;
 	}
 	return 0;
-}
-
-static int
-sf_schemesave(struct sfscheme *s, struct ssa *a, struct ssbuf *buf)
-{
-	/* fields count */
-	uint32_t v = s->fields_count;
-	int rc = ss_bufadd(buf, a, &v, sizeof(uint32_t));
-	if (unlikely(rc == -1))
-		return -1;
-	int i = 0;
-	while (i < s->fields_count) {
-		struct sffield *field = s->fields[i];
-		/* name */
-		v = strlen(field->name) + 1;
-		rc = ss_bufensure(buf, a, sizeof(uint32_t) + v);
-		if (unlikely(rc == -1))
-			goto error;
-		memcpy(buf->p, &v, sizeof(v));
-		ss_bufadvance(buf, sizeof(uint32_t));
-		memcpy(buf->p, field->name, v);
-		ss_bufadvance(buf, v);
-		/* options */
-		v = strlen(field->options) + 1;
-		rc = ss_bufensure(buf, a, sizeof(uint32_t) + v);
-		if (unlikely(rc == -1))
-			goto error;
-		memcpy(buf->p, &v, sizeof(v));
-		ss_bufadvance(buf, sizeof(uint32_t));
-		memcpy(buf->p, field->options, v);
-		ss_bufadvance(buf, v);
-		i++;
-	}
-	return 0;
-error:
-	ss_buffree(buf, a);
-	return -1;
-}
-
-static int
-sf_schemeload(struct sfscheme *s, struct ssa *a, char *buf, int size ssunused)
-{
-	/* count */
-	char *p = buf;
-	uint32_t v = load_u32(p);
-	p += sizeof(uint32_t);
-	int count = v;
-	int i = 0;
-	while (i < count) {
-		/* name */
-		v = load_u32(p);
-		p += sizeof(uint32_t);
-		struct sffield *field = sf_fieldnew(a, p);
-		if (unlikely(field == NULL))
-			goto error;
-		p += v;
-		/* options */
-		v = load_u32(p);
-		p += sizeof(uint32_t);
-		int rc = sf_fieldoptions(field, a, p);
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, a);
-			goto error;
-		}
-		rc = sf_schemeadd(s, a, field);
-		if (unlikely(rc == -1)) {
-			sf_fieldfree(field, a);
-			goto error;
-		}
-		p += v;
-		i++;
-	}
-	return 0;
-error:
-	sf_schemefree(s, a);
-	return -1;
 }
 
 static struct sffield*
@@ -7504,102 +7426,6 @@ static int sd_writepage(struct ssfile*, struct sdbuild*);
 static int sd_writeindex(struct ssfile*, struct sdindex*);
 static int sd_seal(struct ssfile*, struct sdindex*, uint64_t);
 
-struct PACKED sdschemeheader {
-	uint32_t crc;
-	uint32_t size;
-	uint32_t count;
-};
-
-struct PACKED sdschemeopt {
-	uint8_t  type;
-	uint8_t  id;
-	uint32_t size;
-};
-
-struct sdscheme {
-	struct ssbuf buf;
-};
-
-static inline void
-sd_schemeinit(struct sdscheme *c) {
-	ss_bufinit(&c->buf);
-}
-
-static inline void
-sd_schemefree(struct sdscheme *c, struct runtime *r) {
-	ss_buffree(&c->buf, r->a);
-}
-
-static inline char*
-sd_schemesz(struct sdschemeopt *o) {
-	assert(o->type == SS_STRING);
-	return (char*)o + sizeof(struct sdschemeopt);
-}
-
-static inline uint32_t
-sd_schemeu32(struct sdschemeopt *o) {
-	assert(o->type == SS_U32);
-	return load_u32((char*)o + sizeof(struct sdschemeopt));
-}
-
-static inline uint64_t
-sd_schemeu64(struct sdschemeopt *o) {
-	assert(o->type == SS_U64);
-	return load_u64((char*)o + sizeof(struct sdschemeopt));
-}
-
-static int sd_schemebegin(struct sdscheme*, struct runtime*);
-static int sd_schemeadd(struct sdscheme*, struct runtime*, uint8_t, enum sstype, void*, uint32_t);
-static int sd_schemecommit(struct sdscheme*);
-static int sd_schemewrite(struct sdscheme*, struct runtime*, char*, int);
-static int sd_schemerecover(struct sdscheme*, struct runtime*, char*);
-
-struct PACKED sdschemeiter {
-	struct sdscheme *c;
-	char *p;
-};
-
-static inline int
-sd_schemeiter_open(struct sdschemeiter *ci,
-		   struct sdscheme *c, int validate)
-{
-	ci->c = c;
-	ci->p = NULL;
-	if (validate) {
-		struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
-		uint32_t crc = ss_crcs(h, ss_bufused(&c->buf), 0);
-		if (h->crc != crc) {
-			sr_malfunction("%s", "scheme file corrupted");
-			return -1;
-		}
-	}
-	ci->p = c->buf.s + sizeof(struct sdschemeheader);
-	return 0;
-}
-
-static inline int
-sd_schemeiter_has(struct sdschemeiter *ci)
-{
-	return ci->p < ci->c->buf.p;
-}
-
-static inline void *
-sd_schemeiter_get(struct sdschemeiter *ci)
-{
-	if (ci->p >= ci->c->buf.p)
-		return NULL;
-	return ci->p;
-}
-
-static inline void
-sd_schemeiter_next(struct sdschemeiter *ci)
-{
-	if (ci->p >= ci->c->buf.p)
-		return;
-	struct sdschemeopt *o = (struct sdschemeopt*)ci->p;
-	ci->p = (char*)o + sizeof(struct sdschemeopt) + o->size;
-}
-
 static void sd_buildinit(struct sdbuild *b)
 {
 	b->tracker = NULL;
@@ -8431,108 +8257,6 @@ static int sd_recover_complete(struct sdrecover *ri)
 	return 0;
 }
 
-static int sd_schemebegin(struct sdscheme *c, struct runtime *r)
-{
-	int rc = ss_bufensure(&c->buf, r->a, sizeof(struct sdschemeheader));
-	if (unlikely(rc == -1))
-		return sr_oom();
-	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
-	memset(h, 0, sizeof(struct sdschemeheader));
-	ss_bufadvance(&c->buf, sizeof(struct sdschemeheader));
-	return 0;
-}
-
-static int
-sd_schemeadd(struct sdscheme *c, struct runtime *r, uint8_t id,
-	     enum sstype type, void *value, uint32_t size)
-{
-	struct sdschemeopt opt = {
-		.type = type,
-		.id   = id,
-		.size = size
-	};
-	int rc = ss_bufadd(&c->buf, r->a, &opt, sizeof(opt));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = ss_bufadd(&c->buf, r->a, value, size);
-	if (unlikely(rc == -1))
-		goto error;
-	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
-	h->count++;
-	return 0;
-error:
-	return sr_oom();
-}
-
-static int sd_schemecommit(struct sdscheme *c)
-{
-	if (unlikely(ss_bufused(&c->buf) == 0))
-		return 0;
-	struct sdschemeheader *h = (struct sdschemeheader*)c->buf.s;
-	h->size = ss_bufused(&c->buf) - sizeof(struct sdschemeheader);
-	h->crc  = ss_crcs((char*)h, ss_bufused(&c->buf), 0);
-	return 0;
-}
-
-static int
-sd_schemewrite(struct sdscheme *c, struct runtime *r, char *path, int sync)
-{
-	struct ssfile meta;
-	ss_fileinit(&meta, r->vfs);
-	int rc = ss_filenew(&meta, path);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = ss_filewrite(&meta, c->buf.s, ss_bufused(&c->buf));
-	if (unlikely(rc == -1))
-		goto error;
-	if (sync) {
-		rc = ss_filesync(&meta);
-		if (unlikely(rc == -1))
-			goto error;
-	}
-	rc = ss_fileclose(&meta);
-	if (unlikely(rc == -1))
-		goto error;
-	return 0;
-error:
-	sr_error("scheme file '%s' error: %s",
-	         path, strerror(errno));
-	ss_fileclose(&meta);
-	return -1;
-}
-
-static int
-sd_schemerecover(struct sdscheme *c, struct runtime *r, char *path)
-{
-	ssize_t size = ss_vfssize(r->vfs, path);
-	if (unlikely(size == -1))
-		goto error;
-	if (unlikely((unsigned int)size < sizeof(struct sdschemeheader))) {
-		sr_error("scheme file '%s' is corrupted", path);
-		return -1;
-	}
-	int rc = ss_bufensure(&c->buf, r->a, size);
-	if (unlikely(rc == -1))
-		return sr_oom();
-	struct ssfile meta;
-	ss_fileinit(&meta, r->vfs);
-	rc = ss_fileopen(&meta, path);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = ss_filepread(&meta, 0, c->buf.s, size);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = ss_fileclose(&meta);
-	if (unlikely(rc == -1))
-		goto error;
-	ss_bufadvance(&c->buf, size);
-	return 0;
-error:
-	sr_error("scheme file '%s' error: %s",
-	         path, strerror(errno));
-	return -1;
-}
-
 static uint8_t
 sd_vifflags(struct sv *v)
 {
@@ -8694,8 +8418,6 @@ struct sischeme {
 
 static void si_schemeinit(struct sischeme*);
 static void si_schemefree(struct sischeme*, struct ssa*);
-static int  si_schemedeploy(struct sischeme*, struct runtime*);
-static int  si_schemerecover(struct sischeme*, struct runtime*);
 
 struct PACKED sibranch {
 	struct sdid id;
@@ -9067,7 +8789,7 @@ si_scheme(struct si *i) {
 }
 
 static struct si *si_init(struct runtime*, struct phia_index*);
-static int si_open(struct si*);
+static int si_recover(struct si*);
 static int si_close(struct si*);
 static int si_insert(struct si*, struct sinode*);
 static int si_remove(struct si*, struct sinode*);
@@ -9670,11 +9392,6 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	i->ref_be       = 0;
 	i->db           = db;
 	return i;
-}
-
-static int si_open(struct si *i)
-{
-	return si_recover(i);
 }
 
 ss_rbtruncate(si_truncate,
@@ -11936,11 +11653,6 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 			return -1;
 		}
 	}
-	/* create scheme file */
-	rc = si_schemedeploy(&i->scheme, r);
-	if (unlikely(rc == -1)) {
-		return -1;
-	}
 	/* create initial node */
 	struct sinode *n = si_bootstrap(i, 0);
 	if (unlikely(n == NULL))
@@ -12288,7 +12000,6 @@ static int si_recover(struct si *i)
 	case -1: return -1;
 	case  1: goto deploy;
 	}
-	rc = si_schemerecover(&i->scheme, r);
 	if (unlikely(rc == -1))
 		return -1;
 	r->scheme = &i->scheme.scheme;
@@ -12346,195 +12057,6 @@ static void si_schemefree(struct sischeme *s, struct ssa *a)
 		s->compression_branch_sz = NULL;
 	}
 	sf_schemefree(&s->scheme, a);
-}
-
-static int si_schemedeploy(struct sischeme *s, struct runtime *r)
-{
-	struct sdscheme c;
-	sd_schemeinit(&c);
-	int rc;
-	rc = sd_schemebegin(&c, r);
-	if (unlikely(rc == -1))
-		return -1;
-	struct ssbuf buf;
-	ss_bufinit(&buf);
-	rc = sd_schemeadd(&c, r, SI_SCHEME_VERSION, SS_STRING, &s->version,
-	                  sizeof(s->version));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_VERSION_STORAGE, SS_STRING,
-	                  &s->version_storage, sizeof(s->version_storage));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_NAME, SS_STRING, s->name,
-	                  strlen(s->name) + 1);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sf_schemesave(&s->scheme, r->a, &buf);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_SCHEME, SS_STRING, buf.s,
-	                  ss_bufused(&buf));
-	if (unlikely(rc == -1))
-		goto error;
-	ss_buffree(&buf, r->a);
-	uint32_t v;
-	v = s->fmt_storage;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_FORMAT_STORAGE, SS_U32, &v, sizeof(v));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_SIZE, SS_U64,
-	                  &s->node_size,
-	                  sizeof(s->node_size));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_PAGE_SIZE, SS_U32,
-	                  &s->node_page_size,
-	                  sizeof(s->node_page_size));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_NODE_PAGE_CHECKSUM, SS_U32,
-	                  &s->node_page_checksum,
-	                  sizeof(s->node_page_checksum));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_SYNC, SS_U32,
-	                  &s->sync,
-	                  sizeof(s->sync));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION, SS_STRING,
-	                  s->compression_if->name,
-	                  strlen(s->compression_if->name) + 1);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION_BRANCH, SS_STRING,
-	                  s->compression_branch_if->name,
-	                  strlen(s->compression_branch_if->name) + 1);
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_COMPRESSION_KEY, SS_U32,
-	                  &s->compression_key,
-	                  sizeof(s->compression_key));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemeadd(&c, r, SI_SCHEME_AMQF, SS_U32,
-	                  &s->amqf, sizeof(s->amqf));
-	if (unlikely(rc == -1))
-		goto error;
-	rc = sd_schemecommit(&c);
-	if (unlikely(rc == -1))
-		return -1;
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/scheme", s->path);
-	rc = sd_schemewrite(&c, r, path, 0);
-	sd_schemefree(&c, r);
-	return rc;
-error:
-	ss_buffree(&buf, r->a);
-	sd_schemefree(&c, r);
-	return -1;
-}
-
-static int si_schemerecover(struct sischeme *s, struct runtime *r)
-{
-	struct sdscheme c;
-	sd_schemeinit(&c);
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/scheme", s->path);
-	int version_storage_set = 0;
-	int rc;
-	rc = sd_schemerecover(&c, r, path);
-	if (unlikely(rc == -1))
-		goto error;
-	struct sdschemeiter ci;
-	rc = sd_schemeiter_open(&ci, &c, 1);
-	if (unlikely(rc == -1))
-		goto error;
-	while (sd_schemeiter_has(&ci))
-	{
-		struct sdschemeopt *opt = sd_schemeiter_get(&ci);
-		switch (opt->id) {
-		case SI_SCHEME_VERSION:
-			break;
-		case SI_SCHEME_VERSION_STORAGE: {
-			if (opt->size != sizeof(struct srversion))
-				goto error;
-			struct srversion *version = (struct srversion*)sd_schemesz(opt);
-			if (! sr_versionstorage_check(version))
-				goto error_format;
-			version_storage_set = 1;
-			break;
-		}
-		case SI_SCHEME_FORMAT_STORAGE:
-			s->fmt_storage = sd_schemeu32(opt);
-			break;
-		case SI_SCHEME_SCHEME: {
-			sf_schemefree(&s->scheme, r->a);
-			sf_schemeinit(&s->scheme);
-			struct ssbuf buf;
-			ss_bufinit(&buf);
-			rc = sf_schemeload(&s->scheme, r->a, sd_schemesz(opt), opt->size);
-			if (unlikely(rc == -1))
-				goto error;
-			rc = sf_schemevalidate(&s->scheme, r->a);
-			if (unlikely(rc == -1))
-				goto error;
-			ss_buffree(&buf, r->a);
-			break;
-		}
-		case SI_SCHEME_NODE_SIZE:
-			s->node_size = sd_schemeu64(opt);
-			break;
-		case SI_SCHEME_NODE_PAGE_SIZE:
-			s->node_page_size = sd_schemeu32(opt);
-			break;
-		case SI_SCHEME_COMPRESSION_KEY:
-			s->compression_key = sd_schemeu32(opt);
-			break;
-		case SI_SCHEME_COMPRESSION: {
-			char *name = sd_schemesz(opt);
-			struct ssfilterif *cif = ss_filterof(name);
-			if (unlikely(cif == NULL))
-				goto error;
-			s->compression_if = cif;
-			s->compression = s->compression_if != &ss_nonefilter;
-			ss_free(r->a, s->compression_sz);
-			s->compression_sz = ss_strdup(r->a, cif->name);
-			if (unlikely(s->compression_sz == NULL))
-				goto error;
-			break;
-		}
-		case SI_SCHEME_COMPRESSION_BRANCH: {
-			char *name = sd_schemesz(opt);
-			struct ssfilterif *cif = ss_filterof(name);
-			if (unlikely(cif == NULL))
-				goto error;
-			s->compression_branch_if = cif;
-			s->compression_branch = s->compression_branch_if != &ss_nonefilter;
-			ss_free(r->a, s->compression_branch_sz);
-			s->compression_branch_sz = ss_strdup(r->a, cif->name);
-			if (unlikely(s->compression_branch_sz == NULL))
-				goto error;
-			break;
-		}
-		case SI_SCHEME_AMQF:
-			s->amqf = sd_schemeu32(opt);
-			break;
-		default: /* skip unknown */
-			break;
-		}
-		sd_schemeiter_next(&ci);
-	}
-	if (unlikely(! version_storage_set))
-		goto error_format;
-	sd_schemefree(&c, r);
-	return 0;
-error_format:
-	sr_error("%s", "incompatible storage format version");
-error:
-	sd_schemefree(&c, r);
-	return -1;
 }
 
 static void si_begin(struct sitx *x, struct si *index)
@@ -14743,7 +14265,7 @@ static int phia_index_recoverbegin(struct phia_index *db)
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
-	int rc = si_open(db->index);
+	int rc = si_recover(db->index);
 	if (unlikely(rc == -1))
 		goto error;
 	db->created = rc;
