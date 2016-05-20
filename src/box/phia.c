@@ -2729,6 +2729,7 @@ struct sffield {
 struct sfscheme {
 	struct sffield **fields;
 	struct sffield **keys;
+	struct key_def *key_def;
 	int       fields_count;
 	int       keys_count;
 	sfcmpf    cmp;
@@ -3051,40 +3052,6 @@ sf_limitset(struct sflimit *b, struct sfscheme *s, struct sfv *fields, enum phia
 	}
 }
 
-typedef int (*sfupsertf)(int count,
-                         char **src,    uint32_t *src_size,
-                         char **upsert, uint32_t *upsert_size,
-                         char **result, uint32_t *result_size,
-                         void *arg);
-
-struct sfupsert {
-	sfupsertf function;
-	void *arg;
-};
-
-static inline void
-sf_upsertinit(struct sfupsert *u)
-{
-	memset(u, 0, sizeof(*u));
-}
-
-static inline void
-sf_upsertset(struct sfupsert *u, sfupsertf function)
-{
-	u->function = function;
-}
-
-static inline void
-sf_upsertset_arg(struct sfupsert *u, void *arg)
-{
-	u->arg = arg;
-}
-
-static inline int
-sf_upserthas(struct sfupsert *u) {
-	return u->function != NULL;
-}
-
 static inline int
 sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 {
@@ -3182,6 +3149,7 @@ sf_schemeinit(struct sfscheme *s)
 	s->var_count  = 0;
 	s->cmp = sf_schemecompare;
 	s->cmparg = s;
+	s->key_def = NULL;
 }
 
 static void
@@ -3766,7 +3734,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 
 struct runtime {
 	struct srstatus *status;
-	struct sfupsert *fmt_upsert;
 	enum sfstorage fmt_storage;
 	struct sfscheme *scheme;
 	struct srseq *seq;
@@ -3787,7 +3754,6 @@ sr_init(struct runtime *r,
         struct srzonemap *zonemap,
         struct srseq *seq,
         enum sfstorage fmt_storage,
-        struct sfupsert *fmt_upsert,
         struct sfscheme *scheme,
         struct ssinjection *i,
         struct srstat *stat)
@@ -3800,7 +3766,6 @@ sr_init(struct runtime *r,
 	r->seq         = seq;
 	r->scheme      = scheme;
 	r->fmt_storage = fmt_storage;
-	r->fmt_upsert  = fmt_upsert;
 	r->i           = i;
 	r->stat        = stat;
 }
@@ -4334,6 +4299,14 @@ sv_upsertpop(struct svupsert *u)
 	return ss_bufat(&u->stack, sizeof(struct svupsertnode), pos);
 }
 
+/* TODO: move implementation from phia_space.cc */
+extern int
+phia_upsert_cb(int count,
+	       char **src,    uint32_t *src_size,
+	       char **upsert, uint32_t *upsert_size,
+	       char **result, uint32_t *result_size,
+	       struct key_def *key_def);
+
 static inline int
 sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	    struct svupsertnode *b)
@@ -4373,15 +4346,11 @@ sv_upsertdo(struct svupsert *u, struct runtime *r, struct svupsertnode *a,
 	}
 
 	/* execute */
-	int rc;
-	rc = r->fmt_upsert->function(r->scheme->fields_count,
-	                             src_ptr,
-	                             src_size_ptr,
-	                             upsert,
-	                             upsert_size,
-	                             result,
-	                             result_size,
-	                             r->fmt_upsert->arg);
+	int rc = phia_upsert_cb(r->scheme->fields_count,
+				src_ptr, src_size_ptr,
+				upsert, upsert_size,
+				result, result_size,
+				r->scheme->key_def);
 	if (unlikely(rc == -1))
 		return -1;
 
@@ -8410,7 +8379,6 @@ struct sischeme {
 	uint32_t    lru_step;
 	uint32_t    buf_gc_wm;
 	enum sfstorage fmt_storage;
-	struct sfupsert    fmt_upsert;
 	struct sfscheme    scheme;
 	struct srversion   version;
 	struct srversion   version_storage;
@@ -13732,14 +13700,6 @@ phia_cursor_new(struct phia_index *db)
 	return c;
 }
 
-/* TODO: move implementation from phia_space.cc */
-extern int
-phia_upsert_cb(int count,
-                 char **src,    uint32_t *src_size,
-                 char **upsert, uint32_t *upsert_size,
-                 char **result, uint32_t *result_size,
-                 void *arg);
-
 static int
 phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 {
@@ -13821,10 +13781,8 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	scheme->lru                   = 0;
 	scheme->lru_step              = 128 * 1024;
 	scheme->buf_gc_wm             = 1024 * 1024;
-	sf_upsertinit(&scheme->fmt_upsert);
-	sf_upsertset(&scheme->fmt_upsert, phia_upsert_cb);
-	sf_upsertset_arg(&scheme->fmt_upsert, key_def);
 	sf_schemeinit(&scheme->scheme);
+	scheme->scheme.key_def = key_def;
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		char name[32];
@@ -13878,7 +13836,6 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	}
 	db->r->scheme = &scheme->scheme;
 	db->r->fmt_storage = scheme->fmt_storage;
-	db->r->fmt_upsert = &scheme->fmt_upsert;
 	return 0;
 error:
 	si_schemefree(scheme, &e->a);
@@ -14137,12 +14094,10 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		arg->vlsn = 0;
 		arg->vlsn_generate = 1;
 	}
-	if (sf_upserthas(&db->scheme->fmt_upsert)) {
-		arg->upsert = 1;
-		if (arg->order == PHIA_EQ) {
-			arg->order = PHIA_GE;
-			arg->upsert_eq = 1;
-		}
+	arg->upsert = 1;
+	if (arg->order == PHIA_EQ) {
+		arg->order = PHIA_GE;
+		arg->upsert_eq = 1;
 	}
 
 	/* read index */
@@ -14509,9 +14464,6 @@ phia_replace(struct phia_tx *tx, struct phia_document *key)
 int
 phia_upsert(struct phia_tx *tx, struct phia_document *key)
 {
-	struct phia_index *db = key->db;
-	if (! sf_upserthas(&db->scheme->fmt_upsert))
-		return sr_error("%s", "upsert callback is not set");
 	return phia_tx_write(tx, key, SVUPSERT);
 }
 
@@ -14724,7 +14676,7 @@ phia_env_new(void)
 	sf_limitinit(&e->limit, &e->a);
 	sr_init(&e->r, &e->status, &e->a, &e->vfs, &e->quota,
 	        &e->conf.zones, &e->seq, SF_RAW, NULL,
-	        NULL, &e->ei, &e->stat);
+	        &e->ei, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);

@@ -342,13 +342,11 @@ phia_upsert_do(char **result, uint32_t *result_size,
 
 int
 phia_upsert_cb(int count,
-                 char **src,    uint32_t *src_size,
-                 char **upsert, uint32_t *upsert_size,
-                 char **result, uint32_t *result_size,
-                 void *arg)
+	       char **src,    uint32_t *src_size,
+	       char **upsert, uint32_t *upsert_size,
+	       char **result, uint32_t *result_size,
+	       struct key_def *key_def)
 {
-	struct key_def *key_def = (struct key_def *)arg;
-
 	uint32_t value_field;
 	value_field = key_def->part_count;
 
