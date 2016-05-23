@@ -3379,7 +3379,11 @@ sr_versionstorage_check(struct srversion *v)
 
 
 #define sr_e(type, fmt, ...) \
-	({int res = -1; diag_set(ClientError, type, fmt, __VA_ARGS__); res;})
+	({int res = -1;\
+	  char errmsg[256];\
+	  snprintf(errmsg, sizeof(errmsg), fmt, __VA_ARGS__);\
+	  diag_set(ClientError, type, errmsg);\
+	  res;})
 
 #define sr_error(fmt, ...) \
 	sr_e(ER_PHIA, fmt, __VA_ARGS__)
@@ -13816,7 +13820,7 @@ phia_index_scheme_init(struct phia_index *db, struct key_def *key_def)
 	/* validate scheme and set keys */
 	rc = sf_schemevalidate(&scheme->scheme, &e->a);
 	if (unlikely(rc == -1)) {
-		sr_error("incomplete scheme", scheme->name);
+		sr_error("incomplete scheme %s", scheme->name);
 		goto error;
 	}
 	db->r->scheme = &scheme->scheme;
