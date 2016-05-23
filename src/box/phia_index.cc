@@ -164,9 +164,9 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	if (result == NULL) {
 		phia_document_set_cache_only(obj, false);
 		if (transaction == NULL) {
-			result = phia_index_read(db, obj);
+			result = phia_index_coget(db, obj);
 		} else {
-			result = phia_tx_read(transaction, obj);
+			result = phia_coget(transaction, obj);
 		}
 		phia_document_delete(obj);
 		if (result == NULL)
@@ -241,7 +241,7 @@ phia_iterator_next(struct iterator *ptr)
 	/* switch to asynchronous mode (read from disk) */
 	phia_document_set_cache_only(it->current, false);
 
-	obj = phia_cursor_read(it->cursor, it->current);
+	obj = phia_cursor_conext(it->cursor, it->current);
 	if (obj == NULL) {
 		ptr->next = phia_iterator_last;
 		/* immediately close the cursor */
@@ -341,7 +341,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	PhiaIndex *index = (PhiaIndex *)this;
 	struct phia_document *obj = index->createDocument(key, &it->keyend);
 	phia_document_set_order(obj, order);
-	obj = phia_cursor_read(it->cursor, obj);
+	obj = phia_cursor_conext(it->cursor, obj);
 	if (obj == NULL) {
 		phia_cursor_delete(it->cursor);
 		it->cursor = NULL;
