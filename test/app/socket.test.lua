@@ -213,7 +213,6 @@ aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
 test_run:cmd("setopt delimiter ''");
 
-#(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
 wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
 wrong_addr == nil or #wrong_addr == 0
 
@@ -280,15 +279,7 @@ sc:close()
 
 -- tcp_connect
 
-s = socket.tcp_connect('tarantool.org', 80)
-string.match(tostring(s), ', aka') ~= nil
-string.match(tostring(s), ', peer') ~= nil
-s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
-header = s:read({chunk = 4000, delimiter = {"\n\n", "\r\n\r\n" }}, 1)
-string.match(header, "\r\n\r\n$") ~= nil
-string.match(header, "200 [Oo][Kk]") ~= nil
-s:close()
-
+-- test timeout
 socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 
 -- AF_INET
