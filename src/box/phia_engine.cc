@@ -247,7 +247,7 @@ struct phia_read_task {
 };
 
 static ssize_t
-phia_tx_read_cb(struct coio_task *ptr)
+phia_get_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
@@ -256,7 +256,7 @@ phia_tx_read_cb(struct coio_task *ptr)
 }
 
 static ssize_t
-phia_index_read_cb(struct coio_task *ptr)
+phia_index_get_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
@@ -265,7 +265,7 @@ phia_index_read_cb(struct coio_task *ptr)
 }
 
 static ssize_t
-phia_cursor_read_cb(struct coio_task *ptr)
+phia_cursor_next_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
@@ -274,7 +274,7 @@ phia_cursor_read_cb(struct coio_task *ptr)
 }
 
 static ssize_t
-phia_read_free_cb(struct coio_task *ptr)
+phia_read_task_free_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
@@ -285,9 +285,9 @@ phia_read_free_cb(struct coio_task *ptr)
 }
 
 static inline struct phia_document *
-phia_read(struct phia_index *index, struct phia_tx *tx,
-	  struct phia_cursor *cursor, struct phia_document *key,
-	  coio_task_cb func)
+phia_read_task(struct phia_index *index, struct phia_tx *tx,
+	       struct phia_cursor *cursor, struct phia_document *key,
+	       coio_task_cb func)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) mempool_alloc(&phia_read_pool);
@@ -298,7 +298,7 @@ phia_read(struct phia_index *index, struct phia_tx *tx,
 	task->cursor = cursor;
 	task->key = key;
 	task->result = NULL;
-	if (coio_task(&task->base, func, phia_read_free_cb,
+	if (coio_task(&task->base, func, phia_read_task_free_cb,
 	              TIMEOUT_INFINITY) == -1) {
 		return NULL;
 	}
@@ -308,21 +308,21 @@ phia_read(struct phia_index *index, struct phia_tx *tx,
 }
 
 struct phia_document *
-phia_index_read(struct phia_index *index, struct phia_document *key)
+phia_index_coget(struct phia_index *index, struct phia_document *key)
 {
-	return phia_read(index, NULL, NULL, key, phia_index_read_cb);
+	return phia_read_task(index, NULL, NULL, key, phia_index_get_cb);
 }
 
 struct phia_document *
-phia_tx_read(struct phia_tx *tx, struct phia_document *key)
+phia_coget(struct phia_tx *tx, struct phia_document *key)
 {
-	return phia_read(NULL, tx, NULL, key, phia_tx_read_cb);
+	return phia_read_task(NULL, tx, NULL, key, phia_get_cb);
 }
 
 struct phia_document *
-phia_cursor_read(struct phia_cursor *cursor, struct phia_document *key)
+phia_cursor_conext(struct phia_cursor *cursor, struct phia_document *key)
 {
-	return phia_read(NULL, NULL, cursor, key, phia_cursor_read_cb);
+	return phia_read_task(NULL, NULL, cursor, key, phia_cursor_next_cb);
 }
 
 PhiaEngine::PhiaEngine()
