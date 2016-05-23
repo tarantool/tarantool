@@ -12949,7 +12949,6 @@ struct phia_document {
 	struct sv        v;
 	enum phia_order   order;
 	int       orderset;
-	int       flagset;
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
@@ -12958,9 +12957,6 @@ struct phia_document {
 	uint32_t  prefixsize;
 	void     *value;
 	uint32_t  valuesize;
-	/* recover */
-	void     *raw;
-	uint32_t  rawsize;
 	/* read options */
 	int       cache_only;
 	int       oldest_only;
@@ -12968,8 +12964,6 @@ struct phia_document {
 	int       read_disk;
 	int       read_cache;
 	int       read_latency;
-	/* events */
-	int       event;
 };
 
 struct scheduler *
@@ -13009,10 +13003,7 @@ phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 	if (unlikely(o->db != dest))
 		return sr_error("%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
-	if (! o->flagset) {
-		o->flagset = 1;
-		v->flags = SVGET;
-	}
+	v->flags = SVGET;
 	return 0;
 }
 
@@ -13040,13 +13031,7 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 	if (unlikely(o->db != dest))
 		return sr_error("%s", "incompatible document parent db");
 	struct svv *v = o->v.v;
-	if (o->flagset) {
-		if (unlikely(v->flags != flags))
-			return sr_error("%s", "incompatible document flags");
-	} else {
-		o->flagset = 1;
-		v->flags = flags;
-	}
+	v->flags = flags;
 	if (v->lsn != 0) {
 		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
 		if (v->lsn <= lsn)
@@ -14002,7 +13987,6 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	}
 
 	v->created = 1;
-	v->flagset = 1;
 	return v;
 }
 
@@ -14043,7 +14027,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 				ret->oldest_only = o->oldest_only;
 				ret->created     = 1;
 				ret->orderset    = 1;
-				ret->flagset     = 1;
 			} else {
 				sv_vunref(db->r, vup.v);
 			}
@@ -14249,14 +14232,6 @@ phia_document_create(struct phia_document *o)
 
 	/* create document from raw data */
 	struct svv *v;
-	if (o->raw) {
-		v = sv_vbuildraw(db->r, o->raw, o->rawsize);
-		if (unlikely(v == NULL))
-			return sr_oom();
-		sv_init(&o->v, &sv_vif, v, NULL);
-		return 0;
-	}
-
 	if (o->prefix) {
 		if (db->scheme->scheme.keys[0]->type != SS_STRING)
 			return sr_error("%s", "prefix search is only "
