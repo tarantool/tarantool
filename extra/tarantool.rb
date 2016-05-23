@@ -17,6 +17,10 @@ class Tarantool < Formula
       depends_on 'pyyaml'        => [:python, "yaml",    :build]
       depends_on 'pexpect'       => [:python, "pexpect", :build]
     end
+    patch :p0 do
+      url    "https://raw.githubusercontent.com/tarantool/tarantool/stable/extra/osx-ecb-ev.patch"
+      sha256 "b3aba3caeb8796cd47431594b26e143785ab994f7dc5a46e2270c48164f18240"
+    end
     version "1.5"
   end
 
@@ -59,6 +63,8 @@ class Tarantool < Formula
 
     ohai "Installing:"
     system "make install"
+    "#{prefix}/var/run".mkpath
+    "#{prefix}/var/lib/tarantool".mkpath
 
     ohai "Installing man"
     man1.install 'doc/man/tarantool.1'
@@ -68,7 +74,8 @@ class Tarantool < Formula
 
     ohai "Installing config"
     if build.stable?
-      inreplace prefix/"etc/tarantool.cfg", /^work_dir =.*/, "work_dir = #{prefix}/var/lib/tarantool"
+      inreplace "#{prefix}/etc/tarantool.cfg", /^work_dir =.*/, "work_dir = #{prefix}/var/lib/tarantool"
+      inreplace "#{prefix}/etc/tarantool.cfg", /^pid_file =.*/, "work_dir = #{prefix}/var/run/box.pid"
     else
       doc.install "test/box/box.lua"
       inreplace doc/"box.lua" do |s|

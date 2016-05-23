@@ -1,0 +1,20 @@
+--- third_party/libeio/ecb.h    2016-05-23 16:41:55.000000000 +0300
++++ third_party/libeio/ecb.h.patched    2016-05-23 16:41:43.000000000 +0300
+@@ -82,7 +82,7 @@
+
+ #define ECB_C     (__STDC__+0) /* this assumes that __STDC__ is either empty or a number */
+ #define ECB_C99   (__STDC_VERSION__ >= 199901L)
+-#define ECB_C11   (__STDC_VERSION__ >= 201112L)
++#define ECB_C11   0  // (__STDC_VERSION__ >= 201112L)
+ #define ECB_CPP   (__cplusplus+0)
+ #define ECB_CPP11 (__cplusplus >= 201103L)
+--- third_party/libev/ev.c  2015-04-22 19:43:04.000000000 +0300
++++ third_party/libev/ev.c.patched  2016-05-23 16:50:11.000000000 +0300
+@@ -559,7 +559,7 @@
+
+ #define ECB_C     (__STDC__+0) /* this assumes that __STDC__ is either empty or a number */
+ #define ECB_C99   (__STDC_VERSION__ >= 199901L)
+-#define ECB_C11   (__STDC_VERSION__ >= 201112L)
++#define ECB_C11   0  // (__STDC_VERSION__ >= 201112L)
+ #define ECB_CPP   (__cplusplus+0)
+ #define ECB_CPP11 (__cplusplus >= 201103L)
