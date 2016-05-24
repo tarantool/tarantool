@@ -8760,16 +8760,6 @@ si_unlock(struct si *i) {
 	tt_pthread_mutex_unlock(&i->lock);
 }
 
-static inline struct runtime*
-si_r(struct si *i) {
-	return &i->r;
-}
-
-static inline struct siconf*
-si_conf(struct si *i) {
-	return &i->conf;
-}
-
 static struct si *si_init(struct runtime*, struct phia_index*);
 static int si_recover(struct si*);
 static int si_close(struct si*);
@@ -9115,10 +9105,6 @@ si_readopen(struct siread*, struct si*, struct sicache*, enum phia_order,
 	    void*, uint32_t,
 	    void*, uint32_t);
 static int si_readclose(struct siread*);
-static void si_readcache_only(struct siread*);
-static void si_readoldest_only(struct siread*);
-static void si_readhas(struct siread*);
-static void si_readupsert(struct siread*, struct sv*, int);
 static int  si_read(struct siread*);
 static int  si_readcommited(struct si*, struct runtime*, struct sv*, int);
 
@@ -11042,27 +11028,6 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	return 0;
 }
 
-static void si_readcache_only(struct siread *q)
-{
-	q->cache_only = 1;
-}
-
-static void si_readoldest_only(struct siread *q)
-{
-	q->oldest_only = 1;
-}
-
-static void si_readhas(struct siread *q)
-{
-	q->has = 1;
-}
-
-static void si_readupsert(struct siread *q, struct sv *v, int eq)
-{
-	q->upsert_v  = v;
-	q->upsert_eq = eq;
-}
-
 static int si_readclose(struct siread *q)
 {
 	si_unlock(q->index);
@@ -12463,14 +12428,11 @@ static int sc_read(struct scread *r, struct scheduler *s)
 	            arg->prefixsize,
 	            sv_pointer(&arg->v),
 	            sv_size(&arg->v));
-	if (arg->upsert)
-		si_readupsert(&q, &arg->vup, arg->upsert_eq);
-	if (arg->cache_only)
-		si_readcache_only(&q);
-	if (arg->oldest_only)
-		si_readoldest_only(&q);
-	if (arg->has)
-		si_readhas(&q);
+	q.upsert_v = &arg->vup;
+	q.upsert_eq = arg->upsert_eq;
+	q.cache_only = arg->cache_only;
+	q.oldest_only = arg->oldest_only;
+	q.has = arg->has;
 	r->rc = si_read(&q);
 	r->read_disk  += q.read_disk;
 	r->read_cache += q.read_cache;
@@ -14082,8 +14044,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	arg->cachegc     = cachegc;
 	arg->order       = o->order;
 	arg->has         = 0;
-	arg->upsert      = 0;
-	arg->upsert_eq   = 0;
 	arg->cache_only  = o->cache_only;
 	arg->oldest_only = o->oldest_only;
 	if (x) {
@@ -14094,6 +14054,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		arg->vlsn_generate = 1;
 	}
 	arg->upsert = 1;
+	arg->upsert_eq   = 0;
 	if (arg->order == PHIA_EQ) {
 		arg->order = PHIA_GE;
 		arg->upsert_eq = 1;
