@@ -28,6 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include "box/lua/info.h"
 
@@ -216,7 +219,13 @@ lbox_phia_cb(const char *key, const char *value, void *arg)
 	const char *part = key;
 	while(1) {
 		/* stack: box.info.phia, current */
+#ifndef TARGET_OS_DARWIN
 		const char *part_end = strchrnul(part, '.');
+#else
+		const char *part_end = strchr(part, '.');
+		if (!part_end)
+			part_end = part + strlen(part);
+#endif
 		if (*part_end == '\0') {
 			lua_pushlstring(L, part, part_end - part);
 			lua_pushstring(L, value);
