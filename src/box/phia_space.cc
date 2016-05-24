@@ -73,14 +73,14 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 	struct phia_tx *tx = phia_begin(index->env);
 	if (tx == NULL) {
 		phia_document_delete(obj);
-		phia_error();
+		phia_raise();
 	}
 
 	int64_t signature = request->header->lsn;
 	phia_tx_set_lsn(tx, signature);
 
 	if (phia_replace(tx, obj) != 0)
-		phia_error();
+		phia_raise();
 	/* obj destroyed by phia_replace() */
 
 	int rc = phia_commit(tx);
@@ -95,7 +95,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		return;
 	case -1:
-		phia_error();
+		phia_raise();
 		return;
 	default:
 		assert(0);
@@ -144,7 +144,7 @@ PhiaSpace::executeReplace(struct txn*,
 	int rc;
 	rc = phia_replace(tx, obj);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 
 	return NULL;
 }
@@ -163,7 +163,7 @@ PhiaSpace::executeDelete(struct txn*, struct space *space,
 	struct phia_tx *tx = (struct phia_tx *)(in_txn()->engine_tx);
 	int rc = phia_delete(tx, obj);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	return NULL;
 }
 
@@ -209,7 +209,7 @@ PhiaSpace::executeUpdate(struct txn*, struct space *space,
 	int rc;
 	rc = phia_replace(tx, obj);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	return NULL;
 }
 
@@ -439,5 +439,5 @@ PhiaSpace::executeUpsert(struct txn*, struct space *space,
 	int rc = phia_upsert(tx, obj);
 	free(value);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 }

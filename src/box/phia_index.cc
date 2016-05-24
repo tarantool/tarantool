@@ -52,7 +52,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 	assert(key_def->part_count <= 8);
 	struct phia_document *obj = phia_document_new(db);
 	if (obj == NULL)
-		phia_error();
+		phia_raise();
 	if (key == NULL)
 		return obj;
 	uint32_t i = 0;
@@ -71,7 +71,7 @@ PhiaIndex::createDocument(const char *key, const char **keyend)
 		if (partsize == 0)
 			part = "";
 		if (phia_document_set_field(obj, partname, part, partsize) == -1)
-			phia_error();
+			phia_raise();
 		i++;
 	}
 	if (keyend) {
@@ -92,14 +92,14 @@ PhiaIndex::PhiaIndex(struct key_def *key_def_arg)
 	/* create database */
 	db = phia_index_new(env, key_def);
 	if (db == NULL)
-		phia_error();
+		phia_raise();
 	/* start two-phase recovery for a space:
 	 * a. created after snapshot recovery
 	 * b. created during log recovery
 	*/
 	rc = phia_index_open(db);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	format = space->format;
 	tuple_format_ref(format, 1);
 }
@@ -330,7 +330,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	}
 	it->cursor = phia_cursor_new(db);
 	if (it->cursor == NULL)
-		phia_error();
+		phia_raise();
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *

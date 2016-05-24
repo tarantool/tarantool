@@ -359,7 +359,7 @@ PhiaEngine::init()
 	worker_pool_size = cfg_geti("phia.threads");
 	int rc = phia_recover(env);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 }
 
 void
@@ -370,7 +370,7 @@ PhiaEngine::endRecovery()
 	/* complete two-phase recovery */
 	int rc = phia_recover(env);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	recovery_complete = 1;
 }
 
@@ -422,7 +422,7 @@ join_send_space(struct space *sp, void *data)
 	/* send database */
 	struct phia_cursor *cursor = phia_cursor_new(pk->db);
 	if (cursor == NULL)
-		phia_error();
+		phia_raise();
 	auto cursor_guard = make_scoped_guard([=]{
 		phia_cursor_delete(cursor);
 	});
@@ -488,11 +488,11 @@ PhiaEngine::dropIndex(Index *index)
 	/* schedule asynchronous drop */
 	int rc = phia_index_drop(i->db);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	/* unref db object */
 	rc = phia_index_delete(i->db);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	i->db  = NULL;
 	i->env = NULL;
 }
@@ -549,7 +549,7 @@ PhiaEngine::begin(struct txn *txn)
 	assert(txn->engine_tx == NULL);
 	txn->engine_tx = phia_begin(env);
 	if (txn->engine_tx == NULL)
-		phia_error();
+		phia_raise();
 }
 
 void
@@ -577,7 +577,7 @@ PhiaEngine::prepare(struct txn *txn)
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;
 	case -1:
-		phia_error();
+		phia_raise();
 		break;
 	}
 }
@@ -626,7 +626,7 @@ PhiaEngine::beginWalRecovery()
 {
 	int rc = phia_recover(env);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 }
 
 int
@@ -639,7 +639,7 @@ PhiaEngine::beginCheckpoint()
 
 	int rc = phia_checkpoint(env);
 	if (rc == -1)
-		phia_error();
+		phia_raise();
 	return 0;
 }
 
