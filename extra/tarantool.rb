@@ -75,7 +75,7 @@ class Tarantool < Formula
     ohai "Installing config"
     if build.stable?
       inreplace "#{prefix}/etc/tarantool.cfg", /^work_dir =.*/, "work_dir = #{prefix}/var/lib/tarantool"
-      inreplace "#{prefix}/etc/tarantool.cfg", /^pid_file =.*/, "work_dir = #{prefix}/var/run/box.pid"
+      inreplace "#{prefix}/etc/tarantool.cfg", /^pid_file =.*/, "pid_file = #{prefix}/var/run/box.pid"
     else
       doc.install "test/box/box.lua"
       inreplace doc/"box.lua" do |s|
