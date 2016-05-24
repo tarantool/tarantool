@@ -3730,7 +3730,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 
 struct runtime {
 	struct srstatus *status;
-	struct sfscheme *scheme;
 	struct srseq *seq;
 	struct ssa *a;
 	struct ssvfs *vfs;
@@ -3748,7 +3747,6 @@ sr_init(struct runtime *r,
         struct ssquota *quota,
         struct srzonemap *zonemap,
         struct srseq *seq,
-        struct sfscheme *scheme,
         struct ssinjection *i,
         struct srstat *stat)
 {
@@ -3758,7 +3756,6 @@ sr_init(struct runtime *r,
 	r->quota       = quota;
 	r->zonemap     = zonemap;
 	r->seq         = seq;
-	r->scheme      = scheme;
 	r->i           = i;
 	r->stat        = stat;
 }
@@ -8713,7 +8710,6 @@ struct si {
 	struct ssrb       i;
 	int        n;
 	uint64_t   update_time;
-	uint64_t   snapshot;
 	uint64_t   lru_run_lsn;
 	uint64_t   lru_v;
 	uint64_t   lru_steps;
@@ -8730,9 +8726,9 @@ struct si {
 	struct ssbuf      readbuf;
 	struct svupsert   u;
 	struct siconf   conf;
-	struct sfscheme    scheme1;
+	struct sfscheme    scheme;
 	struct phia_index *db;
-	struct runtime         r;
+	struct runtime *r;
 	struct rlist     link;
 };
 
@@ -8770,7 +8766,7 @@ si_lru_add(struct si *i, struct svref *ref)
 	i->lru_intr_sum += ref->v->size;
 	if (unlikely(i->lru_intr_sum >= i->conf.lru_step))
 	{
-		uint64_t lsn = sr_seq(i->r.seq, SR_LSN);
+		uint64_t lsn = sr_seq(i->r->seq, SR_LSN);
 		i->lru_v += (lsn - i->lru_intr_lsn);
 		i->lru_steps++;
 		i->lru_intr_lsn = lsn;
@@ -9086,7 +9082,6 @@ struct siread {
 	int       upsert_eq;
 	struct sv        result;
 	struct sicache  *cache;
-	struct runtime       *r;
 	struct si       *index;
 };
 
@@ -9143,7 +9138,7 @@ si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
 	/* route */
 	assert(ii->key != NULL);
 	int rc;
-	rc = si_itermatch(&index->i, &index->scheme1, ii->key, ii->keysize, &ii->v);
+	rc = si_itermatch(&index->i, &index->scheme, ii->key, ii->keysize, &ii->v);
 	if (unlikely(ii->v == NULL)) {
 		assert(rc != 0);
 		if (rc == 1)
@@ -9319,7 +9314,7 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	struct si *i = ss_malloc(r->a, sizeof(struct si));
 	if (unlikely(i == NULL))
 		return NULL;
-	i->r = *r;
+	i->r = r;
 	sr_statusinit(&i->status);
 	int rc = si_plannerinit(&i->p, r->a, i);
 	if (unlikely(rc == -1)) {
@@ -9331,7 +9326,7 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	ss_rbinit(&i->i);
 	tt_pthread_mutex_init(&i->lock, NULL);
 	si_confinit(&i->conf);
-	sf_schemeinit(&i->scheme1);
+	sf_schemeinit(&i->scheme);
 	rlist_create(&i->link);
 	rlist_create(&i->gc);
 	i->gc_count     = 0;
@@ -9344,7 +9339,6 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	i->size         = 0;
 	i->read_disk    = 0;
 	i->read_cache   = 0;
-	i->snapshot     = 0;
 	i->n            = 0;
 	tt_pthread_mutex_init(&i->ref_lock, NULL);
 	i->ref_fe       = 0;
@@ -9362,24 +9356,24 @@ static int si_close(struct si *i)
 	int rc = 0;
 	struct sinode *node, *n;
 	rlist_foreach_entry_safe(node, &i->gc, gc, n) {
-		rc = si_nodefree(node, &i->r, 1);
+		rc = si_nodefree(node, i->r, 1);
 		if (unlikely(rc == -1))
 			rc_ret = -1;
 	}
 	rlist_create(&i->gc);
 	i->gc_count = 0;
 	if (i->i.root)
-		si_truncate(i->i.root, &i->r);
+		si_truncate(i->i.root, i->r);
 	i->i.root = NULL;
-	sv_upsertfree(&i->u, i->r.a);
-	ss_buffree(&i->readbuf, i->r.a);
-	si_plannerfree(&i->p, i->r.a);
+	sv_upsertfree(&i->u, i->r->a);
+	ss_buffree(&i->readbuf, i->r->a);
+	si_plannerfree(&i->p, i->r->a);
 	tt_pthread_mutex_destroy(&i->lock);
 	tt_pthread_mutex_destroy(&i->ref_lock);
 	sr_statusfree(&i->status);
-	si_conffree(&i->conf, i->r.a);
-	sf_schemefree(&i->scheme1, i->r.a);
-	ss_free(i->r.a, i);
+	si_conffree(&i->conf, i->r->a);
+	sf_schemefree(&i->scheme, i->r->a);
+	ss_free(i->r->a, i);
 	return rc_ret;
 }
 
@@ -9394,7 +9388,7 @@ static int si_insert(struct si *i, struct sinode *n)
 {
 	struct sdindexpage *min = sd_indexmin(&n->self.index);
 	struct ssrbnode *p = NULL;
-	int rc = si_match(&i->i, i->r.scheme,
+	int rc = si_match(&i->i, &i->scheme,
 	                  sd_indexpage_min(&n->self.index, min),
 	                  min->sizemin, &p);
 	assert(! (rc == 0 && p));
@@ -9467,7 +9461,7 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 	int rc = -1;
 	switch (plan->plan) {
 	case SI_NODEGC:
-		rc = si_nodefree(plan->node, &i->r, 1);
+		rc = si_nodefree(plan->node, i->r, 1);
 		break;
 	case SI_CHECKPOINT:
 	case SI_BRANCH:
@@ -9492,7 +9486,7 @@ si_execute(struct si *i, struct sdc *c, struct siplan *plan,
 	/* garbage collect buffers */
 	if (plan->plan != SI_SHUTDOWN &&
 	    plan->plan != SI_DROP) {
-		sd_cgc(c, i->r.a, i->conf.buf_gc_wm);
+		sd_cgc(c, i->r->a, i->conf.buf_gc_wm);
 	}
 	return rc;
 }
@@ -9502,13 +9496,13 @@ si_branchcreate(struct si *index, struct sdc *c,
 		struct sinode *parent, struct svindex *vindex,
 		uint64_t vlsn, struct sibranch **result)
 {
-	struct runtime *r = &index->r;
+	struct runtime *r = index->r;
 	struct sibranch *branch = NULL;
 
 	/* in-memory mode blob */
 	int rc;
 	struct svmerge vmerge;
-	sv_mergeinit(&vmerge, r->a, &index->scheme1);
+	sv_mergeinit(&vmerge, r->a, &index->scheme);
 	rc = sv_mergeprepare(&vmerge, 1);
 	if (unlikely(rc == -1))
 		return -1;
@@ -9631,7 +9625,7 @@ e0:
 static int
 si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 {
-	struct runtime *r = &index->r;
+	struct runtime *r = index->r;
 	struct sinode *n = plan->node;
 	assert(n->flags & SI_LOCK);
 
@@ -9692,7 +9686,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	   struct ssiter *vindex,
 	   uint64_t vindex_used)
 {
-	struct runtime *r = &index->r;
+	struct runtime *r = index->r;
 	struct sinode *node = plan->node;
 	assert(node->flags & SI_LOCK);
 
@@ -9702,7 +9696,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 	if (unlikely(rc == -1))
 		return sr_oom();
 	struct svmerge merge;
-	sv_mergeinit(&merge, r->a, &index->scheme1);
+	sv_mergeinit(&merge, r->a, &index->scheme);
 	rc = sv_mergeprepare(&merge, node->branch_count + 1);
 	if (unlikely(rc == -1))
 		return -1;
@@ -9744,7 +9738,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 			.o               = PHIA_GE,
 			.file            = &node->file,
 			.a               = r->a,
-			.scheme		 = r->scheme
+			.scheme		 = &index->scheme
 		};
 		int rc = sd_read_open(&s->src, &arg, NULL, 0);
 		if (unlikely(rc == -1))
@@ -9836,7 +9830,7 @@ static int si_dropmark(struct si *i)
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
 	struct ssfile drop;
-	ss_fileinit(&drop, i->r.vfs);
+	ss_fileinit(&drop, i->r->vfs);
 	int rc = ss_filenew(&drop, path);
 	if (unlikely(rc == -1)) {
 		sr_malfunction("drop file '%s' create error: %s",
@@ -9849,7 +9843,7 @@ static int si_dropmark(struct si *i)
 
 static int si_drop(struct si *i)
 {
-	struct runtime r = i->r;
+	struct runtime *r = i->r;
 	struct sspath path;
 	ss_pathinit(&path);
 	ss_pathset(&path, "%s", i->conf.path);
@@ -9859,7 +9853,7 @@ static int si_drop(struct si *i)
 	if (unlikely(rc == -1))
 		return -1;
 	/* remove directory */
-	rc = si_droprepository(&r, path.path, 1);
+	rc = si_droprepository(r, path.path, 1);
 	return rc;
 }
 
@@ -9928,7 +9922,7 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 			struct svref *v = ss_bufiterref_get(&i);
 			v->next = NULL;
 			struct sdindexpage *page = sd_indexmin(&p->self.index);
-			int rc = sf_compare(&index->scheme1, sv_vpointer(v->v), v->v->size,
+			int rc = sf_compare(&index->scheme, sv_vpointer(v->v), v->v->size,
 			                    sd_indexpage_min(&p->self.index, page),
 			                    page->sizemin);
 			if (unlikely(rc >= 0))
@@ -10013,7 +10007,7 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
          uint64_t  vlsn,
          uint64_t  vlsn_lru)
 {
-	struct runtime *r = &index->r;
+	struct runtime *r = index->r;
 	int rc;
 	struct sdmergeconf mergeconf = {
 		.stream          = stream,
@@ -10039,13 +10033,13 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 	while ((rc = sd_merge(&merge)) > 0)
 	{
 		/* create new node */
-		n = si_nodenew(&index->scheme1, r);
+		n = si_nodenew(&index->scheme, r);
 		if (unlikely(n == NULL))
 			goto error;
 		struct sdid id = {
 			.parent = parent->self.id.id,
 			.flags  = 0,
-			.id     = sr_seq(index->r.seq, SR_NSNNEXT)
+			.id     = sr_seq(index->r->seq, SR_NSNNEXT)
 		};
 		rc = si_nodecreate(n, &index->conf, &id);
 		if (unlikely(rc == -1))
@@ -10085,7 +10079,7 @@ si_split(struct si *index, struct sdc *c, struct ssbuf *result,
 			goto error;
 
 		/* add node to the list */
-		rc = ss_bufadd(result, index->r.a, &n, sizeof(struct sinode*));
+		rc = ss_bufadd(result, index->r->a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1)) {
 			sr_oom();
 			goto error;
@@ -10112,7 +10106,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	 uint64_t size_stream,
 	 uint32_t n_stream)
 {
-	struct runtime *r = &index->r;
+	struct runtime *r = index->r;
 	struct ssbuf *result = &c->a;
 	struct ssiter i;
 
@@ -10212,7 +10206,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 		}
 		break;
 	}
-	sv_indexinit(j, &index->scheme1);
+	sv_indexinit(j, &index->scheme);
 	si_unlock(index);
 
 	/* compaction completion */
@@ -11004,7 +10998,6 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	q->keysize     = keysize;
 	q->vlsn        = vlsn;
 	q->index       = index;
-	q->r           = &index->r;
 	q->cache       = c;
 	q->prefix      = prefix;
 	q->prefixsize  = prefixsize;
@@ -11016,7 +11009,7 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	q->read_disk   = 0;
 	q->read_cache  = 0;
 	memset(&q->result, 0, sizeof(q->result));
-	sv_mergeinit(&q->merge, index->r.a, &index->scheme1);
+	sv_mergeinit(&q->merge, index->r->a, &index->scheme);
 	si_lock(index);
 	return 0;
 }
@@ -11036,7 +11029,7 @@ si_readdup(struct siread *q, struct sv *result)
 		v = result->v;
 		sv_vref(v);
 	} else {
-		v = sv_vdup(q->r, result);
+		v = sv_vdup(q->index->r, result);
 		if (unlikely(v == NULL))
 			return sr_oom();
 	}
@@ -11071,13 +11064,13 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 {
 	int rc;
 	if (compare) {
-		rc = sf_compare(q->r->scheme, sv_pointer(v), sv_size(v),
+		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
 		                q->key, q->keysize);
 		if (unlikely(rc != 0))
 			return 0;
 	}
 	if (q->prefix) {
-		rc = sf_compareprefix(q->r->scheme,
+		rc = sf_compareprefix(q->merge.scheme,
 		                      q->prefix,
 		                      q->prefixsize,
 		                      sv_pointer(v), sv_size(v));
@@ -11136,7 +11129,7 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	struct siconf *conf= &q->index->conf;
 	int rc;
 	if (conf->amqf) {
-		rc = si_amqfhas_branch(q->r->scheme, b, q->key);
+		rc = si_amqfhas_branch(q->merge.scheme, b, q->key);
 		if (likely(! rc))
 			return 0;
 	}
@@ -11163,8 +11156,8 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 		.has_vlsn        = q->vlsn,
 		.o               = PHIA_GE,
 		.file            = &n->file,
-		.a               = q->r->a,
-		.scheme          = q->r->scheme
+		.a               = q->merge.a,
+		.scheme          = q->merge.scheme
 	};
 	rc = sd_read_open(&c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
@@ -11281,8 +11274,8 @@ si_rangebranch(struct siread *q, struct sinode *n,
 		.has_vlsn        = 0,
 		.o               = q->order,
 		.file            = &n->file,
-		.a               = q->r->a,
-		.scheme          = q->r->scheme
+		.a               = q->merge.a,
+		.scheme          = q->merge.scheme
 	};
 	int rc = sd_read_open(&c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
@@ -11379,13 +11372,13 @@ next_node:
 	rc = 1;
 	/* convert upsert search to PHIA_EQ */
 	if (q->upsert_eq) {
-		rc = sf_compare(q->r->scheme, sv_pointer(v), sv_size(v),
+		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
 		                q->key, q->keysize);
 		rc = rc == 0;
 	}
 	/* do prefix search */
 	if (q->prefix && rc) {
-		rc = sf_compareprefix(q->r->scheme, q->prefix, q->prefixsize,
+		rc = sf_compareprefix(q->merge.scheme, q->prefix, q->prefixsize,
 		                      sv_pointer(v),
 		                      sv_size(v));
 	}
@@ -11458,7 +11451,7 @@ si_readcommited(struct si *index, struct sv *v, int recover)
 	for (b = node->branch; b; b = b->next)
 	{
 		struct sdindexiter ii;
-		sd_indexiter_open(&ii, &index->scheme1, &b->index, PHIA_GE,
+		sd_indexiter_open(&ii, &index->scheme, &b->index, PHIA_GE,
 				  sv_pointer(v), sv_size(v));
 		struct sdindexpage *page = sd_indexiter_get(&ii);
 		if (page == NULL)
@@ -11499,9 +11492,9 @@ si_readcommited(struct si *index, struct sv *v, int recover)
 static struct sinode *
 si_bootstrap(struct si *i, uint64_t parent)
 {
-	struct runtime *r = &i->r;
+	struct runtime *r = i->r;
 	/* create node */
-	struct sinode *n = si_nodenew(&i->scheme1, r);
+	struct sinode *n = si_nodenew(&i->scheme, r);
 	if (unlikely(n == NULL))
 		return NULL;
 	struct sdid id = {
@@ -11528,7 +11521,7 @@ si_bootstrap(struct si *i, uint64_t parent)
 
 	struct sdbuild build;
 	sd_buildinit(&build);
-	rc = sd_buildbegin(&build, r->a, &i->scheme1,
+	rc = sd_buildbegin(&build, r->a, &i->scheme,
 	                   i->conf.node_page_checksum,
 	                   i->conf.compression_key,
 	                   i->conf.compression,
@@ -11692,7 +11685,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			 * incomplete compaction process */
 			head = si_trackget(track, id_parent);
 			if (likely(head == NULL)) {
-				head = si_nodenew(&i->scheme1, r);
+				head = si_nodenew(&i->scheme, r);
 				if (unlikely(head == NULL))
 					goto error;
 				head->self.id.id = id_parent;
@@ -11714,7 +11707,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			}
 			assert(rc == SI_RDB_DBSEAL);
 			/* recover 'sealed' node */
-			node = si_nodenew(&i->scheme1, r);
+			node = si_nodenew(&i->scheme, r);
 			if (unlikely(node == NULL))
 				goto error;
 			node->recover = SI_RDB_DBSEAL;
@@ -11748,7 +11741,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 		}
 
 		/* recover node */
-		node = si_nodenew(&i->scheme1, r);
+		node = si_nodenew(&i->scheme, r);
 		if (unlikely(node == NULL))
 			goto error;
 		node->recover = SI_RDB;
@@ -11929,7 +11922,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 
 static int si_recover(struct si *i)
 {
-	struct runtime *r = &i->r;
+	struct runtime *r = i->r;
 	int exist = ss_vfsexists(r->vfs, i->conf.path);
 	if (exist == 0)
 		goto deploy;
@@ -11944,7 +11937,6 @@ static int si_recover(struct si *i)
 	}
 	if (unlikely(rc == -1))
 		return -1;
-	r->scheme = &i->scheme1;
 	rc = si_recoverindex(i, r);
 	if (likely(rc <= 0))
 		return rc;
@@ -12026,7 +12018,7 @@ static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
 	si_iter_open(&ii, index, PHIA_GE, sv_vpointer(v), v->size);
 	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
-	struct svref *ref = sv_refnew(&index->r, v);
+	struct svref *ref = sv_refnew(index->r, v);
 	assert(ref != NULL);
 	/* insert into node index */
 	struct svindex *vindex = si_nodeindex(node);
@@ -12046,7 +12038,7 @@ static void
 si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
 	 int recover)
 {
-	struct runtime *r = &x->index->r;
+	struct runtime *r = x->index->r;
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
@@ -14000,7 +13992,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 				ret->created     = 1;
 				ret->orderset    = 1;
 			} else {
-				sv_vunref(&db->index->r, vup.v);
+				sv_vunref(db->index->r, vup.v);
 			}
 			if (auto_close)
 				phia_document_delete(o);
@@ -14017,7 +14009,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		cache = si_cachepool_pop(&e->cachepool);
 		if (unlikely(cache == NULL)) {
 			if (vup.v)
-				sv_vunref(&db->index->r, vup.v);
+				sv_vunref(db->index->r, vup.v);
 			sr_oom();
 			goto error;
 		}
@@ -14027,7 +14019,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 	/* prepare request */
 	struct scread q;
-	sc_readopen(&q, &db->index->r, db, db->index);
+	sc_readopen(&q, db->index->r, db, db->index);
 	q.start = start;
 	struct screadarg *arg = &q.arg;
 	arg->v           = o->v;
@@ -14102,15 +14094,14 @@ phia_index_new(struct phia_env *e, struct key_def *key_def)
 		return NULL;
 	}
 	if (si_confcreate(&db->index->conf, e->r.a, key_def) |
-	    sf_schemecreate(&db->index->scheme1, e->r.a, key_def)) {
+	    sf_schemecreate(&db->index->scheme, e->r.a, key_def)) {
 		si_close(db->index);
 		ss_free(&e->a, db);
 		return NULL;
 	}
-	db->index->r.scheme = &db->index->scheme1;
 	sr_statusset(&db->index->status, SR_OFFLINE);
 	sx_indexinit(&db->coindex, &e->xm, db, db->index,
-		     &db->index->scheme1);
+		     &db->index->scheme);
 	db->txn_min = sx_min(&e->xm);
 	db->txn_max = UINT32_MAX;
 	rlist_add(&e->db, &db->link);
@@ -14196,7 +14187,7 @@ static inline int
 phia_document_create(struct phia_document *o)
 {
 	struct phia_index *db = o->db;
-	struct sfscheme *scheme = &db->index->scheme1;
+	struct sfscheme *scheme = &db->index->scheme;
 	struct phia_env *e = db->env;
 
 	assert(o->v.v == NULL);
@@ -14236,7 +14227,7 @@ phia_document_create(struct phia_document *o)
 	}
 
 allocate:
-	v = sv_vbuild(&db->index->r, scheme, o->fields);
+	v = sv_vbuild(db->index->r, scheme, o->fields);
 	if (unlikely(v == NULL))
 		return sr_oom();
 	sv_init(&o->v, &sv_vif, v, NULL);
@@ -14249,7 +14240,7 @@ phia_document_set_field(struct phia_document *v, const char *path,
 {
 	struct phia_index *db = v->db;
 	struct phia_env *e = db->env;
-	struct sffield *field = sf_schemefind(&db->index->scheme1, (char*)path);
+	struct sffield *field = sf_schemefind(&db->index->scheme, (char*)path);
 	if (unlikely(field == NULL))
 		return -1;
 	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
@@ -14290,12 +14281,12 @@ phia_document_field(struct phia_document *v, const char *path, int *size)
 {
 	/* match field */
 	struct phia_index *db = v->db;
-	struct sffield *field = sf_schemefind(&db->index->scheme1, (char*)path);
+	struct sffield *field = sf_schemefind(&db->index->scheme, (char*)path);
 	if (unlikely(field == NULL))
 		return NULL;
 	/* result document */
 	if (v->v.v)
-		return sv_field(&v->v, &db->index->scheme1, field->position, (uint32_t*)size);
+		return sv_field(&v->v, &db->index->scheme, field->position, (uint32_t*)size);
 	/* field document */
 	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
 	struct sfv *fv = &v->fields[field->position];
@@ -14481,7 +14472,7 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	struct phia_env *e = db->env;
 
 	struct scread q;
-	sc_readopen(&q, &db->index->r, db, db->index);
+	sc_readopen(&q, db->index->r, db, db->index);
 	struct screadarg *arg = &q.arg;
 	arg->v             = *v;
 	arg->vup.v         = NULL;
@@ -14620,7 +14611,7 @@ phia_env_new(void)
 	sr_statinit(&e->stat);
 	sf_limitinit(&e->limit, &e->a);
 	sr_init(&e->r, &e->status, &e->a, &e->vfs, &e->quota,
-	        &e->conf.zones, &e->seq, NULL, &e->ei, &e->stat);
+	        &e->conf.zones, &e->seq, &e->ei, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
