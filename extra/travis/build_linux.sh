@@ -5,7 +5,7 @@ sudo pip install six==1.9.0
 sudo pip install gevent
 sudo pip install geventconnpool
 CMAKE_OPTS=""
-if [ -n "${COVERALLS_TOKEN}" ] && [ ${CC}=gcc ]; then
+if [ -n "${COVERALLS_TOKEN}" ] && [ "${CC}" = "gcc" ]; then
     echo "Code coverage analysis is enabled"
     sudo apt-get -q -y install lcov
     gem install coveralls-lcov
