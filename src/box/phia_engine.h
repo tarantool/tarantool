@@ -69,12 +69,15 @@ struct phia_document;
 struct phia_tx;
 struct phia_cursor;
 
-struct phia_document *
-phia_coget(struct phia_tx *tx, struct phia_document *key);
-struct phia_document *
-phia_index_coget(struct phia_index *index, struct phia_document *key);
-struct phia_document *
-phia_cursor_conext(struct phia_cursor *tx, struct phia_document *key);
+int
+phia_coget(struct phia_tx *tx, struct phia_document *key,
+	   struct phia_document **result);
+int
+phia_index_coget(struct phia_index *index, struct phia_document *key,
+		 struct phia_document **result);
+int
+phia_cursor_conext(struct phia_cursor *tx, struct phia_document *key,
+		   struct phia_document **result);
 
 struct tuple *
 phia_tuple_new(struct phia_document *obj, struct key_def *key_def,

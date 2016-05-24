@@ -101,8 +101,9 @@ phia_service_delete(struct phia_service *srv);
 struct phia_tx *
 phia_begin(struct phia_env *e);
 
-struct phia_document *
-phia_get(struct phia_tx *tx, struct phia_document *key);
+int
+phia_get(struct phia_tx *tx, struct phia_document *key,
+	 struct phia_document **result);
 
 int
 phia_replace(struct phia_tx *tx, struct phia_document *doc);
@@ -147,8 +148,9 @@ phia_index_drop(struct phia_index *index);
 int
 phia_index_delete(struct phia_index *index);
 
-struct phia_document *
-phia_index_get(struct phia_index *index, struct phia_document *key);
+int
+phia_index_get(struct phia_index *index, struct phia_document *key,
+	        struct phia_document **result);
 
 size_t
 phia_index_bsize(struct phia_index *db);
@@ -169,8 +171,9 @@ phia_cursor_delete(struct phia_cursor *cursor);
 void
 phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 
-struct phia_document *
-phia_cursor_next(struct phia_cursor *cursor, struct phia_document *key);
+int
+phia_cursor_next(struct phia_cursor *cursor, struct phia_document *key,
+		 struct phia_document **result);
 
 /*
  * Document
@@ -189,9 +192,6 @@ phia_document_new(struct phia_index *index);
 
 int
 phia_document_delete(struct phia_document *doc);
-
-int
-phia_document_open(struct phia_document *doc);
 
 int
 phia_document_set_field(struct phia_document *doc, const char *path,
