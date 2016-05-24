@@ -213,8 +213,6 @@ ss_vfsfree(struct ssvfs *f)
 #define ss_vfswritev(fs, fd, iov)            (fs)->i->writev(fs, fd, iov)
 #define ss_vfsseek(fs, fd, off)              (fs)->i->seek(fs, fd, off)
 #define ss_vfsmmap(fs, m, fd, size, ro)      (fs)->i->mmap(fs, m, fd, size, ro)
-#define ss_vfsmmap_allocate(fs, m, size)     (fs)->i->mmap_allocate(fs, m, size)
-#define ss_vfsmremap(fs, m, size)            (fs)->i->mremap(fs, m, size)
 #define ss_vfsmunmap(fs, m)                  (fs)->i->munmap(fs, m)
 
 static struct ssvfsif ss_stdvfs;
@@ -363,8 +361,8 @@ struct ssa;
 struct ssaif {
 	int   (*open)(struct ssa*, va_list);
 	int   (*close)(struct ssa*);
-	void *(*malloc)(struct ssa*, int);
-	void *(*realloc)(struct ssa*, void*, int);
+	void *(*malloc)(struct ssa*, size_t);
+	void *(*realloc)(struct ssa*, void *, size_t);
 	int   (*ensure)(struct ssa*, int, int);
 	void  (*free)(struct ssa*, void*);
 };
@@ -390,12 +388,12 @@ ss_aclose(struct ssa *a) {
 }
 
 static inline void*
-ss_malloc(struct ssa *a, int size) {
+ss_malloc(struct ssa *a, size_t size) {
 	return a->i->malloc(a, size);
 }
 
 static inline void*
-ss_realloc(struct ssa *a, void *ptr, int size) {
+ss_realloc(struct ssa *a, void *ptr, size_t size) {
 	return a->i->realloc(a, ptr, size);
 }
 
@@ -406,7 +404,7 @@ ss_free(struct ssa *a, void *ptr) {
 
 static inline char*
 ss_strdup(struct ssa *a, const char *str) {
-	int sz = strlen(str) + 1;
+	size_t sz = strlen(str) + 1;
 	char *s = ss_malloc(a, sz);
 	if (unlikely(s == NULL))
 		return NULL;
@@ -461,17 +459,17 @@ ss_buffree(struct ssbuf *b, struct ssa *a)
 	b->e = NULL;
 }
 
-static inline int
+static inline size_t
 ss_bufsize(struct ssbuf *b) {
 	return b->e - b->s;
 }
 
-static inline int
+static inline size_t
 ss_bufused(struct ssbuf *b) {
 	return b->p - b->s;
 }
 
-static inline int
+static inline size_t
 ss_bufunused(struct ssbuf *b) {
 	return b->e - b->p;
 }
@@ -482,7 +480,7 @@ ss_bufreset(struct ssbuf *b) {
 }
 
 static inline void
-ss_bufgc(struct ssbuf *b, struct ssa *a, int wm)
+ss_bufgc(struct ssbuf *b, struct ssa *a, size_t wm)
 {
 	if (unlikely(ss_bufsize(b) >= wm)) {
 		ss_buffree(b, a);
@@ -493,12 +491,12 @@ ss_bufgc(struct ssbuf *b, struct ssa *a, int wm)
 }
 
 static inline int
-ss_bufensure(struct ssbuf *b, struct ssa *a, int size)
+ss_bufensure(struct ssbuf *b, struct ssa *a, size_t size)
 {
-	if (likely(b->e - b->p >= size))
+	if (likely(b->e - b->p >= (ptrdiff_t)size))
 		return 0;
-	int sz = ss_bufsize(b) * 2;
-	int actual = ss_bufused(b) + size;
+	size_t sz = ss_bufsize(b) * 2;
+	size_t actual = ss_bufused(b) + size;
 	if (unlikely(actual > sz))
 		sz = actual;
 	char *p;
@@ -515,18 +513,18 @@ ss_bufensure(struct ssbuf *b, struct ssa *a, int size)
 	b->p = p + (b->p - b->s);
 	b->e = p + sz;
 	b->s = p;
-	assert((b->e - b->p) >= size);
+	assert((b->e - b->p) >= (ptrdiff_t)size);
 	return 0;
 }
 
 static inline void
-ss_bufadvance(struct ssbuf *b, int size)
+ss_bufadvance(struct ssbuf *b, size_t size)
 {
 	b->p += size;
 }
 
 static inline int
-ss_bufadd(struct ssbuf *b, struct ssa *a, void *buf, int size)
+ss_bufadd(struct ssbuf *b, struct ssa *a, void *buf, size_t size)
 {
 	int rc = ss_bufensure(b, a, size);
 	if (unlikely(rc == -1))
@@ -548,7 +546,7 @@ ss_bufat(struct ssbuf *b, int size, int i) {
 }
 
 static inline void
-ss_bufset(struct ssbuf *b, int size, int i, char *buf, int bufsize)
+ss_bufset(struct ssbuf *b, int size, int i, char *buf, size_t bufsize)
 {
 	assert(b->s + (size * i + bufsize) <= b->p);
 	memcpy(b->s + size * i, buf, bufsize);
@@ -722,7 +720,7 @@ struct ssqf {
 static int  ss_qfinit(struct ssqf*);
 static int  ss_qfensure(struct ssqf*, struct ssa*, uint32_t);
 static void ss_qffree(struct ssqf*, struct ssa*);
-static void ss_qfgc(struct ssqf*, struct ssa*, int);
+static void ss_qfgc(struct ssqf*, struct ssa*, size_t);
 static void ss_qfreset(struct ssqf*);
 static void ss_qfrecover(struct ssqf*, int, int, uint32_t, uint64_t*);
 static void ss_qfadd(struct ssqf*, uint64_t);
@@ -964,8 +962,6 @@ struct ssiter {
 	char priv[150];
 };
 
-#define ss_iteratorclose(i) (i)->vif->close(i)
-#define ss_iteratorhas(i) (i)->vif->has(i)
 #define ss_iteratorof(i) (i)->vif->get(i)
 #define ss_iteratornext(i) (i)->vif->next(i)
 
@@ -1164,7 +1160,7 @@ ss_lz4filter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 	case SS_FINPUT:;
 		/* See comments in ss_lz4filter_complete() */
 		int capacity = LZ4F_compressBound(z->total_size + size, NULL);
-		assert(capacity >= ss_bufused(dest));
+		assert(capacity >= (ptrdiff_t)ss_bufused(dest));
 		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
 		if (unlikely(rc == -1))
 			return -1;
@@ -1227,7 +1223,7 @@ ss_lz4filter_complete(struct ssfilter *f, struct ssbuf *dest)
 		size_t block = (cctxPtr->tmpInSize + 16);
 #endif
 		int capacity = LZ4F_compressBound(z->total_size, NULL);
-		assert(capacity >= ss_bufused(dest));
+		assert(capacity >= (ptrdiff_t)ss_bufused(dest));
 		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
 		if (unlikely(rc == -1))
 			return -1;
@@ -1332,7 +1328,7 @@ ss_oomaevent(void)
 }
 
 static inline void*
-ss_oomamalloc(struct ssa *a ssunused, int size)
+ss_oomamalloc(struct ssa *a ssunused, size_t size)
 {
 	if (ss_oomaevent())
 		return NULL;
@@ -1350,7 +1346,7 @@ ss_oomaensure(struct ssa *a ssunused, int n, int size)
 }
 
 static inline void*
-ss_oomarealloc(struct ssa *a ssunused, void *ptr, int size)
+ss_oomarealloc(struct ssa *a ssunused, void *ptr, size_t size)
 {
 	if (ss_oomaevent())
 		return NULL;
@@ -1444,7 +1440,7 @@ ss_qffree(struct ssqf *f, struct ssa *a)
 }
 
 static void
-ss_qfgc(struct ssqf *f, struct ssa *a, int wm)
+ss_qfgc(struct ssqf *f, struct ssa *a, size_t wm)
 {
 	if (unlikely(ss_bufsize(&f->qf_buf) >= wm)) {
 		ss_buffree(&f->qf_buf, a);
@@ -2077,12 +2073,12 @@ ss_stdaclose(struct ssa *a ssunused) {
 }
 
 static inline void*
-ss_stdamalloc(struct ssa *a ssunused, int size) {
+ss_stdamalloc(struct ssa *a ssunused, size_t size) {
 	return malloc(size);
 }
 
 static inline void*
-ss_stdarealloc(struct ssa *a ssunused, void *ptr, int size) {
+ss_stdarealloc(struct ssa *a ssunused, void *ptr, size_t size) {
 	return realloc(ptr,  size);
 }
 
@@ -2318,10 +2314,10 @@ ss_stdvfs_mremap(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
 	         MAP_PRIVATE|MAP_ANON, -1, 0);
 	if (p == MAP_FAILED)
 		return -1;
-	uint64_t to_copy = m->size;
+	size_t to_copy = m->size;
 	if (to_copy > size)
 		to_copy = size;
-	memcpy(p, m->p, size);
+	memcpy(p, m->p, to_copy);
 	munmap(m->p, m->size);
 #else
 	p = mremap(m->p, m->size, size, MREMAP_MAYMOVE);
@@ -2958,8 +2954,6 @@ struct sflimit {
 	uint32_t u32_max;
 	uint64_t u64_min;
 	uint64_t u64_max;
-	int64_t  i64_min;
-	int64_t  i64_max;
 	char    *string_min;
 	int      string_min_size;
 	char    *string_max;
@@ -2973,8 +2967,6 @@ sf_limitinit(struct sflimit *b, struct ssa *a)
 	b->u32_max = UINT32_MAX;
 	b->u64_min = 0;
 	b->u64_max = UINT64_MAX;
-	b->i64_min = INT64_MIN;
-	b->i64_max = UINT64_MAX;
 	b->string_min_size = 0;
 	b->string_min = "";
 	b->string_max_size = 1024;
@@ -3692,8 +3684,6 @@ struct srzone {
 	uint32_t branch_age_period;
 	uint64_t branch_age_period_us;
 	uint32_t branch_age_wm;
-	uint32_t snapshot_period;
-	uint64_t snapshot_period_us;
 	uint32_t gc_prio;
 	uint32_t gc_period;
 	uint64_t gc_period_us;
@@ -3956,7 +3946,6 @@ static int sr_confexec(struct srconf *start, struct srconfstmt *s)
 #define SVUPSERT     2
 #define SVGET        4
 #define SVDUP        8
-#define SVBEGIN     16
 #define SVCONFLICT  32
 
 struct sv;
@@ -4565,7 +4554,7 @@ sv_mergeprepare(struct svmerge *m, int count)
 static inline struct svmergesrc*
 sv_mergenextof(struct svmergesrc *src)
 {
-	return (struct svmergesrc*)((char*)src + sizeof(struct svmergesrc));
+	return src + 1;
 }
 
 static inline void
@@ -5345,27 +5334,27 @@ static struct ssiterif sv_indexiterif =
 static uint8_t
 sv_refifflags(struct sv *v) {
 	struct svref *ref = (struct svref*)v->v;
-	return ((struct svv*)ref->v)->flags | ref->flags;
+	return (ref->v)->flags | ref->flags;
 }
 
 static uint64_t
 sv_refiflsn(struct sv *v) {
-	return ((struct svv*)((struct svref*)v->v)->v)->lsn;
+	return ((struct svref*)v->v)->v->lsn;
 }
 
 static void
 sv_refiflsnset(struct sv *v, uint64_t lsn) {
-	((struct svv*)((struct svref*)v->v)->v)->lsn = lsn;
+	((struct svref*)v->v)->v->lsn = lsn;
 }
 
 static char*
 sv_refifpointer(struct sv *v) {
-	return sv_vpointer(((struct svv*)((struct svref*)v->v)->v));
+	return sv_vpointer(((struct svref*)v->v)->v);
 }
 
 static uint32_t
 sv_refifsize(struct sv *v) {
-	return ((struct svv*)((struct svref*)v->v)->v)->size;
+	return ((struct svref*)v->v)->v->size;
 }
 
 static struct svif sv_refif =
@@ -7271,7 +7260,7 @@ sd_read_page(struct sdread *i, struct sdindexpage *ref)
 
 		/* decompression */
 		struct ssfilter f;
-		rc = ss_filterinit(&f, (struct ssfilterif*)arg->compression_if, r->a, SS_FOUTPUT);
+		rc = ss_filterinit(&f, arg->compression_if, r->a, SS_FOUTPUT);
 		if (unlikely(rc == -1)) {
 			sr_error("index file '%s' decompression error",
 			         ss_pathof(&arg->file->path));
@@ -8099,7 +8088,7 @@ sd_recover_next_of(struct sdrecover *i, struct sdseal *next)
 	if (next == NULL)
 		return 0;
 
-	char *eof = (char*)i->map.p + i->map.size;
+	char *eof = i->map.p + i->map.size;
 	char *pointer = (char*)next;
 
 	/* eof */
@@ -8721,7 +8710,6 @@ struct si {
 	struct ssrb       i;
 	int        n;
 	uint64_t   update_time;
-	uint32_t   snapshot_run;
 	uint64_t   snapshot;
 	uint64_t   lru_run_lsn;
 	uint64_t   lru_v;
@@ -8758,16 +8746,6 @@ si_lock(struct si *i) {
 static inline void
 si_unlock(struct si *i) {
 	tt_pthread_mutex_unlock(&i->lock);
-}
-
-static inline struct runtime*
-si_r(struct si *i) {
-	return &i->r;
-}
-
-static inline struct siconf*
-si_conf(struct si *i) {
-	return &i->conf;
 }
 
 static struct si *si_init(struct runtime*, struct phia_index*);
@@ -9115,10 +9093,6 @@ si_readopen(struct siread*, struct si*, struct sicache*, enum phia_order,
 	    void*, uint32_t,
 	    void*, uint32_t);
 static int si_readclose(struct siread*);
-static void si_readcache_only(struct siread*);
-static void si_readoldest_only(struct siread*);
-static void si_readhas(struct siread*);
-static void si_readupsert(struct siread*, struct sv*, int);
 static int  si_read(struct siread*);
 static int  si_readcommited(struct si*, struct runtime*, struct sv*, int);
 
@@ -9367,7 +9341,6 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	i->size         = 0;
 	i->read_disk    = 0;
 	i->read_cache   = 0;
-	i->snapshot_run = 0;
 	i->snapshot     = 0;
 	i->n            = 0;
 	tt_pthread_mutex_init(&i->ref_lock, NULL);
@@ -11042,27 +11015,6 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	return 0;
 }
 
-static void si_readcache_only(struct siread *q)
-{
-	q->cache_only = 1;
-}
-
-static void si_readoldest_only(struct siread *q)
-{
-	q->oldest_only = 1;
-}
-
-static void si_readhas(struct siread *q)
-{
-	q->has = 1;
-}
-
-static void si_readupsert(struct siread *q, struct sv *v, int eq)
-{
-	q->upsert_v  = v;
-	q->upsert_eq = eq;
-}
-
 static int si_readclose(struct siread *q)
 {
 	si_unlock(q->index);
@@ -12463,14 +12415,11 @@ static int sc_read(struct scread *r, struct scheduler *s)
 	            arg->prefixsize,
 	            sv_pointer(&arg->v),
 	            sv_size(&arg->v));
-	if (arg->upsert)
-		si_readupsert(&q, &arg->vup, arg->upsert_eq);
-	if (arg->cache_only)
-		si_readcache_only(&q);
-	if (arg->oldest_only)
-		si_readoldest_only(&q);
-	if (arg->has)
-		si_readhas(&q);
+	q.upsert_v = &arg->vup;
+	q.upsert_eq = arg->upsert_eq;
+	q.cache_only = arg->cache_only;
+	q.oldest_only = arg->oldest_only;
+	q.has = arg->has;
 	r->rc = si_read(&q);
 	r->read_disk  += q.read_disk;
 	r->read_cache += q.read_cache;
@@ -14082,8 +14031,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	arg->cachegc     = cachegc;
 	arg->order       = o->order;
 	arg->has         = 0;
-	arg->upsert      = 0;
-	arg->upsert_eq   = 0;
 	arg->cache_only  = o->cache_only;
 	arg->oldest_only = o->oldest_only;
 	if (x) {
@@ -14094,6 +14041,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		arg->vlsn_generate = 1;
 	}
 	arg->upsert = 1;
+	arg->upsert_eq   = 0;
 	if (arg->order == PHIA_EQ) {
 		arg->order = PHIA_GE;
 		arg->upsert_eq = 1;
