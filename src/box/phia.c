@@ -8760,16 +8760,6 @@ si_unlock(struct si *i) {
 	tt_pthread_mutex_unlock(&i->lock);
 }
 
-static inline struct runtime*
-si_r(struct si *i) {
-	return &i->r;
-}
-
-static inline struct siconf*
-si_conf(struct si *i) {
-	return &i->conf;
-}
-
 static struct si *si_init(struct runtime*, struct phia_index*);
 static int si_recover(struct si*);
 static int si_close(struct si*);
@@ -12955,7 +12945,6 @@ struct phia_index {
 
 struct phia_document {
 	struct phia_index *db;
-	int       created;
 	struct sv        v;
 	enum phia_order   order;
 	int       orderset;
@@ -13018,21 +13007,7 @@ phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 }
 
 static inline int
-phia_document_create(struct phia_document *o);
-
-int
-phia_document_open(struct phia_document *v)
-{
-	if (likely(v->created)) {
-		assert(v->v.v != NULL);
-		return 0;
-	}
-	int rc = phia_document_create(v);
-	if (unlikely(rc == -1))
-		return -1;
-	v->created = 1;
-	return 0;
-}
+phia_document_build(struct phia_document *o);
 
 static inline int
 phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
@@ -13051,8 +13026,9 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 }
 
 static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
-static struct phia_document *
-phia_index_read(struct phia_index*, struct phia_document*, struct sx*, int, struct sicache*);
+int
+phia_index_read(struct phia_index*, struct phia_document*,
+		struct phia_document **, struct sx*, int, struct sicache*);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_index*);
 static void phia_index_unbind(struct phia_index*, uint64_t);
@@ -13641,8 +13617,9 @@ phia_cursor_delete(struct phia_cursor *c)
 	ss_free(&e->a, c);
 }
 
-struct phia_document *
-phia_cursor_next(struct phia_cursor *c, struct phia_document *key)
+int
+phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
+		 struct phia_document **result)
 {
 	struct phia_index *db = key->db;
 	if (unlikely(! key->orderset))
@@ -13655,7 +13632,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document *key)
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
-	return phia_index_read(db, key, x, 0, c->cache);
+	return phia_index_read(db, key, result, x, 0, c->cache);
 }
 
 void
@@ -14002,53 +13979,55 @@ phia_index_result(struct phia_env *e, struct scread *r)
 		v->prefixsize = r->arg.prefixsize;
 	}
 
-	v->created = 1;
 	return v;
 }
 
-static struct phia_document *
+int
 phia_index_read(struct phia_index *db, struct phia_document *o,
-		struct sx *x, int x_search, struct sicache *cache)
+		struct phia_document **result, struct sx *x, int x_search,
+		struct sicache *cache)
 {
 	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
 
 	/* prepare the key */
-	int auto_close = !o->created;
-	int rc = phia_document_open(o);
+	int rc = phia_document_build(o);
 	if (unlikely(rc == -1))
-		goto error;
+		return -1;
 	rc = phia_document_validate_ro(o, db);
 	if (unlikely(rc == -1))
-		goto error;
-	if (unlikely(! sr_online(&db->index->status)))
-		goto error;
+		return -1;
+	if (unlikely(! sr_online(&db->index->status))) {
+		sr_error("%s", "index is not online");
+		return -1;
+	}
 
 	struct sv vup;
 	sv_init(&vup, &sv_vif, NULL, NULL);
-
-	struct phia_document *ret = NULL;
 
 	/* concurrent */
 	if (x_search && o->order == PHIA_EQ) {
 		/* note: prefix is ignored during concurrent
 		 * index search */
 		int rc = sx_get(x, &db->coindex, &o->v, &vup);
-		if (unlikely(rc == -1 || rc == 2 /* delete */))
-			goto error;
+		if (unlikely(rc == -1))
+			return -1;
+		if (rc == 2) { /* delete */
+			*result = NULL;
+			return 0;
+		}
 		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
+			struct phia_document *ret;
 			ret = phia_document_newv(e, db, &vup);
-			if (likely(ret)) {
-				ret->cache_only  = o->cache_only;
-				ret->oldest_only = o->oldest_only;
-				ret->created     = 1;
-				ret->orderset    = 1;
-			} else {
+			if (ret == NULL) {
 				sv_vunref(&db->index->r, vup.v);
+				return -1;
 			}
-			if (auto_close)
-				phia_document_delete(o);
-			return ret;
+			ret->cache_only  = o->cache_only;
+			ret->oldest_only = o->oldest_only;
+			ret->orderset    = 1;
+			*result = ret;
+			return 0;
 		}
 	} else {
 		sx_get_autocommit(&e->xm, &db->coindex);
@@ -14063,7 +14042,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 			if (vup.v)
 				sv_vunref(&db->index->r, vup.v);
 			sr_oom();
-			goto error;
+			return -1;
 		}
 	}
 
@@ -14101,26 +14080,38 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 	/* read index */
 	rc = sc_read(&q, &e->scheduler);
-	if (rc == 1) {
-		ret = phia_index_result(e, &q);
-		if (ret)
-			o->prefixcopy = NULL;
+	switch (rc) {
+	case 0:
+		/* not found */
+		sc_readclose(&q);
+		*result = NULL;
+		return 0;
+	case 1:
+		/* found */
+		*result = phia_index_result(e, &q);
+		sc_readclose(&q);
+		if (*result == NULL)
+			return -1;
+		o->prefixcopy = NULL;
+		return 0;
+	case 2:
+		/* cache miss */
+		assert(o->cache_only);
+		sc_readclose(&q);
+		*result = NULL;
+		return 0;
+	default:
+		assert(rc < 0);
+		sc_readclose(&q);
+		return -1;
 	}
-	sc_readclose(&q);
-
-	if (auto_close)
-		phia_document_delete(o);
-	return ret;
-error:
-	if (auto_close)
-		phia_document_delete(o);
-	return NULL;
 }
 
-struct phia_document *
-phia_index_get(struct phia_index *db, struct phia_document *key)
+int
+phia_index_get(struct phia_index *db, struct phia_document *key,
+	       struct phia_document **result)
 {
-	return phia_index_read(db, key, NULL, 0, NULL);
+	return phia_index_read(db, key, result, NULL, 0, NULL);
 }
 
 struct phia_index *
@@ -14238,11 +14229,14 @@ static int phia_index_recoverend(struct phia_index *db)
 }
 
 static inline int
-phia_document_create(struct phia_document *o)
+phia_document_build(struct phia_document *o)
 {
 	struct phia_index *db = o->db;
 	struct sfscheme *scheme = &db->index->scheme1;
 	struct phia_env *e = db->env;
+
+	if (likely(o->v.v != NULL))
+		return 0;
 
 	assert(o->v.v == NULL);
 
@@ -14390,12 +14384,10 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	struct phia_env *e = t->env;
 	struct phia_index *db = o->db;
 
-	int auto_close = !o->created;
-
 	/* validate req */
 	if (unlikely(t->t.state == SXPREPARE)) {
 		sr_error("%s", "transaction is in 'prepare' state (read-only)");
-		goto error;
+		return -1;
 	}
 
 	/* validate index status */
@@ -14405,44 +14397,35 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	case SR_DROP_PENDING:
 		if (unlikely(! phia_index_visible(db, t->t.id))) {
 			sr_error("%s", "index is invisible for the transaction");
-			goto error;
+			return -1;
 		}
 		break;
 	case SR_RECOVER:
 	case SR_ONLINE: break;
-	default: goto error;
+	default:
+		assert(0);
+		return -1;
 	}
 
 	/* create document */
-	int rc = phia_document_open(o);
+	int rc = phia_document_build(o);
 	if (unlikely(rc == -1))
-		goto error;
+		return -1;
 	rc = phia_document_validate(o, db, flags);
 	if (unlikely(rc == -1))
-		goto error;
+		return -1;
 
 	struct svv *v = o->v.v;
 	sv_vref(v);
-
-	/* destroy document object */
 	int size = sv_vsize(v);
-	if (auto_close) {
-		ss_quota(&e->quota, SS_QADD, size);
-		phia_document_delete(o);
-	}
 
 	/* concurrent index only */
 	rc = sx_set(&t->t, &db->coindex, v);
-	if (unlikely(rc == -1)) {
-		if (auto_close)
-			ss_quota(&e->quota, SS_QREMOVE, size);
+	phia_document_delete(o);
+	if (unlikely(rc != 0))
 		return -1;
-	}
+	ss_quota(&e->quota, SS_QADD, size);
 	return 0;
-error:
-	if (auto_close)
-		phia_document_delete(o);
-	return -1;
 }
 
 int
@@ -14463,8 +14446,9 @@ phia_delete(struct phia_tx *tx, struct phia_document *key)
 	return phia_tx_write(tx, key, SVDELETE);
 }
 
-struct phia_document *
-phia_get(struct phia_tx *t, struct phia_document *key)
+int
+phia_get(struct phia_tx *t, struct phia_document *key,
+	 struct phia_document **result)
 {
 	struct phia_index *db = key->db;
 	/* validate index */
@@ -14474,18 +14458,17 @@ phia_get(struct phia_tx *t, struct phia_document *key)
 	case SR_DROP_PENDING:
 		if (unlikely(! phia_index_visible(db, t->t.id))) {
 			sr_error("%s", "index is invisible to the transaction");
-			goto error;
+			return -1;
 		}
 		break;
 	case SR_ONLINE:
 	case SR_RECOVER:
 		break;
-	default: goto error;
+	default:
+		assert(0);
+		return -1;
 	}
-	return phia_index_read(db, key, &t->t, 1, NULL);
-error:
-	phia_document_delete(key);
-	return NULL;
+	return phia_index_read(db, key, result, &t->t, 1, NULL);
 }
 
 static inline void

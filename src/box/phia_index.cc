@@ -140,6 +140,9 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	(void)part_count;
 	struct phia_document *obj = ((PhiaIndex *)this)->
 		createDocument(key, NULL);
+	auto key_guard = make_scoped_guard([=] {
+		phia_document_delete(obj);
+	});
 	struct phia_tx *transaction = NULL;
 	/* engine_tx might be empty, even if we are in txn context.
 	 *
@@ -150,33 +153,31 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 	 * retry using disk */
 	phia_document_set_cache_only(obj, true);
 	int rc;
-	rc = phia_document_open(obj);
-	if (rc == -1) {
-		phia_document_delete(obj);
-		phia_error();
-	}
-	struct phia_document *result;
+	struct phia_document *result = NULL;
 	if (transaction == NULL) {
-		result = phia_index_get(db, obj);
+		rc = phia_index_get(db, obj, &result);
 	} else {
-		result = phia_get(transaction, obj);
+		rc = phia_get(transaction, obj, &result);
 	}
-	if (result == NULL) {
+	if (rc != 0)
+		diag_raise();
+	if (result == NULL) { /* cache miss or not found */
 		phia_document_set_cache_only(obj, false);
 		if (transaction == NULL) {
-			result = phia_index_coget(db, obj);
+			rc = phia_index_coget(db, obj, &result);
 		} else {
-			result = phia_coget(transaction, obj);
+			rc = phia_coget(transaction, obj, &result);
 		}
-		phia_document_delete(obj);
-		if (result == NULL)
-			return NULL;
-	} else {
-		phia_document_delete(obj);
+		if (rc != 0)
+			diag_raise();
 	}
-	struct tuple *tuple = phia_tuple_new(result, key_def, format);
-	phia_document_delete(result);
-	return tuple;
+	if (result == NULL) /* not found */
+		return NULL;
+
+	auto result_guard = make_scoped_guard([=] {
+		phia_document_delete(result);
+	});
+	return phia_tuple_new(result, key_def, format);
 }
 
 struct tuple *
@@ -229,34 +230,31 @@ phia_iterator_next(struct iterator *ptr)
 {
 	struct phia_iterator *it = (struct phia_iterator *) ptr;
 	assert(it->cursor != NULL);
+	struct phia_document *result;
 
 	/* read from cache */
-	struct phia_document *obj = phia_cursor_next(it->cursor, it->current);
-	if (likely(obj != NULL)) {
-		phia_document_delete(it->current);
-		it->current = obj;
-		return phia_tuple_new(obj, it->key_def, it->space->format);
-
-	}
-	/* switch to asynchronous mode (read from disk) */
-	phia_document_set_cache_only(it->current, false);
-
-	obj = phia_cursor_conext(it->cursor, it->current);
-	if (obj == NULL) {
-		ptr->next = phia_iterator_last;
-		/* immediately close the cursor */
-		phia_cursor_delete(it->cursor);
-		phia_document_delete(it->current);
-		it->current = NULL;
-		it->cursor = NULL;
-		return NULL;
+	phia_document_set_cache_only(it->current, true);
+	if (phia_cursor_next(it->cursor, it->current, &result) != 0)
+		diag_raise();
+	if (result == NULL) { /* cache miss or not found */
+		/* switch to asynchronous mode (read from disk) */
+		phia_document_set_cache_only(it->current, false);
+		if (phia_cursor_conext(it->cursor, it->current, &result) != 0)
+			diag_raise();
 	}
 	phia_document_delete(it->current);
-	it->current = obj;
+	it->current = NULL;
+	if (result == NULL) { /* not found */
+		/* immediately close the cursor */
+		phia_cursor_delete(it->cursor);
+		it->cursor = NULL;
+		ptr->next = NULL;
+		return NULL;
+	}
 
-	/* switch back to synchronous mode */
-	phia_document_set_cache_only(obj, true);
-	return phia_tuple_new(obj, it->key_def, it->space->format);
+	/* found */
+	it->current = result;
+	return phia_tuple_new(result, it->key_def, it->space->format);
 }
 
 struct tuple *
@@ -341,14 +339,18 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	PhiaIndex *index = (PhiaIndex *)this;
 	struct phia_document *obj = index->createDocument(key, &it->keyend);
 	phia_document_set_order(obj, order);
-	obj = phia_cursor_conext(it->cursor, obj);
-	if (obj == NULL) {
+	int rc = phia_cursor_conext(it->cursor, obj, &it->current);
+	phia_document_delete(obj);
+	if (rc != 0) {
 		phia_cursor_delete(it->cursor);
 		it->cursor = NULL;
+		diag_raise();
+	}
+	if (it->current == NULL) { /* empty set */
+		phia_cursor_delete(it->cursor);
+		it->cursor = NULL;
+		ptr->next = phia_iterator_last;
 		return;
 	}
-	it->current = obj;
-	/* switch to sync mode (cache read) */
-	phia_document_set_cache_only(obj, 1);
 	ptr->next = phia_iterator_first;
 }
