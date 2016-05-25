@@ -3386,8 +3386,9 @@ sr_versionstorage_check(struct srversion *v)
 
 enum {
 	SR_OFFLINE,
+	SR_INITIAL_RECOVERY,
+	SR_FINAL_RECOVERY,
 	SR_ONLINE,
-	SR_RECOVER,
 	SR_SHUTDOWN_PENDING,
 	SR_SHUTDOWN,
 	SR_DROP_PENDING,
@@ -3437,7 +3438,8 @@ sr_statusactive_is(int status)
 {
 	switch (status) {
 	case SR_ONLINE:
-	case SR_RECOVER:
+	case SR_INITIAL_RECOVERY:
+	case SR_FINAL_RECOVERY:
 		return 1;
 	case SR_SHUTDOWN_PENDING:
 	case SR_SHUTDOWN:
@@ -13010,42 +13012,32 @@ struct phia_cursor {
 	struct sicache *cache;
 };
 
-int
-phia_recover(struct phia_env *e)
+void
+phia_bootstrap(struct phia_env *e)
 {
-	/* recover phases */
-	int status = sr_status(&e->status);
-	if (status == SR_RECOVER) {
-		sr_statusset(&e->status, SR_ONLINE);
-		return 0;
-	}
-	if (status == SR_ONLINE) {
-		sr_statusset(&e->status, SR_RECOVER);
-		return 0;
-	}
-	if (status != SR_OFFLINE)
-		return -1;
-
-	/* validate configuration */
-	int rc;
-	rc = se_confvalidate(&e->conf);
-	if (unlikely(rc == -1))
-		return -1;
-	sr_statusset(&e->status, SR_RECOVER);
-
-	/* set memory quota (disable during recovery) */
-	ss_quotaset(&e->quota, e->conf.memory_limit);
-	ss_quotaenable(&e->quota, 0);
-
-	/* Ensure phia data directory exists. */
-	rc = sr_checkdir(&e->r, e->conf.path);
-	if (unlikely(rc == -1))
-		return -1;
-	/* enable quota */
-	ss_quotaenable(&e->quota, 1);
+	assert(sr_status(&e->status) == SR_OFFLINE);
 	sr_statusset(&e->status, SR_ONLINE);
+}
 
-	return 0;
+void
+phia_begin_initial_recovery(struct phia_env *e)
+{
+	assert(sr_status(&e->status) == SR_OFFLINE);
+	sr_statusset(&e->status, SR_INITIAL_RECOVERY);
+}
+
+void
+phia_begin_final_recovery(struct phia_env *e)
+{
+	assert(sr_status(&e->status) == SR_INITIAL_RECOVERY);
+	sr_statusset(&e->status, SR_FINAL_RECOVERY);
+}
+
+void
+phia_end_recovery(struct phia_env *e)
+{
+	assert(sr_status(&e->status) == SR_FINAL_RECOVERY);
+	sr_statusset(&e->status, SR_ONLINE);
 }
 
 int
@@ -13779,7 +13771,7 @@ phia_index_open(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
 	int status = sr_status(&db->index->status);
-	if (status == SR_RECOVER ||
+	if (status == SR_FINAL_RECOVERY ||
 	    status == SR_DROP_PENDING)
 		goto online;
 	if (status != SR_OFFLINE)
@@ -14157,7 +14149,7 @@ phia_index_size(struct phia_index *db)
 static int phia_index_recoverbegin(struct phia_index *db)
 {
 	/* open and recover repository */
-	sr_statusset(&db->index->status, SR_RECOVER);
+	sr_statusset(&db->index->status, SR_FINAL_RECOVERY);
 	/* do not allow to recover existing indexes
 	 * during online (only create), since logpool
 	 * reply is required. */
@@ -14352,7 +14344,8 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 			return -1;
 		}
 		break;
-	case SR_RECOVER:
+	case SR_INITIAL_RECOVERY:
+	case SR_FINAL_RECOVERY:
 	case SR_ONLINE: break;
 	default:
 		assert(0);
@@ -14414,7 +14407,8 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 		}
 		break;
 	case SR_ONLINE:
-	case SR_RECOVER:
+	case SR_INITIAL_RECOVERY:
+	case SR_FINAL_RECOVERY:
 		break;
 	default:
 		assert(0);
@@ -14489,7 +14483,7 @@ phia_commit(struct phia_tx *t)
 	int status = sr_status(&e->status);
 	if (unlikely(! sr_statusactive_is(status)))
 		return -1;
-	int recover = (status == SR_RECOVER);
+	int recover = (status == SR_FINAL_RECOVERY);
 
 	/* prepare transaction */
 	if (t->t.state == SXREADY || t->t.state == SXLOCK)
@@ -14622,9 +14616,24 @@ phia_env_new(void)
 	z->branch_age_period = cfg_geti("phia.branch_age_period");
 	z->branch_age_wm = cfg_geti("phia.branch_age_wm");
 
+	/* validate configuration */
+	rc = se_confvalidate(&e->conf);
+	if (unlikely(rc == -1))
+		goto error;
+
+	/* set memory quota (disable during recovery) */
+	ss_quotaset(&e->quota, e->conf.memory_limit);
+	ss_quotaenable(&e->quota, 0);
+
+	/* Ensure phia data directory exists. */
+	rc = sr_checkdir(&e->r, e->conf.path);
+	if (unlikely(rc == -1))
+		goto error;
+	/* enable quota */
+	ss_quotaenable(&e->quota, 1);
+
 	return e;
 error:
-	sr_statusfree(&e->status);
 	phia_env_delete(e);
 	return NULL;
 }

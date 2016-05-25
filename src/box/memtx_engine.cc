@@ -666,7 +666,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::recoverToCheckpoint(int64_t lsn)
+MemtxEngine::beginInitialRecovery()
 {
 	assert(m_state == MEMTX_INITIALIZED);
 	/*
@@ -679,11 +679,19 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	 * discard duplicates in the snapshot.
 	 */
 	m_state = (m_snap_dir.panic_if_error ?
-		   MEMTX_READING_SNAPSHOT : MEMTX_OK);
+		   MEMTX_INITIAL_RECOVERY : MEMTX_OK);
+
+	/*
+	 * JOIN from remote master - empty data directory.
+	 */
+	if (!m_has_checkpoint)
+		return;
 
 	/* Process existing snapshot */
 	say_info("recovery start");
-	struct xlog *snap = xlog_open_xc(&m_snap_dir, lsn);
+	assert(m_has_checkpoint);
+	int64_t signature = m_last_checkpoint.signature;
+	struct xlog *snap = xlog_open_xc(&m_snap_dir, signature);
 	auto guard = make_scoped_guard([=]{ xlog_close(snap); });
 	/* Save server UUID */
 	SERVER_UUID = snap->server_uuid;
@@ -714,29 +722,35 @@ MemtxEngine::recoverToCheckpoint(int64_t lsn)
 	 */
 	if (!cursor.eof_read)
 		panic("snapshot `%s' has no EOF marker", snap->filename);
+}
 
-	if (m_state == MEMTX_READING_SNAPSHOT) {
-		/* End of the fast path: loaded the primary key. */
-		space_foreach(memtx_end_build_primary_key, this);
+void
+MemtxEngine::beginFinalRecovery()
+{
+	if (m_state == MEMTX_OK)
+		return;
 
-		if (m_panic_on_wal_error) {
-			/*
-			 * Fast start path: "play out" WAL
-			 * records using the primary key only,
-			 * then bulk-build all secondary keys.
-			 */
-			m_state = MEMTX_READING_WAL;
-		} else {
-			/*
-			 * If panic_on_wal_error = false, it's
-			 * a disaster recovery mode. Build
-			 * secondary keys before reading the WAL,
-			 * to detect and discard duplicates in
-			 * unique keys.
-			 */
-			m_state = MEMTX_OK;
-			space_foreach(memtx_build_secondary_keys, this);
-		}
+	assert(m_state == MEMTX_INITIAL_RECOVERY);
+	/* End of the fast path: loaded the primary key. */
+	space_foreach(memtx_end_build_primary_key, this);
+
+	if (m_panic_on_wal_error) {
+		/*
+		 * Fast start path: "play out" WAL
+		 * records using the primary key only,
+		 * then bulk-build all secondary keys.
+		 */
+		m_state = MEMTX_FINAL_RECOVERY;
+	} else {
+		/*
+		 * If panic_on_wal_error = false, it's
+		 * a disaster recovery mode. Build
+		 * secondary keys before reading the WAL,
+		 * to detect and discard duplicates in
+		 * unique keys.
+		 */
+		m_state = MEMTX_OK;
+		space_foreach(memtx_build_secondary_keys, this);
 	}
 }
 
@@ -750,6 +764,7 @@ MemtxEngine::endRecovery()
 	 * - it's a replication join
 	 */
 	if (m_state != MEMTX_OK) {
+		assert(m_state == MEMTX_FINAL_RECOVERY);
 		m_state = MEMTX_OK;
 		space_foreach(memtx_build_secondary_keys, this);
 	}
@@ -769,11 +784,11 @@ memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 	case MEMTX_INITIALIZED:
 		panic("can't create a new space before snapshot recovery");
 		break;
-	case MEMTX_READING_SNAPSHOT:
+	case MEMTX_INITIAL_RECOVERY:
 		((MemtxIndex *) space->index[0])->beginBuild();
 		handler->replace = memtx_replace_build_next;
 		break;
-	case MEMTX_READING_WAL:
+	case MEMTX_FINAL_RECOVERY:
 		((MemtxIndex *) space->index[0])->beginBuild();
 		((MemtxIndex *) space->index[0])->endBuild();
 		handler->replace = memtx_replace_primary_key;
@@ -1005,6 +1020,9 @@ MemtxEngine::commit(struct txn *txn, int64_t signature)
 void
 MemtxEngine::bootstrap()
 {
+	assert(m_state == MEMTX_INITIALIZED);
+	m_state = MEMTX_OK;
+
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
 	struct xdir dir;
@@ -1023,12 +1041,6 @@ MemtxEngine::bootstrap()
 	struct xrow_header row;
 	while (xlog_cursor_next_xc(&cursor, &row) == 0)
 		recoverSnapshotRow(&row);
-}
-
-void
-MemtxEngine::beginJoin()
-{
-	m_state = MEMTX_OK;
 }
 
 static void

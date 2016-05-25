@@ -87,11 +87,6 @@ bool Engine::needToBuildSecondaryKey(struct space * /* space */)
 	return true;
 }
 
-void
-Engine::beginJoin()
-{
-}
-
 int
 Engine::beginCheckpoint()
 {
@@ -112,16 +107,6 @@ Engine::commitCheckpoint()
 
 void
 Engine::abortCheckpoint()
-{
-}
-
-void
-Engine::endRecovery()
-{
-}
-
-void
-Engine::recoverToCheckpoint(int64_t /* lsn */)
 {
 }
 
@@ -259,16 +244,6 @@ void engine_shutdown()
 }
 
 void
-engine_recover_to_checkpoint(int64_t checkpoint_id)
-{
-	/* recover engine snapshot */
-	Engine *engine;
-	engine_foreach(engine) {
-		engine->recoverToCheckpoint(checkpoint_id);
-	}
-}
-
-void
 engine_bootstrap()
 {
 	Engine *engine;
@@ -278,27 +253,21 @@ engine_bootstrap()
 }
 
 void
-engine_begin_join()
+engine_begin_initial_recovery()
 {
 	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
-		engine->beginJoin();
+		engine->beginInitialRecovery();
 	}
 }
 
 void
-engine_begin_wal_recovery()
+engine_begin_final_recovery()
 {
 	Engine *engine;
 	engine_foreach(engine)
-		engine->beginWalRecovery();
-}
-
-void
-engine_end_join()
-{
-	/* just for symmetry with engine_begin_join() */
+		engine->beginFinalRecovery();
 }
 
 void

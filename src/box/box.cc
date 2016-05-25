@@ -1277,14 +1277,14 @@ bootstrap_from_master(struct server *master)
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
-	engine_begin_join();
+	engine_begin_initial_recovery();
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 
 	/*
 	 * Process final data (WALs).
 	 */
-	engine_begin_wal_recovery();
+	engine_begin_final_recovery();
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
 
@@ -1292,7 +1292,7 @@ bootstrap_from_master(struct server *master)
 	vclock_copy(&recovery->vclock, &applier->vclock);
 
 	/* Finalize the new replica */
-	engine_end_join();
+	engine_end_recovery();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_CONNECTED, TIMEOUT_INFINITY);
@@ -1358,11 +1358,11 @@ box_init(void)
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("panic_on_wal_error"),
 					&checkpoint_vclock);
-		/* Tell Phia engine LSN it must recover to. */
-		engine_recover_to_checkpoint(lsn);
+		engine_begin_initial_recovery();
+
 		/* Replace server vclock using the data from snapshot */
 		vclock_copy(&recovery->vclock, &checkpoint_vclock);
-		engine_begin_wal_recovery();
+		engine_begin_final_recovery();
 		title("orphan");
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
@@ -1376,6 +1376,8 @@ box_init(void)
 		recovery_finalize(recovery, &wal_stream.base);
 
 		box_sync_replication_source();
+
+		engine_end_recovery();
 	} else {
 		/* TODO: don't create recovery for this case */
 		vclock_create(&checkpoint_vclock);
@@ -1401,7 +1403,6 @@ box_init(void)
 		wal_writer_start(wal_mode, cfg_gets("wal_dir"), &SERVER_UUID,
 				 &recovery->vclock, rows_per_wal);
 	}
-	engine_end_recovery();
 
 	rmean_cleanup(rmean_box);
 

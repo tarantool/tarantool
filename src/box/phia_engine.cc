@@ -357,20 +357,33 @@ PhiaEngine::init()
 	if (env == NULL)
 		panic("failed to create phia environment");
 	worker_pool_size = cfg_geti("phia.threads");
-	int rc = phia_recover(env);
-	if (rc == -1)
-		phia_raise();
+}
+
+void
+PhiaEngine::bootstrap()
+{
+	phia_bootstrap(env);
+	recovery_complete = 1;
+}
+
+void
+PhiaEngine::beginInitialRecovery()
+{
+	phia_begin_initial_recovery(env);
+}
+
+void
+PhiaEngine::beginFinalRecovery()
+{
+	phia_begin_final_recovery(env);
 }
 
 void
 PhiaEngine::endRecovery()
 {
-	if (recovery_complete)
-		return;
+	assert(!recovery_complete);
 	/* complete two-phase recovery */
-	int rc = phia_recover(env);
-	if (rc == -1)
-		phia_raise();
+	phia_end_recovery(env);
 	recovery_complete = 1;
 }
 
@@ -619,14 +632,6 @@ PhiaEngine::rollback(struct txn *txn)
 	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
 	phia_rollback(tx);
 	txn->engine_tx = NULL;
-}
-
-void
-PhiaEngine::beginWalRecovery()
-{
-	int rc = phia_recover(env);
-	if (rc == -1)
-		phia_raise();
 }
 
 int

@@ -72,8 +72,17 @@ int
 phia_confcursor_next(struct phia_confcursor *confcursor, const char **key,
 		     const char **value);
 
-int
-phia_recover(struct phia_env *env);
+void
+phia_bootstrap(struct phia_env *e);
+
+void
+phia_begin_initial_recovery(struct phia_env *e);
+
+void
+phia_begin_final_recovery(struct phia_env *e);
+
+void
+phia_end_recovery(struct phia_env *e);
 
 int
 phia_checkpoint(struct phia_env *env);
