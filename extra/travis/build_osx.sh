@@ -1,3 +1,4 @@
+brew install openssl
 sudo pip install python-daemon PyYAML
 sudo pip install six==1.9.0
 sudo pip install gevent

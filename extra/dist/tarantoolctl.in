@@ -150,8 +150,8 @@ local group_name
 --
 -- overrides for defaults files
 --
--- local instance_dir
--- local default_cfg
+local instance_dir
+local default_cfg
 
 --
 -- print usage and exit
@@ -240,17 +240,24 @@ end
 --
 -- System-wide default file may be missing, this is OK, we'll assume built-in
 -- defaults
+-- It uses sandboxing for isolation. It's not completely safe, but it won't
+-- allow a pollution of global variables
 --
 local function load_default_file(default_file)
     if default_file then
-        local success, data = pcall(dofile, default_file)
+        local env = setmetatable({}, { __index = _G })
+        local ufunc, msg = loadfile(default_file)
         -- if load fails - show last 10 lines of the log file
-        if not success then
-            log.error("Failed to load defaults file: %s", data)
-            if fio.stat(default_cfg.logger) then
-                os.execute('tail -n 10 ' .. default_cfg.logger)
-            end
+        if not ufunc then
+            log.error("Failed to load defaults file: %s", msg)
         end
+        debug.setfenv(ufunc, env)
+        local state, msg = pcall(ufunc)
+        if not state then
+            log.error('Failed to execute defaults file: %s', msg)
+        end
+        default_cfg = env.default_cfg
+        instance_dir = env.instance_dir
     end
     local d = default_cfg or {}
 
