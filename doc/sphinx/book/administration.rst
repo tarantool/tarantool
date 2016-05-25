@@ -246,10 +246,10 @@ Explanatory notes about what tarantool displayed in the above example:
 With ``tarantoolctl`` one can say: "start an instance of the Tarantool server
 which runs a single user-written Lua program, allocating disk resources
 specifically for that program, via a standardized deployment method."
-If Tarantool was downloaded from source, then the script is in
-:file:`[tarantool]/extra/dist/tarantoolctl`. If Tarantool was installed with Debian or
-Red Hat installation packages, the script is renamed :program:`tarantoolctl`
-and is in :file:`/usr/bin/tarantoolctl`. The script handles such things as:
+If Tarantool was installed with Debian or
+Red Hat installation packages, the script is 
+in :file:`/usr/bin/tarantoolctl` or :file:`/usr/local/bin/tarantoolctl`.
+The script handles such things as:
 starting, stopping, rotating logs, logging in to the application's console,
 and checking status.
 
@@ -300,11 +300,11 @@ The settings in the above script are:
     add ":samp:`/{instance-name}.log`" to the name.
 
 ``username``
-    the user that runs the tarantool server. This is the operating-system
+    The user that runs the tarantool server. This is the operating-system
     user name rather than the Tarantool-client user name.
 
 ``instance_dir``
-    the directory where all applications for this host are stored. The user
+    The directory where all applications for this host are stored. The user
     who writes an application for :program:`tarantoolctl` must put the
     application's source code in this directory, or a symbolic link. For
     examples in this section the application name my_app will be used, and
@@ -320,11 +320,11 @@ operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
 .. option:: start <application>
 
-    Starts application *<application>*
+    Start application *<application>*
 
 .. option:: stop <application>
 
-    Stops application
+    Stop application
 
 .. option:: enter <application>
 
@@ -336,7 +336,7 @@ operation is one of: start, stop, enter, logrotate, status, eval. Thus ...
 
 .. option:: status <application>
 
-    Check application's status status
+    Check application's status
 
 .. option:: eval <application> <scriptname>
 
@@ -388,6 +388,7 @@ can start a long-running application and monitor it.
 
 The assumptions are: the root password is known, the computer is only being used
 for tests, the Tarantool server is ready to run but is not currently running,
+tarantoolctl is installed along the user's path,
 and there currently is no directory named :file:`tarantool_test`.
 
 Create a directory named /tarantool_test:
@@ -396,37 +397,8 @@ Create a directory named /tarantool_test:
 
     $ sudo mkdir /tarantool_test
 
-Copy tarantoolctl to /tarantool_test. If you made a source
-download to ~/tarantool-1.6, then
-
-.. code-block:: console
-
-    $ sudo cp ~/tarantool-1.6/extra/dist/tarantoolctl /tarantool_test/tarantoolctl
-
-If the file was named tarantoolctl and placed on :file:`/usr/bin/tarantoolctl`, then
-
-.. code-block:: console
-
-    $ sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl
-
-Check and possibly change the first line of :file:`code/tarantool_test/tarantoolctl`.
-Initially it says
-
-.. code-block:: bash
-
-    #!/usr/bin/env tarantool
-
-If that is not correct, edit tarantoolctl and change the line. For example,
-if the Tarantool server is actually on :file:`/home/user/tarantool-1.6/src/tarantool`,
-change the line to
-
-.. code-block:: bash
-
-    #!/usr/bin/env /home/user/tarantool-1.6/src/tarantool
-
-Save a copy of :file:`/etc/sysconfig/tarantool`, if it exists.
-
-Edit /etc/sysconfig/tarantool. It might be necessary to say sudo mkdir /etc/sysconfig first. Let the new file contents be:
+Edit /etc/sysconfig/tarantool. It might be necessary to
+say :codenormal:`sudo mkdir /etc/sysconfig` first. Let the new file contents be:
 
 .. code-block:: lua
 
@@ -463,7 +435,7 @@ Tell tarantoolctl to start the application ...
 .. code-block:: console
 
     $ cd /tarantool_test
-    $ sudo ./tarantoolctl start my_app
+    $ sudo tarantoolctl start my_app
 
 ... expect to see messages indicating that the instance has started. Then ...
 
@@ -471,11 +443,11 @@ Tell tarantoolctl to start the application ...
 
     $ ls -l /tarantool_test/my_app
 
-... expect to see the .snap file, .xlog file, and sophia directory. Then ...
+... expect to see the .snap file and the .xlog file. Then ...
 
 .. code-block:: console
 
-    $ less /tarantool_test/log/my_app.log
+    $ sudo less /tarantool_test/log/my_app.log
 
 ... expect to see the contents of my_app's log, including error messages, if any. Then ...
 
@@ -495,7 +467,7 @@ Stop. The only clean way to stop my_app is with tarantoolctl, thus:
 
 .. code-block:: console
 
-    $ sudo ./tarantoolctl stop my_app
+    $ sudo tarantoolctl stop my_app
 
 Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
 
