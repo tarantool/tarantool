@@ -405,7 +405,7 @@ box_sync_replication_source(void)
 extern "C" void
 box_set_replication_source(void)
 {
-	if (wal == NULL) {
+	if (!box_init_done) {
 		/*
 		 * Do nothing, we're in local hot standby mode, the server
 		 * will automatically begin following the replica when local
@@ -962,7 +962,7 @@ box_process_auth(struct request *request, struct obuf *out)
 	assert(request->type == IPROTO_AUTH);
 
 	/* Check that bootstrap has been finished */
-	if (wal == NULL)
+	if (!box_init_done)
 		tnt_raise(ClientError, ER_LOADING);
 
 	const char *user = request->key;
@@ -1021,7 +1021,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	xrow_decode_join(header, &server_uuid);
 
 	/* Check that bootstrap has been finished */
-	if (wal == NULL)
+	if (!box_init_done)
 		tnt_raise(ClientError, ER_LOADING);
 
 	/* Forbid connection to itself */
@@ -1089,7 +1089,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	assert(header->type == IPROTO_SUBSCRIBE);
 
 	/* Check that bootstrap has been finished */
-	if (wal == NULL)
+	if (!box_init_done)
 		tnt_raise(ClientError, ER_LOADING);
 
 	struct tt_uuid cluster_uuid = uuid_nil, replica_uuid = uuid_nil;
@@ -1097,10 +1097,6 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	vclock_create(&replica_clock);
 	xrow_decode_subscribe(header, &cluster_uuid, &replica_uuid,
 			      &replica_clock);
-
-	/* Check that bootstrap has been finished */
-	if (wal == NULL)
-		tnt_raise(ClientError, ER_LOADING);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &SERVER_UUID))

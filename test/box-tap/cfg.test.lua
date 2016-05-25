@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(36)
+test:plan(37)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -178,6 +178,19 @@ os.remove(path2)
 code = " box.cfg{ listen='unix/:'" .. path .. "' } "
 run_script(code)
 test:isnil(fio.stat(path), "delete socket at exit")
+
+-- gh-1499: AUTH raises ER_LOADING if wal_mode is 'none'
+code = [[
+box.cfg{wal_mode = 'none', listen='unix/:./tarantool.sock' }
+box.once("bootstrap", function()
+    box.schema.user.create("test", { password = '123'  })
+end)
+local conn = require('net.box').new('unix/:./tarantool.sock',
+    { user = 'test', password = '123' })
+if not conn:ping() then os.exit(1) end
+os.exit(0)
+]]
+test:is(run_script(code), 0, "wal_mode none and ER_LOADING")
 
 test:check()
 os.exit(0)
