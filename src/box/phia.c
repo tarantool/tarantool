@@ -12806,7 +12806,6 @@ struct phia_document {
 	struct phia_index *db;
 	struct svv *value;
 	enum phia_order   order;
-	int       orderset;
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
@@ -13455,8 +13454,6 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
 		 struct phia_document **result)
 {
 	struct phia_index *db = key->db;
-	if (unlikely(! key->orderset))
-		key->order = PHIA_GE;
 	/* this statistics might be not complete, because
 	 * last statement is not accounted here */
 	c->read_disk  += key->read_disk;
@@ -13815,7 +13812,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 			}
 			ret->value = vup;
 			ret->cache_only  = o->cache_only;
-			ret->orderset    = 1;
 			*result = ret;
 			return 0;
 		}
@@ -13911,7 +13907,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 	/* propagate current document settings to
 	 * the result one */
-	v->orderset = 1;
 	v->order = q.order;
 	if (v->order == PHIA_GE)
 		v->order = PHIA_GT;
@@ -14111,7 +14106,6 @@ void
 phia_document_set_order(struct phia_document *doc, enum phia_order order)
 {
 	doc->order = order;
-	doc->orderset = 1;
 }
 
 char *

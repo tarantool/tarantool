@@ -446,6 +446,7 @@ join_send_space(struct space *sp, void *data)
 	phia_cursor_set_read_commited(cursor, true);
 
 	struct phia_document *key = phia_document_new(pk->db);
+	phia_document_set_order(key, PHIA_GE);
 	while (1) {
 		struct phia_document *doc;
 		int rc = phia_cursor_next(cursor, key, &doc);
