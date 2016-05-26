@@ -12810,12 +12810,8 @@ struct phia_document {
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
-	void     *prefix;
-	void     *prefixcopy;
-	uint32_t  prefixsize;
 	/* read options */
 	int       cache_only;
-	int       oldest_only;
 	/* stats */
 	int       read_disk;
 	int       read_cache;
@@ -12841,10 +12837,6 @@ phia_document_delete(struct phia_document *v)
 	if (v->value)
 		si_gcv(&e->r, v->value);
 	v->value = NULL;
-	if (v->prefixcopy)
-		ss_free(&e->a, v->prefixcopy);
-	v->prefixcopy = NULL;
-	v->prefix = NULL;
 	ss_free(&e->a, v);
 	return 0;
 }
@@ -13823,7 +13815,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 			}
 			ret->value = vup;
 			ret->cache_only  = o->cache_only;
-			ret->oldest_only = o->oldest_only;
 			ret->orderset    = 1;
 			*result = ret;
 			return 0;
@@ -13864,10 +13855,8 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	si_readopen(&q, db->index, cache,
 	            order,
 	            vlsn,
-	            o->prefixcopy,
-	            o->prefixsize,
-		    o->value->data,
-		    o->value->size);
+	            NULL, 0,
+		    o->value->data, o->value->size);
 	struct sv sv_vup;
 	if (vup != NULL) {
 		sv_init(&sv_vup, &sv_vif, vup, NULL);
@@ -13875,7 +13864,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	}
 	q.upsert_eq = upsert_eq;
 	q.cache_only = o->cache_only;
-	q.oldest_only = o->oldest_only;
 	rc = si_read(&q);
 	si_readclose(&q);
 
@@ -13913,7 +13901,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	}
 	v->value = q.result;
 	v->cache_only   = o->cache_only;
-	v->oldest_only  = o->oldest_only;
 	v->read_disk   += q.read_disk;
 	v->read_cache  += q.read_cache;
 	v->read_latency = clock_monotonic64() - start;
@@ -13930,14 +13917,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		v->order = PHIA_GT;
 	else if (v->order == PHIA_LE)
 		v->order = PHIA_LT;
-
-	/* set prefix */
-	if (o->prefix) {
-		v->prefix = o->prefix;
-		v->prefixcopy = o->prefix;
-		v->prefixsize = o->prefixsize;
-	}
-	o->prefixcopy = NULL;
 
 	*result = v;
 	return 0;
@@ -14075,29 +14054,6 @@ phia_document_build(struct phia_document *o)
 
 	assert(o->value == NULL);
 
-	/* create document from raw data */
-	struct svv *v;
-	if (o->prefix) {
-		if (scheme->keys[0]->type != SS_STRING)
-			return sr_error("%s", "prefix search is only "
-			                "supported for a string key");
-
-		void *copy = ss_malloc(&e->a, o->prefixsize);
-		if (unlikely(copy == NULL))
-			return sr_oom();
-		memcpy(copy, o->prefix, o->prefixsize);
-		o->prefixcopy = copy;
-
-		if (o->fields_count_keys == 0 && o->prefix)
-		{
-			memset(o->fields, 0, sizeof(o->fields));
-			o->fields[0].pointer = o->prefix;
-			o->fields[0].size = o->prefixsize;
-			sf_limitset(&e->limit, scheme, o->fields, PHIA_GE);
-			goto allocate;
-		}
-	}
-
 	/* create document using current format, supplied
 	 * key-chain and value */
 	if (unlikely(o->fields_count_keys != scheme->keys_count))
@@ -14109,8 +14065,7 @@ phia_document_build(struct phia_document *o)
 		o->fields_count_keys = scheme->keys_count;
 	}
 
-allocate:
-	v = sv_vbuild(db->index->r, scheme, o->fields);
+	struct svv *v = sv_vbuild(db->index->r, scheme, o->fields);
 	if (unlikely(v == NULL))
 		return sr_oom();
 	o->value = v;
