@@ -14144,18 +14144,9 @@ phia_document_field(struct phia_document *v, const char *path, uint32_t *size)
 	if (unlikely(field == NULL))
 		return NULL;
 	/* result document */
-	if (v->value) {
-		return sf_fieldof(&db->index->scheme, field->position,
-				  v->value->data, size);
-	}
-	/* field document */
-	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
-	struct sfv *fv = &v->fields[field->position];
-	if (fv->pointer == NULL)
-		return NULL;
-	if (size)
-		*size = fv->size;
-	return fv->pointer;
+	assert(v->value);
+	return sf_fieldof(&db->index->scheme, field->position,
+			  v->value->data, size);
 }
 
 int64_t
