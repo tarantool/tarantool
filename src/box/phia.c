@@ -4016,14 +4016,10 @@ struct PACKED svv {
 	uint32_t size;
 	uint8_t  flags;
 	uint16_t refs;
+	char data[0];
 };
 
 static struct svif sv_vif;
-
-static inline char*
-sv_vpointer(struct svv *v) {
-	return (char*)(v) + sizeof(struct svv);
-}
 
 static inline uint32_t
 sv_vsize(struct svv *v) {
@@ -4041,7 +4037,7 @@ sv_vbuild(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
 	v->lsn       = 0;
 	v->flags     = 0;
 	v->refs      = 1;
-	char *ptr = sv_vpointer(v);
+	char *ptr = v->data;
 	sf_write(scheme, fields, ptr);
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
@@ -4061,7 +4057,7 @@ sv_vbuildraw(struct runtime *r, char *src, int size)
 	v->flags     = 0;
 	v->refs      = 1;
 	v->lsn       = 0;
-	memcpy(sv_vpointer(v), src, size);
+	memcpy(v->data, src, size);
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
@@ -5081,7 +5077,7 @@ struct PACKED svindex {
 };
 
 ss_rbget(sv_indexmatch,
-         sf_compare(scheme, sv_vpointer((container_of(n, struct svref, node))->v),
+         sf_compare(scheme, ((container_of(n, struct svref, node))->v)->data,
                     (container_of(n, struct svref, node))->v->size,
                     key, keysize))
 
@@ -5289,7 +5285,7 @@ sv_vset(struct svref *head, struct svref *v)
 static struct svref*
 sv_indexget(struct svindex *i, struct svindexpos *p, struct svref *v)
 {
-	p->rc = sv_indexmatch(&i->i, i->scheme, sv_vpointer(v->v), v->v->size, &p->node);
+	p->rc = sv_indexmatch(&i->i, i->scheme, v->v->data, v->v->size, &p->node);
 	if (p->rc == 0 && p->node)
 		return container_of(p->node, struct svref, node);
 	return NULL;
@@ -5338,7 +5334,7 @@ sv_refiflsnset(struct sv *v, uint64_t lsn) {
 
 static char*
 sv_refifpointer(struct sv *v) {
-	return sv_vpointer(((struct svref*)v->v)->v);
+	return (((struct svref*)v->v)->v)->data;
 }
 
 static uint32_t
@@ -5410,7 +5406,7 @@ sv_viflsnset(struct sv *v, uint64_t lsn) {
 
 static char*
 sv_vifpointer(struct sv *v) {
-	return sv_vpointer(((struct svv*)v->v));
+	return ((struct svv*)v->v)->data;
 }
 
 static uint32_t
@@ -6078,7 +6074,7 @@ static enum sxstate sx_commit(struct sx *x)
 }
 
 ss_rbget(sx_match,
-         sf_compare(scheme, sv_vpointer((container_of(n, struct sxv, node))->v),
+         sf_compare(scheme, ((container_of(n, struct sxv, node))->v)->data,
                     (container_of(n, struct sxv, node))->v->size,
                     key, keysize))
 
@@ -6105,7 +6101,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	/* update concurrent index */
 	struct ssrbnode *n = NULL;
 	int rc = sx_match(&index->i, index->scheme,
-	                  sv_vpointer(version),
+	                  version->data,
 	                  version->size,
 	                  &n);
 	if (unlikely(rc == 0 && n)) {
@@ -6295,7 +6291,7 @@ sx_viflsnset(struct sv *v, uint64_t lsn) {
 
 static char*
 sx_vifpointer(struct sv *v) {
-	return sv_vpointer(((struct sxv*)v->v)->v);
+	return (((struct sxv*)v->v)->v)->data;
 }
 
 static uint32_t
@@ -9920,7 +9916,7 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 			struct svref *v = ss_bufiterref_get(&i);
 			v->next = NULL;
 			struct sdindexpage *page = sd_indexmin(&p->self.index);
-			int rc = sf_compare(&index->scheme, sv_vpointer(v->v), v->v->size,
+			int rc = sf_compare(&index->scheme, v->v->data, v->v->size,
 			                    sd_indexpage_min(&p->self.index, page),
 			                    page->sizemin);
 			if (unlikely(rc >= 0))
@@ -9943,7 +9939,7 @@ si_redistribute_set(struct si *index, uint64_t now, struct svref *v)
 	index->update_time = now;
 	/* match node */
 	struct siiter ii;
-	si_iter_open(&ii, index, PHIA_GE, sv_vpointer(v->v), v->v->size);
+	si_iter_open(&ii, index, PHIA_GE, v->v->data, v->v->size);
 	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
 	/* update node */
@@ -12013,7 +12009,7 @@ static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
 	index->update_time = time;
 	/* match node */
 	struct siiter ii;
-	si_iter_open(&ii, index, PHIA_GE, sv_vpointer(v), v->size);
+	si_iter_open(&ii, index, PHIA_GE, v->data, v->size);
 	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
 	struct svref *ref = sv_refnew(index->r, v);
