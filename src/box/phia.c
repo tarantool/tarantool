@@ -12816,8 +12816,6 @@ struct phia_document {
 	void     *prefix;
 	void     *prefixcopy;
 	uint32_t  prefixsize;
-	void     *value;
-	uint32_t  valuesize;
 	/* read options */
 	int       cache_only;
 	int       oldest_only;
