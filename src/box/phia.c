@@ -12943,7 +12943,6 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 	return 0;
 }
 
-static struct phia_document *phia_index_result(struct phia_env*, struct scread*);
 int
 phia_index_read(struct phia_index*, struct phia_document*,
 		struct phia_document **, struct sx*, int, struct sicache*);
@@ -13848,48 +13847,6 @@ phia_index_drop(struct phia_index *db)
 	return 0;
 }
 
-static struct phia_document *
-phia_index_result(struct phia_env *e, struct scread *r)
-{
-	struct sv result;
-	sv_init(&result, &sv_vif, r->result, NULL);
-	r->result = NULL;
-
-	struct phia_document *v = phia_document_newv(e, r->db, &result);
-	if (unlikely(v == NULL))
-		return NULL;
-	v->cache_only   = r->cache_only;
-	v->oldest_only  = r->oldest_only;
-	v->read_disk    = r->read_disk;
-	v->read_cache   = r->read_cache;
-	v->read_latency = 0;
-	if (result.v) {
-		v->read_latency = clock_monotonic64() - r->start;
-		sr_statget(&e->stat,
-		           v->read_latency,
-		           v->read_disk,
-		           v->read_cache);
-	}
-
-	/* propagate current document settings to
-	 * the result one */
-	v->orderset = 1;
-	v->order = r->order;
-	if (v->order == PHIA_GE)
-		v->order = PHIA_GT;
-	else if (v->order == PHIA_LE)
-		v->order = PHIA_LT;
-
-	/* set prefix */
-	if (r->prefix) {
-		v->prefix = r->prefix;
-		v->prefixcopy = r->prefix;
-		v->prefixsize = r->prefixsize;
-	}
-
-	return v;
-}
-
 int
 phia_index_read(struct phia_index *db, struct phia_document *o,
 		struct phia_document **result, struct sx *x, int x_search,
@@ -13999,31 +13956,63 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	/* free read cache */
 	if (likely(cachegc))
 		si_cachepool_push(cache);
-	switch (rc) {
-	case 0:
+	if (rc < 0) {
+		/* error */
+		assert(q.result == NULL);
+		return -1;
+	} else if (rc == 0) {
 		/* not found */
 		assert(q.result == NULL);
 		*result = NULL;
 		return 0;
-	case 1:
-		/* found */
-		*result = phia_index_result(e, &q);
-		if (q.result != NULL)
-			sv_vunref(db->index->r, q.result);
-		if (*result == NULL)
-			return -1;
-		o->prefixcopy = NULL;
-		return 0;
-	case 2:
+	} else if (rc == 2) {
 		/* cache miss */
 		assert(q.result == NULL);
 		assert(o->cache_only);
 		*result = NULL;
 		return 0;
-	default:
-		assert(rc < 0);
+	}
+
+	/* found */
+	assert(rc == 1);
+
+	assert(q.result != NULL);
+	struct sv sv;
+	sv_init(&sv, &sv_vif, q.result, NULL);
+	struct phia_document *v = phia_document_newv(e, db, &sv);
+	if (unlikely(v == NULL)) {
+		sv_vunref(db->index->r, q.result);
 		return -1;
 	}
+	v->cache_only   = q.cache_only;
+	v->oldest_only  = q.oldest_only;
+	v->read_disk    = q.read_disk;
+	v->read_cache   = q.read_cache;
+	v->read_latency = clock_monotonic64() - q.start;
+	sr_statget(&e->stat,
+		   v->read_latency,
+		   v->read_disk,
+		   v->read_cache);
+
+	/* propagate current document settings to
+	 * the result one */
+	v->orderset = 1;
+	v->order = q.order;
+	if (v->order == PHIA_GE)
+		v->order = PHIA_GT;
+	else if (v->order == PHIA_LE)
+		v->order = PHIA_LT;
+
+	/* set prefix */
+	if (q.prefix) {
+		v->prefix = q.prefix;
+		v->prefixcopy = q.prefix;
+		v->prefixsize = q.prefixsize;
+	}
+	o->prefixcopy = NULL;
+
+	*result = v;
+	return 0;
 }
 
 int
