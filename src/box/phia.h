@@ -171,8 +171,17 @@ phia_index_size(struct phia_index *db);
  * Index Cursor
  */
 
+enum phia_order {
+	PHIA_LT,
+	PHIA_LE,
+	PHIA_GT,
+	PHIA_GE,
+	PHIA_EQ
+};
+
 struct phia_cursor *
-phia_cursor_new(struct phia_index *index);
+phia_cursor_new(struct phia_index *index, struct phia_document *key,
+		enum phia_order order);
 
 void
 phia_cursor_delete(struct phia_cursor *cursor);
@@ -181,20 +190,12 @@ void
 phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 
 int
-phia_cursor_next(struct phia_cursor *cursor, struct phia_document *key,
-		 struct phia_document **result, bool cache_only);
+phia_cursor_next(struct phia_cursor *cursor, struct phia_document **result,
+		 bool cache_only);
 
 /*
  * Document
  */
-
-enum phia_order {
-	PHIA_LT,
-	PHIA_LE,
-	PHIA_GT,
-	PHIA_GE,
-	PHIA_EQ
-};
 
 struct phia_document *
 phia_document_new(struct phia_index *index);
@@ -208,9 +209,6 @@ phia_document_set_field(struct phia_document *doc, const char *path,
 
 char *
 phia_document_field(struct phia_document *doc, const char *path, uint32_t *size);
-
-void
-phia_document_set_order(struct phia_document *doc, enum phia_order order);
 
 int64_t
 phia_document_lsn(struct phia_document *doc);

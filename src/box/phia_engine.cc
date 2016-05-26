@@ -267,7 +267,7 @@ phia_cursor_next_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	return phia_cursor_next(task->cursor, task->key, &task->result, false);
+	return phia_cursor_next(task->cursor, &task->result, false);
 }
 
 static ssize_t
@@ -320,10 +320,9 @@ phia_coget(struct phia_tx *tx, struct phia_document *key,
 }
 
 int
-phia_cursor_conext(struct phia_cursor *cursor, struct phia_document *key,
-		   struct phia_document **result)
+phia_cursor_conext(struct phia_cursor *cursor, struct phia_document **result)
 {
-	return phia_read_task(NULL, NULL, cursor, key, result,
+	return phia_read_task(NULL, NULL, cursor, NULL, result,
 			      phia_cursor_next_cb);
 }
 
@@ -433,9 +432,12 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	struct phia_cursor *cursor = phia_cursor_new(pk->db);
-	if (cursor == NULL)
+	struct phia_document *key = phia_document_new(pk->db);
+	struct phia_cursor *cursor = phia_cursor_new(pk->db, key, PHIA_GE);
+	if (cursor == NULL) {
+		phia_document_delete(key);
 		phia_raise();
+	}
 	auto cursor_guard = make_scoped_guard([=]{
 		phia_cursor_delete(cursor);
 	});
@@ -445,31 +447,26 @@ join_send_space(struct space *sp, void *data)
 	 * for duplicates */
 	phia_cursor_set_read_commited(cursor, true);
 
-	struct phia_document *key = phia_document_new(pk->db);
-	phia_document_set_order(key, PHIA_GE);
 	while (1) {
 		struct phia_document *doc;
-		int rc = phia_cursor_next(cursor, key, &doc, false);
-		phia_document_delete(key);
+		int rc = phia_cursor_next(cursor, &doc, false);
 		if (rc != 0)
 			diag_raise();
 		if (doc == NULL)
 			break; /* eof */
-		key = doc;
 		int64_t lsn = phia_document_lsn(doc);
 		uint32_t tuple_size;
 		char *tuple = phia_tuple_data_new(doc, pk->key_def,
 						  &tuple_size);
+		phia_document_delete(doc);
 		try {
 			phia_send_row(stream, pk->key_def->space_id,
 				      tuple, tuple_size, lsn);
 		} catch (Exception *e) {
 			free(tuple);
-			phia_document_delete(doc);
 			throw;
 		}
 		free(tuple);
-		key = doc;
 	}
 }
 

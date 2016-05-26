@@ -12811,7 +12811,6 @@ struct phia_index {
 struct phia_document {
 	struct phia_index *db;
 	struct svv *value;
-	enum phia_order   order;
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
@@ -12833,25 +12832,15 @@ int
 phia_document_delete(struct phia_document *v)
 {
 	struct phia_env *e = v->db->env;
-	if (v->value)
-		si_gcv(&e->r, v->value);
+	if (v->value != NULL)
+		sv_vunref(v->db->index->r, v->value);
 	v->value = NULL;
 	ss_free(&e->a, v);
 	return 0;
 }
 
-
 static inline int
-phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
-{
-	if (unlikely(o->db != dest))
-		return sr_error("%s", "incompatible document parent db");
-	o->value->flags = SVGET;
-	return 0;
-}
-
-static inline int
-phia_document_build(struct phia_document *o);
+phia_document_build(struct phia_document *o, enum phia_order order);
 
 static inline int
 phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
@@ -12869,8 +12858,8 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 }
 
 int
-phia_index_read(struct phia_index*, struct phia_document*,
-		struct phia_document **, struct sx*, int, struct sicache*,
+phia_index_read(struct phia_index*, struct svv*, enum phia_order order,
+		struct svv **, struct sx*, int, struct sicache*,
 		bool cache_only, struct phia_statget *);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_index*);
@@ -12889,6 +12878,8 @@ struct phia_tx {
 
 struct phia_cursor {
 	struct phia_index *db;
+	struct svv *key;
+	enum phia_order order;
 	struct svlog log;
 	struct sx t;
 	uint64_t start;
@@ -13442,6 +13433,8 @@ phia_cursor_delete(struct phia_cursor *c)
 		sx_rollback(&c->t);
 	if (c->cache)
 		si_cachepool_push(c->cache);
+	if (c->key)
+		sv_vunref(c->db->index->r, c->key);
 	phia_index_unbind(c->db, id);
 	sr_statcursor(&e->stat, c->start,
 	              c->read_disk,
@@ -13451,25 +13444,51 @@ phia_cursor_delete(struct phia_cursor *c)
 }
 
 int
-phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
-		 struct phia_document **result, bool cache_only)
+phia_cursor_next(struct phia_cursor *c, struct phia_document **result,
+		 bool cache_only)
 {
-	struct phia_index *db = key->db;
+	struct phia_index *db = c->db;
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
 
+	struct svv *value;
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, x, 0, c->cache, cache_only,
-			    &statget) != 0) {
+	assert(c->key != NULL);
+	if (phia_index_read(db, c->key, c->order, &value, x, 0, c->cache,
+			    cache_only, &statget) != 0) {
 		return -1;
 	}
 
 	c->ops++;
-	if (*result != NULL) {
-		c->read_disk += statget.read_disk;
-		c->read_cache += statget.read_cache;
+	if (value == NULL) {
+		if (!cache_only) {
+			 sv_vunref(db->index->r, c->key);
+			 c->key = NULL;
+		}
+		 *result = NULL;
+		 return 0;
 	}
+
+	struct phia_document *doc = phia_document_new(db);
+	if (unlikely(doc == NULL)) {
+		sv_vunref(db->index->r, value);
+		return -1;
+	}
+	doc->value = value;
+	if (c->order == PHIA_GE)
+		c->order = PHIA_GT;
+	else if (c->order == PHIA_LE)
+		c->order = PHIA_LT;
+
+	c->read_disk += statget.read_disk;
+	c->read_cache += statget.read_cache;
+
+	sv_vunref(db->index->r, c->key);
+	c->key = value;
+	sv_vref(c->key);
+
+	*result = doc;
 	return 0;
 }
 
@@ -13481,8 +13500,14 @@ phia_cursor_set_read_commited(struct phia_cursor *c, bool read_commited)
 }
 
 struct phia_cursor *
-phia_cursor_new(struct phia_index *db)
+phia_cursor_new(struct phia_index *db, struct phia_document *key,
+		enum phia_order order)
 {
+	/* prepare the key */
+	int rc = phia_document_build(key, order);
+	if (unlikely(rc == -1))
+		return NULL;
+
 	struct phia_env *e = db->env;
 	struct phia_cursor *c;
 	c = ss_malloc(&e->a, sizeof(struct phia_cursor));
@@ -13507,6 +13532,11 @@ phia_cursor_new(struct phia_index *db)
 	uint64_t vlsn = UINT64_MAX;
 	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
 	phia_index_bind(db);
+
+	c->key = key->value;
+	sv_vref(c->key);
+	phia_document_delete(key);
+	c->order = order;
 	return c;
 }
 
@@ -13779,33 +13809,27 @@ phia_index_drop(struct phia_index *db)
 }
 
 int
-phia_index_read(struct phia_index *db, struct phia_document *o,
-		struct phia_document **result, struct sx *x, int x_search,
+phia_index_read(struct phia_index *db, struct svv *key, enum phia_order order,
+		struct svv **result, struct sx *x, int x_search,
 		struct sicache *cache, bool cache_only,
 		struct phia_statget *statget)
 {
 	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
 
-	/* prepare the key */
-	int rc = phia_document_build(o);
-	if (unlikely(rc == -1))
-		return -1;
-	rc = phia_document_validate_ro(o, db);
-	if (unlikely(rc == -1))
-		return -1;
 	if (unlikely(! sr_online(&db->index->status))) {
 		sr_error("%s", "index is not online");
 		return -1;
 	}
 
+	key->flags = SVGET;
 	struct svv *vup = NULL;
 
 	/* concurrent */
-	if (x_search && o->order == PHIA_EQ) {
+	if (x_search && order == PHIA_EQ) {
 		/* note: prefix is ignored during concurrent
 		 * index search */
-		int rc = sx_get(x, &db->coindex, o->value, &vup);
+		int rc = sx_get(x, &db->coindex, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
 		if (rc == 2) { /* delete */
@@ -13813,14 +13837,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 			return 0;
 		}
 		if (rc == 1 && ((vup->flags & SVUPSERT) == 0)) {
-			struct phia_document *ret;
-			ret = phia_document_new(db);
-			if (ret == NULL) {
-				sv_vunref(db->index->r, vup);
-				return -1;
-			}
-			ret->value = vup;
-			*result = ret;
+			*result = vup;
 			return 0;
 		}
 	} else {
@@ -13848,7 +13865,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	}
 
 	int upsert_eq = 0;
-	enum phia_order order = o->order;
 	if (order == PHIA_EQ) {
 		order = PHIA_GE;
 		upsert_eq = 1;
@@ -13860,7 +13876,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	            order,
 	            vlsn,
 	            NULL, 0,
-		    o->value->data, o->value->size);
+		    key->data, key->size);
 	struct sv sv_vup;
 	if (vup != NULL) {
 		sv_init(&sv_vup, &sv_vif, vup, NULL);
@@ -13868,7 +13884,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	}
 	q.upsert_eq = upsert_eq;
 	q.cache_only = cache_only;
-	rc = si_read(&q);
+	int rc = si_read(&q);
 	si_readclose(&q);
 
 	if (vup != NULL) {
@@ -13898,25 +13914,11 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	assert(rc == 1);
 
 	assert(q.result != NULL);
-	struct phia_document *v = phia_document_new(db);
-	if (unlikely(v == NULL)) {
-		sv_vunref(db->index->r, q.result);
-		return -1;
-	}
-	v->value = q.result;
 	statget->read_disk = q.read_disk;
 	statget->read_cache = q.read_cache;
 	statget->read_latency = clock_monotonic64() - start;
 
-	/* propagate current document settings to
-	 * the result one */
-	v->order = q.order;
-	if (v->order == PHIA_GE)
-		v->order = PHIA_GT;
-	else if (v->order == PHIA_LE)
-		v->order = PHIA_LT;
-
-	*result = v;
+	*result = q.result;
 	return 0;
 }
 
@@ -13924,14 +13926,34 @@ int
 phia_index_get(struct phia_index *db, struct phia_document *key,
 	       struct phia_document **result, bool cache_only)
 {
+	assert(key->db == db);
+
+	/* prepare the key */
+	int rc = phia_document_build(key, PHIA_EQ);
+	if (unlikely(rc == -1))
+		return -1;
+
+	struct svv *value;
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, NULL, 0, NULL, cache_only,
-			    &statget) != 0) {
+	if (phia_index_read(db, key->value, PHIA_EQ, &value, NULL, 0, NULL,
+			    cache_only, &statget) != 0) {
 		return -1;
 	}
 
-	if (*result != NULL)
-		sr_statget(&db->env->stat, &statget);
+	if (value == NULL) {
+		 *result = NULL;
+		 return 0;
+	}
+
+	struct phia_document *doc = phia_document_new(db);
+	if (unlikely(doc == NULL)) {
+		sv_vunref(db->index->r, value);
+		return -1;
+	}
+	doc->value = value;
+	sr_statget(&db->env->stat, &statget);
+
+	*result = doc;
 	return 0;
 }
 
@@ -14049,7 +14071,7 @@ static int phia_index_recoverend(struct phia_index *db)
 }
 
 static inline int
-phia_document_build(struct phia_document *o)
+phia_document_build(struct phia_document *o, enum phia_order order)
 {
 	struct phia_index *db = o->db;
 	struct sfscheme *scheme = &db->index->scheme;
@@ -14066,7 +14088,7 @@ phia_document_build(struct phia_document *o)
 	{
 		/* set unspecified min/max keys, depending on
 		 * iteration order */
-		sf_limitset(&e->limit, scheme, o->fields, o->order);
+		sf_limitset(&e->limit, scheme, o->fields, order);
 		o->fields_count = scheme->fields_count;
 		o->fields_count_keys = scheme->keys_count;
 	}
@@ -14113,12 +14135,6 @@ phia_document_set_field(struct phia_document *v, const char *path,
 	return 0;
 }
 
-void
-phia_document_set_order(struct phia_document *doc, enum phia_order order)
-{
-	doc->order = order;
-}
-
 char *
 phia_document_field(struct phia_document *v, const char *path, uint32_t *size)
 {
@@ -14161,7 +14177,6 @@ phia_document_new(struct phia_index *db)
 		return NULL;
 	}
 	memset(doc, 0, sizeof(*doc));
-	doc->order = PHIA_EQ;
 	doc->db = db;
 	return doc;
 }
@@ -14197,7 +14212,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	}
 
 	/* create document */
-	int rc = phia_document_build(o);
+	int rc = phia_document_build(o, PHIA_EQ);
 	if (unlikely(rc == -1))
 		return -1;
 	rc = phia_document_validate(o, db, flags);
@@ -14258,14 +14273,32 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 		return -1;
 	}
 
+	/* prepare the key */
+	int rc = phia_document_build(key, PHIA_EQ);
+	if (unlikely(rc == -1))
+		return -1;
+
+	struct svv *value;
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, &t->t, 1, NULL, cache_only,
-			    &statget) != 0) {
+	if (phia_index_read(db, key->value, PHIA_EQ, &value, &t->t, 1, NULL,
+			    cache_only, &statget) != 0) {
 		return -1;
 	}
 
-	if (*result != NULL)
-		sr_statget(&db->env->stat, &statget);
+	if (value == NULL) {
+		 *result = NULL;
+		 return 0;
+	}
+
+	struct phia_document *doc = phia_document_new(db);
+	if (unlikely(doc == NULL)) {
+		sv_vunref(db->index->r, value);
+		return -1;
+	}
+	doc->value = value;
+	sr_statget(&db->env->stat, &statget);
+
+	*result = doc;
 	return 0;
 }
 

@@ -109,11 +109,11 @@ box_info_sort(box.info.phia())
     - lfsn: '0'
     - lsn: '5'
     - nsn: '1'
-    - tsn: '8'
+    - tsn: '9'
   - performance:
     - cursor: '1'
     - cursor_latency: <cursor_latency>
-    - cursor_ops: 0 3 3.0
+    - cursor_ops: 0 4 4.0
     - cursor_read_cache: 0 0 0.0
     - cursor_read_disk: 0 0 0.0
     - delete: '0'

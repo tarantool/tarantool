@@ -198,7 +198,6 @@ struct phia_iterator {
 	struct phia_env *env;
 	struct phia_index *db;
 	struct phia_cursor *cursor;
-	struct phia_document *current;
 };
 
 void
@@ -206,10 +205,6 @@ phia_iterator_free(struct iterator *ptr)
 {
 	assert(ptr->free == phia_iterator_free);
 	struct phia_iterator *it = (struct phia_iterator *) ptr;
-	if (it->current) {
-		phia_document_delete(it->current);
-		it->current = NULL;
-	}
 	if (it->cursor) {
 		phia_cursor_delete(it->cursor);
 		it->cursor = NULL;
@@ -231,15 +226,13 @@ phia_iterator_next(struct iterator *ptr)
 	struct phia_document *result;
 
 	/* read from cache */
-	if (phia_cursor_next(it->cursor, it->current, &result, true) != 0)
+	if (phia_cursor_next(it->cursor, &result, true) != 0)
 		diag_raise();
 	if (result == NULL) { /* cache miss or not found */
 		/* switch to asynchronous mode (read from disk) */
-		if (phia_cursor_conext(it->cursor, it->current, &result) != 0)
+		if (phia_cursor_conext(it->cursor, &result) != 0)
 			diag_raise();
 	}
-	phia_document_delete(it->current);
-	it->current = NULL;
 	if (result == NULL) { /* not found */
 		/* immediately close the cursor */
 		phia_cursor_delete(it->cursor);
@@ -249,16 +242,10 @@ phia_iterator_next(struct iterator *ptr)
 	}
 
 	/* found */
-	it->current = result;
+	auto result_guard = make_scoped_guard([=]{
+		phia_document_delete(result);
+	});
 	return phia_tuple_new(result, it->key_def, it->space->format);
-}
-
-struct tuple *
-phia_iterator_first(struct iterator *ptr)
-{
-	struct phia_iterator *it = (struct phia_iterator *) ptr;
-	ptr->next = phia_iterator_next;
-	return phia_tuple_new(it->current, it->key_def, it->space->format);
 }
 
 struct tuple *
@@ -303,7 +290,6 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	it->key = key;
 	it->env = env;
 	it->db  = db;
-	it->current = NULL;
 	/* point-lookup iterator */
 	if (type == ITER_EQ) {
 		ptr->next = phia_iterator_eq;
@@ -324,9 +310,6 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	default:
 		return initIterator(ptr, type, key, part_count);
 	}
-	it->cursor = phia_cursor_new(db);
-	if (it->cursor == NULL)
-		phia_raise();
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.
 	 *
@@ -334,19 +317,10 @@ PhiaIndex::initIterator(struct iterator *ptr,
 	 */
 	PhiaIndex *index = (PhiaIndex *)this;
 	struct phia_document *obj = index->createDocument(key, &it->keyend);
-	phia_document_set_order(obj, order);
-	int rc = phia_cursor_conext(it->cursor, obj, &it->current);
-	phia_document_delete(obj);
-	if (rc != 0) {
-		phia_cursor_delete(it->cursor);
-		it->cursor = NULL;
-		diag_raise();
+	it->cursor = phia_cursor_new(db, obj, order);
+	if (it->cursor == NULL) {
+		phia_document_delete(obj);
+		phia_raise();
 	}
-	if (it->current == NULL) { /* empty set */
-		phia_cursor_delete(it->cursor);
-		it->cursor = NULL;
-		ptr->next = phia_iterator_last;
-		return;
-	}
-	ptr->next = phia_iterator_first;
+	ptr->next = phia_iterator_next;
 }
