@@ -12201,7 +12201,16 @@ static int sc_ctl_call(struct phia_service *, uint64_t);
 static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
-struct screadarg {
+struct scread {
+	struct phia_index *db;
+	struct si         *index;
+	int         start;
+	int         read_disk;
+	int         read_cache;
+	struct svv        *result;
+	int         rc;
+	struct runtime         *r;
+
 	struct sv        v;
 	char     *prefix;
 	int       prefixsize;
@@ -12218,20 +12227,6 @@ struct screadarg {
 	int       vlsn_generate;
 };
 
-struct scread {
-	struct phia_index *db;
-	struct si         *index;
-	struct screadarg   arg;
-	int         start;
-	int         read_disk;
-	int         read_cache;
-	struct svv        *result;
-	int         rc;
-	struct runtime         *r;
-};
-
-static void sc_readopen(struct scread*, struct runtime*, struct phia_index*, struct si*);
-static void sc_readclose(struct scread*);
 static int sc_read(struct scread*, struct scheduler*);
 
 static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
@@ -12364,55 +12359,26 @@ static int sc_ctl_shutdown(struct scheduler *s, struct si *i)
 	return 0;
 }
 
-static void sc_readclose(struct scread *r)
-{
-	struct runtime *rt = r->r;
-	/* free key, prefix, upsert and a pending result */
-	if (r->arg.v.v)
-		sv_vunref(rt, r->arg.v.v);
-	if (r->arg.vup.v)
-		sv_vunref(rt, r->arg.vup.v);
-	if (unlikely(r->result))
-		sv_vunref(rt, r->result);
-	/* free read cache */
-	if (likely(r->arg.cachegc && r->arg.cache))
-		si_cachepool_push(r->arg.cache);
-}
-
-static void
-sc_readopen(struct scread *r, struct runtime *rt, struct phia_index *db, struct si *index)
-{
-	r->db = db;
-	r->index = index;
-	r->start = 0;
-	r->read_disk = 0;
-	r->read_cache = 0;
-	r->result = NULL;
-	r->rc = 0;
-	r->r = rt;
-}
-
 static int sc_read(struct scread *r, struct scheduler *s)
 {
-	struct screadarg *arg = &r->arg;
 	struct si *index = r->index;
 
-	if (likely(arg->vlsn_generate))
-		arg->vlsn = sr_seq(s->r->seq, SR_LSN);
+	if (likely(r->vlsn_generate))
+		r->vlsn = sr_seq(s->r->seq, SR_LSN);
 
 	struct siread q;
-	si_readopen(&q, index, arg->cache,
-	            arg->order,
-	            arg->vlsn,
-	            arg->prefix,
-	            arg->prefixsize,
-	            sv_pointer(&arg->v),
-	            sv_size(&arg->v));
-	q.upsert_v = &arg->vup;
-	q.upsert_eq = arg->upsert_eq;
-	q.cache_only = arg->cache_only;
-	q.oldest_only = arg->oldest_only;
-	q.has = arg->has;
+	si_readopen(&q, index, r->cache,
+	            r->order,
+	            r->vlsn,
+	            r->prefix,
+	            r->prefixsize,
+	            sv_pointer(&r->v),
+	            sv_size(&r->v));
+	q.upsert_v = &r->vup;
+	q.upsert_eq = r->upsert_eq;
+	q.cache_only = r->cache_only;
+	q.oldest_only = r->oldest_only;
+	q.has = r->has;
 	r->rc = si_read(&q);
 	r->read_disk  += q.read_disk;
 	r->read_cache += q.read_cache;
@@ -13892,8 +13858,8 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	struct phia_document *v = phia_document_newv(e, r->db, &result);
 	if (unlikely(v == NULL))
 		return NULL;
-	v->cache_only   = r->arg.cache_only;
-	v->oldest_only  = r->arg.oldest_only;
+	v->cache_only   = r->cache_only;
+	v->oldest_only  = r->oldest_only;
 	v->read_disk    = r->read_disk;
 	v->read_cache   = r->read_cache;
 	v->read_latency = 0;
@@ -13908,17 +13874,17 @@ phia_index_result(struct phia_env *e, struct scread *r)
 	/* propagate current document settings to
 	 * the result one */
 	v->orderset = 1;
-	v->order = r->arg.order;
+	v->order = r->order;
 	if (v->order == PHIA_GE)
 		v->order = PHIA_GT;
 	else if (v->order == PHIA_LE)
 		v->order = PHIA_LT;
 
 	/* set prefix */
-	if (r->arg.prefix) {
-		v->prefix = r->arg.prefix;
-		v->prefixcopy = r->arg.prefix;
-		v->prefixsize = r->arg.prefixsize;
+	if (r->prefix) {
+		v->prefix = r->prefix;
+		v->prefixcopy = r->prefix;
+		v->prefixsize = r->prefixsize;
 	}
 
 	return v;
@@ -13988,62 +13954,74 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		}
 	}
 
-	sv_vref(o->v.v);
-
 	/* prepare request */
 	struct scread q;
-	sc_readopen(&q, db->index->r, db, db->index);
+	memset(&q, 0, sizeof(q));
+	q.db = db;
+	q.index = db->index;
+	q.start = 0;
+	q.read_disk = 0;
+	q.read_cache = 0;
+	q.result = NULL;
+	q.rc = 0;
+	q.r = db->index->r;
 	q.start = start;
-	struct screadarg *arg = &q.arg;
-	arg->v           = o->v;
-	arg->prefix      = o->prefixcopy;
-	arg->prefixsize  = o->prefixsize;
-	arg->vup         = vup;
-	arg->cache       = cache;
-	arg->cachegc     = cachegc;
-	arg->order       = o->order;
-	arg->has         = 0;
-	arg->cache_only  = o->cache_only;
-	arg->oldest_only = o->oldest_only;
+	q.v           = o->v;
+	q.prefix      = o->prefixcopy;
+	q.prefixsize  = o->prefixsize;
+	q.vup         = vup;
+	q.cache       = cache;
+	q.cachegc     = cachegc;
+	q.order       = o->order;
+	q.has         = 0;
+	q.cache_only  = o->cache_only;
+	q.oldest_only = o->oldest_only;
 	if (x) {
-		arg->vlsn = x->vlsn;
-		arg->vlsn_generate = 0;
+		q.vlsn = x->vlsn;
+		q.vlsn_generate = 0;
 	} else {
-		arg->vlsn = 0;
-		arg->vlsn_generate = 1;
+		q.vlsn = 0;
+		q.vlsn_generate = 1;
 	}
-	arg->upsert = 1;
-	arg->upsert_eq   = 0;
-	if (arg->order == PHIA_EQ) {
-		arg->order = PHIA_GE;
-		arg->upsert_eq = 1;
+	q.upsert = 1;
+	q.upsert_eq   = 0;
+	if (q.order == PHIA_EQ) {
+		q.order = PHIA_GE;
+		q.upsert_eq = 1;
 	}
 
 	/* read index */
 	rc = sc_read(&q, &e->scheduler);
+	if (vup.v) {
+		assert(vup.i = &sv_vif);
+		sv_vunref(db->index->r, vup.v);
+	}
+	/* free read cache */
+	if (likely(cachegc))
+		si_cachepool_push(cache);
 	switch (rc) {
 	case 0:
 		/* not found */
-		sc_readclose(&q);
+		assert(q.result == NULL);
 		*result = NULL;
 		return 0;
 	case 1:
 		/* found */
 		*result = phia_index_result(e, &q);
-		sc_readclose(&q);
+		if (q.result != NULL)
+			sv_vunref(db->index->r, q.result);
 		if (*result == NULL)
 			return -1;
 		o->prefixcopy = NULL;
 		return 0;
 	case 2:
 		/* cache miss */
+		assert(q.result == NULL);
 		assert(o->cache_only);
-		sc_readclose(&q);
 		*result = NULL;
 		return 0;
 	default:
 		assert(rc < 0);
-		sc_readclose(&q);
 		return -1;
 	}
 }
@@ -14448,27 +14426,36 @@ static int
 phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 		struct sicache *cache)
 {
+	assert(v->i == &sx_vif); /* sv holds sxv */
+
 	struct phia_env *e = db->env;
 
 	struct scread q;
-	sc_readopen(&q, db->index->r, db, db->index);
-	struct screadarg *arg = &q.arg;
-	arg->v             = *v;
-	arg->vup.v         = NULL;
-	arg->prefix        = NULL;
-	arg->prefixsize    = 0;
-	arg->cache         = cache;
-	arg->cachegc       = 0;
-	arg->order         = PHIA_EQ;
-	arg->has           = 1;
-	arg->upsert        = 0;
-	arg->upsert_eq     = 0;
-	arg->cache_only    = 0;
-	arg->oldest_only   = 0;
-	arg->vlsn          = x->vlsn;
-	arg->vlsn_generate = 0;
+	q.db = db;
+	q.index = db->index;
+	q.start = 0;
+	q.read_disk = 0;
+	q.read_cache = 0;
+	q.result = NULL;
+	q.rc = 0;
+	q.r = db->index->r;
+	q.v             = *v;
+	q.vup.v         = NULL;
+	q.prefix        = NULL;
+	q.prefixsize    = 0;
+	q.cache         = cache;
+	q.cachegc       = 0;
+	q.order         = PHIA_EQ;
+	q.has           = 1;
+	q.upsert        = 0;
+	q.upsert_eq     = 0;
+	q.cache_only    = 0;
+	q.oldest_only   = 0;
+	q.vlsn          = x->vlsn;
+	q.vlsn_generate = 0;
 	int rc = sc_read(&q, &e->scheduler);
-	sc_readclose(&q);
+	if (unlikely(q.result))
+		sv_vunref(db->index->r, q.result);
 	return rc;
 }
 
