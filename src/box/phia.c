@@ -3538,14 +3538,20 @@ sr_statkey(struct srstat *s, int size)
 	tt_pthread_mutex_unlock(&s->lock);
 }
 
+struct phia_statget {
+	int read_disk;
+	int read_cache;
+	uint64_t read_latency;
+};
+
 static inline void
-sr_statget(struct srstat *s, uint64_t diff, int read_disk, int read_cache)
+sr_statget(struct srstat *s, const struct phia_statget *statget)
 {
 	tt_pthread_mutex_lock(&s->lock);
 	s->get++;
-	ss_avgupdate(&s->get_read_disk, read_disk);
-	ss_avgupdate(&s->get_read_cache, read_cache);
-	ss_avgupdate(&s->get_latency, diff);
+	ss_avgupdate(&s->get_read_disk, statget->read_disk);
+	ss_avgupdate(&s->get_read_cache, statget->read_cache);
+	ss_avgupdate(&s->get_latency, statget->read_latency);
 	tt_pthread_mutex_unlock(&s->lock);
 }
 
@@ -12811,10 +12817,6 @@ struct phia_document {
 	int       fields_count_keys;
 	/* read options */
 	int       cache_only;
-	/* stats */
-	int       read_disk;
-	int       read_cache;
-	int       read_latency;
 };
 
 struct scheduler *
@@ -12870,7 +12872,8 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 
 int
 phia_index_read(struct phia_index*, struct phia_document*,
-		struct phia_document **, struct sx*, int, struct sicache*);
+		struct phia_document **, struct sx*, int, struct sicache*,
+		struct phia_statget *);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_index*);
 static void phia_index_unbind(struct phia_index*, uint64_t);
@@ -13454,15 +13457,20 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
 		 struct phia_document **result)
 {
 	struct phia_index *db = key->db;
-	/* this statistics might be not complete, because
-	 * last statement is not accounted here */
-	c->read_disk  += key->read_disk;
-	c->read_cache += key->read_cache;
-	c->ops++;
 	struct sx *x = &c->t;
 	if (c->read_commited)
 		x = NULL;
-	return phia_index_read(db, key, result, x, 0, c->cache);
+
+	struct phia_statget statget;
+	if (phia_index_read(db, key, result, x, 0, c->cache, &statget) != 0)
+		return -1;
+
+	c->ops++;
+	if (*result != NULL) {
+		c->read_disk += statget.read_disk;
+		c->read_cache += statget.read_cache;
+	}
+	return 0;
 }
 
 void
@@ -13773,7 +13781,7 @@ phia_index_drop(struct phia_index *db)
 int
 phia_index_read(struct phia_index *db, struct phia_document *o,
 		struct phia_document **result, struct sx *x, int x_search,
-		struct sicache *cache)
+		struct sicache *cache, struct phia_statget *statget)
 {
 	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
@@ -13897,13 +13905,9 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	}
 	v->value = q.result;
 	v->cache_only   = o->cache_only;
-	v->read_disk   += q.read_disk;
-	v->read_cache  += q.read_cache;
-	v->read_latency = clock_monotonic64() - start;
-	sr_statget(&e->stat,
-		   v->read_latency,
-		   v->read_disk,
-		   v->read_cache);
+	statget->read_disk = q.read_disk;
+	statget->read_cache = q.read_cache;
+	statget->read_latency = clock_monotonic64() - start;
 
 	/* propagate current document settings to
 	 * the result one */
@@ -13921,7 +13925,13 @@ int
 phia_index_get(struct phia_index *db, struct phia_document *key,
 	       struct phia_document **result)
 {
-	return phia_index_read(db, key, result, NULL, 0, NULL);
+	struct phia_statget statget;
+	if (phia_index_read(db, key, result, NULL, 0, NULL, &statget) != 0)
+		return -1;
+
+	if (*result != NULL)
+		sr_statget(&db->env->stat, &statget);
+	return 0;
 }
 
 struct phia_index *
@@ -14252,7 +14262,13 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 		assert(0);
 		return -1;
 	}
-	return phia_index_read(db, key, result, &t->t, 1, NULL);
+
+	struct phia_statget statget;
+	if (phia_index_read(db, key, result, &t->t, 1, NULL, &statget) != 0)
+		return -1;
+	if (*result != NULL)
+		sr_statget(&db->env->stat, &statget);
+	return 0;
 }
 
 static inline void
