@@ -68,7 +68,7 @@ phia_get_parts(struct key_def *key_def, struct phia_document *obj,
 		"key_4", "key_5", "key_6", "key_7"
 	};
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		int len = 0;
+		uint32_t len = 0;
 		parts[i].iov_base = phia_document_field(obj, PARTNAMES[i], &len);
 		parts[i].iov_len = len;
 		assert(parts[i].iov_base != NULL);
@@ -123,7 +123,7 @@ phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
 	assert(format);
 	assert(key_def->part_count <= 8);
 	struct iovec parts[8];
-	int valuesize = 0;
+	uint32_t valuesize = 0;
 	void *value = phia_document_field(obj, "value", &valuesize);
 	uint32_t field_count = 0;
 	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,
@@ -148,7 +148,7 @@ phia_tuple_data_new(struct phia_document *obj, struct key_def *key_def,
 {
 	assert(key_def->part_count <= 8);
 	struct iovec parts[8];
-	int valuesize = 0;
+	uint32_t valuesize = 0;
 	void *value = phia_document_field(obj, "value", &valuesize);
 	uint32_t field_count = 0;
 	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,

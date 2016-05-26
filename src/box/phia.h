@@ -207,7 +207,7 @@ phia_document_set_field(struct phia_document *doc, const char *path,
 			const char *value, int size);
 
 char *
-phia_document_field(struct phia_document *doc, const char *path, int *size);
+phia_document_field(struct phia_document *doc, const char *path, uint32_t *size);
 
 void
 phia_document_set_cache_only(struct phia_document *doc, bool cache_only);

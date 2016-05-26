@@ -5671,7 +5671,7 @@ static enum sxstate sx_prepare(struct sx*, sxpreparef, void*);
 static enum sxstate sx_commit(struct sx*);
 static enum sxstate sx_rollback(struct sx*);
 static int sx_set(struct sx*, struct sxindex*, struct svv*);
-static int sx_get(struct sx*, struct sxindex*, struct sv*, struct sv*);
+static int sx_get(struct sx*, struct sxindex*, struct svv*, struct svv**);
 static uint64_t sx_min(struct sxmanager*);
 static uint64_t sx_max(struct sxmanager*);
 static uint64_t sx_vlsn(struct sxmanager*);
@@ -6160,14 +6160,15 @@ error:
 	return -1;
 }
 
-static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv *result)
+static int sx_get(struct sx *x, struct sxindex *index, struct svv *key,
+		  struct svv **result)
 {
 	struct sxmanager *m = x->manager;
 	struct ssrbnode *n = NULL;
 	int rc;
 	rc = sx_match(&index->i, index->scheme,
-	              sv_pointer(key),
-	              sv_size(key),
+	              key->data,
+		      key->size,
 	              &n);
 	if (! (rc == 0 && n))
 		goto add;
@@ -6181,24 +6182,20 @@ static int sx_get(struct sx *x, struct sxindex *index, struct sv *key, struct sv
 		return 2;
 	struct sv vv;
 	sv_init(&vv, &sv_vif, v->v, NULL);
-	struct svv *ret = sv_vdup(m->r, &vv);
-	if (unlikely(ret == NULL)) {
-		rc = sr_oom();
-	} else {
-		sv_init(result, &sv_vif, ret, NULL);
-		rc = 1;
-	}
-	return rc;
+	*result = sv_vdup(m->r, &vv);
+	if (unlikely(*result == NULL))
+		return -1;
+	return 1;
 
 add:
 	/* track a start of the latest read sequence in the
 	 * transactional log */
 	if (x->log_read == -1)
 		x->log_read = sv_logcount(x->log);
-	rc = sx_set(x, index, key->v);
+	rc = sx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
-	sv_vref((struct svv*)key->v);
+	sv_vref(key);
 	return 0;
 }
 
@@ -12807,7 +12804,7 @@ struct phia_index {
 
 struct phia_document {
 	struct phia_index *db;
-	struct sv        v;
+	struct svv *value;
 	enum phia_order   order;
 	int       orderset;
 	struct sfv       fields[8];
@@ -12837,16 +12834,13 @@ phia_raise()
 	diag_raise();
 }
 
-static struct phia_document *
-phia_document_newv(struct phia_env*, struct phia_index *, const struct sv*);
-
 int
 phia_document_delete(struct phia_document *v)
 {
 	struct phia_env *e = v->db->env;
-	if (v->v.v)
-		si_gcv(&e->r, v->v.v);
-	v->v.v = NULL;
+	if (v->value)
+		si_gcv(&e->r, v->value);
+	v->value = NULL;
 	if (v->prefixcopy)
 		ss_free(&e->a, v->prefixcopy);
 	v->prefixcopy = NULL;
@@ -12861,8 +12855,7 @@ phia_document_validate_ro(struct phia_document *o, struct phia_index *dest)
 {
 	if (unlikely(o->db != dest))
 		return sr_error("%s", "incompatible document parent db");
-	struct svv *v = o->v.v;
-	v->flags = SVGET;
+	o->value->flags = SVGET;
 	return 0;
 }
 
@@ -12875,11 +12868,10 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 	struct phia_env *e = o->db->env;
 	if (unlikely(o->db != dest))
 		return sr_error("%s", "incompatible document parent db");
-	struct svv *v = o->v.v;
-	v->flags = flags;
-	if (v->lsn != 0) {
+	o->value->flags = flags;
+	if (o->value->lsn != 0) {
 		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
-		if (v->lsn <= lsn)
+		if (o->value->lsn <= lsn)
 			return sr_error("%s", "incompatible document lsn");
 	}
 	return 0;
@@ -13809,27 +13801,27 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		return -1;
 	}
 
-	struct sv vup;
-	sv_init(&vup, &sv_vif, NULL, NULL);
+	struct svv *vup = NULL;
 
 	/* concurrent */
 	if (x_search && o->order == PHIA_EQ) {
 		/* note: prefix is ignored during concurrent
 		 * index search */
-		int rc = sx_get(x, &db->coindex, &o->v, &vup);
+		int rc = sx_get(x, &db->coindex, o->value, &vup);
 		if (unlikely(rc == -1))
 			return -1;
 		if (rc == 2) { /* delete */
 			*result = NULL;
 			return 0;
 		}
-		if (rc == 1 && !sv_is(&vup, SVUPSERT)) {
+		if (rc == 1 && ((vup->flags && SVUPSERT) == 0)) {
 			struct phia_document *ret;
-			ret = phia_document_newv(e, db, &vup);
+			ret = phia_document_new(db);
 			if (ret == NULL) {
-				sv_vunref(db->index->r, vup.v);
+				sv_vunref(db->index->r, vup);
 				return -1;
 			}
+			ret->value = vup;
 			ret->cache_only  = o->cache_only;
 			ret->oldest_only = o->oldest_only;
 			ret->orderset    = 1;
@@ -13846,8 +13838,8 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		cachegc = 1;
 		cache = si_cachepool_pop(&e->cachepool);
 		if (unlikely(cache == NULL)) {
-			if (vup.v)
-				sv_vunref(db->index->r, vup.v);
+			if (vup != NULL)
+				sv_vunref(db->index->r, vup);
 			sr_oom();
 			return -1;
 		}
@@ -13874,18 +13866,21 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	            vlsn,
 	            o->prefixcopy,
 	            o->prefixsize,
-	            sv_pointer(&o->v),
-	            sv_size(&o->v));
-	q.upsert_v = &vup;
+		    o->value->data,
+		    o->value->size);
+	struct sv sv_vup;
+	if (vup != NULL) {
+		sv_init(&sv_vup, &sv_vif, vup, NULL);
+		q.upsert_v = &sv_vup;
+	}
 	q.upsert_eq = upsert_eq;
 	q.cache_only = o->cache_only;
 	q.oldest_only = o->oldest_only;
 	rc = si_read(&q);
 	si_readclose(&q);
 
-	if (vup.v) {
-		assert(vup.i = &sv_vif);
-		sv_vunref(db->index->r, vup.v);
+	if (vup != NULL) {
+		sv_vunref(db->index->r, vup);
 	}
 	/* free read cache */
 	if (likely(cachegc))
@@ -13911,13 +13906,12 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	assert(rc == 1);
 
 	assert(q.result != NULL);
-	struct sv sv;
-	sv_init(&sv, &sv_vif, q.result, NULL);
-	struct phia_document *v = phia_document_newv(e, db, &sv);
+	struct phia_document *v = phia_document_new(db);
 	if (unlikely(v == NULL)) {
 		sv_vunref(db->index->r, q.result);
 		return -1;
 	}
+	v->value = q.result;
 	v->cache_only   = o->cache_only;
 	v->oldest_only  = o->oldest_only;
 	v->read_disk   += q.read_disk;
@@ -14076,10 +14070,10 @@ phia_document_build(struct phia_document *o)
 	struct sfscheme *scheme = &db->index->scheme;
 	struct phia_env *e = db->env;
 
-	if (likely(o->v.v != NULL))
+	if (likely(o->value != NULL))
 		return 0;
 
-	assert(o->v.v == NULL);
+	assert(o->value == NULL);
 
 	/* create document from raw data */
 	struct svv *v;
@@ -14119,7 +14113,7 @@ allocate:
 	v = sv_vbuild(db->index->r, scheme, o->fields);
 	if (unlikely(v == NULL))
 		return sr_oom();
-	sv_init(&o->v, &sv_vif, v, NULL);
+	o->value = v;
 	return 0;
 }
 
@@ -14166,7 +14160,7 @@ phia_document_set_order(struct phia_document *doc, enum phia_order order)
 }
 
 char *
-phia_document_field(struct phia_document *v, const char *path, int *size)
+phia_document_field(struct phia_document *v, const char *path, uint32_t *size)
 {
 	/* match field */
 	struct phia_index *db = v->db;
@@ -14174,8 +14168,10 @@ phia_document_field(struct phia_document *v, const char *path, int *size)
 	if (unlikely(field == NULL))
 		return NULL;
 	/* result document */
-	if (v->v.v)
-		return sv_field(&v->v, &db->index->scheme, field->position, (uint32_t*)size);
+	if (v->value) {
+		return sf_fieldof(&db->index->scheme, field->position,
+				  v->value->data, size);
+	}
 	/* field document */
 	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
 	struct sfv *fv = &v->fields[field->position];
@@ -14195,15 +14191,15 @@ phia_document_set_cache_only(struct phia_document *doc, bool cache_only)
 int64_t
 phia_document_lsn(struct phia_document *v)
 {
-	uint64_t lsn = -1;
-	if (v->v.v)
-		lsn = ((struct svv*)(v->v.v))->lsn;
-	return lsn;
+	if (v->value == NULL)
+		return -1;
+	return v->value->lsn;
 }
 
-static struct phia_document *
-phia_document_newv(struct phia_env *e, struct phia_index *db, const struct sv *vp)
+struct phia_document *
+phia_document_new(struct phia_index *db)
 {
+	struct phia_env *e = db->env;
 	struct phia_document *doc;
 	doc = ss_malloc(&e->a, sizeof(struct phia_document));
 	if (unlikely(doc == NULL)) {
@@ -14213,9 +14209,6 @@ phia_document_newv(struct phia_env *e, struct phia_index *db, const struct sv *v
 	memset(doc, 0, sizeof(*doc));
 	doc->order = PHIA_EQ;
 	doc->db = db;
-	if (vp) {
-		doc->v = *vp;
-	}
 	return doc;
 }
 
@@ -14257,12 +14250,11 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	if (unlikely(rc == -1))
 		return -1;
 
-	struct svv *v = o->v.v;
-	sv_vref(v);
-	int size = sv_vsize(v);
+	sv_vref(o->value);
+	int size = sv_vsize(o->value);
 
 	/* concurrent index only */
-	rc = sx_set(&t->t, &db->coindex, v);
+	rc = sx_set(&t->t, &db->coindex, o->value);
 	phia_document_delete(o);
 	if (unlikely(rc != 0))
 		return -1;
@@ -14528,13 +14520,6 @@ phia_env_new(void)
 error:
 	phia_env_delete(e);
 	return NULL;
-}
-
-struct phia_document *
-phia_document_new(struct phia_index *db)
-{
-	struct phia_env *env = db->env;
-	return phia_document_newv(env, db, NULL);
 }
 
 struct phia_service *
