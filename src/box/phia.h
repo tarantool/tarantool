@@ -112,7 +112,7 @@ phia_begin(struct phia_env *e);
 
 int
 phia_get(struct phia_tx *tx, struct phia_document *key,
-	 struct phia_document **result);
+	 struct phia_document **result, bool cache_only);
 
 int
 phia_replace(struct phia_tx *tx, struct phia_document *doc);
@@ -159,7 +159,7 @@ phia_index_delete(struct phia_index *index);
 
 int
 phia_index_get(struct phia_index *index, struct phia_document *key,
-	        struct phia_document **result);
+	        struct phia_document **result, bool cache_only);
 
 size_t
 phia_index_bsize(struct phia_index *db);
@@ -182,7 +182,7 @@ phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 
 int
 phia_cursor_next(struct phia_cursor *cursor, struct phia_document *key,
-		 struct phia_document **result);
+		 struct phia_document **result, bool cache_only);
 
 /*
  * Document
@@ -208,9 +208,6 @@ phia_document_set_field(struct phia_document *doc, const char *path,
 
 char *
 phia_document_field(struct phia_document *doc, const char *path, uint32_t *size);
-
-void
-phia_document_set_cache_only(struct phia_document *doc, bool cache_only);
 
 void
 phia_document_set_order(struct phia_document *doc, enum phia_order order);

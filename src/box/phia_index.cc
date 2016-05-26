@@ -151,18 +151,16 @@ PhiaIndex::findByKey(const char *key, uint32_t part_count = 0) const
 		transaction = (struct phia_tx *) in_txn()->engine_tx;
 	/* try to read from cache first, if nothing is found
 	 * retry using disk */
-	phia_document_set_cache_only(obj, true);
 	int rc;
 	struct phia_document *result = NULL;
 	if (transaction == NULL) {
-		rc = phia_index_get(db, obj, &result);
+		rc = phia_index_get(db, obj, &result, true);
 	} else {
-		rc = phia_get(transaction, obj, &result);
+		rc = phia_get(transaction, obj, &result, true);
 	}
 	if (rc != 0)
 		diag_raise();
 	if (result == NULL) { /* cache miss or not found */
-		phia_document_set_cache_only(obj, false);
 		if (transaction == NULL) {
 			rc = phia_index_coget(db, obj, &result);
 		} else {
@@ -233,12 +231,10 @@ phia_iterator_next(struct iterator *ptr)
 	struct phia_document *result;
 
 	/* read from cache */
-	phia_document_set_cache_only(it->current, true);
-	if (phia_cursor_next(it->cursor, it->current, &result) != 0)
+	if (phia_cursor_next(it->cursor, it->current, &result, true) != 0)
 		diag_raise();
 	if (result == NULL) { /* cache miss or not found */
 		/* switch to asynchronous mode (read from disk) */
-		phia_document_set_cache_only(it->current, false);
 		if (phia_cursor_conext(it->cursor, it->current, &result) != 0)
 			diag_raise();
 	}

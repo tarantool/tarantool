@@ -12815,8 +12815,6 @@ struct phia_document {
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
-	/* read options */
-	int       cache_only;
 };
 
 struct scheduler *
@@ -12873,7 +12871,7 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 int
 phia_index_read(struct phia_index*, struct phia_document*,
 		struct phia_document **, struct sx*, int, struct sicache*,
-		struct phia_statget *);
+		bool cache_only, struct phia_statget *);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_index*);
 static void phia_index_unbind(struct phia_index*, uint64_t);
@@ -13454,7 +13452,7 @@ phia_cursor_delete(struct phia_cursor *c)
 
 int
 phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
-		 struct phia_document **result)
+		 struct phia_document **result, bool cache_only)
 {
 	struct phia_index *db = key->db;
 	struct sx *x = &c->t;
@@ -13462,8 +13460,10 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document *key,
 		x = NULL;
 
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, x, 0, c->cache, &statget) != 0)
+	if (phia_index_read(db, key, result, x, 0, c->cache, cache_only,
+			    &statget) != 0) {
 		return -1;
+	}
 
 	c->ops++;
 	if (*result != NULL) {
@@ -13781,7 +13781,8 @@ phia_index_drop(struct phia_index *db)
 int
 phia_index_read(struct phia_index *db, struct phia_document *o,
 		struct phia_document **result, struct sx *x, int x_search,
-		struct sicache *cache, struct phia_statget *statget)
+		struct sicache *cache, bool cache_only,
+		struct phia_statget *statget)
 {
 	struct phia_env *e = db->env;
 	uint64_t start  = clock_monotonic64();
@@ -13819,7 +13820,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 				return -1;
 			}
 			ret->value = vup;
-			ret->cache_only  = o->cache_only;
 			*result = ret;
 			return 0;
 		}
@@ -13867,7 +13867,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		q.upsert_v = &sv_vup;
 	}
 	q.upsert_eq = upsert_eq;
-	q.cache_only = o->cache_only;
+	q.cache_only = cache_only;
 	rc = si_read(&q);
 	si_readclose(&q);
 
@@ -13889,7 +13889,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	} else if (rc == 2) {
 		/* cache miss */
 		assert(q.result == NULL);
-		assert(o->cache_only);
+		assert(cache_only);
 		*result = NULL;
 		return 0;
 	}
@@ -13904,7 +13904,6 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		return -1;
 	}
 	v->value = q.result;
-	v->cache_only   = o->cache_only;
 	statget->read_disk = q.read_disk;
 	statget->read_cache = q.read_cache;
 	statget->read_latency = clock_monotonic64() - start;
@@ -13923,11 +13922,13 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 
 int
 phia_index_get(struct phia_index *db, struct phia_document *key,
-	       struct phia_document **result)
+	       struct phia_document **result, bool cache_only)
 {
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, NULL, 0, NULL, &statget) != 0)
+	if (phia_index_read(db, key, result, NULL, 0, NULL, cache_only,
+			    &statget) != 0) {
 		return -1;
+	}
 
 	if (*result != NULL)
 		sr_statget(&db->env->stat, &statget);
@@ -14141,12 +14142,6 @@ phia_document_field(struct phia_document *v, const char *path, uint32_t *size)
 	return fv->pointer;
 }
 
-void
-phia_document_set_cache_only(struct phia_document *doc, bool cache_only)
-{
-	doc->cache_only = cache_only;
-}
-
 int64_t
 phia_document_lsn(struct phia_document *v)
 {
@@ -14241,7 +14236,7 @@ phia_delete(struct phia_tx *tx, struct phia_document *key)
 
 int
 phia_get(struct phia_tx *t, struct phia_document *key,
-	 struct phia_document **result)
+	 struct phia_document **result, bool cache_only)
 {
 	struct phia_index *db = key->db;
 	/* validate index */
@@ -14264,8 +14259,11 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 	}
 
 	struct phia_statget statget;
-	if (phia_index_read(db, key, result, &t->t, 1, NULL, &statget) != 0)
+	if (phia_index_read(db, key, result, &t->t, 1, NULL, cache_only,
+			    &statget) != 0) {
 		return -1;
+	}
+
 	if (*result != NULL)
 		sr_statget(&db->env->stat, &statget);
 	return 0;

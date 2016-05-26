@@ -251,7 +251,7 @@ phia_get_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	return phia_get(task->tx, task->key, &task->result);
+	return phia_get(task->tx, task->key, &task->result, false);
 }
 
 static ssize_t
@@ -259,7 +259,7 @@ phia_index_get_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	return phia_index_get(task->index, task->key, &task->result);
+	return phia_index_get(task->index, task->key, &task->result, false);
 }
 
 static ssize_t
@@ -267,7 +267,7 @@ phia_cursor_next_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	return phia_cursor_next(task->cursor, task->key, &task->result);
+	return phia_cursor_next(task->cursor, task->key, &task->result, false);
 }
 
 static ssize_t
@@ -449,7 +449,7 @@ join_send_space(struct space *sp, void *data)
 	phia_document_set_order(key, PHIA_GE);
 	while (1) {
 		struct phia_document *doc;
-		int rc = phia_cursor_next(cursor, key, &doc);
+		int rc = phia_cursor_next(cursor, key, &doc, false);
 		phia_document_delete(key);
 		if (rc != 0)
 			diag_raise();
