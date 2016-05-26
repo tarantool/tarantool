@@ -13814,7 +13814,7 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 			*result = NULL;
 			return 0;
 		}
-		if (rc == 1 && ((vup->flags && SVUPSERT) == 0)) {
+		if (rc == 1 && ((vup->flags & SVUPSERT) == 0)) {
 			struct phia_document *ret;
 			ret = phia_document_new(db);
 			if (ret == NULL) {
