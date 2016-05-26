@@ -9074,7 +9074,7 @@ struct siread {
 	int       read_cache;
 	struct sv       *upsert_v;
 	int       upsert_eq;
-	struct sv        result;
+	struct svv *result;
 	struct sicache  *cache;
 	struct si       *index;
 };
@@ -11002,7 +11002,7 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	q->oldest_only = 0;
 	q->read_disk   = 0;
 	q->read_cache  = 0;
-	memset(&q->result, 0, sizeof(q->result));
+	q->result      = NULL;
 	sv_mergeinit(&q->merge, index->r->a, &index->scheme);
 	si_lock(index);
 	return 0;
@@ -11027,7 +11027,7 @@ si_readdup(struct siread *q, struct sv *result)
 		if (unlikely(v == NULL))
 			return sr_oom();
 	}
-	sv_init(&q->result, &sv_vif, v, NULL);
+	q->result = v;
 	return 1;
 }
 
@@ -13894,16 +13894,16 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 		si_cachepool_push(cache);
 	if (rc < 0) {
 		/* error */
-		assert(q.result.v == NULL);
+		assert(q.result == NULL);
 		return -1;
 	} else if (rc == 0) {
 		/* not found */
-		assert(q.result.v == NULL);
+		assert(q.result == NULL);
 		*result = NULL;
 		return 0;
 	} else if (rc == 2) {
 		/* cache miss */
-		assert(q.result.v == NULL);
+		assert(q.result == NULL);
 		assert(o->cache_only);
 		*result = NULL;
 		return 0;
@@ -13912,13 +13912,12 @@ phia_index_read(struct phia_index *db, struct phia_document *o,
 	/* found */
 	assert(rc == 1);
 
-	assert(q.result.v != NULL);
-	assert(q.result.i == &sv_vif);
+	assert(q.result != NULL);
 	struct sv sv;
-	sv_init(&sv, &sv_vif, q.result.v, NULL);
+	sv_init(&sv, &sv_vif, q.result, NULL);
 	struct phia_document *v = phia_document_newv(e, db, &sv);
 	if (unlikely(v == NULL)) {
-		sv_vunref(db->index->r, q.result.v);
+		sv_vunref(db->index->r, q.result);
 		return -1;
 	}
 	v->cache_only   = o->cache_only;
@@ -14366,10 +14365,8 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	int rc = si_read(&q);
 	si_readclose(&q);
 
-	if (unlikely(q.result.v)) {
-		assert(q.result.i == &sv_vif);
-		sv_vunref(db->index->r, q.result.v);
-	}
+	if (unlikely(q.result))
+		sv_vunref(db->index->r, q.result);
 	return rc;
 }
 
