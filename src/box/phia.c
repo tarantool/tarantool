@@ -4016,8 +4016,7 @@ sv_hash(struct sv *v, struct sfscheme *scheme) {
 	return sf_hash(scheme, sv_pointer(v));
 }
 
-
-struct PACKED svv {
+struct PACKED phia_tuple {
 	uint64_t lsn;
 	uint32_t size;
 	uint8_t  flags;
@@ -4028,15 +4027,15 @@ struct PACKED svv {
 static struct svif sv_vif;
 
 static inline uint32_t
-sv_vsize(struct svv *v) {
-	return sizeof(struct svv) + v->size;
+phia_tuple_size(struct phia_tuple *v) {
+	return sizeof(struct phia_tuple) + v->size;
 }
 
-static inline struct svv*
-sv_vbuild(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
+static inline struct phia_tuple*
+phia_tuple_build(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
 {
 	int size = sf_writesize(scheme, fields);
-	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
+	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
 	if (unlikely(v == NULL))
 		return NULL;
 	v->size      = size;
@@ -4048,15 +4047,15 @@ sv_vbuild(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
-	r->stat->v_allocated += sizeof(struct svv) + size;
+	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
 	tt_pthread_mutex_unlock(&r->stat->lock);
 	return v;
 }
 
-static inline struct svv*
-sv_vbuildraw(struct runtime *r, char *src, int size)
+static inline struct phia_tuple*
+phia_tuple_buildraw(struct runtime *r, char *src, int size)
 {
-	struct svv *v = ss_malloc(r->a, sizeof(struct svv) + size);
+	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
 	if (unlikely(v == NULL))
 		return NULL;
 	v->size      = size;
@@ -4067,15 +4066,15 @@ sv_vbuildraw(struct runtime *r, char *src, int size)
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
-	r->stat->v_allocated += sizeof(struct svv) + size;
+	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
 	tt_pthread_mutex_unlock(&r->stat->lock);
 	return v;
 }
 
-static inline struct svv*
+static inline struct phia_tuple*
 sv_vdup(struct runtime *r, struct sv *src)
 {
-	struct svv *v = sv_vbuildraw(r, sv_pointer(src), sv_size(src));
+	struct phia_tuple *v = phia_tuple_buildraw(r, sv_pointer(src), sv_size(src));
 	if (unlikely(v == NULL))
 		return NULL;
 	v->flags     = sv_flags(src);
@@ -4084,15 +4083,15 @@ sv_vdup(struct runtime *r, struct sv *src)
 }
 
 static inline void
-sv_vref(struct svv *v) {
+phia_tuple_ref(struct phia_tuple *v) {
 	v->refs++;
 }
 
 static inline int
-sv_vunref(struct runtime *r, struct svv *v)
+phia_tuple_unref(struct runtime *r, struct phia_tuple *v)
 {
 	if (likely(--v->refs == 0)) {
-		uint32_t size = sv_vsize(v);
+		uint32_t size = phia_tuple_size(v);
 		/* update runtime statistics */
 		tt_pthread_mutex_lock(&r->stat->lock);
 		assert(r->stat->v_count > 0);
@@ -4107,7 +4106,7 @@ sv_vunref(struct runtime *r, struct svv *v)
 }
 
 struct PACKED svref {
-	struct svv      *v;
+	struct phia_tuple      *v;
 	struct svref    *next;
 	uint8_t  flags;
 	struct ssrbnode node;
@@ -4116,7 +4115,7 @@ struct PACKED svref {
 static struct svif sv_refif;
 
 static inline struct svref*
-sv_refnew(struct runtime *r, struct svv *v)
+sv_refnew(struct runtime *r, struct phia_tuple *v)
 {
 	struct svref *ref = ss_malloc(r->a, sizeof(struct svref));
 	if (unlikely(ref == NULL))
@@ -4133,7 +4132,7 @@ sv_reffree(struct runtime *r, struct svref *v)
 {
 	while (v) {
 		struct svref *n = v->next;
-		sv_vunref(r, v->v);
+		phia_tuple_unref(r, v->v);
 		ss_free(r->a, v);
 		v = n;
 	}
@@ -5110,7 +5109,7 @@ sv_indexset(struct svindex *i, struct svref  *v)
 
 static inline uint32_t
 sv_indexused(struct svindex *i) {
-	return i->count * sizeof(struct svv) + i->used;
+	return i->count * sizeof(struct phia_tuple) + i->used;
 }
 
 struct PACKED svindexiter {
@@ -5265,7 +5264,7 @@ static inline struct svref*
 sv_vset(struct svref *head, struct svref *v)
 {
 	assert(head->v->lsn != v->v->lsn);
-	struct svv *vv = v->v;
+	struct phia_tuple *vv = v->v;
 	/* default */
 	if (likely(head->v->lsn < vv->lsn)) {
 		v->next = head;
@@ -5397,27 +5396,27 @@ static struct svif sv_upsertvif =
 
 static uint8_t
 sv_vifflags(struct sv *v) {
-	return ((struct svv*)v->v)->flags;
+	return ((struct phia_tuple*)v->v)->flags;
 }
 
 static uint64_t
 sv_viflsn(struct sv *v) {
-	return ((struct svv*)v->v)->lsn;
+	return ((struct phia_tuple*)v->v)->lsn;
 }
 
 static void
 sv_viflsnset(struct sv *v, uint64_t lsn) {
-	((struct svv*)v->v)->lsn = lsn;
+	((struct phia_tuple*)v->v)->lsn = lsn;
 }
 
 static char*
 sv_vifpointer(struct sv *v) {
-	return ((struct svv*)v->v)->data;
+	return ((struct phia_tuple*)v->v)->data;
 }
 
 static uint32_t
 sv_vifsize(struct sv *v) {
-	return ((struct svv*)v->v)->size;
+	return ((struct phia_tuple*)v->v)->size;
 }
 
 static struct svif sv_vif =
@@ -5434,7 +5433,7 @@ struct PACKED sxv {
 	uint32_t lo;
 	uint64_t csn;
 	void *index;
-	struct svv *v;
+	struct phia_tuple *v;
 	struct sxv *next;
 	struct sxv *prev;
 	struct sxv *gc;
@@ -5489,7 +5488,7 @@ sx_vpool_push(struct sxvpool *p, struct sxv *v)
 }
 
 static inline struct sxv*
-sx_valloc(struct sxvpool *p, struct svv *ref)
+sx_valloc(struct sxvpool *p, struct phia_tuple *ref)
 {
 	struct sxv *v = sx_vpool_pop(p);
 	if (unlikely(v == NULL)) {
@@ -5512,7 +5511,7 @@ sx_valloc(struct sxvpool *p, struct svv *ref)
 static inline void
 sx_vfree(struct sxvpool *p, struct sxv *v)
 {
-	sv_vunref(p->r, v->v);
+	phia_tuple_unref(p->r, v->v);
 	sx_vpool_push(p, v);
 }
 
@@ -5676,8 +5675,8 @@ static void sx_gc(struct sx*);
 static enum sxstate sx_prepare(struct sx*, sxpreparef, void*);
 static enum sxstate sx_commit(struct sx*);
 static enum sxstate sx_rollback(struct sx*);
-static int sx_set(struct sx*, struct sxindex*, struct svv*);
-static int sx_get(struct sx*, struct sxindex*, struct svv*, struct svv**);
+static int sx_set(struct sx*, struct sxindex*, struct phia_tuple*);
+static int sx_get(struct sx*, struct sxindex*, struct phia_tuple*, struct phia_tuple**);
 static uint64_t sx_min(struct sxmanager*);
 static uint64_t sx_max(struct sxmanager*);
 static uint64_t sx_vlsn(struct sxmanager*);
@@ -5943,11 +5942,11 @@ sx_rollback_svp(struct sx *x, struct ssbufiter *i, int free)
 		/* remove from index and replace head with
 		 * a first waiter */
 		sx_untrack(v);
-		/* translate log version from struct sxv to struct svv */
+		/* translate log version from struct sxv to struct phia_tuple */
 		sv_init(&lv->v, &sv_vif, v->v, NULL);
 		if (free) {
-			int size = sv_vsize((struct svv*)v->v);
-			if (sv_vunref(m->r, v->v))
+			int size = phia_tuple_size((struct phia_tuple*)v->v);
+			if (phia_tuple_unref(m->r, v->v))
 				gc += size;
 		}
 		sx_vpool_push(&m->pool, v);
@@ -5966,9 +5965,9 @@ static enum sxstate sx_rollback(struct sx *x)
 		for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
 		{
 			struct svlogv *lv = ss_bufiter_get(&i);
-			struct svv *v = lv->v.v;
-			int size = sv_vsize(v);
-			if (sv_vunref(m->r, v))
+			struct phia_tuple *v = lv->v.v;
+			int size = phia_tuple_size(v);
+			if (phia_tuple_unref(m->r, v))
 				gc += size;
 		}
 		ss_quota(m->r->quota, SS_QREMOVE, gc);
@@ -6057,11 +6056,11 @@ static enum sxstate sx_commit(struct sx *x)
 		sx_vabort_all(v->next);
 		/* mark stmt as commited */
 		sx_vcommit(v, csn);
-		/* translate log version from struct sxv to struct svv */
+		/* translate log version from struct sxv to struct phia_tuple */
 		sv_init(&lv->v, &sv_vif, v->v, NULL);
 		/* schedule read stmt for gc */
 		if (v->v->flags & SVGET) {
-			sv_vref(v->v);
+			phia_tuple_ref(v->v);
 			v->gc = m->gc;
 			m->gc = v;
 			m->count_gc++;
@@ -6084,7 +6083,7 @@ ss_rbget(sx_match,
                     (container_of(n, struct sxv, node))->v->size,
                     key, keysize))
 
-static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
+static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *version)
 {
 	struct sxmanager *m = x->manager;
 	struct runtime *r = m->r;
@@ -6094,8 +6093,8 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	/* allocate mvcc container */
 	struct sxv *v = sx_valloc(&m->pool, version);
 	if (unlikely(v == NULL)) {
-		ss_quota(r->quota, SS_QREMOVE, sv_vsize(version));
-		sv_vunref(r, version);
+		ss_quota(r->quota, SS_QREMOVE, phia_tuple_size(version));
+		phia_tuple_unref(r, version);
 		return -1;
 	}
 	v->id = x->id;
@@ -6146,7 +6145,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 		/* update log */
 		sv_logreplace(x->log, v->lo, &lv);
 
-		ss_quota(r->quota, SS_QREMOVE, sv_vsize(own->v));
+		ss_quota(r->quota, SS_QREMOVE, phia_tuple_size(own->v));
 		sx_vfree(&m->pool, own);
 		return 0;
 	}
@@ -6161,13 +6160,13 @@ static int sx_set(struct sx *x, struct sxindex *index, struct svv *version)
 	sx_vlink(head, v);
 	return 0;
 error:
-	ss_quota(r->quota, SS_QREMOVE, sv_vsize(v->v));
+	ss_quota(r->quota, SS_QREMOVE, phia_tuple_size(v->v));
 	sx_vfree(&m->pool, v);
 	return -1;
 }
 
-static int sx_get(struct sx *x, struct sxindex *index, struct svv *key,
-		  struct svv **result)
+static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
+		  struct phia_tuple **result)
 {
 	struct sxmanager *m = x->manager;
 	struct ssrbnode *n = NULL;
@@ -6201,7 +6200,7 @@ add:
 	rc = sx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
-	sv_vref(key);
+	phia_tuple_ref(key);
 	return 0;
 }
 
@@ -8798,7 +8797,6 @@ si_lru_vlsn(struct si *i)
 	return rc;
 }
 
-static uint32_t si_gcv(struct runtime*, struct svv*);
 static uint32_t si_gcref(struct runtime*, struct svref*);
 
 struct PACKED sicachebranch {
@@ -9077,7 +9075,7 @@ struct siread {
 	int       read_cache;
 	struct sv       *upsert_v;
 	int       upsert_eq;
-	struct svv *result;
+	struct phia_tuple *result;
 	struct sicache  *cache;
 	struct si       *index;
 };
@@ -9854,23 +9852,14 @@ static int si_drop(struct si *i)
 	return rc;
 }
 
-static uint32_t si_gcv(struct runtime *r, struct svv *v)
-{
-	uint32_t size = sv_vsize(v);
-	if (sv_vunref(r, v)) {
-		return size;
-	}
-	return 0;
-}
-
 static uint32_t si_gcref(struct runtime *r, struct svref *gc)
 {
 	uint32_t used = 0;
 	struct svref *v = gc;
 	while (v) {
 		struct svref *n = v->next;
-		uint32_t size = sv_vsize(v->v);
-		if (si_gcv(r, v->v))
+		uint32_t size = phia_tuple_size(v->v);
+		if (phia_tuple_unref(r, v->v))
 			used += size;
 		ss_free(r->a, v);
 		v = n;
@@ -9949,7 +9938,7 @@ si_redistribute_set(struct si *index, uint64_t now, struct svref *v)
 	struct svindex *vindex = si_nodeindex(node);
 	sv_indexset(vindex, v);
 	node->update_time = index->update_time;
-	node->used += sv_vsize(v->v);
+	node->used += phia_tuple_size(v->v);
 	/* schedule node */
 	si_plannerupdate(&index->p, SI_BRANCH, node);
 }
@@ -11021,10 +11010,10 @@ static int si_readclose(struct siread *q)
 static inline int
 si_readdup(struct siread *q, struct sv *result)
 {
-	struct svv *v;
+	struct phia_tuple *v;
 	if (likely(result->i == &sv_vif)) {
 		v = result->v;
-		sv_vref(v);
+		phia_tuple_ref(v);
 	} else {
 		v = sv_vdup(q->index->r, result);
 		if (unlikely(v == NULL))
@@ -12006,7 +11995,7 @@ static void si_commit(struct sitx *x)
 	si_unlock(x->index);
 }
 
-static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
+static inline int si_set(struct sitx *x, struct phia_tuple *v, uint64_t time)
 {
 	struct si *index = x->index;
 	index->update_time = time;
@@ -12024,7 +12013,7 @@ static inline int si_set(struct sitx *x, struct svv *v, uint64_t time)
 	sv_indexupdate(vindex, &pos, ref);
 	/* update node */
 	node->update_time = index->update_time;
-	node->used += sv_vsize(v);
+	node->used += phia_tuple_size(v);
 	if (index->conf.lru)
 		si_lru_add(index, ref);
 	si_txtrack(x, node);
@@ -12039,16 +12028,17 @@ si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
-		struct svv *v = cv->v.v;
+		struct phia_tuple *v = cv->v.v;
 		if (recover) {
 			if (si_readcommited(x->index, &cv->v, recover)) {
-				uint32_t gc = si_gcv(r, v);
-				ss_quota(r->quota, SS_QREMOVE, gc);
+				size_t gc = phia_tuple_size(v);
+				if (phia_tuple_unref(r, v))
+					ss_quota(r->quota, SS_QREMOVE, gc);
 				goto next;
 			}
 		}
 		if (v->flags & SVGET) {
-			sv_vunref(r, v);
+			phia_tuple_unref(r, v);
 			goto next;
 		}
 		si_set(x, v, time);
@@ -12810,7 +12800,7 @@ struct phia_index {
 
 struct phia_document {
 	struct phia_index *db;
-	struct svv *value;
+	struct phia_tuple *value;
 	struct sfv       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
@@ -12833,7 +12823,7 @@ phia_document_delete(struct phia_document *v)
 {
 	struct phia_env *e = v->db->env;
 	if (v->value != NULL)
-		sv_vunref(v->db->index->r, v->value);
+		phia_tuple_unref(v->db->index->r, v->value);
 	v->value = NULL;
 	ss_free(&e->a, v);
 	return 0;
@@ -12858,8 +12848,8 @@ phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t
 }
 
 int
-phia_index_read(struct phia_index*, struct svv*, enum phia_order order,
-		struct svv **, struct sx*, int, struct sicache*,
+phia_index_read(struct phia_index*, struct phia_tuple*, enum phia_order order,
+		struct phia_tuple **, struct sx*, int, struct sicache*,
 		bool cache_only, struct phia_statget *);
 static int phia_index_visible(struct phia_index*, uint64_t);
 static void phia_index_bind(struct phia_index*);
@@ -12878,7 +12868,7 @@ struct phia_tx {
 
 struct phia_cursor {
 	struct phia_index *db;
-	struct svv *key;
+	struct phia_tuple *key;
 	enum phia_order order;
 	struct svlog log;
 	struct sx t;
@@ -13434,7 +13424,7 @@ phia_cursor_delete(struct phia_cursor *c)
 	if (c->cache)
 		si_cachepool_push(c->cache);
 	if (c->key)
-		sv_vunref(c->db->index->r, c->key);
+		phia_tuple_unref(c->db->index->r, c->key);
 	phia_index_unbind(c->db, id);
 	sr_statcursor(&e->stat, c->start,
 	              c->read_disk,
@@ -13452,7 +13442,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document **result,
 	if (c->read_commited)
 		x = NULL;
 
-	struct svv *value;
+	struct phia_tuple *value;
 	struct phia_statget statget;
 	assert(c->key != NULL);
 	if (phia_index_read(db, c->key, c->order, &value, x, 0, c->cache,
@@ -13463,7 +13453,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document **result,
 	c->ops++;
 	if (value == NULL) {
 		if (!cache_only) {
-			 sv_vunref(db->index->r, c->key);
+			 phia_tuple_unref(db->index->r, c->key);
 			 c->key = NULL;
 		}
 		 *result = NULL;
@@ -13472,7 +13462,7 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document **result,
 
 	struct phia_document *doc = phia_document_new(db);
 	if (unlikely(doc == NULL)) {
-		sv_vunref(db->index->r, value);
+		phia_tuple_unref(db->index->r, value);
 		return -1;
 	}
 	doc->value = value;
@@ -13484,9 +13474,9 @@ phia_cursor_next(struct phia_cursor *c, struct phia_document **result,
 	c->read_disk += statget.read_disk;
 	c->read_cache += statget.read_cache;
 
-	sv_vunref(db->index->r, c->key);
+	phia_tuple_unref(db->index->r, c->key);
 	c->key = value;
-	sv_vref(c->key);
+	phia_tuple_ref(c->key);
 
 	*result = doc;
 	return 0;
@@ -13534,7 +13524,7 @@ phia_cursor_new(struct phia_index *db, struct phia_document *key,
 	phia_index_bind(db);
 
 	c->key = key->value;
-	sv_vref(c->key);
+	phia_tuple_ref(c->key);
 	phia_document_delete(key);
 	c->order = order;
 	return c;
@@ -13809,8 +13799,8 @@ phia_index_drop(struct phia_index *db)
 }
 
 int
-phia_index_read(struct phia_index *db, struct svv *key, enum phia_order order,
-		struct svv **result, struct sx *x, int x_search,
+phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order order,
+		struct phia_tuple **result, struct sx *x, int x_search,
 		struct sicache *cache, bool cache_only,
 		struct phia_statget *statget)
 {
@@ -13823,7 +13813,7 @@ phia_index_read(struct phia_index *db, struct svv *key, enum phia_order order,
 	}
 
 	key->flags = SVGET;
-	struct svv *vup = NULL;
+	struct phia_tuple *vup = NULL;
 
 	/* concurrent */
 	if (x_search && order == PHIA_EQ) {
@@ -13851,7 +13841,7 @@ phia_index_read(struct phia_index *db, struct svv *key, enum phia_order order,
 		cache = si_cachepool_pop(&e->cachepool);
 		if (unlikely(cache == NULL)) {
 			if (vup != NULL)
-				sv_vunref(db->index->r, vup);
+				phia_tuple_unref(db->index->r, vup);
 			sr_oom();
 			return -1;
 		}
@@ -13888,7 +13878,7 @@ phia_index_read(struct phia_index *db, struct svv *key, enum phia_order order,
 	si_readclose(&q);
 
 	if (vup != NULL) {
-		sv_vunref(db->index->r, vup);
+		phia_tuple_unref(db->index->r, vup);
 	}
 	/* free read cache */
 	if (likely(cachegc))
@@ -13933,7 +13923,7 @@ phia_index_get(struct phia_index *db, struct phia_document *key,
 	if (unlikely(rc == -1))
 		return -1;
 
-	struct svv *value;
+	struct phia_tuple *value;
 	struct phia_statget statget;
 	if (phia_index_read(db, key->value, PHIA_EQ, &value, NULL, 0, NULL,
 			    cache_only, &statget) != 0) {
@@ -13947,7 +13937,7 @@ phia_index_get(struct phia_index *db, struct phia_document *key,
 
 	struct phia_document *doc = phia_document_new(db);
 	if (unlikely(doc == NULL)) {
-		sv_vunref(db->index->r, value);
+		phia_tuple_unref(db->index->r, value);
 		return -1;
 	}
 	doc->value = value;
@@ -14093,7 +14083,7 @@ phia_document_build(struct phia_document *o, enum phia_order order)
 		o->fields_count_keys = scheme->keys_count;
 	}
 
-	struct svv *v = sv_vbuild(db->index->r, scheme, o->fields);
+	struct phia_tuple *v = phia_tuple_build(db->index->r, scheme, o->fields);
 	if (unlikely(v == NULL))
 		return sr_oom();
 	o->value = v;
@@ -14210,8 +14200,8 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	if (unlikely(rc == -1))
 		return -1;
 
-	sv_vref(o->value);
-	int size = sv_vsize(o->value);
+	phia_tuple_ref(o->value);
+	int size = phia_tuple_size(o->value);
 
 	/* concurrent index only */
 	rc = sx_set(&t->t, &db->coindex, o->value);
@@ -14269,7 +14259,7 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 	if (unlikely(rc == -1))
 		return -1;
 
-	struct svv *value;
+	struct phia_tuple *value;
 	struct phia_statget statget;
 	if (phia_index_read(db, key->value, PHIA_EQ, &value, &t->t, 1, NULL,
 			    cache_only, &statget) != 0) {
@@ -14283,7 +14273,7 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 
 	struct phia_document *doc = phia_document_new(db);
 	if (unlikely(doc == NULL)) {
-		sv_vunref(db->index->r, value);
+		phia_tuple_unref(db->index->r, value);
 		return -1;
 	}
 	doc->value = value;
@@ -14343,7 +14333,7 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	si_readclose(&q);
 
 	if (unlikely(q.result))
-		sv_vunref(db->index->r, q.result);
+		phia_tuple_unref(db->index->r, q.result);
 	return rc;
 }
 
