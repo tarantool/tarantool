@@ -1128,6 +1128,74 @@ may be unaware of them.
 
 To see a sample Lua + C module, go to http_ on github.com/tarantool.
 
+=====================================================================
+       Backups
+=====================================================================
+
+The exact procedure for backing up a database depends on:
+how up-to-date the database must be,
+how frequently backups must be taken,
+whether it is okay to disrupt other users,
+and whether the procedure should be optimized for size (saving disk space) or for speed (saving time).
+So there is a spectrum of possible policies, ranging from cold-and-simple to hot-and-difficult.
+
+**Cold Backup**
+
+In essence:
+The last snapshot file is a backup of the entire database;
+and the WAL files that are made after the last snapshot are incremental backups.
+Therefore taking a backup is a matter of copying the snapshot and WAL files. |br|
+(1) Prevent all users from writing to the database.This can be done by
+shutting down the server, or by saying
+:codenormal:`box.cfg{read_only=true}` and then ensuring that all earlier
+writes are complete (fsync can be used for this purpose). |br|
+(2) If this is a backup of the whole database, say
+:codenormal:`box.snapshot()`. |br|
+(3) Use tar to make a (possibly compressed) copy of the
+latest .snap and .xlog files on the :ref:`snap_dir <box-cfg-snap-dir>` and :ref:`wal_dir <box-cfg-wal-dir>`
+directories. |br|
+(4) If there is a security policy, encrypt the tar file. |br|
+(5) Copy the tar file to a safe place. |br|
+... Later, restoring the database is a matter of taking the
+tar file and putting its contents back in the snap_dir and wal_dir
+directories.
+
+**Continuous remote backup**
+
+In essence: :ref:`replication <box-replication>`
+is useful for backup as well as for load balancing.
+Therefore taking a backup is a matter of ensuring that any given
+replica is up to date, and doing a cold backup on it.
+Since all the other replicas continue to operate, this is not a
+cold backup from the end user's point of view. This could be
+done on a regular basis, with a cron job or with a Tarantool fiber.
+
+**Hot backup**
+
+In essence:
+The logged changes done since the last cold backup must be
+secured, while the system is running.
+
+For this purpose one needs a "file copy" utility that will
+do the copying remotely and continuously, copying only the
+parts of a file that are changing. One such utility is
+rsync_.
+
+Alternatively, one needs an ordinary file copy utility,
+but there should be frequent production of new snapshot files or
+new WAL files as
+changes occur, so that only the new files need to be copied.
+One such utility is
+`tarantar <https://github.com/tarantool/tarantool/wiki/Tarantar>`_
+but it will require some modifications to work with the latest
+Tarantool version. Setting the :ref:`rows_per_wal <box-cfg-rows-per-wal>` configuration
+parameter is another option.
+
+Note re storage engines:
+sophia databases require additional steps, see the
+explanation in
+`the sophia manual <http://sophia.systems/v2.1/sophia_v21_manual.pdf>`_.
+
 .. _Lua-Modules-Tutorial: http://lua-users.org/wiki/ModulesTutorial
 .. _LuaRocks: http://rocks.tarantool.org
 .. _LuaRocks-Quick-Start-Guide: http://luarocks.org/#quick-start
@@ -1135,3 +1203,5 @@ To see a sample Lua + C module, go to http_ on github.com/tarantool.
 .. _rocks: github.com/tarantool/rocks <https://github.com/tarantool/rocks
 .. _CMake-scripts: https://github.com/tarantool/http
 .. _http: https://github.com/tarantool/http
+.. _rsync: https://en.wikipedia.org/wiki/rsync
+

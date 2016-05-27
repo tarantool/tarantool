@@ -23,6 +23,8 @@
     Default: true |br|
     Dynamic: yes |br|
 
+.. _box-cfg-rows-per-wal:
+
 .. confval:: rows_per_wal
 
     How many log records to store in a single write-ahead log file.
