@@ -32,6 +32,7 @@
  */
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 #include "tt_uuid.h"
 #include "vclock.h"
 
