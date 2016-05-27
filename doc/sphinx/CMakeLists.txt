@@ -29,7 +29,7 @@ add_custom_target(sphinx-html ALL
 #    DEPENDS ${SPHINX_BUILD_DIR} ${SPHINX_HTML_DIR}
     COMMAND "${SPHINX_EXECUTABLE}"
         -b html
-        -d "${SPHINX_BUILD_HTML_DIR}"
+        -d "${SPHINX_BUILD_SINGLEHTML_DIR}"
         -c html/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_HTML_DIR}"
@@ -40,7 +40,7 @@ add_custom_target(sphinx-html ALL
 add_custom_target(sphinx-singlehtml ALL
     COMMAND "${SPHINX_EXECUTABLE}"
         -b singlehtml
-        -d "${SPHINX_BUILD_SINGLEHTML_DIR}"
+        -d "${SPHINX_BUILD_HTML_DIR}"
         -c singlehtml/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_HTML_DIR}"
@@ -58,6 +58,7 @@ add_custom_target(sphinx-html-ru ALL
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${SPHINX_RU_HTML_DIR}"
         -Dlanguage=ru
+	-vvv
     COMMENT "Building HTML documentation with Sphinx"
     DEPENDS api-doc
 )
@@ -71,6 +72,7 @@ add_custom_target(sphinx-singlehtml-ru ALL
         "${SPHINX_RU_HTML_DIR}"
         singlehtml.rst
         -Dlanguage=ru
+	-vvv
     COMMENT "Building HTML documentation with Sphinx"
     DEPENDS api-doc
 )
@@ -79,7 +81,7 @@ add_custom_target(sphinx-update-pot
     COMMAND "${SPHINX_EXECUTABLE}"
         -b gettext
         -d "${SPHINX_BUILD_LOCALE_DIR}"
-        -c locale/
+	-c locale/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${PROJECT_SOURCE_DIR}/doc/sphinx/locale"
     COMMENT "Generate localization templates"
@@ -89,8 +91,9 @@ add_custom_target(sphinx-update-pot
 add_custom_target(sphinx-update-po
     COMMAND "${SPHINX_INTL_EXECUTABLE}"
         update
-        -p ${PROJECT_SOURCE_DIR}/doc/sphinx/locale
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx/locale
+        -l ru
+        -p ${PROJECT_SOURCE_DIR}/doc/sphinx/
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doc/sphinx/
     COMMENT "Regenerate localization files from templates"
     DEPENDS sphinx-update-pot
 )
