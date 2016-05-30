@@ -3698,8 +3698,8 @@ sv_hash(struct sv *v, struct sfscheme *scheme) {
 struct PACKED phia_tuple {
 	uint64_t lsn;
 	uint32_t size;
-	uint8_t  flags;
 	uint16_t refs;
+	uint8_t  flags;
 	char data[0];
 };
 
@@ -3780,56 +3780,6 @@ phia_tuple_unref(struct runtime *r, struct phia_tuple *v)
 		tt_pthread_mutex_unlock(&r->stat->lock);
 		ss_free(r->a, v);
 		return 1;
-	}
-	return 0;
-}
-
-struct PACKED svref {
-	struct phia_tuple      *v;
-	struct svref    *next;
-	uint8_t  flags;
-	struct ssrbnode node;
-};
-
-static struct svif sv_refif;
-
-static inline struct svref*
-sv_refnew(struct runtime *r, struct phia_tuple *v)
-{
-	struct svref *ref = ss_malloc(r->a, sizeof(struct svref));
-	if (unlikely(ref == NULL))
-		return NULL;
-	ref->v = v;
-	ref->next = NULL;
-	ref->flags = 0;
-	memset(&ref->node, 0, sizeof(ref->node));
-	return ref;
-}
-
-static inline void
-sv_reffree(struct runtime *r, struct svref *v)
-{
-	while (v) {
-		struct svref *n = v->next;
-		phia_tuple_unref(r, v->v);
-		ss_free(r->a, v);
-		v = n;
-	}
-}
-
-static inline struct svref*
-sv_refvisible(struct svref *v, uint64_t vlsn) {
-	while (v && v->v->lsn > vlsn)
-		v = v->next;
-	return v;
-}
-
-static inline int
-sv_refvisible_gte(struct svref *v, uint64_t vlsn) {
-	while (v) {
-		if (v->v->lsn >= vlsn)
-			return 1;
-		v = v->next;
 	}
 	return 0;
 }
@@ -4747,54 +4697,220 @@ sv_writeiter_is_duplicate(struct svwriteiter *im)
 	return im->vdup;
 }
 
-struct svindexpos {
-	struct ssrbnode *node;
-	int rc;
+struct svref {
+	struct phia_tuple *v;
+	uint8_t flags;
 };
 
-struct PACKED svindex {
-	struct ssrb i;
-	uint32_t count;
+struct tree_svindex_key {
+	char *data;
+	int size;
+	uint64_t lsn;
+};
+
+struct svindex;
+
+int
+tree_svindex_compare(struct svref a, struct svref b, struct svindex *index);
+
+int
+tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
+			 struct svindex *index);
+
+#define BPS_TREE_VINDEX_PAGE_SIZE (16 * 1024)
+#define BPS_TREE_NAME _svindex
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE BPS_TREE_VINDEX_PAGE_SIZE
+#define BPS_TREE_COMPARE(a, b, index) tree_svindex_compare(a, b, index)
+#define BPS_TREE_COMPARE_KEY(a, b, index) tree_svindex_compare_key(a, b, index)
+#define bps_tree_elem_t struct svref
+#define bps_tree_key_t struct tree_svindex_key *
+#define bps_tree_arg_t struct svindex *
+#define BPS_TREE_NO_DEBUG
+
+#include "salad/bps_tree.h"
+
+struct svindex {
+	struct bps_tree_svindex tree;
 	uint32_t used;
 	uint64_t lsnmin;
 	struct sfscheme *scheme;
+	bool hint_match_key_found;
 };
 
-ss_rbget(sv_indexmatch,
-         sf_compare(scheme, ((container_of(n, struct svref, node))->v)->data,
-                    (container_of(n, struct svref, node))->v->size,
-                    key, keysize))
+int
+tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
+{
+	int res = sf_compare(index->scheme, a.v->data, a.v->size,
+			     b.v->data, b.v->size);
+	if (res == 0) {
+		index->hint_match_key_found = true;
+		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
+	}
+	return res;
+}
+
+int
+tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
+			 struct svindex *index)
+{
+	int res = sf_compare(index->scheme, a.v->data, a.v->size,
+			     key->data, key->size);
+	if (res == 0) {
+		index->hint_match_key_found = true;
+		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
+	}
+	return res;
+}
+
+void *
+sv_index_alloc_matras_page()
+{
+	return malloc(BPS_TREE_VINDEX_PAGE_SIZE);
+}
+
+void
+sv_index_free_matras_page(void *p)
+{
+	return free(p);
+}
 
 static int
-sv_indexinit(struct svindex*, struct sfscheme *scheme);
+sv_indexinit(struct svindex *i, struct sfscheme *scheme)
+{
+	i->lsnmin = UINT64_MAX;
+	i->used   = 0;
+	i->scheme = scheme;
+	bps_tree_svindex_create(&i->tree, i,
+				sv_index_alloc_matras_page,
+				sv_index_free_matras_page);
+	return 0;
+}
 
 static int
-sv_indexfree(struct svindex*, struct runtime *);
-
-static int
-sv_indexupdate(struct svindex*, struct svindexpos*, struct svref*);
-
-static struct svref *
-sv_indexget(struct svindex*, struct svindexpos*, struct svref*);
+sv_indexfree(struct svindex *i, struct runtime *r)
+{
+	assert(i == i->tree.arg);
+	struct bps_tree_svindex_iterator itr =
+		bps_tree_svindex_itr_first(&i->tree);
+	while (!bps_tree_svindex_itr_is_invalid(&itr)) {
+		phia_tuple_unref(r, bps_tree_svindex_itr_get_elem(&i->tree, &itr)->v);
+		bps_tree_svindex_itr_next(&i->tree, &itr);
+	}
+	bps_tree_svindex_destroy(&i->tree);
+	return 0;
+}
 
 static inline int
-sv_indexset(struct svindex *i, struct svref  *v)
+sv_indexset(struct svindex *i, struct svref ref)
 {
-	struct svindexpos pos;
-	sv_indexget(i, &pos, v);
-	sv_indexupdate(i, &pos, v);
+	assert(i == i->tree.arg);
+	i->hint_match_key_found = false;
+	bps_tree_svindex_insert(&i->tree, ref, NULL);
+	i->used += ref.v->size;
+	phia_tuple_ref(ref.v);
+	if (i->lsnmin > ref.v->lsn)
+		i->lsnmin = ref.v->lsn;
+	if (!i->hint_match_key_found)
+		return 0;
+	/* the key is already in tree, but with different lsn */
+	struct tree_svindex_key tree_key;
+	tree_key.data = ref.v->data;
+	tree_key.size = ref.v->size;
+	tree_key.lsn = ref.v->lsn;
+	bool exact;
+	struct bps_tree_svindex_iterator itr =
+		bps_tree_svindex_lower_bound(&i->tree, &tree_key, &exact);
+	assert(!bps_tree_svindex_itr_is_invalid(&itr));
+	struct svref *curr =
+		bps_tree_svindex_itr_get_elem(&i->tree, &itr);
+	struct bps_tree_svindex_iterator itr_prev = itr;
+	bps_tree_svindex_itr_prev(&i->tree, &itr_prev);
+	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
+		struct svref *prev =
+			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
+		if (sf_compare(i->scheme, curr->v->data, curr->v->size,
+			        prev->v->data, prev->v->size) == 0) {
+			curr->flags |= SVDUP;
+			return 0;
+		}
+	}
+	struct bps_tree_svindex_iterator itr_next = itr;
+	bps_tree_svindex_itr_next(&i->tree, &itr_next);
+	assert(!bps_tree_svindex_itr_is_invalid(&itr_next));
+	struct svref *next =
+		bps_tree_svindex_itr_get_elem(&i->tree, &itr_next);
+	next->flags |= SVDUP;
 	return 0;
+}
+/*
+ * Find a value in index with given key and biggest lsn <= given lsn
+ */
+static struct svref *
+sv_indexfind(struct svindex *i, char *key, int size, uint64_t lsn)
+{
+	assert(i == i->tree.arg);
+	struct tree_svindex_key tree_key;
+	tree_key.data = key;
+	tree_key.size = size;
+	tree_key.lsn = lsn;
+	bool exact;
+	struct bps_tree_svindex_iterator itr =
+		bps_tree_svindex_lower_bound(&i->tree, &tree_key, &exact);
+	struct svref *ref = bps_tree_svindex_itr_get_elem(&i->tree, &itr);
+	if (ref != NULL && tree_svindex_compare_key(*ref, &tree_key, i) != 0)
+		ref = NULL;
+	return ref;
 }
 
 static inline uint32_t
 sv_indexused(struct svindex *i) {
-	return i->count * sizeof(struct phia_tuple) + i->used;
+	return i->tree.size * sizeof(struct phia_tuple) + i->used +
+		bps_tree_svindex_mem_used(&i->tree);
 }
 
-struct PACKED svindexiter {
+static uint8_t
+sv_refifflags(struct sv *v) {
+	struct svref *ref = (struct svref *)v->v;
+	return (ref->v)->flags | ref->flags;
+}
+
+static uint64_t
+sv_refiflsn(struct sv *v) {
+	struct svref *ref = (struct svref *)v->v;
+	return ref->v->lsn;
+}
+
+static void
+sv_refiflsnset(struct sv *v, uint64_t lsn) {
+	struct svref *ref = (struct svref *)v->v;
+	ref->v->lsn = lsn;
+}
+
+static char*
+sv_refifpointer(struct sv *v) {
+	struct svref *ref = (struct svref *)v->v;
+	return ref->v->data;
+}
+
+static uint32_t
+sv_refifsize(struct sv *v) {
+	struct svref *ref = (struct svref *)v->v;
+	return ref->v->size;
+}
+
+static struct svif sv_refif =
+{
+       .flags     = sv_refifflags,
+       .lsn       = sv_refiflsn,
+       .lsnset    = sv_refiflsnset,
+       .pointer   = sv_refifpointer,
+       .size      = sv_refifsize
+};
+
+struct svindexiter {
 	struct svindex *index;
-	struct ssrbnode *v;
-	struct svref *vcur;
+	struct bps_tree_svindex_iterator itr;
 	struct sv current;
 	enum phia_order order;
 };
@@ -4805,191 +4921,79 @@ static inline int
 sv_indexiter_open(struct ssiter *i, struct svindex *index,
 		  enum phia_order o, void *key, int keysize)
 {
+	assert(index == index->tree.arg);
 	i->vif = &sv_indexiterif;
-	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	ii->index   = index;
-	ii->order   = o;
-	ii->v       = NULL;
-	ii->vcur    = NULL;
-	sv_init(&ii->current, &sv_refif, NULL, NULL);
-	int rc;
-	int eq = 0;
-	switch (ii->order) {
-	case PHIA_LT:
-	case PHIA_LE:
-		if (unlikely(key == NULL)) {
-			ii->v = ss_rbmax(&ii->index->i);
-			break;
+	struct svindexiter *ii = (struct svindexiter *)i->priv;
+	struct bps_tree_svindex *tree = &index->tree;
+	ii->index = index;
+	ii->order = o;
+	ii->current.i = &sv_refif;
+	if (key == NULL) {
+		if (o == PHIA_GT || o == PHIA_GE) {
+			ii->itr = bps_tree_svindex_itr_first(tree);
+		} else {
+			assert(o == PHIA_LT || o == PHIA_LE);
+			ii->itr = bps_tree_svindex_itr_last(tree);
 		}
-		rc = sv_indexmatch(&index->i, index->scheme, key, keysize, &ii->v);
-		if (ii->v == NULL)
-			break;
-		switch (rc) {
-		case 0:
-			eq = 1;
-			if (ii->order == PHIA_LT)
-				ii->v = ss_rbprev(&index->i, ii->v);
-			break;
-		case 1:
-			ii->v = ss_rbprev(&index->i, ii->v);
-			break;
-		}
-		break;
-	case PHIA_GT:
-	case PHIA_GE:
-		if (unlikely(key == NULL)) {
-			ii->v = ss_rbmin(&index->i);
-			break;
-		}
-		rc = sv_indexmatch(&index->i, index->scheme, key, keysize, &ii->v);
-		if (ii->v == NULL)
-			break;
-		switch (rc) {
-		case  0:
-			eq = 1;
-			if (ii->order == PHIA_GT)
-				ii->v = ss_rbnext(&index->i, ii->v);
-			break;
-		case -1:
-			ii->v = ss_rbnext(&index->i, ii->v);
-			break;
-		}
-		break;
-	default:
-		assert(0);
+		return 0;
 	}
-	ii->vcur = NULL;
-	if (ii->v) {
-		ii->vcur = container_of(ii->v, struct svref, node);
-		ii->current.v = ii->vcur;
+
+	struct tree_svindex_key tree_key;
+	tree_key.data = key;
+	tree_key.size = keysize;
+	tree_key.lsn = UINT64_MAX;
+	bool exact;
+	ii->index->hint_match_key_found = false;
+	ii->itr = bps_tree_svindex_lower_bound(tree, &tree_key, &exact);
+	if (ii->index->hint_match_key_found) {
+		if (o == PHIA_GT)
+			bps_tree_svindex_itr_next(tree, &ii->itr);
+		else if(o == PHIA_LT)
+			bps_tree_svindex_itr_prev(tree, &ii->itr);
+	} else if(bps_tree_svindex_itr_is_invalid(&ii->itr)) {
+		if(o == PHIA_LT || o == PHIA_LE)
+			ii->itr = bps_tree_svindex_itr_last(tree);
 	}
-	return eq;
+	return (int)ii->index->hint_match_key_found;
 }
 
 static inline void
-sv_indexiter_close(struct ssiter *i ssunused)
-{}
+sv_indexiter_close(struct ssiter *i)
+{
+	(void)i;
+}
 
 static inline int
 sv_indexiter_has(struct ssiter *i)
 {
-	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	return ii->v != NULL;
+	struct svindexiter *ii = (struct svindexiter *)i->priv;
+	return !bps_tree_svindex_itr_is_invalid(&ii->itr);
 }
 
-static inline void*
+static inline void *
 sv_indexiter_get(struct ssiter *i)
 {
-	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	if (unlikely(ii->v == NULL))
+	struct svindexiter *ii = (struct svindexiter *)i->priv;
+	if (bps_tree_svindex_itr_is_invalid(&ii->itr))
 		return NULL;
-	return &ii->current;
+	ii->current.v = (void *)
+		bps_tree_svindex_itr_get_elem(&ii->index->tree, &ii->itr);
+	assert(ii->current.v != NULL);
+	return (void *)&ii->current;
 }
 
 static inline void
 sv_indexiter_next(struct ssiter *i)
 {
-	struct svindexiter *ii = (struct svindexiter*)i->priv;
-	if (unlikely(ii->v == NULL))
-		return;
-	assert(ii->vcur != NULL);
-	struct svref *v = ii->vcur->next;
-	if (v) {
-		ii->vcur = v;
-		ii->current.v = ii->vcur;
-		return;
-	}
-	switch (ii->order) {
-	case PHIA_LT:
-	case PHIA_LE:
-		ii->v = ss_rbprev(&ii->index->i, ii->v);
-		break;
-	case PHIA_GT:
-	case PHIA_GE:
-		ii->v = ss_rbnext(&ii->index->i, ii->v);
-		break;
-	default: assert(0);
-	}
-	if (likely(ii->v)) {
-		ii->vcur = container_of(ii->v, struct svref, node);
-		ii->current.v = ii->vcur;
+	struct svindexiter *ii = (struct svindexiter *)i->priv;
+	assert(!bps_tree_svindex_itr_is_invalid(&ii->itr));
+
+	if (ii->order == PHIA_GT || ii->order == PHIA_GE) {
+		bps_tree_svindex_itr_next(&ii->index->tree, &ii->itr);
 	} else {
-		ii->vcur = NULL;
+		assert(ii->order == PHIA_LT || ii->order == PHIA_LE);
+		bps_tree_svindex_itr_prev(&ii->index->tree, &ii->itr);
 	}
-}
-
-ss_rbtruncate(sv_indextruncate,
-              sv_reffree((struct runtime*)arg, container_of(n, struct svref, node)))
-
-static int sv_indexinit(struct svindex *i, struct sfscheme *scheme)
-{
-	i->lsnmin = UINT64_MAX;
-	i->count  = 0;
-	i->used   = 0;
-	i->scheme = scheme;
-	ss_rbinit(&i->i);
-	return 0;
-}
-
-static int sv_indexfree(struct svindex *i, struct runtime *r)
-{
-	if (i->i.root)
-		sv_indextruncate(i->i.root, r);
-	ss_rbinit(&i->i);
-	return 0;
-}
-
-static inline struct svref*
-sv_vset(struct svref *head, struct svref *v)
-{
-	assert(head->v->lsn != v->v->lsn);
-	struct phia_tuple *vv = v->v;
-	/* default */
-	if (likely(head->v->lsn < vv->lsn)) {
-		v->next = head;
-		head->flags |= SVDUP;
-		return v;
-	}
-	/* redistribution (starting from highest lsn) */
-	struct svref *prev = head;
-	struct svref *c = head->next;
-	while (c) {
-		assert(c->v->lsn != vv->lsn);
-		if (c->v->lsn < vv->lsn)
-			break;
-		prev = c;
-		c = c->next;
-	}
-	prev->next = v;
-	v->next = c;
-	v->flags |= SVDUP;
-	return head;
-}
-
-static struct svref*
-sv_indexget(struct svindex *i, struct svindexpos *p, struct svref *v)
-{
-	p->rc = sv_indexmatch(&i->i, i->scheme, v->v->data, v->v->size, &p->node);
-	if (p->rc == 0 && p->node)
-		return container_of(p->node, struct svref, node);
-	return NULL;
-}
-
-static int sv_indexupdate(struct svindex *i, struct svindexpos *p, struct svref *v)
-{
-	if (p->rc == 0 && p->node) {
-		struct svref *head = container_of(p->node, struct svref, node);
-		struct svref *update = sv_vset(head, v);
-		if (head != update)
-			ss_rbreplace(&i->i, p->node, &update->node);
-	} else {
-		ss_rbset(&i->i, p->node, p->rc, &v->node);
-	}
-	if (v->v->lsn < i->lsnmin)
-		i->lsnmin = v->v->lsn;
-	i->count++;
-	i->used += v->v->size;
-	return 0;
 }
 
 static struct ssiterif sv_indexiterif =
@@ -4998,41 +5002,6 @@ static struct ssiterif sv_indexiterif =
 	.has     = sv_indexiter_has,
 	.get     = sv_indexiter_get,
 	.next    = sv_indexiter_next
-};
-
-static uint8_t
-sv_refifflags(struct sv *v) {
-	struct svref *ref = (struct svref*)v->v;
-	return (ref->v)->flags | ref->flags;
-}
-
-static uint64_t
-sv_refiflsn(struct sv *v) {
-	return ((struct svref*)v->v)->v->lsn;
-}
-
-static void
-sv_refiflsnset(struct sv *v, uint64_t lsn) {
-	((struct svref*)v->v)->v->lsn = lsn;
-}
-
-static char*
-sv_refifpointer(struct sv *v) {
-	return (((struct svref*)v->v)->v)->data;
-}
-
-static uint32_t
-sv_refifsize(struct sv *v) {
-	return ((struct svref*)v->v)->v->size;
-}
-
-static struct svif sv_refif =
-{
-	.flags     = sv_refifflags,
-	.lsn       = sv_refiflsn,
-	.lsnset    = sv_refiflsnset,
-	.pointer   = sv_refifpointer,
-	.size      = sv_refifsize
 };
 
 static uint8_t
@@ -5851,9 +5820,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 	struct ssrbnode *n = NULL;
 	int rc;
 	rc = sx_match(&index->i, index->scheme,
-	              key->data,
-		      key->size,
-	              &n);
+	              key->data, key->size, &n);
 	if (! (rc == 0 && n))
 		goto add;
 	struct sxv *head = container_of(n, struct sxv, node);
@@ -8213,6 +8180,7 @@ si_nodeunrotate(struct sinode *node) {
 	assert((node->flags & SI_ROTATE) > 0);
 	node->flags &= ~SI_ROTATE;
 	node->i0 = node->i1;
+	node->i0.tree.arg = &node->i0;
 	sv_indexinit(&node->i1, node->i0.scheme);
 }
 
@@ -8475,8 +8443,6 @@ si_lru_vlsn(struct si *i)
 	si_unlock(i);
 	return rc;
 }
-
-static uint32_t si_gcref(struct runtime*, struct svref*);
 
 struct PACKED sicachebranch {
 	struct sibranch *branch;
@@ -9187,7 +9153,7 @@ si_branchcreate(struct si *index, struct sdc *c,
 
 	/* merge iter is not used */
 	struct sdmergeconf mergeconf = {
-		.stream          = vindex->count,
+		.stream          = vindex->tree.size,
 		.size_stream     = UINT32_MAX,
 		.size_node       = UINT64_MAX,
 		.size_page       = index->conf.node_page_size,
@@ -9323,6 +9289,7 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 		n->used -= used;
 		ss_quota(r->quota, SS_QREMOVE, used);
 		struct svindex swap = *i;
+		swap.tree.arg = &swap;
 		si_nodeunrotate(n);
 		si_nodeunlock(n);
 		si_plannerupdate(&index->p, SI_BRANCH|SI_COMPACT, n);
@@ -9344,6 +9311,7 @@ si_branch(struct si *index, struct sdc *c, struct siplan *plan, uint64_t vlsn)
 		sd_indexsize_ext(branch->index.h) +
 		sd_indextotal(&branch->index);
 	struct svindex swap = *i;
+	swap.tree.arg = &swap;
 	si_nodeunrotate(n);
 	si_nodeunlock(n);
 	si_plannerupdate(&index->p, SI_BRANCH|SI_COMPACT, n);
@@ -9531,21 +9499,6 @@ static int si_drop(struct si *i)
 	return rc;
 }
 
-static uint32_t si_gcref(struct runtime *r, struct svref *gc)
-{
-	uint32_t used = 0;
-	struct svref *v = gc;
-	while (v) {
-		struct svref *n = v->next;
-		uint32_t size = phia_tuple_size(v->v);
-		if (phia_tuple_unref(r, v->v))
-			used += size;
-		ss_free(r->a, v);
-		v = n;
-	}
-	return used;
-}
-
 static int
 si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 		struct sinode *node, struct ssbuf *result)
@@ -9576,8 +9529,7 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 			assert(prev != NULL);
 			while (ss_bufiterref_has(&i)) {
 				struct svref *v = ss_bufiterref_get(&i);
-				v->next = NULL;
-				sv_indexset(&prev->i0, v);
+				sv_indexset(&prev->i0, *v);
 				ss_bufiterref_next(&i);
 			}
 			break;
@@ -9585,14 +9537,14 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 		while (ss_bufiterref_has(&i))
 		{
 			struct svref *v = ss_bufiterref_get(&i);
-			v->next = NULL;
 			struct sdindexpage *page = sd_indexmin(&p->self.index);
-			int rc = sf_compare(&index->scheme, v->v->data, v->v->size,
+			int rc = sf_compare(&index->scheme, v->v->data,
+					    v->v->size,
 			                    sd_indexpage_min(&p->self.index, page),
 			                    page->sizemin);
 			if (unlikely(rc >= 0))
 				break;
-			sv_indexset(&prev->i0, v);
+			sv_indexset(&prev->i0, *v);
 			ss_bufiterref_next(&i);
 		}
 		if (unlikely(! ss_bufiterref_has(&i)))
@@ -9615,7 +9567,7 @@ si_redistribute_set(struct si *index, uint64_t now, struct svref *v)
 	assert(node != NULL);
 	/* update node */
 	struct svindex *vindex = si_nodeindex(node);
-	sv_indexset(vindex, v);
+	sv_indexset(vindex, *v);
 	node->update_time = index->update_time;
 	node->used += phia_tuple_size(v->v);
 	/* schedule node */
@@ -9641,7 +9593,6 @@ si_redistribute_index(struct si *index, struct ssa *a, struct sdc *c, struct sin
 	ss_bufiterref_open(&i, &c->b, sizeof(struct svref*));
 	while (ss_bufiterref_has(&i)) {
 		struct svref *v = ss_bufiterref_get(&i);
-		v->next = NULL;
 		si_redistribute_set(index, now, v);
 		ss_bufiterref_next(&i);
 	}
@@ -9834,6 +9785,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 	case 1: /* self update */
 		n = *(struct sinode**)result->s;
 		n->i0 = *j;
+		n->i0.tree.arg = &n->i0;
 		n->temperature = node->temperature;
 		n->temperature_reads = node->temperature_reads;
 		n->used = sv_indexused(j);
@@ -9978,13 +9930,9 @@ si_nodenew(struct sfscheme *scheme, struct runtime *r)
 	return n;
 }
 
-ss_rbtruncate(si_nodegc_indexgc,
-              si_gcref((struct runtime*)arg, container_of(n, struct svref, node)))
-
 static int si_nodegc_index(struct runtime *r, struct svindex *i)
 {
-	if (i->i.root)
-		si_nodegc_indexgc(i->i.root, r);
+	sv_indexfree(i, r);
 	sv_indexinit(i, i->scheme);
 	return 0;
 }
@@ -10610,8 +10558,8 @@ static int si_profiler(struct siprofiler *p)
 			p->temperature_min = n->temperature;
 		temperature_total += n->temperature;
 		p->total_node_count++;
-		p->count += n->i0.count;
-		p->count += n->i1.count;
+		p->count += n->i0.tree.size;
+		p->count += n->i1.tree.size;
 		p->total_branch_count += n->branch_count;
 		if (p->total_branch_max < n->branch_count)
 			p->total_branch_max = n->branch_count;
@@ -10757,32 +10705,17 @@ si_getindex(struct siread *q, struct sinode *n)
 {
 	struct svindex *second;
 	struct svindex *first = si_nodeindex_priority(n, &second);
-	struct ssiter i;
-	int rc;
-	if (first->count > 0) {
-		rc = sv_indexiter_open(&i, first, PHIA_GE, q->key, q->keysize);
-		if (rc) {
-			goto result;
-		}
-	}
-	if (likely(second == NULL || !second->count))
+
+	uint64_t lsn = q->has ? UINT64_MAX : q->vlsn;
+	struct svref *ref = sv_indexfind(first, q->key, q->keysize, lsn);
+	if (ref == NULL && second != NULL)
+		ref = sv_indexfind(second, q->key, q->keysize, lsn);
+	if (ref == NULL)
 		return 0;
-	rc = sv_indexiter_open(&i, second, PHIA_GE, q->key, q->keysize);
-	if (! rc) {
-		return 0;
-	}
-result:;
+
 	si_readstat(q, 1, n, 1);
-	struct sv *v = sv_indexiter_get(&i);
-	assert(v != NULL);
-	struct svref *visible = v->v;
-	if (likely(! q->has)) {
-		visible = sv_refvisible(visible, q->vlsn);
-		if (visible == NULL)
-			return 0;
-	}
 	struct sv vret;
-	sv_init(&vret, &sv_vif, visible->v, NULL);
+	sv_init(&vret, &sv_vif, ref->v, NULL);
 	return si_getresult(q, &vret, 0);
 }
 
@@ -10990,12 +10923,12 @@ next_node:
 	/* in-memory indexes */
 	struct svindex *second;
 	struct svindex *first = si_nodeindex_priority(node, &second);
-	if (first->count) {
+	if (first->tree.size) {
 		s = sv_mergeadd(m, NULL);
 		sv_indexiter_open(&s->src, first, q->order,
 				  q->key, q->keysize);
 	}
-	if (unlikely(second && second->count)) {
+	if (unlikely(second && second->tree.size)) {
 		s = sv_mergeadd(m, NULL);
 		sv_indexiter_open(&s->src, second, q->order,
 				  q->key, q->keysize);
@@ -11084,31 +11017,17 @@ si_readcommited(struct si *index, struct sv *v, int recover)
 	assert(node != NULL);
 
 	uint64_t lsn = sv_lsn(v);
-	int rc;
 	/* search in-memory */
 	if (recover == 2) {
 		struct svindex *second;
 		struct svindex *first = si_nodeindex_priority(node, &second);
-		if (likely(first->count > 0)) {
-			struct ssiter i;
-			rc = sv_indexiter_open(&i, first, PHIA_GE,
-					       sv_pointer(v), sv_size(v));
-			if (rc) {
-				struct sv *ref = sv_indexiter_get(&i);
-				if (sv_refvisible_gte((struct svref*)ref->v, lsn))
-					return 1;
-			}
-		}
-		if (second && !second->count) {
-			struct ssiter i;
-			rc = sv_indexiter_open(&i, second, PHIA_GE,
-					       sv_pointer(v), sv_size(v));
-			if (rc) {
-				struct sv *ref = sv_indexiter_get(&i);
-				if (sv_refvisible_gte((struct svref*)ref->v, lsn))
-					return 1;
-			}
-		}
+		struct svref *ref = sv_indexfind(first, sv_pointer(v),
+						 sv_size(v), UINT64_MAX);
+		if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
+			ref = sv_indexfind(second, sv_pointer(v),
+					   sv_size(v), UINT64_MAX);
+		if (ref != NULL && ref->v->lsn >= lsn)
+			return 1;
 	}
 
 	/* search branches */
@@ -11683,18 +11602,17 @@ static inline int si_set(struct sitx *x, struct phia_tuple *v, uint64_t time)
 	si_iter_open(&ii, index, PHIA_GE, v->data, v->size);
 	struct sinode *node = si_iter_get(&ii);
 	assert(node != NULL);
-	struct svref *ref = sv_refnew(index->r, v);
-	assert(ref != NULL);
+	struct svref ref;
+	ref.v = v;
+	ref.flags = 0;
 	/* insert into node index */
 	struct svindex *vindex = si_nodeindex(node);
-	struct svindexpos pos;
-	sv_indexget(vindex, &pos, ref);
-	sv_indexupdate(vindex, &pos, ref);
+	sv_indexset(vindex, ref);
 	/* update node */
 	node->update_time = index->update_time;
 	node->used += phia_tuple_size(v);
 	if (index->conf.lru)
-		si_lru_add(index, ref);
+		si_lru_add(index, &ref);
 	si_txtrack(x, node);
 	return 0;
 }

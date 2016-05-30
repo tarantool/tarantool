@@ -89,7 +89,7 @@ box_info_sort(box.info.phia())
       - branch_max: '1'
       - count: '2'
       - count_dup: '0'
-      - memory_used: '68'
+      - memory_used: '49220'
       - node_count: '1'
       - page_count: '1'
       - read_cache: '0'
