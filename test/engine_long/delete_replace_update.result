@@ -11,7 +11,7 @@ delete_replace_update(engine_name, iterations)
 ---
 - - 100000
   - 3
-  - EMLMARJEFGTVZHSKBOOS
+  - EISMEJTLAMKKUKAGXHLK
   - BUPYVKWEHVEFKSZFAQIK
 ...
 math.randomseed(2)
@@ -21,7 +21,7 @@ delete_replace_update(engine_name, iterations)
 ---
 - - 100000
   - 3
-  - DYHLURGFSDJLBUPOBAUV
+  - DTUNRKMNKTQDTBLYQVUQ
   - UHMBETMEPMQWOIHLAOSR
 ...
 math.randomseed(3)
@@ -31,7 +31,7 @@ delete_replace_update(engine_name, iterations)
 ---
 - - 100000
   - 1
-  - KOWURFNHHVGDRYNKXJUM
+  - KORQQVUDKFSDPZVQOEZE
   - RSMFJYXLNSOILKDEFJZW
 ...
 math.randomseed(4)
@@ -41,7 +41,7 @@ delete_replace_update(engine_name, iterations)
 ---
 - - 100000
   - 3
-  - OLLNLRZCZFCOHXGVAVPX
+  - OKKQFSHPFMOLMOFOXEAN
   - RXXYWNPDXVVGONOGTEZK
 ...
 math.randomseed(5)
@@ -51,6 +51,6 @@ delete_replace_update(engine_name, iterations)
 ---
 - - 100000
   - 3
-  - LDPXEIVXEAAAGIVUFAZL
+  - LCUFGMXHLNHJBAQJDHGH
   - HKBELZCRRWNZHFIRAHJD
 ...

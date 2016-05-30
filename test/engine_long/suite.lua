@@ -25,7 +25,7 @@ function delete_replace_update(engine_name, iterations)
     while counter < iterations do
         local string_value = string_function()
 
-        local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'GE', limit = 1})
+        local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'EQ'})
         if string_table[1] == nil then
             box.space.tester:insert{string_value, counter}
             string_value_2 = string_value
@@ -80,7 +80,7 @@ function delete_insert(engine_name, iterations)
     local counter = 1
     while counter < iterations do
         local string_value = string_function()
-        local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'GE', limit = 1})
+        local string_table = box.space.tester.index.primary:select({string_value}, {iterator = 'EQ'})
 
         if string_table[1] == nil then
             -- print (1, ' insert', counter, string_value)
