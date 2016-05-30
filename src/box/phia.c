@@ -8520,6 +8520,7 @@ struct sicachepool {
 	struct sicache *head;
 	int n;
 	struct runtime *r;
+	pthread_mutex_t mutex;
 };
 
 static inline void
@@ -8693,6 +8694,7 @@ si_cachepool_init(struct sicachepool *p, struct runtime *r)
 	p->head = NULL;
 	p->n    = 0;
 	p->r    = r;
+	tt_pthread_mutex_init(&p->mutex, NULL);
 }
 
 static inline void
@@ -8706,11 +8708,13 @@ si_cachepool_free(struct sicachepool *p)
 		ss_free(p->r->a, c);
 		c = next;
 	}
+	tt_pthread_mutex_destroy(&p->mutex);
 }
 
 static inline struct sicache*
 si_cachepool_pop(struct sicachepool *p)
 {
+	tt_pthread_mutex_lock(&p->mutex);
 	struct sicache *c;
 	if (likely(p->n > 0)) {
 		c = p->head;
@@ -8718,12 +8722,13 @@ si_cachepool_pop(struct sicachepool *p)
 		p->n--;
 		si_cachereset(c);
 		c->pool = p;
-		return c;
+	} else {
+		c = ss_malloc(p->r->a, sizeof(struct sicache));
+		if (unlikely(c == NULL))
+			return NULL;
+		si_cacheinit(c, p);
 	}
-	c = ss_malloc(p->r->a, sizeof(struct sicache));
-	if (unlikely(c == NULL))
-		return NULL;
-	si_cacheinit(c, p);
+	tt_pthread_mutex_unlock(&p->mutex);
 	return c;
 }
 
@@ -8731,9 +8736,11 @@ static inline void
 si_cachepool_push(struct sicache *c)
 {
 	struct sicachepool *p = c->pool;
+	tt_pthread_mutex_lock(&p->mutex);
 	c->next = p->head;
 	p->head = c;
 	p->n++;
+	tt_pthread_mutex_unlock(&p->mutex);
 }
 
 struct sitx {
