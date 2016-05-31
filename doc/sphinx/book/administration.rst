@@ -257,12 +257,15 @@ and checking status.
             configuring for tarantoolctl
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The :program:`tarantoolctl` script will read a configuration file named
-:file:`~/.config/tarantool/default`, or
-:file:`/etc/sysconfig/tarantool`, or :file:`/etc/default/tarantool`. Most
+"The :codenormal:`tarantool` script will look for a configuration file
+in the current directory (:codenormal:`$PWD/.tarantoolctl`).
+If that fails, it looks in the current user's home directory (:codenormal:`$HOME/.config/tarantool/tarantool`).
+If that fails, it looks in the SYSCONFIGDIR directory (usually :codenormal:`/usr/local/etc/default/tarantool`
+but it may be different on some platforms)."
+Most
 of the settings are similar to the settings used by ``box.cfg{...};``
 however, tarantoolctl adjusts some of them by adding an application name.
-A copy of :file:`/etc/sysconfig/tarantool`, with defaults for all settings,
+A copy of :file:`usr/local/etc/default/tarantool`, with defaults for all settings,
 would look like this:
 
 .. code-block:: lua
@@ -397,8 +400,8 @@ Create a directory named /tarantool_test:
 
     $ sudo mkdir /tarantool_test
 
-Edit /etc/sysconfig/tarantool. It might be necessary to
-say :codenormal:`sudo mkdir /etc/sysconfig` first. Let the new file contents be:
+Edit /usr/local/etc/default/tarantool. It might be necessary to
+say :codenormal:`sudo mkdir /usr/local/etc/default` first. Let the new file contents be:
 
 .. code-block:: lua
 
@@ -469,7 +472,7 @@ Stop. The only clean way to stop my_app is with tarantoolctl, thus:
 
     $ sudo tarantoolctl stop my_app
 
-Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
+Clean up. Restore the original contents of :file:`/usr/local/etc/default/tarantool`, and ...
 
 .. code-block:: console
 
