@@ -1,0 +1,5326 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C)
+# This file is distributed under the same license as the Tarantool package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Tarantool 1.6\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-05-31 15:17+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.2.0\n"
+
+#: ../reference/box.rst:19
+msgid "Package `box`"
+msgstr ""
+
+#: ../reference/box.rst:21
+msgid ""
+"The contents of the ``box`` library can be inspected at runtime with "
+"``box``, with no arguments. The packages inside the box library are: "
+"``box.schema``, ``box.tuple``, ``box.space``, ``box.index``, ``net.box``,"
+" ``box.cfg``, ``box.info``, ``box.slab``, ``box.stat``. Every package "
+"contains one or more Lua functions. A few packages contain members as "
+"well as functions. The functions allow data definition (create alter "
+"drop), data manipulation (insert delete update upsert select replace), "
+"and introspection (inspecting contents of spaces, accessing server "
+"configuration)."
+msgstr ""
+
+#: ../reference/box_error.rst:19
+msgid "Package `box.error`"
+msgstr ""
+
+#: ../reference/box_error.rst:23
+msgid ""
+"The ``box.error`` function is for raising an error. The difference "
+"between this function and Lua's built-in ``error()`` function is that "
+"when the error reaches the client, its error code is preserved. In "
+"contrast, a Lua error would always be presented to the client as "
+":errcode:`ER_PROC_LUA`."
+msgstr ""
+
+#: ../reference/box_error.rst:30
+msgid ""
+"When called with a Lua-table argument, the code and reason have any user-"
+"desired values. The result will be those values."
+msgstr ""
+
+#: ../reference/box_error.rst:38
+msgid ""
+"When called without arguments, ``box.error()`` re-throws whatever the "
+"last error was."
+msgstr ""
+
+#: ../reference/box_error.rst:43
+msgid ""
+"Emulate a request error, with text based on one of the pre-defined "
+"Tarantool errors defined in the file `errcode.h "
+"<https://github.com/tarantool/tarantool/blob/master/src/box/errcode.h>`_ "
+"in the source tree. Lua constants which correspond to those Tarantool "
+"errors are defined as members of ``box.error``, for example "
+"``box.error.NO_SUCH_USER == 45``."
+msgstr ""
+
+#: ../reference/box_error.rst:49
+msgid "number of a pre-defined error"
+msgstr ""
+
+#: ../reference/box_error.rst:50
+msgid "part of the message which will accompany the error"
+msgstr ""
+
+#: ../reference/box_error.rst:52
+msgid "For example:"
+msgstr ""
+
+#: ../reference/box_error.rst:54
+#, python-format
+msgid ""
+"the ``NO_SUCH_USER`` message is \"``User '%s' is not found``\" -- it "
+"includes one \"``%s``\" component which will be replaced with errtext. "
+"Thus a call to ``box.error(box.error.NO_SUCH_USER, 'joe')`` or "
+"``box.error(45, 'joe')`` will result in an error with the accompanying "
+"message \"``User 'joe' is not found``\"."
+msgstr ""
+
+#: ../reference/box_error.rst:60
+msgid "whatever is specified in errcode-number."
+msgstr ""
+
+#: ../reference/box_error.rst:62 ../reference/box_error.rst:98
+#: ../reference/clock.rst:42 ../reference/clock.rst:61
+#: ../reference/clock.rst:79 ../reference/clock.rst:97
+#: ../reference/clock.rst:119 ../reference/console.rst:61
+#: ../reference/console.rst:93 ../reference/console.rst:116
+#: ../reference/csv.rst:59 ../reference/csv.rst:136 ../reference/csv.rst:177
+#: ../reference/fiber.rst:67 ../reference/fiber.rst:89
+#: ../reference/fiber.rst:107 ../reference/fiber.rst:125
+#: ../reference/fiber.rst:152 ../reference/fiber.rst:169
+#: ../reference/fiber.rst:194 ../reference/fiber.rst:208
+#: ../reference/fiber.rst:226 ../reference/fiber.rst:245
+#: ../reference/fiber.rst:268 ../reference/fiber.rst:286
+#: ../reference/fiber.rst:309 ../reference/fiber.rst:328
+#: ../reference/fiber.rst:369 ../reference/fiber.rst:386
+#: ../reference/fio.rst:41 ../reference/fio.rst:61 ../reference/fio.rst:79
+#: ../reference/fio.rst:101 ../reference/fio.rst:121 ../reference/fio.rst:152
+#: ../reference/fio.rst:173 ../reference/fio.rst:188 ../reference/fio.rst:201
+#: ../reference/fio.rst:225 ../reference/fio.rst:248 ../reference/fio.rst:267
+#: ../reference/fio.rst:290 ../reference/fio.rst:306 ../reference/fio.rst:329
+#: ../reference/fio.rst:351 ../reference/fio.rst:374 ../reference/fio.rst:404
+#: ../reference/fio.rst:422 ../reference/fio.rst:445 ../reference/fio.rst:463
+#: ../reference/fio.rst:495 ../reference/jit.rst:31 ../reference/jit.rst:46
+#: ../reference/jit.rst:59 ../reference/jit.rst:73 ../reference/jit.rst:94
+#: ../reference/json.rst:35 ../reference/json.rst:71 ../reference/json.rst:95
+#: ../reference/net_box.rst:70 ../reference/net_box.rst:90
+#: ../reference/net_box.rst:104 ../reference/net_box.rst:117
+#: ../reference/other.rst:29 ../reference/other.rst:66
+#: ../reference/pickle.rst:80 ../reference/pickle.rst:125
+#: ../reference/strict.rst:32 ../reference/tap.rst:84 ../reference/tap.rst:126
+#: ../reference/tarantool.rst:33
+msgid "**Example:**"
+msgstr ""
+
+#: ../reference/box_error.rst:64
+msgid ""
+"tarantool> box.error{code = 555, reason = 'Arbitrary message'}\n"
+"---\n"
+"- error: Arbitrary message\n"
+"...\n"
+"tarantool> box.error()\n"
+"---\n"
+"- error: Arbitrary message\n"
+"...\n"
+"tarantool> box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')\n"
+"---\n"
+"- error: A access denied for user 'B' to function 'C'\n"
+"..."
+msgstr ""
+
+#: ../reference/box_error.rst:81
+msgid ""
+"Returns a description of the last error, as a Lua table with five "
+"members: \"line\" (number) Tarantool source file line number, \"code\" "
+"(number) error's number, \"type\", (string) error's C++ class, "
+"\"message\" (string) error's message, \"file\" (string) Tarantool source "
+"file. Additionally, if the error is a system error (for example due to a "
+"failure in socket or file io), there may be a sixth member: \"errno\" "
+"(number) C standard error number."
+msgstr ""
+
+#: ../reference/box_error.rst:91
+msgid "rtype: table"
+msgstr ""
+
+#: ../reference/box_error.rst:95
+msgid ""
+"Clears the record of errors, so functions like `box.error()` or "
+"`box.error.last()` will have no effect."
+msgstr ""
+
+#: ../reference/box_error.rst:100
+msgid ""
+"tarantool> box.error{code = 555, reason = 'Arbitrary message'}\n"
+"---\n"
+"- error: Arbitrary message\n"
+"...\n"
+"tarantool> box.schema.space.create('#')\n"
+"---\n"
+"- error: Invalid identifier '#' (expected letters, digits or an "
+"underscore)\n"
+"...\n"
+"tarantool> box.error.last()\n"
+"---\n"
+"- line: 278\n"
+"  code: 70\n"
+"  type: ClientError\n"
+"  message: Invalid identifier '#' (expected letters, digits or an "
+"underscore)\n"
+"  file: "
+"/tmp/buildd/tarantool-1.6.6.252.g1654e31~precise/src/box/key_def.cc\n"
+"...\n"
+"tarantool> box.error.clear()\n"
+"---\n"
+"...\n"
+"tarantool> box.error.last()\n"
+"---\n"
+"- null\n"
+"..."
+msgstr ""
+
+#: ../reference/capi.rst:19
+msgid "Module C API"
+msgstr ""
+
+#: ../reference/capi.rst
+msgid "Defines"
+msgstr ""
+
+#: ../reference/capi.rst
+msgid "Typedefs"
+msgstr ""
+
+#: ../reference/capi.rst
+msgid "Enums"
+msgstr ""
+
+#: ../reference/capi.rst
+msgid "Functions"
+msgstr ""
+
+#: ../reference/capi.rst
+msgid "Variables"
+msgstr ""
+
+#: ../reference/clock.rst:19
+msgid "Package `clock`"
+msgstr ""
+
+#: ../reference/clock.rst:21
+msgid ""
+"The ``clock`` package returns time values derived from the Posix / C "
+"CLOCK_GETTIME_ function or equivalent. Most functions in the package "
+"return a number of seconds; functions whose names end in \"64\" return a "
+"64-bit number of nanoseconds."
+msgstr ""
+
+#: ../reference/clock.rst:33
+msgid ""
+"The wall clock time. Derived from C function "
+"clock_gettime(CLOCK_REALTIME). Approximately the same as os.clock(). This"
+" is the best function for knowing what the official time is, as "
+"determined by the system administrator. |br| See also :func:`fiber.time64"
+" <fiber.time64>`."
+msgstr ""
+
+#: ../reference/clock.rst:39
+msgid "seconds or nanoseconds since epoch (1970-01-01 00:00:00), adjusted."
+msgstr ""
+
+#: ../reference/clock.rst:40 ../reference/clock.rst:59
+#: ../reference/clock.rst:77 ../reference/clock.rst:95
+msgid "number or number64"
+msgstr ""
+
+#: ../reference/clock.rst:44
+msgid ""
+"-- This will print an approximate number of years since 1970.\n"
+"clock = require('clock')\n"
+"print(clock.time() / (365*24*60*60))"
+msgstr ""
+
+#: ../reference/clock.rst:53
+msgid ""
+"The monotonic time. Derived from C function "
+"clock_gettime(CLOCK_MONOTONIC). Monotonic time is similar to wall clock "
+"time but is not affected by changes to or from daylight saving time, or "
+"by changes done by a user. This is the best function to use with "
+"benchmarks that need to calculate elapsed time."
+msgstr ""
+
+#: ../reference/clock.rst:58
+msgid "seconds or nanoseconds since the last time that the computer was booted."
+msgstr ""
+
+#: ../reference/clock.rst:63
+msgid ""
+"-- This will print nanoseconds since the start.\n"
+"clock = require('clock')\n"
+"print(clock.monotonic64())"
+msgstr ""
+
+#: ../reference/clock.rst:72
+msgid ""
+"The processor time. Derived from C function "
+"clock_gettime(CLOCK_PROCESS_CPUTIME_ID). This is the best function to use"
+" with benchmarks that need to calculate how much time has been spent "
+"within a CPU."
+msgstr ""
+
+#: ../reference/clock.rst:76
+msgid "seconds or nanoseconds since processor start."
+msgstr ""
+
+#: ../reference/clock.rst:81
+msgid ""
+"-- This will print nanoseconds in the CPU since the start.\n"
+"clock = require('clock')\n"
+"print(clock.proc64())"
+msgstr ""
+
+#: ../reference/clock.rst:90
+msgid ""
+"The thread time. Derived from C function "
+"clock_gettime(CLOCK_THREAD_CPUTIME_ID). This is the best function to use "
+"with benchmarks that need to calculate how much time has been spent "
+"within a thread within a CPU."
+msgstr ""
+
+#: ../reference/clock.rst:94
+msgid "seconds or nanoseconds since thread start."
+msgstr ""
+
+#: ../reference/clock.rst:99
+msgid ""
+"-- This will print seconds in the thread since the start.\n"
+"clock = require('clock')\n"
+"print(clock.thread64())"
+msgstr ""
+
+#: ../reference/clock.rst:107
+msgid ""
+"The time that a function takes within a processor. This function uses "
+"clock.proc(), therefore it calculates elapsed CPU time. Therefore it is "
+"not useful for showing actual elapsed time."
+msgstr ""
+
+#: ../reference/clock.rst:111 ../reference/socket.rst:196
+msgid "Parameters:"
+msgstr ""
+
+#: ../reference/clock.rst:113
+msgid ":samp:`{function}` = function or function reference;"
+msgstr ""
+
+#: ../reference/clock.rst:114
+msgid ""
+":samp:`{function parameters}` = whatever values are required by the "
+"function."
+msgstr ""
+
+#: ../reference/clock.rst:116
+msgid ""
+"table. first element = seconds of CPU time; second element = whatever the"
+" function returns."
+msgstr ""
+
+#: ../reference/clock.rst:117 ../reference/csv.rst:57
+#: ../reference/fiber.rst:167 ../reference/fio.rst:119 ../reference/fio.rst:169
+#: ../reference/fio.rst:461 ../reference/json.rst:69
+#: ../reference/msgpack.rst:40 ../reference/pickle.rst:123
+#: ../reference/socket.rst:140 ../reference/socket.rst:446
+#: ../reference/socket.rst:456 ../reference/yaml.rst:40
+msgid "table"
+msgstr ""
+
+#: ../reference/clock.rst:121
+msgid ""
+"-- Benchmark a function which sleeps 10 seconds.\n"
+"-- NB: bench() will not calculate sleep time.\n"
+"-- So the returned value will be {a number less than 10, 88}.\n"
+"clock = require('clock')\n"
+"fiber = require('fiber')\n"
+"function f(param)\n"
+"  fiber.sleep(param)\n"
+"  return 88\n"
+"end\n"
+"clock.bench(f,10)"
+msgstr ""
+
+#: ../reference/console.rst:21
+msgid "Package `console`"
+msgstr ""
+
+#: ../reference/console.rst:23
+msgid ""
+"The console package allows one Tarantool server to access another "
+"Tarantool server, and allows one Tarantool server to start listening on "
+"an administrative host/port."
+msgstr ""
+
+#: ../reference/console.rst:31
+msgid ""
+"Connect to the server at :ref:`URI`, change the prompt from "
+"':samp:`tarantool>`' to ':samp:`{uri}>`', and act henceforth as a client "
+"until the user ends the session or types :code:`control-D`."
+msgstr ""
+
+#: ../reference/console.rst:35
+msgid ""
+"The console.connect function allows one Tarantool server, in interactive "
+"mode, to access another Tarantool server. Subsequent requests will appear"
+" to be handled locally, but in reality the requests are being sent to the"
+" remote server and the local server is acting as a client. Once "
+"connection is successful, the prompt will change and subsequent requests "
+"are sent to, and executed on, the remote server. Results are displayed on"
+" the local server. To return to local mode, enter :code:`control-D`."
+msgstr ""
+
+#: ../reference/console.rst:44
+msgid ""
+"If the Tarantool server at :samp:`uri` requires authentication, the "
+"connection might look something like: "
+":code:`console.connect('admin:secretpassword@distanthost.com:3301')`."
+msgstr ""
+
+#: ../reference/console.rst:48
+msgid ""
+"There are no restrictions on the types of requests that can be entered, "
+"except those which are due to privilege restrictions -- by default the "
+"login to the remote server is done with user name = 'guest'. The remote "
+"server could allow for this by granting at least one privilege: "
+":code:`box.schema.user.grant('guest','execute','universe')`."
+msgstr ""
+
+#: ../reference/console.rst:54
+msgid "the URI of the remote server"
+msgstr ""
+
+#: ../reference/console.rst:56 ../reference/fiber.rst:266
+#: ../reference/fiber.rst:305 ../reference/log.rst:45 ../reference/tap.rst:52
+#: ../reference/tap.rst:63 ../reference/tap.rst:70 ../reference/tap.rst:124
+msgid "nil"
+msgstr ""
+
+#: ../reference/console.rst:58
+msgid ""
+"Possible errors: the connection will fail if the target Tarantool server "
+"was not initiated with :code:`box.cfg{listen=...}`."
+msgstr ""
+
+#: ../reference/console.rst:63
+msgid ""
+"tarantool> console = require('console')\n"
+"---\n"
+"...\n"
+"tarantool> console.connect('198.18.44.44:3301')\n"
+"---\n"
+"...\n"
+"198.18.44.44:3301> -- prompt is telling us that server is remote"
+msgstr ""
+
+#: ../reference/console.rst:75
+msgid ""
+"Listen on :ref:`URI`. The primary way of listening for incoming requests "
+"is via the connection-information string, or URI, specified in "
+":code:`box.cfg{listen=...}`. The alternative way of listening is via the "
+"URI specified in :code:`console.listen(...)`. This alternative way is "
+"called \"administrative\" or simply \"admin port\". The listening is "
+"usually over a local host with a Unix socket, specified with host = "
+"'unix/', port = 'path/to/something.sock'."
+msgstr ""
+
+#: ../reference/console.rst:83
+msgid "the URI of the local server"
+msgstr ""
+
+#: ../reference/console.rst:85
+msgid ""
+"The \"admin\" address is the URI to listen on for administrative "
+"connections. It has no default value, so it must be specified if "
+"connections will occur via telnet. The parameter is expressed with URI = "
+"Universal Resource Identifier format, for example "
+"\"/tmpdir/unix_domain_socket.sock\", or as a numeric TCP port. "
+"Connections are often made with telnet. A typical port value is 3313."
+msgstr ""
+
+#: ../reference/console.rst:95
+msgid ""
+"tarantool> console = require('console')\n"
+"---\n"
+"...\n"
+"tarantool> console.listen('unix/:/tmp/X.sock')\n"
+"... main/103/console/unix/:/tmp/X I> started\n"
+"---\n"
+"- fd: 6\n"
+"  name:\n"
+"    host: unix/\n"
+"    family: AF_UNIX\n"
+"    type: SOCK_STREAM\n"
+"    protocol: 0\n"
+"    port: /tmp/X.sock\n"
+"..."
+msgstr ""
+
+#: ../reference/console.rst:114
+msgid "Start the console on the current interactive terminal."
+msgstr ""
+
+#: ../reference/console.rst:118
+msgid ""
+"A special use of ``console.start()`` is with :ref:`initialization files "
+"<init-label>`. Normally, if one starts the tarantool server with "
+":samp:`tarantool {initialization file}` there is no console. This can be "
+"remedied by adding these lines at the end of the initialization file:"
+msgstr ""
+
+#: ../reference/console.rst:125
+msgid ""
+"console = require('console')\n"
+"console.start()"
+msgstr ""
+
+#: ../reference/csv.rst:19
+msgid "Package `csv`"
+msgstr ""
+
+#: ../reference/csv.rst:23
+msgid ""
+"The csv package handles records formatted according to Comma-Separated-"
+"Values (CSV) rules."
+msgstr ""
+
+#: ../reference/csv.rst:26
+msgid "The default formatting rules are:"
+msgstr ""
+
+#: ../reference/csv.rst:28
+msgid ""
+"Lua `escape sequences`_ such as \\\\n or \\\\10 are legal within strings "
+"but not within files,"
+msgstr ""
+
+#: ../reference/csv.rst:30
+msgid "Commas designate end-of-field,"
+msgstr ""
+
+#: ../reference/csv.rst:31
+msgid "Line feeds, or line feeds plus carriage returns, designate end-of-record,"
+msgstr ""
+
+#: ../reference/csv.rst:32
+msgid "Leading or trailing spaces are ignored,"
+msgstr ""
+
+#: ../reference/csv.rst:33
+msgid "Quote marks may enclose fields or parts of fields,"
+msgstr ""
+
+#: ../reference/csv.rst:34
+msgid ""
+"When enclosed by quote marks, commas and line feeds and spaces are "
+"treated as ordinary characters, and a pair of quote marks \"\" is treated"
+" as a single quote mark."
+msgstr ""
+
+#: ../reference/csv.rst:40
+msgid "The possible options which can be passed to csv functions are:"
+msgstr ""
+
+#: ../reference/csv.rst:42
+msgid ""
+":samp:`delimiter = {string}` -- single-byte character to designate end-"
+"of-field, default = comma"
+msgstr ""
+
+#: ../reference/csv.rst:43
+msgid ""
+":samp:`quote_char = {string}` -- single-byte character to designate "
+"encloser of string, default = quote mark"
+msgstr ""
+
+#: ../reference/csv.rst:44
+msgid ""
+":samp:`chunk-size = {number}` -- number of characters to read at once "
+"(usually for file-IO efficiency), default = 4096"
+msgstr ""
+
+#: ../reference/csv.rst:45
+msgid ""
+":samp:`skip_head_lines = {number}` -- number of lines to skip at the "
+"start (usually for a header), default 0"
+msgstr ""
+
+#: ../reference/csv.rst:49
+msgid ""
+"Get CSV-formatted input from ``readable`` and return a table as output. "
+"Usually ``readable`` is either a string or a file opened for reading. "
+"Usually :samp:`{options}` is not specified."
+msgstr ""
+
+#: ../reference/csv.rst:53
+msgid ""
+"a string, or any object which has a read() method, formatted according to"
+" the CSV rules"
+msgstr ""
+
+#: ../reference/csv.rst:55 ../reference/csv.rst:173
+msgid "see :ref:`above <csv-options>`"
+msgstr ""
+
+#: ../reference/csv.rst:56
+msgid "loaded_value"
+msgstr ""
+
+#: ../reference/csv.rst:61
+msgid ""
+"Readable string has 3 fields, field#2 has comma and space so use quote "
+"marks:"
+msgstr ""
+
+#: ../reference/csv.rst:63
+msgid ""
+"tarantool> csv = require('csv')\n"
+"---\n"
+"...\n"
+"tarantool> csv.load('a,\"b,c \",d')\n"
+"---\n"
+"- - - a\n"
+"    - 'b,c '\n"
+"    - d\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:75
+msgid ""
+"Readable string contains 2-byte character = Cyrillic Letter Palochka: "
+"(This displays a palochka if and only if character set = UTF-8.)"
+msgstr ""
+
+#: ../reference/csv.rst:78
+msgid ""
+"tarantool> csv.load('a\\\\211\\\\128b')\n"
+"---\n"
+"- - - a\\211\\128b\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:85
+msgid "Semicolon instead of comma for the delimiter:"
+msgstr ""
+
+#: ../reference/csv.rst:87
+msgid ""
+"tarantool> csv.load('a,b;c,d', {delimiter = ';'})\n"
+"---\n"
+"- - - a,b\n"
+"    - c,d\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:95
+msgid ""
+"Readable file :file:`./file.csv` contains two CSV records. Explanation of"
+" fio is in section :ref:`fio <fio-section>`. Source CSV file and example "
+"respectively:"
+msgstr ""
+
+#: ../reference/csv.rst:99
+msgid ""
+"tarantool> -- input in file.csv is:\n"
+"tarantool> -- a,\"b,c \",d\n"
+"tarantool> -- a\\\\211\\\\128b\n"
+"tarantool> fio = require('fio')\n"
+"---\n"
+"...\n"
+"tarantool> f = fio.open('./file.csv', {'O_RDONLY'})\n"
+"---\n"
+"...\n"
+"tarantool> csv.load(f, {chunk_size = 4096})\n"
+"---\n"
+"- - - a\n"
+"    - 'b,c '\n"
+"    - d\n"
+"  - - a\\\\211\\\\128b\n"
+"...\n"
+"tarantool> f:close(nn)\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:124
+msgid ""
+"Get table input from ``csv-table`` and return a CSV-formatted string as "
+"output. Or, get table input from ``csv-table`` and put the output in "
+"``writable``. Usually :samp:`{options}` is not specified. Usually "
+"``writable``, if specified, is a file opened for writing. "
+":func:`csv.dump()` is the reverse of :func:`csv.load()`."
+msgstr ""
+
+#: ../reference/csv.rst:130 ../reference/csv.rst:172
+msgid "a table which can be formatted according to the CSV rules."
+msgstr ""
+
+#: ../reference/csv.rst:131
+msgid "optional. see :ref:`above <csv-options>`"
+msgstr ""
+
+#: ../reference/csv.rst:132
+msgid "any object which has a write() method"
+msgstr ""
+
+#: ../reference/csv.rst:133
+msgid "dumped_value"
+msgstr ""
+
+#: ../reference/csv.rst:134
+msgid "string, which is written to ``writable`` if specified"
+msgstr ""
+
+#: ../reference/csv.rst:138
+msgid "CSV-table has 3 fields, field#2 has \",\" so result has quote marks"
+msgstr ""
+
+#: ../reference/csv.rst:140
+msgid ""
+"tarantool> csv = require('csv')\n"
+"---\n"
+"...\n"
+"tarantool> csv.dump({'a','b,c ','d'})\n"
+"---\n"
+"- 'a,\"b,c \",d\n"
+"\n"
+"'\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:152
+msgid "Round Trip: from string to table and back to string"
+msgstr ""
+
+#: ../reference/csv.rst:154
+msgid ""
+"tarantool> csv_table = csv.load('a,b,c')\n"
+"---\n"
+"...\n"
+"tarantool> csv.dump(csv_table)\n"
+"---\n"
+"- 'a,b,c\n"
+"\n"
+"'\n"
+"..."
+msgstr ""
+
+#: ../reference/csv.rst:169
+msgid ""
+"Form a Lua iterator function for going through CSV records one field at a"
+" time."
+msgstr ""
+
+#: ../reference/csv.rst:174
+msgid "Lua iterator function"
+msgstr ""
+
+#: ../reference/csv.rst:175
+msgid "iterator function"
+msgstr ""
+
+#: ../reference/csv.rst:179
+msgid ""
+"func:`csv.iterate()` is the low level of func:`csv.load()` and "
+":func:`csv.dump()`. To illustrate that, here is a function which is the "
+"same as the :func:`csv.load()` function, as seen in `the Tarantool source"
+" code`_."
+msgstr ""
+
+#: ../reference/csv.rst:183
+msgid ""
+"tarantool> load = function(readable, opts)\n"
+"         >   opts = opts or {}\n"
+"         >   local result = {}\n"
+"         >   for i, tup in csv.iterate(readable, opts) do\n"
+"         >     result[i] = tup\n"
+"         >   end\n"
+"         >   return result\n"
+"         > end\n"
+"---\n"
+"...\n"
+"tarantool> load('a,b,c')\n"
+"---\n"
+"- - - a\n"
+"    - b\n"
+"    - c\n"
+"..."
+msgstr ""
+
+#: ../reference/digest.rst:19
+msgid "Package `digest`"
+msgstr ""
+
+#: ../reference/digest.rst:23
+msgid ""
+"A \"digest\" is a value which is returned by a function (usually a "
+"`Cryptographic hash function`_), applied against a string. Tarantool "
+"supports five types of cryptographic hash functions (SHA-0_, SHA-1_, "
+"SHA-2_, MD4_, MD5) as well as a checksum function (CRC32_), two functions"
+" for base64_, and two non-cryptographic hash functions (guava_, murmur_)."
+" The functions in digest are:"
+msgstr ""
+
+#: ../reference/digest.rst:29
+msgid ""
+":func:`digest.sha() <digest.sha>`, |br| :func:`digest.sha_hex() "
+"<digest.sha_hex>`, |br| :func:`digest.sha1() <digest.sha1>`, |br| "
+":func:`digest.sha1_hex() <digest.sha1_hex>`, |br| :func:`digest.sha224() "
+"<digest.sha224>`, |br| :func:`digest.sha224_hex() <digest.sha224_hex>`, "
+"|br| :func:`digest.sha256() <digest.sha256>`, |br| "
+":func:`digest.sha256_hex() <digest.sha256_hex>`, |br| "
+":func:`digest.sha384() <digest.sha384>`, |br| :func:`digest.sha384_hex() "
+"<digest.sha384_hex>`, |br| :func:`digest.sha512() <digest.sha512>`, |br| "
+":func:`digest.sha512_hex() <digest.sha512_hex>`, |br| :func:`digest.md4()"
+" <digest.md4>`, |br| :func:`digest.md4_hex() <digest.md4_hex>`, |br| "
+":func:`digest.md5() <digest.md5>`, |br| :func:`digest.md5_hex() "
+"<digest.md5_hex>`, |br| :func:`digest.crc32() <digest.crc32>`, |br| "
+":func:`digest.crc32.update() <digest.crc32.update>`, |br| "
+":func:`digest.crc32.new() <digest.crc32.new>`, |br| "
+":func:`digest.base64_encode() <digest.base64_encode>`, |br| "
+":func:`digest.base64_decode() <digest.base64_decode>`, |br| "
+":func:`digest.urandom() <digest.urandom>`, |br| :func:`digest.guava() "
+"<digest.guava>`, |br| :func:`digest.murmur() <digest.murmur>`, |br| "
+":func:`digest.murmur.new() <digest.murmur.new>` |br|"
+msgstr ""
+
+#: ../reference/digest.rst:58
+msgid "Returns 160-bit digest made with SHA-0. Not recommended."
+msgstr ""
+
+#: ../reference/digest.rst:63
+msgid "Returns hexadecimal of a digest calculated with sha."
+msgstr ""
+
+#: ../reference/digest.rst:68
+msgid "Returns 160-bit digest made with SHA-1."
+msgstr ""
+
+#: ../reference/digest.rst:73
+msgid "Returns hexadecimal of a digest calculated with sha1."
+msgstr ""
+
+#: ../reference/digest.rst:78
+msgid "Returns 224-bit digest made with SHA-2."
+msgstr ""
+
+#: ../reference/digest.rst:83
+msgid "Returns hexadecimal of a digest calculated with sha224."
+msgstr ""
+
+#: ../reference/digest.rst:88
+msgid "Returns 256-bit digest made with SHA-2."
+msgstr ""
+
+#: ../reference/digest.rst:93
+msgid "Returns hexadecimal of a digest calculated with sha256."
+msgstr ""
+
+#: ../reference/digest.rst:98
+msgid "Returns 384-bit digest made with SHA-2."
+msgstr ""
+
+#: ../reference/digest.rst:103
+msgid "Returns hexadecimal of a digest calculated with sha384."
+msgstr ""
+
+#: ../reference/digest.rst:108
+msgid "Returns 512-bit digest made with SHA-2."
+msgstr ""
+
+#: ../reference/digest.rst:113
+msgid "Returns hexadecimal of a digest calculated with sha512."
+msgstr ""
+
+#: ../reference/digest.rst:118
+msgid "Returns 128-bit digest made with MD4."
+msgstr ""
+
+#: ../reference/digest.rst:123
+msgid "Returns hexadecimal of a digest calculated with md4."
+msgstr ""
+
+#: ../reference/digest.rst:128
+msgid "Returns 256-bit digest made with MD5."
+msgstr ""
+
+#: ../reference/digest.rst:133
+msgid "Returns hexadecimal of a digest calculated with md5."
+msgstr ""
+
+#: ../reference/digest.rst:138
+msgid "Returns 32-bit checksum made with CRC32."
+msgstr ""
+
+#: ../reference/digest.rst:140
+msgid ""
+"The crc32 and crc32_update function use the `CRC-32C (Castagnoli)`_ "
+"polynomial value: 0x11EDC6F41 / 4812730177. If it is necessary to be "
+"compatible with other checksum functions in other programming languages, "
+"ensure that the other functions use the same polynomial value. |br| For "
+"example, in Python, install the crcmod package and say:"
+msgstr ""
+
+#: ../reference/digest.rst:147
+msgid ""
+">>> import crcmod\n"
+">>> fun = crcmod.mkCrcFun('4812730177')\n"
+">>> fun('string')\n"
+"3304160206L"
+msgstr ""
+
+#: ../reference/digest.rst:159
+msgid ""
+"Returns update of a checksum calculated with CRC32. See "
+":func:`digest.crc32() <digest.crc32>` notes."
+msgstr ""
+
+#: ../reference/digest.rst:164
+msgid ""
+"Initiates incremental crc32. See :func:`incremental digests "
+"<digest.murmur.new>` notes."
+msgstr ""
+
+#: ../reference/digest.rst:169
+msgid "Returns base64 encoding from a regular string."
+msgstr ""
+
+#: ../reference/digest.rst:174
+msgid "Returns a regular string from a base64 encoding."
+msgstr ""
+
+#: ../reference/digest.rst:179
+msgid "Returns array of random bytes with length = integer."
+msgstr ""
+
+#: ../reference/digest.rst:184
+msgid "Returns a number made with consistent hash."
+msgstr ""
+
+#: ../reference/digest.rst:186
+msgid ""
+"The guava function uses the `Consistent Hashing`_ algorithm of the Google"
+" guava library. The first parameter should be a hash code; the second "
+"parameter should be the number of buckets; the returned value will be an "
+"integer between 0 and the number of buckets. For example,"
+msgstr ""
+
+#: ../reference/digest.rst:192
+msgid ""
+"tarantool> digest.guava(10863919174838991, 11)\n"
+"---\n"
+"- 8\n"
+"..."
+msgstr ""
+
+#: ../reference/digest.rst:202
+msgid "Returns 32-bit digest made with MurmurHash."
+msgstr ""
+
+#: ../reference/digest.rst:207
+msgid "Initiates incremental MurmurHash."
+msgstr ""
+
+#: ../reference/digest.rst:209
+msgid ""
+"Suppose that a digest is done for a string 'A', then a new part 'B' is "
+"appended to the string, then a new digest is required. The new digest "
+"could be recomputed for the whole string 'AB', but it is faster to take "
+"what was computed before for 'A' and apply changes based on the new part "
+"'B'. This is called multi-step or \"incremental\" digesting, which "
+"Tarantool supports with crc32 and with murmur ..."
+msgstr ""
+
+#: ../reference/digest.rst:218
+msgid ""
+"digest = require('digest')\n"
+"\n"
+"-- print crc32 of 'AB', with one step, then incrementally\n"
+"print(digest.crc32('AB'))\n"
+"c = digest.crc32.new()\n"
+"c:update('A')\n"
+"c:update('B')\n"
+"print(c:result())\n"
+"\n"
+"-- print murmur hash of 'AB', with one step, then incrementally\n"
+"print(digest.murmur('AB'))\n"
+"m = digest.murmur.new()\n"
+"m:update('A')\n"
+"m:update('B')\n"
+"print(m:result())"
+msgstr ""
+
+#: ../reference/digest.rst:238 ../reference/fiber-ipc.rst:120
+#: ../reference/log.rst:53 ../reference/msgpack.rst:48
+#: ../reference/socket.rst:462 ../reference/tap.rst:193
+#: ../reference/uuid.rst:106 ../reference/yaml.rst:48
+msgid "Example"
+msgstr ""
+
+#: ../reference/digest.rst:240
+msgid ""
+"In the following example, the user creates two functions, "
+"``password_insert()`` which inserts a SHA-1_ digest of the word "
+"\"**^S^e^c^ret Wordpass**\" into a tuple set, and ``password_check()`` "
+"which requires input of a password."
+msgstr ""
+
+#: ../reference/digest.rst:244
+msgid ""
+"tarantool> digest = require('diges')\n"
+"---\n"
+"...\n"
+"tarantool> function password_insert()\n"
+"         >   box.space.tester:insert{12345, digest.sha1('^S^e^c^ret "
+"Wordpass')}\n"
+"         >   return 'OK'\n"
+"         > end\n"
+"---\n"
+"...\n"
+"tarantool> function password_check(password)\n"
+"         >   local t\n"
+"         >   local t = box.space.tester:select{12345}\n"
+"         >   if digest.sha1(password) == t[2] then\n"
+"         >     print('Password is valid')\n"
+"         >   else\n"
+"         >     print('Password is not valid')\n"
+"         >   end\n"
+"         > end\n"
+"---\n"
+"...\n"
+"tarantool> password_insert()\n"
+"---\n"
+"- 'OK'\n"
+"..."
+msgstr ""
+
+#: ../reference/digest.rst:271
+msgid ""
+"If a later user calls the ``password_check()`` function and enters the "
+"wrong password, the result is an error."
+msgstr ""
+
+#: ../reference/digest.rst:274
+msgid ""
+"tarantool> password_check('Secret Password')\n"
+"Password is not valid\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/expirationd.rst:19
+msgid "Package `expirationd`"
+msgstr ""
+
+#: ../reference/expirationd.rst:21
+msgid ""
+"For a commercial-grade example of a Lua rock that works with Tarantool, "
+"let us look at expirationd, which Tarantool supplies on GitHub_ with an "
+"Artistic license. The expirationd.lua program is lengthy (about 500 "
+"lines), so here we will only highlight the matters that will be enhanced "
+"by studying the full source later."
+msgstr ""
+
+#: ../reference/expirationd.rst:26
+msgid ""
+"task.worker_fiber = fiber.create(worker_loop, task)\n"
+"log.info(\"expiration: task %q restarted\", task.name)\n"
+"...\n"
+"fiber.sleep(expirationd.constants.check_interval)\n"
+"..."
+msgstr ""
+
+#: ../reference/expirationd.rst:34
+msgid ""
+"Whenever one hears \"daemon\" in Tarantool, one should suspect it's being"
+" done with :doc:`fiber`. The program is making a fiber and turning "
+"control over to it so it runs occasionally, goes to sleep, then comes "
+"back for more."
+msgstr ""
+
+#: ../reference/expirationd.rst:38
+msgid ""
+"for _, tuple in scan_space.index[0]:pairs(nil, {iterator = "
+"box.index.ALL}) do\n"
+"...\n"
+"        if task.is_tuple_expired(task.args, tuple) then\n"
+"        task.expired_tuples_count = task.expired_tuples_count + 1\n"
+"        task.process_expired_tuple(task.space_id, task.args, tuple)\n"
+"..."
+msgstr ""
+
+#: ../reference/expirationd.rst:47
+msgid ""
+"The \"for\" instruction can be translated as \"iterate through the index "
+"of the space that is being scanned\", and within it, if the tuple is "
+"\"expired\" (that is, if the tuple has a timestamp field which is less "
+"than the current time), process the tuple as an expired tuple."
+msgstr ""
+
+#: ../reference/expirationd.rst:52
+msgid ""
+"-- put expired tuple in archive\n"
+"local function put_tuple_to_archive(space_id, args, tuple)\n"
+"    -- delete expired tuple\n"
+"    box.space[space_id]:delete{tuple[1]}\n"
+"    local email = get_field(tuple, 2)\n"
+"    if args.archive_space_id ~= nil and email ~= nil then\n"
+"        box.space[args.archive_space_id]:replace{email, os.time()}\n"
+"    end\n"
+"end"
+msgstr ""
+
+#: ../reference/expirationd.rst:64
+msgid ""
+"Ultimately the tuple-expiry process leads to ``put_tuple_to_archive()`` "
+"which does a \"delete\" of a tuple from its original space, and an "
+"\"insert\" of the same tuple into another space. Tarantool's \"replace\" "
+"function is the same as an \"insert\" function without an error message "
+"if a tuple with the same content already exists in the target space."
+msgstr ""
+
+#: ../reference/expirationd.rst:70
+msgid ""
+"function expirationd.do_test(space_id, archive_space_id)\n"
+"..."
+msgstr ""
+
+#: ../reference/expirationd.rst:75
+msgid ""
+"At this point, if the above explanation is worthwhile, it's clear that "
+"``expirationd.lua`` starts a background routine (fiber) which iterates "
+"through all the tuples in a space, sleeps cooperatively so that other "
+"fibers can operate at the same time, and - whenever it finds a tuple that"
+" has expired - deletes it from this space and puts it in another space. "
+"Now the \"``do_test()``\" function can be used to create some sample "
+"spaces, let the daemon run for a while, and print results."
+msgstr ""
+
+#: ../reference/expirationd.rst:83
+msgid ""
+"For those who like to see things run, here are the exact steps to get "
+"expirationd through the test."
+msgstr ""
+
+#: ../reference/expirationd.rst:86
+msgid ""
+"Get ``expirationd.lua``. There are standard ways - it is after all part "
+"of a `standard rock <https://luarocks.org/modules/rtsisyk/expirationd>`_"
+"  - but for this purpose just copy the contents of expirationd.lua_ to a "
+"default directory."
+msgstr ""
+
+#: ../reference/expirationd.rst:89
+msgid "Start the Tarantool server as described before."
+msgstr ""
+
+#: ../reference/expirationd.rst:90
+msgid "Execute these requests:"
+msgstr ""
+
+#: ../reference/expirationd.rst:92
+msgid ""
+"box.cfg{}\n"
+"a = box.schema.space.create('origin')\n"
+"a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})\n"
+"b = box.schema.space.create('archive')\n"
+"b:create_index('first', {type = 'tree', parts = {1, 'STR'}})\n"
+"expd = require('expirationd')\n"
+"expd._debug = true\n"
+"expd.do_test('origin', 'archive')\n"
+"os.exit()"
+msgstr ""
+
+#: ../reference/expirationd.rst:104
+msgid ""
+"The database-specific requests (``cfg``, ``space.create``, "
+"``create_index``) should already be familiar. The key for getting the "
+"rock rolling is ``expd = require('expirationd')``. The \"``require``\" "
+"function is what reads in the program; it will appear in many later "
+"examples in this manual, when it's necessary to get a package that's not "
+"part of the Tarantool kernel. After the Lua variable expd has been "
+"assigned the value of the expirationd package, it's possible to invoke "
+"the package's ``do_test()`` function."
+msgstr ""
+
+#: ../reference/expirationd.rst:112
+msgid ""
+"After a while, when the task has had time to do its iterations through "
+"the spaces, ``do_test()`` will print out a report showing the tuples that"
+" were originally in the original space, the tuples that have now been "
+"moved to the archive space, and some statistics. Of course, expirationd "
+"can be customized to do different things by passing different parameters,"
+" which will be evident after looking in more detail at the source code."
+msgstr ""
+
+#: ../reference/fiber.rst:19
+msgid "Package `fiber`"
+msgstr ""
+
+#: ../reference/fiber.rst:21
+msgid "The ``fiber`` package allows for creating, running and managing *fibers*."
+msgstr ""
+
+#: ../reference/fiber.rst:23
+msgid ""
+"A fiber is a set of instructions which are executed with cooperative "
+"multitasking. Fibers managed by the fiber package are associated with a "
+"user-supplied function called the *fiber function*. A fiber has three "
+"possible states: **running**, **suspended** or **dead**. When a fiber is "
+"created with :func:`fiber.create()`, it is running. When a fiber yields "
+"control with :func:`fiber.sleep()`, it is suspended. When a fiber ends "
+"(because the fiber function ends), it is dead."
+msgstr ""
+
+#: ../reference/fiber.rst:31
+msgid ""
+"All fibers are part of the fiber registry. This registry can be searched "
+"with :func:`fiber.find()` - via fiber id (fid), which is a numeric "
+"identifier."
+msgstr ""
+
+#: ../reference/fiber.rst:34
+msgid ""
+"A runaway fiber can be stopped with :func:`fiber_object.cancel`. However,"
+" :func:`fiber_object.cancel` is advisory — it works only if the runaway "
+"fiber calls :func:`fiber.testcancel()` occasionally. Most ``box.*`` "
+"functions, such as :func:`box.space...delete() <space_object.delete>` or "
+":func:`box.space...update() <space_object.update>`, do call "
+":func:`fiber.testcancel()` but :func:`box.space...select{} "
+"<space_object.select>` does not. In practice, a runaway fiber can only "
+"become unresponsive if it does many computations and does not check "
+"whether it has been canceled."
+msgstr ""
+
+#: ../reference/fiber.rst:43
+msgid ""
+"The other potential problem comes from fibers which never get scheduled, "
+"because they are not subscribed to any events, or because no relevant "
+"events occur. Such morphing fibers can be killed with "
+":func:`fiber.kill()` at any time, since :func:`fiber.kill()` sends an "
+"asynchronous wakeup event to the fiber, and :func:`fiber.testcancel()` is"
+" checked whenever such a wakeup event occurs."
+msgstr ""
+
+#: ../reference/fiber.rst:50
+msgid ""
+"Like all Lua objects, dead fibers are garbage collected. The garbage "
+"collector frees pool allocator memory owned by the fiber, resets all "
+"fiber data, and returns the fiber (now called a fiber carcass) to the "
+"fiber pool. The carcass can be reused when another fiber is created."
+msgstr ""
+
+#: ../reference/fiber.rst:59
+msgid ""
+"Create and start a fiber. The fiber is created and begins to run "
+"immediately."
+msgstr ""
+
+#: ../reference/fiber.rst:61
+msgid "the function to be associated with the fiber"
+msgstr ""
+
+#: ../reference/fiber.rst:62
+msgid "what will be passed to function"
+msgstr ""
+
+#: ../reference/fiber.rst:64
+msgid "created fiber object"
+msgstr ""
+
+#: ../reference/fiber.rst:65 ../reference/fiber.rst:87
+#: ../reference/fiber.rst:105 ../reference/fiber-ipc.rst:44
+#: ../reference/fio.rst:325 ../reference/net_box.rst:68
+#: ../reference/socket.rst:122 ../reference/socket.rst:131
+#: ../reference/socket.rst:199 ../reference/socket.rst:275
+#: ../reference/socket.rst:298 ../reference/tap.rst:38
+msgid "userdata"
+msgstr ""
+
+#: ../reference/fiber.rst:69
+msgid ""
+"tarantool> fiber = require('fiber')\n"
+"---\n"
+"...\n"
+"tarantool> function function_name()\n"
+"         >   fiber.sleep(1000)\n"
+"         > end\n"
+"---\n"
+"...\n"
+"tarantool> fiber_object = fiber.create(function_name)\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:86
+msgid "fiber object for the currently scheduled fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:91
+msgid ""
+"tarantool> fiber.self()\n"
+"---\n"
+"- status: running\n"
+"  name: interactive\n"
+"  id: 101\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:102
+msgid "numeric identifier of the fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:104
+msgid "fiber object for the specified fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:109
+msgid ""
+"tarantool> fiber.find(101)\n"
+"---\n"
+"- status: running\n"
+"  name: interactive\n"
+"  id: 101\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:120
+msgid ""
+"Yield control to the scheduler and sleep for the specified number of "
+"seconds. Only the current fiber can be made to sleep."
+msgstr ""
+
+#: ../reference/fiber.rst:123
+msgid "number of seconds to sleep."
+msgstr ""
+
+#: ../reference/fiber.rst:127
+msgid ""
+"tarantool> fiber.sleep(1.5)\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:135
+msgid ""
+"Yield control to the scheduler. Equivalent to :func:`fiber.sleep(0) "
+"<fiber.sleep>`."
+msgstr ""
+
+#: ../reference/fiber.rst:137 ../reference/socket.rst:142
+msgid "Example:"
+msgstr ""
+
+#: ../reference/fiber.rst:139
+msgid ""
+"tarantool> fiber.yield()\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:147
+msgid "Return the status of the current fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:149
+msgid "the status of ``fiber``. One of: “dead”, “suspended”, or “running”."
+msgstr ""
+
+#: ../reference/fiber.rst:150 ../reference/fiber.rst:243
+#: ../reference/fiber.rst:284 ../reference/fio.rst:39 ../reference/fio.rst:59
+#: ../reference/fio.rst:77 ../reference/json.rst:33 ../reference/msgpack.rst:32
+#: ../reference/pickle.rst:76 ../reference/socket.rst:228
+#: ../reference/socket.rst:257 ../reference/yaml.rst:32
+msgid "string"
+msgstr ""
+
+#: ../reference/fiber.rst:154
+msgid ""
+"tarantool> fiber.status()\n"
+"---\n"
+"- running\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:163
+msgid "Return information about all fibers."
+msgstr ""
+
+#: ../reference/fiber.rst:165
+msgid ""
+"number of context switches, backtrace, id, total memory, used memory, "
+"name for each fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:171
+msgid ""
+"tarantool> fiber.info()\n"
+"---\n"
+"- 101:\n"
+"    csw: 7\n"
+"    backtrace: []\n"
+"    fid: 101\n"
+"    memory:\n"
+"      total: 65776\n"
+"      used: 0\n"
+"    name: interactive\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:187
+msgid ""
+"Locate a fiber by its numeric id and cancel it. In other words, "
+":func:`fiber.kill()` combines :func:`fiber.find()` and "
+":func:`fiber_object:cancel() <fiber_object.cancel>`."
+msgstr ""
+
+#: ../reference/fiber.rst:191
+msgid "the id of the fiber to be canceled."
+msgstr ""
+
+#: ../reference/fiber.rst:192
+msgid "the specified fiber does not exist or cancel is not permitted."
+msgstr ""
+
+#: ../reference/fiber.rst:196
+msgid ""
+"tarantool> fiber.kill(fiber.id())\n"
+"---\n"
+"- error: fiber is cancelled\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:205
+msgid ""
+"Check if the current fiber has been canceled and throw an exception if "
+"this is the case."
+msgstr ""
+
+#: ../reference/fiber.rst:210
+msgid ""
+"tarantool> fiber.testcancel()\n"
+"---\n"
+"- error: fiber is cancelled\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:221 ../reference/fiber.rst:240
+#: ../reference/fiber.rst:262 ../reference/fiber.rst:280
+#: ../reference/fiber.rst:302
+msgid ""
+"fiber object, for example the fiber object returned by "
+":func:`fiber.create`"
+msgstr ""
+
+#: ../reference/fiber.rst:223
+msgid "id of the fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:224 ../reference/fiber-ipc.rst:88
+#: ../reference/fio.rst:99 ../reference/fio.rst:441 ../reference/socket.rst:212
+#: ../reference/socket.rst:311
+msgid "number"
+msgstr ""
+
+#: ../reference/fiber.rst:228
+msgid ""
+"tarantool> fiber_object = fiber.self()\n"
+"---\n"
+"...\n"
+"tarantool> fiber_object:id()\n"
+"---\n"
+"- 101\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:242
+msgid "name of the fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:247
+msgid ""
+"tarantool> fiber.self():name()\n"
+"---\n"
+"- interactive\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:256
+msgid ""
+"Change the fiber name. By default the Tarantool server's interactive-mode"
+" fiber is named 'interactive' and new fibers created due to "
+":func:`fiber.create` are named 'lua'. Giving fibers distinct names makes "
+"it easier to distinguish them when using :func:`fiber.info`."
+msgstr ""
+
+#: ../reference/fiber.rst:264
+msgid "the new name of the fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:270
+msgid ""
+"tarantool> fiber.self():name('non-interactive')\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:278
+msgid "Return the status of the specified fiber."
+msgstr ""
+
+#: ../reference/fiber.rst:283
+msgid "the status of fiber. One of: “dead”, “suspended”, or “running”."
+msgstr ""
+
+#: ../reference/fiber.rst:288
+msgid ""
+"tarantool> fiber.self():status()\n"
+"---\n"
+"- running\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:297
+msgid ""
+"Cancel a fiber. Running and suspended fibers can be canceled. After a "
+"fiber has been canceled, attempts to operate on it will cause errors, for"
+" example :func:`fiber_object:id() <fiber_object.id>` will cause ``error: "
+"the fiber is dead``."
+msgstr ""
+
+#: ../reference/fiber.rst:307
+msgid "Possible errors: cancel is not permitted for the specified fiber object."
+msgstr ""
+
+#: ../reference/fiber.rst:311
+msgid ""
+"tarantool> fiber.self():cancel()\n"
+"---\n"
+"- error: fiber is cancelled\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:320
+msgid ""
+"Local storage within the fiber. The storage can contain any number of "
+"named values, subject to memory limitations. Naming may be done with "
+":samp:`{fiber_object}.storage.{name}` or "
+":samp:`fiber_object}.storage['{name}'].` or with a number "
+":samp:`{fiber_object}.storage[{number}]`. Values may be either numbers or"
+" strings. The storage is garbage-collected when "
+":samp:`{fiber_object}:cancel()` happens. |br| See also "
+":data:`box.session.storage <box.session.storage>`."
+msgstr ""
+
+#: ../reference/fiber.rst:330
+msgid ""
+"tarantool> fiber = require('fiber')\n"
+"---\n"
+"...\n"
+"tarantool> function f () fiber.sleep(1000); end\n"
+"---\n"
+"...\n"
+"tarantool> fiber_function = fiber:create(f)\n"
+"---\n"
+"- error: '[string \"fiber_function = fiber:create(f)\"]:1: "
+"fiber.create(function, ...):\n"
+"    bad arguments'\n"
+"...\n"
+"tarantool> fiber_function = fiber.create(f)\n"
+"---\n"
+"...\n"
+"tarantool> fiber_function.storage.str1 = 'string'\n"
+"---\n"
+"...\n"
+"tarantool> fiber_function.storage['str1']\n"
+"---\n"
+"- string\n"
+"...\n"
+"tarantool> fiber_function:cancel()\n"
+"---\n"
+"...\n"
+"tarantool> fiber_function.storage['str1']\n"
+"---\n"
+"- error: '[string \"return fiber_function.storage[''str1'']\"]:1: the "
+"fiber is dead'\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:363
+msgid ""
+"current system time (in seconds since the epoch) as a Lua number. The "
+"time is taken from the event loop clock, which makes this call very "
+"cheap, but still useful for constructing artificial tuple keys."
+msgstr ""
+
+#: ../reference/fiber.rst:367 ../reference/fiber.rst:384
+msgid "num"
+msgstr ""
+
+#: ../reference/fiber.rst:371
+msgid ""
+"tarantool> fiber.time(), fiber.time()\n"
+"---\n"
+"- 1448466279.2415\n"
+"- 1448466279.2415\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:381
+msgid ""
+"current system time (in microseconds since the epoch) as a 64-bit "
+"integer. The time is taken from the event loop clock."
+msgstr ""
+
+#: ../reference/fiber.rst:388
+msgid ""
+"tarantool> fiber.time(), fiber.time64()\n"
+"---\n"
+"- 1448466351.2708\n"
+"- 1448466351270762\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:398
+msgid "Show all running fibers, with their stack. Mainly useful for debugging."
+msgstr ""
+
+#: ../reference/fiber.rst:402
+msgid "Example Of Fiber Use"
+msgstr ""
+
+#: ../reference/fiber.rst:404
+msgid ""
+"Make the function which will be associated with the fiber. This function "
+"contains an infinite loop (``while 0 == 0`` is always true). Each "
+"iteration of the loop adds 1 to a global variable named gvar, then goes "
+"to sleep for 2 seconds. The sleep causes an implicit "
+":func:`fiber.yield()`."
+msgstr ""
+
+#: ../reference/fiber.rst:409
+msgid ""
+"tarantool> fiber = require('fiber')\n"
+"tarantool> function function_x()\n"
+"         >   gvar = 0\n"
+"         >   while true do\n"
+"         >     gvar = gvar + 1\n"
+"         >     fiber.sleep(2)\n"
+"         >   end\n"
+"         > end\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:422
+msgid ""
+"Make a fiber, associate function_x with the fiber, and start function_x. "
+"It will immediately \"detach\" so it will be running independently of the"
+" caller."
+msgstr ""
+
+#: ../reference/fiber.rst:425
+msgid ""
+"tarantool> fiber_of_x = fiber.create(function_x)\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:431
+msgid "Get the id of the fiber (fid), to be used in later displays."
+msgstr ""
+
+#: ../reference/fiber.rst:433
+msgid ""
+"tarantool> fid = fiber_of_x:id()\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:439
+msgid ""
+"Pause for a while, while the detached function runs. Then ... Display the"
+" fiber id, the fiber status, and gvar (gvar will have gone up a bit "
+"depending how long the pause lasted). The status is suspended because the"
+" fiber spends almost all its time sleeping or yielding."
+msgstr ""
+
+#: ../reference/fiber.rst:444
+msgid ""
+"tarantool> printf('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)\n"
+"# 102 .  suspended . gvar= 399\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber.rst:451
+msgid ""
+"Pause for a while, while the detached function runs. Then ... Cancel the "
+"fiber. Then, once again ... Display the fiber id, the fiber status, and "
+"gvar (gvar will have gone up a bit more depending how long the pause "
+"lasted). This time the status is dead because the cancel worked."
+msgstr ""
+
+#: ../reference/fiber.rst:456
+msgid ""
+"tarantool> fiber_of_x:cancel()\n"
+"... fiber `lua` has been cancelled\n"
+"... fiber `lua` exiting\n"
+"---\n"
+"- error:\n"
+"...\n"
+"tarantool> printf('#', fid, '. ', fiber_of_x:status(), '. gvar=', gvar)\n"
+"# 102 .  dead . gvar= 421\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:19
+msgid "Package `fiber-ipc`"
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:21
+msgid ""
+"The ``fiber-ipc`` package allows sending and receiving messages between "
+"different processes. The words \"different processes\" in this context "
+"mean different connections, different sessions, or different fibers."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:25
+msgid ""
+"Call ``fiber.channel()`` to allocate space and get a channel object, "
+"which will be called channel for examples in this section. Call the other"
+" ``fiber-ipc`` routines, via channel, to send messages, receive messages,"
+" or check ipc status. Message exchange is synchronous. The channel is "
+"garbage collected when no one is using it, as with any other Lua object. "
+"Use object-oriented syntax, for example ``channel:put(message)`` rather "
+"than ``fiber.channel.put(message)``."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:37
+msgid "Create a new communication channel."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:39
+msgid ""
+"positive integer as great as the maximum number of slots (spaces for "
+"``get`` or ``put`` messages) that might be pending at any given time."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:43
+msgid "new channel."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:50
+msgid ""
+"Send a message using a channel. If the channel is full, ``channel:put()``"
+" blocks until there is a free slot in the channel."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:55
+msgid ""
+"If timeout is provided, and the channel doesn't become empty for the "
+"duration of the timeout, ``channel:put()`` returns false. Otherwise it "
+"returns true."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:58 ../reference/fiber-ipc.rst:81
+#: ../reference/fiber-ipc.rst:95 ../reference/fiber-ipc.rst:103
+#: ../reference/fiber-ipc.rst:111 ../reference/fiber-ipc.rst:116
+#: ../reference/fio.rst:150 ../reference/fio.rst:246 ../reference/fio.rst:288
+#: ../reference/fio.rst:304 ../reference/fio.rst:349 ../reference/fio.rst:420
+#: ../reference/net_box.rst:88 ../reference/net_box.rst:102
+#: ../reference/net_box.rst:115 ../reference/socket.rst:344
+#: ../reference/socket.rst:353 ../reference/tap.rst:82 ../reference/tap.rst:114
+#: ../reference/tap.rst:145 ../reference/tap.rst:156 ../reference/tap.rst:173
+#: ../reference/tap.rst:181
+msgid "boolean"
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:62
+msgid ""
+"Close the channel. All waiters in the channel will be woken up. All "
+"following ``channel:put()`` or ``channel:get()`` operations will return "
+"an error (``nil``)."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:68
+msgid ""
+"Fetch a message from a channel. If the channel is empty, "
+"``channel:get()`` blocks until there is a message."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:72
+msgid "the value placed on the channel by an earlier ``channel:put()``."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:74
+msgid "lua_object"
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:78
+msgid "Check whether the specified channel is empty (has no messages)."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:80
+msgid "true if the specified channel is empty"
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:85
+msgid ""
+"Find out how many messages are on the channel. The answer is 0 if the "
+"channel is empty."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:87
+msgid "the number of messages."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:92
+msgid "Check whether the specified channel is full."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:94
+msgid "true if the specified channel is full (has no room for a new message)."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:99
+msgid ""
+"Check whether the specified channel is empty and has readers waiting for "
+"a message (because they have issued ``channel:get()`` and then blocked)."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:102 ../reference/fiber-ipc.rst:110
+msgid "true if blocked users are waiting. Otherwise false."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:107
+msgid ""
+"Check whether the specified channel is full and has writers waiting "
+"(because they have issued ``channel:put()`` and then blocked due to lack "
+"of room)."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:115
+msgid "true if the specified channel is already closed. Otherwise false."
+msgstr ""
+
+#: ../reference/fiber-ipc.rst:122
+msgid ""
+"fiber = require('fiber')\n"
+"channel = fiber.channel(10)\n"
+"function consumer_fiber()\n"
+"    while true do\n"
+"        local task = channel:get()\n"
+"        ...\n"
+"    end\n"
+"end\n"
+"\n"
+"function consumer2_fiber()\n"
+"    while true do\n"
+"        -- 10 seconds\n"
+"        local task = channel:get(10)\n"
+"        if task ~= nil then\n"
+"            ...\n"
+"        else\n"
+"            -- timeout\n"
+"        end\n"
+"    end\n"
+"end\n"
+"\n"
+"function producer_fiber()\n"
+"    while true do\n"
+"        task = box.space...:select{...}\n"
+"        ...\n"
+"        if channel:is_empty() then\n"
+"            -- channel is empty\n"
+"        end\n"
+"\n"
+"        if channel:is_full() then\n"
+"            -- channel is full\n"
+"        end\n"
+"\n"
+"        ...\n"
+"        if channel:has_readers() then\n"
+"            -- there are some fibers\n"
+"            -- that are waiting for data\n"
+"        end\n"
+"        ...\n"
+"\n"
+"        if channel:has_writers() then\n"
+"            -- there are some fibers\n"
+"            -- that are waiting for readers\n"
+"        end\n"
+"        channel:put(task)\n"
+"    end\n"
+"end\n"
+"\n"
+"function producer2_fiber()\n"
+"    while true do\n"
+"        task = box.space...select{...}\n"
+"        -- 10 seconds\n"
+"        if channel:put(task, 10) then\n"
+"            ...\n"
+"        else\n"
+"            -- timeout\n"
+"        end\n"
+"    end\n"
+"end"
+msgstr ""
+
+#: ../reference/fio.rst:19
+msgid "Package `fio`"
+msgstr ""
+
+#: ../reference/fio.rst:23
+msgid ""
+"Tarantool supports file input/output with an API that is similar to POSIX"
+" syscalls. All operations are performed asynchronously. Multiple fibers "
+"can access the same file simultaneously."
+msgstr ""
+
+#: ../reference/fio.rst:31
+msgid "Common pathname manipulations"
+msgstr ""
+
+#: ../reference/fio.rst:35
+msgid "Concatenate partial string, separated by '/' to form a path name."
+msgstr ""
+
+#: ../reference/fio.rst:37
+msgid "one or more strings to be concatenated."
+msgstr ""
+
+#: ../reference/fio.rst:38 ../reference/fio.rst:55 ../reference/fio.rst:74
+msgid "path name"
+msgstr ""
+
+#: ../reference/fio.rst:43
+msgid ""
+"tarantool> fio.pathjoin('/etc', 'default', 'myfile')\n"
+"---\n"
+"- /etc/default/myfile\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:52
+msgid ""
+"Given a full path name, remove all but the final part (the file name). "
+"Also remove the suffix, if it is passed."
+msgstr ""
+
+#: ../reference/fio.rst:56
+msgid "suffix"
+msgstr ""
+
+#: ../reference/fio.rst:58
+msgid "file name"
+msgstr ""
+
+#: ../reference/fio.rst:63
+msgid ""
+"tarantool> fio.basename('/path/to/my.lua', '.lua')\n"
+"---\n"
+"- my\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:72
+msgid "Given a full path name, remove the final part (the file name)."
+msgstr ""
+
+#: ../reference/fio.rst:76
+msgid "directory name, that is, path name except for file name."
+msgstr ""
+
+#: ../reference/fio.rst:81
+msgid ""
+"tarantool> fio.dirname('path/to/my.lua')\n"
+"---\n"
+"- 'path/to/'\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:90
+msgid "Common file manipulations"
+msgstr ""
+
+#: ../reference/fio.rst:94
+msgid ""
+"Set the mask bits used when creating files or directories. For a detailed"
+" description type \"man 2 umask\"."
+msgstr ""
+
+#: ../reference/fio.rst:97
+msgid "mask bits."
+msgstr ""
+
+#: ../reference/fio.rst:98
+msgid "previous mask bits."
+msgstr ""
+
+#: ../reference/fio.rst:103
+msgid ""
+"tarantool> fio.umask(tonumber('755', 8))\n"
+"---\n"
+"- 493\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:113
+msgid ""
+"Returns information about a file object. For details type \"man 2 lstat\""
+" or \"man 2 stat\"."
+msgstr ""
+
+#: ../reference/fio.rst:116
+msgid "path name of file."
+msgstr ""
+
+#: ../reference/fio.rst:117
+msgid ""
+"fields which describe the file's block size, creation time, size, and "
+"other attributes."
+msgstr ""
+
+#: ../reference/fio.rst:123
+msgid ""
+"tarantool> fio.lstat('/etc')\n"
+"---\n"
+"- inode: 1048577\n"
+"  rdev: 0\n"
+"  size: 12288\n"
+"  atime: 1421340698\n"
+"  mode: 16877\n"
+"  mtime: 1424615337\n"
+"  nlink: 160\n"
+"  uid: 0\n"
+"  blksize: 4096\n"
+"  gid: 0\n"
+"  ctime: 1424615337\n"
+"  dev: 2049\n"
+"  blocks: 24\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:145
+msgid ""
+"Create or delete a directory. For details type \"man 2 mkdir\" or \"man 2"
+" rmdir\"."
+msgstr ""
+
+#: ../reference/fio.rst:148
+msgid "path of directory."
+msgstr ""
+
+#: ../reference/fio.rst:149 ../reference/fio.rst:245 ../reference/fio.rst:287
+#: ../reference/fio.rst:303 ../reference/fio.rst:419 ../reference/fio.rst:493
+msgid "true if success, false if failure."
+msgstr ""
+
+#: ../reference/fio.rst:154
+msgid ""
+"tarantool> fio.mkdir('/etc')\n"
+"---\n"
+"- false\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:163
+msgid ""
+"Return a list of files that match an input string. The list is "
+"constructed with a single flag that controls the behavior of the "
+"function: GLOB_NOESCAPE. For details type \"man 3 glob\"."
+msgstr ""
+
+#: ../reference/fio.rst:167
+msgid "path-name, which may contain wildcard characters."
+msgstr ""
+
+#: ../reference/fio.rst:168
+msgid "list of files whose names match the input string"
+msgstr ""
+
+#: ../reference/fio.rst:171 ../reference/fio.rst:327 ../reference/fio.rst:443
+#: ../reference/socket.rst:300
+msgid "Possible errors: nil."
+msgstr ""
+
+#: ../reference/fio.rst:175
+msgid ""
+"tarantool> fio.glob('/etc/x*')\n"
+"---\n"
+"- - /etc/xdg\n"
+"  - /etc/xml\n"
+"  - /etc/xul-ext\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:186
+msgid "Return the name of a directory that can be used to store temporary files."
+msgstr ""
+
+#: ../reference/fio.rst:190
+msgid ""
+"tarantool> fio.tempdir()\n"
+"---\n"
+"- /tmp/lG31e7\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:199
+msgid "Return the name of the current working directory."
+msgstr ""
+
+#: ../reference/fio.rst:203
+msgid ""
+"tarantool> fio.cwd()\n"
+"---\n"
+"- /home/username/tarantool_sandbox\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:215
+msgid ""
+"Functions to create and delete links. For details type \"man readlink\", "
+"\"man 2 link\", \"man 2 symlink\", \"man 2 unlink\".."
+msgstr ""
+
+#: ../reference/fio.rst:218
+msgid "existing file name."
+msgstr ""
+
+#: ../reference/fio.rst:219
+msgid "linked name."
+msgstr ""
+
+#: ../reference/fio.rst:221
+msgid ""
+"``fio.link`` and ``fio.symlink`` and ``fio.unlink`` return true if "
+"success, false if failure. ``fio.readlink`` returns the link value if "
+"success, nil if failure."
+msgstr ""
+
+#: ../reference/fio.rst:227
+msgid ""
+"tarantool> fio.link('/home/username/tmp.txt', '/home/username/tmp.txt2')\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> fio.unlink('/home/username/tmp.txt2')\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:240
+msgid "Rename a file or directory. For details type \"man 2 rename\"."
+msgstr ""
+
+#: ../reference/fio.rst:242
+msgid "original name."
+msgstr ""
+
+#: ../reference/fio.rst:243
+msgid "new name."
+msgstr ""
+
+#: ../reference/fio.rst:250
+msgid ""
+"tarantool> fio.rename('/home/username/tmp.txt', "
+"'/home/username/tmp.txt2')\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:260
+msgid ""
+"Manage the rights to file objects, or ownership of file objects. For "
+"details type \"man 2 chown\" or \"man 2 chmod\"."
+msgstr ""
+
+#: ../reference/fio.rst:263
+msgid "new user uid."
+msgstr ""
+
+#: ../reference/fio.rst:264
+msgid "new group uid."
+msgstr ""
+
+#: ../reference/fio.rst:265
+msgid "new permissions"
+msgstr ""
+
+#: ../reference/fio.rst:269
+msgid ""
+"tarantool> fio.chmod('/home/username/tmp.txt', tonumber('0755', 8))\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> fio.chown('/home/username/tmp.txt', 'username', 'username')\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:282
+msgid ""
+"Reduce file size to a specified value. For details type \"man 2 "
+"truncate\"."
+msgstr ""
+
+#: ../reference/fio.rst:292
+msgid ""
+"tarantool> fio.truncate('/home/username/tmp.txt', 99999)\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:301
+msgid "Ensure that changes are written to disk. For details type \"man 2 sync\"."
+msgstr ""
+
+#: ../reference/fio.rst:308
+msgid ""
+"tarantool> fio.sync()\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:317
+msgid "Open a file in preparation for reading or writing or seeking."
+msgstr ""
+
+#: ../reference/fio.rst:320
+msgid ""
+"Flags can be passed as a number or as string constants, for example "
+"'``O_RDONLY``', '``O_WRONLY``', '``O_RDWR``'. Flags can be combined by "
+"enclosing them in braces."
+msgstr ""
+
+#: ../reference/fio.rst:324
+msgid "file handle (later - fh)"
+msgstr ""
+
+#: ../reference/fio.rst:331
+msgid ""
+"tarantool> fh = fio.open('/home/username/tmp.txt', {'O_RDWR', "
+"'O_APPEND'})\n"
+"---\n"
+"...\n"
+"tarantool> fh -- display file handle returned by fio.open\n"
+"---\n"
+"- fh: 11\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:345
+msgid ""
+"Close a file that was opened with ``fio.open``. For details type \"man 2 "
+"close\"."
+msgstr ""
+
+#: ../reference/fio.rst:347 ../reference/fio.rst:367 ../reference/fio.rst:398
+#: ../reference/fio.rst:418 ../reference/fio.rst:436 ../reference/fio.rst:459
+#: ../reference/fio.rst:492
+msgid "file-handle as returned by ``fio.open()``."
+msgstr ""
+
+#: ../reference/fio.rst:348
+msgid "true if success, false on failure."
+msgstr ""
+
+#: ../reference/fio.rst:353
+msgid ""
+"tarantool> fh:close() -- where fh = file-handle\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:363
+msgid ""
+"Perform read/write random-access operation on a file, without affecting "
+"the current seek position of the file. For details type \"man 2 pread\" "
+"or \"man 2 pwrite\"."
+msgstr ""
+
+#: ../reference/fio.rst:368 ../reference/fio.rst:399
+msgid "number of bytes to read"
+msgstr ""
+
+#: ../reference/fio.rst:369 ../reference/fio.rst:400
+msgid "value to write"
+msgstr ""
+
+#: ../reference/fio.rst:370
+msgid "offset within file where reading or writing begins"
+msgstr ""
+
+#: ../reference/fio.rst:371
+msgid ""
+"``fh:pwrite`` returns true if success, false if failure. ``fh:pread`` "
+"returns the data that was read, or nil if failure."
+msgstr ""
+
+#: ../reference/fio.rst:376
+msgid ""
+"tarantool> fh:pread(25, 25)\n"
+"---\n"
+"- |\n"
+"  elete from t8//\n"
+"  insert in\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:388
+msgid ""
+"Perform non-random-access read or write on a file. For details type \"man"
+" 2 read\" or \"man 2 write\"."
+msgstr ""
+
+#: ../reference/fio.rst:393
+msgid ""
+"``fh:read`` and ``fh:write`` affect the seek position within the file, "
+"and this must be taken into account when working on the same file from "
+"multiple fibers. It is possible to limit or prevent file access from "
+"other fibers with ``fiber.ipc``."
+msgstr ""
+
+#: ../reference/fio.rst:401
+msgid ""
+"``fh:write`` returns true if success, false if failure. ``fh:read`` "
+"returns the data that was read, or nil if failure."
+msgstr ""
+
+#: ../reference/fio.rst:406
+msgid ""
+"tarantool> fh:write('new data')\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:415
+msgid ""
+"Change the size of an open file. Differs from ``fio.truncate``, which "
+"changes the size of a closed file."
+msgstr ""
+
+#: ../reference/fio.rst:424
+msgid ""
+"tarantool> fh:truncate(0)\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:433
+msgid ""
+"Shift position in the file to the specified position. For details type "
+"\"man 2 seek\"."
+msgstr ""
+
+#: ../reference/fio.rst:437
+msgid "position to seek to"
+msgstr ""
+
+#: ../reference/fio.rst:438
+msgid ""
+"'``SEEK_END``' = end of file, '``SEEK_CUR``' = current position, "
+"'``SEEK_SET``' = start of file."
+msgstr ""
+
+#: ../reference/fio.rst:440
+msgid "the new position if success"
+msgstr ""
+
+#: ../reference/fio.rst:447
+msgid ""
+"tarantool> fh:seek(20, 'SEEK_SET')\n"
+"---\n"
+"- 20\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:456
+msgid ""
+"Return statistics about an open file. This differs from ``fio.stat`` "
+"which return statistics about a closed file. For details type \"man 2 "
+"stat\"."
+msgstr ""
+
+#: ../reference/fio.rst:460
+msgid "details about the file."
+msgstr ""
+
+#: ../reference/fio.rst:465
+msgid ""
+"tarantool> fh:stat()\n"
+"---\n"
+"- inode: 729866\n"
+"  rdev: 0\n"
+"  size: 100\n"
+"  atime: 140942855\n"
+"  mode: 33261\n"
+"  mtime: 1409430660\n"
+"  nlink: 1\n"
+"  uid: 1000\n"
+"  blksize: 4096\n"
+"  gid: 1000\n"
+"  ctime: 1409430660\n"
+"  dev: 2049\n"
+"  blocks: 8\n"
+"..."
+msgstr ""
+
+#: ../reference/fio.rst:488
+msgid ""
+"Ensure that file changes are written to disk, for an open file. Compare "
+"``fio.sync``, which is for all files. For details type \"man 2 fsync\" or"
+" \"man 2 fdatasync\"."
+msgstr ""
+
+#: ../reference/fio.rst:497
+msgid ""
+"tarantool> fh:fsync()\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/fun.rst:19
+msgid "Package `fun`"
+msgstr ""
+
+#: ../reference/fun.rst:21
+msgid ""
+"Lua fun, also known as the Lua Functional Library, takes advantage of the"
+" features of LuaJIT to help users create complex functions. Inside the "
+"package are \"sequence processors\" such as map, filter, reduce, zip -- "
+"they take a user-written function as an argument and run it against every"
+" element in a sequence, which can be faster or more convenient than a "
+"user-written loop. Inside the package are \"generators\" such as range, "
+"tabulate, and rands -- they return a bounded or boundless series of "
+"values. Within the package are \"reducers\", \"filters\", \"composers\" "
+"... or, in short, all the important features found in languages like "
+"Standard ML, Haskell, or Erlang."
+msgstr ""
+
+#: ../reference/fun.rst:33
+msgid ""
+"The full documentation is `On the luafun section of github`_. However, "
+"the first chapter can be skipped because installation is already done, "
+"it's inside Tarantool. All that is needed is the usual :code:`require` "
+"request. After that, all the operations described in the Lua fun manual "
+"will work, provided they are preceded by the name returned by the "
+":code:`require` request. For example:"
+msgstr ""
+
+#: ../reference/fun.rst:41
+msgid ""
+"tarantool> fun = require('fun')\n"
+"---\n"
+"...\n"
+"tarantool> for _k, a in fun_range(3) do\n"
+"         >   print(a)\n"
+"         > end\n"
+"1\n"
+"2\n"
+"3\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/index.rst:19
+msgid "Reference Manual"
+msgstr ""
+
+#: ../reference/jit.rst:19
+msgid "Package `jit`"
+msgstr ""
+
+#: ../reference/jit.rst:23
+msgid ""
+"The ``jit`` package has functions for tracing the LuaJIT Just-In-Time "
+"compiler's progress, showing the byte-code or assembler output that the "
+"compiler produces, and in general providing information about what LuaJIT"
+" does with Lua code."
+msgstr ""
+
+#: ../reference/jit.rst:29
+msgid "Prints the byte code of a function."
+msgstr ""
+
+#: ../reference/jit.rst:33
+msgid ""
+"function f()\n"
+"  print(\"D\")\n"
+"end\n"
+"jit.bc.dump(f)"
+msgstr ""
+
+#: ../reference/jit.rst:40
+msgid "For a list of available options, read `the source code of bc.lua`_."
+msgstr ""
+
+#: ../reference/jit.rst:44
+msgid "Prints the i386 assembler code of a string of bytes"
+msgstr ""
+
+#: ../reference/jit.rst:48
+msgid ""
+"-- Disassemble hexadecimal 97 which is the x86 code for xchg eax, edi\n"
+"jit.dis_x86.disass('\\x97')"
+msgstr ""
+
+#: ../reference/jit.rst:53
+msgid "For a list of available options, read `the source code of dis_x86.lua`_."
+msgstr ""
+
+#: ../reference/jit.rst:57
+msgid "Prints the x86-64 assembler code of a string of bytes"
+msgstr ""
+
+#: ../reference/jit.rst:61
+msgid ""
+"-- Disassemble hexadecimal 97 which is the x86-64 code for xchg eax, edi\n"
+"jit.dis_x64.disass('\\x97')"
+msgstr ""
+
+#: ../reference/jit.rst:66
+msgid "For a list of available options, read `the source code of dis_x64.lua`_."
+msgstr ""
+
+#: ../reference/jit.rst:71
+msgid "Prints the intermediate or machine code of following Lua code"
+msgstr ""
+
+#: ../reference/jit.rst:75
+msgid ""
+"-- Show the machine code of a Lua \"for\" loop\n"
+"jit.dump.on('m')\n"
+"local x = 0;\n"
+"for i = 1, 1e6 do\n"
+"  x = x + i\n"
+"end\n"
+"print(x)\n"
+"jit.dump.off()"
+msgstr ""
+
+#: ../reference/jit.rst:86
+msgid "For a list of available options, read `the source code of dump.lua`_."
+msgstr ""
+
+#: ../reference/jit.rst:92
+msgid "Prints a trace of LuaJIT's progress compiling and interpreting code"
+msgstr ""
+
+#: ../reference/jit.rst:96
+msgid ""
+"-- Show what LuaJIT is doing for a Lua \"for\" loop\n"
+"jit.v.on()\n"
+"local x = 0\n"
+"for i = 1, 1e6 do\n"
+"    x = x + i\n"
+"end\n"
+"print(x)\n"
+"jit.v.off()"
+msgstr ""
+
+#: ../reference/jit.rst:107
+msgid "For a list of available options, read `the source code of v.lua`_."
+msgstr ""
+
+#: ../reference/json.rst:19
+msgid "Package `json`"
+msgstr ""
+
+#: ../reference/json.rst:21
+msgid ""
+"The json package provides JSON manipulation routines. It is based on the "
+"`Lua-CJSON package by Mark Pulford`_. For a complete manual on Lua-CJSON "
+"please read `the official documentation`_."
+msgstr ""
+
+#: ../reference/json.rst:29
+msgid "Convert a Lua object to a JSON string."
+msgstr ""
+
+#: ../reference/json.rst:31 ../reference/msgpack.rst:30
+#: ../reference/yaml.rst:30
+msgid "either a scalar value or a Lua table value."
+msgstr ""
+
+#: ../reference/json.rst:32
+msgid "the original value reformatted as a JSON string."
+msgstr ""
+
+#: ../reference/json.rst:37
+msgid ""
+"tarantool> json=require('json')\n"
+"---\n"
+"...\n"
+"tarantool> json.encode(123)\n"
+"---\n"
+"- '123'\n"
+"...\n"
+"tarantool> json.encode({123})\n"
+"---\n"
+"- '[123]'\n"
+"...\n"
+"tarantool> json.encode({123, 234, 345})\n"
+"---\n"
+"- '[123,234,345]'\n"
+"...\n"
+"tarantool> json.encode({abc = 234, cde = 345})\n"
+"---\n"
+"- '{\"cde\":345,\"abc\":234}'\n"
+"...\n"
+"tarantool> json.encode({hello = {'world'}})\n"
+"---\n"
+"- '{\"hello\":[\"world\"]}'\n"
+"..."
+msgstr ""
+
+#: ../reference/json.rst:65
+msgid "Convert a JSON string to a Lua object."
+msgstr ""
+
+#: ../reference/json.rst:67
+msgid "a string formatted as JSON."
+msgstr ""
+
+#: ../reference/json.rst:68 ../reference/msgpack.rst:39
+#: ../reference/yaml.rst:39
+msgid "the original contents formatted as a Lua table."
+msgstr ""
+
+#: ../reference/json.rst:73
+msgid ""
+"tarantool> json = require('json')\n"
+"---\n"
+"...\n"
+"tarantool> json.decode('123')\n"
+"---\n"
+"- 123\n"
+"...\n"
+"tarantool> json.decode('[123, \"hello\"]')\n"
+"---\n"
+"- [123, 'hello']\n"
+"...\n"
+"tarantool> json.decode('{\"hello\": \"world\"}').hello\n"
+"---\n"
+"- world\n"
+"..."
+msgstr ""
+
+#: ../reference/json.rst:93 ../reference/msgpack.rst:44
+#: ../reference/yaml.rst:44
+msgid ""
+"A value comparable to Lua \"nil\" which may be useful as a placeholder in"
+" a tuple."
+msgstr ""
+
+#: ../reference/json.rst:97
+msgid ""
+"-- When nil is assigned to a Lua-table field, the field is null\n"
+"tarantool> {nil, 'a', 'b'}\n"
+"---\n"
+"- - null\n"
+"  - a\n"
+"  - b\n"
+"...\n"
+"-- When json.NULL is assigned to a Lua-table field, the field is "
+"json.NULL\n"
+"tarantool> {json.NULL, 'a', 'b'}\n"
+"---\n"
+"- - null\n"
+"  - a\n"
+"  - b\n"
+"...\n"
+"-- When json.NULL is assigned to a JSON field, the field is null\n"
+"tarantool> json.encode({field2 = json.NULL, field1 = 'a', field3 = 'c'}\n"
+"---\n"
+"- '{\"field2\":null,\"field1\":\"a\",\"field3\":\"c\"}'\n"
+"..."
+msgstr ""
+
+#: ../reference/json.rst:119
+msgid "The JSON output structure can be specified with ``__serialize``:"
+msgstr ""
+
+#: ../reference/json.rst:121
+msgid "``__serialize=\"seq\"`` for an array"
+msgstr ""
+
+#: ../reference/json.rst:122
+msgid "``__serialize=\"map\"`` for a map"
+msgstr ""
+
+#: ../reference/json.rst:124 ../reference/yaml.rst:81
+msgid ""
+"Serializing 'A' and 'B' with different ``__serialize`` values causes "
+"different results:"
+msgstr ""
+
+#: ../reference/json.rst:126
+msgid ""
+"tarantool> json.encode(setmetatable({'A', 'B'}, { __serialize=\"seq\"}))\n"
+"---\n"
+"- '[\"A\",\"B\"]'\n"
+"...\n"
+"tarantool> json.encode(setmetatable({'A', 'B'}, { __serialize=\"map\"}))\n"
+"---\n"
+"- '{\"1\":\"A\",\"2\":\"B\"}'\n"
+"...\n"
+"tarantool> json.encode({setmetatable({f1 = 'A', f2 = 'B'}, { "
+"__serialize=\"map\"})})\n"
+"---\n"
+"- '[{\"f2\":\"B\",\"f1\":\"A\"}]'\n"
+"...\n"
+"tarantool> json.encode({setmetatable({f1 = 'A', f2 = 'B'}, { "
+"__serialize=\"seq\"})})\n"
+"---\n"
+"- '[[]]'\n"
+"..."
+msgstr ""
+
+#: ../reference/log.rst:19
+msgid "Package `log`"
+msgstr ""
+
+#: ../reference/log.rst:23
+msgid ""
+"The Tarantool server puts all diagnostic messages in a log file specified"
+" by the :ref:`logger <log-label>` configuration parameter. Diagnostic "
+"messages may be either system-generated by the server's internal code, or"
+" user-generated with the ``log.log_level_function_name`` function."
+msgstr ""
+
+#: ../reference/log.rst:33
+msgid ""
+"Output a user-generated message to the :ref:`log file <log-label>`, given"
+" log_level_function_name = ``error`` or ``warn`` or ``info`` or "
+"``debug``."
+msgstr ""
+
+#: ../reference/log.rst:36
+#, python-format
+msgid ""
+"The actual output will be a line containing the current timestamp, a "
+"module name, 'E' or 'W' or 'I' or 'D' or 'R' depending on "
+"``log_level_function_name``, and ``message``. Output will not occur if "
+"``log_level_function_name`` is for a type greater than :ref:`log_level "
+"<log-label>`. Messages may contain C-style format specifiers %d or %s, so"
+" :samp:`log.error('...%d...%s',{x},{y})` will work if x is a number and y"
+" is a string."
+msgstr ""
+
+#: ../reference/log.rst:55
+#, python-format
+msgid ""
+"$ ~/tarantool/src/tarantool\n"
+"tarantool> box.cfg{log_level=3, logger='tarantool.txt'}\n"
+"tarantool> log = require('log')\n"
+"tarantool> log.error('Error')\n"
+"tarantool> log.info('Info %s', box.info.version)\n"
+"tarantool> os.exit()\n"
+"$ less tarantool.txt"
+msgstr ""
+
+#: ../reference/log.rst:68
+msgid ""
+"2...0 [5257] main/101/interactive C> version 1.6.3-355-ga4f762d\n"
+"2...1 [5257] main/101/interactive C> log level 3\n"
+"2...1 [5261] main/101/spawner C> initialized\n"
+"2...0 [5257] main/101/interactive [C]:-1 E> Error"
+msgstr ""
+
+#: ../reference/log.rst:73
+msgid "The 'Error' line is visible in tarantool.txt preceded by the letter E."
+msgstr ""
+
+#: ../reference/log.rst:75
+msgid "The 'Info' line is not present because the log_level is 3."
+msgstr ""
+
+#: ../reference/msgpack.rst:19
+msgid "Package `msgpack`"
+msgstr ""
+
+#: ../reference/msgpack.rst:21
+msgid ""
+"The ``msgpack`` package takes strings in MsgPack_ format and decodes "
+"them, or takes a series of non-MsgPack values and encodes them."
+msgstr ""
+
+#: ../reference/msgpack.rst:28
+msgid "Convert a Lua object to a MsgPack string."
+msgstr ""
+
+#: ../reference/msgpack.rst:31
+msgid "the original value reformatted as a MsgPack string."
+msgstr ""
+
+#: ../reference/msgpack.rst:36
+msgid "Convert a MsgPack string to a Lua object."
+msgstr ""
+
+#: ../reference/msgpack.rst:38 ../reference/yaml.rst:38
+msgid "a string formatted as YAML."
+msgstr ""
+
+#: ../reference/msgpack.rst:50
+msgid ""
+"tarantool> msgpack = require('msgpack')\n"
+"---\n"
+"...\n"
+"tarantool> y = msgpack.encode({'a',1,'b',2})\n"
+"---\n"
+"...\n"
+"tarantool> z = msgpack.decode(y)\n"
+"---\n"
+"...\n"
+"tarantool> z[1], z[2], z[3], z[4]\n"
+"---\n"
+"- a\n"
+"- 1\n"
+"- b\n"
+"- 2\n"
+"...\n"
+"tarantool> box.space.tester:insert{20, msgpack.NULL, 20}\n"
+"---\n"
+"- [20, null, 20]\n"
+"..."
+msgstr ""
+
+#: ../reference/msgpack.rst:73
+msgid "The MsgPack output structure can be specified with ``__serialize``:"
+msgstr ""
+
+#: ../reference/msgpack.rst:75
+msgid "``__serialize = \"seq\" or \"sequence\"`` for an array"
+msgstr ""
+
+#: ../reference/msgpack.rst:76
+msgid "``__serialize = \"map\" or \"mapping\"`` for a map"
+msgstr ""
+
+#: ../reference/msgpack.rst:78
+msgid ""
+"Serializing 'A' and 'B' with different ``__serialize`` values causes "
+"different results. To show this, here is a routine which encodes "
+"`{'A','B'}` both as an array and as a map, then displays each result in "
+"hexadecimal."
+msgstr ""
+
+#: ../reference/msgpack.rst:82
+#, python-format
+msgid ""
+"local function hexdump(bytes)\n"
+"    local result = ''\n"
+"    for i = 1, #m do\n"
+"        result = result .. string.format(\"%x\", string.byte(m, i)) .. ' "
+"'\n"
+"    end\n"
+"    return result\n"
+"end\n"
+"\n"
+"local msgpack = require('msgpack')\n"
+"local m1 = msgpack.encode(setmetatable({'A', 'B'}, {\n"
+"                             __serialize = \"seq\"\n"
+"                          }\n"
+"local m2 = msgpack.encode(setmetatable({'A', 'B'}, {\n"
+"                             __serialize = \"map\"\n"
+"                          }\n"
+"print('array encoding: ', hexdump(m1))\n"
+"print('map encoding: ', hexdump(m2))"
+msgstr ""
+
+#: ../reference/msgpack.rst:102
+msgid "**Result:**"
+msgstr ""
+
+#: ../reference/msgpack.rst:107
+msgid ""
+"**array** encoding: 92 a1 41 a1 42\n"
+"**map** encoding:   82 1 a1 41 2 a1 42"
+msgstr ""
+
+#: ../reference/msgpack.rst:110
+msgid "The MsgPack Specification_ page explains that the first encoding means:"
+msgstr ""
+
+#: ../reference/msgpack.rst:115
+msgid "fixarray(2), fixstr(1), \"A\", fixstr(1), \"B\""
+msgstr ""
+
+#: ../reference/msgpack.rst:117
+msgid "and the second encoding means:"
+msgstr ""
+
+#: ../reference/msgpack.rst:122
+msgid "fixmap(2), key(1), fixstr(1), \"A\", key(2), fixstr(2), \"B\"."
+msgstr ""
+
+#: ../reference/net_box.rst:21
+msgid "Package `net.box`"
+msgstr ""
+
+#: ../reference/net_box.rst:23
+msgid ""
+"The ``net.box`` package contains connectors to remote database systems. "
+"One variant, to be discussed later, is for connecting to MySQL or MariaDB"
+" or PostgreSQL — that variant is the subject of the :ref:`SQL DBMS "
+"plugins <dbms-plugins>` appendix. In this section the subject is the "
+"built-in variant, ``net.box``. This is for connecting to tarantool "
+"servers via a network."
+msgstr ""
+
+#: ../reference/net_box.rst:29
+msgid ""
+"Call ``require('net.box')`` to get a ``net.box`` object, which will be "
+"called ``net_box`` for examples in this section. Call ``net_box.new()`` "
+"to connect and get a connection object, which will be called ``conn`` for"
+" examples in this section. Call the other ``net.box()`` routines, passing"
+" ``conn:``, to execute requests on the remote box. Call :func:`conn:close"
+" <socket_object.close>` to disconnect."
+msgstr ""
+
+#: ../reference/net_box.rst:35
+msgid ""
+"All ``net.box`` methods are fiber-safe, that is, it is safe to share and "
+"use the same connection object across multiple concurrent fibers. In "
+"fact, it's perhaps the best programming practice with Tarantool. When "
+"multiple fibers use the same connection, all requests are pipelined "
+"through the same network socket, but each fiber gets back a correct "
+"response. Reducing the number of active sockets lowers the overhead of "
+"system calls and increases the overall server performance. There are, "
+"however, cases when a single connection is not enough — for example when "
+"it's necessary to prioritize requests or to use different authentication "
+"ids."
+msgstr ""
+
+#: ../reference/net_box.rst:48
+msgid ""
+"Create a new connection. The connection is established on demand, at the "
+"time of the first request. It is re-established automatically after a "
+"disconnect. The returned ``conn`` object supports methods for making "
+"remote requests, such as select, update or delete."
+msgstr ""
+
+#: ../reference/net_box.rst:53
+msgid ""
+"For the local tarantool server there is a pre-created always-established "
+"connection object named :samp:`{net_box}.self`. Its purpose is to make "
+"polymorphic use of the ``net_box`` API easier. Therefore :samp:`conn = "
+"{net_box}.new('localhost', 3301)` can be replaced by :samp:`conn = "
+"{net_box}.self`. However, there is an important difference between the "
+"embedded connection and a remote one. With the embedded connection, "
+"requests which do not modify data do not yield. When using a remote "
+"connection, any request can yield, and local database state may have "
+"changed by the time it returns."
+msgstr ""
+
+#: ../reference/net_box.rst:67
+msgid "conn object"
+msgstr ""
+
+#: ../reference/net_box.rst:72
+msgid ""
+"conn = net_box.new('localhost', 3301)\n"
+"conn = net_box.new('127.0.0.1', box.cfg.listen, {\n"
+"  wait_connect = false,\n"
+"  user = 'boxer',\n"
+"  password = ''\n"
+"})"
+msgstr ""
+
+#: ../reference/net_box.rst:85
+msgid "Execute a PING command."
+msgstr ""
+
+#: ../reference/net_box.rst:87
+msgid "true on success, false on error"
+msgstr ""
+
+#: ../reference/net_box.rst:92
+msgid "net_box.self:ping()"
+msgstr ""
+
+#: ../reference/net_box.rst:98
+msgid "Wait for connection to be active or closed."
+msgstr ""
+
+#: ../reference/net_box.rst:101
+msgid "true when connected, false on failure."
+msgstr ""
+
+#: ../reference/net_box.rst:106
+msgid "net_box.self:wait_connected()"
+msgstr ""
+
+#: ../reference/net_box.rst:112
+msgid "Show whether connection is active or closed."
+msgstr ""
+
+#: ../reference/net_box.rst:114
+msgid "true if connected, false on failure."
+msgstr ""
+
+#: ../reference/net_box.rst:119
+msgid "net_box.self:is_connected()"
+msgstr ""
+
+#: ../reference/net_box.rst:126
+msgid "Close a connection."
+msgstr ""
+
+#: ../reference/net_box.rst:128
+msgid ""
+"Connection objects are garbage collected just like any other objects in "
+"Lua, so an explicit destruction is not mandatory. However, since close() "
+"is a system call, it is good programming practice to close a connection "
+"explicitly when it is no longer needed, to avoid lengthy stalls of the "
+"garbage collector."
+msgstr ""
+
+#: ../reference/net_box.rst:133
+msgid "Example: ``conn:close()``"
+msgstr ""
+
+#: ../reference/net_box.rst:137
+msgid ""
+":samp:`conn.space.{space-name}:select`:code:`{...}` is the remote-call "
+"equivalent of the local call :samp:`box.space.{space-"
+"name}:select`:code:`{...}`. Please note this difference: a local "
+":samp:`box.space.{space-name}:select`:code:`{...}` does not yield, but a "
+"remote :samp:`conn.space.{space-name}:select`:code:`{...}` call does "
+"yield, so local data may change while a remote :samp:`conn.space.{space-"
+"name}:select`:code:`{...}` is running."
+msgstr ""
+
+#: ../reference/net_box.rst:146
+msgid ""
+":samp:`conn.space.{space-name}:insert(...)` is the remote-call equivalent"
+" of the local call :samp:`box.space.{space-name}:insert(...)`."
+msgstr ""
+
+#: ../reference/net_box.rst:151
+msgid ""
+":samp:`conn.space.{space-name}:replace(...)` is the remote-call "
+"equivalent of the local call :samp:`box.space.space-name:replace(...)`."
+msgstr ""
+
+#: ../reference/net_box.rst:156
+msgid ""
+":samp:`conn.space.{space-name}:update(...)` is the remote-call equivalent"
+" of the local call :samp:`box.space.space-name:update(...)`."
+msgstr ""
+
+#: ../reference/net_box.rst:161
+msgid ""
+":samp:`conn.space.{space-name}:delete(...)` is the remote-call equivalent"
+" of the local call :samp:`box.space.space-name:delete(...)`."
+msgstr ""
+
+#: ../reference/net_box.rst:166
+msgid ""
+":samp:`conn:call('func', '1', '2', '3')` is the remote-call equivalent of"
+" :samp:`func('1', '2', '3')`. That is, ``conn:call`` is a remote stored-"
+"procedure call."
+msgstr ""
+
+#: ../reference/net_box.rst:170
+msgid "Example: ``conn:call('function5')``"
+msgstr ""
+
+#: ../reference/net_box.rst:174
+msgid ""
+":samp:`conn:eval({Lua-string})` evaluates and executes the expression in "
+"Lua-string, which may be any statement or series of statements. An "
+":ref:`execute privilege <privileges>` is required; if the user does not "
+"have it, an administrator may grant it with "
+":samp:`box.schema.user.grant({username}, 'execute', 'universe')`."
+msgstr ""
+
+#: ../reference/net_box.rst:180
+msgid "Example: ``conn:eval('return 5+5')``"
+msgstr ""
+
+#: ../reference/net_box.rst:184
+msgid ""
+"``timeout(...)`` is a wrapper which sets a timeout for the request that "
+"follows it."
+msgstr ""
+
+#: ../reference/net_box.rst:187
+msgid "Example: ``conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})``"
+msgstr ""
+
+#: ../reference/net_box.rst:189
+msgid ""
+"All remote calls support execution timeouts. Using a wrapper object makes"
+" the remote connection API compatible with the local one, removing the "
+"need for a separate ``timeout`` argument, which the local version would "
+"ignore. Once a request is sent, it cannot be revoked from the remote "
+"server even if a timeout expires: the timeout expiration only aborts the "
+"wait for the remote server response, not the request itself."
+msgstr ""
+
+#: ../reference/net_box.rst:198
+msgid "Example showing use of most of the net.box methods"
+msgstr ""
+
+#: ../reference/net_box.rst:200
+msgid ""
+"This example will work with the sandbox configuration described in the "
+"preface. That is, there is a space named tester with a numeric primary "
+"key. Assume that the database is nearly empty. Assume that the tarantool "
+"server is running on ``localhost 127.0.0.1:3301``."
+msgstr ""
+
+#: ../reference/net_box.rst:205
+msgid ""
+"tarantool> net_box = require('net.box')\n"
+"---\n"
+"...\n"
+"tarantool> function example()\n"
+"         >   local conn, wtuple\n"
+"         >   if net_box.self:ping() then\n"
+"         >     table.insert(ta, 'self:ping() succeeded')\n"
+"         >     table.insert(ta, '  (no surprise -- self connection is "
+"pre-established)')\n"
+"         >   end\n"
+"         >   if box.cfg.listen == '3301' then\n"
+"         >     table.insert(ta,'The local server listen address = 3301')\n"
+"         >   else\n"
+"         >     table.insert(ta, 'The local server listen address is not "
+"3301')\n"
+"         >     table.insert(ta, '(  (maybe box.cfg{...listen=\"3301\"...}"
+" was not stated)')\n"
+"         >     table.insert(ta, '(  (so connect will fail)')\n"
+"         >   end\n"
+"         >   conn = net_box.new('127.0.0.1', 3301)\n"
+"         >   conn.space.tester:delete{800}\n"
+"         >   table.insert(ta, 'conn delete done on tester.')\n"
+"         >   conn.space.tester:insert{800, 'data'}\n"
+"         >   table.insert(ta, 'conn insert done on tester, index 0')\n"
+"         >   table.insert(ta, '  primary key value = 800.')\n"
+"         >   wtuple = conn.space.tester:select{800}\n"
+"         >   table.insert(ta, 'conn select done on tester, index 0')\n"
+"         >   table.insert(ta, '  number of fields = ' .. #wtuple)\n"
+"         >   conn.space.tester:delete{800}\n"
+"         >   table.insert(ta, 'conn delete done on tester')\n"
+"         >   conn.space.tester:replace{800, 'New data', 'Extra data'}\n"
+"         >   table.insert(ta, 'conn:replace done on tester')\n"
+"         >   conn:timeout(0.5).space.tester:update({800}, {{'=', 2, "
+"'Fld#1'}})\n"
+"         >   table.insert(ta, 'conn update done on tester')\n"
+"         >   conn:close()\n"
+"         >   table.insert(ta, 'conn close done')\n"
+"         > end\n"
+"---\n"
+"...\n"
+"tarantool> ta = {}\n"
+"---\n"
+"...\n"
+"tarantool> example()\n"
+"---\n"
+"...\n"
+"tarantool> ta\n"
+"---\n"
+"- - self:ping() succeeded\n"
+"  - '  (no surprise -- self connection is pre-established)'\n"
+"  - The local server listen address = 3301\n"
+"  - conn delete done on tester.\n"
+"  - conn insert done on tester, index 0\n"
+"  - '  primary key value = 800.'\n"
+"  - conn select done on tester, index 0\n"
+"  - '  number of fields = 1'\n"
+"  - conn delete done on tester\n"
+"  - conn:replace done on tester\n"
+"  - conn update done on tester\n"
+"  - conn close done\n"
+"..."
+msgstr ""
+
+#: ../reference/other.rst:19
+msgid "Miscellaneous"
+msgstr ""
+
+#: ../reference/other.rst:23
+msgid ""
+"Convert a string or a Lua number to a 64-bit integer. The result can be "
+"used in arithmetic, and the arithmetic will be 64-bit integer arithmetic "
+"rather than floating-point arithmetic. (Operations on an unconverted Lua "
+"number use floating-point arithmetic.) The ``tonumber64()`` function is "
+"added by Tarantool; the name is global."
+msgstr ""
+
+#: ../reference/other.rst:31
+msgid ""
+"tarantool> type(123456789012345), type(tonumber64(123456789012345))\n"
+"---\n"
+"- number\n"
+"- number\n"
+"...\n"
+"tarantool> i = tonumber64('1000000000')\n"
+"---\n"
+"...\n"
+"tarantool> type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2\n"
+"---\n"
+"- number\n"
+"- 500000000\n"
+"- 999999998\n"
+"- 2000000000\n"
+"- 1000000002\n"
+"- 0\n"
+"- 1000000000000000000\n"
+"..."
+msgstr ""
+
+#: ../reference/other.rst:54
+msgid ""
+"Parse and execute an arbitrary chunk of Lua code. This function is mainly"
+" useful to define and run Lua code without having to introduce changes to"
+" the global Lua environment."
+msgstr ""
+
+#: ../reference/other.rst:58
+msgid "Lua code"
+msgstr ""
+
+#: ../reference/other.rst:59
+msgid ""
+"zero or more scalar values which will be appended to, or substitute for, "
+"items in the Lua chunk."
+msgstr ""
+
+#: ../reference/other.rst:62
+msgid "whatever is returned by the Lua code chunk."
+msgstr ""
+
+#: ../reference/other.rst:64
+msgid ""
+"Possible errors: If there is a compilation error, it is raised as a Lua "
+"error."
+msgstr ""
+
+#: ../reference/other.rst:68
+msgid ""
+"tarantool> dostring('abc')\n"
+"---\n"
+"error: '[string \"abc\"]:1: ''='' expected near ''<eof>'''\n"
+"...\n"
+"tarantool> dostring('return 1')\n"
+"---\n"
+"- 1\n"
+"...\n"
+"tarantool> dostring('return ...', 'hello', 'world')\n"
+"---\n"
+"- hello\n"
+"- world\n"
+"...\n"
+"tarantool> dostring([[\n"
+"         >   local f = function(key)\n"
+"         >     local t = box.space.tester:select{key}\n"
+"         >     if t ~= nil then\n"
+"         >       return t[1]\n"
+"         >     else\n"
+"         >       return nil\n"
+"         >     end\n"
+"         >   end\n"
+"         >   return f(...)]], 1)\n"
+"---\n"
+"- null\n"
+"..."
+msgstr ""
+
+#: ../reference/pickle.rst:19
+msgid "Package `pickle`"
+msgstr ""
+
+#: ../reference/pickle.rst:25
+msgid ""
+"To use Tarantool binary protocol primitives from Lua, it's necessary to "
+"convert Lua variables to binary format. The ``pickle.pack()`` helper "
+"function is prototyped after Perl 'pack_'."
+msgstr ""
+
+#: ../reference/pickle.rst:31
+msgid "**Format specifiers**"
+msgstr ""
+
+#: ../reference/pickle.rst:36
+msgid "b, B"
+msgstr ""
+
+#: ../reference/pickle.rst:36
+msgid ""
+"converts Lua variable to a 1-byte integer, and stores the integer in the "
+"resulting string"
+msgstr ""
+
+#: ../reference/pickle.rst:39
+msgid "s, S"
+msgstr ""
+
+#: ../reference/pickle.rst:39
+msgid ""
+"converts Lua variable to a 2-byte integer, and stores the integer in the "
+"resulting string, low byte first"
+msgstr ""
+
+#: ../reference/pickle.rst:43
+msgid "i, I"
+msgstr ""
+
+#: ../reference/pickle.rst:43
+msgid ""
+"converts Lua variable to a 4-byte integer, and stores the integer in the "
+"resulting string, low byte first"
+msgstr ""
+
+#: ../reference/pickle.rst:47
+msgid "l, L"
+msgstr ""
+
+#: ../reference/pickle.rst:47
+msgid ""
+"converts Lua variable to an 8-byte integer, and stores the integer in the"
+" resulting string, low byte first"
+msgstr ""
+
+#: ../reference/pickle.rst:51
+msgid "n"
+msgstr ""
+
+#: ../reference/pickle.rst:51
+msgid ""
+"converts Lua variable to a 2-byte integer, and stores the integer in the "
+"resulting string, big endian,"
+msgstr ""
+
+#: ../reference/pickle.rst:55
+msgid "N"
+msgstr ""
+
+#: ../reference/pickle.rst:55
+msgid ""
+"converts Lua variable to a 4-byte integer, and stores the integer in the "
+"resulting string, big"
+msgstr ""
+
+#: ../reference/pickle.rst:58
+msgid "q, Q"
+msgstr ""
+
+#: ../reference/pickle.rst:58
+msgid ""
+"converts Lua variable to an 8-byte integer, and stores the integer in the"
+" resulting string, big endian,"
+msgstr ""
+
+#: ../reference/pickle.rst:62
+msgid "f"
+msgstr ""
+
+#: ../reference/pickle.rst:62
+msgid ""
+"converts Lua variable to a 4-byte float, and stores the float in the "
+"resulting string"
+msgstr ""
+
+#: ../reference/pickle.rst:65
+msgid "d"
+msgstr ""
+
+#: ../reference/pickle.rst:65
+msgid ""
+"converts Lua variable to a 8-byte double, and stores the double in the "
+"resulting string"
+msgstr ""
+
+#: ../reference/pickle.rst:68
+msgid "a, A"
+msgstr ""
+
+#: ../reference/pickle.rst:68
+msgid ""
+"converts Lua variable to a sequence of bytes, and stores the sequence in "
+"the resulting string"
+msgstr ""
+
+#: ../reference/pickle.rst:72
+msgid "string containing format specifiers"
+msgstr ""
+
+#: ../reference/pickle.rst:73
+msgid "scalar values to be formatted"
+msgstr ""
+
+#: ../reference/pickle.rst:74
+msgid ""
+"a binary string containing all arguments, packed according to the format "
+"specifiers."
+msgstr ""
+
+#: ../reference/pickle.rst:78
+msgid "Possible errors: unknown format specifier."
+msgstr ""
+
+#: ../reference/pickle.rst:82
+msgid ""
+"tarantool> pickle = require('pickle')\n"
+"---\n"
+"...\n"
+"tarantool> box.space.tester:insert{0, 'hello world'}\n"
+"---\n"
+"- [0, 'hello world']\n"
+"...\n"
+"tarantool> box.space.tester:update({0}, {{'=', 2, 'bye world'}})\n"
+"---\n"
+"- [0, 'bye world']\n"
+"...\n"
+"tarantool> box.space.tester:update({0}, {\n"
+"         >   {'=', 2, pickle.pack('iiA', 0, 3, 'hello')}\n"
+"         > })\n"
+"---\n"
+"- [0, \"\\0\\0\\0\\0\\x03\\0\\0\\0hello\"]\n"
+"...\n"
+"tarantool> box.space.tester:update({0}, {{'=', 2, 4}})\n"
+"---\n"
+"- [0, 4]\n"
+"...\n"
+"tarantool> box.space.tester:update({0}, {{'+', 2, 4}})\n"
+"---\n"
+"- [0, 8]\n"
+"...\n"
+"tarantool> box.space.tester:update({0}, {{'^', 2, 4}})\n"
+"---\n"
+"- [0, 12]\n"
+"..."
+msgstr ""
+
+#: ../reference/pickle.rst:116
+msgid ""
+"Counterpart to ``pickle.pack()``. Warning: if format specifier 'A' is "
+"used, it must be the last item."
+msgstr ""
+
+#: ../reference/pickle.rst:122
+msgid "A list of strings or numbers."
+msgstr ""
+
+#: ../reference/pickle.rst:127
+msgid ""
+"tarantool> pickle = require('pickle')\n"
+"---\n"
+"...\n"
+"tarantool> tuple = box.space.tester:replace{0}\n"
+"---\n"
+"...\n"
+"tarantool> string.len(tuple[1])\n"
+"---\n"
+"- 1\n"
+"...\n"
+"tarantool> pickle.unpack('b', tuple[1])\n"
+"---\n"
+"- 48\n"
+"...\n"
+"tarantool> pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, "
+"4294967295))\n"
+"---\n"
+"- 255\n"
+"- 65535\n"
+"- 4294967295\n"
+"...\n"
+"tarantool> pickle.unpack('ls', pickle.pack('ls', "
+"tonumber64('18446744073709551615'), 65535))\n"
+"---\n"
+"...\n"
+"tarantool> num, num64, str = pickle.unpack('slA', pickle.pack('slA', 666,"
+"\n"
+"         > tonumber64('666666666666666'), 'string'))\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/shard.rst:19
+msgid "Package `shard`"
+msgstr ""
+
+#: ../reference/shard.rst:23
+msgid ""
+"With sharding, the tuples of a tuple set are distributed to multiple "
+"nodes, with a Tarantool database server on each node. With this "
+"arrangement, each server is handling only a subset of the total data, so "
+"larger loads can be handled by simply adding more computers to a network."
+msgstr ""
+
+#: ../reference/shard.rst:28
+msgid ""
+"The Tarantool shard package has facilities for creating shards, as well "
+"as analogues for the data-manipulation functions of the box library "
+"(select, insert, replace, update, delete)."
+msgstr ""
+
+#: ../reference/shard.rst:32
+msgid "First some terminology:"
+msgstr ""
+
+#: ../reference/shard.rst:35
+msgid "Consistent Hash"
+msgstr ""
+
+#: ../reference/shard.rst:37
+msgid ""
+"The shard package distributes according to a hash algorithm, that is, it "
+"applies a hash function to a tuple's primary-key value in order to decide"
+" which shard the tuple belongs to. The hash function is `consistent`_ so "
+"that changing the number of servers will not affect results for many "
+"keys. The specific hash function that the shard package uses is "
+":func:`digest.guava` in the :codeitalic:`digest` package."
+msgstr ""
+
+#: ../reference/shard.rst:43
+msgid "Queue"
+msgstr ""
+
+#: ../reference/shard.rst:45
+msgid ""
+"A temporary list of recent update requests. Sometimes called "
+"\"batching\". Since updates to a sharded database can be slow, it may "
+"speed up throughput to send requests to a queue rather than wait for the "
+"update to finish on ever node. The shard package has functions for adding"
+" requests to the queue, which it will process without further "
+"intervention. Queuing is optional."
+msgstr ""
+
+#: ../reference/shard.rst:51
+msgid "Redundancy"
+msgstr ""
+
+#: ../reference/shard.rst:53
+msgid "The number of replicas in each shard."
+msgstr ""
+
+#: ../reference/shard.rst:54
+msgid "Replica"
+msgstr ""
+
+#: ../reference/shard.rst:56
+msgid ""
+"A complete copy of the data. The shard package handles both sharding and "
+"replication. One shard can contain one or more replicas. When a write "
+"occurs, the write is attempted on every replica in turn. The shard "
+"package does not use the built-in replication feature."
+msgstr ""
+
+#: ../reference/shard.rst:60
+msgid "Shard"
+msgstr ""
+
+#: ../reference/shard.rst:62
+msgid ""
+"A subset of the tuples in the database partitioned according to the value"
+" returned by the consistent hash function. Usually each shard is on a "
+"separate node, or a separate set of nodes (for example if redundancy = 3 "
+"then the shard will be on three nodes)."
+msgstr ""
+
+#: ../reference/shard.rst:66
+msgid "Zone"
+msgstr ""
+
+#: ../reference/shard.rst:68
+msgid ""
+"A physical location where the nodes are closely connected, with the same "
+"security and backup and access points. The simplest example of a zone is "
+"a single computer with a single tarantool-server instance. A shard's "
+"replicas should be in different zones."
+msgstr ""
+
+#: ../reference/shard.rst:73
+msgid ""
+"The shard package is distributed separately from the main tarantool "
+"package. To acquire it, do a separate install. For example on Ubuntu say:"
+msgstr ""
+
+#: ../reference/shard.rst:76
+msgid "sudo apt-get install tarantool-shard tarantool-pool"
+msgstr ""
+
+#: ../reference/shard.rst:80
+msgid ""
+"Or, download from github tarantool/shard and compile as described in the "
+"README. Then, before using the package, say ``shard = require('shard')``"
+msgstr ""
+
+#: ../reference/shard.rst:83
+msgid "The most important function is:"
+msgstr ""
+
+#: ../reference/shard.rst:88
+msgid "shard.init(*shard-configuration*)"
+msgstr ""
+
+#: ../reference/shard.rst:90
+msgid ""
+"This must be called for every shard. The shard-configuration is a table "
+"with these fields:"
+msgstr ""
+
+#: ../reference/shard.rst:93
+msgid "servers (a list of URIs of nodes and the zones the nodes are in)"
+msgstr ""
+
+#: ../reference/shard.rst:94
+msgid "login (the user name which applies for accessing via the shard package)"
+msgstr ""
+
+#: ../reference/shard.rst:95
+msgid "password (the password for the login)"
+msgstr ""
+
+#: ../reference/shard.rst:96
+msgid "redundancy (a number, minimum 1)"
+msgstr ""
+
+#: ../reference/shard.rst:97
+msgid ""
+"binary (a port number that this host is listening on, on the current "
+"host) (distinguishable from the 'listen' port specified by box.cfg)"
+msgstr ""
+
+#: ../reference/shard.rst:100
+msgid ""
+"Possible Errors: Redundancy should not be greater than the number of "
+"servers; the servers must be alive; two replicas of the same shard should"
+" not be in the same zone."
+msgstr ""
+
+#: ../reference/shard.rst:106
+msgid "Example: shard.init syntax for one shard"
+msgstr ""
+
+#: ../reference/shard.rst:108
+msgid ""
+"The number of replicas per shard (redundancy) is 3. The number of servers"
+" is 3. The shard package will conclude that there is only one shard."
+msgstr ""
+
+#: ../reference/shard.rst:112
+msgid ""
+"tarantool> cfg = {\n"
+"         >   servers = {\n"
+"         >     { uri = 'loclhost:33131', zone = '1' },\n"
+"         >     { uri = 'loclhost:33132', zone = '2' },\n"
+"         >     { uri = 'loclhost:33133', zone = '3' },1\n"
+"         >   },\n"
+"         >   login = 'tester',\n"
+"         >   password = 'pass',\n"
+"         >   redundancy = '3'\n"
+"         >   binary = 33131,\n"
+"         > }\n"
+"---\n"
+"...\n"
+"tarantool> server.init(cfg)\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/shard.rst:133
+msgid "Example: shard.init syntax for three shards"
+msgstr ""
+
+#: ../reference/shard.rst:135
+msgid ""
+"This describes three shards. Each shard has two replicas. Since the "
+"number of servers is 7, and the number of replicas per server is 2, and "
+"dividing 7 / 2 leaves a remainder of 1, one of the servers will not be "
+"used. This is not necessarily an error, because perhaps one of the "
+"servers in the list is not alive."
+msgstr ""
+
+#: ../reference/shard.rst:140
+msgid ""
+"tarantool> cfg = {\n"
+"         >   servers = {\n"
+"         >     { uri = 'loclhost:33131', zone = '1' },\n"
+"         >     { uri = 'loclhost:33131', zone = '2' },\n"
+"         >     { uri = 'loclhost:33132', zone = '1' },\n"
+"         >     { uri = 'loclhost:33133', zone = '2' },\n"
+"         >     { uri = 'loclhost:33131', zone = '1' },\n"
+"         >     { uri = 'loclhost:33132', zone = '2' },\n"
+"         >     { uri = 'loclhost:33133', zone = '1' },\n"
+"         >   },\n"
+"         >   login = 'tester',\n"
+"         >   password = 'pass',\n"
+"         >   redundancy = '3'\n"
+"         >   binary = 33131,\n"
+"         > }\n"
+"---\n"
+"...\n"
+"tarantool> server.init(cfg)\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/shard.rst:166
+msgid ""
+"shard[*space-name*].insert{...}\n"
+"shard[*space-name*].replace{...}\n"
+"shard[*space-name*].delete{...}\n"
+"shard[*space-name*].select{...}\n"
+"shard[*space-name*].update{...}\n"
+"shard[*space-name*].auto_increment{...}"
+msgstr ""
+
+#: ../reference/shard.rst:173
+msgid ""
+"Every data-access function in the box package has an analogue in the "
+"shard package, so (for example) to insert in table T in a sharded "
+"database one simply says ``shard.T:insert{...}`` instead of "
+"``box.T:insert{...}``. A ``shard.T:select{}`` request without a primary "
+"key will search all shards."
+msgstr ""
+
+#: ../reference/shard.rst:181
+msgid ""
+"shard[*space-name*].q_insert{...}\n"
+"shard[*space-name*].q_replace{...}\n"
+"shard[*space-name*].q_delete{...}\n"
+"shard[*space-name*].q_select{...}\n"
+"shard[*space-name*].q_update{...}\n"
+"shard[*space-name*].q_auto_increment{...}"
+msgstr ""
+
+#: ../reference/shard.rst:188
+msgid ""
+"Every queued data-access function has an analogue in the shard package. "
+"The user must add an operation_id. The details of queued data-access "
+"functions, and of maintenance-related functions, are on `the shard "
+"section of github`_."
+msgstr ""
+
+#: ../reference/shard.rst:194
+msgid "Example: Shard, Minimal Configuration"
+msgstr ""
+
+#: ../reference/shard.rst:196
+msgid ""
+"There is only one shard, and that shard contains only one replica. So "
+"this isn't illustrating the features of either replication or sharding, "
+"it's only illustrating what the syntax is, and what the messages look "
+"like, that anyone could duplicate in a minute or two with the magic of "
+"cut-and-paste."
+msgstr ""
+
+#: ../reference/shard.rst:201
+msgid ""
+"$ mkdir ~/tarantool_sandbox_1\n"
+"$ cd ~/tarantool_sandbox_1\n"
+"$ rm -r *.snap\n"
+"$ rm -r *.xlog\n"
+"$ ~/tarantool-master/src/tarantool\n"
+"\n"
+"tarantool> box.cfg{listen = 3301}\n"
+"tarantool> box.schema.space.create('tester')\n"
+"tarantool> box.space.tester:create_index('primary', {})\n"
+"tarantool> box.schema.user.passwd('admin', 'password')\n"
+"tarantool> cfg = {\n"
+"         >   servers = {\n"
+"         >       { uri = 'localhost:3301', zone = '1' },\n"
+"         >   },\n"
+"         >   login = 'admin';\n"
+"         >   password = 'password';\n"
+"         >   redundancy = 1;\n"
+"         >   binary = 3301;\n"
+"         > }\n"
+"tarantool> shard = require('shard')\n"
+"tarantool> shard.init(cfg)\n"
+"tarantool> -- Now put something in ...\n"
+"tarantool> shard.tester:insert{1,'Tuple #1'}"
+msgstr ""
+
+#: ../reference/shard.rst:227
+msgid ""
+"If one cuts and pastes the above, then the result, showing only the "
+"requests and responses for shard.init and shard.tester, should look "
+"approximately like this:"
+msgstr ""
+
+#: ../reference/shard.rst:231
+msgid ""
+"tarantool> shard.init(cfg)\n"
+"2015-08-09 ... I> Sharding initialization started...\n"
+"2015-08-09 ... I> establishing connection to cluster servers...\n"
+"2015-08-09 ... I>  - localhost:3301 - connecting...\n"
+"2015-08-09 ... I>  - localhost:3301 - connected\n"
+"2015-08-09 ... I> connected to all servers\n"
+"2015-08-09 ... I> started\n"
+"2015-08-09 ... I> redundancy = 1\n"
+"2015-08-09 ... I> Zone len=1 THERE\n"
+"2015-08-09 ... I> Adding localhost:3301 to shard 1\n"
+"2015-08-09 ... I> Zone len=1 THERE\n"
+"2015-08-09 ... I> shards = 1\n"
+"2015-08-09 ... I> Done\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> -- Now put something in ...\n"
+"---\n"
+"...\n"
+"tarantool> shard.tester:insert{1,'Tuple #1'}\n"
+"---\n"
+"- - [1, 'Tuple #1']\n"
+"..."
+msgstr ""
+
+#: ../reference/shard.rst:260
+msgid "Example: Shard, Scaling Out"
+msgstr ""
+
+#: ../reference/shard.rst:262
+msgid ""
+"There are two shards, and each shard contains one replica. This requires "
+"two nodes. In real life the two nodes would be two computers, but for "
+"this illustration the requirement is merely: start two shells, which "
+"we'll call Terminal#1 and Terminal #2."
+msgstr ""
+
+#: ../reference/shard.rst:267
+msgid "On Terminal #1, say:"
+msgstr ""
+
+#: ../reference/shard.rst:269
+msgid ""
+"$ mkdir ~/tarantool_sandbox_1\n"
+"$ cd ~/tarantool_sandbox_1\n"
+"$ rm -r *.snap\n"
+"$ rm -r *.xlog\n"
+"$ ~/tarantool-master/src/tarantool\n"
+"\n"
+"tarantool> box.cfg{listen = 3301}\n"
+"tarantool> box.schema.space.create('tester')\n"
+"tarantool> box.space.tester:create_index('primary', {})\n"
+"tarantool> box.schema.user.passwd('admin', 'password')\n"
+"tarantool> console = require('console')\n"
+"tarantool> cfg = {\n"
+"         >   servers = {\n"
+"         >     { uri = 'localhost:3301', zone = '1' },\n"
+"         >     { uri = 'localhost:3302', zone = '2' },\n"
+"         >   },\n"
+"         >   login = 'admin',\n"
+"         >   password = 'password',\n"
+"         >   redundancy = 1,\n"
+"         >   binary = 3301,\n"
+"         > }\n"
+"tarantool> shard = require('shard')\n"
+"tarantool> shard.init(cfg)\n"
+"tarantool> -- Now put something in ...\n"
+"tarantool> shard.tester:insert{1,'Tuple #1'}"
+msgstr ""
+
+#: ../reference/shard.rst:297
+msgid "On Terminal #2, say:"
+msgstr ""
+
+#: ../reference/shard.rst:299
+msgid ""
+"$ mkdir ~/tarantool_sandbox_2\n"
+"$ cd ~/tarantool_sandbox_2\n"
+"$ rm -r *.snap\n"
+"$ rm -r *.xlog\n"
+"$ ~/tarantool-master/src/tarantool\n"
+"\n"
+"tarantool> box.cfg{listen = 3302}\n"
+"tarantool> box.schema.space.create('tester')\n"
+"tarantool> box.space.tester:create_index('primary', {})\n"
+"tarantool> box.schema.user.passwd('admin', 'password')\n"
+"tarantool> console = require('console')\n"
+"tarantool> cfg = {\n"
+"         >   servers = {\n"
+"         >     { uri = 'localhost:3301', zone = '1' };\n"
+"         >     { uri = 'localhost:3302', zone = '2' };\n"
+"         >   };\n"
+"         >   login = 'admin';\n"
+"         >   password = 'password';\n"
+"         >   redundancy = 1;\n"
+"         >   binary = 3302;\n"
+"         > }\n"
+"tarantool> shard = require('shard')\n"
+"tarantool> shard.init(cfg)\n"
+"tarantool> -- Now get something out ...\n"
+"tarantool> shard.tester:select{1}"
+msgstr ""
+
+#: ../reference/shard.rst:327
+msgid ""
+"What will appear on Terminal #1 is: a loop of error messages saying "
+"\"Connection refused\" and \"server check failure\". This is normal. It "
+"will go on until Terminal #2 process starts."
+msgstr ""
+
+#: ../reference/shard.rst:331
+msgid "What will appear on Terminal #2, at the end, should look like this:"
+msgstr ""
+
+#: ../reference/shard.rst:333
+msgid ""
+"tarantool> shard.tester:select{1}\n"
+"---\n"
+"- - - [1, 'Tuple #1']\n"
+"..."
+msgstr ""
+
+#: ../reference/shard.rst:340
+msgid ""
+"This shows that what was inserted by Terminal #1 can be selected by "
+"Terminal #2, via the shard package."
+msgstr ""
+
+#: ../reference/shard.rst:343
+msgid "Details are on `the shard section of github`_."
+msgstr ""
+
+#: ../reference/socket.rst:19
+msgid "Package `socket`"
+msgstr ""
+
+#: ../reference/socket.rst:21
+msgid ""
+"The ``socket`` package allows exchanging data via BSD sockets with a "
+"local or remote host in connection-oriented (TCP) or datagram-oriented "
+"(UDP) mode. Semantics of the calls in the ``socket`` API closely follow "
+"semantics of the corresponding POSIX calls. Function names and signatures"
+" are mostly compatible with `luasocket`_."
+msgstr ""
+
+#: ../reference/socket.rst:27
+msgid ""
+"The functions for setting up and connecting are ``socket``, "
+"``sysconnect``, ``tcp_connect``. The functions for sending data are "
+"``send``, ``sendto``, ``write``, ``syswrite``. The functions for "
+"receiving data are ``recv``, ``recvfrom``, ``read``. The functions for "
+"waiting before sending/receiving data are ``wait``, ``readable``, "
+"``writable``. The functions for setting flags are ``nonblock``, "
+"``setsockopt``. The functions for stopping and disconnecting are "
+"``shutdown``, ``close``. The functions for error checking are ``errno``, "
+"``error``."
+msgstr ""
+
+#: ../reference/socket.rst:38
+msgid "**Socket functions**"
+msgstr ""
+
+#: ../reference/socket.rst:43
+msgid "Purposes"
+msgstr ""
+
+#: ../reference/socket.rst:43
+msgid "Names"
+msgstr ""
+
+#: ../reference/socket.rst:45
+msgid "setup"
+msgstr ""
+
+#: ../reference/socket.rst:45
+msgid ":func:`socket() <socket.__call>`"
+msgstr ""
+
+#: ../reference/socket.rst:47 ../reference/socket.rst:49
+#: ../reference/socket.rst:51 ../reference/socket.rst:53
+#: ../reference/socket.rst:57 ../reference/socket.rst:59
+#: ../reference/socket.rst:63 ../reference/socket.rst:65
+#: ../reference/socket.rst:69 ../reference/socket.rst:71
+#: ../reference/socket.rst:75 ../reference/socket.rst:79
+#: ../reference/socket.rst:83 ../reference/socket.rst:87
+#: ../reference/socket.rst:89 ../reference/socket.rst:91
+#: ../reference/socket.rst:95 ../reference/socket.rst:97
+msgid "\"\""
+msgstr ""
+
+#: ../reference/socket.rst:47
+msgid ":func:`socket.tcp_connect() <socket.tcp_connect>`"
+msgstr ""
+
+#: ../reference/socket.rst:49
+msgid ":func:`socket.tcp_server() <socket.tcp_server>`"
+msgstr ""
+
+#: ../reference/socket.rst:51
+msgid ":func:`socket_object:sysconnect() <socket_object.sysconnect>`"
+msgstr ""
+
+#: ../reference/socket.rst:53
+msgid ":func:`socket_object:send() <socket_object.send>`"
+msgstr ""
+
+#: ../reference/socket.rst:55
+msgid "sending"
+msgstr ""
+
+#: ../reference/socket.rst:55
+msgid ":func:`socket_object:sendto() <socket_object.sendto>`"
+msgstr ""
+
+#: ../reference/socket.rst:57
+msgid ":func:`socket_object:write() <socket_object.write>`"
+msgstr ""
+
+#: ../reference/socket.rst:59
+msgid ":func:`socket_object:syswrite() <socket_object.syswrite>`"
+msgstr ""
+
+#: ../reference/socket.rst:61
+msgid "receiving"
+msgstr ""
+
+#: ../reference/socket.rst:61
+msgid ":func:`socket_object:recv() <socket_object.recv>`"
+msgstr ""
+
+#: ../reference/socket.rst:63
+msgid ":func:`socket_object:recvfrom() <socket_object.recvfrom>`"
+msgstr ""
+
+#: ../reference/socket.rst:65
+msgid ":func:`socket_object:read() <socket_object.read>`"
+msgstr ""
+
+#: ../reference/socket.rst:67
+msgid "flag setting"
+msgstr ""
+
+#: ../reference/socket.rst:67
+msgid ":func:`socket_object:nonblock() <socket_object.nonblock>`"
+msgstr ""
+
+#: ../reference/socket.rst:69
+msgid ":func:`socket_object:setsockopt() <socket_object.setsockopt>`"
+msgstr ""
+
+#: ../reference/socket.rst:71
+msgid ":func:`socket_object:linger() <socket_object.linger>`"
+msgstr ""
+
+#: ../reference/socket.rst:73
+msgid "client/server"
+msgstr ""
+
+#: ../reference/socket.rst:73
+msgid ":func:`socket_object:listen() <socket_object.listen>`"
+msgstr ""
+
+#: ../reference/socket.rst:75
+msgid ":func:`socket_object:accept() <socket_object.accept>`"
+msgstr ""
+
+#: ../reference/socket.rst:77
+msgid "teardown"
+msgstr ""
+
+#: ../reference/socket.rst:77
+msgid ":func:`socket_object:shutdown() <socket_object.shutdown>`"
+msgstr ""
+
+#: ../reference/socket.rst:79
+msgid ":func:`socket_object:close() <socket_object.close>`"
+msgstr ""
+
+#: ../reference/socket.rst:81
+msgid "error checking"
+msgstr ""
+
+#: ../reference/socket.rst:81
+msgid ":func:`socket_object:error() <socket_object.error>`"
+msgstr ""
+
+#: ../reference/socket.rst:83
+msgid ":func:`socket_object:errno() <socket_object.errno>`"
+msgstr ""
+
+#: ../reference/socket.rst:85
+msgid "information"
+msgstr ""
+
+#: ../reference/socket.rst:85
+msgid ":func:`socket.getaddrinfo() <socket.getaddrinfo>`"
+msgstr ""
+
+#: ../reference/socket.rst:87
+msgid ":func:`socket_object:getsockopt() <socket_object.getsockopt>`"
+msgstr ""
+
+#: ../reference/socket.rst:89
+msgid ":func:`socket_object:peer() <socket_object.peer>`"
+msgstr ""
+
+#: ../reference/socket.rst:91
+msgid ":func:`socket_object:name() <socket_object.name>`"
+msgstr ""
+
+#: ../reference/socket.rst:93
+msgid "state checking"
+msgstr ""
+
+#: ../reference/socket.rst:93
+msgid ":func:`socket_object:readable() <socket_object.readable>`"
+msgstr ""
+
+#: ../reference/socket.rst:95
+msgid ":func:`socket_object:writable() <socket_object.writable>`"
+msgstr ""
+
+#: ../reference/socket.rst:97
+msgid ":func:`socket_object:wait() <socket_object.wait>`"
+msgstr ""
+
+#: ../reference/socket.rst:100
+msgid ""
+"Typically a socket session will begin with the setup functions, will set "
+"one or more flags, will have a loop with sending and receiving functions,"
+" will end with the teardown functions -- as an example at the end of this"
+" section will show. Throughout, there may be error-checking and waiting "
+"functions for synchronization. Some functions may \"block\" if a non-"
+"default option flag is set, therefore the fiber that they are in will "
+"yield so that other processes may take over, as is the norm for "
+"cooperative multitasking."
+msgstr ""
+
+#: ../reference/socket.rst:108
+msgid ""
+"For all examples in this section the socket name will be sock and the "
+"function invocations will look like ``sock:function_name(...)``."
+msgstr ""
+
+#: ../reference/socket.rst:115
+msgid ""
+"Create a new TCP or UDP socket. The argument values are the same as in "
+"the `Linux socket(2) man page <http://man7.org/linux/man-"
+"pages/man2/socket.2.html>`_."
+msgstr ""
+
+#: ../reference/socket.rst:121
+msgid "a new socket, or nil."
+msgstr ""
+
+#: ../reference/socket.rst:126
+msgid "Connect a socket to a remote host."
+msgstr ""
+
+#: ../reference/socket.rst:128
+msgid "URL or IP address"
+msgstr ""
+
+#: ../reference/socket.rst:129
+msgid "port number"
+msgstr ""
+
+#: ../reference/socket.rst:130 ../reference/socket.rst:198
+msgid "a connected socket, if no error."
+msgstr ""
+
+#: ../reference/socket.rst:135
+msgid ""
+"The ``socket.getaddrinfo()`` function is useful for finding information "
+"about a remote site so that the correct arguments for "
+"``sock:sysconnect()`` can be passed."
+msgstr ""
+
+#: ../reference/socket.rst:139 ../reference/socket.rst:445
+#: ../reference/socket.rst:455
+msgid ""
+"A table containing these fields: \"host\", \"family\", \"type\", "
+"\"protocol\", \"port\"."
+msgstr ""
+
+#: ../reference/socket.rst:144
+msgid "tarantool> socket.getaddrinfo('tarantool.org', 'http')"
+msgstr ""
+
+#: ../reference/socket.rst:148
+msgid "will return variable information such as"
+msgstr ""
+
+#: ../reference/socket.rst:150
+msgid ""
+"---\n"
+"- - host: 188.93.56.70\n"
+"    family: AF_INET\n"
+"    type: SOCK_STREAM\n"
+"    protocol: tcp\n"
+"    port: 80\n"
+"  - host: 188.93.56.70\n"
+"    family: AF_INET\n"
+"    type: SOCK_DGRAM\n"
+"    protocol: udp\n"
+"    port: 80\n"
+"..."
+msgstr ""
+
+#: ../reference/socket.rst:167
+msgid ""
+"The ``socket.tcp_server()`` function makes Tarantool act as a server that"
+" can accept connections. Usually the same objective is accomplished with "
+"``box.cfg{listen=...)``."
+msgstr ""
+
+#: ../reference/socket.rst:171
+msgid "socket.tcp_server('localhost', 3302, function () end)"
+msgstr ""
+
+#: ../reference/socket.rst:179
+msgid ""
+"Connect a socket to a remote host. The argument values are the same as in"
+" the `Linux connect(2) man page <http://man7.org/linux/man-"
+"pages/man2/connect.2.html>`_. The host must be an IP address."
+msgstr ""
+
+#: ../reference/socket.rst:186
+msgid "Either:"
+msgstr ""
+
+#: ../reference/socket.rst:185
+msgid "host - a string representation of an IPv4 address or an IPv6 address;"
+msgstr ""
+
+#: ../reference/socket.rst:187
+msgid "port - a number."
+msgstr ""
+
+#: ../reference/socket.rst:189 ../reference/socket.rst:196
+msgid "Or:"
+msgstr ""
+
+#: ../reference/socket.rst:189
+msgid "host - a string containing \"unix/\";"
+msgstr ""
+
+#: ../reference/socket.rst:190
+msgid "port - a string containing a path to a unix socket."
+msgstr ""
+
+#: ../reference/socket.rst:192
+msgid "host - a number, 0 (zero), meaning \"all local interfaces\";"
+msgstr ""
+
+#: ../reference/socket.rst:194
+msgid ""
+"port - a number. If a port number is 0 (zero), the socket will be bound "
+"to a random local port."
+msgstr ""
+
+#: ../reference/socket.rst:201
+msgid "sock:sysconnect('127.0.0.1', 80)"
+msgstr ""
+
+#: ../reference/socket.rst:208
+msgid "Send data over a connected socket."
+msgstr ""
+
+#: ../reference/socket.rst:211 ../reference/socket.rst:310
+msgid "the number of bytes sent."
+msgstr ""
+
+#: ../reference/socket.rst:214
+msgid "Possible errors: nil on error."
+msgstr ""
+
+#: ../reference/socket.rst:218
+msgid ""
+"Write as much as possible data to the socket buffer if non-blocking. "
+"Rarely used. For details see `this description`_."
+msgstr ""
+
+#: ../reference/socket.rst:223
+msgid ""
+"Read ``size`` bytes from a connected socket. An internal read-ahead "
+"buffer is used to reduce the cost of this call."
+msgstr ""
+
+#: ../reference/socket.rst:227
+msgid "a string of the requested length on success."
+msgstr ""
+
+#: ../reference/socket.rst:230
+msgid ""
+"Possible errors: On error, returns an empty string, followed by status, "
+"errno, errstr. In case the writing side has closed its end, returns the "
+"remainder read from the socket (possibly an empty string), followed by "
+"\"eof\" status."
+msgstr ""
+
+#: ../reference/socket.rst:241
+msgid ""
+"Read from a connected socket until some condition is true, and return the"
+" bytes that were read. Reading goes on until ``limit`` bytes have been "
+"read, or a delimiter has been read, or a timeout has expired."
+msgstr ""
+
+#: ../reference/socket.rst:246
+msgid ""
+"maximum number of bytes to read for example 50 means \"stop after 50 "
+"bytes\""
+msgstr ""
+
+#: ../reference/socket.rst:248
+msgid "separator for example '?' means \"stop after a question mark\""
+msgstr ""
+
+#: ../reference/socket.rst:250
+msgid ""
+"maximum number of seconds to wait for example 50 means \"stop after 50 "
+"seconds\"."
+msgstr ""
+
+#: ../reference/socket.rst:253
+msgid ""
+"an empty string if there is nothing more to read, or a nil value if "
+"error, or a string up to ``limit`` bytes long, which may include the "
+"bytes that matched the ``delimiter`` expression."
+msgstr ""
+
+#: ../reference/socket.rst:261
+msgid ""
+"Return all available data from the socket buffer if non-blocking. Rarely "
+"used. For details see `this description`_."
+msgstr ""
+
+#: ../reference/socket.rst:266
+msgid ""
+"Bind a socket to the given host/port. A UDP socket after binding can be "
+"used to receive data (see :func:`socket_object.recvfrom`). A TCP socket "
+"can be used to accept new connections, after it has been put in listen "
+"mode."
+msgstr ""
+
+#: ../reference/socket.rst:274
+msgid "a socket object on success"
+msgstr ""
+
+#: ../reference/socket.rst:277
+msgid "Possible errors: Returns nil, status, errno, errstr on error."
+msgstr ""
+
+#: ../reference/socket.rst:282
+msgid "Start listening for incoming connections."
+msgstr ""
+
+#: ../reference/socket.rst:284
+msgid ""
+"On Linux the listen ``backlog`` backlog may be from "
+"/proc/sys/net/core/somaxconn, on BSD the backlog may be ``SOMAXCONN``."
+msgstr ""
+
+#: ../reference/socket.rst:288
+msgid "true for success, false for error."
+msgstr ""
+
+#: ../reference/socket.rst:289
+msgid "boolean."
+msgstr ""
+
+#: ../reference/socket.rst:293
+msgid ""
+"Accept a new client connection and create a new connected socket. It is "
+"good practice to set the socket's blocking mode explicitly after "
+"accepting."
+msgstr ""
+
+#: ../reference/socket.rst:297
+msgid "new socket if success."
+msgstr ""
+
+#: ../reference/socket.rst:304
+msgid "Send a message on a UDP socket to a specified host."
+msgstr ""
+
+#: ../reference/socket.rst:313 ../reference/socket.rst:323
+msgid "Possible errors: on error, returns status, errno, errstr."
+msgstr ""
+
+#: ../reference/socket.rst:317
+msgid "Receive a message on a UDP socket."
+msgstr ""
+
+#: ../reference/socket.rst:320
+msgid "message, a table containing \"host\", \"family\" and \"port\" fields."
+msgstr ""
+
+#: ../reference/socket.rst:321
+msgid "string, table"
+msgstr ""
+
+#: ../reference/socket.rst:325
+msgid "After"
+msgstr ""
+
+#: ../reference/socket.rst:327
+msgid "message_content, message_sender = recvfrom(1)"
+msgstr ""
+
+#: ../reference/socket.rst:331
+msgid ""
+"the value of ``message_content`` might be a string containing 'X' and the"
+" value of ``message_sender`` might be a table containing "
+"``message_sender.host = '18.44.0.1'``, ``message_sender.family = "
+"'AF_INET'``, ``message_sender.port = 43065``."
+msgstr ""
+
+#: ../reference/socket.rst:339
+msgid "Shutdown a reading end, a writing end, or both ends of a socket."
+msgstr ""
+
+#: ../reference/socket.rst:341
+msgid "socket.SHUT_RD, socket.SHUT_WR, or socket.SHUT_RDWR."
+msgstr ""
+
+#: ../reference/socket.rst:343 ../reference/tap.rst:81 ../reference/tap.rst:113
+#: ../reference/tap.rst:144
+msgid "true or false."
+msgstr ""
+
+#: ../reference/socket.rst:348
+msgid ""
+"Close (destroy) a socket. A closed socket should not be used any more. A "
+"socket is closed automatically when its userdata is garbage collected by "
+"Lua."
+msgstr ""
+
+#: ../reference/socket.rst:351
+msgid ""
+"true on success, false on error. For example, if sock is already closed, "
+"sock:close() returns false."
+msgstr ""
+
+#: ../reference/socket.rst:358
+msgid ""
+"Retrieve information about the last error that occurred on a socket, if "
+"any. Errors do not cause throwing of exceptions so these functions are "
+"usually necessary."
+msgstr ""
+
+#: ../reference/socket.rst:361
+msgid ""
+"result for ``sock:errno()``, result for ``sock:error()``. If there is no "
+"error, then ``sock:errno()`` will return 0 and ``sock:error()``."
+msgstr ""
+
+#: ../reference/socket.rst:363
+msgid "number, string"
+msgstr ""
+
+#: ../reference/socket.rst:367
+msgid ""
+"Set socket flags. The argument values are the same as in the `Linux "
+"getsockopt(2) man page <http://man7.org/linux/man-"
+"pages/man2/setsockopt.2.html>`_. The ones that Tarantool accepts are:"
+msgstr ""
+
+#: ../reference/socket.rst:371
+msgid "SO_ACCEPTCONN"
+msgstr ""
+
+#: ../reference/socket.rst:372
+msgid "SO_BINDTODEVICE"
+msgstr ""
+
+#: ../reference/socket.rst:373
+msgid "SO_BROADCAST"
+msgstr ""
+
+#: ../reference/socket.rst:374
+msgid "SO_DEBUG"
+msgstr ""
+
+#: ../reference/socket.rst:375
+msgid "SO_DOMAIN"
+msgstr ""
+
+#: ../reference/socket.rst:376
+msgid "SO_ERROR"
+msgstr ""
+
+#: ../reference/socket.rst:377
+msgid "SO_DONTROUTE"
+msgstr ""
+
+#: ../reference/socket.rst:378
+msgid "SO_KEEPALIVE"
+msgstr ""
+
+#: ../reference/socket.rst:379
+msgid "SO_MARK"
+msgstr ""
+
+#: ../reference/socket.rst:380
+msgid "SO_OOBINLINE"
+msgstr ""
+
+#: ../reference/socket.rst:381
+msgid "SO_PASSCRED"
+msgstr ""
+
+#: ../reference/socket.rst:382
+msgid "SO_PEERCRED"
+msgstr ""
+
+#: ../reference/socket.rst:383
+msgid "SO_PRIORITY"
+msgstr ""
+
+#: ../reference/socket.rst:384
+msgid "SO_PROTOCOL"
+msgstr ""
+
+#: ../reference/socket.rst:385
+msgid "SO_RCVBUF"
+msgstr ""
+
+#: ../reference/socket.rst:386
+msgid "SO_RCVBUFFORCE"
+msgstr ""
+
+#: ../reference/socket.rst:387
+msgid "SO_RCVLOWAT"
+msgstr ""
+
+#: ../reference/socket.rst:388
+msgid "SO_SNDLOWAT"
+msgstr ""
+
+#: ../reference/socket.rst:389
+msgid "SO_RCVTIMEO"
+msgstr ""
+
+#: ../reference/socket.rst:390
+msgid "SO_SNDTIMEO"
+msgstr ""
+
+#: ../reference/socket.rst:391
+msgid "SO_REUSEADDR"
+msgstr ""
+
+#: ../reference/socket.rst:392
+msgid "SO_SNDBUF"
+msgstr ""
+
+#: ../reference/socket.rst:393
+msgid "SO_SNDBUFFORCE"
+msgstr ""
+
+#: ../reference/socket.rst:394
+msgid "SO_TIMESTAMP"
+msgstr ""
+
+#: ../reference/socket.rst:395
+msgid "SO_TYPE"
+msgstr ""
+
+#: ../reference/socket.rst:397
+msgid "Setting SO_LINGER is done with ``sock:linger(active)``."
+msgstr ""
+
+#: ../reference/socket.rst:401
+msgid "Get socket flags. For a list of possible flags see ``sock:setsockopt()``."
+msgstr ""
+
+#: ../reference/socket.rst:405
+msgid ""
+"Set or clear the SO_LINGER flag. For a description of the flag, see the "
+"`Linux man page <http://man7.org/linux/man-pages/man1/loginctl.1.html>`_."
+msgstr ""
+
+#: ../reference/socket.rst:410
+msgid "new active and timeout values."
+msgstr ""
+
+#: ../reference/socket.rst:414
+msgid ""
+"``sock:nonblock()`` returns the current flag value. |br| "
+"``sock:nonblock(false)`` sets the flag to false and returns false. |br| "
+"``sock:nonblock(true)`` sets the flag to true and returns true. This "
+"function may be useful before invoking a function which might otherwise "
+"block indefinitely."
+msgstr ""
+
+#: ../reference/socket.rst:422
+msgid "Wait until something is readable, or until a timeout value expires."
+msgstr ""
+
+#: ../reference/socket.rst:424
+msgid "true if the socket is now readable, false if timeout expired;"
+msgstr ""
+
+#: ../reference/socket.rst:428
+msgid "Wait until something is writable, or until a timeout value expires."
+msgstr ""
+
+#: ../reference/socket.rst:430
+msgid "true if the socket is now writable, false if timeout expired;"
+msgstr ""
+
+#: ../reference/socket.rst:434
+msgid ""
+"Wait until something is either readable or writable, or until a timeout "
+"value expires."
+msgstr ""
+
+#: ../reference/socket.rst:436
+msgid ""
+"'R' if the socket is now readable, 'W' if the socket is now writable, "
+"'RW' if the socket is now both readable and writable, '' (empty string) "
+"if timeout expired;"
+msgstr ""
+
+#: ../reference/socket.rst:440
+msgid ""
+"The ``sock:name()`` function is used to get information about the near "
+"side of the connection. If a socket was bound to ``xyz.com:45``, then "
+"``sock:name`` will return information about ``[host:xyz.com, port:45]``. "
+"The equivalent POSIX function is ``getsockname()``."
+msgstr ""
+
+#: ../reference/socket.rst:450
+msgid ""
+"The ``sock:peer()`` function is used to get information about the far "
+"side of a connection. If a TCP connection has been made to a distant host"
+" ``tarantool.org:80``, ``sock:peer()`` will return information about "
+"``[host:tarantool.org, port:80]``. The equivalent POSIX function is "
+"``getpeername()``."
+msgstr ""
+
+#: ../reference/socket.rst:466
+msgid "Use of a TCP socket over the Internet"
+msgstr ""
+
+#: ../reference/socket.rst:468
+msgid ""
+"In this example a connection is made over the internet between the "
+"Tarantool server and tarantool.org, then an HTTP \"head\" message is "
+"sent, and a response is received: \"``HTTP/1.1 200 OK``\". This is not a "
+"useful way to communicate with this particular site, but shows that the "
+"system works."
+msgstr ""
+
+#: ../reference/socket.rst:473
+msgid ""
+"tarantool> socket = require('socket')\n"
+"---\n"
+"...\n"
+"tarantool> sock = socket.tcp_connect('tarantool.org', 80)\n"
+"---\n"
+"...\n"
+"tarantool> type(sock)\n"
+"---\n"
+"- table\n"
+"...\n"
+"tarantool> sock:error()\n"
+"---\n"
+"- null\n"
+"...\n"
+"tarantool> sock:send(\"HEAD / HTTP/1.0rnHost: tarantool.orgrnrn\")\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> sock:read(17)\n"
+"---\n"
+"- \"HTTP/1.1 200 OKrn\"\n"
+"...\n"
+"tarantool> sock:close()\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/socket.rst:504
+msgid "Use of a UDP socket on localhost"
+msgstr ""
+
+#: ../reference/socket.rst:506
+msgid ""
+"Here is an example with datagrams. Set up two connections on 127.0.0.1 "
+"(localhost): ``sock_1`` and ``sock_2``. Using ``sock_2``, send a message "
+"to ``sock_1``. Using ``sock_1``, receive a message. Display the received "
+"message. Close both connections. |br| This is not a useful way for a "
+"computer to communicate with itself, but shows that the system works."
+msgstr ""
+
+#: ../reference/socket.rst:512
+msgid ""
+"tarantool> socket = require('socket')\n"
+"---\n"
+"...\n"
+"tarantool> sock_1 = socket('AF_INET', 'SOCK_DGRAM', 'udp')\n"
+"---\n"
+"...\n"
+"tarantool> sock_1:bind('127.0.0.1')\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> sock_2 = socket('AF_INET', 'SOCK_DGRAM', 'udp')\n"
+"---\n"
+"...\n"
+"tarantool> sock_2:sendto('127.0.0.1', sock_1:name().port,'X')\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> message = sock_1:recvfrom()\n"
+"---\n"
+"...\n"
+"tarantool> message\n"
+"---\n"
+"- X\n"
+"...\n"
+"tarantool> sock_1:close()\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> sock_2:close()\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/socket.rst:549
+msgid "Use tcp_server to accept file contents sent with socat"
+msgstr ""
+
+#: ../reference/socket.rst:551
+msgid ""
+"Here is an example of the tcp_server function, reading strings from the "
+"client and printing them. On the client side, the Linux socat utility "
+"will be used to ship a whole file for the tcp_server function to read."
+msgstr ""
+
+#: ../reference/socket.rst:556
+msgid ""
+"Start two shells. The first shell will be the server. The second shell "
+"will be the client."
+msgstr ""
+
+#: ../reference/socket.rst:559
+msgid "On the first shell, start Tarantool and say:"
+msgstr ""
+
+#: ../reference/socket.rst:561
+msgid ""
+"box.cfg{}\n"
+"socket = require('socket')\n"
+"socket.tcp_server('0.0.0.0', 3302, function(s)\n"
+"    while true do\n"
+"      local request\n"
+"      request = s:read(\"\\n\");\n"
+"      if request == \"\" or request == nil then\n"
+"        break\n"
+"      end\n"
+"      print(request)\n"
+"    end\n"
+"  end)"
+msgstr ""
+
+#: ../reference/socket.rst:576
+msgid ""
+"The above code means: use `tcp_server()` to wait for a connection from "
+"any host on port 3302. When it happens, enter a loop that reads on the "
+"socket and prints what it reads. The \"delimiter\" for the read function "
+"is \"\\\\n\" so each `read()` will read a string as far as the next line "
+"feed, including the line feed."
+msgstr ""
+
+#: ../reference/socket.rst:583
+msgid ""
+"On the second shell, create a file that contains a few lines. The "
+"contents don't matter. Suppose the first line contains A, the second line"
+" contains B, the third line contains C. Call this file \"tmp.txt\"."
+msgstr ""
+
+#: ../reference/socket.rst:588
+msgid ""
+"On the second shell, use the socat utility to ship the tmp.txt file to "
+"the server's host and port:"
+msgstr ""
+
+#: ../reference/socket.rst:591
+msgid "$ socat TCP:localhost:3302 ./tmp.txt"
+msgstr ""
+
+#: ../reference/socket.rst:595
+msgid ""
+"Now watch what happens on the first shell. The strings \"A\", \"B\", "
+"\"C\" are printed."
+msgstr ""
+
+#: ../reference/strict.rst:19
+msgid "Package `strict`"
+msgstr ""
+
+#: ../reference/strict.rst:23
+msgid ""
+"The :code:`strict` package has functions for turning \"strict mode\" on "
+"or off. When strict mode is on, an attempt to use an undeclared global "
+"variable will cause an error. A global variable is considered "
+"\"undeclared\" if it has never had a value assigned to it. Often this is "
+"an indication of a programming error."
+msgstr ""
+
+#: ../reference/strict.rst:28
+msgid ""
+"By default strict mode is off, unless tarantool was built with the "
+"``-DCMAKE_BUILD_TYPE=Debug`` option -- see the description of build "
+"options in section :ref:`building-from-source`."
+msgstr ""
+
+#: ../reference/strict.rst:34
+msgid ""
+"tarantool> strict = require('strict')\n"
+"---\n"
+"...\n"
+"tarantool> strict.on()\n"
+"---\n"
+"...\n"
+"tarantool> a = b -- strict mode is on so this will cause an error\n"
+"---\n"
+"- error: ... variable ''b'' is not declared'\n"
+"...\n"
+"tarantool> strict.off()\n"
+"---\n"
+"...\n"
+"tarantool> a = b -- strict mode is off so this will not cause an error\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/tap.rst:19
+msgid "Package `tap`"
+msgstr ""
+
+#: ../reference/tap.rst:21
+msgid ""
+"The tap package streamlines the testing of other packages. It allows "
+"writing of tests in the `TAP protocol`_. The results from the tests can "
+"be parsed by standard TAP-analyzers so they can be passed to utilities "
+"such as `prove`_. Thus one can run tests and then use the results for "
+"statistics, decision-making, and so on."
+msgstr ""
+
+#: ../reference/tap.rst:30
+msgid "Initialize."
+msgstr ""
+
+#: ../reference/tap.rst:32
+msgid ""
+"The result of ``tap.test`` is an object, which will be called taptest in "
+"the rest of this discussion, which is necessary for ``taptest:plan()`` "
+"and all the other methods."
+msgstr ""
+
+#: ../reference/tap.rst:36
+msgid "an arbitrary name to give for the test outputs."
+msgstr ""
+
+#: ../reference/tap.rst:37
+msgid "taptest"
+msgstr ""
+
+#: ../reference/tap.rst:40
+msgid ""
+"tap = require('tap')\n"
+"taptest = tap.test('test-name')"
+msgstr ""
+
+#: ../reference/tap.rst:49
+msgid "Indicate how many tests will be performed."
+msgstr ""
+
+#: ../reference/tap.rst:56
+msgid ""
+"Checks the number of tests performed. This check should only be done "
+"after all planned tests are complete, so ordinarily ``taptest:check()`` "
+"will only appear at the end of a script."
+msgstr ""
+
+#: ../reference/tap.rst:60
+msgid ""
+"Will display ``# bad plan: ...`` if the number of completed tests is not "
+"equal to the number of tests specified by ``taptest:plan(...)``."
+msgstr ""
+
+#: ../reference/tap.rst:67
+msgid "Display a diagnostic message."
+msgstr ""
+
+#: ../reference/tap.rst:69
+msgid "the message to be displayed."
+msgstr ""
+
+#: ../reference/tap.rst:74
+msgid ""
+"This is a basic function which is used by other functions. Depending on "
+"the value of ``condition``, print 'ok' or 'not ok' along with debugging "
+"information. Displays the message."
+msgstr ""
+
+#: ../reference/tap.rst:78
+msgid "an expression which is true or false"
+msgstr ""
+
+#: ../reference/tap.rst:79 ../reference/tap.rst:111 ../reference/tap.rst:122
+#: ../reference/tap.rst:143 ../reference/tap.rst:153 ../reference/tap.rst:170
+#: ../reference/tap.rst:185
+msgid "name of test"
+msgstr ""
+
+#: ../reference/tap.rst:86
+msgid ""
+"tarantool> taptest:ok(true, 'x')\n"
+"ok - x\n"
+"---\n"
+"- true\n"
+"...\n"
+"tarantool> tap = require('tap')\n"
+"---\n"
+"...\n"
+"tarantool> taptest = tap.test('test-name')\n"
+"TAP version 13\n"
+"---\n"
+"...\n"
+"tarantool> taptest:ok(1 + 1 == 2, 'X')\n"
+"ok - X\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/tap.rst:108
+msgid ""
+"``taptest:fail('x')`` is equivalent to ``taptest:ok(false, 'x')``. "
+"Displays the message."
+msgstr ""
+
+#: ../reference/tap.rst:118
+msgid ""
+"``taptest:skip('x')`` is equivalent to ``taptest:ok(true, 'x' .. '# "
+"skip')``. Displays the message."
+msgstr ""
+
+#: ../reference/tap.rst:128
+msgid ""
+"tarantool> taptest:skip('message')\n"
+"ok - message # skip\n"
+"---\n"
+"- true\n"
+"..."
+msgstr ""
+
+#: ../reference/tap.rst:138
+msgid ""
+"Check whether the first argument equals the second argument. Displays "
+"extensive message if the result is false."
+msgstr ""
+
+#: ../reference/tap.rst:141 ../reference/tap.rst:151 ../reference/tap.rst:183
+msgid "actual result"
+msgstr ""
+
+#: ../reference/tap.rst:142 ../reference/tap.rst:152 ../reference/tap.rst:184
+msgid "expected result"
+msgstr ""
+
+#: ../reference/tap.rst:149
+msgid "This is the negation of ``taptest:is(...)``."
+msgstr ""
+
+#: ../reference/tap.rst:155 ../reference/tap.rst:172 ../reference/tap.rst:180
+msgid "true of false."
+msgstr ""
+
+#: ../reference/tap.rst:166
+msgid ""
+"Test whether a value has a particular type. Displays a long message if "
+"the value is not of the specified type."
+msgstr ""
+
+#: ../reference/tap.rst:177
+msgid ""
+"Recursive version of ``tap-test:is(...)``, which can be be used to "
+"compare tables as well as scalar values."
+msgstr ""
+
+#: ../reference/tap.rst:195
+msgid ""
+"To run this example: put the script in a file named ./tap.lua, then make "
+"tap.lua executable by saying ``chmod a+x ./tap.lua``, then execute using "
+"Tarantool as a script processor by saying ./tap.lua."
+msgstr ""
+
+#: ../reference/tap.rst:199
+msgid ""
+"#!/usr/bin/tarantool\n"
+"local tap = require('tap')\n"
+"test = tap.test(\"my test name\")\n"
+"test:plan(2)\n"
+"test:ok(2 * 2 == 4, \"2 * 2 is 4\")\n"
+"test:test(\"some subtests for test2\", function(test)\n"
+"    test:plan(2)\n"
+"    test:is(2 + 2, 4, \"2 + 2 is 4\")\n"
+"    test:isnt(2 + 3, 4, \"2 + 3 is not 4\")\n"
+"end)\n"
+"test:check()"
+msgstr ""
+
+#: ../reference/tap.rst:213
+msgid "The output from the above script will look approximately like this:"
+msgstr ""
+
+#: ../reference/tap.rst:215
+msgid ""
+"TAP version 13\n"
+"1..2\n"
+"ok - 2 * 2 is 4\n"
+"    # Some subtests for test2\n"
+"    1..2\n"
+"    ok - 2 + 2 is 4,\n"
+"    ok - 2 + 3 is not 4\n"
+"    # Some subtests for test2: end\n"
+"ok - some subtests for test2"
+msgstr ""
+
+#: ../reference/tarantool.rst:19
+msgid "Package `tarantool`"
+msgstr ""
+
+#: ../reference/tarantool.rst:23
+msgid ""
+"By saying ``require('tarantool')``, one can answer some questions about "
+"how the tarantool server was built, such as \"what flags were used\", or "
+"\"what was the version of the compiler\"."
+msgstr ""
+
+#: ../reference/tarantool.rst:29
+msgid ""
+"Additionally one can see the uptime and the server version and the "
+"process id. Those information items can also be accessed with "
+":func:`box.info` but use of the tarantool package is recommended."
+msgstr ""
+
+#: ../reference/tarantool.rst:35
+msgid ""
+"tarantool> tarantool = require('tarantool')\n"
+"---\n"
+"...\n"
+"tarantool> tarantool\n"
+"---\n"
+"- build:\n"
+"    target: Linux-x86_64-RelWithDebInfo\n"
+"    options: cmake . -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_TRACE=ON "
+"-DENABLE_BACKTRACE=ON\n"
+"    mod_format: so\n"
+"    flags: ' -fno-common -fno-omit-frame-pointer -fno-stack-protector "
+"-fexceptions\n"
+"      -funwind-tables -fopenmp -msse2 -std=c11 -Wall -Wextra -Wno-sign-"
+"compare -Wno-strict-aliasing\n"
+"      -fno-gnu89-inline'\n"
+"    compiler: /usr/bin/x86_64-linux-gnu-gcc /usr/bin/x86_64-linux-gnu-g++"
+"\n"
+"  uptime: 'function: 0x408668e0'\n"
+"  version: 1.6.8-66-g9093daa\n"
+"  pid: 'function: 0x40866900'\n"
+"...\n"
+"tarantool> tarantool.pid()\n"
+"---\n"
+"- 30155\n"
+"...\n"
+"tarantool> tarantool.uptime()\n"
+"---\n"
+"- 108.64641499519\n"
+"..."
+msgstr ""
+
+#: ../reference/uuid.rst:19
+msgid "Package `uuid`"
+msgstr ""
+
+#: ../reference/uuid.rst:21
+msgid ""
+"A \"UUID\" is a `Universally unique identifier`_. If an application "
+"requires that a value be unique only within a single computer or on a "
+"single database, then a simple counter is better than a UUID, because "
+"getting a UUID is time-consuming (it requires a syscall_). For clusters "
+"of computers, or widely distributed applications, UUIDs are better."
+msgstr ""
+
+#: ../reference/uuid.rst:27
+msgid "The functions that can return a UUID are:"
+msgstr ""
+
+#: ../reference/uuid.rst:29
+msgid ":func:`uuid() <uuid.__call>`"
+msgstr ""
+
+#: ../reference/uuid.rst:30
+msgid ":func:`uuid.bin()`"
+msgstr ""
+
+#: ../reference/uuid.rst:31
+msgid ":func:`uuid.str()`"
+msgstr ""
+
+#: ../reference/uuid.rst:33
+msgid "The functions that can convert between different types of UUID are:"
+msgstr ""
+
+#: ../reference/uuid.rst:35
+msgid ":func:`uuid_object:bin() <uuid_object.bin>`"
+msgstr ""
+
+#: ../reference/uuid.rst:36
+msgid ":func:`uuid_object:str() <uuid_object.str>`"
+msgstr ""
+
+#: ../reference/uuid.rst:37
+msgid ":func:`uuid.fromstr()`"
+msgstr ""
+
+#: ../reference/uuid.rst:38
+msgid ":func:`uuid.frombin()`"
+msgstr ""
+
+#: ../reference/uuid.rst:40
+msgid "The function that can determine whether a UUID is an all-zero value is:"
+msgstr ""
+
+#: ../reference/uuid.rst:42
+msgid ":func:`uuid_object:isnil() <uuid_object.isnil>`"
+msgstr ""
+
+#: ../reference/uuid.rst:48
+msgid "A nil object"
+msgstr ""
+
+#: ../reference/uuid.rst:52 ../reference/uuid.rst:57 ../reference/uuid.rst:62
+msgid "a UUID"
+msgstr ""
+
+#: ../reference/uuid.rst:53 ../reference/uuid.rst:69 ../reference/uuid.rst:75
+msgid "cdata"
+msgstr ""
+
+#: ../reference/uuid.rst:58
+msgid "16-byte string"
+msgstr ""
+
+#: ../reference/uuid.rst:63
+msgid "36-byte binary string"
+msgstr ""
+
+#: ../reference/uuid.rst:67
+msgid "UUID in 36-byte hexadecimal string"
+msgstr ""
+
+#: ../reference/uuid.rst:68 ../reference/uuid.rst:74
+msgid "converted UUID"
+msgstr ""
+
+#: ../reference/uuid.rst:73
+msgid "UUID in 16-byte binary string"
+msgstr ""
+
+#: ../reference/uuid.rst:81
+msgid ""
+"|br| 'l' - little-endian, |br| 'b' - big-endian, |br| 'h' - endianness "
+"depends on host (default), |br| 'n' - endianness depends on network"
+msgstr ""
+
+#: ../reference/uuid.rst:86 ../reference/uuid.rst:91
+msgid "UUID converted from cdata input value."
+msgstr ""
+
+#: ../reference/uuid.rst:87
+msgid "16-byte binary string"
+msgstr ""
+
+#: ../reference/uuid.rst:92
+msgid "36-byte hexadecimal string"
+msgstr ""
+
+#: ../reference/uuid.rst:96
+msgid ""
+"The all-zero UUID value can be expressed as uuid.NULL, or as "
+"``uuid.fromstr('00000000-0000-0000-0000-000000000000')``. The comparison "
+"with an all-zero value can also be expressed as ``uuid_with_type_cdata =="
+" uuid.NULL``."
+msgstr ""
+
+#: ../reference/uuid.rst:101
+msgid "true if the value is all zero, otherwise false."
+msgstr ""
+
+#: ../reference/uuid.rst:102
+msgid "bool"
+msgstr ""
+
+#: ../reference/uuid.rst:108
+msgid ""
+"tarantool> uuid = require('uuid')\n"
+"---\n"
+"...\n"
+"tarantool> uuid(), uuid.bin(), uuid.str()\n"
+"---\n"
+"- 16ffedc8-cbae-4f93-a05e-349f3ab70baa\n"
+"- !!binary FvG+Vy1MfUC6kIyeM81DYw==\n"
+"- 67c999d2-5dce-4e58-be16-ac1bcb93160f\n"
+"...\n"
+"tarantool> uu = uuid()\n"
+"---\n"
+"...\n"
+"tarantool> #uui:bin(), #uu:str(), type(uu), uu:isnil()\n"
+"---\n"
+"- 16\n"
+"- 36\n"
+"- cdata\n"
+"- false\n"
+"..."
+msgstr ""
+
+#: ../reference/yaml.rst:19
+msgid "Package `yaml`"
+msgstr ""
+
+#: ../reference/yaml.rst:21
+msgid ""
+"The ``yaml`` package takes strings in YAML_ format and decodes them, or "
+"takes a series of non-YAML values and encodes them."
+msgstr ""
+
+#: ../reference/yaml.rst:28
+msgid "Convert a Lua object to a YAML string."
+msgstr ""
+
+#: ../reference/yaml.rst:31
+msgid "the original value reformatted as a YAML string."
+msgstr ""
+
+#: ../reference/yaml.rst:36
+msgid "Convert a YAML string to a Lua object."
+msgstr ""
+
+#: ../reference/yaml.rst:50
+msgid ""
+"tarantool> yaml = require('yaml')\n"
+"---\n"
+"...\n"
+"tarantool> y = yaml.encode({'a', 1, 'b', 2})\n"
+"---\n"
+"...\n"
+"tarantool> z = yaml.decode(y)\n"
+"---\n"
+"...\n"
+"tarantool> z[1], z[2], z[3], z[4]\n"
+"---\n"
+"- a\n"
+"- 1\n"
+"- b\n"
+"- 2\n"
+"...\n"
+"tarantool> if yaml.NULL == nil then print('hi') end\n"
+"hi\n"
+"---\n"
+"..."
+msgstr ""
+
+#: ../reference/yaml.rst:73
+msgid ""
+"The `YAML collection style <http://yaml.org/spec/1.1/#id930798>`_ can be "
+"specified with ``__serialize``:"
+msgstr ""
+
+#: ../reference/yaml.rst:76
+msgid "``__serialize=\"sequence\"`` for a Block Sequence array,"
+msgstr ""
+
+#: ../reference/yaml.rst:77
+msgid "``__serialize=\"seq\"`` for a Flow Sequence array,"
+msgstr ""
+
+#: ../reference/yaml.rst:78
+msgid "``__serialize=\"mapping\"`` for a Block Mapping map,"
+msgstr ""
+
+#: ../reference/yaml.rst:79
+msgid "``__serialize=\"map\"`` for a Flow Mapping map."
+msgstr ""
+
+#: ../reference/yaml.rst:84
+msgid ""
+"tarantool> yaml = require('yaml')\n"
+"---\n"
+"...\n"
+"tarantool> yaml.encode(setmetatable({'A', 'B'}, { "
+"__serialize=\"sequence\"}))\n"
+"---\n"
+"- |\n"
+"  ---\n"
+"  - A\n"
+"  - B\n"
+"  ...\n"
+"...\n"
+"tarantool> yaml.encode(setmetatable({'A', 'B'}, { __serialize=\"seq\"}))\n"
+"---\n"
+"- |\n"
+"  ---\n"
+"  ['A', 'B']\n"
+"  ...\n"
+"...\n"
+"tarantool> yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { "
+"__serialize=\"map\"})})\n"
+"---\n"
+"- |\n"
+"  ---\n"
+"  - {'f2': 'B', 'f1': 'A'}\n"
+"  ...\n"
+"...\n"
+"tarantool> yaml.encode({setmetatable({f1 = 'A', f2 = 'B'}, { "
+"__serialize=\"mapping\"})})\n"
+"---\n"
+"- |\n"
+"  ---\n"
+"  - f2: B\n"
+"    f1: A\n"
+"  ...\n"
+"..."
+msgstr ""
+

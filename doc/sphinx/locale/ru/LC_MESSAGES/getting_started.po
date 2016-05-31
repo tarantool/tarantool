@@ -1,0 +1,555 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C)
+# This file is distributed under the same license as the Tarantool package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Tarantool 1.6\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-05-31 15:17+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.2.0\n"
+
+#: ../getting_started.rst:19
+msgid "Getting started"
+msgstr ""
+
+#: ../getting_started.rst:22
+msgid ""
+"This chapter shows how to download, how to install, and how to start "
+"Tarantool for the first time."
+msgstr ""
+
+#: ../getting_started.rst:25
+msgid ""
+"For production, if possible, you should download a binary (executable) "
+"package. This will ensure that you have the same build of the same "
+"version that the developers have. That makes analysis easier if later you"
+" need to report a problem, and avoids subtle problems that might happen "
+"if you used different tools or different parameters when building from "
+"source. The section about binaries is “`Downloading and installing a "
+"binary package`_”."
+msgstr ""
+
+#: ../getting_started.rst:32
+msgid ""
+"For development, you will want to download a source package and make the "
+"binary by yourself using a C/C++ compiler and common tools. Although this"
+" is a bit harder, it gives more control. And the source packages include "
+"additional files, for example the Tarantool test suite. The section about"
+" source is “:ref:`building-from-source`”."
+msgstr ""
+
+#: ../getting_started.rst:37
+msgid ""
+"If the installation has already been done, then you should try it out. So"
+" we've provided some instructions that you can use to make a temporary "
+"“sandbox”. In a few minutes you can start the server and type in some "
+"database-manipulation statements. The section about sandbox is “`Starting"
+" Tarantool and making your first database`_”."
+msgstr ""
+
+#: ../getting_started.rst:46
+msgid "Downloading and installing a binary package"
+msgstr ""
+
+#: ../getting_started.rst:48
+msgid ""
+"The repositories for the “stable” release are at "
+"`tarantool.org/dist/stable`_. The repositories for the “master” release "
+"are at `tarantool.org/dist/master`_. Since this is the manual for the "
+"“master” release, all instructions use `tarantool.org/dist/master`_."
+msgstr ""
+
+#: ../getting_started.rst:53
+msgid ""
+"An automatic build system creates, tests and publishes packages for every"
+" push into the master branch. Therefore if you looked at "
+"`tarantool.org/dist/master`_ you would see that there are source files "
+"and subdirectories for the packages that will be described in this "
+"section."
+msgstr ""
+
+#: ../getting_started.rst:58
+msgid ""
+"To download and install the package that's appropriate for your "
+"environment, start a shell (terminal) and enter one of the following sets"
+" of command-line instructions."
+msgstr ""
+
+#: ../getting_started.rst:62
+msgid "More advice for binary downloads is at http://tarantool.org/download.html."
+msgstr ""
+
+#: ../getting_started.rst:66
+msgid "Debian GNU/Linux"
+msgstr ""
+
+#: ../getting_started.rst:68
+msgid ""
+"There is always an up-to-date Debian repository at "
+"http://tarantool.org/dist/master/debian. The repository contains builds "
+"for Debian unstable \"Sid\", stable \"Wheezy\", forthcoming \"Jessie\". "
+"Add the tarantool.org repository to your apt sources list. $release is an"
+" environment variable which will contain the Debian version code e.g. "
+"\"Wheezy\":"
+msgstr ""
+
+#: ../getting_started.rst:74
+msgid ""
+"wget http://tarantool.org/dist/public.key\n"
+"sudo apt-key add ./public.key\n"
+"release=`lsb_release -c -s`\n"
+"# append two lines to a list of source repositories\n"
+"echo \"deb http://tarantool.org/dist/master/debian/ $release main\" | \\\n"
+"sudo tee -a /etc/apt/sources.list.d/tarantool.list\n"
+"echo \"deb-src http://tarantool.org/dist/master/debian/ $release main\" |"
+" \\\n"
+"sudo tee -a /etc/apt/sources.list.d/tarantool.list\n"
+"# install\n"
+"sudo apt-get update\n"
+"sudo apt-get install tarantool"
+msgstr ""
+
+#: ../getting_started.rst:90
+msgid "Ubuntu"
+msgstr ""
+
+#: ../getting_started.rst:92
+msgid ""
+"There is always an up-to-date Ubuntu repository at "
+"http://tarantool.org/dist/master/ubuntu. The repository contains builds "
+"for Ubuntu 12.04 \"precise\", 13.10 \"saucy\", and 14.04 \"trusty\". Add "
+"the tarantool.org repository to your apt sources list. $release is an "
+"environment variable which will contain the Ubuntu version code e.g. "
+"\"precise\". If you want the version that comes with Ubuntu, start with "
+"the lines that follow the '# install' comment:"
+msgstr ""
+
+#: ../getting_started.rst:99
+msgid ""
+"cd ~\n"
+"wget http://tarantool.org/dist/public.key\n"
+"sudo apt-key add ./public.key\n"
+"release=`lsb_release -c -s`\n"
+"# append two lines to a list of source repositories\n"
+"echo \"deb http://tarantool.org/dist/master/ubuntu/ $release main\" | \\\n"
+"sudo tee -a /etc/apt/sources.list.d/tarantool.list\n"
+"echo \"deb-src http://tarantool.org/dist/master/ubuntu/ $release main\" |"
+" \\\n"
+"sudo tee -a /etc/apt/sources.list.d/tarantool.list\n"
+"# install\n"
+"sudo apt-get update\n"
+"sudo apt-get install tarantool"
+msgstr ""
+
+#: ../getting_started.rst:117
+msgid "CentOS"
+msgstr ""
+
+#: ../getting_started.rst:119
+msgid ""
+"These instructions are applicable for CentOS version 6 or 7, and RHEL "
+"version 6 or 7. Pick the CentOS repository which fits your CentOS/RHEL "
+"version and your x86 platform:"
+msgstr ""
+
+#: ../getting_started.rst:123
+msgid "http://tarantool.org/dist/master/centos/6/os/i386 for version 6, x86-32"
+msgstr ""
+
+#: ../getting_started.rst:124
+msgid "http://tarantool.org/dist/master/centos/6/os/x86_64 for version 6, x86-64"
+msgstr ""
+
+#: ../getting_started.rst:125
+msgid "http://tarantool.org/dist/master/centos/7/os/x86_64 for version 7, x86-64"
+msgstr ""
+
+#: ../getting_started.rst:127
+msgid ""
+"Add the following section to your yum repository list "
+"(``/etc/yum.repos.d/tarantool.repo``) (in these instructions "
+"``$releasever`` i.e. CentOS release version must be either 6 or 7 and "
+"``$basearch`` i.e. base architecture must be either i386 or x86_64):"
+msgstr ""
+
+#: ../getting_started.rst:135
+msgid ""
+"# [tarantool]\n"
+"name=CentOS-$releasever - Tarantool\n"
+"baseurl=http://tarantool.org/dist/master/centos/*$releasever*/os/*$basearch*/"
+"\n"
+"enabled=1\n"
+"gpgcheck=0"
+msgstr ""
+
+#: ../getting_started.rst:141
+msgid ""
+"For example, if you have CentOS version 6 and x86-64, you can add the new"
+" section thus:"
+msgstr ""
+
+#: ../getting_started.rst:143
+msgid ""
+"echo \"[tarantool]\" | \\\n"
+"sudo tee /etc/yum.repos.d/tarantool.repo\n"
+"echo \"name=CentOS-6 - Tarantool\"| sudo tee -a "
+"/etc/yum.repos.d/tarantool.repo\n"
+"echo \"baseurl=http://tarantool.org/dist/master/centos/6/os/x86_64/\" | "
+"\\\n"
+"sudo tee -a /etc/yum.repos.d/tarantool.repo\n"
+"echo \"enabled=1\" | sudo tee -a /etc/yum.repos.d/tarantool.repo\n"
+"echo \"gpgcheck=0\" | sudo tee -a /etc/yum.repos.d/tarantool.repo"
+msgstr ""
+
+#: ../getting_started.rst:153 ../getting_started.rst:187
+msgid "Then install with :code:`sudo yum install tarantool`."
+msgstr ""
+
+#: ../getting_started.rst:157
+msgid "Fedora"
+msgstr ""
+
+#: ../getting_started.rst:159
+msgid ""
+"These instructions are applicable for Fedora 19, 20 or rawhide. Pick the "
+"Fedora repository, for example "
+"http://tarantool.org/dist/master/fedora/20/x86_64 for version 20, x86-64."
+" Add the following section to your yum repository list "
+"(``/etc/yum.repos.d/tarantool.repo``) (in these instructions "
+"``$releasever`` i.e. Fedora release version must be 19, 20 or rawhide and"
+" ``$basearch`` i.e. base architecture must be x86_64):"
+msgstr ""
+
+#: ../getting_started.rst:169
+msgid ""
+"[tarantool]\n"
+"name=Fedora-$releasever - Tarantool\n"
+"baseurl=http://tarantool.org/dist/master/fedora/*$releasever*/*$basearch*/"
+"\n"
+"enabled=1\n"
+"gpgcheck=0"
+msgstr ""
+
+#: ../getting_started.rst:175
+msgid ""
+"For example, if you have Fedora version 20, you can add the new section "
+"thus:"
+msgstr ""
+
+#: ../getting_started.rst:177
+msgid ""
+"echo \"[tarantool]\" | \\\n"
+"sudo tee /etc/yum.repos.d/tarantool.repo\n"
+"echo \"name=Fedora-20 - Tarantool\"| sudo tee -a "
+"/etc/yum.repos.d/tarantool.repo\n"
+"echo \"baseurl=http://tarantool.org/dist/master/fedora/20/x86_64/\" | \\\n"
+"sudo tee -a /etc/yum.repos.d/tarantool.repo\n"
+"echo \"enabled=1\" | sudo tee -a /etc/yum.repos.d/tarantool.repo\n"
+"echo \"gpgcheck=0\" | sudo tee -a /etc/yum.repos.d/tarantool.repo"
+msgstr ""
+
+#: ../getting_started.rst:191
+msgid "Gentoo"
+msgstr ""
+
+#: ../getting_started.rst:193
+msgid ""
+"There is a tarantool portage overlay. Use layman to add the overlay to "
+"your system:"
+msgstr ""
+
+#: ../getting_started.rst:195
+msgid ""
+"layman -S\n"
+"layman -a tarantool\n"
+"emerge dev-db/tarantool -av"
+msgstr ""
+
+#: ../getting_started.rst:203
+msgid "FreeBSD"
+msgstr ""
+
+#: ../getting_started.rst:205
+msgid ""
+"With your browser go to the FreeBSD ports page "
+"http://www.freebsd.org/ports/index.html. Enter the search term: "
+"tarantool. Choose the package you want."
+msgstr ""
+
+#: ../getting_started.rst:211
+msgid "Mac OS X"
+msgstr ""
+
+#: ../getting_started.rst:213
+msgid ""
+"You can install tarantool via Homebrew. It contains binaries for OS X "
+"10.09 and higher. Simply use:"
+msgstr ""
+
+#: ../getting_started.rst:215
+msgid ""
+"$ brew install tarantool\n"
+"==> Downloading "
+"https://homebrew.bintray.com/bottles/tarantool-1.6.7-593.el_capitan.bottle.tar.gz"
+"\n"
+"Already downloaded: "
+"/Library/Caches/Homebrew/tarantool-1.6.7-593.el_capitan.bottle.tar.gz\n"
+"==> Pouring tarantool-1.6.7-593.el_capitan.bottle.tar.gz\n"
+"🍺  /usr/local/Cellar/tarantool/1.6.7-593: 19 files, 2.1M"
+msgstr ""
+
+#: ../getting_started.rst:225
+msgid "Starting Tarantool and making your first database"
+msgstr ""
+
+#: ../getting_started.rst:227
+msgid "Here is how to create a simple test database after installing."
+msgstr ""
+
+#: ../getting_started.rst:229
+msgid ""
+"Create a new directory. It's just for tests, you can delete it when the "
+"tests are over."
+msgstr ""
+
+#: ../getting_started.rst:231
+msgid ""
+"mkdir ~/tarantool_sandbox\n"
+"cd ~/tarantool_sandbox"
+msgstr ""
+
+#: ../getting_started.rst:236
+msgid "Start the server. The server name is tarantool."
+msgstr ""
+
+#: ../getting_started.rst:238 ../getting_started.rst:359
+msgid ""
+"# if you downloaded a binary with apt-get or yum, say this:\n"
+"/usr/bin/tarantool\n"
+"# if you downloaded and untarred a binary tarball to ~/tarantool, say "
+"this:\n"
+"~/tarantool/bin/tarantool\n"
+"# if you built from a source download, say this:\n"
+"~/tarantool/src/tarantool"
+msgstr ""
+
+#: ../getting_started.rst:247
+msgid ""
+"The server starts in interactive mode and outputs a command prompt. To "
+"turn on the database, :mod:`configure <box.cfg>` it:"
+msgstr ""
+
+#: ../getting_started.rst:250
+msgid "tarantool> box.cfg{listen = 3301}"
+msgstr ""
+
+#: ../getting_started.rst:254
+msgid "(this minimal example is sufficient)."
+msgstr ""
+
+#: ../getting_started.rst:256
+msgid ""
+"If all goes well, you will see the server displaying progress as it "
+"initializes, something like this:"
+msgstr ""
+
+#: ../getting_started.rst:259
+msgid ""
+"tarantool> box.cfg{listen = 3301}\n"
+"2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b\n"
+"2014-08-07 09:41:41.077 ... log level 5\n"
+"2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared "
+"arena...\n"
+"2014-08-07 09:41:41.079 ... initialized\n"
+"2014-08-07 09:41:41.081 ... initializing an empty data directory\n"
+"2014-08-07 09:41:41.095 ... creating "
+"'./00000000000000000000.snap.inprogress'\n"
+"2014-08-07 09:41:41.095 ... saving snapshot "
+"'./00000000000000000000.snap.inprogress'\n"
+"2014-08-07 09:41:41.127 ... done\n"
+"2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301\n"
+"2014-08-07 09:41:41.128 ... ready to accept requests"
+msgstr ""
+
+#: ../getting_started.rst:273
+msgid ""
+"Now that the server is up, you could start up a different shell and "
+"connect to its primary port with"
+msgstr ""
+
+#: ../getting_started.rst:276
+msgid "telnet 0 3301"
+msgstr ""
+
+#: ../getting_started.rst:280
+msgid ""
+"but for example purposes it is simpler to just leave the server running "
+"in \"interactive mode\". On production machines the interactive mode is "
+"just for administrators, but because it's convenient for learning it will"
+" be used for most examples in this manual. Tarantool is waiting for the "
+"user to type instructions."
+msgstr ""
+
+#: ../getting_started.rst:286
+msgid ""
+"To create the first space and the first :ref:`index <box.index>`, try "
+"this:"
+msgstr ""
+
+#: ../getting_started.rst:288
+msgid ""
+"tarantool> s = box.schema.space.create('tester')\n"
+"tarantool> i = s:create_index('primary', {type = 'hash', parts = {1, "
+"'NUM'}})"
+msgstr ""
+
+#: ../getting_started.rst:293
+msgid ""
+"To insert three “tuples” (our name for “records”) into the first “space” "
+"of the database try this:"
+msgstr ""
+
+#: ../getting_started.rst:295
+msgid ""
+"tarantool> t = s:insert({1})\n"
+"tarantool> t = s:insert({2, 'Music'})\n"
+"tarantool> t = s:insert({3, 'Length', 93})"
+msgstr ""
+
+#: ../getting_started.rst:301
+msgid ""
+"To select a tuple from the first space of the database, using the first "
+"defined key, try this:"
+msgstr ""
+
+#: ../getting_started.rst:303
+msgid "tarantool> s:select{3}"
+msgstr ""
+
+#: ../getting_started.rst:307
+msgid "Your terminal screen should now look like this:"
+msgstr ""
+
+#: ../getting_started.rst:309
+msgid ""
+"tarantool> s = box.schema.space.create('tester')\n"
+"2014-06-10 12:04:18.158 ... creating "
+"'./00000000000000000002.xlog.inprogress'\n"
+"---\n"
+"...\n"
+"tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})"
+"\n"
+"---\n"
+"...\n"
+"tarantool> t = s:insert{1}\n"
+"---\n"
+"...\n"
+"tarantool> t = s:insert{2, 'Music'}\n"
+"---\n"
+"...\n"
+"tarantool> t = s:insert{3, 'Length', 93}\n"
+"---\n"
+"...\n"
+"tarantool> s:select{3}\n"
+"---\n"
+"- - [3, 'Length', 93]\n"
+"...\n"
+"tarantool>"
+msgstr ""
+
+#: ../getting_started.rst:333
+msgid "Now, to prepare for the example in the next section, try this:"
+msgstr ""
+
+#: ../getting_started.rst:335
+msgid "tarantool> box.schema.user.grant('guest','read,write,execute','universe')"
+msgstr ""
+
+#: ../getting_started.rst:344
+msgid "Starting another Tarantool instance and connecting remotely"
+msgstr ""
+
+#: ../getting_started.rst:346
+msgid ""
+"In the previous section the first request was with ``box.cfg{listen = "
+"3301}``. The \"listen\" value can be any form of URI (uniform resource "
+"identifier); in this case it's just a local port: port 3301. It's "
+"possible to send requests to the listen URI via (a) telnet, (b) a "
+"connector (which will be the subject of Chapter 8), or (c) another "
+"instance of Tarantool. Let's try (c)."
+msgstr ""
+
+#: ../getting_started.rst:353
+msgid ""
+"1. Switch to another terminal. On Linux, for example, this means starting"
+" another instance of a Bash shell. There is no need to use cd to switch "
+"to the ~/tarantool_sandbox directory."
+msgstr ""
+
+#: ../getting_started.rst:357
+msgid "Start the second instance of Tarantool. The server name is tarantool."
+msgstr ""
+
+#: ../getting_started.rst:368
+msgid "Try these requests:"
+msgstr ""
+
+#: ../getting_started.rst:370
+msgid ""
+"console = require('console')\n"
+"console.connect('localhost:3301')\n"
+"box.space.tester:select{2}"
+msgstr ""
+
+#: ../getting_started.rst:376
+msgid ""
+"The requests are saying \"use the :ref:`console package <package-"
+"console>` to connect to the Tarantool server that's listening on "
+"``localhost:3301``, send a request to that server, and display the "
+"result.\" The result in this case is one of the tuples that was inserted "
+"earlier. Your terminal screen should now look like this:"
+msgstr ""
+
+#: ../getting_started.rst:382
+msgid ""
+"<... ...>\n"
+"tarantool> console = require('console')\n"
+"---\n"
+"...\n"
+"tarantool> console.connect('localhost:3301')\n"
+"<...> [32628] main/101/interactive I> connected to localhost:3301\n"
+"---\n"
+"...\n"
+"localhost:3301> box.space.tester:select{2}\n"
+"---\n"
+"- - [2, 'Music']\n"
+"...\n"
+"localhost:3301>"
+msgstr ""
+
+#: ../getting_started.rst:398
+msgid ""
+"You can repeat box.space...:insert{} and box.space...:select{} "
+"indefinitely, on either Tarantool instance. When the testing is over: To "
+"drop the space: s:drop(). To stop tarantool: Ctrl+C. To stop tarantool "
+"(an alternative): os.exit(). To stop tarantool (from another terminal): "
+"sudo pkill -f tarantool. To destroy the test: rm -r ~/tarantool_sandbox."
+msgstr ""
+
+#: ../getting_started.rst:406
+msgid ""
+"To review ... If you followed all the instructions in this chapter, then "
+"so far you have: installed Tarantool from either a binary or a source "
+"repository, started up the Tarantool server, inserted and selected "
+"tuples."
+msgstr ""
+
