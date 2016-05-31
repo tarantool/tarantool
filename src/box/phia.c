@@ -4730,12 +4730,39 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 
 #include "salad/bps_tree.h"
 
+/*
+ * svindex is used for in-memory storage of phia_tuples in node
+ * bps_tree stores struct svref objects that hold pointers to phia_tuples.
+ * phia_tuples are ordered by their keys and, if keys are equal,
+ * by their lsn in descending order.
+ * Let's name two phia_tuples with the same key (but different lsn)
+ * as duplicates, and several duplicates in order of their lsn (descending)
+ * as chain.
+ * Due to specifics of usage, svindex must show difference between first
+ * duplicate in the chain and the others in that chain.
+ * That's why svref objects additionally store 'flags' member
+ * that could hold SVDUP bit. The first svref in chain
+ * has flags == 0 and the others has flags == SVDUP
+ * Due to specific usage, only insert, select and destroy all
+ * During insertion reference counter of phia_tuple is incremented,
+ * during destruction all phia_tuples' counters are decremented.
+ */
 struct svindex {
 	struct bps_tree_svindex tree;
 	uint32_t used;
 	uint64_t lsnmin;
 	struct sfscheme *scheme;
-	bool hint_match_key_found;
+	/*
+	 * This flags is set to true always when the tree comparator compares
+	 * two items (or item and key) with equal key (but different lsn).
+	 * If you set this flag to false, after inserting a new svref this flag
+	 * will show if there is another item in the tree with the same key
+	 * (but different lsn)
+	 * If you set this flag to false, after range search like lower_bound/
+	 * /upper_bound this flag will show if there is at least one item in
+	 * the tree with the same key (but different lsn)
+	 */
+	bool hint_key_is_equal;
 };
 
 int
@@ -4744,7 +4771,7 @@ tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
 	int res = sf_compare(index->scheme, a.v->data, a.v->size,
 			     b.v->data, b.v->size);
 	if (res == 0) {
-		index->hint_match_key_found = true;
+		index->hint_key_is_equal = true;
 		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
 	}
 	return res;
@@ -4757,7 +4784,7 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 	int res = sf_compare(index->scheme, a.v->data, a.v->size,
 			     key->data, key->size);
 	if (res == 0) {
-		index->hint_match_key_found = true;
+		index->hint_key_is_equal = true;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
 	}
 	return res;
@@ -4804,16 +4831,26 @@ sv_indexfree(struct svindex *i, struct runtime *r)
 static inline int
 sv_indexset(struct svindex *i, struct svref ref)
 {
+	/* see struct svindex comments */
 	assert(i == i->tree.arg);
-	i->hint_match_key_found = false;
-	bps_tree_svindex_insert(&i->tree, ref, NULL);
+	i->hint_key_is_equal = false;
+	if (bps_tree_svindex_insert(&i->tree, ref, NULL) != 0)
+		return -1;
 	i->used += ref.v->size;
 	phia_tuple_ref(ref.v);
 	if (i->lsnmin > ref.v->lsn)
 		i->lsnmin = ref.v->lsn;
-	if (!i->hint_match_key_found)
+	if (!i->hint_key_is_equal) {
+		/* there no duplicates, no need to change and flags */
 		return 0;
-	/* the key is already in tree, but with different lsn */
+	}
+	/*
+	 * There is definitely a duplicate.
+	 * If current ref was inserted into head of the chain,
+	 * the previous head's flags must be set to SVDUP. (1)
+	 * Otherwise, the new inserted ref's flags must be set to SVDUP. (2)
+	 * First of all let's find just inserted svref.
+	 */
 	struct tree_svindex_key tree_key;
 	tree_key.data = ref.v->data;
 	tree_key.size = ref.v->size;
@@ -4824,6 +4861,7 @@ sv_indexset(struct svindex *i, struct svref ref)
 	assert(!bps_tree_svindex_itr_is_invalid(&itr));
 	struct svref *curr =
 		bps_tree_svindex_itr_get_elem(&i->tree, &itr);
+	/* Find previous position */
 	struct bps_tree_svindex_iterator itr_prev = itr;
 	bps_tree_svindex_itr_prev(&i->tree, &itr_prev);
 	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
@@ -4831,10 +4869,18 @@ sv_indexset(struct svindex *i, struct svref ref)
 			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
 		if (sf_compare(i->scheme, curr->v->data, curr->v->size,
 			        prev->v->data, prev->v->size) == 0) {
+			/*
+			 * Previous position exists and holds same key,
+			 * it's case (2)
+			 */
 			curr->flags |= SVDUP;
 			return 0;
 		}
 	}
+	/*
+	 * Previous position does not exist or holds another key,
+	 * it's case (1). Next position holds previous head of chain.
+	 */
 	struct bps_tree_svindex_iterator itr_next = itr;
 	bps_tree_svindex_itr_next(&i->tree, &itr_next);
 	assert(!bps_tree_svindex_itr_is_invalid(&itr_next));
@@ -4943,9 +4989,9 @@ sv_indexiter_open(struct ssiter *i, struct svindex *index,
 	tree_key.size = keysize;
 	tree_key.lsn = UINT64_MAX;
 	bool exact;
-	ii->index->hint_match_key_found = false;
+	ii->index->hint_key_is_equal = false;
 	ii->itr = bps_tree_svindex_lower_bound(tree, &tree_key, &exact);
-	if (ii->index->hint_match_key_found) {
+	if (ii->index->hint_key_is_equal) {
 		if (o == PHIA_GT)
 			bps_tree_svindex_itr_next(tree, &ii->itr);
 		else if(o == PHIA_LT)
@@ -4954,7 +5000,7 @@ sv_indexiter_open(struct ssiter *i, struct svindex *index,
 		if(o == PHIA_LT || o == PHIA_LE)
 			ii->itr = bps_tree_svindex_itr_last(tree);
 	}
-	return (int)ii->index->hint_match_key_found;
+	return (int)ii->index->hint_key_is_equal;
 }
 
 static inline void
