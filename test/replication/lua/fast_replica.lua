@@ -20,7 +20,7 @@ function drop_all(inspector)
         if id ~= box.info.server.id then
             box.space._cluster:delete{id}
             inspector:cmd('stop server replica'..tostring(id - 1))
-            inspector:cmd('cleanup server replica'..tostring(id - 1))
+            inspector:cmd('delete server replica'..tostring(id - 1))
         end
     end
 end

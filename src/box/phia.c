@@ -5307,6 +5307,7 @@ struct sxindex {
 	struct si *index;
 	struct sfscheme *scheme;
 	struct rlist    link;
+	pthread_mutex_t mutex;
 };
 
 struct sx;
@@ -5401,6 +5402,7 @@ static int sx_indexinit(struct sxindex *i, struct sxmanager *m,
 	i->db = db;
 	i->index = index;
 	i->scheme = scheme;
+	(void) tt_pthread_mutex_init(&i->mutex, NULL);
 	rlist_add(&m->indexes, &i->link);
 	return 0;
 }
@@ -5418,14 +5420,17 @@ sx_indextruncate(struct sxindex *i, struct sxmanager *m)
 {
 	if (i->i.root == NULL)
 		return;
+	tt_pthread_mutex_lock(&i->mutex);
 	sx_truncate(i->i.root, &m->pool);
 	ss_rbinit(&i->i);
+	tt_pthread_mutex_unlock(&i->mutex);
 }
 
 static int sx_indexfree(struct sxindex *i, struct sxmanager *m)
 {
 	sx_indextruncate(i, m);
 	rlist_del(&i->link);
+	(void) tt_pthread_mutex_destroy(&i->mutex);
 	return 0;
 }
 
@@ -5532,10 +5537,12 @@ sx_untrack(struct sxv *v)
 {
 	if (v->prev == NULL) {
 		struct sxindex *i = v->index;
+		tt_pthread_mutex_lock(&i->mutex);
 		if (v->next == NULL)
 			ss_rbremove(&i->i, &v->node);
 		else
 			ss_rbreplace(&i->i, &v->node, &v->next->node);
+		tt_pthread_mutex_unlock(&i->mutex);
 	}
 	sx_vunlink(v);
 }
@@ -5783,6 +5790,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 	lv.next = UINT32_MAX;
 	sv_init(&lv.v, &sx_vif, v, NULL);
 	/* update concurrent index */
+	tt_pthread_mutex_lock(&index->mutex);
 	struct ssrbnode *n = NULL;
 	int rc = sx_match(&index->i, index->scheme,
 	                  version->data,
@@ -5800,6 +5808,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 			goto error;
 		}
 		ss_rbset(&index->i, n, pos, &v->node);
+		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
 	struct sxv *head = container_of(n, struct sxv, node);
@@ -5826,6 +5835,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 
 		ss_quota(r->quota, SS_QREMOVE, phia_tuple_size(own->v));
 		sx_vfree(&m->pool, own);
+		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
 	/* update log */
@@ -5837,8 +5847,10 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 	}
 	/* add version */
 	sx_vlink(head, v);
+	tt_pthread_mutex_unlock(&index->mutex);
 	return 0;
 error:
+	tt_pthread_mutex_unlock(&index->mutex);
 	ss_quota(r->quota, SS_QREMOVE, phia_tuple_size(v->v));
 	sx_vfree(&m->pool, v);
 	return -1;
@@ -5850,6 +5862,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 	struct sxmanager *m = x->manager;
 	struct ssrbnode *n = NULL;
 	int rc;
+	tt_pthread_mutex_lock(&index->mutex);
 	rc = sx_match(&index->i, index->scheme,
 	              key->data,
 		      key->size,
@@ -5860,6 +5873,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 	struct sxv *v = sx_vmatch(head, x->id);
 	if (v == NULL)
 		goto add;
+	tt_pthread_mutex_unlock(&index->mutex);
 	if (unlikely((v->v->flags & SVGET) > 0))
 		return 0;
 	if (unlikely((v->v->flags & SVDELETE) > 0))
@@ -5876,6 +5890,7 @@ add:
 	 * transactional log */
 	if (x->log_read == -1)
 		x->log_read = sv_logcount(x->log);
+	tt_pthread_mutex_unlock(&index->mutex);
 	rc = sx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
@@ -8505,6 +8520,7 @@ struct sicachepool {
 	struct sicache *head;
 	int n;
 	struct runtime *r;
+	pthread_mutex_t mutex;
 };
 
 static inline void
@@ -8678,6 +8694,7 @@ si_cachepool_init(struct sicachepool *p, struct runtime *r)
 	p->head = NULL;
 	p->n    = 0;
 	p->r    = r;
+	tt_pthread_mutex_init(&p->mutex, NULL);
 }
 
 static inline void
@@ -8691,11 +8708,13 @@ si_cachepool_free(struct sicachepool *p)
 		ss_free(p->r->a, c);
 		c = next;
 	}
+	tt_pthread_mutex_destroy(&p->mutex);
 }
 
 static inline struct sicache*
 si_cachepool_pop(struct sicachepool *p)
 {
+	tt_pthread_mutex_lock(&p->mutex);
 	struct sicache *c;
 	if (likely(p->n > 0)) {
 		c = p->head;
@@ -8703,12 +8722,13 @@ si_cachepool_pop(struct sicachepool *p)
 		p->n--;
 		si_cachereset(c);
 		c->pool = p;
-		return c;
+	} else {
+		c = ss_malloc(p->r->a, sizeof(struct sicache));
+		if (unlikely(c == NULL))
+			return NULL;
+		si_cacheinit(c, p);
 	}
-	c = ss_malloc(p->r->a, sizeof(struct sicache));
-	if (unlikely(c == NULL))
-		return NULL;
-	si_cacheinit(c, p);
+	tt_pthread_mutex_unlock(&p->mutex);
 	return c;
 }
 
@@ -8716,9 +8736,11 @@ static inline void
 si_cachepool_push(struct sicache *c)
 {
 	struct sicachepool *p = c->pool;
+	tt_pthread_mutex_lock(&p->mutex);
 	c->next = p->head;
 	p->head = c;
 	p->n++;
+	tt_pthread_mutex_unlock(&p->mutex);
 }
 
 struct sitx {
