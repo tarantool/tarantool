@@ -1199,6 +1199,25 @@ sophia databases require additional steps, see the
 explanation in
 `the sophia manual <http://sophia.systems/v2.1/sophia_v21_manual.pdf>`_.
 
+=====================================================================
+       Upgrades
+=====================================================================
+
+This information applies for users who created databases with older
+versions of the Tarantool server, and have now installed a newer version.
+The request to make in this case is: :codenormal:`box.schema.upgrade()`.
+
+For example, here is what happens when one runs :codenormal:`box.schema.upgrade()`
+with a database that was created in early 2015. Only a small part of the output is shown. |br|
+:codenormal:`tarantool>` :codebold:`box.schema.upgrade()` |br|
+:codenormal:`alter index primary on _space set options to {"unique":true}, parts to [[0,"num"]]` |br|
+:codenormal:`alter space _schema set options to {}` |br|
+:codenormal:`create view _vindex...` |br|
+:codenormal:`grant read access to 'public' role for _vindex view` |br|
+:codenormal:`set schema version to 1.6.8` |br|
+:codenormal:`---` |br|
+:codenormal:`...` |br|
+
 .. _Lua-Modules-Tutorial: http://lua-users.org/wiki/ModulesTutorial
 .. _LuaRocks: http://rocks.tarantool.org
 .. _LuaRocks-Quick-Start-Guide: http://luarocks.org/#quick-start
