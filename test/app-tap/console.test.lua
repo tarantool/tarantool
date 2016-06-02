@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(32)
+test:plan(34)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -89,6 +89,18 @@ test:ok(yaml.decode(client:read(EOL))[1].error:find('denied'),
 box.schema.user.grant('test', 'execute', 'universe')
 
 client:write(string.format("require('console').connect('test:pass@%s')\n",
+    IPROTO_SOCKET))
+test:ok(yaml.decode(client:read(EOL)), "remote connect")
+
+-- Log in with an empty password
+box.schema.user.create('test2', { password = '' })
+box.schema.user.grant('test2', 'execute', 'universe')
+
+client:write(string.format("require('console').connect('test2@%s')\n",
+    IPROTO_SOCKET))
+test:ok(yaml.decode(client:read(EOL)), "remote connect")
+
+client:write(string.format("require('console').connect('test2:@%s')\n",
     IPROTO_SOCKET))
 test:ok(yaml.decode(client:read(EOL)), "remote connect")
 

@@ -49,7 +49,7 @@ test_invalid()
 int
 main(void)
 {
-	plan(60);
+	plan(61);
 
 	/* General */
 	test("host", NULL, NULL, NULL, "host", NULL, NULL, NULL, NULL, 0);
@@ -83,6 +83,8 @@ main(void)
 	     "q1=v1&q2=v2", "fragment", 0);
 
 	test("login:password@host", NULL, "login", "password", "host", NULL,
+	     NULL, NULL, NULL, 0);
+	test("login:@host", NULL, "login", "", "host", NULL,
 	     NULL, NULL, NULL, 0);
 	test("login:password@host/", NULL, "login", "password", "host", NULL,
 	     "/", NULL, NULL, 0);

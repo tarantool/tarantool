@@ -138,7 +138,7 @@ uri_parse(struct uri *uri, const char *p)
 			>{ s = p; }
 			%{ login = s; login_len = p - s; };
 
-		password = (unreserved | pct_encoded | sub_delims )+
+		password = (unreserved | pct_encoded | sub_delims )*
 			>{ s = p; }
 			%{ uri->password = s; uri->password_len = p - s; };
 
