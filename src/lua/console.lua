@@ -309,6 +309,12 @@ local function connect(uri)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
+    if u.password == nil then
+        -- Not specifying a password means empty password.
+        -- Required for passwordless URI forms like admin@host
+        u.password = ''
+    end
+
     -- connect to remote host
     local remote = require('net.box'):new(u.host, u.service,
         { user = u.login, password = u.password })
