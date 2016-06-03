@@ -1,5 +1,5 @@
 TAP version 13
-1..32
+1..34
 ok - console.listen started
 ok - Handshake
 ok - connect to console
@@ -14,6 +14,8 @@ ok - clear delimiter
 ok - remote network error
 ok - remote access denied
 ok - remote access denied
+ok - remote connect
+ok - remote connect
 ok - remote connect
 ok - remote eval
 ok - remote state.remote.host

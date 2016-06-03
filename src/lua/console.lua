@@ -309,7 +309,7 @@ local function connect(uri)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
-    if u.password == nil then
+    if u.login ~= nil and u.password == nil then
         -- Not specifying a password means empty password.
         -- Required for passwordless URI forms like admin@host
         u.password = ''

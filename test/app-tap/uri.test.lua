@@ -6,7 +6,7 @@ local uri = require('uri')
 local function test_parse(test)
     -- Tests for uri.parse() Lua bindings.
     -- Parser itself is tested by test/unit/uri unit test.
-    test:plan(17)
+    test:plan(28)
 
     local u
 
@@ -20,6 +20,22 @@ local function test_parse(test)
     test:is(u.path, "/path1/path2/path3", "path")
     test:is(u.query, "q1=v1&q2=v2", "query")
     test:is(u.fragment, "fragment", "fragment")
+
+    u = uri.parse("scheme://login:@host:service"..
+        "/path1/path2/path3?q1=v1&q2=v2#fragment")
+    test:is(u.scheme, "scheme", "scheme")
+    test:is(u.login, "login", "login")
+    test:is(u.password, "", "password")
+    test:is(u.host, "host", "host")
+    test:is(u.service, "service", "service")
+    test:is(u.path, "/path1/path2/path3", "path")
+    test:is(u.query, "q1=v1&q2=v2", "query")
+    test:is(u.fragment, "fragment", "fragment")
+
+    u = uri.parse('login@host')
+    test:is(u.login, "login", "login")
+    test:is(u.password, nil, "password")
+    test:is(u.host, "host", "host")
 
     u = uri.parse('127.0.0.1')
     test:is(u.host, '127.0.0.1', 'ipv4')

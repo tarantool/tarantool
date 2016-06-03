@@ -2,7 +2,7 @@ TAP version 13
 # uri
 1..1
     # parse
-    1..17
+    1..28
     ok - scheme
     ok - login
     ok - password
@@ -11,6 +11,17 @@ TAP version 13
     ok - path
     ok - query
     ok - fragment
+    ok - scheme
+    ok - login
+    ok - password
+    ok - host
+    ok - service
+    ok - path
+    ok - query
+    ok - fragment
+    ok - login
+    ok - password
+    ok - host
     ok - ipv4
     ok - ipv4
     ok - ipv6
