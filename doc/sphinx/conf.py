@@ -38,9 +38,9 @@ version = '.'.join(release.split('.')[0:2])
 exclude_patterns = [
     '_build',
     'book/connectors/__*',
-    'book/replication/*-1.rst',
-    'book/replication/*-2.rst',
-    'book/configuration/cfg-*'
+    'book/replication/*_1.rst',
+    'book/replication/*_2.rst',
+    'book/configuration/cfg_*'
 ]
 
 pygments_style = 'sphinx'

@@ -58,7 +58,7 @@ A Tarantool server's process title has these components:
   - "running" (ordinary node "ready to accept requests"),
   - "loading" (ordinary node recovering from old snap and wal files),
   - "orphan" (not in a cluster),
-  - "hot_standby" (see section :ref:`local hot standby <book-cfg-local_hot_standy>`), or
+  - "hot_standby" (see section :ref:`local hot standby <book_cfg_local_hot_standby>`), or
   - "dumper" + process-id (saving a snapshot).
 * **custom_proc_title** is taken from the :confval:`custom_proc_title` configuration parameter, if one was specified.
 
@@ -192,7 +192,7 @@ declaration does not have an ``end`` keyword). Example:
     console.delimiter('')!
 
 For a condensed Backus-Naur Form [BNF] description of the suggested form
-of client requests, see http://tarantool.org/doc/box-protocol.html.
+of client requests, see http://tarantool.org/doc/dev_guide/box-protocol.html.
 
 In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of
@@ -970,8 +970,8 @@ before reading this section.
 The modules that come from Tarantool developers and community contributors are
 on rocks.tarantool.org_. Some of them
 -- :ref:`expirationd <package-expirationd>`,
-:ref:`mysql <d-plugins-mysql-example>`,
-:ref:`postgresql <d-plugins-postgresql-example>`,
+:ref:`mysql <d_plugins-mysql-example>`,
+:ref:`postgresql <d_plugins-postgresql-example>`,
 :ref:`shard <package-shard>` --
 are discussed elsewhere in this manual.
 

@@ -34,7 +34,7 @@ A reference description also follows below:
 
     Although box.snapshot() does not cause a fork, there is a separate fiber
     which may produce snapshots at regular intervals -- see the discussion of
-    the :ref:`snapshot daemon <book-cfg-snapshot_daemon>`.
+    the :ref:`snapshot daemon <book_cfg_snapshot_daemon>`.
 
     **Example:**
 

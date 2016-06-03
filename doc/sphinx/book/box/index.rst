@@ -342,9 +342,9 @@ Since not all Tarantool operations can be expressed with the data-manipulation
 functions, or with Lua, to gain complete access to data manipulation
 functionality one must use a :ref:`Perl, PHP, Python or other programming language connector <box-connectors>`.
 The client/server protocol is open and documented: an annotated BNF can be found
-in the source tree, file `doc/box-protocol.html`_.
+in the source tree, file `doc/dev_guide/box-protocol.html`_.
 
-.. _doc/box-protocol.html: http://tarantool.org/doc/box-protocol.html
+.. _doc/dev_guide/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
 
 --------------
 Saving To Disk
