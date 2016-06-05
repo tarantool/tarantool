@@ -555,7 +555,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
         :samp:`{tuple_value}` (type = Lua table or scalar) =
-        field values, must be passed as a Lua table if tuple_value contains more than one field;
+        field values, must be passed as a Lua table;
         :codeitalic:`{operator, field_no, value}` (type = Lua table) = a group of arguments for each
         operation, indicating what the operation is, what field the
         operation will apply to, and what value will be applied. The

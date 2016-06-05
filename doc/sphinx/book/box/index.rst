@@ -232,7 +232,7 @@ Six examples of basic operations:
     tarantool> box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
 
     -- Upsert the tuple, changing field field[2] again.
-    -- The syntax of upsert is the same as the syntax of update,
+    -- The syntax of upsert is similar to the syntax of update,
     -- but the return value will be different.
     tarantool> box.space.tester:upsert({999}, {{'=', 2, 'Tarantism'}})
 
