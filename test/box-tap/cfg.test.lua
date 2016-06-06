@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(41)
+test:plan(46)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -17,6 +17,11 @@ local function invalid(name, val)
     test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
+invalid('slab_alloc_minimal', 7)
+invalid('slab_alloc_minimal', 0)
+invalid('slab_alloc_minimal', -1)
+invalid('slab_alloc_minimal', 1048281)
+invalid('slab_alloc_minimal', 1000000000)
 invalid('replication_source', '//guest@localhost:3301')
 invalid('wal_mode', 'invalid')
 invalid('rows_per_wal', -1)

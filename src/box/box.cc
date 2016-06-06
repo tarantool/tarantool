@@ -112,6 +112,15 @@ box_check_writable(void)
 		tnt_raise(LoggedError, ER_READONLY);
 }
 
+static void
+box_check_slab_alloc_minimal(ssize_t slab_alloc_minimal)
+{
+
+	if (slab_alloc_minimal < 8 || slab_alloc_minimal > 1048280)
+	tnt_raise(ClientError, ER_CFG, "slab_alloc_minimal",
+		  "specified value is out of bounds");
+}
+
 void
 process_rw(struct request *request, struct tuple **result)
 {
@@ -297,6 +306,7 @@ box_check_config()
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_rows_per_wal(cfg_geti64("rows_per_wal"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_slab_alloc_minimal(cfg_geti64("slab_alloc_minimal"));
 }
 
 /*
