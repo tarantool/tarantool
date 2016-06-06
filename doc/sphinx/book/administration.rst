@@ -261,7 +261,7 @@ and checking status.
 in the current directory (:codenormal:`$PWD/.tarantoolctl`).
 If that fails, it looks in the current user's home directory (:codenormal:`$HOME/.config/tarantool/tarantool`).
 If that fails, it looks in the SYSCONFDIR directory (usually :codenormal:`/etc/sysconfig/tarantool`
-but it may be different on some platforms)."
+but it may be different on some platforms).
 Most
 of the settings are similar to the settings used by ``box.cfg{...};``
 however, tarantoolctl adjusts some of them by adding an application name.

@@ -360,7 +360,7 @@ is lost when the power goes off, Tarantool recovers it automatically
 when it starts up again, by reading the WAL files and redoing the requests
 (this is called the "recovery process").
 Users can change the timing of the WAL writer,
-or turn it off, by setting :confval:`wal_mode <wal_mode>`.
+or turn it off, by setting :ref:`wal_mode <confval-wal-mode>`.
 
 Tarantool also maintains a set of snapshot files.
 A snapshot file is an on-disk copy of the entire data set for a given moment.
@@ -625,8 +625,8 @@ introspection (inspecting contents of spaces, accessing server configuration).
     |                   | important than the others.                          |
     +-------------------+-----------------------------------------------------+
     | WAL settings      | The important setting for the write-ahead log is    |
-    |                   | :ref:`wal_mode <wal_mode>`. If the setting causes   |
-    |                   | no writing or                                       |
+    |                   | :ref:`wal_mode <confval-wal-mode>`. If the setting  |
+    |                   | causes no writing or                                |
     |                   | delayed writing, this factor is unimportant. If the |
     |                   | setting causes every data-change request to wait    |
     |                   | for writing to finish on a slow device, this factor |

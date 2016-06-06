@@ -63,13 +63,13 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :func:`space_object:truncate()       | Delete all tuples               |
         | <space_object.truncate>`             |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:inc{}            | Increment a tuple's counter     |
+        | :func:`space_object:inc()            | Increment a tuple's counter     |
         | <space_object.inc>`                  |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:dec{}            | Decrement a tuple's counter     |
+        | :func:`space_object:dec()            | Decrement a tuple's counter     |
         | <space_object.dec>`                  |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:auto_increment{} | Generate key + Insert a tuple   |
+        | :func:`space_object:auto_increment() | Generate key + Insert a tuple   |
         | <space_object.auto_increment>`       |                                 |
         +--------------------------------------+---------------------------------+
         | :func:`space_object:pairs()          | Prepare for iterating           |
@@ -666,8 +666,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. data:: index
 
-        A container for all defined indexes. An index is a Lua object of type
-        :mod:`box.index` with methods to search tuples and iterate over them in
+        A container for all defined indexes. There is a Lua object of type
+        :ref:`box.index <box_index>` with methods to search tuples and iterate over them in
         predefined order.
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.
