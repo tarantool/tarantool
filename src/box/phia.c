@@ -4731,21 +4731,27 @@ tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 #include "salad/bps_tree.h"
 
 /*
- * svindex is used for in-memory storage of phia_tuples in node
- * bps_tree stores struct svref objects that hold pointers to phia_tuples.
- * phia_tuples are ordered by their keys and, if keys are equal,
- * by their lsn in descending order.
- * Let's name two phia_tuples with the same key (but different lsn)
- * as duplicates, and several duplicates in order of their lsn (descending)
- * as chain.
- * Due to specifics of usage, svindex must show difference between first
- * duplicate in the chain and the others in that chain.
+ * svindex is an in-memory container for phia_tuples in an
+ * a single phia node.
+ * Internally it uses bps_tree to stores struct svref objects,
+ * which, in turn, hold pointers to phia_tuple objects.
+ * svrefs are ordered by tuple key and, for the same key,
+ * by lsn, in descending order.
+ *
+ * For example, assume there are two tuples with the same key,
+ * but different LSN. These are duplicates of the same key,
+ * maintained for the purpose of MVCC/consistent read view.
+ * In Phia terms, they form a duplicate chain.
+ *
+ * Due to specifics of usage, svindex must distinguish between the
+ * first duplicate in the chain and other keys in that chain.
+ *
  * That's why svref objects additionally store 'flags' member
- * that could hold SVDUP bit. The first svref in chain
- * has flags == 0 and the others has flags == SVDUP
- * Due to specific usage, only insert, select and destroy all
- * During insertion reference counter of phia_tuple is incremented,
- * during destruction all phia_tuples' counters are decremented.
+ * that could hold SVDUP bit. The first svref in a chain
+ * has flags == 0,  and others have flags == SVDUP
+ *
+ * During insertion, reference counter of phia_tuple is incremented,
+ * during destruction all phia_tuple' reference counters are decremented.
  */
 struct svindex {
 	struct bps_tree_svindex tree;
@@ -4753,14 +4759,11 @@ struct svindex {
 	uint64_t lsnmin;
 	struct sfscheme *scheme;
 	/*
-	 * This flags is set to true always when the tree comparator compares
-	 * two items (or item and key) with equal key (but different lsn).
-	 * If you set this flag to false, after inserting a new svref this flag
-	 * will show if there is another item in the tree with the same key
-	 * (but different lsn)
-	 * If you set this flag to false, after range search like lower_bound/
-	 * /upper_bound this flag will show if there is at least one item in
-	 * the tree with the same key (but different lsn)
+	 * This is a search state flag, which is set
+	 * to true to true when the tree comparator finds
+	 * a duplicate key in a chain (same key, different LSN).
+	 * Used in insert and range search operations with the
+	 * index.
 	 */
 	bool hint_key_is_equal;
 };
@@ -4846,10 +4849,10 @@ sv_indexset(struct svindex *i, struct svref ref)
 	}
 	/*
 	 * There is definitely a duplicate.
-	 * If current ref was inserted into head of the chain,
+	 * If current ref was inserted into the head of the chain,
 	 * the previous head's flags must be set to SVDUP. (1)
 	 * Otherwise, the new inserted ref's flags must be set to SVDUP. (2)
-	 * First of all let's find just inserted svref.
+	 * First of all, let's find the just inserted svref.
 	 */
 	struct tree_svindex_key tree_key;
 	tree_key.data = ref.v->data;
