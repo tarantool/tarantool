@@ -23,10 +23,6 @@ box.space._cluster:len() == 1
 ---
 - true
 ...
-#box.info.vclock == 1
----
-- true
-...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
@@ -51,10 +47,6 @@ box.space._cluster:len() == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
----
-- true
-...
 -- try to add one more replica
 uuid = require('uuid')
 ---
@@ -68,10 +60,6 @@ replica_set.drop_all(test_run)
 ---
 ...
 box.space._cluster:len() == 1
----
-- true
-...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
@@ -98,13 +86,9 @@ while box.space._cluster:len() ~= 2 do fiber.sleep(0.001) end
 -- Check server ids
 test_run:cmd('eval replica1 "return box.info.server.id"')
 ---
-- '{"result": [2]}'
+- [2]
 ...
 box.space._cluster:len() == 2
----
-- true
-...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...
@@ -113,10 +97,6 @@ replica_set.drop_all(test_run)
 ---
 ...
 box.space._cluster:len() == 1
----
-- true
-...
-#box.info.vclock == box.schema.REPLICA_MAX - 1
 ---
 - true
 ...

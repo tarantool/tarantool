@@ -206,7 +206,7 @@ The basic operations are: the five data-change operations
 (insert, update, upsert, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like
 “ping” which can only be used with the binary protocol.
-Also, there are :func:`index iterator <index_object.pairs>` operations, which can only
+Also, there are :ref:`index iterator <index-pairs>` operations, which can only
 be used with Lua code. (Index iterators are for traversing
 indexes one key at a time, taking advantage of features
 that are specific to an index type, for example evaluating

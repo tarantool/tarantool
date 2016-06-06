@@ -33,7 +33,7 @@
 #include "tt_uuid.h"
 #include <stdint.h>
 #define RB_COMPACT 1
-#include <third_party/rb.h> /* serverset_t */
+#include <small/rb.h> /* serverset_t */
 
 /**
  * @module cluster - global state of multi-master

@@ -60,34 +60,4 @@ blocks  :
       content: >
         Terms of commercial 24x7 support are available upon request,
         please send an inquiry to support@tarantool.org
-  example:
-    format: rst
-    content: |
-      .. code-block:: lua
-          :linenos: none
-
-          #!/usr/bin/env tarantool
-
-          box.cfg{}
-          hosts = box.space.hosts
-          if not hosts then
-              hosts = box.schema.create_space('hosts')
-              hosts:create_index('primary',
-                      {parts = {1, 'STR'}})
-          end
-
-          local function handler(self)
-              local host = self.peer.host
-              local response = {
-                  host = host;
-                  counter = hosts:inc(host);
-              }
-              return self:render{ json = response }
-          end
-
-          httpd = require('http.server')
-          server = httpd.new('127.0.0.1', 8080)
-          server:route({ path = '/' }, handler)
-          server:start()
-  video: '<iframe src="//www.youtube.com/embed/R9UHoZDFLWg" frameborder="0" allowfullscreen></iframe>'
 ...

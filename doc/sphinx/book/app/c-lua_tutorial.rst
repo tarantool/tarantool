@@ -1,6 +1,13 @@
 -------------------------------------------------------------------------------
-                        Appendix C. Lua tutorial
+                        Appendix C. Lua tutorials
 -------------------------------------------------------------------------------
+
+There are three tutorials:
+:ref:`Insert one million tuples with a Lua stored procedure <tutorial-insert-one-million-tuples>`,
+:ref:`Sum a JSON field for all tuples <tutorial-sum-a-json-field>`,
+:ref:`Indexed pattern search <tutorial-indexed-pattern-search>`.
+
+.. _tutorial-insert-one-million-tuples:
 
 =====================================================================
        Insert one million tuples with a Lua stored procedure
@@ -469,6 +476,8 @@ What has also been shown is that inserting a million tuples took 37 seconds. The
 host computer was a Linux laptop. By changing :confval:`wal_mode <wal_mode>` to 'none' before
 running the test, one can reduce the elapsed time to 4 seconds.
 
+.. _tutorial-sum-a-json-field:
+
 =====================================================================
                   Sum a JSON field for all tuples
 =====================================================================
@@ -593,3 +602,244 @@ It works. We'll just leave, as exercises for future improvement, the possibility
 that the "hard coding" assumptions could be removed, that there might have to be
 an overflow check if some field values are huge, and that the function should
 contain a "yield" instruction if the count of tuples is huge.
+
+.. _tutorial-indexed-pattern-search:
+
+=====================================================================
+       Indexed Pattern Search
+=====================================================================
+
+Here is a generic function which takes a field identifier
+and a search pattern, and returns all tuples that match. |br|
+* The field must be the first field of a TREE index.
+If the engine is sophia, the field must be the only field of the index. |br|
+* The function will use `Lua pattern matching <http://www.lua.org/manual/5.2/manual.html#6.4.1>`_,
+which allows "magic characters" in regular expressions. |br|
+* The initial characters in the pattern, as far as the
+first magic character, will be used as an index search key.
+For each tuple that is found via the index, there will be
+a match of the whole pattern. |br|
+* To be :ref:`cooperative <cooperative_multitasking>`, the function should yield after every
+10 tuples, unless there is a reason to delay yielding. |br|
+With this function, we can take advantage of Tarantool's indexes
+for speed, and take advantage of Lua's pattern matching for flexibility.
+It does everything that an SQL "LIKE" search can do, and far more.
+
+Read the following Lua code to see how it works.
+The comments that begin with "SEE NOTE ..." refer to long
+explanations that follow the code.
+
+.. code-block:: tarantoolsession
+
+   function indexed_pattern_search(space_name, field_no, pattern)
+     -- SEE NOTE #1 "FIND AN APPROPRIATE INDEX"
+     if (box.space[space_name] == nil) then
+       print("Error: Failed to find the specified space")
+       return nil
+     end
+     local index_no = -1
+     for i=0,box.schema.INDEX_MAX,1 do
+       if (box.space[space_name].index[i] == nil) then break end
+       if (box.space[space_name].index[i].type == "TREE"
+           and box.space[space_name].index[i].parts[1].fieldno == field_no
+           and box.space[space_name].index[i].parts[1].type == "STR"
+           and (box.space[space_name].index[i].parts[2] == nil
+                or box.space[space_name].engine == "memtx")) then
+         index_no = i
+         break
+       end
+     end
+     if (index_no == -1) then
+       print("Error: Failed to find an appropriate index")
+       return nil
+     end
+     -- SEE NOTE #2 "DERIVE INDEX SEARCH KEY FROM PATTERN"
+     local index_search_key = ""
+     local index_search_key_length = 0
+     local last_character = ""
+     local c = ""
+     for i=1,string.len(pattern),1 do
+       c = string.sub(pattern, i, i)
+       if (last_character ~= "%") then
+         if (c == '^' or c == "$" or c == "(" or c == ")" or c == "."
+                      or c == "[" or c == "]" or c == "*" or c == "+"
+                      or c == "-" or c == "?") then
+           break
+         end
+         if (c == "%") then
+           c2 = string.sub(pattern, i + 1, i + 1)
+           if (string.match(c2, "%p") == nil) then break end
+           index_search_key = index_search_key .. c2
+         else
+           index_search_key = index_search_key .. c
+         end
+       end
+       last_character = c
+     end
+     index_search_key_length = string.len(index_search_key)
+     if (index_search_key_length < 3) then
+       print("Error: index search key " .. index_search_key .. " is too short")
+       return nil
+     end
+     -- SEE NOTE #3 "OUTER LOOP: INITIATE"
+     local result_set = {}
+     local number_of_tuples_in_result_set = 0
+     local previous_tuple_field = ""
+     while true do
+       local number_of_tuples_since_last_yield = 0
+       local is_time_for_a_yield = false
+       -- SEE NOTE #4 "INNER LOOP: ITERATOR"
+       for _,tuple in box.space[space_name].index[index_no]:
+       pairs(index_search_key,{iterator = box.index.GE}) do
+         -- SEE NOTE #5 "INNER LOOP: BREAK IF INDEX KEY IS TOO GREAT"
+         if (string.sub(tuple[field_no], 1, index_search_key_length)
+         > index_search_key) then
+           break
+         end
+         -- SEE NOTE #6 "INNER LOOP: BREAK AFTER EVERY 10 TUPLES -- MAYBE"
+         number_of_tuples_since_last_yield = number_of_tuples_since_last_yield + 1
+         if (number_of_tuples_since_last_yield >= 10
+             and tuple[field_no] ~= previous_tuple_field) then
+           index_search_key = tuple[field_no]
+           is_time_for_a_yield = true
+           break
+           end
+         previous_tuple_field = tuple[field_no]
+         -- SEE NOTE #7 "INNER LOOP: ADD TO RESULT SET IF PATTERN MATCHES"
+         if (string.match(tuple[field_no], pattern) ~= nil) then
+           number_of_tuples_in_result_set = number_of_tuples_in_result_set + 1
+           result_set[number_of_tuples_in_result_set] = tuple
+         end
+       end
+       -- SEE NOTE #8 "OUTER LOOP: BREAK, OR YIELD AND CONTINUE"
+       if (is_time_for_a_yield ~= true) then
+         break
+       end
+       require('fiber').yield()
+     end
+     return result_set
+   end
+
+NOTE #1 "FIND AN APPROPRIATE INDEX" |br|
+The caller has passed space_name (a string) and field_no (a number).
+The requirements are: |br|
+(a) index type must be "TREE" because for other index types
+(HASH, BITSET, RTREE) a search with iterator=GE
+will not return strings in order by string value; |br|
+(b) field_no must be the first index part; |br|
+(c) the field must contain strings, because for the other data type
+("NUM") pattern searches are not possible; |br|
+(d) if the index has more than one part then the space's engine
+must be "memtx", because for the other engine ("sophia")
+a search on only one part will cause an error
+"Index ... does not support partial keys". |br|
+If these requirements are not met by any index, then
+print an error message and return nil.
+
+NOTE #2 "DERIVE INDEX SEARCH KEY FROM PATTERN" |br|
+The caller has passed pattern (a string).
+The index search key will be
+the characters in the pattern as far as the first magic character.
+Lua's magic characters are % ^ $ ( ) . [ ] * + - ?.
+For example, if the pattern is "ABC.E", the period is a magic
+character and therefore the index search key will be "ABC".
+But there is a complication ... If we see "%" followed by a punctuation
+character, that punctuation character is "escaped" so
+remove the "%" when making the index search key. For example, if the
+pattern is "AB%$E", the dollar sign is escaped and therefore
+the index search key will be "AB$E".
+Finally there is a check that the index search key length
+must be at least three -- this is an arbitrary number, and in
+fact zero would be okay, but short index search keys will cause
+long search times.
+
+NOTE #3 -- "OUTER LOOP: INITIATE" |br|
+The function's job is to return a result set,
+just as box.space.select would. We will fill
+it within an outer loop that contains an inner
+loop. The outer loop's job is to execute the inner
+loop, and possibly yield, until the search ends.
+The inner loop's job is to find tuples via the index, and put
+them in the result set if they match the pattern.
+
+NOTE #4 "INNER LOOP: ITERATOR" |br|
+The for loop here is using pairs(), see the
+:ref:`explanation of what index iterators are <index-pairs>`. 
+Within the inner loop,
+there will be a local variable named "tuple" which contains
+the latest tuple found via the index search key.
+
+NOTE #5 "INNER LOOP: BREAK IF INDEX KEY IS TOO GREAT" |br|
+The iterator is GE (Greater or Equal), and we must be
+more specific: if the search index key has N characters,
+then the leftmost N characters of the result's index field
+must not be greater than the search index key. For example,
+if the search index key is 'ABC', then 'ABCDE' is
+a potential match, but 'ABD' is a signal that
+no more matches are possible.
+
+NOTE #6 "INNER LOOP: BREAK AFTER EVERY 10 TUPLES -- MAYBE" |br|
+This chunk of code is for cooperative multitasking.
+The number 10 is arbitrary, and usually a larger number would be okay.
+The simple rule would be "after checking 10 tuples, yield,
+and then resume the search (that is, do the inner loop again)
+starting after the last value that was found". However, if
+the index is non-unique or if there is more than one field
+in the index, then we might have duplicates -- for example
+{"ABC",1}, {"ABC", 2}, {"ABC", 3}" -- and it would be difficult
+to decide which "ABC" tuple to resume with. Therefore, if
+the result's index field is the same as the previous
+result's index field, there is no break.
+
+NOTE #7 "INNER LOOP: ADD TO RESULT SET IF PATTERN MATCHES" |br|
+Compare the result's index field to the entire pattern.
+For example, suppose that the caller passed pattern "ABC.E"
+and there is an indexed field containing "ABCDE".
+Therefore the initial index search key is "ABC".
+Therefore a tuple containing an indexed field with "ABCDE"
+will be found by the iterator, because "ABCDE" > "ABC".
+In that case string.match will return a value which is not nil.
+Therefore this tuple can be added to the result set.
+
+NOTE #8 "OUTER LOOP: BREAK, OR YIELD AND CONTINUE" |br|
+There are three conditions which will cause a break from
+the inner loop: (1) the for loop ends naturally because
+there are no more index keys which are greater than or
+equal to the index search key, (2) the index key is too
+great as described in NOTE #5, (3) it is time for a yield
+as described in NOTE #6. If condition (1) or condition (2)
+is true, then there is nothing more to do, the outer loop
+ends too. If and only if condition (3) is true, the
+outer loop must yield and then continue. If it does
+continue, then the inner loop -- the iterator search --
+will happen again with a new value for the index search key.
+
+EXAMPLE:
+
+Start tarantool, cut and paste the code for function indexed_pattern_search,
+and try the following: |br|
+:codebold:`box.space.t:drop()` |br|
+:codebold:`box.schema.space.create('t')` |br|
+:codebold:`box.space.t:create_index('primary',{})` |br|
+:codebold:`box.space.t:create_index('secondary',{unique=false,parts={2,'STR',3,'STR'}})` |br|
+:codebold:`box.space.t:insert{1,'A','a'}` |br|
+:codebold:`box.space.t:insert{2,'AB',''}` |br|
+:codebold:`box.space.t:insert{3,'ABC','a'}` |br|
+:codebold:`box.space.t:insert{4,'ABCD',''}` |br|
+:codebold:`box.space.t:insert{5,'ABCDE','a'}` |br|
+:codebold:`box.space.t:insert{6,'ABCDE',''}` |br|
+:codebold:`box.space.t:insert{7,'ABCDEF','a'}` |br|
+:codebold:`box.space.t:insert{8,'ABCDF',''}` |br|
+:codebold:`indexed_pattern_search("t", 2, "ABC.E.")` |br|
+The result will be: |br|
+:codenormal:`tarantool>` :codebold:`indexed_pattern_search("t", 2, "ABC.E.")` |br|
+:codenormal:`---` |br|
+:codenormal:`- - [7, 'ABCDEF', 'a']` |br|
+:codenormal:`...` |br|
+
+
+
+
+
+
+
