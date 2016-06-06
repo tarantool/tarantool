@@ -35,7 +35,7 @@
 #include "small/matras.h"
 
 #define RB_COMPACT 1
-#include "third_party/rb.h"
+#include "small/rb.h"
 
 /**
  * In-memory Guttman's R-tree
