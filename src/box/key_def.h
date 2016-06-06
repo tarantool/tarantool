@@ -35,7 +35,7 @@
 #include "error.h"
 #include <msgpuck.h>
 #define RB_COMPACT 1
-#include "third_party/rb.h"
+#include "small/rb.h"
 #include <limits.h>
 #include <wchar.h>
 #include <wctype.h>

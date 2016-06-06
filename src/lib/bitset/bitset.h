@@ -57,7 +57,7 @@
 
 /** @cond false */
 #define RB_COMPACT 1
-#include <third_party/rb.h>
+#include <small/rb.h>
 /** @endcond */
 
 
