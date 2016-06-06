@@ -1,6 +1,11 @@
 TAP version 13
-1..37
+1..42
 ok - box is not started
+ok - invalid slab_alloc_minimal
+ok - invalid slab_alloc_minimal
+ok - invalid slab_alloc_minimal
+ok - invalid slab_alloc_minimal
+ok - invalid slab_alloc_minimal
 ok - invalid replication_source
 ok - invalid wal_mode
 ok - invalid rows_per_wal
