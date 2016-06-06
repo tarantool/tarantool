@@ -9,10 +9,15 @@
 {% block content %}
 <section class="b-gray_block b-mainhead">
   <div class="b-block-wrapper">
-    <a  href="https://github.com/tarantool/tarantool/" class="b-follow">Follow on</a>
-    <h1 class="b-Tarantool_title"     >{{ page.blocks.header[0] }}</h1>
+    <!-- <a  href="https://github.com/tarantool/tarantool/" class="b-follow">Follow on</a> -->
+    <div class="header-logo"></div>
     <h2 class="b-Tarantool_title-note">{{ page.blocks.header[1] }}</h2>
     <p  class="b-Tarantool_title-text">{{ page.blocks.header[2] }}</p>
+    <div class="buttons-header">
+        <a href="http://tarantool.org/download.html" class="b-button-red-download">DOWNLOAD</a>
+        <a href="https://github.com/tarantool/tarantool/"
+        class="b-button-white">FOLLOW ON GITHUB</a>
+    </div>
   </div>
 </section>
 
@@ -82,56 +87,6 @@
   </div>
 </section>
 
-<section class="b-gray_block b-example">
-  <div class="b-block-wrapper">
-    <h2 class="b-section-title">Example</h2>
-    <div class="b-cols p-example">
-      <div class="b-cols-item">
-        <div class="b-example-code">
-          {{ page.blocks.example }}
-        </div>
-      </div>
-      <div class="b-cols-item-empty">&nbsp;</div>
-      <div class="b-cols-item">
-        <div class="b-example-player">
-          {{ page.blocks.video }}
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="b-block b-benchmark">
-  <div class="b-block-wrapper">
-    <h2 class="b-section-title">Our benchmarks (YCSB)</h2>
-    <div class="b-block-wrapper_bench">
-      <div class="b-benchmark-catalog">
-        <ul class="b-switcher">
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url p-active">A</a></li>
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">B</a></li>
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">C</a></li>
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">D</a></li>
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">E</a></li>
-          <li class="b-switcher-item"><a href="#" class="b-switcher-item-url">F</a></li>
-        </ul>
-      </div>
-      <div class="b-benchmark-type">
-        <ul class="b-switcher">
-          <li class="b-switcher-item">
-            <a href="#" class="b-switcher-item-url p-active">Throughput</a>
-          </li>
-          <li class="b-switcher-item">
-            <a href="#" class="b-switcher-item-url">Latency</a>
-          </li>
-        </ul>
-      </div>
-      <h3 class="b-benchmark-type-title">Workload A</h3>
-    </div>
-    <div class="b-benchmark-grapf"><div id="b-benchmark-grapf-image"></div></div>
-    <div class="b-benchmark-more"> <a href="/benchmark.html">Learn more</a></div>
-  </div>
-</section>
-
 <section class="b-gray_block b-customers">
   <div class="b-block-wrapper">
     <h2 class="b-section-title">Our users</h2>
@@ -162,6 +117,7 @@
     </div>
   </div>
 </section>
+
 {% endblock content %}
 
 {# vim: syntax=htmldjango ts=2 sts=2 sw=2 expandtab #}
