@@ -545,6 +545,7 @@ h1, h2, h3, h4, h5 {
 .i-wallarm {
     width:130px;
     height:63px;
+    margin-bottom: 36px;
 }
 .i-wallarm:after,
 .i-wallarm:before {
