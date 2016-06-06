@@ -55,7 +55,11 @@ all nested content that follows in the method description).
                 Language and style issues
 ===========================================================
 
-*TBD (to be discussed)*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+               US vs British spelling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We use English US spelling.
 
 ===========================================================
                Examples and templates
@@ -111,16 +115,9 @@ Here is an example of documenting a module (``my_box.index``), a class
     .. method:: rename(index-name)
 
         Rename an index.
-        
-        *Here follow 2 different notations for the same set of parameters.*
                       
         :param index_object: an object reference
         :param index_name: a new name for the index (type = string)
-
-        Parameters:
-        
-        * :samp:`{index_object}` = an object reference;
-        * :samp:`{index-name}` (type = string) = new name for index.
 
         :return: nil
 
