@@ -56,6 +56,8 @@ API is a direct binding to corresponding methods of index objects of type
               type: TREE
             ...
 
+.. _index-pairs:
+
     .. method:: pairs(bitset-value | search-value, iterator-type)
 
         This method provides iteration support within an index.
@@ -79,6 +81,8 @@ API is a direct binding to corresponding methods of index objects of type
         to the yielded procedure, the data set could have changed significantly.
         Iteration, resumed after a yield point, does not preserve the read view,
         but continues with the new content of the database.
+        The tutorial :ref:`Indexed pattern search <tutorial-indexed-pattern-search>`
+        shows one way that iterators and yields can be used together.
 
         Parameters:
 
@@ -290,7 +294,7 @@ API is a direct binding to corresponding methods of index objects of type
             |                    |           | Tuples are returned in order: nearest neighbor first.   |
             +--------------------+-----------+---------------------------------------------------------+
 
-        **Example:**
+        **First Example of index pairs():**
 
         Default 'TREE' Index and ``pairs()`` function:
 
@@ -339,6 +343,36 @@ API is a direct binding to corresponding methods of index objects of type
             tarantool> s:drop()
             ---
             ...
+
+        **Second Example of index pairs():**
+
+        This Lua code finds all the tuples whose primary key values begin with 'XY'.
+        The assumptions include that there is a one-part primary-key
+        TREE index on the first field, which must be a string. The iterator loop ensures
+        that the search will return tuples where the first value
+        is greater than or equal to 'XY'. The conditional statement
+        within the loop ensures that the looping will stop when the
+        first two letters are not 'XY'. |br|
+        :codenormal:`for _,tuple in box.space.t.index.primary:pairs("XY",{iterator = "GE"}) do` |br|
+        |nbsp| |nbsp| :codenormal:`if (string.sub(tuple[1], 1, 2) ~= "XY") then break end` |br|
+        |nbsp| |nbsp| :codenormal:`print(tuple)` |br|
+        |nbsp| |nbsp| :codenormal:`end` |br|
+
+        **Third Example of index pairs():**
+
+        This Lua code finds all the tuples whose primary key values are
+        greater than or equal to 1000, and less than or equal to 1999
+        (this type of request is sometimes called a "range search" or a "between search").
+        The assumptions include that there is a one-part primary-key
+        TREE index on the first field, which must be a number. The iterator loop ensures
+        that the search will return tuples where the first value
+        is greater than or equal to 1000. The conditional statement
+        within the loop ensures that the looping will stop when the
+        first value is greater than 1999. |br|
+        :codenormal:`for _,tuple in box.space.t2.index.primary:pairs(1000,{iterator = "GE"}) do` |br|
+        |nbsp| |nbsp| :codenormal:`if (tuple[1] > 1999) then break end` |br|
+        |nbsp| |nbsp| :codenormal:`print(tuple)` |br|
+        |nbsp| |nbsp| :codenormal:`end` |br|
 
     .. _index_object_select:
 
@@ -792,6 +826,44 @@ Lua functions `os.date()`_ and `string.sub()`_.
     ---
     - error: 'This tuple already has 3 fields'
     ...
+
+=================================================================
+              Example showing a user-defined iterator
+=================================================================
+
+Here is an example that shows how to build one's own iterator.
+The paged_iter function is an "iterator function", which will only be
+understood by programmers who have read the Lua
+manual section
+`Iterators and Closures <https://www.lua.org/pil/7.1.html>`_.
+It does paginated retrievals, that is, it returns 10
+tuples at a time from a table named "t", whose
+primary key was defined with :codenormal:`create_index('primary',{parts={1,'STR'}})`. |br|
+|nbsp| |nbsp| :codenormal:`function paged_iter(search_key, tuples_per_page)` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`local iterator_string = "GE"` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`return function ()` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`local page = box.space.t.index[0]:select(search_key,` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`{iterator = iterator_string, limit=tuples_per_page})` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`if #page == 0 then return nil end` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`search_key = page[#page][1]` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`iterator_string = "GT"` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`return page` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`end` |br|
+|nbsp| |nbsp| :codenormal:`end`
+
+Programmers who use paged_iter do not need to know
+why it works, they only need to know that, if they
+call it within a loop, they will get 10 tuples
+at a time until there are no more tuples. In this
+example the tuples are merely printed, a page at a time.
+But it should be simple to change the functionality,
+for example by yielding after each retrieval, or
+by breaking when the tuples fail to match some
+additional criteria. |br|
+|nbsp| |nbsp| :codenormal:`for page in paged_iter("X", 10) do` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`print("New Page. Number Of Tuples = " .. #page)` |br|
+|nbsp| |nbsp| |nbsp| |nbsp| :codenormal:`for i=1,#page,1 do print(page[i]) end` |br|
+|nbsp| |nbsp| :codenormal:`end`
 
 .. _RTREE:
 
