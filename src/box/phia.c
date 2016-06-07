@@ -13807,8 +13807,7 @@ phia_tx_write(struct phia_tx *t, struct phia_document *o, uint8_t flags)
 	case SR_FINAL_RECOVERY:
 	case SR_ONLINE: break;
 	default:
-		assert(0);
-		return -1;
+		return sr_malfunction("%s", "index in malfunction state");
 	}
 
 	/* create document */
