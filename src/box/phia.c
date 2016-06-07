@@ -2497,8 +2497,8 @@ struct PACKED sfvar {
 	uint32_t size;
 };
 
-struct sfv {
-	char     *pointer;
+struct phia_field {
+	const char *data;
 	uint32_t  size;
 };
 
@@ -2546,7 +2546,7 @@ sf_fieldsize(struct sfscheme *s, int pos, char *data)
 }
 
 static inline int
-sf_writesize(struct sfscheme *s, struct sfv *v)
+sf_writesize(struct sfscheme *s, struct phia_field *v)
 {
 	int sum = s->var_offset;
 	int i;
@@ -2560,7 +2560,7 @@ sf_writesize(struct sfscheme *s, struct sfv *v)
 }
 
 static inline void
-sf_write(struct sfscheme *s, struct sfv *v, char *dest)
+sf_write(struct sfscheme *s, struct phia_field *v, char *dest)
 {
 	int var_value_offset =
 		s->var_offset + sizeof(struct sfvar) * s->var_count;
@@ -2570,13 +2570,13 @@ sf_write(struct sfscheme *s, struct sfv *v, char *dest)
 		struct sffield *f = s->fields[i];
 		if (f->fixed_size) {
 			assert(f->fixed_size == v[i].size);
-			memcpy(dest + f->fixed_offset, v[i].pointer, f->fixed_size);
+			memcpy(dest + f->fixed_offset, v[i].data, f->fixed_size);
 			continue;
 		}
 		struct sfvar *current = &var[f->position_ref];
 		current->offset = var_value_offset;
 		current->size   = v[i].size;
-		memcpy(dest + var_value_offset, v[i].pointer, v[i].size);
+		memcpy(dest + var_value_offset, v[i].data, v[i].size);
 		var_value_offset += current->size;
 	}
 }
@@ -2667,57 +2667,57 @@ sf_limitfree(struct sflimit *b, struct ssa *a)
 }
 
 static inline void
-sf_limitset(struct sflimit *b, struct sfscheme *s, struct sfv *fields, enum phia_order order)
+sf_limitset(struct sflimit *b, struct sfscheme *s, struct phia_field *fields, enum phia_order order)
 {
 	int i;
 	for (i = 0; i < s->fields_count; i++) {
-		struct sfv *v = &fields[i];
-		if (v->pointer)
+		struct phia_field *v = &fields[i];
+		if (v->data)
 			continue;
 		struct sffield *part = s->fields[i];
 		switch (part->type) {
 		case SS_U32:
 			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = (char*)&b->u32_max;
+				v->data = (char*)&b->u32_max;
 				v->size = sizeof(uint32_t);
 			} else {
-				v->pointer = (char*)&b->u32_min;
+				v->data = (char*)&b->u32_min;
 				v->size = sizeof(uint32_t);
 			}
 			break;
 		case SS_U32REV:
 			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = (char*)&b->u32_min;
+				v->data = (char*)&b->u32_min;
 				v->size = sizeof(uint32_t);
 			} else {
-				v->pointer = (char*)&b->u32_max;
+				v->data = (char*)&b->u32_max;
 				v->size = sizeof(uint32_t);
 			}
 			break;
 		case SS_U64:
 			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = (char*)&b->u64_max;
+				v->data = (char*)&b->u64_max;
 				v->size = sizeof(uint64_t);
 			} else {
-				v->pointer = (char*)&b->u64_min;
+				v->data = (char*)&b->u64_min;
 				v->size = sizeof(uint64_t);
 			}
 			break;
 		case SS_U64REV:
 			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = (char*)&b->u64_min;
+				v->data = (char*)&b->u64_min;
 				v->size = sizeof(uint64_t);
 			} else {
-				v->pointer = (char*)&b->u64_max;
+				v->data = (char*)&b->u64_max;
 				v->size = sizeof(uint64_t);
 			}
 			break;
 		case SS_STRING:
 			if (order == PHIA_LT || order == PHIA_LE) {
-				v->pointer = b->string_max;
+				v->data = b->string_max;
 				v->size = b->string_max_size;
 			} else {
-				v->pointer = b->string_min;
+				v->data = b->string_min;
 				v->size = b->string_min_size;
 			}
 			break;
@@ -3911,10 +3911,10 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct sfscheme *scheme,
 		return -1;
 
 	/* validate and create new record */
-	struct sfv v[16];
+	struct phia_field v[16];
 	i = 0;
 	for ( ; i < scheme->fields_count; i++) {
-		v[i].pointer = result[i];
+		v[i].data = result[i];
 		v[i].size = result_size[i];
 	}
 	int size = sf_writesize(scheme, v);
@@ -3934,11 +3934,11 @@ cleanup:
 	i = 0;
 	for ( ; i < scheme->fields_count; i++) {
 		if (src_ptr == NULL) {
-			if (v[i].pointer != upsert[i])
-				free(v[i].pointer);
+			if (v[i].data != upsert[i])
+				free((char *)v[i].data);
 		} else {
-			if (v[i].pointer != src[i])
-				free(v[i].pointer);
+			if (v[i].data != src[i])
+				free((char *)v[i].data);
 		}
 	}
 	return rc;
@@ -6079,11 +6079,11 @@ sd_pagesparse_convert(struct sdpage *p, struct sfscheme *scheme,
 	char *ptr = dest;
 	memcpy(ptr, v, sizeof(struct sdv));
 	ptr += sizeof(struct sdv);
-	struct sfv fields[8];
+	struct phia_field fields[8];
 	int i = 0;
 	while (i < scheme->fields_count) {
-		struct sfv *k = &fields[i];
-		k->pointer = sd_pagesparse_field(p, v, i, &k->size);
+		struct phia_field *k = &fields[i];
+		k->data = sd_pagesparse_field(p, v, i, &k->size);
 		i++;
 	}
 	sf_write(scheme, fields, ptr);
@@ -7455,7 +7455,7 @@ static inline int
 sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		   struct sdindexpage *p, char *min, char *max)
 {
-	struct sfv fields[16];
+	struct phia_field fields[16];
 
 	/* min */
 	int part = 0;
@@ -7469,12 +7469,12 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		int fieldsize = *(uint32_t*)field;
 		field += sizeof(uint32_t);
 		/* copy only key fields, others are set to zero */
-		struct sfv *k = &fields[part];
+		struct phia_field *k = &fields[part];
 		if (build->scheme->fields[part]->key) {
-			k->pointer = field;
+			k->data = field;
 			k->size = fieldsize;
 		} else {
-			k->pointer = NULL;
+			k->data = NULL;
 			k->size = 0;
 		}
 		part++;
@@ -7499,12 +7499,12 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		int fieldsize = *(uint32_t*)field;
 		field += sizeof(uint32_t);
 
-		struct sfv *k = &fields[part];
+		struct phia_field *k = &fields[part];
 		if (build->scheme->fields[part]->key) {
-			k->pointer = field;
+			k->data = field;
 			k->size = fieldsize;
 		} else {
-			k->pointer = NULL;
+			k->data = NULL;
 			k->size = 0;
 		}
 		part++;
@@ -12408,7 +12408,7 @@ struct phia_index {
 struct phia_document {
 	struct phia_index *db;
 	struct phia_tuple *value;
-	struct sfv       fields[8];
+	struct phia_field       fields[8];
 	int       fields_count;
 	int       fields_count_keys;
 };
@@ -13601,7 +13601,7 @@ phia_document_new(struct phia_index *db)
 }
 
 static inline struct phia_tuple*
-phia_tuple_build(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
+phia_tuple_build(struct runtime *r, struct sfscheme *scheme, struct phia_field *fields)
 {
 	int size = sf_writesize(scheme, fields);
 	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
@@ -13718,8 +13718,8 @@ phia_document_set_field(struct phia_document *v, const char *path,
 	struct sffield *field = sf_schemefind(&db->index->scheme, (char*)path);
 	if (unlikely(field == NULL))
 		return -1;
-	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct sfv)));
-	struct sfv *fv = &v->fields[field->position];
+	assert(field->position < (int)(sizeof(v->fields) / sizeof(struct phia_field)));
+	struct phia_field *fv = &v->fields[field->position];
 	if (size == 0)
 		size = strlen(pointer);
 	int fieldsize_max;
@@ -13733,12 +13733,12 @@ phia_document_set_field(struct phia_document *v, const char *path,
 		         pointer, fieldsize_max);
 		return -1;
 	}
-	if (fv->pointer == NULL) {
+	if (fv->data == NULL) {
 		v->fields_count++;
 		if (field->key)
 			v->fields_count_keys++;
 	}
-	fv->pointer = (char *)pointer;
+	fv->data = (char *)pointer;
 	fv->size = size;
 	sr_statkey(&e->stat, size);
 	return 0;
