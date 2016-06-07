@@ -13082,7 +13082,8 @@ si_confcreate(struct siconf *conf, struct ssa *a,
 				 key_def->opts.compression);
 			goto error;
 		}
-		conf->compression = 1;
+		if (conf->compression_if != &ss_nonefilter)
+			conf->compression = 1;
 	} else {
 		conf->compression = 0;
 		conf->compression_if = &ss_nonefilter;
@@ -13102,7 +13103,8 @@ si_confcreate(struct siconf *conf, struct ssa *a,
 				 key_def->opts.compression_branch);
 			goto error;
 		}
-		conf->compression_branch = 1;
+		if (conf->compression_branch_if != &ss_nonefilter)
+			conf->compression_branch = 1;
 	} else {
 		conf->compression_branch = 0;
 		conf->compression_branch_if = &ss_nonefilter;
