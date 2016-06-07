@@ -3055,7 +3055,11 @@ sr_versionstorage_check(struct srversion *v)
 
 
 #define sr_e(type, fmt, ...) \
-	({int res = -1; diag_set(ClientError, type, fmt, __VA_ARGS__); res;})
+	({int res = -1;\
+	  char errmsg[256];\
+	  snprintf(errmsg, sizeof(errmsg), fmt, __VA_ARGS__);\
+	  diag_set(ClientError, type, errmsg);\
+	  res;})
 
 #define sr_error(fmt, ...) \
 	sr_e(ER_PHIA, fmt, __VA_ARGS__)
