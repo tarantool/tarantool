@@ -3707,86 +3707,22 @@ struct PACKED phia_tuple {
 	char data[0];
 };
 
-static struct svif sv_vif;
-
 static inline uint32_t
 phia_tuple_size(struct phia_tuple *v) {
 	return sizeof(struct phia_tuple) + v->size;
 }
 
 static inline struct phia_tuple*
-phia_tuple_build(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
-{
-	int size = sf_writesize(scheme, fields);
-	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
-	if (unlikely(v == NULL))
-		return NULL;
-	v->size      = size;
-	v->lsn       = 0;
-	v->flags     = 0;
-	v->refs      = 1;
-	char *ptr = v->data;
-	sf_write(scheme, fields, ptr);
-	/* update runtime statistics */
-	tt_pthread_mutex_lock(&r->stat->lock);
-	r->stat->v_count++;
-	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
-	tt_pthread_mutex_unlock(&r->stat->lock);
-	return v;
-}
-
-static inline struct phia_tuple*
-phia_tuple_buildraw(struct runtime *r, char *src, int size)
-{
-	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
-	if (unlikely(v == NULL))
-		return NULL;
-	v->size      = size;
-	v->flags     = 0;
-	v->refs      = 1;
-	v->lsn       = 0;
-	memcpy(v->data, src, size);
-	/* update runtime statistics */
-	tt_pthread_mutex_lock(&r->stat->lock);
-	r->stat->v_count++;
-	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
-	tt_pthread_mutex_unlock(&r->stat->lock);
-	return v;
-}
-
-static inline struct phia_tuple*
-sv_vdup(struct runtime *r, struct sv *src)
-{
-	struct phia_tuple *v = phia_tuple_buildraw(r, sv_pointer(src), sv_size(src));
-	if (unlikely(v == NULL))
-		return NULL;
-	v->flags     = sv_flags(src);
-	v->lsn       = sv_lsn(src);
-	return v;
-}
+phia_tuple_from_sv(struct runtime *r, struct sv *src);
 
 static inline void
-phia_tuple_ref(struct phia_tuple *v) {
-	v->refs++;
-}
+phia_tuple_ref(struct phia_tuple *v);
 
 static inline int
-phia_tuple_unref(struct runtime *r, struct phia_tuple *v)
-{
-	if (likely(--v->refs == 0)) {
-		uint32_t size = phia_tuple_size(v);
-		/* update runtime statistics */
-		tt_pthread_mutex_lock(&r->stat->lock);
-		assert(r->stat->v_count > 0);
-		assert(r->stat->v_allocated >= size);
-		r->stat->v_count--;
-		r->stat->v_allocated -= size;
-		tt_pthread_mutex_unlock(&r->stat->lock);
-		ss_free(r->a, v);
-		return 1;
-	}
-	return 0;
-}
+phia_tuple_unref(struct runtime *r, struct phia_tuple *v);
+
+static inline int
+phia_document_build(struct phia_document *o, enum phia_order order);
 
 static struct svif sv_upsertvif;
 
@@ -5900,7 +5836,7 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 		return 2;
 	struct sv vv;
 	sv_init(&vv, &sv_vif, v->v, NULL);
-	*result = sv_vdup(m->r, &vv);
+	*result = phia_tuple_from_sv(m->r, &vv);
 	if (unlikely(*result == NULL))
 		return -1;
 	return 1;
@@ -10717,7 +10653,7 @@ si_readdup(struct siread *q, struct sv *result)
 		v = result->v;
 		phia_tuple_ref(v);
 	} else {
-		v = sv_vdup(q->index->r, result);
+		v = phia_tuple_from_sv(q->index->r, result);
 		if (unlikely(v == NULL))
 			return sr_oom();
 	}
@@ -12490,35 +12426,6 @@ phia_raise()
 }
 
 int
-phia_document_delete(struct phia_document *v)
-{
-	struct phia_env *e = v->db->env;
-	if (v->value != NULL)
-		phia_tuple_unref(v->db->index->r, v->value);
-	v->value = NULL;
-	ss_free(&e->a, v);
-	return 0;
-}
-
-static inline int
-phia_document_build(struct phia_document *o, enum phia_order order);
-
-static inline int
-phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
-{
-	struct phia_env *e = o->db->env;
-	if (unlikely(o->db != dest))
-		return sr_error("%s", "incompatible document parent db");
-	o->value->flags = flags;
-	if (o->value->lsn != 0) {
-		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
-		if (o->value->lsn <= lsn)
-			return sr_error("%s", "incompatible document lsn");
-	}
-	return 0;
-}
-
-int
 phia_index_read(struct phia_index*, struct phia_tuple*, enum phia_order order,
 		struct phia_tuple **, struct sx*, int, struct sicache*,
 		bool cache_only, struct phia_statget *);
@@ -13678,6 +13585,42 @@ static int phia_index_recoverend(struct phia_index *db)
 	return 0;
 }
 
+struct phia_document *
+phia_document_new(struct phia_index *db)
+{
+	struct phia_env *e = db->env;
+	struct phia_document *doc;
+	doc = ss_malloc(&e->a, sizeof(struct phia_document));
+	if (unlikely(doc == NULL)) {
+		sr_oom();
+		return NULL;
+	}
+	memset(doc, 0, sizeof(*doc));
+	doc->db = db;
+	return doc;
+}
+
+static inline struct phia_tuple*
+phia_tuple_build(struct runtime *r, struct sfscheme *scheme, struct sfv *fields)
+{
+	int size = sf_writesize(scheme, fields);
+	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
+	if (unlikely(v == NULL))
+		return NULL;
+	v->size      = size;
+	v->lsn       = 0;
+	v->flags     = 0;
+	v->refs      = 1;
+	char *ptr = v->data;
+	sf_write(scheme, fields, ptr);
+	/* update runtime statistics */
+	tt_pthread_mutex_lock(&r->stat->lock);
+	r->stat->v_count++;
+	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
+	tt_pthread_mutex_unlock(&r->stat->lock);
+	return v;
+}
+
 static inline int
 phia_document_build(struct phia_document *o, enum phia_order order)
 {
@@ -13705,6 +13648,64 @@ phia_document_build(struct phia_document *o, enum phia_order order)
 	if (unlikely(v == NULL))
 		return sr_oom();
 	o->value = v;
+	return 0;
+}
+
+static inline struct phia_tuple*
+phia_tuple_from_sv(struct runtime *r, struct sv *sv)
+{
+	char *src = sv_pointer(sv);
+	size_t size = sv_size(sv);
+	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
+	if (unlikely(v == NULL))
+		return NULL;
+	v->size      = size;
+	v->flags     = 0;
+	v->refs      = 1;
+	v->lsn       = 0;
+	v->flags     = sv_flags(sv);
+	v->lsn       = sv_lsn(sv);
+		memcpy(v->data, src, size);
+	/* update runtime statistics */
+	tt_pthread_mutex_lock(&r->stat->lock);
+	r->stat->v_count++;
+	r->stat->v_allocated += sizeof(struct phia_tuple) + size;
+	tt_pthread_mutex_unlock(&r->stat->lock);
+	return v;
+}
+
+static inline void
+phia_tuple_ref(struct phia_tuple *v)
+{
+	v->refs++;
+}
+
+static inline int
+phia_tuple_unref(struct runtime *r, struct phia_tuple *v)
+{
+	if (likely(--v->refs == 0)) {
+		uint32_t size = phia_tuple_size(v);
+		/* update runtime statistics */
+		tt_pthread_mutex_lock(&r->stat->lock);
+		assert(r->stat->v_count > 0);
+		assert(r->stat->v_allocated >= size);
+		r->stat->v_count--;
+		r->stat->v_allocated -= size;
+		tt_pthread_mutex_unlock(&r->stat->lock);
+		ss_free(r->a, v);
+		return 1;
+	}
+	return 0;
+}
+
+int
+phia_document_delete(struct phia_document *v)
+{
+	struct phia_env *e = v->db->env;
+	if (v->value != NULL)
+		phia_tuple_unref(v->db->index->r, v->value);
+	v->value = NULL;
+	ss_free(&e->a, v);
 	return 0;
 }
 
@@ -13765,19 +13766,19 @@ phia_document_lsn(struct phia_document *v)
 	return v->value->lsn;
 }
 
-struct phia_document *
-phia_document_new(struct phia_index *db)
+static inline int
+phia_document_validate(struct phia_document *o, struct phia_index *dest, uint8_t flags)
 {
-	struct phia_env *e = db->env;
-	struct phia_document *doc;
-	doc = ss_malloc(&e->a, sizeof(struct phia_document));
-	if (unlikely(doc == NULL)) {
-		sr_oom();
-		return NULL;
+	struct phia_env *e = o->db->env;
+	if (unlikely(o->db != dest))
+		return sr_error("%s", "incompatible document parent db");
+	o->value->flags = flags;
+	if (o->value->lsn != 0) {
+		uint64_t lsn = sr_seq(&e->seq, SR_LSN);
+		if (o->value->lsn <= lsn)
+			return sr_error("%s", "incompatible document lsn");
 	}
-	memset(doc, 0, sizeof(*doc));
-	doc->db = db;
-	return doc;
+	return 0;
 }
 
 static inline int
