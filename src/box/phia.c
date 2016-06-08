@@ -13869,7 +13869,7 @@ phia_get(struct phia_tx *t, struct phia_document *key,
 	case SR_FINAL_RECOVERY:
 		break;
 	default:
-		assert(0);
+		sr_malfunction("%s", "index is in malfunction state");
 		return -1;
 	}
 
