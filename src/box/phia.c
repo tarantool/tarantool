@@ -2363,7 +2363,7 @@ ss_zstdfilter_complete(struct ssfilter *f, struct ssbuf *dest)
 	int rc;
 	switch (f->op) {
 	case SS_FINPUT:;
-		size_t block = ZSTD_blockHeaderSize;
+		size_t block = ZSTD_compressBound(0);
 		rc = ss_bufensure(dest, f->a, block);
 		if (unlikely(rc == -1))
 			return -1;
