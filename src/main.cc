@@ -466,6 +466,9 @@ tarantool_free(void)
 	if (getpid() != master_pid)
 		return;
 
+	/* Shutdown worker pool. Waits until threads terminate. */
+	coeio_shutdown();
+
 	box_free();
 
 	if (history) {

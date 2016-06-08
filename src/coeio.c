@@ -150,6 +150,12 @@ coeio_enable(void)
 	ev_async_start(loop(), &coeio_manager.coeio_async);
 }
 
+void
+coeio_shutdown(void)
+{
+	eio_set_max_parallel(0);
+}
+
 static void
 coio_on_exec(eio_req *req)
 {
