@@ -20,10 +20,8 @@ set(SPHINX_BUILD_LOCALE_DIR "${PROJECT_BINARY_DIR}/doc/sphinx/_locale_build/")
 set(SPHINX_HTML_DIR  "${PROJECT_BINARY_DIR}/doc/www/output/doc/")
 set(SPHINX_RU_HTML_DIR  "${PROJECT_BINARY_DIR}/doc/www/output/doc/ru/")
 
-#add_custom_command(OUTPUT
-#    ${MKDIR} -p ${SPHINX_BUILD_DIR})
-#add_custom_command(OUTPUT
-#    ${MKDIR} -p ${SPHINX_HTML_DIR})
+#add_custom_command(OUTPUT ${MKDIR} -p ${SPHINX_BUILD_DIR})
+#add_custom_command(OUTPUT ${MKDIR} -p ${SPHINX_HTML_DIR})
 
 add_custom_target(sphinx-html ALL
 #    DEPENDS ${SPHINX_BUILD_DIR} ${SPHINX_HTML_DIR}
@@ -79,6 +77,7 @@ add_custom_target(sphinx-update-pot
     COMMAND "${SPHINX_EXECUTABLE}"
         -b gettext
         -d "${SPHINX_BUILD_LOCALE_DIR}"
+        -c locale/
         "${PROJECT_SOURCE_DIR}/doc/sphinx"
         "${PROJECT_SOURCE_DIR}/doc/sphinx/locale"
     COMMENT "Generate localization templates"
