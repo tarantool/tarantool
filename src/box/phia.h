@@ -42,7 +42,7 @@ extern "C" {
 struct phia_env;
 struct phia_service;
 struct phia_tx;
-struct phia_document;
+struct phia_tuple;
 struct phia_cursor;
 struct phia_index;
 struct phia_confcursor;
@@ -111,17 +111,20 @@ struct phia_tx *
 phia_begin(struct phia_env *e);
 
 int
-phia_get(struct phia_tx *tx, struct phia_document *key,
-	 struct phia_document **result, bool cache_only);
+phia_get(struct phia_tx *tx, struct phia_index *index,
+	 struct phia_tuple *key, struct phia_tuple **result, bool cache_only);
 
 int
-phia_replace(struct phia_tx *tx, struct phia_document *doc);
+phia_replace(struct phia_tx *tx, struct phia_index *index,
+	     struct phia_tuple *tuple);
 
 int
-phia_upsert(struct phia_tx *tx, struct phia_document *doc);
+phia_upsert(struct phia_tx *tx, struct phia_index *index,
+	    struct phia_tuple *tuple);
 
 int
-phia_delete(struct phia_tx *tx, struct phia_document *doc);
+phia_delete(struct phia_tx *tx, struct phia_index *index,
+	    struct phia_tuple *tuple);
 
 int
 phia_commit(struct phia_tx *tx);
@@ -158,8 +161,8 @@ int
 phia_index_delete(struct phia_index *index);
 
 int
-phia_index_get(struct phia_index *index, struct phia_document *key,
-	        struct phia_document **result, bool cache_only);
+phia_index_get(struct phia_index *index, struct phia_tuple *key,
+	        struct phia_tuple **result, bool cache_only);
 
 size_t
 phia_index_bsize(struct phia_index *db);
@@ -180,7 +183,7 @@ enum phia_order {
 };
 
 struct phia_cursor *
-phia_cursor_new(struct phia_index *index, struct phia_document *key,
+phia_cursor_new(struct phia_index *index, struct phia_tuple *key,
 		enum phia_order order);
 
 void
@@ -190,28 +193,37 @@ void
 phia_cursor_set_read_commited(struct phia_cursor *cursor, bool read_commited);
 
 int
-phia_cursor_next(struct phia_cursor *cursor, struct phia_document **result,
+phia_cursor_next(struct phia_cursor *cursor, struct phia_tuple **result,
 		 bool cache_only);
 
 /*
- * Document
+ * Tuple
  */
+struct phia_field {
+	const char *data;
+	uint32_t size;
+};
 
-struct phia_document *
-phia_document_new(struct phia_index *index);
-
-int
-phia_document_delete(struct phia_document *doc);
-
-int
-phia_document_set_field(struct phia_document *doc, const char *path,
-			const char *value, int size);
+struct phia_tuple *
+phia_tuple_new(struct phia_index *index, struct phia_field *fields,
+	       int fields_count);
 
 char *
-phia_document_field(struct phia_document *doc, const char *path, uint32_t *size);
+phia_tuple_field(struct phia_index *index, struct phia_tuple *tuple,
+		 int field_id, uint32_t *size);
+
+void
+phia_tuple_fields(struct phia_index *index, struct phia_tuple *tuple,
+		  struct phia_field *fields, int fields_count);
+
+void
+phia_tuple_ref(struct phia_tuple *tuple);
+
+void
+phia_tuple_unref(struct phia_index *index, struct phia_tuple *tuple);
 
 int64_t
-phia_document_lsn(struct phia_document *doc);
+phia_tuple_lsn(struct phia_tuple *doc);
 
 #ifdef __cplusplus
 }

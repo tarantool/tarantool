@@ -42,6 +42,10 @@ public:
 	replace(struct tuple*,
 	        struct tuple*, enum dup_replace_mode) override;
 
+	/* Used by INSERT */
+	struct tuple *
+	findByKey(struct phia_tuple *tuple) const;
+
 	virtual struct tuple*
 	findByKey(const char *key, uint32_t) const override;
 
@@ -59,10 +63,16 @@ public:
 public:
 	struct phia_env *env;
 	struct phia_index *db;
-
-	struct phia_document *createDocument(const char *key, const char **keyend);
 private:
 	struct tuple_format *format;
 };
+
+void
+phia_set_fields(struct key_def *key_def, struct phia_field *fields,
+		const char **data, uint32_t part_count);
+
+struct phia_tuple *
+phia_tuple_from_key_data(struct phia_index *index, struct key_def *key_def,
+			 const char *key, uint32_t part_count, int order);
 
 #endif /* TARANTOOL_BOX_PHIA_INDEX_H_INCLUDED */

@@ -67,21 +67,21 @@ int phia_info(const char*, phia_info_f, void*);
 }
 void phia_workers_start(struct phia_env *);
 
-struct phia_document;
+struct phia_tuple;
 struct phia_tx;
 struct phia_cursor;
 
 int
-phia_coget(struct phia_tx *tx, struct phia_document *key,
-	   struct phia_document **result);
+phia_coget(struct phia_tx *tx, struct phia_index *index,
+	   struct phia_tuple *key, struct phia_tuple **result);
 int
-phia_index_coget(struct phia_index *index, struct phia_document *key,
-		 struct phia_document **result);
+phia_index_coget(struct phia_index *index, struct phia_tuple *key,
+		 struct phia_tuple **result);
 int
-phia_cursor_conext(struct phia_cursor *tx, struct phia_document **result);
+phia_cursor_conext(struct phia_cursor *tx, struct phia_tuple **result);
 
 struct tuple *
-phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
-               struct tuple_format *format);
+phia_convert_tuple(struct phia_index *index, struct phia_tuple *phia_tuple,
+		   struct key_def *key_def, struct tuple_format *format);
 
 #endif /* TARANTOOL_BOX_PHIA_ENGINE_H_INCLUDED */

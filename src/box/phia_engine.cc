@@ -56,82 +56,78 @@ static int worker_pool_size;
 static volatile int worker_pool_run;
 
 static inline uint32_t
-phia_get_parts(struct key_def *key_def, struct phia_document *obj,
-	       void *value, int valuesize, struct iovec *parts,
-	       uint32_t *field_count)
+phia_calc_fields(struct key_def *key_def, struct phia_field *fields,
+		uint32_t *field_count)
 {
 	/* prepare keys */
-	int size = 0;
-	assert(key_def->part_count <= 8);
-	static const char *PARTNAMES[] = {
-		"key_0", "key_1", "key_2", "key_3",
-		"key_4", "key_5", "key_6", "key_7"
-	};
+	uint32_t size = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		uint32_t len = 0;
-		parts[i].iov_base = phia_document_field(obj, PARTNAMES[i], &len);
-		parts[i].iov_len = len;
-		assert(parts[i].iov_base != NULL);
+		struct phia_field *field = &fields[i];
+		assert(field->data != NULL);
 		switch (key_def->parts[i].type) {
 		case STRING:
-			size += mp_sizeof_str(len);
+			size += mp_sizeof_str(field->size);
 			break;
 		case NUM:
-			size += mp_sizeof_uint(load_u64(parts[i].iov_base));
+			size += mp_sizeof_uint(load_u64(field->data));
 			break;
 		default:
 			assert(0);
 		}
 	}
+
 	int count = key_def->part_count;
-	void *valueend = (char *) value + valuesize;
+	struct phia_field *value_field = &fields[key_def->part_count];
+	const char *value = value_field->data;
+	const char *valueend = value + value_field->size;
 	while (value < valueend) {
 		count++;
-		mp_next((const char **)&value);
+		mp_next(&value);
 	}
 	size += mp_sizeof_array(count);
-	size += valuesize;
+	size += value_field->size;
+
 	*field_count = count;
 	return size;
 }
 
 static inline char *
-phia_write_parts(struct key_def *key_def, void *value, int valuesize,
-		   struct iovec *parts, char *p)
+phia_write_fields(struct key_def *key_def, struct phia_field *fields,
+		  char *p)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct phia_field *field = &fields[i];
 		switch (key_def->parts[i].type) {
 		case STRING:
-			p = mp_encode_str(p, (const char *) parts[i].iov_base,
-					  parts[i].iov_len);
+			p = mp_encode_str(p, field->data, field->size);
 			break;
 		case NUM:
-			p = mp_encode_uint(p, load_u64(parts[i].iov_base));
+			p = mp_encode_uint(p, load_u64(field->data));
 			break;
 		default:
 			assert(0);
 		}
 	}
-	memcpy(p, value, valuesize);
-	return p + valuesize;
+	struct phia_field *value_field = &fields[key_def->part_count];
+	memcpy(p, value_field->data, value_field->size);
+	return p + value_field->size;
 }
 
 struct tuple *
-phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
-	       struct tuple_format *format)
+phia_convert_tuple(struct phia_index *index, struct phia_tuple *phia_tuple,
+		   struct key_def *key_def, struct tuple_format *format)
 {
 	assert(format);
-	assert(key_def->part_count <= 8);
-	struct iovec parts[8];
-	uint32_t valuesize = 0;
-	void *value = phia_document_field(obj, "value", &valuesize);
+	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	phia_tuple_fields(index, phia_tuple, fields, key_def->part_count + 1);
 	uint32_t field_count = 0;
-	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,
-				       &field_count);
+	size_t size = phia_calc_fields(key_def, fields, &field_count);
+
 	struct tuple *tuple = tuple_alloc(format, size);
 	char *d = tuple->data;
 	d = mp_encode_array(d, field_count);
-	d = phia_write_parts(key_def, value, valuesize, parts, d);
+	d = phia_write_fields(key_def, fields, d);
 	assert(tuple->data + size == d);
 	try {
 		tuple_init_field_map(format, tuple);
@@ -143,22 +139,21 @@ phia_tuple_new(struct phia_document *obj, struct key_def *key_def,
 }
 
 static char *
-phia_tuple_data_new(struct phia_document *obj, struct key_def *key_def,
-		    uint32_t *bsize)
+phia_convert_tuple_data(struct phia_index *index, struct phia_tuple *phia_tuple,
+			struct key_def *key_def,
+			uint32_t *bsize)
 {
-	assert(key_def->part_count <= 8);
-	struct iovec parts[8];
-	uint32_t valuesize = 0;
-	void *value = phia_document_field(obj, "value", &valuesize);
+	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1]; /* parts + value */
+	phia_tuple_fields(index, phia_tuple, fields, key_def->part_count + 1);
 	uint32_t field_count = 0;
-	size_t size = phia_get_parts(key_def, obj, value, valuesize, parts,
-				       &field_count);
+	size_t size = phia_calc_fields(key_def, fields, &field_count);
 	char *tuple_data = (char *) malloc(size);
 	if (tuple_data == NULL)
 		tnt_raise(OutOfMemory, size, "malloc", "tuple");
 	char *d = tuple_data;
 	d = mp_encode_array(d, field_count);
-	d = phia_write_parts(key_def, value, valuesize, parts, d);
+	d = phia_write_fields(key_def, fields, d);
 	assert(tuple_data + size == d);
 	*bsize = size;
 	return tuple_data;
@@ -242,8 +237,8 @@ struct phia_read_task {
 	struct phia_index *index;
 	struct phia_cursor *cursor;
 	struct phia_tx *tx;
-	struct phia_document *key;
-	struct phia_document *result;
+	struct phia_tuple *key;
+	struct phia_tuple *result;
 };
 
 static ssize_t
@@ -251,7 +246,7 @@ phia_get_cb(struct coio_task *ptr)
 {
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
-	return phia_get(task->tx, task->key, &task->result, false);
+	return phia_get(task->tx, task->index, task->key, &task->result, false);
 }
 
 static ssize_t
@@ -276,15 +271,15 @@ phia_read_task_free_cb(struct coio_task *ptr)
 	struct phia_read_task *task =
 		(struct phia_read_task *) ptr;
 	if (task->result != NULL)
-		phia_document_delete(task->result);
+		phia_tuple_unref(task->index, task->result);
 	mempool_free(&phia_read_pool, task);
 	return 0;
 }
 
 static inline int
 phia_read_task(struct phia_index *index, struct phia_tx *tx,
-	       struct phia_cursor *cursor, struct phia_document *key,
-	       struct phia_document **result,
+	       struct phia_cursor *cursor, struct phia_tuple *key,
+	       struct phia_tuple **result,
 	       coio_task_cb func)
 {
 	struct phia_read_task *task =
@@ -306,21 +301,21 @@ phia_read_task(struct phia_index *index, struct phia_tx *tx,
 }
 
 int
-phia_index_coget(struct phia_index *index, struct phia_document *key,
-		 struct phia_document **result)
+phia_index_coget(struct phia_index *index, struct phia_tuple *key,
+		 struct phia_tuple **result)
 {
 	return phia_read_task(index, NULL, NULL, key, result, phia_index_get_cb);
 }
 
 int
-phia_coget(struct phia_tx *tx, struct phia_document *key,
-	   struct phia_document **result)
+phia_coget(struct phia_tx *tx, struct phia_index *index,
+	   struct phia_tuple *key, struct phia_tuple **result)
 {
-	return phia_read_task(NULL, tx, NULL, key, result, phia_get_cb);
+	return phia_read_task(index, tx, NULL, key, result, phia_get_cb);
 }
 
 int
-phia_cursor_conext(struct phia_cursor *cursor, struct phia_document **result)
+phia_cursor_conext(struct phia_cursor *cursor, struct phia_tuple **result)
 {
 	return phia_read_task(NULL, NULL, cursor, NULL, result,
 			      phia_cursor_next_cb);
@@ -432,12 +427,12 @@ join_send_space(struct space *sp, void *data)
 		return;
 
 	/* send database */
-	struct phia_document *key = phia_document_new(pk->db);
-	struct phia_cursor *cursor = phia_cursor_new(pk->db, key, PHIA_GE);
-	if (cursor == NULL) {
-		phia_document_delete(key);
+	struct phia_tuple *phia_key =
+		phia_tuple_from_key_data(pk->db, pk->key_def, NULL, 0, PHIA_GE);
+	struct phia_cursor *cursor = phia_cursor_new(pk->db, phia_key, PHIA_GE);
+	phia_tuple_unref(pk->db, phia_key);
+	if (cursor == NULL)
 		phia_raise();
-	}
 	auto cursor_guard = make_scoped_guard([=]{
 		phia_cursor_delete(cursor);
 	});
@@ -448,17 +443,17 @@ join_send_space(struct space *sp, void *data)
 	phia_cursor_set_read_commited(cursor, true);
 
 	while (1) {
-		struct phia_document *doc;
-		int rc = phia_cursor_next(cursor, &doc, false);
+		struct phia_tuple *phia_tuple;
+		int rc = phia_cursor_next(cursor, &phia_tuple, false);
 		if (rc != 0)
 			diag_raise();
-		if (doc == NULL)
+		if (phia_tuple == NULL)
 			break; /* eof */
-		int64_t lsn = phia_document_lsn(doc);
+		int64_t lsn = phia_tuple_lsn(phia_tuple);
 		uint32_t tuple_size;
-		char *tuple = phia_tuple_data_new(doc, pk->key_def,
-						  &tuple_size);
-		phia_document_delete(doc);
+		char *tuple = phia_convert_tuple_data(pk->db, phia_tuple,
+			pk->key_def, &tuple_size);
+		phia_tuple_unref(pk->db, phia_tuple);
 		try {
 			phia_send_row(stream, pk->key_def->space_id,
 				      tuple, tuple_size, lsn);
