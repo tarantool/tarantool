@@ -4780,7 +4780,6 @@ sv_indexset(struct svindex *i, struct svref ref)
 	if (bps_tree_svindex_insert(&i->tree, ref, NULL) != 0)
 		return -1;
 	i->used += ref.v->size;
-	phia_tuple_ref(ref.v);
 	if (i->lsnmin > ref.v->lsn)
 		i->lsnmin = ref.v->lsn;
 	if (!i->hint_key_is_equal) {
