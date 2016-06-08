@@ -1140,7 +1140,7 @@ ss_lz4filter_next(struct ssfilter *f, struct ssbuf *dest, char *buf, int size)
 		/* See comments in ss_lz4filter_complete() */
 		int capacity = LZ4F_compressBound(z->total_size + size, NULL);
 		assert(capacity >= (ptrdiff_t)ss_bufused(dest));
-		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
+		rc = ss_bufensure(dest, f->a, capacity);
 		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = LZ4F_compressUpdate(z->compress, dest->p,
