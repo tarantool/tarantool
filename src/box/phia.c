@@ -152,74 +152,6 @@ struct ssmmap {
 
 struct ssvfs;
 
-struct ssvfsif {
-	int     (*init)(struct ssvfs*, va_list);
-	void    (*free)(struct ssvfs*);
-	int64_t (*size)(struct ssvfs*, char*);
-	int     (*exists)(struct ssvfs*, const char*);
-	int     (*unlink)(struct ssvfs*, char*);
-	int     (*rename)(struct ssvfs*, char*, char*);
-	int     (*mkdir)(struct ssvfs*, const char*, int);
-	int     (*rmdir)(struct ssvfs*, char*);
-	int     (*open)(struct ssvfs*, char*, int, int);
-	int     (*close)(struct ssvfs*, int);
-	int     (*sync)(struct ssvfs*, int);
-	int     (*advise)(struct ssvfs*, int, int, uint64_t, uint64_t);
-	int     (*truncate)(struct ssvfs*, int, uint64_t);
-	int64_t (*pread)(struct ssvfs*, int, uint64_t, void*, int);
-	int64_t (*pwrite)(struct ssvfs*, int, uint64_t, void*, int);
-	int64_t (*write)(struct ssvfs*, int, void*, int);
-	int64_t (*writev)(struct ssvfs*, int, struct ssiov*);
-	int64_t (*seek)(struct ssvfs*, int, uint64_t);
-	int     (*mmap)(struct ssvfs*, struct ssmmap*, int, uint64_t, int);
-	int     (*mmap_allocate)(struct ssvfs*, struct ssmmap*, uint64_t);
-	int     (*mremap)(struct ssvfs*, struct ssmmap*, uint64_t);
-	int     (*munmap)(struct ssvfs*, struct ssmmap*);
-};
-
-struct ssvfs {
-	struct ssvfsif *i;
-	char priv[48];
-};
-
-static inline int
-ss_vfsinit(struct ssvfs *f, struct ssvfsif *i, ...)
-{
-	f->i = i;
-	va_list args;
-	va_start(args, i);
-	int rc = i->init(f, args);
-	va_end(args);
-	return rc;
-}
-
-static inline void
-ss_vfsfree(struct ssvfs *f)
-{
-	f->i->free(f);
-}
-
-#define ss_vfssize(fs, path)                 (fs)->i->size(fs, path)
-#define ss_vfsexists(fs, path)               (fs)->i->exists(fs, path)
-#define ss_vfsunlink(fs, path)               (fs)->i->unlink(fs, path)
-#define ss_vfsrename(fs, src, dest)          (fs)->i->rename(fs, src, dest)
-#define ss_vfsmkdir(fs, path, mode)          (fs)->i->mkdir(fs, path, mode)
-#define ss_vfsrmdir(fs, path)                (fs)->i->rmdir(fs, path)
-#define ss_vfsopen(fs, path, flags, mode)    (fs)->i->open(fs, path, flags, mode)
-#define ss_vfsclose(fs, fd)                  (fs)->i->close(fs, fd)
-#define ss_vfssync(fs, fd)                   (fs)->i->sync(fs, fd)
-#define ss_vfsadvise(fs, fd, hint, off, len) (fs)->i->advise(fs, fd, hint, off, len)
-#define ss_vfstruncate(fs, fd, size)         (fs)->i->truncate(fs, fd, size)
-#define ss_vfspread(fs, fd, off, buf, size)  (fs)->i->pread(fs, fd, off, buf, size)
-#define ss_vfspwrite(fs, fd, off, buf, size) (fs)->i->pwrite(fs, fd, off, buf, size)
-#define ss_vfswrite(fs, fd, buf, size)       (fs)->i->write(fs, fd, buf, size)
-#define ss_vfswritev(fs, fd, iov)            (fs)->i->writev(fs, fd, iov)
-#define ss_vfsseek(fs, fd, off)              (fs)->i->seek(fs, fd, off)
-#define ss_vfsmmap(fs, m, fd, size, ro)      (fs)->i->mmap(fs, m, fd, size, ro)
-#define ss_vfsmunmap(fs, m)                  (fs)->i->munmap(fs, m)
-
-static struct ssvfsif ss_stdvfs;
-
 struct PACKED ssfile {
 	int fd;
 	uint64_t size;
@@ -229,10 +161,9 @@ struct PACKED ssfile {
 };
 
 static inline void
-ss_fileinit(struct ssfile *f, struct ssvfs *vfs)
+ss_fileinit(struct ssfile *f)
 {
 	ss_pathinit(&f->path);
-	f->vfs   = vfs;
 	f->fd    = -1;
 	f->size  = 0;
 	f->creat = 0;
@@ -242,20 +173,21 @@ static inline int
 ss_fileopen_as(struct ssfile *f, char *path, int flags)
 {
 	f->creat = (flags & O_CREAT ? 1 : 0);
-	f->fd = ss_vfsopen(f->vfs, path, flags, 0644);
+	f->fd = open(path, flags, 0644);
 	if (unlikely(f->fd == -1))
 		return -1;
 	ss_pathset(&f->path, "%s", path);
 	f->size = 0;
 	if (f->creat)
 		return 0;
-	int64_t size = ss_vfssize(f->vfs, path);
-	if (unlikely(size == -1)) {
-		ss_vfsclose(f->vfs, f->fd);
+	struct stat st;
+	int rc = lstat(path, &st);
+	if (unlikely(rc == -1)) {
+		close(f->fd);
 		f->fd = -1;
 		return -1;
 	}
-	f->size = size;
+	f->size = st.st_size;
 	return 0;
 }
 
@@ -273,7 +205,7 @@ static inline int
 ss_fileclose(struct ssfile *f)
 {
 	if (unlikely(f->fd != -1)) {
-		int rc = ss_vfsclose(f->vfs, f->fd);
+		int rc = close(f->fd);
 		if (unlikely(rc == -1))
 			return -1;
 		f->fd  = -1;
@@ -285,7 +217,7 @@ ss_fileclose(struct ssfile *f)
 static inline int
 ss_filerename(struct ssfile *f, char *path)
 {
-	int rc = ss_vfsrename(f->vfs, ss_pathof(&f->path), path);
+	int rc = rename(ss_pathof(&f->path), path);
 	if (unlikely(rc == -1))
 		return -1;
 	ss_pathset(&f->path, "%s", path);
@@ -294,18 +226,26 @@ ss_filerename(struct ssfile *f, char *path)
 
 static inline int
 ss_filesync(struct ssfile *f) {
-	return ss_vfssync(f->vfs, f->fd);
+	return fdatasync(f->fd);
 }
 
 static inline int
 ss_fileadvise(struct ssfile *f, int hint, uint64_t off, uint64_t len) {
-	return ss_vfsadvise(f->vfs, f->fd, hint, off, len);
+	(void)hint;
+#if !defined(HAVE_POSIX_FADVISE)
+	(void)fd;
+	(void)off;
+	(void)len;
+	return 0;
+#else
+	return posix_fadvise(f->fd, off, len, POSIX_FADV_DONTNEED);
+#endif
 }
 
 static inline int
 ss_fileresize(struct ssfile *f, uint64_t size)
 {
-	int rc = ss_vfstruncate(f->vfs, f->fd, size);
+	int rc = ftruncate(f->fd, size);
 	if (unlikely(rc == -1))
 		return -1;
 	f->size = size;
@@ -315,48 +255,94 @@ ss_fileresize(struct ssfile *f, uint64_t size)
 static inline int
 ss_filepread(struct ssfile *f, uint64_t off, void *buf, int size)
 {
-	int64_t rc = ss_vfspread(f->vfs, f->fd, off, buf, size);
-	if (unlikely(rc == -1))
+	int64_t n = 0;
+	do {
+		int r;
+		do {
+			r = pread(f->fd, (char*)buf + n, size - n, off + n);
+		} while (r == -1 && errno == EINTR);
+		if (r <= 0)
+			return -1;
+		n += r;
+	} while (n != size);
+
+	if (unlikely(n == -1))
 		return -1;
-	assert(rc == size);
-	return rc;
+	assert(n == size);
+	return n;
 }
 
 static inline int
 ss_filepwrite(struct ssfile *f, uint64_t off, void *buf, int size)
 {
-	int64_t rc = ss_vfspwrite(f->vfs, f->fd, off, buf, size);
-	if (unlikely(rc == -1))
-		return -1;
-	assert(rc == size);
-	return rc;
+	int n = 0;
+	do {
+		int r;
+		do {
+			r = pwrite(f->fd, (char*)buf + n, size - n, off + n);
+		} while (r == -1 && errno == EINTR);
+		if (r <= 0)
+			return -1;
+		n += r;
+	} while (n != size);
+	assert(n == size);
+	return n;
 }
 
 static inline int
 ss_filewrite(struct ssfile *f, void *buf, int size)
 {
-	int64_t rc = ss_vfswrite(f->vfs, f->fd, buf, size);
-	if (unlikely(rc == -1))
-		return -1;
-	assert(rc == size);
-	f->size += rc;
-	return rc;
+	int n = 0;
+	do {
+		int r;
+		do {
+			r = write(f->fd, (char*)buf + n, size - n);
+		} while (r == -1 && errno == EINTR);
+		if (r <= 0)
+			return -1;
+		n += r;
+	} while (n != size);
+	assert(n == size);
+	//FIXME: this may be incorrect
+	f->size += n;
+	return n;
 }
 
 static inline int
 ss_filewritev(struct ssfile *f, struct ssiov *iov)
 {
-	int64_t rc = ss_vfswritev(f->vfs, f->fd, iov);
-	if (unlikely(rc == -1))
-		return -1;
-	f->size += rc;
-	return rc;
+	struct iovec *v = iov->v;
+	int n = iov->iovc;
+	int size = 0;
+	do {
+		int r;
+		do {
+			r = writev(f->fd, v, n);
+		} while (r == -1 && errno == EINTR);
+		if (r < 0)
+			return -1;
+		size += r;
+		while (n > 0) {
+			if (v->iov_len > (size_t)r) {
+				v->iov_base = (char*)v->iov_base + r;
+				v->iov_len -= r;
+				break;
+			} else {
+				r -= v->iov_len;
+				v++;
+				n--;
+			}
+		}
+	} while (n > 0);
+	//FIXME: this may be incorrect
+	f->size += size;
+	return size;
 }
 
 static inline int
 ss_fileseek(struct ssfile *f, uint64_t off)
 {
-	return ss_vfsseek(f->vfs, f->fd, off);
+	return lseek(f->fd, off, SEEK_SET);
 }
 
 struct ssa;
@@ -1137,7 +1123,7 @@ ss_lz4filter_complete(struct ssfilter *f, struct ssbuf *dest)
 #endif
 		int capacity = LZ4F_compressBound(z->total_size, NULL);
 		assert(capacity >= (ptrdiff_t)ss_bufused(dest));
-		rc = ss_bufensure(dest, f->a, capacity - ss_bufused(dest));
+		rc = ss_bufensure(dest, f->a, capacity);
 		if (unlikely(rc == -1))
 			return -1;
 		size_t sz = LZ4F_compressEnd(z->compress, dest->p,
@@ -1614,185 +1600,15 @@ static struct ssaif ss_stda =
 	.free    = ss_stdafree
 };
 
-static inline int
-ss_stdvfs_init(struct ssvfs *f ssunused, va_list args ssunused)
-{
-	return 0;
-}
-
-static inline void
-ss_stdvfs_free(struct ssvfs *f ssunused)
-{ }
-
-static int64_t
-ss_stdvfs_size(struct ssvfs *f ssunused, char *path)
-{
-	struct stat st;
-	int rc = lstat(path, &st);
-	if (unlikely(rc == -1))
-		return -1;
-	return st.st_size;
-}
-
 static int
-ss_stdvfs_exists(struct ssvfs *f ssunused, const char *path)
+path_exists(const char *path)
 {
 	struct stat st;
 	int rc = lstat(path, &st);
 	return rc == 0;
 }
-
 static int
-ss_stdvfs_unlink(struct ssvfs *f ssunused, char *path)
-{
-	return unlink(path);
-}
-
-static int
-ss_stdvfs_rename(struct ssvfs *f ssunused, char *src, char *dest)
-{
-	return rename(src, dest);
-}
-
-static int
-ss_stdvfs_mkdir(struct ssvfs *f ssunused, const char *path, int mode)
-{
-	return mkdir(path, mode);
-}
-
-static int
-ss_stdvfs_rmdir(struct ssvfs *f ssunused, char *path)
-{
-	return rmdir(path);
-}
-
-static int
-ss_stdvfs_open(struct ssvfs *f ssunused, char *path, int flags, int mode)
-{
-	return open(path, flags, mode);
-}
-
-static int
-ss_stdvfs_close(struct ssvfs *f ssunused, int fd)
-{
-	return close(fd);
-}
-
-static int
-ss_stdvfs_sync(struct ssvfs *f ssunused, int fd)
-{
-	return fdatasync(fd);
-}
-
-static int
-ss_stdvfs_advise(struct ssvfs *f ssunused, int fd, int hint, uint64_t off, uint64_t len)
-{
-	(void)hint;
-#if !defined(HAVE_POSIX_FADVISE)
-	(void)fd;
-	(void)off;
-	(void)len;
-	return 0;
-#else
-	return posix_fadvise(fd, off, len, POSIX_FADV_DONTNEED);
-#endif
-}
-
-static int
-ss_stdvfs_truncate(struct ssvfs *f ssunused, int fd, uint64_t size)
-{
-	return ftruncate(fd, size);
-}
-
-static int64_t
-ss_stdvfs_pread(struct ssvfs *f ssunused, int fd, uint64_t off, void *buf, int size)
-{
-	int n = 0;
-	do {
-		int r;
-		do {
-			r = pread(fd, (char*)buf + n, size - n, off + n);
-		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
-			return -1;
-		n += r;
-	} while (n != size);
-
-	return n;
-}
-
-static int64_t
-ss_stdvfs_pwrite(struct ssvfs *f ssunused, int fd, uint64_t off, void *buf, int size)
-{
-	int n = 0;
-	do {
-		int r;
-		do {
-			r = pwrite(fd, (char*)buf + n, size - n, off + n);
-		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
-			return -1;
-		n += r;
-	} while (n != size);
-
-	return n;
-}
-
-static int64_t
-ss_stdvfs_write(struct ssvfs *f ssunused, int fd, void *buf, int size)
-{
-	int n = 0;
-	do {
-		int r;
-		do {
-			r = write(fd, (char*)buf + n, size - n);
-		} while (r == -1 && errno == EINTR);
-		if (r <= 0)
-			return -1;
-		n += r;
-	} while (n != size);
-
-	return n;
-}
-
-static int64_t
-ss_stdvfs_writev(struct ssvfs *f ssunused, int fd, struct ssiov *iov)
-{
-	struct iovec *v = iov->v;
-	int n = iov->iovc;
-	int size = 0;
-	do {
-		int r;
-		do {
-			r = writev(fd, v, n);
-		} while (r == -1 && errno == EINTR);
-		if (r < 0)
-			return -1;
-		size += r;
-		while (n > 0) {
-			if (v->iov_len > (size_t)r) {
-				v->iov_base = (char*)v->iov_base + r;
-				v->iov_len -= r;
-				break;
-			} else {
-				r -= v->iov_len;
-				v++;
-				n--;
-			}
-		}
-	} while (n > 0);
-
-	return size;
-}
-
-static int64_t
-ss_stdvfs_seek(struct ssvfs *f ssunused, int fd, uint64_t off)
-{
-	return lseek(fd, off, SEEK_SET);
-}
-
-static int
-ss_stdvfs_mmap(struct ssvfs *f ssunused, struct ssmmap *m, int fd, uint64_t size, int ro)
+ss_mmap(struct ssmmap *m, int fd, uint64_t size, int ro)
 {
 	int flags = PROT_READ;
 	if (! ro)
@@ -1807,46 +1623,7 @@ ss_stdvfs_mmap(struct ssvfs *f ssunused, struct ssmmap *m, int fd, uint64_t size
 }
 
 static int
-ss_stdvfs_mmap_allocate(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
-{
-	int flags = PROT_READ|PROT_WRITE;
-	m->p = mmap(NULL, size, flags, MAP_PRIVATE|MAP_ANON, -1, 0);
-	if (unlikely(m->p == MAP_FAILED)) {
-		m->p = NULL;
-		return -1;
-	}
-	m->size = size;
-	return 0;
-}
-
-static int
-ss_stdvfs_mremap(struct ssvfs *f ssunused, struct ssmmap *m, uint64_t size)
-{
-	if (unlikely(m->p == NULL))
-		return ss_stdvfs_mmap_allocate(f, m, size);
-	void *p;
-#if !defined(HAVE_MREMAP)
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE,
-	         MAP_PRIVATE|MAP_ANON, -1, 0);
-	if (p == MAP_FAILED)
-		return -1;
-	size_t to_copy = m->size;
-	if (to_copy > size)
-		to_copy = size;
-	memcpy(p, m->p, to_copy);
-	munmap(m->p, m->size);
-#else
-	p = mremap(m->p, m->size, size, MREMAP_MAYMOVE);
-	if (unlikely(p == MAP_FAILED))
-		return -1;
-#endif
-	m->p = p;
-	m->size = size;
-	return 0;
-}
-
-static int
-ss_stdvfs_munmap(struct ssvfs *f ssunused, struct ssmmap *m)
+ss_munmap(struct ssmmap *m)
 {
 	if (unlikely(m->p == NULL))
 		return 0;
@@ -1854,32 +1631,6 @@ ss_stdvfs_munmap(struct ssvfs *f ssunused, struct ssmmap *m)
 	m->p = NULL;
 	return rc;
 }
-
-static struct ssvfsif ss_stdvfs =
-{
-	.init          = ss_stdvfs_init,
-	.free          = ss_stdvfs_free,
-	.size          = ss_stdvfs_size,
-	.exists        = ss_stdvfs_exists,
-	.unlink        = ss_stdvfs_unlink,
-	.rename        = ss_stdvfs_rename,
-	.mkdir         = ss_stdvfs_mkdir,
-	.rmdir         = ss_stdvfs_rmdir,
-	.open          = ss_stdvfs_open,
-	.close         = ss_stdvfs_close,
-	.sync          = ss_stdvfs_sync,
-	.advise        = ss_stdvfs_advise,
-	.truncate      = ss_stdvfs_truncate,
-	.pread         = ss_stdvfs_pread,
-	.pwrite        = ss_stdvfs_pwrite,
-	.write         = ss_stdvfs_write,
-	.writev        = ss_stdvfs_writev,
-	.seek          = ss_stdvfs_seek,
-	.mmap          = ss_stdvfs_mmap,
-	.mmap_allocate = ss_stdvfs_mmap_allocate,
-	.mremap        = ss_stdvfs_mremap,
-	.munmap        = ss_stdvfs_munmap
-};
 
 struct sszstdfilter {
 	void *ctx;
@@ -2833,14 +2584,12 @@ struct runtime {
 static inline void
 sr_init(struct runtime *r,
         struct ssa *a,
-        struct ssvfs *vfs,
         struct ssquota *quota,
         struct srzonemap *zonemap,
         struct srseq *seq,
         struct srstat *stat)
 {
 	r->a           = a;
-	r->vfs         = vfs;
 	r->quota       = quota;
 	r->zonemap     = zonemap;
 	r->seq         = seq;
@@ -7201,7 +6950,7 @@ static int sd_recover_open(struct sdrecover *ri, struct runtime *r,
 		ri->corrupt = 1;
 		return -1;
 	}
-	int rc = ss_vfsmmap(r->vfs, &ri->map, ri->file->fd, ri->file->size, 1);
+	int rc = ss_mmap(&ri->map, ri->file->fd, ri->file->size, 1);
 	if (unlikely(rc == -1)) {
 		sr_malfunction("failed to mmap index file '%s': %s",
 		               ss_pathof(&ri->file->path),
@@ -7211,14 +6960,14 @@ static int sd_recover_open(struct sdrecover *ri, struct runtime *r,
 	struct sdseal *seal = (struct sdseal*)((char*)ri->map.p);
 	rc = sd_recover_next_of(ri, seal);
 	if (unlikely(rc == -1))
-		ss_vfsmunmap(r->vfs, &ri->map);
+		ss_munmap(&ri->map);
 	return rc;
 }
 
 static void
 sd_recover_close(struct sdrecover *ri)
 {
-	ss_vfsmunmap(ri->r->vfs, &ri->map);
+	ss_munmap(&ri->map);
 }
 
 static int
@@ -8258,7 +8007,7 @@ si_iter_next(struct siiter *ii)
 
 static int si_drop(struct si*);
 static int si_dropmark(struct si*);
-static int si_droprepository(struct runtime*, char*, int);
+static int si_droprepository(char*, int);
 
 static int
 si_merge(struct si*, struct sdc*, struct sinode*, uint64_t,
@@ -8861,7 +8610,7 @@ si_compact_index(struct si *index, struct sdc *c, struct siplan *plan,
 	return si_compact(index, c, plan, vlsn, vlsn_lru, &i, size_stream);
 }
 
-static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
+static int si_droprepository(char *repo, int drop_directory)
 {
 	DIR *dir = opendir(repo);
 	if (dir == NULL) {
@@ -8879,7 +8628,7 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 		if (unlikely(strcmp(de->d_name, "drop") == 0))
 			continue;
 		snprintf(path, sizeof(path), "%s/%s", repo, de->d_name);
-		rc = ss_vfsunlink(r->vfs, path);
+		rc = unlink(path);
 		if (unlikely(rc == -1)) {
 			sr_malfunction("index file '%s' unlink error: %s",
 			               path, strerror(errno));
@@ -8890,14 +8639,14 @@ static int si_droprepository(struct runtime *r, char *repo, int drop_directory)
 	closedir(dir);
 
 	snprintf(path, sizeof(path), "%s/drop", repo);
-	rc = ss_vfsunlink(r->vfs, path);
+	rc = unlink(path);
 	if (unlikely(rc == -1)) {
 		sr_malfunction("index file '%s' unlink error: %s",
 		               path, strerror(errno));
 		return -1;
 	}
 	if (drop_directory) {
-		rc = ss_vfsrmdir(r->vfs, repo);
+		rc = rmdir(repo);
 		if (unlikely(rc == -1)) {
 			sr_malfunction("directory '%s' unlink error: %s",
 			               repo, strerror(errno));
@@ -8913,7 +8662,7 @@ static int si_dropmark(struct si *i)
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
 	struct ssfile drop;
-	ss_fileinit(&drop, i->r->vfs);
+	ss_fileinit(&drop);
 	int rc = ss_filenew(&drop, path);
 	if (unlikely(rc == -1)) {
 		sr_malfunction("drop file '%s' create error: %s",
@@ -8926,7 +8675,6 @@ static int si_dropmark(struct si *i)
 
 static int si_drop(struct si *i)
 {
-	struct runtime *r = i->r;
 	struct sspath path;
 	ss_pathinit(&path);
 	ss_pathset(&path, "%s", i->conf.path);
@@ -8936,7 +8684,7 @@ static int si_drop(struct si *i)
 	if (unlikely(rc == -1))
 		return -1;
 	/* remove directory */
-	rc = si_droprepository(r, path.path, 1);
+	rc = si_droprepository(path.path, 1);
 	return rc;
 }
 
@@ -9357,7 +9105,7 @@ si_nodenew(struct sfscheme *scheme, struct runtime *r)
 	n->temperature_reads = 0;
 	n->refs = 0;
 	tt_pthread_mutex_init(&n->reflock, NULL);
-	ss_fileinit(&n->file, r->vfs);
+	ss_fileinit(&n->file);
 	sv_indexinit(&n->i0, scheme);
 	sv_indexinit(&n->i1, scheme);
 	ss_rqinitnode(&n->nodecompact);
@@ -9504,7 +9252,7 @@ static int si_nodefree(struct sinode *n, struct runtime *r, int gc)
 	int rc;
 	if (gc && ss_pathis_set(&n->file.path)) {
 		ss_fileadvise(&n->file, 0, 0, n->file.size);
-		rc = ss_vfsunlink(r->vfs, ss_pathof(&n->file.path));
+		rc = unlink(ss_pathof(&n->file.path));
 		if (unlikely(rc == -1)) {
 			sr_malfunction("index file '%s' unlink error: %s",
 			               ss_pathof(&n->file.path),
@@ -10581,7 +10329,7 @@ si_deploy(struct si *i, struct runtime *r, int create_directory)
 	/* create directory */
 	int rc;
 	if (likely(create_directory)) {
-		rc = ss_vfsmkdir(r->vfs, i->conf.path, 0755);
+		rc = mkdir(i->conf.path, 0755);
 		if (unlikely(rc == -1)) {
 			sr_malfunction("directory '%s' create error: %s",
 			               i->conf.path, strerror(errno));
@@ -10697,7 +10445,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 			if (rc == SI_RDB_DBI) {
 				ss_pathcompound(&path, i->conf.path, id_parent, id,
 				                ".index.incomplete");
-				rc = ss_vfsunlink(r->vfs, path.path);
+				rc = unlink(path.path);
 				if (unlikely(rc == -1)) {
 					sr_malfunction("index file '%s' unlink error: %s",
 					               path.path, strerror(errno));
@@ -10724,7 +10472,7 @@ si_trackdir(struct sitrack *track, struct runtime *r, struct si *i)
 		}
 		case SI_RDB_REMOVE:
 			ss_path(&path, i->conf.path, id, ".index.gc");
-			rc = ss_vfsunlink(r->vfs, ss_pathof(&path));
+			rc = unlink(ss_pathof(&path));
 			if (unlikely(rc == -1)) {
 				sr_malfunction("index file '%s' unlink error: %s",
 				               ss_pathof(&path), strerror(errno));
@@ -10899,11 +10647,11 @@ error:
 }
 
 static inline int
-si_recoverdrop(struct si *i, struct runtime *r)
+si_recoverdrop(struct si *i)
 {
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/drop", i->conf.path);
-	int rc = ss_vfsexists(r->vfs, path);
+	int rc = path_exists(path);
 	if (likely(! rc))
 		return 0;
 	if (i->conf.path_fail_on_drop) {
@@ -10911,7 +10659,7 @@ si_recoverdrop(struct si *i, struct runtime *r)
 		               i->conf.path);
 		return -1;
 	}
-	rc = si_droprepository(r, i->conf.path, 0);
+	rc = si_droprepository(i->conf.path, 0);
 	if (unlikely(rc == -1))
 		return -1;
 	return 1;
@@ -10920,14 +10668,14 @@ si_recoverdrop(struct si *i, struct runtime *r)
 static int si_recover(struct si *i)
 {
 	struct runtime *r = i->r;
-	int exist = ss_vfsexists(r->vfs, i->conf.path);
+	int exist = path_exists(i->conf.path);
 	if (exist == 0)
 		goto deploy;
 	if (i->conf.path_fail_on_exists) {
 		sr_error("directory '%s' already exists", i->conf.path);
 		return -1;
 	}
-	int rc = si_recoverdrop(i, r);
+	int rc = si_recoverdrop(i);
 	switch (rc) {
 	case -1: return -1;
 	case  1: goto deploy;
@@ -11043,9 +10791,9 @@ next:
  * Create phia_dir if it doesn't exist.
  */
 static int
-sr_checkdir(struct runtime *r, const char *path)
+sr_checkdir(const char *path)
 {
-	int exists = ss_vfsexists(r->vfs, path);
+	int exists = path_exists(path);
 	if (exists == 0) {
 		sr_error("directory '%s' does not exist", path);
 		return -1;
@@ -11744,7 +11492,6 @@ struct phia_env {
 	struct srseq       seq;
 	struct seconf      conf;
 	struct ssquota     quota;
-	struct ssvfs       vfs;
 	struct ssa         a_oom;
 	struct ssa         a;
 	struct sicachepool cachepool;
@@ -11854,7 +11601,6 @@ phia_env_delete(struct phia_env *e)
 		}
 	}
 	sx_managerfree(&e->xm);
-	ss_vfsfree(&e->vfs);
 	si_cachepool_free(&e->cachepool);
 	se_conffree(&e->conf);
 	ss_quotafree(&e->quota);
@@ -13242,7 +12988,6 @@ phia_env_new(void)
 		return NULL;
 	memset(e, 0, sizeof(*e));
 	e->status = SR_OFFLINE;
-	ss_vfsinit(&e->vfs, &ss_stdvfs);
 	ss_aopen(&e->a, &ss_stda);
 	int rc;
 	rc = se_confinit(&e->conf, e);
@@ -13252,7 +12997,7 @@ phia_env_new(void)
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
 	sr_statinit(&e->stat);
-	sr_init(&e->r, &e->a, &e->vfs, &e->quota,
+	sr_init(&e->r, &e->a, &e->quota,
 		&e->conf.zones, &e->seq, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
@@ -13264,7 +13009,7 @@ phia_env_new(void)
 	ss_quotaenable(&e->quota, 0);
 
 	/* Ensure phia data directory exists. */
-	rc = sr_checkdir(&e->r, e->conf.path);
+	rc = sr_checkdir(e->conf.path);
 	if (unlikely(rc == -1))
 		goto error;
 	/* enable quota */
