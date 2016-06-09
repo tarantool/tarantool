@@ -2016,11 +2016,6 @@ struct sffield {
 	sfcmpf    cmp;
 };
 
-enum sfstorage {
-	SF_RAW,
-	SF_SPARSE
-};
-
 struct sfscheme {
 	struct sffield **fields;
 	struct sffield **keys;
@@ -2031,7 +2026,7 @@ struct sfscheme {
 	void     *cmparg;
 	int       var_offset;
 	int       var_count;
-	enum sfstorage fmt_storage;
+	bool compression_key;
 };
 
 static inline struct sffield*
@@ -2285,7 +2280,7 @@ sf_schemeinit(struct sfscheme *s)
 	s->cmp = sf_schemecompare;
 	s->cmparg = s;
 	s->key_def = NULL;
-	s->fmt_storage = SF_RAW;
+	s->compression_key = false;
 }
 
 static void
@@ -5563,12 +5558,12 @@ sd_pageiter_result(struct sdpageiter *i)
 {
 	if (unlikely(i->v == NULL))
 		return;
-	if (likely(i->scheme->fmt_storage == SF_RAW)) {
+	if (likely(!i->scheme->compression_key)) {
 		sv_init(&i->current, &sd_vif, i->v, i->page->h);
-		return;
+	} else {
+		sd_pagesparse_convert(i->page, i->scheme, i->v, i->xfbuf->s);
+		sv_init(&i->current, &sd_vrawif, i->xfbuf->s, NULL);
 	}
-	sd_pagesparse_convert(i->page, i->scheme, i->v, i->xfbuf->s);
-	sv_init(&i->current, &sd_vrawif, i->xfbuf->s, NULL);
 }
 
 static inline void
@@ -5581,7 +5576,7 @@ sd_pageiter_end(struct sdpageiter *i)
 static inline int
 sd_pageiter_cmp(struct sdpageiter *i, struct sfscheme *scheme, struct sdv *v)
 {
-	if (likely(scheme->fmt_storage == SF_RAW)) {
+	if (likely(!scheme->compression_key)) {
 		return sf_compare(scheme, sd_pagepointer(i->page, v),
 		                  v->size, i->key, i->keysize);
 	}
@@ -6709,13 +6704,10 @@ int sd_buildadd(struct sdbuild *b, struct sv *v, uint32_t flags)
 	sv->lsn = lsn;
 	ss_bufadvance(&b->m, sizeof(struct sdv));
 	/* copy document */
-	switch (b->scheme->fmt_storage) {
-	case SF_RAW:
+	if (!b->scheme->compression_key) {
 		rc = sd_buildadd_raw(b, v, size);
-		break;
-	case SF_SPARSE:
+	} else {
 		rc = sd_buildadd_sparse(b, v);
-		break;
 	}
 	if (unlikely(rc == -1))
 		return -1;
@@ -7002,13 +6994,10 @@ sd_indexadd(struct sdindex *i, struct sdbuild *build, uint64_t offset)
 	{
 		char *min = sd_buildminkey(build);
 		char *max = sd_buildmaxkey(build);
-		switch (build->scheme->fmt_storage) {
-		case SF_RAW:
+		if (!build->scheme->compression_key) {
 			rc = sd_indexadd_raw(i, build, p, min, max);
-			break;
-		case SF_SPARSE:
+		} else {
 			rc = sd_indexadd_sparse(i, build, p, min, max);
-			break;
 		}
 		if (unlikely(rc == -1))
 			return -1;
@@ -12582,8 +12571,7 @@ sf_schemecreate(struct sfscheme *scheme, struct ssa *a,
 		struct key_def *key_def)
 {
 	scheme->key_def = key_def;
-	scheme->fmt_storage = key_def->opts.compression_key ?
-		SF_SPARSE : SF_RAW;
+	scheme->compression_key = key_def->opts.compression_key;
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		char name[32];
