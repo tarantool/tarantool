@@ -2858,18 +2858,10 @@ struct srconf;
 
 typedef int (*srconff)(struct srconf*, struct srconfstmt*);
 
-enum {
-	SR_RO = 1,
-	SR_NS = 2
-};
-
 struct srconf {
-	char    *key;
-	int      flags;
-	enum sstype   type;
-	srconff  function;
-	void    *value;
-	void    *ptr;
+	char *key;
+	enum sstype type;
+	void *value;
 	struct srconf  *next;
 };
 
@@ -2885,38 +2877,21 @@ struct srconfstmt {
 	struct runtime         *r;
 };
 
-static int sr_conf_serialize(struct srconf*, struct srconfstmt*);
-
-static inline struct srconf*
-sr_c(struct srconf **link, struct srconf **cp, srconff func,
-     char *key, int type,
-     void *value)
+static inline struct srconf *
+sr_C(struct srconf **link, struct srconf **cp, char *key,
+     int type, void *value)
 {
 	struct srconf *c = *cp;
+	*cp += 1;
 	c->key      = key;
-	c->function = func;
-	c->flags    = 0;
 	c->type     = type;
 	c->value    = value;
-	c->ptr      = NULL;
 	c->next     = NULL;
-	*cp = c + 1;
-	if (likely(link)) {
-		if (likely(*link))
+	if (link) {
+		if (*link)
 			(*link)->next = c;
 		*link = c;
 	}
-	return c;
-}
-
-static inline struct srconf*
-sr_C(struct srconf **link, struct srconf **cp, srconff func,
-     char *key, int type,
-     void *value, int flags, void *ptr)
-{
-	struct srconf *c = sr_c(link, cp, func, key, type, value);
-	c->flags = flags;
-	c->ptr = ptr;
 	return c;
 }
 
@@ -2931,7 +2906,7 @@ sr_confvalue(struct srconfdump *v) {
 }
 
 static int
-sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
+sr_valueserialize(struct srconf *m, struct srconfstmt *s)
 {
 	char buf[128];
 	void *value = NULL;
@@ -2989,29 +2964,31 @@ sr_conf_serialize(struct srconf *m, struct srconfstmt *s)
 }
 
 static inline int
-sr_confexec_serialize(struct srconf *c, struct srconfstmt *stmt, char *root)
+sr_confserialize(struct srconf *c, struct srconfstmt *stmt)
 {
-	char path[256];
+	int rc = 0;
 	while (c) {
-		if (root)
-			snprintf(path, sizeof(path), "%s.%s", root, c->key);
+		char path[256];
+		const char *old_path = stmt->path;
+
+		if (old_path)
+			snprintf(path, sizeof(path), "%s.%s", old_path, c->key);
 		else
 			snprintf(path, sizeof(path), "%s", c->key);
-		int rc;
-		if (c->flags & SR_NS) {
-			rc = sr_confexec_serialize(c->value, stmt, path);
-			if (unlikely(rc == -1))
-				return -1;
-		} else {
-			stmt->path = path;
-			rc = c->function(c, stmt);
-			if (unlikely(rc == -1))
-				return -1;
-			stmt->path = NULL;
-		}
+
+		stmt->path = path;
+
+		if (c->type == SS_UNDEF)
+			rc = sr_confserialize(c->value, stmt);
+		else
+			rc = sr_valueserialize(c, stmt);
+
+		stmt->path = old_path;
+		if (rc == -1)
+			break;
 		c = c->next;
 	}
-	return 0;
+	return rc;
 }
 
 
@@ -11722,10 +11699,6 @@ struct seconfrt {
 	char      build[32];
 	/* memory */
 	uint64_t  memory_used;
-	uint32_t  pager_pools;
-	uint32_t  pager_pool_size;
-	uint32_t  pager_ref_pools;
-	uint32_t  pager_ref_pool_size;
 	/* scheduler */
 	char      zone[4];
 	uint32_t  checkpoint;
@@ -11743,17 +11716,14 @@ struct seconfrt {
 };
 
 struct seconf {
-	/* phia */
-	char         *path;
-	int           recover;
-	int           recover_complete;
+	/* path to phia_dir */
+	char *path;
 	/* compaction */
-	struct srzonemap     zones;
+	struct srzonemap zones;
 	/* memory */
-	uint64_t      memory_limit;
-	int           confmax;
-	struct srconf       *conf;
-	struct phia_env     *env;
+	uint64_t memory_limit;
+	struct srconf *conf;
+	struct phia_env *env;
 };
 
 static int se_confinit(struct seconf*, struct phia_env *o);
@@ -11894,22 +11864,16 @@ phia_env_delete(struct phia_env *e)
 	return rcret;
 }
 
-static inline int
-se_confv(struct srconf *c, struct srconfstmt *s)
-{
-	return sr_conf_serialize(c, s);
-}
-
 static inline struct srconf*
 se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *phia = *pc;
 	struct srconf *p = NULL;
-	sr_C(&p, pc, se_confv, "version", SS_STRING, rt->version, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "version_storage", SS_STRING, rt->version_storage, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "build", SS_STRING, rt->build, SR_RO, NULL);
-	sr_c(&p, pc, se_confv, "path", SS_STRINGPTR, &e->conf.path);
-	return sr_C(NULL, pc, NULL, "phia", SS_UNDEF, phia, SR_NS, NULL);
+	sr_C(&p, pc, "version", SS_STRING, rt->version);
+	sr_C(&p, pc, "version_storage", SS_STRING, rt->version_storage);
+	sr_C(&p, pc, "build", SS_STRING, rt->build);
+	sr_C(&p, pc, "path", SS_STRINGPTR, &e->conf.path);
+	return sr_C(NULL, pc, "phia", SS_UNDEF, phia);
 }
 
 static inline struct srconf*
@@ -11917,13 +11881,13 @@ se_confmemory(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *memory = *pc;
 	struct srconf *p = NULL;
-	sr_c(&p, pc, se_confv, "limit", SS_U64, &e->conf.memory_limit);
-	sr_C(&p, pc, se_confv, "used", SS_U64, &rt->memory_used, SR_RO, NULL);
-	return sr_C(NULL, pc, NULL, "memory", SS_UNDEF, memory, SR_NS, NULL);
+	sr_C(&p, pc, "limit", SS_U64, &e->conf.memory_limit);
+	sr_C(&p, pc, "used", SS_U64, &rt->memory_used);
+	return sr_C(NULL, pc, "memory", SS_UNDEF, memory);
 }
 
 static inline struct srconf*
-se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confcompaction(struct phia_env *e, struct srconf **pc)
 {
 	struct srconf *compaction = NULL;
 	struct srconf *prev = NULL;
@@ -11935,24 +11899,24 @@ se_confcompaction(struct phia_env *e, struct seconfrt *rt ssunused, struct srcon
 			continue;
 		struct srconf *zone = *pc;
 		p = NULL;
-		sr_c(&p, pc, se_confv, "mode", SS_U32, &z->mode);
-		sr_c(&p, pc, se_confv, "compact_wm", SS_U32, &z->compact_wm);
-		sr_c(&p, pc, se_confv, "compact_mode", SS_U32, &z->compact_mode);
-		sr_c(&p, pc, se_confv, "branch_prio", SS_U32, &z->branch_prio);
-		sr_c(&p, pc, se_confv, "branch_wm", SS_U32, &z->branch_wm);
-		sr_c(&p, pc, se_confv, "branch_age", SS_U32, &z->branch_age);
-		sr_c(&p, pc, se_confv, "branch_age_period", SS_U32, &z->branch_age_period);
-		sr_c(&p, pc, se_confv, "branch_age_wm", SS_U32, &z->branch_age_wm);
-		sr_c(&p, pc, se_confv, "gc_wm", SS_U32, &z->gc_wm);
-		sr_c(&p, pc, se_confv, "gc_prio", SS_U32, &z->gc_prio);
-		sr_c(&p, pc, se_confv, "gc_period", SS_U32, &z->gc_period);
-		sr_c(&p, pc, se_confv, "lru_prio", SS_U32, &z->lru_prio);
-		sr_c(&p, pc, se_confv, "lru_period", SS_U32, &z->lru_period);
-		prev = sr_C(&prev, pc, NULL, z->name, SS_UNDEF, zone, SR_NS, NULL);
+		sr_C(&p, pc, "mode", SS_U32, &z->mode);
+		sr_C(&p, pc, "compact_wm", SS_U32, &z->compact_wm);
+		sr_C(&p, pc, "compact_mode", SS_U32, &z->compact_mode);
+		sr_C(&p, pc, "branch_prio", SS_U32, &z->branch_prio);
+		sr_C(&p, pc, "branch_wm", SS_U32, &z->branch_wm);
+		sr_C(&p, pc, "branch_age", SS_U32, &z->branch_age);
+		sr_C(&p, pc, "branch_age_period", SS_U32, &z->branch_age_period);
+		sr_C(&p, pc, "branch_age_wm", SS_U32, &z->branch_age_wm);
+		sr_C(&p, pc, "gc_wm", SS_U32, &z->gc_wm);
+		sr_C(&p, pc, "gc_prio", SS_U32, &z->gc_prio);
+		sr_C(&p, pc, "gc_period", SS_U32, &z->gc_period);
+		sr_C(&p, pc, "lru_prio", SS_U32, &z->lru_prio);
+		sr_C(&p, pc, "lru_period", SS_U32, &z->lru_period);
+		prev = sr_C(&prev, pc, z->name, SS_UNDEF, zone);
 		if (compaction == NULL)
 			compaction = prev;
 	}
-	return sr_C(NULL, pc, NULL, "compaction", SS_UNDEF, compaction, SR_NS, NULL);
+	return sr_C(NULL, pc, "compaction", SS_UNDEF, compaction);
 }
 
 int
@@ -11975,61 +11939,61 @@ se_confscheduler(struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *scheduler = *pc;
 	struct srconf *p = NULL;
-	sr_C(&p, pc, se_confv, "zone", SS_STRING, rt->zone, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "gc_active", SS_U32, &rt->gc_active, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "lru_active", SS_U32, &rt->lru_active, SR_RO, NULL);
-	return sr_C(NULL, pc, NULL, "scheduler", SS_UNDEF, scheduler, SR_NS, NULL);
+	sr_C(&p, pc, "zone", SS_STRING, rt->zone);
+	sr_C(&p, pc, "gc_active", SS_U32, &rt->gc_active);
+	sr_C(&p, pc, "lru_active", SS_U32, &rt->lru_active);
+	return sr_C(NULL, pc, "scheduler", SS_UNDEF, scheduler);
 }
 
 static inline struct srconf*
-se_confperformance(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **pc)
+se_confperformance(struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *perf = *pc;
 	struct srconf *p = NULL;
-	sr_C(&p, pc, se_confv, "documents", SS_U64, &rt->stat.v_count, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "documents_used", SS_U64, &rt->stat.v_allocated, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "set", SS_U64, &rt->stat.set, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "set_latency", SS_STRING, rt->stat.set_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "delete", SS_U64, &rt->stat.del, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "delete_latency", SS_STRING, rt->stat.del_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "upsert", SS_U64, &rt->stat.upsert, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "upsert_latency", SS_STRING, rt->stat.upsert_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "get", SS_U64, &rt->stat.get, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "get_latency", SS_STRING, rt->stat.get_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "get_read_disk", SS_STRING, rt->stat.get_read_disk.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "get_read_cache", SS_STRING, rt->stat.get_read_cache.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_active_rw", SS_U32, &rt->tx_rw, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_active_ro", SS_U32, &rt->tx_ro, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx", SS_U64, &rt->stat.tx, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_rollback", SS_U64, &rt->stat.tx_rlb, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_conflict", SS_U64, &rt->stat.tx_conflict, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_lock", SS_U64, &rt->stat.tx_lock, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_latency", SS_STRING, rt->stat.tx_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_ops", SS_STRING, rt->stat.tx_stmts.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tx_gc_queue", SS_U32, &rt->tx_gc_queue, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "cursor", SS_U64, &rt->stat.cursor, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "cursor_latency", SS_STRING, rt->stat.cursor_latency.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "cursor_read_disk", SS_STRING, rt->stat.cursor_read_disk.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "cursor_read_cache", SS_STRING, rt->stat.cursor_read_cache.sz, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "cursor_ops", SS_STRING, rt->stat.cursor_ops.sz, SR_RO, NULL);
-	return sr_C(NULL, pc, NULL, "performance", SS_UNDEF, perf, SR_NS, NULL);
+	sr_C(&p, pc, "documents", SS_U64, &rt->stat.v_count);
+	sr_C(&p, pc, "documents_used", SS_U64, &rt->stat.v_allocated);
+	sr_C(&p, pc, "set", SS_U64, &rt->stat.set);
+	sr_C(&p, pc, "set_latency", SS_STRING, rt->stat.set_latency.sz);
+	sr_C(&p, pc, "delete", SS_U64, &rt->stat.del);
+	sr_C(&p, pc, "delete_latency", SS_STRING, rt->stat.del_latency.sz);
+	sr_C(&p, pc, "upsert", SS_U64, &rt->stat.upsert);
+	sr_C(&p, pc, "upsert_latency", SS_STRING, rt->stat.upsert_latency.sz);
+	sr_C(&p, pc, "get", SS_U64, &rt->stat.get);
+	sr_C(&p, pc, "get_latency", SS_STRING, rt->stat.get_latency.sz);
+	sr_C(&p, pc, "get_read_disk", SS_STRING, rt->stat.get_read_disk.sz);
+	sr_C(&p, pc, "get_read_cache", SS_STRING, rt->stat.get_read_cache.sz);
+	sr_C(&p, pc, "tx_active_rw", SS_U32, &rt->tx_rw);
+	sr_C(&p, pc, "tx_active_ro", SS_U32, &rt->tx_ro);
+	sr_C(&p, pc, "tx", SS_U64, &rt->stat.tx);
+	sr_C(&p, pc, "tx_rollback", SS_U64, &rt->stat.tx_rlb);
+	sr_C(&p, pc, "tx_conflict", SS_U64, &rt->stat.tx_conflict);
+	sr_C(&p, pc, "tx_lock", SS_U64, &rt->stat.tx_lock);
+	sr_C(&p, pc, "tx_latency", SS_STRING, rt->stat.tx_latency.sz);
+	sr_C(&p, pc, "tx_ops", SS_STRING, rt->stat.tx_stmts.sz);
+	sr_C(&p, pc, "tx_gc_queue", SS_U32, &rt->tx_gc_queue);
+	sr_C(&p, pc, "cursor", SS_U64, &rt->stat.cursor);
+	sr_C(&p, pc, "cursor_latency", SS_STRING, rt->stat.cursor_latency.sz);
+	sr_C(&p, pc, "cursor_read_disk", SS_STRING, rt->stat.cursor_read_disk.sz);
+	sr_C(&p, pc, "cursor_read_cache", SS_STRING, rt->stat.cursor_read_cache.sz);
+	sr_C(&p, pc, "cursor_ops", SS_STRING, rt->stat.cursor_ops.sz);
+	return sr_C(NULL, pc, "performance", SS_UNDEF, perf);
 }
 
 static inline struct srconf*
-se_confmetric(struct phia_env *e ssunused, struct seconfrt *rt, struct srconf **pc)
+se_confmetric(struct seconfrt *rt, struct srconf **pc)
 {
 	struct srconf *metric = *pc;
 	struct srconf *p = NULL;
-	sr_C(&p, pc, se_confv, "lsn",  SS_U64, &rt->seq.lsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "tsn",  SS_U64, &rt->seq.tsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "nsn",  SS_U64, &rt->seq.nsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "dsn",  SS_U32, &rt->seq.dsn, SR_RO, NULL);
-	sr_C(&p, pc, se_confv, "lfsn", SS_U64, &rt->seq.lfsn, SR_RO, NULL);
-	return sr_C(NULL, pc, NULL, "metric", SS_UNDEF, metric, SR_NS, NULL);
+	sr_C(&p, pc, "lsn",  SS_U64, &rt->seq.lsn);
+	sr_C(&p, pc, "tsn",  SS_U64, &rt->seq.tsn);
+	sr_C(&p, pc, "nsn",  SS_U64, &rt->seq.nsn);
+	sr_C(&p, pc, "dsn",  SS_U32, &rt->seq.dsn);
+	sr_C(&p, pc, "lfsn", SS_U64, &rt->seq.lfsn);
+	return sr_C(NULL, pc, "metric", SS_UNDEF, metric);
 }
 
 static inline struct srconf*
-se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
+se_confdb(struct phia_env *e, struct srconf **pc)
 {
 	struct srconf *db = NULL;
 	struct srconf *prev = NULL;
@@ -12043,29 +12007,29 @@ se_confdb(struct phia_env *e, struct seconfrt *rt ssunused, struct srconf **pc)
 		/* database index */
 		struct srconf *database = *pc;
 		p = NULL;
-		sr_C(&p, pc, se_confv, "memory_used", SS_U64, &o->rtp.memory_used, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "size", SS_U64, &o->rtp.total_node_size, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "size_uncompressed", SS_U64, &o->rtp.total_node_origin_size, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "size_amqf", SS_U64, &o->rtp.total_amqf_size, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "count", SS_U64, &o->rtp.count, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "count_dup", SS_U64, &o->rtp.count_dup, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "read_disk", SS_U64, &o->rtp.read_disk, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "read_cache", SS_U64, &o->rtp.read_cache, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "temperature_avg", SS_U32, &o->rtp.temperature_avg, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "temperature_min", SS_U32, &o->rtp.temperature_min, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "temperature_max", SS_U32, &o->rtp.temperature_max, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "temperature_histogram", SS_STRINGPTR, &o->rtp.histogram_temperature_ptr, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "node_count", SS_U32, &o->rtp.total_node_count, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "branch_count", SS_U32, &o->rtp.total_branch_count, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "branch_avg", SS_U32, &o->rtp.total_branch_avg, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "branch_max", SS_U32, &o->rtp.total_branch_max, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "branch_histogram", SS_STRINGPTR, &o->rtp.histogram_branch_ptr, SR_RO, NULL);
-		sr_C(&p, pc, se_confv, "page_count", SS_U32, &o->rtp.total_page_count, SR_RO, NULL);
-		sr_C(&prev, pc, NULL, o->index->conf.name, SS_UNDEF, database, SR_NS, o);
+		sr_C(&p, pc, "memory_used", SS_U64, &o->rtp.memory_used);
+		sr_C(&p, pc, "size", SS_U64, &o->rtp.total_node_size);
+		sr_C(&p, pc, "size_uncompressed", SS_U64, &o->rtp.total_node_origin_size);
+		sr_C(&p, pc, "size_amqf", SS_U64, &o->rtp.total_amqf_size);
+		sr_C(&p, pc, "count", SS_U64, &o->rtp.count);
+		sr_C(&p, pc, "count_dup", SS_U64, &o->rtp.count_dup);
+		sr_C(&p, pc, "read_disk", SS_U64, &o->rtp.read_disk);
+		sr_C(&p, pc, "read_cache", SS_U64, &o->rtp.read_cache);
+		sr_C(&p, pc, "temperature_avg", SS_U32, &o->rtp.temperature_avg);
+		sr_C(&p, pc, "temperature_min", SS_U32, &o->rtp.temperature_min);
+		sr_C(&p, pc, "temperature_max", SS_U32, &o->rtp.temperature_max);
+		sr_C(&p, pc, "temperature_histogram", SS_STRINGPTR, &o->rtp.histogram_temperature_ptr);
+		sr_C(&p, pc, "node_count", SS_U32, &o->rtp.total_node_count);
+		sr_C(&p, pc, "branch_count", SS_U32, &o->rtp.total_branch_count);
+		sr_C(&p, pc, "branch_avg", SS_U32, &o->rtp.total_branch_avg);
+		sr_C(&p, pc, "branch_max", SS_U32, &o->rtp.total_branch_max);
+		sr_C(&p, pc, "branch_histogram", SS_STRINGPTR, &o->rtp.histogram_branch_ptr);
+		sr_C(&p, pc, "page_count", SS_U32, &o->rtp.total_page_count);
+		sr_C(&prev, pc, o->index->conf.name, SS_UNDEF, database);
 		if (db == NULL)
 			db = prev;
 	}
-	return sr_C(NULL, pc, NULL, "db", SS_UNDEF, db, SR_NS, NULL);
+	return sr_C(NULL, pc, "db", SS_UNDEF, db);
 }
 
 static struct srconf*
@@ -12075,11 +12039,11 @@ se_confprepare(struct phia_env *e, struct seconfrt *rt, struct srconf *c)
 	struct srconf *pc = c;
 	struct srconf *phia     = se_confphia(e, rt, &pc);
 	struct srconf *memory     = se_confmemory(e, rt, &pc);
-	struct srconf *compaction = se_confcompaction(e, rt, &pc);
+	struct srconf *compaction = se_confcompaction(e, &pc);
 	struct srconf *scheduler  = se_confscheduler(rt, &pc);
-	struct srconf *perf       = se_confperformance(e, rt, &pc);
-	struct srconf *metric     = se_confmetric(e, rt, &pc);
-	struct srconf *db         = se_confdb(e, rt, &pc);
+	struct srconf *perf       = se_confperformance(rt, &pc);
+	struct srconf *metric     = se_confmetric(rt, &pc);
+	struct srconf *db         = se_confdb(e, &pc);
 
 	phia->next     = memory;
 	memory->next     = compaction;
@@ -12140,47 +12104,23 @@ se_confrt(struct phia_env *e, struct seconfrt *rt)
 	return 0;
 }
 
-static inline int
-se_confensure(struct seconf *c)
-{
-	struct phia_env *e = (struct phia_env*)c->env;
-	int confmax = 2048;
-	confmax *= sizeof(struct srconf);
-	if (likely(confmax <= c->confmax))
-		return 0;
-	struct srconf *cptr = ss_malloc(&e->a, confmax);
-	if (unlikely(cptr == NULL))
-		return sr_oom();
-	ss_free(&e->a, c->conf);
-	c->conf = cptr;
-	c->confmax = confmax;
-	return 0;
-}
-
 static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 {
-	int rc;
-	rc = se_confensure(c);
-	if (unlikely(rc == -1))
-		return -1;
-	struct phia_env *e = (struct phia_env*)c->env;
+	struct phia_env *e = c->env;
 	struct seconfrt rt;
 	se_confrt(e, &rt);
-	struct srconf *conf = c->conf;
-	struct srconf *root;
-	root = se_confprepare(e, &rt, conf);
+	struct srconf *root = se_confprepare(e, &rt, c->conf);
 	struct srconfstmt stmt = {
 		.path      = NULL,
 		.serialize = buf,
 		.r         = &e->r
 	};
-	return sr_confexec_serialize(root, &stmt, NULL);
+	return sr_confserialize(root, &stmt);
 }
 
 static int se_confinit(struct seconf *c, struct phia_env *e)
 {
-	c->confmax = 2048;
-	c->conf = ss_malloc(&e->a, sizeof(struct srconf) * c->confmax);
+	c->conf = ss_malloc(&e->a, sizeof(struct srconf) * 2048);
 	if (unlikely(c->conf == NULL))
 		return -1;
 	c->env = e;
@@ -12189,7 +12129,6 @@ static int se_confinit(struct seconf *c, struct phia_env *e)
 		sr_oom();
 		return -1;
 	}
-	c->recover = 1;
 	c->memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
@@ -12261,7 +12200,6 @@ static void se_conffree(struct seconf *c)
 	}
 }
 
-
 void
 phia_confcursor_delete(struct phia_confcursor *c)
 {
@@ -12281,7 +12219,7 @@ phia_confcursor_next(struct phia_confcursor *c, const char **key,
 	} else {
 		int size = sizeof(struct srconfdump) + c->pos->keysize + c->pos->valuesize;
 		c->pos = (struct srconfdump*)((char*)c->pos + size);
-	if ((char*)c->pos >= c->dump.p)
+		if ((char*)c->pos >= c->dump.p)
 			c->pos = NULL;
 	}
 	if (unlikely(c->pos == NULL))
