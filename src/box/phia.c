@@ -12202,7 +12202,6 @@ struct seconfrt {
 struct seconf {
 	/* phia */
 	char         *path;
-	uint32_t      path_create;
 	int           recover;
 	int           recover_complete;
 	/* compaction */
@@ -12368,7 +12367,6 @@ se_confphia(struct phia_env *e, struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, se_confv, "version_storage", SS_STRING, rt->version_storage, SR_RO, NULL);
 	sr_C(&p, pc, se_confv, "build", SS_STRING, rt->build, SR_RO, NULL);
 	sr_c(&p, pc, se_confv, "path", SS_STRINGPTR, &e->conf.path);
-	sr_c(&p, pc, se_confv, "path_create", SS_U32, &e->conf.path_create);
 	return sr_C(NULL, pc, NULL, "phia", SS_UNDEF, phia, SR_NS, NULL);
 }
 
@@ -12649,7 +12647,6 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		return -1;
 	c->env                 = o;
 	c->path                = NULL;
-	c->path_create         = 1;
 	c->recover             = 1;
 	c->memory_limit        = 0;
 	struct srzone def = {
@@ -13397,6 +13394,7 @@ phia_tuple_new(struct phia_index *db, struct phia_field *fields,
 	struct sfscheme *scheme = &db->index->scheme;
 	struct runtime *r = db->index->r;
 	assert(fields_count == scheme->fields_count);
+	(void) fields_count;
 	int size = sf_writesize(scheme, fields);
 	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
 	if (unlikely(v == NULL))
@@ -13486,8 +13484,7 @@ phia_tuple_fields(struct phia_index *db, struct phia_tuple *tuple,
 		  struct phia_field *fields, int fields_count)
 {
 	struct si *index = db->index;
-	struct sfscheme *scheme = &index->scheme;
-	assert(fields_count <= scheme->fields_count);
+	assert(fields_count <= index->scheme.fields_count);
 	for (int i = 0; i < fields_count; i++) {
 		struct phia_field *field = &fields[i];
 		field->data = sf_fieldof(&index->scheme, i, tuple->data,
@@ -13790,7 +13787,6 @@ phia_env_new(void)
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
 
-	e->conf.path_create = 0;
 	e->conf.path = ss_strdup(&e->a, cfg_gets("phia_dir"));
 	if (e->conf.path == NULL) {
 		sr_oom();
