@@ -4491,6 +4491,7 @@ struct sxvpool {
 	struct sxv *head;
 	int n;
 	struct runtime *r;
+	pthread_mutex_t stack_lock;
 };
 
 static inline void
@@ -4499,6 +4500,7 @@ sx_vpool_init(struct sxvpool *p, struct runtime *r)
 	p->head = NULL;
 	p->n = 0;
 	p->r = r;
+	pthread_mutex_init(&p->stack_lock, NULL);
 }
 
 static inline void
@@ -4515,23 +4517,30 @@ sx_vpool_free(struct sxvpool *p)
 static inline struct sxv*
 sx_vpool_pop(struct sxvpool *p)
 {
-	if (unlikely(p->n == 0))
+	pthread_mutex_lock(&p->stack_lock);
+	if (unlikely(p->n == 0)) {
+		pthread_mutex_unlock(&p->stack_lock);
 		return NULL;
+	}
+	assert(p->head);
 	struct sxv *v = p->head;
 	p->head = v->next;
 	p->n--;
+	pthread_mutex_unlock(&p->stack_lock);
 	return v;
 }
 
 static inline void
 sx_vpool_push(struct sxvpool *p, struct sxv *v)
 {
+	pthread_mutex_lock(&p->stack_lock);
 	v->v    = NULL;
 	v->next = NULL;
 	v->prev = NULL;
 	v->next = p->head;
 	p->head = v;
 	p->n++;
+	pthread_mutex_unlock(&p->stack_lock);
 }
 
 static inline struct sxv*
