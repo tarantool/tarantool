@@ -59,6 +59,9 @@
 
 #include <bit/bit.h>
 #include <small/rlist.h>
+#define RB_COMPACT 1
+#define RB_CMP_TREE_ARG 1
+#include "small/rb.h"
 
 #include "trivia/util.h"
 #include "crc32.h"
@@ -612,73 +615,6 @@ ss_quotaused_percent(struct ssquota *q)
 	tt_pthread_mutex_unlock(&q->lock);
 	return percent;
 }
-
-struct PACKED ssrbnode {
-	struct ssrbnode *p, *l, *r;
-	uint8_t color;
-};
-
-struct PACKED ssrb {
-	struct ssrbnode *root;
-};
-
-static inline void
-ss_rbinit(struct ssrb *t) {
-	t->root = NULL;
-}
-
-static inline void
-ss_rbinitnode(struct ssrbnode *n) {
-	n->color = 2;
-	n->p = NULL;
-	n->l = NULL;
-	n->r = NULL;
-}
-
-#define ss_rbget(name, compare) \
-\
-static inline int \
-name(struct ssrb *t, \
-     void *scheme ssunused, \
-     void *key ssunused, int keysize ssunused, \
-     struct ssrbnode **match) \
-{ \
-	struct ssrbnode *n = t->root; \
-	*match = NULL; \
-	int rc = 0; \
-	while (n) { \
-		*match = n; \
-		switch ((rc = (compare))) { \
-		case  0: return 0; \
-		case -1: n = n->r; \
-			break; \
-		case  1: n = n->l; \
-			break; \
-		} \
-	} \
-	return rc; \
-}
-
-#define ss_rbtruncate(name, executable) \
-\
-static inline void \
-name(struct ssrbnode *n, void *arg) \
-{ \
-	if (n->l) \
-		name(n->l, arg); \
-	if (n->r) \
-		name(n->r, arg); \
-	executable; \
-}
-
-static struct ssrbnode *ss_rbmin(struct ssrb*);
-static struct ssrbnode *ss_rbmax(struct ssrb*);
-static struct ssrbnode *ss_rbnext(struct ssrb*, struct ssrbnode*);
-static struct ssrbnode *ss_rbprev(struct ssrb*, struct ssrbnode*);
-
-static void ss_rbset(struct ssrb*, struct ssrbnode*, int, struct ssrbnode*);
-static void ss_rbreplace(struct ssrb*, struct ssrbnode*, struct ssrbnode*);
-static void ss_rbremove(struct ssrb*, struct ssrbnode*);
 
 struct ssqf {
 	uint8_t   qf_qbits;
@@ -1640,326 +1576,6 @@ ss_quota(struct ssquota *q, enum ssquotaop op, int64_t v)
 	}
 	tt_pthread_mutex_unlock(&q->lock);
 	return 0;
-}
-
-#define SS_RBBLACK 0
-#define SS_RBRED   1
-#define SS_RBUNDEF 2
-
-static struct ssrbnode *
-ss_rbmin(struct ssrb *t)
-{
-	struct ssrbnode *n = t->root;
-	if (unlikely(n == NULL))
-		return NULL;
-	while (n->l)
-		n = n->l;
-	return n;
-}
-
-static struct ssrbnode *
-ss_rbmax(struct ssrb *t)
-{
-	struct ssrbnode *n = t->root;
-	if (unlikely(n == NULL))
-		return NULL;
-	while (n->r)
-		n = n->r;
-	return n;
-}
-
-static struct ssrbnode *
-ss_rbnext(struct ssrb *t, struct ssrbnode *n)
-{
-	if (unlikely(n == NULL))
-		return ss_rbmin(t);
-	if (n->r) {
-		n = n->r;
-		while (n->l)
-			n = n->l;
-		return n;
-	}
-	struct ssrbnode *p;
-	while ((p = n->p) && p->r == n)
-		n = p;
-	return p;
-}
-
-static struct ssrbnode *
-ss_rbprev(struct ssrb *t, struct ssrbnode *n)
-{
-	if (unlikely(n == NULL))
-		return ss_rbmax(t);
-	if (n->l) {
-		n = n->l;
-		while (n->r)
-			n = n->r;
-		return n;
-	}
-	struct ssrbnode *p;
-	while ((p = n->p) && p->l == n)
-		n = p;
-	return p;
-}
-
-static inline void
-ss_rbrotate_left(struct ssrb *t, struct ssrbnode *n)
-{
-	struct ssrbnode *p = n;
-	struct ssrbnode *q = n->r;
-	struct ssrbnode *parent = n->p;
-	if (likely(p->p != NULL)) {
-		if (parent->l == p)
-			parent->l = q;
-		else
-			parent->r = q;
-	} else {
-		t->root = q;
-	}
-	q->p = parent;
-	p->p = q;
-	p->r = q->l;
-	if (p->r)
-		p->r->p = p;
-	q->l = p;
-}
-
-static inline void
-ss_rbrotate_right(struct ssrb *t, struct ssrbnode *n)
-{
-	struct ssrbnode *p = n;
-	struct ssrbnode *q = n->l;
-	struct ssrbnode *parent = n->p;
-	if (likely(p->p != NULL)) {
-		if (parent->l == p)
-			parent->l = q;
-		else
-			parent->r = q;
-	} else {
-		t->root = q;
-	}
-	q->p = parent;
-	p->p = q;
-	p->l = q->r;
-	if (p->l)
-		p->l->p = p;
-	q->r = p;
-}
-
-static inline void
-ss_rbset_fixup(struct ssrb *t, struct ssrbnode *n)
-{
-	struct ssrbnode *p;
-	while ((p = n->p) && (p->color == SS_RBRED))
-	{
-		struct ssrbnode *g = p->p;
-		if (p == g->l) {
-			struct ssrbnode *u = g->r;
-			if (u && u->color == SS_RBRED) {
-				g->color = SS_RBRED;
-				p->color = SS_RBBLACK;
-				u->color = SS_RBBLACK;
-				n = g;
-			} else {
-				if (n == p->r) {
-					ss_rbrotate_left(t, p);
-					n = p;
-					p = n->p;
-				}
-				g->color = SS_RBRED;
-				p->color = SS_RBBLACK;
-				ss_rbrotate_right(t, g);
-			}
-		} else {
-			struct ssrbnode *u = g->l;
-			if (u && u->color == SS_RBRED) {
-				g->color = SS_RBRED;
-				p->color = SS_RBBLACK;
-				u->color = SS_RBBLACK;
-				n = g;
-			} else {
-				if (n == p->l) {
-					ss_rbrotate_right(t, p);
-					n = p;
-					p = n->p;
-				}
-				g->color = SS_RBRED;
-				p->color = SS_RBBLACK;
-				ss_rbrotate_left(t, g);
-			}
-		}
-	}
-	t->root->color = SS_RBBLACK;
-}
-
-static void
-ss_rbset(struct ssrb *t, struct ssrbnode *p, int prel, struct ssrbnode *n)
-{
-	n->color = SS_RBRED;
-	n->p     = p;
-	n->l     = NULL;
-	n->r     = NULL;
-	if (likely(p)) {
-		assert(prel != 0);
-		if (prel > 0)
-			p->l = n;
-		else
-			p->r = n;
-	} else {
-		t->root = n;
-	}
-	ss_rbset_fixup(t, n);
-}
-
-static void
-ss_rbreplace(struct ssrb *t, struct ssrbnode *o, struct ssrbnode *n)
-{
-	struct ssrbnode *p = o->p;
-	if (p) {
-		if (p->l == o) {
-			p->l = n;
-		} else {
-			p->r = n;
-		}
-	} else {
-		t->root = n;
-	}
-	if (o->l)
-		o->l->p = n;
-	if (o->r)
-		o->r->p = n;
-	*n = *o;
-}
-
-static void
-ss_rbremove(struct ssrb *t, struct ssrbnode *n)
-{
-	if (unlikely(n->color == SS_RBUNDEF))
-		return;
-	struct ssrbnode *l = n->l;
-	struct ssrbnode *r = n->r;
-	struct ssrbnode *x = NULL;
-	if (l == NULL) {
-		x = r;
-	} else
-	if (r == NULL) {
-		x = l;
-	} else {
-		x = r;
-		while (x->l)
-			x = x->l;
-	}
-	struct ssrbnode *p = n->p;
-	if (p) {
-		if (p->l == n) {
-			p->l = x;
-		} else {
-			p->r = x;
-		}
-	} else {
-		t->root = x;
-	}
-	uint8_t color;
-	if (l && r) {
-		color    = x->color;
-		x->color = n->color;
-		x->l     = l;
-		l->p     = x;
-		if (x != r) {
-			p    = x->p;
-			x->p = n->p;
-			n    = x->r;
-			p->l = n;
-			x->r = r;
-			r->p = x;
-		} else {
-			x->p = p;
-			p    = x;
-			n    = x->r;
-		}
-	} else {
-		color = n->color;
-		n     = x;
-	}
-	if (n)
-		n->p = p;
-
-	if (color == SS_RBRED)
-		return;
-	if (n && n->color == SS_RBRED) {
-		n->color = SS_RBBLACK;
-		return;
-	}
-
-	struct ssrbnode *s;
-	do {
-		if (unlikely(n == t->root))
-			break;
-
-		if (n == p->l) {
-			s = p->r;
-			if (s->color == SS_RBRED)
-			{
-				s->color = SS_RBBLACK;
-				p->color = SS_RBRED;
-				ss_rbrotate_left(t, p);
-				s = p->r;
-			}
-			if ((!s->l || (s->l->color == SS_RBBLACK)) &&
-			    (!s->r || (s->r->color == SS_RBBLACK)))
-			{
-				s->color = SS_RBRED;
-				n = p;
-				p = p->p;
-				continue;
-			}
-			if ((!s->r || (s->r->color == SS_RBBLACK)))
-			{
-				s->l->color = SS_RBBLACK;
-				s->color    = SS_RBRED;
-				ss_rbrotate_right(t, s);
-				s = p->r;
-			}
-			s->color    = p->color;
-			p->color    = SS_RBBLACK;
-			s->r->color = SS_RBBLACK;
-			ss_rbrotate_left(t, p);
-			n = t->root;
-			break;
-		} else {
-			s = p->l;
-			if (s->color == SS_RBRED)
-			{
-				s->color = SS_RBBLACK;
-				p->color = SS_RBRED;
-				ss_rbrotate_right(t, p);
-				s = p->l;
-			}
-			if ((!s->l || (s->l->color == SS_RBBLACK)) &&
-				(!s->r || (s->r->color == SS_RBBLACK)))
-			{
-				s->color = SS_RBRED;
-				n = p;
-				p = p->p;
-				continue;
-			}
-			if ((!s->l || (s->l->color == SS_RBBLACK)))
-			{
-				s->r->color = SS_RBBLACK;
-				s->color    = SS_RBRED;
-				ss_rbrotate_left(t, s);
-				s = p->l;
-			}
-			s->color    = p->color;
-			p->color    = SS_RBBLACK;
-			s->l->color = SS_RBBLACK;
-			ss_rbrotate_right(t, p);
-			n = t->root;
-			break;
-		}
-	} while (n->color == SS_RBBLACK);
-	if (n)
-		n->color = SS_RBBLACK;
 }
 
 static inline int
@@ -4863,12 +4479,12 @@ struct PACKED sxv {
 	uint64_t id;
 	uint32_t lo;
 	uint64_t csn;
-	void *index;
+	struct sxindex *index;
 	struct phia_tuple *v;
 	struct sxv *next;
 	struct sxv *prev;
 	struct sxv *gc;
-	struct ssrbnode node;
+	rb_node(struct sxv) tree_node;
 };
 
 struct sxvpool {
@@ -4935,7 +4551,6 @@ sx_valloc(struct sxvpool *p, struct phia_tuple *ref)
 	v->next  = NULL;
 	v->prev  = NULL;
 	v->gc    = NULL;
-	memset(&v->node, 0, sizeof(v->node));
 	return v;
 }
 
@@ -5052,8 +4667,33 @@ enum sxtype {
 	SXRW
 };
 
+typedef rb_tree(struct sxv) sxv_tree_t;
+
+struct sxv_tree_key {
+	char *data;
+	int size;
+};
+
+static int
+sxv_tree_cmp(sxv_tree_t *rbtree, struct sxv *a, struct sxv *b);
+
+static int
+sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b);
+
+rb_gen_ext_key(, sxv_tree_, sxv_tree_t, struct sxv, tree_node, sxv_tree_cmp,
+		 struct sxv_tree_key *, sxv_tree_key_cmp);
+
+static struct sxv *
+sxv_tree_search_key(sxv_tree_t *rbtree, char *data, int size)
+{
+	struct sxv_tree_key key;
+	key.data = data;
+	key.size = size;
+	return sxv_tree_search(rbtree, &key);
+}
+
 struct sxindex {
-	struct ssrb      i;
+	sxv_tree_t tree;
 	uint32_t  dsn;
 	struct phia_index *db;
 	struct si *index;
@@ -5061,6 +4701,26 @@ struct sxindex {
 	struct rlist    link;
 	pthread_mutex_t mutex;
 };
+
+static int
+sxv_tree_cmp(sxv_tree_t *rbtree, struct sxv *a, struct sxv *b)
+{
+	struct sfscheme *scheme =
+		container_of(rbtree, struct sxindex, tree)->scheme;
+	return sf_compare(scheme,
+			  a->v->data, a->v->size,
+			  b->v->data, b->v->size);
+}
+
+static int
+sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
+{
+	struct sfscheme *scheme =
+		container_of(rbtree, struct sxindex, tree)->scheme;
+	return sf_compare(scheme,
+			  a->data, a->size,
+			  b->v->data, b->v->size);
+}
 
 struct sx;
 struct sicache;
@@ -5077,14 +4737,33 @@ struct sx {
 	int        log_read;
 	struct svlog     *log;
 	struct rlist     deadlock;
-	struct ssrbnode   node;
+	rb_node(struct sx) tree_node;
 	struct sxmanager *manager;
 };
 
+typedef rb_tree(struct sx) sx_tree_t;
+
+static int
+sx_tree_cmp(sx_tree_t *rbtree, struct sx *a, struct sx *b)
+{
+	(void)rbtree;
+	return ss_cmp(a->id, b->id);
+}
+
+static int
+sx_tree_key_cmp(sx_tree_t *rbtree, const char *a, struct sx *b)
+{
+	(void)rbtree;
+	return ss_cmp(load_u64(a), b->id);
+}
+
+rb_gen_ext_key(, sx_tree_, sx_tree_t, struct sx, tree_node,
+		 sx_tree_cmp, const char *, sx_tree_key_cmp);
+
 struct sxmanager {
 	pthread_mutex_t  lock;
+	sx_tree_t tree;
 	struct rlist      indexes;
-	struct ssrb        i;
 	uint32_t    count_rd;
 	uint32_t    count_rw;
 	uint32_t    count_gc;
@@ -5123,7 +4802,7 @@ sx_count(struct sxmanager *m) {
 
 static int sx_managerinit(struct sxmanager *m, struct runtime *r)
 {
-	ss_rbinit(&m->i);
+	sx_tree_new(&m->tree);
 	m->count_rd = 0;
 	m->count_rw = 0;
 	m->count_gc = 0;
@@ -5148,7 +4827,7 @@ static int sx_indexinit(struct sxindex *i, struct sxmanager *m,
 			struct phia_index *db,
 			struct si *index, struct sfscheme *scheme)
 {
-	ss_rbinit(&i->i);
+	sxv_tree_new(&i->tree);
 	rlist_create(&i->link);
 	i->dsn = 0;
 	i->db = db;
@@ -5165,20 +4844,27 @@ static int sx_indexset(struct sxindex *i, uint32_t dsn)
 	return 0;
 }
 
-ss_rbtruncate(sx_truncate, sx_vfreeall(arg, container_of(n, struct sxv, node)))
+
+static struct sxv *
+sxv_tree_free_cb(sxv_tree_t *t, struct sxv *v, void *arg)
+{
+	(void)t;
+	struct sxvpool *p = (struct sxvpool *)arg;
+	sx_vfreeall(p, v);
+	return NULL;
+}
 
 static inline void
 sx_indextruncate(struct sxindex *i, struct sxmanager *m)
 {
-	if (i->i.root == NULL)
-		return;
 	tt_pthread_mutex_lock(&i->mutex);
-	sx_truncate(i->i.root, &m->pool);
-	ss_rbinit(&i->i);
+	sxv_tree_iter(&i->tree, NULL, sxv_tree_free_cb, &m->pool);
+	sxv_tree_new(&i->tree);
 	tt_pthread_mutex_unlock(&i->mutex);
 }
 
-static int sx_indexfree(struct sxindex *i, struct sxmanager *m)
+static int
+sx_indexfree(struct sxindex *i, struct sxmanager *m)
 {
 	sx_indextruncate(i, m);
 	rlist_del(&i->link);
@@ -5191,8 +4877,7 @@ static uint64_t sx_min(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
-		struct ssrbnode *node = ss_rbmin(&m->i);
-		struct sx *min = container_of(node, struct sx, node);
+		struct sx *min = sx_tree_first(&m->tree);
 		id = min->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -5204,8 +4889,7 @@ static uint64_t sx_max(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t id = 0;
 	if (sx_count(m) > 0) {
-		struct ssrbnode *node = ss_rbmax(&m->i);
-		struct sx *max = container_of(node, struct sx, node);
+		struct sx *max = sx_tree_last(&m->tree);
 		id = max->id;
 	}
 	tt_pthread_mutex_unlock(&m->lock);
@@ -5217,8 +4901,7 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	tt_pthread_mutex_lock(&m->lock);
 	uint64_t vlsn;
 	if (sx_count(m) > 0) {
-		struct ssrbnode *node = ss_rbmin(&m->i);
-		struct sx *min = container_of(node, struct sx, node);
+		struct sx *min = sx_tree_first(&m->tree);
 		vlsn = min->vlsn;
 	} else {
 		vlsn = sr_seq(m->r->seq, SR_LSN);
@@ -5227,15 +4910,9 @@ static uint64_t sx_vlsn(struct sxmanager *m)
 	return vlsn;
 }
 
-ss_rbget(sx_matchtx, ss_cmp((container_of(n, struct sx, node))->id, load_u64(key)))
-
 static struct sx *sx_find(struct sxmanager *m, uint64_t id)
 {
-	struct ssrbnode *n = NULL;
-	int rc = sx_matchtx(&m->i, NULL, (char*)&id, sizeof(id), &n);
-	if (rc == 0 && n)
-		return  container_of(n, struct sx, node);
-	return NULL;
+	return sx_tree_search(&m->tree, (char*)&id);
 }
 
 static void sx_init(struct sxmanager *m, struct sx *x, struct svlog *log)
@@ -5269,13 +4946,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	sr_sequnlock(m->r->seq);
 	sx_init(m, x, log);
 	tt_pthread_mutex_lock(&m->lock);
-	struct ssrbnode *n = NULL;
-	int rc = sx_matchtx(&m->i, NULL, (char*)&x->id, sizeof(x->id), &n);
-	if (rc == 0 && n) {
-		assert(0);
-	} else {
-		ss_rbset(&m->i, n, rc, &x->node);
-	}
+	sx_tree_insert(&m->tree, x);
 	if (type == SXRO)
 		m->count_rd++;
 	else
@@ -5290,10 +4961,9 @@ sx_untrack(struct sxv *v)
 	if (v->prev == NULL) {
 		struct sxindex *i = v->index;
 		tt_pthread_mutex_lock(&i->mutex);
-		if (v->next == NULL)
-			ss_rbremove(&i->i, &v->node);
-		else
-			ss_rbreplace(&i->i, &v->node, &v->next->node);
+		sxv_tree_remove(&i->tree, v);
+		if (v->next != NULL)
+			sxv_tree_insert(&i->tree, v->next);
 		tt_pthread_mutex_unlock(&i->mutex);
 	}
 	sx_vunlink(v);
@@ -5305,15 +4975,12 @@ sx_csn(struct sxmanager *m)
 	uint64_t csn = UINT64_MAX;
 	if (m->count_rw == 0)
 		return csn;
-	struct ssrbnode *p = ss_rbmin(&m->i);
-	struct sx *min = NULL;
-	while (p) {
-		min = container_of(p, struct sx, node);
-		if (min->type == SXRO) {
-			p = ss_rbnext(&m->i, p);
-			continue;
+	struct sx *min = sx_tree_first(&m->tree);
+	while (min) {
+		if (min->type != SXRO) {
+			break;
 		}
-		break;
+		min = sx_tree_next(&m->tree, min);
 	}
 	assert(min != NULL);
 	return min->csn;
@@ -5360,7 +5027,7 @@ sx_end(struct sx *x)
 {
 	struct sxmanager *m = x->manager;
 	tt_pthread_mutex_lock(&m->lock);
-	ss_rbremove(&m->i, &x->node);
+	sx_tree_remove(&m->tree, x);
 	if (x->type == SXRO)
 		m->count_rd--;
 	else
@@ -5516,11 +5183,6 @@ static enum sxstate sx_commit(struct sx *x)
 	return SXCOMMIT;
 }
 
-ss_rbget(sx_match,
-         sf_compare(scheme, ((container_of(n, struct sxv, node))->v)->data,
-                    (container_of(n, struct sxv, node))->v->size,
-                    key, keysize))
-
 static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *version)
 {
 	struct sxmanager *m = x->manager;
@@ -5543,29 +5205,22 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 	sv_init(&lv.v, &sx_vif, v, NULL);
 	/* update concurrent index */
 	tt_pthread_mutex_lock(&index->mutex);
-	struct ssrbnode *n = NULL;
-	int rc = sx_match(&index->i, index->scheme,
-	                  version->data,
-	                  version->size,
-	                  &n);
-	if (unlikely(rc == 0 && n)) {
-		/* exists */
-	} else {
-		int pos = rc;
+	struct sxv *head = sxv_tree_search_key(&index->tree,
+					       v->v->data, v->v->size);
+	if (unlikely(head == NULL)) {
 		/* unique */
 		v->lo = sv_logcount(x->log);
-		rc = sv_logadd(x->log, r->a, &lv, index->index);
+		int rc = sv_logadd(x->log, r->a, &lv, index->index);
 		if (unlikely(rc == -1)) {
 			sr_oom();
 			goto error;
 		}
-		ss_rbset(&index->i, n, pos, &v->node);
+		sxv_tree_insert(&index->tree, v);
 		tt_pthread_mutex_unlock(&index->mutex);
 		return 0;
 	}
-	struct sxv *head = container_of(n, struct sxv, node);
-	/* match previous update made by current
-	 * transaction */
+	/* exists */
+	/* match previous update made by current transaction */
 	struct sxv *own = sx_vmatch(head, x->id);
 	if (unlikely(own))
 	{
@@ -5580,8 +5235,10 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 		if (unlikely(sx_vaborted(own)))
 			sx_vabort(v);
 		sx_vreplace(own, v);
-		if (likely(head == own))
-			ss_rbreplace(&index->i, &own->node, &v->node);
+		if (likely(head == own)) {
+			sxv_tree_remove(&index->tree, own);
+			sxv_tree_insert(&index->tree, v);
+		}
 		/* update log */
 		sv_logreplace(x->log, v->lo, &lv);
 
@@ -5592,7 +5249,7 @@ static int sx_set(struct sx *x, struct sxindex *index, struct phia_tuple *versio
 	}
 	/* update log */
 	v->lo = sv_logcount(x->log);
-	rc = sv_logadd(x->log, r->a, &lv, index->index);
+	int rc = sv_logadd(x->log, r->a, &lv, index->index);
 	if (unlikely(rc == -1)) {
 		sr_oom();
 		goto error;
@@ -5612,14 +5269,11 @@ static int sx_get(struct sx *x, struct sxindex *index, struct phia_tuple *key,
 		  struct phia_tuple **result)
 {
 	struct sxmanager *m = x->manager;
-	struct ssrbnode *n = NULL;
-	int rc;
 	tt_pthread_mutex_lock(&index->mutex);
-	rc = sx_match(&index->i, index->scheme,
-	              key->data, key->size, &n);
-	if (! (rc == 0 && n))
+	struct sxv *head = sxv_tree_search_key(&index->tree,
+					       key->data, key->size);
+	if (head != NULL)
 		goto add;
-	struct sxv *head = container_of(n, struct sxv, node);
 	struct sxv *v = sx_vmatch(head, x->id);
 	if (v == NULL)
 		goto add;
@@ -5641,7 +5295,7 @@ add:
 	if (x->log_read == -1)
 		x->log_read = sv_logcount(x->log);
 	tt_pthread_mutex_unlock(&index->mutex);
-	rc = sx_set(x, index, key);
+	int rc = sx_set(x, index, key);
 	if (unlikely(rc == -1))
 		return -1;
 	phia_tuple_ref(key);
@@ -7904,7 +7558,7 @@ struct PACKED sinode {
 	pthread_mutex_t reflock;
 	struct svindex    i0, i1;
 	struct ssfile     file;
-	struct ssrbnode   node;
+	rb_node(struct sinode) tree_node;
 	struct ssrqnode   nodecompact;
 	struct ssrqnode   nodebranch;
 	struct ssrqnode   nodetemp;
@@ -8000,20 +7654,15 @@ si_nodeindex_priority(struct sinode *node, struct svindex **second)
 	return &node->i0;
 }
 
-static inline struct sinode*
-si_nodeof(struct ssrbnode *node) {
-	return container_of(node, struct sinode, node);
-}
-
 static inline int
 si_nodecmp(struct sinode *n, void *key, int size, struct sfscheme *s)
 {
 	struct sdindexpage *min = sd_indexmin(&n->self.index);
 	struct sdindexpage *max = sd_indexmax(&n->self.index);
 	int l = sf_compare(s, sd_indexpage_min(&n->self.index, min),
-	                   min->sizemin, key, size);
+			   min->sizemin, key, size);
 	int r = sf_compare(s, sd_indexpage_max(&n->self.index, max),
-	                   max->sizemax, key, size);
+			   max->sizemax, key, size);
 	/* inside range */
 	if (l <= 0 && r >= 0)
 		return 0;
@@ -8023,6 +7672,20 @@ si_nodecmp(struct sinode *n, void *key, int size, struct sfscheme *s)
 	/* key < range */
 	assert(r == 1);
 	return 1;
+}
+
+static inline int
+si_nodecmpnode(struct sinode *n1, struct sinode *n2, struct sfscheme *s)
+{
+	if (n1 == n2)
+		return 0;
+	struct sdindexpage *min1 = sd_indexmin(&n1->self.index);
+	struct sdindexpage *min2 = sd_indexmin(&n2->self.index);
+	return sf_compare(s,
+			  sd_indexpage_min(&n1->self.index, min1),
+			  min1->sizemin,
+			  sd_indexpage_min(&n2->self.index, min2),
+			  min2->sizemax);
 }
 
 static inline uint64_t
@@ -8144,11 +7807,38 @@ enum siref {
 	SI_REFBE
 };
 
+typedef rb_tree(struct sinode) sinode_tree_t;
+
+struct sinode_tree_key {
+	char *data;
+	int size;
+};
+
+static int
+sinode_tree_cmp(sinode_tree_t *rbtree, struct sinode *a, struct sinode *b);
+
+static int
+sinode_tree_key_cmp(sinode_tree_t *rbtree,
+		    struct sinode_tree_key *a, struct sinode *b);
+
+rb_gen_ext_key(, sinode_tree_, sinode_tree_t, struct sinode, tree_node,
+		 sinode_tree_cmp, struct sinode_tree_key *,
+		 sinode_tree_key_cmp);
+
+struct sinode *
+sinode_tree_free_cb(sinode_tree_t *t, struct sinode * n, void *arg)
+{
+	(void)t;
+	struct runtime *r = (struct runtime *)arg;
+	si_nodefree(n, r, 0);
+	return NULL;
+}
+
 struct si {
+	sinode_tree_t tree;
 	struct srstatus   status;
 	pthread_mutex_t    lock;
 	struct siplanner  p;
-	struct ssrb       i;
 	int        n;
 	uint64_t   update_time;
 	uint64_t   lru_run_lsn;
@@ -8172,6 +7862,23 @@ struct si {
 	struct runtime *r;
 	struct rlist     link;
 };
+
+static int
+sinode_tree_cmp(sinode_tree_t *rbtree, struct sinode *a, struct sinode *b)
+{
+	struct sfscheme *scheme =
+		&container_of(rbtree, struct si, tree)->scheme;
+	return si_nodecmpnode(a, b, scheme);
+}
+
+static int
+sinode_tree_key_cmp(sinode_tree_t *rbtree,
+		    struct sinode_tree_key *a, struct sinode *b)
+{
+	struct sfscheme *scheme =
+		&container_of(rbtree, struct si, tree)->scheme;
+	return (-si_nodecmp(b, a->data, a->size, scheme));
+}
 
 static inline bool
 si_active(struct si *i) {
@@ -8538,14 +8245,11 @@ static int  si_readcommited(struct si*, struct sv*, int);
 
 struct PACKED siiter {
 	struct si *index;
-	struct ssrbnode *v;
+	struct sinode *node;
 	enum phia_order order;
 	void *key;
 	int keysize;
 };
-
-ss_rbget(si_itermatch,
-         si_nodecmp(container_of(n, struct sinode, node), key, keysize, scheme))
 
 static inline int
 si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
@@ -8555,21 +8259,21 @@ si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
 	ii->order   = o;
 	ii->key     = key;
 	ii->keysize = keysize;
-	ii->v       = NULL;
+	ii->node = NULL;
 	int eq = 0;
 	if (unlikely(index->n == 1)) {
-		ii->v = ss_rbmin(&index->i);
+		ii->node = sinode_tree_first(&index->tree);
 		return 1;
 	}
 	if (unlikely(ii->key == NULL)) {
 		switch (ii->order) {
 		case PHIA_LT:
 		case PHIA_LE:
-			ii->v = ss_rbmax(&index->i);
+			ii->node = sinode_tree_last(&index->tree);;
 			break;
 		case PHIA_GT:
 		case PHIA_GE:
-			ii->v = ss_rbmin(&index->i);
+			ii->node = sinode_tree_first(&index->tree);
 			break;
 		default:
 			assert(0);
@@ -8579,33 +8283,23 @@ si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
 	}
 	/* route */
 	assert(ii->key != NULL);
-	int rc;
-	rc = si_itermatch(&index->i, &index->scheme, ii->key, ii->keysize, &ii->v);
-	if (unlikely(ii->v == NULL)) {
-		assert(rc != 0);
-		if (rc == 1)
-			ii->v = ss_rbmin(&index->i);
-		else
-			ii->v = ss_rbmax(&index->i);
+	struct sinode_tree_key tree_key;
+	tree_key.data = ii->key;
+	tree_key.size = ii->keysize;
+	ii->node = sinode_tree_search(&index->tree, &tree_key);
+	if (ii->node != NULL) {
+		eq = 1;
 	} else {
-		eq = rc == 0 && ii->v;
-		if (rc == 1) {
-			ii->v = ss_rbprev(&index->i, ii->v);
-			if (unlikely(ii->v == NULL))
-				ii->v = ss_rbmin(&index->i);
-		}
+		ii->node = sinode_tree_psearch(&index->tree, &tree_key);
 	}
-	assert(ii->v != NULL);
+	assert(ii->node != NULL);
 	return eq;
 }
 
-static inline void*
+static inline struct sinode *
 si_iter_get(struct siiter *ii)
 {
-	if (unlikely(ii->v == NULL))
-		return NULL;
-	struct sinode *n = si_nodeof(ii->v);
-	return n;
+	return ii->node;
 }
 
 static inline void
@@ -8614,11 +8308,11 @@ si_iter_next(struct siiter *ii)
 	switch (ii->order) {
 	case PHIA_LT:
 	case PHIA_LE:
-		ii->v = ss_rbprev(&ii->index->i, ii->v);
+		ii->node = sinode_tree_prev(&ii->index->tree, ii->node);
 		break;
 	case PHIA_GT:
 	case PHIA_GE:
-		ii->v = ss_rbnext(&ii->index->i, ii->v);
+		ii->node = sinode_tree_next(&ii->index->tree, ii->node);
 		break;
 	default: assert(0);
 	}
@@ -8639,28 +8333,58 @@ si_compact(struct si*, struct sdc*, struct siplan*, uint64_t,
 static int
 si_compact_index(struct si*, struct sdc*, struct siplan*, uint64_t, uint64_t);
 
+typedef rb_tree(struct sinode) sinode_id_tree_t;
+
+static int
+sinode_id_tree_cmp(sinode_id_tree_t *rbtree, struct sinode *a, struct sinode *b)
+{
+	(void)rbtree;
+	return ss_cmp(a->self.id.id, b->self.id.id);
+}
+
+static int
+sinode_id_tree_key_cmp(sinode_id_tree_t *rbtree, const char *a, struct sinode *b)
+{
+	(void)rbtree;
+	return ss_cmp(load_u64(a), b->self.id.id);
+}
+
+rb_gen_ext_key(, sinode_id_tree_, sinode_id_tree_t, struct sinode,
+		 tree_node, sinode_id_tree_cmp, const char *,
+		 sinode_id_tree_key_cmp);
+
+struct sinode *
+sinode_id_tree_free_cb(sinode_id_tree_t *t, struct sinode * n, void *arg)
+{
+	(void)t;
+	struct runtime *r = (struct runtime *)arg;
+	si_nodefree(n, r, 0);
+	return NULL;
+}
+
 struct sitrack {
-	struct ssrb i;
+	sinode_id_tree_t tree;
 	int count;
 	uint64_t nsn;
 	uint64_t lsn;
 };
 
 static inline void
-si_trackinit(struct sitrack *t) {
-	ss_rbinit(&t->i);
+si_trackinit(struct sitrack *t)
+{
+	sinode_id_tree_new(&t->tree);
 	t->count = 0;
 	t->nsn = 0;
 	t->lsn = 0;
 }
 
-ss_rbtruncate(si_tracktruncate,
-              si_nodefree(container_of(n, struct sinode, node), (struct runtime*)arg, 0))
-
 static inline void
-si_trackfree(struct sitrack *t, struct runtime *r) {
-	if (t->i.root)
-		si_tracktruncate(t->i.root, r);
+si_trackfree(struct sitrack *t, struct runtime *r)
+{
+	sinode_id_tree_iter(&t->tree, NULL, sinode_id_tree_free_cb, r);
+#ifndef NDEBUG
+	t->tree.rbt_root = (struct sinode *)(intptr_t)0xDEADBEEF;
+#endif
 }
 
 static inline void
@@ -8688,35 +8412,25 @@ si_tracknsn(struct sitrack *t, uint64_t nsn)
 		t->nsn = nsn;
 }
 
-ss_rbget(si_trackmatch, ss_cmp((container_of(n, struct sinode, node))->self.id.id, load_u64(key)))
-
 static inline void
 si_trackset(struct sitrack *t, struct sinode *n)
 {
-	struct ssrbnode *p = NULL;
-	int rc = si_trackmatch(&t->i, NULL, (char*)&n->self.id.id,
-	                       sizeof(n->self.id.id), &p);
-	assert(! (rc == 0 && p));
-	ss_rbset(&t->i, p, rc, &n->node);
+	sinode_id_tree_insert(&t->tree, n);
 	t->count++;
 }
 
 static inline struct sinode*
 si_trackget(struct sitrack *t, uint64_t id)
 {
-	struct ssrbnode *p = NULL;
-	int rc = si_trackmatch(&t->i, NULL, (char*)&id, sizeof(id), &p);
-	if (rc == 0 && p)
-		return container_of(p, struct sinode, node);
-	return NULL;
+	return sinode_id_tree_search(&t->tree, (const char *)&id);
 }
 
 static inline void
 si_trackreplace(struct sitrack *t, struct sinode *o, struct sinode *n)
 {
-	ss_rbreplace(&t->i, &o->node, &n->node);
+	sinode_id_tree_remove(&t->tree, o);
+	sinode_id_tree_insert(&t->tree, n);
 }
-
 static struct sinode *si_bootstrap(struct si*, uint64_t);
 static int si_recover(struct si*);
 
@@ -8765,10 +8479,10 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	}
 	ss_bufinit(&i->readbuf);
 	sv_upsertinit(&i->u);
-	ss_rbinit(&i->i);
-	tt_pthread_mutex_init(&i->lock, NULL);
 	si_confinit(&i->conf);
 	sf_schemeinit(&i->scheme);
+	sinode_tree_new(&i->tree);
+	tt_pthread_mutex_init(&i->lock, NULL);
 	rlist_create(&i->link);
 	rlist_create(&i->gc);
 	i->gc_count     = 0;
@@ -8789,9 +8503,6 @@ static struct si *si_init(struct runtime *r, struct phia_index *db)
 	return i;
 }
 
-ss_rbtruncate(si_truncate,
-              si_nodefree(container_of(n, struct sinode, node), (struct runtime*)arg, 0))
-
 static int si_close(struct si *i)
 {
 	int rc_ret = 0;
@@ -8804,9 +8515,11 @@ static int si_close(struct si *i)
 	}
 	rlist_create(&i->gc);
 	i->gc_count = 0;
-	if (i->i.root)
-		si_truncate(i->i.root, i->r);
-	i->i.root = NULL;
+
+	sinode_tree_iter(&i->tree, NULL, sinode_tree_free_cb, i->r);
+#ifndef NDEBUG
+	i->tree.rbt_root = (struct sinode *)(intptr_t)0xDEADBEEF;
+#endif
 	sv_upsertfree(&i->u, i->r->a);
 	ss_buffree(&i->readbuf, i->r->a);
 	si_plannerfree(&i->p, i->r->a);
@@ -8819,36 +8532,24 @@ static int si_close(struct si *i)
 	return rc_ret;
 }
 
-ss_rbget(si_match,
-         sf_compare(scheme,
-                    sd_indexpage_min(&(container_of(n, struct sinode, node))->self.index,
-                                     sd_indexmin(&(container_of(n, struct sinode, node))->self.index)),
-                    sd_indexmin(&(container_of(n, struct sinode, node))->self.index)->sizemin,
-                                key, keysize))
-
 static int si_insert(struct si *i, struct sinode *n)
 {
-	struct sdindexpage *min = sd_indexmin(&n->self.index);
-	struct ssrbnode *p = NULL;
-	int rc = si_match(&i->i, &i->scheme,
-	                  sd_indexpage_min(&n->self.index, min),
-	                  min->sizemin, &p);
-	assert(! (rc == 0 && p));
-	ss_rbset(&i->i, p, rc, &n->node);
+	sinode_tree_insert(&i->tree, n);
 	i->n++;
 	return 0;
 }
 
 static int si_remove(struct si *i, struct sinode *n)
 {
-	ss_rbremove(&i->i, &n->node);
+	sinode_tree_remove(&i->tree, n);
 	i->n--;
 	return 0;
 }
 
 static int si_replace(struct si *i, struct sinode *o, struct sinode *n)
 {
-	ss_rbreplace(&i->i, &o->node, &n->node);
+	sinode_tree_remove(&i->tree, o);
+	sinode_tree_insert(&i->tree, n);
 	return 0;
 }
 
@@ -9723,7 +9424,6 @@ si_nodenew(struct sfscheme *scheme, struct runtime *r)
 	ss_fileinit(&n->file, r->vfs);
 	sv_indexinit(&n->i0, scheme);
 	sv_indexinit(&n->i1, scheme);
-	ss_rbinitnode(&n->node);
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodebranch);
 	ss_rqinitnode(&n->nodetemp);
@@ -10349,11 +10049,8 @@ static int si_profiler(struct siprofiler *p)
 {
 	uint32_t temperature_total = 0;
 	uint64_t memory_used = 0;
-	struct ssrbnode *pn;
-	struct sinode *n;
-	pn = ss_rbmin(&p->i->i);
-	while (pn) {
-		n = container_of(pn, struct sinode, node);
+	struct sinode *n = sinode_tree_first(&p->i->tree);
+	while (n) {
 		if (p->temperature_max < n->temperature)
 			p->temperature_max = n->temperature;
 		if (p->temperature_min > n->temperature)
@@ -10386,7 +10083,7 @@ static int si_profiler(struct siprofiler *p)
 			}
 			b = b->next;
 		}
-		pn = ss_rbnext(&p->i->i, pn);
+		n = sinode_tree_next(&p->i->tree, n);
 	}
 	if (p->total_node_count > 0) {
 		p->total_branch_avg =
@@ -11145,9 +10842,8 @@ static inline int
 si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct si *i)
 {
 	ss_bufreset(buf);
-	struct ssrbnode *p = ss_rbmax(&track->i);
-	while (p) {
-		struct sinode *n = container_of(p, struct sinode, node);
+	struct sinode *n = sinode_id_tree_last(&track->tree);
+	while (n) {
 		switch (n->recover) {
 		case SI_RDB|SI_RDB_DBI|SI_RDB_DBSEAL|SI_RDB_REMOVE:
 		case SI_RDB|SI_RDB_DBSEAL|SI_RDB_REMOVE:
@@ -11188,7 +10884,7 @@ si_trackvalidate(struct sitrack *track, struct ssbuf *buf, struct si *i)
 			return sr_malfunction("corrupted index repository: %s",
 			                      i->conf.path);
 		}
-		p = ss_rbprev(&track->i, p);
+		n = sinode_id_tree_prev(&track->tree, n);
 	}
 	return 0;
 }
@@ -11198,13 +10894,12 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 {
 	/* prepare and build primary index */
 	ss_bufreset(buf);
-	struct ssrbnode *p = ss_rbmin(&track->i);
-	while (p) {
-		struct sinode *n = container_of(p, struct sinode, node);
+	struct sinode *n = sinode_id_tree_first(&track->tree);
+	while (n) {
 		int rc = ss_bufadd(buf, r->a, &n, sizeof(struct sinode*));
 		if (unlikely(rc == -1))
 			return sr_oom();
-		p = ss_rbnext(&track->i, p);
+		n = sinode_id_tree_next(&track->tree, n);
 	}
 	struct ssiter i;
 	ss_bufiterref_open(&i, buf, sizeof(struct sinode*));
@@ -11229,11 +10924,10 @@ si_recovercomplete(struct sitrack *track, struct runtime *r, struct si *index, s
 static inline void
 si_recoversize(struct si *i)
 {
-	struct ssrbnode *pn = ss_rbmin(&i->i);
-	while (pn) {
-		struct sinode *n = container_of(pn, struct sinode, node);
+	struct sinode *n = sinode_tree_first(&i->tree);
+	while (n) {
 		i->size += si_nodesize(n);
-		pn = ss_rbnext(&i->i, pn);
+		n = sinode_tree_next(&i->tree, n);
 	}
 }
 
