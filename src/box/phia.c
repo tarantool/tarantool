@@ -2954,7 +2954,7 @@ sr_versionstorage_check(struct srversion *v)
 #define sr_oom() \
 	sr_e(ER_PHIA, "%s", "memory allocation failed")
 
-enum {
+enum phia_status {
 	SR_OFFLINE,
 	SR_INITIAL_RECOVERY,
 	SR_FINAL_RECOVERY,
@@ -2967,7 +2967,7 @@ enum {
 };
 
 struct srstatus {
-	int status;
+	enum phia_status status;
 	pthread_mutex_t lock;
 };
 
@@ -2984,51 +2984,51 @@ sr_statusfree(struct srstatus *s)
 	tt_pthread_mutex_destroy(&s->lock);
 }
 
-static inline int
-sr_statusset(struct srstatus *s, int status)
+static inline enum phia_status
+sr_statusset(struct srstatus *s, enum phia_status status)
 {
 	tt_pthread_mutex_lock(&s->lock);
-	int old = s->status;
+	enum phia_status old = s->status;
 	s->status = status;
 	tt_pthread_mutex_unlock(&s->lock);
 	return old;
 }
 
-static inline int
+static inline enum phia_status
 sr_status(struct srstatus *s)
 {
 	tt_pthread_mutex_lock(&s->lock);
-	int status = s->status;
+	enum phia_status status = s->status;
 	tt_pthread_mutex_unlock(&s->lock);
 	return status;
 }
 
-static inline int
-sr_statusactive_is(int status)
+static inline bool
+sr_statusactive_is(enum phia_status status)
 {
 	switch (status) {
 	case SR_ONLINE:
 	case SR_INITIAL_RECOVERY:
 	case SR_FINAL_RECOVERY:
-		return 1;
+		return true;
 	case SR_SHUTDOWN_PENDING:
 	case SR_SHUTDOWN:
 	case SR_DROP_PENDING:
 	case SR_DROP:
 	case SR_OFFLINE:
 	case SR_MALFUNCTION:
-		return 0;
+		return false;
 	}
 	assert(0);
 	return 0;
 }
 
-static inline int
+static inline bool
 sr_statusactive(struct srstatus *s) {
 	return sr_statusactive_is(sr_status(s));
 }
 
-static inline int
+static inline bool
 sr_online(struct srstatus *s) {
 	return sr_status(s) == SR_ONLINE;
 }
@@ -3291,7 +3291,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 }
 
 struct runtime {
-	struct srstatus *status;
 	struct srseq *seq;
 	struct ssa *a;
 	struct ssvfs *vfs;
@@ -3302,7 +3301,6 @@ struct runtime {
 
 static inline void
 sr_init(struct runtime *r,
-        struct srstatus *status,
         struct ssa *a,
         struct ssvfs *vfs,
         struct ssquota *quota,
@@ -3310,7 +3308,6 @@ sr_init(struct runtime *r,
         struct srseq *seq,
         struct srstat *stat)
 {
-	r->status      = status;
 	r->a           = a;
 	r->vfs         = vfs;
 	r->quota       = quota;
@@ -8244,7 +8241,7 @@ struct si {
 	struct rlist     link;
 };
 
-static inline int
+static inline bool
 si_active(struct si *i) {
 	return sr_statusactive(&i->status);
 }
@@ -11663,7 +11660,6 @@ sc_task_age_done(struct scheduler *s, uint64_t now)
 
 static int sc_step(struct phia_service*, uint64_t);
 
-static int sc_ctl_call(struct phia_service *, uint64_t);
 static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
@@ -11769,16 +11765,6 @@ free:
 
 static struct scheduler *
 phia_env_get_scheduler(struct phia_env *);
-
-static int sc_ctl_call(struct phia_service *srv, uint64_t vlsn)
-{
-	struct scheduler *sc = phia_env_get_scheduler(srv->env);
-	int rc = sr_statusactive(sc->r->status);
-	if (unlikely(rc == 0))
-		return 0;
-	rc = sc_step(srv, vlsn);
-	return rc;
-}
 
 static int sc_ctl_checkpoint(struct scheduler *s)
 {
@@ -12241,7 +12227,7 @@ struct phia_confcursor {
 };
 
 struct phia_env {
-	struct srstatus    status;
+	enum phia_status status;
 	/** List of open spaces. */
 	struct rlist db;
 	struct srseq       seq;
@@ -12317,29 +12303,29 @@ struct phia_cursor {
 void
 phia_bootstrap(struct phia_env *e)
 {
-	assert(sr_status(&e->status) == SR_OFFLINE);
-	sr_statusset(&e->status, SR_ONLINE);
+	assert(e->status == SR_OFFLINE);
+	e->status = SR_ONLINE;
 }
 
 void
 phia_begin_initial_recovery(struct phia_env *e)
 {
-	assert(sr_status(&e->status) == SR_OFFLINE);
-	sr_statusset(&e->status, SR_INITIAL_RECOVERY);
+	assert(e->status == SR_OFFLINE);
+	e->status = SR_INITIAL_RECOVERY;
 }
 
 void
 phia_begin_final_recovery(struct phia_env *e)
 {
-	assert(sr_status(&e->status) == SR_INITIAL_RECOVERY);
-	sr_statusset(&e->status, SR_FINAL_RECOVERY);
+	assert(e->status == SR_INITIAL_RECOVERY);
+	e->status = SR_FINAL_RECOVERY;
 }
 
 void
 phia_end_recovery(struct phia_env *e)
 {
-	assert(sr_status(&e->status) == SR_FINAL_RECOVERY);
-	sr_statusset(&e->status, SR_ONLINE);
+	assert(e->status == SR_FINAL_RECOVERY);
+	e->status = SR_ONLINE;
 }
 
 int
@@ -12347,7 +12333,7 @@ phia_env_delete(struct phia_env *e)
 {
 	int rcret = 0;
 	int rc;
-	sr_statusset(&e->status, SR_SHUTDOWN);
+	e->status = SR_SHUTDOWN;
 	{
 		struct phia_index *db, *next;
 		rlist_foreach_entry_safe(db, &e->db, link, next) {
@@ -12363,7 +12349,6 @@ phia_env_delete(struct phia_env *e)
 	ss_quotafree(&e->quota);
 	sr_statfree(&e->stat);
 	sr_seqfree(&e->seq);
-	sr_statusfree(&e->status);
 	free(e);
 	return rcret;
 }
@@ -13088,8 +13073,7 @@ phia_index_unref(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
 	/* do nothing during env shutdown */
-	int status = sr_status(&e->status);
-	if (status == SR_SHUTDOWN)
+	if (e->status == SR_SHUTDOWN)
 		return;
 	/* reduce reference counter */
 	int ref;
@@ -13101,7 +13085,7 @@ phia_index_unref(struct phia_index *db)
 	 * switch state and transfer job to
 	 * the scheduler.
 	*/
-	status = sr_status(&db->index->status);
+	enum phia_status status = sr_status(&db->index->status);
 	switch (status) {
 	case SR_SHUTDOWN_PENDING:
 		status = SR_SHUTDOWN;
@@ -13126,9 +13110,7 @@ int
 phia_index_delete(struct phia_index *db)
 {
 	struct phia_env *e = db->env;
-	int status = sr_status(&e->status);
-	if (status == SR_SHUTDOWN ||
-	    status == SR_OFFLINE) {
+	if (e->status == SR_SHUTDOWN || e->status == SR_OFFLINE) {
 		return phia_index_free(db, 1);
 	}
 	phia_index_unref(db);
@@ -13692,10 +13674,9 @@ int
 phia_commit(struct phia_tx *t)
 {
 	struct phia_env *e = t->env;
-	int status = sr_status(&e->status);
-	if (unlikely(! sr_statusactive_is(status)))
+	if (unlikely(! sr_statusactive_is(e->status)))
 		return -1;
-	int recover = (status == SR_FINAL_RECOVERY);
+	int recover = (e->status == SR_FINAL_RECOVERY);
 
 	/* prepare transaction */
 	if (t->t.state == SXREADY || t->t.state == SXLOCK)
@@ -13792,8 +13773,7 @@ phia_env_new(void)
 	if (unlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	sr_statusinit(&e->status);
-	sr_statusset(&e->status, SR_OFFLINE);
+	e->status = SR_OFFLINE;
 	ss_vfsinit(&e->vfs, &ss_stdvfs);
 	ss_aopen(&e->a, &ss_stda);
 	int rc;
@@ -13804,7 +13784,7 @@ phia_env_new(void)
 	ss_quotainit(&e->quota);
 	sr_seqinit(&e->seq);
 	sr_statinit(&e->stat);
-	sr_init(&e->r, &e->status, &e->a, &e->vfs, &e->quota,
+	sr_init(&e->r, &e->a, &e->vfs, &e->quota,
 		&e->conf.zones, &e->seq, &e->stat);
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
@@ -13865,7 +13845,10 @@ phia_service_new(struct phia_env *env)
 int
 phia_service_do(struct phia_service *srv)
 {
-	return sc_ctl_call(srv, sx_vlsn(&srv->env->xm));
+	if (! sr_statusactive_is(srv->env->status))
+		return 0;
+
+	return sc_step(srv, sx_vlsn(&srv->env->xm));
 }
 
 void
