@@ -2271,8 +2271,6 @@ struct sszstdfilter {
 	void *ctx;
 };
 
-static const size_t ZSTD_blockHeaderSize = 3;
-
 static int
 ss_zstdfilter_init(struct ssfilter *f, va_list args ssunused)
 {
