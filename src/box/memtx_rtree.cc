@@ -277,7 +277,7 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		return initIterator(iterator, type, key, part_count);
+		return Index::initIterator(iterator, type, key, part_count);
 	}
 	rtree_search(&m_tree, &rect, op, &it->impl);
 }

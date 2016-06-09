@@ -7,6 +7,10 @@ inspector = test_run.new()
 engine = inspector:get_cfg('engine')
 ---
 ...
+inspector:cmd("push filter '"..engine.."' to 'engine'")
+---
+- true
+...
 -- iterator (str)
 space = box.schema.space.create('test', { engine = engine })
 ---
@@ -2926,4 +2930,23 @@ t
 ...
 space:drop()
 ---
+...
+-- gh-1467: invalid iterator type
+space = box.schema.space.create('test', { engine = engine })
+---
+...
+index = space:create_index('primary')
+---
+...
+space:select({}, {iterator = 'BITS_ALL_SET' } )
+---
+- error: Index 'primary' (TREE) of space 'test' (engine) does not support requested
+    iterator type
+...
+space:drop()
+---
+...
+inspector:cmd("clear filter")
+---
+- true
 ...

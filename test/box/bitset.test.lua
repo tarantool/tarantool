@@ -94,3 +94,15 @@ dump(box.index.BITS_ANY_SET, 84)
 dump(box.index.BITS_ANY_SET, 113)
 
 drop_space()
+
+------------------------------------------------------------------------------
+-- Misc
+------------------------------------------------------------------------------
+
+-- gh-1467: invalid iterator type
+space = box.schema.space.create('test')
+_ = space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+_ = space:create_index('bitset', { type = 'bitset', parts = {2, 'num'}, unique = false })
+space.index.bitset:select({1}, { iterator = 'OVERLAPS'})
+space:drop()
+space = nil

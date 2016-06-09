@@ -55,7 +55,7 @@ Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, binutils, libgomp1, libyaml-0-2,
- openssl
+ openssl, tarantool-common (>= 1.6)
 Replaces: tarantool-lts
 Conflicts: tarantool-lts-common,
  tarantool-lts,
@@ -75,7 +75,6 @@ Conflicts: tarantool-lts-common,
  tarantool-modules (<< 1.6.7),
  tarantool-mysql-module (<< 1.6.7),
  tarantool-postgresql-module (<< 1.6.7)
-Recommends: tarantool-common (>= 1.6)
 Description: In-memory database with a Lua application server
  Tarantool is an in-memory database and a Lua application server.
  Its key properties include:

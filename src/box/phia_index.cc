@@ -361,7 +361,7 @@ PhiaIndex::initIterator(struct iterator *ptr,
 		order = PHIA_EQ;
 		break;
 	default:
-		return initIterator(ptr, type, key, part_count);
+		return Index::initIterator(ptr, type, key, part_count);
 	}
 	/* Position first key here, since key pointer might be
 	 * unavailable from lua.

@@ -305,3 +305,9 @@ _ = box.schema.create_space('test')
 _ = box.space.test:create_index('i',{parts={1,'STR'}})
 box.space.test:insert{1}
 box.space.test:drop()
+
+-- gh-1467: invalid iterator type
+space = box.schema.space.create('test')
+index = space:create_index('primary', { type = 'hash' })
+space:select({1}, {iterator = 'BITS_ALL_SET' } )
+space:drop()
