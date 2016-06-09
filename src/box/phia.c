@@ -2881,16 +2881,10 @@ struct PACKED srconfdump {
 
 struct srconfstmt {
 	const char *path;
-	void       *value;
-	enum sstype valuetype;
-	int         valuesize;
-	struct srconf     *match;
 	struct ssbuf      *serialize;
-	void       *ptr;
 	struct runtime         *r;
 };
 
-static int sr_confexec(struct srconf*, struct srconfstmt*);
 static int sr_conf_serialize(struct srconf*, struct srconfstmt*);
 
 static inline struct srconf*
@@ -3020,10 +3014,6 @@ sr_confexec_serialize(struct srconf *c, struct srconfstmt *stmt, char *root)
 	return 0;
 }
 
-static int sr_confexec(struct srconf *start, struct srconfstmt *s)
-{
-	return sr_confexec_serialize(start, s, NULL);
-}
 
 #define SVNONE       0
 #define SVDELETE     1
@@ -11768,7 +11758,6 @@ struct seconf {
 
 static int se_confinit(struct seconf*, struct phia_env *o);
 static void se_conffree(struct seconf*);
-static int se_confvalidate(struct seconf*);
 static int se_confserialize(struct seconf*, struct ssbuf*);
 
 struct phia_confcursor {
@@ -12182,26 +12171,26 @@ static int se_confserialize(struct seconf *c, struct ssbuf *buf)
 	root = se_confprepare(e, &rt, conf);
 	struct srconfstmt stmt = {
 		.path      = NULL,
-		.value     = NULL,
-		.valuesize = 0,
-		.valuetype = SS_UNDEF,
 		.serialize = buf,
-		.ptr       = e,
 		.r         = &e->r
 	};
-	return sr_confexec(root, &stmt);
+	return sr_confexec_serialize(root, &stmt, NULL);
 }
 
-static int se_confinit(struct seconf *c, struct phia_env *o)
+static int se_confinit(struct seconf *c, struct phia_env *e)
 {
 	c->confmax = 2048;
-	c->conf = ss_malloc(&o->a, sizeof(struct srconf) * c->confmax);
+	c->conf = ss_malloc(&e->a, sizeof(struct srconf) * c->confmax);
 	if (unlikely(c->conf == NULL))
 		return -1;
-	c->env                 = o;
-	c->path                = NULL;
-	c->recover             = 1;
-	c->memory_limit        = 0;
+	c->env = e;
+	c->path = ss_strdup(&e->a, cfg_gets("phia_dir"));
+	if (c->path == NULL) {
+		sr_oom();
+		return -1;
+	}
+	c->recover = 1;
+	c->memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
 		.mode              = 3, /* branch + compact */
@@ -12234,8 +12223,28 @@ static int se_confinit(struct seconf *c, struct phia_env *o)
 		.lru_prio          = 0,
 		.lru_period        = 0
 	};
-	sr_zonemap_set(&o->conf.zones,  0, &def);
-	sr_zonemap_set(&o->conf.zones, 80, &redzone);
+	sr_zonemap_set(&c->zones,  0, &def);
+	sr_zonemap_set(&c->zones, 80, &redzone);
+	/* configure zone = 0 */
+	struct srzone *z = &c->zones.zones[0];
+	assert(z->enable);
+	z->compact_wm = cfg_geti("phia.compact_wm");
+	if (z->compact_wm <= 1) {
+		sr_error("bad %d.compact_wm value", 0);
+		return -1;
+	}
+	z->branch_prio = cfg_geti("phia.branch_prio");
+	z->branch_age = cfg_geti("phia.branch_age");
+	z->branch_age_period = cfg_geti("phia.branch_age_period");
+	z->branch_age_wm = cfg_geti("phia.branch_age_wm");
+
+	/* convert periodic times from sec to usec */
+	for (int i = 0; i < 11; i++) {
+		z = &c->zones.zones[i];
+		z->branch_age_period_us = z->branch_age_period * 1000000;
+		z->gc_period_us         = z->gc_period * 1000000;
+		z->lru_period_us        = z->lru_period * 1000000;
+	}
 	return 0;
 }
 
@@ -12252,29 +12261,6 @@ static void se_conffree(struct seconf *c)
 	}
 }
 
-static int se_confvalidate(struct seconf *c)
-{
-	struct phia_env *e = (struct phia_env*)c->env;
-	if (c->path == NULL) {
-		sr_error("%s", "repository path is not set");
-		return -1;
-	}
-	int i = 0;
-	for (; i < 11; i++) {
-		struct srzone *z = &e->conf.zones.zones[i];
-		if (! z->enable)
-			continue;
-		if (z->compact_wm <= 1) {
-			sr_error("bad %d.compact_wm value", i * 10);
-			return -1;
-		}
-		/* convert periodic times from sec to usec */
-		z->branch_age_period_us = z->branch_age_period * 1000000;
-		z->gc_period_us         = z->gc_period * 1000000;
-		z->lru_period_us        = z->lru_period * 1000000;
-	}
-	return 0;
-}
 
 void
 phia_confcursor_delete(struct phia_confcursor *c)
@@ -13334,26 +13320,6 @@ phia_env_new(void)
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
 
-	e->conf.path = ss_strdup(&e->a, cfg_gets("phia_dir"));
-	if (e->conf.path == NULL) {
-		sr_oom();
-		goto error;
-	}
-	e->conf.memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
-
-	/* configure zone = 0 */
-	struct srzone *z = &e->conf.zones.zones[0];
-	assert(z->enable);
-	z->compact_wm = cfg_geti("phia.compact_wm");
-	z->branch_prio = cfg_geti("phia.branch_prio");
-	z->branch_age = cfg_geti("phia.branch_age");
-	z->branch_age_period = cfg_geti("phia.branch_age_period");
-	z->branch_age_wm = cfg_geti("phia.branch_age_wm");
-
-	/* validate configuration */
-	rc = se_confvalidate(&e->conf);
-	if (unlikely(rc == -1))
-		goto error;
 
 	/* set memory quota (disable during recovery) */
 	ss_quotaset(&e->quota, e->conf.memory_limit);
