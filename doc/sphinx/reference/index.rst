@@ -16,7 +16,7 @@
     box_error
     expirationd
     fiber
-    fiber-ipc
+    fiber_ipc
     fio
     fun
     jit

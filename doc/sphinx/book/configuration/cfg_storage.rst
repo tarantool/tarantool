@@ -34,7 +34,7 @@
 .. confval:: slab_alloc_minimal
 
     Size of the smallest allocation unit. It can be decreased if most
-    of the tuples are very small.
+    of the tuples are very small. The value must be between 8 and 1048280.
 
     Type: integer |br|
     Default: 16 |br|

@@ -232,7 +232,7 @@ Six examples of basic operations:
     tarantool> box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
 
     -- Upsert the tuple, changing field field[2] again.
-    -- The syntax of upsert is the same as the syntax of update,
+    -- The syntax of upsert is similar to the syntax of update,
     -- but the return value will be different.
     tarantool> box.space.tester:upsert({999}, {{'=', 2, 'Tarantism'}})
 
@@ -342,9 +342,9 @@ Since not all Tarantool operations can be expressed with the data-manipulation
 functions, or with Lua, to gain complete access to data manipulation
 functionality one must use a :ref:`Perl, PHP, Python or other programming language connector <box-connectors>`.
 The client/server protocol is open and documented: an annotated BNF can be found
-in the source tree, file `doc/box-protocol.html`_.
+in the source tree, file `doc/dev_guide/box-protocol.html`_.
 
-.. _doc/box-protocol.html: http://tarantool.org/doc/box-protocol.html
+.. _doc/dev_guide/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html
 
 --------------
 Saving To Disk
@@ -360,7 +360,7 @@ is lost when the power goes off, Tarantool recovers it automatically
 when it starts up again, by reading the WAL files and redoing the requests
 (this is called the "recovery process").
 Users can change the timing of the WAL writer,
-or turn it off, by setting :confval:`wal_mode <wal_mode>`.
+or turn it off, by setting :ref:`wal_mode <confval-wal-mode>`.
 
 Tarantool also maintains a set of snapshot files.
 A snapshot file is an on-disk copy of the entire data set for a given moment.
@@ -625,8 +625,8 @@ introspection (inspecting contents of spaces, accessing server configuration).
     |                   | important than the others.                          |
     +-------------------+-----------------------------------------------------+
     | WAL settings      | The important setting for the write-ahead log is    |
-    |                   | :ref:`wal_mode <wal_mode>`. If the setting causes   |
-    |                   | no writing or                                       |
+    |                   | :ref:`wal_mode <confval-wal-mode>`. If the setting  |
+    |                   | causes no writing or                                |
     |                   | delayed writing, this factor is unimportant. If the |
     |                   | setting causes every data-change request to wait    |
     |                   | for writing to finish on a slow device, this factor |

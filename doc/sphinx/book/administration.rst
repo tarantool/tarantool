@@ -58,7 +58,7 @@ A Tarantool server's process title has these components:
   - "running" (ordinary node "ready to accept requests"),
   - "loading" (ordinary node recovering from old snap and wal files),
   - "orphan" (not in a cluster),
-  - "hot_standby" (see section :ref:`local hot standby <book-cfg-local_hot_standy>`), or
+  - "hot_standby" (see section :ref:`local hot standby <book_cfg_local_hot_standby>`), or
   - "dumper" + process-id (saving a snapshot).
 * **custom_proc_title** is taken from the :confval:`custom_proc_title` configuration parameter, if one was specified.
 
@@ -192,7 +192,7 @@ declaration does not have an ``end`` keyword). Example:
     console.delimiter('')!
 
 For a condensed Backus-Naur Form [BNF] description of the suggested form
-of client requests, see http://tarantool.org/doc/box-protocol.html.
+of client requests, see http://tarantool.org/doc/dev_guide/box-protocol.html.
 
 In *interactive* mode, one types requests and gets results. Typically the
 requests are typed in by the user following prompts. Here is an example of
@@ -257,12 +257,15 @@ and checking status.
             configuring for tarantoolctl
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The :program:`tarantoolctl` script will read a configuration file named
-:file:`~/.config/tarantool/default`, or
-:file:`/etc/sysconfig/tarantool`, or :file:`/etc/default/tarantool`. Most
+"The :codenormal:`tarantoolctl` script will look for a configuration file
+in the current directory (:codenormal:`$PWD/.tarantoolctl`).
+If that fails, it looks in the current user's home directory (:codenormal:`$HOME/.config/tarantool/tarantool`).
+If that fails, it looks in the SYSCONFDIR directory (usually :codenormal:`/etc/sysconfig/tarantool`
+but it may be different on some platforms).
+Most
 of the settings are similar to the settings used by ``box.cfg{...};``
 however, tarantoolctl adjusts some of them by adding an application name.
-A copy of :file:`/etc/sysconfig/tarantool`, with defaults for all settings,
+A copy of :file:`usr/local/etc/default/tarantool`, with defaults for all settings,
 would look like this:
 
 .. code-block:: lua
@@ -397,8 +400,8 @@ Create a directory named /tarantool_test:
 
     $ sudo mkdir /tarantool_test
 
-Edit /etc/sysconfig/tarantool. It might be necessary to
-say :codenormal:`sudo mkdir /etc/sysconfig` first. Let the new file contents be:
+Edit /usr/local/etc/default/tarantool. It might be necessary to
+say :codenormal:`sudo mkdir /usr/local/etc/default` first. Let the new file contents be:
 
 .. code-block:: lua
 
@@ -469,7 +472,7 @@ Stop. The only clean way to stop my_app is with tarantoolctl, thus:
 
     $ sudo tarantoolctl stop my_app
 
-Clean up. Restore the original contents of :file:`/etc/sysconfig/tarantool`, and ...
+Clean up. Restore the original contents of :file:`/usr/local/etc/default/tarantool`, and ...
 
 .. code-block:: console
 
@@ -967,8 +970,8 @@ before reading this section.
 The modules that come from Tarantool developers and community contributors are
 on rocks.tarantool.org_. Some of them
 -- :ref:`expirationd <package-expirationd>`,
-:ref:`mysql <d-plugins-mysql-example>`,
-:ref:`postgresql <d-plugins-postgresql-example>`,
+:ref:`mysql <d_plugins-mysql-example>`,
+:ref:`postgresql <d_plugins-postgresql-example>`,
 :ref:`shard <package-shard>` --
 are discussed elsewhere in this manual.
 
@@ -1128,6 +1131,93 @@ may be unaware of them.
 
 To see a sample Lua + C module, go to http_ on github.com/tarantool.
 
+=====================================================================
+       Backups
+=====================================================================
+
+The exact procedure for backing up a database depends on:
+how up-to-date the database must be,
+how frequently backups must be taken,
+whether it is okay to disrupt other users,
+and whether the procedure should be optimized for size (saving disk space) or for speed (saving time).
+So there is a spectrum of possible policies, ranging from cold-and-simple to hot-and-difficult.
+
+**Cold Backup**
+
+In essence:
+The last snapshot file is a backup of the entire database;
+and the WAL files that are made after the last snapshot are incremental backups.
+Therefore taking a backup is a matter of copying the snapshot and WAL files. |br|
+(1) Prevent all users from writing to the database.This can be done by
+shutting down the server, or by saying
+:codenormal:`box.cfg{read_only=true}` and then ensuring that all earlier
+writes are complete (fsync can be used for this purpose). |br|
+(2) If this is a backup of the whole database, say
+:codenormal:`box.snapshot()`. |br|
+(3) Use tar to make a (possibly compressed) copy of the
+latest .snap and .xlog files on the :ref:`snap_dir <box-cfg-snap-dir>` and :ref:`wal_dir <box-cfg-wal-dir>`
+directories. |br|
+(4) If there is a security policy, encrypt the tar file. |br|
+(5) Copy the tar file to a safe place. |br|
+... Later, restoring the database is a matter of taking the
+tar file and putting its contents back in the snap_dir and wal_dir
+directories.
+
+**Continuous remote backup**
+
+In essence: :ref:`replication <box-replication>`
+is useful for backup as well as for load balancing.
+Therefore taking a backup is a matter of ensuring that any given
+replica is up to date, and doing a cold backup on it.
+Since all the other replicas continue to operate, this is not a
+cold backup from the end user's point of view. This could be
+done on a regular basis, with a cron job or with a Tarantool fiber.
+
+**Hot backup**
+
+In essence:
+The logged changes done since the last cold backup must be
+secured, while the system is running.
+
+For this purpose one needs a "file copy" utility that will
+do the copying remotely and continuously, copying only the
+parts of a file that are changing. One such utility is
+rsync_.
+
+Alternatively, one needs an ordinary file copy utility,
+but there should be frequent production of new snapshot files or
+new WAL files as
+changes occur, so that only the new files need to be copied.
+One such utility is
+`tarantar <https://github.com/tarantool/tarantool/wiki/Tarantar>`_
+but it will require some modifications to work with the latest
+Tarantool version. Setting the :ref:`rows_per_wal <box-cfg-rows-per-wal>` configuration
+parameter is another option.
+
+Note re storage engines:
+sophia databases require additional steps, see the
+explanation in
+`the sophia manual <http://sophia.systems/v2.1/sophia_v21_manual.pdf>`_.
+
+=====================================================================
+       Upgrades
+=====================================================================
+
+This information applies for users who created databases with older
+versions of the Tarantool server, and have now installed a newer version.
+The request to make in this case is: :codenormal:`box.schema.upgrade()`.
+
+For example, here is what happens when one runs :codenormal:`box.schema.upgrade()`
+with a database that was created in early 2015. Only a small part of the output is shown. |br|
+:codenormal:`tarantool>` :codebold:`box.schema.upgrade()` |br|
+:codenormal:`alter index primary on _space set options to {"unique":true}, parts to [[0,"num"]]` |br|
+:codenormal:`alter space _schema set options to {}` |br|
+:codenormal:`create view _vindex...` |br|
+:codenormal:`grant read access to 'public' role for _vindex view` |br|
+:codenormal:`set schema version to 1.6.8` |br|
+:codenormal:`---` |br|
+:codenormal:`...` |br|
+
 .. _Lua-Modules-Tutorial: http://lua-users.org/wiki/ModulesTutorial
 .. _LuaRocks: http://rocks.tarantool.org
 .. _LuaRocks-Quick-Start-Guide: http://luarocks.org/#quick-start
@@ -1135,3 +1225,5 @@ To see a sample Lua + C module, go to http_ on github.com/tarantool.
 .. _rocks: github.com/tarantool/rocks <https://github.com/tarantool/rocks
 .. _CMake-scripts: https://github.com/tarantool/http
 .. _http: https://github.com/tarantool/http
+.. _rsync: https://en.wikipedia.org/wiki/rsync
+

@@ -10,7 +10,7 @@
     building_documentation
     developer_guidelines
     documentation_guidelines
-    box-protocol
+    box_protocol
     c_style_guide
     python_style_guide
     release_management
