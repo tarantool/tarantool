@@ -567,9 +567,7 @@ enum sstype {
 	SS_STRING,
 	SS_STRINGPTR,
 	SS_U32,
-	SS_U32REV,
 	SS_U64,
-	SS_U64REV,
 };
 
 enum ssquotaop {
@@ -2635,26 +2633,6 @@ sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 }
 
 static inline int
-sf_cmpu32(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
-{
-	uint32_t av = load_u32(a);
-	uint32_t bv = load_u32(b);
-	if (av == bv)
-		return 0;
-	return (av > bv) ? 1 : -1;
-}
-
-static inline int
-sf_cmpu32_reverse(char *a, int asz ssunused, char *b, int bsz ssunused, void *arg ssunused)
-{
-	uint32_t av = load_u32(a);
-	uint32_t bv = load_u32(b);
-	if (av == bv)
-		return 0;
-	return (av > bv) ? -1 : 1;
-}
-
-static inline int
 sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
               void *arg ssunused)
 {
@@ -2663,17 +2641,6 @@ sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
 	if (av == bv)
 		return 0;
 	return (av > bv) ? 1 : -1;
-}
-
-static inline int
-sf_cmpu64_reverse(char *a, int asz ssunused, char *b, int bsz ssunused,
-              void *arg ssunused)
-{
-	uint64_t av = load_u64(a);
-	uint64_t bv = load_u64(b);
-	if (av == bv)
-		return 0;
-	return (av > bv) ? -1 : 1;
 }
 
 static int
@@ -2759,35 +2726,17 @@ sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
 }
 
 static inline int
-sf_schemeset(struct sfscheme *s, struct sffield *f, char *opt)
+sf_schemeset(struct sffield *f, char *opt)
 {
-	(void)s;
 	if (strcmp(opt, "string") == 0) {
 		f->type = SS_STRING;
 		f->fixed_size = 0;
 		f->cmp = sf_cmpstring;
-	} else
-	if (strcmp(opt, "u32") == 0) {
-		f->type = SS_U32;
-		f->fixed_size = sizeof(uint32_t);
-		f->cmp = sf_cmpu32;
-	} else
-	if (strcmp(opt, "u32_rev") == 0) {
-		f->type = SS_U32REV;
-		f->fixed_size = sizeof(uint32_t);
-		f->cmp = sf_cmpu32_reverse;
-	} else
-	if (strcmp(opt, "u64") == 0) {
+	} else if (strcmp(opt, "u64") == 0) {
 		f->type = SS_U64;
 		f->fixed_size = sizeof(uint64_t);
 		f->cmp = sf_cmpu64;
-	} else
-	if (strcmp(opt, "u64_rev") == 0) {
-		f->type = SS_U64REV;
-		f->fixed_size = sizeof(uint64_t);
-		f->cmp = sf_cmpu64_reverse;
-	} else
-	if (strncmp(opt, "key", 3) == 0) {
+	} else if (strncmp(opt, "key", 3) == 0) {
 		char *p = opt + 3;
 		if (unlikely(*p != '('))
 			return -1;
@@ -2833,7 +2782,7 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 		for (p = strtok(opts, " ,"); p;
 		     p = strtok(NULL, " ,"))
 		{
-			int rc = sf_schemeset(s, f, p);
+			int rc = sf_schemeset(f, p);
 			if (unlikely(rc == -1))
 				return -1;
 		}
