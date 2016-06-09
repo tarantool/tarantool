@@ -2022,8 +2022,6 @@ struct sfscheme {
 	struct key_def *key_def;
 	int       fields_count;
 	int       keys_count;
-	sfcmpf    cmp;
-	void     *cmparg;
 	int       var_offset;
 	int       var_count;
 	bool compression_key;
@@ -2047,7 +2045,6 @@ sf_fieldnew(struct ssa *a, char *name)
 	}
 	f->type = SS_UNDEF;
 	f->options = NULL;
-	f->cmp = NULL;
 	return f;
 }
 
@@ -2081,13 +2078,7 @@ static void sf_schemeinit(struct sfscheme*);
 static void sf_schemefree(struct sfscheme*, struct ssa*);
 static int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
 static int  sf_schemevalidate(struct sfscheme*, struct ssa*);
-static int  sf_schemecompare(char*, int, char*, int, void*);
-
-static inline int
-sf_compare(struct sfscheme *s, char *a, int asize, char *b, int bsize)
-{
-	return s->cmp(a, asize, b, bsize, s->cmparg);
-}
+static int  sf_compare(struct sfscheme*, char *, char *b);
 
 struct PACKED sfvar {
 	uint32_t offset;
@@ -2248,9 +2239,8 @@ sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
 }
 
 static int
-sf_schemecompare(char *a, int asize ssunused, char *b, int bsize ssunused, void *arg)
+sf_compare(struct sfscheme *s, char *a, char *b)
 {
-	struct sfscheme *s = arg;
 	struct sffield **part = s->keys;
 	struct sffield **last = part + s->keys_count;
 	int rc;
@@ -2277,8 +2267,6 @@ sf_schemeinit(struct sfscheme *s)
 	s->keys_count = 0;
 	s->var_offset = 0;
 	s->var_count  = 0;
-	s->cmp = sf_schemecompare;
-	s->cmparg = s;
 	s->key_def = NULL;
 	s->compression_key = false;
 }
@@ -3603,9 +3591,8 @@ sv_mergeiter_gt(struct svmergeiter *i)
 			continue;
 		}
 		int rc;
-		rc = sf_compare(i->merge->scheme,
-		                sv_pointer(minv), sv_size(minv),
-		                sv_pointer(v), sv_size(v));
+		rc = sf_compare(i->merge->scheme, sv_pointer(minv),
+				sv_pointer(v));
 		switch (rc) {
 		case 0:
 			/*
@@ -3650,8 +3637,7 @@ sv_mergeiter_lt(struct svmergeiter *i)
 		}
 		int rc;
 		rc = sf_compare(i->merge->scheme,
-		                sv_pointer(maxv), sv_size(maxv),
-		                sv_pointer(v), sv_size(v));
+				sv_pointer(maxv), sv_pointer(v));
 		switch (rc) {
 		case  0:
 			/*
@@ -4117,8 +4103,7 @@ struct svindex {
 int
 tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
 {
-	int res = sf_compare(index->scheme, a.v->data, a.v->size,
-			     b.v->data, b.v->size);
+	int res = sf_compare(index->scheme, a.v->data, b.v->data);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
@@ -4130,8 +4115,7 @@ int
 tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 			 struct svindex *index)
 {
-	int res = sf_compare(index->scheme, a.v->data, a.v->size,
-			     key->data, key->size);
+	int res = sf_compare(index->scheme, a.v->data, key->data);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
@@ -4215,8 +4199,7 @@ sv_indexset(struct svindex *i, struct svref ref)
 	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
 		struct svref *prev =
 			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
-		if (sf_compare(i->scheme, curr->v->data, curr->v->size,
-			        prev->v->data, prev->v->size) == 0) {
+		if (sf_compare(i->scheme, curr->v->data, prev->v->data) == 0) {
 			/*
 			 * Previous position exists and holds same key,
 			 * it's case (2)
@@ -4711,9 +4694,7 @@ sxv_tree_cmp(sxv_tree_t *rbtree, struct sxv *a, struct sxv *b)
 {
 	struct sfscheme *scheme =
 		container_of(rbtree, struct sxindex, tree)->scheme;
-	return sf_compare(scheme,
-			  a->v->data, a->v->size,
-			  b->v->data, b->v->size);
+	return sf_compare(scheme, a->v->data, b->v->data);
 }
 
 static int
@@ -4721,9 +4702,7 @@ sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
 {
 	struct sfscheme *scheme =
 		container_of(rbtree, struct sxindex, tree)->scheme;
-	return sf_compare(scheme,
-			  a->data, a->size,
-			  b->v->data, b->v->size);
+	return sf_compare(scheme, a->data, b->v->data);
 }
 
 struct sx;
@@ -5578,7 +5557,7 @@ sd_pageiter_cmp(struct sdpageiter *i, struct sfscheme *scheme, struct sdv *v)
 {
 	if (likely(!scheme->compression_key)) {
 		return sf_compare(scheme, sd_pagepointer(i->page, v),
-		                  v->size, i->key, i->keysize);
+		                  i->key);
 	}
 	struct sffield **part = scheme->keys;
 	struct sffield **last = part + scheme->keys_count;
@@ -6003,9 +5982,7 @@ sd_indexiter_route(struct sdindexiter *i)
 		struct sdindexpage *page = sd_indexpage(i->index, mid);
 		int rc = sf_compare(i->scheme,
 		                    sd_indexpage_max(i->index, page),
-		                    page->sizemax,
-		                    i->key,
-		                    i->keysize);
+		                    i->key);
 		if (rc < 0) {
 			begin = mid + 1;
 		} else {
@@ -6059,14 +6036,14 @@ sd_indexiter_open(struct sdindexiter *ii, struct sfscheme *scheme,
 	case PHIA_LE:
 	case PHIA_LT:
 		rc = sf_compare(ii->scheme, sd_indexpage_min(ii->index, p),
-		                p->sizemin, ii->key, ii->keysize);
+		                ii->key);
 		if (rc ==  1 || (rc == 0 && ii->cmp == PHIA_LT))
 			ii->pos--;
 		break;
 	case PHIA_GE:
 	case PHIA_GT:
 		rc = sf_compare(ii->scheme, sd_indexpage_max(ii->index, p),
-		                p->sizemax, ii->key, ii->keysize);
+				ii->key);
 		if (rc == -1 || (rc == 0 && ii->cmp == PHIA_GT))
 			ii->pos++;
 		break;
@@ -7653,14 +7630,12 @@ si_nodeindex_priority(struct sinode *node, struct svindex **second)
 }
 
 static inline int
-si_nodecmp(struct sinode *n, void *key, int size, struct sfscheme *s)
+si_nodecmp(struct sinode *n, void *key, struct sfscheme *s)
 {
 	struct sdindexpage *min = sd_indexmin(&n->self.index);
 	struct sdindexpage *max = sd_indexmax(&n->self.index);
-	int l = sf_compare(s, sd_indexpage_min(&n->self.index, min),
-			   min->sizemin, key, size);
-	int r = sf_compare(s, sd_indexpage_max(&n->self.index, max),
-			   max->sizemax, key, size);
+	int l = sf_compare(s, sd_indexpage_min(&n->self.index, min), key);
+	int r = sf_compare(s, sd_indexpage_max(&n->self.index, max), key);
 	/* inside range */
 	if (l <= 0 && r >= 0)
 		return 0;
@@ -7681,9 +7656,7 @@ si_nodecmpnode(struct sinode *n1, struct sinode *n2, struct sfscheme *s)
 	struct sdindexpage *min2 = sd_indexmin(&n2->self.index);
 	return sf_compare(s,
 			  sd_indexpage_min(&n1->self.index, min1),
-			  min1->sizemin,
-			  sd_indexpage_min(&n2->self.index, min2),
-			  min2->sizemax);
+			  sd_indexpage_min(&n2->self.index, min2));
 }
 
 static inline uint64_t
@@ -7875,7 +7848,7 @@ sinode_tree_key_cmp(sinode_tree_t *rbtree,
 {
 	struct sfscheme *scheme =
 		&container_of(rbtree, struct si, tree)->scheme;
-	return (-si_nodecmp(b, a->data, a->size, scheme));
+	return (-si_nodecmp(b, a->data, scheme));
 }
 
 static inline bool
@@ -9040,9 +9013,7 @@ si_redistribute(struct si *index, struct ssa *a, struct sdc *c,
 			struct svref *v = ss_bufiterref_get(&i);
 			struct sdindexpage *page = sd_indexmin(&p->self.index);
 			int rc = sf_compare(&index->scheme, v->v->data,
-					    v->v->size,
-			                    sd_indexpage_min(&p->self.index, page),
-			                    page->sizemin);
+			                    sd_indexpage_min(&p->self.index, page));
 			if (unlikely(rc >= 0))
 				break;
 			sv_indexset(&prev->i0, *v);
@@ -10171,8 +10142,7 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 {
 	int rc;
 	if (compare) {
-		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
-		                q->key, q->keysize);
+		rc = sf_compare(q->merge.scheme, sv_pointer(v), q->key);
 		if (unlikely(rc != 0))
 			return 0;
 	}
@@ -10456,8 +10426,7 @@ next_node:
 	rc = 1;
 	/* convert upsert search to PHIA_EQ */
 	if (q->upsert_eq) {
-		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
-		                q->key, q->keysize);
+		rc = sf_compare(q->merge.scheme, sv_pointer(v), q->key);
 		rc = rc == 0;
 	}
 	if (likely(rc == 1)) {
