@@ -2470,19 +2470,12 @@ static void sf_schemeinit(struct sfscheme*);
 static void sf_schemefree(struct sfscheme*, struct ssa*);
 static int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
 static int  sf_schemevalidate(struct sfscheme*, struct ssa*);
-static int  sf_schemecompare_prefix(struct sfscheme*, char*, uint32_t, char*);
 static int  sf_schemecompare(char*, int, char*, int, void*);
 
 static inline int
 sf_compare(struct sfscheme *s, char *a, int asize, char *b, int bsize)
 {
 	return s->cmp(a, asize, b, bsize, s->cmparg);
-}
-
-static inline int
-sf_compareprefix(struct sfscheme *s, char *a, int asize, char *b, int bsize ssunused)
-{
-	return sf_schemecompare_prefix(s, a, asize, b);
 }
 
 struct PACKED sfvar {
@@ -2662,16 +2655,6 @@ sf_schemecompare(char *a, int asize ssunused, char *b, int bsize ssunused, void 
 		part++;
 	}
 	return 0;
-}
-
-static int
-sf_schemecompare_prefix(struct sfscheme *s, char *prefix, uint32_t prefixsize, char *key)
-{
-	uint32_t keysize;
-	key = sf_fieldof(s, 0, key, &keysize);
-	if (keysize < prefixsize)
-		return 0;
-	return (memcmp(prefix, key, prefixsize) == 0) ? 1 : 0;
 }
 
 static void
@@ -8529,10 +8512,8 @@ si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t, int);
 
 struct siread {
 	enum phia_order   order;
-	void     *prefix;
 	void     *key;
 	uint32_t  keysize;
-	uint32_t  prefixsize;
 	int       has;
 	uint64_t  vlsn;
 	struct svmerge   merge;
@@ -8550,7 +8531,6 @@ struct siread {
 static int
 si_readopen(struct siread*, struct si*, struct sicache*, enum phia_order,
 	    uint64_t,
-	    void*, uint32_t,
 	    void*, uint32_t);
 static int si_readclose(struct siread*);
 static int  si_read(struct siread*);
@@ -10425,8 +10405,7 @@ static int si_profiler(struct siprofiler *p)
 
 static int
 si_readopen(struct siread *q, struct si *index, struct sicache *c,
-	    enum phia_order o, uint64_t vlsn, void *prefix, uint32_t prefixsize,
-	    void *key, uint32_t keysize)
+	    enum phia_order o, uint64_t vlsn, void *key, uint32_t keysize)
 {
 	q->order       = o;
 	q->key         = key;
@@ -10434,8 +10413,6 @@ si_readopen(struct siread *q, struct si *index, struct sicache *c,
 	q->vlsn        = vlsn;
 	q->index       = index;
 	q->cache       = c;
-	q->prefix      = prefix;
-	q->prefixsize  = prefixsize;
 	q->has         = 0;
 	q->upsert_v    = NULL;
 	q->upsert_eq   = 0;
@@ -10502,14 +10479,6 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
 		                q->key, q->keysize);
 		if (unlikely(rc != 0))
-			return 0;
-	}
-	if (q->prefix) {
-		rc = sf_compareprefix(q->merge.scheme,
-		                      q->prefix,
-		                      q->prefixsize,
-		                      sv_pointer(v), sv_size(v));
-		if (unlikely(! rc))
 			return 0;
 	}
 	if (unlikely(q->has))
@@ -10795,12 +10764,6 @@ next_node:
 		rc = sf_compare(q->merge.scheme, sv_pointer(v), sv_size(v),
 		                q->key, q->keysize);
 		rc = rc == 0;
-	}
-	/* do prefix search */
-	if (q->prefix && rc) {
-		rc = sf_compareprefix(q->merge.scheme, q->prefix, q->prefixsize,
-		                      sv_pointer(v),
-		                      sv_size(v));
 	}
 	if (likely(rc == 1)) {
 		if (unlikely(si_readdup(q, v) == -1))
@@ -13111,8 +13074,6 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 
 	/* concurrent */
 	if (x_search && order == PHIA_EQ) {
-		/* note: prefix is ignored during concurrent
-		 * index search */
 		int rc = sx_get(x, &db->coindex, key, &vup);
 		if (unlikely(rc == -1))
 			return -1;
@@ -13159,7 +13120,6 @@ phia_index_read(struct phia_index *db, struct phia_tuple *key, enum phia_order o
 	si_readopen(&q, db->index, cache,
 	            order,
 	            vlsn,
-	            NULL, 0,
 		    key->data, key->size);
 	struct sv sv_vup;
 	if (vup != NULL) {
@@ -13603,8 +13563,6 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 	si_readopen(&q, db->index, cache,
 	            PHIA_EQ,
 	            x->vlsn,
-	            NULL,
-	            0,
 	            sv_pointer(v),
 	            sv_size(v));
 	q.has = 1;
