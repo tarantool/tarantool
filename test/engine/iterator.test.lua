@@ -1,6 +1,7 @@
 test_run = require('test_run')
 inspector = test_run.new()
 engine = inspector:get_cfg('engine')
+inspector:cmd("push filter '"..engine.."' to 'engine'")
 
 -- iterator (str)
 space = box.schema.space.create('test', { engine = engine })
@@ -91,3 +92,11 @@ t
 t = {} for state, v in index:pairs(box.tuple.new(tostring(77)), {iterator = 'LT'}) do table.insert(t, v) end
 t
 space:drop()
+
+-- gh-1467: invalid iterator type
+space = box.schema.space.create('test', { engine = engine })
+index = space:create_index('primary')
+space:select({}, {iterator = 'BITS_ALL_SET' } )
+space:drop()
+
+inspector:cmd("clear filter")

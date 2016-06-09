@@ -241,4 +241,7 @@ i:select({0, 0, 0}, {iterator = 'neighbor'})
 i:alter{distance = 'manhattan' }
 i:select({0, 0, 0}, {iterator = 'neighbor'})
 
+-- gh-1467: invalid iterator type
+i:select({1, 2, 3, 4, 5, 6}, {iterator = 'BITS_ALL_SET' } )
+
 s:drop()

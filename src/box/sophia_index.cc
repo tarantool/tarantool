@@ -733,7 +733,7 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	case ITER_LT: compare = "<";
 		break;
 	default:
-		return initIterator(ptr, type, key, part_count);
+		return Index::initIterator(ptr, type, key, part_count);
 	}
 	it->cursor = sp_cursor(env);
 	if (it->cursor == NULL)
