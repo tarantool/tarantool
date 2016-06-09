@@ -6,6 +6,7 @@ _CPack_Packages
 *.gcno
 *.gcda
 *.gcov
+coverage/
 coverage.info
 *.o
 *.reject

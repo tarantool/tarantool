@@ -13,6 +13,8 @@ compiler:
 
 env:
     matrix:
+      - PACK=none
+      - PACK=coverage
       - OS=el DIST=6 PACK=rpm
       - OS=el DIST=7 PACK=rpm
       - OS=fedora DIST=22 PACK=rpm
@@ -26,10 +28,10 @@ env:
       - OS=debian DIST=wheezy PACK=deb
       - OS=debian DIST=stretch PACK=deb
       - OS=debian DIST=sid PACK=deb
-      - PACK=none
 
 matrix:
     allow_failures:
+      - env: PACK=coverage
       - env: OS=el DIST=6 PACK=rpm
       - env: OS=el DIST=7 PACK=rpm
       - env: OS=fedora DIST=22 PACK=rpm
@@ -45,6 +47,8 @@ matrix:
       - env: OS=debian DIST=sid PACK=deb
 
     exclude:
+      - env: PACK=coverage
+        compiler: clang
       - env: OS=el DIST=6 PACK=rpm
         compiler: clang
       - env: OS=el DIST=7 PACK=rpm
@@ -71,6 +75,8 @@ matrix:
         compiler: clang
       - env: OS=debian DIST=sid PACK=deb
         compiler: clang
+      - env: PACK=coverage
+        os: osx
       - env: OS=el DIST=6 PACK=rpm
         os: osx
       - env: OS=el DIST=7 PACK=rpm
