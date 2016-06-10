@@ -293,6 +293,7 @@ t;
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
   - 'box.error.injection : table: <address>
+  - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.CONNECTION_TO_SELF : 117'
   - 'box.error.NO_SUCH_INDEX : 35'
   - 'box.error.UNKNOWN_RTREE_INDEX_DISTANCE_TYPE : 103'
