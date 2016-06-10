@@ -71,7 +71,7 @@ a master and vice versa with the help of the :func:`box.cfg` statement.
 
 NOTE:
 The replica does not inherit the master's configuration parameters, such
-as the ones that cause the :ref:`snapshot daemon <book-cfg-snapshot_daemon>` to run on the master.
+as the ones that cause the :ref:`snapshot daemon <book_cfg_snapshot_daemon>` to run on the master.
 To get the same behavior, one would have to set the relevant parameters explicitly
 so that they are the same on both master and replica.
 
@@ -408,12 +408,12 @@ screen looks like this: (except that UUID values are always different):
         .. container:: b-documentation_tab
             :name: terminal-2-1
 
-            .. include:: 1-1.rst
+            .. include:: 1_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-2-2
 
-            .. include:: 1-2.rst
+            .. include:: 1_2.rst
 
     .. raw:: html
 
@@ -489,12 +489,12 @@ on Terminal #1, because both servers are in the same cluster.
         .. container:: b-documentation_tab
             :name: terminal-3-1
 
-            .. include:: 2-1.rst
+            .. include:: 2_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-3-2
 
-            .. include:: 2-2.rst
+            .. include:: 2_2.rst
 
     .. raw:: html
 
@@ -558,12 +558,12 @@ Now the screen looks like this:
         .. container:: b-documentation_tab
             :name: terminal-4-1
 
-            .. include:: 3-1.rst
+            .. include:: 3_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-4-2
 
-            .. include:: 3-2.rst
+            .. include:: 3_2.rst
 
     .. raw:: html
 
@@ -630,12 +630,12 @@ Now the screen looks like this (remember to click on the "Terminal #2" tab when 
         .. container:: b-documentation_tab
             :name: terminal-5-1
 
-            .. include:: 4-1.rst
+            .. include:: 4_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-5-2
 
-            .. include:: 4-2.rst
+            .. include:: 4_2.rst
 
     .. raw:: html
 
@@ -704,12 +704,12 @@ similar sizes because they both contain the same tuples.
         .. container:: b-documentation_tab
             :name: terminal-6-1
 
-            .. include:: 5-1.rst
+            .. include:: 5_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-6-2
 
-            .. include:: 5-2.rst
+            .. include:: 5_2.rst
 
     .. raw:: html
 
@@ -774,12 +774,12 @@ messages):
         .. container:: b-documentation_tab
             :name: terminal-7-1
 
-            .. include:: 6-1.rst
+            .. include:: 6_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-7-2
 
-            .. include:: 6-2.rst
+            .. include:: 6_2.rst
 
     .. raw:: html
 
@@ -845,12 +845,12 @@ Now the screen looks like this:
         .. container:: b-documentation_tab
             :name: terminal-8-1
 
-            .. include:: 7-1.rst
+            .. include:: 7_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-8-2
 
-            .. include:: 7-2.rst
+            .. include:: 7_2.rst
 
     .. raw:: html
 
@@ -919,12 +919,12 @@ The screen now looks like this:
         .. container:: b-documentation_tab
             :name: terminal-9-1
 
-            .. include:: 8-1.rst
+            .. include:: 8_1.rst
 
         .. container:: b-documentation_tab
             :name: terminal-9-2
 
-            .. include:: 8-2.rst
+            .. include:: 8_2.rst
 
     .. raw:: html
 

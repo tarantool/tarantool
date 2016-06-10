@@ -63,13 +63,13 @@ A list of all ``box.space`` functions follows, then comes a list of all
         | :func:`space_object:truncate()       | Delete all tuples               |
         | <space_object.truncate>`             |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:inc{}            | Increment a tuple's counter     |
+        | :func:`space_object:inc()            | Increment a tuple's counter     |
         | <space_object.inc>`                  |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:dec{}            | Decrement a tuple's counter     |
+        | :func:`space_object:dec()            | Decrement a tuple's counter     |
         | <space_object.dec>`                  |                                 |
         +--------------------------------------+---------------------------------+
-        | :func:`space_object:auto_increment{} | Generate key + Insert a tuple   |
+        | :func:`space_object:auto_increment() | Generate key + Insert a tuple   |
         | <space_object.auto_increment>`       |                                 |
         +--------------------------------------+---------------------------------+
         | :func:`space_object:pairs()          | Prepare for iterating           |
@@ -555,7 +555,7 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`;
         :samp:`{tuple_value}` (type = Lua table or scalar) =
-        field values, must be passed as a Lua table if tuple_value contains more than one field;
+        field values, must be passed as a Lua table;
         :codeitalic:`{operator, field_no, value}` (type = Lua table) = a group of arguments for each
         operation, indicating what the operation is, what field the
         operation will apply to, and what value will be applied. The
@@ -666,8 +666,8 @@ A list of all ``box.space`` functions follows, then comes a list of all
 
     .. data:: index
 
-        A container for all defined indexes. An index is a Lua object of type
-        :mod:`box.index` with methods to search tuples and iterate over them in
+        A container for all defined indexes. There is a Lua object of type
+        :ref:`box.index <box_index>` with methods to search tuples and iterate over them in
         predefined order.
 
         Parameters: :samp:`{space_object}` = an :ref:`object reference <object-reference>`.

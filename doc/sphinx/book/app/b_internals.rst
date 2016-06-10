@@ -22,7 +22,7 @@ file is based on the log sequence number of the first record in the file, plus
 an extension ``.xlog``.
 
 Apart from a log sequence number and the data change request (its format is the
-same as in the binary protocol and is described in `doc/box-protocol.html`_),
+same as in the binary protocol and is described in `doc/dev_guide/box-protocol.html`_),
 each WAL record contains a header, some metadata, and then the data formatted
 according to `msgpack`_ rules. For example this is what the WAL file looks like
 after the first INSERT request ("s:insert({1})") for the introductory sandbox
@@ -267,4 +267,4 @@ The following temporary limitations apply for version 1.6:
   limit is reached, users may have to reorganize the _cluster space manually.
 
 .. _MsgPack: https://en.wikipedia.org/wiki/MessagePack
-.. _doc/box-protocol.html: http://tarantool.org/doc/box-protocol.html
+.. _doc/dev_guide/box-protocol.html: http://tarantool.org/doc/dev_guide/box-protocol.html

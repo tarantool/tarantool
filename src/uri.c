@@ -1,5 +1,5 @@
 
-#line 1 "../../src/uri.rl"
+#line 1 "src/uri.rl"
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -48,7 +48,7 @@ uri_parse(struct uri *uri, const char *p)
 	size_t login_len = 0, scheme_len = 0;
 
 	
-#line 50 "../../src/uri.c"
+#line 52 "src/uri.c"
 static const int uri_start = 144;
 static const int uri_first_final = 144;
 static const int uri_error = 0;
@@ -56,12 +56,12 @@ static const int uri_error = 0;
 static const int uri_en_main = 144;
 
 
-#line 58 "../../src/uri.c"
+#line 60 "src/uri.c"
 	{
 	cs = uri_start;
 	}
 
-#line 63 "../../src/uri.c"
+#line 65 "src/uri.c"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -98,16 +98,16 @@ st0:
 cs = 0;
 	goto _out;
 tr150:
-#line 137 "../../src/uri.rl"
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st145;
 st145:
 	if ( ++p == pe )
 		goto _test_eof145;
 case 145:
-#line 109 "../../src/uri.c"
+#line 111 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
@@ -130,89 +130,88 @@ case 145:
 		goto st145;
 	goto st0;
 tr151:
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
 tr159:
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
 tr170:
-#line 68 "../../src/uri.rl"
+#line 70 "src/uri.rl"
 	{ s = p; }
-#line 69 "../../src/uri.rl"
+#line 71 "src/uri.rl"
 	{ uri->query = s; uri->query_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
 tr172:
-#line 69 "../../src/uri.rl"
+#line 71 "src/uri.rl"
 	{ uri->query = s; uri->query_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
 tr175:
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr185:
-#line 132 "../../src/uri.rl"
+tr186:
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr200:
-#line 100 "../../src/uri.rl"
+tr201:
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr209:
-#line 161 "../../src/uri.rl"
+tr210:
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr314:
-#line 165 "../../src/uri.rl"
+tr316:
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 128 "../../src/uri.rl"
+#line 129 "src/uri.rl"
 	{ s = p;}
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -224,18 +223,17 @@ tr314:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr318:
-#line 165 "../../src/uri.rl"
+tr320:
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -247,20 +245,19 @@ tr318:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
-tr323:
-#line 161 "../../src/uri.rl"
+tr325:
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -272,14 +269,14 @@ tr323:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st146;
 st146:
 	if ( ++p == pe )
 		goto _test_eof146;
 case 146:
-#line 281 "../../src/uri.c"
+#line 280 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr165;
 		case 37: goto tr166;
@@ -297,14 +294,14 @@ case 146:
 		goto tr165;
 	goto st0;
 tr165:
-#line 72 "../../src/uri.rl"
+#line 74 "src/uri.rl"
 	{ s = p; }
 	goto st147;
 st147:
 	if ( ++p == pe )
 		goto _test_eof147;
 case 147:
-#line 306 "../../src/uri.c"
+#line 305 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st147;
 		case 37: goto st1;
@@ -322,14 +319,14 @@ case 147:
 		goto st147;
 	goto st0;
 tr166:
-#line 72 "../../src/uri.rl"
+#line 74 "src/uri.rl"
 	{ s = p; }
 	goto st1;
 st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 331 "../../src/uri.c"
+#line 330 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st147;
 		case 117: goto st2;
@@ -396,16 +393,16 @@ case 5:
 		goto st147;
 	goto st0;
 tr152:
-#line 137 "../../src/uri.rl"
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 407 "../../src/uri.c"
+#line 406 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st145;
 		case 117: goto st7;
@@ -472,43 +469,43 @@ case 10:
 		goto st145;
 	goto st0;
 tr161:
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st148;
 tr177:
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st148;
-tr186:
-#line 132 "../../src/uri.rl"
+tr187:
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st148;
-tr201:
-#line 100 "../../src/uri.rl"
+tr202:
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st148;
-tr210:
-#line 161 "../../src/uri.rl"
+tr211:
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st148;
 st148:
 	if ( ++p == pe )
 		goto _test_eof148;
 case 148:
-#line 510 "../../src/uri.c"
+#line 509 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -597,75 +594,74 @@ case 15:
 		goto st148;
 	goto st0;
 tr155:
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
 tr163:
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
 tr179:
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr188:
-#line 132 "../../src/uri.rl"
+tr189:
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr204:
-#line 100 "../../src/uri.rl"
+tr205:
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr212:
-#line 161 "../../src/uri.rl"
+tr213:
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr317:
-#line 165 "../../src/uri.rl"
+tr319:
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 128 "../../src/uri.rl"
+#line 129 "src/uri.rl"
 	{ s = p;}
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -677,18 +673,17 @@ tr317:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr320:
-#line 165 "../../src/uri.rl"
+tr322:
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -700,20 +695,19 @@ tr320:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
-tr325:
-#line 161 "../../src/uri.rl"
+tr327:
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -725,14 +719,14 @@ tr325:
 				uri->path_len = 0;
 			};
 		}
-#line 185 "../../src/uri.rl"
+#line 186 "src/uri.rl"
 	{ s = p; }
 	goto st149;
 st149:
 	if ( ++p == pe )
 		goto _test_eof149;
 case 149:
-#line 734 "../../src/uri.c"
+#line 730 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr169;
 		case 35: goto tr170;
@@ -751,14 +745,14 @@ case 149:
 		goto tr169;
 	goto st0;
 tr169:
-#line 68 "../../src/uri.rl"
+#line 70 "src/uri.rl"
 	{ s = p; }
 	goto st150;
 st150:
 	if ( ++p == pe )
 		goto _test_eof150;
 case 150:
-#line 760 "../../src/uri.c"
+#line 756 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr172;
@@ -777,14 +771,14 @@ case 150:
 		goto st150;
 	goto st0;
 tr171:
-#line 68 "../../src/uri.rl"
+#line 70 "src/uri.rl"
 	{ s = p; }
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 786 "../../src/uri.c"
+#line 782 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st150;
 		case 117: goto st17;
@@ -851,25 +845,25 @@ case 20:
 		goto st150;
 	goto st0;
 tr162:
-#line 138 "../../src/uri.rl"
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st151;
-tr240:
-#line 138 "../../src/uri.rl"
+tr241:
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 100 "../../src/uri.rl"
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st151;
 st151:
 	if ( ++p == pe )
 		goto _test_eof151;
 case 151:
-#line 871 "../../src/uri.c"
+#line 867 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr174;
 		case 35: goto tr175;
@@ -878,6 +872,7 @@ case 151:
 		case 59: goto tr174;
 		case 61: goto tr174;
 		case 63: goto tr179;
+		case 64: goto tr180;
 		case 95: goto tr174;
 		case 126: goto tr174;
 	}
@@ -887,21 +882,21 @@ case 151:
 	} else if ( (*p) > 57 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr180;
+				goto tr181;
 		} else if ( (*p) >= 65 )
-			goto tr180;
+			goto tr181;
 	} else
 		goto tr178;
 	goto st0;
 tr174:
-#line 141 "../../src/uri.rl"
+#line 142 "src/uri.rl"
 	{ s = p; }
 	goto st21;
 st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-#line 903 "../../src/uri.c"
+#line 900 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 37: goto st22;
@@ -924,14 +919,14 @@ case 21:
 		goto st21;
 	goto st0;
 tr176:
-#line 141 "../../src/uri.rl"
+#line 142 "src/uri.rl"
 	{ s = p; }
 	goto st22;
 st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-#line 933 "../../src/uri.c"
+#line 930 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st21;
 		case 117: goto st23;
@@ -998,22 +993,30 @@ case 26:
 		goto st21;
 	goto st0;
 tr23:
-#line 142 "../../src/uri.rl"
+#line 143 "src/uri.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 146 "../../src/uri.rl"
+#line 147 "src/uri.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st27;
 tr164:
-#line 138 "../../src/uri.rl"
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 146 "../../src/uri.rl"
+#line 147 "src/uri.rl"
+	{ uri->login = login; uri->login_len = login_len; }
+	goto st27;
+tr180:
+#line 142 "src/uri.rl"
+	{ s = p; }
+#line 143 "src/uri.rl"
+	{ uri->password = s; uri->password_len = p - s; }
+#line 147 "src/uri.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st27;
 st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 1015 "../../src/uri.c"
+#line 1020 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr28;
 		case 37: goto tr29;
@@ -1038,20 +1041,20 @@ case 27:
 		goto tr31;
 	goto st0;
 tr28:
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st152;
 st152:
 	if ( ++p == pe )
 		goto _test_eof152;
 case 152:
-#line 1047 "../../src/uri.c"
+#line 1052 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -1067,14 +1070,14 @@ case 152:
 		goto st152;
 	goto st0;
 tr29:
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st28;
 st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1076 "../../src/uri.c"
+#line 1081 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st152;
 		case 117: goto st29;
@@ -1140,22 +1143,22 @@ case 32:
 	} else
 		goto st152;
 	goto st0;
-tr182:
-#line 93 "../../src/uri.rl"
+tr183:
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st153;
-tr203:
-#line 100 "../../src/uri.rl"
+tr204:
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st153;
 st153:
 	if ( ++p == pe )
 		goto _test_eof153;
 case 153:
-#line 1157 "../../src/uri.c"
+#line 1162 "src/uri.c"
 	switch( (*p) ) {
 		case 35: goto tr175;
 		case 47: goto tr177;
@@ -1163,43 +1166,43 @@ case 153:
 	}
 	if ( (*p) < 65 ) {
 		if ( 48 <= (*p) && (*p) <= 57 )
-			goto tr183;
+			goto tr184;
 	} else if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
-			goto tr184;
+			goto tr185;
 	} else
-		goto tr184;
+		goto tr185;
 	goto st0;
-tr183:
-#line 131 "../../src/uri.rl"
+tr184:
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st154;
 st154:
 	if ( ++p == pe )
 		goto _test_eof154;
 case 154:
-#line 1180 "../../src/uri.c"
+#line 1185 "src/uri.c"
 	switch( (*p) ) {
-		case 35: goto tr185;
-		case 47: goto tr186;
-		case 63: goto tr188;
+		case 35: goto tr186;
+		case 47: goto tr187;
+		case 63: goto tr189;
 	}
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st154;
 	goto st0;
-tr184:
-#line 131 "../../src/uri.rl"
+tr185:
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st155;
 st155:
 	if ( ++p == pe )
 		goto _test_eof155;
 case 155:
-#line 1197 "../../src/uri.c"
+#line 1202 "src/uri.c"
 	switch( (*p) ) {
-		case 35: goto tr185;
-		case 47: goto tr186;
-		case 63: goto tr188;
+		case 35: goto tr186;
+		case 47: goto tr187;
+		case 63: goto tr189;
 	}
 	if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
@@ -1208,14 +1211,14 @@ case 155:
 		goto st155;
 	goto st0;
 tr30:
-#line 182 "../../src/uri.rl"
+#line 183 "src/uri.rl"
 	{ s = p; }
 	goto st156;
 st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 1217 "../../src/uri.c"
+#line 1222 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 37: goto st33;
@@ -1325,23 +1328,23 @@ case 37:
 		goto st157;
 	goto st0;
 tr31:
-#line 99 "../../src/uri.rl"
+#line 101 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st158;
 st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 1336 "../../src/uri.c"
+#line 1341 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 46: goto st159;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1369,7 +1372,7 @@ case 159:
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1398,7 +1401,7 @@ case 160:
 		case 37: goto st28;
 		case 46: goto st161;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1426,7 +1429,7 @@ case 161:
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1455,7 +1458,7 @@ case 162:
 		case 37: goto st28;
 		case 46: goto st163;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1483,7 +1486,7 @@ case 163:
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1508,13 +1511,13 @@ st164:
 case 164:
 	switch( (*p) ) {
 		case 33: goto st152;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st28;
-		case 47: goto tr201;
-		case 58: goto tr203;
+		case 47: goto tr202;
+		case 58: goto tr204;
 		case 59: goto st152;
 		case 61: goto st152;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 95: goto st152;
 		case 126: goto st152;
 	}
@@ -1536,13 +1539,13 @@ st165:
 case 165:
 	switch( (*p) ) {
 		case 33: goto st152;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st28;
-		case 47: goto tr201;
-		case 58: goto tr203;
+		case 47: goto tr202;
+		case 58: goto tr204;
 		case 59: goto st152;
 		case 61: goto st152;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 95: goto st152;
 		case 126: goto st152;
 	}
@@ -1564,12 +1567,12 @@ st166:
 case 166:
 	switch( (*p) ) {
 		case 33: goto st152;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st28;
-		case 47: goto tr201;
-		case 58: goto tr203;
+		case 47: goto tr202;
+		case 58: goto tr204;
 		case 61: goto st152;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 95: goto st152;
 		case 126: goto st152;
 	}
@@ -1592,7 +1595,7 @@ case 167:
 		case 37: goto st28;
 		case 46: goto st163;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1621,7 +1624,7 @@ case 168:
 		case 37: goto st28;
 		case 46: goto st163;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -1646,7 +1649,7 @@ case 169:
 		case 37: goto st28;
 		case 46: goto st161;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1675,7 +1678,7 @@ case 170:
 		case 37: goto st28;
 		case 46: goto st161;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -1700,7 +1703,7 @@ case 171:
 		case 37: goto st28;
 		case 46: goto st159;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 59: goto st152;
 		case 61: goto st152;
 		case 63: goto tr163;
@@ -1729,7 +1732,7 @@ case 172:
 		case 37: goto st28;
 		case 46: goto st159;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -1757,14 +1760,14 @@ case 38:
 		goto tr44;
 	goto st0;
 tr44:
-#line 106 "../../src/uri.rl"
+#line 108 "src/uri.rl"
 	{ s = p; }
 	goto st39;
 st39:
 	if ( ++p == pe )
 		goto _test_eof39;
 case 39:
-#line 1766 "../../src/uri.c"
+#line 1771 "src/uri.c"
 	if ( (*p) == 58 )
 		goto st43;
 	if ( (*p) > 57 ) {
@@ -2315,7 +2318,7 @@ case 82:
 		goto tr52;
 	goto st0;
 tr52:
-#line 107 "../../src/uri.rl"
+#line 109 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 				   uri->host_hint = 2; }
 	goto st173;
@@ -2323,23 +2326,23 @@ st173:
 	if ( ++p == pe )
 		goto _test_eof173;
 case 173:
-#line 2325 "../../src/uri.c"
+#line 2330 "src/uri.c"
 	switch( (*p) ) {
-		case 35: goto tr209;
-		case 47: goto tr210;
+		case 35: goto tr210;
+		case 47: goto tr211;
 		case 58: goto st153;
-		case 63: goto tr212;
+		case 63: goto tr213;
 	}
 	goto st0;
 tr45:
-#line 106 "../../src/uri.rl"
+#line 108 "src/uri.rl"
 	{ s = p; }
 	goto st83;
 st83:
 	if ( ++p == pe )
 		goto _test_eof83;
 case 83:
-#line 2341 "../../src/uri.c"
+#line 2346 "src/uri.c"
 	switch( (*p) ) {
 		case 58: goto st84;
 		case 93: goto tr52;
@@ -2568,20 +2571,20 @@ case 103:
 		goto st57;
 	goto st0;
 tr33:
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st174;
 st174:
 	if ( ++p == pe )
 		goto _test_eof174;
 case 174:
-#line 2577 "../../src/uri.c"
+#line 2582 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -2606,7 +2609,7 @@ case 175:
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -2631,7 +2634,7 @@ case 176:
 		case 35: goto tr159;
 		case 37: goto st28;
 		case 47: goto tr161;
-		case 58: goto tr182;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -2655,8 +2658,8 @@ case 177:
 		case 33: goto st152;
 		case 35: goto tr159;
 		case 37: goto st28;
-		case 47: goto tr216;
-		case 58: goto tr182;
+		case 47: goto tr217;
+		case 58: goto tr183;
 		case 61: goto st152;
 		case 63: goto tr163;
 		case 95: goto st152;
@@ -2671,17 +2674,17 @@ case 177:
 	} else
 		goto st152;
 	goto st0;
-tr216:
-#line 93 "../../src/uri.rl"
+tr217:
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st178;
 st178:
 	if ( ++p == pe )
 		goto _test_eof178;
 case 178:
-#line 2683 "../../src/uri.c"
+#line 2688 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -2706,40 +2709,40 @@ st179:
 		goto _test_eof179;
 case 179:
 	switch( (*p) ) {
-		case 33: goto tr218;
+		case 33: goto tr219;
 		case 35: goto tr151;
-		case 37: goto tr219;
-		case 47: goto tr220;
-		case 58: goto tr221;
-		case 61: goto tr218;
+		case 37: goto tr220;
+		case 47: goto tr221;
+		case 58: goto tr222;
+		case 61: goto tr219;
 		case 63: goto tr155;
-		case 95: goto tr218;
-		case 126: goto tr218;
+		case 95: goto tr219;
+		case 126: goto tr219;
 	}
 	if ( (*p) < 64 ) {
 		if ( 36 <= (*p) && (*p) <= 59 )
-			goto tr218;
+			goto tr219;
 	} else if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
-			goto tr218;
+			goto tr219;
 	} else
-		goto tr218;
+		goto tr219;
 	goto st0;
-tr218:
-#line 128 "../../src/uri.rl"
+tr219:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st180;
 st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 2735 "../../src/uri.c"
+#line 2740 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st180;
 		case 35: goto tr151;
 		case 37: goto st104;
 		case 47: goto st181;
-		case 58: goto tr223;
+		case 58: goto tr224;
 		case 61: goto st180;
 		case 63: goto tr155;
 		case 95: goto st180;
@@ -2754,15 +2757,15 @@ case 180:
 	} else
 		goto st180;
 	goto st0;
-tr219:
-#line 128 "../../src/uri.rl"
+tr220:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st104;
 st104:
 	if ( ++p == pe )
 		goto _test_eof104;
 case 104:
-#line 2764 "../../src/uri.c"
+#line 2769 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st180;
 		case 117: goto st105;
@@ -2828,24 +2831,24 @@ case 108:
 	} else
 		goto st180;
 	goto st0;
-tr226:
-#line 161 "../../src/uri.rl"
+tr227:
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st181;
-tr220:
-#line 128 "../../src/uri.rl"
+tr221:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st181;
 st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 2842 "../../src/uri.c"
+#line 2847 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st181;
 		case 35: goto tr151;
 		case 37: goto st109;
-		case 58: goto tr225;
+		case 58: goto tr226;
 		case 61: goto st181;
 		case 63: goto tr155;
 		case 95: goto st181;
@@ -2929,13 +2932,12 @@ case 113:
 	} else
 		goto st181;
 	goto st0;
-tr225:
-#line 111 "../../src/uri.rl"
+tr226:
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -2952,15 +2954,15 @@ st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 2954 "../../src/uri.c"
+#line 2958 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st181;
-		case 35: goto tr209;
+		case 35: goto tr210;
 		case 37: goto st109;
-		case 47: goto tr226;
-		case 58: goto tr225;
+		case 47: goto tr227;
+		case 58: goto tr226;
 		case 61: goto st181;
-		case 63: goto tr212;
+		case 63: goto tr213;
 		case 95: goto st181;
 		case 126: goto st181;
 	}
@@ -2973,13 +2975,12 @@ case 182:
 	} else
 		goto st181;
 	goto st0;
-tr223:
-#line 111 "../../src/uri.rl"
+tr224:
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -2992,15 +2993,14 @@ tr223:
 			};
 		}
 	goto st183;
-tr221:
-#line 128 "../../src/uri.rl"
+tr222:
+#line 129 "src/uri.rl"
 	{ s = p;}
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -3017,14 +3017,14 @@ st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 3019 "../../src/uri.c"
+#line 3021 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
-		case 35: goto tr209;
+		case 35: goto tr210;
 		case 37: goto st11;
-		case 47: goto tr210;
+		case 47: goto tr211;
 		case 61: goto st148;
-		case 63: goto tr212;
+		case 63: goto tr213;
 		case 95: goto st148;
 		case 126: goto st148;
 	}
@@ -3038,24 +3038,24 @@ case 183:
 		goto st148;
 	goto st0;
 tr178:
-#line 141 "../../src/uri.rl"
+#line 142 "src/uri.rl"
 	{ s = p; }
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st184;
 st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 3049 "../../src/uri.c"
+#line 3051 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st22;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 59: goto st21;
 		case 61: goto st21;
-		case 63: goto tr188;
+		case 63: goto tr189;
 		case 64: goto tr23;
 		case 95: goto st21;
 		case 126: goto st21;
@@ -3072,25 +3072,25 @@ case 184:
 	} else
 		goto st184;
 	goto st0;
-tr180:
-#line 141 "../../src/uri.rl"
+tr181:
+#line 142 "src/uri.rl"
 	{ s = p; }
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st185;
 st185:
 	if ( ++p == pe )
 		goto _test_eof185;
 case 185:
-#line 3084 "../../src/uri.c"
+#line 3086 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st21;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st22;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 59: goto st21;
 		case 61: goto st21;
-		case 63: goto tr188;
+		case 63: goto tr189;
 		case 64: goto tr23;
 		case 95: goto st21;
 		case 126: goto st21;
@@ -3105,14 +3105,14 @@ case 185:
 		goto st185;
 	goto st0;
 tr153:
-#line 182 "../../src/uri.rl"
+#line 183 "src/uri.rl"
 	{ s = p; }
 	goto st186;
 st186:
 	if ( ++p == pe )
 		goto _test_eof186;
 case 186:
-#line 3114 "../../src/uri.c"
+#line 3116 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st187;
 		case 35: goto tr151;
@@ -3226,20 +3226,20 @@ case 118:
 		goto st187;
 	goto st0;
 tr154:
-#line 137 "../../src/uri.rl"
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 99 "../../src/uri.rl"
+#line 101 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
-#line 178 "../../src/uri.rl"
+#line 179 "src/uri.rl"
 	{ uri->service = p; }
 	goto st188;
 st188:
 	if ( ++p == pe )
 		goto _test_eof188;
 case 188:
-#line 3241 "../../src/uri.c"
+#line 3243 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
@@ -3419,13 +3419,13 @@ st194:
 case 194:
 	switch( (*p) ) {
 		case 33: goto st145;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st6;
-		case 47: goto tr201;
-		case 58: goto tr240;
+		case 47: goto tr202;
+		case 58: goto tr241;
 		case 59: goto st145;
 		case 61: goto st145;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto tr164;
 		case 95: goto st145;
 		case 126: goto st145;
@@ -3448,13 +3448,13 @@ st195:
 case 195:
 	switch( (*p) ) {
 		case 33: goto st145;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st6;
-		case 47: goto tr201;
-		case 58: goto tr240;
+		case 47: goto tr202;
+		case 58: goto tr241;
 		case 59: goto st145;
 		case 61: goto st145;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto tr164;
 		case 95: goto st145;
 		case 126: goto st145;
@@ -3477,12 +3477,12 @@ st196:
 case 196:
 	switch( (*p) ) {
 		case 33: goto st145;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st6;
-		case 47: goto tr201;
-		case 58: goto tr240;
+		case 47: goto tr202;
+		case 58: goto tr241;
 		case 61: goto st145;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto tr164;
 		case 95: goto st145;
 		case 126: goto st145;
@@ -3708,25 +3708,25 @@ case 204:
 	}
 	goto st0;
 tr157:
-#line 151 "../../src/uri.rl"
+#line 152 "src/uri.rl"
 	{ s = p; }
-#line 137 "../../src/uri.rl"
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st205;
 st205:
 	if ( ++p == pe )
 		goto _test_eof205;
 case 205:
-#line 3721 "../../src/uri.c"
+#line 3723 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
 		case 37: goto st6;
 		case 43: goto st205;
 		case 47: goto tr161;
-		case 58: goto tr247;
+		case 58: goto tr248;
 		case 59: goto st145;
 		case 61: goto st145;
 		case 63: goto tr163;
@@ -3746,27 +3746,28 @@ case 205:
 	} else
 		goto st205;
 	goto st0;
-tr247:
-#line 153 "../../src/uri.rl"
+tr248:
+#line 154 "src/uri.rl"
 	{scheme = s; scheme_len = p - s; }
-#line 138 "../../src/uri.rl"
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st206;
 st206:
 	if ( ++p == pe )
 		goto _test_eof206;
 case 206:
-#line 3760 "../../src/uri.c"
+#line 3762 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto tr174;
 		case 35: goto tr175;
 		case 37: goto tr176;
-		case 47: goto tr248;
+		case 47: goto tr249;
 		case 59: goto tr174;
 		case 61: goto tr174;
 		case 63: goto tr179;
+		case 64: goto tr180;
 		case 95: goto tr174;
 		case 126: goto tr174;
 	}
@@ -3776,27 +3777,27 @@ case 206:
 	} else if ( (*p) > 57 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr180;
+				goto tr181;
 		} else if ( (*p) >= 65 )
-			goto tr180;
+			goto tr181;
 	} else
 		goto tr178;
 	goto st0;
-tr248:
-#line 169 "../../src/uri.rl"
+tr249:
+#line 170 "src/uri.rl"
 	{ uri->scheme = scheme; uri->scheme_len = scheme_len;}
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st207;
 st207:
 	if ( ++p == pe )
 		goto _test_eof207;
 case 207:
-#line 3798 "../../src/uri.c"
+#line 3801 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -3821,52 +3822,52 @@ st208:
 		goto _test_eof208;
 case 208:
 	switch( (*p) ) {
-		case 33: goto tr250;
+		case 33: goto tr251;
 		case 35: goto tr151;
-		case 37: goto tr251;
+		case 37: goto tr252;
 		case 47: goto st148;
 		case 58: goto st148;
-		case 59: goto tr250;
-		case 61: goto tr250;
+		case 59: goto tr251;
+		case 61: goto tr251;
 		case 63: goto tr155;
 		case 64: goto st148;
 		case 91: goto st38;
-		case 95: goto tr250;
-		case 117: goto tr253;
-		case 126: goto tr250;
+		case 95: goto tr251;
+		case 117: goto tr254;
+		case 126: goto tr251;
 	}
 	if ( (*p) < 48 ) {
 		if ( 36 <= (*p) && (*p) <= 46 )
-			goto tr250;
+			goto tr251;
 	} else if ( (*p) > 57 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr250;
+				goto tr251;
 		} else if ( (*p) >= 65 )
-			goto tr250;
+			goto tr251;
 	} else
-		goto tr252;
+		goto tr253;
 	goto st0;
-tr250:
-#line 137 "../../src/uri.rl"
+tr251:
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st209;
 st209:
 	if ( ++p == pe )
 		goto _test_eof209;
 case 209:
-#line 3859 "../../src/uri.c"
+#line 3862 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -3879,17 +3880,17 @@ case 209:
 	} else
 		goto st209;
 	goto st0;
-tr251:
-#line 137 "../../src/uri.rl"
+tr252:
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st119;
 st119:
 	if ( ++p == pe )
 		goto _test_eof119;
 case 119:
-#line 3891 "../../src/uri.c"
+#line 3894 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st209;
 		case 117: goto st120;
@@ -3955,60 +3956,60 @@ case 123:
 	} else
 		goto st209;
 	goto st0;
-tr255:
-#line 138 "../../src/uri.rl"
+tr256:
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st210;
-tr303:
-#line 138 "../../src/uri.rl"
+tr305:
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 100 "../../src/uri.rl"
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st210;
 st210:
 	if ( ++p == pe )
 		goto _test_eof210;
 case 210:
-#line 3976 "../../src/uri.c"
+#line 3979 "src/uri.c"
 	switch( (*p) ) {
-		case 33: goto tr257;
+		case 33: goto tr258;
 		case 35: goto tr175;
-		case 37: goto tr258;
+		case 37: goto tr259;
 		case 47: goto tr177;
 		case 58: goto st148;
-		case 59: goto tr257;
-		case 61: goto tr257;
+		case 59: goto tr258;
+		case 61: goto tr258;
 		case 63: goto tr179;
-		case 64: goto st148;
-		case 95: goto tr257;
-		case 126: goto tr257;
+		case 64: goto tr261;
+		case 95: goto tr258;
+		case 126: goto tr258;
 	}
 	if ( (*p) < 48 ) {
 		if ( 36 <= (*p) && (*p) <= 46 )
-			goto tr257;
+			goto tr258;
 	} else if ( (*p) > 57 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr260;
+				goto tr262;
 		} else if ( (*p) >= 65 )
-			goto tr260;
+			goto tr262;
 	} else
-		goto tr259;
+		goto tr260;
 	goto st0;
-tr257:
-#line 141 "../../src/uri.rl"
+tr258:
+#line 142 "src/uri.rl"
 	{ s = p; }
 	goto st211;
 st211:
 	if ( ++p == pe )
 		goto _test_eof211;
 case 211:
-#line 4010 "../../src/uri.c"
+#line 4013 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
 		case 35: goto tr151;
@@ -4017,7 +4018,7 @@ case 211:
 		case 58: goto st148;
 		case 61: goto st211;
 		case 63: goto tr155;
-		case 64: goto tr262;
+		case 64: goto tr264;
 		case 95: goto st211;
 		case 126: goto st211;
 	}
@@ -4030,15 +4031,15 @@ case 211:
 	} else
 		goto st211;
 	goto st0;
-tr258:
-#line 141 "../../src/uri.rl"
+tr259:
+#line 142 "src/uri.rl"
 	{ s = p; }
 	goto st124;
 st124:
 	if ( ++p == pe )
 		goto _test_eof124;
 case 124:
-#line 4040 "../../src/uri.c"
+#line 4043 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st211;
 		case 117: goto st125;
@@ -4104,65 +4105,73 @@ case 128:
 	} else
 		goto st211;
 	goto st0;
-tr262:
-#line 142 "../../src/uri.rl"
+tr264:
+#line 143 "src/uri.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 146 "../../src/uri.rl"
+#line 147 "src/uri.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st212;
-tr256:
-#line 138 "../../src/uri.rl"
+tr257:
+#line 139 "src/uri.rl"
 	{ login = s; login_len = p - s; }
-#line 146 "../../src/uri.rl"
+#line 147 "src/uri.rl"
+	{ uri->login = login; uri->login_len = login_len; }
+	goto st212;
+tr261:
+#line 142 "src/uri.rl"
+	{ s = p; }
+#line 143 "src/uri.rl"
+	{ uri->password = s; uri->password_len = p - s; }
+#line 147 "src/uri.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st212;
 st212:
 	if ( ++p == pe )
 		goto _test_eof212;
 case 212:
-#line 4122 "../../src/uri.c"
+#line 4133 "src/uri.c"
 	switch( (*p) ) {
-		case 33: goto tr263;
+		case 33: goto tr265;
 		case 35: goto tr151;
-		case 37: goto tr264;
+		case 37: goto tr266;
 		case 47: goto st148;
 		case 58: goto st148;
-		case 59: goto tr263;
-		case 61: goto tr263;
+		case 59: goto tr265;
+		case 61: goto tr265;
 		case 63: goto tr155;
 		case 64: goto st148;
 		case 91: goto st38;
-		case 95: goto tr263;
-		case 117: goto tr266;
-		case 126: goto tr263;
+		case 95: goto tr265;
+		case 117: goto tr268;
+		case 126: goto tr265;
 	}
 	if ( (*p) < 48 ) {
 		if ( 36 <= (*p) && (*p) <= 46 )
-			goto tr263;
+			goto tr265;
 	} else if ( (*p) > 57 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr263;
+				goto tr265;
 		} else if ( (*p) >= 65 )
-			goto tr263;
+			goto tr265;
 	} else
-		goto tr265;
+		goto tr267;
 	goto st0;
-tr263:
-#line 92 "../../src/uri.rl"
+tr265:
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st213;
 st213:
 	if ( ++p == pe )
 		goto _test_eof213;
 case 213:
-#line 4158 "../../src/uri.c"
+#line 4169 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4178,15 +4187,15 @@ case 213:
 	} else
 		goto st213;
 	goto st0;
-tr264:
-#line 92 "../../src/uri.rl"
+tr266:
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st129;
 st129:
 	if ( ++p == pe )
 		goto _test_eof129;
 case 129:
-#line 4188 "../../src/uri.c"
+#line 4199 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st213;
 		case 117: goto st130;
@@ -4252,22 +4261,22 @@ case 133:
 	} else
 		goto st213;
 	goto st0;
-tr268:
-#line 93 "../../src/uri.rl"
+tr270:
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st214;
-tr283:
-#line 100 "../../src/uri.rl"
+tr285:
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st214;
 st214:
 	if ( ++p == pe )
 		goto _test_eof214;
 case 214:
-#line 4269 "../../src/uri.c"
+#line 4280 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr175;
@@ -4282,34 +4291,34 @@ case 214:
 	if ( (*p) < 58 ) {
 		if ( (*p) > 46 ) {
 			if ( 48 <= (*p) && (*p) <= 57 )
-				goto tr269;
+				goto tr271;
 		} else if ( (*p) >= 36 )
 			goto st148;
 	} else if ( (*p) > 59 ) {
 		if ( (*p) > 90 ) {
 			if ( 97 <= (*p) && (*p) <= 122 )
-				goto tr270;
+				goto tr272;
 		} else if ( (*p) >= 65 )
-			goto tr270;
+			goto tr272;
 	} else
 		goto st148;
 	goto st0;
-tr269:
-#line 131 "../../src/uri.rl"
+tr271:
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st215;
 st215:
 	if ( ++p == pe )
 		goto _test_eof215;
 case 215:
-#line 4304 "../../src/uri.c"
+#line 4315 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st11;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 61: goto st148;
-		case 63: goto tr188;
+		case 63: goto tr189;
 		case 95: goto st148;
 		case 126: goto st148;
 	}
@@ -4328,22 +4337,22 @@ case 215:
 	} else
 		goto st148;
 	goto st0;
-tr270:
-#line 131 "../../src/uri.rl"
+tr272:
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st216;
 st216:
 	if ( ++p == pe )
 		goto _test_eof216;
 case 216:
-#line 4338 "../../src/uri.c"
+#line 4349 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st11;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 61: goto st148;
-		case 63: goto tr188;
+		case 63: goto tr189;
 		case 64: goto st148;
 		case 95: goto st148;
 		case 126: goto st148;
@@ -4357,24 +4366,24 @@ case 216:
 	} else
 		goto st216;
 	goto st0;
-tr265:
-#line 99 "../../src/uri.rl"
+tr267:
+#line 101 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st217;
 st217:
 	if ( ++p == pe )
 		goto _test_eof217;
 case 217:
-#line 4369 "../../src/uri.c"
+#line 4380 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 46: goto st218;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4403,7 +4412,7 @@ case 218:
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4433,7 +4442,7 @@ case 219:
 		case 37: goto st129;
 		case 46: goto st220;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4462,7 +4471,7 @@ case 220:
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4492,7 +4501,7 @@ case 221:
 		case 37: goto st129;
 		case 46: goto st222;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4521,7 +4530,7 @@ case 222:
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4547,13 +4556,13 @@ st223:
 case 223:
 	switch( (*p) ) {
 		case 33: goto st213;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st129;
-		case 47: goto tr201;
-		case 58: goto tr283;
+		case 47: goto tr202;
+		case 58: goto tr285;
 		case 59: goto st213;
 		case 61: goto st213;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
 		case 126: goto st213;
@@ -4576,13 +4585,13 @@ st224:
 case 224:
 	switch( (*p) ) {
 		case 33: goto st213;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st129;
-		case 47: goto tr201;
-		case 58: goto tr283;
+		case 47: goto tr202;
+		case 58: goto tr285;
 		case 59: goto st213;
 		case 61: goto st213;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
 		case 126: goto st213;
@@ -4605,12 +4614,12 @@ st225:
 case 225:
 	switch( (*p) ) {
 		case 33: goto st213;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st129;
-		case 47: goto tr201;
-		case 58: goto tr283;
+		case 47: goto tr202;
+		case 58: goto tr285;
 		case 61: goto st213;
-		case 63: goto tr204;
+		case 63: goto tr205;
 		case 64: goto st148;
 		case 95: goto st213;
 		case 126: goto st213;
@@ -4634,7 +4643,7 @@ case 226:
 		case 37: goto st129;
 		case 46: goto st222;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4664,7 +4673,7 @@ case 227:
 		case 37: goto st129;
 		case 46: goto st222;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4690,7 +4699,7 @@ case 228:
 		case 37: goto st129;
 		case 46: goto st220;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4720,7 +4729,7 @@ case 229:
 		case 37: goto st129;
 		case 46: goto st220;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4746,7 +4755,7 @@ case 230:
 		case 37: goto st129;
 		case 46: goto st218;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 59: goto st213;
 		case 61: goto st213;
 		case 63: goto tr163;
@@ -4776,7 +4785,7 @@ case 231:
 		case 37: goto st129;
 		case 46: goto st218;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4792,21 +4801,21 @@ case 231:
 	} else
 		goto st213;
 	goto st0;
-tr266:
-#line 92 "../../src/uri.rl"
+tr268:
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st232;
 st232:
 	if ( ++p == pe )
 		goto _test_eof232;
 case 232:
-#line 4802 "../../src/uri.c"
+#line 4813 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st213;
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4832,7 +4841,7 @@ case 233:
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4858,7 +4867,7 @@ case 234:
 		case 35: goto tr159;
 		case 37: goto st129;
 		case 47: goto tr161;
-		case 58: goto tr268;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4883,8 +4892,8 @@ case 235:
 		case 33: goto st213;
 		case 35: goto tr159;
 		case 37: goto st129;
-		case 47: goto tr216;
-		case 58: goto tr268;
+		case 47: goto tr217;
+		case 58: goto tr270;
 		case 61: goto st213;
 		case 63: goto tr163;
 		case 64: goto st148;
@@ -4900,27 +4909,27 @@ case 235:
 	} else
 		goto st213;
 	goto st0;
-tr259:
-#line 141 "../../src/uri.rl"
+tr260:
+#line 142 "src/uri.rl"
 	{ s = p; }
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st236;
 st236:
 	if ( ++p == pe )
 		goto _test_eof236;
 case 236:
-#line 4912 "../../src/uri.c"
+#line 4923 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st124;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 58: goto st148;
 		case 59: goto st211;
 		case 61: goto st211;
-		case 63: goto tr188;
-		case 64: goto tr262;
+		case 63: goto tr189;
+		case 64: goto tr264;
 		case 95: goto st211;
 		case 126: goto st211;
 	}
@@ -4936,26 +4945,26 @@ case 236:
 	} else
 		goto st236;
 	goto st0;
-tr260:
-#line 141 "../../src/uri.rl"
+tr262:
+#line 142 "src/uri.rl"
 	{ s = p; }
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
 	goto st237;
 st237:
 	if ( ++p == pe )
 		goto _test_eof237;
 case 237:
-#line 4948 "../../src/uri.c"
+#line 4959 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st211;
-		case 35: goto tr185;
+		case 35: goto tr186;
 		case 37: goto st124;
-		case 47: goto tr186;
+		case 47: goto tr187;
 		case 58: goto st148;
 		case 61: goto st211;
-		case 63: goto tr188;
-		case 64: goto tr262;
+		case 63: goto tr189;
+		case 64: goto tr264;
 		case 95: goto st211;
 		case 126: goto st211;
 	}
@@ -4968,30 +4977,30 @@ case 237:
 	} else
 		goto st237;
 	goto st0;
-tr252:
-#line 137 "../../src/uri.rl"
+tr253:
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 99 "../../src/uri.rl"
+#line 101 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st238;
 st238:
 	if ( ++p == pe )
 		goto _test_eof238;
 case 238:
-#line 4982 "../../src/uri.c"
+#line 4993 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 46: goto st239;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5016,11 +5025,11 @@ case 239:
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5046,11 +5055,11 @@ case 240:
 		case 37: goto st119;
 		case 46: goto st241;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5075,11 +5084,11 @@ case 241:
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5105,11 +5114,11 @@ case 242:
 		case 37: goto st119;
 		case 46: goto st243;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5134,11 +5143,11 @@ case 243:
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5160,14 +5169,14 @@ st244:
 case 244:
 	switch( (*p) ) {
 		case 33: goto st209;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st119;
-		case 47: goto tr201;
-		case 58: goto tr303;
+		case 47: goto tr202;
+		case 58: goto tr305;
 		case 59: goto st209;
 		case 61: goto st209;
-		case 63: goto tr204;
-		case 64: goto tr256;
+		case 63: goto tr205;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5189,14 +5198,14 @@ st245:
 case 245:
 	switch( (*p) ) {
 		case 33: goto st209;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st119;
-		case 47: goto tr201;
-		case 58: goto tr303;
+		case 47: goto tr202;
+		case 58: goto tr305;
 		case 59: goto st209;
 		case 61: goto st209;
-		case 63: goto tr204;
-		case 64: goto tr256;
+		case 63: goto tr205;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5218,13 +5227,13 @@ st246:
 case 246:
 	switch( (*p) ) {
 		case 33: goto st209;
-		case 35: goto tr200;
+		case 35: goto tr201;
 		case 37: goto st119;
-		case 47: goto tr201;
-		case 58: goto tr303;
+		case 47: goto tr202;
+		case 58: goto tr305;
 		case 61: goto st209;
-		case 63: goto tr204;
-		case 64: goto tr256;
+		case 63: goto tr205;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5247,11 +5256,11 @@ case 247:
 		case 37: goto st119;
 		case 46: goto st243;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5277,10 +5286,10 @@ case 248:
 		case 37: goto st119;
 		case 46: goto st243;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5303,11 +5312,11 @@ case 249:
 		case 37: goto st119;
 		case 46: goto st241;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5333,10 +5342,10 @@ case 250:
 		case 37: goto st119;
 		case 46: goto st241;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5359,11 +5368,11 @@ case 251:
 		case 37: goto st119;
 		case 46: goto st239;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 59: goto st209;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5389,10 +5398,10 @@ case 252:
 		case 37: goto st119;
 		case 46: goto st239;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5405,26 +5414,26 @@ case 252:
 	} else
 		goto st209;
 	goto st0;
-tr253:
-#line 137 "../../src/uri.rl"
+tr254:
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st253;
 st253:
 	if ( ++p == pe )
 		goto _test_eof253;
 case 253:
-#line 5417 "../../src/uri.c"
+#line 5428 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st209;
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 110: goto st254;
 		case 126: goto st209;
@@ -5447,10 +5456,10 @@ case 254:
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 105: goto st255;
 		case 126: goto st209;
@@ -5473,10 +5482,10 @@ case 255:
 		case 35: goto tr159;
 		case 37: goto st119;
 		case 47: goto tr161;
-		case 58: goto tr255;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 120: goto st256;
 		case 126: goto st209;
@@ -5498,11 +5507,11 @@ case 256:
 		case 33: goto st209;
 		case 35: goto tr159;
 		case 37: goto st119;
-		case 47: goto tr311;
-		case 58: goto tr255;
+		case 47: goto tr313;
+		case 58: goto tr256;
 		case 61: goto st209;
 		case 63: goto tr163;
-		case 64: goto tr256;
+		case 64: goto tr257;
 		case 95: goto st209;
 		case 126: goto st209;
 	}
@@ -5515,17 +5524,17 @@ case 256:
 	} else
 		goto st209;
 	goto st0;
-tr311:
-#line 93 "../../src/uri.rl"
+tr313:
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st257;
 st257:
 	if ( ++p == pe )
 		goto _test_eof257;
 case 257:
-#line 5527 "../../src/uri.c"
+#line 5538 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st148;
 		case 35: goto tr151;
@@ -5550,42 +5559,42 @@ st258:
 		goto _test_eof258;
 case 258:
 	switch( (*p) ) {
-		case 33: goto tr313;
-		case 35: goto tr314;
-		case 37: goto tr315;
-		case 47: goto tr316;
-		case 58: goto tr221;
-		case 61: goto tr313;
-		case 63: goto tr317;
-		case 95: goto tr313;
-		case 126: goto tr313;
+		case 33: goto tr315;
+		case 35: goto tr316;
+		case 37: goto tr317;
+		case 47: goto tr318;
+		case 58: goto tr222;
+		case 61: goto tr315;
+		case 63: goto tr319;
+		case 95: goto tr315;
+		case 126: goto tr315;
 	}
 	if ( (*p) < 64 ) {
 		if ( 36 <= (*p) && (*p) <= 59 )
-			goto tr313;
+			goto tr315;
 	} else if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
-			goto tr313;
+			goto tr315;
 	} else
-		goto tr313;
+		goto tr315;
 	goto st0;
-tr313:
-#line 128 "../../src/uri.rl"
+tr315:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st259;
 st259:
 	if ( ++p == pe )
 		goto _test_eof259;
 case 259:
-#line 5579 "../../src/uri.c"
+#line 5590 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st259;
-		case 35: goto tr318;
+		case 35: goto tr320;
 		case 37: goto st134;
 		case 47: goto st260;
-		case 58: goto tr223;
+		case 58: goto tr224;
 		case 61: goto st259;
-		case 63: goto tr320;
+		case 63: goto tr322;
 		case 95: goto st259;
 		case 126: goto st259;
 	}
@@ -5598,15 +5607,15 @@ case 259:
 	} else
 		goto st259;
 	goto st0;
-tr315:
-#line 128 "../../src/uri.rl"
+tr317:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st134;
 st134:
 	if ( ++p == pe )
 		goto _test_eof134;
 case 134:
-#line 5608 "../../src/uri.c"
+#line 5619 "src/uri.c"
 	switch( (*p) ) {
 		case 37: goto st259;
 		case 117: goto st135;
@@ -5672,26 +5681,26 @@ case 138:
 	} else
 		goto st259;
 	goto st0;
-tr324:
-#line 161 "../../src/uri.rl"
+tr326:
+#line 162 "src/uri.rl"
 	{ s = p; }
 	goto st260;
-tr316:
-#line 128 "../../src/uri.rl"
+tr318:
+#line 129 "src/uri.rl"
 	{ s = p;}
 	goto st260;
 st260:
 	if ( ++p == pe )
 		goto _test_eof260;
 case 260:
-#line 5686 "../../src/uri.c"
+#line 5697 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st260;
-		case 35: goto tr318;
+		case 35: goto tr320;
 		case 37: goto st139;
-		case 58: goto tr322;
+		case 58: goto tr324;
 		case 61: goto st260;
-		case 63: goto tr320;
+		case 63: goto tr322;
 		case 95: goto st260;
 		case 126: goto st260;
 	}
@@ -5773,13 +5782,12 @@ case 143:
 	} else
 		goto st260;
 	goto st0;
-tr322:
-#line 111 "../../src/uri.rl"
+tr324:
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -5796,15 +5804,15 @@ st261:
 	if ( ++p == pe )
 		goto _test_eof261;
 case 261:
-#line 5798 "../../src/uri.c"
+#line 5808 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st260;
-		case 35: goto tr323;
+		case 35: goto tr325;
 		case 37: goto st139;
-		case 47: goto tr324;
-		case 58: goto tr322;
+		case 47: goto tr326;
+		case 58: goto tr324;
 		case 61: goto st260;
-		case 63: goto tr325;
+		case 63: goto tr327;
 		case 95: goto st260;
 		case 126: goto st260;
 	}
@@ -5818,25 +5826,25 @@ case 261:
 		goto st260;
 	goto st0;
 tr158:
-#line 151 "../../src/uri.rl"
+#line 152 "src/uri.rl"
 	{ s = p; }
-#line 137 "../../src/uri.rl"
+#line 138 "src/uri.rl"
 	{ s = p; }
-#line 92 "../../src/uri.rl"
+#line 94 "src/uri.rl"
 	{ s = p; }
 	goto st262;
 st262:
 	if ( ++p == pe )
 		goto _test_eof262;
 case 262:
-#line 5831 "../../src/uri.c"
+#line 5841 "src/uri.c"
 	switch( (*p) ) {
 		case 33: goto st145;
 		case 35: goto tr159;
 		case 37: goto st6;
 		case 43: goto st205;
 		case 47: goto tr161;
-		case 58: goto tr247;
+		case 58: goto tr248;
 		case 59: goto st145;
 		case 61: goto st145;
 		case 63: goto tr163;
@@ -5867,7 +5875,7 @@ case 263:
 		case 37: goto st6;
 		case 43: goto st205;
 		case 47: goto tr161;
-		case 58: goto tr247;
+		case 58: goto tr248;
 		case 59: goto st145;
 		case 61: goto st145;
 		case 63: goto tr163;
@@ -5898,7 +5906,7 @@ case 264:
 		case 37: goto st6;
 		case 43: goto st205;
 		case 47: goto tr161;
-		case 58: goto tr247;
+		case 58: goto tr248;
 		case 59: goto st145;
 		case 61: goto st145;
 		case 63: goto tr163;
@@ -5928,8 +5936,8 @@ case 265:
 		case 35: goto tr159;
 		case 37: goto st6;
 		case 43: goto st205;
-		case 47: goto tr311;
-		case 58: goto tr247;
+		case 47: goto tr313;
+		case 58: goto tr248;
 		case 59: goto st145;
 		case 61: goto st145;
 		case 63: goto tr163;
@@ -6220,21 +6228,20 @@ case 265:
 	{
 	switch ( cs ) {
 	case 150: 
-#line 69 "../../src/uri.rl"
+#line 71 "src/uri.rl"
 	{ uri->query = s; uri->query_len = p - s; }
 	break;
 	case 147: 
-#line 73 "../../src/uri.rl"
+#line 75 "src/uri.rl"
 	{ uri->fragment = s; uri->fragment_len = p - s; }
 	break;
 	case 156: 
 	case 157: 
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -6259,41 +6266,40 @@ case 265:
 	case 211: 
 	case 212: 
 	case 257: 
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 149: 
-#line 68 "../../src/uri.rl"
+#line 70 "src/uri.rl"
 	{ s = p; }
-#line 69 "../../src/uri.rl"
+#line 71 "src/uri.rl"
 	{ uri->query = s; uri->query_len = p - s; }
 	break;
 	case 146: 
-#line 72 "../../src/uri.rl"
+#line 74 "src/uri.rl"
 	{ s = p; }
-#line 73 "../../src/uri.rl"
+#line 75 "src/uri.rl"
 	{ uri->fragment = s; uri->fragment_len = p - s; }
 	break;
 	case 173: 
 	case 182: 
 	case 183: 
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 186: 
 	case 187: 
 	case 259: 
 	case 260: 
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -6372,11 +6378,11 @@ case 265:
 	case 263: 
 	case 264: 
 	case 265: 
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 154: 
@@ -6387,24 +6393,23 @@ case 265:
 	case 216: 
 	case 236: 
 	case 237: 
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 261: 
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -6418,16 +6423,15 @@ case 265:
 		}
 	break;
 	case 258: 
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 128 "../../src/uri.rl"
+#line 129 "src/uri.rl"
 	{ s = p;}
-#line 111 "../../src/uri.rl"
+#line 113 "src/uri.rl"
 	{
 			/*
-			 * This action is also called for path_* terminals.
-			 * I absolute have no idea why. Please don't blame
-			 * and fix grammar if you have a LOT of free time.
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
 			 */
 			if (uri->host_hint != 3) {
 				uri->host_hint = 3;
@@ -6444,13 +6448,13 @@ case 265:
 	case 201: 
 	case 202: 
 	case 203: 
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 179 "../../src/uri.rl"
+#line 180 "src/uri.rl"
 	{ uri->service_len = p - uri->service;
 			   uri->host = NULL; uri->host_len = 0; }
 	break;
@@ -6466,14 +6470,14 @@ case 265:
 	case 244: 
 	case 245: 
 	case 246: 
-#line 100 "../../src/uri.rl"
+#line 102 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 93 "../../src/uri.rl"
+#line 95 "src/uri.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 151: 
@@ -6481,23 +6485,23 @@ case 265:
 	case 206: 
 	case 210: 
 	case 214: 
-#line 131 "../../src/uri.rl"
+#line 132 "src/uri.rl"
 	{ s = p; }
-#line 132 "../../src/uri.rl"
+#line 133 "src/uri.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 161 "../../src/uri.rl"
+#line 162 "src/uri.rl"
 	{ s = p; }
-#line 165 "../../src/uri.rl"
+#line 166 "src/uri.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
-#line 6492 "../../src/uri.c"
+#line 6498 "src/uri.c"
 	}
 	}
 
 	_out: {}
 	}
 
-#line 192 "../../src/uri.rl"
+#line 193 "src/uri.rl"
 
 
 	if (uri->path_len == 0)

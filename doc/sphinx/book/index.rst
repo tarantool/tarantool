@@ -14,8 +14,8 @@
     configuration/index
     administration
     connectors/index
-    app/a-errcodes
-    app/b-internals
-    app/c-lua_tutorial
-    app/d-plugins
-    app/e-phia/index
+    app/a_errcodes
+    app/b_internals
+    app/c_lua_tutorial
+    app/d_plugins
+    app/e_phia/index

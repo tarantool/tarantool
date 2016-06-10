@@ -149,6 +149,9 @@ explain what the steps are, then on the Internet you can look at some example sc
    the reasonable option
    is ``-DENABLE_DOC=false`` or just don't use the ``-DENABLE_DOC`` clause at all.
 
+   The option for hinting that the result will be distributed is :code:`-DENABLE_DIST=ON`.
+   If this option is on, then later ``make install`` will install tarantoolctl files in addition to tarantool files.
+
 6. Use make to complete the build.
 
    .. code-block:: bash
@@ -205,7 +208,6 @@ explain what the steps are, then on the Internet you can look at some example sc
 This is the end of the list of steps to take for source downloads.
 
 For your added convenience, github.com has README files with example scripts: |br|
-`README.CentOS <https://github.com/tarantool/tarantool/blob/1.6/README.CentOS>`_ for CentOS 5.8, |br|
 `README.FreeBSD <https://github.com/tarantool/tarantool/blob/1.6/README.FreeBSD>`_ for FreeBSD 10.1, |br|
 `README.MacOSX <https://github.com/tarantool/tarantool/blob/1.6/README.MacOSX>`_ for Mac OS X `El Capitan`, |br|
 `README.md <https://github.com/tarantool/tarantool/blob/1.6/README.md>`_ for generic GNU/Linux. |br|

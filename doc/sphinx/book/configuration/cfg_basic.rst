@@ -50,7 +50,7 @@
     administrative host and port).
 
     A typical value is 3301. The listen parameter may also be set for
-    :ref:`local hot standby <book-cfg-local_hot_standy>`.
+    :ref:`local hot standby <book_cfg_local_hot_standby>`.
 
     NOTE: A replica also binds to this port, and accepts connections, but these
     connections can only serve reads until the replica becomes a master.
