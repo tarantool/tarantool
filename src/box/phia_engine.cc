@@ -29,14 +29,22 @@
  * SUCH DAMAGE.
  */
 #include "phia_engine.h"
-#include "phia_index.h"
-#include "phia_space.h"
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <small/pmatomic.h>
+
+#include "trivia/util.h"
 #include "coeio.h"
 #include "coio.h"
 #include "cfg.h"
+#include "scoped_guard.h"
+
+#include "phia_index.h"
+#include "phia_space.h"
 #include "xrow.h"
 #include "tuple.h"
-#include "scoped_guard.h"
 #include "txn.h"
 #include "index.h"
 #include "relay.h"
@@ -45,11 +53,7 @@
 #include "port.h"
 #include "request.h"
 #include "iproto_constants.h"
-#include "small/pmatomic.h"
 #include "phia.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 
 struct cord *worker_pool;
 static int worker_pool_size;
@@ -72,7 +76,7 @@ phia_calc_fields(struct key_def *key_def, struct phia_field *fields,
 			size += mp_sizeof_uint(load_u64(field->data));
 			break;
 		default:
-			assert(0);
+			unreachable();
 		}
 	}
 
@@ -105,7 +109,7 @@ phia_write_fields(struct key_def *key_def, struct phia_field *fields,
 			p = mp_encode_uint(p, load_u64(field->data));
 			break;
 		default:
-			assert(0);
+			unreachable();
 		}
 	}
 	struct phia_field *value_field = &fields[key_def->part_count];
@@ -482,7 +486,7 @@ PhiaEngine::createIndex(struct key_def *key_def)
 	switch (key_def->type) {
 	case TREE: return new PhiaIndex(key_def);
 	default:
-		assert(false);
+		unreachable();
 		return NULL;
 	}
 }

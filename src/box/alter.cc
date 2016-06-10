@@ -214,7 +214,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 		} else if (def->len == sizeof(uint32_t)) {
 			store_u32(opt, uval);
 		} else {
-			mp_unreachable();
+			unreachable();
 		}
 		break;
 	case MP_STR:
@@ -224,7 +224,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 		opt[str_len + 1] = '\0';
 		break;
 	default:
-		mp_unreachable();
+		unreachable();
 	}
 }
 

@@ -29,12 +29,16 @@
  * SUCH DAMAGE.
  */
 #include "memtx_rtree.h"
+
+#include <small/small.h>
+
+#include "errinj.h"
+#include "fiber.h"
+#include "trivia/util.h"
+
 #include "tuple.h"
 #include "space.h"
 #include "memtx_engine.h"
-#include "errinj.h"
-#include "fiber.h"
-#include "small/small.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -191,7 +195,7 @@ MemtxRTree::findByKey(const char *key, uint32_t part_count) const
 
 	rtree_rect rect;
 	if (mp_decode_rect_from_key(&rect, m_dimension, key, part_count))
-		assert(false);
+		unreachable();
 
 	struct tuple *result = NULL;
 	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &iterator))

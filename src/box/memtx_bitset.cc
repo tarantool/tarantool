@@ -33,6 +33,8 @@
 
 #include <string.h>
 
+#include "trivia/util.h"
+
 #include "tuple.h"
 
 #ifndef OLD_GOOD_BITSET
@@ -268,7 +270,7 @@ make_key(const char *field, uint32_t *key_len)
 		break;
 	default:
 		*key_len = 0;
-		assert(false);
+		unreachable();
 		return NULL;
 	}
 }

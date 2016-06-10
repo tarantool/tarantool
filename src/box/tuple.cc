@@ -33,6 +33,7 @@
 #include "small/small.h"
 #include "small/quota.h"
 
+#include "trivia/util.h"
 #include "fiber.h"
 
 uint32_t snapshot_version;
@@ -432,7 +433,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	}
 	default:
 	{
-		assert(false);
+		unreachable();
 		return 0;
 	} /* end case */
 	} /* end switch */

@@ -29,11 +29,15 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
-#include "space.h"
-#include "schema.h"
+
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "trivia/util.h"
 #include "scoped_guard.h"
+
+#include "space.h"
+#include "schema.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 
@@ -219,7 +223,7 @@ key_list_del_key(struct rlist *key_list, uint32_t iid)
 			return;
 		}
 	}
-	assert(false);
+	unreachable();
 }
 
 void

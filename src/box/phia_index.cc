@@ -28,21 +28,25 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "phia_engine.h"
-#include "phia_space.h"
 #include "phia_index.h"
-#include "say.h"
-#include "tuple.h"
-#include "tuple_update.h"
-#include "scoped_guard.h"
-#include "schema.h"
-#include "space.h"
-#include "txn.h"
-#include "cfg.h"
-#include "phia.h"
+
 #include <stdio.h>
 #include <inttypes.h>
 #include <bit/bit.h> /* load/store */
+
+#include "trivia/util.h"
+#include "cfg.h"
+#include "say.h"
+#include "scoped_guard.h"
+
+#include "phia_engine.h"
+#include "phia_space.h"
+#include "tuple.h"
+#include "tuple_update.h"
+#include "schema.h"
+#include "space.h"
+#include "txn.h"
+#include "phia.h"
 
 enum { PHIA_KEY_MAXLEN = 1024 };
 static char PHIA_STRING_MIN[] = { '\0' };
@@ -68,7 +72,7 @@ phia_set_fields(struct key_def *key_def, struct phia_field *fields,
 					  field->size, PHIA_KEY_MAXLEN);
 			break;
 		default:
-			mp_unreachable();
+			unreachable();
 			return;
 		}
 	}
@@ -98,7 +102,7 @@ phia_tuple_from_key_data(struct phia_index *index, struct key_def *key_def,
 				field->size = sizeof(PHIA_STRING_MAX);
 				break;
 			default:
-				mp_unreachable();
+				unreachable();
 			}
 		} else if ((i > 0 && (order == PHIA_GE || order == PHIA_LT)) ||
 			   (i == 0 && (order == PHIA_GT || order == PHIA_GE))) {
@@ -113,10 +117,10 @@ phia_tuple_from_key_data(struct phia_index *index, struct key_def *key_def,
 				field->size = 0;
 				break;
 			default:
-				mp_unreachable();
+				unreachable();
 			}
 		} else {
-			mp_unreachable();
+			unreachable();
 		}
 	}
 	/* Add an empty value. Value is stored after key parts. */
@@ -241,7 +245,7 @@ PhiaIndex::replace(struct tuple*, struct tuple*, enum dup_replace_mode)
 	 *
 	 * see: phia_space.cc
 	*/
-	assert(0);
+	unreachable();
 	return NULL;
 }
 

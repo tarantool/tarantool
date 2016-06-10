@@ -826,7 +826,7 @@ tx_process_misc(struct cmsg *m)
 			iproto_reply_ok(out, msg->header.sync);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 	} catch (Exception *e) {
 		iproto_reply_error(out, diag_last_error(&fiber()->diag),
@@ -863,7 +863,7 @@ tx_process_join_subscribe(struct cmsg *m)
 			box_process_subscribe(&con->input, &msg->header);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 	} catch (Exception *e) {
 		iproto_write_error(con->input.fd, e);

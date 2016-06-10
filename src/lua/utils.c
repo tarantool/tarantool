@@ -32,6 +32,8 @@
 
 #include <assert.h>
 #include <errno.h>
+
+#include <trivia/util.h>
 #include <diag.h>
 #include <fiber.h>
 
@@ -251,7 +253,7 @@ luaL_serializer_cfg(lua_State *L)
 			lua_pushinteger(L, *pval);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 		/* Save normalized value to serializer.cfg table */
 		lua_setfield(L, 1, OPTIONS[i].name);
@@ -308,7 +310,7 @@ luaL_newserializer(struct lua_State *L, const char *modname, const luaL_Reg *reg
 			lua_pushinteger(L, *pval);
 			break;
 		default:
-			assert(false);
+			unreachable();
 		}
 		lua_setfield(L, -2, OPTIONS[i].name);
 	}
@@ -920,7 +922,7 @@ lbox_error(lua_State *L)
 	assert(e != NULL);
 	luaL_pusherror(L, e);
 	lua_error(L);
-	assert(0); /* unreachable */
+	unreachable();
 	return 0;
 }
 

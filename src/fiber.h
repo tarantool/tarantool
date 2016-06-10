@@ -531,7 +531,7 @@ fiber_new_xc(const char *name, fiber_func func)
 	struct fiber *f = fiber_new(name, func);
 	if (f == NULL) {
 		diag_raise();
-		assert(false);
+		unreachable();
 	}
 	return f;
 }

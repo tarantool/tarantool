@@ -525,7 +525,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 		request->key_end = data;
 		break;
 	default:
-		assert(0);
+		unreachable();
 	}
 	process_rw(request, NULL);
 }

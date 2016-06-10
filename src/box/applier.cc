@@ -378,7 +378,7 @@ applier_f(va_list ap)
 			 * subscribe() has an infinite loop which
 			 * is stoppable only with fiber_cancel().
 			 */
-			assert(0);
+			unreachable();
 			return 0;
 		} catch (ClientError *e) {
 			if (e->errcode() == ER_CONNECTION_TO_SELF &&

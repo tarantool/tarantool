@@ -29,6 +29,17 @@
  * SUCH DAMAGE.
  */
 #include "memtx_engine.h"
+
+#include <msgpuck.h>
+#include <small/rlist.h>
+
+#include "trivia/util.h"
+#include "main.h"
+#include "coeio_file.h"
+#include "coeio.h"
+#include "errinj.h"
+#include "scoped_guard.h"
+
 #include "tuple.h"
 #include "txn.h"
 #include "index.h"
@@ -37,8 +48,6 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "space.h"
-#include <msgpuck.h>
-#include "small/rlist.h"
 #include "request.h"
 #include "box.h"
 #include "iproto_constants.h"
@@ -49,11 +58,6 @@
 #include "relay.h"
 #include "schema.h"
 #include "port.h"
-#include "main.h"
-#include "coeio_file.h"
-#include "coeio.h"
-#include "errinj.h"
-#include "scoped_guard.h"
 
 /** For all memory used by all indexes.
  * If you decide to use memtx_index_arena or
@@ -840,7 +844,7 @@ MemtxEngine::createIndex(struct key_def *key_def)
 	case BITSET:
 		return new MemtxBitset(key_def);
 	default:
-		assert(false);
+		unreachable();
 		return NULL;
 	}
 }
@@ -924,7 +928,7 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 			}
 			break;
 		default:
-			assert(false);
+			unreachable();
 			break;
 		}
 	}

@@ -118,7 +118,7 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 		phia_raise();
 		return;
 	default:
-		assert(0);
+		unreachable();
 	}
 }
 

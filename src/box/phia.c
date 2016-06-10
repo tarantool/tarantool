@@ -2297,7 +2297,7 @@ sr_statusactive_is(enum phia_status status)
 	case SR_MALFUNCTION:
 		return false;
 	}
-	assert(0);
+	unreachable();
 	return 0;
 }
 
@@ -3380,7 +3380,7 @@ sv_mergeiter_next(struct svmergeiter *im)
 	case PHIA_LE:
 		sv_mergeiter_lt(im);
 		break;
-	default: assert(0);
+	default: unreachable();
 	}
 }
 
@@ -4100,7 +4100,7 @@ sv_upsertviflsn(struct sv *v) {
 
 static void
 sv_upsertviflsnset(struct sv *v ssunused, uint64_t lsn ssunused) {
-	assert(0);
+	unreachable();
 }
 
 static char*
@@ -5417,7 +5417,7 @@ sd_pageiter_open(struct sdpageiter *pi, struct sfscheme *scheme,
 		break;
 	case PHIA_LE: rc = sd_pageiter_lt(pi, 1);
 		break;
-	default: assert(0);
+	default: unreachable();
 	}
 	sd_pageiter_result(pi);
 	return rc;
@@ -5471,7 +5471,7 @@ sd_pageiter_next(struct sdpageiter *pi)
 		sd_pageiter_chain_head(pi, pi->pos - 1);
 		break;
 	}
-	default: assert(0);
+	default: unreachable();
 	}
 	sd_pageiter_result(pi);
 }
@@ -5727,7 +5727,7 @@ sd_indexiter_open(struct sdindexiter *ii, struct sfscheme *scheme,
 		case PHIA_GE: ii->pos = 0;
 			break;
 		default:
-			assert(0);
+			unreachable();
 		}
 		ii->v = sd_indexpage(ii->index, ii->pos);
 		return 0;
@@ -5752,7 +5752,7 @@ sd_indexiter_open(struct sdindexiter *ii, struct sfscheme *scheme,
 		if (rc == -1 || (rc == 0 && ii->cmp == PHIA_GT))
 			ii->pos++;
 		break;
-	default: assert(0);
+	default: unreachable();
 	}
 	if (unlikely(ii->pos == -1 ||
 	               ii->pos >= (int)ii->index->h->count))
@@ -5778,7 +5778,7 @@ sd_indexiter_next(struct sdindexiter *ii)
 	case PHIA_GE: ii->pos++;
 		break;
 	default:
-		assert(0);
+		unreachable();
 		break;
 	}
 	if (unlikely(ii->pos < 0))
@@ -7952,7 +7952,7 @@ si_iter_open(struct siiter *ii, struct si *index, enum phia_order o,
 			ii->node = sinode_tree_first(&index->tree);
 			break;
 		default:
-			assert(0);
+			unreachable();
 			break;
 		}
 		return 0;
@@ -7990,7 +7990,7 @@ si_iter_next(struct siiter *ii)
 	case PHIA_GE:
 		ii->node = sinode_tree_next(&ii->index->tree, ii->node);
 		break;
-	default: assert(0);
+	default: unreachable();
 	}
 }
 
@@ -11287,7 +11287,7 @@ sc_periodic(struct scheduler *s, struct srzone *zone, uint64_t now)
 	case 0:  /* compact_index */
 		break;
 	case 1:  /* compact_index + branch_count prio */
-		assert(0);
+		unreachable();
 		break;
 	case 2:  /* checkpoint */
 	{

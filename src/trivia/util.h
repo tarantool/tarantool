@@ -106,6 +106,8 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
 #endif
 
+#define unreachable() (assert(0), __builtin_unreachable())
+
 void close_all_xcpt(int fdc, ...);
 void coredump(int dump_interval);
 
