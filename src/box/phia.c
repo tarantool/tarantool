@@ -4015,6 +4015,7 @@ sv_indexiter_open(struct ssiter *i, struct svindex *index,
 		  enum phia_order o, void *key, int keysize)
 {
 	assert(index == index->tree.arg);
+	assert(o == PHIA_GT || o == PHIA_GE || o == PHIA_LT || o == PHIA_LE);
 	i->vif = &sv_indexiterif;
 	struct svindexiter *ii = (struct svindexiter *)i->priv;
 	struct bps_tree_svindex *tree = &index->tree;
@@ -4034,19 +4035,12 @@ sv_indexiter_open(struct ssiter *i, struct svindex *index,
 	struct tree_svindex_key tree_key;
 	tree_key.data = key;
 	tree_key.size = keysize;
-	tree_key.lsn = UINT64_MAX;
+	tree_key.lsn = (o == PHIA_GE || o == PHIA_LT) ? UINT64_MAX : 0;
 	bool exact;
 	ii->index->hint_key_is_equal = false;
 	ii->itr = bps_tree_svindex_lower_bound(tree, &tree_key, &exact);
-	if (ii->index->hint_key_is_equal) {
-		if (o == PHIA_GT)
-			bps_tree_svindex_itr_next(tree, &ii->itr);
-		else if(o == PHIA_LT)
-			bps_tree_svindex_itr_prev(tree, &ii->itr);
-	} else if(bps_tree_svindex_itr_is_invalid(&ii->itr)) {
-		if(o == PHIA_LT || o == PHIA_LE)
-			ii->itr = bps_tree_svindex_itr_last(tree);
-	}
+	if (o == PHIA_LE || o == PHIA_LT)
+		bps_tree_svindex_itr_prev(tree, &ii->itr);
 	return (int)ii->index->hint_key_is_equal;
 }
 

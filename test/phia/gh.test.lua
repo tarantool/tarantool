@@ -1,3 +1,5 @@
+env = require('test_run')
+test_run = env.new()
 
 -- gh-283: hang after three creates and drops
 s = box.schema.space.create('space0', {engine='phia'})
@@ -116,3 +118,44 @@ box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_in
 box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_index}, {'!', -1, time}})
 box.space.email:select{email}
 box.space.email:drop()
+
+--gh-1540: phia: invalid results from LE/LT iterators
+s = box.schema.space.create('test', { engine = 'phia' })
+i = box.space.test:create_index('primary', { parts = { 1, 'NUM', 2, 'NUM' } })
+for i =1,2 do for j=1,9 do box.space.test:replace({i, j}) end end
+box.space.test:select({1, 999999}, {iterator = 'LE'})
+box.space.test:drop()
+
+s1 = box.schema.create_space('s1',{engine='phia'})
+i1 = s1:create_index('primary',{parts={1,'num',2,'num'}})
+s2 = box.schema.create_space('s2',{engine='memtx'})
+i2 = s2:create_index('primary',{parts={1,'num',2,'num'}})
+for i = 1,3 do for j = 1,5 do s1:insert{i, j} s2:insert{i, j} end end
+itrs = {'GE', 'GT', 'LE', 'LT'}
+good = true
+test_run:cmd("setopt delimiter ';'")
+function my_equal(a, b)
+    if type(a) ~= type(b) then
+        return false
+    elseif type(a) ~= 'table' and not box.tuple.is(a) then
+        return a == b
+    end
+    for k,v in pairs(a) do if not my_equal(b[k], v) then return false end end
+    for k,v in pairs(b) do if not my_equal(a[k], v) then return false end end
+    return true
+end;
+for i = 0,4 do
+    for j = 0,6 do
+        for k = 1,4 do
+            opts = {iterator=itrs[k]}
+            if not my_equal(s1:select({i, j}, opts), s2:select({i, j}, opts)) then
+                good = false
+            end
+        end
+    end
+end;
+test_run:cmd("setopt delimiter ''");
+good
+s1:drop()
+s2:drop()
+
