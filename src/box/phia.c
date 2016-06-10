@@ -561,7 +561,7 @@ enum ssquotaop {
 };
 
 struct ssquota {
-	int enable;
+	bool enable;
 	int wait;
 	int64_t limit;
 	int64_t used;
@@ -569,9 +569,8 @@ struct ssquota {
 	pthread_cond_t cond;
 };
 
-static int ss_quotainit(struct ssquota*);
-static int ss_quotaset(struct ssquota*, int64_t);
-static int ss_quotaenable(struct ssquota*, int);
+static void ss_quotainit(struct ssquota*, int64_t);
+static void ss_quotaenable(struct ssquota*);
 static int ss_quotafree(struct ssquota*);
 static int ss_quota(struct ssquota*, enum ssquotaop, int64_t);
 
@@ -1493,30 +1492,21 @@ ss_qfhas(struct ssqf *f, uint64_t h)
 	return 0;
 }
 
-static int
-ss_quotainit(struct ssquota *q)
+static void
+ss_quotainit(struct ssquota *q, int64_t limit)
 {
-	q->enable = 0;
+	q->enable = false;
 	q->wait   = 0;
-	q->limit  = 0;
+	q->limit  = limit;
 	q->used   = 0;
 	tt_pthread_mutex_init(&q->lock, NULL);
 	tt_pthread_cond_init(&q->cond, NULL);
-	return 0;
 }
 
-static int
-ss_quotaset(struct ssquota *q, int64_t limit)
+static void
+ss_quotaenable(struct ssquota *q)
 {
-	q->limit = limit;
-	return 0;
-}
-
-static int
-ss_quotaenable(struct ssquota *q, int v)
-{
-	q->enable = v;
-	return 0;
+	q->enable = true;
 }
 
 static int
@@ -4468,8 +4458,7 @@ static int sx_indexinit(struct sxindex *, struct sxmanager *,
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
 static struct sx *sx_find(struct sxmanager*, uint64_t);
-static void sx_init(struct sxmanager*, struct sx*, struct svlog*);
-static enum sxstate sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*, uint64_t);
+static void sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*, uint64_t);
 static void sx_gc(struct sx*);
 static enum sxstate sx_prepare(struct sx*, sxpreparef, void*);
 static enum sxstate sx_commit(struct sx*);
@@ -4603,13 +4592,6 @@ static struct sx *sx_find(struct sxmanager *m, uint64_t id)
 	return sx_tree_search(&m->tree, (char*)&id);
 }
 
-static void sx_init(struct sxmanager *m, struct sx *x, struct svlog *log)
-{
-	x->manager = m;
-	x->log = log;
-	rlist_create(&x->deadlock);
-}
-
 static inline enum sxstate
 sx_promote(struct sx *x, enum sxstate state)
 {
@@ -4617,13 +4599,17 @@ sx_promote(struct sx *x, enum sxstate state)
 	return state;
 }
 
-static enum sxstate
+static void
 sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	 struct svlog *log, uint64_t vlsn)
 {
-	sx_promote(x, SXREADY);
+	x->manager = m;
+	x->log = log;
+	x->state = SXREADY;
 	x->type = type;
 	x->log_read = -1;
+	rlist_create(&x->deadlock);
+
 	sr_seqlock(m->r->seq);
 	x->csn = m->csn;
 	x->id = sr_seqdo(m->r->seq, SR_TSNNEXT);
@@ -4632,7 +4618,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	else
 		x->vlsn = vlsn;
 	sr_sequnlock(m->r->seq);
-	sx_init(m, x, log);
+
 	tt_pthread_mutex_lock(&m->lock);
 	sx_tree_insert(&m->tree, x);
 	if (type == SXRO)
@@ -4640,7 +4626,6 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	else
 		m->count_rw++;
 	tt_pthread_mutex_unlock(&m->lock);
-	return SXREADY;
 }
 
 static inline void
@@ -7138,8 +7123,6 @@ struct siconf {
 	uint32_t    id;
 	char       *name;
 	char       *path;
-	uint32_t    path_fail_on_exists;
-	uint32_t    path_fail_on_drop;
 	uint32_t    sync;
 	uint64_t    node_size;
 	uint32_t    node_page_size;
@@ -10643,11 +10626,6 @@ si_recoverdrop(struct si *i)
 	int rc = path_exists(path);
 	if (likely(! rc))
 		return 0;
-	if (i->conf.path_fail_on_drop) {
-		sr_malfunction("attempt to recover a dropped index: %s:",
-		               i->conf.path);
-		return -1;
-	}
 	rc = si_droprepository(i->conf.path, 0);
 	if (unlikely(rc == -1))
 		return -1;
@@ -10660,10 +10638,6 @@ static int si_recover(struct si *i)
 	int exist = path_exists(i->conf.path);
 	if (exist == 0)
 		goto deploy;
-	if (i->conf.path_fail_on_exists) {
-		sr_error("directory '%s' already exists", i->conf.path);
-		return -1;
-	}
 	int rc = si_recoverdrop(i);
 	switch (rc) {
 	case -1: return -1;
@@ -11552,6 +11526,8 @@ phia_bootstrap(struct phia_env *e)
 {
 	assert(e->status == SR_OFFLINE);
 	e->status = SR_ONLINE;
+	/* enable quota */
+	ss_quotaenable(&e->quota);
 }
 
 void
@@ -11573,6 +11549,8 @@ phia_end_recovery(struct phia_env *e)
 {
 	assert(e->status == SR_FINAL_RECOVERY);
 	e->status = SR_ONLINE;
+	/* enable quota */
+	ss_quotaenable(&e->quota);
 }
 
 int
@@ -11864,6 +11842,9 @@ static int se_confinit(struct seconf *c, struct phia_env *e)
 		sr_oom();
 		return -1;
 	}
+	/* Ensure phia data directory exists. */
+	if (sr_checkdir(c->path))
+		return -1;
 	c->memory_limit = cfg_getd("phia.memory_limit")*1024*1024*1024;
 	struct srzone def = {
 		.enable            = 1,
@@ -12064,7 +12045,6 @@ phia_cursor_new(struct phia_index *db, struct phia_tuple *key,
 		return NULL;
 	}
 	sv_loginit(&c->log);
-	sx_init(&e->xm, &c->t, &c->log);
 	c->db = db;
 	c->start = clock_monotonic64();
 	c->ops = 0;
@@ -12147,8 +12127,7 @@ si_confcreate(struct siconf *conf, struct ssa *a,
 		sr_oom();
 		goto error;
 	}
-
-	conf->temperature           = 0;
+	conf->temperature           = 1;
 	conf->amqf                  = key_def->opts.amqf;
 	/* path */
 	if (key_def->opts.path[0] == '\0') {
@@ -12163,8 +12142,6 @@ si_confcreate(struct siconf *conf, struct ssa *a,
 		sr_oom();
 		goto error;
 	}
-	conf->path_fail_on_exists   = 0;
-	conf->path_fail_on_drop     = 0;
 	conf->lru                   = 0;
 	conf->lru_step              = 128 * 1024;
 	conf->buf_gc_wm             = 1024 * 1024;
@@ -12822,14 +12799,6 @@ phia_get(struct phia_tx *t, struct phia_index *db, struct phia_tuple *key,
 }
 
 static inline void
-phia_tx_free(struct phia_tx *tx)
-{
-	struct phia_env *env = tx->env;
-	sv_logfree(&tx->log, &env->a);
-	ss_free(&env->a, tx);
-}
-
-static inline void
 phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 {
 	struct phia_env *e = t->env;
@@ -12841,7 +12810,8 @@ phia_tx_end(struct phia_tx *t, int rlb, int conflict)
 	rlist_foreach_entry_safe(db, &e->db, link, tmp) {
 		phia_index_unbind(db, t->t.id);
 	}
-	phia_tx_free(t);
+	sv_logfree(&t->log, &e->a);
+	ss_free(&e->a, t);
 }
 
 int
@@ -12913,7 +12883,7 @@ phia_commit(struct phia_tx *t)
 			 *
 			 * A half committed transaction is no longer
 			 * being part of concurrent index, but still can be
-			 * commited or rolled back.
+			 * committed or rolled back.
 			 * Yet, it is important to maintain external
 			 * serial commit order.
 			*/
@@ -12957,7 +12927,6 @@ phia_begin(struct phia_env *e)
 	}
 	t->env = e;
 	sv_loginit(&t->log);
-	sx_init(&e->xm, &t->t, &t->log);
 	t->start = clock_monotonic64();
 	t->lsn = 0;
 	t->half_commit = 0;
@@ -12976,14 +12945,14 @@ phia_env_new(void)
 	if (unlikely(e == NULL))
 		return NULL;
 	memset(e, 0, sizeof(*e));
-	e->status = SR_OFFLINE;
-	ss_aopen(&e->a, &ss_stda);
-	int rc;
-	rc = se_confinit(&e->conf, e);
-	if (unlikely(rc == -1))
-		goto error;
 	rlist_create(&e->db);
-	ss_quotainit(&e->quota);
+	e->status = SR_OFFLINE;
+
+	ss_aopen(&e->a, &ss_stda);
+	if (se_confinit(&e->conf, e))
+		goto error;
+	/* set memory quota (disable during recovery) */
+	ss_quotainit(&e->quota, e->conf.memory_limit);
 	sr_seqinit(&e->seq);
 	sr_statinit(&e->stat);
 	sr_init(&e->r, &e->a, &e->quota,
@@ -12991,24 +12960,13 @@ phia_env_new(void)
 	sx_managerinit(&e->xm, &e->r);
 	si_cachepool_init(&e->cachepool, &e->r);
 	sc_init(&e->scheduler, &e->r);
-
-
-	/* set memory quota (disable during recovery) */
-	ss_quotaset(&e->quota, e->conf.memory_limit);
-	ss_quotaenable(&e->quota, 0);
-
-	/* Ensure phia data directory exists. */
-	rc = sr_checkdir(e->conf.path);
-	if (unlikely(rc == -1))
-		goto error;
-	/* enable quota */
-	ss_quotaenable(&e->quota, 1);
-
 	return e;
 error:
 	phia_env_delete(e);
 	return NULL;
 }
+
+/** {{{ phia_service - context of a phia background thread */
 
 struct phia_service *
 phia_service_new(struct phia_env *env)
@@ -13038,3 +12996,5 @@ phia_service_delete(struct phia_service *srv)
 	sd_cfree(&srv->sdc, srv->env->r.a);
 	ss_free(srv->env->r.a, srv);
 }
+
+/* }}} phia service */

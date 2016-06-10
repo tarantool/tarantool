@@ -567,7 +567,7 @@ PhiaEngine::prepare(struct txn *txn)
 {
 	/* A half committed transaction is no longer
 	 * being part of concurrent index, but still can be
-	 * commited or rolled back.
+	 * committed or rolled back.
 	 *
 	 * This mode disables conflict resolution for 'prepared'
 	 * transactions and solves the issue with concurrent
