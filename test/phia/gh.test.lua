@@ -83,15 +83,6 @@ s:insert{'1','2','3','4','5','6','7','8','9'}
 s:drop()
 
 
--- gh-1016: behaviour of multi-part indexes
-s = box.schema.create_space('t',{engine='phia'})
-i = s:create_index('primary',{parts={1,'str',2,'str',3,'str'}})
-s:insert{'1','2','3'}
-s:insert{'1','2','0'}
-i:select({'1','2',nil},{iterator='GT'})
-s:drop()
-
-
 -- gh-1407: upsert generate garbage data
 email_space_id = 'email'
 email_space = box.schema.space.create(email_space_id, { engine = 'phia', if_not_exists = true })

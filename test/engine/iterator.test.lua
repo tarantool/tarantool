@@ -93,10 +93,4 @@ t = {} for state, v in index:pairs(box.tuple.new(tostring(77)), {iterator = 'LT'
 t
 space:drop()
 
--- gh-1467: invalid iterator type
-space = box.schema.space.create('test', { engine = engine })
-index = space:create_index('primary')
-space:select({}, {iterator = 'BITS_ALL_SET' } )
-space:drop()
-
 inspector:cmd("clear filter")

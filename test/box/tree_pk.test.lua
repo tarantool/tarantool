@@ -92,17 +92,6 @@ s0.index['primary']:get{200}
 s0.index['primary']:get{199}
 s0.index['primary']:get{201}
 
--- Test partially specified keys in TREE indexes
-s1:insert{'abcd'}
-s1:insert{'abcda'}
-s1:insert{'abcda_'}
-s1:insert{'abcdb'}
-s1:insert{'abcdb_'}
-s1:insert{'abcdb__'}
-s1:insert{'abcdb___'}
-s1:insert{'abcdc'}
-s1:insert{'abcdc_'}
-utils.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
 s1:drop()
 s1 = nil
 s2:drop()

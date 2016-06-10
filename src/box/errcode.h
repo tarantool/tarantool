@@ -171,6 +171,7 @@ struct errcode_record {
 	/*115 */_(ER_SYSTEM, 2, "%s") \
 	/*116 */_(ER_LOADING, 2, "Server bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF, 2, "Connection to self") \
+	/*118 */_(ER_KEY_PART_IS_TOO_LONG, 2, "Key part is too long: %u of %u bytes") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
