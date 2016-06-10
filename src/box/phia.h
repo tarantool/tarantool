@@ -127,16 +127,13 @@ phia_delete(struct phia_tx *tx, struct phia_index *index,
 	    struct phia_tuple *tuple);
 
 int
-phia_commit(struct phia_tx *tx);
+phia_prepare(struct phia_tx *tx);
+
+int
+phia_commit(struct phia_tx *tx, int64_t lsn);
 
 int
 phia_rollback(struct phia_tx *tx);
-
-void
-phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn);
-
-void
-phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit);
 
 /*
  * Index

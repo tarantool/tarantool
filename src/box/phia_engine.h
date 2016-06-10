@@ -54,8 +54,6 @@ struct PhiaEngine: public Engine {
 	virtual void join(struct xstream *stream) override;
 	virtual int beginCheckpoint() override;
 	virtual int waitCheckpoint(struct vclock *vclock) override;
-private:
-	int64_t m_prev_commit_lsn;
 public:
 	struct phia_env *env;
 	int recovery_complete;

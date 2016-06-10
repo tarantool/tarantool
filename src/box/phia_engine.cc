@@ -327,7 +327,6 @@ phia_cursor_conext(struct phia_cursor *cursor, struct phia_tuple **result)
 
 PhiaEngine::PhiaEngine()
 	:Engine("phia")
-	 ,m_prev_commit_lsn(-1)
 	 ,recovery_complete(0)
 {
 	flags = 0;
@@ -565,24 +564,11 @@ PhiaEngine::begin(struct txn *txn)
 void
 PhiaEngine::prepare(struct txn *txn)
 {
-	/* A half committed transaction is no longer
-	 * being part of concurrent index, but still can be
-	 * committed or rolled back.
-	 *
-	 * This mode disables conflict resolution for 'prepared'
-	 * transactions and solves the issue with concurrent
-	 * write-write conflicts during wal write/yield.
-	 *
-	 * It is important to maintain correct serial
-	 * commit order by wal_writer.
-	 */
 	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
-	phia_tx_set_half_commit(tx, true);
 
-	int rc = phia_commit(tx);
+	int rc = phia_prepare(tx);
 	switch (rc) {
 	case 1: /* rollback */
-		txn->engine_tx = NULL;
 	case 2: /* lock */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		break;
@@ -593,31 +579,17 @@ PhiaEngine::prepare(struct txn *txn)
 }
 
 void
-PhiaEngine::commit(struct txn *txn, int64_t signature)
+PhiaEngine::commit(struct txn *txn, int64_t lsn)
 {
-	if (txn->engine_tx == NULL)
-		return;
-
 	struct phia_tx *tx = (struct phia_tx *) txn->engine_tx;
-	if (txn->n_rows > 0) {
-		/* commit transaction using transaction commit signature */
-		assert(signature >= 0);
-
-		if (m_prev_commit_lsn == signature) {
-			panic("phia commit panic: m_prev_commit_lsn == signature = %"
-			      PRIu64, signature);
+	if (tx) {
+		int rc = phia_commit(tx, txn->n_rows ? lsn : 0);
+		if (rc == -1) {
+			panic("phia commit failed: txn->signature = %"
+			      PRIu64, lsn);
 		}
-		/* Set tx id in Phia only if tx has WRITE requests */
-		phia_tx_set_lsn(tx, signature);
-		m_prev_commit_lsn = signature;
+		txn->engine_tx = NULL;
 	}
-
-	int rc = phia_commit(tx);
-	if (rc == -1) {
-		panic("phia commit failed: txn->signature = %"
-		      PRIu64, signature);
-	}
-	txn->engine_tx = NULL;
 }
 
 void

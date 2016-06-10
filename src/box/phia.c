@@ -11500,8 +11500,6 @@ static int phia_index_recoverend(struct phia_index*);
 
 struct phia_tx {
 	struct phia_env *env;
-	int64_t lsn;
-	bool half_commit;
 	uint64_t start;
 	struct svlog log;
 	struct sx t;
@@ -12844,7 +12842,7 @@ phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
 }
 
 int
-phia_commit(struct phia_tx *t)
+phia_prepare(struct phia_tx *t)
 {
 	struct phia_env *e = t->env;
 	if (unlikely(! sr_statusactive_is(e->status)))
@@ -12852,68 +12850,59 @@ phia_commit(struct phia_tx *t)
 	int recover = (e->status == SR_FINAL_RECOVERY);
 
 	/* prepare transaction */
-	if (t->t.state == SXREADY || t->t.state == SXLOCK)
-	{
-		struct sicache *cache = NULL;
-		sxpreparef prepare = NULL;
-		if (! recover) {
-			prepare = phia_tx_prepare;
-			cache = si_cachepool_pop(&e->cachepool);
-			if (unlikely(cache == NULL))
-				return sr_oom();
-		}
-		enum sxstate s = sx_prepare(&t->t, prepare, cache);
-		if (cache)
-			si_cachepool_push(cache);
-		if (s == SXLOCK) {
-			sr_stattx_lock(&e->stat);
-			return 2;
-		}
-		if (s == SXROLLBACK) {
-			sx_rollback(&t->t);
-			phia_tx_end(t, 0, 1);
-			return 1;
-		}
-		assert(s == SXPREPARE);
-
-		sx_commit(&t->t);
-
-		if (t->half_commit) {
-			/* Half commit mode.
-			 *
-			 * A half committed transaction is no longer
-			 * being part of concurrent index, but still can be
-			 * committed or rolled back.
-			 * Yet, it is important to maintain external
-			 * serial commit order.
-			*/
-			return 0;
-		}
+	assert(t->t.state == SXREADY);
+	struct sicache *cache = NULL;
+	sxpreparef prepare = NULL;
+	if (! recover) {
+		prepare = phia_tx_prepare;
+		cache = si_cachepool_pop(&e->cachepool);
+		if (unlikely(cache == NULL))
+			return sr_oom();
 	}
+	enum sxstate s = sx_prepare(&t->t, prepare, cache);
+	if (cache)
+		si_cachepool_push(cache);
+	if (s == SXLOCK) {
+		sr_stattx_lock(&e->stat);
+		return 2;
+	}
+	if (s == SXROLLBACK) {
+		return 1;
+	}
+	assert(s == SXPREPARE);
+
+	sx_commit(&t->t);
+
+	/*
+	 * A half committed transaction is no longer
+	 * being part of concurrent index, but still can be
+	 * committed or rolled back.
+	 * Yet, it is important to maintain external
+	 * serial commit order.
+	 */
+	return 0;
+}
+
+int
+phia_commit(struct phia_tx *t, int64_t lsn)
+{
+	struct phia_env *e = t->env;
+	if (unlikely(! sr_statusactive_is(e->status)))
+		return -1;
+	int recover = (e->status == SR_FINAL_RECOVERY);
+
 	assert(t->t.state == SXCOMMIT);
 
 	/* do wal write and backend commit */
 	if (unlikely(recover))
 		recover = 2;
 	int rc;
-	rc = sc_write(&e->scheduler, &t->log, t->lsn, recover);
+	rc = sc_write(&e->scheduler, &t->log, lsn, recover);
 	if (unlikely(rc == -1))
 		sx_rollback(&t->t);
 
 	phia_tx_end(t, 0, 0);
 	return rc;
-}
-
-void
-phia_tx_set_lsn(struct phia_tx *tx, int64_t lsn)
-{
-	tx->lsn = lsn;
-}
-
-void
-phia_tx_set_half_commit(struct phia_tx *tx, bool half_commit)
-{
-	tx->half_commit = half_commit;
 }
 
 struct phia_tx *
@@ -12928,8 +12917,6 @@ phia_begin(struct phia_env *e)
 	t->env = e;
 	sv_loginit(&t->log);
 	t->start = clock_monotonic64();
-	t->lsn = 0;
-	t->half_commit = 0;
 	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
 	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {

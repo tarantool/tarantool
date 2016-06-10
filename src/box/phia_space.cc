@@ -98,23 +98,24 @@ PhiaSpace::applySnapshotRow(struct space *space, struct request *request)
 		phia_raise();
 
 	int64_t signature = request->header->lsn;
-	phia_tx_set_lsn(tx, signature);
 
 	if (phia_replace(tx, index->db, tuple) != 0)
 		phia_raise();
 
-	int rc = phia_commit(tx);
+	int rc = phia_prepare(tx);
 	switch (rc) {
 	case 0:
+		if (phia_commit(tx, signature))
+			panic("failed to commit phia transaction");
 		return;
 	case 1: /* rollback */
-		return;
 	case 2: /* lock */
 		phia_rollback(tx);
 		/* must never happen during JOIN */
 		tnt_raise(ClientError, ER_TRANSACTION_CONFLICT);
 		return;
 	case -1:
+		phia_rollback(tx);
 		phia_raise();
 		return;
 	default:
