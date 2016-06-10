@@ -150,14 +150,11 @@ struct ssmmap {
 	size_t size;
 };
 
-struct ssvfs;
-
 struct PACKED ssfile {
 	int fd;
 	uint64_t size;
 	int creat;
 	struct sspath path;
-	struct ssvfs *vfs;
 };
 
 static inline void
@@ -209,7 +206,6 @@ ss_fileclose(struct ssfile *f)
 		if (unlikely(rc == -1))
 			return -1;
 		f->fd  = -1;
-		f->vfs = NULL;
 	}
 	return 0;
 }
@@ -2575,7 +2571,6 @@ sr_zonemap(struct srzonemap *m, uint32_t percent)
 struct runtime {
 	struct srseq *seq;
 	struct ssa *a;
-	struct ssvfs *vfs;
 	struct ssquota *quota;
 	struct srzonemap *zonemap;
 	struct srstat *stat;
