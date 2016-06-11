@@ -2737,7 +2737,7 @@ struct sv;
 
 struct svif {
 	uint8_t   (*flags)(struct sv*);
-	void      (*lsnset)(struct sv*, uint64_t);
+	void      (*lsnset)(struct sv*, int64_t);
 	uint64_t  (*lsn)(struct sv*);
 	char     *(*pointer)(struct sv*);
 	uint32_t  (*size)(struct sv*);
@@ -2776,7 +2776,7 @@ sv_lsn(struct sv *v) {
 }
 
 static inline void
-sv_lsnset(struct sv *v, uint64_t lsn) {
+sv_lsnset(struct sv *v, int64_t lsn) {
 	v->i->lsnset(v, lsn);
 }
 
@@ -3960,7 +3960,7 @@ sv_refiflsn(struct sv *v) {
 }
 
 static void
-sv_refiflsnset(struct sv *v, uint64_t lsn) {
+sv_refiflsnset(struct sv *v, int64_t lsn) {
 	struct svref *ref = (struct svref *)v->v;
 	ref->v->lsn = lsn;
 }
@@ -4089,7 +4089,7 @@ sv_upsertviflsn(struct sv *v) {
 }
 
 static void
-sv_upsertviflsnset(struct sv *v ssunused, uint64_t lsn ssunused) {
+sv_upsertviflsnset(struct sv *v ssunused, int64_t lsn ssunused) {
 	unreachable();
 }
 
@@ -4125,7 +4125,7 @@ sv_viflsn(struct sv *v) {
 }
 
 static void
-sv_viflsnset(struct sv *v, uint64_t lsn) {
+sv_viflsnset(struct sv *v, int64_t lsn) {
 	((struct phia_tuple*)v->v)->lsn = lsn;
 }
 
@@ -4458,9 +4458,8 @@ static int sx_indexinit(struct sxindex *, struct sxmanager *,
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
 static struct sx *sx_find(struct sxmanager*, uint64_t);
-static void sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*, uint64_t);
+static void sx_begin(struct sxmanager*, struct sx*, enum sxtype, struct svlog*);
 static void sx_gc(struct sx*);
-static enum sxstate sx_prepare(struct sx*, sxpreparef, void*);
 static enum sxstate sx_commit(struct sx*);
 static enum sxstate sx_rollback(struct sx*);
 static int sx_set(struct sx*, struct sxindex*, struct phia_tuple*);
@@ -4601,7 +4600,7 @@ sx_promote(struct sx *x, enum sxstate state)
 
 static void
 sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
-	 struct svlog *log, uint64_t vlsn)
+	 struct svlog *log)
 {
 	x->manager = m;
 	x->log = log;
@@ -4613,10 +4612,7 @@ sx_begin(struct sxmanager *m, struct sx *x, enum sxtype type,
 	sr_seqlock(m->r->seq);
 	x->csn = m->csn;
 	x->id = sr_seqdo(m->r->seq, SR_TSNNEXT);
-	if (likely(vlsn == UINT64_MAX))
-		x->vlsn = sr_seqdo(m->r->seq, SR_LSN);
-	else
-		x->vlsn = vlsn;
+	x->vlsn = sr_seqdo(m->r->seq, SR_LSN);
 	sr_sequnlock(m->r->seq);
 
 	tt_pthread_mutex_lock(&m->lock);
@@ -4758,20 +4754,26 @@ static enum sxstate sx_rollback(struct sx *x)
 	return SXROLLBACK;
 }
 
+
+static int
+phia_tx_prepare(struct sx *x, struct sv *v, struct phia_index *db,
+		struct sicache *cache);
+
 static inline int
-sx_preparecb(struct sx *x, struct svlogv *v, uint64_t lsn, sxpreparef prepare, void *arg)
+sx_preparev(struct sx *x, struct svlogv *v, uint64_t lsn,
+	    struct sicache *cache, enum phia_status status)
 {
-	if (likely(lsn == x->vlsn))
+	if (lsn == x->vlsn || status == SR_FINAL_RECOVERY)
 		return 0;
-	if (prepare) {
-		struct sxindex *i = ((struct sxv*)v->v.v)->index;
-		if (prepare(x, &v->v, i->db, arg))
-			return 1;
-	}
+
+	struct sxindex *i = ((struct sxv*)v->v.v)->index;
+	if (phia_tx_prepare(x, &v->v, i->db, cache))
+		return 1;
 	return 0;
 }
 
-static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
+static enum sxstate
+sx_prepare(struct sx *x, struct sicache *cache, enum phia_status status)
 {
 	uint64_t lsn = sr_seq(x->manager->r->seq, SR_LSN);
 	/* proceed read-only transactions */
@@ -4789,7 +4791,7 @@ static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 		if (sx_vaborted(v))
 			return sx_promote(x, SXROLLBACK);
 		if (likely(v->prev == NULL)) {
-			rc = sx_preparecb(x, lv, lsn, prepare, arg);
+			rc = sx_preparev(x, lv, lsn, cache, status);
 			if (unlikely(rc != 0))
 				return sx_promote(x, SXROLLBACK);
 			continue;
@@ -4801,7 +4803,7 @@ static enum sxstate sx_prepare(struct sx *x, sxpreparef prepare, void *arg)
 		}
 		/* force commit for read-only conflicts */
 		if (v->prev->v->flags & SVGET) {
-			rc = sx_preparecb(x, lv, lsn, prepare, arg);
+			rc = sx_preparev(x, lv, lsn, cache, status);
 			if (unlikely(rc != 0))
 				return sx_promote(x, SXROLLBACK);
 			continue;
@@ -5058,7 +5060,7 @@ sx_viflsn(struct sv *v) {
 }
 
 static void
-sx_viflsnset(struct sv *v, uint64_t lsn) {
+sx_viflsnset(struct sv *v, int64_t lsn) {
 	((struct sxv*)v->v)->v->lsn = lsn;
 }
 
@@ -5081,38 +5083,16 @@ static struct svif sx_vif =
 	.size      = sx_vifsize
 };
 
-struct sltx {
-	uint64_t lsn;
-};
-
-static int sl_begin(struct runtime *r, struct sltx *t, uint64_t lsn)
+static void
+sl_write(struct svlog *vlog, int64_t lsn)
 {
-	if (likely(lsn == 0)) {
-		lsn = sr_seq(r->seq, SR_LSNNEXT);
-	} else {
-		sr_seqlock(r->seq);
-		if (lsn > r->seq->lsn)
-			r->seq->lsn = lsn;
-		sr_sequnlock(r->seq);
-	}
-	t->lsn = lsn;
-	return 0;
-}
-
-static int sl_write(struct sltx *t, struct svlog *vlog)
-{
-	/*
-	 * fast path for log-disabled, recover or
-	 * ro-transactions
-	 */
 	struct ssbufiter i;
 	ss_bufiter_open(&i, &vlog->buf, sizeof(struct svlogv));
 	for (; ss_bufiter_has(&i); ss_bufiter_next(&i))
 	{
 		struct svlogv *v = ss_bufiter_get(&i);
-		sv_lsnset(&v->v, t->lsn);
+		sv_lsnset(&v->v, lsn);
 	}
-	return 0;
 }
 
 #define SD_IDBRANCH 1
@@ -7874,7 +7854,8 @@ si_txtrack(struct sitx *x, struct sinode *n) {
 }
 
 static void
-si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t, int);
+si_write(struct sitx*, struct svlog*, struct svlogindex*, uint64_t,
+	 enum phia_status status);
 
 struct siread {
 	enum phia_order   order;
@@ -7893,14 +7874,6 @@ struct siread {
 	struct sicache  *cache;
 	struct si       *index;
 };
-
-static int
-si_readopen(struct siread*, struct si*, struct sicache*, enum phia_order,
-	    uint64_t,
-	    void*, uint32_t);
-static int si_readclose(struct siread*);
-static int  si_read(struct siread*);
-static int  si_readcommited(struct si*, struct sv*, int);
 
 struct PACKED siiter {
 	struct si *index;
@@ -10143,7 +10116,7 @@ static int si_read(struct siread *q)
 }
 
 static int
-si_readcommited(struct si *index, struct sv *v, int recover)
+si_readcommited(struct si *index, struct sv *v)
 {
 	/* search node index */
 	struct siiter ii;
@@ -10154,17 +10127,15 @@ si_readcommited(struct si *index, struct sv *v, int recover)
 
 	uint64_t lsn = sv_lsn(v);
 	/* search in-memory */
-	if (recover == 2) {
-		struct svindex *second;
-		struct svindex *first = si_nodeindex_priority(node, &second);
-		struct svref *ref = sv_indexfind(first, sv_pointer(v),
-						 sv_size(v), UINT64_MAX);
-		if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
-			ref = sv_indexfind(second, sv_pointer(v),
-					   sv_size(v), UINT64_MAX);
-		if (ref != NULL && ref->v->lsn >= lsn)
-			return 1;
-	}
+	struct svindex *second;
+	struct svindex *first = si_nodeindex_priority(node, &second);
+	struct svref *ref = sv_indexfind(first, sv_pointer(v),
+					 sv_size(v), UINT64_MAX);
+	if ((ref == NULL || ref->v->lsn < lsn) && second != NULL)
+		ref = sv_indexfind(second, sv_pointer(v),
+				   sv_size(v), UINT64_MAX);
+	if (ref != NULL && ref->v->lsn >= lsn)
+		return 1;
 
 	/* search branches */
 	struct sibranch *b;
@@ -10723,15 +10694,15 @@ static inline int si_set(struct sitx *x, struct phia_tuple *v, uint64_t time)
 
 static void
 si_write(struct sitx *x, struct svlog *l, struct svlogindex *li, uint64_t time,
-	 int recover)
+	 enum phia_status status)
 {
 	struct runtime *r = x->index->r;
 	struct svlogv *cv = sv_logat(l, li->head);
 	int c = li->count;
 	while (c) {
 		struct phia_tuple *v = cv->v.v;
-		if (recover) {
-			if (si_readcommited(x->index, &cv->v, recover)) {
+		if (status == SR_FINAL_RECOVERY) {
+			if (si_readcommited(x->index, &cv->v)) {
 				size_t gc = phia_tuple_size(v);
 				if (phia_tuple_unref_rt(r, v))
 					ss_quota(r->quota, SS_QREMOVE, gc);
@@ -10894,7 +10865,6 @@ static int sc_step(struct phia_service*, uint64_t);
 static int sc_ctl_checkpoint(struct scheduler*);
 static int sc_ctl_shutdown(struct scheduler*, struct si*);
 
-static int sc_write(struct scheduler*, struct svlog*, uint64_t, int);
 
 static int
 sc_init(struct scheduler *s, struct runtime *r)
@@ -11378,15 +11348,15 @@ sc_step(struct phia_service *srv, uint64_t vlsn)
 	return rc_job;
 }
 
-static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int recover)
+static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn,
+		    enum phia_status status)
 {
 	/* write-ahead log */
-	struct sltx tl;
-	sl_begin(s->r, &tl, lsn);
-	int rc = sl_write(&tl, log);
-	if (unlikely(rc == -1)) {
-		return -1;
-	}
+	sr_seqlock(s->r->seq);
+	if (lsn > s->r->seq->lsn)
+		s->r->seq->lsn = lsn;
+	sr_sequnlock(s->r->seq);
+	sl_write(log, lsn);
 
 	/* index */
 	uint64_t now = clock_monotonic64();
@@ -11396,7 +11366,7 @@ static int sc_write(struct scheduler *s, struct svlog *log, uint64_t lsn, int re
 		struct si *index = i->index;
 		struct sitx x;
 		si_begin(&x, index);
-		si_write(&x, log, i, now, recover);
+		si_write(&x, log, i, now, status);
 		si_commit(&x);
 		i++;
 	}
@@ -12055,8 +12025,7 @@ phia_cursor_new(struct phia_index *db, struct phia_tuple *key,
 		return NULL;
 	}
 	c->read_commited = 0;
-	uint64_t vlsn = UINT64_MAX;
-	sx_begin(&e->xm, &c->t, SXRO, &c->log, vlsn);
+	sx_begin(&e->xm, &c->t, SXRO, &c->log);
 	phia_index_bind(db);
 
 	c->key = key;
@@ -12847,21 +12816,15 @@ phia_prepare(struct phia_tx *t)
 	struct phia_env *e = t->env;
 	if (unlikely(! sr_statusactive_is(e->status)))
 		return -1;
-	int recover = (e->status == SR_FINAL_RECOVERY);
 
 	/* prepare transaction */
 	assert(t->t.state == SXREADY);
-	struct sicache *cache = NULL;
-	sxpreparef prepare = NULL;
-	if (! recover) {
-		prepare = phia_tx_prepare;
-		cache = si_cachepool_pop(&e->cachepool);
-		if (unlikely(cache == NULL))
-			return sr_oom();
-	}
-	enum sxstate s = sx_prepare(&t->t, prepare, cache);
-	if (cache)
-		si_cachepool_push(cache);
+	struct sicache *cache = si_cachepool_pop(&e->cachepool);
+	if (unlikely(cache == NULL))
+		return sr_oom();
+	enum sxstate s = sx_prepare(&t->t, cache, e->status);
+
+	si_cachepool_push(cache);
 	if (s == SXLOCK) {
 		sr_stattx_lock(&e->stat);
 		return 2;
@@ -12889,15 +12852,10 @@ phia_commit(struct phia_tx *t, int64_t lsn)
 	struct phia_env *e = t->env;
 	if (unlikely(! sr_statusactive_is(e->status)))
 		return -1;
-	int recover = (e->status == SR_FINAL_RECOVERY);
-
 	assert(t->t.state == SXCOMMIT);
 
 	/* do wal write and backend commit */
-	if (unlikely(recover))
-		recover = 2;
-	int rc;
-	rc = sc_write(&e->scheduler, &t->log, lsn, recover);
+	int rc = sc_write(&e->scheduler, &t->log, lsn, e->status);
 	if (unlikely(rc == -1))
 		sx_rollback(&t->t);
 
@@ -12917,7 +12875,7 @@ phia_begin(struct phia_env *e)
 	t->env = e;
 	sv_loginit(&t->log);
 	t->start = clock_monotonic64();
-	sx_begin(&e->xm, &t->t, SXRW, &t->log, UINT64_MAX);
+	sx_begin(&e->xm, &t->t, SXRW, &t->log);
 	struct phia_index *db;
 	rlist_foreach_entry(db, &e->db, link) {
 		phia_index_bind(db);
