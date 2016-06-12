@@ -105,8 +105,6 @@ box_info_sort(box.info.phia())
     - limit: '53687091'
     - used: '68'
   - metric:
-    - dsn: '0'
-    - lfsn: '0'
     - lsn: '5'
     - nsn: '1'
     - tsn: '9'

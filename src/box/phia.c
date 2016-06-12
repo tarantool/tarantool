@@ -2417,15 +2417,8 @@ sr_statcursor(struct srstat *s, uint64_t start, int read_disk, int read_cache, i
 }
 
 enum srseqop {
-	SR_DSN,
-	SR_DSNNEXT,
-	SR_NSN,
-	SR_NSNNEXT,
 	SR_LSN,
-	SR_LSNNEXT,
-	SR_LFSN,
-	SR_LFSNNEXT,
-	SR_TSN,
+	SR_NSNNEXT,
 	SR_TSNNEXT
 };
 
@@ -2437,10 +2430,6 @@ struct srseq {
 	uint64_t tsn;
 	/** Node sequence number. */
 	uint64_t nsn;
-	/** Log file sequence number. */
-	uint64_t lfsn;
-	/** Database sequence number. */
-	uint32_t dsn;
 };
 
 static inline void
@@ -2471,23 +2460,9 @@ sr_seqdo(struct srseq *n, enum srseqop op)
 	switch (op) {
 	case SR_LSN:       v = n->lsn;
 		break;
-	case SR_LSNNEXT:   v = ++n->lsn;
-		break;
-	case SR_TSN:       v = n->tsn;
-		break;
 	case SR_TSNNEXT:   v = ++n->tsn;
 		break;
-	case SR_NSN:       v = n->nsn;
-		break;
 	case SR_NSNNEXT:   v = ++n->nsn;
-		break;
-	case SR_LFSN:      v = n->lfsn;
-		break;
-	case SR_LFSNNEXT:  v = ++n->lfsn;
-		break;
-	case SR_DSN:       v = n->dsn;
-		break;
-	case SR_DSNNEXT:   v = ++n->dsn;
 		break;
 	}
 	return v;
@@ -11668,8 +11643,6 @@ se_confmetric(struct seconfrt *rt, struct srconf **pc)
 	sr_C(&p, pc, "lsn",  SS_U64, &rt->seq.lsn);
 	sr_C(&p, pc, "tsn",  SS_U64, &rt->seq.tsn);
 	sr_C(&p, pc, "nsn",  SS_U64, &rt->seq.nsn);
-	sr_C(&p, pc, "dsn",  SS_U32, &rt->seq.dsn);
-	sr_C(&p, pc, "lfsn", SS_U64, &rt->seq.lfsn);
 	return sr_C(NULL, pc, "metric", SS_UNDEF, metric);
 }
 
