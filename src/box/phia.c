@@ -395,26 +395,15 @@ ss_strdup(struct ssa *a, const char *str) {
 static struct ssaif ss_stda;
 
 struct ssbuf {
-	char *reserve;
 	char *s, *p, *e;
 };
 
 static inline void
 ss_bufinit(struct ssbuf *b)
 {
-	b->reserve = NULL;
 	b->s = NULL;
 	b->p = NULL;
 	b->e = NULL;
-}
-
-static inline void
-ss_bufinit_reserve(struct ssbuf *b, void *buf, int size)
-{
-	b->reserve = buf;
-	b->s = buf;
-	b->p = b->s;
-	b->e = b->s + size;
 }
 
 static inline void
@@ -422,8 +411,7 @@ ss_buffree(struct ssbuf *b, struct ssa *a)
 {
 	if (unlikely(b->s == NULL))
 		return;
-	if (unlikely(b->s != b->reserve))
-		ss_free(a, b->s);
+	ss_free(a, b->s);
 	b->s = NULL;
 	b->p = NULL;
 	b->e = NULL;
@@ -470,11 +458,10 @@ ss_bufensure(struct ssbuf *b, struct ssa *a, size_t size)
 	if (unlikely(actual > sz))
 		sz = actual;
 	char *p;
-	if (unlikely(b->s == b->reserve)) {
+	if (b->s == NULL) {
 		p = ss_malloc(a, sz);
 		if (unlikely(p == NULL))
 			return -1;
-		memcpy(p, b->s, ss_bufused(b));
 	} else {
 		p = ss_realloc(a, b->s, sz);
 		if (unlikely(p == NULL))
@@ -2802,10 +2789,7 @@ struct svupsertnode {
 	struct ssbuf    buf;
 };
 
-#define SV_UPSERTRESRV 16
-
 struct svupsert {
-	struct svupsertnode reserve[SV_UPSERTRESRV];
 	struct ssbuf stack;
 	struct ssbuf tmp;
 	int max;
@@ -2816,16 +2800,10 @@ struct svupsert {
 static inline void
 sv_upsertinit(struct svupsert *u)
 {
-	const int reserve = SV_UPSERTRESRV;
-	int i = 0;
-	while (i < reserve) {
-		ss_bufinit(&u->reserve[i].buf);
-		i++;
-	}
-	memset(&u->result, 0, sizeof(u->result));
-	u->max = reserve;
+	u->max = 0;
 	u->count = 0;
-	ss_bufinit_reserve(&u->stack, u->reserve, sizeof(u->reserve));
+	memset(&u->result, 0, sizeof(u->result));
+	ss_bufinit(&u->stack);
 	ss_bufinit(&u->tmp);
 }
 
@@ -3059,10 +3037,20 @@ struct PACKED svlogv {
 	uint32_t next;
 };
 
+/**
+ * In-memory transaction log.
+ * Transaction changes are made in multi-version
+ * in-memory index (sxindex) and recorded in this log.
+ * When the transaction is committed, the changes are written to the
+ * in-memory single-version index (struct svindex) in a
+ * specific sinode object of an index.
+ */
 struct svlog {
+	/**
+	 * Number of writes (inserts,updates, deletes) done by
+	 * the transaction.
+	 */
 	int count_write;
-	struct svlogindex reserve_i[2];
-	struct svlogv reserve_v[1];
 	struct ssbuf index;
 	struct ssbuf buf;
 };
@@ -3070,8 +3058,8 @@ struct svlog {
 static inline void
 sv_loginit(struct svlog *l)
 {
-	ss_bufinit_reserve(&l->index, l->reserve_i, sizeof(l->reserve_i));
-	ss_bufinit_reserve(&l->buf, l->reserve_v, sizeof(l->reserve_v));
+	ss_bufinit(&l->buf);
+	ss_bufinit(&l->index);
 	l->count_write = 0;
 }
 
@@ -3164,14 +3152,13 @@ struct PACKED svmergesrc {
 struct svmerge {
 	struct ssa *a;
 	struct sfscheme *scheme;
-	struct svmergesrc reserve[16];
 	struct ssbuf buf;
 };
 
 static inline void
 sv_mergeinit(struct svmerge *m, struct ssa *a, struct sfscheme *scheme)
 {
-	ss_bufinit_reserve(&m->buf, m->reserve, sizeof(m->reserve));
+	ss_bufinit(&m->buf);
 	m->a = a;
 	m->scheme = scheme;
 }
@@ -10002,10 +9989,9 @@ next_node:
 
 	/* external source (upsert) */
 	struct svmergesrc *s;
-	struct sv upbuf_reserve;
 	struct ssbuf upbuf;
 	if (unlikely(q->upsert_v && q->upsert_v->v)) {
-		ss_bufinit_reserve(&upbuf, &upbuf_reserve, sizeof(upbuf_reserve));
+		ss_bufinit(&upbuf);
 		ss_bufadd(&upbuf, NULL, (void*)&q->upsert_v, sizeof(struct sv*));
 		s = sv_mergeadd(m, NULL);
 		ss_bufiterref_open(&s->src, &upbuf, sizeof(struct sv*));
@@ -11411,7 +11397,6 @@ struct phia_env {
 
 struct phia_index {
 	struct phia_env *env;
-	uint32_t   created;
 	struct siprofiler rtp;
 	struct si        *index;
 	struct sxindex    coindex;
@@ -12496,7 +12481,6 @@ static int phia_index_recoverbegin(struct phia_index *db)
 	int rc = si_recover(db->index);
 	if (unlikely(rc == -1))
 		goto error;
-	db->created = rc;
 	return 0;
 error:
 	sr_statusset(&db->index->status, SR_MALFUNCTION);
