@@ -1725,10 +1725,8 @@ static struct ssfilterif ss_zstdfilter =
 	.complete = ss_zstdfilter_complete
 };
 
-typedef int (*sfcmpf)(char*, int, char*, int, void*);
-
 struct sffield {
-	enum sstype    type;
+	enum field_type type;
 	int       position;
 	int       position_ref;
 	int       position_key;
@@ -1737,7 +1735,6 @@ struct sffield {
 	char     *name;
 	char     *options;
 	int       key;
-	sfcmpf    cmp;
 };
 
 struct sfscheme {
@@ -1767,7 +1764,7 @@ sf_fieldnew(struct ssa *a, char *name)
 		ss_free(a, f);
 		return NULL;
 	}
-	f->type = SS_UNDEF;
+	f->type = UNKNOWN;
 	f->options = NULL;
 	return f;
 }
@@ -1939,7 +1936,7 @@ sf_comparable_write(struct sfscheme *s, char *src, char *dest)
 }
 
 static inline int
-sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
+sf_cmpstring(char *a, int asz, char *b, int bsz)
 {
 	int size = (asz < bsz) ? asz : bsz;
 	int rc = memcmp(a, b, size);
@@ -1952,14 +1949,29 @@ sf_cmpstring(char *a, int asz, char *b, int bsz, void *arg ssunused)
 }
 
 static inline int
-sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused,
-              void *arg ssunused)
+sf_cmpu64(char *a, int asz ssunused, char *b, int bsz ssunused)
 {
 	uint64_t av = load_u64(a);
 	uint64_t bv = load_u64(b);
 	if (av == bv)
 		return 0;
 	return (av > bv) ? 1 : -1;
+}
+
+static inline int
+sf_compare_field(enum field_type type, char *a, int asz, char *b, int bsz)
+{
+	switch (type) {
+	case NUM:
+		return sf_cmpu64(a, asz, b, bsz);
+		break;
+	case STRING:
+		return sf_cmpstring(a, asz, b, bsz);
+		break;
+	default:
+		unreachable();
+		return 0;
+	}
 }
 
 static int
@@ -1974,7 +1986,8 @@ sf_compare(struct sfscheme *s, char *a, char *b)
 		char *a_field = sf_fieldof_ptr(s, key, a, &a_fieldsize);
 		uint32_t b_fieldsize;
 		char *b_field = sf_fieldof_ptr(s, key, b, &b_fieldsize);
-		rc = key->cmp(a_field, a_fieldsize, b_field, b_fieldsize, NULL);
+		rc = sf_compare_field(key->type, a_field, a_fieldsize,
+				      b_field, b_fieldsize);
 		if (rc != 0)
 			return rc;
 		part++;
@@ -2035,13 +2048,11 @@ static inline int
 sf_schemeset(struct sffield *f, char *opt)
 {
 	if (strcmp(opt, "string") == 0) {
-		f->type = SS_STRING;
+		f->type = STRING;
 		f->fixed_size = 0;
-		f->cmp = sf_cmpstring;
 	} else if (strcmp(opt, "u64") == 0) {
-		f->type = SS_U64;
+		f->type = NUM;
 		f->fixed_size = sizeof(uint64_t);
-		f->cmp = sf_cmpu64;
 	} else if (strncmp(opt, "key", 3) == 0) {
 		char *p = opt + 3;
 		if (unlikely(*p != '('))
@@ -5200,7 +5211,8 @@ sd_pageiter_cmp(struct sdpageiter *i, struct sfscheme *scheme, struct sdv *v)
 		char *a_field = sd_pagesparse_field(i->page, v, key->position, &a_fieldsize);
 		uint32_t b_fieldsize;
 		char *b_field = sf_fieldof_ptr(scheme, key, i->key, &b_fieldsize);
-		rc = key->cmp(a_field, a_fieldsize, b_field, b_fieldsize, NULL);
+		rc = sf_compare_field(key->type, a_field, a_fieldsize,
+				      b_field, b_fieldsize);
 		if (rc != 0)
 			return rc;
 		part++;
