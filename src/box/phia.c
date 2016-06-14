@@ -1732,8 +1732,6 @@ struct sffield {
 	int       position_key;
 	uint32_t  fixed_size;
 	uint32_t  fixed_offset;
-	char     *name;
-	char     *options;
 	int       key;
 };
 
@@ -1749,7 +1747,7 @@ struct sfscheme {
 };
 
 static inline struct sffield*
-sf_fieldnew(struct ssa *a, char *name)
+sf_fieldnew(struct ssa *a)
 {
 	struct sffield *f = ss_malloc(a, sizeof(struct sffield));
 	if (unlikely(f == NULL))
@@ -1759,40 +1757,14 @@ sf_fieldnew(struct ssa *a, char *name)
 	f->fixed_offset = 0;
 	f->position = 0;
 	f->position_ref = 0;
-	f->name = ss_strdup(a, name);
-	if (unlikely(f->name == NULL)) {
-		ss_free(a, f);
-		return NULL;
-	}
 	f->type = UNKNOWN;
-	f->options = NULL;
 	return f;
 }
 
 static inline void
 sf_fieldfree(struct sffield *f, struct ssa *a)
 {
-	if (f->name) {
-		ss_free(a, f->name);
-		f->name = NULL;
-	}
-	if (f->options) {
-		ss_free(a, f->options);
-		f->options = NULL;
-	}
 	ss_free(a, f);
-}
-
-static inline int
-sf_fieldoptions(struct sffield *f, struct ssa *a, char *options)
-{
-	char *sz = ss_strdup(a, options);
-	if (unlikely(sz == NULL))
-		return -1;
-	if (f->options)
-		ss_free(a, f->options);
-	f->options = sz;
-	return 0;
 }
 
 static void sf_schemeinit(struct sfscheme*);
@@ -2044,38 +2016,6 @@ sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
 	return 0;
 }
 
-static inline int
-sf_schemeset(struct sffield *f, char *opt)
-{
-	if (strcmp(opt, "string") == 0) {
-		f->type = STRING;
-		f->fixed_size = 0;
-	} else if (strcmp(opt, "u64") == 0) {
-		f->type = NUM;
-		f->fixed_size = sizeof(uint64_t);
-	} else if (strncmp(opt, "key", 3) == 0) {
-		char *p = opt + 3;
-		if (unlikely(*p != '('))
-			return -1;
-		p++;
-		if (unlikely(! isdigit(*p)))
-			return -1;
-		int v = 0;
-		while (isdigit(*p)) {
-			v = (v * 10) + *p - '0';
-			p++;
-		}
-		if (unlikely(*p != ')'))
-			return -1;
-		p++;
-		f->position_key = v;
-		f->key = 1;
-	} else {
-		return -1;
-	}
-	return 0;
-}
-
 static int
 sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 {
@@ -2088,21 +2028,7 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 	int i = 0;
 	while (i < s->fields_count)
 	{
-		/* validate and apply field options */
 		struct sffield *f = s->fields[i];
-		if (f->options == NULL) {
-			return -1;
-		}
-		char opts[256];
-		snprintf(opts, sizeof(opts), "%s", f->options);
-		char *p;
-		for (p = strtok(opts, " ,"); p;
-		     p = strtok(NULL, " ,"))
-		{
-			int rc = sf_schemeset(f, p);
-			if (unlikely(rc == -1))
-				return -1;
-		}
 		/* calculate offset and position for fixed
 		 * size types */
 		if (f->fixed_size > 0) {
@@ -12096,48 +12022,42 @@ sf_schemecreate(struct sfscheme *scheme, struct ssa *a,
 	scheme->compression_key = key_def->opts.compression_key;
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		char name[32];
-		snprintf(name, sizeof(name), "key_%" PRIu32, i);
-		struct sffield *field = sf_fieldnew(a, name);
+		struct key_part *part = &key_def->parts[i];
+		struct sffield *field = sf_fieldnew(a);
 		if (field == NULL) {
 			sr_oom();
 			goto error;
 		}
 
 		/* set field type */
-		char type[32];
-		snprintf(type, sizeof(type), "%s,key(%" PRIu32 ")",
-		         (key_def->parts[i].type == NUM ? "u64" : "string"),
-		         i);
-		int rc = sf_fieldoptions(field, a, type);
+		int rc = sf_schemeadd(scheme, a, field);
 		if (rc == -1) {
 			sf_fieldfree(field, a);
 			sr_oom();
 			goto error;
 		}
-		rc = sf_schemeadd(scheme, a, field);
-		if (rc == -1) {
-			sf_fieldfree(field, a);
-			sr_oom();
-			goto error;
+		field->type = part->type;
+		field->key = 1;
+		field->position_key = i;
+		if (field->type == NUM) {
+			field->fixed_size = sizeof(uint64_t);
+		} else {
+			field->fixed_size = 0;
 		}
 	}
 
-	struct sffield *field = sf_fieldnew(a, "value");
+	struct sffield *field = sf_fieldnew(a);
 	if (field == NULL) {
 		sr_oom();
 		goto error;
 	}
-	int rc = sf_fieldoptions(field, a, "string");
+	int rc = sf_schemeadd(scheme, a, field);
 	if (rc == -1) {
 		sf_fieldfree(field, a);
 		goto error;
 	}
-	rc = sf_schemeadd(scheme, a, field);
-	if (rc == -1) {
-		sf_fieldfree(field, a);
-		goto error;
-	}
+	field->type = STRING;
+	field->key = 0;
 
 	/* validate scheme and set keys */
 	rc = sf_schemevalidate(scheme, a);
