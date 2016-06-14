@@ -80,7 +80,7 @@ phia_calc_fields(struct key_def *key_def, struct phia_field *fields,
 		}
 	}
 
-	int count = key_def->part_count;
+	uint32_t count = key_def->part_count;
 	struct phia_field *value_field = &fields[key_def->part_count];
 	const char *value = value_field->data;
 	const char *valueend = value + value_field->size;

@@ -1726,19 +1726,15 @@ static struct ssfilterif ss_zstdfilter =
 };
 
 struct sffield {
+	// uint32_t fieldno;
 	enum field_type type;
-	int       position;
-	int       position_ref;
-	int       position_key;
-	int       key;
 };
 
 struct sfscheme {
 	struct sffield **fields;
-	struct sffield **keys;
 	struct key_def *key_def;
-	int       fields_count;
-	int       keys_count;
+	uint32_t fields_count;
+	uint32_t keys_count;
 	bool compression_key;
 };
 
@@ -1748,9 +1744,7 @@ sf_fieldnew(struct ssa *a)
 	struct sffield *f = ss_malloc(a, sizeof(struct sffield));
 	if (unlikely(f == NULL))
 		return NULL;
-	f->key = 0;
-	f->position = 0;
-	f->position_ref = 0;
+	// f->fieldno = 0;
 	f->type = UNKNOWN;
 	return f;
 }
@@ -1763,8 +1757,6 @@ sf_fieldfree(struct sffield *f, struct ssa *a)
 
 static void sf_schemeinit(struct sfscheme*);
 static void sf_schemefree(struct sfscheme*, struct ssa*);
-static int  sf_schemeadd(struct sfscheme*, struct ssa*, struct sffield*);
-static int  sf_schemevalidate(struct sfscheme*, struct ssa*);
 static int  sf_compare(struct sfscheme*, char *, char *b);
 
 struct PACKED sfvar {
@@ -1772,64 +1764,44 @@ struct PACKED sfvar {
 	uint32_t size;
 };
 
-static inline char*
-sf_fieldof_ptr(struct sfscheme *s, struct sffield *f, char *data, uint32_t *size)
+static inline struct sfvar *
+sf_fieldmeta(struct sfscheme *s, uint32_t part_id, char *data)
 {
+	assert(part_id <= s->keys_count);
 	(void)s;
-	register struct sfvar *v =
-		&((struct sfvar*)(data))[f->position_ref];
+	uint32_t offset_slot = part_id;
+	return &((struct sfvar*)(data))[offset_slot];
+}
+
+static inline char*
+sf_field(struct sfscheme *s, uint32_t part_id, char *data, uint32_t *size)
+{
+	struct sfvar *v = sf_fieldmeta(s, part_id, data);
 	if (likely(size))
 		*size = v->size;
 	return data + v->offset;
-}
-
-static inline char*
-sf_fieldof(struct sfscheme *s, int pos, char *data, uint32_t *size)
-{
-	return sf_fieldof_ptr(s, s->fields[pos], data, size);
-}
-
-static inline char*
-sf_field(struct sfscheme *s, int pos, char *data)
-{
-	register struct sffield *f = s->fields[pos];
-	register struct sfvar *v =
-		&((struct sfvar*)(data))[f->position_ref];
-	return data + v->offset;
-}
-
-static inline int
-sf_fieldsize(struct sfscheme *s, int pos, char *data)
-{
-	register struct sffield *f = s->fields[pos];
-	register struct sfvar *v =
-		&((struct sfvar*)(data))[f->position_ref];
-	return v->size;
 }
 
 static inline int
 sf_writesize(struct sfscheme *s, struct phia_field *v)
 {
 	int sum = 0;
-	int i;
-	for (i = 0; i < s->fields_count; i++) {
+	for (uint32_t i = 0; i < s->fields_count; i++) {
 		sum += sizeof(struct sfvar)+ v[i].size;
 	}
 	return sum;
 }
 
 static inline void
-sf_write(struct sfscheme *s, struct phia_field *v, char *dest)
+sf_write(struct sfscheme *s, struct phia_field *fields, char *dest)
 {
 	int var_value_offset = sizeof(struct sfvar) * s->fields_count;
-	struct sfvar *var = (struct sfvar*)(dest);
-	int i;
-	for (i = 0; i < s->fields_count; i++) {
-		struct sffield *f = s->fields[i];
-		struct sfvar *current = &var[f->position_ref];
+	for (uint32_t part_id = 0; part_id < s->fields_count; part_id++) {
+		struct phia_field *field = &fields[part_id];
+		struct sfvar *current = sf_fieldmeta(s, part_id, dest);
 		current->offset = var_value_offset;
-		current->size   = v[i].size;
-		memcpy(dest + var_value_offset, v[i].data, v[i].size);
+		current->size   = field->size;
+		memcpy(dest + var_value_offset, field->data, field->size);
 		var_value_offset += current->size;
 	}
 }
@@ -1838,9 +1810,11 @@ static inline uint64_t
 sf_hash(struct sfscheme *s, char *data)
 {
 	uint64_t hash = 0;
-	int i;
-	for (i = 0; i < s->keys_count; i++)
-		hash ^= ss_fnv(sf_field(s, i, data), sf_fieldsize(s, i, data));
+	for (uint32_t part_id = 0; part_id < s->keys_count; part_id++) {
+		uint32_t size;
+		char *field = sf_field(s, part_id, data, &size);
+		hash ^= ss_fnv(field, size);
+	}
 	return hash;
 }
 
@@ -1848,13 +1822,15 @@ static inline int
 sf_comparable_size(struct sfscheme *s, char *data)
 {
 	int sum = 0;
-	int i;
-	for (i = 0; i < s->fields_count; i++) {
-		struct sffield *f = s->fields[i];
-		if (f->key)
-			sum += sf_fieldsize(s, i, data);
+	for (uint32_t part_id = 0; part_id < s->keys_count; part_id++) {
+		uint32_t field_size;
+		(void) sf_field(s, part_id, data, &field_size);
+		sum += field_size;
 		sum += sizeof(struct sfvar);
 	}
+	/* fields: [key_part, key_part, ..., value] */
+	assert(s->keys_count + 1 == s->fields_count);
+	sum += sizeof(struct sfvar);
 	return sum;
 }
 
@@ -1862,20 +1838,17 @@ static inline void
 sf_comparable_write(struct sfscheme *s, char *src, char *dest)
 {
 	int var_value_offset = sizeof(struct sfvar) * s->fields_count;
-	struct sfvar *var = (struct sfvar*)(dest);
-	int i;
-	for (i = 0; i < s->fields_count; i++) {
-		struct sffield *f = s->fields[i];
-		struct sfvar *current = &var[f->position_ref];
+	for (uint32_t part_id = 0; part_id < s->keys_count; part_id++) {
+		struct sfvar *current = sf_fieldmeta(s, part_id, dest);
 		current->offset = var_value_offset;
-		if (! f->key) {
-			current->size = 0;
-			continue;
-		}
-		char *ptr = sf_fieldof_ptr(s, f, src, &current->size);
+		char *ptr = sf_field(s, part_id, src, &current->size);
 		memcpy(dest + var_value_offset, ptr, current->size);
 		var_value_offset += current->size;
 	}
+	/* fields: [key_part, key_part, ..., value] */
+	struct sfvar *current = sf_fieldmeta(s, s->keys_count, dest);
+	current->offset = var_value_offset;
+	current->size = 0;
 }
 
 static inline int
@@ -1920,16 +1893,14 @@ sf_compare_field(enum field_type type, char *a, int asz, char *b, int bsz)
 static int
 sf_compare(struct sfscheme *s, char *a, char *b)
 {
-	struct sffield **part = s->keys;
-	struct sffield **last = part + s->keys_count;
 	int rc;
-	while (part < last) {
-		struct sffield *key = *part;
+	for (uint32_t part_id = 0; part_id < s->keys_count; part_id++) {
+		struct sffield *part = s->fields[part_id];
 		uint32_t a_fieldsize;
-		char *a_field = sf_fieldof_ptr(s, key, a, &a_fieldsize);
+		char *a_field = sf_field(s, part_id, a, &a_fieldsize);
 		uint32_t b_fieldsize;
-		char *b_field = sf_fieldof_ptr(s, key, b, &b_fieldsize);
-		rc = sf_compare_field(key->type, a_field, a_fieldsize,
+		char *b_field = sf_field(s, part_id, b, &b_fieldsize);
+		rc = sf_compare_field(part->type, a_field, a_fieldsize,
 				      b_field, b_fieldsize);
 		if (rc != 0)
 			return rc;
@@ -1943,7 +1914,6 @@ sf_schemeinit(struct sfscheme *s)
 {
 	s->fields = NULL;
 	s->fields_count = 0;
-	s->keys = NULL;
 	s->keys_count = 0;
 	s->key_def = NULL;
 	s->compression_key = false;
@@ -1953,88 +1923,12 @@ static void
 sf_schemefree(struct sfscheme *s, struct ssa *a)
 {
 	if (s->fields) {
-		int i = 0;
-		while (i < s->fields_count) {
+		for (uint32_t i = 0; i < s->fields_count; i++) {
 			sf_fieldfree(s->fields[i], a);
-			i++;
 		}
 		ss_free(a, s->fields);
 		s->fields = NULL;
 	}
-	if (s->keys) {
-		ss_free(a, s->keys);
-		s->keys = NULL;
-	}
-}
-
-static int
-sf_schemeadd(struct sfscheme *s, struct ssa *a, struct sffield *f)
-{
-	int size = sizeof(struct sffield*) * (s->fields_count + 1);
-	struct sffield **fields = ss_malloc(a, size);
-	if (unlikely(fields == NULL))
-		return -1;
-	memcpy(fields, s->fields, size - sizeof(struct sffield*));
-	fields[s->fields_count] = f;
-	f->position = s->fields_count;
-	f->position_key = -1;
-	if (s->fields)
-		ss_free(a, s->fields);
-	s->fields = fields;
-	s->fields_count++;
-	return 0;
-}
-
-static int
-sf_schemevalidate(struct sfscheme *s, struct ssa *a)
-{
-	/* validate fields */
-	if (s->fields_count == 0) {
-		return -1;
-	}
-	int i = 0;
-	while (i < s->fields_count)
-	{
-		struct sffield *f = s->fields[i];
-		if (f->key)
-			s->keys_count++;
-		i++;
-	}
-
-	/* validate keys */
-	if (unlikely(s->keys_count == 0))
-		return -1;
-	int size = sizeof(struct sffield*) * s->keys_count;
-	s->keys = ss_malloc(a, size);
-	if (unlikely(s->keys == NULL))
-		return -1;
-	memset(s->keys, 0, size);
-	int pos_var = 0;
-	i = 0;
-	while (i < s->fields_count) {
-		struct sffield *f = s->fields[i];
-		if (f->key) {
-			if (unlikely(f->position_key < 0))
-				return -1;
-			if (unlikely(f->position_key >= s->fields_count))
-				return -1;
-			if (unlikely(f->position_key >= s->keys_count))
-				return -1;
-			if (unlikely(s->keys[f->position_key] != NULL))
-				return -1;
-			s->keys[f->position_key] = f;
-		}
-		f->position_ref = pos_var++;
-		i++;
-	}
-	i = 0;
-	while (i < s->keys_count) {
-		struct sffield *f = s->keys[i];
-		if (f == NULL)
-			return -1;
-		i++;
-	}
-	return 0;
 }
 
 #define SR_VERSION_MAGIC      8529643324614668147ULL
@@ -2646,7 +2540,7 @@ sv_size(struct sv *v) {
 
 static inline char*
 sv_field(struct sv *v, struct sfscheme *scheme, int pos, uint32_t *size) {
-	return sf_fieldof(scheme, pos, v->i->pointer(v), size);
+	return sf_field(scheme, pos, v->i->pointer(v), size);
 }
 
 static inline uint64_t
@@ -2820,14 +2714,14 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct sfscheme *scheme,
 	uint32_t  result_size[16];
 	char     *result[16];
 
-	int i = 0;
+	uint32_t i = 0;
 	if (n1 && !(n1->flags & SVDELETE))
 	{
 		src_ptr = src;
 		src_size_ptr = src_size;
 		for (; i < scheme->fields_count; i++) {
-			src[i]    = sf_fieldof(scheme, i, n1->buf.s, &src_size[i]);
-			upsert[i] = sf_fieldof(scheme, i, n2->buf.s, &upsert_size[i]);
+			src[i]    = sf_field(scheme, i, n1->buf.s, &src_size[i]);
+			upsert[i] = sf_field(scheme, i, n2->buf.s, &upsert_size[i]);
 			result[i] = src[i];
 			result_size[i] = src_size[i];
 		}
@@ -2835,7 +2729,7 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct sfscheme *scheme,
 		src_ptr = NULL;
 		src_size_ptr = NULL;
 		for (; i < scheme->fields_count; i++) {
-			upsert[i] = sf_fieldof(scheme, i, n2->buf.s, &upsert_size[i]);
+			upsert[i] = sf_field(scheme, i, n2->buf.s, &upsert_size[i]);
 			result[i] = upsert[i];
 			result_size[i] = upsert_size[i];
 		}
@@ -2871,8 +2765,7 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct sfscheme *scheme,
 	                       n2->lsn);
 cleanup:
 	/* free fields */
-	i = 0;
-	for ( ; i < scheme->fields_count; i++) {
+	for (uint32_t i = 0 ; i < scheme->fields_count; i++) {
 		if (src_ptr == NULL) {
 			if (v[i].data != upsert[i])
 				free((char *)v[i].data);
@@ -5021,10 +4914,10 @@ sd_pagesparse_keyread(struct sdpage *p, uint32_t offset, uint32_t *size)
 }
 
 static inline char*
-sd_pagesparse_field(struct sdpage *p, struct sdv *v, int pos, uint32_t *size)
+sd_pagesparse_field(struct sdpage *p, struct sdv *v, uint32_t part_id, uint32_t *size)
 {
 	uint32_t *offsets = (uint32_t*)sd_pagepointer(p, v);
-	return sd_pagesparse_keyread(p, offsets[pos], size);
+	return sd_pagesparse_keyread(p, offsets[part_id], size);
 }
 
 static inline void
@@ -5035,11 +4928,9 @@ sd_pagesparse_convert(struct sdpage *p, struct sfscheme *scheme,
 	memcpy(ptr, v, sizeof(struct sdv));
 	ptr += sizeof(struct sdv);
 	struct phia_field fields[8];
-	int i = 0;
-	while (i < scheme->fields_count) {
+	for (uint32_t i = 0; i < scheme->fields_count; i++) {
 		struct phia_field *k = &fields[i];
 		k->data = sd_pagesparse_field(p, v, i, &k->size);
-		i++;
 	}
 	sf_write(scheme, fields, ptr);
 }
@@ -5083,20 +4974,18 @@ sd_pageiter_cmp(struct sdpageiter *i, struct sfscheme *scheme, struct sdv *v)
 		return sf_compare(scheme, sd_pagepointer(i->page, v),
 		                  i->key);
 	}
-	struct sffield **part = scheme->keys;
-	struct sffield **last = part + scheme->keys_count;
+
 	int rc;
-	while (part < last) {
-		struct sffield *key = *part;
+	for (uint32_t part_id = 0; part_id < scheme->keys_count; part_id++) {
+		struct sffield *part = scheme->fields[part_id];
 		uint32_t a_fieldsize;
-		char *a_field = sd_pagesparse_field(i->page, v, key->position, &a_fieldsize);
+		char *a_field = sd_pagesparse_field(i->page, v, part_id, &a_fieldsize);
 		uint32_t b_fieldsize;
-		char *b_field = sf_fieldof_ptr(scheme, key, i->key, &b_fieldsize);
-		rc = sf_compare_field(key->type, a_field, a_fieldsize,
+		char *b_field = sf_field(scheme, part_id, i->key, &b_fieldsize);
+		rc = sf_compare_field(part->type, a_field, a_fieldsize,
 				      b_field, b_fieldsize);
 		if (rc != 0)
 			return rc;
-		part++;
 	}
 	return 0;
 }
@@ -6117,8 +6006,7 @@ struct sdbuildkey {
 static inline int
 sd_buildadd_sparse(struct sdbuild *b, struct sv *v)
 {
-	int i = 0;
-	for (; i < b->scheme->fields_count; i++)
+	for (uint32_t i = 0; i < b->scheme->fields_count; i++)
 	{
 		uint32_t fieldsize;
 		char *field = sv_field(v, b->scheme, i, &fieldsize);
@@ -6409,7 +6297,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 	struct phia_field fields[16];
 
 	/* min */
-	int part = 0;
+	uint32_t part = 0;
 	while (part < build->scheme->fields_count)
 	{
 		/* read field offset */
@@ -6421,7 +6309,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		field += sizeof(uint32_t);
 		/* copy only key fields, others are set to zero */
 		struct phia_field *k = &fields[part];
-		if (build->scheme->fields[part]->key) {
+		if (part < build->scheme->keys_count) {
 			k->data = field;
 			k->size = fieldsize;
 		} else {
@@ -6451,7 +6339,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		field += sizeof(uint32_t);
 
 		struct phia_field *k = &fields[part];
-		if (build->scheme->fields[part]->key) {
+		if (part < build->scheme->keys_count) {
 			k->data = field;
 			k->size = fieldsize;
 		} else {
@@ -11973,27 +11861,28 @@ static int
 sf_schemecreate(struct sfscheme *scheme, struct ssa *a,
 		struct key_def *key_def)
 {
+	assert(key_def->part_count > 0);
 	scheme->key_def = key_def;
 	scheme->compression_key = key_def->opts.compression_key;
 
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct key_part *part = &key_def->parts[i];
+	int size = sizeof(struct sffield*) * (key_def->part_count + 1);
+	scheme->fields = ss_malloc(a, size);
+	if (unlikely(scheme->fields == NULL))
+		return -1;
+
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		struct key_part *part = &key_def->parts[part_id];
 		struct sffield *field = sf_fieldnew(a);
 		if (field == NULL) {
 			sr_oom();
 			goto error;
 		}
 
-		/* set field type */
-		int rc = sf_schemeadd(scheme, a, field);
-		if (rc == -1) {
-			sf_fieldfree(field, a);
-			sr_oom();
-			goto error;
-		}
+		// field->fieldno = part->fieldno;
 		field->type = part->type;
-		field->key = 1;
-		field->position_key = i;
+		scheme->fields[part_id] = field;
+		scheme->fields_count++;
+		scheme->keys_count++;
 	}
 
 	struct sffield *field = sf_fieldnew(a);
@@ -12001,21 +11890,10 @@ sf_schemecreate(struct sfscheme *scheme, struct ssa *a,
 		sr_oom();
 		goto error;
 	}
-	int rc = sf_schemeadd(scheme, a, field);
-	if (rc == -1) {
-		sf_fieldfree(field, a);
-		goto error;
-	}
 	field->type = STRING;
-	field->key = 0;
 
-	/* validate scheme and set keys */
-	rc = sf_schemevalidate(scheme, a);
-	if (rc == -1) {
-		sr_error("incomplete scheme %s", "");
-		goto error;
-	}
-	assert(scheme->fields_count == scheme->keys_count + 1);
+	scheme->fields[key_def->part_count] = field;
+	scheme->fields_count++;
 	return 0;
 error:
 	return -1;
@@ -12380,7 +12258,7 @@ static int phia_index_recoverend(struct phia_index *db)
 
 struct phia_tuple *
 phia_tuple_new(struct phia_index *db, struct phia_field *fields,
-	       int fields_count)
+	       uint32_t fields_count)
 {
 	struct sfscheme *scheme = &db->index->scheme;
 	struct runtime *r = db->index->r;
@@ -12461,25 +12339,23 @@ phia_tuple_unref(struct phia_index *db, struct phia_tuple *tuple)
 
 char *
 phia_tuple_field(struct phia_index *db, struct phia_tuple *tuple,
-		 int field_id, uint32_t *size)
+		 uint32_t field_id, uint32_t *size)
 {
 	struct sfscheme *scheme = &db->index->scheme;
 	assert(field_id <= scheme->keys_count);
-	struct sffield *field = scheme->fields[field_id];
-	return sf_fieldof(&db->index->scheme, field->position,
-			  tuple->data, size);
+	return sf_field(&db->index->scheme, field_id, tuple->data, size);
 }
 
 void
 phia_tuple_fields(struct phia_index *db, struct phia_tuple *tuple,
-		  struct phia_field *fields, int fields_count)
+		  struct phia_field *fields, uint32_t fields_count)
 {
 	struct si *index = db->index;
 	assert(fields_count <= index->scheme.fields_count);
-	for (int i = 0; i < fields_count; i++) {
+	for (uint32_t i = 0; i < fields_count; i++) {
 		struct phia_field *field = &fields[i];
-		field->data = sf_fieldof(&index->scheme, i, tuple->data,
-					&field->size);
+		field->data = sf_field(&index->scheme, i, tuple->data,
+				       &field->size);
 	}
 }
 

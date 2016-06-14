@@ -203,15 +203,15 @@ struct phia_field {
 
 struct phia_tuple *
 phia_tuple_new(struct phia_index *index, struct phia_field *fields,
-	       int fields_count);
+	       uint32_t fields_count);
 
 char *
 phia_tuple_field(struct phia_index *index, struct phia_tuple *tuple,
-		 int field_id, uint32_t *size);
+		 uint32_t field_id, uint32_t *size);
 
 void
 phia_tuple_fields(struct phia_index *index, struct phia_tuple *tuple,
-		  struct phia_field *fields, int fields_count);
+		  struct phia_field *fields, uint32_t fields_count);
 
 void
 phia_tuple_ref(struct phia_tuple *tuple);
