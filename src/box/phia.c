@@ -1730,8 +1730,6 @@ struct sffield {
 	int       position;
 	int       position_ref;
 	int       position_key;
-	uint32_t  fixed_size;
-	uint32_t  fixed_offset;
 	int       key;
 };
 
@@ -1741,8 +1739,6 @@ struct sfscheme {
 	struct key_def *key_def;
 	int       fields_count;
 	int       keys_count;
-	int       var_offset;
-	int       var_count;
 	bool compression_key;
 };
 
@@ -1753,8 +1749,6 @@ sf_fieldnew(struct ssa *a)
 	if (unlikely(f == NULL))
 		return NULL;
 	f->key = 0;
-	f->fixed_size = 0;
-	f->fixed_offset = 0;
 	f->position = 0;
 	f->position_ref = 0;
 	f->type = UNKNOWN;
@@ -1781,13 +1775,9 @@ struct PACKED sfvar {
 static inline char*
 sf_fieldof_ptr(struct sfscheme *s, struct sffield *f, char *data, uint32_t *size)
 {
-	if (likely(f->fixed_size > 0)) {
-		if (likely(size))
-			*size = f->fixed_size;
-		return data + f->fixed_offset;
-	}
+	(void)s;
 	register struct sfvar *v =
-		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
+		&((struct sfvar*)(data))[f->position_ref];
 	if (likely(size))
 		*size = v->size;
 	return data + v->offset;
@@ -1803,10 +1793,8 @@ static inline char*
 sf_field(struct sfscheme *s, int pos, char *data)
 {
 	register struct sffield *f = s->fields[pos];
-	if (likely(f->fixed_size > 0))
-		return data + f->fixed_offset;
 	register struct sfvar *v =
-		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
+		&((struct sfvar*)(data))[f->position_ref];
 	return data + v->offset;
 }
 
@@ -1814,22 +1802,17 @@ static inline int
 sf_fieldsize(struct sfscheme *s, int pos, char *data)
 {
 	register struct sffield *f = s->fields[pos];
-	if (likely(f->fixed_size > 0))
-		return f->fixed_size;
 	register struct sfvar *v =
-		&((struct sfvar*)(data + s->var_offset))[f->position_ref];
+		&((struct sfvar*)(data))[f->position_ref];
 	return v->size;
 }
 
 static inline int
 sf_writesize(struct sfscheme *s, struct phia_field *v)
 {
-	int sum = s->var_offset;
+	int sum = 0;
 	int i;
 	for (i = 0; i < s->fields_count; i++) {
-		struct sffield *f = s->fields[i];
-		if (f->fixed_size != 0)
-			continue;
 		sum += sizeof(struct sfvar)+ v[i].size;
 	}
 	return sum;
@@ -1838,17 +1821,11 @@ sf_writesize(struct sfscheme *s, struct phia_field *v)
 static inline void
 sf_write(struct sfscheme *s, struct phia_field *v, char *dest)
 {
-	int var_value_offset =
-		s->var_offset + sizeof(struct sfvar) * s->var_count;
-	struct sfvar *var = (struct sfvar*)(dest + s->var_offset);
+	int var_value_offset = sizeof(struct sfvar) * s->fields_count;
+	struct sfvar *var = (struct sfvar*)(dest);
 	int i;
 	for (i = 0; i < s->fields_count; i++) {
 		struct sffield *f = s->fields[i];
-		if (f->fixed_size) {
-			assert(f->fixed_size == v[i].size);
-			memcpy(dest + f->fixed_offset, v[i].data, f->fixed_size);
-			continue;
-		}
 		struct sfvar *current = &var[f->position_ref];
 		current->offset = var_value_offset;
 		current->size   = v[i].size;
@@ -1870,12 +1847,10 @@ sf_hash(struct sfscheme *s, char *data)
 static inline int
 sf_comparable_size(struct sfscheme *s, char *data)
 {
-	int sum = s->var_offset;
+	int sum = 0;
 	int i;
 	for (i = 0; i < s->fields_count; i++) {
 		struct sffield *f = s->fields[i];
-		if (f->fixed_size != 0)
-			continue;
 		if (f->key)
 			sum += sf_fieldsize(s, i, data);
 		sum += sizeof(struct sfvar);
@@ -1886,15 +1861,11 @@ sf_comparable_size(struct sfscheme *s, char *data)
 static inline void
 sf_comparable_write(struct sfscheme *s, char *src, char *dest)
 {
-	int var_value_offset =
-		s->var_offset + sizeof(struct sfvar) * s->var_count;
-	memcpy(dest, src, s->var_offset);
-	struct sfvar *var = (struct sfvar*)(dest + s->var_offset);
+	int var_value_offset = sizeof(struct sfvar) * s->fields_count;
+	struct sfvar *var = (struct sfvar*)(dest);
 	int i;
 	for (i = 0; i < s->fields_count; i++) {
 		struct sffield *f = s->fields[i];
-		if (f->fixed_size != 0)
-			continue;
 		struct sfvar *current = &var[f->position_ref];
 		current->offset = var_value_offset;
 		if (! f->key) {
@@ -1974,8 +1945,6 @@ sf_schemeinit(struct sfscheme *s)
 	s->fields_count = 0;
 	s->keys = NULL;
 	s->keys_count = 0;
-	s->var_offset = 0;
-	s->var_count  = 0;
 	s->key_def = NULL;
 	s->compression_key = false;
 }
@@ -2023,27 +1992,14 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 	if (s->fields_count == 0) {
 		return -1;
 	}
-	int fixed_offset = 0;
-	int fixed_pos = 0;
 	int i = 0;
 	while (i < s->fields_count)
 	{
 		struct sffield *f = s->fields[i];
-		/* calculate offset and position for fixed
-		 * size types */
-		if (f->fixed_size > 0) {
-			f->position_ref = fixed_pos;
-			fixed_pos++;
-			f->fixed_offset = fixed_offset;
-			fixed_offset += f->fixed_size;
-		} else {
-			s->var_count++;
-		}
 		if (f->key)
 			s->keys_count++;
 		i++;
 	}
-	s->var_offset = fixed_offset;
 
 	/* validate keys */
 	if (unlikely(s->keys_count == 0))
@@ -2068,8 +2024,7 @@ sf_schemevalidate(struct sfscheme *s, struct ssa *a)
 				return -1;
 			s->keys[f->position_key] = f;
 		}
-		if (f->fixed_size == 0)
-			f->position_ref = pos_var++;
+		f->position_ref = pos_var++;
 		i++;
 	}
 	i = 0;
@@ -12039,11 +11994,6 @@ sf_schemecreate(struct sfscheme *scheme, struct ssa *a,
 		field->type = part->type;
 		field->key = 1;
 		field->position_key = i;
-		if (field->type == NUM) {
-			field->fixed_size = sizeof(uint64_t);
-		} else {
-			field->fixed_size = 0;
-		}
 	}
 
 	struct sffield *field = sf_fieldnew(a);
