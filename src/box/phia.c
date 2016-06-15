@@ -1733,42 +1733,42 @@ struct PACKED sfvar {
 };
 
 static inline struct sfvar *
-sf_fieldmeta(struct key_def *s, uint32_t part_id, char *data)
+sf_fieldmeta(struct key_def *key_def, uint32_t part_id, char *data)
 {
-	assert(part_id <= s->part_count);
-	(void)s;
+	assert(part_id <= key_def->part_count);
+	(void)key_def;
 	uint32_t offset_slot = part_id;
 	return &((struct sfvar*)(data))[offset_slot];
 }
 
 static inline char*
-sf_field(struct key_def *s, uint32_t part_id, char *data, uint32_t *size)
+sf_field(struct key_def *key_def, uint32_t part_id, char *data, uint32_t *size)
 {
-	struct sfvar *v = sf_fieldmeta(s, part_id, data);
+	struct sfvar *v = sf_fieldmeta(key_def, part_id, data);
 	if (likely(size))
 		*size = v->size;
 	return data + v->offset;
 }
 
 static inline int
-sf_writesize(struct key_def *s, struct phia_field *v)
+sf_writesize(struct key_def *key_def, struct phia_field *v)
 {
 	int sum = 0;
 	/* for each key_part + value */
-	for (uint32_t i = 0; i <= s->part_count; i++) {
-		sum += sizeof(struct sfvar)+ v[i].size;
+	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
+		sum += sizeof(struct sfvar)+ v[part_id].size;
 	}
 	return sum;
 }
 
 static inline void
-sf_write(struct key_def *s, struct phia_field *fields, char *dest)
+sf_write(struct key_def *key_def, struct phia_field *fields, char *dest)
 {
-	int var_value_offset = sizeof(struct sfvar) * (s->part_count + 1);
+	int var_value_offset = sizeof(struct sfvar) * (key_def->part_count + 1);
 	/* for each key_part + value */
-	for (uint32_t part_id = 0; part_id <= s->part_count; part_id++) {
+	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
 		struct phia_field *field = &fields[part_id];
-		struct sfvar *current = sf_fieldmeta(s, part_id, dest);
+		struct sfvar *current = sf_fieldmeta(key_def, part_id, dest);
 		current->offset = var_value_offset;
 		current->size   = field->size;
 		memcpy(dest + var_value_offset, field->data, field->size);
@@ -1777,24 +1777,24 @@ sf_write(struct key_def *s, struct phia_field *fields, char *dest)
 }
 
 static inline uint64_t
-sf_hash(struct key_def *s, char *data)
+sf_hash(struct key_def *key_def, char *data)
 {
 	uint64_t hash = 0;
-	for (uint32_t part_id = 0; part_id < s->part_count; part_id++) {
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		uint32_t size;
-		char *field = sf_field(s, part_id, data, &size);
+		char *field = sf_field(key_def, part_id, data, &size);
 		hash ^= ss_fnv(field, size);
 	}
 	return hash;
 }
 
 static inline int
-sf_comparable_size(struct key_def *s, char *data)
+sf_comparable_size(struct key_def *key_def, char *data)
 {
 	int sum = 0;
-	for (uint32_t part_id = 0; part_id < s->part_count; part_id++) {
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		uint32_t field_size;
-		(void) sf_field(s, part_id, data, &field_size);
+		(void) sf_field(key_def, part_id, data, &field_size);
 		sum += field_size;
 		sum += sizeof(struct sfvar);
 	}
@@ -1804,19 +1804,19 @@ sf_comparable_size(struct key_def *s, char *data)
 }
 
 static inline void
-sf_comparable_write(struct key_def *s, char *src, char *dest)
+sf_comparable_write(struct key_def *key_def, char *src, char *dest)
 {
-	int var_value_offset = sizeof(struct sfvar) * (s->part_count + 1);
+	int var_value_offset = sizeof(struct sfvar) * (key_def->part_count + 1);
 	/* for each key_part + value */
-	for (uint32_t part_id = 0; part_id < s->part_count; part_id++) {
-		struct sfvar *current = sf_fieldmeta(s, part_id, dest);
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		struct sfvar *current = sf_fieldmeta(key_def, part_id, dest);
 		current->offset = var_value_offset;
-		char *ptr = sf_field(s, part_id, src, &current->size);
+		char *ptr = sf_field(key_def, part_id, src, &current->size);
 		memcpy(dest + var_value_offset, ptr, current->size);
 		var_value_offset += current->size;
 	}
 	/* fields: [key_part, key_part, ..., value] */
-	struct sfvar *current = sf_fieldmeta(s, s->part_count, dest);
+	struct sfvar *current = sf_fieldmeta(key_def, key_def->part_count, dest);
 	current->offset = var_value_offset;
 	current->size = 0;
 }
@@ -1861,15 +1861,15 @@ sf_compare_field(enum field_type type, char *a, int asz, char *b, int bsz)
 }
 
 static int
-sf_compare(struct key_def *s, char *a, char *b)
+sf_compare(struct key_def *key_def, char *a, char *b)
 {
 	int rc;
-	for (uint32_t part_id = 0; part_id < s->part_count; part_id++) {
-		struct key_part *part = &s->parts[part_id];
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		struct key_part *part = &key_def->parts[part_id];
 		uint32_t a_fieldsize;
-		char *a_field = sf_field(s, part_id, a, &a_fieldsize);
+		char *a_field = sf_field(key_def, part_id, a, &a_fieldsize);
 		uint32_t b_fieldsize;
-		char *b_field = sf_field(s, part_id, b, &b_fieldsize);
+		char *b_field = sf_field(key_def, part_id, b, &b_fieldsize);
 		rc = sf_compare_field(part->type, a_field, a_fieldsize,
 				      b_field, b_fieldsize);
 		if (rc != 0)
@@ -2487,13 +2487,13 @@ sv_size(struct sv *v) {
 }
 
 static inline char*
-sv_field(struct sv *v, struct key_def *scheme, int pos, uint32_t *size) {
-	return sf_field(scheme, pos, v->i->pointer(v), size);
+sv_field(struct sv *v, struct key_def *key_def, int pos, uint32_t *size) {
+	return sf_field(key_def, pos, v->i->pointer(v), size);
 }
 
 static inline uint64_t
-sv_hash(struct sv *v, struct key_def *scheme) {
-	return sf_hash(scheme, sv_pointer(v));
+sv_hash(struct sv *v, struct key_def *key_def) {
+	return sf_hash(key_def, sv_pointer(v));
 }
 
 struct PACKED phia_tuple {
@@ -2646,10 +2646,10 @@ phia_upsert_cb(int count,
 	       struct key_def *key_def);
 
 static inline int
-sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *scheme,
+sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *key_def,
 	    struct svupsertnode *n1, struct svupsertnode *n2)
 {
-	assert(scheme->part_count < 16);
+	assert(key_def->part_count < 16);
 	assert(n2->flags & SVUPSERT);
 
 	uint32_t  src_size[16];
@@ -2667,9 +2667,9 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *scheme,
 		src_ptr = src;
 		src_size_ptr = src_size;
 		/* for each key part + value */
-		for (uint32_t i = 0; i <= scheme->part_count; i++) {
-			src[i]    = sf_field(scheme, i, n1->buf.s, &src_size[i]);
-			upsert[i] = sf_field(scheme, i, n2->buf.s, &upsert_size[i]);
+		for (uint32_t i = 0; i <= key_def->part_count; i++) {
+			src[i]    = sf_field(key_def, i, n1->buf.s, &src_size[i]);
+			upsert[i] = sf_field(key_def, i, n2->buf.s, &upsert_size[i]);
 			result[i] = src[i];
 			result_size[i] = src_size[i];
 		}
@@ -2677,35 +2677,35 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *scheme,
 		src_ptr = NULL;
 		src_size_ptr = NULL;
 		/* for each key part + value */
-		for (uint32_t i = 0; i <= scheme->part_count; i++) {
-			upsert[i] = sf_field(scheme, i, n2->buf.s, &upsert_size[i]);
+		for (uint32_t i = 0; i <= key_def->part_count; i++) {
+			upsert[i] = sf_field(key_def, i, n2->buf.s, &upsert_size[i]);
 			result[i] = upsert[i];
 			result_size[i] = upsert_size[i];
 		}
 	}
 
 	/* execute */
-	int rc = phia_upsert_cb(scheme->part_count + 1,
+	int rc = phia_upsert_cb(key_def->part_count + 1,
 				src_ptr, src_size_ptr,
 				upsert, upsert_size,
 				result, result_size,
-				scheme);
+				key_def);
 	if (unlikely(rc == -1))
 		return -1;
 
 	/* validate and create new record */
 	struct phia_field v[16];
 	/* for each key part + value */
-	for (uint32_t i = 0; i <= scheme->part_count; i++) {
+	for (uint32_t i = 0; i <= key_def->part_count; i++) {
 		v[i].data = result[i];
 		v[i].size = result_size[i];
 	}
-	int size = sf_writesize(scheme, v);
+	int size = sf_writesize(key_def, v);
 	ss_bufreset(&u->tmp);
 	rc = ss_bufensure(&u->tmp, a, size);
 	if (unlikely(rc == -1))
 		goto cleanup;
-	sf_write(scheme, v, u->tmp.s);
+	sf_write(key_def, v, u->tmp.s);
 	ss_bufadvance(&u->tmp, size);
 
 	/* save result */
@@ -2714,7 +2714,7 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *scheme,
 	                       n2->lsn);
 cleanup:
 	/* free key parts + value */
-	for (uint32_t i = 0 ; i <= scheme->part_count; i++) {
+	for (uint32_t i = 0 ; i <= key_def->part_count; i++) {
 		if (src_ptr == NULL) {
 			if (v[i].data != upsert[i])
 				free((char *)v[i].data);
@@ -2727,7 +2727,7 @@ cleanup:
 }
 
 static inline int
-sv_upsert(struct svupsert *u, struct ssa *a, struct key_def *scheme)
+sv_upsert(struct svupsert *u, struct ssa *a, struct key_def *key_def)
 {
 	assert(u->count >= 1 );
 	struct svupsertnode *f = ss_bufat(&u->stack,
@@ -2736,7 +2736,7 @@ sv_upsert(struct svupsert *u, struct ssa *a, struct key_def *scheme)
 	int rc;
 	if (f->flags & SVUPSERT) {
 		f = sv_upsertpop(u);
-		rc = sv_upsertdo(u, a, scheme, NULL, f);
+		rc = sv_upsertdo(u, a, key_def, NULL, f);
 		if (unlikely(rc == -1))
 			return -1;
 	}
@@ -2747,7 +2747,7 @@ sv_upsert(struct svupsert *u, struct ssa *a, struct key_def *scheme)
 		struct svupsertnode *s = sv_upsertpop(u);
 		assert(f != NULL);
 		assert(s != NULL);
-		rc = sv_upsertdo(u, a, scheme, f, s);
+		rc = sv_upsertdo(u, a, key_def, f, s);
 		if (unlikely(rc == -1))
 			return -1;
 	}
@@ -2885,16 +2885,16 @@ struct PACKED svmergesrc {
 
 struct svmerge {
 	struct ssa *a;
-	struct key_def *scheme;
+	struct key_def *key_def;
 	struct ssbuf buf;
 };
 
 static inline void
-sv_mergeinit(struct svmerge *m, struct ssa *a, struct key_def *scheme)
+sv_mergeinit(struct svmerge *m, struct ssa *a, struct key_def *key_def)
 {
 	ss_bufinit(&m->buf);
 	m->a = a;
-	m->scheme = scheme;
+	m->key_def = key_def;
 }
 
 static inline int
@@ -2988,7 +2988,7 @@ sv_mergeiter_gt(struct svmergeiter *i)
 			continue;
 		}
 		int rc;
-		rc = sf_compare(i->merge->scheme, sv_pointer(minv),
+		rc = sf_compare(i->merge->key_def, sv_pointer(minv),
 				sv_pointer(v));
 		switch (rc) {
 		case 0:
@@ -3033,7 +3033,7 @@ sv_mergeiter_lt(struct svmergeiter *i)
 			continue;
 		}
 		int rc;
-		rc = sf_compare(i->merge->scheme,
+		rc = sf_compare(i->merge->key_def,
 				sv_pointer(maxv), sv_pointer(v));
 		switch (rc) {
 		case  0:
@@ -3145,7 +3145,7 @@ sv_readiter_upsert(struct svreaditer *i)
 			skip = 1;
 	}
 	/* upsert */
-	rc = sv_upsert(i->u, i->a, i->merge->merge->scheme);
+	rc = sv_upsert(i->u, i->a, i->merge->merge->key_def);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
@@ -3289,7 +3289,7 @@ sv_writeiter_upsert(struct svwriteiter *i)
 	}
 
 	/* upsert */
-	rc = sv_upsert(i->u, i->a, i->merge->merge->scheme);
+	rc = sv_upsert(i->u, i->a, i->merge->merge->key_def);
 	if (unlikely(rc == -1))
 		return -1;
 	return 0;
@@ -3486,7 +3486,7 @@ struct svindex {
 	struct bps_tree_svindex tree;
 	uint32_t used;
 	uint64_t lsnmin;
-	struct key_def *scheme;
+	struct key_def *key_def;
 	/*
 	 * This is a search state flag, which is set
 	 * to true to true when the tree comparator finds
@@ -3500,7 +3500,7 @@ struct svindex {
 int
 tree_svindex_compare(struct svref a, struct svref b, struct svindex *index)
 {
-	int res = sf_compare(index->scheme, a.v->data, b.v->data);
+	int res = sf_compare(index->key_def, a.v->data, b.v->data);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > b.v->lsn ? -1 : a.v->lsn < b.v->lsn;
@@ -3512,7 +3512,7 @@ int
 tree_svindex_compare_key(struct svref a, struct tree_svindex_key *key,
 			 struct svindex *index)
 {
-	int res = sf_compare(index->scheme, a.v->data, key->data);
+	int res = sf_compare(index->key_def, a.v->data, key->data);
 	if (res == 0) {
 		index->hint_key_is_equal = true;
 		res = a.v->lsn > key->lsn ? -1 : a.v->lsn < key->lsn;
@@ -3533,11 +3533,11 @@ sv_index_free_matras_page(void *p)
 }
 
 static int
-sv_indexinit(struct svindex *i, struct key_def *scheme)
+sv_indexinit(struct svindex *i, struct key_def *key_def)
 {
 	i->lsnmin = UINT64_MAX;
 	i->used   = 0;
-	i->scheme = scheme;
+	i->key_def = key_def;
 	bps_tree_svindex_create(&i->tree, i,
 				sv_index_alloc_matras_page,
 				sv_index_free_matras_page);
@@ -3596,7 +3596,7 @@ sv_indexset(struct svindex *i, struct svref ref)
 	if (!bps_tree_svindex_itr_is_invalid(&itr_prev)) {
 		struct svref *prev =
 			bps_tree_svindex_itr_get_elem(&i->tree, &itr_prev);
-		if (sf_compare(i->scheme, curr->v->data, prev->v->data) == 0) {
+		if (sf_compare(i->key_def, curr->v->data, prev->v->data) == 0) {
 			/*
 			 * Previous position exists and holds same key,
 			 * it's case (2)
@@ -4075,7 +4075,7 @@ struct sxindex {
 	uint32_t  dsn;
 	struct phia_index *db;
 	struct si *index;
-	struct key_def *scheme;
+	struct key_def *key_def;
 	struct rlist    link;
 	pthread_mutex_t mutex;
 };
@@ -4083,17 +4083,17 @@ struct sxindex {
 static int
 sxv_tree_cmp(sxv_tree_t *rbtree, struct sxv *a, struct sxv *b)
 {
-	struct key_def *scheme =
-		container_of(rbtree, struct sxindex, tree)->scheme;
-	return sf_compare(scheme, a->v->data, b->v->data);
+	struct key_def *key_def =
+		container_of(rbtree, struct sxindex, tree)->key_def;
+	return sf_compare(key_def, a->v->data, b->v->data);
 }
 
 static int
 sxv_tree_key_cmp(sxv_tree_t *rbtree, struct sxv_tree_key *a, struct sxv *b)
 {
-	struct key_def *scheme =
-		container_of(rbtree, struct sxindex, tree)->scheme;
-	return sf_compare(scheme, a->data, b->v->data);
+	struct key_def *key_def =
+		container_of(rbtree, struct sxindex, tree)->key_def;
+	return sf_compare(key_def, a->data, b->v->data);
 }
 
 struct sx;
@@ -4150,7 +4150,7 @@ struct sxmanager {
 static int sx_managerinit(struct sxmanager*, struct runtime*);
 static int sx_managerfree(struct sxmanager*);
 static int sx_indexinit(struct sxindex *, struct sxmanager *,
-			struct phia_index *, struct si *, struct key_def *scheme);
+			struct phia_index *, struct si *, struct key_def *key_def);
 static int sx_indexset(struct sxindex*, uint32_t);
 static int sx_indexfree(struct sxindex*, struct sxmanager*);
 static struct sx *sx_find(struct sxmanager*, uint64_t);
@@ -4197,14 +4197,14 @@ static int sx_managerfree(struct sxmanager *m)
 
 static int sx_indexinit(struct sxindex *i, struct sxmanager *m,
 			struct phia_index *db,
-			struct si *index, struct key_def *scheme)
+			struct si *index, struct key_def *key_def)
 {
 	sxv_tree_new(&i->tree);
 	rlist_create(&i->link);
 	i->dsn = 0;
 	i->db = db;
 	i->index = index;
-	i->scheme = scheme;
+	i->key_def = key_def;
 	(void) tt_pthread_mutex_init(&i->mutex, NULL);
 	rlist_add(&m->indexes, &i->link);
 	return 0;
@@ -4870,7 +4870,7 @@ sd_pagesparse_field(struct sdpage *p, struct sdv *v, uint32_t part_id, uint32_t 
 }
 
 static inline void
-sd_pagesparse_convert(struct sdpage *p, struct key_def *scheme,
+sd_pagesparse_convert(struct sdpage *p, struct key_def *key_def,
 		      struct sdv *v, char *dest)
 {
 	char *ptr = dest;
@@ -4878,11 +4878,11 @@ sd_pagesparse_convert(struct sdpage *p, struct key_def *scheme,
 	ptr += sizeof(struct sdv);
 	struct phia_field fields[8];
 	/* for each key parts + value */
-	for (uint32_t i = 0; i <= scheme->part_count; i++) {
+	for (uint32_t i = 0; i <= key_def->part_count; i++) {
 		struct phia_field *k = &fields[i];
 		k->data = sd_pagesparse_field(p, v, i, &k->size);
 	}
-	sf_write(scheme, fields, ptr);
+	sf_write(key_def, fields, ptr);
 }
 
 struct PACKED sdpageiter {
@@ -4894,7 +4894,7 @@ struct PACKED sdpageiter {
 	enum phia_order order;
 	void *key;
 	int keysize;
-	struct key_def *scheme;
+	struct key_def *key_def;
 };
 
 static inline void
@@ -4902,10 +4902,10 @@ sd_pageiter_result(struct sdpageiter *i)
 {
 	if (unlikely(i->v == NULL))
 		return;
-	if (likely(!i->scheme->opts.compression_key)) {
+	if (likely(!i->key_def->opts.compression_key)) {
 		sv_init(&i->current, &sd_vif, i->v, i->page->h);
 	} else {
-		sd_pagesparse_convert(i->page, i->scheme, i->v, i->xfbuf->s);
+		sd_pagesparse_convert(i->page, i->key_def, i->v, i->xfbuf->s);
 		sv_init(&i->current, &sd_vrawif, i->xfbuf->s, NULL);
 	}
 }
@@ -4918,20 +4918,20 @@ sd_pageiter_end(struct sdpageiter *i)
 }
 
 static inline int
-sd_pageiter_cmp(struct sdpageiter *i, struct key_def *scheme, struct sdv *v)
+sd_pageiter_cmp(struct sdpageiter *i, struct key_def *key_def, struct sdv *v)
 {
-	if (likely(!scheme->opts.compression_key)) {
-		return sf_compare(scheme, sd_pagepointer(i->page, v),
+	if (likely(!key_def->opts.compression_key)) {
+		return sf_compare(key_def, sd_pagepointer(i->page, v),
 		                  i->key);
 	}
 
 	int rc;
-	for (uint32_t part_id = 0; part_id < scheme->part_count; part_id++) {
-		struct key_part *part = &scheme->parts[part_id];
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		struct key_part *part = &key_def->parts[part_id];
 		uint32_t a_fieldsize;
 		char *a_field = sd_pagesparse_field(i->page, v, part_id, &a_fieldsize);
 		uint32_t b_fieldsize;
-		char *b_field = sf_field(scheme, part_id, i->key, &b_fieldsize);
+		char *b_field = sf_field(key_def, part_id, i->key, &b_fieldsize);
 		rc = sf_compare_field(part->type, a_field, a_fieldsize,
 				      b_field, b_fieldsize);
 		if (rc != 0)
@@ -4949,7 +4949,7 @@ sd_pageiter_search(struct sdpageiter *i)
 	while (max >= min)
 	{
 		mid = min + (max - min) / 2;
-		int rc = sd_pageiter_cmp(i, i->scheme, sd_pagev(i->page, mid));
+		int rc = sd_pageiter_cmp(i, i->key_def, sd_pagev(i->page, mid));
 		switch (rc) {
 		case -1: min = mid + 1;
 			continue;
@@ -5008,7 +5008,7 @@ sd_pageiter_gt(struct sdpageiter *i, int e)
 	sd_pageiter_chain_head(i, pos);
 	if (i->v == NULL)
 		return 0;
-	int rc = sd_pageiter_cmp(i, i->scheme, i->v);
+	int rc = sd_pageiter_cmp(i, i->key_def, i->v);
 	int match = rc == 0;
 	switch (rc) {
 		case  0:
@@ -5035,7 +5035,7 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 	sd_pageiter_chain_head(i, pos);
 	if (i->v == NULL)
 		return 0;
-	int rc = sd_pageiter_cmp(i, i->scheme, i->v);
+	int rc = sd_pageiter_cmp(i, i->key_def, i->v);
 	int match = rc == 0;
 	switch (rc) {
 		case 0:
@@ -5050,11 +5050,11 @@ sd_pageiter_lt(struct sdpageiter *i, int e)
 }
 
 static inline int
-sd_pageiter_open(struct sdpageiter *pi, struct key_def *scheme,
+sd_pageiter_open(struct sdpageiter *pi, struct key_def *key_def,
 		 struct ssbuf *xfbuf, struct sdpage *page, enum phia_order o,
 		 void *key, int keysize)
 {
-	pi->scheme = scheme;
+	pi->key_def = key_def;
 	pi->page    = page;
 	pi->xfbuf   = xfbuf;
 	pi->order   = o;
@@ -5152,7 +5152,7 @@ struct sdbuild {
 	uint32_t n;
 	struct mh_strnptr_t *tracker;
 	struct ssa *a;
-	struct key_def *scheme;
+	struct key_def *key_def;
 };
 
 static void sd_buildinit(struct sdbuild*);
@@ -5193,7 +5193,7 @@ sd_buildmaxkey(struct sdbuild *b) {
 	return b->v.s + r->v + sd_buildmax(b)->offset;
 }
 
-static int sd_buildbegin(struct sdbuild*, struct ssa *a, struct key_def *scheme,
+static int sd_buildbegin(struct sdbuild*, struct ssa *a, struct key_def *key_def,
 			 int, int, int, struct ssfilterif*);
 static int sd_buildend(struct sdbuild*);
 static int sd_buildcommit(struct sdbuild*);
@@ -5333,7 +5333,7 @@ struct PACKED sdindexiter {
 	enum phia_order cmp;
 	void *key;
 	int keysize;
-	struct key_def *scheme;
+	struct key_def *key_def;
 };
 
 static inline int
@@ -5344,7 +5344,7 @@ sd_indexiter_route(struct sdindexiter *i)
 	while (begin != end) {
 		int mid = begin + (end - begin) / 2;
 		struct sdindexpage *page = sd_indexpage(i->index, mid);
-		int rc = sf_compare(i->scheme,
+		int rc = sf_compare(i->key_def,
 		                    sd_indexpage_max(i->index, page),
 		                    i->key);
 		if (rc < 0) {
@@ -5360,11 +5360,11 @@ sd_indexiter_route(struct sdindexiter *i)
 }
 
 static inline int
-sd_indexiter_open(struct sdindexiter *ii, struct key_def *scheme,
+sd_indexiter_open(struct sdindexiter *ii, struct key_def *key_def,
 		  struct sdindex *index, enum phia_order o, void *key,
 		  int keysize)
 {
-	ii->scheme = scheme;
+	ii->key_def = key_def;
 	ii->index   = index;
 	ii->cmp     = o;
 	ii->key     = key;
@@ -5399,14 +5399,14 @@ sd_indexiter_open(struct sdindexiter *ii, struct key_def *scheme,
 	switch (ii->cmp) {
 	case PHIA_LE:
 	case PHIA_LT:
-		rc = sf_compare(ii->scheme, sd_indexpage_min(ii->index, p),
+		rc = sf_compare(ii->key_def, sd_indexpage_min(ii->index, p),
 		                ii->key);
 		if (rc ==  1 || (rc == 0 && ii->cmp == PHIA_LT))
 			ii->pos--;
 		break;
 	case PHIA_GE:
 	case PHIA_GT:
-		rc = sf_compare(ii->scheme, sd_indexpage_max(ii->index, p),
+		rc = sf_compare(ii->key_def, sd_indexpage_max(ii->index, p),
 				ii->key);
 		if (rc == -1 || (rc == 0 && ii->cmp == PHIA_GT))
 			ii->pos++;
@@ -5645,7 +5645,7 @@ struct sdreadarg {
 	int         use_compression;
 	struct ssfilterif *compression_if;
 	struct ssa *a;
-	struct key_def *scheme;
+	struct key_def *key_def;
 };
 
 struct PACKED sdread {
@@ -5734,7 +5734,7 @@ sd_read_openpage(struct sdread *i, void *key, int keysize)
 	int rc = sd_read_page(i, i->ref);
 	if (unlikely(rc == -1))
 		return -1;
-	return sd_pageiter_open(arg->page_iter, arg->scheme,
+	return sd_pageiter_open(arg->page_iter, arg->key_def,
 				arg->buf_xf,
 				&i->page, arg->o, key, keysize);
 }
@@ -5751,7 +5751,7 @@ sd_read_open(struct ssiter *iptr, struct sdreadarg *arg, void *key, int keysize)
 	struct sdread *i = (struct sdread*)iptr->priv;
 	i->reads = 0;
 	i->ra = *arg;
-	sd_indexiter_open(arg->index_iter, arg->scheme, arg->index,
+	sd_indexiter_open(arg->index_iter, arg->key_def, arg->index,
 			  arg->o, key, keysize);
 	i->ref = sd_indexiter_get(arg->index_iter);
 	if (i->ref == NULL)
@@ -5901,12 +5901,12 @@ static void sd_buildgc(struct sdbuild *b, int wm)
 }
 
 static int
-sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *scheme,
+sd_buildbegin(struct sdbuild *b, struct ssa *a, struct key_def *key_def,
 	      int crc, int compress_dup,
 	      int compress, struct ssfilterif *compress_if)
 {
 	b->a = a;
-	b->scheme = scheme;
+	b->key_def = key_def;
 	b->crc = crc;
 	b->compress_dup = compress_dup;
 	b->compress = compress;
@@ -5957,10 +5957,10 @@ static inline int
 sd_buildadd_sparse(struct sdbuild *b, struct sv *v)
 {
 	/* for each key part and value */
-	for (uint32_t i = 0; i <= b->scheme->part_count; i++)
+	for (uint32_t i = 0; i <= b->key_def->part_count; i++)
 	{
 		uint32_t fieldsize;
-		char *field = sv_field(v, b->scheme, i, &fieldsize);
+		char *field = sv_field(v, b->key_def, i, &fieldsize);
 
 		int offsetstart = ss_bufused(&b->k);
 		int offset = (offsetstart - sd_buildref(b)->k);
@@ -6045,7 +6045,7 @@ int sd_buildadd(struct sdbuild *b, struct sv *v, uint32_t flags)
 	sv->lsn = lsn;
 	ss_bufadvance(&b->m, sizeof(struct sdv));
 	/* copy document */
-	if (!b->scheme->opts.compression_key) {
+	if (!b->key_def->opts.compression_key) {
 		rc = sd_buildadd_raw(b, v, size);
 	} else {
 		rc = sd_buildadd_sparse(b, v);
@@ -6229,14 +6229,14 @@ sd_indexadd_raw(struct sdindex *i, struct sdbuild *build,
 		struct sdindexpage *p, char *min, char *max)
 {
 	/* reformat document to exclude non-key fields */
-	p->sizemin = sf_comparable_size(build->scheme, min);
-	p->sizemax = sf_comparable_size(build->scheme, max);
+	p->sizemin = sf_comparable_size(build->key_def, min);
+	p->sizemax = sf_comparable_size(build->key_def, max);
 	int rc = ss_bufensure(&i->v, build->a, p->sizemin + p->sizemax);
 	if (unlikely(rc == -1))
 		return sr_oom();
-	sf_comparable_write(build->scheme, min, i->v.p);
+	sf_comparable_write(build->key_def, min, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
-	sf_comparable_write(build->scheme, max, i->v.p);
+	sf_comparable_write(build->key_def, max, i->v.p);
 	ss_bufadvance(&i->v, p->sizemax);
 	return 0;
 }
@@ -6248,7 +6248,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 	struct phia_field fields[16];
 
 	/* min - for each key part + value */
-	for (uint32_t part = 0; part <= build->scheme->part_count; part++) {
+	for (uint32_t part = 0; part <= build->key_def->part_count; part++) {
 		/* read field offset */
 		uint32_t offset = *(uint32_t*)min;
 		min += sizeof(uint32_t);
@@ -6258,7 +6258,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		field += sizeof(uint32_t);
 		/* copy only key fields, others are set to zero */
 		struct phia_field *k = &fields[part];
-		if (part < build->scheme->part_count) {
+		if (part < build->key_def->part_count) {
 			k->data = field;
 			k->size = fieldsize;
 		} else {
@@ -6266,15 +6266,15 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 			k->size = 0;
 		}
 	}
-	p->sizemin = sf_writesize(build->scheme, fields);
+	p->sizemin = sf_writesize(build->key_def, fields);
 	int rc = ss_bufensure(&i->v, build->a, p->sizemin);
 	if (unlikely(rc == -1))
 		return sr_oom();
-	sf_write(build->scheme, fields, i->v.p);
+	sf_write(build->key_def, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemin);
 
 	/* max - for each key part + value */
-	for (uint32_t part = 0; part <= build->scheme->part_count; part++) {
+	for (uint32_t part = 0; part <= build->key_def->part_count; part++) {
 		/* read field offset */
 		uint32_t offset = *(uint32_t*)max;
 		max += sizeof(uint32_t);
@@ -6285,7 +6285,7 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		field += sizeof(uint32_t);
 
 		struct phia_field *k = &fields[part];
-		if (part < build->scheme->part_count) {
+		if (part < build->key_def->part_count) {
 			k->data = field;
 			k->size = fieldsize;
 		} else {
@@ -6293,11 +6293,11 @@ sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 			k->size = 0;
 		}
 	}
-	p->sizemax = sf_writesize(build->scheme, fields);
+	p->sizemax = sf_writesize(build->key_def, fields);
 	rc = ss_bufensure(&i->v, build->a, p->sizemax);
 	if (unlikely(rc == -1))
 		return sr_oom();
-	sf_write(build->scheme, fields, i->v.p);
+	sf_write(build->key_def, fields, i->v.p);
 	ss_bufadvance(&i->v, p->sizemax);
 	return 0;
 }
@@ -6329,7 +6329,7 @@ sd_indexadd(struct sdindex *i, struct sdbuild *build, uint64_t offset)
 	{
 		char *min = sd_buildminkey(build);
 		char *max = sd_buildmaxkey(build);
-		if (!build->scheme->opts.compression_key) {
+		if (!build->key_def->opts.compression_key) {
 			rc = sd_indexadd_raw(i, build, p, min, max);
 		} else {
 			rc = sd_indexadd_sparse(i, build, p, min, max);
@@ -6452,7 +6452,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 	if (! sd_mergehas(m))
 		return 0;
 	int rc;
-	rc = sd_buildbegin(m->build, m->merge->merge->a, m->merge->merge->scheme,
+	rc = sd_buildbegin(m->build, m->merge->merge->a, m->merge->merge->key_def,
 			   conf->checksum, conf->compression_key,
 	                   conf->compression, conf->compression_if);
 	if (unlikely(rc == -1))
@@ -6467,7 +6467,7 @@ static int sd_mergepage(struct sdmerge *m, uint64_t offset)
 		if (unlikely(rc == -1))
 			return -1;
 		if (conf->amqf) {
-			ss_qfadd(m->qf, sv_hash(v, m->merge->merge->scheme));
+			ss_qfadd(m->qf, sv_hash(v, m->merge->merge->key_def));
 		}
 		sv_writeiter_next(&m->i);
 	}
@@ -6897,7 +6897,7 @@ struct PACKED sinode {
 	struct rlist     commit;
 };
 
-static struct sinode *si_nodenew(struct key_def *scheme, struct runtime *r);
+static struct sinode *si_nodenew(struct key_def *key_def, struct runtime *r);
 static int
 si_nodeopen(struct sinode*, struct runtime*, struct sspath*);
 static int
@@ -6964,7 +6964,7 @@ si_nodeunrotate(struct sinode *node) {
 	node->flags &= ~SI_ROTATE;
 	node->i0 = node->i1;
 	node->i0.tree.arg = &node->i0;
-	sv_indexinit(&node->i1, node->i0.scheme);
+	sv_indexinit(&node->i1, node->i0.key_def);
 }
 
 static inline struct svindex*
@@ -6986,12 +6986,12 @@ si_nodeindex_priority(struct sinode *node, struct svindex **second)
 }
 
 static inline int
-si_nodecmp(struct sinode *n, void *key, struct key_def *s)
+si_nodecmp(struct sinode *n, void *key, struct key_def *key_def)
 {
 	struct sdindexpage *min = sd_indexmin(&n->self.index);
 	struct sdindexpage *max = sd_indexmax(&n->self.index);
-	int l = sf_compare(s, sd_indexpage_min(&n->self.index, min), key);
-	int r = sf_compare(s, sd_indexpage_max(&n->self.index, max), key);
+	int l = sf_compare(key_def, sd_indexpage_min(&n->self.index, min), key);
+	int r = sf_compare(key_def, sd_indexpage_max(&n->self.index, max), key);
 	/* inside range */
 	if (l <= 0 && r >= 0)
 		return 0;
@@ -7004,13 +7004,13 @@ si_nodecmp(struct sinode *n, void *key, struct key_def *s)
 }
 
 static inline int
-si_nodecmpnode(struct sinode *n1, struct sinode *n2, struct key_def *s)
+si_nodecmpnode(struct sinode *n1, struct sinode *n2, struct key_def *key_def)
 {
 	if (n1 == n2)
 		return 0;
 	struct sdindexpage *min1 = sd_indexmin(&n1->self.index);
 	struct sdindexpage *min2 = sd_indexmin(&n2->self.index);
-	return sf_compare(s,
+	return sf_compare(key_def,
 			  sd_indexpage_min(&n1->self.index, min1),
 			  sd_indexpage_min(&n2->self.index, min2));
 }
@@ -7121,12 +7121,12 @@ static int si_plannerremove(struct siplanner*, int, struct sinode*);
 static int si_planner(struct siplanner*, struct siplan*);
 
 static inline int
-si_amqfhas_branch(struct key_def *scheme, struct sibranch *b, char *key)
+si_amqfhas_branch(struct key_def *key_def, struct sibranch *b, char *key)
 {
 	struct sdindexamqf *qh = sd_indexamqf(&b->index);
 	struct ssqf qf;
 	ss_qfrecover(&qf, qh->q, qh->r, qh->size, qh->table);
-	return ss_qfhas(&qf, sf_hash(scheme, key));
+	return ss_qfhas(&qf, sf_hash(key_def, key));
 }
 
 enum siref {
@@ -8201,7 +8201,7 @@ si_compact(struct si *index, struct sdc *c, struct siplan *plan,
 			.o               = PHIA_GE,
 			.file            = &node->file,
 			.a               = r->a,
-			.scheme		 = index->key_def
+			.key_def		 = index->key_def
 		};
 		int rc = sd_read_open(&s->src, &arg, NULL, 0);
 		if (unlikely(rc == -1))
@@ -8716,7 +8716,7 @@ si_merge(struct si *index, struct sdc *c, struct sinode *node,
 }
 
 static struct sinode *
-si_nodenew(struct key_def *scheme, struct runtime *r)
+si_nodenew(struct key_def *key_def, struct runtime *r)
 {
 	struct sinode *n = (struct sinode*)ss_malloc(r->a, sizeof(struct sinode));
 	if (unlikely(n == NULL)) {
@@ -8737,8 +8737,8 @@ si_nodenew(struct key_def *scheme, struct runtime *r)
 	n->refs = 0;
 	tt_pthread_mutex_init(&n->reflock, NULL);
 	ss_fileinit(&n->file);
-	sv_indexinit(&n->i0, scheme);
-	sv_indexinit(&n->i1, scheme);
+	sv_indexinit(&n->i0, key_def);
+	sv_indexinit(&n->i1, key_def);
 	ss_rqinitnode(&n->nodecompact);
 	ss_rqinitnode(&n->nodebranch);
 	ss_rqinitnode(&n->nodetemp);
@@ -8750,7 +8750,7 @@ si_nodenew(struct key_def *scheme, struct runtime *r)
 static int si_nodegc_index(struct runtime *r, struct svindex *i)
 {
 	sv_indexfree(i, r);
-	sv_indexinit(i, i->scheme);
+	sv_indexinit(i, i->key_def);
 	return 0;
 }
 
@@ -9488,7 +9488,7 @@ si_getresult(struct siread *q, struct sv *v, int compare)
 {
 	int rc;
 	if (compare) {
-		rc = sf_compare(q->merge.scheme, sv_pointer(v), q->key);
+		rc = sf_compare(q->merge.key_def, sv_pointer(v), q->key);
 		if (unlikely(rc != 0))
 			return 0;
 	}
@@ -9529,7 +9529,7 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 	struct siconf *conf= &q->index->conf;
 	int rc;
 	if (conf->amqf) {
-		rc = si_amqfhas_branch(q->merge.scheme, b, q->key);
+		rc = si_amqfhas_branch(q->merge.key_def, b, q->key);
 		if (likely(! rc))
 			return 0;
 	}
@@ -9557,7 +9557,7 @@ si_getbranch(struct siread *q, struct sinode *n, struct sicachebranch *c)
 		.o               = PHIA_GE,
 		.file            = &n->file,
 		.a               = q->merge.a,
-		.scheme          = q->merge.scheme
+		.key_def          = q->merge.key_def
 	};
 	rc = sd_read_open(&c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
@@ -9675,7 +9675,7 @@ si_rangebranch(struct siread *q, struct sinode *n,
 		.o               = q->order,
 		.file            = &n->file,
 		.a               = q->merge.a,
-		.scheme          = q->merge.scheme
+		.key_def          = q->merge.key_def
 	};
 	int rc = sd_read_open(&c->i, &arg, q->key, q->keysize);
 	int reads = sd_read_stat(&c->i);
@@ -9771,7 +9771,7 @@ next_node:
 	rc = 1;
 	/* convert upsert search to PHIA_EQ */
 	if (q->upsert_eq) {
-		rc = sf_compare(q->merge.scheme, sv_pointer(v), q->key);
+		rc = sf_compare(q->merge.key_def, sv_pointer(v), q->key);
 		rc = rc == 0;
 	}
 	if (likely(rc == 1)) {
@@ -9861,7 +9861,7 @@ si_readcommited(struct si *index, struct sv *v)
 		c. if parent has seal - remove parent, complete seal
 
 	see: snapshot recover
-	see: scheme recover
+	see: key_def recover
 	see: test/crash/durability.test.c
 */
 
@@ -12162,11 +12162,11 @@ struct phia_tuple *
 phia_tuple_new(struct phia_index *db, struct phia_field *fields,
 	       uint32_t fields_count)
 {
-	struct key_def *scheme = db->index->key_def;
+	struct key_def *key_def = db->index->key_def;
 	struct runtime *r = db->index->r;
-	assert(fields_count == scheme->part_count + 1);
+	assert(fields_count == key_def->part_count + 1);
 	(void) fields_count;
-	int size = sf_writesize(scheme, fields);
+	int size = sf_writesize(key_def, fields);
 	struct phia_tuple *v = ss_malloc(r->a, sizeof(struct phia_tuple) + size);
 	if (unlikely(v == NULL))
 		return NULL;
@@ -12175,7 +12175,7 @@ phia_tuple_new(struct phia_index *db, struct phia_field *fields,
 	v->flags     = 0;
 	v->refs      = 1;
 	char *ptr = v->data;
-	sf_write(scheme, fields, ptr);
+	sf_write(key_def, fields, ptr);
 	/* update runtime statistics */
 	tt_pthread_mutex_lock(&r->stat->lock);
 	r->stat->v_count++;
@@ -12243,9 +12243,9 @@ char *
 phia_tuple_field(struct phia_index *db, struct phia_tuple *tuple,
 		 uint32_t field_id, uint32_t *size)
 {
-	struct key_def *scheme = db->index->key_def;
-	assert(field_id <= scheme->part_count);
-	return sf_field(scheme, field_id, tuple->data, size);
+	struct key_def *key_def = db->index->key_def;
+	assert(field_id <= key_def->part_count);
+	return sf_field(key_def, field_id, tuple->data, size);
 }
 
 void
