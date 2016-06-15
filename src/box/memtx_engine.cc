@@ -818,6 +818,11 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 					  "ARRAY field type is not supported");
 			}
 			break;
+		case NUMBER:
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name(space),
+				  "NUMBER field type is not supported");
 		default:
 			assert(false);
 			break;
