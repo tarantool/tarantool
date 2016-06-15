@@ -93,6 +93,10 @@ ha|
 |1|
 |23|
 	*** iter_test2: done ***
+	*** iter_test3 ***
+|1|	|2|	|3|
+|4|	|5|	|6|
+	*** iter_test3: done ***
 	*** csv_out ***
 abc<len=3>,"with,comma"<len=12>,""in quotes""<len=13>,1 "" quote<len=10>
 	*** csv_out: done ***

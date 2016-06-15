@@ -36,7 +36,7 @@ local test6_ans = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|" ..
                   "lag[ flag ])|\t\n||\t||\t||\t\n"
 
 test = tap.test("csv")
-test:plan(9)
+test:plan(11)
 
 readable = {}
 readable.read = myread
@@ -56,6 +56,7 @@ tmpdir = fio.tempdir()
 file1 = fio.pathjoin(tmpdir, 'file.1')
 file2 = fio.pathjoin(tmpdir, 'file.2')
 file3 = fio.pathjoin(tmpdir, 'file.3')
+file4 = fio.pathjoin(tmpdir, 'file.4')
 
 local f = fio.open(file1, { 'O_WRONLY', 'O_TRUNC', 'O_CREAT' }, 0777)
 f:write("123 , 5  ,       92    , 0, 0\n" ..
@@ -109,7 +110,22 @@ test:is(table2str(t), table2str(csv.load(csv.dump(t))), "test load(dump(t))")
 
 test:is(table2str(csv.load('a,b,c,')), '|a|\t|b|\t|c|\t||\t\n', "final comma")
 
+local str = "ячсмитьб-Pincall;79031111111\r\n"
+str = str .. str .. str .. str .. str .. str
+str = "Vendor;Prefix\r\n" .. str
+f = fio.open(file4, { "O_WRONLY", "O_TRUNC" , "O_CREAT"}, 0x1FF)
+f:write(str)
+f:close()
+
+test:is(#csv.load(fio.open(file4, {'O_RDONLY'}),
+                  {separator = ';', chunk_size = 3}), 7, "gh-1210 (1)")
+test:is(#csv.load(fio.open(file4, {'O_RDONLY'}),
+                  {separator = ';', chunk_size = 4}), 7, "gh-1210 (2)")
+
 fio.unlink(file1)
 fio.unlink(file2)
 fio.unlink(file3)
+fio.unlink(file4)
 fio.rmdir(tmpdir)
+
+test:check()

@@ -310,6 +310,37 @@ void iter_test2() {
 	footer();
 }
 
+void iter_test3() {
+	header();
+	struct csv_iterator it;
+	struct csv csv;
+	csv_create(&csv);
+	csv_iterator_create(&it, &csv);
+	int st = 0;
+	const char *ar[] = {"1,2,3\r\n", "4,5,6", ""};
+	int i = 0;
+	const char *buf = ar[i++];
+	while((st = csv_next(&it)) != CSV_IT_EOF) {
+		switch(st) {
+		case CSV_IT_NEEDMORE:
+			csv_feed(&it, buf, strlen(buf));
+			buf = ar[i++];
+			break;
+		case CSV_IT_EOL:
+			print_endl(0);
+			break;
+		case CSV_IT_OK:
+			print_field(0, it.field, it.field + it.field_len);
+			break;
+		case CSV_IT_ERROR:
+			printf("\nerror");
+			break;
+		}
+	}
+	csv_destroy(&csv);
+	footer();
+}
+
 void csv_out() {
 	header();
 
@@ -392,6 +423,7 @@ int main() {
 	//iterator tests
 	iter_test1();
 	iter_test2();
+	iter_test3();
 
 	//output test
 	csv_out();

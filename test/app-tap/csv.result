@@ -1,5 +1,5 @@
 TAP version 13
-1..9
+1..11
 ok - obj test1
 ok - obj test2
 ok - obj test3
@@ -9,3 +9,5 @@ ok - fio test3
 ok - test roundtrip
 ok - test load(dump(t))
 ok - final comma
+ok - gh-1210 (1)
+ok - gh-1210 (2)
