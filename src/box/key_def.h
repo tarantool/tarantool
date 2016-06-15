@@ -212,6 +212,13 @@ struct key_def {
 	struct key_part parts[];
 };
 
+struct key_def *
+key_def_dup(struct key_def *def);
+
+/* Destroy and free a key_def. */
+void
+key_def_delete(struct key_def *def);
+
 /**
  * Encapsulates privileges of a user on an object.
  * I.e. "space" object has an instance of this
@@ -338,7 +345,7 @@ typedef int (*box_function_f)(box_function_ctx_t *ctx,
 static inline size_t
 key_def_sizeof(uint32_t part_count)
 {
-	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+	return sizeof(struct key_def) + sizeof(struct key_part) * (part_count + 1);
 }
 
 /** Initialize a pre-allocated key_def. */
@@ -403,10 +410,6 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  */
 int
 key_def_cmp(const struct key_def *key1, const struct key_def *key2);
-
-/* Destroy and free a key_def. */
-void
-key_def_delete(struct key_def *def);
 
 /** Add a key to the list of keys. */
 static inline  void

@@ -166,10 +166,20 @@ key_def_dup(struct key_def *def)
 	size_t sz = key_def_sizeof(def->part_count);
 	struct key_def *dup = (struct key_def *) malloc(sz);
 	if (dup == NULL) {
-		tnt_raise(OutOfMemory, sz, "malloc", "struct key_def");
+		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		return NULL;
 	}
 	memcpy(dup, def, key_def_sizeof(def->part_count));
 	rlist_create(&dup->link);
+	return dup;
+}
+
+struct key_def *
+key_def_dup_xc(struct key_def *def)
+{
+	struct key_def *dup = key_def_dup(def);
+	if (dup == NULL)
+		diag_raise();
 	return dup;
 }
 

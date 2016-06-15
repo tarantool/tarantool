@@ -7848,6 +7848,7 @@ static int si_close(struct si *i)
 	tt_pthread_mutex_destroy(&i->ref_lock);
 	sr_statusfree(&i->status);
 	si_conffree(&i->conf, i->r->a);
+	key_def_delete(i->key_def);
 	ss_free(i->r->a, i);
 	return rc_ret;
 }
@@ -12076,7 +12077,12 @@ phia_index_new(struct phia_env *e, struct key_def *key_def)
 		ss_free(&e->a, db);
 		return NULL;
 	}
-	db->index->key_def = key_def;
+	db->index->key_def = key_def_dup(key_def);
+	if (db->index->key_def == NULL) {
+		si_close(db->index);
+		ss_free(&e->a, db);
+		return NULL;
+	}
 	sr_statusset(&db->index->status, SR_OFFLINE);
 	sx_indexinit(&db->coindex, &e->xm, db, db->index,
 		     db->index->key_def);
