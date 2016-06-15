@@ -1727,24 +1727,24 @@ static struct ssfilterif ss_zstdfilter =
 
 static int  sf_compare(struct key_def*, char *, char *b);
 
-struct PACKED sfvar {
+struct PACKED phia_field_meta {
 	uint32_t offset;
 	uint32_t size;
 };
 
-static inline struct sfvar *
+static inline struct phia_field_meta *
 sf_fieldmeta(struct key_def *key_def, uint32_t part_id, char *data)
 {
 	assert(part_id <= key_def->part_count);
 	(void)key_def;
 	uint32_t offset_slot = part_id;
-	return &((struct sfvar*)(data))[offset_slot];
+	return &((struct phia_field_meta*)(data))[offset_slot];
 }
 
 static inline char*
 sf_field(struct key_def *key_def, uint32_t part_id, char *data, uint32_t *size)
 {
-	struct sfvar *v = sf_fieldmeta(key_def, part_id, data);
+	struct phia_field_meta *v = sf_fieldmeta(key_def, part_id, data);
 	if (likely(size))
 		*size = v->size;
 	return data + v->offset;
@@ -1756,7 +1756,7 @@ sf_writesize(struct key_def *key_def, struct phia_field *v)
 	int sum = 0;
 	/* for each key_part + value */
 	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
-		sum += sizeof(struct sfvar)+ v[part_id].size;
+		sum += sizeof(struct phia_field_meta)+ v[part_id].size;
 	}
 	return sum;
 }
@@ -1764,11 +1764,11 @@ sf_writesize(struct key_def *key_def, struct phia_field *v)
 static inline void
 sf_write(struct key_def *key_def, struct phia_field *fields, char *dest)
 {
-	int var_value_offset = sizeof(struct sfvar) * (key_def->part_count + 1);
+	int var_value_offset = sizeof(struct phia_field_meta) * (key_def->part_count + 1);
 	/* for each key_part + value */
 	for (uint32_t part_id = 0; part_id <= key_def->part_count; part_id++) {
 		struct phia_field *field = &fields[part_id];
-		struct sfvar *current = sf_fieldmeta(key_def, part_id, dest);
+		struct phia_field_meta *current = sf_fieldmeta(key_def, part_id, dest);
 		current->offset = var_value_offset;
 		current->size   = field->size;
 		memcpy(dest + var_value_offset, field->data, field->size);
@@ -1796,27 +1796,29 @@ sf_comparable_size(struct key_def *key_def, char *data)
 		uint32_t field_size;
 		(void) sf_field(key_def, part_id, data, &field_size);
 		sum += field_size;
-		sum += sizeof(struct sfvar);
+		sum += sizeof(struct phia_field_meta);
 	}
 	/* fields: [key_part, key_part, ..., value] */
-	sum += sizeof(struct sfvar);
+	sum += sizeof(struct phia_field_meta);
 	return sum;
 }
 
 static inline void
 sf_comparable_write(struct key_def *key_def, char *src, char *dest)
 {
-	int var_value_offset = sizeof(struct sfvar) * (key_def->part_count + 1);
+	int var_value_offset = sizeof(struct phia_field_meta) *
+		(key_def->part_count + 1);
 	/* for each key_part + value */
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
-		struct sfvar *current = sf_fieldmeta(key_def, part_id, dest);
+		struct phia_field_meta *current = sf_fieldmeta(key_def, part_id, dest);
 		current->offset = var_value_offset;
 		char *ptr = sf_field(key_def, part_id, src, &current->size);
 		memcpy(dest + var_value_offset, ptr, current->size);
 		var_value_offset += current->size;
 	}
 	/* fields: [key_part, key_part, ..., value] */
-	struct sfvar *current = sf_fieldmeta(key_def, key_def->part_count, dest);
+	struct phia_field_meta *current =
+		sf_fieldmeta(key_def, key_def->part_count, dest);
 	current->offset = var_value_offset;
 	current->size = 0;
 }
