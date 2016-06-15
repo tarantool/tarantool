@@ -53,4 +53,25 @@ _ = space:insert({15})
 primary:len()
 space:drop()
 
+-- Key part max
+parts = {}
+for i=1,box.schema.INDEX_PART_MAX,1 do parts[2 * i - 1] = i; parts[2 * i] = 'NUM' end
+space = box.schema.space.create('test', { engine = engine })
+_ = space:create_index('primary', { type = 'tree', parts = parts })
 
+tuple = {}
+for i=1,box.schema.INDEX_PART_MAX,1 do tuple[i] = i; end
+_ = space:replace(tuple)
+space:upsert(tuple, {{'=', box.schema.INDEX_PART_MAX + 1, 100500}})
+space:get(tuple)
+space:select(tuple)
+_ = space:delete(tuple)
+
+space:drop()
+
+-- Too many key parts
+parts = {}
+for i=1,box.schema.INDEX_PART_MAX + 1,1 do parts[2 * i - 1] = i; parts[2 * i] = 'NUM' end
+space = box.schema.space.create('test', { engine = engine })
+_ = space:create_index('primary', { type = 'tree', parts = parts })
+space:drop()

@@ -2651,18 +2651,19 @@ static inline int
 sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *key_def,
 	    struct svupsertnode *n1, struct svupsertnode *n2)
 {
-	assert(key_def->part_count < 16);
+	assert(key_def->part_count <= BOX_INDEX_PART_MAX);
 	assert(n2->flags & SVUPSERT);
 
-	uint32_t  src_size[16];
-	char     *src[16];
+	uint32_t  src_size[BOX_INDEX_PART_MAX + 1];
+	char     *src[BOX_INDEX_PART_MAX + 1];
 	void     *src_ptr;
 	uint32_t *src_size_ptr;
 
-	uint32_t  upsert_size[16];
-	char     *upsert[16];
-	uint32_t  result_size[16];
-	char     *result[16];
+	uint32_t  upsert_size[BOX_INDEX_PART_MAX + 1];
+	char     *upsert[BOX_INDEX_PART_MAX + 1];
+
+	char     *result[BOX_INDEX_PART_MAX + 1];
+	uint32_t  result_size[BOX_INDEX_PART_MAX + 1];
 
 	if (n1 && !(n1->flags & SVDELETE))
 	{
@@ -2696,7 +2697,7 @@ sv_upsertdo(struct svupsert *u, struct ssa *a, struct key_def *key_def,
 		return -1;
 
 	/* validate and create new record */
-	struct phia_field v[16];
+	struct phia_field v[BOX_INDEX_PART_MAX + 1];
 	/* for each key part + value */
 	for (uint32_t i = 0; i <= key_def->part_count; i++) {
 		v[i].data = result[i];
@@ -4878,7 +4879,7 @@ sd_pagesparse_convert(struct sdpage *p, struct key_def *key_def,
 	char *ptr = dest;
 	memcpy(ptr, v, sizeof(struct sdv));
 	ptr += sizeof(struct sdv);
-	struct phia_field fields[8];
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1];
 	/* for each key parts + value */
 	for (uint32_t i = 0; i <= key_def->part_count; i++) {
 		struct phia_field *k = &fields[i];
@@ -6247,7 +6248,7 @@ static inline int
 sd_indexadd_sparse(struct sdindex *i, struct sdbuild *build,
 		   struct sdindexpage *p, char *min, char *max)
 {
-	struct phia_field fields[16];
+	struct phia_field fields[BOX_INDEX_PART_MAX + 1];
 
 	/* min - for each key part + value */
 	for (uint32_t part = 0; part <= build->key_def->part_count; part++) {

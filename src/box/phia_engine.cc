@@ -526,13 +526,6 @@ PhiaEngine::keydefCheck(struct space *space, struct key_def *key_def)
 			  space_name(space),
 			  "Phia secondary indexes are not supported");
 	}
-	const uint32_t keypart_limit = 8;
-	if (key_def->part_count > keypart_limit) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  key_def->name,
-				  space_name(space),
-				  "Phia index key has too many parts (8 max)");
-	}
 	unsigned i = 0;
 	while (i < key_def->part_count) {
 		struct key_part *part = &key_def->parts[i];
