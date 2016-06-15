@@ -27,7 +27,7 @@ necessary to prioritize requests or to use different authentication ids.
 
 .. module:: net_box
 
-.. function:: new(host, port[, {other parameter[s]}])
+.. function:: new(URI [, {option[s]}])
 
     Create a new connection. The connection is established on demand, at the
     time of the first request. It is re-established automatically after a
@@ -36,7 +36,7 @@ necessary to prioritize requests or to use different authentication ids.
 
     For the local tarantool server there is a pre-created always-established
     connection object named :samp:`{net_box}.self`. Its purpose is to make polymorphic
-    use of the ``net_box`` API easier. Therefore :samp:`conn = {net_box}.new('localhost', 3301)`
+    use of the ``net_box`` API easier. Therefore :samp:`conn = {net_box}.new('localhost:3301')`
     can be replaced by :samp:`conn = {net_box}.self`. However, there is an important
     difference between the embedded connection and a remote one. With the
     embedded connection, requests which do not modify data do not yield.
@@ -44,11 +44,8 @@ necessary to prioritize requests or to use different authentication ids.
     any request can yield, and database
     state may have changed by the time it regains control.
 
-    :param string host:
-    :param number port:
-    :param boolean wait_connect:
-    :param string user:
-    :param string password:
+    :param string URI: the :ref:`URI` of the target for the connection
+    :param options: a possible option is `wait_connect`
     :return: conn object
     :rtype:  userdata
 
@@ -56,12 +53,8 @@ necessary to prioritize requests or to use different authentication ids.
 
     .. code-block:: lua
 
-        conn = net_box.new('localhost', 3301)
-        conn = net_box.new('127.0.0.1', box.cfg.listen, {
-          wait_connect = false,
-          user = 'boxer',
-          password = ''
-        })
+        conn = net_box.new('localhost:3301')
+        conn = net_box.new('127.0.0.1:3306', {wait_connect = false})
 
 .. class:: conn
 
@@ -206,7 +199,7 @@ the database is nearly empty. Assume that the tarantool server is running on
              >     table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')
              >     table.insert(ta, '(  (so connect will fail)')
              >   end
-             >   conn = net_box.new('127.0.0.1', 3301)
+             >   conn = net_box.new('127.0.0.1:3301')
              >   conn.space.tester:delete{800}
              >   table.insert(ta, 'conn delete done on tester.')
              >   conn.space.tester:insert{800, 'data'}
