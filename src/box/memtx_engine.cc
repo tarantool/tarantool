@@ -887,7 +887,14 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "RTREE index can not be unique");
 		}
-		break;
+		if (key_def->parts[0].type != ARRAY) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name(space),
+				  "RTREE index field type must be ARRAY");
+		}
+		/* no furter checks of parts needed */
+		return;
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
@@ -901,38 +908,29 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 				  space_name(space),
 				  "BITSET can not be unique");
 		}
-		break;
+		if (key_def->parts[0].type != NUM &&
+		    key_def->parts[0].type != STRING) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name(space),
+				  "BITSET index field type must be NUM or STR");
+		}
+		/* no furter checks of parts needed */
+		return;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
 			  key_def->name,
 			  space_name(space));
 		break;
 	}
+	/* Only HASH and TREE indexes checks parts there */
+	/* Just check that there are no ARRAY parts */
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		switch (key_def->parts[i].type) {
-		case NUM:
-		case STRING:
-		case INT:
-		case NUMBER:
-		case SCALAR:
-			if (key_def->type == RTREE) {
-				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  key_def->name,
-					  space_name(space),
-					  "RTREE index field type must be ARRAY");
-			}
-			break;
-		case ARRAY:
-			if (key_def->type != RTREE) {
-				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  key_def->name,
-					  space_name(space),
-					  "ARRAY field type is not supported");
-			}
-			break;
-		default:
-			unreachable();
-			break;
+		if (key_def->parts[i].type == ARRAY) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  key_def->name,
+				  space_name(space),
+				  "ARRAY field type is not supported");
 		}
 	}
 }
