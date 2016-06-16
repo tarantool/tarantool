@@ -912,6 +912,9 @@ MemtxEngine::keydefCheck(struct space *space, struct key_def *key_def)
 		switch (key_def->parts[i].type) {
 		case NUM:
 		case STRING:
+		case INT:
+		case NUMBER:
+		case SCALAR:
 			if (key_def->type == RTREE) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  key_def->name,

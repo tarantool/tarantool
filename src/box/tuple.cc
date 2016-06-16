@@ -413,6 +413,127 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 inline __attribute__((always_inline)) int
 mp_compare_uint(const char **data_a, const char **data_b);
 
+enum mp_class {
+	MP_CLASS_NIL = 0,
+	MP_CLASS_BOOL,
+	MP_CLASS_NUMBER,
+	MP_CLASS_STR,
+	MP_CLASS_BIN,
+	MP_CLASS_ARRAY,
+	MP_CLASS_MAP };
+
+#define COMPARE_RESULT(a, b) (a < b ? -1 : a > b)
+
+static int mp_classes[] = { MP_CLASS_NIL, MP_CLASS_NUMBER, MP_CLASS_NUMBER,
+	MP_CLASS_STR, MP_CLASS_BIN, MP_CLASS_ARRAY, MP_CLASS_MAP,
+	MP_CLASS_BOOL, MP_CLASS_NUMBER, MP_CLASS_NUMBER, MP_CLASS_BIN };
+
+typedef int (*compare_mp_vals)(const char *, const char *);
+
+bool
+mptype_is_number(mp_type tp) {
+	return mp_classes[tp] == MP_CLASS_NUMBER;
+}
+
+bool
+mp_type_is_real(mp_type tp) {
+	return (tp == MP_FLOAT) || (tp == MP_DOUBLE);
+}
+
+int
+mp_compare_nil(const char *field_a, const char *field_b)
+{
+	(void)field_a;
+	(void)field_b;
+	return 0;
+}
+
+int
+mp_compare_bool(const char *field_a, const char *field_b)
+{
+	int a_val = mp_decode_bool(&field_a);
+	int b_val = mp_decode_bool(&field_b);
+	return COMPARE_RESULT(a_val, b_val);
+}
+
+int
+mp_compare_integer(const char *field_a, const char *field_b) {
+	mp_type a_type = mp_typeof(*field_a);
+	mp_type b_type = mp_typeof(*field_b);
+	assert(!mp_type_is_real(a_type));
+	assert(!mp_type_is_real(b_type));
+	if (a_type == MP_UINT) {
+		uint64_t a_val = mp_decode_uint(&field_a);
+		if (b_type == MP_UINT) {
+			uint64_t b_val = mp_decode_uint(&field_b);
+			return COMPARE_RESULT(a_val, b_val);
+		} else {
+			int64_t b_val = mp_decode_int(&field_b);
+			if (b_val < 0)
+				return 1;
+			return COMPARE_RESULT(a_val, (uint64_t)b_val);
+		}
+	} else {
+		int64_t a_val = mp_decode_int(&field_a);
+		if (b_type == MP_UINT) {
+			uint64_t b_val = mp_decode_uint(&field_b);
+			if (a_val < 0)
+				return -1;
+			return COMPARE_RESULT((uint64_t)a_val, b_val);
+		} else {
+			int64_t b_val = mp_decode_int(&field_b);
+			return COMPARE_RESULT(a_val, b_val);
+		}
+	}
+}
+
+int
+mp_compare_number(const char *field_a, const char *field_b) {
+	mp_type a_type = mp_typeof(*field_a);
+	mp_type b_type = mp_typeof(*field_b);
+	assert(mptype_is_number(a_type));
+	assert(mptype_is_number(b_type));
+	if (mp_type_is_real(a_type) || mp_type_is_real(b_type)) {
+		double a_val = mp_decode_num(&field_a, 1);
+		double b_val = mp_decode_num(&field_b, 1);
+		return COMPARE_RESULT(a_val, b_val);
+	}
+	return mp_compare_integer(field_a, field_b);
+}
+
+int
+mp_compare_bin(const char *left, const char *right)
+{
+	uint32_t left_len = 0, right_len = 0;
+	mp_type left_type = mp_typeof(*left);
+	mp_type right_type = mp_typeof(*left);
+	assert(left_type == right_type);
+	const char *left_data, *right_data;
+	if (left_type == MP_STR) {
+		left_data = mp_decode_str(&left, &left_len);
+		right_data = mp_decode_str(&right, &right_len);
+	} else if (left_type == MP_BIN) {
+		left_data = mp_decode_bin(&left, &left_len);
+		right_data = mp_decode_bin(&right, &right_len);
+	} else {
+		assert(false);
+	}
+	int res = memcmp(left_data, right_data, MIN(left_len, right_len));
+	if (!res)
+		res = COMPARE_RESULT(left_len, right_len);
+	return res;
+}
+
+int
+mp_compare_str(const char *left, const char *right)
+{
+	return mp_compare_bin(left, right);
+}
+
+static compare_mp_vals mp_class_comparators[] = { mp_compare_nil,
+	mp_compare_bool, mp_compare_number, mp_compare_str, mp_compare_bin,
+	0, 0};
+
 int
 tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type)
@@ -421,15 +542,22 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	case NUM:
 		return mp_compare_uint(field_a, field_b);
 	case STRING:
+		return mp_compare_str(field_a, field_b);
+	case INT:
+		return mp_compare_integer(field_a, field_b);
+	case NUMBER:
+		return mp_compare_number(field_a, field_b);
+	case SCALAR:
 	{
-		uint32_t size_a = mp_decode_strl(&field_a);
-		uint32_t size_b = mp_decode_strl(&field_b);
-		const char *a = field_a;
-		const char *b = field_b;
-		int r = memcmp(a, b, MIN(size_a, size_b));
-		if (r == 0)
-			r = size_a < size_b ? -1 : size_a > size_b;
-		return r;
+		mp_type a_type = mp_typeof(*field_a);
+		mp_type b_type = mp_typeof(*field_b);
+		int a_class = mp_classes[a_type];
+		int b_class = mp_classes[b_type];
+		if (a_class != b_class) {
+			return COMPARE_RESULT(a_class, b_class);
+		}
+		assert(mp_class_comparators[a_class]);
+		return mp_class_comparators[a_class](field_a, field_b);
 	}
 	default:
 	{

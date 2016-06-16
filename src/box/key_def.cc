@@ -39,7 +39,7 @@
 #include "space.h"
 #include "schema.h"
 
-const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
+const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", "INT", "SCALAR", ""};
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
@@ -67,6 +67,9 @@ const uint32_t key_mp_type[] = {
 	/* [STR]     =  */  1U << MP_STR,
 	/* [ARRAY]   =  */  1U << MP_ARRAY,
 	/* [NUMBER]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE),
+	/* [INT]     =  */  (1U << MP_UINT) | (1U << MP_INT),
+	/* [SCALAR]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE) |
+		(1U << MP_NIL) | (1U << MP_STR) | (1U << MP_BIN) | (1U << MP_BOOL),
 };
 
 const struct key_opts key_opts_default = {
