@@ -544,10 +544,10 @@ mp_compare_str(const char *field_a, const char *field_b)
 }
 
 static inline int
-mp_compare_strbin(const char *field_a, const char *field_b)
+mp_compare_bin(const char *field_a, const char *field_b)
 {
-	uint32_t size_a = mp_decode_strbinl(&field_a);
-	uint32_t size_b = mp_decode_strbinl(&field_b);
+	uint32_t size_a = mp_decode_binl(&field_a);
+	uint32_t size_b = mp_decode_binl(&field_b);
 	int r = memcmp(field_a, field_b, MIN(size_a, size_b));
 	if (r != 0)
 		return r;
@@ -559,8 +559,8 @@ static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_NIL    = */ mp_compare_nil,
 	/* .MP_CLASS_BOOL   = */ mp_compare_bool,
 	/* .MP_CLASS_NUMBER = */ mp_compare_number,
-	/* .MP_CLASS_STR    = */ mp_compare_strbin,
-	/* .MP_CLASS_BIN    = */ mp_compare_strbin,
+	/* .MP_CLASS_STR    = */ mp_compare_str,
+	/* .MP_CLASS_BIN    = */ mp_compare_bin,
 	/* .MP_CLASS_ARRAY  = */ NULL,
 	/* .MP_CLASS_MAP    = */ NULL,
 };
